@@ -23,11 +23,14 @@
 //!   `cargo xtask help write` regenerates the files derived from them.
 //! - `cargo xtask budgets` checks the binary's size, cold start, idle
 //!   memory and shutdown against the brief's targets.
+//! - `cargo xtask adr next` prints the next free decision record and D
+//!   numbers, and `cargo xtask adr new <slug>` starts a record with them.
 //! - `cargo xtask perf-gate` fails the nightly run when a k6 p95 regresses
 //!   by 10 % or more against `deploy/perf/baseline.json`.
 
 use std::process::{Command, ExitCode};
 
+mod adr;
 mod boundaries;
 mod budgets;
 mod fast;
@@ -37,7 +40,7 @@ mod pr_check;
 mod relock;
 mod schema;
 
-const USAGE: &str = "usage: cargo xtask <fast | pr-check | install-hooks | relock | boundaries | \
+const USAGE: &str = "usage: cargo xtask <fast | pr-check | install-hooks | relock | boundaries | adr | \
                      help [check|write] | budgets | perf-gate | \
                      schema [--check]>";
 
@@ -53,6 +56,7 @@ fn main() -> ExitCode {
         Some("install-hooks") => install_hooks(),
         Some("relock") => relock::run(),
         Some("boundaries") => boundaries::run(),
+        Some("adr") => adr::run(rest),
         Some("help") => help::run(mode),
         Some("budgets") => budgets::run(rest),
         Some("perf-gate") => perf_gate::run(rest),
