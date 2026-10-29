@@ -22,6 +22,16 @@ workspace = true
 conformance = []
 # Git work tree with commit per save batch and merge-based sync.
 git = ["tokio/process", "tokio/fs", "tokio/io-util"]
+# Remote adapters, one feature each. `remote` is their shared HTTP layer.
+remote = ["dep:reqwest", "dep:serde", "dep:serde_json"]
+# Dropbox, on the Dropbox API v2.
+dropbox = ["remote"]
+# OneDrive and SharePoint document libraries via Microsoft Graph.
+onedrive = ["remote"]
+# Amazon S3 and S3-compatible object stores (MinIO, R2, LocalStack).
+s3 = ["remote", "dep:hmac", "dep:httpdate"]
+# Google Drive (API v3).
+gdrive = ["remote"]
 
 [dependencies]
 async-trait = "0.1.92"
@@ -30,8 +40,13 @@ diff-match-patch-rs = "0.5.1"
 diffy = "0.5.2"
 futures = "0.3.34"
 hex = "0.4.3"
+hmac = { version = "0.13.0", optional = true }
+httpdate = { version = "1.0.3", optional = true }
 notify = "8.2.0"
 opentelemetry = "0.33.1"
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "json", "form", "query"], optional = true }
+serde = { version = "1.0.229", features = ["derive"], optional = true }
+serde_json = { version = "1.0.154", optional = true }
 sha2 = "0.11.1"
 thiserror = "2.0.21"
 tokio = { version = "1.49.0", features = ["rt", "sync", "time"] }
@@ -39,7 +54,8 @@ tracing = "0.1.44"
 vellum-kernel.workspace = true
 
 [dev-dependencies]
+axum = { version = "0.8.9", default-features = false, features = ["http1", "tokio", "json", "query"] }
 proptest = ">=1.11.0, <1.12"
 tempfile = "3.27.0"
 tokio = { version = "1.49.0", features = ["macros", "rt-multi-thread"] }
-vellum-store = { path = ".", features = ["conformance", "git"] }
+vellum-store = { path = ".", features = ["conformance", "git", "dropbox", "onedrive", "s3", "gdrive"] }

@@ -6,16 +6,15 @@
 //!
 //! A form maps each field to part of the issue: the title, the
 //! description, a label, the priority, or a line in a `facts` block at the
-//! top of the description. Values are plain text; they are escaped before
-//! they enter the Markdown so a submission cannot inject containers or
-//! links (no raw HTML exists in the dialect to begin with).
+//! top of the description. Values are plain text and become text nodes
+//! through [`Body`], so a submission cannot inject
+//! containers, links or images.
 
 use std::collections::BTreeMap;
 
-use std::fmt::Write as _;
-
 use serde::{Deserialize, Serialize};
 
+use super::text::{Body, Fact};
 use crate::model::{IssueDraft, Priority, Source};
 
 /// What a field collects.
@@ -99,28 +98,6 @@ pub struct FieldError {
 /// The longest value accepted for any field, in characters.
 pub const MAX_VALUE: usize = 16_384;
 
-/// Escapes Markdown punctuation and container fences in plain text.
-fn escape(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    for line in text.lines() {
-        let line = line.trim_end();
-        if line.trim_start().starts_with(":::") || line.trim_start().starts_with("```") {
-            out.push('\\');
-        }
-        for c in line.chars() {
-            if matches!(
-                c,
-                '\\' | '[' | ']' | '<' | '>' | '`' | '*' | '_' | '|' | '#' | '!' | '=' | '^' | '@'
-            ) {
-                out.push('\\');
-            }
-            out.push(c);
-        }
-        out.push('\n');
-    }
-    out.trim_end().to_owned()
-}
-
 fn check(field: &Field, value: &str) -> Result<(), String> {
     if value.chars().count() > MAX_VALUE {
         return Err("is too long".to_owned());
@@ -194,7 +171,7 @@ impl Form {
             }
             match field.target {
                 Target::Title => value.clone_into(&mut draft.title),
-                Target::Description => body.push(escape(value)),
+                Target::Description => body.push(value),
                 Target::Label => {
                     let _ = draft.labels.insert(value.to_owned());
                 }
@@ -205,11 +182,7 @@ impl Form {
                         message: "is not a priority".to_owned(),
                     }),
                 },
-                Target::Fact => facts.push(format!(
-                    "- {}: {}",
-                    escape(&field.label),
-                    escape(value).replace('\n', " ")
-                )),
+                Target::Fact => facts.push(Fact::new(field.label.clone(), value)),
             }
         }
         if draft.title.is_empty() && errors.is_empty() {
@@ -224,12 +197,12 @@ impl Form {
         if let Some(prefix) = &self.title_prefix {
             draft.title = format!("{prefix} {}", draft.title);
         }
-        let mut description = String::new();
-        if !facts.is_empty() {
-            let _ = write!(description, "::: facts\n\n{}\n\n:::\n\n", facts.join("\n"));
+        let mut description = Body::new();
+        let _ = description.facts(&facts);
+        for text in body {
+            let _ = description.text(text).text("");
         }
-        description.push_str(&body.join("\n\n"));
-        description.trim_end().clone_into(&mut draft.description);
+        draft.description = description.finish();
         Ok(draft)
     }
 }
@@ -315,7 +288,7 @@ mod tests {
                 .starts_with("::: facts\n\n- contact: zoe\\@northstar.dev\n")
         );
         assert!(draft.description.contains("Click \\*\\*Export\\*\\*"));
-        assert!(draft.description.contains("\\::: crit"));
+        assert!(draft.description.contains("\\::: crit\\\n"));
         assert!(draft.description.contains("\\[x\\](javascript:alert(1))"));
         Ok(())
     }

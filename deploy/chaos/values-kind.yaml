@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Chart values for the weekly chaos run on kind: the locally built image,
+# the in-cluster MinIO, small requests, and one Patroni shard.
+image:
+  repository: vellum
+  tag: ci
+  pullPolicy: Never
+publicUrl: http://vellum.default.svc
+autoscaling:
+  enabled: false
+replicaCount: 2
+resources:
+  requests: { cpu: 100m, memory: 128Mi, ephemeral-storage: 64Mi }
+  limits: { cpu: "1", memory: 512Mi, ephemeral-storage: 512Mi }
+blob:
+  url: s3://vellum
+  endpoint: http://minio:9000
+  credentialsSecret: minio-credentials
+postgres:
+  operator:
+    volumeSize: 2Gi
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits: { cpu: "1", memory: 1Gi }
+kroki:
+  resources:
+    requests: { cpu: 50m, memory: 256Mi, ephemeral-storage: 64Mi }
+    limits: { cpu: "1", memory: 1Gi, ephemeral-storage: 512Mi }
+  companionResources:
+    requests: { cpu: 50m, memory: 128Mi, ephemeral-storage: 64Mi }
+    limits: { cpu: "1", memory: 768Mi, ephemeral-storage: 512Mi }

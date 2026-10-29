@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Ingress, external Postgres and three shards.
+ingress:
+  enabled: true
+postgres:
+  mode: external
+shards:
+  - name: s0
+  - name: s1
+  - name: s2

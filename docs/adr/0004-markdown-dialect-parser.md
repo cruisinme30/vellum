@@ -89,6 +89,9 @@ flowchart LR
   between reading and writing.
 - An issue key is a candidate. Render resolves it against teams and
   falls back to plain text.
+- A backslash keeps one literal: `\@everyone`, `ENG\-1`, `2026\-11-24` and
+  `\^blk-…` stay text. The serializer adds these escapes to any text that
+  would otherwise be read as an extra.
 
 Every block the editor gives an ID to keeps it through a save (#285).
 The ID goes where the block's own syntax leaves room for it:

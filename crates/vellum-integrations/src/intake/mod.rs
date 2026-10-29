@@ -15,11 +15,16 @@
 //! | Sentry issue alerts | `Sentry-Hook-Signature` (HMAC) | [`sentry`] |
 //! | Email to `ENG@intake…` / replies to notifications | the mail server's SPF/DKIM verdict, plus a signed reply token | [`email`] |
 //! | Intake forms | the form's own access setting | [`form`] |
+//!
+//! Text from all of them reaches the description through [`text::Body`],
+//! which keeps it as plain text so a sender cannot add links, images,
+//! mentions or containers.
 
 pub mod email;
 pub mod form;
 pub mod sentry;
 pub mod slack;
+pub mod text;
 
 /// Where intake lands when the sender does not name a team.
 #[derive(Debug, Clone, PartialEq, Eq)]

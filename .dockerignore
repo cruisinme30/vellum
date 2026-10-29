@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# The image build context: sources only, never local build output, secrets
+# or editor state. Keeping it small keeps builds fast and reproducible.
+
+.git
+**/target
+**/node_modules
+web/dist
+web/coverage
+web/playwright-report
+web/test-results
+dist
+lcov.info
+.env
+.env.*
+**/.DS_Store
+**/*.swp

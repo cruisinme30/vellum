@@ -10,9 +10,11 @@ use vellum_authz::{
     Actor as AuthzActor, Authz, Change, Id, MemoryStore, Object, Relation, Subject, Tuple,
     TupleRelation,
 };
+use vellum_db::{Index, IndexConfig};
 use vellum_drive::authz::AuthzAccess;
 use vellum_drive::memory::MemoryIndex;
-use vellum_drive::{Drive, DriveError, SpaceKind};
+use vellum_drive::sql::SqlIndex;
+use vellum_drive::{Drive, DriveError, DriveIndex, SpaceKind};
 use vellum_kernel::{Actor, ObjectId, SpaceId, UserId};
 use vellum_store::LocalStore;
 
@@ -37,9 +39,19 @@ const fn space_id(id: SpaceId) -> Id {
 
 #[tokio::test]
 async fn the_drive_runs_on_rebac() -> TestResult {
+    the_drive_runs_on_rebac_with(Arc::new(MemoryIndex::new())).await
+}
+
+#[tokio::test]
+async fn the_drive_runs_on_rebac_with_the_sqlite_index() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let db = Index::open(&IndexConfig::sqlite(dir.path().join("index.sqlite"), None)).await?;
+    the_drive_runs_on_rebac_with(Arc::new(SqlIndex::new(db))).await
+}
+
+async fn the_drive_runs_on_rebac_with(index: Arc<dyn DriveIndex>) -> TestResult {
     let dir = tempfile::tempdir()?;
     let store = Arc::new(LocalStore::open(dir.path()).await?);
-    let index = Arc::new(MemoryIndex::new());
     let authz = Arc::new(Authz::new(MemoryStore::new()));
     let access = Arc::new(AuthzAccess::new(authz.clone(), index.clone()));
     let drive = Drive::new(store, index, access);
@@ -110,5 +122,72 @@ async fn the_drive_runs_on_rebac() -> TestResult {
     let _ = drive.trash(&alice, a.id).await?;
     assert!(drive.restore(&alice, a.id).await.is_ok());
     assert!(drive.read(&bob, moved.id).await.is_ok());
+    Ok(())
+}
+
+/// Copying a folder never hands over what a restriction hides inside it
+/// (issue #322): a viewer of the folder could copy it into a drive they
+/// own and read every restricted page.
+#[tokio::test]
+async fn copies_leave_restricted_parts_behind() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let store = Arc::new(LocalStore::open(dir.path()).await?);
+    let index = Arc::new(MemoryIndex::new());
+    let authz = Arc::new(Authz::new(MemoryStore::new()));
+    let access = Arc::new(AuthzAccess::new(authz.clone(), index.clone()));
+    let drive = Drive::new(store, index, access);
+    let (alice_id, bob_id) = (UserId::generate(), UserId::generate());
+    let (alice, bob) = (Actor::User { user: alice_id }, Actor::User { user: bob_id });
+
+    let eng = drive
+        .create_space(&alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .await?;
+    let team = drive.create_folder(&alice, eng.id, None, "Team").await?;
+    let hr = drive
+        .create_folder(&alice, eng.id, Some(team.id), "HR only")
+        .await?;
+    let salaries = drive
+        .create_page(&alice, eng.id, Some(hr.id), "Salaries", "Alice 200k")
+        .await?;
+    let notes = drive
+        .create_page(&alice, eng.id, Some(team.id), "Notes", "public")
+        .await?;
+    let review = drive
+        .create_page(&alice, eng.id, Some(team.id), "Review", "private")
+        .await?;
+    let _ = authz
+        .write(
+            space_id(eng.id),
+            AuthzActor::User(Id(alice_id.as_u128())),
+            &[
+                grant(node(team.id), Relation::Viewer, bob_id),
+                Change::Restrict(Id(hr.id.as_u128())),
+                Change::Restrict(Id(review.id.as_u128())),
+            ],
+        )
+        .await?;
+    assert!(drive.read(&bob, notes.id).await.is_ok());
+    for hidden in [salaries.id, review.id] {
+        assert!(matches!(
+            drive.read(&bob, hidden).await,
+            Err(DriveError::PermissionDenied)
+        ));
+    }
+
+    let mine = drive
+        .create_space(&bob, SpaceKind::SharedDrive, "bob", "Bob", None)
+        .await?;
+    let copy = drive.copy_node(&bob, team.id, mine.id, None).await?;
+    let titles: Vec<String> = drive
+        .list(&bob, mine.id, Some(copy.id))
+        .await?
+        .into_iter()
+        .map(|n| n.title)
+        .collect();
+    assert_eq!(titles, ["Notes"], "only what Bob can view is copied");
+
+    // The owner still copies everything.
+    let all = drive.copy_node(&alice, team.id, eng.id, None).await?;
+    assert_eq!(drive.list(&alice, eng.id, Some(all.id)).await?.len(), 3);
     Ok(())
 }

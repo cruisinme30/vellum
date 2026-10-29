@@ -43,6 +43,7 @@ mod engine;
 mod graph;
 mod memory;
 mod model;
+mod sql;
 mod store;
 
 pub use engine::{Actor, Authz, Change, Clock, Decision, Error};
@@ -52,4 +53,5 @@ pub use graph::{
 };
 pub use memory::MemoryStore;
 pub use model::{Id, Object, Permission, Principal, Relation, Subject, Tuple, TupleRelation};
+pub use sql::SqlStore;
 pub use store::{AuthzStore, Commit, EffectiveRow, Scope, StoreError, TupleKey};

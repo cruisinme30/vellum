@@ -2,14 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 //! The drive service end to end, on a real folder (the local-folder
-//! adapter) with the in-memory index and access adapters.
+//! adapter), once per index: in memory, SQLite and Postgres (in a
+//! throwaway container). Access is the in-memory role adapter.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
 
 use bytes::Bytes;
+use testcontainers_modules::postgres::Postgres;
+use testcontainers_modules::testcontainers::runners::AsyncRunner as _;
+use testcontainers_modules::testcontainers::{ContainerAsync, ImageExt as _};
+use vellum_db::{Index, IndexConfig};
 use vellum_drive::layout;
 use vellum_drive::memory::{MemoryAccess, MemoryIndex, Role};
+use vellum_drive::sql::SqlIndex;
 use vellum_drive::{
     ActivityKind, Clock, Drive, DriveError, DriveIndex, Node, NodeKind, Saved, SpaceKind,
     SpaceSettings,
@@ -17,7 +23,7 @@ use vellum_drive::{
 use vellum_kernel::{Actor, ObjectId, Timestamp, UserId};
 use vellum_store::{Base, BlobPath, BlobStore, LocalStore, Precondition};
 
-type TestResult = Result<(), Box<dyn std::error::Error>>;
+type TestResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
 
 const DAY_MS: i64 = 86_400_000;
 
@@ -36,10 +42,78 @@ impl Clock for ManualClock {
     }
 }
 
+/// Which index a test runs on.
+#[derive(Debug, Clone, Copy)]
+enum Kind {
+    Memory,
+    Sqlite,
+    Postgres,
+}
+
+/// Where SQL indexes for one test live: a folder for SQLite files, or a
+/// Postgres container with one database per index.
+struct Databases {
+    kind: Kind,
+    dir: tempfile::TempDir,
+    postgres: Option<(ContainerAsync<Postgres>, String)>,
+    opened: AtomicI64,
+}
+
+impl Databases {
+    async fn new(kind: Kind) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        let postgres = if matches!(kind, Kind::Postgres) {
+            let container = Postgres::default().with_tag("17-alpine").start().await?;
+            let port = container.get_host_port_ipv4(5432).await?;
+            Some((
+                container,
+                format!("postgres://postgres:postgres@127.0.0.1:{port}"),
+            ))
+        } else {
+            None
+        };
+        Ok(Self {
+            kind,
+            dir: tempfile::tempdir()?,
+            postgres,
+            opened: AtomicI64::new(0),
+        })
+    }
+
+    /// A new, empty index.
+    async fn index(&self) -> Result<Arc<dyn DriveIndex>, Box<dyn std::error::Error + Send + Sync>> {
+        let n = self.opened.fetch_add(1, Ordering::SeqCst);
+        Ok(match (self.kind, &self.postgres) {
+            (Kind::Memory, _) => Arc::new(MemoryIndex::new()),
+            (Kind::Sqlite, _) => {
+                let path = self.dir.path().join(format!("index-{n}.sqlite"));
+                Arc::new(SqlIndex::new(
+                    Index::open(&IndexConfig::sqlite(path, None)).await?,
+                ))
+            }
+            (Kind::Postgres, Some((_, base))) => {
+                let admin = Index::open(&IndexConfig::postgres(format!("{base}/postgres"))).await?;
+                if let vellum_db::IndexPool::Postgres(pool) = admin.pool() {
+                    let _ = vellum_db::sqlx::query(vellum_db::sqlx::AssertSqlSafe(format!(
+                        "CREATE DATABASE drive_{n}"
+                    )))
+                    .execute(pool)
+                    .await?;
+                }
+                admin.close().await;
+                Arc::new(SqlIndex::new(
+                    Index::open(&IndexConfig::postgres(format!("{base}/drive_{n}"))).await?,
+                ))
+            }
+            (Kind::Postgres, None) => return Err("no Postgres container".into()),
+        })
+    }
+}
+
 struct World {
     dir: tempfile::TempDir,
+    databases: Databases,
     store: Arc<LocalStore>,
-    index: Arc<MemoryIndex>,
+    index: Arc<dyn DriveIndex>,
     access: Arc<MemoryAccess>,
     clock: Arc<ManualClock>,
     drive: Drive,
@@ -49,16 +123,18 @@ struct World {
     bob_id: UserId,
 }
 
-async fn world() -> Result<World, Box<dyn std::error::Error>> {
+async fn world(kind: Kind) -> Result<World, Box<dyn std::error::Error + Send + Sync>> {
     let dir = tempfile::tempdir()?;
+    let databases = Databases::new(kind).await?;
     let store = Arc::new(LocalStore::open(dir.path()).await?);
-    let index = Arc::new(MemoryIndex::new());
+    let index = databases.index().await?;
     let access = Arc::new(MemoryAccess::new(index.clone()));
     let clock = Arc::new(ManualClock(AtomicI64::new(1_790_000_000_000)));
     let drive = Drive::with_clock(store.clone(), index.clone(), access.clone(), clock.clone());
     let (alice_id, bob_id) = (UserId::generate(), UserId::generate());
     Ok(World {
         dir,
+        databases,
         store,
         index,
         access,
@@ -72,13 +148,13 @@ async fn world() -> Result<World, Box<dyn std::error::Error>> {
 }
 
 impl World {
-    async fn text(&self, node: &Node) -> Result<String, Box<dyn std::error::Error>> {
+    async fn text(&self, node: &Node) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         Ok(String::from_utf8(
             self.store.get(&node.path).await?.bytes.to_vec(),
         )?)
     }
 
-    async fn node(&self, id: ObjectId) -> Result<Node, Box<dyn std::error::Error>> {
+    async fn node(&self, id: ObjectId) -> Result<Node, Box<dyn std::error::Error + Send + Sync>> {
         Ok(self.index.node(id).await?.ok_or("missing node")?)
     }
 
@@ -87,7 +163,7 @@ impl World {
         actor: &Actor,
         node: &Node,
         f: impl FnOnce(String) -> String,
-    ) -> Result<vellum_drive::SaveOutcome, Box<dyn std::error::Error>> {
+    ) -> Result<vellum_drive::SaveOutcome, Box<dyn std::error::Error + Send + Sync>> {
         let blob = self.store.get(&node.path).await?;
         let text = String::from_utf8(blob.bytes.to_vec())?;
         let base = Base {
@@ -101,9 +177,8 @@ impl World {
     }
 }
 
-#[tokio::test]
-async fn pages_live_in_real_folders() -> TestResult {
-    let w = world().await?;
+async fn pages_live_in_real_folders(kind: Kind) -> TestResult {
+    let w = world(kind).await?;
     let eng = w
         .drive
         .create_space(&w.alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
@@ -186,9 +261,8 @@ async fn pages_live_in_real_folders() -> TestResult {
     Ok(())
 }
 
-#[tokio::test]
-async fn my_drive_and_shared_with_me() -> TestResult {
-    let w = world().await?;
+async fn my_drive_and_shared_with_me(kind: Kind) -> TestResult {
+    let w = world(kind).await?;
     assert!(matches!(
         w.drive
             .create_space(
@@ -239,9 +313,8 @@ async fn my_drive_and_shared_with_me() -> TestResult {
     Ok(())
 }
 
-#[tokio::test]
-async fn renaming_rewrites_links_and_backlinks_follow() -> TestResult {
-    let w = world().await?;
+async fn renaming_rewrites_links_and_backlinks_follow(kind: Kind) -> TestResult {
+    let w = world(kind).await?;
     let eng = w
         .drive
         .create_space(&w.alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
@@ -301,9 +374,8 @@ async fn renaming_rewrites_links_and_backlinks_follow() -> TestResult {
     Ok(())
 }
 
-#[tokio::test]
-async fn moving_keeps_explicit_grants_and_fixes_relative_links() -> TestResult {
-    let w = world().await?;
+async fn moving_keeps_explicit_grants_and_fixes_relative_links(kind: Kind) -> TestResult {
+    let w = world(kind).await?;
     let eng = w
         .drive
         .create_space(&w.alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
@@ -364,9 +436,8 @@ async fn moving_keeps_explicit_grants_and_fixes_relative_links() -> TestResult {
     Ok(())
 }
 
-#[tokio::test]
-async fn copies_get_fresh_ids_and_internal_links() -> TestResult {
-    let w = world().await?;
+async fn copies_get_fresh_ids_and_internal_links(kind: Kind) -> TestResult {
+    let w = world(kind).await?;
     let eng = w
         .drive
         .create_space(&w.alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
@@ -417,9 +488,8 @@ async fn copies_get_fresh_ids_and_internal_links() -> TestResult {
     Ok(())
 }
 
-#[tokio::test]
-async fn trash_cascades_and_restores_exactly() -> TestResult {
-    let w = world().await?;
+async fn trash_cascades_and_restores_exactly(kind: Kind) -> TestResult {
+    let w = world(kind).await?;
     let eng = w
         .drive
         .create_space(&w.alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
@@ -487,9 +557,8 @@ async fn trash_cascades_and_restores_exactly() -> TestResult {
     Ok(())
 }
 
-#[tokio::test]
-async fn shortcuts_never_grant_access() -> TestResult {
-    let w = world().await?;
+async fn shortcuts_never_grant_access(kind: Kind) -> TestResult {
+    let w = world(kind).await?;
     let eng = w
         .drive
         .create_space(&w.alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
@@ -524,9 +593,8 @@ async fn shortcuts_never_grant_access() -> TestResult {
     Ok(())
 }
 
-#[tokio::test]
-async fn quotas_and_version_retention() -> TestResult {
-    let w = world().await?;
+async fn quotas_and_version_retention(kind: Kind) -> TestResult {
+    let w = world(kind).await?;
     let eng = w
         .drive
         .create_space(&w.alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
@@ -583,9 +651,8 @@ async fn quotas_and_version_retention() -> TestResult {
     Ok(())
 }
 
-#[tokio::test]
-async fn concurrent_edits_merge_or_make_a_conflict_copy() -> TestResult {
-    let w = world().await?;
+async fn concurrent_edits_merge_or_make_a_conflict_copy(kind: Kind) -> TestResult {
+    let w = world(kind).await?;
     let eng = w
         .drive
         .create_space(&w.alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
@@ -633,9 +700,8 @@ async fn concurrent_edits_merge_or_make_a_conflict_copy() -> TestResult {
     Ok(())
 }
 
-#[tokio::test]
-async fn the_index_rebuilds_from_files() -> TestResult {
-    let w = world().await?;
+async fn the_index_rebuilds_from_files(kind: Kind) -> TestResult {
+    let w = world(kind).await?;
     let eng = w
         .drive
         .create_space(&w.alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
@@ -673,7 +739,7 @@ async fn the_index_rebuilds_from_files() -> TestResult {
     assert_eq!(w.node(page.id).await?.path, outside);
 
     // A fresh index rebuilt from the same files sees the same drive.
-    let index = Arc::new(MemoryIndex::new());
+    let index = w.databases.index().await?;
     let access = Arc::new(MemoryAccess::new(index.clone()));
     let rebuilt = Drive::new(w.store.clone(), index.clone(), access);
     let report = rebuilt.scan().await?;
@@ -690,9 +756,8 @@ async fn the_index_rebuilds_from_files() -> TestResult {
     Ok(())
 }
 
-#[tokio::test]
-async fn external_edits_and_renames_come_in_through_the_watcher() -> TestResult {
-    let w = world().await?;
+async fn external_edits_and_renames_come_in_through_the_watcher(kind: Kind) -> TestResult {
+    let w = world(kind).await?;
     let eng = w
         .drive
         .create_space(&w.alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
@@ -751,3 +816,41 @@ async fn external_edits_and_renames_come_in_through_the_watcher() -> TestResult 
     assert_eq!(w.drive.versions(&w.alice, edited.id).await?.len(), 2);
     Ok(())
 }
+
+/// Runs each test on every index.
+macro_rules! on_every_index {
+    ($($name:ident),* $(,)?) => {$(
+        mod $name {
+            use super::{Kind, TestResult};
+
+            #[tokio::test]
+            async fn memory() -> TestResult {
+                super::$name(Kind::Memory).await
+            }
+
+            #[tokio::test]
+            async fn sqlite() -> TestResult {
+                super::$name(Kind::Sqlite).await
+            }
+
+            #[tokio::test]
+            async fn postgres() -> TestResult {
+                super::$name(Kind::Postgres).await
+            }
+        }
+    )*};
+}
+
+on_every_index!(
+    pages_live_in_real_folders,
+    my_drive_and_shared_with_me,
+    renaming_rewrites_links_and_backlinks_follow,
+    moving_keeps_explicit_grants_and_fixes_relative_links,
+    copies_get_fresh_ids_and_internal_links,
+    trash_cascades_and_restores_exactly,
+    shortcuts_never_grant_access,
+    quotas_and_version_retention,
+    concurrent_edits_merge_or_make_a_conflict_copy,
+    the_index_rebuilds_from_files,
+    external_edits_and_renames_come_in_through_the_watcher,
+);
