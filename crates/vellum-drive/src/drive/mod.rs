@@ -15,6 +15,7 @@ mod organize;
 mod scan;
 mod trash;
 mod views;
+mod watch;
 
 use std::sync::Arc;
 use std::time::Instant;

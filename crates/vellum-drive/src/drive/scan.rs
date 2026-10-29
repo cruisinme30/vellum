@@ -134,7 +134,7 @@ impl Drive {
         Ok(spaces)
     }
 
-    async fn read_manifests(
+    pub(super) async fn read_manifests(
         &self,
         blobs: &Blobs,
         report: &mut ScanReport,
@@ -172,7 +172,7 @@ impl Drive {
         out
     }
 
-    async fn scan_space(
+    pub(super) async fn scan_space(
         &self,
         space: &Space,
         all: &Blobs,

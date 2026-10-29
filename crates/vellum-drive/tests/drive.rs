@@ -37,7 +37,7 @@ impl Clock for ManualClock {
 }
 
 struct World {
-    _dir: tempfile::TempDir,
+    dir: tempfile::TempDir,
     store: Arc<LocalStore>,
     index: Arc<MemoryIndex>,
     access: Arc<MemoryAccess>,
@@ -58,7 +58,7 @@ async fn world() -> Result<World, Box<dyn std::error::Error>> {
     let drive = Drive::with_clock(store.clone(), index.clone(), access.clone(), clock.clone());
     let (alice_id, bob_id) = (UserId::generate(), UserId::generate());
     Ok(World {
-        _dir: dir,
+        dir,
         store,
         index,
         access,
@@ -673,5 +673,67 @@ async fn the_index_rebuilds_from_files() -> TestResult {
     let space = index.space(eng.id).await?.ok_or("space lost")?;
     assert_eq!(space.name, "Engineering");
     assert!(layout::is_state(&trashed.path));
+    Ok(())
+}
+
+#[tokio::test]
+async fn external_edits_and_renames_come_in_through_the_watcher() -> TestResult {
+    let w = world().await?;
+    let eng = w
+        .drive
+        .create_space(&w.alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .await?;
+    let folder = w
+        .drive
+        .create_folder(&w.alice, eng.id, None, "Specs")
+        .await?;
+    let edited = w
+        .drive
+        .create_page(&w.alice, eng.id, None, "Edited", "one\n")
+        .await?;
+    let moved = w
+        .drive
+        .create_page(&w.alice, eng.id, None, "Moved", "")
+        .await?;
+
+    let mut known = Vec::new();
+    for node in w.index.nodes(eng.id).await? {
+        let file = layout::id_file(node.kind, &node.path)?;
+        known.push((node.id, file.clone(), w.store.head(&file).await?.etag));
+    }
+    let watched = LocalStore::open(w.dir.path()).await?;
+    let mut reconciler = vellum_store::watch::Reconciler::new(watched, known);
+
+    // An editor saves in place; Finder moves a file into a folder.
+    w.clock.advance_days(1);
+    let text = w.text(&edited).await?;
+    let _ = w
+        .store
+        .put(
+            &edited.path,
+            Bytes::from(format!("{text}two\n")),
+            Precondition::None,
+        )
+        .await?;
+    let target = BlobPath::new("drives/shared/eng/Specs/Moved.md")?;
+    let _ = w.store.rename(&moved.path, &target).await?;
+
+    let changes = reconciler.scan().await?;
+    let report = w.drive.apply_changes(&changes).await?;
+    assert_eq!(report.relocated, 1, "{changes:?}");
+    let now = w.node(moved.id).await?;
+    assert_eq!((now.path, now.parent), (target, Some(folder.id)));
+    let versions = w.drive.versions(&w.alice, edited.id).await?;
+    assert_eq!(versions.len(), 2);
+    assert_eq!(versions.first().map(|v| v.author), Some(Actor::External));
+
+    // Re-applying the same edit (our own write echoing back) adds nothing.
+    let again = vec![vellum_store::watch::Change::Modified {
+        id: edited.id,
+        path: edited.path.clone(),
+        etag: w.store.head(&edited.path).await?.etag,
+    }];
+    let _ = w.drive.apply_changes(&again).await?;
+    assert_eq!(w.drive.versions(&w.alice, edited.id).await?.len(), 2);
     Ok(())
 }

@@ -78,6 +78,14 @@ fn is_slug(slug: &str) -> bool {
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
 }
 
+/// The directory holding every trash entry.
+///
+/// # Errors
+/// Never fails; the result is propagated for uniformity.
+pub fn trash_root() -> DriveResult<BlobPath> {
+    Ok(BlobPath::new(format!("{STATE_DIR}/trash"))?)
+}
+
 /// The directory of a trash entry.
 ///
 /// # Errors
@@ -120,29 +128,17 @@ pub fn is_state(path: &BlobPath) -> bool {
     path.segments().next() == Some(STATE_DIR)
 }
 
-/// Turns a title into a safe file-name stem: path separators, reserved
-/// characters and control characters become spaces, runs of whitespace
-/// collapse, and the result never starts with a dot.
+/// Turns a title into a safe file-name stem, with the store's naming
+/// rules (characters a backend rejects become `-`, leading dots and
+/// Windows device names are avoided), leaving room for a suffix.
 #[must_use]
 pub fn stem(title: &str) -> String {
-    let cleaned: String = title
-        .chars()
-        .map(|c| {
-            if c.is_control() || matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') {
-                ' '
-            } else {
-                c
-            }
-        })
-        .collect();
-    let mut out = cleaned.split_whitespace().collect::<Vec<_>>().join(" ");
-    out = out
-        .trim_start_matches('.')
-        .trim_end_matches(['.', ' '])
-        .to_owned();
+    let name = vellum_store::layout::file_name(title, "md");
+    let mut out = name.strip_suffix(".md").unwrap_or(&name).to_owned();
     while out.len() > MAX_STEM_BYTES {
         let _ = out.pop();
     }
+    let out = out.trim_end_matches(['.', ' ']).to_owned();
     if out.is_empty() || out.starts_with(".vellum") {
         return "Untitled".to_owned();
     }
@@ -179,6 +175,9 @@ pub fn classify(path: &BlobPath) -> Option<(NodeKind, BlobPath)> {
         if name == COLLECTION_FILE && dir_name.ends_with(NodeKind::Collection.suffix()) {
             return Some((NodeKind::Collection, dir.clone()));
         }
+    }
+    if !vellum_store::layout::Kind::of(path).is_content() {
+        return None;
     }
     if name.ends_with(NodeKind::Shortcut.suffix()) {
         return Some((NodeKind::Shortcut, path.clone()));
@@ -255,9 +254,9 @@ mod tests {
     #[test]
     fn stems_are_safe() {
         assert_eq!(stem("Roadmap 2027"), "Roadmap 2027");
-        assert_eq!(stem("  a/b:c?  "), "a b c");
+        assert_eq!(stem("  a/b:c?  "), "a-b-c-");
         assert_eq!(stem("..hidden."), "hidden");
-        assert_eq!(stem("\u{0}\n"), "Untitled");
+        assert_eq!(stem("CON"), "CON-untitled");
         assert_eq!(stem(".vellum-folder"), "vellum-folder");
         assert!(stem(&"x".repeat(500)).len() <= MAX_STEM_BYTES);
     }
