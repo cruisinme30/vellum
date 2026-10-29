@@ -109,7 +109,9 @@ export async function startPlatform(
 ): Promise<WorkerHandle | undefined> {
   if (platform.kind === "desktop" || !options.production) return undefined;
   const storage = (navigator as Partial<Navigator>).storage;
-  await storage?.persist().catch(() => false);
+  // Not awaited: Firefox asks the person first, and the answer can take
+  // forever. Offline start-up must not wait on that prompt.
+  void storage?.persist().catch(() => false);
   return registerServiceWorker(
     options.onUpdateReady === undefined ? {} : { onUpdateReady: options.onUpdateReady },
   );
