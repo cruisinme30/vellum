@@ -77,3 +77,7 @@ jobs also queued for runners.
   release, since main stays gated.
 - A new top-level folder counts as Rust until `changed-areas.sh` lists it.
 - Revisit if the repository moves to an organisation with a merge queue.
+- The full suite runs each test once: Rust tests only with coverage, UI
+  tests only in the browser matrix, and nothing again on the push to main.
+- A release pull request opened from develop itself fails fast; releases
+  come from a frozen `chore/release-…` branch.
