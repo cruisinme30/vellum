@@ -1,2 +1,4 @@
 ^https://github\.com/cruisinme30/vellum
 ^https://cruisinme30\.github\.io/vellum
+# Northstar is the made-up demo company in the docs, so its links never resolve.
+^https?://([a-z0-9-]+\.)*northstar\.dev
