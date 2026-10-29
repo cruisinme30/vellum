@@ -1,0 +1,205 @@
+<!doctype html>
+<!--
+SPDX-FileCopyrightText: 2026 The Vellum contributors
+SPDX-License-Identifier: AGPL-3.0-only
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'"
+    />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Vellum: the workspace that lives in your folders</title>
+    <meta
+      name="description"
+      content="Vellum is an open-source, self-hosted workspace for documents, books, databases, issue tracking and tasks. Every object is a Markdown file in a real folder, and an MCP server lets AI models work under your own permissions."
+    />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="top">
+      <nav class="bar" aria-label="Site">
+        <a class="brand" href="./">
+          <img src="favicon.svg" alt="" width="28" height="28" />
+          <span>Vellum</span>
+        </a>
+        <ul class="links">
+          <li><a href="#features">Features</a></li>
+          <li><a href="#install">Install</a></li>
+          <li><a href="#docs">Docs</a></li>
+          <li>
+            <a class="pill tonal" href="https://github.com/cruisinme30/vellum">GitHub</a>
+          </li>
+        </ul>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="hero">
+        <p class="eyebrow">Open source · Self-hosted · AGPL-3.0</p>
+        <h1>The workspace that lives in your folders.</h1>
+        <p class="lede">
+          Documents, books, databases, issue tracking, tasks and a drive in one
+          small binary. Every object is a Markdown file you can open, grep,
+          back up and put in Git. The database is only an index you can rebuild.
+        </p>
+        <p class="actions">
+          <a class="pill filled" href="#install">Get started</a>
+          <a class="pill outlined" href="https://github.com/cruisinme30/vellum">View the source</a>
+        </p>
+        <p class="status">
+          Vellum is in active development toward its 1.0 release. Follow along
+          on GitHub.
+        </p>
+      </section>
+
+      <section class="band" aria-labelledby="files-title">
+        <div class="split">
+          <div>
+            <h2 id="files-title">Your files, not our format</h2>
+            <p>
+              A page is a <code>.md</code> file. A book is a folder with a
+              <code>SUMMARY.md</code> that builds with unmodified mdBook. A
+              collection is a folder with one page per row. Edit them in Vellum, in your editor
+              or with a script, and Vellum notices and merges the change.
+            </p>
+            <p>
+              Stop the server and your workspace is still there: readable,
+              searchable and yours.
+            </p>
+          </div>
+          <pre class="tree" aria-label="Example workspace folder"><code>northstar/
+├─ drives/shared/product/
+│  ├─ roadmap.md
+│  ├─ handbook.book/
+│  │  ├─ book.yaml
+│  │  ├─ SUMMARY.md
+│  │  └─ welcome.md
+│  └─ customers.collection/
+│     ├─ schema.yaml
+│     └─ rows/acme.md
+├─ teams/NS/issues/NS-142.md
+└─ tasks/ana/inbox.md</code></pre>
+        </div>
+      </section>
+
+      <section id="features" aria-labelledby="features-title">
+        <h2 id="features-title">One workspace instead of six tools</h2>
+        <ul class="cards">
+          <li class="card">
+            <h3>Pages and real-time editing</h3>
+            <p>
+              A block editor with comments, history and live collaboration,
+              exporting to PDF, Word, HTML and Markdown.
+            </p>
+          </li>
+          <li class="card">
+            <h3>Books</h3>
+            <p>
+              Long documents as a tree of pages with numbering, cross-references
+              and whole-book export. Publish one as a static site.
+            </p>
+          </li>
+          <li class="card">
+            <h3>Collections</h3>
+            <p>
+              Databases with typed properties, relations and formulas, shown as
+              tables, boards, calendars and galleries.
+            </p>
+          </li>
+          <li class="card">
+            <h3>Work</h3>
+            <p>
+              Fast issue tracking with cycles, triage, projects and Git
+              automation, keyboard first.
+            </p>
+          </li>
+          <li class="card">
+            <h3>My Work</h3>
+            <p>
+              Your personal tasks next to the issues assigned to you, with
+              reminders and a daily digest.
+            </p>
+          </li>
+          <li class="card">
+            <h3>Drive</h3>
+            <p>
+              Spaces, folders, favourites and sharing that organise all of it,
+              with attachments stored where you choose.
+            </p>
+          </li>
+          <li class="card">
+            <h3>An AI door, on your terms</h3>
+            <p>
+              A built-in MCP server lets Claude and other models search, read and
+              draft with your permissions. Their edits arrive as drafts for you
+              to accept.
+            </p>
+          </li>
+          <li class="card">
+            <h3>Encrypted by default</h3>
+            <p>
+              Every document is encrypted at rest with its own key. Private
+              spaces can be end-to-end encrypted.
+            </p>
+          </li>
+          <li class="card">
+            <h3>Laptop to organisation</h3>
+            <p>
+              One binary idles under 80 MB on a laptop and scales out to a highly
+              available cluster with the same code.
+            </p>
+          </li>
+        </ul>
+      </section>
+
+      <section id="install" class="band" aria-labelledby="install-title">
+        <h2 id="install-title">Install</h2>
+        <p>
+          Vellum 1.0 will ship as a single signed binary, a container image and a
+          Helm chart. Until then, build it from source. You need Rust (the
+          pinned version installs itself), Node 22 and pnpm 10.
+        </p>
+        <pre class="code"><code>git clone https://github.com/cruisinme30/vellum
+cd vellum
+cargo build --release
+pnpm --dir web install</code></pre>
+        <p>
+          The <a href="https://github.com/cruisinme30/vellum/blob/develop/CONTRIBUTING.md">contributing guide</a>
+          explains the branches and the checks every change passes.
+        </p>
+      </section>
+
+      <section id="docs" aria-labelledby="docs-title">
+        <h2 id="docs-title">Documentation</h2>
+        <!-- BOOKS -->
+      </section>
+
+      <section class="band" aria-labelledby="licence-title">
+        <h2 id="licence-title">Free software, no lock-in</h2>
+        <p>
+          Vellum is licensed under the
+          <a href="https://github.com/cruisinme30/vellum/blob/develop/LICENSE">GNU Affero General Public License v3.0</a>.
+          There is no per-seat price and no hosted tier you are pushed toward.
+          Contributions are welcome under the Developer Certificate of Origin.
+        </p>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <p>
+        Vellum is a personal open-source project.
+        <a href="https://github.com/cruisinme30/vellum">Source</a> ·
+        <a href="https://github.com/cruisinme30/vellum/blob/develop/SECURITY.md">Security</a> ·
+        <a href="https://github.com/cruisinme30/vellum/blob/develop/LICENSE">Licence</a>
+      </p>
+      <p class="quiet">This site sets no cookies and loads nothing from other servers.</p>
+    </footer>
+  </body>
+</html>
