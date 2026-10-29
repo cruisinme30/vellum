@@ -12,8 +12,8 @@ vellum: 1
 - Date: `2026-10-29`
 - Status: accepted
 - Decisions: `D61`, `D62`, `D63`
-- Issue: `#102`, also `#99`, `#100` and `#172`
-- Pull requests: `#236`
+- Issue: `#102`, also `#99`, `#100`, `#172` and `#403`
+- Pull requests: `#236`, and the page feed after it
 
 :::
 
@@ -90,3 +90,7 @@ runs the same checks against each engine.
   adapter is the path, as D23 says.
 - Postgres search tables live in their own `vellum_search` schema with
   their own migrations.
+- The index learns about saved pages by sweeping the drive's page rows
+  about once a second and comparing fingerprints, because the drive emits
+  no events and its file scans record no activity. A sweep reads one row per
+  page, so very large drives may want a longer interval.
