@@ -41,3 +41,11 @@ holder = "reliability (#191, #74), ADR 0061"
 adrs = "0066"
 decisions = "D271"
 holder = "release binary build (ADR 0066 if it needs its own record)"
+
+[[reservation]]
+decisions = "D272"
+holder = "books thread: people picker"
+
+[[reservation]]
+decisions = "D273-D275"
+holder = "admin thread: groups"
