@@ -63,6 +63,18 @@ pub struct AuthStatus {
     pub credential: String,
     /// The caller's scopes.
     pub scopes: Vec<Scope>,
+    /// The single sign-on button, when a provider is configured.
+    pub sso: Option<SsoButton>,
+}
+
+/// How the sign-in page offers single sign-on.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SsoButton {
+    /// The provider's name, for "Sign in with {name}".
+    pub name: String,
+    /// Where the button goes; append `?next=<path>` to return there.
+    pub start_url: String,
 }
 
 /// The first administrator's details.
@@ -259,6 +271,10 @@ impl Service for IdentityService {
                         user,
                         credential: credential_name(ctx.principal.kind()).to_owned(),
                         scopes: ctx.principal.scopes().iter().collect(),
+                        sso: id.sso().map(|sso| SsoButton {
+                            name: sso.config().display_name.clone(),
+                            start_url: "/auth/sso/start".to_owned(),
+                        }),
                     })
                 }
             }

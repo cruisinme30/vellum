@@ -18,7 +18,8 @@ use vellum_security::rate::Lockout;
 use crate::oauth::{ClientMetadataFetcher, NoMetadataFetch, OAuthState};
 use crate::password;
 use crate::secret::{self, Kind, SecretHash};
-use crate::store::{ApiToken, Session, SessionMethod, State, Store, User, hash_key};
+use crate::sso::{Sso, SsoIdentity};
+use crate::store::{ApiToken, Session, SessionMethod, SsoLink, State, Store, User, hash_key};
 
 /// How often `last_seen_at` and `last_used_at` are written back, so a busy
 /// session does not rewrite the store on every request.
@@ -177,6 +178,7 @@ pub struct Identity {
     ip_lockout: Lockout<IpAddr>,
     pub(crate) oauth: OAuthState,
     pub(crate) fetcher: Arc<dyn ClientMetadataFetcher>,
+    sso: Option<Arc<Sso>>,
 }
 
 impl std::fmt::Debug for Identity {
@@ -260,7 +262,132 @@ impl Identity {
             ip_lockout: Lockout::new(20, Duration::from_secs(1), Duration::from_mins(15)),
             oauth: OAuthState::default(),
             fetcher: Arc::new(NoMetadataFetch),
+            sso: None,
         }
+    }
+
+    /// Turns on single sign-on with one `OpenID Connect` provider.
+    #[must_use]
+    pub fn with_sso(mut self, sso: Sso) -> Self {
+        self.sso = Some(Arc::new(sso));
+        self
+    }
+
+    /// The single sign-on provider, when one is configured.
+    #[must_use]
+    pub const fn sso(&self) -> Option<&Arc<Sso>> {
+        self.sso.as_ref()
+    }
+
+    /// Signs in the user a provider vouched for, and opens a session.
+    ///
+    /// The account is the one already linked to the provider's user ID.
+    /// Failing that, a verified address links the account with that
+    /// address, or, if the settings allow it, creates a member account
+    /// without a password. Administrators are never created this way.
+    ///
+    /// # Errors
+    ///
+    /// [`ErrorKind::Conflict`] before set-up, [`ErrorKind::PermissionDenied`]
+    /// for a disabled account or an address with no account, and
+    /// [`ErrorKind::Unavailable`] when single sign-on is off.
+    pub fn sso_sign_in(
+        &self,
+        found: &SsoIdentity,
+        user_agent: Option<&str>,
+    ) -> Result<NewSession, Error> {
+        let sso = self.sso.as_ref().ok_or_else(|| {
+            Error::new(ErrorKind::Unavailable, "single sign-on is not configured")
+        })?;
+        if self.needs_setup() {
+            return Err(Error::new(
+                ErrorKind::Conflict,
+                "finish set-up first: the first administrator signs in with a password",
+            ));
+        }
+        let link = SsoLink {
+            issuer: found.issuer.clone(),
+            subject: found.subject.clone(),
+        };
+        let email = found
+            .email
+            .as_deref()
+            .filter(|_| found.email_verified)
+            .map(normalise_email)
+            .transpose()
+            .ok()
+            .flatten();
+        let name = found
+            .name
+            .as_deref()
+            .and_then(|n| check_name(n).ok())
+            .or_else(|| {
+                email
+                    .as_deref()
+                    .and_then(|e| e.split('@').next())
+                    .map(str::to_owned)
+            })
+            .unwrap_or_else(|| "Member".to_owned());
+        let may_create = email.as_deref().is_some_and(|e| sso.config().may_create(e));
+        let (user, created) = self.store.write(|s| {
+            if let Some(user) = s.users.values().find(|u| u.sso.contains(&link)) {
+                return Ok((user.clone(), false));
+            }
+            let Some(email) = email else {
+                return Err(Error::new(
+                    ErrorKind::PermissionDenied,
+                    "the sign-in provider did not share a verified email address",
+                ));
+            };
+            if email == BREAK_GLASS_EMAIL {
+                return Err(Error::new(
+                    ErrorKind::PermissionDenied,
+                    "this account cannot use single sign-on",
+                ));
+            }
+            if let Some(user) = s.users.values_mut().find(|u| u.email == email) {
+                user.sso.push(link.clone());
+                return Ok((user.clone(), false));
+            }
+            if !may_create {
+                return Err(Error::new(
+                    ErrorKind::PermissionDenied,
+                    "there is no account for this address; ask an administrator to add you",
+                ));
+            }
+            let user = User {
+                id: UserId::generate(),
+                handle: s.free_handle(&email),
+                email,
+                name: name.clone(),
+                password_hash: None,
+                admin: false,
+                disabled: false,
+                created_at: Timestamp::now(),
+                sso: vec![link.clone()],
+            };
+            let _ = s.users.insert(user.id, user.clone());
+            Ok((user, true))
+        })??;
+        if user.disabled {
+            return Err(Error::new(
+                ErrorKind::PermissionDenied,
+                "this account is disabled; ask an administrator",
+            ));
+        }
+        tracing::info!(
+            event = "identity.signed_in",
+            user = %user.id,
+            method = "sso",
+            created,
+            "signed in"
+        );
+        self.open_session(
+            user.id,
+            SessionMethod::Sso,
+            self.config.session_lifetime,
+            user_agent,
+        )
     }
 
     /// Sets how Client ID Metadata Documents are fetched (through the SSRF
@@ -337,6 +464,7 @@ impl Identity {
             admin,
             disabled: false,
             created_at: Timestamp::now(),
+            sso: Vec::new(),
         };
         self.store.write(|s| {
             if s.user_by_email(&user.email).is_some() {
@@ -965,6 +1093,7 @@ impl Identity {
                 admin: true,
                 disabled: false,
                 created_at: Timestamp::now(),
+                sso: Vec::new(),
             };
             let id = user.id;
             let _ = s.users.insert(id, user);

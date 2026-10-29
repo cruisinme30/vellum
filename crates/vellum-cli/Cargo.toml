@@ -45,7 +45,8 @@ vellum-work = { path = "../vellum-work" }
 vellum-work-service = { path = "../vellum-work-service" }
 
 [dev-dependencies]
-axum = { version = "0.8.9", default-features = false }
+aws-lc-rs = { version = "1.19.0", default-features = false, features = ["aws-lc-sys"] }
+axum = { version = "0.8.9", default-features = false, features = ["http1", "json", "tokio"] }
 http-body-util = "0.1.3"
 serde_urlencoded = "0.7.1"
 sha2 = "0.11.1"

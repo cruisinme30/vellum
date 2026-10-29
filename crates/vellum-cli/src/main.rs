@@ -18,6 +18,8 @@ mod mcp;
 mod reindex;
 mod serve;
 mod services;
+#[cfg(test)]
+mod sso_tests;
 mod workspace;
 
 use std::io::Write as _;

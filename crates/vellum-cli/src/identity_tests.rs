@@ -19,22 +19,22 @@ use vellum_api::gateway::GatewayBuilder;
 
 use crate::services::{Services, VERSION};
 
-const ORIGIN: &str = "http://localhost";
+pub const ORIGIN: &str = "http://localhost";
 
-struct Reply {
-    status: StatusCode,
-    headers: http::HeaderMap,
-    text: String,
+pub struct Reply {
+    pub status: StatusCode,
+    pub headers: http::HeaderMap,
+    pub text: String,
 }
 
 impl Reply {
-    fn json(&self) -> Value {
+    pub fn json(&self) -> Value {
         serde_json::from_str(&self.text).unwrap_or(Value::Null)
     }
 }
 
 fn app(data_dir: Option<&std::path::Path>) -> Router {
-    let services = Services::open(ORIGIN, data_dir).unwrap();
+    let services = Services::open(ORIGIN, data_dir, None).unwrap();
     let mut config = GatewayConfig::new(ORIGIN, vec![3; 32]);
     config.rate_per_second = 10_000;
     config.rate_burst = 10_000;
@@ -45,7 +45,7 @@ fn app(data_dir: Option<&std::path::Path>) -> Router {
         .router()
 }
 
-async fn send(app: &Router, request: Request<Body>) -> Reply {
+pub async fn send(app: &Router, request: Request<Body>) -> Reply {
     let response = app.clone().oneshot(request).await.unwrap();
     let status = response.status();
     let headers = response.headers().clone();
@@ -57,14 +57,14 @@ async fn send(app: &Router, request: Request<Body>) -> Reply {
     }
 }
 
-fn request(method: &str, path: &str) -> http::request::Builder {
+pub fn request(method: &str, path: &str) -> http::request::Builder {
     Request::builder()
         .method(method)
         .uri(path)
         .header(header::HOST, "localhost")
 }
 
-fn json_request(method: &str, path: &str, body: &Value) -> http::request::Builder {
+pub fn json_request(method: &str, path: &str, body: &Value) -> http::request::Builder {
     request(method, path)
         .header(header::CONTENT_TYPE, "application/json")
         .header(header::ORIGIN, ORIGIN)
@@ -73,7 +73,7 @@ fn json_request(method: &str, path: &str, body: &Value) -> http::request::Builde
 
 /// Builds a JSON request; the body travels in a header above only to keep
 /// the builder chain readable, and is moved into the body here.
-fn finish(builder: http::request::Builder) -> Request<Body> {
+pub fn finish(builder: http::request::Builder) -> Request<Body> {
     let mut request = builder.body(Body::empty()).unwrap();
     if let Some(body) = request.headers_mut().remove("x-body") {
         *request.body_mut() = Body::from(body.as_bytes().to_vec());
@@ -81,7 +81,7 @@ fn finish(builder: http::request::Builder) -> Request<Body> {
     request
 }
 
-fn cookie_of(reply: &Reply) -> String {
+pub fn cookie_of(reply: &Reply) -> String {
     let set = reply.headers[header::SET_COOKIE].to_str().unwrap();
     set.split(';').next().unwrap().to_owned()
 }
@@ -95,7 +95,7 @@ async fn csrf(app: &Router, cookie: &str) -> String {
     reply.json()["token"].as_str().unwrap().to_owned()
 }
 
-async fn signed_in_admin(app: &Router) -> String {
+pub async fn signed_in_admin(app: &Router) -> String {
     let setup = send(
         app,
         finish(json_request(
@@ -563,7 +563,7 @@ async fn workspace_services_answer_signed_in_users() {
     std::fs::create_dir_all(&dir).unwrap();
     let mut config = vellum_kernel::Config::default();
     config.data_dir = dir.clone();
-    let services = Services::open(ORIGIN, Some(&dir))
+    let services = Services::open(ORIGIN, Some(&dir), None)
         .unwrap()
         .with_workspace(&config, |k| {
             (k == crate::workspace::PLAINTEXT_VAR).then(|| "1".to_owned())

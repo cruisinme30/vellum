@@ -8567,6 +8567,7 @@ dependencies = [
 name = "vellum-cli"
 version = "0.0.0"
 dependencies = [
+ "aws-lc-rs",
  "axum",
  "base64 0.23.1",
  "clap",
@@ -8779,6 +8780,7 @@ name = "vellum-identity"
 version = "0.0.0"
 dependencies = [
  "argon2",
+ "aws-lc-rs",
  "axum",
  "base64 0.23.1",
  "getrandom 0.4.3",

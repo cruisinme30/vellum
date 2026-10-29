@@ -16,10 +16,12 @@ use url::Url;
 use vellum_api::config::GatewayConfig;
 use vellum_api::gateway::{Gateway, GatewayBuilder};
 use vellum_contracts::Service;
-use vellum_identity::{Identity, IdentityConfig, IdentityService, Store, http as identity_http};
+use vellum_identity::{
+    Identity, IdentityConfig, IdentityService, Sso, SsoConfig, Store, http as identity_http,
+};
 use vellum_kernel::{Config, Error, ErrorKind};
 
-use crate::identity::{GuardedFetcher, IdentityAuthenticator};
+use crate::identity::{GuardedFetcher, GuardedSsoHttp, IdentityAuthenticator};
 use crate::workspace;
 
 /// The binary's version, shown in `/healthz` and the API documents.
@@ -51,7 +53,11 @@ impl Services {
     /// # Errors
     ///
     /// Invalid settings or unreadable state.
-    pub fn open(public_url: &str, data_dir: Option<&Path>) -> Result<Self, Error> {
+    pub fn open(
+        public_url: &str,
+        data_dir: Option<&Path>,
+        sso: Option<SsoConfig>,
+    ) -> Result<Self, Error> {
         let url = Url::parse(public_url).map_err(|e| {
             Error::new(
                 ErrorKind::InvalidInput,
@@ -64,8 +70,13 @@ impl Services {
             Some(dir) => Store::open(dir)?,
             None => Store::memory(),
         };
-        let identity =
+        let mut identity =
             Identity::new(config, store).with_metadata_fetcher(Arc::new(GuardedFetcher::new()?));
+        if let Some(sso) = sso {
+            let http = Arc::new(GuardedSsoHttp::new(&sso.issuer)?);
+            tracing::info!(issuer = %sso.issuer, "single sign-on is on");
+            identity = identity.with_sso(Sso::new(sso, http));
+        }
         Ok(Self {
             identity: Arc::new(identity),
             workspace: Vec::new(),
@@ -115,7 +126,7 @@ impl Services {
 /// A gateway built only to describe the API: no listener, in-memory
 /// permissions and an empty scratch folder that is removed afterwards.
 pub fn contract_gateway() -> Result<Gateway, Error> {
-    let mut services = Services::open("http://localhost", None)?;
+    let mut services = Services::open("http://localhost", None, None)?;
     let scratch = std::env::temp_dir().join(format!("vellum-contracts-{}", std::process::id()));
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()

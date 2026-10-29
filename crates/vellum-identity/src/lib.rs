@@ -16,10 +16,12 @@
 //!   app ([`oauth`]).
 //! - **Break-glass**: a one-time code written to the data directory by
 //!   `vellum admin break-glass` opens a 15-minute administrator session.
+//! - **Single sign-on** with one `OpenID Connect` provider ([`sso`]):
+//!   accounts link by provider user ID or verified email, and SSO
+//!   sessions are ordinary sessions, so they outlive a provider outage.
 //!
 //! The JSON operations register through [`service::IdentityService`];
-//! cookie and redirect endpoints are routers in [`http`]. Single sign-on
-//! (OIDC and SAML) arrives in a later change.
+//! cookie and redirect endpoints are routers in [`http`].
 
 pub mod http;
 pub mod identity;
@@ -27,6 +29,7 @@ pub mod oauth;
 pub mod password;
 pub mod secret;
 pub mod service;
+pub mod sso;
 pub mod store;
 
 pub use identity::{
@@ -34,4 +37,5 @@ pub use identity::{
 };
 pub use oauth::{ClientMetadataFetcher, DESKTOP_CLIENT_ID, NoMetadataFetch};
 pub use service::IdentityService;
+pub use sso::{Sso, SsoConfig, SsoHttp};
 pub use store::Store;

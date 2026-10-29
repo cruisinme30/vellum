@@ -18,6 +18,7 @@ layer = "service"
 workspace = true
 
 [dependencies]
+aws-lc-rs = { version = "1.19.0", default-features = false, features = ["aws-lc-sys"] }
 argon2 = { version = "0.6.0", default-features = false, features = ["alloc", "password-hash", "zeroize"] }
 axum = { version = "0.8.9", default-features = false, features = ["form", "json", "original-uri", "query", "tokio"] }
 base64 = "0.23.1"
