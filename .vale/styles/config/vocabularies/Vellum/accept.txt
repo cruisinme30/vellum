@@ -62,6 +62,7 @@ ATX
 [Ww]ikilinks?
 [Ss]ubscript
 [Ss]uperscript
+[Ee]tags?
 [Mm]utators?
 Yjs
 [Jj]ittered
