@@ -11,7 +11,7 @@ use bytes::Bytes;
 use vellum_kernel::{Actor, ObjectId, SpaceId};
 use vellum_store::{BlobPath, Precondition, StoreError};
 
-use super::Drive;
+use super::{Drive, books};
 use crate::error::{DriveError, DriveResult};
 use crate::files::{ShortcutFile, from_yaml, to_yaml};
 use crate::frontmatter;
@@ -189,7 +189,8 @@ impl Drive {
     /// Copies a node (a folder with everything in it) into `parent` of
     /// `space`. Every copied node gets a fresh ID, and links inside the
     /// copy are re-pointed at the copies (R-DR-3). The copier owns the
-    /// copy; no grants are copied.
+    /// copy; no grants are copied. Anything inside a folder that the
+    /// copier cannot view is left out.
     ///
     /// # Errors
     /// `NotFound`, `PermissionDenied`, `Invalid`, `QuotaExceeded`.
@@ -219,30 +220,15 @@ impl Drive {
                     "cannot copy a folder into itself".into(),
                 ));
             }
-            let blobs = if node.kind.is_dir() {
-                // Build output and in-flight temp files are not content.
-                self.blobs_under(&node.path)
-                    .await?
-                    .into_iter()
-                    .filter(|(p, _)| {
-                        !p.segments().any(|s| s == ".mdbook")
-                            && !p.file_name().contains(".vellum-tmp")
-                            && vellum_store::layout::Kind::of(p).is_content()
-                    })
-                    .collect()
-            } else {
-                vec![(node.path.clone(), node.size)]
-            };
-            let total: u64 = blobs.iter().map(|(_, size)| size).sum();
+            let files = self.copy_sources(actor, &node).await?;
+            let total: u64 = files.iter().map(|(_, bytes)| bytes.len() as u64).sum();
             self.ensure_quota(&to_space, total).await?;
             let dest = self.free_path(&dir, node.kind, &node.title, None).await?;
 
-            // Read everything first, then map every ID found to a fresh one.
-            let mut files = Vec::with_capacity(blobs.len());
+            // Map every ID found to a fresh one.
             let mut ids = HashMap::new();
-            for (path, _) in blobs {
-                let blob = self.store.get(&path).await?;
-                if let Some(text) = text_of(&path, &blob.bytes) {
+            for (path, bytes) in &files {
+                if let Some(text) = text_of(path, bytes) {
                     let id = if layout::has_ext(path.file_name(), "md") {
                         frontmatter::get_md(&text, "id")
                     } else {
@@ -254,7 +240,6 @@ impl Drive {
                             .or_insert_with(|| ObjectId::generate().to_string());
                     }
                 }
-                files.push((path, blob.bytes));
             }
             for (path, bytes) in files {
                 let target = layout::rebase(&path, &node.path, &dest)?;
@@ -316,6 +301,65 @@ impl Drive {
             );
         }
         Ok(out)
+    }
+
+    /// The files a copy of `node` by `actor` carries, with their content.
+    /// What the copier cannot view stays behind, and books come as the
+    /// copier sees them.
+    async fn copy_sources(
+        &self,
+        actor: &Actor,
+        node: &Node,
+    ) -> DriveResult<Vec<(BlobPath, Bytes)>> {
+        // What the copier cannot view stays behind: a restricted
+        // folder or page inside a folder they can see must not reach
+        // them as a copy they own.
+        let mut hidden = Vec::new();
+        let mut books = Vec::new();
+        for member in self.subtree(node).await? {
+            if member.id != node.id && !self.may(actor, &member, Permission::View).await? {
+                hidden.push(member.path);
+            } else if member.kind == NodeKind::Book {
+                books.push(member);
+            }
+        }
+        books.retain(|b| !hidden.iter().any(|h| b.path.starts_with(h)));
+        let blobs = if node.kind.is_dir() {
+            // Build output and in-flight temp files are not content.
+            self.blobs_under(&node.path)
+                .await?
+                .into_iter()
+                .filter(|(p, _)| {
+                    !p.segments().any(|s| s == ".mdbook")
+                        && !p.file_name().contains(".vellum-tmp")
+                        && vellum_store::layout::Kind::of(p).is_content()
+                        && !hidden.iter().any(|h| p.starts_with(h))
+                })
+                .collect()
+        } else {
+            vec![(node.path.clone(), node.size)]
+        };
+        // A book's sections narrow access on their own: the copy gets
+        // the book as the copier sees it, and never its snapshots.
+        // Files beside or beneath a hidden section stay behind as well.
+        let mut files: Vec<(BlobPath, Bytes)> = Vec::with_capacity(blobs.len());
+        let mut views = Vec::with_capacity(books.len());
+        for book in books {
+            let view = self.book_view(actor, &book).await?;
+            files.extend(view.files.iter().map(|(p, b)| (p.clone(), b.clone())));
+            views.push((book.path, view));
+        }
+        for (path, _) in blobs {
+            let left_out = views.iter().any(|(root, view)| {
+                books::never_copied(root, &path)
+                    || books::from_view(root, &path)
+                    || view.withholds(root, &path)
+            });
+            if !left_out {
+                files.push((path.clone(), self.store.get(&path).await?.bytes));
+            }
+        }
+        Ok(files)
     }
 
     /// Moves a node's files to `path` in `space` under `parent`, updates
