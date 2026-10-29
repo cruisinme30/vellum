@@ -29,6 +29,7 @@ getrandom = "0.4"
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "json", "form"] }
 http = "1.5.0"
 jiff = "0.2.38"
+schemars = { version = "1.2.3", default-features = false, features = ["std", "derive"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde-saphyr = { version = "2.0.0", default-features = false, features = ["deserialize"] }
 serde_json = "1.0.154"
@@ -45,6 +46,7 @@ vellum-contracts.workspace = true
 vellum-crypto = { path = "../vellum-crypto", features = ["os-keychain"] }
 vellum-db.workspace = true
 vellum-drive = { path = "../vellum-drive" }
+vellum-format = { path = "../vellum-format" }
 vellum-help.workspace = true
 vellum-identity = { path = "../vellum-identity" }
 vellum-integrations = { path = "../vellum-integrations" }
@@ -52,6 +54,7 @@ vellum-kernel.workspace = true
 vellum-mcp = { path = "../vellum-mcp" }
 vellum-notify = { path = "../vellum-notify" }
 vellum-private = { path = "../vellum-private", features = ["os-keychain"] }
+vellum-render = { path = "../vellum-render" }
 vellum-security = { path = "../vellum-security" }
 vellum-store = { path = "../vellum-store" }
 vellum-tasks = { path = "../vellum-tasks" }

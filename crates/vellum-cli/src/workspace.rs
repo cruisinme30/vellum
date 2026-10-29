@@ -38,6 +38,7 @@ use vellum_work_service::{Directory, EventSink, SystemClock, WorkService};
 
 use crate::collab::Collab;
 use crate::google_http::{self, Endpoints, FileLinks, GoogleHttp};
+use crate::page_render::{Handles, PageRenderService};
 use crate::reindex::{KEY_VAR, index_key};
 use crate::tasks::{DriveTasks, Parts, TasksSettings};
 
@@ -252,9 +253,10 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
             space_of,
         )),
     ));
+    let directory = Arc::new(IdentityDirectory(Arc::clone(identity)));
     let (work, report) = WorkService::open(
         Arc::clone(&store),
-        Arc::new(IdentityDirectory(Arc::clone(identity))),
+        Arc::clone(&directory) as Arc<dyn Directory>,
         events,
         Arc::new(SystemClock),
     )
@@ -266,7 +268,6 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
             "some Work files could not be read"
         );
     }
-    let work = Arc::new(work);
     let adapter = DriveTasks::open(
         Parts {
             drive: Arc::clone(&drive),
@@ -285,6 +286,16 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
         tasks = tasks.with_google(Google::new(Arc::new(api), Arc::new(links), id));
     }
     let tasks = Arc::new(tasks);
+    let handles: Handles = Arc::new(move |user| {
+        let directory = Arc::clone(&directory);
+        Box::pin(async move { directory.handle(user).await })
+    });
+    let pages = PageRenderService::new(
+        Arc::clone(&drive),
+        Arc::clone(&work),
+        handles,
+        PageRenderService::figures_from_env()?,
+    );
     Ok(Workspace {
         services: vec![
             Arc::new(DriveService::new(Arc::clone(&drive))),
@@ -292,6 +303,7 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
             Arc::clone(&books) as Arc<dyn Service>,
             Arc::clone(&work) as Arc<dyn Service>,
             Arc::clone(&tasks) as Arc<dyn Service>,
+            Arc::new(pages),
         ],
         drive,
         books,

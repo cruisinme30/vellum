@@ -23,6 +23,7 @@ mod integrations;
 mod keys;
 mod mcp;
 mod notifications;
+mod page_render;
 mod private;
 #[cfg(test)]
 mod private_tests;
