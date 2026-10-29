@@ -373,14 +373,8 @@ fn steps(base: Option<&str>, branch: Option<&str>, tested: Option<&[String]>) ->
                 "--offline",
                 "--no-progress",
                 "--include-fragments",
-                "--exclude-path",
-                "LICENSES",
-                "--exclude-path",
-                "web/node_modules",
-                "--exclude-path",
-                "desktop/node_modules",
-                "--exclude-path",
-                "corpus",
+                // lychee.toml excludes LICENSES, corpus and downloaded
+                // third-party docs (node_modules, target, cargo home).
                 "**/*.md",
             ],
         ),

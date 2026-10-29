@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# The local link check (CI "Local links" and `cargo xtask fast`) reads this
+# file. It checks the repository's own Markdown, never third-party docs
+# that installs and builds download into the tree: node_modules, target,
+# a cargo home or pnpm store inside the checkout (ADR 0049).
+exclude_path = [
+  '(^|/)node_modules/',
+  '(^|/)target/',
+  '(^|/)\.cargo[^/]*/',
+  '(^|/)\.pnpm-store/',
+  '(^|/)LICENSES/',
+  '(^|/)corpus/',
+]
