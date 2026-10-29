@@ -1,0 +1,42 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Ship on "
+          },
+          {
+            "type": "date",
+            "date": "2026-11-24"
+          },
+          {
+            "type": "text",
+            "text": ", review "
+          },
+          {
+            "type": "date",
+            "date": "today"
+          },
+          {
+            "type": "text",
+            "text": ", demo "
+          },
+          {
+            "type": "mention",
+            "handle": "next-friday"
+          },
+          {
+            "type": "text",
+            "text": "."
+          }
+        ],
+        "id": null
+      }
+    ]
+  },
+  "diagnostics": []
+}
