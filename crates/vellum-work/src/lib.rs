@@ -47,7 +47,9 @@ pub mod triage;
 pub mod view;
 pub mod workflow;
 
-pub use comment::{BlockRef, Comment, CommentChanges, Comments, NewComment, Target, Thread};
+pub use comment::{
+    BlockRef, Comment, CommentChanges, Comments, Mention, NewComment, Target, Thread,
+};
 pub use cycle::{Cycle, CycleKey, CycleSettings};
 pub use doclink::{BackLink, IssueEmbed};
 pub use error::{Result, WorkError};

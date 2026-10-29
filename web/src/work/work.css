@@ -123,3 +123,52 @@
 .vl-comment-list p {
   margin: 0 0 4px;
 }
+
+/* A mention: no tick box, a Dismiss button instead. */
+.vl-task-mention .vl-task-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.vl-work-settings-panel {
+  margin: 24px 0;
+}
+
+.vl-work-settings-panel summary {
+  min-height: 40px;
+  cursor: pointer;
+  line-height: 40px;
+}
+
+.vl-work-settings {
+  display: grid;
+  gap: 12px;
+  max-width: 420px;
+}
+
+.vl-work-settings label {
+  display: grid;
+  gap: 4px;
+  font-size: 0.875rem;
+}
+
+.vl-work-settings input {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--md-outline);
+  border-radius: 4px;
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+  font: inherit;
+}
+
+.vl-work-settings p {
+  margin: 0;
+}
+
+.vl-work-settings button {
+  justify-self: start;
+}

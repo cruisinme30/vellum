@@ -13,6 +13,8 @@ import type {
   CreatedIssue,
   IssueGroups,
   IssueOut,
+  MyWorkSettingsInput,
+  MyWorkSettingsView,
   MyWorkView,
   TaskView,
   TeamOut,
@@ -36,6 +38,11 @@ export interface WorkApi {
   addTask(text: string): Promise<TaskView>;
   /** Ticks or unticks a task. */
   setDone(task: string, done: boolean): Promise<TaskView>;
+  /** Takes a mention (a task of kind `mention`) out of My Work. */
+  dismissMention(task: string): Promise<void>;
+  /** The person's time zone, start of day and digest time. */
+  settings(): Promise<MyWorkSettingsView>;
+  saveSettings(settings: MyWorkSettingsInput): Promise<MyWorkSettingsView>;
   teams(): Promise<TeamOut[]>;
   /** A team's open issues, most important first. */
   issues(team: string): Promise<IssueOut[]>;
@@ -62,6 +69,13 @@ export function createHttpWorkApi(http: Http): WorkApi {
       const completed = await http.send<CompleteView>("POST", `${path}/complete`, {});
       return completed.task;
     },
+    async dismissMention(task) {
+      const comment = task.replace(/^mention\./, "");
+      await http.send("POST", `/api/v1/my-work/mentions/${segment(comment)}/dismiss`, {});
+    },
+    settings: () => http.get<MyWorkSettingsView>("/api/v1/my-work/settings"),
+    saveSettings: (settings) =>
+      http.send<MyWorkSettingsView>("PUT", "/api/v1/my-work/settings", settings),
     async teams() {
       const list = await http.get<TeamsOut>(`${WORK}/teams`);
       return list.teams;
@@ -94,4 +108,11 @@ export function createHttpWorkApi(http: Http): WorkApi {
   };
 }
 
-export type { CommentOut, IssueOut, MyWorkView, TaskView, TeamOut } from "../api/api.gen";
+export type {
+  CommentOut,
+  IssueOut,
+  MyWorkSettingsView,
+  MyWorkView,
+  TaskView,
+  TeamOut,
+} from "../api/api.gen";

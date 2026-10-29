@@ -528,3 +528,44 @@ fn project_pages_embed_issue_views() {
             .is_err()
     );
 }
+
+#[test]
+fn mentions_wait_in_my_work_until_answered_or_resolved() {
+    let mut c = Comments::new();
+    let at = BlockRef::new(plan_doc(), "blk-bbbbbbbb").unwrap();
+    let draft = NewComment::new(cid(1), Target::block(at), "@dev can you check the limits?");
+    let _ = c.add(draft, &[], &as_user("priya")).unwrap();
+
+    let items = c.mentions_of(&user("dev"));
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0].comment, cid(1));
+    assert_eq!(items[0].author, user("priya"));
+    assert_eq!(items[0].summary, "@dev can you check the limits?");
+    // The author is never their own mention, and others see nothing.
+    assert!(c.mentions_of(&user("priya")).is_empty());
+    assert!(c.mentions_of(&user("mara")).is_empty());
+
+    // A reply from dev answers it; a later mention brings it back.
+    let reply = NewComment::reply(cid(2), cid(1), "Looking now.");
+    let _ = c.add(reply, &[], &as_user("dev")).unwrap();
+    assert!(c.mentions_of(&user("dev")).is_empty());
+    let again = NewComment::reply(cid(3), cid(1), "Thanks @dev, and @mara too");
+    let _ = c.add(again, &[], &as_user("priya")).unwrap();
+    assert_eq!(c.mentions_of(&user("dev"))[0].comment, cid(3));
+    assert_eq!(c.mentions_of(&user("mara"))[0].comment, cid(3));
+
+    // Resolving the thread clears it for everyone.
+    let _ = c.resolve(&cid(1), true, &as_user("priya")).unwrap();
+    assert!(c.mentions_of(&user("dev")).is_empty());
+    assert!(c.mentions_of(&user("mara")).is_empty());
+}
+
+#[test]
+fn a_thread_assigned_to_someone_is_not_also_their_mention() {
+    let mut c = Comments::new();
+    let mut draft = NewComment::new(cid(1), Target::doc(plan_doc()), "@dev please size this");
+    draft.assign_to = Some(user("dev"));
+    let _ = c.add(draft, &[], &as_user("priya")).unwrap();
+    assert_eq!(c.assignments(&user("dev")).len(), 1);
+    assert!(c.mentions_of(&user("dev")).is_empty());
+}

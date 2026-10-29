@@ -17,16 +17,19 @@ use std::sync::{Arc, Mutex};
 use jiff::Timestamp;
 use jiff::tz::TimeZone;
 use vellum_contracts::{BoxFuture, CredentialKind, Principal, Scope, ScopeSet, Service};
-use vellum_kernel::{DocId, Error, ErrorKind, ShareTokenHash, UserId};
+use vellum_kernel::{CommentId, DocId, Error, ErrorKind, ShareTokenHash, UserId};
 use vellum_tasks::lists;
 use vellum_tasks::model::{Origin, Task};
 use vellum_tasks::port::{Document, Profile, SecretKind, Workspace};
 use vellum_tasks::projection::FileContext;
 use vellum_tasks::raw::{RECIPIENT_HEADER, RawRequest, RawResponse};
+use vellum_tasks::schedule::NoticeKind;
 use vellum_tasks::service::{
     BucketName, CompleteInput, Config, CreateInput, CreateListInput, ImportFrom, ImportInput,
-    MemberInput, MoveInput, MyWorkView, NoInput, ParseInput, TaskRef, TasksService, UpdateInput,
+    MemberInput, MentionRef, MoveInput, MyWorkView, NoInput, ParseInput, TaskRef, TasksService,
+    UpdateInput,
 };
+use vellum_tasks::settings::{MyWorkSettingsInput, Preferences};
 
 #[derive(Debug, Clone)]
 struct File {
@@ -40,6 +43,8 @@ struct State {
     files: BTreeMap<DocId, File>,
     secrets: HashMap<SecretKind, ([u8; 32], UserId)>,
     members: Vec<(DocId, String)>,
+    preferences: Preferences,
+    dismissed: Vec<CommentId>,
 }
 
 struct Mem {
@@ -85,11 +90,13 @@ fn ready<T: Send + 'static>(value: T) -> BoxFuture<'static, T> {
 
 impl Workspace for Mem {
     fn profile(&self, user: UserId) -> BoxFuture<'_, Result<Profile, Error>> {
+        let preferences = self.state.lock().unwrap().preferences.clone();
         ready(Ok(Profile {
             user,
             handle: "ana".into(),
             display_name: "Ana".into(),
-            time_zone: TimeZone::get("Europe/London").unwrap(),
+            time_zone: preferences.zone_or(&TimeZone::get("Europe/London").unwrap()),
+            preferences,
         }))
     }
 
@@ -205,6 +212,28 @@ impl Workspace for Mem {
         _slack_user: String,
     ) -> BoxFuture<'_, Result<Option<UserId>, Error>> {
         ready(Ok(Some(self.user)))
+    }
+
+    fn save_preferences(
+        &self,
+        _user: UserId,
+        preferences: Preferences,
+    ) -> BoxFuture<'_, Result<(), Error>> {
+        self.state.lock().unwrap().preferences = preferences;
+        ready(Ok(()))
+    }
+
+    fn dismiss_mention(
+        &self,
+        _user: UserId,
+        comment: CommentId,
+    ) -> BoxFuture<'_, Result<(), Error>> {
+        self.state.lock().unwrap().dismissed.push(comment);
+        ready(Ok(()))
+    }
+
+    fn people(&self) -> BoxFuture<'_, Result<Vec<UserId>, Error>> {
+        ready(Ok(vec![self.user]))
     }
 }
 
@@ -328,7 +357,7 @@ fn operations_are_unique_and_versioned() {
     ids.sort_unstable();
     ids.dedup();
     assert_eq!(ids.len(), count);
-    assert_eq!(count, 22);
+    assert_eq!(count, 25);
 }
 
 #[tokio::test]
@@ -834,12 +863,10 @@ async fn the_digest_and_reminders() {
     );
     assert!(text.contains("Pay invoice"));
 
-    let settings = vellum_tasks::remind::Settings::new(TimeZone::get("Europe/London").unwrap());
     let due = f
         .service
         .reminders_due(
             f.user,
-            &settings,
             "2026-11-03T08:00:00Z".parse().unwrap(),
             "2026-11-03T09:00:00Z".parse().unwrap(),
         )
@@ -1273,4 +1300,116 @@ async fn time_blocks_sync_with_google_calendar_both_ways() {
             .connected
     );
     assert!(sync().await.is_err());
+}
+
+#[tokio::test]
+async fn settings_move_today_into_the_persons_time_zone() {
+    let f = fixture();
+    let settings = f.service.settings(f.user, NoInput {}).await.unwrap();
+    assert_eq!(settings.time_zone, None);
+    assert_eq!(settings.effective_time_zone, "Europe/London");
+    assert_eq!(settings.digest_at.as_deref(), Some("07:30"));
+    let before = f.service.my_work(f.user, NoInput {}).await.unwrap();
+
+    // Fourteen hours ahead of UTC, 10:00 UTC is already tomorrow.
+    let input = MyWorkSettingsInput {
+        time_zone: Some("Pacific/Kiritimati".into()),
+        day_starts_at: "08:00".into(),
+        digest_at: None,
+    };
+    let saved = f.service.set_settings(f.user, input).await.unwrap();
+    assert_eq!(saved.effective_time_zone, "Pacific/Kiritimati");
+    assert_eq!(saved.digest_at, None);
+    let after = f.service.my_work(f.user, NoInput {}).await.unwrap();
+    assert_ne!(
+        before.today, after.today,
+        "{} vs {}",
+        before.today, after.today
+    );
+    assert_eq!(f.service.take_edited(), [f.user]);
+
+    let bad = MyWorkSettingsInput {
+        time_zone: Some("Atlantis/Lost".into()),
+        day_starts_at: "08:00".into(),
+        digest_at: None,
+    };
+    let err = f.service.set_settings(f.user, bad).await.unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::InvalidInput);
+}
+
+#[tokio::test]
+async fn notices_carry_reminders_and_the_digest() {
+    let f = fixture();
+    let _ = f.service.take_edited();
+    let _ = f.add("Pay invoice today remind me 30 minutes before").await;
+    assert_eq!(f.service.take_edited(), [f.user]);
+    assert!(f.service.take_edited().is_empty());
+
+    // London, 07:00 to 09:00 UTC: the 07:30 digest and the 08:30 reminder.
+    let notices = f
+        .service
+        .notices(
+            f.user,
+            "2026-11-03T07:00:00Z".parse().unwrap(),
+            "2026-11-03T09:00:00Z".parse().unwrap(),
+        )
+        .await
+        .unwrap();
+    let kinds: Vec<NoticeKind> = notices.iter().map(|n| n.kind).collect();
+    assert_eq!(kinds, [NoticeKind::Digest, NoticeKind::Reminder]);
+    assert_eq!(notices[0].at.to_string(), "2026-11-03T07:30:00Z");
+    assert!(
+        notices[0].body.starts_with("1 today"),
+        "{}",
+        notices[0].body
+    );
+    assert_eq!(notices[1].title, "Pay invoice");
+    assert!(notices[1].url.starts_with("/p/"), "{}", notices[1].url);
+    assert_ne!(notices[0].subject, notices[1].subject);
+
+    // With the digest off, only the reminder is left.
+    let input = MyWorkSettingsInput {
+        time_zone: None,
+        day_starts_at: "09:00".into(),
+        digest_at: None,
+    };
+    let _ = f.service.set_settings(f.user, input).await.unwrap();
+    let notices = f
+        .service
+        .notices(
+            f.user,
+            "2026-11-03T07:00:00Z".parse().unwrap(),
+            "2026-11-03T09:00:00Z".parse().unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(notices.len(), 1);
+}
+
+#[tokio::test]
+async fn dismissing_a_mention_reaches_the_workspace() {
+    let f = fixture();
+    let comment = CommentId::generate();
+    let _ = f
+        .service
+        .dismiss_mention(
+            f.user,
+            MentionRef {
+                comment: comment.to_string(),
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(f.mem.state.lock().unwrap().dismissed, [comment]);
+    let err = f
+        .service
+        .dismiss_mention(
+            f.user,
+            MentionRef {
+                comment: "not-an-id".into(),
+            },
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::InvalidInput);
 }

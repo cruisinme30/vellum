@@ -448,6 +448,17 @@ pub enum Source {
         /// Whether the comment thread is resolved.
         resolved: bool,
     },
+    /// A comment that mentions the owner and that they have not answered.
+    Mention {
+        /// The comment that mentions them.
+        comment: CommentId,
+        /// The document the thread is on, if it is on one.
+        doc: Option<DocId>,
+        /// The issue key, if the thread is on an issue.
+        issue: Option<String>,
+        /// Who mentioned them, without `@`.
+        by: String,
+    },
     /// A review requested from the owner: a document review or a pull
     /// request linked to an issue.
     Review {
@@ -467,6 +478,7 @@ impl Source {
             Self::Checklist { doc, block, .. } => format!("{doc}.{block}"),
             Self::Issue { issue, .. } => format!("issue.{issue}"),
             Self::Comment { comment, .. } => format!("comment.{comment}"),
+            Self::Mention { comment, .. } => format!("mention.{comment}"),
             Self::Review { reference, .. } => format!("review.{reference}"),
         }
     }

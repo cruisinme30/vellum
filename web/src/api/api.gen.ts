@@ -3818,6 +3818,16 @@ export interface MemberInput {
 }
 
 /**
+ * A mention by the ID of the comment that made it.
+ */
+export interface MentionRef {
+  /**
+   * The comment ID.
+   */
+  comment: string;
+}
+
+/**
  * Dragging a task to another bucket.
  */
 export interface MoveInput {
@@ -3893,6 +3903,48 @@ export interface MyIssuesOut {
    * Issues in focus order.
    */
   issues: FocusedIssue[];
+}
+
+/**
+ * My Work settings as a client sends them, and as they are stored.
+ */
+export interface MyWorkSettingsInput {
+  /**
+   * When the day starts, `HH:MM`; reminders on a date-only deadline
+   * count from it.
+   */
+  day_starts_at?: string;
+  /**
+   * When the morning digest is sent, `HH:MM`; `null` turns it off.
+   */
+  digest_at?: string | null;
+  /**
+   * An IANA time zone such as `Europe/Berlin`; `null` follows the
+   * server's zone.
+   */
+  time_zone?: string | null;
+}
+
+/**
+ * A person's My Work settings.
+ */
+export interface MyWorkSettingsView {
+  /**
+   * When their day starts, `HH:MM`.
+   */
+  day_starts_at: string;
+  /**
+   * When their digest is sent, `HH:MM`; `null` when it is off.
+   */
+  digest_at?: string | null;
+  /**
+   * The zone My Work counts in for them now.
+   */
+  effective_time_zone: string;
+  /**
+   * The zone they chose; `null` when they follow the server's.
+   */
+  time_zone?: string | null;
 }
 
 /**
@@ -5816,7 +5868,7 @@ export interface TargetOut {
 /**
  * Where a task comes from.
  */
-export type TaskKind = "checklist" | "issue" | "comment" | "review";
+export type TaskKind = "checklist" | "issue" | "comment" | "mention" | "review";
 
 /**
  * A task by ID.
@@ -5864,6 +5916,10 @@ export interface TaskView {
    * The list's title, for items in task lists.
    */
   list?: string | null;
+  /**
+   * For a mention: who mentioned the person, without `@`.
+   */
+  mentioned_by?: string | null;
   /**
    * Whether its deadline has passed.
    */
@@ -5945,6 +6001,10 @@ export interface TasksCreateTaskView {
    */
   list?: string | null;
   /**
+   * For a mention: who mentioned the person, without `@`.
+   */
+  mentioned_by?: string | null;
+  /**
    * Whether its deadline has passed.
    */
   overdue: boolean;
@@ -5994,6 +6054,11 @@ export type TasksGoogleSyncNoInput = Record<string, unknown>;
 export type TasksListsNoInput = Record<string, unknown>;
 
 /**
+ * An acknowledgement with nothing to return.
+ */
+export type TasksMentionDismissDone = Record<string, unknown>;
+
+/**
  * One task in a view.
  */
 export interface TasksMoveTaskView {
@@ -6029,6 +6094,10 @@ export interface TasksMoveTaskView {
    * The list's title, for items in task lists.
    */
   list?: string | null;
+  /**
+   * For a mention: who mentioned the person, without `@`.
+   */
+  mentioned_by?: string | null;
   /**
    * Whether its deadline has passed.
    */
@@ -6090,6 +6159,10 @@ export interface TasksReopenTaskView {
    */
   list?: string | null;
   /**
+   * For a mention: who mentioned the person, without `@`.
+   */
+  mentioned_by?: string | null;
+  /**
    * Whether its deadline has passed.
    */
   overdue: boolean;
@@ -6132,6 +6205,11 @@ export type TasksRotateCaptureNoInput = Record<string, unknown>;
  * No input.
  */
 export type TasksRotateFeedNoInput = Record<string, unknown>;
+
+/**
+ * No input.
+ */
+export type TasksSettingsNoInput = Record<string, unknown>;
 
 /**
  * A task list.
@@ -6229,6 +6307,10 @@ export interface TasksUpdateTaskView {
    * The list's title, for items in task lists.
    */
   list?: string | null;
+  /**
+   * For a mention: who mentioned the person, without `@`.
+   */
+  mentioned_by?: string | null;
   /**
    * Whether its deadline has passed.
    */
@@ -9036,6 +9118,13 @@ export interface Operations {
     input: TasksListsNoInput;
     output: ListsView;
   };
+  /** Takes a mention out of My Work without replying */
+  "tasks.mention_dismiss": {
+    method: "POST";
+    path: "/v1/my-work/mentions/{comment}/dismiss";
+    input: MentionRef;
+    output: TasksMentionDismissDone;
+  };
   /** Moves a task to another bucket or day */
   "tasks.move": {
     method: "POST";
@@ -9091,6 +9180,20 @@ export interface Operations {
     path: "/v1/my-work/feed";
     input: TasksRotateFeedNoInput;
     output: SecretView;
+  };
+  /** Your My Work settings: time zone, start of day and digest time */
+  "tasks.settings": {
+    method: "GET";
+    path: "/v1/my-work/settings";
+    input: TasksSettingsNoInput;
+    output: MyWorkSettingsView;
+  };
+  /** Replaces your My Work settings */
+  "tasks.settings_update": {
+    method: "PUT";
+    path: "/v1/my-work/settings";
+    input: MyWorkSettingsInput;
+    output: MyWorkSettingsView;
   };
   /** Shares a list with someone */
   "tasks.share_list": {
@@ -9443,6 +9546,7 @@ export const OPERATIONS = {
   "tasks.google_sync": { method: "POST", path: "/v1/my-work/google/sync", mutation: true },
   "tasks.import": { method: "POST", path: "/v1/tasks/import", mutation: true },
   "tasks.lists": { method: "GET", path: "/v1/task-lists", mutation: false },
+  "tasks.mention_dismiss": { method: "POST", path: "/v1/my-work/mentions/{comment}/dismiss", mutation: true },
   "tasks.move": { method: "POST", path: "/v1/tasks/{task}/move", mutation: true },
   "tasks.my_work": { method: "GET", path: "/v1/my-work", mutation: false },
   "tasks.parse": { method: "GET", path: "/v1/tasks/parse", mutation: false },
@@ -9451,6 +9555,8 @@ export const OPERATIONS = {
   "tasks.revoke_feed": { method: "DELETE", path: "/v1/my-work/feed", mutation: true },
   "tasks.rotate_capture": { method: "POST", path: "/v1/my-work/capture-address", mutation: true },
   "tasks.rotate_feed": { method: "POST", path: "/v1/my-work/feed", mutation: true },
+  "tasks.settings": { method: "GET", path: "/v1/my-work/settings", mutation: false },
+  "tasks.settings_update": { method: "PUT", path: "/v1/my-work/settings", mutation: true },
   "tasks.share_list": { method: "POST", path: "/v1/task-lists/{list_id}/members", mutation: true },
   "tasks.unshare_list": { method: "DELETE", path: "/v1/task-lists/{list_id}/members/{member}", mutation: true },
   "tasks.update": { method: "PATCH", path: "/v1/tasks/{task}", mutation: true },

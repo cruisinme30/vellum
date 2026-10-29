@@ -15,6 +15,11 @@
 //!   threads assigned to them on documents.
 //! - **Secrets** (the feed token and the capture address) are stored as
 //!   hashes in `<data>/.vellum/tasks/secrets.json`.
+//! - **Mentions** are open comment threads where someone else named the
+//!   person and they have not written since, on issues and on documents
+//!   they can open, less the ones they dismissed.
+//! - **Settings** (time zone, start of day, digest time) and dismissed
+//!   mentions are kept in `<data>/.vellum/tasks/people.json`.
 //! - **Slack users** are linked to Vellum handles in
 //!   `<data>/.vellum/tasks/slack-users.json`, as `{"T…/U…": "handle"}`.
 //!
@@ -35,13 +40,16 @@ use vellum_contracts::BoxFuture;
 use vellum_drive::{Drive, DriveIndex, Filter, Node, NodeKind, Saved, Space, SpaceKind};
 use vellum_identity::Identity;
 use vellum_kernel::{
-    Actor, DocId, Error, ErrorKind, ObjectId, ShareTokenHash, SpaceId, Timestamp as KernelTime,
-    UserId,
+    Actor, CommentId, DocId, Error, ErrorKind, ObjectId, ShareTokenHash, SpaceId,
+    Timestamp as KernelTime, UserId,
 };
 use vellum_store::{Base, BlobPath, BlobStore, Etag};
 use vellum_tasks::model::{Due, IssueCategory, Origin, Priority, Source, Task, TaskFields};
 use vellum_tasks::port::{Document, Profile, SecretKind, Workspace};
 use vellum_tasks::projection::FileContext;
+use vellum_tasks::settings::Preferences;
+
+use crate::task_prefs::PeoplePrefs;
 use vellum_work::workflow::Category;
 use vellum_work::{Target, UserRef};
 use vellum_work_service::WorkService;
@@ -227,6 +235,7 @@ pub struct DriveTasks<S> {
     identity: Arc<Identity>,
     work: Arc<WorkService>,
     secrets: Secrets,
+    people: PeoplePrefs,
     slack: HashMap<String, String>,
     time_zone: TimeZone,
 }
@@ -269,6 +278,7 @@ impl<S: AuthzStore + 'static> DriveTasks<S> {
             identity: parts.identity,
             work: parts.work,
             secrets: Secrets::open(dir)?,
+            people: PeoplePrefs::open(dir)?,
             slack: slack_links(dir)?,
             time_zone: settings.time_zone.clone().unwrap_or_else(TimeZone::system),
         })
@@ -414,6 +424,7 @@ impl<S: AuthzStore + 'static> DriveTasks<S> {
         let Ok(me) = UserRef::parse(&handle) else {
             return Ok(Vec::new());
         };
+        let dismissed = self.people.dismissed(user);
         let tasks = self
             .work
             .read(|graph, comments| {
@@ -460,6 +471,7 @@ impl<S: AuthzStore + 'static> DriveTasks<S> {
                         list: None,
                     });
                 }
+                out.extend(mention_tasks(graph, comments, &me, &handle, &dismissed));
                 for assignment in comments.assignments(&me) {
                     if let Target::Doc { doc, .. } = assignment.target {
                         out.push(Task {
@@ -480,7 +492,35 @@ impl<S: AuthzStore + 'static> DriveTasks<S> {
                 out
             })
             .await;
-        Ok(tasks)
+        Ok(self.readable_only(user, tasks).await)
+    }
+
+    /// Drops mentions on documents the person cannot open; mentioning
+    /// someone does not share the document with them.
+    async fn readable_only(&self, user: UserId, tasks: Vec<Task>) -> Vec<Task> {
+        let actor = Actor::User { user };
+        let mut open = Vec::with_capacity(tasks.len());
+        let mut readable: HashMap<DocId, bool> = HashMap::new();
+        for task in tasks {
+            if let Source::Mention { doc: Some(doc), .. } = &task.source {
+                let can = if let Some(can) = readable.get(doc) {
+                    *can
+                } else {
+                    let can = self
+                        .drive
+                        .get(&actor, (*doc).into())
+                        .await
+                        .is_ok_and(|node| node.is_live());
+                    let _ = readable.insert(*doc, can);
+                    can
+                };
+                if !can {
+                    continue;
+                }
+            }
+            open.push(task);
+        }
+        open
     }
 
     async fn read_doc(&self, user: UserId, doc: DocId) -> Result<Document, Error> {
@@ -623,6 +663,46 @@ impl<S: AuthzStore + 'static> DriveTasks<S> {
     }
 }
 
+/// Unanswered, undismissed mentions of `me` as My Work items.
+fn mention_tasks(
+    graph: &vellum_work::WorkGraph,
+    comments: &vellum_work::Comments,
+    me: &UserRef,
+    handle: &str,
+    dismissed: &[CommentId],
+) -> Vec<Task> {
+    let mut out = Vec::new();
+    for mention in comments.mentions_of(me) {
+        if dismissed.contains(&mention.comment) {
+            continue;
+        }
+        let (doc, issue) = match mention.target {
+            Target::Doc { doc, .. } => (Some(doc), None),
+            Target::Issue { issue } => {
+                let Some(found) = graph.issue(&issue) else {
+                    continue;
+                };
+                (None, Some(found.key().to_string()))
+            }
+        };
+        out.push(Task {
+            source: Source::Mention {
+                comment: mention.comment,
+                doc,
+                issue,
+                by: mention.author.to_string(),
+            },
+            title: mention.summary,
+            done: false,
+            fields: TaskFields::default(),
+            assignees: vec![handle.to_owned()],
+            parent: None,
+            list: None,
+        });
+    }
+    out
+}
+
 const fn category(category: Category) -> IssueCategory {
     match category {
         Category::Triage => IssueCategory::Triage,
@@ -639,11 +719,13 @@ impl<S: AuthzStore + 'static> Workspace for DriveTasks<S> {
     fn profile(&self, user: UserId) -> BoxFuture<'_, Result<Profile, Error>> {
         Box::pin(async move {
             let person = self.identity.user(user)?;
+            let preferences = self.people.preferences(user);
             Ok(Profile {
                 user,
                 handle: person.handle,
                 display_name: person.name,
-                time_zone: self.time_zone.clone(),
+                time_zone: preferences.zone_or(&self.time_zone),
+                preferences,
             })
         })
     }
@@ -704,6 +786,34 @@ impl<S: AuthzStore + 'static> Workspace for DriveTasks<S> {
         hash: ShareTokenHash,
     ) -> BoxFuture<'_, Result<Option<UserId>, Error>> {
         Box::pin(async move { self.secrets.user_for(kind, hash) })
+    }
+
+    fn save_preferences(
+        &self,
+        user: UserId,
+        preferences: Preferences,
+    ) -> BoxFuture<'_, Result<(), Error>> {
+        Box::pin(async move { self.people.set_preferences(user, &preferences) })
+    }
+
+    fn dismiss_mention(
+        &self,
+        user: UserId,
+        comment: CommentId,
+    ) -> BoxFuture<'_, Result<(), Error>> {
+        Box::pin(async move { self.people.dismiss(user, comment) })
+    }
+
+    fn people(&self) -> BoxFuture<'_, Result<Vec<UserId>, Error>> {
+        Box::pin(async move {
+            Ok(self
+                .identity
+                .users()
+                .into_iter()
+                .filter(|u| !u.disabled)
+                .map(|u| u.id)
+                .collect())
+        })
     }
 
     fn slack_user(

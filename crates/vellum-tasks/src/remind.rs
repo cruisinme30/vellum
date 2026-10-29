@@ -132,7 +132,12 @@ fn link(task: &Task) -> String {
         Source::Checklist { doc, .. } | Source::Comment { doc, .. } => {
             format!("[{title}](vellum://doc/{doc})")
         }
-        Source::Issue { key, .. } => format!("{key} {title}"),
+        Source::Mention { doc: Some(doc), .. } => format!("[{title}](vellum://doc/{doc})"),
+        Source::Issue { key, .. }
+        | Source::Mention {
+            issue: Some(key), ..
+        } => format!("{key} {title}"),
+        Source::Mention { .. } => title,
         Source::Review { .. } => format!("Review: {title}"),
     }
 }

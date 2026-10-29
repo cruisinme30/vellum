@@ -10,7 +10,8 @@
 //! it was read at. The calendar feed, CalDAV and capture endpoints are
 //! not JSON and live in [`crate::raw`].
 
-use std::sync::Arc;
+use std::collections::BTreeSet;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use jiff::civil::Date;
@@ -18,7 +19,7 @@ use jiff::{Timestamp, Zoned};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use vellum_contracts::{HttpMethod, Operation, RequestContext, Scope, Service};
-use vellum_kernel::{BlockId, DocId, Error, ErrorKind, UserId};
+use vellum_kernel::{BlockId, CommentId, DocId, Error, ErrorKind, UserId};
 
 use crate::attrs::Attrs;
 use crate::checklist::{self, Checklist, Completion, EditError};
@@ -29,6 +30,7 @@ use crate::port::{Document, Profile, SecretKind, Workspace};
 use crate::projection::{self, Entry, MyWork, Target, UpcomingGroup};
 use crate::quickadd::{self, TokenKind};
 use crate::remind;
+use crate::settings::{MyWorkSettingsInput, MyWorkSettingsView, Preferences};
 use crate::{capture, feed};
 
 /// How many completed tasks the view shows.
@@ -58,6 +60,9 @@ pub struct TasksService {
     pub(crate) config: Config,
     clock: Clock,
     pub(crate) google: Option<Arc<crate::google::Google>>,
+    /// People whose task files changed through this service since the
+    /// reminder scheduler last asked.
+    edited: Arc<Mutex<BTreeSet<UserId>>>,
 }
 
 impl std::fmt::Debug for TasksService {
@@ -145,6 +150,8 @@ pub enum TaskKind {
     Issue,
     /// A comment that assigns the person.
     Comment,
+    /// A comment that mentions the person.
+    Mention,
     /// A review request.
     Review,
 }
@@ -172,6 +179,8 @@ pub struct TaskView {
     pub fields: FieldsView,
     /// People mentioned in the item, without `@`.
     pub assignees: Vec<String>,
+    /// For a mention: who mentioned the person, without `@`.
+    pub mentioned_by: Option<String>,
     /// Subtasks.
     pub subtasks: Vec<Self>,
 }
@@ -182,6 +191,7 @@ impl TaskView {
             Source::Checklist { doc, .. } => (TaskKind::Checklist, Some(*doc), None),
             Source::Issue { key, .. } => (TaskKind::Issue, None, Some(key.clone())),
             Source::Comment { doc, .. } => (TaskKind::Comment, Some(*doc), None),
+            Source::Mention { doc, issue, .. } => (TaskKind::Mention, *doc, issue.clone()),
             Source::Review { .. } => (TaskKind::Review, None, None),
         };
         Self {
@@ -195,6 +205,10 @@ impl TaskView {
             issue_key,
             fields: FieldsView::new(&task.fields),
             assignees: task.assignees.clone(),
+            mentioned_by: match &task.source {
+                Source::Mention { by, .. } => Some(by.clone()),
+                _ => None,
+            },
             subtasks,
         }
     }
@@ -464,6 +478,13 @@ pub struct CreateInput {
     pub parent: Option<String>,
 }
 
+/// A mention by the ID of the comment that made it.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct MentionRef {
+    /// The comment ID.
+    pub comment: String,
+}
+
 /// A task by ID.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct TaskRef {
@@ -642,6 +663,7 @@ impl TasksService {
             config,
             clock: Arc::new(Timestamp::now),
             google: None,
+            edited: Arc::default(),
         }
     }
 
@@ -654,6 +676,24 @@ impl TasksService {
 
     pub(crate) fn now(&self) -> Timestamp {
         (self.clock)()
+    }
+
+    /// Notes that `user`'s tasks may have changed, so their reminders are
+    /// planned again on the scheduler's next tick.
+    pub(crate) fn touch(&self, user: UserId) {
+        if let Ok(mut edited) = self.edited.lock() {
+            let _ = edited.insert(user);
+        }
+    }
+
+    /// The people whose tasks changed through this service since the last
+    /// call.
+    #[must_use]
+    pub fn take_edited(&self) -> Vec<UserId> {
+        self.edited
+            .lock()
+            .map(|mut edited| std::mem::take(&mut *edited).into_iter().collect())
+            .unwrap_or_default()
     }
 
     pub(crate) async fn me(&self, user: UserId) -> Result<Me, Error> {
@@ -707,6 +747,7 @@ impl TasksService {
                 .await
             {
                 Ok(version) => {
+                    self.touch(user);
                     let written = Document {
                         context: current.context,
                         text,
@@ -795,7 +836,9 @@ impl TasksService {
             lists::list_path(handle, title)
         };
         let text = lists::new_list(DocId::generate(), title, handle);
-        self.workspace.create(user, path, text).await
+        let created = self.workspace.create(user, path, text).await;
+        self.touch(user);
+        created
     }
 
     /// Adds a task from a quick-add line (R-MW-3).
@@ -1237,13 +1280,60 @@ impl TasksService {
     pub async fn reminders_due(
         &self,
         user: UserId,
-        settings: &remind::Settings,
         after: Timestamp,
         until: Timestamp,
     ) -> Result<Vec<remind::DueReminder>, Error> {
         let profile = self.workspace.profile(user).await?;
+        let settings = profile.preferences.reminders(profile.time_zone.clone());
         let tasks = self.gather(user, &profile.handle).await?;
-        Ok(remind::due_between(&tasks, after, until, settings))
+        Ok(remind::due_between(&tasks, after, until, &settings))
+    }
+
+    /// The person's My Work settings (D178).
+    ///
+    /// # Errors
+    ///
+    /// Fails when the profile cannot be read.
+    pub async fn settings(
+        &self,
+        user: UserId,
+        _input: NoInput,
+    ) -> Result<MyWorkSettingsView, Error> {
+        let profile = self.workspace.profile(user).await?;
+        Ok(MyWorkSettingsView::new(
+            &profile.preferences,
+            &profile.time_zone,
+        ))
+    }
+
+    /// Replaces the person's My Work settings (D178).
+    ///
+    /// # Errors
+    ///
+    /// `invalid` for an unknown zone or a malformed time.
+    pub async fn set_settings(
+        &self,
+        user: UserId,
+        input: MyWorkSettingsInput,
+    ) -> Result<MyWorkSettingsView, Error> {
+        let preferences = Preferences::parse(&input)?;
+        self.workspace.save_preferences(user, preferences).await?;
+        self.touch(user);
+        self.settings(user, NoInput {}).await
+    }
+
+    /// Takes a mention out of the person's My Work (D179).
+    ///
+    /// # Errors
+    ///
+    /// `invalid` for a malformed comment ID.
+    pub async fn dismiss_mention(&self, user: UserId, input: MentionRef) -> Result<Done, Error> {
+        let comment: CommentId = input
+            .comment
+            .parse()
+            .map_err(|_| invalid("not a comment ID"))?;
+        self.workspace.dismiss_mention(user, comment).await?;
+        Ok(Done {})
     }
 
     /// Tidies a file after the editor saves it: gives new checklist items
@@ -1254,6 +1344,8 @@ impl TasksService {
     ///
     /// Fails when the workspace does.
     pub async fn settle(&self, user: UserId, doc: DocId) -> Result<(), Error> {
+        // The editor saved: whatever it wrote may hold new reminders.
+        self.touch(user);
         let me = self.me(user).await?;
         let now = me.now;
         let _ = self
@@ -1290,6 +1382,7 @@ impl Service for TasksService {
     fn operations(self: Arc<Self>) -> Vec<Operation> {
         let mut operations = task_operations(&self);
         operations.extend(list_operations(&self));
+        operations.extend(settings_operations(&self));
         operations.extend(google_operations(&self));
         operations
     }
@@ -1445,6 +1538,34 @@ fn list_operations(s: &Arc<TasksService>) -> Vec<Operation> {
             handler!(s, revoke_capture),
         )
         .summary("Turns capture by e-mail off"),
+    ]
+}
+
+fn settings_operations(s: &Arc<TasksService>) -> Vec<Operation> {
+    vec![
+        Operation::query(
+            "tasks.settings",
+            "/v1/my-work/settings",
+            Scope::Read,
+            handler!(s, settings),
+        )
+        .summary("Your My Work settings: time zone, start of day and digest time"),
+        Operation::mutation(
+            "tasks.settings_update",
+            HttpMethod::Put,
+            "/v1/my-work/settings",
+            Scope::WriteDirect,
+            handler!(s, set_settings),
+        )
+        .summary("Replaces your My Work settings"),
+        Operation::mutation(
+            "tasks.mention_dismiss",
+            HttpMethod::Post,
+            "/v1/my-work/mentions/{comment}/dismiss",
+            Scope::WriteDirect,
+            handler!(s, dismiss_mention),
+        )
+        .summary("Takes a mention out of My Work without replying"),
     ]
 }
 
