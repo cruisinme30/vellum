@@ -11,6 +11,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "@startuml\nactor Developer\nparticipant Gateway\ndatabase \"Audit log\" as Audit\nDeveloper -> Gateway: POST /orders\nGateway -> Audit: write decision\nGateway --> Developer: 201 Created\n@enduml\n"
       }
     ]
