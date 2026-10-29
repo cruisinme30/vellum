@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+[package]
+name = "vellum-books-service"
+description = "The books service: book operations over the gateway, with section restrictions enforced and mirrored into authorization."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[package.metadata.vellum]
+layer = "service"
+
+[lints]
+workspace = true
+
+[dependencies]
+async-trait = "0.1.92"
+bytes = "1.12.1"
+futures = "0.3.34"
+schemars = { version = "1.2.3", default-features = false, features = ["std", "derive"] }
+serde = { version = "1.0.229", features = ["derive"] }
+tokio = { version = "1.49.0", features = ["sync"] }
+tracing = "0.1.44"
+vellum-authz = { path = "../vellum-authz" }
+vellum-books = { path = "../vellum-books" }
+vellum-contracts = { path = "../vellum-contracts" }
+vellum-kernel.workspace = true
+vellum-store = { path = "../vellum-store" }
+
+[dev-dependencies]
+serde_json = "1.0.154"
+tempfile = "3.27.0"
+tokio = { version = "1.49.0", features = ["macros", "rt"] }

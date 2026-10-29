@@ -11,9 +11,9 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D67, D68, D69
+- Decisions: D67, D68, D69, D143, D144, D145
 - Requirements: R-BK-1 to R-BK-10
-- Issue: #112, #113, #114, #115, #116, #117, #118
+- Issue: #112, #113, #114, #115, #116, #117, #118, #327, #336
 - Pull requests: #212
 
 :::
@@ -101,9 +101,6 @@ summary cannot read or write outside its book.
   Per-file history stays with the version service (R-BK-2). A diff matches
   sections by ID and reports added, removed, moved or given a new number, and
   changed sections with unified patches.
-- A principal in `restrict_to`, `owners` or `reviewers` is
-  `user:<UserId>` or `group:<GroupId>`, with the ID as the kernel ULID
-  in upper case. Matching is exact.
 - Section restrictions only narrow. A section is visible when the viewer
   is in the `restrict_to` set of that section and of every enclosing
   section that has one. A child cannot name someone its parent excludes.
@@ -126,15 +123,70 @@ summary cannot read or write outside its book.
 - **Snapshots in version history**: they would depend on retention and
   not travel with the folder.
 
+### D143: the books service
+
+- A new crate, `vellum-books-service` (service layer), registers the
+  `books` service on the service seam: list, table of contents, read a
+  section, add, move, update and remove sections, set section access,
+  and snapshots with diffs, under `/v1/books/...`.
+- Each request loads the book from the blob store, so edits made on disk
+  are seen at once. A save writes only changed files, guarded by the
+  etags read, with `book.yaml` checked first, so an edit made meanwhile
+  fails with a conflict and is never overwritten.
+- Removing a section deletes its files; snapshots and the store's
+  history keep earlier versions.
+
+### D144: section access is enforced and mirrored
+
+- Opening a book needs read access to its `.book` node, editing needs
+  edit access, and changing section access needs manage access.
+- A restricted section is visible to book managers and owners, and to
+  others only through one of its effective `restrict_to` principals
+  (their user or one of their groups). Anything else answers "not
+  found". Removing a section needs sight of everything under it.
+- A principal is `user:<UserId>` or `group:<GroupId>`, with the ID as the
+  kernel ULID in upper case. Matching is exact.
+- After every edit, the service mirrors each section's effective
+  restriction into authorization: a `restricted` marker plus an `editor`
+  grant per principal, which the engine caps at the principal's relation
+  on the book. The index already registers sections under the book, and
+  the effective set is a literal intersection, so a flat tree is exact.
+  Sections the engine does not know yet are skipped; the service still
+  enforces them.
+- Every role grant on a section node belongs to the mirror, because the
+  drive never shares a chapter on its own.
+
+### D145: one numbering for every reader
+
+- Readers who cannot see a section get the book's own numbers, so
+  colleagues quote the same `§2.3`. Hidden sections drop out of the
+  contents, and a cross-reference to one keeps its bare `§`.
+- A gap in the numbers shows that something is hidden, never what.
+- Diffs leave out sections hidden now (or, for sections since removed,
+  hidden in the version that had them), and show settings and summary
+  changes to managers only.
+- Copying a whole book in the drive copies only what the copier may see
+  (`Book::view_for`) and never copies `.snapshots/`, because snapshots
+  hold every section's text (red-team finding #327).
+
+## Alternatives
+
+- **Enforce sections only in the books service**: search, MCP and export
+  would still see restricted chapters through the index.
+- **Renumber per reader**: numbers would differ between colleagues and
+  cross-references would break when quoted.
+- **Nest sections in the authorization tree**: needs the index and the
+  drive to understand `SUMMARY.md`; the literal intersection makes it
+  unnecessary.
+
 ## Consequences
 
 - The export service walks `Book::toc()`: each entry has its number,
   label, depth and heading level, and `TocEntry::rebased` starts a
   section's export at level 1 (R-BK-5).
-- The HTTP and GraphQL operations for books are registered by the pages
-  service on top of this crate through the service seam.
+- The HTTP and GraphQL operations for books come from the books service
+  (D143), not the pages service.
+- The watcher should call `BooksService::sync_access` when a `book.yaml`
+  changes on disk, so outside edits to restrictions reach authorization.
 - The drive watcher must ignore `.mdbook/` and treat `.snapshots/` as book
   data, not documents.
-- Copying a whole book in the drive copies only what the copier may see
-  (`Book::published_view`) and never copies `.snapshots/`, because
-  snapshots hold every section's text (red-team finding, see #322).
