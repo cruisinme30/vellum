@@ -43,6 +43,7 @@ url = "2.5.8"
 vellum-admin = { path = "../vellum-admin" }
 vellum-api = { path = "../vellum-api" }
 vellum-authz = { path = "../vellum-authz" }
+vellum-books = { path = "../vellum-books" }
 vellum-books-service = { path = "../vellum-books-service" }
 vellum-collab = { path = "../vellum-collab" }
 vellum-collections = { path = "../vellum-collections" }

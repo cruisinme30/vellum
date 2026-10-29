@@ -38,8 +38,9 @@ const BOOK: BookInfo = {
   ],
 };
 
+/** Only the reading operations; a reader never reaches the others. */
 function fakeApi(): BooksApi {
-  return {
+  const reading: Pick<BooksApi, "list" | "book" | "section"> = {
     list: vi.fn(() => Promise.resolve([{ id: "b1", title: "Handbook", path: "handbook.book" }])),
     book: vi.fn(() => Promise.resolve(BOOK)),
     section: vi.fn((_book: string, section: string) =>
@@ -56,6 +57,7 @@ function fakeApi(): BooksApi {
       }),
     ),
   };
+  return reading as BooksApi;
 }
 
 function renderAt(path: string, api?: BooksApi) {
