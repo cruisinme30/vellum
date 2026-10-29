@@ -48,7 +48,7 @@ port.
 - Only schedule-based repeats carry an RRULE.
 - The token is a share token; only its hash is stored, and rotating it
   revokes the old one.
-- CalDAV (`/dav/…`) serves each list as VTODOs in floating local time;
+- CalDAV (`/dav/…`) serves each list as `VTODO` items in floating local time;
   sync tokens are list versions, and a stale token gets `403
   valid-sync-token`. Client UIDs are kept as `src=caldav:<uid>`.
 - Why: this is what calendar apps and task clients actually read, with no
@@ -68,7 +68,7 @@ port.
 
 - **A sidecar index for fields**: breaks "files are the truth". Rejected.
 - **Dataview-style inline fields**: collide with prose. Rejected.
-- **VTODOs in the subscribed feed**: most calendar apps ignore them.
+- **`VTODO` items in the subscribed feed**: most calendar apps ignore them.
 - **Tombstones for CalDAV sync**: need storage the crate does not own.
 
 ## Consequences
