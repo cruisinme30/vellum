@@ -12,8 +12,8 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D97, D98, D99
-- Issue: none (recorded before the issue rule, D119)
-- Pull requests: #34
+- Issue: #182 (desktop), #185 (PWA); also #91, #184 and #186
+- Pull requests: #34, #139, #263
 - Requirements: R-WK-6, R-MW-5, R-LT-4, R-SE-10
 
 :::
@@ -45,6 +45,13 @@ every client must run the same editor build.
   integration off, a strict content security policy and no remote
   content in privileged windows. External links open in the system
   browser. The bridge exposes functions, never `ipcRenderer` itself.
+- The PWA precaches the app shell with content revisions and serves it
+  cache-first, so it starts offline. APIs, sign-in and MCP always go to
+  the network; records reach the device only through the store (D98),
+  never the HTTP cache. A new deployment offers a reload rather than
+  swapping code under an open editor.
+- Web Push uses VAPID keys held by the notifications service. Permission
+  is asked only from a click; a payload links only to Vellum's origin.
 - Layout, including the phone layout, belongs to `web/src/shell/`.
   Native iOS and Android shells (release 1.1) will reuse
   `web/src/platform/` unchanged.
@@ -90,6 +97,10 @@ every client must run the same editor build.
   (`basic_text` back end) the app keeps tokens in memory only and asks
   people to sign in again after a restart, rather than store a token
   that any local process could read.
+- Pages load from the privileged `app://vellum/` scheme, which also
+  forwards `/api/*` to the server and adds the access token in the main
+  process. Local mode runs the bundled `vellum serve` on a loopback port
+  with the `single` profile and waits for `/readyz`.
 - Releases are built with electron-builder. macOS builds are signed and
   notarised when the repository secrets `APPLE_ID`,
   `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`, `CSC_LINK` and

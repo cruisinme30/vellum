@@ -97,6 +97,10 @@ area/cli:
   - changed-files:
       - any-glob-to-any-file:
           - "crates/vellum-cli/**"
+area/desktop:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "desktop/**"
 area/editor:
   - changed-files:
       - any-glob-to-any-file:

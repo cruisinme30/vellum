@@ -30,6 +30,7 @@ tracing = "0.1.44"
 url = "2.5.8"
 vellum-api = { path = "../vellum-api" }
 vellum-contracts.workspace = true
+vellum-db.workspace = true
 vellum-help.workspace = true
 vellum-identity = { path = "../vellum-identity" }
 vellum-kernel.workspace = true
