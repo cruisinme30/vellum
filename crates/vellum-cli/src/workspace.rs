@@ -635,17 +635,17 @@ async fn join_cluster(
 
 /// Rescans the workspace files once per cluster (a replica that starts
 /// while others run finds the index already current), then starts the
-/// cluster's upkeep (D163).
+/// cluster's upkeep (D163) and the drive's (D266).
 async fn rescan_and_maintain(
     replica: &Replica,
     others_alive: bool,
     drive: &Arc<Drive>,
     index: &Index,
 ) {
-    let drive = Arc::clone(drive);
+    let scanned = Arc::clone(drive);
     replica
         .rescan_once(others_alive, async move {
-            match drive.scan().await {
+            match scanned.scan().await {
                 Ok(report) => {
                     tracing::info!(?report, "drive index rebuilt from the workspace files");
                 }
@@ -654,6 +654,44 @@ async fn rescan_and_maintain(
         })
         .await;
     replica.maintain(index);
+    drive_jobs(replica, drive);
+}
+
+/// How often trashed items past their space's trash days are deleted.
+const TRASH_EXPIRY_EVERY: Duration = Duration::from_hours(1);
+/// How often every space's version retention is applied.
+const VERSION_RETENTION_EVERY: Duration = Duration::from_hours(24);
+
+/// The drive's upkeep (D266): trash expiry and version retention, each on
+/// one replica of the cluster at a time, as Vellum itself. Each also runs
+/// when a replica takes its lease, so a restart catches up at once.
+fn drive_jobs(replica: &Replica, drive: &Arc<Drive>) {
+    let trash = Arc::clone(drive);
+    replica.every("drive.trash_expiry", TRASH_EXPIRY_EVERY, move || {
+        let drive = Arc::clone(&trash);
+        async move {
+            match drive.purge_expired().await {
+                Ok(0) => {}
+                Ok(purged) => tracing::info!(purged, "deleted expired trash"),
+                Err(error) => tracing::warn!(%error, "trash expiry skipped"),
+            }
+        }
+    });
+    let versions = Arc::clone(drive);
+    replica.every(
+        "drive.version_retention",
+        VERSION_RETENTION_EVERY,
+        move || {
+            let drive = Arc::clone(&versions);
+            async move {
+                match drive.prune_all_versions().await {
+                    Ok(0) => {}
+                    Ok(pruned) => tracing::info!(pruned, "deleted versions past retention"),
+                    Err(error) => tracing::warn!(%error, "version retention skipped"),
+                }
+            }
+        },
+    );
 }
 
 /// My Work's cluster jobs: Google Calendar sync every

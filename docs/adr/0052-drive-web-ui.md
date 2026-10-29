@@ -11,8 +11,8 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D226, D227, D228
-- Issue: #503
+- Decisions: D226, D227, D228, D266
+- Issue: #503, #509
 - Pull requests: to be linked when merged
 
 :::
@@ -74,6 +74,17 @@ own record.
   in GB, the trash days and the version retention, and "Apply retention
   now" runs `drive.prune_versions`.
 
+### D266: trash expiry and version retention run once per cluster
+
+- `vellum serve` runs `Drive::purge_expired` every hour and
+  `Drive::prune_all_versions` every day, each under its own lease
+  (`drive.trash_expiry`, `drive.version_retention`), so one replica
+  does the work, as for the other cluster jobs (ADR 0038).
+- Both act as Vellum itself and need no person's rights. Each space
+  keeps its own trash days and retention policy.
+- A replica that takes a lease runs the job at once, so a restart
+  catches up. "Apply retention now" stays as a manual trigger.
+
 ## Alternatives
 
 - **Fold the Drive into the sidebar's page tree**: the tree shows one
@@ -92,8 +103,7 @@ own record.
 - Every R-DR navigation, trash, activity, filter and quota requirement
   now has a screen. Uploads stay with the upload route (ADR 0039 D211-D213).
 - Each list reads the person's stars in a second request.
-- `vellum serve` runs neither the trash expiry (`Drive::purge_expired`)
-  nor version retention on a schedule yet. The settings page therefore
-  offers "Apply retention now"; the scheduled job is #509.
+- Trash and old versions now go on their own (#509). Retention reads
+  every page's versions once a day, which grows with the workspace.
 - Activity shows no names for other people until a people directory
   exists.

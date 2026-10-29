@@ -1028,6 +1028,60 @@ async fn my_drive_is_made_once_per_person(kind: Kind) -> TestResult {
 }
 
 /// Runs each test on every index.
+/// The scheduled upkeep (D266) applies every space's retention as Vellum
+/// itself: no person's rights are needed, and each space keeps its own
+/// policy.
+async fn scheduled_retention_covers_every_space(kind: Kind) -> TestResult {
+    let w = world(kind).await?;
+    let eng = w
+        .drive
+        .create_space(&w.alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .await?;
+    let ops = w
+        .drive
+        .create_space(&w.alice, SpaceKind::SharedDrive, "ops", "Operations", None)
+        .await?;
+    let mut tight = SpaceSettings::default();
+    tight.retention.keep_all_days = 15;
+    tight.retention.daily_days = 0;
+    tight.retention.weekly_weeks = Some(0);
+    let _ = w.drive.update_space(&w.alice, eng.id, None, tight).await?;
+    let mut pages = Vec::new();
+    for space in [eng.id, ops.id] {
+        pages.push(
+            w.drive
+                .create_page(&w.alice, space, None, "Log", "v1\n")
+                .await?,
+        );
+    }
+    for n in 2..=4 {
+        w.clock.advance_days(10);
+        for page in &mut pages {
+            *page = w.edit(&w.alice, page, |t| format!("{t}v{n}\n")).await?.node;
+        }
+    }
+    let [eng_page, ops_page] = <[Node; 2]>::try_from(pages).map_err(|_| "two pages")?;
+    // Ages 0, 10, 20 and 30 days in each space. Engineering keeps the two
+    // under 15 days; Operations keeps everything by default.
+    assert_eq!(w.drive.prune_all_versions().await?, 2);
+    assert_eq!(w.drive.versions(&w.alice, eng_page.id).await?.len(), 2);
+    assert_eq!(w.drive.versions(&w.alice, ops_page.id).await?.len(), 4);
+    assert_eq!(
+        w.drive.prune_all_versions().await?,
+        0,
+        "a second run finds nothing"
+    );
+
+    // Trash expiry covers every space too.
+    let _ = w.drive.trash(&w.alice, eng_page.id).await?;
+    let _ = w.drive.trash(&w.alice, ops_page.id).await?;
+    w.clock.advance_days(30);
+    assert_eq!(w.drive.purge_expired().await?, 2);
+    assert!(w.drive.trash_list(&w.alice, eng.id).await?.is_empty());
+    assert!(w.drive.trash_list(&w.alice, ops.id).await?.is_empty());
+    Ok(())
+}
+
 macro_rules! on_every_index {
     ($($name:ident),* $(,)?) => {$(
         mod $name {
@@ -1066,4 +1120,5 @@ on_every_index!(
     pages_nest_under_pages,
     siblings_keep_their_order_and_the_tree_comes_whole,
     my_drive_is_made_once_per_person,
+    scheduled_retention_covers_every_space,
 );

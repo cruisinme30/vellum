@@ -13,7 +13,9 @@
 //! - pruning the change feed, the page change log, finished jobs and old
 //!   rate counts runs on whichever replica holds `maintenance`;
 //! - the Google Calendar sync runs on whichever holds `tasks.google_sync`,
-//!   and My Work reminders on whichever holds `tasks.reminders`.
+//!   and My Work reminders on whichever holds `tasks.reminders`;
+//! - trash expiry and version retention run on whichever replica holds
+//!   `drive.trash_expiry` and `drive.version_retention` (D266).
 //!
 //! On a single server all of this simply runs there, as before.
 
