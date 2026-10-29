@@ -43,3 +43,7 @@ tsc
 Affero
 [Ww]orkstreams?
 [Ll]abeler
+[Mm]utators?
+Yjs
+[Jj]ittered
+Replicache
