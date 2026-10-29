@@ -1,7 +1,9 @@
 ## Rollback {#rollback .wide}
 
 ::: info {#note-1}
+
 Attributes go on the first line of a block.
+
 :::
 
 ```chart {height="240"}
