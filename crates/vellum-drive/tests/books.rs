@@ -203,3 +203,161 @@ async fn copies_and_reads_leave_restricted_sections_behind() -> TestResult {
     assert!(drive.copy_node(&bob, book.id, mine.id, None).await.is_err());
     Ok(())
 }
+
+/// Writes `Guide.book` under `dir`: a public section, and a staff section
+/// (with a data file beside it) restricted to `group:<staff>`.
+async fn guide(store: &LocalStore, dir: &str, staff: ObjectId) -> TestResult {
+    let (book, public, team) = (
+        ObjectId::generate(),
+        ObjectId::generate(),
+        ObjectId::generate(),
+    );
+    let root = format!("{dir}/Guide.book");
+    put(
+        store,
+        &format!("{root}/book.yaml"),
+        &format!(
+            "vellum: 1\nid: {book}\ntitle: Guide\nnodes:\n  {public}:\n    path: public.md\n  \
+             {team}:\n    path: staff/README.md\n    restrict_to:\n      - group:{staff}\n"
+        ),
+    )
+    .await?;
+    put(
+        store,
+        &format!("{root}/SUMMARY.md"),
+        "# Summary\n\n- [Public](public.md)\n- [Staff](staff/README.md)\n",
+    )
+    .await?;
+    put(
+        store,
+        &format!("{root}/public.md"),
+        &chapter(public, "Public", "Welcome."),
+    )
+    .await?;
+    put(
+        store,
+        &format!("{root}/staff/README.md"),
+        &chapter(team, "Staff", "Staff only."),
+    )
+    .await?;
+    put(store, &format!("{root}/staff/roster.csv"), "name\nMaya\n").await?;
+    Ok(())
+}
+
+/// Copies and reads the guide as a group member and as someone outside
+/// the group: only the member gets the staff section.
+async fn group_sections_follow_membership(
+    drive: &Drive,
+    store: &LocalStore,
+    book: &vellum_drive::Node,
+    member: UserId,
+    outsider: UserId,
+) -> TestResult {
+    for (user, sees) in [(member, true), (outsider, false)] {
+        let actor = Actor::User { user };
+        let (_, manifest) = drive.read(&actor, book.id).await?;
+        let manifest = String::from_utf8(manifest.bytes.to_vec())?;
+        assert_eq!(manifest.contains("staff/"), sees, "{manifest}");
+        let mine = drive
+            .create_space(
+                &actor,
+                SpaceKind::UserDrive,
+                &format!("u{}", user.to_string().to_lowercase()),
+                "Mine",
+                Some(user),
+            )
+            .await?;
+        let copy = drive.copy_node(&actor, book.id, mine.id, None).await?;
+        let files = files_under(store, &copy.path).await?;
+        for kept in ["staff/README.md", "staff/roster.csv"] {
+            assert_eq!(
+                files.iter().any(|(p, _)| p.ends_with(kept)),
+                sees,
+                "{kept}: {files:?}"
+            );
+        }
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn group_restricted_sections_reach_group_members() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let store = Arc::new(LocalStore::open(dir.path()).await?);
+    let index = Arc::new(MemoryIndex::new());
+    let access = Arc::new(MemoryAccess::new(index.clone()));
+    let drive = Drive::new(store.clone(), index.clone(), access.clone());
+    let (alice_id, bob_id, dave_id) = (UserId::generate(), UserId::generate(), UserId::generate());
+    let alice = Actor::User { user: alice_id };
+    let staff = ObjectId::generate();
+
+    let eng = drive
+        .create_space(&alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .await?;
+    guide(&store, eng.root.as_str(), staff).await?;
+    let _ = drive.scan().await?;
+    let book = index
+        .nodes(eng.id)
+        .await?
+        .into_iter()
+        .find(|n| n.kind == NodeKind::Book)
+        .ok_or("the book was not indexed")?;
+    access.grant(bob_id, eng.id, Role::Viewer);
+    access.grant(dave_id, eng.id, Role::Viewer);
+    access.join(bob_id, staff);
+    group_sections_follow_membership(&drive, &store, &book, bob_id, dave_id).await
+}
+
+#[tokio::test]
+async fn group_restricted_sections_follow_the_permission_engine() -> TestResult {
+    use vellum_authz::{
+        Actor as AuthzActor, Authz, AuthzStore as _, Change, Id, MemoryStore, Object, Relation,
+        Subject, Tuple,
+    };
+    use vellum_drive::authz::AuthzAccess;
+
+    let dir = tempfile::tempdir()?;
+    let store = Arc::new(LocalStore::open(dir.path()).await?);
+    let index = Arc::new(MemoryIndex::new());
+    let authz = Arc::new(Authz::new(MemoryStore::new()));
+    let access = Arc::new(AuthzAccess::new(authz.clone(), index.clone()));
+    let drive = Drive::new(store.clone(), index.clone(), access);
+    let (alice_id, bob_id, dave_id) = (UserId::generate(), UserId::generate(), UserId::generate());
+    let alice = Actor::User { user: alice_id };
+    let staff = ObjectId::generate();
+
+    let eng = drive
+        .create_space(&alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .await?;
+    guide(&store, eng.root.as_str(), staff).await?;
+    let _ = drive.scan().await?;
+    let book = index
+        .nodes(eng.id)
+        .await?
+        .into_iter()
+        .find(|n| n.kind == NodeKind::Book)
+        .ok_or("the book was not indexed")?;
+    let space = Id(eng.id.as_u128());
+    let viewers: Vec<Change> = [bob_id, dave_id]
+        .into_iter()
+        .map(|user| {
+            Change::Grant(Tuple::role(
+                Object::Space(space),
+                Relation::Viewer,
+                Subject::User(Id(user.as_u128())),
+            ))
+        })
+        .collect();
+    let _ = authz.write(space, AuthzActor::System, &viewers).await?;
+    authz
+        .store()
+        .write_directory(
+            vec![Tuple::member(
+                Id(staff.as_u128()),
+                Subject::User(Id(bob_id.as_u128())),
+            )],
+            vec![],
+        )
+        .await?;
+    group_sections_follow_membership(&drive, &store, &book, bob_id, dave_id).await
+}

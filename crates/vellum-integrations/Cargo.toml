@@ -29,6 +29,7 @@ thiserror = "2.0.21"
 time = "0.3.55"
 tracing = "0.1.44"
 url = "2.5.8"
+vellum-format = { path = "../vellum-format" }
 vellum-kernel.workspace = true
 vellum-work = { path = "../vellum-work" }
 

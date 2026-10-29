@@ -45,6 +45,16 @@ impl Drive {
             for space in &spaces {
                 self.scan_space(space, &blobs, &manifests, &mut seen_ids, &mut report)
                     .await?;
+                // Nodes found on disk inherit access like any other, so
+                // the permission engine needs the space's tree as scanned.
+                let ids: Vec<ObjectId> = self
+                    .index
+                    .nodes(space.id)
+                    .await?
+                    .iter()
+                    .map(|n| n.id)
+                    .collect();
+                self.access.tree_changed(space.id, &ids).await?;
             }
             self.scan_versions(&blobs).await?;
             Ok(report)

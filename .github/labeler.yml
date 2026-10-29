@@ -88,10 +88,18 @@ area/api:
   - changed-files:
       - any-glob-to-any-file:
           - "crates/vellum-api/**"
+area/identity:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-identity/**"
 area/jobs:
   - changed-files:
       - any-glob-to-any-file:
           - "crates/vellum-jobs/**"
+area/search:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-search/**"
 area/mcp:
   - changed-files:
       - any-glob-to-any-file:

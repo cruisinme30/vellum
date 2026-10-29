@@ -98,6 +98,9 @@
 - name: area/jobs
   color: "5319e7"
   description: "vellum-jobs: background jobs"
+- name: area/search
+  color: "5319e7"
+  description: "vellum-search: indexing, ranking and retrieval"
 - name: area/mcp
   color: "5319e7"
   description: "vellum-mcp: the MCP server"

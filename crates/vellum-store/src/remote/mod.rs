@@ -15,6 +15,8 @@ pub mod gdrive;
 mod oauth;
 #[cfg(feature = "onedrive")]
 pub mod onedrive;
+#[cfg(feature = "s3")]
+pub mod s3;
 
 use std::{fmt, time::Duration};
 
