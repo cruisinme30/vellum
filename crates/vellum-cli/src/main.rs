@@ -15,6 +15,7 @@ mod docs;
 mod identity;
 #[cfg(test)]
 mod identity_tests;
+mod integrations;
 mod mcp;
 mod private;
 #[cfg(test)]
