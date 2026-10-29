@@ -288,6 +288,40 @@ impl Workspace {
         self.collections.values()
     }
 
+    /// Replaces several schemas at once, keeping their rows, so a change
+    /// that spans collections (both sides of a relation) is checked as a
+    /// whole. Nothing changes when the result does not check.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EditError::UnknownCollection`] or the first link error.
+    pub fn set_schemas(&mut self, schemas: Vec<Schema>) -> Result<(), EditError> {
+        let mut previous = Vec::with_capacity(schemas.len());
+        for schema in &schemas {
+            if !self.collections.contains_key(&schema.id) {
+                return Err(EditError::UnknownCollection(schema.id));
+            }
+        }
+        for schema in schemas {
+            let id = schema.id;
+            let Some(existing) = self.collections.get(&id) else {
+                continue;
+            };
+            let mut next = Collection::new(schema);
+            next.rows.clone_from(&existing.rows);
+            if let Some(old) = self.collections.insert(id, next) {
+                previous.push(old);
+            }
+        }
+        if let Err(e) = self.check_links() {
+            for old in previous {
+                let _ = self.collections.insert(old.id(), old);
+            }
+            return Err(e.into());
+        }
+        Ok(())
+    }
+
     /// Replaces a collection's schema, keeping its rows.
     ///
     /// # Errors

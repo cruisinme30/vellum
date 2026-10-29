@@ -7,31 +7,46 @@ import { useT } from "../i18n/i18n";
 import { Icon } from "../shell/icon";
 
 import { messageOf, useCollections } from "./context";
+import {
+  extrasOf,
+  NEW_TYPES,
+  RETYPE_TARGETS,
+  settingsFor,
+  TypeFields,
+  useExtras,
+  type Extras,
+  type RetypeTarget,
+} from "./property-fields";
 import { FormError, SidePanel } from "./side-panel";
-import type { CollectionInfo, NewPropertyType, PropertyInfo, SelectOption } from "./types";
+import type { CollectionInfo, NewPropertyType, PropertyInfo } from "./types";
 
-const NEW_TYPES: readonly NewPropertyType[] = [
-  "text",
-  "number",
-  "select",
-  "multi",
-  "person",
-  "date",
-  "checkbox",
-  "url",
-  "formula",
-  "created",
-];
-
-/** `Draft, Live` → options, keeping the colours of options that stay. */
-function optionsOf(text: string, old: readonly SelectOption[] = []): SelectOption[] {
-  const names = [...new Set(text.split(",").map((s) => s.trim()))].filter((s) => s !== "");
-  return names.map((name) => old.find((o) => o.name === name) ?? { name });
+/** Calls `action`, then reports its error or clears the last one. */
+function report(action: Promise<unknown>, onError: (error?: string) => void, after?: () => void) {
+  action.then(
+    () => {
+      onError();
+      after?.();
+    },
+    (error: unknown) => {
+      onError(messageOf(error));
+    },
+  );
 }
 
-const hasOptions = (type: string) => type === "select" || type === "multi";
+/** What changed in one property's form, as an update. */
+function changesOf(property: PropertyInfo, name: string, type: string, extras: Extras) {
+  const retyped = type !== property.type;
+  const settings = settingsFor(type, extras, property.options);
+  const before = settingsFor(property.type, extrasOf(property), property.options);
+  const settingsChanged = JSON.stringify(settings) !== JSON.stringify(before);
+  return {
+    ...(name.trim() === property.name ? {} : { name: name.trim() }),
+    ...(retyped ? { type: type as RetypeTarget } : {}),
+    ...(retyped || settingsChanged ? settings : {}),
+  };
+}
 
-/** One property: rename it, change its options or formula, or remove it. */
+/** One property: rename it, change its type or settings, or remove it. */
 function PropertyRow({
   info,
   property,
@@ -46,38 +61,24 @@ function PropertyRow({
   const t = useT();
   const store = useCollections();
   const [name, setName] = useState(property.name);
-  const [options, setOptions] = useState((property.options ?? []).map((o) => o.name).join(", "));
-  const [formula, setFormula] = useState(property.formula ?? "");
+  const [type, setType] = useState<string>(property.type);
+  const [extras, set] = useExtras(property);
   const [confirming, setConfirming] = useState(false);
-  const removable = property.type !== "title" && property.relation?.back === undefined;
-  const run = (action: () => Promise<unknown>) => {
-    action().then(
-      () => {
-        onError();
-      },
-      (error: unknown) => {
-        onError(messageOf(error));
-      },
-    );
-  };
+  const fixed = property.type === "title" || property.type === "relation";
+  const twoWay = property.relation?.back !== undefined;
   const save = () => {
-    const nextOptions = optionsOf(options, property.options);
-    const changed = {
-      ...(name.trim() === property.name ? {} : { name: name.trim() }),
-      ...(hasOptions(property.type) &&
-      nextOptions.map((o) => o.name).join("\n") !==
-        (property.options ?? []).map((o) => o.name).join("\n")
-        ? { options: nextOptions }
-        : {}),
-      ...(property.type === "formula" && formula !== (property.formula ?? "") ? { formula } : {}),
-    };
+    const changed = changesOf(property, name, type, extras);
     if (Object.keys(changed).length > 0) {
-      run(() => store.updateProperty({ collection_id: info.id, key: property.key, ...changed }));
+      report(
+        store.updateProperty({ collection_id: info.id, key: property.key, ...changed }),
+        onError,
+      );
     }
   };
   return (
     <li className="vl-property-row">
       <form
+        aria-label={property.name}
         onSubmit={(event) => {
           event.preventDefault();
           save();
@@ -94,34 +95,32 @@ function PropertyRow({
             }}
           />
         </label>
-        {hasOptions(property.type) && (
+        {!fixed && (
           <label className="vl-field">
-            {t("collection-property-options")}
-            <input
-              value={options}
+            {t("collection-property-type")}
+            <select
+              value={type}
               onChange={(event) => {
-                setOptions(event.target.value);
+                setType(event.target.value);
               }}
-            />
+            >
+              {RETYPE_TARGETS.map((kind) => (
+                <option key={kind} value={kind}>
+                  {labels[kind]}
+                </option>
+              ))}
+            </select>
           </label>
         )}
-        {property.type === "formula" && (
-          <label className="vl-field">
-            {t("collection-property-formula")}
-            <input
-              value={formula}
-              spellCheck={false}
-              onChange={(event) => {
-                setFormula(event.target.value);
-              }}
-            />
-          </label>
+        {type !== property.type && (
+          <p className="vl-muted vl-hint">{t("collection-retype-hint")}</p>
         )}
+        {type !== "relation" && <TypeFields info={info} type={type} extras={extras} set={set} />}
         <div className="vl-panel-actions">
           <button type="submit" className="vl-text-button">
             {t("collection-save")}
           </button>
-          {removable && !confirming && (
+          {property.type !== "title" && !confirming && (
             <button
               type="button"
               className="vl-icon-button"
@@ -138,10 +137,15 @@ function PropertyRow({
               type="button"
               className="vl-text-button vl-danger"
               onClick={() => {
-                run(() => store.deleteProperty({ collection_id: info.id, key: property.key }));
+                report(
+                  store.deleteProperty({ collection_id: info.id, key: property.key }),
+                  onError,
+                );
               }}
             >
-              {t("collection-confirm-delete-property", { property: property.name })}
+              {twoWay
+                ? t("collection-confirm-delete-relation", { property: property.name })
+                : t("collection-confirm-delete-property", { property: property.name })}
             </button>
           )}
         </div>
@@ -164,33 +168,26 @@ function AddProperty({
   const store = useCollections();
   const [name, setName] = useState("");
   const [type, setType] = useState<NewPropertyType>("text");
-  const [options, setOptions] = useState("");
-  const [formula, setFormula] = useState("");
+  const [extras, set, setExtras] = useExtras();
   return (
     <form
       className="vl-row-fields vl-add-property"
       aria-label={t("collection-add-property")}
       onSubmit={(event) => {
         event.preventDefault();
-        store
-          .addProperty({
+        report(
+          store.addProperty({
             collection_id: info.id,
             name: name.trim(),
             type,
-            ...(hasOptions(type) ? { options: optionsOf(options) } : {}),
-            ...(type === "formula" ? { formula } : {}),
-          })
-          .then(
-            () => {
-              onError();
-              setName("");
-              setOptions("");
-              setFormula("");
-            },
-            (error: unknown) => {
-              onError(messageOf(error));
-            },
-          );
+            ...settingsFor(type, extras),
+          }),
+          onError,
+          () => {
+            setName("");
+            setExtras(extrasOf());
+          },
+        );
       }}
     >
       <h3>{t("collection-add-property")}</h3>
@@ -220,32 +217,7 @@ function AddProperty({
           ))}
         </select>
       </label>
-      {hasOptions(type) && (
-        <label className="vl-field">
-          {t("collection-property-options")}
-          <input
-            value={options}
-            placeholder="Draft, Live"
-            onChange={(event) => {
-              setOptions(event.target.value);
-            }}
-          />
-        </label>
-      )}
-      {type === "formula" && (
-        <label className="vl-field">
-          {t("collection-property-formula")}
-          <input
-            required
-            value={formula}
-            spellCheck={false}
-            placeholder="round(Estimate * 0.5, 1)"
-            onChange={(event) => {
-              setFormula(event.target.value);
-            }}
-          />
-        </label>
-      )}
+      <TypeFields info={info} type={type} extras={extras} set={set} />
       <div className="vl-panel-actions">
         <button type="submit" className="vl-filled-button">
           {t("collection-add-property")}
@@ -255,7 +227,23 @@ function AddProperty({
   );
 }
 
-/** A collection's properties: rename, re-option, remove, and add new ones. */
+/** Values that did not fit their property, kept in the files as written. */
+function Problems({ info }: { readonly info: CollectionInfo }) {
+  const t = useT();
+  if (info.diagnostics.length === 0) return;
+  return (
+    <details className="vl-csv-report">
+      <summary>{t("collection-problems", { count: info.diagnostics.length })}</summary>
+      <ul>
+        {info.diagnostics.slice(0, 50).map((d, index) => (
+          <li key={`${String(index)}-${d.location}`}>{d.message}</li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
+/** A collection's properties: rename, retype, re-option, remove, and add new ones. */
 export function PropertiesPanel({
   info,
   onClose,
@@ -283,11 +271,12 @@ export function PropertiesPanel({
   return (
     <SidePanel title={t("collection-properties")} onClose={onClose}>
       <FormError error={error} />
+      <Problems info={info} />
       <ul className="vl-property-list">
         {info.properties.map((property) => (
           <PropertyRow
             // A new schema starts each row's draft over.
-            key={`${property.key}:${property.name}:${(property.options ?? []).map((o) => o.name).join(",")}:${property.formula ?? ""}`}
+            key={JSON.stringify(property)}
             info={info}
             property={property}
             labels={labels}

@@ -55,7 +55,9 @@ describe("view settings", () => {
       }),
     );
     expect(await screen.findByRole("tab", { name: "Done work" })).toBeDefined();
-    expect(location()).toBe(`${ISSUES}?view=Done+work`);
+    await waitFor(() => {
+      expect(location()).toBe(`${ISSUES}?view=Done+work`);
+    });
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
@@ -129,6 +131,96 @@ describe("property settings", () => {
     await user.type(estimate, "s{Enter}");
     const found = await within(panel).findByRole("alert");
     expect(found.textContent).toMatch(/Points left uses it/);
+  });
+});
+
+describe("types, relations and rollups", () => {
+  it("changes a column's type", async () => {
+    const { user, collections } = await openIssues();
+    await user.click(screen.getByRole("button", { name: "Properties" }));
+    const panel = screen.getByRole("dialog", { name: "Properties" });
+    const link = within(panel).getByRole("form", { name: "Link" });
+    expect(within(link).getByLabelText<HTMLSelectElement>("Type").value).toBe("url");
+    await user.selectOptions(within(link).getByLabelText("Type"), "select");
+    expect(within(link).getByText(/keeps every value in the files/)).toBeDefined();
+    await user.type(within(link).getByLabelText("Options, separated by commas"), "Docs, Spec");
+    const update = vi.spyOn(collections, "updateProperty");
+    await user.click(within(link).getByRole("button", { name: "Save" }));
+    expect(update).toHaveBeenCalledWith({
+      collection_id: COLLECTION.issues,
+      key: "link",
+      type: "select",
+      options: [{ name: "Docs" }, { name: "Spec" }],
+    });
+    const info = await collections.info(COLLECTION.issues);
+    expect(info.properties.find((p) => p.key === "link")?.type).toBe("select");
+    const title = within(panel).getByRole("form", { name: "Issue" });
+    expect(within(title).queryByLabelText("Type")).toBeNull();
+  });
+
+  it("links to another collection, then rolls up through the link", async () => {
+    const { user, collections } = await openIssues();
+    await user.click(screen.getByRole("button", { name: "Properties" }));
+    const panel = screen.getByRole("dialog", { name: "Properties" });
+    const add = within(panel).getByRole("form", { name: "Add property" });
+    await user.type(within(add).getByLabelText("Name"), "Shipped in");
+    await user.selectOptions(within(add).getByLabelText("Type"), "relation");
+    const target = within(add).getByLabelText("Links to");
+    await within(target).findByRole("option", { name: "Releases" });
+    await user.selectOptions(target, "Releases");
+    await user.type(within(add).getByLabelText("Name in the linked collection"), "Shipped work");
+    await user.click(within(add).getByRole("button", { name: "Add property" }));
+    expect(await within(panel).findByDisplayValue("Shipped in")).toBeDefined();
+    const releases = await collections.info(COLLECTION.releases);
+    expect(releases.properties.at(-1)?.name).toBe("Shipped work");
+
+    await user.type(within(add).getByLabelText("Name"), "Ship dates");
+    await user.selectOptions(within(add).getByLabelText("Type"), "rollup");
+    await user.selectOptions(within(add).getByLabelText("Relation"), "Shipped in");
+    const property = within(add).getByLabelText("Property of the linked rows");
+    await within(property).findByRole("option", { name: "Ships" });
+    await user.selectOptions(property, "Ships");
+    await user.selectOptions(within(add).getByLabelText("Combine as"), "max");
+    await user.click(within(add).getByRole("button", { name: "Add property" }));
+    expect(await within(panel).findByDisplayValue("Ship dates")).toBeDefined();
+    const issues = await collections.info(COLLECTION.issues);
+    expect(issues.properties.at(-1)?.rollup).toMatchObject({ prop: "ships", agg: "max" });
+
+    const row = within(panel).getByRole("form", { name: "Release" });
+    await user.click(within(row).getByRole("button", { name: "Delete Release" }));
+    expect(within(row).getByRole("button", { name: /from both collections/ })).toBeDefined();
+  });
+
+  it("says a rollup needs a relation first", async () => {
+    const collections = createMockCollectionsStore();
+    const { user } = renderApp(`/data/${COLLECTION.releases}`, undefined, collections);
+    await screen.findByRole("heading", { level: 1, name: "Releases" });
+    await collections.deleteProperty({ collection_id: COLLECTION.releases, key: "issues" });
+    await user.click(screen.getByRole("button", { name: "Properties" }));
+    const add = screen.getByRole("form", { name: "Add property" });
+    await user.selectOptions(within(add).getByLabelText("Type"), "rollup");
+    expect(within(add).getByText(/Add a relation first/)).toBeDefined();
+  });
+
+  it("lists values that did not fit their property", async () => {
+    const collections = createMockCollectionsStore();
+    const info = collections.info.bind(collections);
+    vi.spyOn(collections, "info").mockImplementation(async (id) => ({
+      ...(await info(id)),
+      diagnostics: [
+        {
+          severity: "error",
+          location: "rows/a.md",
+          message: "Estimate (est): expected a number; kept as written",
+        },
+      ],
+    }));
+    const { user } = renderApp(ISSUES, undefined, collections);
+    await screen.findByRole("heading", { level: 1, name: "Issues" });
+    await user.click(screen.getByRole("button", { name: "Properties" }));
+    const panel = screen.getByRole("dialog", { name: "Properties" });
+    await user.click(within(panel).getByText("One problem in this collection"));
+    expect(within(panel).getByText(/kept as written/)).toBeDefined();
   });
 });
 

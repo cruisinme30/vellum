@@ -43,7 +43,8 @@ export type ViewKind = "table" | "board" | "gallery" | "calendar" | "timeline" |
 
 type NumberFormat = "plain" | "percent";
 
-type Aggregation = "count" | "sum" | "avg" | "min" | "max" | "checked" | "pct" | "unique" | "show";
+export type Aggregation =
+  "count" | "sum" | "avg" | "min" | "max" | "checked" | "pct" | "unique" | "show";
 
 export interface SelectOption {
   readonly name: string;
@@ -263,8 +264,8 @@ export interface SaveViewInput {
   readonly limit?: number;
 }
 
-/** The types a property can be added as; relations and the title are not. */
-export type NewPropertyType = Exclude<PropertyType, "title" | "relation">;
+/** The types a property can be added as: anything but a second title. */
+export type NewPropertyType = Exclude<PropertyType, "title">;
 
 /** `AddPropertyInput`: the server picks the key from the name. */
 export interface AddPropertyInput {
@@ -277,13 +278,25 @@ export interface AddPropertyInput {
   readonly prop?: string;
   readonly agg?: Aggregation;
   readonly format?: NumberFormat;
+  /** A relation's target collection; the target gets the paired property. */
+  readonly to?: string;
+  /** The paired property's name; this collection's title when absent. */
+  readonly back_name?: string;
 }
 
-/** `UpdatePropertyInput`: fields left out stay as they are. */
+/**
+ * `UpdatePropertyInput`: fields left out stay as they are. A rename
+ * rewrites the formulas that name the property.
+ */
 export interface UpdatePropertyInput {
   readonly collection_id: string;
   readonly key: string;
   readonly name?: string;
+  /** A new type; titles and relations keep theirs. */
+  readonly type?: Exclude<PropertyType, "title" | "relation">;
+  readonly via?: string;
+  readonly prop?: string;
+  readonly agg?: Aggregation;
   /** The full new option list. */
   readonly options?: readonly SelectOption[];
   readonly formula?: string;

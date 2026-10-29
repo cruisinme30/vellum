@@ -110,6 +110,7 @@ function newKey(collection: MockCollection, name: string): string {
 export function addProperty(collection: MockCollection, input: AddPropertyInput): MockCollection {
   const name = checkName(collection, input.name);
   const computed = ["formula", "rollup", "created"].includes(input.type);
+  const via = input.via === undefined ? undefined : resolve(collection, input.via);
   const property: PropertyInfo = {
     key: newKey(collection, name),
     name,
@@ -118,8 +119,68 @@ export function addProperty(collection: MockCollection, input: AddPropertyInput)
     ...(input.options?.length ? { options: input.options } : {}),
     ...(input.formula === undefined ? {} : { formula: input.formula }),
     ...(input.format === undefined ? {} : { format: input.format }),
+    ...(via && input.prop !== undefined
+      ? { rollup: { via: via.key, prop: input.prop, agg: input.agg ?? "count" } }
+      : {}),
   };
   return { ...collection, properties: [...collection.properties, property] };
+}
+
+/** Adds a two-way relation and its pair, like `collections.add_property`. */
+export function addRelation(
+  source: MockCollection,
+  target: MockCollection,
+  input: AddPropertyInput,
+): [source: MockCollection, target: MockCollection] {
+  const name = checkName(source, input.name);
+  const key = newKey(source, name);
+  const same = source.id === target.id;
+  const wanted = input.back_name?.trim() ?? "";
+  let backName = wanted === "" ? source.title : wanted;
+  const names = new Set([
+    ...target.properties.map((p) => p.name.toLowerCase()),
+    ...(same ? [name.toLowerCase()] : []),
+  ]);
+  let n = 1;
+  while (names.has(backName.toLowerCase())) {
+    n += 1;
+    backName = `${wanted === "" ? source.title : wanted} ${String(n)}`;
+  }
+  const forward: PropertyInfo = {
+    key,
+    name,
+    type: "relation",
+    computed: false,
+    relation: { to: target.id, back: "" },
+  };
+  const withForward = { ...target, properties: [...target.properties, ...(same ? [forward] : [])] };
+  const backKey = newKey(withForward, backName);
+  const back: PropertyInfo = {
+    key: backKey,
+    name: backName,
+    type: "relation",
+    computed: false,
+    relation: { to: source.id, back: key },
+  };
+  const linked = { ...forward, relation: { to: target.id, back: backKey } };
+  if (same) {
+    const both = { ...source, properties: [...source.properties, linked, back] };
+    return [both, both];
+  }
+  return [
+    { ...source, properties: [...source.properties, linked] },
+    { ...target, properties: [...target.properties, back] },
+  ];
+}
+
+/** `Estimate * 2` → `prop("Points") * 2`, for the demo's formula text. */
+function renameIn(formula: string, from: string, to: string): string {
+  const quoted = `prop(${JSON.stringify(to)})`;
+  return formula
+    .replaceAll(`prop(${JSON.stringify(from)})`, quoted)
+    .split(/(\W+)/)
+    .map((part) => (part === from ? quoted : part))
+    .join("");
 }
 
 /** Renames a property or changes its options, like `collections.update_property`. */
@@ -132,17 +193,28 @@ export function updateProperty(
     throw new Error(`no property with key ${JSON.stringify(input.key)}`);
   }
   const name = input.name === undefined ? old.name : checkName(collection, input.name, old.key);
+  if (input.type !== undefined && (old.type === "title" || old.type === "relation")) {
+    throw new Error(
+      `${old.name} cannot become a ${input.type}: titles and relations keep their type`,
+    );
+  }
+  const type = input.type ?? old.type;
   const next: PropertyInfo = {
     ...old,
     name,
+    type,
+    computed: ["formula", "rollup", "created"].includes(type),
     ...(input.options === undefined ? {} : { options: input.options }),
     ...(input.formula === undefined ? {} : { formula: input.formula }),
     ...(input.format === undefined ? {} : { format: input.format }),
   };
-  return {
-    ...collection,
-    properties: collection.properties.map((p) => (p.key === old.key ? next : p)),
-  };
+  const properties = collection.properties.map((p) => {
+    if (p.key === old.key) return next;
+    return p.formula === undefined || name === old.name
+      ? p
+      : { ...p, formula: renameIn(p.formula, old.name, name) };
+  });
+  return { ...collection, properties };
 }
 
 /** Removes a property and the view settings that use it. */
@@ -153,9 +225,6 @@ export function deleteProperty(collection: MockCollection, key: string): MockCol
   }
   if (property.type === "title") {
     throw new Error("the title property cannot be removed");
-  }
-  if (property.relation?.back !== undefined) {
-    throw new Error("a two-way relation is removed from both collections' schema.yaml");
   }
   const uses = (filter: string) =>
     filter.trim().toLowerCase().startsWith(property.key) ||

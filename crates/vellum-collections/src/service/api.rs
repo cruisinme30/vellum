@@ -200,10 +200,17 @@ pub struct AddPropertyInput {
     /// The display name, unique in the collection.
     pub name: String,
     /// The type: `text`, `number`, `select`, `multi`, `person`, `date`,
-    /// `checkbox`, `url`, `rollup`, `formula` or `created`. Relations are
-    /// two-way, so they are added in `schema.yaml`.
+    /// `checkbox`, `url`, `relation`, `rollup`, `formula` or `created`.
     #[serde(rename = "type")]
     pub kind: String,
+    /// A relation's target collection. Relations are two-way: the target
+    /// gets a paired property too.
+    #[serde(default)]
+    pub to: Option<CollectionId>,
+    /// The name of the paired property in the target collection; this
+    /// collection's title when absent.
+    #[serde(default)]
+    pub back_name: Option<String>,
     /// Options of a select or multi-select, in order.
     #[serde(default)]
     pub options: Vec<SelectOption>,
@@ -224,8 +231,8 @@ pub struct AddPropertyInput {
     pub format: Option<NumberFormat>,
 }
 
-/// Changes a property. Fields left out stay as they are; the type and key
-/// never change.
+/// Changes a property. Fields left out stay as they are; the key never
+/// changes. A rename rewrites the formulas that name the property.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct UpdatePropertyInput {
@@ -236,6 +243,20 @@ pub struct UpdatePropertyInput {
     /// A new display name.
     #[serde(default)]
     pub name: Option<String>,
+    /// A new type. Row files are not rewritten: each value is read again
+    /// as the new type, and one that does not fit is kept as written and
+    /// reported. Titles and relations keep their type.
+    #[serde(default, rename = "type")]
+    pub kind: Option<String>,
+    /// A rollup's relation, by key or name (when changing to a rollup).
+    #[serde(default)]
+    pub via: Option<String>,
+    /// A rollup's property on the related rows, by key or name.
+    #[serde(default)]
+    pub prop: Option<String>,
+    /// A rollup's aggregation.
+    #[serde(default)]
+    pub agg: Option<Aggregation>,
     /// The full new option list of a select or multi-select.
     #[serde(default)]
     pub options: Option<Vec<SelectOption>>,

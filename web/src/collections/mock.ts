@@ -11,6 +11,7 @@ import {
 } from "./mock-data";
 import {
   addProperty,
+  addRelation,
   collectionFromCsv,
   csvOf,
   csvRows,
@@ -170,6 +171,10 @@ export function createMockCollectionsStore(
       listener();
     }
   };
+  /** Swaps in new versions of these collections. */
+  const replaceCollections = (...next: MockCollection[]) => {
+    collections = collections.map((c) => next.find((n) => n.id === c.id) ?? c);
+  };
   /** Replaces a collection's schema, as a `schema.yaml` rewrite would. */
   const edit = (id: string, change: (c: MockCollection) => MockCollection) =>
     later(() => {
@@ -265,9 +270,38 @@ export function createMockCollectionsStore(
       }),
     saveView: (input) => edit(input.collection_id, (c) => saveView(c, input)),
     deleteView: (key) => edit(key.collection_id, (c) => deleteView(c, key.view)),
-    addProperty: (input) => edit(input.collection_id, (c) => addProperty(c, input)),
+    addProperty: (input) => {
+      if (input.type !== "relation") {
+        return edit(input.collection_id, (c) => addProperty(c, input));
+      }
+      return later(() => {
+        const [source, target] = addRelation(
+          collectionOf(input.collection_id),
+          collectionOf(input.to ?? ""),
+          input,
+        );
+        replaceCollections(source, target);
+        changed();
+        return strip(source);
+      });
+    },
     updateProperty: (input) => edit(input.collection_id, (c) => updateProperty(c, input)),
-    deleteProperty: (key) => edit(key.collection_id, (c) => deleteProperty(c, key.key)),
+    deleteProperty: (key) =>
+      later(() => {
+        const source = collectionOf(key.collection_id);
+        const relation = source.properties.find((p) => p.key === key.key)?.relation;
+        const next = deleteProperty(source, key.key);
+        const back = relation?.back ?? "";
+        if (relation && back !== "" && relation.to === source.id) {
+          replaceCollections(deleteProperty(next, back));
+        } else if (relation && back !== "") {
+          replaceCollections(next, deleteProperty(collectionOf(relation.to), back));
+        } else {
+          replaceCollections(next);
+        }
+        changed();
+        return strip(collectionOf(source.id));
+      }),
     exportCsv: (input) =>
       later(() => {
         const collection = collectionOf(input.collection_id);

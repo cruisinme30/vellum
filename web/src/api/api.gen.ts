@@ -122,6 +122,11 @@ export interface AddPropertyInput {
    */
   agg?: Aggregation | null;
   /**
+   * The name of the paired property in the target collection; this
+   * collection's title when absent.
+   */
+  back_name?: string | null;
+  /**
    * The collection.
    */
   collection_id: CollectionId;
@@ -146,9 +151,13 @@ export interface AddPropertyInput {
    */
   prop?: string | null;
   /**
+   * A relation's target collection. Relations are two-way: the target
+   * gets a paired property too.
+   */
+  to?: CollectionId | null;
+  /**
    * The type: `text`, `number`, `select`, `multi`, `person`, `date`,
-   * `checkbox`, `url`, `rollup`, `formula` or `created`. Relations are
-   * two-way, so they are added in `schema.yaml`.
+   * `checkbox`, `url`, `relation`, `rollup`, `formula` or `created`.
    */
   type: string;
   /**
@@ -7203,10 +7212,14 @@ export interface UpdateMe {
 }
 
 /**
- * Changes a property. Fields left out stay as they are; the type and key
- * never change.
+ * Changes a property. Fields left out stay as they are; the key never
+ * changes. A rename rewrites the formulas that name the property.
  */
 export interface UpdatePropertyInput {
+  /**
+   * A rollup's aggregation.
+   */
+  agg?: Aggregation | null;
   /**
    * The collection.
    */
@@ -7231,6 +7244,20 @@ export interface UpdatePropertyInput {
    * The full new option list of a select or multi-select.
    */
   options?: SelectOption[] | null;
+  /**
+   * A rollup's property on the related rows, by key or name.
+   */
+  prop?: string | null;
+  /**
+   * A new type. Row files are not rewritten: each value is read again
+   * as the new type, and one that does not fit is kept as written and
+   * reported. Titles and relations keep their type.
+   */
+  type?: string | null;
+  /**
+   * A rollup's relation, by key or name (when changing to a rollup).
+   */
+  via?: string | null;
 }
 
 /**
@@ -9130,7 +9157,7 @@ export interface Operations {
     input: SaveViewInput;
     output: CollectionInfo;
   };
-  /** Rename a property or change its options, formula or format */
+  /** Rename a property or change its type, options, formula or format */
   "collections.update_property": {
     method: "PATCH";
     path: "/v1/collections/{collection_id}/properties/{key}";

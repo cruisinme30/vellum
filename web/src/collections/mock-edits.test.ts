@@ -90,9 +90,70 @@ describe("the mock store's schema, CSV and embed operations", () => {
     await expect(store.deleteProperty({ collection_id: ISSUES, key: "name" })).rejects.toThrow(
       /title/,
     );
-    await expect(store.deleteProperty({ collection_id: ISSUES, key: "release" })).rejects.toThrow(
-      /two-way/,
+    info = await store.deleteProperty({ collection_id: ISSUES, key: "release" });
+    expect(info.properties.some((p) => p.key === "release")).toBe(false);
+    const releases = await store.info(RELEASES);
+    expect(releases.properties.some((p) => p.relation?.to === ISSUES)).toBe(false);
+  });
+
+  it("links collections both ways and rolls up through the link", async () => {
+    const store = createMockCollectionsStore();
+    const info = await store.addProperty({
+      collection_id: RELEASES,
+      name: "Blockers",
+      type: "relation",
+      to: ISSUES,
+      back_name: "Blocks release",
+    });
+    const forward = info.properties.at(-1);
+    expect(forward).toMatchObject({ key: "blockers", type: "relation" });
+    const issues = await store.info(ISSUES);
+    expect(issues.properties.at(-1)).toMatchObject({
+      name: "Blocks release",
+      relation: { to: RELEASES, back: "blockers" },
+    });
+    expect(forward?.relation?.back).toBe(issues.properties.at(-1)?.key);
+    const self = await store.addProperty({
+      collection_id: ISSUES,
+      name: "Duplicates",
+      type: "relation",
+      to: ISSUES,
+    });
+    expect(self.properties.slice(-2).map((p) => p.name)).toEqual(["Duplicates", "Issues"]);
+    const rolled = await store.addProperty({
+      collection_id: RELEASES,
+      name: "Blocker count",
+      type: "rollup",
+      via: "Blockers",
+      prop: "est",
+      agg: "count",
+    });
+    expect(rolled.properties.at(-1)).toMatchObject({
+      computed: true,
+      rollup: { via: "blockers", prop: "est", agg: "count" },
+    });
+  });
+
+  it("changes types and rewrites formulas on a rename", async () => {
+    const store = createMockCollectionsStore();
+    let info = await store.updateProperty({
+      collection_id: ISSUES,
+      key: "est",
+      name: "Story points",
+      type: "text",
+    });
+    expect(info.properties.find((p) => p.key === "est")).toMatchObject({
+      name: "Story points",
+      type: "text",
+    });
+    expect(info.properties.find((p) => p.key === "left")?.formula).toBe(
+      'if(Status == "Done", 0, prop("Story points"))',
     );
+    info = await store.updateProperty({ collection_id: ISSUES, key: "est", type: "formula" });
+    expect(info.properties.find((p) => p.key === "est")?.computed).toBe(true);
+    await expect(
+      store.updateProperty({ collection_id: ISSUES, key: "name", type: "text" }),
+    ).rejects.toThrow(/keep their type/);
   });
 
   it("deletes a row and unlinks it from the other side", async () => {

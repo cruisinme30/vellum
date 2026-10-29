@@ -363,6 +363,29 @@ collection-property-formula = Formula
 collection-property-type = Type
 collection-new-property-name = Name
 collection-add-property = Add property
+collection-retype-hint = Changing the type keeps every value in the files. Values that do not fit the new type are listed under Problems until you fix them or change the type back.
+collection-rollup-needs-relation = Add a relation first: a rollup sums up the rows a relation links to.
+collection-rollup-via = Relation
+collection-rollup-prop = Property of the linked rows
+collection-rollup-agg = Combine as
+collection-agg-count = Count of linked rows
+collection-agg-sum = Sum
+collection-agg-avg = Average
+collection-agg-min = Smallest
+collection-agg-max = Largest
+collection-agg-checked = Number checked
+collection-agg-pct = Percent checked
+collection-agg-unique = Number of different values
+collection-agg-show = Show the values
+collection-relation-to = Links to
+collection-relation-back = Name in the linked collection
+collection-relation-hint = Relations work both ways: the linked collection gets a property listing the rows that link to it. You need to be able to edit both collections.
+collection-confirm-delete-relation = Delete { $property } from both collections? Press again to confirm
+collection-problems =
+    { $count ->
+        [one] One problem in this collection
+       *[other] { $count } problems in this collection
+    }
 collection-delete-property = Delete { $property }
 collection-confirm-delete-property = Delete { $property }? Press again to confirm
 collection-type-title = Title

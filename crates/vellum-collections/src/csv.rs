@@ -346,7 +346,7 @@ pub(crate) fn unique_key(header: &str, index: usize, used: &mut BTreeSet<String>
     key
 }
 
-fn unique_name(header: &str, index: usize, used: &mut BTreeSet<String>) -> String {
+pub(crate) fn unique_name(header: &str, index: usize, used: &mut BTreeSet<String>) -> String {
     let base = if header.trim().is_empty() {
         format!("Column {}", index + 1)
     } else {
