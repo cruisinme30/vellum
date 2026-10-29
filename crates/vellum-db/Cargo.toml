@@ -34,7 +34,3 @@ vellum-kernel.workspace = true
 tempfile = "3"
 testcontainers-modules = { version = "0.15", features = ["postgres"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
-
-[[test]]
-name = "exit"
-harness = false
