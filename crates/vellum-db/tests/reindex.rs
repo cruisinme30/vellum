@@ -175,3 +175,84 @@ async fn an_empty_folder_gives_an_empty_index() {
     let report = index.reindex(work.path(), PlainFiles).await.unwrap();
     assert_eq!(report, ReindexReport::default());
 }
+
+/// Every file under `root`, as a bucket listing would hold it.
+fn listing_of(root: &Path) -> std::io::Result<vellum_db::Listing> {
+    fn walk(root: &Path, dir: &Path, out: &mut vellum_db::Listing) -> std::io::Result<()> {
+        for entry in std::fs::read_dir(dir)? {
+            let path = entry?.path();
+            if path.is_dir() {
+                walk(root, &path, out)?;
+                continue;
+            }
+            let rel = path
+                .strip_prefix(root)
+                .map_err(std::io::Error::other)?
+                .components()
+                .map(|c| c.as_os_str().to_string_lossy().into_owned())
+                .collect::<Vec<_>>()
+                .join("/");
+            let modified = std::fs::metadata(&path)?.modified()?;
+            let bytes = if vellum_db::Listing::wants_content(&rel) {
+                Some(std::fs::read(&path)?)
+            } else {
+                None
+            };
+            out.insert(&rel, modified, bytes);
+        }
+        Ok(())
+    }
+    let mut listing = vellum_db::Listing::new();
+    walk(root, root, &mut listing)?;
+    Ok(listing)
+}
+
+async fn rows(path: &Path) -> sqlx::Result<Vec<(String, String, String, i64)>> {
+    let mut conn = connect(path).await?;
+    sqlx::query_as("SELECT path, kind, content_hash, modified_at FROM documents ORDER BY path")
+        .fetch_all(&mut conn)
+        .await
+}
+
+#[tokio::test]
+async fn a_bucket_listing_gives_the_same_index_as_the_folder() {
+    let work = tempfile::tempdir().unwrap();
+    let _fx = common::northstar(work.path()).unwrap();
+    let db = tempfile::tempdir().unwrap();
+    let from_disk = db.path().join("disk.sqlite");
+    let from_bucket = db.path().join("bucket.sqlite");
+
+    let disk = Index::open(&IndexConfig::sqlite(from_disk.clone(), None))
+        .await
+        .unwrap();
+    let disk_report = disk.reindex(work.path(), PlainFiles).await.unwrap();
+    disk.close().await;
+
+    let listing = listing_of(work.path()).unwrap();
+    assert!(!listing.is_empty());
+    let bucket = Index::open(&IndexConfig::sqlite(from_bucket.clone(), None))
+        .await
+        .unwrap();
+    let bucket_report = bucket.reindex_listing(listing).await.unwrap();
+    bucket.close().await;
+
+    assert_eq!(bucket_report, disk_report);
+    let disk_rows = rows(&from_disk).await.unwrap();
+    assert!(!disk_rows.is_empty());
+    assert_eq!(rows(&from_bucket).await.unwrap(), disk_rows);
+}
+
+#[test]
+fn only_pages_and_manifests_are_fetched() {
+    use vellum_db::Listing;
+    assert!(Listing::wants_content("drives/shared/eng/roadmap.md"));
+    assert!(Listing::wants_content(
+        "drives/shared/eng/.vellum-folder.yaml"
+    ));
+    assert!(Listing::wants_content(
+        "drives/shared/eng/plan.book/book.yaml"
+    ));
+    assert!(!Listing::wants_content("drives/shared/eng/diagram.png"));
+    assert!(!Listing::wants_content(".vellum/work/journal.json"));
+    assert!(!Listing::wants_content(".vellum/versions/a.md"));
+}

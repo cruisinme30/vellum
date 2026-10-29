@@ -15,8 +15,7 @@
 //! `name.shortcut.yaml` is a shortcut. `.vellum/` is never indexed.
 
 use std::collections::HashSet;
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::UNIX_EPOCH;
 
 use serde::Deserialize;
@@ -25,7 +24,7 @@ use vellum_kernel::ObjectId;
 
 use super::{
     DocKind, DocumentRow, FileReader, FolderRow, Problem, ProblemKind, Snapshot, SpaceKind,
-    SpaceRow,
+    SpaceRow, Tree,
 };
 
 const FOLDER_MANIFEST: &str = ".vellum-folder.yaml";
@@ -64,6 +63,7 @@ struct Parent {
 
 pub(super) struct Scanner<'a> {
     root: &'a Path,
+    tree: &'a dyn Tree,
     reader: &'a dyn FileReader,
     now_ms: i64,
     seen: HashSet<ObjectId>,
@@ -71,9 +71,15 @@ pub(super) struct Scanner<'a> {
 }
 
 impl<'a> Scanner<'a> {
-    pub(super) fn new(root: &'a Path, reader: &'a dyn FileReader, now_ms: i64) -> Self {
+    pub(super) fn new(
+        root: &'a Path,
+        tree: &'a dyn Tree,
+        reader: &'a dyn FileReader,
+        now_ms: i64,
+    ) -> Self {
         Self {
             root,
+            tree,
             reader,
             now_ms,
             seen: HashSet::new(),
@@ -83,8 +89,8 @@ impl<'a> Scanner<'a> {
 
     pub(super) fn run(mut self) -> Snapshot {
         for (parent, kind) in SPACE_PARENTS {
-            for dir in Self::sorted_entries(&self.root.join(parent)) {
-                if dir.is_dir() {
+            for dir in self.tree.entries(&self.root.join(parent)) {
+                if self.tree.is_dir(&dir) {
                     self.space(&dir, kind);
                 }
             }
@@ -117,7 +123,7 @@ impl<'a> Scanner<'a> {
     }
 
     fn walk(&mut self, space_root: &Path, dir: &Path, parent: &Parent) {
-        for path in Self::sorted_entries(dir) {
+        for path in self.tree.entries(dir) {
             let name = file_name(&path);
             if name.starts_with('.')
                 || (parent.container == Some(DocKind::Book) && name == "SUMMARY.md")
@@ -125,7 +131,7 @@ impl<'a> Scanner<'a> {
                 continue;
             }
             let rel = relative_to(space_root, &path);
-            if path.is_dir() {
+            if self.tree.is_dir(&path) {
                 self.directory(space_root, &path, &name, rel, parent);
             } else if let Some(stem) = name.strip_suffix(".md") {
                 let kind = match (parent.container, parent.kind) {
@@ -222,9 +228,9 @@ impl<'a> Scanner<'a> {
             }
         };
         let id = self.claim(file, header.id.as_deref())?;
-        let modified_at = fs::metadata(file)
-            .and_then(|m| m.modified())
-            .ok()
+        let modified_at = self
+            .tree
+            .modified(file)
             .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
             .map_or(self.now_ms, |d| {
                 i64::try_from(d.as_millis()).unwrap_or(i64::MAX)
@@ -250,7 +256,7 @@ impl<'a> Scanner<'a> {
     /// Reads a folder's `.vellum-folder.yaml` and claims its ID.
     fn manifest(&mut self, dir: &Path) -> Option<(ObjectId, Header)> {
         let file = dir.join(FOLDER_MANIFEST);
-        if !file.is_file() {
+        if !self.tree.is_file(&file) {
             self.problem(dir, ProblemKind::MissingId);
             return None;
         }
@@ -309,15 +315,6 @@ impl<'a> Scanner<'a> {
 
     fn relative(&self, path: &Path) -> String {
         relative_to(self.root, path)
-    }
-
-    fn sorted_entries(dir: &Path) -> Vec<PathBuf> {
-        let Ok(entries) = fs::read_dir(dir) else {
-            return Vec::new();
-        };
-        let mut paths: Vec<PathBuf> = entries.filter_map(|e| e.ok().map(|e| e.path())).collect();
-        paths.sort();
-        paths
     }
 }
 

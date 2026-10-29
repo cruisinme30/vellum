@@ -6,9 +6,14 @@
 //! The scan reads the workspace into memory, then one transaction replaces
 //! spaces, folders, documents and `page_ancestors`. Grants and per-user
 //! state are left alone. Readers see the old index until the commit.
+//!
+//! The workspace is a folder on disk, or a [`Listing`] of a bucket that the
+//! caller fetched (ADR 0044, D187); both go through the same scanner, so
+//! they give the same rows.
 
 mod scan;
 
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -38,6 +43,146 @@ pub struct PlainFiles;
 impl FileReader for PlainFiles {
     fn read(&self, path: &Path) -> io::Result<Vec<u8>> {
         std::fs::read(path)
+    }
+}
+
+/// The shape of a workspace: which folders and files exist, and when each
+/// file last changed. The scanner reads contents through a [`FileReader`].
+pub trait Tree: Send + Sync {
+    /// The folders and files directly in `dir`, sorted by path. A missing
+    /// folder has none.
+    fn entries(&self, dir: &Path) -> Vec<PathBuf>;
+    /// Whether `path` is a folder.
+    fn is_dir(&self, path: &Path) -> bool;
+    /// Whether `path` is a file.
+    fn is_file(&self, path: &Path) -> bool;
+    /// When the file at `path` last changed, if known.
+    fn modified(&self, path: &Path) -> Option<SystemTime>;
+}
+
+/// A folder on this machine.
+#[derive(Debug, Clone, Copy, Default)]
+struct Disk;
+
+impl Tree for Disk {
+    fn entries(&self, dir: &Path) -> Vec<PathBuf> {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return Vec::new();
+        };
+        let mut paths: Vec<PathBuf> = entries.filter_map(|e| e.ok().map(|e| e.path())).collect();
+        paths.sort();
+        paths
+    }
+
+    fn is_dir(&self, path: &Path) -> bool {
+        path.is_dir()
+    }
+
+    fn is_file(&self, path: &Path) -> bool {
+        path.is_file()
+    }
+
+    fn modified(&self, path: &Path) -> Option<SystemTime> {
+        std::fs::metadata(path).and_then(|m| m.modified()).ok()
+    }
+}
+
+/// A workspace held in memory: the listing of a bucket, with the contents
+/// of the files the index reads (see [`Listing::wants_content`]).
+///
+/// Paths are relative to the workspace root, with `/` separators.
+/// Folders are implied by the files below them, as in a bucket.
+#[derive(Debug, Default, Clone)]
+pub struct Listing {
+    files: BTreeMap<PathBuf, Listed>,
+    children: BTreeMap<PathBuf, BTreeSet<PathBuf>>,
+}
+
+#[derive(Debug, Clone)]
+struct Listed {
+    modified: SystemTime,
+    bytes: Option<Vec<u8>>,
+}
+
+impl Listing {
+    /// An empty listing.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Whether the index needs the contents of the file at `path`: the
+    /// Markdown pages and the YAML manifests, outside `.vellum/`.
+    /// Attachments and other files are listed but never read.
+    #[must_use]
+    // Case-sensitive like the scanner, which only reads `.md` and `.yaml`.
+    #[allow(clippy::case_sensitive_file_extension_comparisons)]
+    pub fn wants_content(path: &str) -> bool {
+        !path.starts_with(".vellum/")
+            && path.split('/').all(|segment| !segment.is_empty())
+            && (path.ends_with(".md") || path.ends_with(".yaml"))
+    }
+
+    /// Adds the file at `path`, with its contents when the index needs
+    /// them. A later insert of the same path replaces the earlier one.
+    pub fn insert(&mut self, path: &str, modified: SystemTime, bytes: Option<Vec<u8>>) {
+        let file = PathBuf::from(path);
+        let mut parent = PathBuf::new();
+        for component in file.components() {
+            let child = parent.join(component);
+            let _ = self
+                .children
+                .entry(parent.clone())
+                .or_default()
+                .insert(child.clone());
+            parent = child;
+        }
+        let _ = self.files.insert(file, Listed { modified, bytes });
+    }
+
+    /// The number of files listed.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.files.len()
+    }
+
+    /// Whether nothing is listed.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.files.is_empty()
+    }
+}
+
+impl Tree for Listing {
+    fn entries(&self, dir: &Path) -> Vec<PathBuf> {
+        self.children
+            .get(dir)
+            .map(|c| c.iter().cloned().collect())
+            .unwrap_or_default()
+    }
+
+    fn is_dir(&self, path: &Path) -> bool {
+        self.children.contains_key(path) && !self.files.contains_key(path)
+    }
+
+    fn is_file(&self, path: &Path) -> bool {
+        self.files.contains_key(path)
+    }
+
+    fn modified(&self, path: &Path) -> Option<SystemTime> {
+        self.files.get(path).map(|f| f.modified)
+    }
+}
+
+impl FileReader for Listing {
+    fn read(&self, path: &Path) -> io::Result<Vec<u8>> {
+        match self.files.get(path) {
+            Some(Listed {
+                bytes: Some(bytes), ..
+            }) => Ok(bytes.clone()),
+            Some(_) => Err(io::Error::other("the contents were not fetched")),
+            None => Err(io::Error::from(io::ErrorKind::NotFound)),
+        }
     }
 }
 
@@ -320,10 +465,26 @@ where
     R: FileReader + 'static,
 {
     let root_owned: PathBuf = root.to_path_buf();
-    let snap =
-        tokio::task::spawn_blocking(move || scan::Scanner::new(&root_owned, &reader, now).run())
-            .await
-            .map_err(|err| Error::Io(io::Error::other(err)))?;
+    finish(
+        tokio::task::spawn_blocking(move || {
+            scan::Scanner::new(&root_owned, &Disk, &reader, now).run()
+        })
+        .await,
+    )
+}
+
+/// Scans a [`Listing`] the same way, off the async runtime.
+pub async fn scan_listing(listing: Listing, now: i64) -> Result<Snapshot> {
+    finish(
+        tokio::task::spawn_blocking(move || {
+            scan::Scanner::new(Path::new(""), &listing, &listing, now).run()
+        })
+        .await,
+    )
+}
+
+fn finish(joined: std::result::Result<Snapshot, tokio::task::JoinError>) -> Result<Snapshot> {
+    let snap = joined.map_err(|err| Error::Io(io::Error::other(err)))?;
     for problem in &snap.problems {
         tracing::warn!(%problem, "reindex skipped a path");
     }
@@ -346,6 +507,19 @@ impl Index {
     {
         let now = now_ms();
         let snap = scan(root, reader, now).await?;
+        self.write_snapshot(&snap, now).await?;
+        let _ = tracing::Span::current().record("documents", snap.documents.len());
+        Ok(snap.report())
+    }
+
+    /// Like [`Index::reindex`], from a [`Listing`] of a bucket.
+    ///
+    /// # Errors
+    /// As [`Index::reindex`].
+    #[tracing::instrument(name = "db.reindex", skip_all, fields(files = listing.len(), documents))]
+    pub async fn reindex_listing(&self, listing: Listing) -> Result<ReindexReport> {
+        let now = now_ms();
+        let snap = scan_listing(listing, now).await?;
         self.write_snapshot(&snap, now).await?;
         let _ = tracing::Span::current().record("documents", snap.documents.len());
         Ok(snap.report())

@@ -877,11 +877,14 @@ impl Service for BooksService {
         ]
     }
 
+    /// Books are listed from the files, so a failure here is the blob
+    /// store's: degraded, not unready (ADR 0044, D188). The storage
+    /// service decides whether the store being down takes the replica out.
     fn readiness(&self) -> BoxFuture<'_, Readiness> {
         Box::pin(async move {
             match self.dirs().await {
                 Ok(_) => Readiness::Ready,
-                Err(e) => Readiness::NotReady(format!("books could not be listed: {e}")),
+                Err(e) => Readiness::Degraded(format!("books could not be listed: {e}")),
             }
         })
     }

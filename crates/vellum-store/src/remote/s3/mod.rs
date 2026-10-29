@@ -21,8 +21,11 @@
 //! `PreconditionFailed` for its own write. The merge path re-reads and
 //! finds its own content, so nothing is lost.
 
+mod credentials;
 mod list;
 mod sigv4;
+
+pub use credentials::{Container, CredentialSource, InstanceProfile, WebIdentity};
 
 use std::{
     sync::{
@@ -87,8 +90,9 @@ pub struct S3Config {
     pub prefix: Option<String>,
     /// Virtual-hosted or path-style URLs.
     pub addressing: Addressing,
-    /// The credentials to sign with.
-    pub credentials: S3Credentials,
+    /// Where the signing keys come from: static keys, or the pod's or
+    /// instance's own identity.
+    pub credentials: CredentialSource,
 }
 
 /// Region used when `VELLUM_S3_REGION` is unset.
@@ -114,8 +118,9 @@ impl S3Config {
     ///   endpoint `https://s3.<region>.amazonaws.com`, addressed
     ///   virtual-hosted style.
     /// - `VELLUM_S3_REGION`: defaults to [`DEFAULT_REGION`].
-    /// - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (required) and
-    ///   `AWS_SESSION_TOKEN` (optional).
+    /// - The credentials, as [`CredentialSource::from_vars`] reads them:
+    ///   `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, or workload
+    ///   identity (IRSA, EKS Pod Identity, ECS, an EC2 instance profile).
     ///
     /// # Errors
     /// Returns [`StoreError::Backend`] naming a missing variable, or saying
@@ -147,17 +152,15 @@ impl S3Config {
             },
             |endpoint| (endpoint.trim_end_matches('/').to_owned(), Addressing::Path),
         );
+        let on_aws = addressing == Addressing::VirtualHosted;
+        let credentials = CredentialSource::from_vars(&var, &region, on_aws)?;
         Ok(Self {
             endpoint,
             region,
             bucket: bucket.to_owned(),
             prefix: (!prefix.is_empty()).then(|| prefix.to_owned()),
             addressing,
-            credentials: S3Credentials {
-                access_key_id: require("AWS_ACCESS_KEY_ID")?,
-                secret_access_key: Secret::new(require("AWS_SECRET_ACCESS_KEY")?),
-                session_token: get("AWS_SESSION_TOKEN").map(Secret::new),
-            },
+            credentials,
         })
     }
 }
@@ -179,7 +182,7 @@ struct Inner {
     bucket_path: String,
     prefix: Option<BlobPath>,
     region: String,
-    credentials: S3Credentials,
+    credentials: credentials::Provider,
     /// Set once the bucket answered `501` to `If-Match` on `DeleteObject`.
     no_conditional_delete: AtomicBool,
 }
@@ -264,7 +267,7 @@ impl S3Store {
             bucket_path,
             prefix,
             region: config.region,
-            credentials: config.credentials,
+            credentials: credentials::Provider::new(config.credentials)?,
             no_conditional_delete: AtomicBool::new(false),
         })))
     }
@@ -350,19 +353,20 @@ impl Inner {
         } else {
             sigv4::sha256_hex(&call.body)
         };
+        let credentials = self.credentials.get().await?;
         let when = sigv4::AmzDate::at(SystemTime::now());
         let mut headers: Vec<(&str, &str)> = vec![
             ("host", &self.host),
             ("x-amz-content-sha256", &payload_hash),
             ("x-amz-date", &when.stamp),
         ];
-        if let Some(token) = &self.credentials.session_token {
+        if let Some(token) = &credentials.session_token {
             headers.push(("x-amz-security-token", token.expose()));
         }
         headers.extend(call.headers.iter().map(|(n, v)| (*n, v.as_str())));
         let key = sigv4::Key {
-            access_key_id: &self.credentials.access_key_id,
-            secret: self.credentials.secret_access_key.expose(),
+            access_key_id: &credentials.access_key_id,
+            secret: credentials.secret_access_key.expose(),
             region: &self.region,
             service: "s3",
         };
@@ -689,7 +693,15 @@ mod tests {
                 access_key_id: "AKID".into(),
                 secret_access_key: Secret::new("very-secret"),
                 session_token: Some(Secret::new("session-secret")),
-            },
+            }
+            .into(),
+        }
+    }
+
+    fn keys(c: &S3Config) -> &S3Credentials {
+        match &c.credentials {
+            CredentialSource::Static(keys) => keys,
+            other => panic!("expected static keys, got {other:?}"),
         }
     }
 
@@ -716,9 +728,9 @@ mod tests {
         assert_eq!(c.region, "us-east-1");
         assert_eq!(c.endpoint, "https://s3.us-east-1.amazonaws.com");
         assert_eq!(c.addressing, Addressing::VirtualHosted);
-        assert_eq!(c.credentials.access_key_id, "AKID");
-        assert_eq!(c.credentials.secret_access_key.expose(), "s3cr3t-value");
-        assert!(c.credentials.session_token.is_none());
+        assert_eq!(keys(&c).access_key_id, "AKID");
+        assert_eq!(keys(&c).secret_access_key.expose(), "s3cr3t-value");
+        assert!(keys(&c).session_token.is_none());
         let s = S3Store::new(c)?;
         assert_eq!(s.0.origin, "https://notes.s3.us-east-1.amazonaws.com");
         Ok(())
@@ -739,7 +751,7 @@ mod tests {
         assert_eq!(c.endpoint, "http://127.0.0.1:9000");
         assert_eq!(c.addressing, Addressing::Path);
         assert_eq!(
-            c.credentials.session_token.as_ref().map(Secret::expose),
+            keys(&c).session_token.as_ref().map(Secret::expose),
             Some("tok")
         );
         let s = S3Store::new(c)?;
@@ -757,11 +769,20 @@ mod tests {
         let id = ("AWS_ACCESS_KEY_ID", "AKID");
         let secret = ("AWS_SECRET_ACCESS_KEY", "s3cr3t-value");
         assert!(message(&[id, secret]).contains("VELLUM_BLOB_URL is not set"));
-        assert!(message(&[url, secret]).contains("AWS_ACCESS_KEY_ID is not set"));
+        // No keys on a custom endpoint: nothing to fall back to.
+        let minio = ("VELLUM_S3_ENDPOINT", "http://127.0.0.1:9000");
+        assert!(message(&[url, minio, secret]).contains("no credentials"));
+        // No keys on AWS: the instance profile.
+        assert_eq!(
+            S3Config::from_vars(vars(&[url]))
+                .map(|c| c.credentials.kind())
+                .ok(),
+            Some("instance_profile")
+        );
         let missing_secret = message(&[url, id]);
-        assert!(missing_secret.contains("AWS_SECRET_ACCESS_KEY is not set"));
+        assert!(missing_secret.contains("AWS_SECRET_ACCESS_KEY is not"));
         let empty = message(&[url, id, ("AWS_SECRET_ACCESS_KEY", "")]);
-        assert!(empty.contains("AWS_SECRET_ACCESS_KEY is not set"));
+        assert!(empty.contains("AWS_SECRET_ACCESS_KEY is not"));
         for bad in ["https://notes", "s3://", "s3:///prefix"] {
             let got = message(&[("VELLUM_BLOB_URL", bad), id, secret]);
             assert!(got.contains("VELLUM_BLOB_URL"), "{bad}: {got}");

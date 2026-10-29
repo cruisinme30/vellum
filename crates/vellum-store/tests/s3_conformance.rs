@@ -131,7 +131,8 @@ fn store(
             access_key_id: "test".into(),
             secret_access_key: Secret::new("test"),
             session_token: None,
-        },
+        }
+        .into(),
     })
 }
 
