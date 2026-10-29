@@ -205,3 +205,76 @@ async fn copies_leave_restricted_parts_behind() -> TestResult {
     assert_eq!(drive.list(&alice, eng.id, Some(all.id)).await?.len(), 3);
     Ok(())
 }
+
+/// Moving or trashing a folder carries everything inside it, so a part
+/// the person may not change blocks the whole operation, and nothing
+/// moves. Without it, an editor of a folder could trash or move a page
+/// restricted away from them.
+#[tokio::test]
+async fn folders_move_and_trash_only_with_rights_on_all_of_them() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let store = Arc::new(LocalStore::open(dir.path()).await?);
+    let index = Arc::new(MemoryIndex::new());
+    let authz = Arc::new(Authz::new(MemoryStore::new()));
+    let access = Arc::new(AuthzAccess::new(authz.clone(), index.clone()));
+    let drive = Drive::new(store, index, access);
+    let (alice_id, bob_id) = (UserId::generate(), UserId::generate());
+    let (alice, bob) = (Actor::User { user: alice_id }, Actor::User { user: bob_id });
+
+    let eng = drive
+        .create_space(&alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .await?;
+    let team = drive.create_folder(&alice, eng.id, None, "Team").await?;
+    let archive = drive.create_folder(&alice, eng.id, None, "Archive").await?;
+    let notes = drive
+        .create_page(&alice, eng.id, Some(team.id), "Notes", "public")
+        .await?;
+    let review = drive
+        .create_page(&alice, eng.id, Some(team.id), "Review", "private")
+        .await?;
+    let _ = authz
+        .write(
+            space_id(eng.id),
+            AuthzActor::User(Id(alice_id.as_u128())),
+            &[
+                grant(Object::Space(space_id(eng.id)), Relation::Editor, bob_id),
+                Change::Restrict(Id(review.id.as_u128())),
+            ],
+        )
+        .await?;
+    assert!(matches!(
+        drive.read(&bob, review.id).await,
+        Err(DriveError::PermissionDenied)
+    ));
+
+    // Bob edits Team but not the page restricted inside it.
+    assert!(matches!(
+        drive.trash(&bob, team.id).await,
+        Err(DriveError::PermissionDenied)
+    ));
+    assert!(matches!(
+        drive
+            .move_node(&bob, team.id, eng.id, Some(archive.id))
+            .await,
+        Err(DriveError::PermissionDenied)
+    ));
+    let still = drive.read(&alice, review.id).await?.0;
+    assert!(still.is_live());
+    assert_eq!(still.parent, Some(team.id), "nothing moved");
+
+    // What Bob may change, he still moves and trashes.
+    let moved = drive
+        .move_node(&bob, notes.id, eng.id, Some(archive.id))
+        .await?;
+    assert_eq!(moved.parent, Some(archive.id));
+    let _ = drive.trash(&bob, archive.id).await?;
+
+    // Alice, who owns the space, moves and trashes Team whole.
+    let old = drive.create_folder(&alice, eng.id, None, "Old").await?;
+    let moved = drive
+        .move_node(&alice, team.id, eng.id, Some(old.id))
+        .await?;
+    assert_eq!(moved.parent, Some(old.id));
+    let _ = drive.trash(&alice, team.id).await?;
+    Ok(())
+}

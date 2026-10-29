@@ -30,9 +30,9 @@ impl Drive {
     pub async fn trash(&self, actor: &Actor, id: ObjectId) -> DriveResult<Node> {
         self.observe("trash", async {
             let node = self.live_node(id).await?;
-            self.authorize(actor, node.space, node.id, Permission::Edit)
+            let members = self
+                .authorize_subtree(actor, &node, Permission::Edit)
                 .await?;
-            let members = self.subtree(&node).await?;
             let entry = layout::trash_dir(node.id)?;
             let item = layout::trash_item(node.id, node.path.file_name())?;
             let now = self.clock.now();
