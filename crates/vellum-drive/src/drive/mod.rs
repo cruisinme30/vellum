@@ -9,6 +9,7 @@
 //! activity entry. Files are the truth: if a crash lands between the two,
 //! [`Drive::scan`] brings the index back in line.
 
+mod books;
 mod content;
 mod create;
 mod organize;

@@ -3378,6 +3378,7 @@ dependencies = [
  "rustls-platform-verifier",
  "serde",
  "serde_json",
+ "serde_urlencoded",
  "sync_wrapper",
  "tokio",
  "tokio-rustls",
@@ -5044,6 +5045,7 @@ dependencies = [
  "tokio",
  "tracing",
  "vellum-authz",
+ "vellum-books",
  "vellum-kernel",
  "vellum-store",
 ]
@@ -5081,9 +5083,12 @@ dependencies = [
  "sha2 0.11.1",
  "subtle",
  "thiserror",
+ "time",
  "tokio",
  "tracing",
  "url",
+ "vellum-kernel",
+ "vellum-work",
 ]
 
 [[package]]
@@ -5239,6 +5244,7 @@ name = "vellum-store"
 version = "0.0.0"
 dependencies = [
  "async-trait",
+ "axum",
  "bytes",
  "diff-match-patch-rs",
  "diffy",
@@ -5247,6 +5253,9 @@ dependencies = [
  "notify",
  "opentelemetry",
  "proptest",
+ "reqwest",
+ "serde",
+ "serde_json",
  "sha2 0.11.1",
  "tempfile",
  "thiserror",

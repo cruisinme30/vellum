@@ -137,4 +137,5 @@ RTO
 JSONL
 KiB
 MiB
+zizmor
 [Rr]ecents
