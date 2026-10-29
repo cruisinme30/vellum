@@ -82,7 +82,7 @@ pub enum Update {
 }
 
 /// A block with its whole section: what "ask this space" and MCP quote.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct Context {
     /// The block asked for.
     pub block: StoredBlock,

@@ -12,11 +12,14 @@ use std::fmt;
 use std::ops::RangeInclusive;
 use std::str::FromStr;
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use vellum_kernel::{BlockId, DocId, ObjectId, SpaceId, Timestamp, UserId};
 
 /// The kind of object a document is, for the drive's "type" filter.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum DocKind {
     /// A page.
@@ -80,7 +83,7 @@ impl FromStr for DocKind {
 }
 
 /// The kind of a block, which shapes how its hit is shown.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum BlockKind {
     /// A heading; it opens a section.
@@ -255,7 +258,7 @@ impl SearchQuery {
 }
 
 /// A run of snippet text, highlighted when it matched the query.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Fragment {
     /// The text.
     pub text: String,
@@ -264,7 +267,7 @@ pub struct Fragment {
 }
 
 /// One block that matched, with what the UI and MCP need to show and cite it.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct SearchHit {
     /// The space.
     pub space: SpaceId,
@@ -293,7 +296,7 @@ pub struct SearchHit {
 }
 
 /// One page of search results.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct SearchPage {
     /// The hits, best first.
     pub hits: Vec<SearchHit>,
@@ -304,7 +307,7 @@ pub struct SearchPage {
 }
 
 /// A title match for the instant (⌘K) search.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct TitleHit {
     /// The space.
     pub space: SpaceId,
@@ -319,7 +322,7 @@ pub struct TitleHit {
 }
 
 /// A block as stored in an index: what a backend returns.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct StoredBlock {
     /// The space.
     pub space: SpaceId,

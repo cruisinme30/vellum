@@ -69,3 +69,7 @@ Yjs
 Replicache
 mdBook
 Roboto
+[Tt]antivy
+Meilisearch
+BM25
+ONNX

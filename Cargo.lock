@@ -5252,6 +5252,7 @@ dependencies = [
  "proptest",
  "prost",
  "reqwest",
+ "schemars 1.2.3",
  "serde",
  "serde_json",
  "sqlx",
@@ -5263,6 +5264,7 @@ dependencies = [
  "tracing",
  "tract-onnx",
  "uuid",
+ "vellum-contracts",
  "vellum-kernel",
  "zeroize",
 ]
