@@ -12,6 +12,7 @@ import type { NodeType } from "@tiptap/pm/model";
 
 import type { NodeName } from "../schema/blocks.gen";
 import { nodeSpec, tiptapAttributes } from "../schema/spec";
+import { safeUrl } from "../urls";
 
 /**
  * An input rule that turns the `token` group of a match into an inline atom
@@ -215,4 +216,26 @@ export const MathInline = Node.create({
       ),
     ];
   },
+});
+
+/** `![alt](src)` inside a line of text or a link. */
+export const InlineImage = Node.create({
+  ...inlineBase("inlineImage"),
+  draggable: true,
+  parseHTML: () => [{ tag: 'img[data-type="inlineImage"]', priority: 60 }],
+  renderHTML: ({ node, HTMLAttributes }) => {
+    const source = safeUrl(String(node.attrs["src"]));
+    const title = String(node.attrs["title"]);
+    return [
+      "img",
+      mergeAttributes(HTMLAttributes, {
+        "data-type": "inlineImage",
+        class: "vl-inline-image",
+        alt: String(node.attrs["alt"]),
+        ...(source === undefined ? {} : { src: source }),
+        ...(title === "" ? {} : { title }),
+      }),
+    ];
+  },
+  renderText: ({ node }) => `![${String(node.attrs["alt"])}](${String(node.attrs["src"])})`,
 });

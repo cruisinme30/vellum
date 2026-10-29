@@ -46,7 +46,7 @@ export const NODES = [
     defining: true,
     blockId: true,
     markdown: "heading",
-    attrs: { "level": { type: "integer", default: 1 }, },
+    attrs: { "attributes": { type: "string", default: "" }, "level": { type: "integer", default: 1 }, },
     slash: [
       { title: "Heading 1", description: "Large section heading", keywords: ["h1","title"], section: "Basic", icon: "format_h1", attrs: {"level":1} },
       { title: "Heading 2", description: "Medium section heading", keywords: ["h2"], section: "Basic", icon: "format_h2", attrs: {"level":2} },
@@ -91,7 +91,7 @@ export const NODES = [
     defining: true,
     blockId: true,
     markdown: "fence:code",
-    attrs: { "language": { type: "string", default: "" }, },
+    attrs: { "args": { type: "string", default: "" }, "attributes": { type: "string", default: "" }, "language": { type: "string", default: "" }, },
     slash: [
       { title: "Code", description: "Code with syntax colours", keywords: ["fence","snippet","pre"], section: "Basic", icon: "code", attrs: {} },
     ],
@@ -117,9 +117,9 @@ export const NODES = [
     doc: "A `-` bullet list.",
     impl: "tiptap",
     group: "block list",
-    content: "listItem+",
+    content: "(listItem | taskItem)+",
     markdown: "list:bullet",
-    attrs: { },
+    attrs: { "tight": { type: "boolean", default: true }, },
     slash: [
       { title: "Bulleted list", description: "A simple list", keywords: ["ul","unordered","bullets"], section: "Lists", icon: "format_list_bulleted", attrs: {} },
     ],
@@ -129,9 +129,9 @@ export const NODES = [
     doc: "A numbered list.",
     impl: "tiptap",
     group: "block list",
-    content: "listItem+",
+    content: "(listItem | taskItem)+",
     markdown: "list:ordered",
-    attrs: { "start": { type: "integer", default: 1 }, },
+    attrs: { "start": { type: "integer", default: 1 }, "tight": { type: "boolean", default: true }, },
     slash: [
       { title: "Numbered list", description: "A list with numbers", keywords: ["ol","ordered","numbers"], section: "Lists", icon: "format_list_numbered", attrs: {} },
     ],
@@ -155,7 +155,7 @@ export const NODES = [
     group: "block list",
     content: "taskItem+",
     markdown: "list:task",
-    attrs: { },
+    attrs: { "tight": { type: "boolean", default: true }, },
     slash: [
       { title: "To-do list", description: "Tasks with checkboxes", keywords: ["todo","task","checkbox","checklist"], section: "Lists", icon: "checklist", attrs: {} },
     ],
@@ -230,7 +230,7 @@ export const NODES = [
     defining: true,
     blockId: true,
     markdown: "container:callout",
-    attrs: { "kind": { type: "enum", default: "info", values: ["info","warn","good","crit","tip","note"] }, },
+    attrs: { "attributes": { type: "string", default: "" }, "kind": { type: "enum", default: "info", values: ["info","warn","good","crit","tip","note"] }, "title": { type: "string", default: "" }, },
     slash: [
       { title: "Info callout", description: "Neutral information", keywords: ["callout","info","aside"], section: "Callouts", icon: "info", attrs: {"kind":"info"} },
       { title: "Warning callout", description: "Something to watch", keywords: ["callout","warn","caution"], section: "Callouts", icon: "warning", attrs: {"kind":"warn"} },
@@ -249,7 +249,7 @@ export const NODES = [
     defining: true,
     blockId: true,
     markdown: "container:details",
-    attrs: { "summary": { type: "string", default: "Details" }, },
+    attrs: { "attributes": { type: "string", default: "" }, "summary": { type: "string", default: "Details" }, },
     slash: [
       { title: "Toggle", description: "Collapsible section", keywords: ["details","collapse","expand","accordion"], section: "Layout", icon: "expand_circle_down", attrs: {} },
     ],
@@ -263,7 +263,7 @@ export const NODES = [
     isolating: true,
     blockId: true,
     markdown: "container:columns",
-    attrs: { },
+    attrs: { "attributes": { type: "string", default: "" }, },
     slash: [
       { title: "Two columns", description: "Side-by-side content", keywords: ["columns","split","layout"], section: "Layout", icon: "view_column_2", attrs: {}, template: "columns2" },
       { title: "Three columns", description: "Three side-by-side areas", keywords: ["columns","layout"], section: "Layout", icon: "view_week", attrs: {}, template: "columns3" },
@@ -277,7 +277,7 @@ export const NODES = [
     content: "block+",
     isolating: true,
     markdown: "container_section",
-    attrs: { },
+    attrs: { "attributes": { type: "string", default: "" }, },
     slash: [
     ],
   },
@@ -290,7 +290,7 @@ export const NODES = [
     isolating: true,
     blockId: true,
     markdown: "container:tabs",
-    attrs: { },
+    attrs: { "attributes": { type: "string", default: "" }, },
     slash: [
       { title: "Tabs", description: "Content behind tabs", keywords: ["tabs","tabbed"], section: "Layout", icon: "tab", attrs: {}, template: "tabs" },
     ],
@@ -303,7 +303,7 @@ export const NODES = [
     content: "block+",
     isolating: true,
     markdown: "container_section:tab",
-    attrs: { "title": { type: "string", default: "Tab" }, },
+    attrs: { "attributes": { type: "string", default: "" }, "title": { type: "string", default: "Tab" }, },
     slash: [
     ],
   },
@@ -316,7 +316,7 @@ export const NODES = [
     atom: true,
     blockId: true,
     markdown: "container:toc",
-    attrs: { },
+    attrs: { "attributes": { type: "string", default: "" }, },
     slash: [
       { title: "Table of contents", description: "Links to the headings", keywords: ["toc","contents","outline"], section: "Layout", icon: "toc", attrs: {} },
     ],
@@ -329,7 +329,7 @@ export const NODES = [
     content: "bulletList",
     blockId: true,
     markdown: "container:stats",
-    attrs: { },
+    attrs: { "attributes": { type: "string", default: "" }, },
     slash: [
       { title: "Stats", description: "Big numbers with deltas", keywords: ["stats","kpi","metrics","numbers"], section: "Data", icon: "monitoring", attrs: {}, template: "stats" },
     ],
@@ -342,7 +342,7 @@ export const NODES = [
     content: "bulletList",
     blockId: true,
     markdown: "container:facts",
-    attrs: { },
+    attrs: { "attributes": { type: "string", default: "" }, },
     slash: [
       { title: "Facts", description: "Key and value pairs", keywords: ["facts","properties","kv","metadata"], section: "Data", icon: "fact_check", attrs: {}, template: "facts" },
     ],
@@ -355,7 +355,7 @@ export const NODES = [
     content: "bulletList",
     blockId: true,
     markdown: "container:progress",
-    attrs: { },
+    attrs: { "attributes": { type: "string", default: "" }, },
     slash: [
       { title: "Progress", description: "Progress bars", keywords: ["progress","percent","bars"], section: "Data", icon: "linear_scale", attrs: {}, template: "progress" },
     ],
@@ -368,7 +368,7 @@ export const NODES = [
     content: "bulletList",
     blockId: true,
     markdown: "container:cards",
-    attrs: { },
+    attrs: { "attributes": { type: "string", default: "" }, },
     slash: [
       { title: "Cards", description: "A grid of cards", keywords: ["cards","grid","features"], section: "Layout", icon: "grid_view", attrs: {}, template: "cards" },
     ],
@@ -381,7 +381,7 @@ export const NODES = [
     content: "orderedList",
     blockId: true,
     markdown: "container:steps",
-    attrs: { },
+    attrs: { "attributes": { type: "string", default: "" }, },
     slash: [
       { title: "Steps", description: "A numbered procedure", keywords: ["steps","procedure","howto"], section: "Layout", icon: "format_list_numbered", attrs: {}, template: "steps" },
     ],
@@ -394,21 +394,34 @@ export const NODES = [
     content: "bulletList?",
     blockId: true,
     markdown: "container:pages",
-    attrs: { },
+    attrs: { "attributes": { type: "string", default: "" }, },
     slash: [
       { title: "Page cards", description: "Cards for linked pages", keywords: ["pages","subpages","children"], section: "Layout", icon: "dashboard", attrs: {} },
     ],
   },
   {
+    name: "container",
+    doc: "Any other `::: name arg` container, or a typed one whose body does not fit its node; kept verbatim so a save never rewrites it.",
+    impl: "generic",
+    group: "block",
+    content: "block+",
+    defining: true,
+    blockId: true,
+    markdown: "container:*",
+    attrs: { "arg": { type: "string", default: "" }, "attributes": { type: "string", default: "" }, "name": { type: "string", default: "" }, },
+    slash: [
+    ],
+  },
+  {
     name: "linkCard",
-    doc: "`::: link <url>` with a title line; a rich link preview.",
+    doc: "`::: link <url>` whose body is one line, the title; a rich link preview.",
     impl: "custom",
     group: "block",
     content: "",
     atom: true,
     blockId: true,
     markdown: "container:link",
-    attrs: { "title": { type: "string", default: "" }, "url": { type: "string", default: "" }, },
+    attrs: { "attributes": { type: "string", default: "" }, "title": { type: "string", default: "" }, "url": { type: "string", default: "" }, },
     slash: [
       { title: "Link card", description: "A rich link preview", keywords: ["bookmark","link","url","unfurl"], section: "Media", icon: "link", attrs: {} },
     ],
@@ -422,7 +435,7 @@ export const NODES = [
     atom: true,
     blockId: true,
     markdown: "container:embed",
-    attrs: { "url": { type: "string", default: "" }, },
+    attrs: { "attributes": { type: "string", default: "" }, "url": { type: "string", default: "" }, },
     slash: [
       { title: "Embed", description: "Video, design or map", keywords: ["embed","youtube","figma","loom","iframe"], section: "Media", icon: "smart_display", attrs: {} },
     ],
@@ -453,7 +466,7 @@ export const NODES = [
     defining: true,
     blockId: true,
     markdown: "fence:data",
-    attrs: { "args": { type: "string", default: "" }, "lang": { type: "enum", default: "chart", values: ["chart","timeline","roadmap","risk-matrix","board","table","architecture","mermaid","d2","plantuml","graphviz","excalidraw","drawio","calculator","image","collection"] }, },
+    attrs: { "args": { type: "string", default: "" }, "attributes": { type: "string", default: "" }, "lang": { type: "enum", default: "chart", values: ["chart","timeline","roadmap","risk-matrix","board","table","architecture","mermaid","d2","plantuml","graphviz","excalidraw","drawio","calculator","image","collection"] }, },
     slash: [
       { title: "Chart", description: "Bar, line, donut and more", keywords: ["chart","graph","bar","line","pie","donut"], section: "Charts and plans", icon: "bar_chart", attrs: {"lang":"chart"}, template: "chart" },
       { title: "Timeline", description: "Dated milestones", keywords: ["timeline","history","dates"], section: "Charts and plans", icon: "timeline", attrs: {"lang":"timeline"}, template: "timeline" },
@@ -559,6 +572,19 @@ export const NODES = [
     atom: true,
     markdown: "math_inline",
     attrs: { "literal": { type: "string", default: "" }, },
+    slash: [
+    ],
+  },
+  {
+    name: "inlineImage",
+    doc: "An image inside a line of text or a link, `![alt](src \"title\")`. An image alone on its line is the `image` block.",
+    impl: "custom",
+    group: "inline",
+    content: "",
+    inline: true,
+    atom: true,
+    markdown: "image:inline",
+    attrs: { "alt": { type: "string", default: "" }, "src": { type: "string", default: "" }, "title": { type: "string", default: "" }, },
     slash: [
     ],
   },

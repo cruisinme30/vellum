@@ -42,3 +42,5 @@ export const Progress = genericNode("progress");
 export const Cards = genericNode("cards");
 export const Steps = genericNode("steps");
 export const Pages = genericNode("pages");
+/** Any other `::: name` container, kept verbatim. */
+export const Container = genericNode("container");

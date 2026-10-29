@@ -73,7 +73,9 @@ pub enum NodeType {
     Steps,
     /// `::: pages`, a card grid of linked pages; empty means the subpages.
     Pages,
-    /// `::: link <url>` with a title line; a rich link preview.
+    /// Any other `::: name arg` container, or a typed one whose body does not fit its node; kept verbatim so a save never rewrites it.
+    Container,
+    /// `::: link <url>` whose body is one line, the title; a rich link preview.
     LinkCard,
     /// `::: embed <url>`, shown in a sandboxed frame.
     Embed,
@@ -95,11 +97,13 @@ pub enum NodeType {
     Date,
     /// Inline math, `$x^2$`.
     MathInline,
+    /// An image inside a line of text or a link, `![alt](src "title")`. An image alone on its line is the `image` block.
+    InlineImage,
 }
 
 impl NodeType {
     /// Every value, in schema order.
-    pub const ALL: [Self; 40] = [
+    pub const ALL: [Self; 42] = [
         Self::Doc,
         Self::Paragraph,
         Self::Heading,
@@ -129,6 +133,7 @@ impl NodeType {
         Self::Cards,
         Self::Steps,
         Self::Pages,
+        Self::Container,
         Self::LinkCard,
         Self::Embed,
         Self::Image,
@@ -140,6 +145,7 @@ impl NodeType {
         Self::IssueKey,
         Self::Date,
         Self::MathInline,
+        Self::InlineImage,
     ];
 
     /// The name used in documents.
@@ -175,6 +181,7 @@ impl NodeType {
             Self::Cards => "cards",
             Self::Steps => "steps",
             Self::Pages => "pages",
+            Self::Container => "container",
             Self::LinkCard => "linkCard",
             Self::Embed => "embed",
             Self::Image => "image",
@@ -186,6 +193,7 @@ impl NodeType {
             Self::IssueKey => "issueKey",
             Self::Date => "date",
             Self::MathInline => "mathInline",
+            Self::InlineImage => "inlineImage",
         }
     }
 
@@ -217,6 +225,7 @@ impl NodeType {
                 | Self::Cards
                 | Self::Steps
                 | Self::Pages
+                | Self::Container
                 | Self::LinkCard
                 | Self::Embed
                 | Self::Image
@@ -236,6 +245,7 @@ impl NodeType {
                 | Self::IssueKey
                 | Self::Date
                 | Self::MathInline
+                | Self::InlineImage
         )
     }
 
@@ -251,8 +261,8 @@ impl NodeType {
             Self::HorizontalRule => "",
             Self::CodeBlock => "text*",
             Self::MathBlock => "text*",
-            Self::BulletList => "listItem+",
-            Self::OrderedList => "listItem+",
+            Self::BulletList => "(listItem | taskItem)+",
+            Self::OrderedList => "(listItem | taskItem)+",
             Self::ListItem => "paragraph block*",
             Self::TaskList => "taskItem+",
             Self::TaskItem => "paragraph block*",
@@ -273,6 +283,7 @@ impl NodeType {
             Self::Cards => "bulletList",
             Self::Steps => "orderedList",
             Self::Pages => "bulletList?",
+            Self::Container => "block+",
             Self::LinkCard => "",
             Self::Embed => "",
             Self::Image => "",
@@ -284,6 +295,7 @@ impl NodeType {
             Self::IssueKey => "",
             Self::Date => "",
             Self::MathInline => "",
+            Self::InlineImage => "",
         }
     }
 
@@ -321,6 +333,7 @@ impl NodeType {
             Self::Cards => "container:cards",
             Self::Steps => "container:steps",
             Self::Pages => "container:pages",
+            Self::Container => "container:*",
             Self::LinkCard => "container:link",
             Self::Embed => "container:embed",
             Self::Image => "image",
@@ -332,6 +345,7 @@ impl NodeType {
             Self::IssueKey => "issue_key",
             Self::Date => "date",
             Self::MathInline => "math_inline",
+            Self::InlineImage => "image:inline",
         }
     }
 }

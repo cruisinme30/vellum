@@ -3,7 +3,7 @@
 
 import type { AnyExtension } from "@tiptap/core";
 import { Highlight } from "@tiptap/extension-highlight";
-import { TaskItem, TaskList } from "@tiptap/extension-list";
+import { BulletList, OrderedList, TaskItem, TaskList } from "@tiptap/extension-list";
 import { Subscript } from "@tiptap/extension-subscript";
 import { Superscript } from "@tiptap/extension-superscript";
 import { Placeholder } from "@tiptap/extensions";
@@ -33,6 +33,7 @@ import {
   Cards,
   Column,
   Columns,
+  Container,
   Facts,
   Pages,
   Progress,
@@ -41,12 +42,15 @@ import {
 } from "./nodes/generic";
 import {
   DateChip,
+  InlineImage,
   IssueKey,
   MathInline,
   Mention,
   WikiLink,
   type ResolvePage,
 } from "./nodes/inline";
+import { nodeSpec } from "./schema/spec";
+import { SchemaAttributes } from "./schema-attributes";
 import { SlashCommand } from "./slash/slash-extension";
 
 /** What the editor needs from its host. */
@@ -66,6 +70,8 @@ export function vellumExtensions({ t, resolvePage, history }: ExtensionOptions):
   return [
     StarterKit.configure({
       codeBlock: false,
+      bulletList: false,
+      orderedList: false,
       underline: false,
       trailingNode: false,
       undoRedo: history ? {} : false,
@@ -81,6 +87,9 @@ export function vellumExtensions({ t, resolvePage, history }: ExtensionOptions):
         HTMLAttributes: { rel: "noopener noreferrer", target: null },
       },
     }),
+    // Lists may mix in tasks, so ordered and mixed task lists fit.
+    BulletList.extend({ content: nodeSpec("bulletList").content }),
+    OrderedList.extend({ content: nodeSpec("orderedList").content }),
     CodeBlock,
     MathBlock,
     TaskList,
@@ -121,6 +130,7 @@ export function vellumExtensions({ t, resolvePage, history }: ExtensionOptions):
     Cards,
     Steps,
     Pages,
+    Container,
     LinkCard,
     Embed,
     Image,
@@ -130,7 +140,9 @@ export function vellumExtensions({ t, resolvePage, history }: ExtensionOptions):
     IssueKey,
     DateChip,
     MathInline,
+    InlineImage,
     BlockIds,
+    SchemaAttributes,
     SlashCommand.configure({ t }),
     Placeholder.configure({
       placeholder: ({ node }) => (node.type.name === "paragraph" ? t("editor-placeholder") : ""),

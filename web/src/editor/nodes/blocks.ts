@@ -41,6 +41,8 @@ const fromSchema = (name: NodeName) => {
 export const CodeBlock = CodeBlockBase.extend({
   addAttributes() {
     return {
+      // `args` and `attributes`: the rest of the info string, kept verbatim.
+      ...tiptapAttributes(nodeSpec("codeBlock")),
       language: {
         default: "",
         parseHTML: (element) =>

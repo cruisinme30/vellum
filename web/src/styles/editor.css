@@ -635,3 +635,21 @@
   line-height: 1.2;
   overflow-wrap: anywhere;
 }
+
+.vl-inline-image {
+  max-height: 1.5em;
+  vertical-align: middle;
+}
+
+.vl-container {
+  padding: 8px 16px;
+  border: 1px dashed var(--md-outline-variant);
+}
+
+.vl-container::before {
+  content: "::: " attr(data-name) " " attr(data-arg);
+  display: block;
+  color: var(--md-on-surface-variant);
+  font-family: var(--vl-font-mono, monospace);
+  font-size: 0.8rem;
+}
