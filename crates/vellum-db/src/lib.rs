@@ -28,6 +28,7 @@ mod index;
 pub mod jobs;
 pub mod rate;
 mod reindex;
+mod router;
 mod shard;
 mod telemetry;
 
@@ -35,6 +36,7 @@ pub use config::{IndexConfig, IndexKey};
 pub use error::{Error, Result};
 pub use index::{Backend, Index, IndexPool};
 pub use reindex::{FileReader, PlainFiles, Problem, ProblemKind, ReindexReport};
+pub use router::ShardRouter;
 pub use shard::{MAIN_URL_VAR, SHARDS_VAR, Shard, ShardedIndex, ShardsConfig, shard_url_var};
 pub use telemetry::{RowCount, traced};
 

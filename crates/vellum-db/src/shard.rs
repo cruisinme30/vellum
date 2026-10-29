@@ -187,10 +187,23 @@ impl ShardedIndex {
     /// configured; database errors from the main database.
     #[tracing::instrument(name = "db.shard_for", skip_all, fields(db.shard))]
     pub async fn shard_for(&self, space: ObjectId) -> Result<&Shard> {
+        let shard = match self.assigned(space).await? {
+            Some(name) => self.shard(&name).ok_or(Error::UnknownShard(name))?,
+            None => self.home(),
+        };
+        let _ = tracing::Span::current().record("db.shard", shard.name.as_str());
+        Ok(shard)
+    }
+
+    /// The shard named for `space` in the map, if any.
+    ///
+    /// # Errors
+    /// Database errors from the main database.
+    pub async fn assigned(&self, space: ObjectId) -> Result<Option<String>> {
         let id = space.as_uuid();
         let system = self.main.backend().otel_system();
         let sql = "SELECT shard FROM space_shards WHERE space_id = $1";
-        let name: Option<String> = match &self.main.pool {
+        Ok(match &self.main.pool {
             Pool::Sqlite(pool) => {
                 let q = sqlx::query_scalar(sql).bind(id).fetch_optional(pool);
                 traced(system, "space_shards.get", q).await?
@@ -199,13 +212,39 @@ impl ShardedIndex {
                 let q = sqlx::query_scalar(sql).bind(id).fetch_optional(pool);
                 traced(system, "space_shards.get", q).await?
             }
+        })
+    }
+
+    /// How many spaces the map puts on each shard, by name.
+    ///
+    /// # Errors
+    /// Database errors from the main database.
+    pub async fn counts(&self) -> Result<HashMap<String, u64>> {
+        let system = self.main.backend().otel_system();
+        let sql = "SELECT shard, COUNT(*) FROM space_shards GROUP BY shard";
+        let rows: Vec<(String, i64)> = match &self.main.pool {
+            Pool::Sqlite(pool) => {
+                let q = sqlx::query_as(sql).fetch_all(pool);
+                traced(system, "space_shards.count", q).await?
+            }
+            Pool::Postgres(pool) => {
+                let q = sqlx::query_as(sql).fetch_all(pool);
+                traced(system, "space_shards.count", q).await?
+            }
         };
-        let shard = match name {
-            Some(name) => self.shard(&name).ok_or(Error::UnknownShard(name))?,
-            None => self.home(),
-        };
-        let _ = tracing::Span::current().record("db.shard", shard.name.as_str());
-        Ok(shard)
+        Ok(rows
+            .into_iter()
+            .map(|(name, n)| (name.to_ascii_lowercase(), u64::try_from(n).unwrap_or(0)))
+            .collect())
+    }
+
+    /// Records `space` on shard `name` unless the map already has an
+    /// entry for it, which then stands.
+    ///
+    /// # Errors
+    /// Database errors from the main database.
+    pub async fn claim(&self, space: ObjectId, name: &str) -> Result<()> {
+        self.record(&[(space, name.to_owned())], false).await
     }
 
     /// Records that `space` lives on shard `name`. This only updates the
@@ -281,7 +320,7 @@ impl ShardedIndex {
     }
 
     /// Every entry of the map.
-    async fn assignments(&self) -> Result<HashMap<ObjectId, String>> {
+    pub(crate) async fn assignments(&self) -> Result<HashMap<ObjectId, String>> {
         let system = self.main.backend().otel_system();
         let sql = "SELECT space_id, shard FROM space_shards";
         let rows: Vec<(Uuid, String)> = match &self.main.pool {
