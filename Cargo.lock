@@ -9280,7 +9280,7 @@ dependencies = [
  "bytes",
  "futures",
  "serde",
- "serde-saphyr",
+ "serde-saphyr 2.0.0",
  "tempfile",
  "thiserror",
  "tokio",
