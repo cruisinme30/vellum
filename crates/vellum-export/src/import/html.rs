@@ -608,8 +608,8 @@ mod tests {
             <div class="expand-content"><p>Hidden</p></div></div>
             <div class="code panel"><div class="codeContent"><pre class="syntaxhighlighter-pre" data-syntaxhighlighter-params="brush: py; gutter: false">print(1)</pre></div></div></body>"#,
         );
-        assert!(md.contains("::: crit\nDo not restart.\n:::"), "{md}");
-        assert!(md.contains("::: details More\nHidden\n:::"), "{md}");
+        assert!(md.contains("::: crit\n\nDo not restart.\n\n:::"), "{md}");
+        assert!(md.contains("::: details More\n\nHidden\n\n:::"), "{md}");
         assert!(md.contains("```python\nprint(1)\n```"), "{md}");
     }
 

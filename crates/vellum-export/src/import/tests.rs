@@ -115,7 +115,10 @@ fn outline_and_docmost_notices_become_callouts() {
         )
         .unwrap();
         let (_, text) = page(&set, "Deploys.md");
-        assert!(text.contains("::: warn\nFreeze on Fridays.\n:::"), "{text}");
+        assert!(
+            text.contains("::: warn\n\nFreeze on Fridays.\n\n:::"),
+            "{text}"
+        );
     }
 }
 
@@ -215,7 +218,10 @@ fn confluence_spaces_keep_their_page_tree() {
         restart.contains("![Request path](../attachments/2/diagram.png)"),
         "{restart}"
     );
-    assert!(restart.contains("::: warn\nDrain first.\n:::"), "{restart}");
+    assert!(
+        restart.contains("::: warn\n\nDrain first.\n\n:::"),
+        "{restart}"
+    );
     let all = paths(&set);
     assert!(
         !all.iter()
