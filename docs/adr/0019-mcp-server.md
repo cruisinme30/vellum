@@ -12,7 +12,7 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D85, D86, D87
-- Issue: #165, #166, #167, #168, #169, #170, #171
+- Issue: #165, #166, #167, #168, #169, #170, #171, #316
 - Pull requests: #210
 - Crate: `vellum-mcp` (layer `edge`)
 
@@ -59,7 +59,10 @@ the brief differ, the decisions below say which way we went.
   removed, and blocks that read like instructions to the model are
   flagged in `_meta["dev.vellum/warnings"]` with their block ids. Server
   instructions tell the model that workspace content is data, not
-  instructions.
+  instructions. Every tool result also passes one last guard on its way
+  out, covering every string (titles, heading paths, outlines, rows and
+  error text), so a field no tool thought to guard cannot reach the model
+  raw; those warnings name the field by JSON pointer (#316).
 - Every call is audited (user, client, token, tool, URIs touched,
   outcome, request id and trace id) and rate limited per token with the
   shared GCRA limiter from `vellum-security` (burst 30, 120 per minute by
