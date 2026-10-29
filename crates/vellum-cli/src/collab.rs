@@ -28,6 +28,7 @@ use axum::http::request::Parts;
 use axum::http::{StatusCode, header};
 use axum::response::IntoResponse as _;
 use bytes::Bytes;
+use vellum_api::error::ErrorResponse;
 use vellum_collab::sql::{Envelope, SqlUpdateStore};
 use vellum_collab::ws::Authorizer;
 use vellum_collab::{
@@ -37,7 +38,7 @@ use vellum_contracts::{CredentialKind, Principal, Scope};
 use vellum_crypto::{KekId, LocalKeyring, SecretKey};
 use vellum_db::Index;
 use vellum_drive::{Access as DriveAccess, Drive, DriveError, NodeKind, Permission, Saved};
-use vellum_kernel::{Actor, Error, ErrorKind, ObjectId, Result, UserId};
+use vellum_kernel::{Actor, Error, ErrorKind, ObjectId, RequestId, Result, UserId};
 use vellum_store::Base;
 
 /// Name of the key, in the data folder, that seals the change log.
@@ -99,12 +100,18 @@ impl Collab {
 
 /// The router served at `/collab` when no workspace index is configured.
 pub fn unavailable_router() -> Router {
-    Router::new().fallback(|| async {
-        (
-            StatusCode::SERVICE_UNAVAILABLE,
+    Router::new().fallback(|request: axum::extract::Request| async move {
+        let id = request
+            .extensions()
+            .get::<RequestId>()
+            .copied()
+            .unwrap_or_else(RequestId::generate);
+        ErrorResponse::of(
+            ErrorKind::Unavailable,
             "live editing needs the workspace index",
+            id,
         )
-            .into_response()
+        .into_response()
     })
 }
 
@@ -268,7 +275,10 @@ impl DriveAuthorizer {
             .get(header::ORIGIN)
             .and_then(|v| v.to_str().ok())
             .map(|o| o.trim_end_matches('/'));
-        if origin == Some(self.origin.as_str()) {
+        // Hosts are case-insensitive; the API's CSRF check compares the
+        // same way, so a dev proxy that keeps the browser's Origin works
+        // for both.
+        if origin.is_some_and(|o| o.eq_ignore_ascii_case(&self.origin)) {
             Ok(())
         } else {
             Err(Error::new(
@@ -533,6 +543,26 @@ mod tests {
                 Err(ErrorKind::PermissionDenied),
                 "{origin:?}"
             );
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn the_app_origin_is_matched_like_the_api_matches_it() -> TestResult {
+        let world = World::new().await?;
+        let auth = world.authorizer();
+        for origin in [
+            ORIGIN,
+            "https://vellum.northstar.dev/",
+            "https://Vellum.Northstar.dev",
+        ] {
+            let (user, _) = auth
+                .authorize(
+                    &upgrade(Some(session(world.owner)), Some(origin)),
+                    world.room(),
+                )
+                .await?;
+            assert_eq!(user, world.owner, "{origin}");
         }
         Ok(())
     }
