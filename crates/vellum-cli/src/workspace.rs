@@ -132,11 +132,23 @@ impl EventSink for TracingSink {
     }
 }
 
-/// The opened services, plus the two the file watcher drives.
+/// The opened services, plus the two the file watcher drives and Work,
+/// which the integration receivers act through.
 struct Workspace {
     services: Vec<Arc<dyn Service>>,
     drive: Arc<Drive>,
     books: Arc<BooksService>,
+    work: Arc<WorkService>,
+}
+
+/// What `vellum serve` mounts for the workspace.
+#[derive(Default)]
+pub struct Opened {
+    /// The typed services.
+    pub services: Vec<Arc<dyn Service>>,
+    /// The integration receivers, to mount cross-site at `/hooks`, when an
+    /// integration secret is set (see [`crate::integrations`]).
+    pub hooks: Option<axum::Router>,
 }
 
 /// Builds the services over `store`, `authz` and the drive's `index`.
@@ -170,12 +182,13 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
         Arc::new(vellum_books_service::AuthzAccess::new(authz, space_of)),
     ));
     let (work, report) = WorkService::open(
-        store,
+        Arc::clone(&store),
         Arc::new(IdentityDirectory(Arc::clone(identity))),
         Arc::new(TracingSink),
         Arc::new(SystemClock),
     )
     .await?;
+    let work = Arc::new(work);
     if report.skipped > 0 {
         tracing::warn!(
             skipped = report.skipped,
@@ -187,10 +200,11 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
             Arc::new(DriveService::new(Arc::clone(&drive))),
             Arc::new(collections),
             Arc::clone(&books) as Arc<dyn Service>,
-            Arc::new(work),
+            Arc::clone(&work) as Arc<dyn Service>,
         ],
         drive,
         books,
+        work,
     })
 }
 
@@ -199,17 +213,18 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
 ///
 /// # Errors
 ///
-/// An unreachable database, a wrong key or an unreadable data folder.
+/// An unreachable database, a wrong key, an unreadable data folder or
+/// invalid integration settings.
 pub async fn open(
     config: &Config,
     identity: &Arc<Identity>,
-    var: impl Fn(&str) -> Option<String>,
-) -> Result<Vec<Arc<dyn Service>>, Error> {
-    let index_config = match index_config(config, var)? {
+    var: impl Fn(&str) -> Option<String> + Send + Sync,
+) -> Result<Opened, Error> {
+    let index_config = match index_config(config, &var)? {
         Ok(c) => c,
         Err(why) => {
             tracing::warn!("{why}; serving sign-in only, without the workspace API");
-            return Ok(Vec::new());
+            return Ok(Opened::default());
         }
     };
     let index = Index::open(&index_config)
@@ -238,6 +253,7 @@ pub async fn open(
         Ok(report) => tracing::info!(?report, "drive index rebuilt from the data folder"),
         Err(error) => tracing::warn!(%error, "drive rescan failed; the index may be stale"),
     }
+    let hooks = crate::integrations::hooks(&store, &workspace.work, &var).await?;
     spaces.replace(load_spaces(drive_index.as_ref()).await?);
     let refresh = Arc::clone(&spaces);
     drop(tokio::spawn(async move {
@@ -251,7 +267,10 @@ pub async fn open(
             }
         }
     }));
-    Ok(workspace.services)
+    Ok(Opened {
+        services: workspace.services,
+        hooks,
+    })
 }
 
 /// The services over an empty scratch folder and in-memory permissions,
