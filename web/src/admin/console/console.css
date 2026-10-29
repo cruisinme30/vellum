@@ -280,6 +280,7 @@
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
 
 .vl-admin-row-actions {
   display: flex;

@@ -2564,6 +2564,11 @@ export interface DriveAdminSetMemberAdminSpaceView {
 }
 
 /**
+ * No input.
+ */
+export type DriveAdminSpacesNoInput = Record<string, never>;
+
+/**
  * A space as the admin console shows it.
  */
 export interface DriveAdminUpdateSpaceAdminSpaceView {
@@ -9664,7 +9669,7 @@ export interface Operations {
   "drive.admin_spaces": {
     method: "GET";
     path: "/v1/admin/spaces";
-    input: NoInput;
+    input: DriveAdminSpacesNoInput;
     output: AdminSpaceList;
   };
   /** Rename any space and change its quota, trash and version settings */

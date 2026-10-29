@@ -91,6 +91,7 @@ function fakeApi(overrides: Partial<AdminConsoleApi> = {}) {
     backups: unused,
     backUpNow: unused,
     runDrill: unused,
+    usage: unused,
     users: () => Promise.resolve([PRIYA, MARCO]),
     createUser,
     updateUser,
