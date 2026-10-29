@@ -31,6 +31,13 @@ RUN pnpm run build
 # The static musl binary.
 FROM ${RUST_IMAGE} AS build
 WORKDIR /src
+# SQLCipher in vellum-db compiles a vendored OpenSSL, whose build runs
+# Perl and make; the Alpine Rust image has neither. Not pinned: Alpine drops
+# superseded package revisions from its mirrors, so an exact pin breaks the
+# build at the next security update. They are build tools only and never
+# reach the image, and the Rust base image itself is pinned by digest.
+# hadolint ignore=DL3018
+RUN apk add --no-cache perl make
 # Use the image's toolchain (the same version as rust-toolchain.toml)
 # without downloading the extra components the file asks for.
 ENV RUSTUP_TOOLCHAIN=1.97.0 \
