@@ -1,8 +1,8 @@
 # SPDX-FileCopyrightText: 2026 The Vellum contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 
-# The fast suite: gates every pull request into develop (and is part of the
-# full suite for main). Branch protection requires the "Fast suite" check.
+# The fast suite: gates every pull request into develop, again in the merge
+# queue, and is part of the full suite for main. Branch protection requires the "Fast suite" check.
 name: Fast suite
 
 on:
@@ -11,6 +11,8 @@ on:
     types: [opened, synchronize, reopened, edited]
   push:
     branches: [develop]
+  # The merge queue tests each pull request on top of the ones ahead of it.
+  merge_group:
   workflow_call:
 
 permissions:
@@ -106,7 +108,7 @@ jobs:
       - name: YAML
         run: yamllint --strict .
       - name: Shell
-        run: shellcheck -x scripts/ci/*.sh .githooks/*
+        run: shellcheck -x scripts/*/*.sh .githooks/*
       - name: Markdown
         uses: DavidAnson/markdownlint-cli2-action@696eb3f2509270d7b882d2aa68347bc676e7af34 # v25.0.0
       - name: Prose (Vale)
@@ -124,6 +126,9 @@ jobs:
             --exclude-path LICENSES --exclude-path web/node_modules --exclude-path corpus/format '**/*.md'
           fail: true
       - name: Secrets
+        # The pull request already scanned these commits; the action does
+        # not support merge queue events.
+        if: github.event_name != 'merge_group'
         uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
