@@ -70,3 +70,24 @@ async fn an_entry_written_first_wins() {
         Some("us")
     );
 }
+
+#[tokio::test]
+async fn spaces_written_before_sharding_stay_where_they_are() {
+    let dir = tempfile::tempdir().unwrap();
+    let sharded = ShardedIndex::open(&config(&dir)).await.unwrap();
+    // A space already on "us" that the map does not know.
+    let vellum_db::IndexPool::Sqlite(pool) = sharded.shards()[1].index().pool() else {
+        panic!("sqlite")
+    };
+    let _ = sqlx::query(
+        "INSERT INTO spaces (space_id, kind, slug, root_path, name, indexed_at) \
+         VALUES ($1, 'shared_drive', 'old', 'drives/shared/old', 'Old', 0)",
+    )
+    .bind(space(9).as_uuid())
+    .execute(pool)
+    .await
+    .unwrap();
+    let router = ShardRouter::open(sharded).await.unwrap();
+    assert_eq!(router.position(space(9)).await.unwrap(), 1);
+    assert_eq!(router.place(space(9)).await.unwrap(), 1);
+}

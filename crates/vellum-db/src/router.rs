@@ -15,11 +15,13 @@
 use std::collections::HashMap;
 use std::sync::{PoisonError, RwLock};
 
+use uuid::Uuid;
 use vellum_kernel::ObjectId;
 
 use crate::error::{Error, Result};
-use crate::index::Index;
+use crate::index::{Index, IndexPool};
 use crate::shard::ShardedIndex;
+use crate::telemetry::traced;
 
 /// Routes each space to the index of the shard that stores it.
 #[derive(Debug)]
@@ -30,12 +32,15 @@ pub struct ShardRouter {
 }
 
 impl ShardRouter {
-    /// Loads the map from the main database.
+    /// Loads the map from the main database, first recording every space
+    /// a shard already holds that the map has no entry for (spaces written
+    /// before sharding was turned on, all on the home shard).
     ///
     /// # Errors
     /// [`Error::UnknownShard`] when the map names a shard that is not
     /// configured; database errors.
     pub async fn open(sharded: ShardedIndex) -> Result<Self> {
+        adopt(&sharded).await?;
         let mut map = HashMap::new();
         for (space, name) in sharded.assignments().await? {
             let _ = map.insert(space, position(&sharded, &name)?);
@@ -158,6 +163,41 @@ impl ShardRouter {
         self.learn(space, at);
         Ok(at)
     }
+}
+
+/// Records each space found on a shard but missing from the map.
+async fn adopt(sharded: &ShardedIndex) -> Result<()> {
+    const SQL: &str = "SELECT space_id FROM spaces UNION SELECT space_id FROM drive_spaces";
+    let known = sharded.assignments().await?;
+    for shard in sharded.shards() {
+        let index = shard.index();
+        let system = index.backend().otel_system();
+        let ids: Vec<Uuid> = match index.pool() {
+            IndexPool::Sqlite(pool) => {
+                traced(
+                    system,
+                    "spaces.ids",
+                    sqlx::query_scalar(SQL).fetch_all(pool),
+                )
+                .await?
+            }
+            IndexPool::Postgres(pool) => {
+                traced(
+                    system,
+                    "spaces.ids",
+                    sqlx::query_scalar(SQL).fetch_all(pool),
+                )
+                .await?
+            }
+        };
+        for id in ids {
+            let space = ObjectId::from_uuid(id);
+            if !known.contains_key(&space) {
+                sharded.claim(space, shard.name()).await?;
+            }
+        }
+    }
+    Ok(())
 }
 
 fn position(sharded: &ShardedIndex, name: &str) -> Result<usize> {

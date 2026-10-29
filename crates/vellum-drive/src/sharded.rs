@@ -71,6 +71,13 @@ impl ShardedIndex {
             .ok_or_else(|| DriveError::Index(format!("no shard #{at}")))
     }
 
+    /// The shard storing `space`, placing it first when nobody has: a
+    /// write may be the first anyone makes for a space.
+    async fn for_write(&self, space: SpaceId) -> DriveResult<(usize, &SqlIndex)> {
+        let at = self.router.place(object(space)).await.map_err(routing)?;
+        Ok((at, self.shard(at)?))
+    }
+
     async fn for_space(&self, space: SpaceId) -> DriveResult<&SqlIndex> {
         let at = self.router.position(object(space)).await.map_err(routing)?;
         self.shard(at)
@@ -165,11 +172,7 @@ impl DriveIndex for ShardedIndex {
     }
 
     async fn put_node(&self, node: &Node) -> DriveResult<()> {
-        let at = self
-            .router
-            .position(object(node.space))
-            .await
-            .map_err(routing)?;
+        let at = self.for_write(node.space).await?.0;
         let before = self.previous_shard(node.id, at).await?;
         self.shard(at)?.put_node(node).await?;
         if let Some(from) = before {
@@ -249,8 +252,9 @@ impl DriveIndex for ShardedIndex {
     }
 
     async fn append_activity(&self, entry: &Activity) -> DriveResult<()> {
-        self.for_space(entry.space)
+        self.for_write(entry.space)
             .await?
+            .1
             .append_activity(entry)
             .await
     }
@@ -276,8 +280,9 @@ impl DriveIndex for ShardedIndex {
     }
 
     async fn put_version(&self, version: &VersionRecord) -> DriveResult<()> {
-        self.for_space(version.space)
+        self.for_write(version.space)
             .await?
+            .1
             .put_version(version)
             .await
     }
