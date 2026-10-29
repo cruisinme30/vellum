@@ -174,11 +174,17 @@ impl Cx<'_> {
                     sections: vec![self.nested_blocks(node)],
                 })
             }
-            NodeValue::List(list) => Block::List(List {
-                start: (list.list_type == ListType::Ordered).then_some(list.start as u64),
-                tight: list.tight,
-                items: node.children().map(|item| self.item(item)).collect(),
-            }),
+            NodeValue::List(list) => {
+                let items: Vec<_> = node.children().map(|item| self.item(item)).collect();
+                // One item with at most one block has no blank line that
+                // could show it is loose, so it is always tight.
+                let single = matches!(items.as_slice(), [item] if item.blocks.len() <= 1);
+                Block::List(List {
+                    start: (list.list_type == ListType::Ordered).then_some(list.start as u64),
+                    tight: list.tight || single,
+                    items,
+                })
+            }
             NodeValue::CodeBlock(code) => {
                 let mut literal = code.literal;
                 if !literal.is_empty() && !literal.ends_with('\n') {

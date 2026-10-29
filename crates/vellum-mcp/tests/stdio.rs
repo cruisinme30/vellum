@@ -154,3 +154,33 @@ async fn exits_when_input_closes() {
     let finished = tokio::time::timeout(Duration::from_secs(2), c.done).await;
     assert!(matches!(finished, Ok(Ok(Ok(())))));
 }
+
+#[tokio::test]
+async fn answers_every_request_received_before_input_closes() {
+    let mut c = start();
+    // A subscription stays open until input closes; it must not hold
+    // up shutdown.
+    c.send(&request_body(
+        0,
+        "subscriptions/listen",
+        json!({ "notifications": { "resourcesListChanged": true } }),
+    ))
+    .await;
+    // Stay under the default burst of 30 calls per token.
+    for id in 1..=20 {
+        c.send(&request_body(id, "tools/list", json!({}))).await;
+    }
+    drop(c.input);
+    let mut answered = std::collections::BTreeSet::new();
+    while let Ok(Ok(Some(line))) =
+        tokio::time::timeout(Duration::from_secs(2), c.output.next_line()).await
+    {
+        let msg: Value = serde_json::from_str(&line).unwrap_or(Value::Null);
+        if msg.get("result").is_some() {
+            let _ = answered.insert(msg["id"].as_i64().unwrap_or(-1));
+        }
+    }
+    assert_eq!(answered, (1..=20).collect());
+    let finished = tokio::time::timeout(Duration::from_secs(2), c.done).await;
+    assert!(matches!(finished, Ok(Ok(Ok(())))));
+}
