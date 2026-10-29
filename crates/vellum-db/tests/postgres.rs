@@ -113,3 +113,44 @@ async fn reindex_writes_the_same_rows_as_on_sqlite() {
     .unwrap();
     assert_eq!(depth, 2);
 }
+
+/// Two replicas writing at once (ADR 0038): positions still commit in
+/// order, so a reader polling meanwhile never steps over one.
+#[tokio::test]
+async fn feed_positions_commit_in_order_under_concurrent_writers() {
+    use vellum_db::feed::Feed;
+
+    let (_container, url) = start().await.unwrap();
+    let feed = Feed::new(Index::open(&IndexConfig::postgres(&url)).await.unwrap());
+    let mut writers = Vec::new();
+    for w in 0..6 {
+        let feed = feed.clone();
+        writers.push(tokio::spawn(async move {
+            for i in 0..40 {
+                let subject = format!("w{w}/{i}.md");
+                let _ = feed
+                    .publish(&format!("r{w}"), &[("path", &subject), ("path", "x")])
+                    .await
+                    .unwrap();
+            }
+        }));
+    }
+    // Follow while they write: every page must start right after the cursor.
+    let mut cursor = 0;
+    let mut seen = Vec::new();
+    while seen.len() < 480 {
+        let page = feed.read(cursor, 64).await.unwrap();
+        assert!(!page.reset);
+        for c in &page.changes {
+            assert_eq!(c.seq, cursor + 1, "skipped a position");
+            cursor = c.seq;
+            seen.push(c.seq);
+        }
+        cursor = page.cursor;
+        tokio::task::yield_now().await;
+    }
+    for w in writers {
+        w.await.unwrap();
+    }
+    assert_eq!(seen, (1..=480).collect::<Vec<_>>());
+}

@@ -16,6 +16,7 @@
 mod admin;
 mod collab;
 mod docs;
+mod feed;
 mod google_http;
 #[cfg(test)]
 mod google_http_tests;

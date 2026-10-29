@@ -305,7 +305,7 @@ impl Workspace {
         Ok(())
     }
 
-    fn check_links(&self) -> Result<(), SchemaError> {
+    pub(crate) fn check_links(&self) -> Result<(), SchemaError> {
         for c in self.collections.values() {
             for p in &c.schema.properties {
                 match &p.kind {

@@ -54,6 +54,8 @@ single_row!(
     sqlx::sqlite::SqliteRow,
     sqlx::postgres::PgRow,
     i64,
+    (i64,),
+    (i64, i64),
     i32,
     bool,
     String

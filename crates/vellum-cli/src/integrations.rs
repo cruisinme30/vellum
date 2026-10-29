@@ -306,7 +306,9 @@ impl ServiceWork {
 
     /// Runs one step in a transaction as `actor`. When the step fails,
     /// the service puts memory back and the step's own error is returned,
-    /// so a missing issue stays "not found" for the receiver.
+    /// so a missing issue stays "not found" for the receiver. The service
+    /// may run the step again when another replica committed first, so
+    /// it must not consume what it captures.
     async fn run<R: Send>(
         &self,
         actor: UserRef,
