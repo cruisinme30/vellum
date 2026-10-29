@@ -52,3 +52,4 @@ collaboration rooms to another replica in under five seconds.
 | Object storage | The provider's own redundancy |
 | Redis (optional) | Cache only; Vellum falls back to memory |
 | Kroki (optional) | Two replicas; pages fall back to the last drawing |
+| ClamAV (optional) | Two replicas; uploads are refused while none is up ([virus scanning](compose.md#virus-scanning)) |

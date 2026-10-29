@@ -15,6 +15,7 @@ fix it.
 | `/readyz` returns 503 "index not open" | The index is being migrated or rebuilt | Wait; the log shows progress |
 | Pages missing after editing files by hand | The watcher missed changes on a network share | `vellum reindex --drive <name>` |
 | "Kroki unavailable" on diagrams | Kroki is not running or not reachable | Check `VELLUM_KROKI_URL` and the Kroki container |
+| Uploads over 25 MB fail with "virus scanner unavailable" | ClamAV's `StreamMaxLength` is below the upload limit | Set `StreamMaxLength 100M` in `clamd.conf`; see [virus scanning](../deploy/compose.md#virus-scanning) |
 | Conflict copies appear | Two people edited the same lines in and out of Vellum | Expected; merge the copy into the page |
 | Users cannot sign in with SSO | Clock skew or a changed client secret | Check time sync and **Admin → Sign-in** |
 | Slow pages for one space | A very large page or collection | Open **Admin → Requests**, sort by slowest, follow the trace |
