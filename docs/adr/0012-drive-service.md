@@ -13,7 +13,7 @@ vellum: 1
 - Status: accepted
 - Decisions: D64, D65, D66
 - Issue: #103, #104, #105, #106, #107, #108, #109
-- Pull requests: the drive service pull request
+- Pull requests: #223
 
 :::
 
@@ -26,18 +26,6 @@ shortcuts; link rewriting on rename; activity and backlinks; quotas and
 version retention. What you see is the disk, the index is rebuildable,
 and the store (ADR 0005, ADR 0026) already gives atomic conditional
 writes, the three-way merge and an identity-based watcher.
-
-## Options considered
-
-- **Put the drive in `vellum-pages`**: the brief lists that crate for
-  spaces and pages, but the books thread works there too, and two
-  services in one crate break the one-service-per-crate rule.
-- **A `vellum-drive` crate with its own ports**: chosen. It depends on
-  the store and on `vellum-authz` and owns nothing else's tables.
-- **Trash as a flag on files left in place**: rejected, because trashed
-  content would stay visible to Git, sync clients and the file browser.
-- **Trash as a move into `.vellum/trash/`**: chosen, as the PRD layout
-  shows.
 
 ## Decisions
 
@@ -97,6 +85,13 @@ writes, the three-way merge and an identity-based watcher.
   `External`; tree changes scan the touched spaces again, where the node
   follows its ID and a duplicate ID goes to the newcomer.
 
+## Alternatives
+
+- **Put the drive in `vellum-pages`**: the books thread works there too,
+  and two services in one crate break the one-service-per-crate rule.
+- **Trash as a flag on files left in place**: trashed content would stay
+  visible to Git, sync clients and the file browser.
+
 ## Consequences
 
 - The SQL `DriveIndex` adapter follows `MemoryIndex` and the end-to-end
@@ -106,7 +101,3 @@ writes, the three-way merge and an identity-based watcher.
   `vellum-contracts` and map one-to-one to `Drive` methods.
 - Listing a large space reads every node of it from the index; the SQL
   adapter answers those with indexed queries.
-
-## History
-
-- 2026-10-29: accepted.
