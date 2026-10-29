@@ -86,6 +86,13 @@ impl PassphraseKdf {
         Ok(kdf)
     }
 
+    /// The Argon2id memory cost in `KiB`, so callers can refuse KEK ids that
+    /// ask for more than they are willing to spend.
+    #[must_use]
+    pub const fn m_kib(&self) -> u32 {
+        self.m_kib
+    }
+
     /// The KEK id that names this salt and these parameters.
     ///
     /// # Errors

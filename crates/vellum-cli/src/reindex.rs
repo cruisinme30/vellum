@@ -11,7 +11,7 @@ use std::io::Write as _;
 use std::process::ExitCode;
 
 use futures::{StreamExt as _, TryStreamExt as _};
-use vellum_db::{Index, IndexConfig, IndexKey, Listing, PlainFiles, ShardedIndex, ShardsConfig};
+use vellum_db::{Index, IndexConfig, IndexKey, Listing, ShardedIndex, ShardsConfig};
 use vellum_kernel::config::Config;
 use vellum_store::{BlobStore, StoreError, remote::s3::S3Store};
 
@@ -57,27 +57,53 @@ fn execute(args: &Args) -> Result<Vec<String>, String> {
         .map(S3Store::new)
         .transpose()
         .map_err(|e| format!("cannot use the blob store: {e}"))?;
-    let runtime = tokio::runtime::Builder::new_current_thread()
+    // Two workers: the scan runs on a blocking thread and opens sealed
+    // files through the runtime, which a key service call needs.
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
         .enable_all()
         .build()
         .map_err(|e| e.to_string())?;
-    let listing = match &bucket {
+    let var = |k: &str| std::env::var(k).ok();
+    let listing = match bucket {
         Some(store) => {
             let listing = runtime
-                .block_on(fetch_listing(store))
-                .map_err(|e| format!("cannot read the bucket: {e}"))?;
+                .block_on(async {
+                    // Read the bucket as the server stores it: sealed
+                    // unless the files are plaintext.
+                    match crate::at_rest::keys(&config, &store, true, var).await? {
+                        Some(keys) => fetch_listing(&crate::at_rest::sealed(store, keys)).await,
+                        None => fetch_listing(&store).await,
+                    }
+                    .map_err(|e| {
+                        vellum_kernel::Error::new(
+                            vellum_kernel::ErrorKind::Unavailable,
+                            format!("cannot read the bucket: {e}"),
+                        )
+                    })
+                })
+                .map_err(|e| e.to_string())?;
             tracing::info!(files = listing.len(), "listed the bucket");
             Some(listing)
         }
         None => None,
     };
+    // Files in the data folder are opened the same way.
+    let source = match listing {
+        Some(listing) => Source::Bucket(listing),
+        None => Source::Folder(
+            runtime
+                .block_on(crate::at_rest::reader(&config, var))
+                .map_err(|e| e.to_string())?,
+        ),
+    };
     let report = if let Some(shards) = shards {
         // Sharded deployment: each space goes to the shard the map names.
         runtime.block_on(async {
             let index = ShardedIndex::open(&shards).await?;
-            let report = match listing {
-                Some(listing) => index.reindex_listing(listing).await,
-                None => index.reindex(&config.data_dir, PlainFiles).await,
+            let report = match source {
+                Source::Bucket(listing) => index.reindex_listing(listing).await,
+                Source::Folder(files) => index.reindex(&config.data_dir, files).await,
             };
             index.close().await;
             report
@@ -98,9 +124,9 @@ fn execute(args: &Args) -> Result<Vec<String>, String> {
         };
         runtime.block_on(async {
             let index = Index::open(&index_config).await?;
-            let report = match listing {
-                Some(listing) => index.reindex_listing(listing).await,
-                None => index.reindex(&config.data_dir, PlainFiles).await,
+            let report = match source {
+                Source::Bucket(listing) => index.reindex_listing(listing).await,
+                Source::Folder(files) => index.reindex(&config.data_dir, files).await,
             };
             index.close().await;
             report
@@ -145,6 +171,14 @@ pub async fn fetch_listing(store: &dyn BlobStore) -> Result<Listing, StoreError>
         }
     }
     Ok(listing)
+}
+
+/// Where the reindex reads the workspace files.
+enum Source {
+    /// Fetched from the shared bucket.
+    Bucket(Listing),
+    /// Read from the data folder, opening sealed files.
+    Folder(crate::at_rest::OpeningReader),
 }
 
 /// The raw bytes of a key written as 64 hex characters.
@@ -203,6 +237,32 @@ mod tests {
             b"---\ntitle: Roadmap\n---\n"
         );
         assert!(read("drives/shared/eng/diagram.png").is_err());
+    }
+
+    #[tokio::test]
+    async fn a_sealed_bucket_lists_plaintext() {
+        let dir = tempfile::tempdir().unwrap();
+        let raw = LocalStore::open(dir.path()).await.unwrap();
+        let keys = crate::at_rest::AtRestKeys::KeyFile(vellum_crypto::LocalKeyring::new(
+            vellum_crypto::KekId::new("local:test").unwrap(),
+            vellum_crypto::SecretKey::from_bytes([4; 32]),
+        ));
+        let store = crate::at_rest::sealed(raw, keys);
+        let page = "drives/shared/eng/roadmap.md";
+        let _ = store
+            .put(
+                &BlobPath::new(page).unwrap(),
+                Bytes::from_static(b"---\ntitle: Roadmap\n---\n"),
+                Precondition::None,
+            )
+            .await
+            .unwrap();
+        assert!(vellum_crypto::is_envelope(
+            &std::fs::read(dir.path().join(page)).unwrap()
+        ));
+        let listing = fetch_listing(&store).await.unwrap();
+        let read = vellum_db::FileReader::read(&listing, std::path::Path::new(page)).unwrap();
+        assert_eq!(read, b"---\ntitle: Roadmap\n---\n");
     }
 
     #[test]

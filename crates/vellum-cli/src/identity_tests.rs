@@ -664,7 +664,9 @@ async fn workspace_services_answer_signed_in_users() {
     let services = Services::open(ORIGIN, Some(&dir), None)
         .unwrap()
         .with_workspace(&config, |k| {
-            (k == crate::workspace::PLAINTEXT_VAR).then(|| "1".to_owned())
+            // Plain files, so the test can edit them like another editor.
+            (k == crate::workspace::PLAINTEXT_VAR || k == crate::at_rest::PLAINTEXT_VAR)
+                .then(|| "1".to_owned())
         })
         .await
         .unwrap();
