@@ -13,7 +13,7 @@ vellum: 1
 - Status: accepted
 - Decisions: D173, D174, D175
 - Issue: #440, #436, #432
-- Pull requests: #463, shard routing to follow in its own pull request
+- Pull requests: #463, #496
 
 :::
 
