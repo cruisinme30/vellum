@@ -117,6 +117,7 @@ area/desktop:
   - changed-files:
       - any-glob-to-any-file:
           - "desktop/**"
+          - "crates/vellum-private/**"
 area/editor:
   - changed-files:
       - any-glob-to-any-file:

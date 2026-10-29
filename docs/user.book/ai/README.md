@@ -63,6 +63,27 @@ When you connect, you choose what the client may do:
 Every call is recorded in the audit log, and you can revoke a client at
 any time in **Settings → AI**.
 
+## Private spaces {#private}
+
+An end-to-end encrypted private space is sealed to its members' devices,
+so the server cannot search it or pass it to a model. Your own computer
+can: `vellum mcp --private` opens the pages sealed to this device, in
+memory only, and serves them to your AI client read-only.
+
+1. Run `vellum private key` and send the public key it prints to the
+   space's owner, who adds this device to the space.
+2. Add Vellum to your client with the space's folder:
+
+```json
+{ "mcpServers": { "vellum-private": { "command": "vellum",
+  "args": ["mcp", "--private", "--space", "board=drives/shared/board"] } } }
+```
+
+The model can search, read pages and blocks, and cite them. It cannot
+write, comment or export, and nothing it reads leaves your computer
+except through the client you connected. The device key stays in your
+operating system's keychain.
+
 ## For other tools {#markdown}
 
 Any page's Markdown is at its URL plus `?format=md`, and `/llms.txt`
