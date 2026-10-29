@@ -233,11 +233,12 @@ async fn the_embedded_app_is_mounted() {
 
 #[tokio::test]
 async fn the_collab_path_is_kept_for_live_editing() {
-    // The socket's route shape: not mounted yet, but never the app's index.
+    // Live editing answers at `/collab` (here without a workspace index,
+    // so it is unavailable); the app's index never does.
     let path = "/collab/01933c6e-3c6e-7000-8000-000000000001/01933c6e-3c6e-7000-8000-000000000002";
     for app in [app(), gateway(false, None)] {
         let reply = get(&app, path).await;
-        assert_eq!(reply.status, StatusCode::NOT_FOUND);
+        assert_eq!(reply.status, StatusCode::SERVICE_UNAVAILABLE);
         assert!(!reply.is_index());
         assert_eq!(reply.header(header::CONTENT_TYPE), "application/json");
     }
