@@ -47,6 +47,7 @@ import { openLocalDatabase } from "./platform/store/persistence";
 import { createHttpRenderApi } from "./render/api";
 import { createHttpSharingApi } from "./sharing/api";
 import { createHttpOrganisationAppearance } from "./theme/organisation";
+import { createHttpTransferApi } from "./transfer/api";
 import { createHttpWorkApi } from "./work/api";
 
 // Demo pages keep their edits across reloads in the browser's local
@@ -121,6 +122,7 @@ root.render(
       privateSpaces={status === undefined ? undefined : createHttpPrivateSpacesApi(http)}
       render={status === undefined ? undefined : createHttpRenderApi(http)}
       account={status === undefined ? undefined : createHttpAccountApi(http)}
+      transfer={status === undefined ? undefined : createHttpTransferApi(http)}
       collections={
         status === undefined ? createMockCollectionsStore() : createHttpCollectionsStore(http)
       }

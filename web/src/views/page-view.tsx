@@ -16,6 +16,7 @@ import { PageEditor, type EditorControls } from "../editor/page-editor";
 import { useT } from "../i18n/i18n";
 import { useShare } from "../sharing/share-button";
 import { Icon } from "../shell/icon";
+import { ExportButton } from "../transfer/export-button";
 import { issueChipStatus } from "../work/api";
 
 import { HistoryPanel } from "./history-panel";
@@ -266,6 +267,7 @@ export function PageView() {
                 scanSecrets={drive?.scanSecrets}
                 actions={
                   <>
+                    <ExportButton target={{ kind: "page", id: page.id, title: page.title }} />
                     {pageFiles.button}
                     {pageHistory.button}
                   </>

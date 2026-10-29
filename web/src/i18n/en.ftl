@@ -1672,3 +1672,49 @@ admin-users-reset-2fa = Reset two-step verification
 admin-users-reset-2fa-label = Reset { $name }'s two-step verification
 admin-users-reset-2fa-confirm = Remove { $name }'s authenticator app, passkeys and recovery codes, and sign them out? Only do this after checking who is asking.
 admin-users-2fa-reset = { $name }'s two-step verification was reset.
+
+## Export and import
+export-open = Export
+export-title = Export
+export-close = Close export
+export-book = Export book
+export-section = Export section
+export-format = Format
+export-format-pdf = PDF
+export-format-docx = Word
+export-format-html = HTML
+export-format-md = Markdown
+export-paper = Paper
+export-paper-a4 = A4
+export-paper-letter = US Letter
+export-download = Download
+export-working = Exporting…
+export-preview = PDF preview
+export-preview-loading = Typesetting the preview…
+export-page-alt = Page { $page }
+export-more-pages = { $count ->
+    [one] One more page is in the PDF.
+   *[other] { $count } more pages are in the PDF.
+}
+export-warnings = { $count ->
+    [one] One block exports differently
+   *[other] { $count } blocks export differently
+}
+import-title = Import
+import-intro = Bring pages in from Notion, Confluence, Word or a Markdown folder. Everything lands in a new folder, so nothing already here changes.
+import-file = File (.zip export or .docx)
+import-source = Exported from
+import-source-notion = Notion (Markdown & CSV)
+import-source-confluence = Confluence (HTML)
+import-source-docx = Word document
+import-source-markdown = Markdown folder
+import-source-obsidian = Obsidian vault
+import-source-outline = Outline
+import-source-docmost = Docmost
+import-space = Into
+import-folder = Folder
+import-folder-top = Top of the space
+import-start = Import
+import-working = Importing…
+import-done = Imported { $pages } items into “{ $title }”.
+import-open = Open the folder

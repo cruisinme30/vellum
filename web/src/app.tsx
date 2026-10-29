@@ -63,6 +63,8 @@ import type { SharingApi } from "./sharing/api";
 import { AppShell } from "./shell/app-shell";
 import { AppearanceProvider, type OrganisationAppearance } from "./theme/appearance-context";
 import { AppearancePage } from "./theme/appearance-page";
+import type { TransferApi } from "./transfer/api";
+import { ImportScreen } from "./transfer/import-screen";
 import { FavoritesView, HomeView } from "./views/home";
 import { AdminView, HelpView, NotFoundView } from "./views/info";
 import { NewPageView } from "./views/new-page";
@@ -123,6 +125,7 @@ export function AppRoutes() {
         <Route path="settings/api-tokens" element={<ApiTokensPage />} />
         <Route path="settings/security" element={<SecurityPage />} />
         <Route path="new" element={<NewPageView />} />
+        <Route path="import" element={<ImportScreen />} />
         <Route path="my-work" element={<MyWorkPage />} />
         <Route path="issues" element={<IssuesPage />} />
         <Route path="issues/mine" element={<MyIssuesPage />} />
@@ -195,6 +198,8 @@ export interface AppServices {
   readonly sharing?: SharingApi | undefined;
   /** The person's API tokens and sign-in factors; absent in demo mode. */
   readonly account?: AccountApi | undefined;
+  /** Export and import, from a Vellum server; absent in demo mode. */
+  readonly transfer?: TransferApi | undefined;
   readonly collections: CollectionsStore;
   /** Present when a Vellum server answered; absent in demo mode. */
   readonly session?: { readonly auth: AuthApi; readonly status: AuthStatus } | undefined;
@@ -280,6 +285,7 @@ export function AppProviders({
   render,
   sharing,
   account,
+  transfer,
   collections,
   session,
   notifications,
@@ -288,8 +294,19 @@ export function AppProviders({
   children,
 }: AppServices & { readonly children: ReactNode }) {
   const serverApis = useMemo(
-    () => ({ work, books, drive, attachments, privateSpaces, directory, render, sharing, account }),
-    [work, books, drive, attachments, privateSpaces, directory, render, sharing, account],
+    () => ({
+      work,
+      books,
+      drive,
+      attachments,
+      privateSpaces,
+      directory,
+      render,
+      sharing,
+      account,
+      transfer,
+    }),
+    [work, books, drive, attachments, privateSpaces, directory, render, sharing, account, transfer],
   );
   const [demoNotifications] = useState<NotificationServices>(() => ({
     store: createMockNotificationPreferencesStore(),

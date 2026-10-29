@@ -365,6 +365,9 @@ export function createHttpWorkspaceStore(
       }
       void load(next);
     },
+    refresh() {
+      if (user !== undefined) void load(user);
+    },
   };
   store.setUser?.(options.user);
   return store;

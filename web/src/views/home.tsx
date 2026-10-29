@@ -27,6 +27,7 @@ export function HomeView() {
         <Link to="/my-work">{t("my-work")}</Link>
         <Link to="/issues">{t("issues")}</Link>
         <Link to="/books">{t("books")}</Link>
+        <Link to="/import">{t("import-title")}</Link>
       </nav>
       <section aria-labelledby="home-recent">
         <h2 id="home-recent">{t("home-recent")}</h2>

@@ -91,6 +91,7 @@ export function withReauth(http: Http, gate: ReauthGate): Http {
   return {
     get: (path, query) => retry(() => http.get(path, query)),
     send: (method, path, body) => retry(() => http.send(method, path, body)),
+    blob: (path, query) => retry(() => http.blob(path, query)),
     upload: (path, query, body, type) => retry(() => http.upload(path, query, body, type)),
     forgetSession: () => {
       http.forgetSession();

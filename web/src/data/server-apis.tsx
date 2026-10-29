@@ -15,6 +15,7 @@ import type { PrivateSpacesApi } from "../platform/private/api";
 import type { RenderApi } from "../render/api";
 import type { SharingApi } from "../sharing/api";
 import { CopyDiagnostic } from "../shell/copy-diagnostic";
+import type { TransferApi } from "../transfer/api";
 import type { WorkApi } from "../work/api";
 
 import type { Loaded } from "./use-loaded";
@@ -34,6 +35,8 @@ export interface ServerApis {
   readonly sharing?: SharingApi | undefined;
   /** The signed-in person's API tokens and sign-in factors. */
   readonly account?: AccountApi | undefined;
+  /** Export and import. */
+  readonly transfer?: TransferApi | undefined;
 }
 
 const ServerApisContext = createContext<ServerApis>({});
