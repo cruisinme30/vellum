@@ -110,3 +110,4 @@ Pandoc
 [Kk]anban
 [Cc]ollab
 zizmor
+[Rr]ecents
