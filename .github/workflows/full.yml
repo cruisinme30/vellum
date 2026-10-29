@@ -33,10 +33,13 @@ jobs:
   fast:
     name: Fast
     uses: ./.github/workflows/ci.yml # zizmor: ignore[self-repository]
+    # A reused workflow gets at most what its caller grants, so this must
+    # cover every permission a Fast suite job asks for.
     permissions:
       contents: read
       pull-requests: read
       actions: read
+      issues: read # the issue and decision record check reads the linked issue
 
   coverage:
     name: Rust coverage
