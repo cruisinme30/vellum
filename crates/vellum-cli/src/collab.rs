@@ -25,7 +25,7 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use axum::Router;
 use axum::http::request::Parts;
-use axum::http::{StatusCode, header};
+use axum::http::header;
 use axum::response::IntoResponse as _;
 use bytes::Bytes;
 use vellum_api::error::ErrorResponse;
