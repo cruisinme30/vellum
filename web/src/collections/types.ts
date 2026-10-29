@@ -169,7 +169,7 @@ export interface Column {
   readonly editable: boolean;
 }
 
-/** `CellView`: `value` is absent when the cell is empty or has an error. */
+/** `CellView`: `value` is absent only when the cell has an error; empty is `{"type": "empty"}`. */
 export interface CellView {
   readonly value?: Value;
   /** The value as text, as the server formats it. */
@@ -191,7 +191,10 @@ export interface RowView {
   readonly span?: DateSpan;
 }
 
-/** `Group`: `value` is null for the "No …" group (and the single ungrouped one). */
+/**
+ * `Group`: `value` is null for the "No …" group and for the single group of an
+ * ungrouped view (label ""); tell them apart by the view having a group property.
+ */
 export interface Group {
   readonly value: Value | null;
   readonly label: string;
