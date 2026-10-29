@@ -6,8 +6,8 @@
 //! Each service workstream adds its service to [`Services`] and
 //! [`Services::mount`] (with any raw routers), so `vellum serve`, the
 //! OpenAPI document and the `GraphQL` schema all see the same set.
-//! Identity always runs; the workspace services (collections, books,
-//! Work) join when an index is configured.
+//! Identity always runs; the workspace services (drive, collections,
+//! books, Work) join when an index is configured.
 
 use std::path::Path;
 use std::sync::Arc;
@@ -29,7 +29,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 #[derive(Clone)]
 pub struct Services {
     identity: Arc<Identity>,
-    /// Collections, books and Work, when an index is configured.
+    /// The drive, collections, books and Work, when an index is configured.
     workspace: Vec<Arc<dyn Service>>,
 }
 

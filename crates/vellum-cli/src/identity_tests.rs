@@ -572,7 +572,9 @@ async fn workspace_services_answer_signed_in_users() {
         .unwrap();
     let names: Vec<_> = services.all().iter().map(|s| s.name()).collect();
     assert!(
-        names.contains(&"collections") && names.contains(&"books") && names.contains(&"work"),
+        ["drive", "collections", "books", "work"]
+            .iter()
+            .all(|n| names.contains(n)),
         "{names:?}"
     );
     let mut gateway = GatewayConfig::new(ORIGIN, vec![3; 32]);
@@ -601,5 +603,58 @@ async fn workspace_services_answer_signed_in_users() {
         .await;
         assert_eq!(reply.status, StatusCode::OK, "{path}: {}", reply.text);
     }
+    drive_pages_round_trip(&app, &cookie).await;
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A signed-in person makes their My Drive, writes a page and reads it
+/// back through `vellum serve`'s own gateway.
+async fn drive_pages_round_trip(app: &Router, cookie: &str) {
+    let token = csrf(app, cookie).await;
+    let post = |path: &str, body: Value| {
+        finish(
+            json_request("POST", path, &body)
+                .header(header::COOKIE, cookie)
+                .header("x-csrf-token", &token),
+        )
+    };
+    let space = send(
+        app,
+        post(
+            "/api/v1/drive/spaces",
+            json!({"kind": "user_drive", "slug": "priya", "name": "Priya"}),
+        ),
+    )
+    .await;
+    assert_eq!(space.status, StatusCode::OK, "{}", space.text);
+    let space_id = space.json()["id"].as_str().unwrap().to_owned();
+    let page = send(
+        app,
+        post(
+            &format!("/api/v1/drive/spaces/{space_id}/pages"),
+            json!({"title": "Launch plan", "body": "Ship on Friday.\n"}),
+        ),
+    )
+    .await;
+    assert_eq!(page.status, StatusCode::OK, "{}", page.text);
+    let id = page.json()["id"].as_str().unwrap().to_owned();
+    for (path, expected) in [
+        (
+            format!("/api/v1/drive/items/{id}/content"),
+            "Ship on Friday",
+        ),
+        (
+            format!("/api/v1/drive/spaces/{space_id}/items"),
+            "Launch plan",
+        ),
+        ("/api/v1/drive/my-drive".to_owned(), space_id.as_str()),
+    ] {
+        let reply = send(
+            app,
+            finish(request("GET", &path).header(header::COOKIE, cookie)),
+        )
+        .await;
+        assert_eq!(reply.status, StatusCode::OK, "{path}: {}", reply.text);
+        assert!(reply.text.contains(expected), "{path}: {}", reply.text);
+    }
 }

@@ -12,7 +12,7 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D64, D65, D66, D141, D146
-- Issue: #103, #104, #105, #106, #107, #108, #109, #296, #368
+- Issue: #103, #104, #105, #106, #107, #108, #109, #296, #368, #398
 - Pull requests: #223, #309, #371
 
 :::
@@ -138,7 +138,7 @@ writes, the three-way merge and an identity-based watcher.
   and a test checks the shared tables after every kind of change.
 - After `vellum reindex`, the shared tables show only what the files
   say (no trash) until the drive next writes a node or scans.
-- `vellum serve` serves the drive once the composition root opens it
-  with its store, index and permission engine.
+- `vellum serve` serves the drive whenever an index is configured, and
+  scans the files at start-up so the index matches the disk (#398).
 - Listing a large space reads every node of it from the index. Moving a
   large folder rewrites its closure rows, one statement per node.

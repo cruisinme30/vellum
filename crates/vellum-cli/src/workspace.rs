@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-//! The workspace services: collections, books and Work, over the files in
-//! the data folder, the index database and the permission engine.
+//! The workspace services: the drive, collections, books and Work, over
+//! the files in the data folder, the index database and the permission
+//! engine.
 //!
 //! `vellum serve` opens them when an index is configured: Postgres through
 //! the kernel's `database_url`, or the SQLite index in the data folder,
@@ -19,8 +20,10 @@ use vellum_books_service::BooksService;
 use vellum_collections::CollectionsService;
 use vellum_contracts::{BoxFuture, Service};
 use vellum_db::{Index, IndexConfig};
-use vellum_drive::DriveIndex as _;
+use vellum_drive::authz::{AuthzAccess as DriveAccess, TreeSync};
+use vellum_drive::memory::MemoryIndex;
 use vellum_drive::sql::SqlIndex;
+use vellum_drive::{Drive, DriveIndex, DriveService};
 use vellum_identity::Identity;
 use vellum_kernel::{Config, Error, ErrorKind, UserId};
 use vellum_store::{BlobPath, BlobStore, LocalStore};
@@ -89,7 +92,7 @@ impl Spaces {
     }
 }
 
-async fn load_spaces(drive: &SqlIndex) -> Result<Vec<(BlobPath, Id)>, Error> {
+async fn load_spaces(drive: &dyn DriveIndex) -> Result<Vec<(BlobPath, Id)>, Error> {
     let spaces = drive
         .spaces()
         .await
@@ -127,13 +130,19 @@ impl EventSink for TracingSink {
     }
 }
 
-/// Builds the services over `store` and `authz`.
-async fn build<S: AuthzStore + 'static>(
+/// Builds the services over `store`, the drive's `index` and `authz`.
+async fn build<S: AuthzStore + TreeSync + 'static>(
     store: Arc<dyn BlobStore>,
+    index: Arc<dyn DriveIndex>,
     authz: Arc<Authz<S>>,
     spaces: &Arc<Spaces>,
     identity: &Arc<Identity>,
 ) -> Result<Vec<Arc<dyn Service>>, Error> {
+    let drive = Drive::new(
+        Arc::clone(&store),
+        Arc::clone(&index),
+        Arc::new(DriveAccess::new(Arc::clone(&authz), index)),
+    );
     let lookup = Arc::clone(spaces);
     let space_of: vellum_collections::service::SpaceOf =
         Arc::new(move |path: &BlobPath| lookup.of(path));
@@ -161,7 +170,12 @@ async fn build<S: AuthzStore + 'static>(
             "some Work files could not be read"
         );
     }
-    Ok(vec![Arc::new(collections), Arc::new(books), Arc::new(work)])
+    Ok(vec![
+        Arc::new(DriveService::new(Arc::new(drive))),
+        Arc::new(collections),
+        Arc::new(books),
+        Arc::new(work),
+    ])
 }
 
 /// Opens the workspace services for `config`, or returns none (with a
@@ -191,22 +205,43 @@ pub async fn open(
             .map_err(|e| unavailable("cannot open the data folder", e))?,
     );
     let authz = Arc::new(Authz::new(SqlStore::new(index.clone())));
-    let drive = SqlIndex::new(index);
+    let drive: Arc<dyn DriveIndex> = Arc::new(SqlIndex::new(index));
+    scan(&store, &drive, &authz).await;
     let spaces = Arc::new(Spaces::default());
-    spaces.replace(load_spaces(&drive).await?);
+    spaces.replace(load_spaces(drive.as_ref()).await?);
     let refresh = Arc::clone(&spaces);
+    let listed = Arc::clone(&drive);
     drop(tokio::spawn(async move {
         let mut tick = tokio::time::interval(SPACES_REFRESH);
         tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         loop {
             let _ = tick.tick().await;
-            match load_spaces(&drive).await {
+            match load_spaces(listed.as_ref()).await {
                 Ok(list) => refresh.replace(list),
                 Err(error) => tracing::warn!(%error, "space list not refreshed"),
             }
         }
     }));
-    build(store, authz, &spaces, identity).await
+    build(store, drive, authz, &spaces, identity).await
+}
+
+/// Brings the drive's index up to date with the files, so pages written
+/// while the server was down (or by Git and sync clients) are listed. A
+/// failed scan is logged and the server starts with the index it has.
+async fn scan(
+    store: &Arc<dyn BlobStore>,
+    index: &Arc<dyn DriveIndex>,
+    authz: &Arc<Authz<SqlStore>>,
+) {
+    let drive = Drive::new(
+        Arc::clone(store),
+        Arc::clone(index),
+        Arc::new(DriveAccess::new(Arc::clone(authz), Arc::clone(index))),
+    );
+    match drive.scan().await {
+        Ok(report) => tracing::info!(?report, "drive index scanned"),
+        Err(error) => tracing::warn!(%error, "drive scan failed; serving the index as it is"),
+    }
 }
 
 /// The services over an empty scratch folder and in-memory permissions,
@@ -225,7 +260,8 @@ pub async fn describe(
             .map_err(|e| unavailable("cannot open a scratch folder", e))?,
     );
     let authz = Arc::new(Authz::new(MemoryStore::new()));
-    build(store, authz, &Arc::new(Spaces::default()), identity).await
+    let index: Arc<dyn DriveIndex> = Arc::new(MemoryIndex::new());
+    build(store, index, authz, &Arc::new(Spaces::default()), identity).await
 }
 
 #[cfg(test)]
