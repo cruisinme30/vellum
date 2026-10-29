@@ -13,7 +13,7 @@ vellum: 1
 - Status: accepted
 - Decisions: D100, D101, D102
 - Requirements: R-HG-1, R-HG-2, R-HG-3, R-HG-4, R-HG-5
-- Issue: #197, #198, #199
+- Issue: #197, #198, #199, #200 (guide examples and corpus), #201 (cookbook)
 - Pull requests: #218
 
 :::
