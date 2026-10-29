@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { Outlet, useLocation, useMatch, useNavigate } from "react-router";
 
+import { useServiceHealth } from "../api/health";
 import type { StoreProblem } from "../data/store";
 import { useServices, useWorkspace } from "../data/workspace-context";
 import { useT } from "../i18n/i18n";
@@ -25,6 +26,7 @@ export function AppShell() {
   const location = useLocation();
   const { store } = useServices();
   const workspace = useWorkspace();
+  const health = useServiceHealth();
   const currentId = useMatch("/p/:pageId")?.params.pageId;
   // The sidebar choice applies to the window size it was made in; the
   // "More" sheet belongs to the route it was opened on, so navigating
@@ -84,6 +86,7 @@ export function AppShell() {
         <div className="vl-scrim" aria-hidden="true" onClick={closeOverlay} />
       )}
       <main id="vl-main" className="vl-main" tabIndex={-1}>
+        {health.degraded && <ServiceBanner />}
         {workspace.problem !== undefined && <WorkspaceProblem problem={workspace.problem} />}
         <Outlet />
       </main>
@@ -96,6 +99,20 @@ export function AppShell() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * Shown while the server answers 503: part of Vellum (usually file storage)
+ * is down, so pages still read but saving may fail (issue #191). It goes
+ * away by itself on the next good answer.
+ */
+export function ServiceBanner() {
+  const t = useT();
+  return (
+    <div className="vl-problem" role="status" data-testid="service-banner">
+      <p>{t("service-degraded")}</p>
     </div>
   );
 }

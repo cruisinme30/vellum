@@ -324,6 +324,7 @@ not-found-home = Go home
 workspace-loading = Loading your pages…
 workspace-problem-request = { $message } (request { $request })
 workspace-problem-dismiss = Dismiss
+service-degraded = Part of Vellum is unavailable right now. You can keep reading; saving may fail until it is back, and Vellum retries on its own.
 
 ## Page
 

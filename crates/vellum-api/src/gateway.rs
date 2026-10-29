@@ -733,9 +733,58 @@ async fn rest(
             .map(str::to_owned),
     };
     match registered.invoke(ctx, input).await {
+        Ok(output) if op.revalidates() => conditional(&output, headers),
         Ok(output) => Json(output).into_response(),
         Err(e) => ErrorResponse::new(e, id).into_response(),
     }
+}
+
+/// The answer to a query that browsers may revalidate (ADR 0061, D270): a
+/// weak `ETag` over the JSON, `Cache-Control: private, no-cache`, and `304
+/// Not Modified` without a body when `If-None-Match` names that tag. The
+/// tag is weak because the compression layer may re-encode the body.
+fn conditional(output: &Value, headers: &HeaderMap) -> Response {
+    let Ok(body) = serde_json::to_vec(output) else {
+        return Json(output).into_response();
+    };
+    let digest = Sha256::digest(&body);
+    let mut tag = String::with_capacity(36);
+    tag.push_str("W/\"");
+    for byte in digest.iter().take(16) {
+        use std::fmt::Write as _;
+        let _ = write!(tag, "{byte:02x}");
+    }
+    tag.push('"');
+    let matches = headers
+        .get_all(header::IF_NONE_MATCH)
+        .iter()
+        .filter_map(|v| v.to_str().ok())
+        .flat_map(|v| v.split(','))
+        .map(str::trim)
+        .any(|candidate| {
+            candidate == "*" || candidate.trim_start_matches("W/") == tag.trim_start_matches("W/")
+        });
+    let mut response = if matches {
+        StatusCode::NOT_MODIFIED.into_response()
+    } else {
+        (
+            [(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("application/json"),
+            )],
+            body,
+        )
+            .into_response()
+    };
+    let headers = response.headers_mut();
+    if let Ok(value) = HeaderValue::from_str(&tag) {
+        let _ = headers.insert(header::ETAG, value);
+    }
+    let _ = headers.insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("private, no-cache"),
+    );
+    response
 }
 
 async fn api_not_found(Extension(id): Extension<RequestId>) -> Response {

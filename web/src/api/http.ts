@@ -11,7 +11,17 @@
  * - Error responses (`ApiError` on the server: `code`, `message`,
  *   `retryable`, `request_id`) become an {@link ApiError} that views can
  *   show as is.
+ * - A 503 (part of the server is down, such as the bucket) is retried once
+ *   after the `Retry-After` it gives, up to {@link MAX_RETRY_WAIT_MS}; the
+ *   idempotency key makes the retry of a write safe. Every answer is
+ *   reported to {@link serviceHealth}, which drives the shell's banner
+ *   (issue #191, ADR 0061 D267).
  */
+
+import { type HealthMonitor, retryAfterSeconds, serviceHealth } from "./health";
+
+/** The longest `Retry-After` the client waits out before giving up. */
+export const MAX_RETRY_WAIT_MS = 5000;
 
 /** The server's stable error codes, plus `network` when no answer came. */
 export type ErrorCode =
@@ -80,6 +90,10 @@ export interface HttpOptions {
   readonly fetch?: typeof fetch;
   /** Makes idempotency keys; tests pass a fixed one. */
   readonly idempotencyKey?: () => string;
+  /** Told about every answer; the app's {@link serviceHealth} by default. */
+  readonly health?: HealthMonitor;
+  /** Waits before a retry; tests pass one that does not. */
+  readonly sleep?: (ms: number) => Promise<void>;
 }
 
 /** Builds a query string; lists repeat their key, empty values are left out. */
@@ -139,16 +153,36 @@ export function createHttp(options: HttpOptions = {}): Http {
   const base = options.base ?? "";
   const doFetch = options.fetch ?? ((input, init) => fetch(input, init));
   const idempotencyKey = options.idempotencyKey ?? (() => crypto.randomUUID());
+  const health = options.health ?? serviceHealth;
+  const sleep =
+    options.sleep ??
+    ((ms: number) =>
+      new Promise<void>((resolve) => {
+        setTimeout(resolve, ms);
+      }));
   let csrf: Promise<string | undefined> | undefined;
 
-  const request = async (method: Method, url: string, init: RequestInit): Promise<Response> => {
+  const once = async (method: Method, url: string, init: RequestInit): Promise<Response> => {
+    let response: Response;
     try {
-      return await doFetch(`${base}${url}`, { ...init, method, credentials: "same-origin" });
+      response = await doFetch(`${base}${url}`, { ...init, method, credentials: "same-origin" });
     } catch {
       throw new ApiError("network", "Vellum could not reach the server. Check your connection.", {
         retryable: true,
       });
     }
+    health.report(response.status, retryAfterSeconds(response.headers.get("retry-after")));
+    return response;
+  };
+
+  /** One request, and one retry when the server says it is briefly unavailable. */
+  const request = async (method: Method, url: string, init: RequestInit): Promise<Response> => {
+    const response = await once(method, url, init);
+    if (response.status !== 503) return response;
+    const wait = (retryAfterSeconds(response.headers.get("retry-after")) ?? 1) * 1000;
+    if (wait > MAX_RETRY_WAIT_MS) return response;
+    await sleep(wait);
+    return once(method, url, init);
   };
 
   /** The session's CSRF token; none before sign-in, when only the origin is checked. */
