@@ -26,6 +26,7 @@ pub mod event;
 pub mod filter;
 pub mod graph;
 pub mod id;
+pub mod insights;
 pub mod issue;
 pub mod label;
 pub mod my_issues;
