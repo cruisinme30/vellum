@@ -47,6 +47,8 @@ jobs also queued for runners.
   the merge queue and the full suite.
 - `cargo xtask fast` uses the same script, so the pre-push hook skips
   what CI skips.
+- Editing a pull request's title or description reruns only the
+  description checks when the same commit already passed the Fast suite.
 - The required check names (Fast suite, Labels, Full suite) stay the same.
 
 ### `D140`: CodeQL gates main, not develop

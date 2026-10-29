@@ -39,24 +39,46 @@ jobs:
     name: Changed areas
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read # looks up earlier Fast suite runs of the same commit
     outputs:
       rust: ${{ steps.areas.outputs.rust }}
       web: ${{ steps.areas.outputs.web }}
+      files: ${{ steps.areas.outputs.files }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # The pull request merge commit and its first parent, the base.
           fetch-depth: 2
           persist-credentials: false
+      # Editing a pull request's title or description starts a new run on
+      # the same commit. When an earlier run on that commit already passed,
+      # only the description checks run again.
       - id: areas
         env:
           EVENT: ${{ github.event_name }}
+          ACTION: ${{ github.event.action }}
           BASE: ${{ github.base_ref }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           if [[ "${EVENT}" == "pull_request" && "${BASE}" == "develop" ]]; then
-            git diff --name-only HEAD^1 HEAD | scripts/ci/changed-areas.sh | tee -a "${GITHUB_OUTPUT}"
+            passed=0
+            if [[ "${ACTION}" == "edited" ]]; then
+              passed="$(gh api "repos/${GH_REPO}/actions/workflows/ci.yml/runs?head_sha=${SHA}&status=success" \
+                --jq '.total_count' || echo 0)"
+            fi
+            if ((passed > 0)); then
+              echo "This commit already passed the Fast suite; checking the description only."
+              printf 'rust=false\nweb=false\nfiles=false\n' | tee -a "${GITHUB_OUTPUT}"
+            else
+              git diff --name-only HEAD^1 HEAD | scripts/ci/changed-areas.sh | tee -a "${GITHUB_OUTPUT}"
+              echo "files=true" | tee -a "${GITHUB_OUTPUT}"
+            fi
           else
-            printf 'rust=true\nweb=true\n' | tee -a "${GITHUB_OUTPUT}"
+            printf 'rust=true\nweb=true\nfiles=true\n' | tee -a "${GITHUB_OUTPUT}"
           fi
 
   rust:
@@ -129,6 +151,8 @@ jobs:
 
   hygiene:
     name: Files, docs and secrets
+    needs: changes
+    if: needs.changes.outputs.files == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
