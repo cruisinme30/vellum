@@ -13,8 +13,8 @@
 //! and `vellum budgets` ask a running server for a flame graph and for
 //! routes over their latency budget.
 
-mod collab;
 mod admin;
+mod collab;
 mod docs;
 mod google_http;
 #[cfg(test)]
@@ -26,20 +26,20 @@ mod integrations;
 mod keys;
 mod mcp;
 mod notifications;
-mod page_render;
 mod observability;
+mod page_render;
 mod private;
 #[cfg(test)]
 mod private_tests;
 mod reindex;
 mod serve;
 mod services;
-#[cfg(test)]
-mod typescript_tests;
 mod tasks;
 mod tasks_http;
 #[cfg(test)]
 mod tasks_tests;
+#[cfg(test)]
+mod typescript_tests;
 mod watcher;
 mod web;
 #[cfg(test)]
