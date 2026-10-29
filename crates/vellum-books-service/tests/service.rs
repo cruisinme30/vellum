@@ -17,8 +17,9 @@ use vellum_authz::{
     Actor, Authz, Change, Id, MemoryStore, Object, Permission, Relation, Subject, Tuple,
 };
 use vellum_books_service::api::{
-    AddSection, At, BookKey, CreateSnapshot, DiffInput, ListBooks, MoveSection, PlaceInput,
-    SectionKey, SetSectionAccess, TocLine, UpdateSection,
+    AddSection, At, BookKey, CopySection, CreateSnapshot, DiffInput, HistoryEntry, HistoryInput,
+    ListBooks, MergeSection, MoveSection, PlaceInput, Publish, PublishFormat, RestoreOutline,
+    SectionKey, SetSectionAccess, SplitSection, TocLine, TransferSection, UpdateSection,
 };
 use vellum_books_service::{AuthzAccess, BooksService};
 use vellum_contracts::{CredentialKind, Principal, RequestContext, Scope, ScopeSet, Service as _};
@@ -26,6 +27,7 @@ use vellum_kernel::{BookId, ErrorKind, ObjectId, RequestId, Timestamp, UserId};
 use vellum_store::{BlobPath, LocalStore};
 
 const DIR: &str = "drives/shared/Northstar/Handbook.book";
+const GUIDE: &str = "drives/shared/Northstar/Guide.book";
 
 struct World {
     _tmp: tempfile::TempDir,
@@ -42,6 +44,7 @@ struct World {
     ana: UserId,
     raj: UserId,
     mia: UserId,
+    guide: BookId,
 }
 
 fn ctx(user: UserId) -> RequestContext {
@@ -77,6 +80,22 @@ async fn world() -> World {
     let root = tmp.path().to_path_buf();
     let fresh = || ObjectId::generate().to_string();
     let (book, intro, ops, runbook, glossary) = (fresh(), fresh(), fresh(), fresh(), fresh());
+    let (guide, start) = (fresh(), fresh());
+    write(
+        &root,
+        &format!("{GUIDE}/book.yaml"),
+        &format!("vellum: 1\nid: {guide}\ntitle: Guide\nnodes:\n  {start}:\n    path: start.md\n"),
+    );
+    write(
+        &root,
+        &format!("{GUIDE}/SUMMARY.md"),
+        "# Summary\n\n- [Start](start.md)\n",
+    );
+    write(
+        &root,
+        &format!("{GUIDE}/start.md"),
+        &chapter(&start, "Start", "Begin here."),
+    );
     let sre = ObjectId::generate();
     write(
         &root,
@@ -132,6 +151,8 @@ async fn world() -> World {
                 (uid(&intro), Some(uid(&book))),
                 (uid(&ops), Some(uid(&book))),
                 (uid(&glossary), Some(uid(&book))),
+                (uid(&guide), None),
+                (uid(&start), Some(uid(&guide))),
             ]),
         )
         .unwrap();
@@ -147,6 +168,11 @@ async fn world() -> World {
                 Change::Grant(Tuple::role(node, Relation::Viewer, user(ana))),
                 Change::Grant(Tuple::role(node, Relation::Editor, user(raj))),
                 Change::Grant(Tuple::role(node, Relation::Manager, user(mia))),
+                Change::Grant(Tuple::role(
+                    Object::Node(uid(&guide)),
+                    Relation::Editor,
+                    user(raj),
+                )),
             ],
         )
         .await
@@ -177,6 +203,7 @@ async fn world() -> World {
         ana,
         raj,
         mia,
+        guide: guide.parse().unwrap(),
     }
 }
 
@@ -642,7 +669,7 @@ async fn registers_every_operation() {
     let w = world().await;
     assert_eq!(w.service.name(), "books");
     let ops = Arc::clone(&w.service).operations();
-    assert_eq!(ops.len(), 11);
+    assert_eq!(ops.len(), 19);
     let _ = ListBooks::default();
 }
 
@@ -650,4 +677,351 @@ impl World {
     const fn book_node(&self) -> Id {
         Id(self.book.as_u128())
     }
+}
+
+fn place(at: At, section: &str) -> PlaceInput {
+    PlaceInput {
+        at,
+        section: Some(section.to_owned()),
+        region: None,
+    }
+}
+
+#[tokio::test]
+async fn reorders_are_versioned_and_can_be_restored() {
+    let w = world().await;
+    let raj = ctx(w.raj);
+    let history = async |user: UserId| {
+        w.service
+            .history(
+                &ctx(user),
+                HistoryInput {
+                    book_id: w.book,
+                    limit: None,
+                },
+            )
+            .await
+    };
+    assert!(history(w.raj).await.unwrap().entries.is_empty());
+
+    // The glossary moves before Operations, then back to the end.
+    let move_glossary = |at: At, section: &str| MoveSection {
+        book_id: w.book,
+        section_id: w.glossary.clone(),
+        place: place(at, section),
+    };
+    let _ = w
+        .service
+        .move_section(&raj, move_glossary(At::Before, &w.ops))
+        .await
+        .unwrap();
+    let _ = w
+        .service
+        .move_section(&raj, move_glossary(At::After, &w.ops))
+        .await
+        .unwrap();
+    // A body edit changes no outline, so it leaves no record.
+    let _ = w
+        .service
+        .update_section(
+            &raj,
+            UpdateSection {
+                book_id: w.book,
+                section_id: w.intro.clone(),
+                title: None,
+                body: Some("Hello.".to_owned()),
+            },
+        )
+        .await
+        .unwrap();
+    let entries = history(w.raj).await.unwrap().entries;
+    assert_eq!(entries.len(), 2);
+    assert_eq!(entries[0].op, "move_section");
+    assert_eq!(entries[0].by, format!("user:{}", w.raj));
+    let order = |e: &HistoryEntry| {
+        e.outline
+            .iter()
+            .map(|l| l.title.clone())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        order(&entries[1]),
+        ["Introduction", "Glossary", "Operations", "Runbook"]
+    );
+    assert_eq!(
+        entries[1].outline[3].parent.as_deref(),
+        Some(w.ops.as_str())
+    );
+
+    // Readers never see restricted sections in old outlines either.
+    let ana = history(w.ana).await.unwrap().entries;
+    assert_eq!(order(&ana[1]), ["Introduction", "Glossary"]);
+
+    // Restoring the older outline puts the glossary back before Operations.
+    let info = w
+        .service
+        .restore_outline(
+            &raj,
+            RestoreOutline {
+                book_id: w.book,
+                entry: entries[1].id.clone(),
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        titles(&info.toc),
+        ["Introduction", "Glossary", "Operations", "Runbook"]
+    );
+    assert_eq!(
+        history(w.raj).await.unwrap().entries[0].op,
+        "restore_outline"
+    );
+
+    // Viewers cannot restore, and unknown entries are not found.
+    let denied = w
+        .service
+        .restore_outline(
+            &ctx(w.ana),
+            RestoreOutline {
+                book_id: w.book,
+                entry: entries[0].id.clone(),
+            },
+        )
+        .await;
+    assert_eq!(denied.unwrap_err().kind(), ErrorKind::PermissionDenied);
+    let missing = w
+        .service
+        .restore_outline(
+            &raj,
+            RestoreOutline {
+                book_id: w.book,
+                entry: "../../book".to_owned(),
+            },
+        )
+        .await;
+    assert_eq!(missing.unwrap_err().kind(), ErrorKind::NotFound);
+}
+
+#[tokio::test]
+async fn headings_become_sections_and_back() {
+    let w = world().await;
+    let raj = ctx(w.raj);
+    let _ = w
+        .service
+        .update_section(
+            &raj,
+            UpdateSection {
+                book_id: w.book,
+                section_id: w.glossary.clone(),
+                title: None,
+                body: Some("Terms.\n\n## Alpha\n\nA.\n\n## Beta\n\nB.\n".to_owned()),
+            },
+        )
+        .await
+        .unwrap();
+    let split = w
+        .service
+        .split_section(
+            &raj,
+            SplitSection {
+                book_id: w.book,
+                section_id: w.glossary.clone(),
+                level: None,
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(split.created.len(), 2);
+    let info = w.service.get(&raj, w.book).await.unwrap();
+    assert_eq!(
+        titles(&info.toc),
+        [
+            "Introduction",
+            "Operations",
+            "Runbook",
+            "Glossary",
+            "Alpha",
+            "Beta"
+        ]
+    );
+
+    let merged = w
+        .service
+        .merge_section(
+            &raj,
+            MergeSection {
+                book_id: w.book,
+                section_id: w.glossary.clone(),
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(merged.removed.len(), 2);
+    let glossary = w
+        .service
+        .get_section(&raj, w.key(&w.glossary))
+        .await
+        .unwrap();
+    assert!(glossary.markdown.contains("## Alpha"));
+
+    // Viewers cannot fold sections.
+    let denied = w
+        .service
+        .merge_section(
+            &ctx(w.ana),
+            MergeSection {
+                book_id: w.book,
+                section_id: w.glossary.clone(),
+            },
+        )
+        .await;
+    assert_eq!(denied.unwrap_err().kind(), ErrorKind::PermissionDenied);
+}
+
+#[tokio::test]
+async fn sections_copy_within_and_move_between_books() {
+    let w = world().await;
+    let raj = ctx(w.raj);
+    let copy = w
+        .service
+        .copy_section(
+            &raj,
+            CopySection {
+                book_id: w.book,
+                section_id: w.ops.clone(),
+                place: place(At::After, &w.glossary),
+            },
+        )
+        .await
+        .unwrap();
+    assert_ne!(copy.section_id, w.ops);
+    assert_eq!(copy.created.len(), 2);
+
+    // Moving Operations (with its runbook) into the guide.
+    let moved = w
+        .service
+        .transfer_section(
+            &raj,
+            TransferSection {
+                book_id: w.book,
+                section_id: w.ops.clone(),
+                to_book: w.guide,
+                place: PlaceInput {
+                    at: At::End,
+                    section: None,
+                    region: None,
+                },
+                copy: false,
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(moved.section_id, w.ops);
+    let guide = w.service.get(&raj, w.guide).await.unwrap();
+    assert_eq!(titles(&guide.toc), ["Start", "Operations", "Runbook"]);
+    let handbook = w.service.get(&raj, w.book).await.unwrap();
+    assert!(!titles(&handbook.toc)[..2].contains(&"Operations".to_owned()));
+    assert!(
+        std::fs::read_to_string(w.root.join(GUIDE).join("operations/README.md"))
+            .unwrap()
+            .contains("Pager rotation")
+    );
+
+    // The same book is refused, and so is a viewer of the source.
+    let same = w
+        .service
+        .transfer_section(
+            &raj,
+            TransferSection {
+                book_id: w.book,
+                section_id: w.intro.clone(),
+                to_book: w.book,
+                place: place(At::After, &w.glossary),
+                copy: true,
+            },
+        )
+        .await;
+    assert_eq!(same.unwrap_err().kind(), ErrorKind::InvalidInput);
+    let viewer = w
+        .service
+        .transfer_section(
+            &ctx(w.ana),
+            TransferSection {
+                book_id: w.book,
+                section_id: w.intro.clone(),
+                to_book: w.guide,
+                place: PlaceInput {
+                    at: At::End,
+                    section: None,
+                    region: None,
+                },
+                copy: true,
+            },
+        )
+        .await;
+    assert_eq!(viewer.unwrap_err().kind(), ErrorKind::NotFound);
+}
+
+#[tokio::test]
+async fn managers_publish_and_only_public_sites_are_served() {
+    let w = world().await;
+    let publish = async |user: UserId, format: PublishFormat, audience: Vec<String>| {
+        w.service
+            .publish(
+                &ctx(user),
+                Publish {
+                    book_id: w.book,
+                    format,
+                    audience,
+                },
+            )
+            .await
+    };
+    let denied = publish(w.raj, PublishFormat::Site, vec![]).await;
+    assert_eq!(denied.unwrap_err().kind(), ErrorKind::PermissionDenied);
+
+    let site = publish(w.mia, PublishFormat::Site, vec![]).await.unwrap();
+    assert!(site.public);
+    assert_eq!(
+        site.url.as_deref(),
+        Some(format!("/published/books/{}/", w.book).as_str())
+    );
+    let index = w.service.public_file(w.book, "").await.unwrap().unwrap();
+    let index = String::from_utf8_lossy(&index);
+    assert!(index.contains("Glossary"));
+    assert!(
+        !index.contains("Operations"),
+        "restricted sections stay out"
+    );
+    assert!(!w.read(".published/site/style.css").is_empty());
+    for bad in ["../book.yaml", "../../Handbook.book/book.yaml", "nope.html"] {
+        assert!(w.service.public_file(w.book, bad).await.unwrap().is_none());
+    }
+
+    // The mdBook tree for the SRE group keeps their section.
+    let sre = format!("group:{}", ObjectId::from_u128(w.sre.0));
+    let tree = publish(w.mia, PublishFormat::Mdbook, vec![sre.clone()])
+        .await
+        .unwrap();
+    assert!(!tree.public && tree.url.is_none());
+    assert!(
+        w.read(".published/mdbook/src/SUMMARY.md")
+            .contains("Operations")
+    );
+    let listed = w
+        .service
+        .publications(&ctx(w.ana), BookKey { book_id: w.book })
+        .await
+        .unwrap();
+    assert_eq!(listed.publications.len(), 2);
+
+    // A site for members only is not served publicly.
+    let _ = publish(w.mia, PublishFormat::Site, vec![sre])
+        .await
+        .unwrap();
+    assert!(w.service.public_file(w.book, "").await.unwrap().is_none());
+    // Publications never show up as book sections.
+    let info = w.service.get(&ctx(w.mia), w.book).await.unwrap();
+    assert_eq!(titles(&info.toc).len(), 4);
 }

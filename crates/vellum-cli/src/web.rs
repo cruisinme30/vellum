@@ -52,7 +52,7 @@ pub fn router(files: &'static [(&'static str, &'static [u8])]) -> Router {
 }
 
 /// The content type for a file name, by extension.
-fn content_type(path: &str) -> &'static str {
+pub fn content_type(path: &str) -> &'static str {
     let extension = path
         .rsplit_once('.')
         .map(|(_, e)| e.to_ascii_lowercase())

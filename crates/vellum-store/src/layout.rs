@@ -28,6 +28,11 @@ pub const BUILD_DIR: &str = ".mdbook";
 /// A book's published snapshots: data the books service owns, not
 /// documents to index.
 pub const SNAPSHOTS_DIR: &str = ".snapshots";
+/// A book's outline history (ADR 0013, D235): books-service data.
+pub const HISTORY_DIR: &str = ".history";
+/// A book's publications (ADR 0013, D237): generated output, not
+/// documents to index.
+pub const PUBLISHED_DIR: &str = ".published";
 /// Longest file name, in bytes, that every supported backend accepts.
 pub const MAX_NAME_BYTES: usize = 200;
 
@@ -92,7 +97,7 @@ impl Kind {
             }
             _ => {}
         }
-        if in_book_snapshots(path) {
+        if in_book_data(path) {
             return Self::Asset;
         }
         if name.to_ascii_lowercase().ends_with(".shortcut.yaml") {
@@ -120,12 +125,14 @@ fn has_ext(name: &str, ext: &str) -> bool {
         .is_some_and(|(stem, e)| !stem.is_empty() && e.eq_ignore_ascii_case(ext))
 }
 
-/// True for anything under `<name>.book/.snapshots/`.
-fn in_book_snapshots(path: &BlobPath) -> bool {
+/// True for anything under `<name>.book/.snapshots/`, `.history/` or
+/// `.published/`.
+fn in_book_data(path: &BlobPath) -> bool {
     let segments: Vec<&str> = path.segments().collect();
-    segments
-        .windows(2)
-        .any(|w| matches!(w, [book, snaps] if *snaps == SNAPSHOTS_DIR && has_ext(book, "book")))
+    segments.windows(2).any(|w| {
+        matches!(w, [book, dir]
+            if [SNAPSHOTS_DIR, HISTORY_DIR, PUBLISHED_DIR].contains(dir) && has_ext(book, "book"))
+    })
 }
 
 fn is_scratch(name: &str) -> bool {
@@ -278,6 +285,18 @@ mod tests {
         assert_eq!(
             kind("drives/shared/Ops/Guide.book/.snapshots/v1/intro.md"),
             Kind::Asset
+        );
+        assert_eq!(
+            kind("drives/shared/Ops/Guide.book/.published/mdbook/src/intro.md"),
+            Kind::Asset
+        );
+        assert_eq!(
+            kind("drives/shared/Ops/Guide.book/.history/01J.json"),
+            Kind::Asset
+        );
+        assert_eq!(
+            kind("drives/shared/Ops/Notes/.published/intro.md"),
+            Kind::Document
         );
         assert_eq!(
             kind("drives/shared/Ops/Notes/.snapshots/intro.md"),

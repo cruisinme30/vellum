@@ -492,6 +492,35 @@ impl Identity {
         users
     }
 
+    /// Up to `limit` active people whose name, handle or email contains
+    /// `query` (case-insensitive), names starting with it first (D272).
+    /// Queries shorter than two characters find nobody, so the directory
+    /// cannot be listed one letter at a time.
+    #[must_use]
+    pub fn search_people(&self, query: &str, limit: usize) -> Vec<UserView> {
+        let query = query.trim().to_lowercase();
+        if query.chars().count() < 2 {
+            return Vec::new();
+        }
+        let mut found: Vec<(bool, UserView)> = self.store.read(|s| {
+            s.users
+                .values()
+                .filter(|u| u.email != BREAK_GLASS_EMAIL)
+                .map(UserView::from)
+                .filter(|u| !u.disabled)
+                .filter_map(|u| {
+                    let name = u.name.to_lowercase();
+                    let hit = name.contains(&query)
+                        || u.handle.to_lowercase().contains(&query)
+                        || u.email.to_lowercase().contains(&query);
+                    hit.then(|| (!name.starts_with(&query), u))
+                })
+                .collect()
+        });
+        found.sort_by(|(a, x), (b, y)| a.cmp(b).then_with(|| x.name.cmp(&y.name)));
+        found.into_iter().take(limit).map(|(_, u)| u).collect()
+    }
+
     /// A user by ID.
     ///
     /// # Errors

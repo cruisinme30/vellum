@@ -28,6 +28,7 @@ import { createLocalConnector } from "./editor/collab/local-connector";
 import { createSocketConnector } from "./editor/collab/socket-connector";
 import { createBrowserPushDevice } from "./notifications/device";
 import { createHttpNotificationPreferencesStore } from "./notifications/preferences";
+import { createHttpDirectory } from "./people/directory";
 import { startClientTelemetry } from "./platform/client-telemetry-start";
 import { createPlatform, startPlatform } from "./platform/platform";
 import { createHttpPrivateSpacesApi } from "./platform/private/api";
@@ -76,6 +77,7 @@ root.render(
       admin={status === undefined ? undefined : createHttpAdminConsoleApi(http)}
       work={status === undefined ? undefined : createHttpWorkApi(http)}
       books={status === undefined ? undefined : createHttpBooksApi(http)}
+      directory={status === undefined ? undefined : createHttpDirectory(http)}
       privateSpaces={status === undefined ? undefined : createHttpPrivateSpacesApi(http)}
       collections={
         status === undefined ? createMockCollectionsStore() : createHttpCollectionsStore(http)
