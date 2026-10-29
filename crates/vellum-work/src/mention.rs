@@ -19,6 +19,8 @@ const RESERVED: &[&str] = &["me", "today", "tomorrow", "yesterday", "now"];
 ///
 /// A mention is `@handle` at the start of a word: `name@example.com` is
 /// an email, not a mention. Trailing `.`, `-` and `_` are punctuation.
+/// An escaped `\@handle` is literal text, as the format parser reads it,
+/// while `\\@handle` is a literal backslash followed by a mention.
 #[must_use]
 pub fn mentions(markdown: &str) -> Vec<UserRef> {
     let mut seen = BTreeSet::new();
@@ -28,6 +30,9 @@ pub fn mentions(markdown: &str) -> Vec<UserRef> {
         for (i, _) in text.match_indices('@') {
             let before = i.checked_sub(1).and_then(|p| bytes.get(p).copied());
             if before.is_some_and(|b| b.is_ascii_alphanumeric() || b"._-@/".contains(&b)) {
+                continue;
+            }
+            if escaped(bytes, i) {
                 continue;
             }
             let rest = text.get(i + 1..).unwrap_or_default();
@@ -60,6 +65,18 @@ pub fn mentions(markdown: &str) -> Vec<UserRef> {
         }
     }
     out
+}
+
+/// Whether the byte at `i` follows an odd run of backslashes.
+fn escaped(bytes: &[u8], i: usize) -> bool {
+    let run = bytes
+        .get(..i)
+        .unwrap_or_default()
+        .iter()
+        .rev()
+        .take_while(|b| **b == b'\\')
+        .count();
+    run % 2 == 1
 }
 
 /// A block ID such as `blk-a1b2c3d4`, without the leading `^`.
@@ -223,6 +240,12 @@ mod tests {
     fn ignores_emails_dates_code_and_capitals() {
         let text = "mail priya@northstar.dev @today `@dev`\n```\n@sam\n```\n@Priya @me";
         assert!(handles(text).is_empty(), "{:?}", handles(text));
+    }
+
+    #[test]
+    fn escaped_mentions_are_text() {
+        assert!(handles("\\@everyone please look, cc \\@alice").is_empty());
+        assert_eq!(handles("C:\\\\@priya"), ["priya"]);
     }
 
     #[test]
