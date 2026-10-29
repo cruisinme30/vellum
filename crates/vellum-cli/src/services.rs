@@ -6,8 +6,8 @@
 //! Each service workstream adds its service to [`Services`] and
 //! [`Services::mount`] (with any raw routers), so `vellum serve`, the
 //! OpenAPI document and the `GraphQL` schema all see the same set.
-//! Identity and notifications always run; the workspace services (collections, books,
-//! Work) join when an index is configured.
+//! Identity and notifications always run; the workspace services (drive,
+//! collections, books, Work and My Work) join when an index is configured.
 
 use std::path::Path;
 use std::sync::Arc;
@@ -19,6 +19,7 @@ use vellum_contracts::Service;
 use vellum_identity::{Identity, IdentityConfig, IdentityService, Store, http as identity_http};
 use vellum_kernel::{Config, Error, ErrorKind};
 use vellum_notify::service::{NotifyService, NotifyStore};
+use vellum_tasks::service::TasksService;
 
 use crate::collab::Collab;
 use crate::identity::{GuardedFetcher, IdentityAuthenticator};
@@ -41,6 +42,8 @@ pub struct Services {
     hooks: Option<axum::Router>,
     /// Live editing, when an index is configured.
     collab: Option<Collab>,
+    /// My Work, for its feed, CalDAV and capture routes.
+    tasks: Option<Arc<TasksService>>,
 }
 
 impl std::fmt::Debug for Services {
@@ -89,6 +92,7 @@ impl Services {
             workspace: Vec::new(),
             hooks: None,
             collab: None,
+            tasks: None,
         })
     }
 
@@ -107,6 +111,7 @@ impl Services {
         self.workspace = opened.services;
         self.hooks = opened.hooks;
         self.collab = opened.collab;
+        self.tasks = opened.tasks;
         Ok(self)
     }
 
@@ -147,6 +152,11 @@ impl Services {
         if let Some(hooks) = &self.hooks {
             // Providers sign each delivery and send no CSRF token.
             builder = builder.mount_cross_site("/hooks", hooks.clone());
+        }
+        if let Some(tasks) = &self.tasks {
+            for (prefix, router) in crate::tasks_http::routers(tasks, identity) {
+                builder = builder.mount_cross_site(prefix, router);
+            }
         }
         builder
             .authenticator(Arc::new(IdentityAuthenticator::new(Arc::clone(identity))))

@@ -28,6 +28,10 @@ mod serve;
 mod services;
 #[cfg(test)]
 mod typescript_tests;
+mod tasks;
+mod tasks_http;
+#[cfg(test)]
+mod tasks_tests;
 mod watcher;
 mod web;
 #[cfg(test)]

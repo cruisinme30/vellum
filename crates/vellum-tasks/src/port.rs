@@ -78,9 +78,17 @@ pub trait Workspace: Send + Sync + 'static {
         version: u64,
     ) -> BoxFuture<'_, Result<u64, Error>>;
 
-    /// Creates a file at a space-relative path. The text carries the
-    /// new document's `id` in its front matter.
-    fn create(&self, user: UserId, path: String, text: String) -> BoxFuture<'_, Result<(), Error>>;
+    /// Creates a list file. `path` is the suggested location relative to
+    /// the user's own space (`tasks/<handle>/<slug>.md`), and the text
+    /// carries a proposed `id` in its front matter. Returns the ID the
+    /// stored document actually has, which an implementation may assign
+    /// itself (rewriting the front matter to match).
+    fn create(
+        &self,
+        user: UserId,
+        path: String,
+        text: String,
+    ) -> BoxFuture<'_, Result<DocId, Error>>;
 
     /// Grants (`member` true) or revokes another person's edit access to
     /// a list. Unknown handles fail with `not_found`.

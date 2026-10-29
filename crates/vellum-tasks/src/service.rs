@@ -780,16 +780,14 @@ impl TasksService {
         if let Some(file) = files.iter().find(is_target) {
             return Ok(file.context.doc);
         }
-        let id = DocId::generate();
         let title = title.unwrap_or("Inbox");
         let path = if title == "Inbox" {
             lists::inbox_path(handle)
         } else {
             lists::list_path(handle, title)
         };
-        let text = lists::new_list(id, title, handle);
-        self.workspace.create(user, path, text).await?;
-        Ok(id)
+        let text = lists::new_list(DocId::generate(), title, handle);
+        self.workspace.create(user, path, text).await
     }
 
     /// Adds a task from a quick-add line (R-MW-3).
@@ -1125,9 +1123,9 @@ impl TasksService {
                     .await?;
                 (file.context.doc, added)
             } else {
-                let id = DocId::generate();
-                let text = import::render_list(&list, id, &me.profile.handle);
-                self.workspace
+                let text = import::render_list(&list, DocId::generate(), &me.profile.handle);
+                let id = self
+                    .workspace
                     .create(
                         user,
                         lists::list_path(&me.profile.handle, &list.title),
