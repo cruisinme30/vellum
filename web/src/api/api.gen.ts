@@ -1193,6 +1193,24 @@ export interface ChainReport {
 }
 
 /**
+ * People to add to and remove from a group.
+ */
+export interface ChangeMembers {
+  /**
+   * People to add.
+   */
+  add?: UserId[];
+  /**
+   * The group.
+   */
+  id: ObjectId;
+  /**
+   * People to remove.
+   */
+  remove?: UserId[];
+}
+
+/**
  * What an edit touched.
  */
 export interface Changeset {
@@ -1813,6 +1831,20 @@ export interface CreateFromCsvInput {
    * The collection's title.
    */
   title: string;
+}
+
+/**
+ * A new group.
+ */
+export interface CreateGroup {
+  /**
+   * What the group is for.
+   */
+  description?: string;
+  /**
+   * The display name, unique ignoring case.
+   */
+  name: string;
 }
 
 /**
@@ -2467,6 +2499,38 @@ export interface DigestView {
    * Vellum Markdown, or nothing when the day is clear.
    */
   markdown?: string | null;
+}
+
+/**
+ * Groups matching a search, in the people picker's shape.
+ */
+export interface DirectoryEntries {
+  /**
+   * Names starting with the query first, then by name.
+   */
+  entries: DirectoryEntry[];
+}
+
+/**
+ * What a people picker shows for one group.
+ */
+export interface DirectoryEntry {
+  /**
+   * Its description, or "Group".
+   */
+  detail: string;
+  /**
+   * Always `group`.
+   */
+  kind: string;
+  /**
+   * The group's name.
+   */
+  name: string;
+  /**
+   * What a grant names: `group:<ID>`.
+   */
+  principal: string;
 }
 
 /**
@@ -3534,6 +3598,50 @@ export interface Group {
 }
 
 /**
+ * A deleted group.
+ */
+export interface GroupDeleted {
+  /**
+   * The group that is gone.
+   */
+  id: ObjectId;
+}
+
+/**
+ * A group named in the path.
+ */
+export interface GroupKey {
+  /**
+   * The group.
+   */
+  id: ObjectId;
+}
+
+/**
+ * Every group.
+ */
+export interface GroupList {
+  /**
+   * The groups, by name.
+   */
+  groups: GroupView[];
+}
+
+/**
+ * A group and the people in it.
+ */
+export interface GroupMembersView {
+  /**
+   * The group.
+   */
+  group: GroupView;
+  /**
+   * Its members, by name.
+   */
+  members: UserView[];
+}
+
+/**
  * One group of issues.
  */
 export interface GroupOut {
@@ -3545,6 +3653,86 @@ export interface GroupOut {
    * The group's value (`in-review`, `urgent`, `dev`); `None` is "none".
    */
   key?: string | null;
+}
+
+/**
+ * A group search.
+ */
+export interface GroupSearch {
+  /**
+   * The most results, 1 to 100; 20 when absent.
+   */
+  limit?: number | null;
+  /**
+   * Text the name contains, ignoring case; empty lists every group.
+   */
+  q?: string;
+}
+
+/**
+ * A group as the API shows it.
+ */
+export interface GroupView {
+  /**
+   * When it was created.
+   */
+  created_at: Timestamp;
+  /**
+   * What the group is for.
+   */
+  description: string;
+  /**
+   * The group's ID; grants name it as `group:<ID>`.
+   */
+  id: ObjectId;
+  /**
+   * The display name, unique ignoring case.
+   */
+  name: string;
+}
+
+/**
+ * A group as the API shows it.
+ */
+export interface GroupsCreateGroupView {
+  /**
+   * When it was created.
+   */
+  created_at: Timestamp;
+  /**
+   * What the group is for.
+   */
+  description: string;
+  /**
+   * The group's ID; grants name it as `group:<ID>`.
+   */
+  id: ObjectId;
+  /**
+   * The display name, unique ignoring case.
+   */
+  name: string;
+}
+
+/**
+ * A group as the API shows it.
+ */
+export interface GroupsUpdateGroupView {
+  /**
+   * When it was created.
+   */
+  created_at: Timestamp;
+  /**
+   * What the group is for.
+   */
+  description: string;
+  /**
+   * The group's ID; grants name it as `group:<ID>`.
+   */
+  id: ObjectId;
+  /**
+   * The display name, unique ignoring case.
+   */
+  name: string;
 }
 
 /**
@@ -7440,6 +7628,24 @@ export interface Unsubscribe {
 }
 
 /**
+ * Changes to a group.
+ */
+export interface UpdateGroup {
+  /**
+   * A new description.
+   */
+  description?: string | null;
+  /**
+   * The group.
+   */
+  id: ObjectId;
+  /**
+   * A new name.
+   */
+  name?: string | null;
+}
+
+/**
  * Changes to a task. Each field present replaces the old value; an
  * empty string clears it.
  */
@@ -9952,6 +10158,55 @@ export interface Operations {
     input: RevokeDevice;
     output: Revoked;
   };
+  /** Add people to a group and remove others */
+  "groups.change_members": {
+    method: "POST";
+    path: "/v1/admin/groups/{id}/members";
+    input: ChangeMembers;
+    output: GroupMembersView;
+  };
+  /** Create a group */
+  "groups.create": {
+    method: "POST";
+    path: "/v1/admin/groups";
+    input: CreateGroup;
+    output: GroupsCreateGroupView;
+  };
+  /** Delete a group; its members lose what it granted */
+  "groups.delete": {
+    method: "DELETE";
+    path: "/v1/admin/groups/{id}";
+    input: GroupKey;
+    output: GroupDeleted;
+  };
+  /** List every group */
+  "groups.list": {
+    method: "GET";
+    path: "/v1/admin/groups";
+    input: Empty;
+    output: GroupList;
+  };
+  /** List a group's members */
+  "groups.members": {
+    method: "GET";
+    path: "/v1/admin/groups/{id}/members";
+    input: GroupKey;
+    output: GroupMembersView;
+  };
+  /** Find groups by name, for choosing who to share with */
+  "groups.search": {
+    method: "GET";
+    path: "/v1/directory/groups";
+    input: GroupSearch;
+    output: DirectoryEntries;
+  };
+  /** Rename a group or change its description */
+  "groups.update": {
+    method: "PATCH";
+    path: "/v1/admin/groups/{id}";
+    input: UpdateGroup;
+    output: GroupsUpdateGroupView;
+  };
   /** List apps you connected with OAuth */
   "identity.apps": {
     method: "GET";
@@ -10675,6 +10930,13 @@ export const OPERATIONS = {
   "e2e.objects": { method: "GET", path: "/v1/spaces/{space_id}/e2e/objects", mutation: false },
   "e2e.put": { method: "PUT", path: "/v1/spaces/{space_id}/e2e/object", mutation: true },
   "e2e.revoke": { method: "DELETE", path: "/v1/spaces/{space_id}/e2e/keys/{fingerprint}", mutation: true },
+  "groups.change_members": { method: "POST", path: "/v1/admin/groups/{id}/members", mutation: true },
+  "groups.create": { method: "POST", path: "/v1/admin/groups", mutation: true },
+  "groups.delete": { method: "DELETE", path: "/v1/admin/groups/{id}", mutation: true },
+  "groups.list": { method: "GET", path: "/v1/admin/groups", mutation: false },
+  "groups.members": { method: "GET", path: "/v1/admin/groups/{id}/members", mutation: false },
+  "groups.search": { method: "GET", path: "/v1/directory/groups", mutation: false },
+  "groups.update": { method: "PATCH", path: "/v1/admin/groups/{id}", mutation: true },
   "identity.apps": { method: "GET", path: "/v1/me/apps", mutation: false },
   "identity.create_token": { method: "POST", path: "/v1/me/tokens", mutation: true },
   "identity.create_user": { method: "POST", path: "/v1/admin/users", mutation: true },

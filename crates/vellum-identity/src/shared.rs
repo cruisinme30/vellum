@@ -550,6 +550,7 @@ pub fn diff(old: &State, new: &State) -> Result<Vec<Row>, Error> {
         Clone::clone,
         &mut rows,
     )?;
+    diff_map("group", &old.groups, &new.groups, Clone::clone, &mut rows)?;
     Ok(rows)
 }
 
@@ -596,6 +597,7 @@ fn apply(state: &mut State, delta: &Delta) -> Result<(), Error> {
             "lockout" => put(&mut state.lockouts, row)?,
             "oauth_consent" => put(&mut state.oauth_consents, row)?,
             "oauth_code" => put(&mut state.oauth_codes, row)?,
+            "group" => put(&mut state.groups, row)?,
             other => tracing::debug!(kind = other, "skipping an unknown identity record"),
         }
     }
@@ -688,6 +690,7 @@ mod tests {
             "lockouts",
             "oauth_consents",
             "oauth_codes",
+            "groups",
         ];
         maps.sort_unstable();
         assert_eq!(fields, maps);

@@ -8,6 +8,7 @@ import type { AdminConsoleApi } from "./admin/console/api";
 import { AuditPage } from "./admin/console/audit-page";
 import { BackupsPage } from "./admin/console/backups-page";
 import { AdminConsoleProvider } from "./admin/console/context";
+import { GroupsPage } from "./admin/console/groups-page";
 import { SettingsPage } from "./admin/console/settings-page";
 import { SpacesPage } from "./admin/console/spaces-page";
 import { UsagePage } from "./admin/console/usage-page";
@@ -112,6 +113,7 @@ export function AppRoutes() {
         <Route path="admin/webhooks" element={<WebhooksPage />} />
         <Route path="admin/users" element={<UsersPage />} />
         <Route path="admin/spaces" element={<SpacesPage />} />
+        <Route path="admin/groups" element={<GroupsPage />} />
         <Route path="*" element={<NotFoundView />} />
       </Route>
     </Routes>

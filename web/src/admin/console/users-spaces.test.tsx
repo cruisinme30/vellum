@@ -99,6 +99,12 @@ function fakeApi(overrides: Partial<AdminConsoleApi> = {}) {
     createSpace,
     updateSpace: () => Promise.resolve(ENG),
     setMember,
+    groups: unused,
+    createGroup: unused,
+    updateGroup: unused,
+    deleteGroup: unused,
+    groupMembers: unused,
+    changeGroupMembers: unused,
     ...overrides,
   };
   return { api, updateUser, createUser, createSpace, setMember };

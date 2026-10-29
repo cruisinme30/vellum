@@ -334,3 +334,21 @@
 .vl-admin-table tr[aria-current="true"] {
   background: var(--md-secondary-container, var(--md-surface-container));
 }
+
+.vl-admin-members {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vl-admin-members li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--md-outline-variant, var(--md-outline));
+}

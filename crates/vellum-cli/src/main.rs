@@ -27,6 +27,7 @@ mod feed;
 mod google_http;
 #[cfg(test)]
 mod google_http_tests;
+mod groups;
 mod identity;
 #[cfg(test)]
 mod identity_tests;

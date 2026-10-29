@@ -22,6 +22,9 @@ import type {
   ChainReport,
   CreateUser,
   DrillReport,
+  GroupList,
+  GroupMembersView,
+  GroupView,
   UsageCounts,
   SettingsView,
   SpaceRoleView,
@@ -66,6 +69,17 @@ export interface AdminConsoleApi {
     userId: string,
     role: SpaceRoleView | undefined,
   ): Promise<AdminSpaceView>;
+  /** Every named group, by name. */
+  groups(): Promise<GroupView[]>;
+  createGroup(name: string, description: string): Promise<GroupView>;
+  updateGroup(id: string, change: { name?: string; description?: string }): Promise<GroupView>;
+  /** Deletes a group; its members lose what it granted. */
+  deleteGroup(id: string): Promise<void>;
+  groupMembers(id: string): Promise<GroupMembersView>;
+  changeGroupMembers(
+    id: string,
+    change: { add?: readonly string[]; remove?: readonly string[] },
+  ): Promise<GroupMembersView>;
 }
 
 /** What an admin changes about an account; unset fields stay as they are. */
@@ -137,6 +151,25 @@ export function createHttpAdminConsoleApi(http: Http): AdminConsoleApi {
         `${ADMIN}/spaces/${encodeURIComponent(spaceId)}/members/${encodeURIComponent(userId)}`,
         role === undefined ? {} : { role },
       ),
+    async groups() {
+      const list = await http.get<GroupList>(`${ADMIN}/groups`);
+      return list.groups;
+    },
+    createGroup: (name, description) =>
+      http.send<GroupView>("POST", `${ADMIN}/groups`, { name, description }),
+    updateGroup: (id, change) =>
+      http.send<GroupView>("PATCH", `${ADMIN}/groups/${encodeURIComponent(id)}`, change),
+    async deleteGroup(id) {
+      await http.send("DELETE", `${ADMIN}/groups/${encodeURIComponent(id)}`);
+    },
+    groupMembers: (id) =>
+      http.get<GroupMembersView>(`${ADMIN}/groups/${encodeURIComponent(id)}/members`),
+    changeGroupMembers: (id, change) =>
+      http.send<GroupMembersView>(
+        "POST",
+        `${ADMIN}/groups/${encodeURIComponent(id)}/members`,
+        change,
+      ),
   };
 }
 
@@ -152,6 +185,8 @@ export function isConflict(error: unknown): boolean {
 }
 
 export {
+  type GroupMembersView,
+  type GroupView,
   type AdminSpaceView,
   type SettingsView,
   type SpaceRoleView,

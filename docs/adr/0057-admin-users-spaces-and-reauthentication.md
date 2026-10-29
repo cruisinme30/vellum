@@ -1,6 +1,6 @@
 ---
 id: 01M64VPFNBGMGRN5GPVPK4NJ2N
-title: "ADR 0057: Admin users, spaces and re-authentication"
+title: "ADR 0057: Admin users, spaces, groups and re-authentication"
 status: draft
 owner: "@cruisinme30"
 tags: [adr, admin, security, drive]
@@ -11,8 +11,8 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D241, D242, D243
-- Issue: #175
+- Decisions: D241, D242, D243, D273, D274, D275
+- Issue: #175, #519
 - Pull requests: none yet
 
 :::
@@ -64,6 +64,29 @@ actions served by identity or drive were not in the audit log.
 - `Operation::wrap` replaces a handler and keeps its declaration, so OpenAPI,
   `GraphQL` and the re-authentication window stay as declared.
 
+### `D273`: identity names groups; the permission engine keeps members
+
+- A group is an identity record: ID, name (unique ignoring case) and
+  description. Grants name it `group:<ID>`, as before.
+- Members stay in `vellum-authz`'s membership tuples, reached through the
+  `GroupMembers` port that the composition root connects, so the engine
+  stays the one source of who is in.
+- Deleting a group removes its members first, so what it granted ends.
+
+### `D274`: admins manage groups under `/v1/admin/groups`
+
+- List, create, rename, delete, list members, and add or remove members,
+  with the admin scope and a recent sign-in; D243 audits each change.
+- Blocked people cannot join a group.
+- Mapping single sign-on groups to Vellum groups is left out: the brief
+  does not ask for it, and an admin can mirror a few groups by hand.
+
+### `D275`: anyone signed in can search groups by name
+
+- `GET /v1/directory/groups?q=` answers in the shared people picker's shape:
+  `kind: "group"`, `principal: "group:<ID>"`, name and description.
+- It shows no members, so a search reveals names only.
+
 ## Alternatives
 
 - **Prompt before opening any admin screen**: rejected; the server decides
@@ -72,6 +95,8 @@ actions served by identity or drive were not in the audit log.
   another's tables (brief §2), and the drive owns spaces and their grants.
 - **Make every admin a member of every space**: rejected; it would show
   every page to every admin in search and lists.
+- **Keep group members in identity too**: rejected; two copies of
+  membership would drift, and the engine's copy is the one enforced.
 - **Each service writes its own audit records**: rejected; identity and
   drive would depend on the admin crate, and new admin operations could
   forget to.

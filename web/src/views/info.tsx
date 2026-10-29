@@ -66,6 +66,7 @@ export function PendingView({ title, body }: { readonly title: string; readonly 
 const ADMIN_SCREENS = [
   "users",
   "spaces",
+  "groups",
   "usage",
   "audit",
   "settings",
