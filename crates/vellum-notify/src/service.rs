@@ -35,6 +35,7 @@ use vellum_contracts::{HttpMethod, Operation, RequestContext, Scope, Service};
 use vellum_kernel::{Error, ErrorKind, UserId};
 
 use crate::inbox::{self, InboxEntry, InboxItem};
+use crate::mail::PendingEmail;
 use crate::notification::{Channel, NotificationKind, Preferences};
 use crate::webpush::{PushSubscription, VapidKey};
 
@@ -83,6 +84,12 @@ pub struct UserState {
     pub push: Vec<StoredSubscription>,
     /// The in-app inbox, newest first.
     pub inbox: Vec<InboxEntry>,
+    /// Emails waiting for their send time ([`crate::mail`]).
+    pub email_queue: Vec<PendingEmail>,
+    /// The local date the last daily digest went out.
+    pub digest_sent_on: Option<jiff::civil::Date>,
+    /// Task reminders up to this time have been sent.
+    pub reminders_until: Option<Timestamp>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -90,6 +97,8 @@ pub struct UserState {
 struct State {
     /// The VAPID secret, base64url.
     vapid: Option<String>,
+    /// The key that signs unsubscribe links, base64url.
+    mail_key: Option<String>,
     /// Per user, by user ID.
     users: BTreeMap<String, UserState>,
 }
@@ -99,6 +108,7 @@ pub struct NotifyStore {
     path: Option<PathBuf>,
     state: Mutex<State>,
     vapid: VapidKey,
+    mail_key: [u8; 32],
 }
 
 impl std::fmt::Debug for NotifyStore {
@@ -121,6 +131,7 @@ impl NotifyStore {
             path: None,
             state: Mutex::new(State::default()),
             vapid,
+            mail_key: random_key()?,
         })
     }
 
@@ -151,10 +162,22 @@ impl NotifyStore {
             tracing::info!("web push key created");
             key
         };
+        let mail_key = match state.mail_key.as_deref().map(|k| URL_SAFE_NO_PAD.decode(k)) {
+            Some(Ok(bytes)) => <[u8; 32]>::try_from(bytes.as_slice())
+                .map_err(|_| internal(format!("{}: bad mail key", path.display())))?,
+            Some(Err(_)) => return Err(internal(format!("{}: bad mail key", path.display()))),
+            None => {
+                let key = random_key()?;
+                state.mail_key = Some(URL_SAFE_NO_PAD.encode(key));
+                save(&path, &state)?;
+                key
+            }
+        };
         Ok(Self {
             path: Some(path),
             state: Mutex::new(state),
             vapid,
+            mail_key,
         })
     }
 
@@ -162,6 +185,33 @@ impl NotifyStore {
     #[must_use]
     pub const fn vapid(&self) -> &VapidKey {
         &self.vapid
+    }
+
+    /// The signature that lets the link in an email unsubscribe `user`
+    /// from `subject` without signing in (RFC 8058).
+    #[must_use]
+    pub fn unsubscribe_token(&self, user: UserId, subject: &str) -> String {
+        crate::mail::sign_unsubscribe(&self.mail_key, user, subject)
+    }
+
+    /// Whether `token` is [`Self::unsubscribe_token`] for `user` and
+    /// `subject`, compared in constant time.
+    #[must_use]
+    pub fn check_unsubscribe(&self, user: UserId, subject: &str, token: &str) -> bool {
+        use subtle::ConstantTimeEq as _;
+        let expected = self.unsubscribe_token(user, subject);
+        expected.len() == token.len() && bool::from(expected.as_bytes().ct_eq(token.as_bytes()))
+    }
+
+    /// Everyone with stored state, as user IDs.
+    #[must_use]
+    pub fn known_users(&self) -> Vec<UserId> {
+        self.lock()
+            .users
+            .keys()
+            .filter_map(|k| k.parse::<uuid::Uuid>().ok())
+            .map(UserId::from_uuid)
+            .collect()
     }
 
     /// A person's state (defaults when they have none).
@@ -223,13 +273,25 @@ impl NotifyStore {
     }
 }
 
+fn random_key() -> Result<[u8; 32], Error> {
+    let mut key = [0_u8; 32];
+    getrandom::fill(&mut key).map_err(|e| internal(format!("no random source: {e}")))?;
+    Ok(key)
+}
+
 fn key(user: UserId) -> String {
     user.as_uuid().to_string()
 }
 
 fn save(path: &Path, state: &State) -> Result<(), Error> {
+    save_json(path, state)
+}
+
+/// Writes `value` as JSON to `path` atomically, readable only by the
+/// server's user (the files hold secrets).
+pub(crate) fn save_json<T: Serialize>(path: &Path, value: &T) -> Result<(), Error> {
     let fail = |e: std::io::Error| internal(format!("cannot write {}: {e}", path.display()));
-    let bytes = serde_json::to_vec(state).map_err(|e| internal(e.to_string()))?;
+    let bytes = serde_json::to_vec(value).map_err(|e| internal(e.to_string()))?;
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir).map_err(fail)?;
     }
@@ -317,6 +379,22 @@ pub struct PreferencesView {
     pub muted: BTreeSet<String>,
     /// Non-urgent push and email are held until this time (RFC 3339).
     pub snoozed_until: Option<String>,
+    /// The local time (`HH:MM`) of the daily digest email, or `null` for
+    /// no digest. Left out, it is 07:30.
+    #[serde(default = "default_digest_time")]
+    pub digest_time: Option<String>,
+}
+
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "serde's default must return the field's type"
+)]
+fn default_digest_time() -> Option<String> {
+    Some(digest_time(crate::notification::DEFAULT_DIGEST_AT))
+}
+
+fn digest_time(time: jiff::civil::Time) -> String {
+    time.strftime("%H:%M").to_string()
 }
 
 const fn kind_name(kind: NotificationKind) -> &'static str {
@@ -356,6 +434,7 @@ impl From<&Preferences> for PreferencesView {
             email_delay_minutes: p.email_delay.as_mins(),
             muted: p.muted.clone(),
             snoozed_until: p.snoozed_until.map(|t| t.to_string()),
+            digest_time: p.digest_at.map(digest_time),
         }
     }
 }
@@ -401,11 +480,20 @@ impl PreferencesView {
             .map(str::parse::<Timestamp>)
             .transpose()
             .map_err(|e| invalid(format!("snoozed_until: {e}")))?;
+        let digest_at = self
+            .digest_time
+            .as_deref()
+            .map(|t| {
+                jiff::civil::Time::strptime("%H:%M", t)
+                    .map_err(|_| invalid("digest_time must be HH:MM, such as 07:30"))
+            })
+            .transpose()?;
         Ok(Preferences {
             channels,
             email_delay,
             muted: self.muted.clone(),
             snoozed_until,
+            digest_at,
         })
     }
 }

@@ -6,8 +6,9 @@
 //! lines and sends the web pushes.
 //!
 //! Pushes held by a snooze are not sent later; the inbox line is there
-//! when the person looks. Email needs a mail transport, which the server
-//! does not configure yet, so email deliveries are counted and skipped.
+//! when the person looks. Emails are queued for [`crate::mail::Mailer`],
+//! which sends them when their delay ends; without a mail server
+//! configured they are counted and skipped.
 
 use std::sync::Arc;
 
@@ -31,6 +32,8 @@ pub struct Report {
     pub push_failed: usize,
     /// Pushes held by a snooze.
     pub held: usize,
+    /// Emails queued for the mailer.
+    pub email_queued: usize,
     /// Emails skipped for want of a mail transport.
     pub email_skipped: usize,
 }
@@ -40,12 +43,25 @@ pub struct Report {
 pub struct Dispatcher<T> {
     store: Arc<NotifyStore>,
     transport: T,
+    email: bool,
 }
 
 impl<T: HttpTransport> Dispatcher<T> {
     /// A dispatcher over `store`, sending pushes through `transport`.
     pub const fn new(store: Arc<NotifyStore>, transport: T) -> Self {
-        Self { store, transport }
+        Self {
+            store,
+            transport,
+            email: false,
+        }
+    }
+
+    /// Queues email deliveries for the mailer instead of skipping them;
+    /// call it when a mail server is configured.
+    #[must_use]
+    pub const fn with_email(mut self) -> Self {
+        self.email = true;
+        self
     }
 
     /// Delivers `notification` to `to`; `actor`, who caused it, is never
@@ -89,7 +105,22 @@ impl<T: HttpTransport> Dispatcher<T> {
                 }
                 Channel::Push if step.not_before > now => report.held += 1,
                 Channel::Push => self.push(user, notification, now, &mut report).await,
-                Channel::Email => report.email_skipped += 1,
+                Channel::Email if !self.email => report.email_skipped += 1,
+                Channel::Email => {
+                    let queued = self.store.update(user, |state| {
+                        crate::mail::queue(
+                            &mut state.email_queue,
+                            notification,
+                            step.not_before,
+                            step.skip_if_read,
+                        );
+                        Ok(())
+                    });
+                    match queued {
+                        Ok(()) => report.email_queued += 1,
+                        Err(error) => tracing::warn!(%error, "email not queued"),
+                    }
+                }
             }
         }
         tracing::info!(
@@ -98,6 +129,7 @@ impl<T: HttpTransport> Dispatcher<T> {
             pushed = report.pushed,
             push_failed = report.push_failed,
             held = report.held,
+            email_queued = report.email_queued,
             "notification delivered"
         );
         report
