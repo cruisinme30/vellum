@@ -62,6 +62,13 @@ pub struct Services {
     observability: Observability,
     /// The drive index, which Admin → Usage counts pages and storage from.
     drive_index: Option<Arc<dyn vellum_drive::DriveIndex>>,
+    /// The MCP endpoint, when an index is configured (ADR 0019, D217).
+    mcp: Option<Arc<vellum_mcp::http::McpHttp>>,
+    /// The workspace MCP tools run against, for other in-process callers
+    /// that want the same permission-checked reads and drafts.
+    mcp_workspace: Option<Arc<dyn vellum_mcp::ports::Workspace>>,
+    /// Where MCP calls are audited.
+    audit: Arc<crate::mcp_serve::AuditTrail>,
 }
 
 impl std::fmt::Debug for Services {
@@ -73,6 +80,7 @@ impl std::fmt::Debug for Services {
             )
             .field("hooks", &self.hooks.is_some())
             .field("admin", &self.admin.is_some())
+            .field("mcp", &self.mcp.is_some())
             .finish_non_exhaustive()
     }
 }
@@ -153,6 +161,9 @@ impl Services {
             admin: None,
             observability: Observability::new(),
             drive_index: None,
+            mcp: None,
+            mcp_workspace: None,
+            audit: Arc::default(),
         })
     }
 
@@ -179,6 +190,7 @@ impl Services {
         let (service, _) = observability::open(config, &observability, var).await?;
         let (sampler, facts) = observability::counted(config, counts);
         observability::spawn_sampling(sampler);
+        self.audit.attach(service.audit_log());
         observability::spawn_ticks(Arc::clone(&service), Arc::clone(&facts));
         self.admin = Some(observability::api(service, facts));
         self.observability = observability;
@@ -211,6 +223,25 @@ impl Services {
         self.rate_counts = opened.rate_counts;
         self.tasks = opened.tasks;
         self.drive_index = opened.drive_index;
+        if let Some((workspace, events)) = opened.mcp {
+            let shared = self.rate_counts.as_ref().map(|counts| {
+                let per_minute = vellum_mcp::ratelimit::RateLimit::default().per_minute;
+                let limit = Arc::new(crate::limits::ClusterLimit::new(u64::from(per_minute)));
+                limit.spawn_sync(counts.clone());
+                limit as Arc<dyn vellum_mcp::ratelimit::SharedLimit>
+            });
+            let workspace = workspace as Arc<dyn vellum_mcp::ports::Workspace>;
+            let mcp = crate::mcp_serve::endpoint(
+                Arc::clone(&workspace),
+                &self.identity,
+                &self.origin,
+                Arc::clone(&self.audit),
+                shared,
+            );
+            events.attach(mcp.server.notifier());
+            self.mcp = Some(mcp);
+            self.mcp_workspace = Some(workspace);
+        }
         Ok(self)
     }
 
@@ -274,15 +305,19 @@ impl Services {
             "/unsubscribe",
             crate::mail::router(Arc::clone(self.notify.store())),
         );
+        let mut well_known = identity_http::well_known_router(Arc::clone(identity));
+        if let Some(mcp) = &self.mcp {
+            // Bearer tokens only, from clients on other origins: no CSRF.
+            builder = builder
+                .mount_cross_site("/mcp", vellum_mcp::http::endpoint_router(Arc::clone(mcp)));
+            well_known = well_known.merge(vellum_mcp::http::metadata_router(Arc::clone(mcp)));
+        }
         builder
             .route_metrics(self.observability.metrics.clone())
             .authenticator(Arc::new(IdentityAuthenticator::new(Arc::clone(identity))))
             .mount("/auth", identity_http::browser_router(Arc::clone(identity)))
             .mount_cross_site("/oauth", identity_http::oauth_router(Arc::clone(identity)))
-            .mount_cross_site(
-                "/.well-known",
-                identity_http::well_known_router(Arc::clone(identity)),
-            )
+            .mount_cross_site("/.well-known", well_known)
             .mount("/collab", self.collab())
     }
 }

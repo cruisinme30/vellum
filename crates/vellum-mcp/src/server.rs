@@ -315,6 +315,15 @@ impl McpServer {
         }
     }
 
+    /// Holds every token to `shared` as well as this server's own limit,
+    /// so a client cannot multiply its allowance by spreading calls over
+    /// replicas (D218).
+    #[must_use]
+    pub fn with_shared_limit(mut self, shared: Arc<dyn crate::ratelimit::SharedLimit>) -> Self {
+        self.limiter = self.limiter.with_shared(shared);
+        self
+    }
+
     /// The workspace port.
     #[must_use]
     pub fn workspace(&self) -> &Arc<dyn Workspace> {

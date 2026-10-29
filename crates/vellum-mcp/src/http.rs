@@ -122,22 +122,30 @@ fn origin_of(url: &str) -> String {
 /// setup endpoints.
 pub fn router(state: Arc<McpHttp>) -> Router {
     Router::new()
+        .nest("/mcp", endpoint_router(Arc::clone(&state)))
+        .nest("/.well-known", metadata_router(state))
+}
+
+/// The endpoint and its setup routes, relative to `/mcp`: for a server
+/// that mounts them itself.
+pub fn endpoint_router(state: Arc<McpHttp>) -> Router {
+    Router::new()
         .route(
-            "/mcp",
+            "/",
             post(handle_post)
                 .get(method_not_allowed)
                 .delete(method_not_allowed),
         )
-        .route(
-            "/.well-known/oauth-protected-resource",
-            get(resource_metadata),
-        )
-        .route(
-            "/.well-known/oauth-protected-resource/mcp",
-            get(resource_metadata),
-        )
-        .route("/mcp/setup", get(setup::snippets_handler))
-        .route("/mcp/test-connection", post(setup::test_connection_handler))
+        .route("/setup", get(setup::snippets_handler))
+        .route("/test-connection", post(setup::test_connection_handler))
+        .with_state(state)
+}
+
+/// The Protected Resource Metadata documents, relative to `/.well-known`.
+pub fn metadata_router(state: Arc<McpHttp>) -> Router {
+    Router::new()
+        .route("/oauth-protected-resource", get(resource_metadata))
+        .route("/oauth-protected-resource/mcp", get(resource_metadata))
         .with_state(state)
 }
 
