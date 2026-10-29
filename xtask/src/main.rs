@@ -22,7 +22,8 @@
 //! - `cargo xtask help` checks the help books in `docs/`, and
 //!   `cargo xtask help write` regenerates the files derived from them.
 //! - `cargo xtask budgets` checks the binary's size, cold start, idle
-//!   memory, idle CPU and shutdown against the brief's targets.
+//!   memory, idle CPU, memory with ten live rooms and search warm, and
+//!   shutdown against the brief's targets.
 //! - `cargo xtask installers` writes a release's Homebrew formula and
 //!   winget manifests from its checksums.
 //! - `cargo xtask perf-gate` fails the nightly run when a k6 p95 regresses
@@ -35,6 +36,7 @@ mod budgets;
 mod fast;
 mod help;
 mod installers;
+mod load;
 mod perf_gate;
 mod pr_check;
 mod relock;

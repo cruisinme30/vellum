@@ -11,9 +11,11 @@
 //! `cargo xtask budgets --binary <path> [--image-bytes <n>] [--settle <secs>]`
 //! starts `<path> serve` on a free port with an empty data folder, times
 //! the first successful `GET /readyz`, waits for it to settle, reads its
-//! resident set from `/proc`, samples its CPU time over a quiet window, then
-//! sends SIGTERM. Until the binary has a
-//! `serve` command only the size budgets apply, and the check says so.
+//! resident set from `/proc` and samples its CPU time over a quiet window.
+//! It then signs in, opens ten live-editing rooms and warms search (see
+//! [`crate::load`]), reads the resident set again against the 250 MB busy
+//! budget, and sends SIGTERM with the rooms still open. Until the binary
+//! has a `serve` command only the size budgets apply, and the check says so.
 
 use std::io::{Read as _, Write as _};
 use std::net::{Ipv4Addr, SocketAddr, TcpListener, TcpStream};
@@ -32,6 +34,8 @@ pub struct Limits {
     pub idle_rss_bytes: u64,
     /// CPU used once idle, in thousandths of one core.
     pub idle_cpu_permille: u64,
+    /// Resident memory with ten live-editing rooms open and search warm.
+    pub busy_rss_bytes: u64,
     /// From process start to the first ready response.
     pub cold_start: Duration,
     /// From SIGTERM to a clean exit.
@@ -44,6 +48,7 @@ pub const LIMITS: Limits = Limits {
     image_bytes: 45_000_000,
     idle_rss_bytes: 80_000_000,
     idle_cpu_permille: 10,
+    busy_rss_bytes: 250_000_000,
     cold_start: Duration::from_secs(2),
     drain: Duration::from_secs(30),
 };
@@ -61,6 +66,8 @@ pub struct Measurements {
     pub idle_rss_bytes: Option<u64>,
     /// CPU used over the quiet window, in thousandths of one core.
     pub idle_cpu_permille: Option<u64>,
+    /// Resident memory under the busy workload (see [`crate::load`]).
+    pub busy_rss_bytes: Option<u64>,
     /// Time from SIGTERM to exit, and whether the exit was clean.
     pub drain: Option<(Duration, bool)>,
 }
@@ -152,6 +159,9 @@ pub fn evaluate(measured: &Measurements, limits: &Limits) -> Vec<String> {
     if let Some(bytes) = measured.idle_rss_bytes {
         over("idle resident memory", bytes, limits.idle_rss_bytes);
     }
+    if let Some(bytes) = measured.busy_rss_bytes {
+        over("busy resident memory", bytes, limits.busy_rss_bytes);
+    }
     if let Some(permille) = measured.idle_cpu_permille
         && permille >= limits.idle_cpu_permille
     {
@@ -212,6 +222,11 @@ fn report(measured: &Measurements, limits: &Limits) -> String {
         "idle CPU",
         measured.idle_cpu_permille.map(percent),
         percent(limits.idle_cpu_permille),
+    ));
+    text.push_str(&row(
+        "busy resident memory",
+        measured.busy_rss_bytes.map(mb),
+        mb(limits.busy_rss_bytes),
     ));
     text.push_str(&row(
         "SIGTERM to exit",
@@ -303,10 +318,14 @@ fn observe(
         std::thread::sleep(Duration::from_millis(10));
     }
     std::thread::sleep(settle);
-    let status = std::fs::read_to_string(format!("/proc/{}/status", child.id()))
-        .map_err(|e| format!("cannot read the server's memory: {e}"))?;
-    measured.idle_rss_bytes = Some(vm_rss_bytes(&status).ok_or("no VmRSS line in /proc status")?);
+    measured.idle_rss_bytes = Some(rss_bytes(child.id())?);
     measured.idle_cpu_permille = Some(idle_cpu(child.id())?);
+
+    // The busy budget: ten rooms open and search warm. The rooms stay open
+    // through the shutdown below, so the drain also covers live sockets.
+    let rooms = crate::load::warm_up(address)?;
+    std::thread::sleep(BUSY_SETTLE);
+    measured.busy_rss_bytes = Some(rss_bytes(child.id())?);
 
     let signalled = Instant::now();
     let sent = Command::new("kill")
@@ -319,11 +338,13 @@ fn observe(
     while signalled.elapsed() < LIMITS.drain {
         if let Some(status) = child.try_wait().map_err(|e| e.to_string())? {
             measured.drain = Some((signalled.elapsed(), status.success()));
+            rooms.close();
             return Ok(());
         }
         std::thread::sleep(Duration::from_millis(20));
     }
     measured.drain = Some((signalled.elapsed(), false));
+    rooms.close();
     Ok(())
 }
 
@@ -371,6 +392,15 @@ fn cpu_permille(ticks: u64, window: Duration) -> u64 {
 }
 
 /// Sends a minimal HTTP/1.1 GET and returns the status code.
+/// How long the busy workload settles before its memory is read.
+const BUSY_SETTLE: Duration = Duration::from_secs(2);
+
+fn rss_bytes(pid: u32) -> Result<u64, String> {
+    let status = std::fs::read_to_string(format!("/proc/{pid}/status"))
+        .map_err(|e| format!("cannot read the server's memory: {e}"))?;
+    vm_rss_bytes(&status).ok_or_else(|| "no VmRSS line in /proc status".to_owned())
+}
+
 fn get_status(address: SocketAddr, path: &str) -> Option<u16> {
     let timeout = Duration::from_millis(500);
     let mut stream = TcpStream::connect_timeout(&address, timeout).ok()?;
@@ -387,7 +417,7 @@ fn get_status(address: SocketAddr, path: &str) -> Option<u16> {
 }
 
 /// Reads the status code from an HTTP status line.
-fn status_code(response: &str) -> Option<u16> {
+pub fn status_code(response: &str) -> Option<u16> {
     let mut parts = response.split_whitespace();
     let version = parts.next()?;
     if !version.starts_with("HTTP/") {
@@ -415,6 +445,7 @@ mod tests {
             cold_start: Some(Duration::from_millis(300)),
             idle_rss_bytes: Some(30_000_000),
             idle_cpu_permille: Some(2),
+            busy_rss_bytes: Some(120_000_000),
             drain: Some((Duration::from_millis(50), true)),
         };
         assert!(evaluate(&measured, &LIMITS).is_empty());
@@ -428,16 +459,21 @@ mod tests {
             cold_start: Some(Duration::from_millis(2_500)),
             idle_rss_bytes: Some(90_000_000),
             idle_cpu_permille: Some(15),
+            busy_rss_bytes: Some(260_000_000),
             drain: Some((Duration::from_millis(10), false)),
         };
         let failures = evaluate(&measured, &LIMITS);
-        assert_eq!(failures.len(), 6, "{failures:?}");
+        assert_eq!(failures.len(), 7, "{failures:?}");
         assert!(
             failures[0].contains("111.0 MB over the 110.0 MB"),
             "{failures:?}"
         );
-        assert!(failures[3].contains("1.5 % over the 1.0 %"), "{failures:?}");
-        assert!(failures[4].contains("2500 ms"), "{failures:?}");
+        assert!(
+            failures[3].contains("busy resident memory: 260.0 MB over the 250.0 MB"),
+            "{failures:?}"
+        );
+        assert!(failures[4].contains("1.5 % over the 1.0 %"), "{failures:?}");
+        assert!(failures[5].contains("2500 ms"), "{failures:?}");
     }
 
     #[test]
