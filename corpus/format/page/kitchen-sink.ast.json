@@ -35,6 +35,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "sections": [
           []
         ]
@@ -103,6 +104,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "sections": [
           [
             {
@@ -112,6 +114,11 @@
               "items": [
                 {
                   "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
                   "blocks": [
                     {
                       "type": "paragraph",
@@ -127,6 +134,11 @@
                 },
                 {
                   "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
                   "blocks": [
                     {
                       "type": "paragraph",
@@ -170,6 +182,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "sequenceDiagram\n  Client->>Gateway: request\n  Gateway->>Engine: evaluate\n"
       },
       {
@@ -181,6 +194,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "sections": [
           [
             {
@@ -192,6 +206,7 @@
                 "classes": [],
                 "pairs": []
               },
+              "id": null,
               "sections": [
                 [
                   {
@@ -218,6 +233,7 @@
                 "classes": [],
                 "pairs": []
               },
+              "id": null,
               "sections": [
                 [
                   {
@@ -259,6 +275,11 @@
         "items": [
           {
             "task": false,
+            "attrs": {
+              "id": null,
+              "classes": [],
+              "pairs": []
+            },
             "blocks": [
               {
                 "type": "paragraph",
@@ -278,6 +299,11 @@
           },
           {
             "task": true,
+            "attrs": {
+              "id": null,
+              "classes": [],
+              "pairs": []
+            },
             "blocks": [
               {
                 "type": "paragraph",

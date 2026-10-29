@@ -11,6 +11,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "Oct 6 | Design approved | Scope: 7-day replay\nOct 20 | Replay in staging\nNov 24 | GA | Blocked on R3\n"
       }
     ]
