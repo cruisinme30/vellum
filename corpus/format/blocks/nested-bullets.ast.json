@@ -1,0 +1,114 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "list",
+        "start": null,
+        "tight": false,
+        "items": [
+          {
+            "task": null,
+            "blocks": [
+              {
+                "type": "list",
+                "start": null,
+                "tight": true,
+                "items": [
+                  {
+                    "task": null,
+                    "blocks": [
+                      {
+                        "type": "list",
+                        "start": null,
+                        "tight": true,
+                        "items": [
+                          {
+                            "task": null,
+                            "blocks": []
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "task": null,
+            "blocks": [
+              {
+                "type": "list",
+                "start": null,
+                "tight": true,
+                "items": [
+                  {
+                    "task": null,
+                    "blocks": [
+                      {
+                        "type": "list",
+                        "start": null,
+                        "tight": true,
+                        "items": [
+                          {
+                            "task": null,
+                            "blocks": [
+                              {
+                                "type": "paragraph",
+                                "content": [
+                                  {
+                                    "type": "text",
+                                    "text": "Item"
+                                  }
+                                ],
+                                "id": null
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "A list whose only item is loose:"
+          }
+        ],
+        "id": null
+      },
+      {
+        "type": "list",
+        "start": null,
+        "tight": true,
+        "items": [
+          {
+            "task": false,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Northstar"
+                  }
+                ],
+                "id": null
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "diagnostics": []
+}
