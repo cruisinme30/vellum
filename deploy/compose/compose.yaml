@@ -21,7 +21,7 @@ x-hardening: &hardening
   cap_drop: [ALL]
 
 services:
-  vellum:
+  vellum: &vellum
     <<: [*restart, *hardening]
     image: ${VELLUM_IMAGE:-ghcr.io/cruisinme30/vellum:latest}
     build:
@@ -30,7 +30,7 @@ services:
     command: ["serve"]
     ports:
       - "${VELLUM_PORT:-7700}:7700"
-    environment:
+    environment: &vellum-env
       VELLUM_PROFILE: team
       VELLUM_BIND: 0.0.0.0:7700
       VELLUM_DATA_DIR: /data
@@ -47,6 +47,11 @@ services:
       VELLUM_CSRF_KEY_FILE: /run/secrets/vellum_csrf
       VELLUM_LOG: ${VELLUM_LOG:-info}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      # Replicas sign forwarded live-editing joins with this key and find
+      # each other by these names (ADR 0037).
+      VELLUM_CLUSTER_KEY: ${VELLUM_CLUSTER_KEY:-}
+      VELLUM_NODE_NAME: vellum
+      VELLUM_NODE_ADDRESS: vellum:7700
     secrets: [vellum_kek, vellum_csrf]
     volumes:
       - vellum-data:/data
@@ -59,6 +64,21 @@ services:
       # Not "healthy": the first signature download takes minutes, and
       # uploads are refused (never stored unscanned) until clamd is up.
       clamav: { condition: service_started }
+
+  # A second replica over the same Postgres and bucket, for the nightly
+  # two-replica load test (#441): `stack.sh up IMAGE PROJECT PORT` with
+  # REPLICAS=2 starts it on PORT+1.
+  vellum-b:
+    <<: *vellum
+    profiles: [replicas]
+    ports:
+      - "${VELLUM_PORT_B:-7701}:7700"
+    environment:
+      <<: *vellum-env
+      VELLUM_NODE_NAME: vellum-b
+      VELLUM_NODE_ADDRESS: vellum-b:7700
+    volumes:
+      - vellum-b-data:/data
 
   postgres:
     <<: *restart
@@ -166,6 +186,7 @@ secrets:
 
 volumes:
   vellum-data:
+  vellum-b-data:
   postgres-data:
   minio-data:
   clamav-db:

@@ -80,3 +80,34 @@ fn lockout_backs_off_exponentially() {
     lockout.succeed(&"ana@northstar.dev");
     assert!(lockout.check(&"ana@northstar.dev", t0).is_ok());
 }
+
+/// Red team round 4: one `IPv6` client owns a `/64`, so it must count as one.
+#[test]
+fn ipv6_clients_count_by_their_slash_64() {
+    use std::net::IpAddr;
+    use vellum_security::rate::client_bucket;
+    let ip = |s: &str| s.parse::<IpAddr>().unwrap();
+    assert_eq!(
+        client_bucket(ip("2001:db8:1:2:aaaa:bbbb:cccc:dddd")),
+        ip("2001:db8:1:2::")
+    );
+    assert_eq!(
+        client_bucket(ip("2001:db8:1:2::1")),
+        client_bucket(ip("2001:db8:1:2:ffff::9"))
+    );
+    assert_ne!(
+        client_bucket(ip("2001:db8:1:2::1")),
+        client_bucket(ip("2001:db8:1:3::1"))
+    );
+    assert_eq!(client_bucket(ip("203.0.113.7")), ip("203.0.113.7"));
+    assert_eq!(client_bucket(ip("::ffff:203.0.113.7")), ip("203.0.113.7"));
+
+    // A limiter keyed by bucket stops a client rotating its addresses.
+    let limiter = RateLimiter::new(Quota::new(3, Duration::from_mins(1)).unwrap(), 1000);
+    let now = Instant::now();
+    let refused = (0..50_u16)
+        .map(|n| client_bucket(ip(&format!("2001:db8:1:2::{n:x}"))))
+        .filter(|key| limiter.check(key, now).is_err())
+        .count();
+    assert_eq!(refused, 47);
+}

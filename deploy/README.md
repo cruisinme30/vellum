@@ -77,10 +77,15 @@ The release notes carry the matching commands for the binaries.
 | --- | --- | --- |
 | Budgets: size, cold start, idle memory, drain | Full suite | `cargo xtask budgets --binary <path>` |
 | Reproducible build | Full suite and every release | two builds, byte-compared |
-| Load test, 10 % p95 gate | nightly | [`perf/k6/suite.js`](perf/k6/suite.js), `cargo xtask perf-gate` |
+| Load test on two replicas, 10 % p95 gate | nightly | [`perf/k6/suite.js`](perf/k6/suite.js), `cargo xtask perf-gate` |
+| Write on one replica, read on the other | nightly | [`perf/k6/replicas.js`](perf/k6/replicas.js) |
 | ZAP baseline scan | nightly | [`zap/rules.tsv`](zap/rules.tsv) |
 | Chaos under load | weekly | [`chaos/run.sh`](chaos/run.sh) |
 | Upgrade and restore drill | every release | [`drills/`](drills/upgrade.sh) |
 
 The load, chaos, ZAP and drill jobs report a notice and pass until the
-binary has a `serve` command.
+binary has a `serve` command. The load scripts sign in as they start: on
+an empty server they set up the administrator, then make a short-lived API
+token (or use `TOKEN`). `REPLICAS=2 deploy/compose/stack.sh up IMAGE
+PROJECT PORT` starts a second Vellum on `PORT+1` over the same Postgres and
+bucket.

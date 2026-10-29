@@ -24,15 +24,19 @@ same rows; changing a value in one view changes it everywhere.
 
 ## Filters, sorts and groups {#filters}
 
-Select **Filter** to add conditions. Each condition is a property, an
-operator (contains, is, is not, before, after, is empty) and a value.
-Combine conditions with `and` or `or`.
+Select **Edit view** above the view, or **New view** to add one. The
+panel sets the layout, the filters, the sorts, the property to group by,
+the dates for calendars and timelines, the hidden properties and how
+many rows to show.
 
-**Sort** orders rows by one or more properties. **Group** splits a table
-or list into sections by a property. **Properties** hides columns
-without deleting them.
+Write one filter per line as a property, a test and a value, such as
+`Status is Done`, `Estimate > 3` or `Owner is empty`; rows must match
+every line. Write one sort per line, adding `desc` for largest or latest
+first. Hidden properties stay in the rows; they are only left out of the
+view.
 
-Changes to a view are yours until you select **Save for everyone**.
+**Save** stores the view for everyone who can edit the collection.
+**Delete view** removes it after a second press.
 
 ## Embed a view in a page {#embed}
 

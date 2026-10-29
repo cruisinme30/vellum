@@ -19,6 +19,7 @@ workspace = true
 
 [dependencies]
 # SQLCipher is compiled in (vendored OpenSSL) so the single binary needs no system crypto library.
+futures-util = { version = "0.3.31", default-features = false, features = ["std"] }
 libsqlite3-sys = { version = "0.37", features = ["bundled-sqlcipher-vendored-openssl"] }
 sqlx = { version = "0.9", default-features = false, features = ["macros", "migrate", "postgres", "runtime-tokio", "sqlite", "tls-rustls", "uuid"] }
 serde = { version = "1.0.229", features = ["derive"] }

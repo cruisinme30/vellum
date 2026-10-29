@@ -21,6 +21,8 @@ use vellum_identity::{
     Identity, IdentityConfig, IdentityService, Sso, SsoConfig, Store, http as identity_http,
 };
 use vellum_kernel::{Config, Error, ErrorKind};
+use vellum_notify::endpoint::{self, SafeTransport};
+use vellum_notify::hooks::{HookStore, Webhooks, WebhooksService};
 use vellum_notify::service::{NotifyService, NotifyStore};
 use vellum_tasks::service::TasksService;
 
@@ -38,6 +40,8 @@ pub struct Services {
     identity: Arc<Identity>,
     /// Push subscriptions and notification preferences.
     notify: Arc<NotifyService>,
+    /// Webhook subscriptions and their delivery queue.
+    webhooks: Arc<Webhooks<SafeTransport>>,
     /// The app's origin, which live-editing connections must come from.
     origin: String,
     /// Collections, books and Work, when an index is configured.
@@ -56,6 +60,8 @@ pub struct Services {
     admin: Option<Arc<dyn Service>>,
     /// Where the gateway records per-route metrics.
     observability: Observability,
+    /// The drive index, which Admin → Usage counts pages and storage from.
+    drive_index: Option<Arc<dyn vellum_drive::DriveIndex>>,
 }
 
 impl std::fmt::Debug for Services {
@@ -123,9 +129,20 @@ impl Services {
             Some(dir) => NotifyStore::open(dir, &subject)?,
             None => NotifyStore::memory(&subject)?,
         };
+        let hooks = match data_dir {
+            Some(dir) => HookStore::open(dir, endpoint::policy(&[]))?,
+            None => HookStore::memory(endpoint::policy(&[])),
+        };
+        let transport = SafeTransport::new(endpoint::policy(&[])).map_err(|e| {
+            Error::new(
+                ErrorKind::Internal,
+                format!("cannot build the webhook client: {e}"),
+            )
+        })?;
         Ok(Self {
             identity: Arc::new(identity),
             notify: Arc::new(NotifyService::new(Arc::new(notify))),
+            webhooks: Arc::new(Webhooks::new(Arc::new(hooks), transport)),
             origin: url.origin().ascii_serialization(),
             workspace: Vec::new(),
             hooks: None,
@@ -135,12 +152,16 @@ impl Services {
             tasks: None,
             admin: None,
             observability: Observability::new(),
+            drive_index: None,
         })
     }
 
     /// Adds the admin console over `config`'s data folder, reading and
     /// writing the same trace buffer and route metrics as `observability`.
-    /// Scheduled backups, drills and usage reports start running.
+    /// Scheduled backups, drills and usage reports start running, and the
+    /// usage counts (Admin → Usage, `vellum.usage.*`) are taken every few
+    /// minutes. Call it after [`Self::with_workspace`], so pages and storage
+    /// are counted too.
     ///
     /// # Errors
     ///
@@ -151,7 +172,13 @@ impl Services {
         observability: Observability,
         var: impl Fn(&str) -> Option<String>,
     ) -> Result<Self, Error> {
-        let (service, facts) = observability::open(config, &observability, var).await?;
+        let counts = Arc::new(observability::WorkspaceCounts {
+            identity: Arc::clone(&self.identity),
+            drive: self.drive_index.clone(),
+        });
+        let (service, _) = observability::open(config, &observability, var).await?;
+        let (sampler, facts) = observability::counted(config, counts);
+        observability::spawn_sampling(sampler);
         observability::spawn_ticks(Arc::clone(&service), Arc::clone(&facts));
         self.admin = Some(observability::api(service, facts));
         self.observability = observability;
@@ -172,6 +199,7 @@ impl Services {
             config,
             &self.identity,
             self.notify.store(),
+            &self.webhooks,
             &self.origin,
             var,
         )
@@ -182,6 +210,7 @@ impl Services {
         self.replica = opened.replica;
         self.rate_counts = opened.rate_counts;
         self.tasks = opened.tasks;
+        self.drive_index = opened.drive_index;
         Ok(self)
     }
 
@@ -217,6 +246,7 @@ impl Services {
         let mut all: Vec<Arc<dyn Service>> = vec![
             Arc::new(IdentityService::new(Arc::clone(&self.identity))),
             Arc::clone(&self.notify) as Arc<dyn Service>,
+            Arc::new(WebhooksService::new(Arc::clone(&self.webhooks))),
         ];
         all.extend(self.workspace.iter().cloned());
         all.extend(self.admin.iter().cloned());
@@ -239,6 +269,11 @@ impl Services {
                 builder = builder.mount_cross_site(prefix, router);
             }
         }
+        // Mail apps post one-click unsubscribes with no session (RFC 8058).
+        builder = builder.mount_cross_site(
+            "/unsubscribe",
+            crate::mail::router(Arc::clone(self.notify.store())),
+        );
         builder
             .route_metrics(self.observability.metrics.clone())
             .authenticator(Arc::new(IdentityAuthenticator::new(Arc::clone(identity))))

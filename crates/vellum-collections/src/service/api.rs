@@ -190,6 +190,94 @@ pub struct SaveViewInput {
     pub limit: Option<usize>,
 }
 
+/// Adds a property (a column) to a collection. The server picks its key
+/// from the name.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AddPropertyInput {
+    /// The collection.
+    pub collection_id: CollectionId,
+    /// The display name, unique in the collection.
+    pub name: String,
+    /// The type: `text`, `number`, `select`, `multi`, `person`, `date`,
+    /// `checkbox`, `url`, `relation`, `rollup`, `formula` or `created`.
+    #[serde(rename = "type")]
+    pub kind: String,
+    /// A relation's target collection. Relations are two-way: the target
+    /// gets a paired property too.
+    #[serde(default)]
+    pub to: Option<CollectionId>,
+    /// The name of the paired property in the target collection; this
+    /// collection's title when absent.
+    #[serde(default)]
+    pub back_name: Option<String>,
+    /// Options of a select or multi-select, in order.
+    #[serde(default)]
+    pub options: Vec<SelectOption>,
+    /// A formula's expression (`round(Estimate * 0.5, 1)`).
+    #[serde(default)]
+    pub formula: Option<String>,
+    /// A rollup's relation property, by key or name.
+    #[serde(default)]
+    pub via: Option<String>,
+    /// A rollup's property on the related rows, by key or name.
+    #[serde(default)]
+    pub prop: Option<String>,
+    /// A rollup's aggregation.
+    #[serde(default)]
+    pub agg: Option<Aggregation>,
+    /// How numbers show.
+    #[serde(default)]
+    pub format: Option<NumberFormat>,
+}
+
+/// Changes a property. Fields left out stay as they are; the key never
+/// changes. A rename rewrites the formulas that name the property.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct UpdatePropertyInput {
+    /// The collection.
+    pub collection_id: CollectionId,
+    /// The property's key.
+    pub key: String,
+    /// A new display name.
+    #[serde(default)]
+    pub name: Option<String>,
+    /// A new type. Row files are not rewritten: each value is read again
+    /// as the new type, and one that does not fit is kept as written and
+    /// reported. Titles and relations keep their type.
+    #[serde(default, rename = "type")]
+    pub kind: Option<String>,
+    /// A rollup's relation, by key or name (when changing to a rollup).
+    #[serde(default)]
+    pub via: Option<String>,
+    /// A rollup's property on the related rows, by key or name.
+    #[serde(default)]
+    pub prop: Option<String>,
+    /// A rollup's aggregation.
+    #[serde(default)]
+    pub agg: Option<Aggregation>,
+    /// The full new option list of a select or multi-select.
+    #[serde(default)]
+    pub options: Option<Vec<SelectOption>>,
+    /// A formula's new expression.
+    #[serde(default)]
+    pub formula: Option<String>,
+    /// How numbers show.
+    #[serde(default)]
+    pub format: Option<NumberFormat>,
+}
+
+/// Names one property.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PropertyKey {
+    /// The collection.
+    pub collection_id: CollectionId,
+    /// The property's key.
+    pub key: String,
+}
+
 /// Resolves a `collection` block embedded in a page.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

@@ -68,13 +68,46 @@ search-empty = No page matches “{ $query }”.
 search-working = Searching…
 inbox-intro = Pages that mention @{ $handle }.
 inbox-empty = Nobody has mentioned you yet.
-admin-intro = Run this Vellum server: who did what, settings, backups and how requests perform.
+admin-intro = Run this Vellum server: who uses it, who did what, settings, backups and how requests perform.
+admin-usage = Usage
+admin-usage-summary = People, pages, storage and activity on this server, counted every few minutes.
+admin-usage-intro = Exact counts for this server. They stay here: anonymous telemetry, when on, sends only rough size ranges.
+admin-usage-count-now = Count now
+admin-usage-counting = Counting…
+admin-usage-counted = Counted { $when }
+admin-usage-none = Nothing counted yet.
+admin-usage-people = People
+admin-usage-users = Accounts
+admin-usage-enabled = Can sign in
+admin-usage-admins = Administrators
+admin-usage-sessions = Open sessions
+admin-usage-tokens = API tokens
+admin-usage-activity = Activity
+admin-usage-active-1d = Active today
+admin-usage-active-7d = Active this week
+admin-usage-active-30d = Active this month
+admin-usage-events-1d = Changes today
+admin-usage-events-7d = Changes this week
+admin-usage-content = Content
+admin-usage-spaces = Drives
+admin-usage-pages = Pages
+admin-usage-books = Books
+admin-usage-collections = Collections
+admin-usage-folders = Folders
+admin-usage-trashed = In the trash
+admin-usage-versions = Saved versions
+admin-usage-storage = Storage
+admin-usage-total = Total stored
+admin-usage-files = Current files
+admin-usage-version-bytes = Saved versions
 admin-audit = Audit log
 admin-audit-summary = Who did what, in a tamper-evident log you can verify and export.
 admin-settings = Settings
 admin-settings-summary = Backups, admin sessions, observability and anonymous telemetry.
 admin-backups = Backups
 admin-backups-summary = The last backup and restore drill, and both on demand.
+admin-webhooks = Webhooks
+admin-webhooks-summary = Signed event deliveries to other systems, with their health and history.
 admin-requests = Requests
 admin-requests-summary = Recent requests with every span, to see why one was slow or failed.
 admin-routes = Routes
@@ -126,6 +159,61 @@ admin-setting-observability-trace-buffer-mib = Memory for kept requests (MiB)
 admin-setting-telemetry-enabled = Send anonymous usage counts
 admin-setting-telemetry-endpoint = Report address (HTTPS)
 admin-setting-telemetry-interval-hours = Hours between reports
+admin-webhooks-intro = Vellum posts a signed JSON request to each webhook when issues, comments, projects, cycles, labels or SLAs change. Failed deliveries are retried for about two days, and a webhook that keeps failing for three days is paused.
+admin-webhooks-url = Receiver URL
+admin-webhooks-url-hint = HTTPS on port 443 or 8443, at a public address.
+admin-webhooks-description = Note (optional)
+admin-webhooks-events = Events
+admin-webhooks-teams = Teams
+admin-webhooks-teams-hint = Team keys, separated by commas. Leave empty for every public team.
+admin-webhooks-all-teams = Every public team
+admin-webhooks-cancel = Cancel
+admin-webhooks-add = Add a webhook
+admin-webhooks-create = Add webhook
+admin-webhooks-created = Webhook added.
+admin-webhooks-saved = Webhook saved.
+admin-webhooks-deleted = Webhook removed.
+admin-webhooks-empty = No webhooks yet.
+admin-webhooks-secret = Signing secret
+admin-webhooks-secret-title = Copy the signing secret now.
+admin-webhooks-secret-hint = It is shown only once. Your receiver uses it to check the Vellum-Signature header.
+admin-webhooks-secret-done = I have stored it
+admin-webhooks-copy = Copy
+admin-webhooks-rotating = The previous secret still signs for up to 24 hours.
+admin-webhooks-rotate = New secret
+admin-webhooks-rotate-confirm = Make a new signing secret? The current one keeps signing for 24 hours, so you can update the receiver.
+admin-webhooks-delete = Remove
+admin-webhooks-delete-confirm = Remove the webhook to { $url }? Queued deliveries are dropped.
+admin-webhooks-edit = Edit
+admin-webhooks-test = Send a test
+admin-webhooks-tested = Test delivery: { $result } { $detail }
+admin-webhooks-turn-off = Turn off
+admin-webhooks-turn-on = Turn on
+admin-webhooks-on = On
+admin-webhooks-off = Off
+admin-webhooks-paused = Paused: { $reason }
+admin-webhooks-last = Last delivery
+admin-webhooks-never = None yet
+admin-webhooks-queued-count =
+    { $count ->
+        [one] One delivery waiting
+       *[other] { $count } deliveries waiting
+    }
+admin-webhooks-deliveries = Deliveries
+admin-webhooks-deliveries-caption = Recent deliveries to { $url }, newest first
+admin-webhooks-no-deliveries = Nothing has been sent to this webhook yet.
+admin-webhooks-when = When
+admin-webhooks-event = Event
+admin-webhooks-attempt = Attempt
+admin-webhooks-result = Result
+admin-webhooks-actions = Actions
+admin-webhooks-next = Next try { $when }.
+admin-webhooks-redeliver = Send again
+admin-webhooks-queued = Queued to send again.
+admin-webhooks-outcome-delivered = Delivered
+admin-webhooks-outcome-retry = Failed, will retry
+admin-webhooks-outcome-rejected = Refused
+admin-webhooks-outcome-gone = Gone
 admin-backups-intro = Backups are encrypted. A restore drill restores the newest one into scratch space and checks every file.
 admin-backups-now = Back up now
 admin-backups-running = Backing up…
@@ -298,6 +386,106 @@ collection-no-dates = No dates
 collection-computed = Computed, read-only
 collection-body = Notes
 collection-close-row = Close row
+collection-close-panel = Close panel
+collection-delete-row = Delete row
+collection-confirm-delete-row = Delete “{ $title }”? Press again to confirm
+collection-properties = Properties
+collection-import = Import CSV
+collection-export = Export CSV
+collection-save = Save
+collection-new-view = New view
+collection-edit-view-button = Edit view
+collection-edit-view = Edit “{ $view }”
+collection-view-name = Name
+collection-view-layout = Layout
+collection-view-filters = Filters, one per line
+collection-view-filters-hint = Write a property, a test and a value, such as “Status is Done”, “Estimate > 3” or “Owner is empty”. Rows must match every line.
+collection-view-sorts = Sort by, one per line (add “desc” for largest or latest first)
+collection-view-group = Group by
+collection-view-date = Date
+collection-view-end = End date
+collection-view-hidden = Hidden properties
+collection-view-limit = Most rows to show
+collection-delete-view = Delete view
+collection-confirm-delete-view = Delete “{ $view }”? Press again to confirm
+collection-kind-table = Table
+collection-kind-board = Board
+collection-kind-gallery = Gallery
+collection-kind-calendar = Calendar
+collection-kind-timeline = Timeline
+collection-kind-list = List
+collection-property-name = Name ({ $type })
+collection-property-options = Options, separated by commas
+collection-property-formula = Formula
+collection-property-type = Type
+collection-new-property-name = Name
+collection-add-property = Add property
+collection-retype-hint = Changing the type keeps every value in the files. Values that do not fit the new type are listed under Problems until you fix them or change the type back.
+collection-rollup-needs-relation = Add a relation first: a rollup sums up the rows a relation links to.
+collection-rollup-via = Relation
+collection-rollup-prop = Property of the linked rows
+collection-rollup-agg = Combine as
+collection-agg-count = Count of linked rows
+collection-agg-sum = Sum
+collection-agg-avg = Average
+collection-agg-min = Smallest
+collection-agg-max = Largest
+collection-agg-checked = Number checked
+collection-agg-pct = Percent checked
+collection-agg-unique = Number of different values
+collection-agg-show = Show the values
+collection-relation-to = Links to
+collection-relation-back = Name in the linked collection
+collection-relation-hint = Relations work both ways: the linked collection gets a property listing the rows that link to it. You need to be able to edit both collections.
+collection-confirm-delete-relation = Delete { $property } from both collections? Press again to confirm
+collection-problems =
+    { $count ->
+        [one] One problem in this collection
+       *[other] { $count } problems in this collection
+    }
+collection-delete-property = Delete { $property }
+collection-confirm-delete-property = Delete { $property }? Press again to confirm
+collection-type-title = Title
+collection-type-text = Text
+collection-type-number = Number
+collection-type-select = Select
+collection-type-multi = Multi-select
+collection-type-person = Person
+collection-type-date = Date
+collection-type-checkbox = Checkbox
+collection-type-url = Link
+collection-type-relation = Relation
+collection-type-rollup = Rollup
+collection-type-formula = Formula
+collection-type-created = Created time
+collection-import-title = Import into { $collection }
+collection-import-intro = Columns are matched to properties by name. Check the file first to see what would be added; the import adds every row or none.
+collection-csv-file = CSV file
+collection-csv-paste = Or paste CSV text
+collection-csv-check = Check
+collection-csv-import = Import
+collection-csv-would-add =
+    { $rows ->
+        [one] One row would be added.
+       *[other] { $rows } rows would be added.
+    }
+collection-csv-added =
+    { $rows ->
+        [one] Added one row.
+       *[other] Added { $rows } rows.
+    }
+collection-csv-skipped = Ignored columns: { $columns }
+collection-new = New collection
+collection-new-title = Title
+collection-new-folder = Drive folder
+collection-new-csv-hint = Leave the CSV empty for a blank collection, or start from a file: its first column becomes the title and the other column types are guessed.
+collection-create = Create
+fence-collection-needs-id = Add an “id:” line with the collection’s ID to show its rows.
+fence-collection-caption =
+    { $total ->
+        [one] { $title }, { $view }: one row
+       *[other] { $title }, { $view }: { $total } rows
+    }
 
 ## Sign-in and first-run set-up
 
@@ -381,7 +569,7 @@ notify-device-error = Push couldn't be changed. Try again.
 ## Private spaces (end-to-end encrypted)
 
 private-title = Private spaces
-private-intro = Pages in a private space are sealed on members' devices. The server stores only ciphertext, so it can't read, search or export them.
+private-intro = Pages in a private space are sealed on members' devices. The server stores only ciphertext and refuses readable pages there, so it can't read, search or export them. After making a space private, seal its existing pages from this device.
 private-device = This device
 private-device-desktop-only = Enrolling a device needs the Vellum desktop app, which keeps the device key in this computer's keychain.
 private-device-fingerprint = Device fingerprint:
@@ -394,11 +582,15 @@ private-sealed-to = { $count ->
 private-this-device = (this device)
 private-make-private = Make private and enrol this device
 private-enrol = Enrol this device
-private-reseal = Reseal pages for every device
+private-reseal = Seal pages for every device
 private-remove = Remove
 private-remove-label = Remove { $device }
 private-removed = Removed { $device }. Reseal the pages from another device so it can't open new versions.
 private-error = That didn't work. Try again.
+private-untrusted = Some devices were added since this device last sealed the space. Nothing was sealed.
+private-untrusted-heading = New devices to check
+private-untrusted-help = Ask each device's owner to read out its fingerprint from their Private spaces screen. Trust them only if every group matches; otherwise the server may have added a device of its own.
+private-trust = The fingerprints match: trust and seal
 
 ## Screens that need a server
 
@@ -413,6 +605,12 @@ my-work-add = Add a task
 my-work-add-hint = Call Sam tomorrow 3pm !high
 my-work-add-button = Add
 my-work-empty = Nothing to do. Add a task above.
+my-work-slack-title = Link Slack
+my-work-slack-ask = Link the Slack account that sent you here, so Save as task in Slack adds messages to your Inbox? Only continue if you opened this link from your own Slack.
+my-work-slack-link = Link Slack
+my-work-slack-cancel = Not now
+my-work-slack-linked = Slack is linked. Use Save as task in Slack again to add the message.
+my-work-slack-close = Close
 my-work-due = Due { $date }
 my-work-bucket-inbox = Inbox
 my-work-bucket-today = Today

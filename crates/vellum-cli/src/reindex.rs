@@ -1,13 +1,22 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-//! `vellum reindex`: rebuild the index from the workspace folder.
+//! `vellum reindex`: rebuild the index from the workspace files: the data
+//! folder, or the bucket `VELLUM_BLOB_URL` names (ADR 0044, D187).
+//!
+//! A bucket is listed once; the pages and manifests the index reads are
+//! fetched a few at a time, then scanned exactly like a folder.
 
 use std::io::Write as _;
 use std::process::ExitCode;
 
-use vellum_db::{Index, IndexConfig, IndexKey, PlainFiles, ShardedIndex, ShardsConfig};
+use futures::{StreamExt as _, TryStreamExt as _};
+use vellum_db::{Index, IndexConfig, IndexKey, Listing, PlainFiles, ShardedIndex, ShardsConfig};
 use vellum_kernel::config::Config;
+use vellum_store::{BlobStore, StoreError, remote::s3::S3Store};
+
+/// Files fetched from a bucket at once.
+const FETCH_CONCURRENCY: usize = 16;
 
 /// Environment variable holding the 64-hex-character index key, until the
 /// keyring supplies it.
@@ -43,15 +52,33 @@ fn execute(args: &Args) -> Result<Vec<String>, String> {
     let config = Config::load(None).map_err(|e| e.to_string())?;
     let shards =
         ShardsConfig::from_env(|key| std::env::var(key).ok()).map_err(|e| e.to_string())?;
+    let bucket = crate::workspace::bucket(|k| std::env::var(k).ok())
+        .map_err(|e| e.to_string())?
+        .map(S3Store::new)
+        .transpose()
+        .map_err(|e| format!("cannot use the blob store: {e}"))?;
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .map_err(|e| e.to_string())?;
+    let listing = match &bucket {
+        Some(store) => {
+            let listing = runtime
+                .block_on(fetch_listing(store))
+                .map_err(|e| format!("cannot read the bucket: {e}"))?;
+            tracing::info!(files = listing.len(), "listed the bucket");
+            Some(listing)
+        }
+        None => None,
+    };
     let report = if let Some(shards) = shards {
         // Sharded deployment: each space goes to the shard the map names.
         runtime.block_on(async {
             let index = ShardedIndex::open(&shards).await?;
-            let report = index.reindex(&config.data_dir, PlainFiles).await;
+            let report = match listing {
+                Some(listing) => index.reindex_listing(listing).await,
+                None => index.reindex(&config.data_dir, PlainFiles).await,
+            };
             index.close().await;
             report
         })
@@ -71,7 +98,10 @@ fn execute(args: &Args) -> Result<Vec<String>, String> {
         };
         runtime.block_on(async {
             let index = Index::open(&index_config).await?;
-            let report = index.reindex(&config.data_dir, PlainFiles).await;
+            let report = match listing {
+                Some(listing) => index.reindex_listing(listing).await,
+                None => index.reindex(&config.data_dir, PlainFiles).await,
+            };
             index.close().await;
             report
         })
@@ -86,6 +116,35 @@ fn execute(args: &Args) -> Result<Vec<String>, String> {
     )];
     lines.extend(report.problems.iter().map(|p| format!("  skipped {p}")));
     Ok(lines)
+}
+
+/// Lists `store` and fetches the files the index reads, a few at a time.
+/// A file deleted between the listing and its fetch is left out.
+///
+/// # Errors
+///
+/// The listing or a fetch fails (after the store's own retries).
+pub async fn fetch_listing(store: &dyn BlobStore) -> Result<Listing, StoreError> {
+    let entries: Vec<_> = store.list(None).try_collect().await?;
+    let mut fetched = futures::stream::iter(entries)
+        .map(|entry| async move {
+            if !Listing::wants_content(entry.path.as_str()) {
+                return Ok(Some((entry, None)));
+            }
+            match store.get(&entry.path).await {
+                Ok(blob) => Ok(Some((entry, Some(blob.bytes.to_vec())))),
+                Err(StoreError::NotFound(_)) => Ok(None),
+                Err(e) => Err(e),
+            }
+        })
+        .buffer_unordered(FETCH_CONCURRENCY);
+    let mut listing = Listing::new();
+    while let Some(item) = fetched.try_next().await? {
+        if let Some((entry, bytes)) = item {
+            listing.insert(entry.path.as_str(), entry.modified, bytes);
+        }
+    }
+    Ok(listing)
 }
 
 /// The raw bytes of a key written as 64 hex characters.
@@ -110,7 +169,41 @@ pub fn parse_hex_key(var: &str, hex: &str) -> Result<[u8; 32], String> {
 
 #[cfg(test)]
 mod tests {
-    use super::key_bytes;
+    use bytes::Bytes;
+    use vellum_store::{BlobPath, BlobStore as _, LocalStore, Precondition};
+
+    use super::{fetch_listing, key_bytes};
+
+    #[tokio::test]
+    async fn a_store_listing_fetches_only_pages_and_manifests() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = LocalStore::open(dir.path()).await.unwrap();
+        for (path, body) in [
+            (
+                "drives/shared/eng/.vellum-folder.yaml",
+                "id: 01J0000000000000000000000A\n",
+            ),
+            ("drives/shared/eng/roadmap.md", "---\ntitle: Roadmap\n---\n"),
+            ("drives/shared/eng/diagram.png", "png"),
+        ] {
+            let _ = store
+                .put(
+                    &BlobPath::new(path).unwrap(),
+                    Bytes::from(body),
+                    Precondition::None,
+                )
+                .await
+                .unwrap();
+        }
+        let listing = fetch_listing(&store).await.unwrap();
+        assert!(listing.len() >= 3);
+        let read = |p: &str| vellum_db::FileReader::read(&listing, std::path::Path::new(p));
+        assert_eq!(
+            read("drives/shared/eng/roadmap.md").unwrap(),
+            b"---\ntitle: Roadmap\n---\n"
+        );
+        assert!(read("drives/shared/eng/diagram.png").is_err());
+    }
 
     #[test]
     fn key_must_be_64_hex_characters() {

@@ -13,7 +13,8 @@
 //!
 //! Workspace files live in the data folder, or in a shared S3 bucket when
 //! `VELLUM_BLOB_URL` names one (`s3://bucket[/prefix]`, with
-//! `VELLUM_S3_ENDPOINT`, `VELLUM_S3_REGION` and the `AWS_*` keys). Several
+//! `VELLUM_S3_ENDPOINT`, `VELLUM_S3_REGION`, and the `AWS_*` keys or the
+//! pod's workload identity). Several
 //! replicas need the bucket and a Postgres index, so they all see one
 //! workspace and a restarted pod loses nothing.
 //!
@@ -24,28 +25,31 @@
 //! Writes are announced in the index's change feed, and each replica
 //! follows it to keep its caches fresh (see [`crate::feed`]).
 //! Search indexes the drive's pages and the collections' rows (see
-//! [`crate::search`]).
+//! [`crate::search`]). Every blob store call is metered
+//! (`vellum_store_*`, see [`vellum_store::Metered`]).
 
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use futures::StreamExt as _;
-use vellum_authz::{Authz, AuthzStore, Id, MemoryStore, SqlStore};
+use vellum_authz::{Authz, AuthzStore, Id, MemoryStore, ShardedStore};
 use vellum_books_service::BooksService;
 use vellum_collections::CollectionsService;
 use vellum_collections::service::IndexFeed;
 use vellum_contracts::{BoxFuture, Operation, Readiness, Service};
 use vellum_db::feed::Feed;
-use vellum_db::{Index, IndexConfig, IndexKey};
+use vellum_db::{Index, IndexConfig, IndexKey, ShardRouter, ShardedIndex, ShardsConfig};
 use vellum_drive::authz::{AuthzAccess as DriveAuthzAccess, TreeSync};
-use vellum_drive::sql::SqlIndex;
 use vellum_drive::{Drive, DriveIndex, DriveService};
 use vellum_identity::Identity;
 use vellum_kernel::{Config, Error, ErrorKind, UserId};
+use vellum_notify::endpoint::SafeTransport;
+use vellum_notify::hooks::Webhooks;
+use vellum_notify::mail::Mailer;
 use vellum_notify::service::NotifyStore;
 use vellum_store::remote::s3::{S3Config, S3Store};
-use vellum_store::{BlobPath, BlobStore, LocalStore, StoreError};
+use vellum_store::{BlobPath, BlobStore, LocalStore, Metered, StoreError};
 use vellum_tasks::google::Google;
 use vellum_tasks::service::{Config as TasksConfig, TasksService};
 use vellum_work::{UserRef, WorkEvent};
@@ -169,7 +173,7 @@ struct Files {
 /// # Errors
 ///
 /// A blob URL that is not `s3://`, or missing S3 settings.
-fn bucket(var: impl Fn(&str) -> Option<String>) -> Result<Option<S3Config>, Error> {
+pub fn bucket(var: impl Fn(&str) -> Option<String>) -> Result<Option<S3Config>, Error> {
     let Some(url) = var(BLOB_URL_VAR).filter(|v| !v.is_empty()) else {
         return Ok(None);
     };
@@ -200,21 +204,49 @@ async fn open_files(config: &Config, bucket: Option<S3Config>) -> Result<Files, 
             .await
             .map_err(|e| unavailable("cannot open the data folder", e))?;
         return Ok(Files {
-            store: Arc::new(store),
+            store: Arc::new(Metered::new(store)),
             local: true,
         });
     };
     let store = S3Store::new(bucket).map_err(|e| unavailable("cannot use the blob store", e))?;
     Ok(Files {
-        store: Arc::new(store),
+        store: Arc::new(Metered::new(store)),
         local: false,
     })
 }
 
+/// Warns when files are shared but the index is not, which only works
+/// for one replica.
+fn warn_if_unshared(local: bool, index: &IndexConfig) {
+    if !local && matches!(index, IndexConfig::Sqlite { .. }) {
+        tracing::warn!(
+            "files are in a shared bucket but the index is this machine's SQLite file; \
+             run one replica only, or set a database URL"
+        );
+    }
+}
+
 /// Reports whether the blob store answers, for `/readyz`. It has no
 /// operations of its own.
+///
+/// A shared bucket that stops answering makes the replica degraded, not
+/// unready (ADR 0044, D188): every replica shares the bucket, so failing
+/// readiness would take them all out of the load balancer at once, and
+/// the index-backed reads (search, lists, Work, My Work) would go down
+/// with it. Calls that need the files fail on their own with
+/// `unavailable` and a `Retry-After`. A data folder on this machine is
+/// different: if it is gone, this replica cannot serve and another may.
 #[derive(Debug)]
-struct Storage(Arc<dyn BlobStore>);
+struct Storage {
+    store: Arc<dyn BlobStore>,
+    shared: bool,
+}
+
+impl Storage {
+    fn new(store: Arc<dyn BlobStore>, shared: bool) -> Self {
+        Self { store, shared }
+    }
+}
 
 impl Service for Storage {
     fn name(&self) -> &'static str {
@@ -226,7 +258,18 @@ impl Service for Storage {
     }
 
     fn readiness(&self) -> BoxFuture<'_, Readiness> {
-        Box::pin(probe(self.0.as_ref()))
+        Box::pin(async move { soften(probe(self.store.as_ref()).await, self.shared) })
+    }
+}
+
+/// Turns an outage of a shared bucket into [`Readiness::Degraded`].
+fn soften(readiness: Readiness, shared: bool) -> Readiness {
+    match readiness {
+        Readiness::NotReady(reason) if shared => {
+            tracing::warn!(%reason, "the shared blob store is down: serving degraded");
+            Readiness::Degraded(reason)
+        }
+        other => other,
     }
 }
 
@@ -275,9 +318,9 @@ fn keep_fresh(
     cursor: i64,
     workspace: &Workspace,
     spaces: &Arc<Spaces>,
-    drive_index: Arc<SqlIndex>,
+    drive_index: &Arc<dyn DriveIndex>,
 ) {
-    let (reload, from) = (Arc::clone(spaces), Arc::clone(&drive_index));
+    let (reload, from) = (Arc::clone(spaces), Arc::clone(drive_index));
     crate::feed::follow(
         feed,
         me,
@@ -296,7 +339,7 @@ fn keep_fresh(
             }),
         },
     );
-    let refresh = Arc::clone(spaces);
+    let (refresh, drive_index) = (Arc::clone(spaces), Arc::clone(drive_index));
     drop(tokio::spawn(async move {
         let mut tick = tokio::time::interval(SPACES_REFRESH);
         tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
@@ -362,7 +405,7 @@ async fn provision_drives(
 /// Makes the missing My Drives now, then keeps checking for new accounts.
 async fn keep_drives(
     drive: &Arc<Drive>,
-    index: &Arc<SqlIndex>,
+    index: &Arc<dyn DriveIndex>,
     identity: &Arc<Identity>,
 ) -> Result<(), Error> {
     let made = provision_drives(drive, index.as_ref(), identity).await?;
@@ -426,6 +469,8 @@ struct Workspace {
     work: Arc<WorkService>,
     tasks: Arc<TasksService>,
     space_of: vellum_collections::service::SpaceOf,
+    /// Private spaces, whose guard every replica keeps current.
+    e2e: Arc<vellum_e2e::E2e>,
 }
 
 /// What `vellum serve` mounts for the workspace.
@@ -444,6 +489,8 @@ pub struct Opened {
     pub rate_counts: Option<vellum_db::rate::SharedCounts>,
     /// My Work, which also serves the feed, CalDAV and capture routes.
     pub tasks: Option<Arc<TasksService>>,
+    /// The drive index, which Admin → Usage counts pages and storage from.
+    pub drive_index: Option<Arc<dyn DriveIndex>>,
 }
 
 /// My Work's settings: where its secrets live and what it links to.
@@ -494,6 +541,9 @@ struct Feeds {
     rows: Option<Arc<dyn IndexFeed>>,
     /// Page text saved through the API, for live editing rooms.
     pages: Option<Arc<dyn vellum_drive::PageWrites>>,
+    /// Which spaces are private: the e2e service changes it, the store's
+    /// guard enforces it.
+    private: vellum_e2e::PrivateRoots,
 }
 
 /// Builds the services over `store`, `authz` and the drive's `index`.
@@ -514,7 +564,7 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
         Arc::clone(&index),
         Arc::clone(&drive_access),
     ));
-    let e2e = crate::e2e::service(&store, &index, drive_access);
+    let e2e = Arc::new(crate::e2e::service(&store, &index, drive_access).with_roots(feeds.private));
     let lookup = Arc::clone(spaces);
     let space_of: vellum_collections::service::SpaceOf =
         Arc::new(move |path: &BlobPath| lookup.of(path));
@@ -592,7 +642,7 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
             Arc::clone(&work) as Arc<dyn Service>,
             Arc::clone(&tasks) as Arc<dyn Service>,
             Arc::new(pages),
-            Arc::new(e2e),
+            Arc::clone(&e2e) as Arc<dyn Service>,
         ],
         drive,
         collections,
@@ -600,6 +650,7 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
         work,
         tasks,
         space_of,
+        e2e,
     })
 }
 
@@ -633,6 +684,38 @@ async fn join_cluster(
     ))
 }
 
+/// The drive and permission stores, routing each space to its shard:
+/// one of those `VELLUM_SHARDS` lists, or `index` alone (ADR 0040, D262).
+/// Also returns every shard's database, home first.
+async fn open_shards(
+    index: &Index,
+    var: impl Fn(&str) -> Option<String>,
+) -> Result<(Vec<Index>, Arc<Authz<ShardedStore>>, Arc<dyn DriveIndex>), Error> {
+    let sharded =
+        match ShardsConfig::from_env(var).map_err(|e| unavailable("bad shard settings", e))? {
+            Some(config) => {
+                let sharded = ShardedIndex::open(&config)
+                    .await
+                    .map_err(|e| unavailable("cannot open the shards", e))?;
+                tracing::info!(
+                    shards = sharded.shards().len(),
+                    "spaces are spread over shards"
+                );
+                sharded
+            }
+            None => ShardedIndex::single(index.clone()),
+        };
+    let router = ShardRouter::open(sharded)
+        .await
+        .map_err(|e| unavailable("cannot read the space-to-shard map", e))?;
+    let router = Arc::new(router);
+    Ok((
+        router.indexes().cloned().collect(),
+        Arc::new(Authz::new(ShardedStore::new(Arc::clone(&router)))),
+        Arc::new(vellum_drive::sharded::ShardedIndex::new(router)),
+    ))
+}
+
 /// Rescans the workspace files once per cluster (a replica that starts
 /// while others run finds the index already current), then starts the
 /// cluster's upkeep (D163).
@@ -641,6 +724,7 @@ async fn rescan_and_maintain(
     others_alive: bool,
     drive: &Arc<Drive>,
     index: &Index,
+    shards: &[Index],
 ) {
     let drive = Arc::clone(drive);
     replica
@@ -653,7 +737,7 @@ async fn rescan_and_maintain(
             }
         })
         .await;
-    replica.maintain(index);
+    replica.maintain(index, shards);
 }
 
 /// My Work's cluster jobs: Google Calendar sync every
@@ -677,6 +761,55 @@ fn task_jobs(
     Ok(())
 }
 
+/// Starts the notifier on this replica and its delivery timer on one
+/// replica of the cluster.
+fn notify_on_one_replica(
+    replica: &Replica,
+    queued: tokio::sync::mpsc::Receiver<vellum_work::WorkEvent>,
+    work: &Arc<WorkService>,
+    (identity, notify, webhooks): (
+        &Arc<Identity>,
+        &Arc<NotifyStore>,
+        &Arc<Webhooks<SafeTransport>>,
+    ),
+    var: impl Fn(&str) -> Option<String>,
+) -> Result<(), Error> {
+    let delivery = delivery(identity, notify, webhooks, var)?;
+    let ticker = crate::notifications::start(
+        queued,
+        Arc::clone(work),
+        Arc::clone(identity),
+        Arc::clone(notify),
+        delivery,
+    )?;
+    replica.every("notify.deliver", crate::notifications::TICK, move || {
+        let ticker = ticker.clone();
+        async move { ticker.run().await }
+    });
+    Ok(())
+}
+
+/// Webhooks and email for the notifier. With a mail server configured,
+/// email is turned on for every dispatcher over the notify store.
+fn delivery(
+    identity: &Arc<Identity>,
+    notify: &Arc<NotifyStore>,
+    webhooks: &Arc<Webhooks<SafeTransport>>,
+    var: impl Fn(&str) -> Option<String>,
+) -> Result<crate::notifications::Delivery, Error> {
+    let mail = crate::mail::setup(var, identity.config().public_url.as_str())?.map(
+        |(outbound, config)| {
+            notify.enable_email();
+            Arc::new(Mailer::new(Arc::clone(notify), outbound, config))
+        },
+    );
+    Ok(crate::notifications::Delivery {
+        webhooks: Arc::clone(webhooks),
+        mail,
+        people: Arc::new(crate::mail::People::new(Arc::clone(identity))),
+    })
+}
+
 /// Opens the workspace services for `config`, or returns none (with a
 /// warning) when no index is configured.
 ///
@@ -688,6 +821,7 @@ pub async fn open(
     config: &Config,
     identity: &Arc<Identity>,
     notify: &Arc<NotifyStore>,
+    webhooks: &Arc<Webhooks<SafeTransport>>,
     app_origin: &str,
     var: impl Fn(&str) -> Option<String> + Send + Sync,
 ) -> Result<Opened, Error> {
@@ -702,12 +836,7 @@ pub async fn open(
         store: files,
         local,
     } = open_files(config, bucket).await?;
-    if !local && matches!(index_config, IndexConfig::Sqlite { .. }) {
-        tracing::warn!(
-            "files are in a shared bucket but the index is this machine's SQLite file; \
-             run one replica only, or set a database URL"
-        );
-    }
+    warn_if_unshared(local, &index_config);
     tracing::info!(backend = files.backend(), "workspace files opened");
     // Follow the feed from before anything is loaded, so no change made
     // meanwhile is missed.
@@ -718,9 +847,9 @@ pub async fn open(
         .await
         .map_err(|e| unavailable("cannot read the change feed", e))?;
     let (replica, others_alive, rate_counts) = join_cluster(&index, &me, &var).await?;
-    let store: Arc<dyn BlobStore> = Arc::new(AnnouncingStore::new(files, feed.clone(), &me));
-    let authz = Arc::new(Authz::new(SqlStore::new(index.clone())));
-    let drive_index = Arc::new(SqlIndex::new(index.clone()));
+    let (store, roots) =
+        crate::e2e::guarded(Arc::new(AnnouncingStore::new(files, feed.clone(), &me)));
+    let (shards, authz, drive_index) = open_shards(&index, &var).await?;
     let spaces = Arc::new(Spaces::default());
     let (events, queued) = crate::notifications::channel();
     let (rows, row_changes) = crate::search::row_feed();
@@ -728,35 +857,39 @@ pub async fn open(
     let mut workspace = build(
         Arc::clone(&store),
         &authz,
-        Arc::clone(&drive_index) as Arc<dyn DriveIndex>,
+        Arc::clone(&drive_index),
         &spaces,
         identity,
         Feeds {
             events,
             rows: Some(rows),
             pages: Some(Arc::clone(&live_pages) as Arc<dyn vellum_drive::PageWrites>),
+            private: roots,
         },
         setup,
     )
     .await?;
-    crate::notifications::start(
+    notify_on_one_replica(
+        &replica,
         queued,
-        Arc::clone(&workspace.work),
-        Arc::clone(identity),
-        Arc::clone(notify),
+        &workspace.work,
+        (identity, notify, webhooks),
+        &var,
     )?;
     // The watcher starts before the rescan, so nothing edited in between
     // is missed; whatever it sees twice is applied idempotently.
     if local {
         crate::watcher::start(&config.data_dir, &store, &workspace.drive, &workspace.books).await?;
     }
-    rescan_and_maintain(&replica, others_alive, &workspace.drive, &index).await;
+    rescan_and_maintain(&replica, others_alive, &workspace.drive, &index, &shards).await;
+    // After the rescan, so every private space's folder is in the index.
+    crate::e2e::keep_roots_fresh(Arc::clone(&workspace.e2e)).await;
     let hooks = crate::integrations::hooks(&store, &workspace.work, &var).await?;
     let collab = Collab::open(
         Arc::clone(&workspace.drive),
         Arc::new(DriveAuthzAccess::new(
             Arc::clone(&authz),
-            Arc::clone(&drive_index) as Arc<dyn DriveIndex>,
+            Arc::clone(&drive_index),
         )),
         index.clone(),
         &config.data_dir,
@@ -772,6 +905,7 @@ pub async fn open(
         data_dir: config.data_dir.clone(),
         key,
         index,
+        shards,
         store: Arc::clone(&store),
         authz,
         collections: Arc::clone(&workspace.collections),
@@ -781,10 +915,10 @@ pub async fn open(
     })
     .await?;
     workspace.services.push(Arc::new(search));
-    keep_fresh(feed, me, cursor, &workspace, &spaces, drive_index);
+    keep_fresh(feed, me, cursor, &workspace, &spaces, &drive_index);
     task_jobs(&replica, &workspace.tasks, notify, &config.data_dir)?;
     let mut services = workspace.services;
-    services.push(Arc::new(Storage(store)));
+    services.push(Arc::new(Storage::new(store, !local)));
     Ok(Opened {
         services,
         hooks,
@@ -792,6 +926,7 @@ pub async fn open(
         replica: Some(replica),
         rate_counts: Some(rate_counts),
         tasks: Some(workspace.tasks),
+        drive_index: Some(drive_index),
     })
 }
 
@@ -823,6 +958,7 @@ pub async fn describe(
             events: Arc::new(TracingSink),
             rows: None,
             pages: None,
+            private: vellum_e2e::PrivateRoots::default(),
         },
         setup,
     )
@@ -879,7 +1015,11 @@ mod tests {
     fn a_bad_blob_url_or_missing_keys_stop_startup() {
         for vars in [
             &[(BLOB_URL_VAR, "file:///data")][..],
-            &[(BLOB_URL_VAR, "s3://vellum")][..],
+            // A custom endpoint with no keys and no workload identity.
+            &[
+                (BLOB_URL_VAR, "s3://vellum"),
+                ("VELLUM_S3_ENDPOINT", "http://127.0.0.1:9000"),
+            ][..],
         ] {
             let error = bucket(lookup(vars)).err().unwrap();
             assert_eq!(error.kind(), ErrorKind::InvalidInput);
@@ -888,7 +1028,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn an_unreachable_bucket_is_not_ready() {
+    async fn an_unreachable_bucket_is_degraded() {
         // Port 9 (discard) refuses connections on a test machine.
         let store = S3Config::from_vars(lookup(&[
             (BLOB_URL_VAR, "s3://vellum"),
@@ -898,9 +1038,15 @@ mod tests {
         ]))
         .and_then(S3Store::new)
         .unwrap();
+        let down = probe(&store).await;
+        assert!(matches!(&down, Readiness::NotReady(reason) if reason.contains("s3")));
+        // Shared by every replica: degraded, so the pods stay in rotation.
         assert!(
-            matches!(probe(&store).await, Readiness::NotReady(reason) if reason.contains("s3"))
+            matches!(soften(down.clone(), true), Readiness::Degraded(reason) if reason.contains("s3"))
         );
+        // A data folder on this machine: unready, so traffic goes elsewhere.
+        assert!(matches!(soften(down, false), Readiness::NotReady(_)));
+        assert_eq!(soften(Readiness::Ready, true), Readiness::Ready);
     }
 
     #[test]

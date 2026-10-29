@@ -38,6 +38,7 @@ pub mod model;
 pub mod onnx;
 pub mod postgres_index;
 pub mod service;
+pub mod sharded;
 mod stars;
 pub mod tantivy_index;
 pub mod telemetry;
@@ -58,5 +59,6 @@ pub use model::{
 pub use onnx::{OnnxConfig, OnnxEmbedder};
 pub use postgres_index::PostgresBackend;
 pub use service::{Context, SearchService, Tuning, Update};
+pub use sharded::Sharded;
 pub use tantivy_index::{IndexKey, Location, Opened, TantivyBackend, TantivyConfig};
 pub use vector::Embedder;

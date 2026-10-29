@@ -6,8 +6,11 @@
 //! lines and sends the web pushes.
 //!
 //! Pushes held by a snooze are not sent later; the inbox line is there
-//! when the person looks. Email needs a mail transport, which the server
-//! does not configure yet, so email deliveries are counted and skipped.
+//! when the person looks. Emails are queued for [`crate::mail::Mailer`],
+//! which sends them when their delay ends, once the server has turned
+//! email on ([`NotifyStore::enable_email`]); until then they are counted
+//! and skipped. So every dispatcher, such as My Work's reminder sender,
+//! emails by each person's preferences without asking for it.
 
 use std::sync::Arc;
 
@@ -31,6 +34,8 @@ pub struct Report {
     pub push_failed: usize,
     /// Pushes held by a snooze.
     pub held: usize,
+    /// Emails queued for the mailer.
+    pub email_queued: usize,
     /// Emails skipped for want of a mail transport.
     pub email_skipped: usize,
 }
@@ -89,7 +94,22 @@ impl<T: HttpTransport> Dispatcher<T> {
                 }
                 Channel::Push if step.not_before > now => report.held += 1,
                 Channel::Push => self.push(user, notification, now, &mut report).await,
-                Channel::Email => report.email_skipped += 1,
+                Channel::Email if !self.store.email_enabled() => report.email_skipped += 1,
+                Channel::Email => {
+                    let queued = self.store.update(user, |state| {
+                        crate::mail::queue(
+                            &mut state.email_queue,
+                            notification,
+                            step.not_before,
+                            step.skip_if_read,
+                        );
+                        Ok(())
+                    });
+                    match queued {
+                        Ok(()) => report.email_queued += 1,
+                        Err(error) => tracing::warn!(%error, "email not queued"),
+                    }
+                }
             }
         }
         tracing::info!(
@@ -98,6 +118,7 @@ impl<T: HttpTransport> Dispatcher<T> {
             pushed = report.pushed,
             push_failed = report.push_failed,
             held = report.held,
+            email_queued = report.email_queued,
             "notification delivered"
         );
         report

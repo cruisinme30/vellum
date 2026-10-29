@@ -191,7 +191,7 @@ async function start(): Promise<void> {
   const privateSpaces = new PrivateSpaces(
     () => server,
     () => auth.accessToken(),
-    { run: runBinary(binary), hostname },
+    { run: runBinary(binary), hostname, pinDir: path.join(app.getPath("userData"), "private") },
   );
   const handlers = bridgeHandlers({
     serverUrl: () => server,
@@ -201,7 +201,7 @@ async function start(): Promise<void> {
     openExternal: (url) => shell.openExternal(url),
     privateDeviceKey: () => privateSpaces.deviceKey(),
     privateEnrol: (spaceId, label) => privateSpaces.enrol(spaceId, label),
-    privateReseal: (spaceId) => privateSpaces.reseal(spaceId),
+    privateReseal: (spaceId, trust) => privateSpaces.reseal(spaceId, trust),
     notify(notice) {
       const shown = new Notification({ title: notice.title, body: notice.body });
       shown.on("click", () => {

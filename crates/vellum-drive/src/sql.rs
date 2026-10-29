@@ -35,8 +35,8 @@ use vellum_store::BlobPath;
 use crate::error::{DriveError, DriveResult};
 use crate::files;
 use crate::model::{
-    Activity, ActivityKind, Node, NodeKind, Space, SpaceKind, SpaceSettings, TrashState,
-    VersionRecord,
+    Activity, ActivityKind, DriveTotals, Node, NodeKind, Space, SpaceKind, SpaceSettings,
+    TrashState, VersionRecord,
 };
 use crate::ports::DriveIndex;
 
@@ -1012,6 +1012,65 @@ impl DriveIndex for SqlIndex {
             Ok((nodes, versions))
         })?;
         Ok(unsigned(nodes).saturating_add(unsigned(versions)))
+    }
+
+    async fn totals(&self, now: Timestamp) -> DriveResult<DriveTotals> {
+        const DAY_MS: i64 = 86_400_000;
+        type Counts = (i64, Vec<(String, i64, i64, i64)>, (i64, i64), i64, i64);
+        let day = now.unix_ms().saturating_sub(DAY_MS);
+        let week = now.unix_ms().saturating_sub(7 * DAY_MS);
+        let (spaces, nodes, versions, events_1d, events_7d): Counts = on_pool!(self, pool, system => {
+            let spaces: i64 = run!(
+                system,
+                "totals.spaces",
+                sqlx::query_scalar("SELECT COUNT(*) FROM drive_spaces").fetch_one(pool)
+            );
+            let nodes: Vec<(String, i64, i64, i64)> = run!(
+                system,
+                "totals.nodes",
+                sqlx::query_as(
+                    "SELECT kind, CAST(CASE WHEN trash IS NULL THEN 1 ELSE 0 END AS BIGINT) AS live, \
+                     COUNT(*), CAST(COALESCE(SUM(byte_size), 0) AS BIGINT) \
+                     FROM drive_nodes GROUP BY kind, live",
+                )
+                .fetch_all(pool)
+            );
+            let versions: (i64, i64) = run!(
+                system,
+                "totals.versions",
+                sqlx::query_as(
+                    "SELECT COUNT(*), CAST(COALESCE(SUM(byte_size), 0) AS BIGINT) \
+                     FROM drive_versions",
+                )
+                .fetch_one(pool)
+            );
+            let events: (i64, i64) = run!(
+                system,
+                "totals.activity",
+                sqlx::query_as(
+                    "SELECT CAST(COALESCE(SUM(CASE WHEN at >= $1 THEN 1 ELSE 0 END), 0) AS BIGINT), \
+                     COUNT(*) FROM drive_activity WHERE at >= $2",
+                )
+                .bind(day)
+                .bind(week)
+                .fetch_one(pool)
+            );
+            Ok((spaces, nodes, versions, events.0, events.1))
+        })?;
+        let mut totals = DriveTotals {
+            spaces: unsigned(spaces),
+            versions: unsigned(versions.0),
+            version_bytes: unsigned(versions.1),
+            events_1d: unsigned(events_1d),
+            events_7d: unsigned(events_7d),
+            ..DriveTotals::default()
+        };
+        for (kind, live, n, bytes) in nodes {
+            let kind = parse_node_kind(&kind)?;
+            totals.add_nodes(kind, live == 1, unsigned(n));
+            totals.file_bytes = totals.file_bytes.saturating_add(unsigned(bytes));
+        }
+        Ok(totals)
     }
 }
 

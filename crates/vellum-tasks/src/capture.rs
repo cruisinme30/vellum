@@ -268,6 +268,8 @@ struct SlackPayload {
     user: SlackRef,
     #[serde(default)]
     message: SlackMessage,
+    #[serde(default)]
+    response_url: String,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -296,6 +298,9 @@ pub struct SlackCapture {
     pub team: String,
     /// The task.
     pub capture: Capture,
+    /// Where to post a reply only the user sees; kept only when it is a
+    /// Slack URL.
+    pub response_url: Option<String>,
 }
 
 /// Turns Slack's mark-up into plain text: `<@U1>` to `@U1`, `<url|label>`
@@ -363,9 +368,12 @@ pub fn from_slack(body: &str) -> Result<SlackCapture, CaptureError> {
     );
     let notes = clip(&text).map_or_else(|| link.clone(), |t| format!("{t}\n\n{link}"));
     telemetry::record_capture("slack", "captured");
+    let response_url = Some(payload.response_url)
+        .filter(|u| u.starts_with(SLACK_RESPONSE_PREFIX) && u.len() <= 512);
     Ok(SlackCapture {
         slack_user: payload.user.id,
         team: payload.team.id.clone(),
+        response_url,
         capture: Capture {
             title,
             fields: TaskFields {
@@ -379,6 +387,93 @@ pub fn from_slack(body: &str) -> Result<SlackCapture, CaptureError> {
             assignees: Vec::new(),
         },
     })
+}
+
+/// The only place Slack replies are posted (`response_url`).
+pub const SLACK_RESPONSE_PREFIX: &str = "https://hooks.slack.com/";
+
+/// How long a Slack link code is valid.
+pub const SLACK_LINK_TTL: jiff::SignedDuration = jiff::SignedDuration::from_mins(15);
+
+fn link_mac(secret: &[u8], team: &str, user: &str, expires: i64) -> Vec<u8> {
+    #[expect(clippy::expect_used, reason = "HMAC takes keys of any length")]
+    let mut mac = Hmac::<Sha256>::new_from_slice(secret).expect("any key length");
+    mac.update(b"vellum-slack-link\0");
+    mac.update(team.as_bytes());
+    mac.update(b"\0");
+    mac.update(user.as_bytes());
+    mac.update(b"\0");
+    mac.update(expires.to_string().as_bytes());
+    mac.finalize().into_bytes().to_vec()
+}
+
+fn is_slack_id(id: &str) -> bool {
+    !id.is_empty() && id.len() <= 32 && id.bytes().all(|b| b.is_ascii_alphanumeric())
+}
+
+/// A code that proves a Slack user asked to link their account (#163).
+///
+/// Slack shows it to them as a link; opening it while signed in to
+/// Vellum links that Slack user to the Vellum account. It is signed with
+/// the Slack signing secret and expires after [`SLACK_LINK_TTL`].
+#[must_use]
+pub fn slack_link_code(secret: &[u8], team: &str, user: &str, now: Timestamp) -> String {
+    let expires = now.checked_add(SLACK_LINK_TTL).unwrap_or(now).as_second();
+    let mac = link_mac(secret, team, user, expires);
+    let tag: String = mac
+        .get(..16)
+        .unwrap_or_default()
+        .iter()
+        .fold(String::new(), |mut out, b| {
+            let _ = write!(out, "{b:02x}");
+            out
+        });
+    format!("{team}.{user}.{expires}.{tag}")
+}
+
+/// Checks a [`slack_link_code`] and returns the Slack team and user.
+///
+/// # Errors
+///
+/// [`CaptureError::Signature`] for a forged, malformed or expired code.
+pub fn read_slack_link_code(
+    secret: &[u8],
+    code: &str,
+    now: Timestamp,
+) -> Result<(String, String), CaptureError> {
+    let bad = || CaptureError::Signature;
+    let mut parts = code.trim().split('.');
+    let (Some(team), Some(user), Some(expires), Some(tag), None) = (
+        parts.next(),
+        parts.next(),
+        parts.next(),
+        parts.next(),
+        parts.next(),
+    ) else {
+        return Err(bad());
+    };
+    if !is_slack_id(team) || !is_slack_id(user) || tag.len() != 32 {
+        return Err(bad());
+    }
+    let expires: i64 = expires.parse().map_err(|_| bad())?;
+    if now.as_second() > expires {
+        return Err(bad());
+    }
+    let expected = slack_link_code(
+        secret,
+        team,
+        user,
+        Timestamp::from_second(expires)
+            .ok()
+            .and_then(|t| t.checked_sub(SLACK_LINK_TTL).ok())
+            .ok_or_else(bad)?,
+    );
+    let expected_tag = expected.rsplit('.').next().unwrap_or_default();
+    if bool::from(expected_tag.as_bytes().ct_eq(tag.as_bytes())) {
+        Ok((team.to_owned(), user.to_owned()))
+    } else {
+        Err(bad())
+    }
 }
 
 /// Adds a capture to the end of an Inbox file, with its notes. A capture
@@ -438,6 +533,41 @@ pub fn append_to_inbox(inbox: &str, capture: &Capture) -> Option<(String, BlockI
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn slack_link_codes_are_signed_bound_and_expire() {
+        let now = Timestamp::from_second(1_800_000_000).unwrap_or(Timestamp::UNIX_EPOCH);
+        let code = slack_link_code(b"secret", "T01", "U01", now);
+        assert_eq!(
+            read_slack_link_code(b"secret", &code, now),
+            Ok(("T01".to_owned(), "U01".to_owned()))
+        );
+        let forged = code.replacen("U01", "U02", 1);
+        assert!(
+            read_slack_link_code(b"secret", &forged, now).is_err(),
+            "bound to the user"
+        );
+        assert!(
+            read_slack_link_code(b"other", &code, now).is_err(),
+            "bound to the secret"
+        );
+        let later = now.checked_add(SLACK_LINK_TTL + jiff::SignedDuration::from_secs(1));
+        assert!(
+            read_slack_link_code(b"secret", &code, later.unwrap_or(now)).is_err(),
+            "expires"
+        );
+        for junk in [
+            "",
+            "a.b.c",
+            "T01.U01.x.y",
+            "T 1.U01.1.00000000000000000000000000000000",
+        ] {
+            assert!(
+                read_slack_link_code(b"secret", junk, now).is_err(),
+                "{junk}"
+            );
+        }
+    }
     use jiff::civil::date;
 
     fn now() -> DateTime {

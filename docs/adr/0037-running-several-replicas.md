@@ -12,8 +12,8 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D150, D151, D159, D160
-- Issue: #432, #433, #434, #435, #437
-- Pull requests: none yet (delivered as a bundle)
+- Issue: #432, #433, #434, #435, #437, #441
+- Pull requests: none yet (delivered as a bundle and a batch)
 
 :::
 
@@ -127,3 +127,12 @@ safe to run as several replicas. Each fix adds its decision here.
 - Sign-in costs one indexed query per request and writes are serialised
   workspace-wide; per-record queries can replace the cache if load tests
   show it. Break-glass codes are still a file on one replica.
+
+### Proving it under load
+
+- The nightly load test runs two replicas over one Postgres and bucket
+  and spreads its requests over both (#441). A separate check writes on
+  one replica, reads on the other and fails when that takes over a second
+  at p95 or five seconds at worst.
+- The load scripts drive the routes `vellum openapi` lists; a test in
+  the `vellum-cli` crate fails when one of them is no longer served.

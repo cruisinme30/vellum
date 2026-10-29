@@ -27,6 +27,11 @@ struct Fixture {
 
 impl Fixture {
     async fn new() -> Self {
+        Self::with_env(&[]).await
+    }
+
+    /// A server with these extra environment variables.
+    async fn with_env(env: &'static [(&'static str, &'static str)]) -> Self {
         static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
         let dir = std::env::temp_dir().join(format!(
             "vellum-tasks-test-{}-{}",
@@ -40,7 +45,12 @@ impl Fixture {
         let services = Services::open(ORIGIN, Some(&dir), None)
             .unwrap()
             .with_workspace(&config, |k| {
-                (k == crate::workspace::PLAINTEXT_VAR).then(|| "1".to_owned())
+                if k == crate::workspace::PLAINTEXT_VAR {
+                    return Some("1".to_owned());
+                }
+                env.iter()
+                    .find(|(name, _)| *name == k)
+                    .map(|(_, v)| (*v).to_owned())
             })
             .await
             .unwrap();
@@ -422,4 +432,110 @@ async fn mentions_and_settings_reach_my_work() {
     assert_eq!(again.json()["digest_at"], Value::Null);
     let people = std::fs::read_to_string(f.dir.join(".vellum/tasks/people.json")).unwrap();
     assert!(people.contains("America/Los_Angeles"), "{people}");
+}
+
+/// A Slack request signed the way Slack signs it.
+fn slack_request(secret: &str, body: &str) -> http::Request<axum::body::Body> {
+    use hmac::{Hmac, KeyInit as _, Mac as _};
+    let ts = jiff::Timestamp::now().as_second().to_string();
+    let mut mac = Hmac::<sha2::Sha256>::new_from_slice(secret.as_bytes()).unwrap();
+    mac.update(format!("v0:{ts}:{body}").as_bytes());
+    let signature = mac
+        .finalize()
+        .into_bytes()
+        .iter()
+        .fold(String::from("v0="), |mut out, b| {
+            use std::fmt::Write as _;
+            let _ = write!(out, "{b:02x}");
+            out
+        });
+    let mut request = finish(
+        request("POST", "/capture/slack")
+            .header("X-Slack-Request-Timestamp", ts)
+            .header("X-Slack-Signature", signature)
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded"),
+    );
+    *request.body_mut() = axum::body::Body::from(body.to_owned());
+    request
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn people_link_their_slack_account_from_the_shortcut() {
+    const SECRET: &str = "slack-signing-secret";
+    let f = Fixture::with_env(&[(crate::workspace::SLACK_SECRET_VAR, SECRET)]).await;
+    let payload = json!({
+        "type": "message_action",
+        "team": {"id": "T01", "domain": "northstar"},
+        "channel": {"id": "C01"},
+        "user": {"id": "U01"},
+        "message": {"text": "Renew the TLS certificate", "ts": "1700000000.000100"}
+    });
+    // No `response_url`, so the test never calls Slack.
+    let body: String = url::form_urlencoded::Serializer::new(String::new())
+        .append_pair("payload", &payload.to_string())
+        .finish();
+
+    // Not linked yet: Slack gets a link with a signed code, nothing is saved.
+    let first = send(&f.app, slack_request(SECRET, &body)).await;
+    assert_eq!(first.status, StatusCode::OK, "{}", first.text);
+    let text = first.json()["text"].as_str().unwrap().to_owned();
+    let code = text
+        .split("slack_link=")
+        .nth(1)
+        .and_then(|rest| rest.split_whitespace().next())
+        .unwrap()
+        .to_owned();
+    assert!(text.contains("/my-work?slack_link="), "{text}");
+    assert!(
+        f.file_named("Inbox.md")
+            .is_none_or(|t| !t.contains("Renew the TLS"))
+    );
+
+    // A tampered code is refused; the real one links the signed-in person.
+    let forged = code.replacen("U01", "U02", 1);
+    let refused = f
+        .post("/api/v1/my-work/slack-link", json!({"code": forged}))
+        .await;
+    assert_eq!(refused.status, StatusCode::BAD_REQUEST, "{}", refused.text);
+    let linked = f
+        .post("/api/v1/my-work/slack-link", json!({"code": code}))
+        .await;
+    assert_eq!(linked.status, StatusCode::OK, "{}", linked.text);
+    let links = std::fs::read_to_string(f.dir.join(".vellum/tasks/slack-users.json")).unwrap();
+    assert!(links.contains("T01/U01"), "{links}");
+
+    // Now the shortcut saves the message to their Inbox.
+    let saved = send(&f.app, slack_request(SECRET, &body)).await;
+    assert_eq!(saved.status, StatusCode::OK, "{}", saved.text);
+    assert!(
+        saved.json()["text"]
+            .as_str()
+            .unwrap()
+            .starts_with("Saved to your Vellum inbox")
+    );
+    assert!(
+        f.file_named("Inbox.md")
+            .unwrap()
+            .contains("Renew the TLS certificate")
+    );
+
+    // Unlinking stops it.
+    let unlinked = send(
+        &f.app,
+        finish(
+            request("DELETE", "/api/v1/my-work/slack-link")
+                .header(header::COOKIE, &f.cookie)
+                .header(header::ORIGIN, ORIGIN)
+                .header("x-csrf-token", &f.csrf),
+        ),
+    )
+    .await;
+    assert_eq!(unlinked.status, StatusCode::OK, "{}", unlinked.text);
+    let again = send(&f.app, slack_request(SECRET, &body)).await;
+    assert!(
+        again.json()["text"]
+            .as_str()
+            .unwrap()
+            .contains("slack_link=")
+    );
 }

@@ -17,9 +17,12 @@ import type {
   BackupInfo,
   ChainReport,
   DrillReport,
+  UsageCounts,
   Versioned,
 } from "../../api/api.gen";
 import { ApiError, type Http, type Query } from "../../api/http";
+
+import { createHttpWebhooksApi, type WebhooksApi } from "./webhooks-api";
 
 /** The admin console's server operations. */
 export interface AdminConsoleApi {
@@ -36,6 +39,10 @@ export interface AdminConsoleApi {
   backups(): Promise<BackupFile[]>;
   backUpNow(): Promise<BackupInfo>;
   runDrill(): Promise<DrillReport>;
+  /** People, content, storage and activity; `refresh` counts again now. */
+  usage(refresh: boolean): Promise<UsageCounts>;
+  /** Webhook subscriptions (#149). */
+  readonly webhooks?: WebhooksApi;
 }
 
 const ADMIN = "/api/v1/admin";
@@ -75,6 +82,8 @@ export function createHttpAdminConsoleApi(http: Http): AdminConsoleApi {
     },
     backUpNow: () => http.send<BackupInfo>("POST", `${ADMIN}/backups`),
     runDrill: () => http.send<DrillReport>("POST", `${ADMIN}/backups/drill`),
+    usage: (refresh) => http.get<UsageCounts>(`${ADMIN}/usage`, refresh ? { refresh: "true" } : {}),
+    webhooks: createHttpWebhooksApi(http),
   };
 }
 
@@ -96,5 +105,6 @@ export {
   type BackupFile,
   type ChainReport,
   type DrillReport,
+  type UsageCounts,
   type Versioned,
 } from "../../api/api.gen";

@@ -10,11 +10,11 @@
 //! |---|---|---|
 //! | Signed webhooks | [`webhook`], [`signature`], [`delivery`] | [`delivery::HttpTransport`] |
 //! | In-app inbox | [`notification`] | stored by the caller |
-//! | Email | [`email`] | [`email::MailTransport`] |
+//! | Email | [`email`], [`mail`] (queue, unsubscribe) | [`email::MailTransport`] |
 //! | Web push | [`webpush`] | [`delivery::HttpTransport`] |
 //!
 //! [`service`] serves each person's push subscriptions and preferences
-//! through the gateway. The rest of the crate is pure domain logic plus
+//! through the gateway, and [`hooks`] the admin's webhook subscriptions. The rest of the crate is pure domain logic plus
 //! ports: it opens no sockets and reads no tables. Adapters in the edge layer supply the transports, and
 //! every delivery runs inside a `tracing` span so it appears in the trace
 //! of the write that caused it (ADR 0017).
@@ -24,7 +24,9 @@ pub mod dispatch;
 pub mod email;
 pub mod endpoint;
 pub mod event;
+pub mod hooks;
 pub mod inbox;
+pub mod mail;
 pub mod notification;
 pub mod secret;
 pub mod service;

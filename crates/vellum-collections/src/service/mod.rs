@@ -21,6 +21,9 @@
 //! | `collections.delete_row` | `DELETE /v1/collections/{collection_id}/rows/{row_id}` | `write:direct` |
 //! | `collections.save_view` | `PUT /v1/collections/{collection_id}/views/{view}` | `write:direct` |
 //! | `collections.delete_view` | `DELETE /v1/collections/{collection_id}/views/{view}` | `write:direct` |
+//! | `collections.add_property` | `POST /v1/collections/{collection_id}/properties` | `write:direct` |
+//! | `collections.update_property` | `PATCH /v1/collections/{collection_id}/properties/{key}` | `write:direct` |
+//! | `collections.delete_property` | `DELETE /v1/collections/{collection_id}/properties/{key}` | `write:direct` |
 //! | `collections.embed` | `GET /v1/collections/embed` | `read` |
 //! | `collections.chart` | `GET /v1/collections/chart` | `read` |
 //! | `collections.export_csv` | `GET /v1/collections/{collection_id}/csv` | `read` |
@@ -36,6 +39,7 @@
 pub mod access;
 pub mod api;
 pub mod index;
+mod properties;
 mod state;
 
 use std::fmt;
@@ -53,10 +57,11 @@ use vellum_store::BlobStore;
 
 pub use access::{Access, AuthzAccess, Need, SpaceOf};
 pub use api::{
-    ChartInput, CollectionInfo, CollectionKey, CollectionList, CollectionSummary,
+    AddPropertyInput, ChartInput, CollectionInfo, CollectionKey, CollectionList, CollectionSummary,
     CreateFromCsvInput, CreateRowInput, CsvExport, CsvImported, EmbedInput, EmbedResult,
-    ExportCsvInput, ImportCsvInput, ListCollections, PropertyInfo, QueryInput, RelationInfo,
-    RollupInfo, RowDetail, RowKey, RowWritten, SaveViewInput, UpdateRowInput, ViewInfo, ViewKey,
+    ExportCsvInput, ImportCsvInput, ListCollections, PropertyInfo, PropertyKey, QueryInput,
+    RelationInfo, RollupInfo, RowDetail, RowKey, RowWritten, SaveViewInput, UpdatePropertyInput,
+    UpdateRowInput, ViewInfo, ViewKey,
 };
 pub use index::{IndexFeed, IndexField, RowDocument};
 pub use state::{MAX_FILE_BYTES, MAX_ROWS_PER_COLLECTION, collection_dir};
@@ -1248,6 +1253,7 @@ impl Service for CollectionsService {
         )
         .summary("Change a row's values or body");
         let views = Self::view_operations(&self);
+        let properties = Self::property_operations(&self);
         let embeds = Self::embed_operations(&self);
         let csv = Self::csv_operations(&self);
         let s = self;
@@ -1266,16 +1272,20 @@ impl Service for CollectionsService {
             list, get, query, get_row, create_row, update_row, delete_row,
         ];
         ops.extend(views);
+        ops.extend(properties);
         ops.extend(embeds);
         ops.extend(csv);
         ops
     }
 
+    /// Collections load from the files, so a failure here is the blob
+    /// store's: degraded, not unready (ADR 0044, D188). The storage
+    /// service decides whether the store being down takes the replica out.
     fn readiness(&self) -> BoxFuture<'_, Readiness> {
         Box::pin(async move {
             match self.read().await {
                 Ok(_) => Readiness::Ready,
-                Err(e) => Readiness::NotReady(format!("collections could not load: {e}")),
+                Err(e) => Readiness::Degraded(format!("collections could not load: {e}")),
             }
         })
     }

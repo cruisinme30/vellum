@@ -152,7 +152,7 @@ impl SharedLimit for ClusterLimit {
 /// cluster key is set.
 #[must_use]
 pub fn forwarded_joins(var: impl Fn(&str) -> Option<String>) -> Option<RateExempt> {
-    let key = var(CLUSTER_KEY_VAR)?.into_bytes();
+    let key = var(CLUSTER_KEY_VAR).filter(|k| !k.is_empty())?.into_bytes();
     if key.len() < 32 {
         tracing::warn!("{CLUSTER_KEY_VAR} is shorter than 32 bytes; ignoring it");
         return None;

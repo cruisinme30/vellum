@@ -61,6 +61,27 @@ async fn the_drive_runs_on_rebac_all_in_sqlite() -> TestResult {
     the_drive_runs_on_rebac_with(Arc::new(SqlIndex::new(db)), authz).await
 }
 
+/// The same over two SQLite shards (ADR 0040 D174): the engine and the
+/// index route each space to the same shard.
+#[tokio::test]
+async fn the_drive_runs_on_rebac_over_two_shards() -> TestResult {
+    use vellum_db::{ShardRouter, ShardedIndex, ShardsConfig};
+    let dir = tempfile::tempdir()?;
+    let db = |name: &str| IndexConfig::sqlite(dir.path().join(format!("{name}.sqlite")), None);
+    let config = ShardsConfig {
+        main: db("main"),
+        shards: vec![("eu".into(), db("eu")), ("us".into(), db("us"))],
+    };
+    let router = Arc::new(ShardRouter::open(ShardedIndex::open(&config).await?).await?);
+    // Fill the home shard first, so the space under test lands on "us".
+    let _ = router.place(ObjectId::generate()).await?;
+    let authz = Arc::new(Authz::new(vellum_authz::ShardedStore::new(Arc::clone(
+        &router,
+    ))));
+    let index = Arc::new(vellum_drive::sharded::ShardedIndex::new(router));
+    the_drive_runs_on_rebac_with(index, authz).await
+}
+
 async fn the_drive_runs_on_rebac_with<S: AuthzStore + TreeSync + 'static>(
     index: Arc<dyn DriveIndex>,
     authz: Arc<Authz<S>>,

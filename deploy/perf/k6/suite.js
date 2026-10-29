@@ -3,7 +3,11 @@
 
 // The nightly load test on the Team profile (ADR 0022, D96).
 //
-//   k6 run -e BASE_URL=http://localhost:7700 -e TOKEN=... deploy/perf/k6/suite.js
+//   k6 run -e BASE_URL=http://localhost:7700 deploy/perf/k6/suite.js
+//   k6 run -e BASE_URLS=http://localhost:7700,http://localhost:7701 ...
+//
+// With BASE_URLS, requests take turns over the replicas. TOKEN, EMAIL and
+// PASSWORD are as in session.js.
 //
 // Scenarios mirror the brief's targets: 2,000 reads/s split between cached
 // and uncached pages, writes, and 50 concurrent editing sessions. The
@@ -16,19 +20,12 @@ import { WebSocket } from 'k6/websockets';
 import { Trend } from 'k6/metrics';
 import { setTimeout } from 'k6/timers';
 import { routes } from './routes.js';
+import { base, bases, createPage, savePage, signIn, space } from './session.js';
 import { summarise } from './summary.js';
 
-const BASE = __ENV.BASE_URL || 'http://localhost:7700';
-const WS_BASE = BASE.replace(/^http/, 'ws');
-const SPACE = __ENV.SPACE || 'northstar';
 const PAGES = Number(__ENV.PAGES || 500);
 const SCALE = Number(__ENV.SCALE || 1);
 const DURATION = __ENV.DURATION || '5m';
-
-const headers = {
-  'Content-Type': 'application/json',
-  ...(__ENV.TOKEN ? { Authorization: `Bearer ${__ENV.TOKEN}` } : {}),
-};
 
 const collabSync = new Trend('collab_sync', true);
 
@@ -75,56 +72,61 @@ export const options = {
   },
 };
 
-const page = (i) => ({
-  title: `Northstar load page ${i}`,
-  body: `# Northstar load page ${i}\n\nSeeded by the nightly load test.\n`,
-});
-
-// Seeds the pages every scenario reads and edits.
+// Signs in, finds the space and seeds the pages every scenario reads and
+// edits, spread over the replicas.
 export function setup() {
-  const ready = http.get(`${BASE}${routes.ready}`);
-  if (ready.status !== 200) {
-    fail(`${BASE} is not ready: ${ready.status}`);
+  for (const server of bases) {
+    const ready = http.get(`${server}${routes.ready}`);
+    if (ready.status !== 200) {
+      fail(`${server} is not ready: ${ready.status}`);
+    }
   }
+  const headers = signIn(bases[0]);
+  const spaceId = space(bases[0], headers);
   const ids = [];
   for (let i = 0; i < PAGES; i += 1) {
-    const res = http.post(`${BASE}${routes.createPage(SPACE)}`, JSON.stringify(page(i)), { headers });
-    if (!check(res, { 'seed page created': (r) => r.status === 201 })) {
-      fail(`seeding failed: ${res.status} ${res.body}`);
-    }
-    ids.push(res.json('id'));
+    const body = `# Northstar load page ${i}\n\nSeeded by the nightly load test.\n`;
+    ids.push(createPage(base(i), headers, spaceId, `Northstar load page ${i}`, body));
   }
-  return { ids };
+  return { headers, spaceId, ids };
 }
 
 const pick = (ids) => ids[Math.floor(Math.random() * ids.length)];
+const server = () => base(__VU + __ITER);
 
 // The hot set: the same few pages, served from the render cache.
 export function readCached(data) {
-  const res = http.get(`${BASE}${routes.page(data.ids[__ITER % 10])}`, { headers });
+  const res = http.get(`${server()}${routes.content(data.ids[__ITER % 10])}`, {
+    headers: data.headers,
+    tags: { name: 'content' },
+  });
   check(res, { 'cached read 200': (r) => r.status === 200 });
 }
 
 export function readUncached(data) {
-  const res = http.get(`${BASE}${routes.page(pick(data.ids))}`, {
-    headers: { ...headers, 'Cache-Control': 'no-cache' },
+  const res = http.get(`${server()}${routes.content(pick(data.ids))}`, {
+    headers: { ...data.headers, 'Cache-Control': 'no-cache' },
+    tags: { name: 'content' },
   });
   check(res, { 'uncached read 200': (r) => r.status === 200 });
 }
 
 export function write(data) {
-  const id = pick(data.ids);
-  const body = JSON.stringify({ body: `# Edited\n\nIteration ${__ITER} by VU ${__VU}.\n` });
-  const res = http.put(`${BASE}${routes.page(id)}`, body, {
-    headers: { ...headers, 'Idempotency-Key': `k6-${__VU}-${__ITER}` },
+  const content = `# Edited\n\nIteration ${__ITER} by VU ${__VU}.\n`;
+  const res = savePage(server(), data.headers, pick(data.ids), content, {
+    headers: { 'Idempotency-Key': `k6-${__VU}-${__ITER}` },
   });
-  check(res, { 'write 200': (r) => r.status === 200 });
+  check(res, { 'write saved or lost a race': (r) => r.status === 200 || r.status === 409 });
 }
 
 // One editing session: opens the page's collab socket and times the Yjs
 // sync handshake (sync step 1 to sync step 2) for as long as it lasts.
 export function collab(data) {
-  const ws = new WebSocket(`${WS_BASE}${routes.collab(SPACE, pick(data.ids))}`, null, { headers });
+  const ws = new WebSocket(
+    `${server().replace(/^http/, 'ws')}${routes.collab(data.spaceId, pick(data.ids))}`,
+    null,
+    { headers: data.headers },
+  );
   ws.binaryType = 'arraybuffer';
   let sent = 0;
   const syncStep1 = new Uint8Array([0, 0, 1, 0]).buffer; // empty state vector

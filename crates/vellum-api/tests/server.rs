@@ -50,8 +50,27 @@ async fn start_with(
     ),
     Box<dyn std::error::Error>,
 > {
-    let gateway =
-        GatewayBuilder::new(GatewayConfig::new("http://localhost", vec![1; 32]), "test").build()?;
+    start_gateway(
+        GatewayBuilder::new(GatewayConfig::new("http://localhost", vec![1; 32]), "test"),
+        tls,
+        limits,
+    )
+    .await
+}
+
+async fn start_gateway(
+    builder: GatewayBuilder,
+    tls: Tls,
+    limits: ConnectionLimits,
+) -> Result<
+    (
+        std::net::SocketAddr,
+        tokio::sync::oneshot::Sender<()>,
+        tokio::task::JoinHandle<()>,
+    ),
+    Box<dyn std::error::Error>,
+> {
+    let gateway = builder.build()?;
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let addr = listener.local_addr()?;
     let (tx, rx) = tokio::sync::oneshot::channel::<()>();
@@ -146,6 +165,9 @@ const fn tight(max_connections: usize) -> ConnectionLimits {
         handshake_timeout: Duration::from_millis(300),
         header_read_timeout: Duration::from_millis(300),
         max_connections,
+        max_connections_per_ip: 0,
+        body_timeout: Duration::from_secs(1),
+        idle_timeout: Duration::from_millis(600),
     }
 }
 
@@ -236,5 +258,170 @@ async fn hostile_clients_cannot_lock_others_out() -> TestResult {
     .await??;
     assert!(reply.starts_with("HTTP/1.1 200"), "{reply}");
     drop(hostile);
+    Ok(())
+}
+
+// Red team round 4: slow bodies, idle HTTP/2 and one client hogging the
+// connection slots.
+
+/// A gateway with `/echo`, which reads the whole body and answers its length.
+async fn start_echo(
+    limits: ConnectionLimits,
+) -> Result<
+    (
+        std::net::SocketAddr,
+        tokio::sync::oneshot::Sender<()>,
+        tokio::task::JoinHandle<()>,
+    ),
+    Box<dyn std::error::Error>,
+> {
+    let echo = axum::Router::new().route(
+        "/",
+        axum::routing::post(|body: axum::body::Bytes| async move { body.len().to_string() }),
+    );
+    let builder = GatewayBuilder::new(GatewayConfig::new("http://localhost", vec![1; 32]), "test")
+        .mount_cross_site("/echo", echo);
+    start_gateway(builder, Tls::Off, limits).await
+}
+
+const SLOW_POST: &[u8] =
+    b"POST /echo HTTP/1.1\r\nHost: x\r\nContent-Type: text/plain\r\nContent-Length: 100000\r\n\r\n";
+
+#[tokio::test]
+async fn a_body_that_stops_arriving_is_cut_off() -> TestResult {
+    let (addr, _stop, _handle) = start_echo(tight(16)).await?;
+    let mut slow = TcpStream::connect(addr).await?;
+    slow.write_all(SLOW_POST).await?;
+    slow.write_all(b"only a little").await?;
+    assert!(closed_within(&mut slow, Duration::from_secs(3)).await);
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_trickled_body_is_cut_off_at_the_deadline() -> TestResult {
+    let (addr, _stop, _handle) = start_echo(tight(16)).await?;
+    let mut slow = TcpStream::connect(addr).await?;
+    slow.write_all(SLOW_POST).await?;
+    // One byte every 100 ms never trips the 300 ms gap, but the whole
+    // body must arrive within 1 s.
+    let started = tokio::time::Instant::now();
+    let mut buf = [0_u8; 256];
+    loop {
+        assert!(
+            started.elapsed() < Duration::from_secs(4),
+            "the trickle was never cut off"
+        );
+        if slow.write_all(b"x").await.is_err() {
+            break;
+        }
+        match tokio::time::timeout(Duration::from_millis(100), slow.read(&mut buf)).await {
+            Ok(Ok(0) | Err(_)) => break,
+            Ok(Ok(_)) => {
+                assert!(
+                    !buf.starts_with(b"HTTP/1.1 200"),
+                    "a trickled body was accepted"
+                );
+                break;
+            }
+            Err(_) => {}
+        }
+    }
+    assert!(started.elapsed() >= Duration::from_millis(900));
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_prompt_body_is_read_in_full() -> TestResult {
+    let (addr, _stop, _handle) = start_echo(tight(16)).await?;
+    let mut fast = TcpStream::connect(addr).await?;
+    let body = vec![b'n'; 100_000];
+    fast.write_all(SLOW_POST).await?;
+    fast.write_all(&body).await?;
+    let mut buf = vec![0_u8; 4096];
+    let n = tokio::time::timeout(Duration::from_secs(3), fast.read(&mut buf)).await??;
+    let reply = String::from_utf8_lossy(&buf[..n]);
+    assert!(reply.starts_with("HTTP/1.1 200"), "{reply}");
+    assert!(reply.ends_with("100000"), "{reply}");
+    Ok(())
+}
+
+/// Speaks just enough HTTP/2 (prior knowledge, no TLS) to hold a
+/// connection open: the preface, empty settings, and an answer to every
+/// ping. Returns true if the server closed the connection within `wait`.
+async fn idle_h2_closed_within(
+    addr: std::net::SocketAddr,
+    wait: Duration,
+) -> std::io::Result<bool> {
+    let mut stream = TcpStream::connect(addr).await?;
+    stream
+        .write_all(b"PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n\0\0\0\x04\0\0\0\0\0")
+        .await?;
+    let deadline = tokio::time::Instant::now() + wait;
+    loop {
+        let mut head = [0_u8; 9];
+        match tokio::time::timeout_at(deadline, stream.read_exact(&mut head)).await {
+            Err(_) => return Ok(false),
+            Ok(Err(_)) => return Ok(true),
+            Ok(Ok(_)) => {}
+        }
+        let len = usize::from(head[0]) << 16 | usize::from(head[1]) << 8 | usize::from(head[2]);
+        let mut payload = vec![0_u8; len];
+        if stream.read_exact(&mut payload).await.is_err() {
+            return Ok(true);
+        }
+        match (head[3], head[4] & 1) {
+            // A GOAWAY means the server is closing.
+            (7, _) => return Ok(true),
+            // SETTINGS: acknowledge.
+            (4, 0) => stream.write_all(&[0, 0, 0, 4, 1, 0, 0, 0, 0]).await?,
+            // PING: answer it, as a live client would.
+            (6, 0) => {
+                let mut ack = vec![0, 0, 8, 6, 1, 0, 0, 0, 0];
+                ack.extend_from_slice(&payload);
+                stream.write_all(&ack).await?;
+            }
+            _ => {}
+        }
+    }
+}
+
+#[tokio::test]
+async fn an_idle_http2_connection_is_closed() -> TestResult {
+    let (addr, _stop, _handle) = start_with(Tls::Off, tight(16)).await?;
+    // hyper pings every 300 ms here and the client answers each ping, so
+    // only the idle limit (600 ms) can close it.
+    assert!(idle_h2_closed_within(addr, Duration::from_secs(4)).await?);
+    Ok(())
+}
+
+#[tokio::test]
+async fn one_client_cannot_take_every_slot() -> TestResult {
+    let mut limits = tight(64);
+    limits.max_connections_per_ip = 2;
+    limits.header_read_timeout = Duration::from_secs(5);
+    limits.handshake_timeout = Duration::from_secs(5);
+    let (addr, _stop, _handle) = start_with(Tls::Off, limits).await?;
+    let mut held = Vec::new();
+    for _ in 0..2 {
+        let mut s = TcpStream::connect(addr).await?;
+        s.write_all(b"GET /healthz HTTP/1.1\r\nHost: x\r\n").await?;
+        held.push(s);
+    }
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    // A third connection from the same address is closed at once.
+    let mut third = TcpStream::connect(addr).await?;
+    let _ = third
+        .write_all(b"GET /healthz HTTP/1.1\r\nHost: x\r\n\r\n")
+        .await;
+    assert!(closed_within(&mut third, Duration::from_secs(1)).await);
+    // Once one is let go, the client may connect again.
+    drop(held.pop());
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    let reply = tokio::time::timeout(
+        Duration::from_secs(3),
+        exchange(TcpStream::connect(addr).await?, "/healthz"),
+    )
+    .await??;
+    assert!(reply.starts_with("HTTP/1.1 200"), "{reply}");
     Ok(())
 }

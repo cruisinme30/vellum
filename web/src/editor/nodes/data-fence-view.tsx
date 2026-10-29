@@ -3,6 +3,7 @@
 
 import { NodeViewContent, NodeViewWrapper, type ReactNodeViewProps } from "@tiptap/react";
 
+import { CollectionEmbedPreview } from "../../collections/embed-preview";
 import { useT } from "../../i18n/i18n";
 import { Icon } from "../../shell/icon";
 import { NODES } from "../schema/blocks.gen";
@@ -103,6 +104,9 @@ function Preview({ lang, body }: { readonly lang: string; readonly body: string 
   }
   if (lang === "table") {
     return <CsvTable rows={parseCsv(body)} />;
+  }
+  if (lang === "collection") {
+    return <CollectionEmbedPreview fence={body} />;
   }
   return (
     <p className="vl-muted">{t(KROKI.has(lang) ? "fence-kroki" : "fence-rendered", { lang })}</p>

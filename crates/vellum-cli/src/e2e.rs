@@ -64,3 +64,37 @@ impl SpaceAccess for DriveSpaces {
             .await?)
     }
 }
+
+/// Puts the private-space guard in front of `store`: private spaces then
+/// accept only sealed pages, whichever service writes (D208).
+pub fn guarded(store: Arc<dyn BlobStore>) -> (Arc<dyn BlobStore>, vellum_e2e::PrivateRoots) {
+    let roots = vellum_e2e::PrivateRoots::default();
+    (
+        Arc::new(vellum_e2e::Guard::new(store, roots.clone())),
+        roots,
+    )
+}
+
+/// How often each replica reloads which spaces are private, to pick up
+/// key lists changed on other replicas.
+const ROOTS_EVERY: std::time::Duration = std::time::Duration::from_secs(15);
+
+/// Loads which spaces are private before serving, then reloads them every
+/// [`ROOTS_EVERY`] on this replica.
+pub async fn keep_roots_fresh(e2e: Arc<E2e>) {
+    match e2e.refresh_roots().await {
+        Ok(count) => tracing::info!(private_spaces = count, "private spaces loaded"),
+        Err(error) => tracing::warn!(%error, "private spaces not loaded yet"),
+    }
+    drop(tokio::spawn(async move {
+        let mut tick = tokio::time::interval(ROOTS_EVERY);
+        tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        let _ = tick.tick().await;
+        loop {
+            let _ = tick.tick().await;
+            if let Err(error) = e2e.refresh_roots().await {
+                tracing::warn!(%error, "private spaces not reloaded");
+            }
+        }
+    }));
+}
