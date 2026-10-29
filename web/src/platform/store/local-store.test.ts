@@ -104,6 +104,16 @@ describe("LocalStore", () => {
     expect(store.pending).toEqual([]);
   });
 
+  it("pulls page after page until the server has nothing more", async () => {
+    const { server, store } = await setup();
+    server.pageSize = 2;
+    for (const key of ["A", "B", "C", "D", "E"]) {
+      server.serverApply({ name: "createIssue", args: { key, title: key } });
+    }
+    expect(await store.sync()).toEqual({ pushed: 0, pulled: 5, pending: 0 });
+    expect(store.scan("issues")).toHaveLength(5);
+  });
+
   it("does not apply a mutation twice when a push is retried", async () => {
     const { server, store } = await setup();
     store.mutate("createIssue", { key: "ENG-1", title: "a" });

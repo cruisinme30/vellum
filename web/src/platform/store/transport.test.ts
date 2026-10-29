@@ -81,6 +81,7 @@ describe("response checks", () => {
     NULL,
     { cursor: 1, lastMutationId: 0, reset: false, patches: [] },
     { cursor: "1", lastMutationId: 0, reset: "no", patches: [] },
+    { cursor: "1", lastMutationId: 0, reset: false, patches: [], more: "yes" },
     { cursor: "1", lastMutationId: 0, reset: false, patches: [{ op: "move" }] },
     {
       cursor: "1",

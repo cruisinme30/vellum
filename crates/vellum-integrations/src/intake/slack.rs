@@ -18,6 +18,7 @@ use jiff::{SignedDuration, Timestamp};
 use serde_json::Value;
 
 use super::Routing;
+use super::text::Body;
 use crate::inbound::{InboundError, text};
 use crate::mac;
 use crate::model::{IssueDraft, Priority, Source, one_line};
@@ -169,8 +170,10 @@ pub fn to_draft(
                     permalink: Some(permalink.clone()),
                 },
             );
-            let quoted: Vec<String> = text.lines().map(|l| format!("> {l}")).collect();
-            draft.description = format!("{}\n\n[View in Slack]({permalink})\n", quoted.join("\n"));
+            draft.description = Body::new()
+                .quote(text)
+                .link("View in Slack", permalink)
+                .finish();
             draft.reporter = reporter;
             Some(draft)
         }

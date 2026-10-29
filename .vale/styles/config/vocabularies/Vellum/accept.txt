@@ -74,6 +74,10 @@ Yjs
 Replicache
 mdBook
 Roboto
+[Tt]antivy
+Meilisearch
+BM25
+ONNX
 GitLab
 [Gg]it[Hh]ub
 Sentry

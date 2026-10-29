@@ -80,7 +80,6 @@ skip = [
     { crate = "crypto-common@0.1", reason = "RustCrypto 0.10 line, see sha2@0.10" },
     { crate = "cpufeatures@0.2", reason = "RustCrypto 0.10 line, see sha2@0.10" },
     { crate = "rand@0.9", reason = "bollard (testcontainers, tests only) is still on rand 0.9" },
-    { crate = "rand_core@0.9", reason = "pulled by rand 0.9" },
     { crate = "getrandom@0.2", reason = "ring (rustls, testcontainers only) is still on getrandom 0.2" },
     { crate = "windows-sys@0.52", reason = "ring is still on windows-sys 0.52" },
     { crate = "miniz_oxide@0.8", reason = "png still on 0.8 while flate2 moved to 0.9" },
@@ -107,6 +106,12 @@ skip = [
     { crate = "toml_edit@0.22", reason = "pulled by toml 0.8 (Typst 0.15)" },
     { crate = "winnow@0.7", reason = "pulled by toml 0.8 (Typst 0.15)" },
     { crate = "synstructure@0.13", reason = "asn1-rs-derive (x509-parser via rustls-acme) still on synstructure 0.13" },
+    { crate = "windows-sys@0.59", reason = "fs4 (tantivy) is still on windows-sys 0.59" },
+    { crate = "itertools@0.14", reason = "tantivy and prost-derive are on itertools 0.14; tract moved to 0.15" },
+    { crate = "nom@7", reason = "tantivy-query-grammar is on nom 7; tract moved to nom 8" },
+    { crate = "darling@0.23", reason = "async-graphql-derive is on darling 0.23; bon (tantivy) moved to 0.24" },
+    { crate = "darling_core@0.23", reason = "async-graphql-derive is on darling 0.23; bon (tantivy) moved to 0.24" },
+    { crate = "darling_macro@0.23", reason = "async-graphql-derive is on darling 0.23; bon (tantivy) moved to 0.24" },
 ]
 skip-tree = [
     # Linux Secret Service (os-keychain feature only) still uses the previous

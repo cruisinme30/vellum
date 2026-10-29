@@ -55,10 +55,9 @@ pub fn check_url(raw: &str, policy: &UrlPolicy) -> Result<Url, SsrfError> {
             .any(|t| t.eq_ignore_ascii_case(h))
     });
     if trusted {
-        // Trusted local receivers may use any port.
-        let mut relaxed = policy.clone();
-        relaxed.allowed_ports.extend(url.port());
-        relaxed.check_url(&url)?;
+        // An admin named this receiver in the policy, so it is checked as
+        // a trusted host: the address and port rules do not apply to it.
+        policy.check_trusted_url(&url)?;
     } else {
         policy.check_url(&url)?;
     }
