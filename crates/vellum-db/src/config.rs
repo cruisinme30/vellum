@@ -48,6 +48,13 @@ pub enum IndexConfig {
         /// SQLCipher key. `None` only when the operator chose plaintext mode.
         key: Option<IndexKey>,
     },
+    /// HA profiles: a Postgres connection URL.
+    Postgres {
+        /// `postgres://` URL.
+        url: String,
+        /// Upper bound on pooled connections.
+        max_connections: u32,
+    },
 }
 
 impl IndexConfig {
@@ -55,6 +62,15 @@ impl IndexConfig {
     #[must_use]
     pub const fn sqlite(path: PathBuf, key: Option<IndexKey>) -> Self {
         Self::Sqlite { path, key }
+    }
+
+    /// Postgres at `url` with the default pool size of 16.
+    #[must_use]
+    pub fn postgres(url: impl Into<String>) -> Self {
+        Self::Postgres {
+            url: url.into(),
+            max_connections: 16,
+        }
     }
 }
 

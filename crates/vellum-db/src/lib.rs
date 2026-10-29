@@ -7,9 +7,9 @@
 //! index over them (spaces, folders, documents, the `page_ancestors` closure)
 //! plus the two database-owned tables, `grants` and `user_doc_state`.
 //!
-//! The single binary keeps the index in SQLite, encrypted with SQLCipher
-//! when a key is given. The Postgres adapter for the HA profiles shares the
-//! same schema shape.
+//! Two backends share one schema shape:
+//! - **SQLite** for the single binary, encrypted with SQLCipher when a key is given.
+//! - **Postgres** for the HA profiles.
 //!
 //! Conventions: IDs are ULID text, timestamps are UTC epoch milliseconds,
 //! and `space_id` is the shard key on every table. Migrations are forward-only.

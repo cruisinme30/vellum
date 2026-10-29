@@ -49,3 +49,19 @@ async fn encrypted_file_is_unreadable_without_the_key() {
         );
     }
 }
+
+#[tokio::test]
+async fn plaintext_mode_writes_a_plain_sqlite_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("index.sqlite");
+    let index = Index::open(&IndexConfig::sqlite(path.clone(), None))
+        .await
+        .unwrap();
+    assert_eq!(index.table_names().await.unwrap(), ["index_meta"]);
+    index.close().await;
+    assert!(
+        std::fs::read(&path)
+            .unwrap()
+            .starts_with(b"SQLite format 3")
+    );
+}

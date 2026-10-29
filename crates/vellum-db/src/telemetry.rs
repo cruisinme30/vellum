@@ -21,6 +21,12 @@ impl RowCount for sqlx::sqlite::SqliteQueryResult {
     }
 }
 
+impl RowCount for sqlx::postgres::PgQueryResult {
+    fn row_count(&self) -> u64 {
+        self.rows_affected()
+    }
+}
+
 impl<T> RowCount for Vec<T> {
     fn row_count(&self) -> u64 {
         u64::try_from(self.len()).unwrap_or(u64::MAX)

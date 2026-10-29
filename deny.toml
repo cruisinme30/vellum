@@ -48,6 +48,15 @@ skip = [
     { crate = "r-efi@5", reason = "pulled by getrandom 0.3" },
     { crate = "base64@0.22", reason = "sqlx 0.9 is still on base64 0.22" },
     { crate = "hashbrown@0.16", reason = "sqlx-core 0.9 pins hashbrown 0.16; indexmap moved to 0.17" },
+    { crate = "sha2@0.10", reason = "sqlx-core 0.9 is still on the RustCrypto 0.10 line" },
+    { crate = "digest@0.10", reason = "RustCrypto 0.10 line, see sha2@0.10" },
+    { crate = "block-buffer@0.10", reason = "RustCrypto 0.10 line, see sha2@0.10" },
+    { crate = "crypto-common@0.1", reason = "RustCrypto 0.10 line, see sha2@0.10" },
+    { crate = "cpufeatures@0.2", reason = "RustCrypto 0.10 line, see sha2@0.10" },
+    { crate = "rand@0.9", reason = "bollard (testcontainers, tests only) is still on rand 0.9" },
+    { crate = "rand_core@0.9", reason = "pulled by rand 0.9" },
+    { crate = "getrandom@0.2", reason = "ring (rustls, testcontainers only) is still on getrandom 0.2" },
+    { crate = "windows-sys@0.52", reason = "ring is still on windows-sys 0.52" },
 ]
 skip-tree = []
 
