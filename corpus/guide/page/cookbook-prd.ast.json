@@ -25,6 +25,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "sections": [
           [
             {
@@ -34,6 +35,11 @@
               "items": [
                 {
                   "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
                   "blocks": [
                     {
                       "type": "paragraph",
@@ -53,6 +59,11 @@
                 },
                 {
                   "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
                   "blocks": [
                     {
                       "type": "paragraph",
@@ -68,6 +79,11 @@
                 },
                 {
                   "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
                   "blocks": [
                     {
                       "type": "paragraph",
@@ -87,6 +103,11 @@
                 },
                 {
                   "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
                   "blocks": [
                     {
                       "type": "paragraph",
@@ -242,7 +263,8 @@
               }
             ]
           ]
-        ]
+        ],
+        "id": null
       },
       {
         "type": "heading",
@@ -269,6 +291,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "range: 2026-10-01 .. 2027-02-28\nReplay engine | 2026-10-01 | 2026-11-15\nDiff report | 2026-11-01 | 2026-12-15\nPDF report | 2026-12-01 | 2027-01-05\nGA | 2027-01-10 | milestone\n"
       },
       {
@@ -296,6 +319,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "Replay too slow for large tenants | likelihood 3 | impact 4\nPDF layout slips | likelihood 2 | impact 2\n"
       },
       {
@@ -307,6 +331,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "sections": [
           [
             {

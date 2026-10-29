@@ -104,6 +104,9 @@
 - name: area/cli
   color: "5319e7"
   description: "vellum-cli: the vellum binary"
+- name: area/desktop
+  color: "5319e7"
+  description: "The Electron desktop app"
 - name: area/editor
   color: "5319e7"
   description: "The web editor"
