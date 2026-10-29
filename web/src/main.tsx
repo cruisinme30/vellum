@@ -21,11 +21,13 @@ import { createHttpWorkspaceStore } from "./data/http";
 import { createNorthstarStore } from "./data/mock/northstar";
 import { lazyCache } from "./editor/collab/lazy-cache";
 import { createLocalConnector } from "./editor/collab/local-connector";
+import { createSocketConnector } from "./editor/collab/socket-connector";
 import { createPlatform, startPlatform } from "./platform/platform";
 import { DocumentCache } from "./platform/store/document-cache";
 import { openLocalDatabase } from "./platform/store/persistence";
 
-// Pages keep their edits across reloads in the browser's local database.
+// Demo pages keep their edits across reloads in the browser's local
+// database. With a server, the page's room on /collab is the store.
 const cache = lazyCache(async () => new DocumentCache(await openLocalDatabase("vellum-northstar")));
 
 const container = document.querySelector("#root");
@@ -54,7 +56,7 @@ root.render(
           ? createNorthstarStore()
           : createHttpWorkspaceStore(http, { user: status.user ?? undefined })
       }
-      collab={createLocalConnector({ cache })}
+      collab={status === undefined ? createLocalConnector({ cache }) : createSocketConnector()}
       collections={
         status === undefined ? createMockCollectionsStore() : createHttpCollectionsStore(http)
       }
