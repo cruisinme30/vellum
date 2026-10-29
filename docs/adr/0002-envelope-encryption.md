@@ -12,6 +12,7 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D34, D35, D36
+- Issues: [#47](https://github.com/cruisinme30/vellum/issues/47), [#49](https://github.com/cruisinme30/vellum/issues/49), [#50](https://github.com/cruisinme30/vellum/issues/50), [#186](https://github.com/cruisinme30/vellum/issues/186)
 
 :::
 
