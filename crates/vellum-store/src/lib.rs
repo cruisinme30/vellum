@@ -14,6 +14,7 @@ mod local;
 mod merge;
 pub mod metered;
 mod path;
+mod reconcile;
 mod store;
 
 #[cfg(any(test, feature = "conformance"))]
@@ -24,4 +25,5 @@ pub use local::LocalStore;
 pub use merge::{MergeKind, Merged, merge3};
 pub use metered::Metered;
 pub use path::{BlobPath, MAX_PATH_BYTES, TEMP_PREFIX};
+pub use reconcile::{Base, Saved, Writer, conflict_path, save};
 pub use store::{Blob, BlobEntry, BlobMeta, BlobStore, Etag, Precondition};
