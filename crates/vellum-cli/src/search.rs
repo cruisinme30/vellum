@@ -30,7 +30,7 @@ use vellum_kernel::{DocId, Error, ErrorKind, ObjectId, SpaceId, Timestamp, UserI
 use vellum_search::{
     DocKind, DocumentSource, DriveFeed, DriveSource, FeedConfig, IndexDocument, IndexKey, Indexer,
     IndexerConfig, Location, Opened, PostgresBackend, Principal, ReadAccess, SearchApi,
-    SearchBackend, SearchService, Stars, Start, TantivyBackend, TantivyConfig,
+    SearchBackend, SearchService, Sharded, Stars, Start, TantivyBackend, TantivyConfig,
 };
 use vellum_store::{BlobPath, BlobStore};
 
@@ -123,7 +123,8 @@ impl Stars for NoStars {
 
 /// Drive pages, plus collection rows with their computed values.
 struct WorkspaceSource {
-    drive: DriveSource,
+    /// Pages, from every shard's drive tables.
+    drive: Sharded<DriveSource>,
     collections: Arc<CollectionsService>,
     rows: Arc<RowOwners>,
     space_of: SpaceOf,
@@ -221,8 +222,11 @@ pub struct Parts<S: AuthzStore + 'static> {
     pub data_dir: std::path::PathBuf,
     /// The raw index key; `None` in plaintext mode.
     pub key: Option<[u8; 32]>,
-    /// The index database.
+    /// The index database: the search tables on Postgres.
     pub index: Index,
+    /// Every shard's database, holding the drive's tables (just `index`
+    /// without shards).
+    pub shards: Vec<Index>,
     /// The files.
     pub store: Arc<dyn BlobStore>,
     /// Permissions.
@@ -274,6 +278,7 @@ pub async fn start<S: AuthzStore + 'static>(parts: Parts<S>) -> Result<SearchApi
         data_dir,
         key,
         index,
+        shards,
         store,
         authz,
         collections,
@@ -283,7 +288,6 @@ pub async fn start<S: AuthzStore + 'static>(parts: Parts<S>) -> Result<SearchApi
     } = parts;
     let shared = matches!(index.pool(), IndexPool::Postgres(_));
     let (backend, opened) = backend(&data_dir, key, &index).await?;
-    let index = Arc::new(index);
     let rows = Arc::new(RowOwners::default());
     let service = SearchService::new(
         backend,
@@ -291,10 +295,15 @@ pub async fn start<S: AuthzStore + 'static>(parts: Parts<S>) -> Result<SearchApi
             authz,
             rows: Arc::clone(&rows),
         }),
-        Arc::clone(&index) as Arc<dyn Stars>,
+        Arc::new(Sharded(shards.clone())) as Arc<dyn Stars>,
     );
     let source = Arc::new(WorkspaceSource {
-        drive: DriveSource::new(Arc::clone(&index), store),
+        drive: Sharded(
+            shards
+                .iter()
+                .map(|shard| DriveSource::new(Arc::new(shard.clone()), Arc::clone(&store)))
+                .collect(),
+        ),
         collections: Arc::clone(&collections),
         rows,
         space_of,
@@ -346,13 +355,17 @@ pub async fn start<S: AuthzStore + 'static>(parts: Parts<S>) -> Result<SearchApi
             start,
             ..FeedConfig::default()
         };
-        // A shared index needs one follower in the cluster; a local one
-        // needs one per replica.
-        drop(if shared {
-            DriveFeed::spawn_shared(index, indexer, config, &holder)
-        } else {
-            DriveFeed::spawn(index, indexer, config)
-        });
+        // Each shard logs its own page changes. A shared index needs one
+        // follower per shard in the cluster; a local one needs one per
+        // replica.
+        for shard in shards {
+            let (db, indexer) = (Arc::new(shard), indexer.clone());
+            drop(if shared {
+                DriveFeed::spawn_shared(db, indexer, config, &holder)
+            } else {
+                DriveFeed::spawn(db, indexer, config)
+            });
+        }
     }));
     Ok(SearchApi::new(service))
 }
@@ -461,7 +474,7 @@ mod tests {
         let rows = Arc::new(RowOwners::default());
         let space = Id(5);
         let source = WorkspaceSource {
-            drive: DriveSource::new(Arc::new(index), store),
+            drive: Sharded(vec![DriveSource::new(Arc::new(index), store)]),
             collections,
             rows: Arc::clone(&rows),
             space_of: Arc::new(move |_: &BlobPath| Some(space)),

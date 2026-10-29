@@ -40,6 +40,13 @@ impl ShardRouter {
     /// [`Error::UnknownShard`] when the map names a shard that is not
     /// configured; database errors.
     pub async fn open(sharded: ShardedIndex) -> Result<Self> {
+        if sharded.shards().len() == 1 {
+            // One database: every space is at home and the map is unused.
+            return Ok(Self {
+                sharded,
+                map: RwLock::new(HashMap::new()),
+            });
+        }
         adopt(&sharded).await?;
         let mut map = HashMap::new();
         for (space, name) in sharded.assignments().await? {
@@ -96,6 +103,9 @@ impl ShardRouter {
     /// # Errors
     /// [`Error::UnknownShard`] or database errors.
     pub async fn position(&self, space: ObjectId) -> Result<usize> {
+        if self.len() == 1 {
+            return Ok(0);
+        }
         if let Some(at) = self.known(space) {
             return Ok(at);
         }
@@ -137,6 +147,9 @@ impl ShardRouter {
     /// # Errors
     /// Database errors.
     pub async fn place(&self, space: ObjectId) -> Result<usize> {
+        if self.len() == 1 {
+            return Ok(0);
+        }
         if let Some(at) = self.known(space) {
             return Ok(at);
         }

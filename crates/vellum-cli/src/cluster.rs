@@ -152,12 +152,12 @@ impl Replica {
         ));
     }
 
-    /// Prunes the change feed, the page change log and finished jobs,
-    /// on one replica at a time.
-    pub fn maintain(&self, index: &Index) {
-        let (feed, changes, jobs, rates) = (
+    /// Prunes the change feed, finished jobs and rate counts in `index`,
+    /// and the page change log on every shard, on one replica at a time.
+    pub fn maintain(&self, index: &Index, shards: &[Index]) {
+        let changes: Vec<DriveChanges> = shards.iter().cloned().map(DriveChanges::new).collect();
+        let (feed, jobs, rates) = (
             Feed::new(index.clone()),
-            DriveChanges::new(index.clone()),
             Queue::new(index.clone()),
             SharedCounts::new(index.clone()),
         );
@@ -174,9 +174,11 @@ impl Replica {
                     Ok(gone) => tracing::debug!(gone, "pruned the change feed"),
                     Err(error) => tracing::warn!(%error, "cannot prune the change feed"),
                 }
-                match changes.prune(KEEP_PAGE_CHANGES).await {
-                    Ok(gone) => tracing::debug!(gone, "pruned the page change log"),
-                    Err(error) => tracing::warn!(%error, "cannot prune the page change log"),
+                for log in &changes {
+                    match log.prune(KEEP_PAGE_CHANGES).await {
+                        Ok(gone) => tracing::debug!(gone, "pruned the page change log"),
+                        Err(error) => tracing::warn!(%error, "cannot prune the page change log"),
+                    }
                 }
                 match jobs.prune(KEEP_FINISHED_JOBS).await {
                     Ok(gone) => tracing::debug!(gone, "pruned finished jobs"),

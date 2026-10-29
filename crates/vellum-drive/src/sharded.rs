@@ -84,6 +84,9 @@ impl ShardedIndex {
     }
 
     fn learn(&self, node: ObjectId, at: usize) {
+        if self.shards.len() == 1 {
+            return;
+        }
         let _ = self
             .nodes
             .write()
@@ -101,6 +104,9 @@ impl ShardedIndex {
 
     /// The node and the position of the shard that holds it.
     async fn locate(&self, id: ObjectId) -> DriveResult<Option<(usize, Node)>> {
+        if self.shards.len() == 1 {
+            return Ok(self.shard(0)?.node(id).await?.map(|node| (0, node)));
+        }
         let cached = self
             .nodes
             .read()
@@ -147,6 +153,9 @@ impl ShardedIndex {
     /// The shard holding `id`, or home when no shard does (the call then
     /// behaves as on a single database).
     async fn for_node(&self, id: ObjectId) -> DriveResult<&SqlIndex> {
+        if self.shards.len() == 1 {
+            return self.shard(0);
+        }
         let at = self.locate(id).await?.map_or(0, |(at, _)| at);
         self.shard(at)
     }

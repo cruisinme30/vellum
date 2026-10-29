@@ -154,6 +154,22 @@ impl ShardedIndex {
         Ok(Self { main, home, shards })
     }
 
+    /// One database acting as both the main database and the only shard,
+    /// `home`: a deployment without `VELLUM_SHARDS` routes through the same
+    /// code with every space at home.
+    #[must_use]
+    pub fn single(index: Index) -> Self {
+        let home = Shard {
+            name: "home".to_owned(),
+            index: index.clone(),
+        };
+        Self {
+            main: index,
+            home: home.clone(),
+            shards: vec![home],
+        }
+    }
+
     /// The main database.
     #[must_use]
     pub const fn main(&self) -> &Index {

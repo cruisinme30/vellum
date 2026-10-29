@@ -91,3 +91,19 @@ async fn spaces_written_before_sharding_stay_where_they_are() {
     assert_eq!(router.position(space(9)).await.unwrap(), 1);
     assert_eq!(router.place(space(9)).await.unwrap(), 1);
 }
+
+#[tokio::test]
+async fn one_database_keeps_every_space_at_home_without_a_map() {
+    let dir = tempfile::tempdir().unwrap();
+    let index = vellum_db::Index::open(&IndexConfig::sqlite(dir.path().join("one.sqlite"), None))
+        .await
+        .unwrap();
+    let sharded = ShardedIndex::single(index);
+    let router = ShardRouter::open(sharded.clone()).await.unwrap();
+    assert_eq!(router.place(space(1)).await.unwrap(), 0);
+    assert_eq!(router.position(space(2)).await.unwrap(), 0);
+    assert!(
+        sharded.counts().await.unwrap().is_empty(),
+        "nothing recorded"
+    );
+}
