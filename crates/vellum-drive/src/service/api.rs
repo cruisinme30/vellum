@@ -149,7 +149,8 @@ impl From<&Space> for SpaceView {
 /// The caller's My Drive, if they have one.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct MyDrive {
-    /// The space; absent until it is created.
+    /// The space. It is made on the first visit when the account has
+    /// none yet, so it is always present.
     pub space: Option<SpaceView>,
 }
 

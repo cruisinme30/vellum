@@ -550,6 +550,17 @@ async fn break_glass_opens_a_short_admin_session_once() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// An anonymous caller gets 401 from the workspace services.
+async fn anonymous_is_turned_away(app: &axum::Router) {
+    let anonymous = send(app, finish(request("GET", "/api/v1/books"))).await;
+    assert_eq!(
+        anonymous.status,
+        StatusCode::UNAUTHORIZED,
+        "{}",
+        anonymous.text
+    );
+}
+
 /// Live editing is mounted. A test request carries no connection to
 /// upgrade, so the socket handler answers 426 instead of a missing route.
 async fn live_editing_is_mounted(app: &axum::Router) {
@@ -575,6 +586,28 @@ async fn live_editing_is_mounted(app: &axum::Router) {
         "{}",
         anonymous.text
     );
+}
+
+/// The person has a My Drive without asking for one, and a space's whole
+/// tree comes in one request.
+async fn drive_extras(app: &axum::Router, cookie: &str, space_id: &str, page_id: &str) {
+    let mine = send(
+        app,
+        finish(request("GET", "/api/v1/drive/my-drive").header(header::COOKIE, cookie)),
+    )
+    .await;
+    assert_eq!(mine.status, StatusCode::OK, "{}", mine.text);
+    assert_eq!(mine.json()["space"]["kind"], "user_drive", "{}", mine.text);
+    let tree = send(
+        app,
+        finish(
+            request("GET", &format!("/api/v1/drive/spaces/{space_id}/tree"))
+                .header(header::COOKIE, cookie),
+        ),
+    )
+    .await;
+    assert_eq!(tree.status, StatusCode::OK, "{}", tree.text);
+    assert_eq!(tree.json()["items"][0]["id"], page_id, "{}", tree.text);
 }
 
 /// `vellum serve` with a plaintext index: the workspace services answer a
@@ -613,14 +646,7 @@ async fn workspace_services_answer_signed_in_users() {
         .unwrap()
         .router();
 
-    let anonymous = send(&app, finish(request("GET", "/api/v1/books"))).await;
-    assert_eq!(
-        anonymous.status,
-        StatusCode::UNAUTHORIZED,
-        "{}",
-        anonymous.text
-    );
-
+    anonymous_is_turned_away(&app).await;
     live_editing_is_mounted(&app).await;
 
     let cookie = signed_in_admin(&app).await;
@@ -663,6 +689,9 @@ async fn workspace_services_answer_signed_in_users() {
     .await;
     assert_eq!(page.status, StatusCode::OK, "{}", page.text);
     let page_id = page.json()["id"].as_str().unwrap().to_owned();
+
+    drive_extras(&app, &cookie, &space_id, &page_id).await;
+
     let file = dir.join(page.json()["path"].as_str().unwrap());
     let versions = format!("/api/v1/drive/items/{page_id}/versions");
     let mut seen = String::new();

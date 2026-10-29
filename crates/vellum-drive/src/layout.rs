@@ -73,6 +73,26 @@ pub fn parse_space_root(dir: &BlobPath) -> Option<(SpaceKind, &str)> {
     is_slug(slug).then_some((kind, slug))
 }
 
+/// A My Drive slug from a person's handle: lowercase letters and digits,
+/// other characters turned into single dashes, at most 48 bytes, `me`
+/// when nothing is left. The web app's `slugOf` does the same.
+#[must_use]
+pub fn slug_of(handle: &str) -> String {
+    let lower = handle.to_lowercase();
+    let mut slug = lower
+        .split(|c: char| !(c.is_ascii_lowercase() || c.is_ascii_digit()))
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("-");
+    slug.truncate(48);
+    let slug = slug.trim_end_matches('-').to_owned();
+    if slug.is_empty() {
+        "me".to_owned()
+    } else {
+        slug
+    }
+}
+
 fn is_slug(slug: &str) -> bool {
     !slug.is_empty()
         && slug.len() <= 64
@@ -344,6 +364,15 @@ mod tests {
         );
         assert!(space_root(SpaceKind::UserDrive, "Bad Slug").is_err());
         assert_eq!(parse_space_root(&p("drives/other/x")), None);
+    }
+
+    #[test]
+    fn my_drive_slugs_come_from_handles() {
+        assert_eq!(slug_of("Ada.Lovelace"), "ada-lovelace");
+        assert_eq!(slug_of("__"), "me");
+        assert_eq!(slug_of("Zoë_42"), "zo-42");
+        assert!(slug_of(&"a".repeat(80)).len() <= 48);
+        assert!(is_slug(&slug_of("-x-")));
     }
 
     #[test]

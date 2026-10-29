@@ -35,6 +35,7 @@ use crate::model::{Activity, ActivityKind, Node, NodeKind, Space};
 use crate::ports::{Access, Clock, DriveIndex, Permission, SystemClock};
 
 pub use content::{SaveOutcome, Saved};
+pub use create::MY_DRIVE_NAME;
 pub use order::{MAX_TREE_ITEMS, Tree};
 pub use views::Filter;
 

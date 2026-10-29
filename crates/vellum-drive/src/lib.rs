@@ -27,7 +27,9 @@ pub mod retention;
 pub mod service;
 pub mod sql;
 
-pub use drive::{Drive, Filter, MAX_TREE_ITEMS, OP_SECONDS, OPS_TOTAL, SaveOutcome, Saved, Tree};
+pub use drive::{
+    Drive, Filter, MAX_TREE_ITEMS, MY_DRIVE_NAME, OP_SECONDS, OPS_TOTAL, SaveOutcome, Saved, Tree,
+};
 pub use error::{DriveError, DriveResult};
 pub use model::{
     Activity, ActivityKind, Node, NodeKind, RetentionPolicy, ScanReport, Space, SpaceKind,

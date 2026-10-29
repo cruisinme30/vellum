@@ -17,7 +17,7 @@ use bytes::Bytes;
 use vellum_contracts::{
     BoxFuture, HttpMethod, Operation, Readiness, RequestContext, Scope, Service,
 };
-use vellum_kernel::{Actor, Error};
+use vellum_kernel::{Actor, Error, UserId};
 use vellum_store::{Base, Etag};
 
 use self::api::{
@@ -36,17 +36,41 @@ const DEFAULT_LIMIT: usize = 50;
 /// Items a tree returns when the caller does not say.
 const DEFAULT_TREE_LIMIT: usize = 2_000;
 
+/// Looks up a person's handle, for naming the My Drive made for them.
+pub type Handles = Arc<dyn Fn(UserId) -> Option<String> + Send + Sync>;
+
 /// Serves the drive over the gateway.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct DriveService {
     drive: Arc<Drive>,
+    handles: Option<Handles>,
+}
+
+impl std::fmt::Debug for DriveService {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DriveService")
+            .field("drive", &self.drive)
+            .field("handles", &self.handles.is_some())
+            .finish()
+    }
 }
 
 impl DriveService {
     /// Wraps the drive.
     #[must_use]
     pub const fn new(drive: Arc<Drive>) -> Self {
-        Self { drive }
+        Self {
+            drive,
+            handles: None,
+        }
+    }
+
+    /// Names the My Drive made on a person's first visit after their
+    /// handle (D171); without it the slug is `me` or their ID.
+    #[must_use]
+    pub fn with_handles(mut self, handles: Handles) -> Self {
+        self.handles = Some(handles);
+        self
     }
 }
 
@@ -118,9 +142,11 @@ macro_rules! op {
 impl DriveService {
     async fn my_drive(&self, ctx: &RequestContext, _: NoInput) -> Result<MyDrive, Error> {
         let user = ctx.principal.require_user()?;
-        let space = self.drive.my_drive(user).await?;
+        // Normally made with the account; made here if that was missed.
+        let handle = self.handles.as_ref().and_then(|h| h(user));
+        let space = self.drive.ensure_my_drive(user, handle.as_deref()).await?;
         Ok(MyDrive {
-            space: space.as_ref().map(SpaceView::from),
+            space: Some(SpaceView::from(&space)),
         })
     }
 
@@ -464,7 +490,7 @@ impl DriveService {
     fn reads(self: &Arc<Self>) -> Vec<Operation> {
         vec![
             op!(self, query "drive.my_drive", "/v1/drive/my-drive", my_drive,
-                "Get your My Drive"),
+                "Get your My Drive, made for you if you have none yet"),
             op!(self, query "drive.shared_drives", "/v1/drive/shared-drives", shared_drives,
                 "List the shared drives you can open"),
             op!(self, query "drive.shared_with_me", "/v1/drive/shared-with-me", shared_with_me,

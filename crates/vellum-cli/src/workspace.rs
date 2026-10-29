@@ -319,6 +319,68 @@ async fn load_spaces(drive: &dyn DriveIndex) -> Result<Vec<(BlobPath, Id)>, Erro
         .collect())
 }
 
+/// How often accounts made since startup are checked for a My Drive.
+const DRIVES_EVERY: Duration = Duration::from_secs(30);
+
+/// Looks up handles for naming My Drives.
+fn drive_handles(identity: &Arc<Identity>) -> vellum_drive::service::Handles {
+    let identity = Arc::clone(identity);
+    Arc::new(move |user| identity.user(user).ok().map(|u| u.handle))
+}
+
+/// Makes a My Drive for every active account that has none (D171): at
+/// startup for existing installs, then on each refresh for accounts made
+/// since. The drive API also makes one on a person's first visit.
+async fn provision_drives(
+    drive: &Drive,
+    index: &dyn DriveIndex,
+    identity: &Identity,
+) -> Result<usize, Error> {
+    let owners: std::collections::HashSet<UserId> = index
+        .spaces()
+        .await
+        .map_err(|e| unavailable("cannot list spaces", e))?
+        .into_iter()
+        .filter(|s| s.kind == vellum_drive::SpaceKind::UserDrive)
+        .filter_map(|s| s.owner)
+        .collect();
+    let mut made = 0;
+    for user in identity.users() {
+        if user.disabled || owners.contains(&user.id) {
+            continue;
+        }
+        match drive.ensure_my_drive(user.id, Some(&user.handle)).await {
+            Ok(_) => made += 1,
+            Err(error) => tracing::warn!(%error, user = %user.id, "My Drive not created"),
+        }
+    }
+    Ok(made)
+}
+
+/// Makes the missing My Drives now, then keeps checking for new accounts.
+async fn keep_drives(
+    drive: &Arc<Drive>,
+    index: &Arc<SqlIndex>,
+    identity: &Arc<Identity>,
+) -> Result<(), Error> {
+    let made = provision_drives(drive, index.as_ref(), identity).await?;
+    if made > 0 {
+        tracing::info!(made, "made My Drives for accounts that had none");
+    }
+    let (drive, index, people) = (Arc::clone(drive), Arc::clone(index), Arc::clone(identity));
+    drop(tokio::spawn(async move {
+        let mut tick = tokio::time::interval(DRIVES_EVERY);
+        tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        loop {
+            let _ = tick.tick().await;
+            if let Err(error) = provision_drives(&drive, index.as_ref(), &people).await {
+                tracing::warn!(%error, "My Drives not checked");
+            }
+        }
+    }));
+    Ok(())
+}
+
 /// Work handles come from identity's unique handles.
 #[derive(Debug)]
 struct IdentityDirectory(Arc<Identity>);
@@ -510,7 +572,7 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
     );
     Ok(Workspace {
         services: vec![
-            Arc::new(DriveService::new(Arc::clone(&drive))),
+            Arc::new(DriveService::new(Arc::clone(&drive)).with_handles(drive_handles(identity))),
             Arc::clone(&collections) as Arc<dyn Service>,
             Arc::clone(&books) as Arc<dyn Service>,
             Arc::clone(&work) as Arc<dyn Service>,
@@ -640,6 +702,7 @@ pub async fn open(
             identity,
         ))),
     )?;
+    keep_drives(&workspace.drive, &drive_index, identity).await?;
     spaces.replace(load_spaces(drive_index.as_ref()).await?);
     let search = crate::search::start(crate::search::Parts {
         data_dir: config.data_dir.clone(),

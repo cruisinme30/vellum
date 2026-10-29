@@ -1000,6 +1000,33 @@ async fn siblings_keep_their_order_and_the_tree_comes_whole(kind: Kind) -> TestR
     Ok(())
 }
 
+async fn my_drive_is_made_once_per_person(kind: Kind) -> TestResult {
+    let w = world(kind).await?;
+    let first = w.drive.ensure_my_drive(w.alice_id, Some("Ada.L")).await?;
+    assert_eq!(first.slug, "ada-l");
+    assert_eq!(first.owner, Some(w.alice_id));
+    assert_eq!(first.name, vellum_drive::MY_DRIVE_NAME);
+    // Calling again, or at once from two places, keeps the one drive.
+    let (again, racing) = tokio::join!(
+        w.drive.ensure_my_drive(w.alice_id, Some("Ada.L")),
+        w.drive.ensure_my_drive(w.alice_id, Some("Ada.L")),
+    );
+    assert_eq!(again?.id, first.id);
+    assert_eq!(racing?.id, first.id);
+    // Someone whose handle makes the same slug gets a suffixed one.
+    let other = w.drive.ensure_my_drive(w.bob_id, Some("ada_l")).await?;
+    assert_ne!(other.id, first.id);
+    assert!(other.slug.starts_with("ada-l-"), "{}", other.slug);
+    // The owner manages it.
+    let page = w
+        .drive
+        .create_page(&w.alice, first.id, None, "Notes", "")
+        .await?;
+    assert!(w.drive.read(&w.alice, page.id).await.is_ok());
+    assert!(w.drive.read(&w.bob, page.id).await.is_err());
+    Ok(())
+}
+
 /// Runs each test on every index.
 macro_rules! on_every_index {
     ($($name:ident),* $(,)?) => {$(
@@ -1038,4 +1065,5 @@ on_every_index!(
     external_edits_and_renames_come_in_through_the_watcher,
     pages_nest_under_pages,
     siblings_keep_their_order_and_the_tree_comes_whole,
+    my_drive_is_made_once_per_person,
 );
