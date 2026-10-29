@@ -12,6 +12,9 @@ import { StarterKit } from "@tiptap/starter-kit";
 import type { Translate } from "../i18n/i18n";
 
 import { BlockIds } from "./block-id-extension";
+import { ChipSuggest } from "./chips/chip-suggest";
+import { issueChipView } from "./chips/issue-chip";
+import type { ChipSources } from "./chips/items";
 import {
   CodeBlock,
   DataFence,
@@ -59,6 +62,8 @@ export interface ExtensionOptions {
   readonly resolvePage: ResolvePage;
   /** Off when Yjs owns undo history (always, outside tests). */
   readonly history: boolean;
+  /** People, pages and issues for the `@` and `[[` menus and live issue chips. */
+  readonly chips?: ChipSources | undefined;
 }
 
 /**
@@ -66,7 +71,12 @@ export interface ExtensionOptions {
  * schema/blocks.json (checked by extensions.test.ts), plus block IDs, the
  * slash menu and placeholders. Collaboration is added by the host.
  */
-export function vellumExtensions({ t, resolvePage, history }: ExtensionOptions): AnyExtension[] {
+export function vellumExtensions({
+  t,
+  resolvePage,
+  history,
+  chips,
+}: ExtensionOptions): AnyExtension[] {
   return [
     StarterKit.configure({
       codeBlock: false,
@@ -137,13 +147,16 @@ export function vellumExtensions({ t, resolvePage, history }: ExtensionOptions):
     DataFence,
     Mention,
     WikiLink.configure({ resolve: resolvePage }),
-    IssueKey,
+    chips?.issueStatus === undefined && chips?.openIssue === undefined
+      ? IssueKey
+      : IssueKey.extend({ addNodeView: () => issueChipView(chips, t) }),
     DateChip,
     MathInline,
     InlineImage,
     BlockIds,
     SchemaAttributes,
     SlashCommand.configure({ t }),
+    ChipSuggest.configure({ t, sources: chips }),
     Placeholder.configure({
       placeholder: ({ node }) => (node.type.name === "paragraph" ? t("editor-placeholder") : ""),
     }),

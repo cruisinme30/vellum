@@ -1,16 +1,19 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
 import { useSession } from "../api/session";
+import { useServerApis } from "../data/server-apis";
 import { ancestors, siblings } from "../data/tree";
 import type { PageMeta } from "../data/types";
 import { useServices, useWorkspace } from "../data/workspace-context";
+import type { ChipSources } from "../editor/chips/items";
 import { PageEditor, type EditorControls } from "../editor/page-editor";
 import { useT } from "../i18n/i18n";
 import { Icon } from "../shell/icon";
+import { issueChipStatus } from "../work/api";
 
 import { HistoryPanel } from "./history-panel";
 import { NotFoundView } from "./info";
@@ -67,6 +70,39 @@ function usePageHistory(pageId: string) {
   return { button, panel, setControls };
 }
 
+/**
+ * People, pages and issues for the editor's chip menus (#93). The object
+ * lives as long as the Work API; it reads the latest workspace each time.
+ */
+function useChipSources(): ChipSources {
+  const workspace = useWorkspace();
+  const navigate = useNavigate();
+  const { work } = useServerApis();
+  const latest = useRef(workspace);
+  useEffect(() => {
+    latest.current = workspace;
+  }, [workspace]);
+  return useMemo(
+    () => ({
+      people: () => latest.current.people,
+      pages: () => latest.current.pages.filter((page) => page.folder !== true),
+      ...(work === undefined
+        ? {}
+        : {
+            issues: async (query: string) => {
+              const found = await work.searchIssues(query);
+              return found.map(({ key, title }) => ({ key, title }));
+            },
+            issueStatus: issueChipStatus(work),
+            openIssue: (key: string) => {
+              void navigate(`/issues/${encodeURIComponent(key)}`);
+            },
+          }),
+    }),
+    [work, navigate],
+  );
+}
+
 /** A page: breadcrumbs, title, properties and the editor. */
 export function PageView() {
   const t = useT();
@@ -75,6 +111,7 @@ export function PageView() {
   const { store, collab } = useServices();
   const workspace = useWorkspace();
   const pageHistory = usePageHistory(pageId);
+  const chips = useChipSources();
   const page = workspace.pages.find((p) => p.id === pageId);
   const trail = useMemo(() => ancestors(workspace.pages, pageId), [workspace.pages, pageId]);
   const space = workspace.spaces.find((s) => s.id === page?.spaceId);
@@ -201,6 +238,7 @@ export function PageView() {
             onOpenPage={onOpenPage}
             onControls={pageHistory.setControls}
             actions={pageHistory.button}
+            chips={chips}
           />
           {pageHistory.panel}
         </>

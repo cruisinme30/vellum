@@ -21,7 +21,8 @@ const slashKey = new PluginKey("vellumSlash");
 
 const LIST_ID = "vl-slash-list";
 
-function place(element: HTMLElement, rect: DOMRect | null | undefined) {
+/** Pins a floating menu under (or above) the caret, inside the viewport. */
+export function place(element: HTMLElement, rect: DOMRect | null | undefined) {
   if (!rect) {
     return;
   }

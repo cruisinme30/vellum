@@ -241,6 +241,21 @@
   font-size: 0.8125em;
 }
 
+.vl-issue[role="link"] {
+  cursor: pointer;
+}
+
+/* Live status after the key (#93). */
+.vl-issue-state {
+  margin-inline-start: 6px;
+  font-family: var(--vl-font, inherit);
+  opacity: 0.85;
+}
+
+.vl-issue[data-closed="true"] > span:first-child {
+  text-decoration: line-through;
+}
+
 .vl-wikilink {
   text-decoration: underline;
   text-decoration-color: var(--md-outline);
