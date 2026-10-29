@@ -13,7 +13,7 @@ vellum: 1
 - Status: accepted
 - Decisions: D73, D74, D75, D132, D133, D134
 - Issue: #125, #126, #127; views, CSV and embeds in #128 to #132
-- Pull requests: #208 (engine), the collections service PR
+- Pull requests: #208 (engine), #266 (service)
 
 :::
 
