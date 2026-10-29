@@ -56,8 +56,15 @@ impl WorkService {
                 return Err(e);
             }
         };
-        self.commit(&mut st, backup, changes, comments, Vec::new())
-            .await?;
+        self.commit(
+            &mut st,
+            backup,
+            changes,
+            comments,
+            Vec::new(),
+            ctx.actor.as_ref(),
+        )
+        .await?;
         Ok(out)
     }
 }

@@ -13,7 +13,7 @@ vellum: 1
 - Status: accepted
 - Decisions: D135, D136, D137
 - Requirements: R-WK-13, R-WK-15, R-WK-16
-- Issue: #258, #319, #389
+- Issue: #258, #319, #389, #445
 - Pull requests: #275, #324, #396
 
 :::
@@ -90,6 +90,7 @@ the seam.
 - Insights is one read-only query. The team key narrows the caller's
   filter, so a dashboard asks per team without writing filter JSON.
 - In-process callers such as integrations use `read` and `transact`
-  instead of the gateway. A command runs under the same lock and commit
-  path as an operation, so files, events and rollback stay in one place;
-  the caller supplies the acting bot user.
+  instead of the gateway, through the same lock and commit path. Every
+  commit publishes its events with the acting person or bot
+  (`EventSink::publish_by`), so notifications skip someone's own change;
+  one actor per command avoids repeating it on twenty event variants.

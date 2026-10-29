@@ -56,12 +56,21 @@ impl Directory for StaticDirectory {
 pub trait EventSink: Send + Sync + 'static {
     /// Takes the events of one command.
     fn publish(&self, events: Vec<WorkEvent>);
+
+    /// Takes the events of one command with who made it: the signed-in
+    /// person or integration bot, or `None` for scheduled work such as the
+    /// daily cycle and SLA pass. Notifications use it to skip telling
+    /// people about their own changes. The default drops the actor.
+    fn publish_by(&self, actor: Option<&UserRef>, events: Vec<WorkEvent>) {
+        let _ = actor;
+        self.publish(events);
+    }
 }
 
 /// Keeps every event in memory, for tests and the demo.
 #[derive(Debug, Default)]
 pub struct EventLog {
-    events: Mutex<Vec<WorkEvent>>,
+    batches: Mutex<Vec<(Option<UserRef>, Vec<WorkEvent>)>>,
 }
 
 impl EventLog {
@@ -74,17 +83,30 @@ impl EventLog {
     /// Takes the events published so far.
     #[must_use]
     pub fn take(&self) -> Vec<WorkEvent> {
-        self.events
+        self.take_batches()
+            .into_iter()
+            .flat_map(|(_, events)| events)
+            .collect()
+    }
+
+    /// Takes the batches published so far, each with its actor.
+    #[must_use]
+    pub fn take_batches(&self) -> Vec<(Option<UserRef>, Vec<WorkEvent>)> {
+        self.batches
             .lock()
-            .map(|mut e| std::mem::take(&mut *e))
+            .map(|mut b| std::mem::take(&mut *b))
             .unwrap_or_default()
     }
 }
 
 impl EventSink for EventLog {
     fn publish(&self, events: Vec<WorkEvent>) {
-        if let Ok(mut log) = self.events.lock() {
-            log.extend(events);
+        self.publish_by(None, events);
+    }
+
+    fn publish_by(&self, actor: Option<&UserRef>, events: Vec<WorkEvent>) {
+        if let Ok(mut log) = self.batches.lock() {
+            log.push((actor.cloned(), events));
         }
     }
 }

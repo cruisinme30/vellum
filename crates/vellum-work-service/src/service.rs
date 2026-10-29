@@ -162,7 +162,7 @@ impl WorkService {
         let sla = st.graph.sla_tick(now);
         changes.issues.extend(sla.issues);
         changes.events.extend(sla.events);
-        self.commit(&mut st, backup, changes, None, Vec::new())
+        self.commit(&mut st, backup, changes, None, Vec::new(), None)
             .await
     }
 
@@ -187,8 +187,9 @@ impl WorkService {
         })
     }
 
-    /// Writes the files a command changed, publishes its events, or puts
-    /// memory back and fails.
+    /// Writes the files a command changed, publishes its events with the
+    /// person or bot who made the change (`None` for scheduled work), or
+    /// puts memory back and fails.
     async fn commit(
         &self,
         st: &mut State,
@@ -196,6 +197,7 @@ impl WorkService {
         changes: Changes,
         comments: Option<CommentChanges>,
         extra: Vec<(String, String)>,
+        actor: Option<&UserRef>,
     ) -> Result<(), Error> {
         let mut writes = extra;
         let mut deletes: BTreeSet<String> = changes.removed_paths.clone();
@@ -230,7 +232,7 @@ impl WorkService {
             return Err(e);
         }
         if !events.is_empty() {
-            self.events.publish(events);
+            self.events.publish_by(actor, events);
         }
         Ok(())
     }
@@ -549,8 +551,15 @@ impl WorkService {
         let id = draft.id;
         let backup = st.clone();
         let changes = st.graph.create_issue(draft, &ctx)?;
-        self.commit(&mut st, backup, changes, None, Vec::new())
-            .await?;
+        self.commit(
+            &mut st,
+            backup,
+            changes,
+            None,
+            Vec::new(),
+            ctx.actor.as_ref(),
+        )
+        .await?;
         let issue = st
             .graph
             .issue(&id)
@@ -581,8 +590,15 @@ impl WorkService {
         let patch = patch_from(&st.graph, current, i, me)?;
         let backup = st.clone();
         let changes = st.graph.update_issue(&id, patch, &ctx)?;
-        self.commit(&mut st, backup, changes, None, Vec::new())
-            .await?;
+        self.commit(
+            &mut st,
+            backup,
+            changes,
+            None,
+            Vec::new(),
+            ctx.actor.as_ref(),
+        )
+        .await?;
         self.issue_out(&st, &id, ctx.now)
     }
 
@@ -597,8 +613,15 @@ impl WorkService {
         let to = Self::team_key(&st.graph, &i.to)?;
         let backup = st.clone();
         let changes = st.graph.move_issue(&id, &to, &ctx)?;
-        self.commit(&mut st, backup, changes, None, Vec::new())
-            .await?;
+        self.commit(
+            &mut st,
+            backup,
+            changes,
+            None,
+            Vec::new(),
+            ctx.actor.as_ref(),
+        )
+        .await?;
         self.issue_out(&st, &id, ctx.now)
     }
 
@@ -636,8 +659,15 @@ impl WorkService {
         };
         let backup = st.clone();
         let changes = st.graph.triage(&id, &action, &ctx)?;
-        self.commit(&mut st, backup, changes, None, Vec::new())
-            .await?;
+        self.commit(
+            &mut st,
+            backup,
+            changes,
+            None,
+            Vec::new(),
+            ctx.actor.as_ref(),
+        )
+        .await?;
         self.issue_out(&st, &id, ctx.now)
     }
 
@@ -656,7 +686,7 @@ impl WorkService {
         rc: RequestContext,
         i: CreateTeam,
     ) -> Result<TeamOut, Error> {
-        let _ = self.ctx(&rc).await?;
+        let ctx = self.ctx(&rc).await?;
         let mut st = self.state.lock().await;
         let mut team = Team::new(TeamId::generate(), TeamKey::parse(&i.key)?, &i.name)?;
         team.lead = i.lead.as_deref().map(UserRef::parse).transpose()?;
@@ -673,13 +703,20 @@ impl WorkService {
                 return Err(e.into());
             }
         };
-        self.commit(&mut st, backup, changes, None, Vec::new())
-            .await?;
+        self.commit(
+            &mut st,
+            backup,
+            changes,
+            None,
+            Vec::new(),
+            ctx.actor.as_ref(),
+        )
+        .await?;
         Ok(TeamOut::of(&team))
     }
 
     pub(crate) async fn put_team(&self, rc: RequestContext, i: PutTeam) -> Result<TeamOut, Error> {
-        let _ = self.ctx(&rc).await?;
+        let ctx = self.ctx(&rc).await?;
         let mut st = self.state.lock().await;
         let key = Self::team_key(&st.graph, &i.team)?;
         let path = format!("teams/{key}/team.yaml");
@@ -691,8 +728,15 @@ impl WorkService {
         }
         let backup = st.clone();
         let changes = st.graph.update_team(team)?;
-        self.commit(&mut st, backup, changes, None, Vec::new())
-            .await?;
+        self.commit(
+            &mut st,
+            backup,
+            changes,
+            None,
+            Vec::new(),
+            ctx.actor.as_ref(),
+        )
+        .await?;
         st.graph
             .team(&key)
             .map(TeamOut::of)
@@ -704,7 +748,7 @@ impl WorkService {
         rc: RequestContext,
         i: PutProject,
     ) -> Result<ProjectOut, Error> {
-        let _ = self.ctx(&rc).await?;
+        let ctx = self.ctx(&rc).await?;
         let mut st = self.state.lock().await;
         let id = parse_id::<ProjectId>("project_id", &i.project_id)?;
         let path = st.project_paths.get(&id).cloned();
@@ -720,8 +764,15 @@ impl WorkService {
         let backup = st.clone();
         let changes = st.graph.upsert_project(project)?;
         let _ = st.project_paths.insert(id, path.clone());
-        self.commit(&mut st, backup, changes, None, vec![(path, text)])
-            .await?;
+        self.commit(
+            &mut st,
+            backup,
+            changes,
+            None,
+            vec![(path, text)],
+            ctx.actor.as_ref(),
+        )
+        .await?;
         let p = st
             .graph
             .project(&id)
@@ -791,8 +842,15 @@ impl WorkService {
                 return Err(e.into());
             }
         };
-        self.commit(&mut st, backup, changes, Some(cc), Vec::new())
-            .await?;
+        self.commit(
+            &mut st,
+            backup,
+            changes,
+            Some(cc),
+            Vec::new(),
+            ctx.actor.as_ref(),
+        )
+        .await?;
         Ok(thread_result(&st, &id))
     }
 
@@ -874,8 +932,15 @@ impl WorkService {
                 return Err(e.into());
             }
         };
-        self.commit(&mut st, backup, changes, Some(cc), Vec::new())
-            .await?;
+        self.commit(
+            &mut st,
+            backup,
+            changes,
+            Some(cc),
+            Vec::new(),
+            ctx.actor.as_ref(),
+        )
+        .await?;
         Ok(thread.map_or(CommentResult { thread: None }, |t| thread_result(&st, &t)))
     }
 }

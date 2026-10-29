@@ -285,8 +285,15 @@ impl WorkService {
         let changes =
             st.graph
                 .submit_form(&team, &i.slug, id, &i.answers, submitter.as_deref(), &ctx)?;
-        self.commit(&mut st, backup, changes, None, Vec::new())
-            .await?;
+        self.commit(
+            &mut st,
+            backup,
+            changes,
+            None,
+            Vec::new(),
+            ctx.actor.as_ref(),
+        )
+        .await?;
         self.issue_out(&st, &id, ctx.now)
     }
 
@@ -334,8 +341,15 @@ impl WorkService {
         };
         let backup = st.clone();
         let changes = st.graph.suggest_triage(&id, suggestion, &ctx)?;
-        self.commit(&mut st, backup, changes, None, Vec::new())
-            .await?;
+        self.commit(
+            &mut st,
+            backup,
+            changes,
+            None,
+            Vec::new(),
+            ctx.actor.as_ref(),
+        )
+        .await?;
         st.graph
             .suggestion(&id)
             .map(|s| SuggestionOut::of(&s, &st.graph))
@@ -353,8 +367,15 @@ impl WorkService {
         let id = Self::issue_id(&st.graph, &i.key)?;
         let backup = st.clone();
         let changes = st.graph.accept_suggestion(&id, &ctx)?;
-        self.commit(&mut st, backup, changes, None, Vec::new())
-            .await?;
+        self.commit(
+            &mut st,
+            backup,
+            changes,
+            None,
+            Vec::new(),
+            ctx.actor.as_ref(),
+        )
+        .await?;
         self.issue_out(&st, &id, ctx.now)
     }
 
@@ -368,8 +389,15 @@ impl WorkService {
         let id = Self::issue_id(&st.graph, &i.key)?;
         let backup = st.clone();
         let changes = st.graph.dismiss_suggestion(&id)?;
-        self.commit(&mut st, backup, changes, None, Vec::new())
-            .await?;
+        self.commit(
+            &mut st,
+            backup,
+            changes,
+            None,
+            Vec::new(),
+            ctx.actor.as_ref(),
+        )
+        .await?;
         self.issue_out(&st, &id, ctx.now)
     }
 }
