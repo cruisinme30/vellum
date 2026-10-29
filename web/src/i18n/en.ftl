@@ -377,6 +377,7 @@ toolbar-highlight = Highlight
 toolbar-link = Link
 toolbar-link-prompt = Link address (leave empty to remove the link)
 toolbar-insert = Insert
+toolbar-task = Make a task from the selection
 slash-label = Blocks
 slash-empty = No block matches.
 chips-mention-label = People and dates

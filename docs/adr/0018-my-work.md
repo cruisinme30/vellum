@@ -78,14 +78,16 @@ port.
 
 ### `D248`: one quick-add dialog for the whole app
 
-- `Q` opens it anywhere; `T` over a selection in a page, outside code,
-  opens it with the selected text. The task's title gets a link back to
-  the page through `tasks.update` after parsing, so page words never
-  read as dates.
+- `Q` opens it anywhere. A selection in a page, outside code, opens it
+  with the selected text: `⌘⌥↵` or a toolbar button while editing, and a
+  bare `T` only on a page that cannot be edited.
+- The task's title gets a link back to the page through `tasks.update`
+  after parsing, so page words never read as dates.
 - The line is parsed with `tasks.parse` 120 ms after typing stops. The
   marked phrases and a list of what they set sit under a plain input.
 - Issue comments take an optional "Assign to", sent as `assign_to`.
-- Why: a styled overlay inside the field breaks input methods and screen readers.
+- Why: a styled overlay inside the field breaks input methods and screen
+  readers.
 
 ### `D249`: ⌘K searches page titles in memory
 
@@ -125,7 +127,7 @@ port.
   and the redirect URI `<public URL>/connect/google/callback`.
 - Non-English quick-add is a follow-up.
 
-In the web app (D247-D249), `T` over a selection no longer types a "t";
-Escape closes the dialog and keeps the selection. Title search covers the
+In the web app (D247-D249), a typed `T` still replaces a selection while
+editing; taking the plain key there would feel like a bug. Title search covers the
 pages in the person's spaces; shared-with-me items join when the tree
 holds them.

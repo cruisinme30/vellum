@@ -11,7 +11,13 @@ import { NORTHSTAR_BODIES } from "../data/mock/northstar-pages";
 import { createLocalConnector } from "./collab/local-connector";
 import type { CollabConnector, LiveConnection, LiveState } from "./collab/provider";
 import { body, h, p, wiki } from "./content";
-import { PageEditor, selectionTaskText, type PageEditorProperties } from "./page-editor";
+import {
+  isSelectionTaskKey,
+  PageEditor,
+  readOnlyTaskText,
+  selectionTaskText,
+  type PageEditorProperties,
+} from "./page-editor";
 import { createTestEditor, memoryChannels, resolveGateway, settle } from "./test-editor";
 
 const user = { name: "Priya", color: "#1a73e8" };
@@ -330,22 +336,47 @@ describe("PageEditor", () => {
 const press = (key: string, extra: Partial<KeyboardEventInit> = {}) =>
   new KeyboardEvent("keydown", { key, ...extra });
 
-describe("selectionTaskText", () => {
-  it("takes the selected text on a bare T, and nothing else", () => {
-    const editor = createTestEditor({ content: "<p>Call   Sam about the launch</p>" });
-    expect(selectionTaskText(press("t"), editor.state)).toBeUndefined();
-    editor.commands.setTextSelection({ from: 1, to: 15 });
-    expect(selectionTaskText(press("t"), editor.state)).toBe("Call Sam about");
-    expect(selectionTaskText(press("T"), editor.state)).toBe("Call Sam about");
-    expect(selectionTaskText(press("t", { metaKey: true }), editor.state)).toBeUndefined();
-    expect(selectionTaskText(press("x"), editor.state)).toBeUndefined();
-    editor.destroy();
+describe("making a task from the selection", () => {
+  it("uses Ctrl/Cmd+Alt+Enter while editing, so a typed T still replaces the selection", () => {
+    expect(isSelectionTaskKey(press("Enter", { ctrlKey: true, altKey: true }))).toBe(true);
+    expect(isSelectionTaskKey(press("Enter", { metaKey: true, altKey: true }))).toBe(true);
+    expect(isSelectionTaskKey(press("t"))).toBe(false);
+    expect(isSelectionTaskKey(press("Enter", { metaKey: true }))).toBe(false);
   });
 
-  it("leaves code alone", () => {
-    const editor = createTestEditor({ content: "<pre><code>let t = 1</code></pre>" });
-    editor.commands.setTextSelection({ from: 1, to: 4 });
-    expect(selectionTaskText(press("t"), editor.state)).toBeUndefined();
+  it("takes the selected text as one line, and nothing from code", () => {
+    const editor = createTestEditor({ content: "<p>Call   Sam about the launch</p>" });
+    expect(selectionTaskText(editor.state)).toBeUndefined();
+    editor.commands.setTextSelection({ from: 1, to: 15 });
+    expect(selectionTaskText(editor.state)).toBe("Call Sam about");
     editor.destroy();
+    const code = createTestEditor({ content: "<pre><code>let t = 1</code></pre>" });
+    code.commands.setTextSelection({ from: 1, to: 4 });
+    expect(selectionTaskText(code.state)).toBeUndefined();
+    code.destroy();
+  });
+
+  it("takes a bare T on a read-only page, inside the page only", () => {
+    const root = document.createElement("div");
+    root.innerHTML = "<p>Renew   the certificates</p>";
+    const outside = document.createElement("p");
+    outside.textContent = "elsewhere";
+    document.body.append(root, outside);
+    const select = (node: Node) => {
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      globalThis.getSelection()?.removeAllRanges();
+      globalThis.getSelection()?.addRange(range);
+    };
+    select(root);
+    expect(readOnlyTaskText(press("t"), root)).toBe("Renew the certificates");
+    expect(readOnlyTaskText(press("t", { ctrlKey: true }), root)).toBeUndefined();
+    expect(readOnlyTaskText(press("x"), root)).toBeUndefined();
+    select(outside);
+    expect(readOnlyTaskText(press("t"), root)).toBeUndefined();
+    globalThis.getSelection()?.removeAllRanges();
+    expect(readOnlyTaskText(press("t"), root)).toBeUndefined();
+    root.remove();
+    outside.remove();
   });
 });

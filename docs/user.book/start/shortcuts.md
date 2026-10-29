@@ -34,7 +34,7 @@ Windows and Linux, read `⌘` as `Ctrl` and `⌥` as `Alt`.
 | `Tab` `⇧Tab` | Indent, outdent |
 | `⌘↵` | Toggle a task |
 | `⌘⌥M` | Comment on the selection |
-| `T` | Turn the selection into a task |
+| `⌘⌥↵` | Turn the selection into a task |
 
 Markdown shortcuts work as you type: `#`, `-`, `[]`, `>`, three
 backticks, `:::` and `|`.

@@ -29,7 +29,7 @@ Notification settings**.
 
 - Email: forward a message to your personal `tasks+…` address from **My Work → Capture**
 - Slack: use the message menu's **Save to Vellum**
-- Page: select text and press `T`
+- Page: select text and press `⌘⌥↵`, or `T` on a page you can only read
 - Comment: assign the comment to someone
 
 :::

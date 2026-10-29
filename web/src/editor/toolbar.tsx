@@ -69,7 +69,14 @@ const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
 };
 
 /** The formatting toolbar: one tab stop, arrow keys between buttons (WAI-ARIA toolbar). */
-export function Toolbar({ editor }: { readonly editor: Editor }) {
+export function Toolbar({
+  editor,
+  onSelectionTask,
+}: {
+  readonly editor: Editor;
+  /** Makes a task from the selected text; no button when absent. */
+  readonly onSelectionTask?: (() => void) | undefined;
+}) {
   const t = useT();
   const active = useEditorState({
     editor,
@@ -77,6 +84,7 @@ export function Toolbar({ editor }: { readonly editor: Editor }) {
       Object.fromEntries([
         ...ACTIONS.map((a) => [a.id, current.isActive(a.mark)]),
         ["link", current.isActive("link")],
+        ["selection", !current.state.selection.empty],
       ]) as Record<string, boolean>,
   });
 
@@ -129,6 +137,20 @@ export function Toolbar({ editor }: { readonly editor: Editor }) {
       >
         <Icon name="add_link" />
       </button>
+      {onSelectionTask !== undefined && (
+        <button
+          type="button"
+          className="vl-icon-button"
+          tabIndex={-1}
+          disabled={active["selection"] !== true}
+          aria-label={t("toolbar-task")}
+          aria-keyshortcuts="Control+Alt+Enter"
+          title={t("toolbar-task")}
+          onClick={onSelectionTask}
+        >
+          <Icon name="checklist" />
+        </button>
+      )}
       <span className="vl-toolbar-gap" />
       <button
         type="button"

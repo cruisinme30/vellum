@@ -20,6 +20,7 @@ import * as Y from "yjs";
 import { useT } from "../i18n/i18n";
 import { Icon } from "../shell/icon";
 import type { WorkApi } from "../work/api";
+import { isEditable } from "../keyboard/keymap";
 
 import type { ChipSources } from "./chips/items";
 import { PresenceBar } from "./collab/presence";
@@ -69,8 +70,8 @@ export interface PageEditorProperties {
    */
   readonly chips?: ChipSources | undefined;
   /**
-   * `T` with text selected turns the selection into a task (R-MW-3): this
-   * gets the selected text. Without it, `T` types as usual.
+   * Turns the selected text into a task (R-MW-3): Ctrl/Cmd+Alt+Enter or the
+   * toolbar button while editing, a bare `T` on a read-only page.
    */
   readonly onSelectionTask?: ((text: string) => void) | undefined;
 }
@@ -149,21 +150,43 @@ const SAVE_LABELS: Record<SaveStatus, string> = {
   failed: "editor-save-failed",
 };
 
-/** Whether a key press is the save shortcut (Ctrl+S, or Cmd+S on a Mac). */
+/** Selected text as one line, or `undefined` when only space is selected. */
+function oneLine(text: string): string | undefined {
+  const line = text.trim().replaceAll(/\s+/g, " ");
+  return line === "" ? undefined : line;
+}
+
+/** Whether a key press is "make a task from the selection": Ctrl+Alt+Enter, or Cmd+Option+Enter on a Mac. */
+export const isSelectionTaskKey = (event: KeyboardEvent) =>
+  (event.ctrlKey || event.metaKey) && event.altKey && !event.shiftKey && event.key === "Enter";
+
 /**
- * The selected text when `event` is a bare `T` over a selection outside code,
- * which turns the selection into a task; `undefined` otherwise.
+ * The selected text, outside code, that the editor's "make a task" key or
+ * button turns into a task (R-MW-3); `undefined` with nothing to use.
  */
-export function selectionTaskText(event: KeyboardEvent, state: EditorState): string | undefined {
-  if (event.key !== "t" && event.key !== "T") return undefined;
-  if (event.metaKey || event.ctrlKey || event.altKey || event.isComposing) return undefined;
+export function selectionTaskText(state: EditorState): string | undefined {
   const { selection } = state;
   if (selection.empty) return undefined;
   if (selection.$from.parent.type.spec.code === true) return undefined;
-  const text = state.doc.textBetween(selection.from, selection.to, " ", " ").trim();
-  return text === "" ? undefined : text.replaceAll(/\s+/g, " ");
+  return oneLine(state.doc.textBetween(selection.from, selection.to, " ", " "));
 }
 
+/**
+ * On a page that cannot be edited, a bare `T` turns the text selected in
+ * `root` into a task. Typing never reaches a read-only page, so the plain
+ * key is safe there; in the editor it stays a letter.
+ */
+export function readOnlyTaskText(event: KeyboardEvent, root: Element): string | undefined {
+  if (event.key !== "t" && event.key !== "T") return undefined;
+  if (event.metaKey || event.ctrlKey || event.altKey || event.isComposing) return undefined;
+  if (isEditable(event.target)) return undefined;
+  const selection = globalThis.getSelection();
+  if (selection === null || selection.isCollapsed || selection.rangeCount === 0) return undefined;
+  if (!root.contains(selection.getRangeAt(0).commonAncestorContainer)) return undefined;
+  return oneLine(selection.toString());
+}
+
+/** Whether a key press is the save shortcut (Ctrl+S, or Cmd+S on a Mac). */
 const isSaveKey = (event: KeyboardEvent) =>
   (event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "s";
 
@@ -355,8 +378,9 @@ function BoundEditor({
         },
         handleKeyDown: (view, event) => {
           const toTask = selectionTask.current;
-          const selected = toTask === undefined ? undefined : selectionTaskText(event, view.state);
-          if (toTask !== undefined && selected !== undefined) {
+          if (toTask !== undefined && isSelectionTaskKey(event)) {
+            const selected = selectionTaskText(view.state);
+            if (selected === undefined) return false;
             event.preventDefault();
             toTask(selected);
             return true;
@@ -381,6 +405,19 @@ function BoundEditor({
     },
     [session, seeded],
   );
+  useEffect(() => {
+    if (editable || onSelectionTask === undefined) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      const selected = readOnlyTaskText(event, editor.view.dom);
+      if (selected === undefined) return;
+      event.preventDefault();
+      onSelectionTask(selected);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [editor, editable, onSelectionTask]);
   useEffect(() => {
     // Tiptap would emit an update for the change; leave the document alone.
     if (editor.isEditable !== editable) {
@@ -410,7 +447,17 @@ function BoundEditor({
   return (
     <div className="vl-editor">
       <div className="vl-editor-bar">
-        <Toolbar editor={editor} />
+        <Toolbar
+          editor={editor}
+          onSelectionTask={
+            onSelectionTask === undefined || !editable
+              ? undefined
+              : () => {
+                  const selected = selectionTaskText(editor.state);
+                  if (selected !== undefined) onSelectionTask(selected);
+                }
+          }
+        />
         <SaveControls saver={saver} canSave={editable && live.status === "online"}>
           {workActions}
           <PresenceBar awareness={session.awareness} live={session.live ? live : undefined} />
