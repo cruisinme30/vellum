@@ -305,7 +305,7 @@ fn issue_key(s: &str) -> Option<&str> {
 }
 
 /// `YYYY-MM-DD` naming a real calendar day.
-fn is_date(s: &str) -> bool {
+pub fn is_date(s: &str) -> bool {
     let bytes = s.as_bytes();
     let shape = bytes.len() == 10
         && bytes.iter().enumerate().all(|(i, b)| {

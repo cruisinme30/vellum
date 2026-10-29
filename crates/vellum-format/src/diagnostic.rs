@@ -24,6 +24,9 @@ pub enum DiagnosticCode {
     UnknownContainer,
     /// Raw HTML was found; it is kept as literal text.
     RawHtml,
+    /// A line of a data fence or data container could not be read; it is
+    /// skipped and the rest of the block is kept.
+    BlockData,
 }
 
 /// A problem found while parsing, with the 1-based source line when known.
