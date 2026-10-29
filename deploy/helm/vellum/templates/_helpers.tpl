@@ -47,6 +47,10 @@ app.kubernetes.io/component: clamav
 {{- .Values.csrf.secret.name | default (printf "%s-csrf" (include "vellum.fullname" .)) -}}
 {{- end }}
 
+{{- define "vellum.clusterSecret" -}}
+{{- .Values.cluster.secret.name | default (printf "%s-cluster" (include "vellum.fullname" .)) -}}
+{{- end }}
+
 {{- define "vellum.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
 {{- default (include "vellum.fullname" .) .Values.serviceAccount.name }}
@@ -175,6 +179,21 @@ spec:
             secretKeyRef:
               name: {{ include "vellum.csrfSecret" . }}
               key: {{ .Values.csrf.secret.key }}
+        # Replicas find each other in the index database's heartbeat table
+        # by pod name and reach each other at the pod IP (ADR 0037, 0038).
+        - name: VELLUM_CLUSTER_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "vellum.clusterSecret" . }}
+              key: {{ .Values.cluster.secret.key }}
+        - name: VELLUM_NODE_NAME
+          valueFrom:
+            fieldRef: { fieldPath: metadata.name }
+        - name: VELLUM_POD_IP
+          valueFrom:
+            fieldRef: { fieldPath: status.podIP }
+        - name: VELLUM_NODE_ADDRESS
+          value: $(VELLUM_POD_IP):7700
         {{- range .Values.shards }}
         {{- $env := include "vellum.shardEnv" . }}
         {{- if eq $.Values.postgres.mode "operator" }}

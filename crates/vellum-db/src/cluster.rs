@@ -10,11 +10,17 @@
 //! [`Leases`] names singleton work (a sweep, a scheduler). The holder
 //! renews before the lease expires; anyone may take it once it has.
 //!
+//! [`Leases::hold`] and [`singleton`] run work under a lease, and
+//! [`Cursors`] keeps such work's position for the next holder (ADR 0038).
+//!
 //! Both use the replicas' clocks (milliseconds since the Unix epoch), so
 //! clocks must agree to within the windows chosen, which NTP gives. See
 //! ADR 0037.
 
+use std::future::Future;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+use tracing::Instrument as _;
 
 use crate::error::Result;
 use crate::index::{Index, IndexPool};
@@ -287,5 +293,183 @@ impl Leases {
             }
         }
         Ok(())
+    }
+}
+
+impl Leases {
+    /// Runs `work` while `holder` holds lease `name` (D163). Takes the
+    /// lease, renews it every third of `ttl`, and releases it when `work`
+    /// ends. Returns `None` without running `work` when another holder
+    /// has the lease, and drops `work` (cancelling it) as soon as a
+    /// renewal finds the lease lost.
+    ///
+    /// A holder cut off from the database keeps running until its next
+    /// renewal fails, so for up to a third of `ttl` two holders may
+    /// overlap: work run this way must be safe to repeat.
+    ///
+    /// # Errors
+    /// When the database is unreachable while taking the lease.
+    pub async fn hold<F, T>(
+        &self,
+        name: &str,
+        holder: &str,
+        ttl: Duration,
+        work: F,
+    ) -> Result<Option<T>>
+    where
+        F: Future<Output = T>,
+    {
+        if !self.acquire(name, holder, ttl).await? {
+            return Ok(None);
+        }
+        let mut renew = tokio::time::interval(ttl / 3);
+        renew.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        let _ = renew.tick().await;
+        tokio::pin!(work);
+        loop {
+            tokio::select! {
+                out = &mut work => {
+                    if let Err(error) = self.release(name, holder).await {
+                        tracing::warn!(%error, lease = name, "cannot release the lease");
+                    }
+                    return Ok(Some(out));
+                }
+                _ = renew.tick() => match self.acquire(name, holder, ttl).await {
+                    Ok(true) => {}
+                    Ok(false) => {
+                        tracing::warn!(lease = name, "lost the lease; stopping its work");
+                        return Ok(None);
+                    }
+                    // Keep going: the lease still runs until it expires,
+                    // and the next renewal may reach the database.
+                    Err(error) => tracing::warn!(%error, lease = name, "cannot renew the lease"),
+                },
+            }
+        }
+    }
+}
+
+/// Keeps one copy of some background work running in the whole cluster
+/// (D163).
+///
+/// Every replica calls this with the same `name`, and whichever takes
+/// lease `name` runs `make()`'s future while it holds it. When the
+/// holder stops or loses the lease, another replica takes over within
+/// about `ttl`. When the work ends, the lease is released and the work is
+/// started again by whoever takes it next.
+///
+/// The task runs until the handle is aborted.
+#[must_use]
+pub fn singleton<F, Fut>(
+    leases: Leases,
+    name: &str,
+    holder: &str,
+    ttl: Duration,
+    mut make: F,
+) -> tokio::task::JoinHandle<()>
+where
+    F: FnMut() -> Fut + Send + 'static,
+    Fut: Future<Output = ()> + Send,
+{
+    let (name, holder) = (name.to_owned(), holder.to_owned());
+    tokio::spawn(async move {
+        loop {
+            let span = tracing::info_span!("singleton", lease = %name, holder = %holder);
+            match leases
+                .hold(&name, &holder, ttl, make().instrument(span))
+                .await
+            {
+                Ok(Some(()) | None) => {}
+                Err(error) => tracing::warn!(%error, lease = %name, "cannot take the lease"),
+            }
+            tokio::time::sleep(ttl / 3).await;
+        }
+    })
+}
+
+/// A reader's position, kept in the database so the next replica to run
+/// the reader carries on where the last one stopped.
+#[derive(Debug, Clone)]
+pub struct Cursors {
+    index: Index,
+}
+
+impl Cursors {
+    /// The table in `index` (migrated by `Index::open`).
+    #[must_use]
+    pub const fn new(index: Index) -> Self {
+        Self { index }
+    }
+
+    /// The saved position `(major, minor)` of `name`, if any.
+    ///
+    /// # Errors
+    /// When the database is unreachable.
+    pub async fn get(&self, name: &str) -> Result<Option<(i64, i64)>> {
+        let system = self.index.backend().otel_system();
+        let sql = "SELECT major, minor FROM cluster_cursors WHERE name = $1";
+        Ok(match self.index.pool() {
+            IndexPool::Sqlite(pool) => {
+                let query = sqlx::query_as(sql).bind(name);
+                traced(system, "cluster.cursor", query.fetch_optional(pool)).await?
+            }
+            IndexPool::Postgres(pool) => {
+                let query = sqlx::query_as(sql).bind(name);
+                traced(system, "cluster.cursor", query.fetch_optional(pool)).await?
+            }
+        })
+    }
+
+    /// Saves `name` at `(major, minor)`, but only while `holder` holds
+    /// lease `lease`, so a replica that lost its lease cannot move the
+    /// cursor under the new holder. Returns whether it was saved.
+    ///
+    /// # Errors
+    /// When the database is unreachable.
+    pub async fn set(
+        &self,
+        name: &str,
+        (major, minor): (i64, i64),
+        lease: &str,
+        holder: &str,
+    ) -> Result<bool> {
+        let system = self.index.backend().otel_system();
+        let now = now_ms();
+        let sql = "INSERT INTO cluster_cursors (name, major, minor, updated_ms) \
+                   SELECT $1, $2, $3, $4 WHERE EXISTS (SELECT 1 FROM cluster_leases \
+                   WHERE name = $5 AND holder = $6 AND expires_ms >= $4) \
+                   ON CONFLICT (name) DO UPDATE SET major = excluded.major, \
+                   minor = excluded.minor, updated_ms = excluded.updated_ms";
+        let affected = match self.index.pool() {
+            IndexPool::Sqlite(pool) => traced(
+                system,
+                "cluster.cursor_set",
+                sqlx::query(sql)
+                    .bind(name)
+                    .bind(major)
+                    .bind(minor)
+                    .bind(now)
+                    .bind(lease)
+                    .bind(holder)
+                    .execute(pool),
+            )
+            .await?
+            .rows_affected(),
+            IndexPool::Postgres(pool) => traced(
+                system,
+                "cluster.cursor_set",
+                sqlx::query(sql)
+                    .bind(name)
+                    .bind(major)
+                    .bind(minor)
+                    .bind(now)
+                    .bind(lease)
+                    .bind(holder)
+                    .execute(pool),
+            )
+            .await?
+            .rows_affected(),
+        };
+        Ok(affected == 1)
     }
 }

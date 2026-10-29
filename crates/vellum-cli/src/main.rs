@@ -16,6 +16,7 @@
 
 mod admin;
 mod backup_cli;
+mod cluster;
 mod collab;
 mod docs;
 mod feed;
@@ -27,6 +28,7 @@ mod identity;
 mod identity_tests;
 mod integrations;
 mod keys;
+mod limits;
 mod mcp;
 mod notifications;
 mod observability;

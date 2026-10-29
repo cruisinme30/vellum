@@ -178,3 +178,4 @@ zizmor
 [Rr]ecents
 ClamAV
 EICAR
+[Rr]escan(s|ned|ning)?

@@ -9,9 +9,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use uuid::Uuid;
+use vellum_db::cluster::Cursors;
 use vellum_db::{Index, IndexConfig, IndexPool, sqlx};
 use vellum_kernel::{DocId, SpaceId, UserId};
 use vellum_search::conformance::{StaticAccess, StaticStars};
+use vellum_search::drive_feed::SHARED_FEED;
 use vellum_search::{
     DriveFeed, DriveSource, FeedConfig, Indexer, IndexerConfig, Location, Principal, SearchQuery,
     SearchService, Start, TantivyBackend, TantivyConfig,
@@ -125,6 +127,66 @@ async fn saved_pages_flow_into_search() -> TestResult {
         .await?;
     assert!(eventually(&service, "satellite", 0).await.is_empty());
 
+    feed.abort();
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_shared_feed_saves_its_position_for_the_next_holder() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let root = dir.path().join("files");
+    let index =
+        Arc::new(Index::open(&IndexConfig::sqlite(dir.path().join("index.db"), None)).await?);
+    let store: Arc<dyn BlobStore> = Arc::new(LocalStore::open(&root).await?);
+    let (backend, _) = TantivyBackend::open(&TantivyConfig {
+        location: Location::Memory,
+        key: None,
+        model: None,
+    })?;
+    let mut access = StaticAccess::default();
+    access.grant(
+        Principal::User(UserId::from_u128(ADA)),
+        &[SpaceId::from_u128(SPACE)],
+        &[DocId::from_u128(PAGE)],
+    );
+    let service = SearchService::new(
+        Arc::new(backend),
+        Arc::new(access),
+        Arc::new(StaticStars::default()),
+    );
+    let source = Arc::new(DriveSource::new(Arc::clone(&index), store));
+    let (indexer, _task) = Indexer::spawn(service.clone(), source, IndexerConfig::default());
+    let config = FeedConfig {
+        interval: Duration::from_millis(20),
+        start: Start::CatchUp,
+    };
+    let feed = DriveFeed::spawn_shared(Arc::clone(&index), indexer, config, "pod-a");
+
+    std::fs::create_dir_all(root.join("eng"))?;
+    std::fs::write(root.join("eng/launch.md"), "Ship the rocket.\n")?;
+    let _ = sqlx::query(
+        "INSERT INTO drive_nodes (space_id, node_id, kind, parent_id, tree_parent_id, path, \
+         title, byte_size, modified_at, created_by, trash) \
+         VALUES ($1, $2, 'page', NULL, NULL, 'eng/launch.md', 'Launch plan', 17, 1000, $3, NULL)",
+    )
+    .bind(Uuid::from_u128(SPACE))
+    .bind(Uuid::from_u128(PAGE))
+    .bind(Uuid::from_u128(ADA))
+    .execute(pool(&index)?)
+    .await?;
+    assert_eq!(eventually(&service, "rocket", 1).await, vec!["Launch plan"]);
+
+    // The position past the insert is saved for whoever holds the lease next.
+    let cursors = Cursors::new((*index).clone());
+    let mut saved = None;
+    for _ in 0..250 {
+        saved = cursors.get(SHARED_FEED).await?;
+        if saved.is_some_and(|(_, seq)| seq > 0) {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    assert!(saved.is_some_and(|(_, seq)| seq > 0));
     feed.abort();
     Ok(())
 }

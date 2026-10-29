@@ -7,7 +7,7 @@
 
 use std::time::Duration;
 
-use vellum_db::cluster::{Leases, Node, Nodes};
+use vellum_db::cluster::{Cursors, Leases, Node, Nodes};
 use vellum_db::{Index, IndexConfig};
 
 async fn index(dir: &tempfile::TempDir) -> Index {
@@ -93,5 +93,76 @@ async fn one_holder_at_a_time_until_the_lease_expires() {
             .acquire_at("work.daily", "b", ttl, 19_003)
             .await
             .unwrap()
+    );
+}
+
+#[tokio::test]
+async fn held_work_runs_on_one_holder_and_releases() {
+    let dir = tempfile::tempdir().unwrap();
+    let leases = Leases::new(index(&dir).await);
+    let ttl = Duration::from_secs(30);
+    // While a holds the lease, b's work does not run.
+    let (tx, rx) = tokio::sync::oneshot::channel::<()>();
+    let a = {
+        let leases = leases.clone();
+        tokio::spawn(async move {
+            leases
+                .hold("drive.rescan", "a", ttl, async move { rx.await.is_ok() })
+                .await
+        })
+    };
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    assert_eq!(
+        leases
+            .hold("drive.rescan", "b", ttl, async { 1 })
+            .await
+            .unwrap(),
+        None
+    );
+    tx.send(()).unwrap();
+    assert_eq!(a.await.unwrap().unwrap(), Some(true));
+    // a released it when its work ended.
+    assert_eq!(
+        leases
+            .hold("drive.rescan", "b", ttl, async { 2 })
+            .await
+            .unwrap(),
+        Some(2)
+    );
+}
+
+#[tokio::test]
+async fn only_the_lease_holder_moves_a_cursor() {
+    let dir = tempfile::tempdir().unwrap();
+    let index = index(&dir).await;
+    let (leases, cursors) = (Leases::new(index.clone()), Cursors::new(index));
+    let ttl = Duration::from_secs(30);
+    assert_eq!(cursors.get("search.drive_feed").await.unwrap(), None);
+    assert!(leases.acquire("search.drive_feed", "a", ttl).await.unwrap());
+    assert!(
+        cursors
+            .set("search.drive_feed", (1, 2), "search.drive_feed", "a")
+            .await
+            .unwrap()
+    );
+    assert!(
+        !cursors
+            .set("search.drive_feed", (9, 9), "search.drive_feed", "b")
+            .await
+            .unwrap()
+    );
+    assert_eq!(
+        cursors.get("search.drive_feed").await.unwrap(),
+        Some((1, 2))
+    );
+    assert!(
+        cursors
+            .set("search.drive_feed", (3, 0), "search.drive_feed", "a")
+            .await
+            .unwrap()
+    );
+    assert_eq!(
+        cursors.get("search.drive_feed").await.unwrap(),
+        Some((3, 0))
     );
 }

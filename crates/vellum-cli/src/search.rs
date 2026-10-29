@@ -6,8 +6,9 @@
 //! - The index is embedded tantivy in `<data>/.vellum/search`, sealed with
 //!   a key derived from `VELLUM_INDEX_KEY` (plaintext in plaintext mode),
 //!   or Postgres full-text search when the server runs on Postgres.
-//! - Drive pages reach it through `vellum_search::DriveFeed`, which sweeps
-//!   the drive's tables. Collection rows reach it through the collections
+//! - Drive pages reach it through `vellum_search::DriveFeed`, which follows
+//!   the page change log. With the shared Postgres tables one replica of the
+//!   cluster follows it at a time (ADR 0038, D164). Collection rows reach it through the collections
 //!   service's index feed, so formulas and rollups are searchable too.
 //! - A row has no node of its own in the permission tree, so a row hit is
 //!   checked against its collection: whoever can read the collection can
@@ -232,6 +233,8 @@ pub struct Parts<S: AuthzStore + 'static> {
     pub space_of: SpaceOf,
     /// The rows collections writes touch.
     pub row_changes: mpsc::UnboundedReceiver<Vec<DocId>>,
+    /// This replica's name, for the shared feed's lease.
+    pub holder: String,
 }
 
 async fn backend(
@@ -276,7 +279,9 @@ pub async fn start<S: AuthzStore + 'static>(parts: Parts<S>) -> Result<SearchApi
         collections,
         space_of,
         mut row_changes,
+        holder,
     } = parts;
+    let shared = matches!(index.pool(), IndexPool::Postgres(_));
     let (backend, opened) = backend(&data_dir, key, &index).await?;
     let index = Arc::new(index);
     let rows = Arc::new(RowOwners::default());
@@ -341,7 +346,13 @@ pub async fn start<S: AuthzStore + 'static>(parts: Parts<S>) -> Result<SearchApi
             start,
             ..FeedConfig::default()
         };
-        drop(DriveFeed::spawn(index, indexer, config));
+        // A shared index needs one follower in the cluster; a local one
+        // needs one per replica.
+        drop(if shared {
+            DriveFeed::spawn_shared(index, indexer, config, &holder)
+        } else {
+            DriveFeed::spawn(index, indexer, config)
+        });
     }));
     Ok(SearchApi::new(service))
 }

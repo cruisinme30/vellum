@@ -9,8 +9,9 @@ use sqlx::Connection as _;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteConnection};
 use vellum_db::{Backend, Error, Index, IndexConfig, IndexKey};
 
-const TABLES: [&str; 25] = [
+const TABLES: [&str; 30] = [
     "cluster_changes",
+    "cluster_cursors",
     "cluster_feed",
     "cluster_leases",
     "cluster_nodes",
@@ -18,6 +19,8 @@ const TABLES: [&str; 25] = [
     "documents",
     "drive_activity",
     "drive_activity_scope",
+    "drive_change_meta",
+    "drive_changes",
     "drive_links",
     "drive_nodes",
     "drive_spaces",
@@ -28,7 +31,9 @@ const TABLES: [&str; 25] = [
     "identity_meta",
     "identity_records",
     "index_meta",
+    "jobs",
     "page_ancestors",
+    "rate_counts",
     "space_shards",
     "spaces",
     "sync_clients",
