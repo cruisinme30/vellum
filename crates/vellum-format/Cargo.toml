@@ -16,3 +16,9 @@ layer = "foundation"
 
 [lints]
 workspace = true
+
+[dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+serde_yaml_ng = "0.10.0"
+tracing = "0.1.44"
+vellum-kernel.workspace = true
