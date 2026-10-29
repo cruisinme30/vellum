@@ -15,6 +15,7 @@ import { App } from "./app";
 import { createNorthstarStore } from "./data/mock/northstar";
 import { lazyCache } from "./editor/collab/lazy-cache";
 import { createLocalConnector } from "./editor/collab/local-connector";
+import { createPlatform, startPlatform } from "./platform/platform";
 import { DocumentCache } from "./platform/store/document-cache";
 import { openLocalDatabase } from "./platform/store/persistence";
 
@@ -30,3 +31,5 @@ createRoot(container).render(
     <App store={createNorthstarStore()} collab={createLocalConnector({ cache })} />
   </StrictMode>,
 );
+
+void startPlatform(createPlatform(), { production: import.meta.env.PROD });

@@ -16,6 +16,8 @@ path = [
   "web/knip.json",
   "web/.prettierrc.json",
   "schema/*.json",
+  "web/public/manifest.webmanifest",
+  "web/public/icons/**",
   ".markdownlint-cli2.jsonc",
   ".lycheeignore",
   ".vale/styles/config/vocabularies/**",

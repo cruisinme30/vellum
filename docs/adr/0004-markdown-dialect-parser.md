@@ -53,12 +53,15 @@ flowchart LR
 - Inputs that mean the same thing parse to equal trees: setext headings
   become ATX, indented code becomes a fence, a `math` fence becomes
   `$$` math, `> [!NOTE]` alerts become callout containers, a mark nested
-  directly in the same mark is flattened, and adjacent emphasis runs
-  merge.
+  directly in the same mark is flattened, adjacent emphasis runs
+  merge, and a list with one item and one block is tight. A block ID
+  may stand alone as a paragraph (`- [ ] ^blk-…`).
 - `serialize(&Document)` writes one canonical text: `-` bullets and `.`
   markers (alternating `*` and `)` for adjacent lists), backtick fences
   sized to their content, `***` for rules where `---` would be
-  ambiguous, front matter keys in page order, blank lines inside
+  ambiguous, `*` for a bullet list that starts on a `-` item's line
+  (so `- * -` never reads as a rule), an empty `{}` after text that
+  would otherwise read as attributes, front matter keys in page order, blank lines inside
   `:::` containers (so the output passes markdownlint), and minimal
   escapes (a backslash is doubled only before punctuation).
   `parse(serialize(d)) == d` for every parsed `d`.

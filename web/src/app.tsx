@@ -12,6 +12,7 @@ import { AppShell } from "./shell/app-shell";
 import { AppearanceProvider } from "./theme/appearance-context";
 import { FavoritesView, HomeView } from "./views/home";
 import { AdminView, CollectionsView, HelpView, NotFoundView } from "./views/info";
+import { NewPageView } from "./views/new-page";
 import { InboxView, SearchView } from "./views/search";
 
 // The editor is most of the bundle, so it loads with the first page opened.
@@ -46,6 +47,9 @@ export function AppRoutes() {
         <Route path="search" element={<SearchView />} />
         <Route path="favorites" element={<FavoritesView />} />
         <Route path="inbox" element={<InboxView />} />
+        <Route path="new" element={<NewPageView />} />
+        {/* My Work lands with the tasks service; until then, mentions are the closest view. */}
+        <Route path="my-work" element={<InboxView />} />
         <Route path="data" element={<CollectionsView />} />
         <Route path="help" element={<HelpView />} />
         <Route path="admin" element={<AdminView />} />
