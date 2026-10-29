@@ -1,0 +1,26 @@
+{
+  "document": {
+    "front_matter": {
+      "raw": "title: [unclosed\n"
+    },
+    "blocks": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "The page still renders when its front matter is broken."
+          }
+        ],
+        "id": null
+      }
+    ]
+  },
+  "diagnostics": [
+    {
+      "line": 3,
+      "code": "front_matter_yaml",
+      "message": "front matter is not valid YAML: did not find expected ',' or ']' at line 2 column 1, while parsing a flow sequence at line 1 column 8"
+    }
+  ]
+}
