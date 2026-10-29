@@ -13,7 +13,7 @@ vellum: 1
 - Status: accepted
 - Decisions: D147, D148, D149
 - Issue: #365
-- Pull requests: #366
+- Pull requests: #381
 - Requirements: E2E private spaces with client-side search and MCP
   (brief §9, §11)
 
