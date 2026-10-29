@@ -75,6 +75,22 @@ Give the target heading a custom anchor, `{#slash-menu}`, so that
 rewording the heading never breaks the link. Never reuse or rename a
 help ID; add a new one and keep the old one pointing somewhere sensible.
 
+`cargo xtask help write` also writes `web/src/help/topics.gen.ts`, so the
+app can only name IDs that exist. Put a `?` beside a screen's title with
+`<ViewTitle title={…} help="mywork.buckets" />`, or pass `help` to
+`ServerScreen` or `AdminScreen`. Against a server the link opens
+`/guide/topics/<id>`, the books built into that server, rendered by
+`vellum-render` like any page; in the demo it opens the published guide.
+
+## The website {#website}
+
+`scripts/ci/build-site.sh` publishes the books with mdBook. Every page
+ends with **Was this page helpful?** and **Edit this page**: Yes and No
+open a prefilled GitHub issue labelled `docs-feedback`, and nothing is
+sent unless the reader submits it. The newest five release tags get their
+own copy at `docs/v/<tag>/`, linked from the site bar, so readers of an
+older release find its guide.
+
 ## Style {#style}
 
 - Write for someone busy: lead with what the reader can do, in short sentences.
@@ -91,24 +107,24 @@ version that is running.
 
 ## Videos {#videos}
 
-Short videos cover the ten most common tasks, one per task, each under
-two minutes and captioned. They are recorded against the Northstar demo
-workspace from the matching cookbook recipe or chapter:
-
-1. Create and share a page
-2. Use the slash menu
-3. Add a chart and a diagram
-4. Create a collection and a board view
-5. Create a book and reorder its sections
-6. Export to PDF and Word
-7. Create and triage issues
-8. Quick-add tasks and subscribe to the calendar feed
-9. Connect Claude over MCP and review a draft
-10. Restore a page from version history
+Ten short videos cover the most common tasks, each under two minutes and
+captioned. They are recorded, not filmed: a tour in `web/e2e/tours`
+drives the app against the Northstar demo workspace, and `pnpm run
+tours` writes each video and its WebVTT captions to
+`web/test-results/tours`. The [video storyboard](videos.md) has the
+scenes and captions of all ten. Re-record them for each release, so a
+video never shows an older screen than the release it ships with.
 
 ## Translations {#translations}
 
 Interface strings are translated with Fluent. The books are translated
-as copies under `docs/i18n/<locale>/`, keeping the same paths and page
-IDs, so a help ID resolves in every language and falls back to English
-where a page is not yet translated.
+as copies under `docs/i18n/<locale>/<name>.book/`, such as
+`docs/i18n/de/user.book/`. A translation:
+
+- keeps every page's path and `id`, and the book's `id`;
+- keeps every heading's `{#anchor}`, so help IDs resolve in every language;
+- may translate only some pages; the rest fall back to English;
+- translates text only: examples, code and Northstar names stay as they are.
+
+`cargo xtask help` checks all four. Keep text out of screenshots and
+diagrams where you can, so they need no translated copy.

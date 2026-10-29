@@ -41,7 +41,7 @@ function AllBooks({ api }: { readonly api: BooksApi }) {
 export function BooksPage() {
   const t = useT();
   return (
-    <ServerScreen api="books" title={t("books")} className="vl-books">
+    <ServerScreen api="books" help="book.create" title={t("books")} className="vl-books">
       {(api) => <AllBooks api={api} />}
     </ServerScreen>
   );

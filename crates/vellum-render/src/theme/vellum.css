@@ -26,6 +26,9 @@
 .vl-doc blockquote { margin-left: 0; padding-left: 1em; border-left: 4px solid var(--vl-outline-variant); color: var(--vl-on-surface-variant); }
 .vl-doc hr { border: 0; border-top: 1px solid var(--vl-outline-variant); }
 .vl-doc img { max-width: 100%; height: auto; border-radius: 8px; }
+/* Any preformatted block (a chart's data, a diagram's source) scrolls
+   sideways rather than widening the page. */
+.vl-doc pre { max-width: 100%; overflow-x: auto; }
 .vl-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* Inline chips */
@@ -91,7 +94,11 @@
 .vl-stat-label { color: var(--vl-on-surface-variant); }
 .vl-stat-delta.vl-up { color: var(--vl-good); }
 .vl-stat-delta.vl-down { color: var(--vl-crit); }
-.vl-facts { display: grid; grid-template-columns: max-content 1fr; gap: 0.25em 1.5em; margin: 0; }
+/* Each term and its value are wrapped in a <div>; the wrapper must not be
+   a grid item, or pairs fill the two columns side by side and a long value
+   widens the page. */
+.vl-facts { display: grid; grid-template-columns: fit-content(40%) minmax(0, 1fr); gap: 0.25em 1.5em; margin: 0; }
+.vl-facts > div { display: contents; }
 .vl-facts dt { color: var(--vl-on-surface-variant); }
 .vl-facts dd { margin: 0; }
 .vl-progress { display: grid; grid-template-columns: max-content 1fr max-content; gap: 0.4em 1em; align-items: center; }
@@ -153,8 +160,8 @@
 
 /* Calculator and live blocks */
 .vl-calculator { display: grid; gap: 0.5em; background: var(--vl-surface-container-low); border-radius: var(--vl-radius); padding: 0.75em 1em; }
-.vl-calculator label { display: grid; grid-template-columns: 8em 1fr 5em; gap: 1em; align-items: center; }
-.vl-calculator input { accent-color: var(--vl-primary); }
+.vl-calculator label { display: grid; grid-template-columns: minmax(0, 8em) minmax(0, 1fr) minmax(0, 5em); gap: 1em; align-items: center; }
+.vl-calculator input { min-width: 0; accent-color: var(--vl-primary); }
 .vl-calc-result { font-size: 1.25em; font-weight: 600; }
 .vl-collection, .vl-live-placeholder { border: 1px dashed var(--vl-outline); border-radius: var(--vl-radius); padding: 0.75em 1em; color: var(--vl-on-surface-variant); }
 .vl-issues { margin: 1em 0; }

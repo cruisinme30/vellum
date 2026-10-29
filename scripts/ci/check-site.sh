@@ -8,7 +8,8 @@
 #   - every image on them has alt text;
 #   - every local link and file they point to exists, and so does every
 #     link in the site bar at the top of each help book page;
-#   - the build left no placeholder unfilled.
+#   - the build left no placeholder unfilled, on any page;
+#   - every help book page ends with the feedback and edit links (D257).
 #
 # Usage: scripts/ci/check-site.sh [site-dir] (default: _site)
 set -euo pipefail
@@ -73,6 +74,11 @@ while IFS= read -r -d '' page; do
     continue
   fi
   check_links "${page}" "${bar}"
+  grep -qE '@(ROOT|DOCS|VERSIONS)@' "${page}" && fail "${page#"${site}"/} has an unfilled placeholder"
+  case "${page}" in
+    */decisions/*) ;;
+    *) grep -q 'class="vellum-feedback"' "${page}" || fail "${page#"${site}"/} has no feedback links" ;;
+  esac
 done < <(find "${site}/docs" -mindepth 2 -name '*.html' -not -name 'toc.html' -not -name 'print.html' -not -name '404.html' -print0)
 
 if ((failures > 0)); then

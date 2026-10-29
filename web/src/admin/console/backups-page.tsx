@@ -192,7 +192,7 @@ function Overview({ api }: { readonly api: AdminConsoleApi }) {
 export function BackupsPage() {
   const t = useT();
   return (
-    <AdminScreen title={t("admin-backups")} intro={t("admin-backups-intro")}>
+    <AdminScreen help="admin.backups" title={t("admin-backups")} intro={t("admin-backups-intro")}>
       {(api) => <Overview api={api} />}
     </AdminScreen>
   );

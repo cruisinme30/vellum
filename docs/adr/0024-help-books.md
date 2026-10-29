@@ -96,6 +96,9 @@ service (ADR 0013, D67) fixed the on-disk shape of a book.
 
 - A pull request that adds a block must add its example to the guide and
   its name to `coverage.rs`, or the fast suite fails.
+- [ADR 0062](0062-help-in-the-app-site-versions-and-videos.md) adds
+  the in-app reader, site versions and feedback, recorded videos and the
+  translation check (D256 to D258).
 - Chapters describe 1.0 as the brief specifies it; threads update the
   matching chapter in the same pull request when behaviour differs.
 - The markdownlint configuration now ignores `docs/*.book/SUMMARY.md` (mdBook uses `#`

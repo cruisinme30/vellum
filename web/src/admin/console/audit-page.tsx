@@ -243,7 +243,7 @@ export function AuditPage() {
   const t = useT();
   const [filters, setFilters] = useState<Filters>({ action: "", user: "" });
   return (
-    <AdminScreen title={t("admin-audit")} intro={t("admin-audit-intro")}>
+    <AdminScreen help="admin.audit" title={t("admin-audit")} intro={t("admin-audit-intro")}>
       {(api) => (
         <>
           <ChainTools api={api} />

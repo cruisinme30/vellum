@@ -104,6 +104,7 @@
   gap: 12px;
 }
 
+.vl-collection-head .vl-title-row h1,
 .vl-collection-head h1 {
   margin: 0;
   font-size: 2rem;

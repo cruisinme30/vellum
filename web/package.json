@@ -18,7 +18,8 @@
     "knip": "knip",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "tours": "playwright test -c playwright.tours.config.ts"
   },
   "dependencies": {
     "@fluent/bundle": "^0.19.1",
