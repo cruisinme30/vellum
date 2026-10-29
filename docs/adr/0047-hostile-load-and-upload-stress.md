@@ -24,12 +24,12 @@ abusive clients, and the upload virus scanner under hostile files.
 
 Against `vellum serve` built from develop, a request body trickled a
 byte at a time and an HTTP/2 connection that only answers pings were
-both held for as long as the client liked. hyper's header timer covers
+both held for as long as the client liked. `hyper`'s header timer covers
 neither. Under the k6 attack mix, ordinary readers' p95 rose to 0.9 s.
 Sign-in ran Argon2 (19 MiB each) with no bound beyond the 512-thread
 blocking pool, and rate limits keyed on the full IPv6 address.
 
-Against a real clamd with the shipped config, EICAR inside a zip nested
+Against a real `clamd` with the shipped config, EICAR inside a zip nested
 25 deep or inside an encrypted zip came back "OK", and a 150 KB zip that
 inflates to 150 MB took 20 s of scanner time. serve reads
 `VELLUM_CLAMD_ADDRESS`, but has no upload route yet, so nothing tied a
@@ -68,17 +68,17 @@ future route to the scan.
 - At most 8 scans per replica are in flight; waiting counts against the
   30 s scan budget, so a flood is refused instead of queued.
 - `clamd.conf` sets `AlertExceedsMax`, `AlertEncrypted` and a 30 s
-  `MaxScanTime`, so clamd reports what it could not finish as found.
+  `MaxScanTime`, so `clamd` reports what it could not finish as found.
 
 ### D201: the attacks run every night
 
 - `deploy/perf/k6/hostile.js` adds sign-in and token floods (with forged
   `X-Forwarded-For`), header bombs and 1 MB URLs.
-- `deploy/perf/hostile/slow_clients.py` holds slowloris headers, slow
+- `deploy/perf/hostile/slow_clients.py` holds slow headers (`slowloris`), slow
   bodies and idle HTTP/2 connections, which k6 cannot, and fails if any
   stays open past its budget or a reader slows down.
 - `crates/vellum-security/tests/clamd_stress.rs` runs against a real
-  clamd: the config checks, and 56 hostile and clean uploads at once.
+  `clamd`: the config checks, and 56 hostile and clean uploads at once.
 - All three run in the nightly workflow; the unit and server tests for
   each finding run on every pull request.
 
@@ -91,7 +91,7 @@ future route to the scan.
   A byte every few seconds never trips it; the total deadline is needed.
 - **Close HTTP/2 connections at a fixed age.** Slots would still be held
   for that age, and long downloads would be cut. Idle time is the signal.
-- **Let clamd's limits decide on archives.** clamd answers "OK" past
+- **Let `clamd`'s limits decide on archives.** `clamd` answers "OK" past
   them unless told otherwise, and spends seconds getting there; checking
   in Vellum first is cheap and refuses bombs before they cost scan time.
 - **Queue password checks instead of refusing.** A queue grows with the
@@ -108,4 +108,4 @@ future route to the scan.
 - Under a sign-in flood some genuine sign-ins get 429 and retry; the
   server stays up.
 - Each nightly run takes about 3 more minutes for slow clients, and the
-  scanner job needs clamd's first signature load (up to 15 minutes).
+  scanner job needs `clamd`'s first signature load (up to 15 minutes).
