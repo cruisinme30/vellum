@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Runs the Fast suite locally before every push, so CI failures are caught
+# before they cost a CI cycle. Install with: cargo xtask install-hooks
+set -euo pipefail
+
+root="$(git rev-parse --show-toplevel)"
+cd "${root}"
+git fetch --quiet origin develop 2>/dev/null || true
+exec cargo xtask fast
