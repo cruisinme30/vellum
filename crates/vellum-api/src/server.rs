@@ -98,11 +98,11 @@ pub struct ConnectionLimits {
     /// For HTTP/2, where the header timer does not apply, this is what
     /// frees a connection whose client only answers pings.
     pub idle_timeout: Duration,
-    /// The upload routes' path prefix. A body sent there with a
+    /// The upload routes' path prefixes. A body sent there with a
     /// `Content-Length` gets `body_timeout` plus the time to send that
     /// many bytes at `upload_rate`, so a large file on a slow link
     /// finishes; gaps are still bounded by `header_read_timeout` (D213).
-    pub upload_prefix: Option<&'static str>,
+    pub upload_prefixes: &'static [&'static str],
     /// The slowest average rate, in bytes a second, an upload is given
     /// time for.
     pub upload_rate: u64,
@@ -115,7 +115,7 @@ impl ConnectionLimits {
     /// The time a request body to `path` declaring `length` bytes may take.
     #[must_use]
     pub fn body_time(&self, path: &str, length: Option<u64>) -> Duration {
-        let upload = self.upload_prefix.is_some_and(|prefix| {
+        let upload = self.upload_prefixes.iter().any(|prefix| {
             path.strip_prefix(prefix)
                 .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
         });
@@ -139,7 +139,7 @@ impl Default for ConnectionLimits {
             max_connections_per_ip: 0,
             body_timeout: Duration::from_mins(2),
             idle_timeout: Duration::from_mins(1),
-            upload_prefix: None,
+            upload_prefixes: &[],
             upload_rate: 512 * 1024,
         }
     }
@@ -672,7 +672,7 @@ mod tests {
     #[test]
     fn uploads_get_time_for_their_size() {
         let limits = ConnectionLimits {
-            upload_prefix: Some("/api/v1/attachments"),
+            upload_prefixes: &["/api/v1/attachments"],
             ..ConnectionLimits::default()
         };
         let base = limits.body_timeout;

@@ -23,6 +23,9 @@ mod collab;
 mod delivery_tests;
 mod docs;
 mod e2e;
+mod exports;
+#[cfg(test)]
+mod exports_tests;
 mod feed;
 mod google_http;
 #[cfg(test)]

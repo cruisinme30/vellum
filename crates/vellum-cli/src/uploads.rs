@@ -282,7 +282,7 @@ fn download(file: &Attachment, bytes: Bytes) -> Response {
 
 /// The signed-in person behind the request, when the credential allows
 /// `scope`. Share links and anonymous callers have no drive.
-fn caller(request: &Request, scope: Scope) -> Result<Actor, Error> {
+pub(crate) fn caller(request: &Request, scope: Scope) -> Result<Actor, Error> {
     let principal = request
         .extensions()
         .get::<Principal>()
@@ -293,18 +293,18 @@ fn caller(request: &Request, scope: Scope) -> Result<Actor, Error> {
     Ok(Actor::User { user })
 }
 
-fn parse_page(raw: &str) -> Result<ObjectId, Error> {
+pub(crate) fn parse_page(raw: &str) -> Result<ObjectId, Error> {
     raw.parse()
         .map_err(|_| Error::new(ErrorKind::NotFound, "page not found"))
 }
 
-fn invalid(message: &'static str) -> Error {
+pub(crate) fn invalid(message: &'static str) -> Error {
     Error::new(ErrorKind::InvalidInput, message)
 }
 
 /// An upload the check refused, as an error the caller can act on. The
 /// HTTP status is set by [`status_for`].
-fn refused(error: &UploadError) -> Error {
+pub(crate) fn refused(error: &UploadError) -> Error {
     let kind = if matches!(error, UploadError::ScannerUnavailable(_)) {
         ErrorKind::Unavailable
     } else {
@@ -332,7 +332,7 @@ const fn status_for(error: &UploadError) -> StatusCode {
 
 /// Carries an upload refusal's status through the kernel error.
 #[derive(Debug)]
-struct UploadRefusal(StatusCode);
+pub(crate) struct UploadRefusal(pub(crate) StatusCode);
 
 impl std::fmt::Display for UploadRefusal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -342,7 +342,7 @@ impl std::fmt::Display for UploadRefusal {
 
 impl std::error::Error for UploadRefusal {}
 
-fn request_id(request: &Request) -> RequestId {
+pub(crate) fn request_id(request: &Request) -> RequestId {
     request
         .extensions()
         .get::<RequestId>()
@@ -355,7 +355,7 @@ fn fail(request: &Request, error: Error) -> Response {
 }
 
 /// The error as the gateway sends it, with an upload refusal's status.
-fn respond(request_id: RequestId, error: Error) -> Response {
+pub(crate) fn respond(request_id: RequestId, error: Error) -> Response {
     let status = std::error::Error::source(&error)
         .and_then(|s| s.downcast_ref::<UploadRefusal>())
         .map(|r| r.0);
@@ -364,7 +364,7 @@ fn respond(request_id: RequestId, error: Error) -> Response {
     response
 }
 
-fn json(status: StatusCode, body: &impl Serialize) -> Response {
+pub(crate) fn json(status: StatusCode, body: &impl Serialize) -> Response {
     serde_json::to_vec(body).map_or_else(
         |_| StatusCode::INTERNAL_SERVER_ERROR.into_response(),
         |bytes| {
@@ -379,7 +379,7 @@ fn json(status: StatusCode, body: &impl Serialize) -> Response {
 }
 
 /// Percent-encodes everything but RFC 3986's unreserved characters.
-fn encode(name: &str) -> String {
+pub(crate) fn encode(name: &str) -> String {
     let mut out = String::with_capacity(name.len());
     for byte in name.bytes() {
         if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~') {
