@@ -102,26 +102,33 @@ export function parsePush(body: unknown): PushResponse {
   return body as unknown as PushResponse;
 }
 
+function isPatch(patch: unknown): boolean {
+  return (
+    isObject(patch) &&
+    (patch["op"] === "put" || patch["op"] === "del") &&
+    typeof patch["collection"] === "string" &&
+    typeof patch["key"] === "string"
+  );
+}
+
+function isPullShape(body: Record<string, unknown>): boolean {
+  return (
+    typeof body["cursor"] === "string" &&
+    typeof body["lastMutationId"] === "number" &&
+    typeof body["reset"] === "boolean" &&
+    (body["more"] === undefined || typeof body["more"] === "boolean") &&
+    Array.isArray(body["patches"])
+  );
+}
+
 /** Checks a pull response from the network. */
 export function parsePull(body: unknown): PullResponse {
   if (
     !isObject(body) ||
-    typeof body["cursor"] !== "string" ||
-    typeof body["lastMutationId"] !== "number" ||
-    typeof body["reset"] !== "boolean" ||
-    !Array.isArray(body["patches"])
+    !isPullShape(body) ||
+    !(body["patches"] as unknown[]).every((patch) => isPatch(patch))
   ) {
     return malformed("pull");
-  }
-  for (const patch of body["patches"] as unknown[]) {
-    if (
-      !isObject(patch) ||
-      (patch["op"] !== "put" && patch["op"] !== "del") ||
-      typeof patch["collection"] !== "string" ||
-      typeof patch["key"] !== "string"
-    ) {
-      return malformed("pull");
-    }
   }
   return body as unknown as PullResponse;
 }

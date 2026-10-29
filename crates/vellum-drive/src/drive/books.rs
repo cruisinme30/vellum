@@ -26,7 +26,7 @@ use super::Drive;
 use crate::error::{DriveError, DriveResult};
 use crate::layout;
 use crate::model::Node;
-use crate::ports::Permission;
+use crate::ports::{Access, Permission};
 
 /// The book's settings file.
 const MANIFEST: &str = "book.yaml";
@@ -79,20 +79,27 @@ impl IdSource for FreshIds {
     }
 }
 
-/// The principals a person holds, for section restrictions. `None` for
-/// Vellum itself and outside edits, which see everything.
-///
-/// Group membership is not known to the drive yet, so a person allowed
-/// only through a group sees less, never more.
-fn principals(actor: &Actor) -> DriveResult<Option<BTreeSet<Principal>>> {
+/// The principals a person holds, for section restrictions: the person
+/// and every group they belong to. `None` for Vellum itself and outside
+/// edits, which see everything.
+async fn principals(
+    access: &dyn Access,
+    actor: &Actor,
+) -> DriveResult<Option<BTreeSet<Principal>>> {
     let user = match actor {
-        Actor::User { user } => user,
-        Actor::Model { on_behalf_of } => on_behalf_of,
+        Actor::User { user } => *user,
+        Actor::Model { on_behalf_of } => *on_behalf_of,
         _ => return Ok(None),
     };
-    let principal = Principal::parse(&format!("user:{user}"))
-        .map_err(|err| DriveError::Invalid(format!("principal for {user}: {err}")))?;
-    Ok(Some(BTreeSet::from([principal])))
+    let parse = |text: String| {
+        Principal::parse(&text)
+            .map_err(|err| DriveError::Invalid(format!("principal {text}: {err}")))
+    };
+    let mut out = BTreeSet::from([parse(format!("user:{user}"))?]);
+    for group in access.groups_of(user).await? {
+        let _ = out.insert(parse(format!("group:{group}"))?);
+    }
+    Ok(Some(out))
 }
 
 /// True for files a book copy never carries: snapshots and build output.
@@ -142,9 +149,10 @@ impl Drive {
             &mut FreshIds,
         )
         .map_err(|_| unreadable(root))?;
-        let principals = match principals(actor)? {
-            Some(_) if self.may(actor, node, Permission::Manage).await? => None,
-            other => other,
+        let principals = if self.may(actor, node, Permission::Manage).await? {
+            None
+        } else {
+            principals(self.access.as_ref(), actor).await?
         };
         let view = match principals {
             Some(principals) => book

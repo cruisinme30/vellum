@@ -1,0 +1,537 @@
+/*
+ * SPDX-FileCopyrightText: 2026 The Vellum contributors
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+.vl-shell {
+  display: grid;
+  grid-template-columns: 80px auto 1fr;
+  min-height: 100dvh;
+}
+
+.vl-skip {
+  position: absolute;
+  inset-inline-start: 8px;
+  top: -48px;
+  z-index: 60;
+  padding: 8px 16px;
+  border-radius: var(--vl-radius-s);
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+}
+
+.vl-skip:focus {
+  top: 8px;
+}
+
+/* Navigation rail */
+.vl-rail {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  height: 100dvh;
+  padding: 12px 0;
+  background: var(--md-surface-container);
+  overflow-y: auto;
+}
+
+.vl-rail-item {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  width: 72px;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--md-on-surface-variant);
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.vl-rail-indicator {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 32px;
+  border-radius: 16px;
+  transition: background var(--vl-motion);
+}
+
+.vl-rail-item:hover .vl-rail-indicator {
+  background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+}
+
+.vl-rail-item[aria-current="page"],
+.vl-rail-item[aria-expanded="true"] {
+  color: var(--md-on-surface);
+}
+
+.vl-rail-item[aria-current="page"] .vl-rail-indicator,
+.vl-rail-item[aria-expanded="true"] .vl-rail-indicator {
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+.vl-fab {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  margin: 4px 0 12px;
+  padding: 16px;
+  border: 0;
+  border-radius: var(--vl-radius-m);
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+  font-weight: 500;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.vl-rail-spacer {
+  flex: 1;
+}
+
+.vl-menu-anchor {
+  position: relative;
+}
+
+.vl-popover {
+  position: absolute;
+  z-index: 50;
+  min-width: 240px;
+  padding: 16px;
+  border-radius: var(--vl-radius-m);
+  background: var(--md-surface-container-high);
+  color: var(--md-on-surface);
+  box-shadow:
+    0 2px 6px rgb(0 0 0 / 15%),
+    0 1px 2px rgb(0 0 0 / 30%);
+}
+
+.vl-popover-rail {
+  bottom: 0;
+  inset-inline-start: 76px;
+}
+
+.vl-theme-settings fieldset {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+}
+
+.vl-theme-settings legend {
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.vl-radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+}
+
+.vl-radio input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--md-primary);
+}
+
+.vl-seed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vl-seed input {
+  width: 40px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--md-outline);
+  border-radius: var(--vl-radius-s);
+}
+
+/* Sidebar */
+.vl-sidebar {
+  position: sticky;
+  top: 0;
+  width: 280px;
+  height: 100dvh;
+  overflow-y: auto;
+  background: var(--md-surface-container-low);
+  border-inline-end: 1px solid var(--md-outline-variant);
+}
+
+.vl-sidebar-inner {
+  padding: 12px 8px 24px;
+}
+
+.vl-workspace-name {
+  margin: 4px 12px 12px;
+  font-size: 1.125rem;
+  font-weight: 500;
+}
+
+.vl-space {
+  margin-bottom: 12px;
+}
+
+.vl-space-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-inline-start: 12px;
+}
+
+.vl-space-head h2 {
+  margin: 0;
+  color: var(--md-on-surface-variant);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.vl-tree {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vl-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: var(--vl-row);
+  padding-inline-end: 4px;
+  border-radius: 18px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.vl-tree-row:hover {
+  background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+}
+
+.vl-tree-row[aria-selected="true"] {
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+  font-weight: 500;
+}
+
+.vl-tree-twisty {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.vl-tree-icon {
+  width: 20px;
+  text-align: center;
+}
+
+.vl-tree-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vl-tree-more {
+  width: 32px;
+  height: 32px;
+  opacity: 0;
+}
+
+.vl-tree-row:hover > .vl-menu-anchor > .vl-tree-more,
+.vl-tree-row:focus-visible > .vl-menu-anchor > .vl-tree-more,
+.vl-tree-more[aria-expanded="true"] {
+  opacity: 1;
+}
+
+.vl-menu {
+  position: absolute;
+  inset-inline-end: 0;
+  top: 100%;
+  z-index: 50;
+  min-width: 200px;
+  margin: 0;
+  padding: 8px 0;
+  list-style: none;
+  border-radius: var(--vl-radius-s);
+  background: var(--md-surface-container-high);
+  color: var(--md-on-surface);
+  font-weight: 400;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 20%);
+}
+
+.vl-menu [role="menuitem"] {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  padding: 0 16px;
+  cursor: pointer;
+}
+
+.vl-menu [role="menuitem"]:hover,
+.vl-menu [role="menuitem"]:focus {
+  background: color-mix(in srgb, var(--md-on-surface) 10%, transparent);
+  outline: none;
+}
+
+.vl-more-links {
+  display: grid;
+  margin-bottom: 12px;
+}
+
+.vl-more-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 0 16px;
+  border-radius: 24px;
+  color: var(--md-on-surface);
+  text-decoration: none;
+}
+
+.vl-more-link[aria-current="page"] {
+  background: var(--md-secondary-container);
+}
+
+/* Main */
+.vl-main {
+  min-width: 0;
+  padding: 24px clamp(16px, 5vw, 64px) 96px;
+  outline: none;
+}
+
+.vl-view,
+.vl-page {
+  max-width: 880px;
+  margin: 0 auto;
+}
+
+.vl-view h1 {
+  font-size: 2rem;
+  font-weight: 400;
+}
+
+.vl-page-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vl-page-card {
+  display: flex;
+  gap: 12px;
+  height: 100%;
+  padding: 16px;
+  border-radius: var(--vl-radius-m);
+  background: var(--md-surface-container);
+  color: var(--md-on-surface);
+  text-decoration: none;
+}
+
+.vl-page-card:hover {
+  background: var(--md-surface-container-high);
+}
+
+.vl-page-card span {
+  display: grid;
+  gap: 4px;
+}
+
+.vl-page-card small {
+  color: var(--md-on-surface-variant);
+}
+
+.vl-page-card-icon {
+  font-size: 1.5rem;
+}
+
+.vl-search {
+  display: grid;
+  gap: 4px;
+  max-width: 560px;
+}
+
+.vl-search input {
+  min-height: 56px;
+  border-radius: var(--vl-radius-l);
+  font-size: 1rem;
+}
+
+.vl-shortcuts div {
+  display: grid;
+  grid-template-columns: minmax(180px, 2fr) 3fr;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--md-outline-variant);
+}
+
+.vl-shortcuts dd {
+  margin: 0;
+}
+
+kbd {
+  font-family: var(--vl-mono);
+  font-size: 0.875em;
+}
+
+/* Page header */
+.vl-breadcrumbs ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--md-on-surface-variant);
+  font-size: 0.875rem;
+}
+
+.vl-breadcrumbs li + li::before {
+  content: "/";
+  margin-inline-end: 4px;
+}
+
+.vl-page-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.vl-page-icon {
+  font-size: 2.5rem;
+}
+
+.vl-page-title {
+  flex: 1;
+  margin: 0;
+}
+
+.vl-title-input {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 2.25rem;
+  font-weight: 400;
+  line-height: 1.25;
+}
+
+.vl-title-input::placeholder {
+  color: var(--md-on-surface-variant);
+}
+
+.vl-page-props {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin: 12px 0 8px;
+  color: var(--md-on-surface-variant);
+  font-size: 0.875rem;
+}
+
+.vl-page-props div {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.vl-page-props dd {
+  margin: 0;
+  color: var(--md-on-surface);
+}
+
+.vl-status-verified {
+  background: var(--md-callout-good-bg);
+  color: var(--md-callout-good);
+}
+
+.vl-status-in-review {
+  background: var(--md-callout-info-bg);
+  color: var(--md-callout-info);
+}
+
+.vl-status-outdated {
+  background: var(--md-callout-warn-bg);
+  color: var(--md-callout-warn);
+}
+
+/* Medium windows: the sidebar floats over the main area. */
+@media (max-width: 1023.98px) {
+  .vl-shell {
+    grid-template-columns: 80px 1fr;
+  }
+
+  .vl-sidebar {
+    position: fixed;
+    inset-block: 0;
+    inset-inline-start: 80px;
+    z-index: 30;
+    box-shadow: 0 4px 12px rgb(0 0 0 / 20%);
+  }
+
+  .vl-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    background: color-mix(in srgb, var(--md-scrim) 32%, transparent);
+  }
+}
+
+/* Phones: a bottom bar and a "More" sheet replace the rail and sidebar. */
+@media (max-width: 599.98px) {
+  .vl-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .vl-sidebar {
+    inset-inline-start: 0;
+    width: min(320px, 88vw);
+    padding-bottom: 80px;
+  }
+
+  .vl-main {
+    padding: 16px 16px 112px;
+  }
+
+  .vl-title-input {
+    font-size: 1.75rem;
+  }
+
+  .vl-bottom-bar {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 40;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    padding: 12px 0 calc(16px + env(safe-area-inset-bottom, 0px));
+    background: var(--md-surface-container);
+  }
+
+  .vl-bottom-bar .vl-rail-item {
+    width: auto;
+  }
+}
