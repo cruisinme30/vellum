@@ -1,0 +1,25 @@
+[Title] PRD: Policy simulator
+| Owner | @priya |
+| Status | In review |
+| Target | 2027-01-10 |
+| Project | Policy simulator |
+
+[Heading2] Problem
+[Normal] Policy changes ship blind: nobody knows which requests a new rule will block until customers report it.
+[Heading2] Requirements
+| # | Requirement | Issue |
+| R1 | Replay 7 days of traffic in under 10 minutes | ENG-142 |
+| R2 | Diff report of allowed and blocked requests | ENG-143 |
+| R3 | Share the report as a PDF | ENG-151 |
+
+[Heading2] Plan
+[Normal] Roadmap as of 2026-10-29
+[ListParagraph/0] Replay engine: 2026-10-01 → 2026-11-15
+[ListParagraph/0] Diff report: 2026-11-01 → 2026-12-15
+[ListParagraph/0] PDF report: 2026-12-01 → 2027-01-05
+[ListParagraph/0] GA: 2027-01-10 (milestone)
+[Heading2] Risks
+[ListParagraph/0] Replay too slow for large tenants — likelihood 3, impact 4
+[ListParagraph/0] PDF layout slips — likelihood 2, impact 2
+[Subheading] Out of scope
+[Normal] Simulating policies against synthetic traffic; live A/B of policies.

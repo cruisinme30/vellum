@@ -1,0 +1,1 @@
+[Normal] See Gateway architecture or the gateway page.

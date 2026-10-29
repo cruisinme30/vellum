@@ -1,0 +1,16 @@
+<!-- SPDX-FileCopyrightText: 2026 The Vellum contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 160" role="img" aria-labelledby="t">
+  <title id="t">Gateway request path</title>
+  <rect width="640" height="160" rx="16" fill="#f0f2f9"/>
+  <g font-family="Roboto, sans-serif" font-size="15" fill="#1d1b20" text-anchor="middle">
+    <rect x="24" y="56" width="120" height="48" rx="12" fill="#dde1ff"/><text x="84" y="85">Client</text>
+    <rect x="184" y="56" width="120" height="48" rx="12" fill="#dde1ff"/><text x="244" y="85">Gateway</text>
+    <rect x="344" y="56" width="120" height="48" rx="12" fill="#dde1ff"/><text x="404" y="85">Policy engine</text>
+    <rect x="504" y="56" width="112" height="48" rx="12" fill="#dde1ff"/><text x="560" y="85">Backend</text>
+  </g>
+  <g stroke="#4f5b92" stroke-width="3" marker-end="url(#a)">
+    <line x1="144" y1="80" x2="180" y2="80"/><line x1="304" y1="80" x2="340" y2="80"/><line x1="464" y1="80" x2="500" y2="80"/>
+  </g>
+  <defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 10 5 0 10z" fill="#4f5b92"/></marker></defs>
+</svg>

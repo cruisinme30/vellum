@@ -112,33 +112,78 @@ jobs:
           cargo run --locked --package xtask -- budgets \
             --binary "${RUNNER_TEMP}/build-1/vellum" --image-bytes "${image_bytes}"
 
-  e2e:
-    name: End-to-end and accessibility
+  website:
+    name: Website build for the UI suite
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    defaults:
-      run:
-        working-directory: web
+    timeout-minutes: 10
+    env:
+      # Keep in step with site.yml.
+      MDBOOK_VERSION: 0.5.4
+      MDBOOK_SHA256: 3f28de05dafca9d0f2eab99c662116b0e37b89b1d96a08f8f430b9eeae958cd7
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Install mdBook
+        run: |
+          tarball="mdbook-v${MDBOOK_VERSION}-x86_64-unknown-linux-gnu.tar.gz"
+          curl -sSfLo "${RUNNER_TEMP}/${tarball}" \
+            "https://github.com/rust-lang/mdBook/releases/download/v${MDBOOK_VERSION}/${tarball}"
+          echo "${MDBOOK_SHA256}  ${RUNNER_TEMP}/${tarball}" | sha256sum --check
+          tar -xzf "${RUNNER_TEMP}/${tarball}" -C "${RUNNER_TEMP}" mdbook
+          echo "MDBOOK=${RUNNER_TEMP}/mdbook" >> "${GITHUB_ENV}"
+      - run: scripts/ci/build-site.sh _site
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: website
+          path: _site
+
+  e2e:
+    name: End-to-end, UI and accessibility (${{ matrix.browser }} ${{ matrix.shard }}/4)
+    needs: website
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    # The pinned Playwright image: the same browsers and fonts on every
+    # machine, so visual baselines compare (ADR 0031). Keep its version
+    # equal to @playwright/test in web/package.json.
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      options: --user 1001
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+        shard: [1, 2, 3, 4]
+    defaults:
+      run:
+        working-directory: web
+    env:
+      HOME: /tmp
+      UI_SCOPE: full
+      UI_BROWSERS: ${{ matrix.browser }}
+      UI_SITE_DIR: ../_site
+      # Baselines exist for Chromium only.
+      UI_VISUAL: ${{ matrix.browser == 'chromium' && '1' || '0' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: website
+          path: _site
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
           package_json_file: web/package.json
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: web/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm run e2e
+      - run: pnpm exec playwright test --shard=${{ matrix.shard }}/4
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: playwright-report
-          path: web/test-results
+          name: ui-report-${{ matrix.browser }}-${{ matrix.shard }}
+          path: |
+            web/playwright-report
+            web/test-results
 
   links:
     name: External links
@@ -155,10 +200,73 @@ jobs:
             '**/*.md'
           fail: true
 
+  fuzz:
+    name: Fuzz ${{ matrix.target }}
+    # Nightly only: a five-minute run per target is too slow for a pull
+    # request and its result is not deterministic. Crashes upload as
+    # artifacts; each one becomes an issue with a regression test.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - format_roundtrip
+          - formula
+          - merge3
+          - blob_path
+          - collab_frames
+          - mcp_messages
+          - envelope
+    defaults:
+      run:
+        working-directory: fuzz
+    env:
+      # cargo-fuzz sets its own sanitizer flags; nightly-only lints must
+      # not fail the build.
+      RUSTFLAGS: ""
+      # yrs reserves with try_reserve; let a failed reservation return an
+      # error instead of being reported as out of memory.
+      ASAN_OPTIONS: allocator_may_return_null=1
+      TOOLCHAIN: nightly-2026-10-28
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install "${TOOLCHAIN}" --profile minimal
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: fuzz
+          key: ${{ matrix.target }}
+      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+        with:
+          tool: cargo-fuzz
+      - name: Keep the corpus between nights
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: fuzz/corpus/${{ matrix.target }}
+          key: fuzz-corpus-${{ matrix.target }}-${{ github.run_id }}
+          restore-keys: fuzz-corpus-${{ matrix.target }}-
+      - name: Seed the format corpus from the golden examples
+        if: matrix.target == 'format_roundtrip'
+        run: |
+          mkdir -p corpus/format_roundtrip
+          find ../corpus/format -name '*.md' -exec cp {} corpus/format_roundtrip/ \;
+      - name: Fuzz for five minutes
+        run: >-
+          cargo "+${TOOLCHAIN}" fuzz run -O "${{ matrix.target }}" --
+          -max_total_time=300 -rss_limit_mb=4096 -malloc_limit_mb=4096
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fuzz-crash-${{ matrix.target }}
+          path: fuzz/artifacts/${{ matrix.target }}
+
   full-suite:
     name: Full suite
     if: always()
-    needs: [fast, coverage, release-build, image, e2e, links]
+    needs: [fast, coverage, release-build, image, e2e, links, fuzz]
     runs-on: ubuntu-24.04
     steps:
       - name: Every check passed

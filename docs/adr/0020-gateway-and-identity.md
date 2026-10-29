@@ -12,8 +12,8 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D88, D89, D90
-- Issue: #84, #85, #148, #46, #86, #88
-- Pull requests: #39, #234, #347
+- Issue: #84, #85, #148, #46, #86, #88, #174
+- Pull requests: #39, #234, #347, #352
 
 :::
 
@@ -113,3 +113,8 @@ live in the gateway crate.
   shapes are out of scope by design.
 - ID types need `JsonSchema` implementations to appear in inputs; the
   kernel provides them.
+- `vellum-cli` is the composition root: `services.rs` builds every service
+  once, and `vellum serve`, `vellum openapi` and `vellum graphql-schema`
+  all see the same set. Without an index (a key, plaintext mode or a
+  database URL) `vellum serve` runs sign-in only and says why, rather
+  than refusing to start.

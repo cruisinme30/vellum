@@ -11,6 +11,13 @@ license.workspace = true
 repository.workspace = true
 publish.workspace = true
 
+[dependencies]
+time = "0.3.55"
+vellum-collections = { path = "../vellum-collections" }
+vellum-export = { path = "../vellum-export" }
+vellum-format = { path = "../vellum-format" }
+vellum-kernel.workspace = true
+
 [package.metadata.vellum]
 layer = "edge"
 

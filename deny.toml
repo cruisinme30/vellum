@@ -14,6 +14,19 @@ ignore = [
     # smallstr is unmaintained (no vulnerability); yrs 0.28 depends on it.
     # Drop this once yrs replaces it. Mirrored in .cargo/audit.toml.
     { id = "RUSTSEC-2026-0215", reason = "unmaintained, pulled by yrs; no safe upgrade yet" },
+    # Typst 0.15 (print PDF export) pulls these. Our Typst world is closed:
+    # it serves only our own templates and JSON data, never a bibliography,
+    # CSL style or YAML file, and syntax highlighting reads only bundled
+    # grammars. Drop each once Typst moves off the crate. Mirrored in
+    # .cargo/audit.toml.
+    { id = "RUSTSEC-2025-0141", reason = "bincode unmaintained; syntect loads only bundled syntax dumps" },
+    { id = "RUSTSEC-2024-0436", reason = "paste unmaintained; proc-macro used by biblatex at build time" },
+    { id = "RUSTSEC-2026-0194", reason = "quick-xml 0.38 in citationberg; export never parses CSL or bibliography XML" },
+    { id = "RUSTSEC-2026-0195", reason = "quick-xml 0.38 NsReader in citationberg; export never parses CSL or bibliography XML" },
+    { id = "RUSTSEC-2026-0206", reason = "rustybuzz unmaintained; Typst's shaper, fonts are our bundled set" },
+    { id = "RUSTSEC-2026-0192", reason = "ttf-parser unmaintained; Typst's font reader, fonts are our bundled set" },
+    { id = "RUSTSEC-2024-0449", reason = "unsafe-libyaml unmaintained; hayagriva YAML is never read by export" },
+    { id = "RUSTSEC-2024-0320", reason = "yaml-rust unmaintained; syntect YAML grammars are never loaded" },
 ]
 
 [licenses]
@@ -40,6 +53,9 @@ allow = [
 # allowed per crate rather than globally because it has no patent grant.
 exceptions = [
     { crate = "notify", allow = ["CC0-1.0"] },
+    # 0BSD is a public-domain-equivalent permissive licence; the crate is
+    # dual-licensed 0BSD OR CC0-1.0. Pulled by Typst for numbering.
+    { crate = "roman-numerals-rs", allow = ["0BSD"] },
 ]
 
 [licenses.private]
@@ -73,6 +89,24 @@ skip = [
     { crate = "block-buffer@0.10", reason = "pulled by digest 0.10 (WebSocket sha1)" },
     { crate = "crypto-common@0.1", reason = "pulled by digest 0.10 (WebSocket sha1)" },
     { crate = "cpufeatures@0.2", reason = "pulled by sha1 0.10 (WebSocket handshake)" },
+    { crate = "bit-set@0.8", reason = "fancy-regex in syntect (Typst 0.15) is on 0.8" },
+    { crate = "bit-vec@0.8", reason = "pulled by bit-set 0.8 (Typst 0.15)" },
+    { crate = "fearless_simd@0.4", reason = "Typst 0.15's raster stack is on 0.4" },
+    { crate = "hayro-ccitt@0.3", reason = "Typst 0.15's PDF image stack is on 0.3" },
+    { crate = "phf@0.13", reason = "Typst 0.15 dependencies are on phf 0.13" },
+    { crate = "phf_generator@0.13", reason = "pulled by phf 0.13 (Typst 0.15)" },
+    { crate = "phf_macros@0.13", reason = "pulled by phf 0.13 (Typst 0.15)" },
+    { crate = "phf_shared@0.13", reason = "pulled by phf 0.13 (Typst 0.15)" },
+    { crate = "quick-xml@0.38", reason = "citationberg (Typst 0.15) is on 0.38; export uses 0.42" },
+    { crate = "rand@0.8", reason = "Typst 0.15 dependencies are on rand 0.8" },
+    { crate = "rand_chacha@0.3", reason = "pulled by rand 0.8 (Typst 0.15)" },
+    { crate = "rand_core@0.6", reason = "pulled by rand 0.8 (Typst 0.15)" },
+    { crate = "roxmltree@0.20", reason = "Typst 0.15's SVG stack is on 0.20" },
+    { crate = "serde_spanned@0.6", reason = "pulled by toml 0.8 (Typst 0.15)" },
+    { crate = "toml@0.8", reason = "Typst 0.15 dependencies are on toml 0.8" },
+    { crate = "toml_datetime@0.6", reason = "pulled by toml 0.8 (Typst 0.15)" },
+    { crate = "toml_edit@0.22", reason = "pulled by toml 0.8 (Typst 0.15)" },
+    { crate = "winnow@0.7", reason = "pulled by toml 0.8 (Typst 0.15)" },
     { crate = "synstructure@0.13", reason = "asn1-rs-derive (x509-parser via rustls-acme) still on synstructure 0.13" },
     { crate = "windows-sys@0.59", reason = "fs4 (tantivy) is still on windows-sys 0.59" },
     { crate = "itertools@0.14", reason = "tantivy and prost-derive are on itertools 0.14; tract moved to 0.15" },

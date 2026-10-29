@@ -1,0 +1,3 @@
+[ListParagraph/0] PDF export slips — likelihood 3, impact 4
+[ListParagraph/0] Key person leaves — likelihood 1, impact 5
+[ListParagraph/0] Drive quota runs out — likelihood 2, impact 2

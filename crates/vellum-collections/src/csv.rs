@@ -14,7 +14,7 @@
 //! property names or keys. Bad cells never abort an import: they are left
 //! empty and reported as diagnostics with their line number.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use vellum_kernel::{CollectionId, DocId};
 
@@ -32,6 +32,10 @@ use crate::workspace::{Collection, Edit, Workspace};
 
 /// Most data rows one import accepts.
 pub const MAX_IMPORT_ROWS: usize = 100_000;
+
+/// Most problems one import reports; the rest are counted in a final
+/// warning, so a hostile file cannot turn megabytes into millions of them.
+pub const MAX_DIAGNOSTICS: usize = 1_000;
 
 /// Most distinct values for a column to be inferred as a select.
 const SELECT_MAX_OPTIONS: usize = 20;
@@ -423,7 +427,8 @@ pub fn import_into(
             p
         })
         .collect();
-    let mut diagnostics = Vec::new();
+    let mut diagnostics = Diagnostics::default();
+    let mut titles = TitleIndex::default();
     let mut out_rows = Vec::with_capacity(rows.len());
     for (n, r) in rows.iter().enumerate() {
         let line = format!("line {}", n + 2);
@@ -435,7 +440,7 @@ pub fn import_into(
             }
             let value = match &p.kind {
                 PropertyType::Relation { to, .. } => {
-                    relation_cell(ws, *to, cell, &line, &mut diagnostics)
+                    relation_cell(ws, *to, cell, &line, &mut titles, &mut diagnostics)
                 }
                 kind => cell_value(kind, cell),
             };
@@ -459,8 +464,55 @@ pub fn import_into(
         schema: schema.clone(),
         rows: out_rows,
         skipped_columns: skipped,
-        diagnostics,
+        diagnostics: diagnostics.finish(),
     })
+}
+
+/// Collects an import's problems, keeping the first [`MAX_DIAGNOSTICS`].
+#[derive(Default)]
+struct Diagnostics {
+    kept: Vec<Diagnostic>,
+    dropped: usize,
+}
+
+impl Diagnostics {
+    fn push(&mut self, diagnostic: Diagnostic) {
+        if self.kept.len() < MAX_DIAGNOSTICS {
+            self.kept.push(diagnostic);
+        } else {
+            self.dropped += 1;
+        }
+    }
+
+    fn finish(mut self) -> Vec<Diagnostic> {
+        if self.dropped > 0 {
+            self.kept.push(Diagnostic::warning(
+                "import",
+                format!("{} more problems not shown", self.dropped),
+            ));
+        }
+        self.kept
+    }
+}
+
+/// Lowercased row titles per related collection, built once per import so
+/// each relation cell is a lookup, not a scan of every row.
+#[derive(Default)]
+struct TitleIndex(HashMap<CollectionId, HashMap<String, DocId>>);
+
+impl TitleIndex {
+    fn get<'a>(&'a mut self, target: &Collection) -> &'a HashMap<String, DocId> {
+        self.0.entry(target.schema().id).or_insert_with(|| {
+            let mut titles = HashMap::new();
+            for row in target.rows() {
+                // The first row with a title wins, as the scan did.
+                let _ = titles
+                    .entry(row.title(target.schema()).to_lowercase())
+                    .or_insert(row.id);
+            }
+            titles
+        })
+    }
 }
 
 fn relation_cell(
@@ -468,24 +520,21 @@ fn relation_cell(
     to: CollectionId,
     cell: &str,
     line: &str,
-    diagnostics: &mut Vec<Diagnostic>,
+    titles: &mut TitleIndex,
+    diagnostics: &mut Diagnostics,
 ) -> Option<Value> {
     let target = ws.collection(to)?;
+    let by_title = titles.get(target);
     let mut ids = Vec::new();
+    let mut seen = BTreeSet::new();
     for part in cell.split(',').map(str::trim).filter(|s| !s.is_empty()) {
-        let lower = part.to_lowercase();
         let found = part
             .parse::<DocId>()
             .ok()
             .filter(|id| target.row(*id).is_some())
-            .or_else(|| {
-                target
-                    .rows()
-                    .find(|r| r.title(target.schema()).to_lowercase() == lower)
-                    .map(|r| r.id)
-            });
+            .or_else(|| by_title.get(&part.to_lowercase()).copied());
         match found {
-            Some(id) if !ids.contains(&id) => ids.push(id),
+            Some(id) if seen.insert(id) => ids.push(id),
             Some(_) => {}
             None => diagnostics.push(Diagnostic::warning(
                 line,

@@ -17,6 +17,12 @@
 //! | `VELLUM_HTTP_REDIRECT` | Address of a plain-HTTP listener redirecting to HTTPS |
 //! | `VELLUM_CSRF_KEY` | Base64 key shared by replicas; default a per-install key file |
 //! | `VELLUM_EMBED_ORIGINS` | Comma-separated origins allowed in sandboxed embeds |
+//! | `VELLUM_CLAMD_ADDRESS` | `host:port` of `ClamAV`, the default upload virus scanner |
+//! | `VELLUM_INDEX_KEY` | 64 hex characters: the key of the SQLite index |
+//! | `VELLUM_INDEX_PLAINTEXT` | `1` opens the SQLite index without encryption |
+//!
+//! Without an index (a key, plaintext or a database URL) the server runs
+//! sign-in only; collections, books and Work need the index.
 
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
@@ -27,6 +33,10 @@ use vellum_api::config::{GatewayConfig, host_of};
 use vellum_api::gateway::GatewayBuilder;
 use vellum_api::server::{ServeConfig, Tls, serve};
 use vellum_kernel::{Config, Error, ErrorKind};
+use vellum_security::upload::Clamd;
+
+/// How long one virus scan may take.
+const CLAMD_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 
 use crate::services;
 
@@ -53,6 +63,9 @@ pub struct Edge {
     pub serve: ServeConfig,
     /// A CSRF key given in the environment, if any.
     pub csrf_key: Option<Vec<u8>>,
+    /// The default upload virus scanner (`VELLUM_CLAMD_ADDRESS`); an
+    /// address set by an admin takes precedence.
+    pub scanner: Option<Clamd>,
 }
 
 /// Builds the edge settings from `config` and a variable lookup.
@@ -128,14 +141,20 @@ pub fn edge(config: &Config, var: impl Fn(&str) -> Option<String>) -> Result<Edg
             "must decode to at least 32 bytes",
         ));
     }
+    let scanner = var("VELLUM_CLAMD_ADDRESS")
+        .map(|a| a.trim().to_owned())
+        .filter(|a| !a.is_empty())
+        .map(|address| Clamd::new(address, CLAMD_TIMEOUT));
     Ok(Edge {
         gateway,
         serve: ServeConfig {
             bind: config.bind,
             tls,
             redirect_http,
+            limits: vellum_api::server::ConnectionLimits::default(),
         },
         csrf_key,
+        scanner,
     })
 }
 
@@ -204,7 +223,11 @@ pub fn run(config_path: Option<&Path>) -> Result<(), Error> {
         mut gateway,
         serve: serve_config,
         csrf_key,
+        scanner,
     } = edge(&config, |k| std::env::var(k).ok())?;
+    if let Some(scanner) = &scanner {
+        tracing::info!(?scanner, "default upload virus scanner");
+    }
     gateway.csrf_key = match csrf_key {
         Some(key) => key,
         None => csrf_key_file(&config.data_dir)?,
@@ -217,7 +240,10 @@ pub fn run(config_path: Option<&Path>) -> Result<(), Error> {
         })?;
     let app_origin = gateway.app_origin.clone();
     runtime.block_on(async move {
-        let services = services::Services::open(&app_origin, Some(&config.data_dir))?;
+        let services = services::Services::open(&app_origin, Some(&config.data_dir))?
+            .with_workspace(&config, |k| std::env::var(k).ok())
+            .await?;
+        tracing::info!(services = ?services, "services ready");
         let gateway = services
             .mount(GatewayBuilder::new(gateway, services::VERSION))
             .build()?;
@@ -248,6 +274,14 @@ mod tests {
         assert_eq!(e.serve.tls, Tls::Off);
         assert_eq!(e.gateway.app_origin, "https://vellum.northstar.dev");
         assert!(e.gateway.public_origin.is_none());
+        assert!(e.scanner.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn clamd_address_sets_the_default_scanner() -> Result<(), Error> {
+        let e = edge_with(&[("VELLUM_CLAMD_ADDRESS", "clamav:3310")])?;
+        assert!(format!("{:?}", e.scanner).contains("clamav:3310"));
         Ok(())
     }
 
