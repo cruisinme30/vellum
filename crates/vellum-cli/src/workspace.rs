@@ -680,6 +680,30 @@ fn task_jobs(
     Ok(())
 }
 
+/// Starts the notifier on this replica and its delivery timer on one
+/// replica of the cluster.
+fn notify_on_one_replica(
+    replica: &Replica,
+    queued: tokio::sync::mpsc::Receiver<vellum_work::WorkEvent>,
+    work: &Arc<WorkService>,
+    identity: &Arc<Identity>,
+    notify: &Arc<NotifyStore>,
+    delivery: crate::notifications::Delivery,
+) -> Result<(), Error> {
+    let ticker = crate::notifications::start(
+        queued,
+        Arc::clone(work),
+        Arc::clone(identity),
+        Arc::clone(notify),
+        delivery,
+    )?;
+    replica.every("notify.deliver", crate::notifications::TICK, move || {
+        let ticker = ticker.clone();
+        async move { ticker.run().await }
+    });
+    Ok(())
+}
+
 /// Webhooks, email, reminders and digests for the notifier.
 fn delivery(
     identity: &Arc<Identity>,
@@ -767,12 +791,14 @@ pub async fn open(
         setup,
     )
     .await?;
-    crate::notifications::start(
+    let delivery = delivery(identity, notify, webhooks, &workspace.tasks, &var)?;
+    notify_on_one_replica(
+        &replica,
         queued,
-        Arc::clone(&workspace.work),
-        Arc::clone(identity),
-        Arc::clone(notify),
-        delivery(identity, notify, webhooks, &workspace.tasks, &var)?,
+        &workspace.work,
+        identity,
+        notify,
+        delivery,
     )?;
     // The watcher starts before the rescan, so nothing edited in between
     // is missed; whatever it sees twice is applied idempotently.

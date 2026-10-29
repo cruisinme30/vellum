@@ -11,9 +11,9 @@
 //! push, email queue). The same event is turned into webhook events and
 //! queued for every matching hook.
 //!
-//! A second task wakes every [`TICK`] and sends what fell due: webhook
-//! deliveries and retries, queued emails, My Work reminders and each
-//! person's daily digest (ADR 0041).
+//! A [`Ticker`] pass, run every [`TICK`] on one replica of the cluster,
+//! sends what fell due: webhook deliveries and retries, queued emails, My
+//! Work reminders and each person's daily digest (ADR 0041).
 
 use std::collections::BTreeSet;
 use std::sync::Arc;
@@ -84,8 +84,31 @@ pub struct Delivery {
     pub time_zone: jiff::tz::TimeZone,
 }
 
-/// Starts the background tasks that notify people about `events` and
-/// send what falls due.
+/// One pass of the delivery timer, cheap to clone into a cluster loop.
+#[derive(Clone)]
+pub struct Ticker {
+    delivery: Arc<Delivery>,
+    store: Arc<NotifyStore>,
+    dispatcher: Arc<Dispatcher<SafeTransport>>,
+}
+
+impl Ticker {
+    /// Sends what fell due: webhook deliveries, queued emails, My Work
+    /// reminders and digests.
+    pub async fn run(&self) {
+        run_due(
+            &self.delivery,
+            &self.store,
+            &self.dispatcher,
+            Timestamp::now(),
+        )
+        .await;
+    }
+}
+
+/// Starts the background task that notifies people about `events`, and
+/// returns the timer pass for the caller to run every [`TICK`] on one
+/// replica of the cluster.
 ///
 /// # Errors
 ///
@@ -96,7 +119,7 @@ pub fn start(
     identity: Arc<Identity>,
     store: Arc<NotifyStore>,
     delivery: Delivery,
-) -> Result<(), Error> {
+) -> Result<Ticker, Error> {
     let transport = SafeTransport::new(vellum_notify::endpoint::policy(&[])).map_err(|e| {
         Error::new(
             ErrorKind::Internal,
@@ -118,15 +141,11 @@ pub fn start(
             }
         }));
     }
-    drop(tokio::spawn(async move {
-        let mut tick = tokio::time::interval(TICK);
-        tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-        loop {
-            let _ = tick.tick().await;
-            run_due(&delivery, &store, &dispatcher, Timestamp::now()).await;
-        }
-    }));
-    Ok(())
+    Ok(Ticker {
+        delivery: Arc::new(delivery),
+        store,
+        dispatcher,
+    })
 }
 
 async fn notify<T: vellum_notify::delivery::HttpTransport>(
