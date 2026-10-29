@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { useId, useState, type ComponentProps } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 
 import { failureText } from "../data/failure";
 import { Ready, ServerScreen } from "../data/server-apis";
 import { useLoaded } from "../data/use-loaded";
+import { useServices, useWorkspace } from "../data/workspace-context";
 import { useT } from "../i18n/i18n";
 
 import type { CommentOut, IssueOut, TeamOut, WorkApi } from "./api";
@@ -128,6 +129,49 @@ function CommentList({ comments }: { readonly comments: readonly CommentOut[] })
   );
 }
 
+/** The Markdown a doc started from an issue begins with: a link back and the description. */
+function pageBodyFromIssue(issue: IssueOut): string {
+  const description = issue.description?.trim() ?? "";
+  return description === "" ? `Issue: ${issue.key}\n` : `Issue: ${issue.key}\n\n${description}\n`;
+}
+
+/**
+ * "Create doc" (R-WK-7): a page in the person's first space, titled after
+ * the issue, that starts with the issue's chip and description.
+ */
+function CreatePageFromIssue({ issue }: { readonly issue: IssueOut }) {
+  const t = useT();
+  const navigate = useNavigate();
+  const { store } = useServices();
+  const workspace = useWorkspace();
+  const [busy, setBusy] = useState(false);
+  const space = workspace.spaces[0];
+  if (space === undefined) return;
+  return (
+    <button
+      type="button"
+      className="vl-text-button"
+      disabled={busy}
+      onClick={() => {
+        setBusy(true);
+        void store
+          .createPage({
+            spaceId: space.id,
+            parentId: undefined,
+            title: `${issue.key} ${issue.title}`,
+            body: pageBodyFromIssue(issue),
+          })
+          .then((page) => {
+            setBusy(false);
+            if (page) void navigate(`/p/${page.id}`);
+          });
+      }}
+    >
+      {t("issue-create-doc")}
+    </button>
+  );
+}
+
 function Issue({ api, issueKey }: { readonly api: WorkApi; readonly issueKey: string }) {
   const t = useT();
   const [version, setVersion] = useState(0);
@@ -156,6 +200,7 @@ function Issue({ api, issueKey }: { readonly api: WorkApi; readonly issueKey: st
           </p>
           <h1>{found.issue.title}</h1>
           <StatePicker loaded={found} onChange={setState} />
+          <CreatePageFromIssue issue={found.issue} />
           {error !== undefined && (
             <p className="vl-field-error" role="alert">
               {error}

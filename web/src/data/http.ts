@@ -278,12 +278,12 @@ export function createHttpWorkspaceStore(
         listeners.delete(listener);
       };
     },
-    async createPage({ spaceId, parentId, title = "" }) {
+    async createPage({ spaceId, parentId, title = "", body }) {
       try {
         const node = await http.send<NodeView>(
           "POST",
           `${DRIVE}/spaces/${segment(spaceId)}/pages`,
-          { parent_id: parentId, title },
+          { parent_id: parentId, title, body },
         );
         const row = snapshot.pages.filter((p) => p.spaceId === spaceId && p.parentId === parentId);
         const page = metaOf(node, Math.max(0, ...row.map((p) => p.position)) + 1, false);

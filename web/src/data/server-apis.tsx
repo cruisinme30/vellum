@@ -30,6 +30,11 @@ export function ServerApisProvider({
   return <ServerApisContext value={apis}>{children}</ServerApisContext>;
 }
 
+/** The server-only APIs; each is `undefined` in demo mode. */
+export function useServerApis(): ServerApis {
+  return use(ServerApisContext);
+}
+
 /**
  * A screen's frame: its heading, and either the screen or, when the app runs
  * without a Vellum server, a note saying the screen needs one.

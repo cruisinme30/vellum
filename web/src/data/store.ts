@@ -50,6 +50,8 @@ export interface WorkspaceStore {
     spaceId: string;
     parentId: string | undefined;
     title?: string;
+    /** The first body, in Vellum Markdown; the server parses it into the page. */
+    body?: string;
   }): Promise<PageMeta | undefined>;
   renamePage(id: string, title: string): void;
   toggleStar(id: string): void;
@@ -164,7 +166,7 @@ export function createMemoryStore(seed: WorkspaceSeed, clock: () => Date = () =>
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
-    createPage({ spaceId, parentId, title = "" }) {
+    createPage({ spaceId, parentId, title = "", body }) {
       const row = snapshot.pages.filter((p) => p.spaceId === spaceId && p.parentId === parentId);
       const page: PageMeta = {
         id: newPageId(clock().getTime()),
@@ -178,6 +180,7 @@ export function createMemoryStore(seed: WorkspaceSeed, clock: () => Date = () =>
         updatedAt: stamp(),
         starred: false,
       };
+      if (body !== undefined) bodies.set(page.id, paragraphsOf(body));
       setPages([...snapshot.pages, page]);
       return Promise.resolve(page);
     },
@@ -229,4 +232,16 @@ export function createMemoryStore(seed: WorkspaceSeed, clock: () => Date = () =>
       .map((page) => ({ page, snippet: snippet(plainText(bodies.get(page.id)), `@${handle}`) }));
   }
   return store;
+}
+
+/** Markdown as plain paragraphs, one per non-empty line: enough for demo pages. */
+function paragraphsOf(markdown: string): JSONContent {
+  return {
+    type: "doc",
+    content: markdown
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line !== "")
+      .map((text) => ({ type: "paragraph", content: [{ type: "text", text }] })),
+  };
 }
