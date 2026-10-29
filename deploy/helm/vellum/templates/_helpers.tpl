@@ -42,6 +42,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/component: clamav
 {{- end }}
 
+{{/* The secret holding the shared CSRF key (see csrf-secret.yaml). */}}
+{{- define "vellum.csrfSecret" -}}
+{{- .Values.csrf.secret.name | default (printf "%s-csrf" (include "vellum.fullname" .)) -}}
+{{- end }}
+
 {{- define "vellum.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
 {{- default (include "vellum.fullname" .) .Values.serviceAccount.name }}
@@ -165,6 +170,11 @@ spec:
             secretKeyRef:
               name: {{ .Values.encryption.kekSecret.name }}
               key: {{ .Values.encryption.kekSecret.key }}
+        - name: VELLUM_CSRF_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "vellum.csrfSecret" . }}
+              key: {{ .Values.csrf.secret.key }}
         {{- range .Values.shards }}
         {{- $env := include "vellum.shardEnv" . }}
         {{- if eq $.Values.postgres.mode "operator" }}

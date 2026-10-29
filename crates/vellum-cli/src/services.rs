@@ -73,6 +73,24 @@ impl Services {
     ///
     /// Invalid settings or unreadable state.
     pub fn open(public_url: &str, data_dir: Option<&Path>) -> Result<Self, Error> {
+        let store = match data_dir {
+            Some(dir) => Store::open(dir)?,
+            None => Store::memory(),
+        };
+        Self::open_with_store(public_url, data_dir, store)
+    }
+
+    /// As [`Services::open`], with the identity records in `store` (the
+    /// shared database store when several replicas run).
+    ///
+    /// # Errors
+    ///
+    /// Invalid settings.
+    pub fn open_with_store(
+        public_url: &str,
+        data_dir: Option<&Path>,
+        store: Store,
+    ) -> Result<Self, Error> {
         let url = Url::parse(public_url).map_err(|e| {
             Error::new(
                 ErrorKind::InvalidInput,
@@ -82,10 +100,6 @@ impl Services {
         let subject = url.to_string();
         let mut config = IdentityConfig::new(url.clone());
         config.data_dir = data_dir.map(Path::to_path_buf);
-        let store = match data_dir {
-            Some(dir) => Store::open(dir)?,
-            None => Store::memory(),
-        };
         let identity =
             Identity::new(config, store).with_metadata_fetcher(Arc::new(GuardedFetcher::new()?));
         let notify = match data_dir {

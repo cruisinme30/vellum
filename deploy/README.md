@@ -32,11 +32,17 @@ docker build -f deploy/docker/Dockerfile -t vellum .
 ```sh
 cp deploy/compose/.env.example deploy/compose/.env    # set every change-me
 openssl rand -base64 32 > deploy/compose/secrets/kek-passphrase
+openssl rand -base64 32 > deploy/compose/secrets/csrf-key
 docker compose -f deploy/compose/compose.yaml up -d
 ```
 
 The passphrase file wraps every encryption key. Back it up apart from the
-volumes: without it the data cannot be read.
+volumes: without it the data cannot be read. The CSRF key signs form
+tokens; every Vellum container must read the same one (an existing install
+upgrading to this version creates it once with the command above).
+Accounts and sign-in sessions live in Postgres, so they survive restarts
+and are shared by every replica; an `identity.json` from a single-binary
+install is imported on first start.
 
 ## Organisation: Helm
 

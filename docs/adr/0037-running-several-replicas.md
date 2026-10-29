@@ -11,8 +11,8 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D150, D151, D159
-- Issue: #432, #433, #435, #437
+- Decisions: D150, D151, D159, D160
+- Issue: #432, #433, #434, #435, #437
 - Pull requests: none yet (delivered as a bundle)
 
 :::
@@ -77,6 +77,23 @@ safe to run as several replicas. Each fix adds its decision here.
   adapter's `If-Match` and `If-None-Match` writes, which the storage
   conformance suite checks are atomic.
 
+### `D160`: sign-in records live in the index database
+
+- With a database URL, accounts, sessions, API tokens, `OAuth` grants,
+  pending consents and codes, and lockout counters live in
+  `identity_records` (migration 0009); the single binary keeps
+  `identity.json`, which the first start with Postgres imports.
+- Each replica caches the records. A read first fetches the rows written
+  since its cached version, so a sign-out or a disabled account holds on
+  the next request to any replica.
+- A write bumps `identity_meta.version` under its row lock, runs on fresh
+  records, and writes only the changed rows with the new version. Deletes
+  leave tombstones, purged after 1024 versions.
+- Lockout counters are shared and keyed by a hash of the address, so N
+  replicas allow the attempts of one.
+- Every replica signs CSRF tokens with one key: the chart makes a
+  `<release>-csrf` Secret, compose reads `secrets/csrf-key`.
+
 ## Alternatives
 
 - **Work state in Postgres**: the most scalable, but it rewrites the
@@ -88,6 +105,8 @@ safe to run as several replicas. Each fix adds its decision here.
 - **A shared volume (`ReadWriteMany`) at `/data`**: keeps the local
   folder code, but few clusters offer one, and file locking over network
   file systems cannot serve as Work's atomic claim.
+- **Async SQL per identity call**: no cache, but every sign-in path and
+  the in-flight single sign-on work would be rewritten around `await`.
 - **Full reload whenever anything changed**: simple, but each change would
   cost every replica a read of every Work file.
 
@@ -105,3 +124,6 @@ safe to run as several replicas. Each fix adds its decision here.
   option refuses to start until the S3 adapter supports it.
 - Edits made to Work files outside Vellum are still not picked up while
   running; that is unchanged.
+- Sign-in costs one indexed query per request and writes are serialised
+  workspace-wide; per-record queries can replace the cache if load tests
+  show it. Break-glass codes are still a file on one replica.
