@@ -30,12 +30,21 @@ export const DEFAULT_APPEARANCE: Appearance = {
 
 const STORAGE_KEY = "vellum.appearance";
 
-/** Reads saved settings; anything unreadable falls back to the defaults. */
-export function loadAppearance(storage: Pick<Storage, "getItem"> | undefined): Appearance {
+/**
+ * Reads saved settings; anything unreadable falls back to the defaults.
+ * With nothing saved, a theme already set on the page (`<html
+ * data-theme>`, as the UI test suite does before load) is the start theme.
+ */
+export function loadAppearance(
+  storage: Pick<Storage, "getItem"> | undefined,
+  pageTheme?: string,
+): Appearance {
+  const preset = THEMES.find((t) => t === pageTheme);
+  const fallback = preset ? { ...DEFAULT_APPEARANCE, theme: preset } : DEFAULT_APPEARANCE;
   try {
     const raw: unknown = JSON.parse(storage?.getItem(STORAGE_KEY) ?? "null");
     if (typeof raw !== "object" || raw === null) {
-      return DEFAULT_APPEARANCE;
+      return fallback;
     }
     const value = raw as Record<string, unknown>;
     const theme = THEMES.find((t) => t === value["theme"]) ?? DEFAULT_APPEARANCE.theme;
@@ -46,7 +55,7 @@ export function loadAppearance(storage: Pick<Storage, "getItem"> | undefined): A
     const density = value["density"] === "compact" ? "compact" : "comfortable";
     return { theme, seed, density };
   } catch {
-    return DEFAULT_APPEARANCE;
+    return fallback;
   }
 }
 

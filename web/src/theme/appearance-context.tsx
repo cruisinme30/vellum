@@ -47,7 +47,9 @@ function storage(): Storage | undefined {
 
 /** Holds the appearance settings and keeps `<html>` themed. */
 export function AppearanceProvider({ children }: { readonly children: ReactNode }) {
-  const [appearance, setAppearance] = useState(() => loadAppearance(storage()));
+  const [appearance, setAppearance] = useState(() =>
+    loadAppearance(storage(), document.documentElement.dataset["theme"]),
+  );
   const dark = useSyncExternalStore(subscribeDark, prefersDark, () => false);
 
   useEffect(() => {

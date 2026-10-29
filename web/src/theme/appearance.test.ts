@@ -108,3 +108,16 @@ describe("applyAppearance", () => {
     expect(root.style.colorScheme).toBe("light");
   });
 });
+
+describe("a theme preset on the page", () => {
+  it("starts in that theme when nothing is saved", () => {
+    expect(loadAppearance(undefined, "sepia").theme).toBe("sepia");
+    expect(loadAppearance({ getItem: () => "{" }, "dim").theme).toBe("dim");
+  });
+
+  it("ignores an unknown preset and yields to saved settings", () => {
+    expect(loadAppearance(undefined, "neon").theme).toBe("system");
+    const saved = { getItem: () => JSON.stringify({ theme: "dark" }) };
+    expect(loadAppearance(saved, "sepia").theme).toBe("dark");
+  });
+});

@@ -66,6 +66,13 @@ body {
   margin: 0;
   background: var(--md-surface);
   color: var(--md-on-surface);
+  /* Long words, URLs and unspaced scripts wrap instead of widening the page. */
+  overflow-wrap: anywhere;
+}
+
+/* Flex and grid children may shrink below their content's width. */
+:where(#root) :where(*) {
+  min-width: 0;
 }
 
 :focus-visible {

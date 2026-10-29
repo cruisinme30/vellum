@@ -128,4 +128,15 @@ test.describe("on a phone", () => {
     expect(box?.y ?? 0).toBeGreaterThan(600);
     await expectNoViolations(page);
   });
+
+  test("long unbroken text never scrolls the page sideways", async ({ page }) => {
+    await page.goto(GATEWAY);
+    const title = page.getByRole("textbox", { name: "Page title" });
+    await title.fill(`https://example.com/${"a".repeat(300)} 長い見出し😀`);
+    await title.press("Enter");
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+  });
 });
