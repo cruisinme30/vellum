@@ -1,0 +1,7 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# cargo-audit settings. Keep in step with [advisories] in deny.toml.
+[advisories]
+# smallstr is unmaintained (no vulnerability); yrs 0.28 depends on it.
+ignore = ["RUSTSEC-2026-0215"]
