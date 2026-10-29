@@ -12,13 +12,17 @@ import { TARGETS } from "./targets";
 
 /**
  * Every target in every display mode, in the project's browser and
- * viewport (ADR 0031, D123–D124). A failure lists each problem with the
- * element it is about; the full-page screenshot is attached.
+ * viewport (ADR 0031, D123–D124); sweep targets in the default mode only
+ * (D165). A failure lists each problem with the element it is about; the
+ * full-page screenshot is attached.
  */
+const DEFAULT_MODE = MODES[0]?.name;
+
 for (const target of TARGETS) {
   test.describe(target.name, () => {
     for (const mode of MODES) {
       if (mode.appOnly === true && !target.app) continue;
+      if (target.sweep && mode.name !== DEFAULT_MODE) continue;
       test(mode.name, async ({ page, browserName }, testInfo) => {
         test.skip(
           mode.chromiumOnly === true && browserName !== "chromium",

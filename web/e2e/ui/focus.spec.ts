@@ -92,7 +92,8 @@ async function indicatorVisible(page: Page, stop: Stop): Promise<boolean> {
   return !focused.equals(blurred);
 }
 
-for (const target of TARGETS) {
+// Sweep pages share the template of the pages checked here (D165).
+for (const target of TARGETS.filter((candidate) => !candidate.sweep)) {
   test(`${target.name} keyboard focus`, async ({ page, browserName, isMobile }, testInfo) => {
     // WebKit skips links on Tab unless the OS setting is on; phones have no Tab key.
     test.skip(browserName === "webkit" || isMobile, "no Tab navigation to test");

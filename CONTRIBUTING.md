@@ -62,7 +62,7 @@ gitGraph
 | Full (`full.yml`) | release pull requests into `main` only | the fast suite, plus Rust line coverage of at least 85 %, the reproducible release build and image within their budgets, Playwright end-to-end and the full UI suite (Chromium, Firefox and WebKit at four sizes, with visual baselines), and external link checks |
 
 CodeQL (`codeql.yml`) scans release pull requests, pushes to `main` and
-`develop` weekly. The nightly load test, security scan and fuzzers skip a night when
+`develop` weekly. The nightly load test, security scan and fuzz runs skip a night when
 `develop` has not changed since the last green night.
 
 No workflow run cancels another: a new push starts its own run and
@@ -128,8 +128,9 @@ scripts/ci/build-site.sh _site
 cd web && UI_SITE_DIR=../_site pnpm exec playwright test e2e/ui
 ```
 
-`UI_BROWSERS`, `UI_VIEWPORTS` and `UI_SCOPE=full` widen or narrow the
-run. Visual baselines are refreshed with `scripts/ci/ui-baselines.sh`.
+`UI_BROWSERS`, `UI_VIEWPORTS` and `UI_SCOPE` widen or narrow the run.
+`UI_SCOPE=full` (the release check) adds every help page in the default
+mode; `UI_SCOPE=exhaustive` checks every help page in every mode. Visual baselines are refreshed with `scripts/ci/ui-baselines.sh`.
 
 ## Issues and decision records
 
