@@ -377,3 +377,52 @@ notify-device-demo = Push notifications need a Vellum server; the demo can't sen
 notify-device-enable = Turn on push
 notify-device-disable = Turn off push
 notify-device-error = Push couldn't be changed. Try again.
+
+## Screens that need a server
+
+needs-server = This screen needs a Vellum server. The demo has no data for it.
+loading = Loading…
+
+## My Work
+
+my-work = My Work
+my-work-intro = Your tasks and the issues assigned to you.
+my-work-add = Add a task
+my-work-add-hint = Call Sam tomorrow 3pm !high
+my-work-add-button = Add
+my-work-empty = Nothing to do. Add a task above.
+my-work-due = Due { $date }
+my-work-bucket-inbox = Inbox
+my-work-bucket-today = Today
+my-work-bucket-evening = This evening
+my-work-bucket-upcoming = Upcoming
+my-work-bucket-anytime = Anytime
+my-work-bucket-someday = Someday
+my-work-bucket-done = Done
+
+## Issues
+
+issues = Issues
+issues-intro = Each team's open issues.
+issues-team = Team
+issues-no-teams = There are no teams yet. An admin can add one.
+issues-empty = This team has no open issues.
+issues-new = New issue for { $team }
+issues-create = Create issue
+issue-state = State: { $state }
+issue-state-label = State
+issue-no-description = No description.
+issue-comments = Comments
+issue-no-comments = No comments yet.
+issue-comment-by = { $author }, { $when }
+issue-comment-add = Add a comment
+issue-comment-send = Comment
+
+## Books
+
+books = Books
+books-intro = Books you can read.
+books-empty = There are no books you can read.
+books-contents = Contents
+books-no-sections = This book has no sections yet.
+home-shortcuts = Shortcuts

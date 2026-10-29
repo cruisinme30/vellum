@@ -3,16 +3,11 @@
 
 import { useState, type ComponentProps } from "react";
 
+import { failureText } from "../../data/failure";
 import { useLoaded } from "../../data/use-loaded";
 import { useT } from "../../i18n/i18n";
 
-import {
-  failureText,
-  formText,
-  type AdminConsoleApi,
-  type AuditRecord,
-  type ChainReport,
-} from "./api";
+import { formText, type AdminConsoleApi, type AuditRecord, type ChainReport } from "./api";
 import { AdminScreen } from "./context";
 
 /** Records per page. */

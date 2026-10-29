@@ -3,11 +3,11 @@
 
 import { useState, type ComponentProps, type ReactNode } from "react";
 
+import { failureText } from "../../data/failure";
 import { useLoaded } from "../../data/use-loaded";
 import { useT } from "../../i18n/i18n";
 
 import {
-  failureText,
   formText,
   isConflict,
   type AdminConsoleApi,

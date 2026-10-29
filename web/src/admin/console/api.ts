@@ -78,16 +78,6 @@ export function createHttpAdminConsoleApi(http: Http): AdminConsoleApi {
   };
 }
 
-/** A failure as one line for the admin, with the request ID to quote. */
-export function failureText(error: unknown): string {
-  if (error instanceof ApiError) {
-    return error.requestId === undefined
-      ? error.message
-      : `${error.message} (request ${error.requestId})`;
-  }
-  return error instanceof Error ? error.message : String(error);
-}
-
 /** A text field of a submitted form, trimmed; empty when missing. */
 export function formText(data: FormData, name: string): string {
   const value = data.get(name);

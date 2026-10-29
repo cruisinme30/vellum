@@ -3,17 +3,12 @@
 
 import { useState } from "react";
 
+import { failureText } from "../../data/failure";
 import { formatSize } from "../../data/format";
 import { useLoaded } from "../../data/use-loaded";
 import { useT } from "../../i18n/i18n";
 
-import {
-  failureText,
-  type AdminConsoleApi,
-  type AdminState,
-  type BackupFile,
-  type DrillReport,
-} from "./api";
+import { type AdminConsoleApi, type AdminState, type BackupFile, type DrillReport } from "./api";
 import { AdminScreen } from "./context";
 
 const TIME = new Intl.DateTimeFormat("en", {

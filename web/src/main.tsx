@@ -17,6 +17,7 @@ import { createHttpAdminConsoleApi } from "./admin/console/api";
 import { createAuthApi } from "./api/auth";
 import { createHttp } from "./api/http";
 import { App } from "./app";
+import { createHttpBooksApi } from "./books/api";
 import { createHttpCollectionsStore } from "./collections/http";
 import { createMockCollectionsStore } from "./collections/mock";
 import { createHttpPageHistory } from "./data/history";
@@ -31,6 +32,7 @@ import { startClientTelemetry } from "./platform/client-telemetry-start";
 import { createPlatform, startPlatform } from "./platform/platform";
 import { DocumentCache } from "./platform/store/document-cache";
 import { openLocalDatabase } from "./platform/store/persistence";
+import { createHttpWorkApi } from "./work/api";
 
 // Demo pages keep their edits across reloads in the browser's local
 // database. With a server, the page's room on /collab is the store.
@@ -71,6 +73,8 @@ root.render(
       collab={status === undefined ? createLocalConnector({ cache }) : createSocketConnector()}
       history={status === undefined ? undefined : createHttpPageHistory(http)}
       admin={status === undefined ? undefined : createHttpAdminConsoleApi(http)}
+      work={status === undefined ? undefined : createHttpWorkApi(http)}
+      books={status === undefined ? undefined : createHttpBooksApi(http)}
       collections={
         status === undefined ? createMockCollectionsStore() : createHttpCollectionsStore(http)
       }
