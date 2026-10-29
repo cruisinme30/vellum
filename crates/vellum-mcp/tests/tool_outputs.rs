@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The Vellum contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+
 //! Every string a tool returns passes the injection guard, not only the
 //! Markdown body (issue #316).
 
