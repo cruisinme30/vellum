@@ -4,12 +4,14 @@
 //! Postgres backend in a throwaway container: migrations from zero,
 //! schema parity with SQLite, and schema constraints.
 
+mod common;
+
 use sqlx::Connection as _;
 use sqlx::postgres::PgConnection;
 use testcontainers_modules::postgres::Postgres;
 use testcontainers_modules::testcontainers::runners::AsyncRunner as _;
 use testcontainers_modules::testcontainers::{ContainerAsync, ImageExt as _};
-use vellum_db::{Backend, Index, IndexConfig};
+use vellum_db::{Backend, Index, IndexConfig, PlainFiles};
 
 type Started = Result<(ContainerAsync<Postgres>, String), Box<dyn std::error::Error>>;
 
@@ -86,4 +88,28 @@ async fn schema_enforces_paths_and_cascades() {
         .await
         .unwrap();
     assert_eq!(left, 0);
+}
+
+#[tokio::test]
+async fn reindex_writes_the_same_rows_as_on_sqlite() {
+    let (_container, url) = start().await.unwrap();
+    let work = tempfile::tempdir().unwrap();
+    let fx = common::northstar(work.path()).unwrap();
+    let index = Index::open(&IndexConfig::postgres(&url)).await.unwrap();
+    for _ in 0..2 {
+        let report = index.reindex(work.path(), PlainFiles).await.unwrap();
+        assert_eq!((report.spaces, report.folders, report.documents), (3, 1, 9));
+        assert_eq!(report.problems.len(), 3);
+    }
+
+    let mut conn = PgConnection::connect(&url).await.unwrap();
+    let depth: i32 = sqlx::query_scalar(
+        "SELECT depth FROM page_ancestors WHERE ancestor_id = $1 AND descendant_id = $2",
+    )
+    .bind(uuid::Uuid::from_u128(fx.eng_space.as_u128()))
+    .bind(uuid::Uuid::from_u128(fx.handbook_intro.as_u128()))
+    .fetch_one(&mut conn)
+    .await
+    .unwrap();
+    assert_eq!(depth, 2);
 }

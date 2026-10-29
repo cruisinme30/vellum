@@ -16,6 +16,9 @@ pub enum Error {
     /// Applying migrations failed.
     #[error("index migration failed: {0}")]
     Migrate(#[from] sqlx::migrate::MigrateError),
+    /// Reading the workspace failed outside any single file.
+    #[error("index I/O error: {0}")]
+    Io(#[from] std::io::Error),
     /// The SQLite file could not be opened with the given key (wrong key, or not an index).
     #[error("the index at {path} could not be unlocked with the configured key")]
     Locked {

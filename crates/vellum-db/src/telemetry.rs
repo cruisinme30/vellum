@@ -33,6 +33,32 @@ impl<T> RowCount for Vec<T> {
     }
 }
 
+impl<T> RowCount for Option<T> {
+    fn row_count(&self) -> u64 {
+        u64::from(self.is_some())
+    }
+}
+
+/// One fetched row or scalar counts as one row.
+macro_rules! single_row {
+    ($($t:ty),*) => {$(
+        impl RowCount for $t {
+            fn row_count(&self) -> u64 {
+                1
+            }
+        }
+    )*};
+}
+
+single_row!(
+    sqlx::sqlite::SqliteRow,
+    sqlx::postgres::PgRow,
+    i64,
+    i32,
+    bool,
+    String
+);
+
 impl RowCount for () {
     fn row_count(&self) -> u64 {
         0
@@ -43,6 +69,9 @@ impl RowCount for () {
 ///
 /// `statement` is a short, stable name (never SQL with values in it), so spans
 /// can be grouped and nothing sensitive reaches the trace.
+///
+/// # Errors
+/// Returns whatever `fut` returns; errors also mark the span as failed.
 pub async fn traced<T, E, F>(system: &'static str, statement: &'static str, fut: F) -> Result<T, E>
 where
     T: RowCount,

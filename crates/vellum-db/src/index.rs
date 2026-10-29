@@ -39,15 +39,25 @@ impl Backend {
 }
 
 #[derive(Debug, Clone)]
-enum Pool {
+pub enum Pool {
     Sqlite(SqlitePool),
     Postgres(PgPool),
+}
+
+/// A borrowed view of the index's connection pool.
+#[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
+pub enum IndexPool<'a> {
+    /// The SQLite (SQLCipher) pool.
+    Sqlite(&'a SqlitePool),
+    /// The Postgres pool.
+    Postgres(&'a PgPool),
 }
 
 /// A migrated, ready-to-use index. Cheap to clone.
 #[derive(Debug, Clone)]
 pub struct Index {
-    pool: Pool,
+    pub(crate) pool: Pool,
 }
 
 impl Index {
@@ -103,6 +113,16 @@ impl Index {
         let _ = tracing::Span::current().record("db.system", index.backend().otel_system());
         index.migrate().await?;
         Ok(index)
+    }
+
+    /// The underlying pool, for crates that own their own tables in the
+    /// index (such as authorization). Wrap queries in [`crate::traced`].
+    #[must_use]
+    pub const fn pool(&self) -> IndexPool<'_> {
+        match &self.pool {
+            Pool::Sqlite(pool) => IndexPool::Sqlite(pool),
+            Pool::Postgres(pool) => IndexPool::Postgres(pool),
+        }
     }
 
     /// The backend this index runs on.
