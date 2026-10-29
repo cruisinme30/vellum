@@ -25,6 +25,7 @@ pub mod model;
 pub mod ports;
 pub mod retention;
 pub mod service;
+pub mod sharded;
 pub mod sql;
 
 pub use drive::{

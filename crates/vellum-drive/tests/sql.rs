@@ -239,3 +239,76 @@ async fn shared_tables_follow_the_drive_on_postgres() -> TestResult {
     let url = format!("postgres://postgres:postgres@127.0.0.1:{port}/postgres");
     shared_tables_follow_the_drive(Index::open(&IndexConfig::postgres(url)).await?).await
 }
+
+/// Two shards (ADR 0040 D174): each space's rows live on its own shard,
+/// each shard's shared tables stay in step, and moves between shards
+/// leave nothing behind.
+#[tokio::test]
+async fn spaces_on_two_shards_keep_each_shard_in_step() -> TestResult {
+    use vellum_db::{ShardRouter, ShardedIndex as Shards, ShardsConfig};
+    use vellum_drive::sharded::ShardedIndex;
+
+    let dir = tempfile::tempdir()?;
+    let db = |name: &str| IndexConfig::sqlite(dir.path().join(format!("{name}.sqlite")), None);
+    let config = ShardsConfig {
+        main: db("main"),
+        shards: vec![("eu".into(), db("eu")), ("us".into(), db("us"))],
+    };
+    let router = Arc::new(ShardRouter::open(Shards::open(&config).await?).await?);
+    let files = tempfile::tempdir()?;
+    let store = Arc::new(LocalStore::open(files.path()).await?);
+    let index = Arc::new(ShardedIndex::new(router));
+    let access = Arc::new(MemoryAccess::new(index.clone()));
+    let drive = Drive::new(store, index.clone(), access);
+    let alice_id = UserId::generate();
+    let alice = Actor::User { user: alice_id };
+
+    let eng = drive
+        .create_space(&alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .await?;
+    let ops = drive
+        .create_space(&alice, SpaceKind::SharedDrive, "ops", "Operations", None)
+        .await?;
+    let [eu, us] = index.shards() else {
+        panic!("two shards")
+    };
+    assert_eq!(eu.spaces().await?.len(), 1, "one space per shard");
+    assert_eq!(us.spaces().await?.len(), 1, "one space per shard");
+    assert_eq!(index.spaces().await?.len(), 2);
+
+    let folder = drive.create_folder(&alice, eng.id, None, "A").await?;
+    let top = drive.create_page(&alice, ops.id, None, "Top", "x").await?;
+    let page = drive
+        .create_page(&alice, eng.id, Some(folder.id), "Deep", "[[Top]]")
+        .await?;
+    drive.star(&alice, top.id, true).await?;
+    drive.star(&alice, page.id, true).await?;
+    let _ = drive.read(&alice, top.id).await?;
+    let _ = drive.read(&alice, page.id).await?;
+    for shard in index.shards() {
+        assert_in_step(shard, "creates on two shards").await?;
+    }
+    let starred: BTreeSet<ObjectId> = drive
+        .starred(&alice)
+        .await?
+        .into_iter()
+        .map(|n| n.id)
+        .collect();
+    assert_eq!(starred, BTreeSet::from([top.id, page.id]));
+    let recent: BTreeSet<ObjectId> = index
+        .recent(alice_id, 10)
+        .await?
+        .into_iter()
+        .map(|(id, _)| id)
+        .collect();
+    assert!(recent.contains(&top.id) && recent.contains(&page.id));
+
+    // Moving a folder to the other shard moves its rows.
+    let _ = drive.move_node(&alice, folder.id, ops.id, None).await?;
+    for shard in index.shards() {
+        assert_in_step(shard, "a move between shards").await?;
+    }
+    let moved = index.node(page.id).await?.unwrap();
+    assert_eq!(moved.space, ops.id);
+    Ok(())
+}
