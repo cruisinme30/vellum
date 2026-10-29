@@ -54,7 +54,11 @@ skip = [
     { crate = "r-efi@5", reason = "pulled by getrandom 0.3" },
     { crate = "miniz_oxide@0.8", reason = "png still on 0.8 while flate2 moved to 0.9" },
 ]
-skip-tree = []
+skip-tree = [
+    # Linux Secret Service (os-keychain feature only) still uses the previous
+    # RustCrypto generation (sha2 0.10, cipher 0.4) for its session encryption.
+    { crate = "dbus-secret-service@4", depth = 20, reason = "Linux keychain; waiting for its RustCrypto 0.11 release" },
+]
 
 [sources]
 unknown-registry = "deny"
