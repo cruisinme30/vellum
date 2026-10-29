@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 
+import { ViewTitle } from "../help/help-link";
 import { useT } from "../i18n/i18n";
 import { Icon } from "../shell/icon";
 
@@ -20,7 +21,7 @@ export function CollectionsIndexView() {
   return (
     <div className="vl-view">
       <div className="vl-collection-head">
-        <h1>{t("nav-data")}</h1>
+        <ViewTitle title={t("nav-data")} help="collection.create" />
         <button
           type="button"
           className="vl-filled-button"

@@ -277,7 +277,11 @@ function SettingsLoader({ api }: { readonly api: AdminConsoleApi }) {
 export function SettingsPage() {
   const t = useT();
   return (
-    <AdminScreen title={t("admin-settings")} intro={t("admin-settings-intro")}>
+    <AdminScreen
+      help="admin.settings"
+      title={t("admin-settings")}
+      intro={t("admin-settings-intro")}
+    >
       {(api) => <SettingsLoader api={api} />}
     </AdminScreen>
   );

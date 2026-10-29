@@ -24,7 +24,18 @@ describe("HelpView", () => {
     expect(
       screen.getByRole("heading", { level: 2, name: "Blocks you can insert with /" }),
     ).toBeDefined();
-    expect(screen.getAllByRole("listitem")).toHaveLength(SLASH_ITEMS.length);
+    expect(screen.getAllByRole("listitem")).toHaveLength(SLASH_ITEMS.length + 3);
+  });
+
+  it("links the three guides, in a new tab", () => {
+    renderWithProviders(<HelpView />);
+    expect(screen.getByRole("heading", { level: 2, name: "Guides" })).toBeDefined();
+    const guide = screen.getByRole("link", { name: "Admin guide" });
+    expect(guide.getAttribute("href")).toBe(
+      "https://cruisinme30.github.io/vellum/docs/admin/index.html",
+    );
+    expect(guide.getAttribute("target")).toBe("_blank");
+    expect(screen.getByRole("link", { name: "Help: Help" })).toBeDefined();
   });
 });
 

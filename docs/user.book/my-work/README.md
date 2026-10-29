@@ -56,6 +56,27 @@ that person and shows in their My Work:
 Select text and press `T` to turn it into a task. Issues assigned to you
 appear in My Work too, without being copied.
 
+## Your day and time zone {#settings}
+
+The **Time zone and reminders** section at the foot of My Work holds
+three settings, all yours alone:
+
+- **Time zone**: what "today", reminders and the digest follow. The form
+  suggests your browser's zone; leave it empty to use the server's.
+- **Day starts at**: when Today rolls over. A reminder on a date without
+  a time counts from here.
+- **Morning digest**: when the daily digest arrives; clear it to stop
+  the digest.
+
+Travelling? Change the zone and every relative reminder moves with you.
+
+## Mentions you haven't answered {#mentions}
+
+When someone mentions you in a comment on an issue or a page, the thread
+lands in your **Inbox** bucket with who mentioned you. It leaves when you
+reply, when the thread is resolved, or when you dismiss it. A thread
+assigned to you shows once, as an assignment.
+
 ## Fields {#fields}
 
 A task has a separate **start date** (when it shows in Today) and **due

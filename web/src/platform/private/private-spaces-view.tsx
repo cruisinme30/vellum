@@ -30,7 +30,7 @@ function grouped(fingerprint: string): string {
 export function PrivateSpacesView() {
   const t = useT();
   return (
-    <ServerScreen api="privateSpaces" title={t("private-title")}>
+    <ServerScreen api="privateSpaces" help="app.private-spaces" title={t("private-title")}>
       {(api) => <PrivateSpaces api={api} device={desktopBridge()?.privateSpaces} />}
     </ServerScreen>
   );

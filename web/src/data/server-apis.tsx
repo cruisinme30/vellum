@@ -5,6 +5,8 @@ import { createContext, use, type ReactNode } from "react";
 
 import type { BooksApi } from "../books/api";
 import type { DriveApi } from "../drive/api";
+import { ViewTitle } from "../help/help-link";
+import type { HelpTopic } from "../help/topics.gen";
 import { useT } from "../i18n/i18n";
 import type { PrivateSpacesApi } from "../platform/private/api";
 import type { WorkApi } from "../work/api";
@@ -44,12 +46,15 @@ export function useServerApis(): ServerApis {
 export function ServerScreen<K extends keyof ServerApis>({
   api,
   title,
+  help,
   className,
   children,
 }: {
   readonly api: K;
   /** The heading; leave it out when the screen names itself once loaded. */
   readonly title?: string;
+  /** The help topic for the heading's `?` link. */
+  readonly help?: HelpTopic | undefined;
   readonly className?: string;
   readonly children: (api: NonNullable<ServerApis[K]>) => ReactNode;
 }) {
@@ -57,7 +62,7 @@ export function ServerScreen<K extends keyof ServerApis>({
   const found = use(ServerApisContext)[api];
   return (
     <section className={className === undefined ? "vl-view" : `vl-view ${className}`}>
-      {title !== undefined && <h1>{title}</h1>}
+      {title !== undefined && <ViewTitle title={title} help={help} />}
       {found === undefined ? <p>{t("needs-server")}</p> : children(found)}
     </section>
   );

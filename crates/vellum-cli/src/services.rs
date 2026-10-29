@@ -264,6 +264,25 @@ impl Services {
             .map_or_else(crate::collab::unavailable_router, Collab::router)
     }
 
+    /// The help books, mounted at `/guide` by [`Self::mount`]. Diagrams
+    /// draw with the same settings as pages; a malformed diagram setting
+    /// (already refused for pages) falls back to the built-in defaults.
+    pub fn help() -> axum::Router {
+        let figures = crate::page_render::PageRenderService::figures_from_env()
+            .map_err(|e| e.to_string())
+            .or_else(|_| {
+                vellum_render::figure::Figures::new(vellum_render::figure::FigureConfig::default())
+            });
+        let figures = match figures {
+            Ok(figures) => Some(figures),
+            Err(error) => {
+                tracing::warn!(%error, "help books: diagrams are unavailable");
+                None
+            }
+        };
+        figures.map_or_else(axum::Router::new, crate::help_http::router)
+    }
+
     /// Saves every page open for live editing and closes its connections,
     /// then leaves the cluster's heartbeat table.
     /// Call it after the server stops accepting requests.
@@ -326,6 +345,8 @@ impl Services {
             .mount_cross_site("/oauth", identity_http::oauth_router(Arc::clone(identity)))
             .mount_cross_site("/.well-known", well_known)
             .mount("/collab", self.collab())
+            // The help books, for the app's `?` buttons (ADR 0024, D256).
+            .mount(crate::help_http::PREFIX, Self::help())
     }
 }
 

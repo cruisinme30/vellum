@@ -3,6 +3,7 @@
 
 import { useEffect, useId, useState } from "react";
 
+import { ViewTitle } from "../help/help-link";
 import { useT } from "../i18n/i18n";
 import { describeError } from "../views/sign-in";
 
@@ -121,7 +122,7 @@ export function NotificationSettingsView({ now = Date.now }: { readonly now?: ()
 
   return (
     <form className="vl-view vl-notify" onSubmit={save} aria-busy={busy}>
-      <h1>{t("notify-title")}</h1>
+      <ViewTitle title={t("notify-title")} help="app.notifications" />
       <p className="vl-muted">{t("notify-intro")}</p>
 
       <ChannelTable draft={draft} onChange={edit} />

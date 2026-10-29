@@ -41,6 +41,35 @@ northstar/
 A page's identity is the `id` in its front matter, never its path, so
 you can rename or move anything without breaking links.
 
+## Pages inside pages {#nesting}
+
+Drag a page onto another page in the sidebar to nest it, or press
+`Alt Shift →` on the page's row. On disk the nested pages sit in a
+folder named after their parent page, right beside it:
+
+```text
+drives/shared/product/
+  Launch plan.md
+  Launch plan/
+    Press kit.md
+    Pricing FAQ.md
+    .vellum-order.yaml
+```
+
+The parent stays an ordinary page you can open and edit. Moving,
+copying, renaming, deleting or restoring it carries everything nested
+under it, and nested pages inherit the parent's access. A page and a
+folder in the same place can't share a name, because both need
+`Launch plan.md` and `Launch plan/` free.
+
+The sidebar order lives in `.vellum-order.yaml`, a list of page IDs.
+Dragging a page up or down rewrites only that file, never the pages.
+Pages it doesn't list come after, folders first and then by title, so
+pages you add in a text editor still show up.
+
+Each person gets a **My Drive** the first time they sign in; nobody
+has to create it.
+
 ## Move, copy and shortcuts {#move}
 
 Drag to move. A moved page keeps the access that was granted on the page

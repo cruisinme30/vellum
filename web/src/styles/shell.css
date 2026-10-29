@@ -345,6 +345,39 @@
   font-weight: 400;
 }
 
+/* A screen's title and its contextual help link (ADR 0024, D256). */
+.vl-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.vl-title-row h1 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.vl-help-link {
+  flex: none;
+}
+
+.vl-guides {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.vl-guides a {
+  display: block;
+  padding: 16px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 16px;
+  font-weight: 500;
+}
+
 .vl-page-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
