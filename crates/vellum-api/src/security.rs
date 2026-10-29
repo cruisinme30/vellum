@@ -38,6 +38,20 @@ pub enum Surface {
     Public,
 }
 
+/// The app's own origin with a WebSocket scheme (`wss://` for `https://`),
+/// for the live-editing socket at `/collab`. CSP Level 3 lets `'self'`
+/// match it, but older engines need it named.
+fn socket_origin(app_origin: &str) -> Option<String> {
+    let (scheme, rest) = app_origin.split_once("://")?;
+    let scheme = match scheme.to_ascii_lowercase().as_str() {
+        "https" => "wss",
+        "http" => "ws",
+        _ => return None,
+    };
+    let host = rest.split('/').next().filter(|h| !h.is_empty())?;
+    Some(format!("{scheme}://{host}"))
+}
+
 /// The app's Content Security Policy.
 #[must_use]
 pub fn app_csp(config: &GatewayConfig) -> String {
@@ -46,9 +60,11 @@ pub fn app_csp(config: &GatewayConfig) -> String {
     } else {
         config.embed_origins.join(" ")
     };
+    let connect = socket_origin(&config.app_origin)
+        .map_or_else(|| "'self'".to_owned(), |ws| format!("'self' {ws}"));
     let mut csp = format!(
         "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; \
-         font-src 'self'; connect-src 'self'; media-src 'self' blob:; worker-src 'self'; \
+         font-src 'self'; connect-src {connect}; media-src 'self' blob:; worker-src 'self'; \
          manifest-src 'self'; frame-src {frames}; frame-ancestors 'none'; base-uri 'none'; \
          form-action 'self'; object-src 'none'"
     );
@@ -279,5 +295,14 @@ mod tests {
             .and_then(|v| v.to_str().ok())
             .unwrap_or_default();
         assert!(csp.contains("frame-src https://www.youtube-nocookie.com"));
+    }
+
+    #[test]
+    fn the_app_may_open_its_own_socket() {
+        let csp = app_csp(&config());
+        assert!(csp.contains("connect-src 'self' wss://vellum.northstar.dev;"));
+        let plain = GatewayConfig::new("http://localhost:8080", vec![7; 32]);
+        assert!(app_csp(&plain).contains("connect-src 'self' ws://localhost:8080;"));
+        assert_eq!(socket_origin("localhost"), None);
     }
 }

@@ -58,6 +58,11 @@ cargo nextest run --workspace
 cd web && pnpm install && pnpm test
 ```
 
+`vellum serve` embeds the web app from `web/dist` when the binary is
+compiled. Run `pnpm --dir web build` before `cargo build` to include it;
+without it, the binary still builds and its home page says the web app
+was not built.
+
 ## Decisions {#decisions}
 
 Decisions are recorded as architecture decision records in `docs/adr/`,

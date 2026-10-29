@@ -30,7 +30,7 @@ use std::path::{Path, PathBuf};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
 use vellum_api::config::{GatewayConfig, host_of};
-use vellum_api::gateway::GatewayBuilder;
+use vellum_api::gateway::{Gateway, GatewayBuilder};
 use vellum_api::server::{ServeConfig, Tls, serve};
 use vellum_kernel::{Config, Error, ErrorKind};
 use vellum_security::upload::Clamd;
@@ -38,7 +38,7 @@ use vellum_security::upload::Clamd;
 /// How long one virus scan may take.
 const CLAMD_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 
-use crate::services;
+use crate::{services, web};
 
 fn invalid(key: &str, why: impl std::fmt::Display) -> Error {
     Error::new(ErrorKind::InvalidInput, format!("{key}: {why}"))
@@ -189,6 +189,21 @@ fn csrf_key_file(data_dir: &Path) -> Result<Vec<u8>, Error> {
     Ok(key)
 }
 
+/// The gateway `vellum serve` runs: every service, and the embedded web
+/// app for every other path on the app host.
+///
+/// # Errors
+///
+/// An invalid operation or `GraphQL` schema.
+pub fn app_gateway(services: &services::Services, config: GatewayConfig) -> Result<Gateway, Error> {
+    services
+        .mount(GatewayBuilder::new(config, services::VERSION))
+        // Live editing is mounted at `/collab` with the services (#415);
+        // the web app's fallback never answers there.
+        .web_app(web::router(web::embedded()))
+        .build()
+}
+
 async fn shutdown_signal() {
     let ctrl_c = async {
         let _ = tokio::signal::ctrl_c().await;
@@ -244,9 +259,10 @@ pub fn run(config_path: Option<&Path>) -> Result<(), Error> {
             .with_workspace(&config, |k| std::env::var(k).ok())
             .await?;
         tracing::info!(services = ?services, "services ready");
-        let gateway = services
-            .mount(GatewayBuilder::new(gateway, services::VERSION))
-            .build()?;
+        if !web::BUILT {
+            tracing::warn!("this binary was built without the web app; `/` shows a placeholder");
+        }
+        let gateway = app_gateway(&services, gateway)?;
         tracing::info!(bind = %serve_config.bind, app = %host_of(&config.public_url.clone().unwrap_or_default()), "starting vellum");
         serve(gateway, serve_config, shutdown_signal()).await
     })

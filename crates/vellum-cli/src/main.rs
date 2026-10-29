@@ -27,6 +27,9 @@ mod services;
 #[cfg(test)]
 mod typescript_tests;
 mod watcher;
+mod web;
+#[cfg(test)]
+mod web_tests;
 mod workspace;
 
 use std::io::Write as _;
