@@ -92,5 +92,5 @@ runs the same checks against each engine.
   their own migrations.
 - The index learns about saved pages by sweeping the drive's page rows
   about once a second and comparing fingerprints, because the drive emits
-  no events and its rescanning records no activity. A sweep reads one row per
+  no events and its file scans record no activity. A sweep reads one row per
   page, so very large drives may want a longer interval.
