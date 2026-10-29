@@ -1,0 +1,227 @@
+// SPDX-FileCopyrightText: 2026 The Vellum contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+
+//! The WebSocket adapter: an axum router the gateway mounts raw
+//! (`Gateway::mount("/collab", router)`), so its authentication, request
+//! IDs and security headers apply.
+//!
+//! `GET /{space_id}/{doc_id}` upgrades to a WebSocket carrying the
+//! [`crate::protocol`]. The [`Authorizer`] decides who the caller is and
+//! what they may do before the upgrade; a caller it refuses never reaches
+//! a room.
+
+use std::sync::Arc;
+use std::time::Duration;
+
+use async_trait::async_trait;
+use axum::Router;
+use axum::extract::ws::{CloseFrame, Message as WsMessage, WebSocket, WebSocketUpgrade};
+use axum::extract::{Path, State};
+use axum::http::request::Parts;
+use axum::http::{HeaderMap, StatusCode, Uri};
+use axum::response::{IntoResponse as _, Response};
+use axum::routing::get;
+use futures_util::{SinkExt as _, StreamExt as _};
+use tokio::time::{Instant, interval};
+use tracing::{Instrument as _, info_span, warn};
+use vellum_kernel::{DocId, ErrorKind, Result, SpaceId, UserId};
+
+use crate::hub::{Access, CloseReason, Hub, JoinRequest, Outbound, RoomKey};
+use crate::trace::TraceParent;
+
+/// How often the server pings an idle connection.
+const PING_EVERY: Duration = Duration::from_secs(30);
+
+/// Silence after which a connection is considered dead.
+const DEAD_AFTER: Duration = Duration::from_secs(75);
+
+/// Decides who is joining and what they may do. Deny by default: anything
+/// but `Ok` refuses the upgrade.
+#[async_trait]
+pub trait Authorizer: Send + Sync + 'static {
+    /// Authorizes the upgrade request for `room`. The gateway has already
+    /// put the authenticated principal in the request extensions.
+    ///
+    /// # Errors
+    ///
+    /// [`ErrorKind::Unauthenticated`], [`ErrorKind::PermissionDenied`] or
+    /// [`ErrorKind::NotFound`] to refuse; any other kind is a failure.
+    async fn authorize(&self, request: &Parts, room: RoomKey) -> Result<(UserId, Access)>;
+}
+
+#[derive(Clone)]
+struct AppState {
+    hub: Hub,
+    authorizer: Arc<dyn Authorizer>,
+}
+
+/// The router to mount under the collab prefix.
+pub fn router(hub: Hub, authorizer: Arc<dyn Authorizer>) -> Router {
+    Router::new()
+        .route("/{space_id}/{doc_id}", get(upgrade))
+        .with_state(AppState { hub, authorizer })
+}
+
+async fn upgrade(
+    State(state): State<AppState>,
+    Path((space, doc)): Path<(String, String)>,
+    ws: WebSocketUpgrade,
+    parts: Parts,
+) -> Response {
+    let (Ok(space), Ok(doc)) = (space.parse::<SpaceId>(), doc.parse::<DocId>()) else {
+        return (StatusCode::NOT_FOUND, "document not found").into_response();
+    };
+    let room = RoomKey { space, doc };
+    let (user, access) = match state.authorizer.authorize(&parts, room).await {
+        Ok(granted) => granted,
+        Err(err) => return (status_of(err.kind()), err.message().to_owned()).into_response(),
+    };
+    let request = JoinRequest {
+        room,
+        user,
+        access,
+        traceparent: traceparent(&parts.headers, &parts.uri),
+    };
+    let limit = state.hub.config().max_message_bytes;
+    let hub = state.hub;
+    ws.max_message_size(limit)
+        .max_frame_size(limit)
+        .on_upgrade(move |socket| serve(socket, hub, request))
+}
+
+const fn status_of(kind: ErrorKind) -> StatusCode {
+    match kind {
+        ErrorKind::Unauthenticated => StatusCode::UNAUTHORIZED,
+        ErrorKind::PermissionDenied => StatusCode::FORBIDDEN,
+        ErrorKind::NotFound => StatusCode::NOT_FOUND,
+        ErrorKind::InvalidInput => StatusCode::BAD_REQUEST,
+        ErrorKind::RateLimited => StatusCode::TOO_MANY_REQUESTS,
+        ErrorKind::Timeout => StatusCode::GATEWAY_TIMEOUT,
+        ErrorKind::Unavailable => StatusCode::SERVICE_UNAVAILABLE,
+        _ => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+/// The caller's trace context: the `traceparent` header, else the
+/// `traceparent` query parameter (browsers cannot set upgrade headers).
+#[must_use]
+pub fn traceparent(headers: &HeaderMap, uri: &Uri) -> Option<TraceParent> {
+    headers
+        .get("traceparent")
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse().ok())
+        .or_else(|| {
+            uri.query()?
+                .split('&')
+                .find_map(|pair| pair.strip_prefix("traceparent="))
+                .and_then(|value| value.parse().ok())
+        })
+}
+
+/// Bridges one upgraded socket to a room until either side ends.
+pub async fn serve(socket: WebSocket, hub: Hub, request: JoinRequest) {
+    let span = info_span!("collab.connection", room = %request.room, user = %request.user);
+    if let Some(trace) = request.traceparent {
+        trace.parent(&span);
+    }
+    bridge(socket, hub, request).instrument(span).await;
+}
+
+async fn bridge(socket: WebSocket, hub: Hub, request: JoinRequest) {
+    let (mut sink, mut stream) = socket.split();
+    let connection = match hub.join(request).await {
+        Ok(connection) => connection,
+        Err(err) => {
+            warn!(%err, "cannot join the room");
+            let _closed = sink.send(close(1011, "room unavailable")).await;
+            return;
+        }
+    };
+    let (sender, mut outbound) = connection.into_parts();
+    let mut ping = interval(PING_EVERY);
+    let mut last_heard = Instant::now();
+    loop {
+        tokio::select! {
+            incoming = stream.next() => {
+                last_heard = Instant::now();
+                match incoming {
+                    Some(Ok(WsMessage::Binary(frame))) => {
+                        if sender.send(frame.to_vec()).await.is_err() {
+                            let _closed = sink.send(close(CloseReason::Shutdown.code(), "room closed")).await;
+                            break;
+                        }
+                    }
+                    Some(Ok(WsMessage::Text(_))) => {
+                        let _closed = sink.send(close(1003, "binary frames only")).await;
+                        break;
+                    }
+                    Some(Ok(WsMessage::Ping(_) | WsMessage::Pong(_))) => {}
+                    Some(Ok(WsMessage::Close(_)) | Err(_)) | None => break,
+                }
+            }
+            out = outbound.recv() => match out {
+                Some(Outbound::Frame(frame)) => {
+                    if sink.send(WsMessage::Binary(frame)).await.is_err() {
+                        break;
+                    }
+                }
+                Some(Outbound::Close(reason)) => {
+                    let _closed = sink.send(close(reason.code(), reason.as_str())).await;
+                    break;
+                }
+                None => {
+                    let _closed = sink.send(close(CloseReason::Shutdown.code(), "room closed")).await;
+                    break;
+                }
+            },
+            _ = ping.tick() => {
+                if last_heard.elapsed() > DEAD_AFTER {
+                    break;
+                }
+                if sink.send(WsMessage::Ping(Vec::new().into())).await.is_err() {
+                    break;
+                }
+            }
+        }
+    }
+}
+
+fn close(code: u16, reason: &'static str) -> WsMessage {
+    WsMessage::Close(Some(CloseFrame {
+        code,
+        reason: reason.into(),
+    }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const SAMPLE: &str = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
+
+    #[test]
+    fn reads_traceparent_from_header_then_query() {
+        let mut headers = HeaderMap::new();
+        let uri: Uri = format!("/s/d?x=1&traceparent={SAMPLE}")
+            .parse()
+            .unwrap_or_else(|e| unreachable!("{e}"));
+        assert_eq!(
+            traceparent(&headers, &uri)
+                .map(|t| t.to_string())
+                .as_deref(),
+            Some(SAMPLE)
+        );
+        let other = "00-11111111111111111111111111111111-2222222222222222-00";
+        let _previous = headers.insert(
+            "traceparent",
+            other.parse().unwrap_or_else(|e| unreachable!("{e}")),
+        );
+        assert_eq!(
+            traceparent(&headers, &uri)
+                .map(|t| t.to_string())
+                .as_deref(),
+            Some(other)
+        );
+        assert!(traceparent(&HeaderMap::new(), &Uri::from_static("/s/d")).is_none());
+    }
+}
