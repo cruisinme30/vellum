@@ -81,9 +81,11 @@ another service's tables.
 - For "visible in under 1 s", the collaboration WebSocket sends a poke
   when a person's permission epoch or a subscribed space changes, and the
   client pulls at once; polling every 30 s is the fallback.
-- Store adapters (in memory now; SQLite and Postgres on the index
-  database) must pass the shared conformance suite in
-  `vellum_sync::conformance`.
+- Store adapters (in memory, and `SqlStore` on the index database for
+  SQLite and Postgres) must pass the shared conformance suite in
+  `vellum_sync::conformance`. The log tables come from the `vellum-db`
+  migrations. Each append first bumps a single head row, which serialises
+  writers so positions commit in order and a pull never skips one.
 
 ## Alternatives
 
@@ -97,7 +99,7 @@ another service's tables.
 - The gateway serves `sync.push` (`POST /api/v1/sync/push`, scope
   `write:direct`) and `sync.pull` (`GET /api/v1/sync/pull`, scope `read`)
   from the operations this crate registers.
-- A rebuild of the index bumps the log epoch; every client then
-  downloads a fresh snapshot once.
+- A rebuilt index starts a new log epoch (its creation time); every
+  client then downloads a fresh snapshot once.
 - Permission changes cost one snapshot per affected person, which is rare
   and bounded by what they can read.

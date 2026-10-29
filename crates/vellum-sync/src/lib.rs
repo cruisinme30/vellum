@@ -11,7 +11,9 @@
 //! - [`domain`]: the wire contract and log records.
 //! - [`ports`]: the store, read permissions and mutators this crate needs.
 //! - [`Sync`]: the push, pull and publish use cases.
-//! - [`memory`]: the in-memory store; [`conformance`]: the adapter suite.
+//! - [`memory`]: the in-memory store; [`sql`]: the store on the index
+//!   database (SQLite or Postgres); [`conformance`]: the adapter suite.
+//! - [`service`]: `sync.push` and `sync.pull` for the gateway.
 
 pub mod app;
 pub mod conformance;
@@ -19,6 +21,8 @@ pub mod cursor;
 pub mod domain;
 pub mod memory;
 pub mod ports;
+pub mod service;
+pub mod sql;
 
 pub use app::{MAX_PUSH, Mutators, PULL_PAGE, Sync};
 pub use domain::{
@@ -28,3 +32,4 @@ pub use domain::{
 pub use ports::{
     AccessKey, ClientState, LogInfo, MutationContext, ReadAccess, ServerMutator, SyncStore,
 };
+pub use sql::SqlStore;

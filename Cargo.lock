@@ -4668,11 +4668,15 @@ name = "vellum-sync"
 version = "0.0.0"
 dependencies = [
  "proptest",
- "schemars",
+ "schemars 1.2.3",
  "serde",
  "serde_json",
+ "tempfile",
+ "testcontainers-modules",
  "tokio",
  "tracing",
+ "vellum-contracts",
+ "vellum-db",
  "vellum-kernel",
 ]
 

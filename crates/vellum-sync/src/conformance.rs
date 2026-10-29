@@ -5,7 +5,7 @@
 //! tests call [`check_store`] with a factory for empty stores.
 
 use serde_json::json;
-use vellum_kernel::{SpaceId, UserId};
+use vellum_kernel::{ObjectId, SpaceId, UserId};
 
 use crate::domain::{Change, ClientId};
 use crate::ports::SyncStore;
@@ -19,6 +19,7 @@ pub async fn check_store<S: SyncStore, F: Fn() -> S>(make: F) -> Result<(), Stri
     clients_bind_and_advance(&make()).await?;
     log_keeps_latest_version(&make()).await?;
     reads_page_and_skip_tombstones(&make()).await?;
+    records_round_trip(&make()).await?;
     Ok(())
 }
 
@@ -120,5 +121,26 @@ async fn reads_page_and_skip_tombstones<S: SyncStore>(store: &S) -> Result<(), S
     )?;
     let info = store.info().await.map_err(|e| e.to_string())?;
     ensure(info.epoch > 0, "the epoch starts above zero")?;
+    Ok(())
+}
+
+async fn records_round_trip<S: SyncStore>(store: &S) -> Result<(), String> {
+    let (space, object) = (SpaceId::generate(), ObjectId::generate());
+    let value = json!({"title": "Ship sync", "tags": ["a", "b"], "n": 1.5, "z": null});
+    let change = Change::put(space, "issues", "ENG-7", value).governed_by(object);
+    store
+        .append(vec![
+            change.clone(),
+            Change::delete(space, "issues", "ENG-8"),
+        ])
+        .await
+        .map_err(|e| e.to_string())?;
+    let records = store.read(0, 10, false).await.map_err(|e| e.to_string())?;
+    let changes: Vec<_> = records.into_iter().map(|r| r.change).collect();
+    ensure(
+        changes == vec![change, Change::delete(space, "issues", "ENG-8")],
+        "space, object, collection, key and value come back unchanged",
+    )?;
+    store.append(Vec::new()).await.map_err(|e| e.to_string())?;
     Ok(())
 }
