@@ -9,7 +9,8 @@ use sqlx::Connection as _;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteConnection};
 use vellum_db::{Backend, Error, Index, IndexConfig, IndexKey};
 
-const TABLES: [&str; 14] = [
+const TABLES: [&str; 16] = [
+    "collab_updates",
     "documents",
     "drive_activity",
     "drive_activity_scope",
@@ -22,6 +23,7 @@ const TABLES: [&str; 14] = [
     "grants",
     "index_meta",
     "page_ancestors",
+    "space_shards",
     "spaces",
     "user_doc_state",
 ];

@@ -224,6 +224,16 @@ impl MemoryWorkspace {
         );
     }
 
+    /// Records a change for `list_changes`.
+    pub fn add_change(&self, change: Change) {
+        self.lock().changes.push(change);
+    }
+
+    /// Adds a collection with its columns and rows.
+    pub fn add_collection(&self, id: &str, columns: Vec<String>, rows: Vec<Value>) {
+        let _ = self.lock().collections.insert(id.into(), (columns, rows));
+    }
+
     /// Every write made so far.
     #[must_use]
     pub fn writes(&self) -> Vec<Write> {

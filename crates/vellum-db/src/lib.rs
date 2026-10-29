@@ -5,7 +5,8 @@
 //!
 //! Files on disk are the source of truth; this crate holds the rebuildable
 //! index over them (spaces, folders, documents, the `page_ancestors` closure)
-//! plus the two database-owned tables, `grants` and `user_doc_state`.
+//! plus the database-owned tables `grants`, `user_doc_state` and
+//! `collab_updates` (the live-editing change log, written by `vellum-collab`).
 //!
 //! Two backends share one schema shape:
 //! - **SQLite** for the single binary, encrypted with SQLCipher when a key is given.
@@ -18,12 +19,14 @@ mod config;
 mod error;
 mod index;
 mod reindex;
+mod shard;
 mod telemetry;
 
 pub use config::{IndexConfig, IndexKey};
 pub use error::{Error, Result};
 pub use index::{Backend, Index, IndexPool};
 pub use reindex::{FileReader, PlainFiles, Problem, ProblemKind, ReindexReport};
+pub use shard::{MAIN_URL_VAR, SHARDS_VAR, Shard, ShardedIndex, ShardsConfig, shard_url_var};
 pub use telemetry::{RowCount, traced};
 
 /// The sqlx version this crate is built on, so dependants share one copy.

@@ -75,7 +75,11 @@ skip = [
     { crate = "crypto-common@0.1", reason = "pulled by digest 0.10 (WebSocket sha1)" },
     { crate = "cpufeatures@0.2", reason = "pulled by sha1 0.10 (WebSocket handshake)" },
 ]
-skip-tree = []
+skip-tree = [
+    # Linux Secret Service (os-keychain feature only) still uses the previous
+    # RustCrypto generation (sha2 0.10, cipher 0.4) for its session encryption.
+    { crate = "dbus-secret-service@4", depth = 20, reason = "Linux keychain; waiting for its RustCrypto 0.11 release" },
+]
 
 [sources]
 unknown-registry = "deny"
