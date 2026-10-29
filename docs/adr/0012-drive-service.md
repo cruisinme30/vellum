@@ -56,7 +56,7 @@ writes, the three-way merge and an identity-based watcher.
   rights, which models never get.
 - Space settings (quota, trash days, retention) live in the space's
   root `.vellum-folder.yaml`, so `scan` rebuilds spaces, nodes, trash,
-  versions and links from files alone. Stars, recents and activity are
+  versions and links from files alone. Stars, recent items and activity are
   database-owned.
 
 ### D65: trash, versions and quotas
@@ -94,7 +94,7 @@ writes, the three-way merge and an identity-based watcher.
   target's. Creating one needs view rights on the target; following one
   checks the target again, so a shortcut never grants access.
 - External edits reported by the watcher become versions authored by
-  `External`; tree changes rescan the touched spaces, where the node
+  `External`; tree changes scan the touched spaces again, where the node
   follows its ID and a duplicate ID goes to the newcomer.
 
 ## Consequences
