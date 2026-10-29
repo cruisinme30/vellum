@@ -190,6 +190,73 @@ pub struct SaveViewInput {
     pub limit: Option<usize>,
 }
 
+/// Adds a property (a column) to a collection. The server picks its key
+/// from the name.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AddPropertyInput {
+    /// The collection.
+    pub collection_id: CollectionId,
+    /// The display name, unique in the collection.
+    pub name: String,
+    /// The type: `text`, `number`, `select`, `multi`, `person`, `date`,
+    /// `checkbox`, `url`, `rollup`, `formula` or `created`. Relations are
+    /// two-way, so they are added in `schema.yaml`.
+    #[serde(rename = "type")]
+    pub kind: String,
+    /// Options of a select or multi-select, in order.
+    #[serde(default)]
+    pub options: Vec<SelectOption>,
+    /// A formula's expression (`round(Estimate * 0.5, 1)`).
+    #[serde(default)]
+    pub formula: Option<String>,
+    /// A rollup's relation property, by key or name.
+    #[serde(default)]
+    pub via: Option<String>,
+    /// A rollup's property on the related rows, by key or name.
+    #[serde(default)]
+    pub prop: Option<String>,
+    /// A rollup's aggregation.
+    #[serde(default)]
+    pub agg: Option<Aggregation>,
+    /// How numbers show.
+    #[serde(default)]
+    pub format: Option<NumberFormat>,
+}
+
+/// Changes a property. Fields left out stay as they are; the type and key
+/// never change.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct UpdatePropertyInput {
+    /// The collection.
+    pub collection_id: CollectionId,
+    /// The property's key.
+    pub key: String,
+    /// A new display name.
+    #[serde(default)]
+    pub name: Option<String>,
+    /// The full new option list of a select or multi-select.
+    #[serde(default)]
+    pub options: Option<Vec<SelectOption>>,
+    /// A formula's new expression.
+    #[serde(default)]
+    pub formula: Option<String>,
+    /// How numbers show.
+    #[serde(default)]
+    pub format: Option<NumberFormat>,
+}
+
+/// Names one property.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PropertyKey {
+    /// The collection.
+    pub collection_id: CollectionId,
+    /// The property's key.
+    pub key: String,
+}
+
 /// Resolves a `collection` block embedded in a page.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

@@ -324,7 +324,7 @@ fn infer(column: &[&str], rows: usize) -> PropertyType {
     PropertyType::Text
 }
 
-fn unique_key(header: &str, index: usize, used: &mut BTreeSet<String>) -> String {
+pub(crate) fn unique_key(header: &str, index: usize, used: &mut BTreeSet<String>) -> String {
     let mut base: String = slug(header)
         .chars()
         .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })

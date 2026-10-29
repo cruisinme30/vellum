@@ -415,6 +415,37 @@ impl Schema {
         Ok(())
     }
 
+    /// Re-checks a schema changed in memory, exactly as `schema.yaml`
+    /// would be checked on load: keys, names, formulas, rollups, views.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`SchemaError`] naming the first problem found.
+    pub fn revalidate(&self) -> Result<Self, SchemaError> {
+        Self::from_raw(self.to_raw())
+    }
+
+    /// A new property's type from its `schema.yaml` fields, checked as on
+    /// load. Relations need both collections, so they are not built here.
+    ///
+    /// # Errors
+    ///
+    /// [`SchemaError::MissingField`] or [`SchemaError::UnknownType`].
+    pub fn property_type(spec: &PropertySpec) -> Result<PropertyType, SchemaError> {
+        property_type(&PropertyRaw {
+            key: spec.key.clone(),
+            name: spec.name.clone(),
+            kind: spec.kind.clone(),
+            options: spec.options.iter().cloned().map(OptionRaw::Full).collect(),
+            via: spec.via.clone(),
+            prop: spec.prop.clone(),
+            agg: spec.agg,
+            f: spec.formula.clone(),
+            format: spec.format,
+            ..PropertyRaw::default()
+        })
+    }
+
     pub(crate) fn to_raw(&self) -> SchemaRaw {
         SchemaRaw {
             vellum: Some(1),
@@ -424,6 +455,29 @@ impl Schema {
             views: self.views.iter().map(|v| v.to_raw(self)).collect(),
         }
     }
+}
+
+/// The fields of one property, as written in `schema.yaml`.
+#[derive(Debug, Clone, Default)]
+pub struct PropertySpec {
+    /// The key.
+    pub key: String,
+    /// The display name.
+    pub name: String,
+    /// The type name (`text`, `select`, …).
+    pub kind: String,
+    /// Select and multi-select options.
+    pub options: Vec<SelectOption>,
+    /// A rollup's relation.
+    pub via: Option<String>,
+    /// A rollup's property on the related rows.
+    pub prop: Option<String>,
+    /// A rollup's aggregation.
+    pub agg: Option<Aggregation>,
+    /// A formula's source.
+    pub formula: Option<String>,
+    /// Number display format.
+    pub format: Option<NumberFormat>,
 }
 
 fn find_cycle<'a>(
