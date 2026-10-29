@@ -1,5 +1,0 @@
-::: stats
-- 94% · Injections caught · ▲ 6 pts
-- 38 ms · p95 latency · ▼ 12 ms
-- 12 · Open incidents · ▬ 0
-:::

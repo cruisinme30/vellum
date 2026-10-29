@@ -9,7 +9,9 @@ vellum: 1
 ---
 
 ::: info
+
 Drafted by Claude for @priya from 14 issues completed in 2027-C04.
+
 :::
 
 ## Features
