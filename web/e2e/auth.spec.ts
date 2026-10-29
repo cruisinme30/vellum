@@ -7,6 +7,8 @@
 import { AxeBuilder } from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
+import { fakeDrive } from "./support/fake-drive";
+
 // Feature tests: once per browser, at laptop size. The UI suite covers sizes.
 test.use({ viewport: { width: 1366, height: 768 }, hasTouch: false, isMobile: false });
 // eslint-disable-next-line no-empty-pattern -- Playwright needs the fixtures object
@@ -56,6 +58,7 @@ async function fakeServer(page: Page, start: "new" | "signed-out") {
   await page.route("**/api/v1/collections", (route) =>
     route.fulfill({ json: { collections: [] } }),
   );
+  await fakeDrive(page, USER.id);
 }
 
 async function expectNoViolations(page: Page) {
