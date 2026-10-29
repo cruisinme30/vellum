@@ -5,9 +5,9 @@
 /* eslint-disable sonarjs/no-skipped-tests */
 
 import { AxeBuilder } from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
-import { fakeDrive } from "./support/fake-drive";
+import { signedIn } from "./support/server-session";
 
 // Feature tests: once per browser, at laptop size. The UI suite covers sizes.
 test.use({ viewport: { width: 1366, height: 768 }, hasTouch: false, isMobile: false });
@@ -15,30 +15,6 @@ test.use({ viewport: { width: 1366, height: 768 }, hasTouch: false, isMobile: fa
 test.beforeEach(({}, testInfo) => {
   test.skip(!testInfo.project.name.endsWith("-laptop"), "runs at laptop size only");
 });
-
-const USER = {
-  id: "01M6409GN2EYWS8Z7NFQQ3JNWZ",
-  email: "priya@northstar.dev",
-  name: "Priya Raman",
-  handle: "priya",
-  admin: true,
-};
-
-/** A signed-in session on a server whose drive is faked. */
-async function signedIn(page: Page) {
-  await page.route("**/api/v1/auth/status", (route) =>
-    route.fulfill({
-      json: { needsSetup: false, credential: "session", scopes: ["read"], user: USER },
-    }),
-  );
-  await page.route("**/api/csrf", (route) =>
-    route.fulfill({ json: { token: "t", header: "x-csrf-token" } }),
-  );
-  await page.route("**/api/v1/collections", (route) =>
-    route.fulfill({ json: { collections: [] } }),
-  );
-  return fakeDrive(page, USER.id);
-}
 
 test("the page tree comes from the server's drive and changes it", async ({ page }) => {
   const drive = await signedIn(page);

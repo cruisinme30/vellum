@@ -79,6 +79,19 @@ start before the API and the collab server exist.
   folders as tree nodes. Changes show at once and are undone, with the
   request ID shown, when refused; creating a page and search answer with
   promises. Bodies come only over the collab socket, never REST.
+- Against a server the editor joins the page's room at
+  `/collab/{space_id}/{doc_id}` (ADR 0009, #415) over WebSocket, with the
+  session cookie; the server admits only the app's own origin. The
+  client speaks the room's y-sync protocol with a small codec of its own
+  (no direct `lib0` dependency), binding the `default` XML fragment. The
+  editor stays read-only until the server's peer list names it a writer,
+  never from the self-reported presence state. A dropped socket
+  reconnects with backoff (0.5 s doubling to 30 s, jittered); offline
+  edits stay in the document and the sync exchange sends them on
+  reconnect. Close code 4403 (access revoked) stops reconnecting. Each
+  connection re-announces presence with a newer clock, so a room that
+  still holds the old one lists the editor again. Done asks the room for
+  a version and resolves on its answer.
 - Why: the shell and editor could ship before the backend, and swapping
   in the server is a transport change only.
 
@@ -96,5 +109,9 @@ start before the API and the collab server exist.
 
 - A new block means editing `blocks.json`, running `cargo xtask schema`,
   then adding its Tiptap extension; a parity test fails until it exists.
-- Collections run on the API since #417; pages, work, books and search
-  move next (#392), then live editing (#97). The views stay unchanged.
+- Collections run on the API since #417, and pages and live editing on
+  the drive and the collab socket; work, books and search move next
+  (#392). The views stay unchanged.
+- In demo mode pages keep their local cache. Against a server a page
+  opens only once its room answers; an offline copy of server pages is
+  later work (ADR 0023).
