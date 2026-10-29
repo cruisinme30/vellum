@@ -35,6 +35,9 @@ pub enum CryptoError {
     /// Passphrase key derivation failed or its parameters are invalid.
     #[error("passphrase key derivation failed")]
     Kdf,
+    /// A recipient (E2E) envelope operation was refused.
+    #[error("recipient envelope: {0}")]
+    Recipients(&'static str),
     /// A remote or OS key provider (keychain, KMS, Vault) failed.
     #[error("key provider unavailable: {0}")]
     Provider(String),

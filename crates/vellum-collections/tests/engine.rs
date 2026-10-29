@@ -518,6 +518,53 @@ fn csv_round_trips() {
     );
 }
 
+/// Column names are defused like cells, and read back unchanged (#317).
+#[test]
+fn csv_headers_cannot_run_as_formulas() {
+    let names = [
+        "Name",
+        "=HYPERLINK(\"https://evil.example\",\"x\")",
+        "+Points",
+        "@Team",
+    ];
+    let text = format!(
+        "{}\nA,1,2,eng\n",
+        names
+            .map(|n| format!("\"{}\"", n.replace('"', "\"\"")))
+            .join(",")
+    );
+    let c = csv::import_new(&text, CollectionId::generate(), "Imported")
+        .unwrap()
+        .into_collection();
+    let id = c.id();
+    let mut ws = Workspace::new();
+    ws.insert(c).unwrap();
+    let view = ws
+        .collection(id)
+        .unwrap()
+        .schema()
+        .view(None)
+        .unwrap()
+        .clone();
+    let mut computer = Computer::new(&ws, now());
+    let out = csv::export(&mut computer, id, &view).unwrap();
+    let header = out.lines().next().unwrap();
+    assert!(
+        header.split(',').all(|cell| !cell
+            .trim_start_matches('"')
+            .starts_with(['=', '+', '-', '@'])),
+        "header runs as a formula: {header}"
+    );
+    let again = csv::import_new(&out, CollectionId::generate(), "Again").unwrap();
+    let read: Vec<&str> = again
+        .schema
+        .properties
+        .iter()
+        .map(|p| p.name.as_str())
+        .collect();
+    assert_eq!(read, names, "names survive an export and import");
+}
+
 #[test]
 fn embeds_and_charts_resolve() {
     let ws = northstar();
