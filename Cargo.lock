@@ -6742,6 +6742,7 @@ dependencies = [
  "futures-util",
  "opentelemetry",
  "proptest",
+ "serde_json",
  "tempfile",
  "testcontainers-modules",
  "thiserror",
@@ -6749,8 +6750,10 @@ dependencies = [
  "tokio-tungstenite",
  "tracing",
  "tracing-opentelemetry",
+ "vellum-contracts",
  "vellum-crypto",
  "vellum-db",
+ "vellum-format",
  "vellum-kernel",
  "yrs",
 ]
