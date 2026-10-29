@@ -84,6 +84,14 @@ service (ADR 0013, D67) fixed the on-disk shape of a book.
   links (R-HG-4) are site features of the mdBook publish step and the
   in-app reader; the books need nothing extra for them.
 
+## Alternatives
+
+- **A fourth cookbook book**: its recipes could not link to the chapters
+  they use.
+- **A corpus written separately from the guide**: the two would drift.
+- **Help links to headings by text**: rewording a heading would break
+  help.
+
 ## Consequences
 
 - A pull request that adds a block must add its example to the guide and
@@ -93,7 +101,3 @@ service (ADR 0013, D67) fixed the on-disk shape of a book.
 - The markdownlint configuration now ignores `docs/*.book/SUMMARY.md` (mdBook uses `#`
   for part titles), reads the page title from front matter only for
   MD025, and allows bare URLs (`::: link <url>` takes one).
-
-## History
-
-- 2026-10-29: accepted in #218.

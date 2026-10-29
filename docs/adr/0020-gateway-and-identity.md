@@ -12,6 +12,8 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D88
+- Issue: none (recorded before the issue rule, D119)
+- Pull requests: #39
 
 :::
 
@@ -52,11 +54,12 @@ live in the gateway crate.
 - Start-up refuses a malformed operation: a bad ID, a path outside
   `/v1/`, a `GET` mutation, or a path parameter missing from the input.
 
-| Option | One source for REST and `GraphQL` | Services free of HTTP crates | Typed contract tests | Chosen |
-| --- | --- | --- | --- | --- |
-| Typed operation registry | ✓ | ✓ | ✓ | ✓ |
-| Each service ships an `axum` router and a `GraphQL` object | ✗ | ✗ | ◐ | ✗ |
-| Hand-written gateway handlers per service | ◐ | ✓ | ◐ | ✗ |
+## Alternatives
+
+- **Each service ships an `axum` router and a `GraphQL` object**: REST
+  and `GraphQL` drift apart, and services pull in HTTP crates.
+- **Hand-written gateway handlers per service**: the gateway changes for
+  every endpoint and coverage depends on discipline.
 
 ## Consequences
 

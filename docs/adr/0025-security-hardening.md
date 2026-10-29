@@ -14,6 +14,7 @@ vellum: 1
 - Decisions: D103, D104, D105
 - Issues: [#60](https://github.com/cruisinme30/vellum/issues/60) (outbound fetches), [#61](https://github.com/cruisinme30/vellum/issues/61) (uploads),
   [#62](https://github.com/cruisinme30/vellum/issues/62) (secret scanning), [#186](https://github.com/cruisinme30/vellum/issues/186) (E2E private spaces)
+- Pull requests: #221
 
 :::
 
@@ -87,15 +88,14 @@ one place, and services call it.
   `SpaceMode::allows`. The desktop app runs search and MCP for those
   spaces locally.
 
-| Option | Server can read | Search on server | Chosen |
-| --- | --- | --- | --- |
-| Per-member `X25519` recipients | ✗ | ✗ | ✓ |
-| Shared space key held by the server | ✓ | ✓ | ✗ |
-| Shared space key wrapped per member | ✗ | ✗ | ◐ |
+## Alternatives
 
-A shared key wrapped per member makes removal harder, because the whole
-space has to be re-keyed. Per-document recipients let removal touch only
-headers.
+- **Each service builds its own HTTP client**: DNS rebinding and
+  redirect checks would be re-implemented, and missed, per service.
+- **A shared space key held by the server**: the server could read the
+  space.
+- **A shared space key wrapped per member**: removing a member re-keys
+  the whole space; per-document recipients touch only headers.
 
 ## Consequences
 
