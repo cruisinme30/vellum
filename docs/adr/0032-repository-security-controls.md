@@ -53,20 +53,23 @@ neither code scanning results nor signed commits.
 
 ### `D128`: code scanning gates merges; Scorecard watches the repository
 
-- CodeQL default setup runs the extended suite on Rust, JavaScript and
-  TypeScript, and Actions.
-- The `develop` and `main` rulesets require CodeQL results and block on
-  any high or critical security alert and any error-level alert.
+- CodeQL runs the extended suite on Rust, JavaScript and TypeScript, and
+  Actions. Since 2026-10-29 it is an advanced setup (`codeql.yml`) that
+  scans release pull requests, pushes to `main` and `develop` weekly
+  ([ADR 0035](0035-ci-speed.md)); before that it was the default setup.
+- The `main` ruleset requires CodeQL results and blocks on any high or
+  critical security alert and any error-level alert (`develop` dropped
+  this rule, see [ADR 0035](0035-ci-speed.md)).
 - Rulesets require signed commits (GitHub signs the merges it makes),
   restrict `main` to merge commits, and protect `v*` tags.
-- OpenSSF Scorecard runs weekly and on every push to `develop` and
-  uploads its findings to code scanning.
+- OpenSSF Scorecard runs weekly and uploads its findings to code
+  scanning.
 - Secret scanning also checks non-provider patterns and secret validity.
 
 ## Alternatives
 
-- **Advanced CodeQL workflow**: reviewable in the repository, but it
-  cannot upload while default setup is on and needs upkeep.
+- **Advanced CodeQL workflow**: first rejected for upkeep; adopted later
+  to scan per release instead of per push ([ADR 0035](0035-ci-speed.md)).
 - **Required approvals**: an author cannot approve their own pull
   request, so auto-merge would stop.
 - **Strict status checks**: every merge would make every other open pull
@@ -78,8 +81,8 @@ neither code scanning results nor signed commits.
 
 - A workflow change that zizmor flags fails the Fast suite; fix it or
   add an inline ignore with the reason.
-- Pull requests wait for CodeQL too, and a high-severity alert blocks
-  the merge until fixed or dismissed with a reason.
+- Release pull requests wait for CodeQL, and a high-severity alert
+  blocks the release until fixed or dismissed with a reason.
 - Release branches must be cut straight from `develop` with no extra
   local commits, because `main` requires signed commits.
 - Settings outside the repository are recorded in #239. Revisit if the

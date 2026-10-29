@@ -56,8 +56,9 @@ jobs also queued for runners.
 
 - The develop ruleset drops its `code_scanning` rule; main keeps it.
 - CodeQL scans release pull requests, pushes to main and develop weekly
-  (`.github/workflows/codeql.yml`), and a high or critical alert blocks
-  the release into main.
+  (`.github/workflows/codeql.yml`), replacing the CodeQL default setup of
+  [ADR 0032](0032-repository-security-controls.md). A high or critical
+  alert blocks the release into main.
 - Merges into develop wait only for the Fast suite and Labels.
 
 ## Alternatives
