@@ -11,8 +11,8 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D94, D95, D96
-- Issue: #189, #190, #193, #194, #196, and #187 for the budgets
+- Decisions: D94, D95, D96, D253, D254, D255
+- Issue: #189, #190, #193, #194, #196, #57, and #187 for the budgets
 - Pull requests: #245
 
 :::
@@ -34,9 +34,7 @@ release, and the single-binary budgets: under 40 MB to download, under
 [#196](https://github.com/cruisinme30/vellum/issues/196) and
 [#187](https://github.com/cruisinme30/vellum/issues/187).
 
-MinIO stopped publishing community images in October 2025, and the binary
-has no `serve` command yet, so the harnesses must exist before the server
-they test.
+MinIO stopped publishing community images in October 2025.
 
 ## Decisions
 
@@ -97,20 +95,37 @@ they test.
   download target is
   [#491](https://github.com/cruisinme30/vellum/issues/491).
 - Nightly: k6 (`deploy/perf/k6`) against the compose stack with the SLOs as
-  thresholds; `cargo xtask perf-gate` fails when any p95 grows 10 % or more
-  over `deploy/perf/baseline.json`, and the result is kept as trend data.
-  The baseline starts at the SLO targets and is replaced by the first
-  measured run through a pull request. ZAP runs its baseline scan on the
-  same stack.
-- Weekly: `deploy/chaos/run.sh` on kind kills a Vellum node, a Kroki pod
-  and the Postgres primary under load; it fails when a threshold breaks or
-  an acknowledged write cannot be read back.
+  thresholds, the 10 % p95 gate (D254), and ZAP's baseline scan.
+- Weekly: `deploy/chaos/run.sh` on kind injects faults under load (D255);
+  it fails when a threshold breaks or an acknowledged write is lost.
 - Every release: `deploy/drills/upgrade.sh` upgrades a seeded stack from
   each of the previous two releases, and `deploy/drills/restore.sh`
   restores a backup into a scratch stack; both compare row and object
   counts.
-- Until `vellum serve` exists, the server-dependent steps report a notice
-  and pass; size budgets and reproducibility are enforced now.
+
+### D253: upgrades from every earlier schema, with data
+
+- `crates/vellum-db/tests/upgrade.rs` stops at each earlier migration
+  (any may be a previous release's), writes the Northstar rows from
+  `tests/fixtures/upgrade/NNNN.sql` that fit, then upgrades. Every row must
+  survive and the schema must match a fresh install, on both engines.
+- A migration that rewrites existing tables adds a fixture first.
+
+### D254: regression baselines from recent nights, and the release gate
+
+- The 10 % p95 gate compares with the median of the last five green
+  nights; `deploy/perf/baseline.json` (SLO targets) is used until then.
+- `vellum budgets` gets a one-day admin token (`deploy/perf/admin-token.sh`),
+  so a route over budget (R-OB-4) fails the night.
+- A release PR fails while the latest load, ZAP, fuzz or chaos run on
+  develop failed (`scripts/ci/reliability-gate.sh`); a green manual run
+  clears it.
+
+### D255: chaos covers the blob store and a slow database
+
+- Five faults, 140 s apart, in 15 minutes of load: a Vellum node, Kroki,
+  the Postgres primary, a blob store restart, 40 ms extra DB latency.
+- No Redis: shared state is in Postgres (ADR 0040), so DB faults cover it.
 
 ## Alternatives
 
@@ -127,16 +142,12 @@ they test.
   specific ingress) and a hand-written script (no automatic rollback).
 - **Provenance**: the SLSA GitHub generator (level 3, isolated builder)
   was chosen over `actions/attest-build-provenance` (level 2).
+- **Gates**: a fixed baseline drifts and one night is noisy (median of five
+  chosen); re-running load and chaos per hourly release costs hours.
 
 ## Consequences
 
-- The load, chaos, drill and ZAP jobs turn on by themselves when `serve`
-  lands, so the API thread meets the budgets and SLOs from its first day.
 - Endpoint paths the load tests use live in one file,
   `deploy/perf/k6/routes.js`, for the API and collab threads to keep true.
-- The restore drill drives `vellum backup` and `vellum restore` (#192)
-  once the binary has them, and copies the database and bucket directly
-  until then. The nightly run also calls `vellum budgets --server` for
-  per-route latency budgets (#179) once that command exists.
-- GitHub-hosted runners are noisy; if the 10 % gate flaps, move the
-  nightly job to a dedicated runner rather than widening the gate.
+- If the 10 % gate flaps on noisy runners, move the nightly to a
+  dedicated runner rather than widening the gate.
