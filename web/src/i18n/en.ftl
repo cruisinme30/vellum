@@ -244,6 +244,13 @@ editor-saving = Saving…
 editor-save-failed = Not saved yet. Your changes are kept and saving will retry.
 editor-done = Done
 editor-done-hint = Save a version now (Ctrl+S)
+presence-label = { $count ->
+    [one] One other person on this page
+   *[other] { $count } other people on this page
+}
+presence-editing = { $name } is editing
+presence-viewing = { $name } is viewing
+presence-more = { $count } more
 history-open = Version history
 history-title = Version history
 history-close = Close version history

@@ -11,6 +11,7 @@ import * as Y from "yjs";
 import { useT } from "../i18n/i18n";
 
 import type { ChipSources } from "./chips/items";
+import { PresenceBar } from "./collab/presence";
 import type {
   CollabConnector,
   CollabSession,
@@ -268,6 +269,7 @@ function BoundEditor({
       <div className="vl-editor-bar">
         <Toolbar editor={editor} />
         <SaveControls saver={saver} canSave={editable && live.status === "online"}>
+          <PresenceBar awareness={session.awareness} live={session.live ? live : undefined} />
           {actions}
         </SaveControls>
       </div>

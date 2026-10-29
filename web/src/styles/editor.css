@@ -820,3 +820,34 @@
   flex-basis: 100%;
   margin: 0;
 }
+
+/* Who else has the page open (#98). */
+.vl-presence {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding: 0 4px;
+  list-style: none;
+}
+
+.vl-avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-inline-start: -6px;
+  border: 2px solid var(--md-surface);
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.vl-avatar:first-child {
+  margin-inline-start: 0;
+}
+
+.vl-avatar-more {
+  background: var(--md-surface-container-highest);
+  color: var(--md-on-surface);
+}
