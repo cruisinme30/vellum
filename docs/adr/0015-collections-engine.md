@@ -95,9 +95,10 @@ each request through an access port backed by authorization.
 - On first use the service reads every `*.collection/schema.yaml` and its
   `rows/*.md` into one workspace; the watcher calls `invalidate` when a
   file changes on disk, and the next request reloads.
-- Each row keeps the path and etag it was read at. A save rewrites that
-  file only if the etag still matches, so an outside edit is never lost;
-  a mismatch is a `conflict` and drops the cache.
+- Each row and `schema.yaml` keep the etag they were read at. A save
+  (a row, or a saved view in the schema) rewrites the file only if the
+  etag still matches, so an outside edit is never lost; a mismatch is a
+  `conflict` and drops the cache.
 - New rows get `rows/<slug>.md`, then `-2`, `-3`… Deleted rows move to
   `.vellum/trash/collections/<collection>/<row>.md`.
 - When two folders share a collection ID, the older `schema.yaml` keeps
@@ -113,7 +114,9 @@ each request through an access port backed by authorization.
   `not_found`.
 - Editing also needs edit access to the other side of each two-way
   relation, because the engine mirrors links into those row files.
-- Row writes need the `write:direct` scope; reads need `read`. Creating
+- Saving or deleting a view changes only `schema.yaml`, so it needs edit
+  access to that collection alone.
+- Writes need the `write:direct` scope; reads need `read`. Creating
   a collection from CSV needs edit access to the drive folder.
 
 ### D134: `vellum-collections` is a service-layer crate
@@ -137,7 +140,9 @@ each request through an access port backed by authorization.
 
 - The web app calls `collections.list`, `get`, `query`, `get_row` and
   the row writes, with JSON Schema for every input and output.
-- Render, an engine crate, cannot depend on this one; it resolves
-  `collection` fences and charts through a port this service implements.
+- Pages show `collection` blocks and `source=collection:` charts live
+  through `collections.embed` and `collections.chart`, checked as the
+  reader. A bad block is a readable `invalid_input` the page shows in
+  place; an unreadable collection is `not_found`, never shown.
 - Still to come: pushing computed rows to the index and search (D73),
   saving views, CSV and embed operations (#128 to #132).

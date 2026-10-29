@@ -20,7 +20,7 @@ use vellum_store::{BlobPath, BlobStore, Etag, Precondition, StoreError};
 use crate::error::Diagnostic;
 use crate::row::{Row, slug};
 use crate::schema::Schema;
-use crate::workspace::{Changeset, Collection, ROWS_DIR, RowRef, Workspace};
+use crate::workspace::{Changeset, Collection, ROWS_DIR, RowRef, SCHEMA_FILE, Workspace};
 
 /// Most row files one collection folder may hold.
 pub const MAX_ROWS_PER_COLLECTION: usize = 100_000;
@@ -32,6 +32,8 @@ pub const MAX_FILE_BYTES: u64 = 4 * 1024 * 1024;
 pub struct Folder {
     /// The `name.collection` directory.
     pub path: BlobPath,
+    /// The `schema.yaml` file and the etag it was read or written at.
+    pub schema: (BlobPath, Etag),
     /// Each row's file and the etag it was read or written at.
     pub rows: BTreeMap<DocId, (BlobPath, Etag)>,
     /// Problems found while loading.
@@ -101,7 +103,8 @@ impl State {
         let mut state = Self::default();
         let mut total_rows = 0;
         for (dir, schema_path, size, _) in schemas {
-            let Some((schema_text, _)) = read_text(store, &schema_path, size).await? else {
+            let Some((schema_text, schema_etag)) = read_text(store, &schema_path, size).await?
+            else {
                 continue;
             };
             let schema = match Schema::from_yaml(&schema_text) {
@@ -126,6 +129,7 @@ impl State {
             row_files.sort_by(|a, b| a.path.cmp(&b.path));
             let mut folder = Folder {
                 path: dir.clone(),
+                schema: (schema_path.clone(), schema_etag),
                 rows: BTreeMap::new(),
                 diagnostics: Vec::new(),
             };
@@ -232,11 +236,8 @@ impl State {
         collection: Collection,
     ) -> Result<(), Error> {
         let names = collection.file_names();
-        let mut folder = Folder {
-            path: dir.clone(),
-            rows: BTreeMap::new(),
-            diagnostics: Vec::new(),
-        };
+        let mut rows = BTreeMap::new();
+        let mut schema = None;
         let by_name: BTreeMap<&String, DocId> = names.iter().map(|(id, n)| (n, *id)).collect();
         for (rel, text) in collection.files()? {
             let path = dir.join(&rel).map_err(store_error)?;
@@ -254,12 +255,49 @@ impl State {
                 Err(e) => return Err(store_error(e)),
             };
             if let Some(id) = by_name.get(&rel) {
-                let _ = folder.rows.insert(*id, (path, meta.etag));
+                let _ = rows.insert(*id, (path, meta.etag));
+            } else if rel == SCHEMA_FILE {
+                schema = Some((path, meta.etag));
             }
         }
+        let schema = schema.ok_or_else(|| {
+            Error::new(ErrorKind::Internal, "the new collection has no schema.yaml")
+        })?;
+        let folder = Folder {
+            path: dir,
+            schema,
+            rows,
+            diagnostics: Vec::new(),
+        };
         let id = collection.id();
         self.ws.insert(collection)?;
         let _ = self.folders.insert(id, folder);
+        Ok(())
+    }
+
+    /// Rewrites a collection's `schema.yaml` from the loaded schema, if
+    /// the file still has the etag it was read at.
+    pub async fn write_schema(
+        &mut self,
+        store: &dyn BlobStore,
+        id: CollectionId,
+    ) -> Result<(), Error> {
+        let text = self
+            .ws
+            .collection(id)
+            .ok_or_else(|| Error::new(ErrorKind::NotFound, format!("collection {id} not found")))?
+            .schema()
+            .to_yaml()?;
+        let folder = self
+            .folders
+            .get_mut(&id)
+            .ok_or_else(|| Error::new(ErrorKind::NotFound, format!("collection {id} not found")))?;
+        let (path, etag) = folder.schema.clone();
+        let meta = store
+            .put(&path, Bytes::from(text), Precondition::IfMatch(etag))
+            .await
+            .map_err(store_error)?;
+        folder.schema = (path, meta.etag);
         Ok(())
     }
 

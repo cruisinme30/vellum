@@ -13,8 +13,8 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use serde_json::json;
 use vellum_collections::service::{
-    Access, CollectionsService, CreateFromCsvInput, CreateRowInput, ExportCsvInput, ImportCsvInput,
-    Need, QueryInput, RowKey, UpdateRowInput,
+    Access, ChartInput, CollectionsService, CreateFromCsvInput, CreateRowInput, ExportCsvInput,
+    ImportCsvInput, Need, QueryInput, RowKey, SaveViewInput, UpdateRowInput, ViewKey,
 };
 use vellum_collections::{DateValue, Value, ViewKind};
 use vellum_contracts::{
@@ -652,6 +652,10 @@ async fn operations_are_valid_and_callable() {
             "collections.create_row",
             "collections.update_row",
             "collections.delete_row",
+            "collections.save_view",
+            "collections.delete_view",
+            "collections.embed",
+            "collections.chart",
             "collections.export_csv",
             "collections.import_csv",
             "collections.create_from_csv"
@@ -705,6 +709,244 @@ async fn operations_are_valid_and_callable() {
         .await
         .unwrap_err();
     assert_eq!(err.kind(), ErrorKind::InvalidInput);
+}
+
+#[tokio::test]
+async fn resolves_embedded_views_live() {
+    let f = fixture().await;
+    let ana = UserId::generate();
+    f.grants.grant(ana, REQS, Need::Edit);
+    f.grants.grant(ana, RELS, Need::Edit);
+    let c = ctx(ana);
+    let fence = format!("id: {REQS}\nview: Open\ntype: board\nsort: Estimate desc\n");
+    let embed = f.service.resolve_embed(&c.principal, &fence).await.unwrap();
+    assert_eq!(embed.title, "Requirements");
+    assert_eq!(embed.path, REQS_DIR);
+    assert_eq!(embed.result.kind, ViewKind::Board);
+    let titles = |r: &vellum_collections::ViewResult| -> Vec<String> {
+        r.groups
+            .iter()
+            .flat_map(|g| &g.rows)
+            .map(|row| row.title.clone())
+            .collect()
+    };
+    assert_eq!(titles(&embed.result), ["Webhooks"]);
+
+    // Live: a row edit shows up in the next resolve.
+    let _ = f
+        .service
+        .create_row(
+            &c,
+            CreateRowInput {
+                collection_id: REQS.parse().unwrap(),
+                values: BTreeMap::from([
+                    ("t".to_owned(), Value::Text("SSO".into())),
+                    ("est".to_owned(), Value::Number(13.0)),
+                ]),
+                body: String::new(),
+            },
+        )
+        .await
+        .unwrap();
+    let embed = f.service.resolve_embed(&c.principal, &fence).await.unwrap();
+    assert_eq!(titles(&embed.result), ["SSO", "Webhooks"]);
+
+    let bad = |body: &str| {
+        let s = f.service.clone();
+        let p = c.principal.clone();
+        let body = body.to_owned();
+        async move { s.resolve_embed(&p, &body).await.unwrap_err() }
+    };
+    let e = bad("id: nope\n").await;
+    assert_eq!(e.kind(), ErrorKind::InvalidInput);
+    let e = bad(&format!("id: {REQS}\nview: Missing\n")).await;
+    assert_eq!(e.kind(), ErrorKind::InvalidInput);
+    assert!(e.to_string().contains("no view named"), "{e}");
+    let e = bad(&format!("id: {REQS}\ncolour: red\n")).await;
+    assert_eq!(e.kind(), ErrorKind::InvalidInput);
+    // A collection the reader cannot see is not found, never shown.
+    let e = bad(&format!("id: {SECRET}\n")).await;
+    assert_eq!(e.kind(), ErrorKind::NotFound);
+}
+
+#[tokio::test]
+async fn charts_read_collections() {
+    let f = fixture().await;
+    let ana = UserId::generate();
+    f.grants.grant(ana, REQS, Need::Read);
+    f.grants.grant(ana, RELS, Need::Read);
+    let p = ctx(ana).principal;
+    let chart = |y: Option<&str>, agg: Option<&str>| ChartInput {
+        source: format!("collection:{REQS}"),
+        view: None,
+        x: "Done".into(),
+        y: y.map(str::to_owned),
+        series: None,
+        agg: agg.map(str::to_owned),
+    };
+    let sums = f
+        .service
+        .resolve_chart(&p, chart(Some("Estimate"), None))
+        .await
+        .unwrap();
+    assert_eq!(sums.categories.len(), 2);
+    let total: f64 = sums.series.iter().flat_map(|s| &s.values).sum();
+    assert!((total - 13.0).abs() < f64::EPSILON, "{sums:?}");
+    let counts = f
+        .service
+        .resolve_chart(&p, chart(None, None))
+        .await
+        .unwrap();
+    let rows: f64 = counts.series.iter().flat_map(|s| &s.values).sum();
+    assert!((rows - 2.0).abs() < f64::EPSILON, "{counts:?}");
+
+    assert_eq!(
+        kind(f.service.resolve_chart(&p, chart(Some("Nope"), None)).await),
+        ErrorKind::InvalidInput
+    );
+    assert_eq!(
+        kind(
+            f.service
+                .resolve_chart(&p, chart(None, Some("median")))
+                .await
+        ),
+        ErrorKind::InvalidInput
+    );
+    let mut csv = chart(None, None);
+    csv.source = "csv:data.csv".into();
+    assert_eq!(
+        kind(f.service.resolve_chart(&p, csv).await),
+        ErrorKind::InvalidInput
+    );
+    let mut hidden = chart(None, None);
+    hidden.source = format!("collection:{SECRET}");
+    assert_eq!(
+        kind(f.service.resolve_chart(&p, hidden).await),
+        ErrorKind::NotFound
+    );
+}
+
+#[cfg(test)]
+fn board(name: &str) -> SaveViewInput {
+    SaveViewInput {
+        collection_id: REQS.parse().unwrap(),
+        view: name.into(),
+        rename_to: None,
+        kind: Some(ViewKind::Board),
+        filter: vec!["Estimate > 1".into()],
+        sort: vec!["Requirement asc".into()],
+        group: Some("Done".into()),
+        hide: vec!["Remaining".into()],
+        date: None,
+        end: None,
+        limit: Some(20),
+    }
+}
+
+#[tokio::test]
+async fn saves_renames_and_deletes_views() {
+    let f = fixture().await;
+    let ana = UserId::generate();
+    f.grants.grant(ana, REQS, Need::Edit);
+    f.grants.grant(ana, RELS, Need::Read);
+    let c = ctx(ana);
+    let schema_path = format!("{REQS_DIR}/schema.yaml");
+
+    // A new view is added at the end and written to schema.yaml by key.
+    let info = f.service.save_view(&c, board("By status")).await.unwrap();
+    let names: Vec<&str> = info.views.iter().map(|v| v.name.as_str()).collect();
+    assert_eq!(names, ["All", "Open", "By status"]);
+    let saved = &info.views[2];
+    assert_eq!(saved.kind, ViewKind::Board);
+    assert_eq!(saved.group.as_deref(), Some("dn"));
+    assert_eq!(saved.hidden, ["left"]);
+    let yaml = read(&f.root, &schema_path);
+    assert!(yaml.contains("By status"), "{yaml}");
+    assert!(yaml.contains("group: dn"), "{yaml}");
+
+    // Saving the same name (any case) replaces it; renaming keeps its place.
+    let mut again = board("by STATUS");
+    again.kind = Some(ViewKind::Gallery);
+    again.rename_to = Some("Cards".into());
+    let info = f.service.save_view(&c, again).await.unwrap();
+    let names: Vec<&str> = info.views.iter().map(|v| v.name.as_str()).collect();
+    assert_eq!(names, ["All", "Open", "Cards"]);
+    assert_eq!(info.views[2].kind, ViewKind::Gallery);
+
+    // Queries use the saved view.
+    let q = QueryInput {
+        collection_id: REQS.parse().unwrap(),
+        view: Some("cards".into()),
+        kind: None,
+        filter: Vec::new(),
+        sort: Vec::new(),
+        group: None,
+        hide: Vec::new(),
+        limit: None,
+    };
+    assert_eq!(
+        f.service.query(&c, q).await.unwrap().kind,
+        ViewKind::Gallery
+    );
+
+    // Bad input and name clashes are rejected.
+    let mut clash = board("Cards");
+    clash.rename_to = Some("open".into());
+    assert_eq!(
+        kind(f.service.save_view(&c, clash).await),
+        ErrorKind::Conflict
+    );
+    let mut bad = board("Broken");
+    bad.filter = vec!["Nope = 1".into()];
+    assert_eq!(
+        kind(f.service.save_view(&c, bad).await),
+        ErrorKind::InvalidInput
+    );
+    assert_eq!(
+        kind(f.service.save_view(&c, board("  ")).await),
+        ErrorKind::InvalidInput
+    );
+
+    let key = |view: &str| ViewKey {
+        collection_id: REQS.parse().unwrap(),
+        view: view.into(),
+    };
+    let info = f.service.delete_view(&c, key("CARDS")).await.unwrap();
+    assert_eq!(info.views.len(), 2);
+    assert!(!read(&f.root, &schema_path).contains("Cards"));
+    assert_eq!(
+        kind(f.service.delete_view(&c, key("Cards")).await),
+        ErrorKind::NotFound
+    );
+
+    // Saving views needs edit access to this collection only.
+    let bo = UserId::generate();
+    f.grants.grant(bo, REQS, Need::Read);
+    f.grants.grant(bo, RELS, Need::Read);
+    assert_eq!(
+        kind(f.service.save_view(&ctx(bo), board("Mine")).await),
+        ErrorKind::PermissionDenied
+    );
+}
+
+#[tokio::test]
+async fn a_schema_changed_on_disk_is_not_overwritten() {
+    let f = fixture().await;
+    let ana = UserId::generate();
+    f.grants.grant(ana, REQS, Need::Edit);
+    f.grants.grant(ana, RELS, Need::Edit);
+    let c = ctx(ana);
+    let _ = f.service.list(&c).await.unwrap();
+    let schema_path = format!("{REQS_DIR}/schema.yaml");
+    let edited = read(&f.root, &schema_path).replace("title: Requirements", "title: Reqs");
+    write(&f.root, &schema_path, &edited);
+    assert_eq!(
+        kind(f.service.save_view(&c, board("Board")).await),
+        ErrorKind::Conflict
+    );
+    assert_eq!(read(&f.root, &schema_path), edited);
+    let info = f.service.save_view(&c, board("Board")).await.unwrap();
+    assert_eq!(info.title, "Reqs");
 }
 
 #[tokio::test]
