@@ -198,8 +198,8 @@ fn csrf_key_file(data_dir: &Path) -> Result<Vec<u8>, Error> {
 pub fn app_gateway(services: &services::Services, config: GatewayConfig) -> Result<Gateway, Error> {
     services
         .mount(GatewayBuilder::new(config, services::VERSION))
-        // `Services::mount` adds live editing at `/collab`; the web app's
-        // fallback never answers there.
+        // Live editing is mounted at `/collab` with the services (#415);
+        // the web app's fallback never answers there.
         .web_app(web::router(web::embedded()))
         .build()
 }
