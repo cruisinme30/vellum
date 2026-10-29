@@ -13,6 +13,8 @@ import { I18nProvider } from "../i18n/i18n";
 import { createHttpWorkApi, type MyWorkView, type WorkApi } from "./api";
 import { MyWorkPage } from "./my-work-page";
 
+// eslint-disable-next-line unicorn/no-null -- the API reads null as "the server's zone"
+const NONE = null;
 const EMPTY = { sections: [] } as unknown as MyWorkView;
 
 function renderAt(path: string, api: WorkApi) {
@@ -32,7 +34,17 @@ function renderAt(path: string, api: WorkApi) {
 }
 
 function fakeApi(linkSlack: WorkApi["linkSlack"]): WorkApi {
-  return { myWork: () => Promise.resolve(EMPTY), linkSlack } as unknown as WorkApi;
+  return {
+    myWork: () => Promise.resolve(EMPTY),
+    settings: () =>
+      Promise.resolve({
+        time_zone: NONE,
+        effective_time_zone: "UTC",
+        day_starts_at: "09:00",
+        digest_at: "07:30",
+      }),
+    linkSlack,
+  } as unknown as WorkApi;
 }
 
 describe("linking Slack from Save as task", () => {

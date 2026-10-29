@@ -533,6 +533,41 @@ pub fn append_to_inbox(inbox: &str, capture: &Capture) -> Option<(String, BlockI
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn slack_link_codes_are_signed_bound_and_expire() {
+        let now = Timestamp::from_second(1_800_000_000).unwrap_or(Timestamp::UNIX_EPOCH);
+        let code = slack_link_code(b"secret", "T01", "U01", now);
+        assert_eq!(
+            read_slack_link_code(b"secret", &code, now),
+            Ok(("T01".to_owned(), "U01".to_owned()))
+        );
+        let forged = code.replacen("U01", "U02", 1);
+        assert!(
+            read_slack_link_code(b"secret", &forged, now).is_err(),
+            "bound to the user"
+        );
+        assert!(
+            read_slack_link_code(b"other", &code, now).is_err(),
+            "bound to the secret"
+        );
+        let later = now.checked_add(SLACK_LINK_TTL + jiff::SignedDuration::from_secs(1));
+        assert!(
+            read_slack_link_code(b"secret", &code, later.unwrap_or(now)).is_err(),
+            "expires"
+        );
+        for junk in [
+            "",
+            "a.b.c",
+            "T01.U01.x.y",
+            "T 1.U01.1.00000000000000000000000000000000",
+        ] {
+            assert!(
+                read_slack_link_code(b"secret", junk, now).is_err(),
+                "{junk}"
+            );
+        }
+    }
     use jiff::civil::date;
 
     fn now() -> DateTime {
