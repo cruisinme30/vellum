@@ -15,6 +15,7 @@ use serde_json::json;
 use vellum_crypto::{CryptoError, KekId, KeyProvider, SecretKey, WrappedDek};
 use zeroize::Zeroizing;
 
+use crate::aws_credentials::AwsCredentialProvider;
 use crate::http::{self, b64, unb64};
 use crate::sigv4;
 
@@ -25,9 +26,9 @@ const CONTEXT_KEY: &str = "vellum";
 /// Credentials for signing requests.
 #[derive(Clone)]
 pub struct AwsCredentials {
-    access_key_id: String,
-    secret_access_key: Zeroizing<String>,
-    session_token: Option<Zeroizing<String>>,
+    pub(crate) access_key_id: String,
+    pub(crate) secret_access_key: Zeroizing<String>,
+    pub(crate) session_token: Option<Zeroizing<String>>,
 }
 
 impl fmt::Debug for AwsCredentials {
@@ -74,7 +75,7 @@ impl AwsCredentials {
 #[derive(Debug)]
 pub struct AwsKms {
     client: reqwest::Client,
-    credentials: AwsCredentials,
+    credentials: AwsCredentialProvider,
     /// Overrides the regional endpoint (VPC endpoints, tests).
     endpoint: Option<String>,
     current: KekId,
@@ -82,7 +83,9 @@ pub struct AwsKms {
 
 impl AwsKms {
     /// A provider whose current KEK is `key_id` (a key id, key ARN or alias
-    /// ARN) in `region`.
+    /// ARN) in `region`. Pass [`AwsCredentials`] for fixed keys, or an
+    /// [`AwsCredentialProvider`] (usually [`AwsCredentialProvider::from_env`])
+    /// for role credentials without static keys.
     ///
     /// # Errors
     /// [`CryptoError::InvalidKekId`] if the region or key id contain
@@ -90,11 +93,11 @@ impl AwsKms {
     pub fn new(
         region: &str,
         key_id: &str,
-        credentials: AwsCredentials,
+        credentials: impl Into<AwsCredentialProvider>,
     ) -> Result<Self, CryptoError> {
         Ok(Self {
             client: http::client()?,
-            credentials,
+            credentials: credentials.into(),
             endpoint: None,
             current: kek_id(region, key_id)?,
         })
@@ -127,6 +130,7 @@ impl AwsKms {
             .unwrap_or_default()
             .to_owned();
         let body = http::to_json(BACKEND, body)?;
+        let credentials = self.credentials.credentials().await?;
         let amz_date = sigv4::amz_date_now();
         let target = format!("TrentService.{target}");
         let mut headers = vec![
@@ -135,7 +139,7 @@ impl AwsKms {
             ("x-amz-date", amz_date.as_str()),
             ("x-amz-target", target.as_str()),
         ];
-        if let Some(token) = &self.credentials.session_token {
+        if let Some(token) = &credentials.session_token {
             headers.push(("x-amz-security-token", token.as_str()));
         }
         let authorization = sigv4::authorization(
@@ -150,8 +154,8 @@ impl AwsKms {
                 amz_date: &amz_date,
                 region,
                 service: "kms",
-                access_key_id: &self.credentials.access_key_id,
-                secret_access_key: &self.credentials.secret_access_key,
+                access_key_id: &credentials.access_key_id,
+                secret_access_key: &credentials.secret_access_key,
             },
         )?;
         let mut request = self.client.post(format!("{endpoint}/")).body(body);
