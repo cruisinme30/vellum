@@ -21,7 +21,7 @@ export interface AuthStatus {
 }
 
 /** The first administrator's details (`SetupInput`). */
-export interface SetupInput {
+interface SetupInput {
   readonly name: string;
   readonly email: string;
   /** At least 12 characters. */
