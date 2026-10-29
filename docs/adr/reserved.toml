@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Decision record and decision numbers handed out before the record is on
+# a pushed branch (ADR 0049, D216). `cargo xtask adr next` treats them as
+# taken, and scripts/ci/check-adrs.sh fails when two reservations overlap.
+# One [[reservation]] per holder. `decisions` is "DNNN" or "DNNN-DNNN";
+# `adrs`, when present, is "NNNN" or "NNNN-NNNN". A reservation can stay
+# after its record lands; it only keeps the numbers from being reused.
+
+[[reservation]]
+decisions = "D205-D213"
+holder = "collections (D205-D207), desktop (D208-D210), upload route (D211-D213)"
+
+[[reservation]]
+decisions = "D217-D261"
+holder = "16 threads, allocated by the coordinator on 2026-10-29; see the project memory registry"

@@ -21,6 +21,7 @@ use std::process::Command;
 
 const USAGE: &str = "usage: cargo xtask adr <next | new <slug> [--decisions N] [--issue N]>";
 const TEMPLATE: &str = "docs/adr/0000-template.md";
+const RESERVED: &str = "docs/adr/reserved.toml";
 
 /// Numbers already taken.
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -36,6 +37,21 @@ impl Taken {
 
     fn next_decision(&self) -> u32 {
         self.decisions.last().map_or(1, |last| last + 1)
+    }
+
+    /// Adds the ranges in `docs/adr/reserved.toml`.
+    fn reserve(&mut self, text: &str) {
+        for line in text.lines() {
+            let Some((key, value)) = line.split_once('=') else {
+                continue;
+            };
+            let value = value.trim().trim_matches('"');
+            match key.trim() {
+                "decisions" => self.decisions.extend(range(value.trim_start_matches('D'))),
+                "adrs" => self.adrs.extend(range(value)),
+                _ => {}
+            }
+        }
     }
 
     /// Adds one record, given its file name and contents.
@@ -186,6 +202,10 @@ fn taken_everywhere() -> Result<Taken, String> {
         }
     }
 
+    if let Ok(text) = std::fs::read_to_string(root.join(RESERVED)) {
+        taken.reserve(&text);
+    }
+
     // Every record on every branch, read once per distinct blob.
     let refs = git(&["for-each-ref", "--format=%(refname)", "refs/remotes/origin"])?;
     let mut blobs = BTreeMap::new();
@@ -213,6 +233,18 @@ fn taken_everywhere() -> Result<Taken, String> {
         }
     }
     Ok(taken)
+}
+
+/// The numbers in "N" or "N-N" (a second "D" is allowed: "D217-D261").
+fn range(value: &str) -> Vec<u32> {
+    let (first, last) = value.split_once('-').unwrap_or((value, value));
+    match (
+        first.trim().parse::<u32>(),
+        last.trim().trim_start_matches('D').parse::<u32>(),
+    ) {
+        (Ok(first), Ok(last)) if first <= last && last - first < 1000 => (first..=last).collect(),
+        _ => Vec::new(),
+    }
 }
 
 /// The number in `NNNN-slug.md`.
@@ -315,6 +347,17 @@ mod tests {
         taken.add("0043-e2e.md", "- Decisions: D210\n");
         taken.add("README.md", "- Decisions: D999\n");
         assert_eq!((taken.next_adr(), taken.next_decision()), (49, 211));
+    }
+
+    #[test]
+    fn reservations_count_as_taken() {
+        let mut taken = Taken::default();
+        taken.add("0049-x.md", "- Decisions: D214, D215, D216\n");
+        taken.reserve(
+            "# note = \"D999\"\n[[reservation]]\ndecisions = \"D217-D261\"\n\
+             holder = \"16 threads\"\n[[reservation]]\nadrs = \"0050-0051\"\n",
+        );
+        assert_eq!((taken.next_adr(), taken.next_decision()), (52, 262));
     }
 
     #[test]

@@ -58,6 +58,9 @@ Threads also stopped work to ask the coordinator for ADR and D numbers.
   `docs/adr/` in the working tree and on every branch on `origin`.
 - `cargo xtask adr new <slug> --decisions N --issue N` starts a record
   from the template with those numbers. Pushing the branch claims them.
+- `docs/adr/reserved.toml` lists numbers handed out before any branch
+  holds them (D205-D213 and D217-D261 today). The tool counts them as
+  taken, and the check fails when two reservations overlap.
 - `scripts/ci/check-adrs.sh` fails when two records share an ADR number
   or a D number, so collisions between branches fail the integration
   batch before they reach develop.
