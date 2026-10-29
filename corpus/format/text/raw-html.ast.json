@@ -1,0 +1,58 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Raw HTML is shown as text: <b>bold</b> stays literal."
+          }
+        ],
+        "id": null
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "<div class=\"note\">"
+          },
+          {
+            "type": "soft_break"
+          },
+          {
+            "type": "text",
+            "text": "Never interpreted."
+          },
+          {
+            "type": "soft_break"
+          },
+          {
+            "type": "text",
+            "text": "</div>"
+          }
+        ],
+        "id": null
+      }
+    ]
+  },
+  "diagnostics": [
+    {
+      "line": 1,
+      "code": "raw_html",
+      "message": "raw HTML is not part of Vellum Markdown; it is shown as text"
+    },
+    {
+      "line": 1,
+      "code": "raw_html",
+      "message": "raw HTML is not part of Vellum Markdown; it is shown as text"
+    },
+    {
+      "line": 3,
+      "code": "raw_html",
+      "message": "raw HTML is not part of Vellum Markdown; it is shown as text"
+    }
+  ]
+}
