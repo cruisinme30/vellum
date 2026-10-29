@@ -7056,6 +7056,7 @@ dependencies = [
  "tracing",
  "tract-onnx",
  "uuid",
+ "vellum-authz",
  "vellum-contracts",
  "vellum-kernel",
  "zeroize",
