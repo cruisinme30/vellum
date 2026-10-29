@@ -44,6 +44,9 @@ use vellum_drive::authz::{AuthzAccess as DriveAuthzAccess, TreeSync};
 use vellum_drive::{Drive, DriveIndex, DriveService};
 use vellum_identity::Identity;
 use vellum_kernel::{Config, Error, ErrorKind, UserId};
+use vellum_notify::endpoint::SafeTransport;
+use vellum_notify::hooks::Webhooks;
+use vellum_notify::mail::Mailer;
 use vellum_notify::service::NotifyStore;
 use vellum_store::remote::s3::{S3Config, S3Store};
 use vellum_store::{BlobPath, BlobStore, LocalStore, Metered, StoreError};
@@ -758,6 +761,55 @@ fn task_jobs(
     Ok(())
 }
 
+/// Starts the notifier on this replica and its delivery timer on one
+/// replica of the cluster.
+fn notify_on_one_replica(
+    replica: &Replica,
+    queued: tokio::sync::mpsc::Receiver<vellum_work::WorkEvent>,
+    work: &Arc<WorkService>,
+    (identity, notify, webhooks): (
+        &Arc<Identity>,
+        &Arc<NotifyStore>,
+        &Arc<Webhooks<SafeTransport>>,
+    ),
+    var: impl Fn(&str) -> Option<String>,
+) -> Result<(), Error> {
+    let delivery = delivery(identity, notify, webhooks, var)?;
+    let ticker = crate::notifications::start(
+        queued,
+        Arc::clone(work),
+        Arc::clone(identity),
+        Arc::clone(notify),
+        delivery,
+    )?;
+    replica.every("notify.deliver", crate::notifications::TICK, move || {
+        let ticker = ticker.clone();
+        async move { ticker.run().await }
+    });
+    Ok(())
+}
+
+/// Webhooks and email for the notifier. With a mail server configured,
+/// email is turned on for every dispatcher over the notify store.
+fn delivery(
+    identity: &Arc<Identity>,
+    notify: &Arc<NotifyStore>,
+    webhooks: &Arc<Webhooks<SafeTransport>>,
+    var: impl Fn(&str) -> Option<String>,
+) -> Result<crate::notifications::Delivery, Error> {
+    let mail = crate::mail::setup(var, identity.config().public_url.as_str())?.map(
+        |(outbound, config)| {
+            notify.enable_email();
+            Arc::new(Mailer::new(Arc::clone(notify), outbound, config))
+        },
+    );
+    Ok(crate::notifications::Delivery {
+        webhooks: Arc::clone(webhooks),
+        mail,
+        people: Arc::new(crate::mail::People::new(Arc::clone(identity))),
+    })
+}
+
 /// Opens the workspace services for `config`, or returns none (with a
 /// warning) when no index is configured.
 ///
@@ -765,10 +817,15 @@ fn task_jobs(
 ///
 /// An unreachable database, a wrong key, an unreadable data folder or
 /// invalid integration settings.
+#[expect(
+    clippy::too_many_lines,
+    reason = "the composition root wires every workspace service in order"
+)]
 pub async fn open(
     config: &Config,
     identity: &Arc<Identity>,
     notify: &Arc<NotifyStore>,
+    webhooks: &Arc<Webhooks<SafeTransport>>,
     app_origin: &str,
     var: impl Fn(&str) -> Option<String> + Send + Sync,
 ) -> Result<Opened, Error> {
@@ -816,11 +873,12 @@ pub async fn open(
         setup,
     )
     .await?;
-    crate::notifications::start(
+    notify_on_one_replica(
+        &replica,
         queued,
-        Arc::clone(&workspace.work),
-        Arc::clone(identity),
-        Arc::clone(notify),
+        &workspace.work,
+        (identity, notify, webhooks),
+        &var,
     )?;
     // The watcher starts before the rescan, so nothing edited in between
     // is missed; whatever it sees twice is applied idempotently.

@@ -199,3 +199,85 @@
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
+
+/* Webhooks. */
+.vl-admin-hooks {
+  display: grid;
+  gap: 16px;
+  margin: 16px 0 24px;
+  padding: 0;
+  list-style: none;
+}
+
+.vl-admin-hook {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--md-outline);
+  border-radius: 8px;
+}
+
+.vl-admin-hook-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.vl-admin-hook-what {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.vl-admin-hook-url {
+  overflow-wrap: anywhere;
+}
+
+.vl-admin-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.vl-admin-form .vl-admin-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.vl-admin-secret {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 12px 16px;
+  border: 1px solid var(--md-primary);
+  border-radius: 8px;
+}
+
+.vl-admin-secret p {
+  margin: 0;
+}
+
+.vl-admin-secret-value {
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.vl-admin-ok {
+  color: var(--md-primary);
+}
+
+.vl-admin-bad {
+  color: var(--md-error);
+}
+
+.vl-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

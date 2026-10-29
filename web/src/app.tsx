@@ -10,6 +10,7 @@ import { BackupsPage } from "./admin/console/backups-page";
 import { AdminConsoleProvider } from "./admin/console/context";
 import { SettingsPage } from "./admin/console/settings-page";
 import { UsagePage } from "./admin/console/usage-page";
+import { WebhooksPage } from "./admin/console/webhooks-page";
 import { RequestsPage } from "./admin/requests/requests-page";
 import { RoutesPage } from "./admin/routes/routes-page";
 import type { AuthApi, AuthStatus } from "./api/auth";
@@ -103,6 +104,7 @@ export function AppRoutes() {
         <Route path="admin/audit" element={<AuditPage />} />
         <Route path="admin/settings" element={<SettingsPage />} />
         <Route path="admin/backups" element={<BackupsPage />} />
+        <Route path="admin/webhooks" element={<WebhooksPage />} />
         <Route path="*" element={<NotFoundView />} />
       </Route>
     </Routes>

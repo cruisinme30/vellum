@@ -19,6 +19,8 @@ mod admin;
 mod backup_cli;
 mod cluster;
 mod collab;
+#[cfg(test)]
+mod delivery_tests;
 mod docs;
 mod e2e;
 mod feed;
@@ -31,6 +33,7 @@ mod identity_tests;
 mod integrations;
 mod keys;
 mod limits;
+mod mail;
 mod mcp;
 mod notifications;
 mod observability;

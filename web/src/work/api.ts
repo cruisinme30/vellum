@@ -52,6 +52,11 @@ export interface WorkApi {
   /** An issue's comments, oldest first, across its threads. */
   comments(key: string): Promise<CommentOut[]>;
   addComment(key: string, body: string): Promise<void>;
+  /**
+   * Links the Slack account behind a code from Slack's "Save as task"
+   * reply to the signed-in person (#163). Absent in demo mode.
+   */
+  linkSlack?(code: string): Promise<void>;
 }
 
 const WORK = "/api/v1/work";
@@ -62,6 +67,9 @@ const issuePath = (key: string) => `${WORK}/issues/${segment(key)}`;
 export function createHttpWorkApi(http: Http): WorkApi {
   return {
     myWork: () => http.get<MyWorkView>("/api/v1/my-work"),
+    async linkSlack(code) {
+      await http.send("POST", "/api/v1/my-work/slack-link", { code });
+    },
     addTask: (text) => http.send<TaskView>("POST", "/api/v1/tasks", { text }),
     async setDone(task, done) {
       const path = `/api/v1/tasks/${segment(task)}`;
