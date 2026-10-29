@@ -45,6 +45,7 @@ url = "2.5.8"
 uuid = "1.29.0"
 vellum-admin = { path = "../vellum-admin" }
 vellum-api = { path = "../vellum-api" }
+vellum-assist = { path = "../vellum-assist" }
 vellum-authz = { path = "../vellum-authz" }
 vellum-books = { path = "../vellum-books" }
 vellum-books-service = { path = "../vellum-books-service" }

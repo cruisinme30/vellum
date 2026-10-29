@@ -1,0 +1,145 @@
+/* SPDX-FileCopyrightText: 2026 The Vellum contributors */
+/* SPDX-License-Identifier: AGPL-3.0-only */
+
+/* The assistant: a side panel like version history, the ask page and the
+   MCP setup snippets. */
+.vl-assist-panel {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-end: 0;
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+  width: min(440px, 100vw);
+  padding: 16px 24px 32px;
+  overflow-y: auto;
+  background: var(--md-surface-container-low);
+  color: var(--md-on-surface);
+  box-shadow: -2px 0 12px rgb(0 0 0 / 20%);
+}
+
+.vl-assist-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.vl-assist-panel-head h2 {
+  margin: 6px 0 4px;
+  font-size: 1.5rem;
+  font-weight: 400;
+}
+
+.vl-assist-subhead {
+  margin: 16px 0 8px;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.vl-assist-ask {
+  display: grid;
+  gap: 8px;
+  max-width: 720px;
+}
+
+.vl-assist-ask label {
+  display: grid;
+  gap: 4px;
+  font-size: 0.875rem;
+}
+
+.vl-assist-ask textarea,
+.vl-assist-ask input,
+.vl-assist-ask select,
+.vl-admin-form select {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--md-outline);
+  border-radius: 4px;
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+  font: inherit;
+}
+
+.vl-assist-ask textarea {
+  resize: vertical;
+}
+
+.vl-assist-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.vl-assist-check {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+}
+
+.vl-assist-answer {
+  max-width: 720px;
+  overflow-wrap: anywhere;
+}
+
+.vl-assist-sources {
+  display: grid;
+  gap: 8px;
+  padding-inline-start: 24px;
+}
+
+.vl-assist-sources p {
+  margin: 2px 0 0;
+  font-size: 0.875rem;
+}
+
+.vl-assist-meta {
+  font-size: 0.8rem;
+}
+
+.vl-mcp-snippets {
+  display: grid;
+  gap: 16px;
+  max-width: 820px;
+  padding: 0;
+  list-style: none;
+}
+
+.vl-mcp-snippet {
+  display: grid;
+  gap: 8px;
+  padding: 12px 16px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--vl-radius-m, 12px);
+}
+
+.vl-mcp-snippet h2 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 500;
+}
+
+.vl-mcp-snippet pre {
+  margin: 0;
+  padding: 12px;
+  overflow-x: auto;
+  border-radius: 8px;
+  background: var(--md-surface-container-highest);
+  font-family: var(--vl-font-mono, monospace);
+  font-size: 0.8125rem;
+  white-space: pre;
+}
+
+.vl-mcp-checks {
+  display: grid;
+  gap: 4px;
+  padding-inline-start: 0;
+  list-style: none;
+}

@@ -16,6 +16,7 @@
 //! to another shard.
 
 mod admin;
+mod assist;
 mod backup_cli;
 mod cluster;
 mod collab;

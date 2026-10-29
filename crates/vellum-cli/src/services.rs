@@ -83,6 +83,8 @@ pub struct Services {
     scanner: Option<Arc<Clamd>>,
     /// Secret scanning on save, following the admin settings (D296).
     secrets: Arc<crate::secrets::SecretGuard>,
+    /// Bring-your-own-model features, when the MCP workspace is wired.
+    assist: Option<Arc<dyn Service>>,
 }
 
 impl std::fmt::Debug for Services {
@@ -95,6 +97,7 @@ impl std::fmt::Debug for Services {
             .field("hooks", &self.hooks.is_some())
             .field("admin", &self.admin.is_some())
             .field("mcp", &self.mcp.is_some())
+            .field("assist", &self.assist.is_some())
             .finish_non_exhaustive()
     }
 }
@@ -192,6 +195,7 @@ impl Services {
             drive: None,
             scanner: None,
             secrets: Arc::default(),
+            assist: None,
         })
     }
 
@@ -224,6 +228,19 @@ impl Services {
         self.admin_audit = Some(service.audit_log());
         self.admin = Some(observability::api(service, facts));
         self.observability = observability;
+        Ok(self)
+    }
+
+    /// Adds the bring-your-own-model API over the MCP workspace adapter
+    /// (see [`crate::assist`]). Without that adapter it stays off.
+    ///
+    /// # Errors
+    ///
+    /// A malformed `VELLUM_AI_ENDPOINTS`.
+    pub fn with_assist(mut self, var: impl Fn(&str) -> Option<String>) -> Result<Self, Error> {
+        if let Some(workspace) = &self.mcp_workspace {
+            self.assist = crate::assist::service(Arc::clone(workspace), var)?;
+        }
         Ok(self)
     }
 
@@ -389,6 +406,7 @@ impl Services {
                 .collect();
         }
         all.extend(self.admin.iter().cloned());
+        all.extend(self.assist.iter().cloned());
         all
     }
 
@@ -503,6 +521,10 @@ pub fn contract_gateway() -> Result<Gateway, Error> {
     let _ = std::fs::remove_dir_all(&scratch);
     services.workspace = described?;
     services.admin = Some(admin?);
+    services.assist = crate::assist::service(
+        Arc::new(vellum_mcp::memory::MemoryWorkspace::new("http://localhost")),
+        |_| None,
+    )?;
     services
         .mount(GatewayBuilder::new(
             GatewayConfig::new("http://localhost", vec![0; 32]),

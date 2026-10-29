@@ -4,6 +4,7 @@
 import { createContext, use, type ReactNode } from "react";
 
 import type { AccountApi } from "../account/api";
+import type { AssistApi, McpSetupApi } from "../assist/api";
 import type { AttachmentsApi } from "../attachments/api";
 import type { BooksApi } from "../books/api";
 import type { DriveApi } from "../drive/api";
@@ -34,6 +35,10 @@ export interface ServerApis {
   readonly sharing?: SharingApi | undefined;
   /** The signed-in person's API tokens and sign-in factors. */
   readonly account?: AccountApi | undefined;
+  /** The person's own model: summarise, ask, draft (ADR 0056). */
+  readonly assist?: AssistApi | undefined;
+  /** The admin page's MCP client setup. */
+  readonly mcpSetup?: McpSetupApi | undefined;
 }
 
 const ServerApisContext = createContext<ServerApis>({});

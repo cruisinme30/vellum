@@ -624,6 +624,28 @@ export type AdminVerifyAuditEmpty = Record<string, unknown>;
  */
 export type Aggregation = "count" | "sum" | "avg" | "min" | "max" | "checked" | "pct" | "unique" | "show";
 
+/**
+ * A summary or an answer.
+ */
+export interface Answer {
+  /**
+   * The sources cited, in order of first use.
+   */
+  citations: Citation[];
+  /**
+   * The model that answered.
+   */
+  model: string;
+  /**
+   * The text, as Markdown, with `[n]` citation marks.
+   */
+  text: string;
+  /**
+   * The input or the answer was cut short.
+   */
+  truncated: boolean;
+}
+
 export type AnyValue = unknown;
 
 /**
@@ -651,6 +673,12 @@ export interface ApiError {
    */
   retryable: boolean;
 }
+
+/**
+ * A model provider's API key. It is accepted from the request and passed
+ * to the provider; it is never serialised, stored or printed.
+ */
+export type ApiKey = string;
 
 /**
  * A connected `OAuth` app.
@@ -712,6 +740,24 @@ export type Array_of_SessionView = SessionView[];
 export type Array_of_TokenView = TokenView[];
 
 export type Array_of_UserView = UserView[];
+
+/**
+ * `POST /v1/assist/ask`.
+ */
+export interface AskInput {
+  /**
+   * The model to use.
+   */
+  model: ModelSettings;
+  /**
+   * The question.
+   */
+  question: string;
+  /**
+   * Limit the search to one space (slug).
+   */
+  space?: string | null;
+}
 
 /**
  * Assign a thread.
@@ -1536,6 +1582,32 @@ export interface ChipOut {
    * The key to write.
    */
   key: string;
+}
+
+/**
+ * One source an answer cites.
+ */
+export interface Citation {
+  /**
+   * The page's id.
+   */
+  doc_id: string;
+  /**
+   * The number the answer uses, `[n]`.
+   */
+  n: number;
+  /**
+   * The quoted text.
+   */
+  snippet: string;
+  /**
+   * Page title and headings above the block.
+   */
+  title: string;
+  /**
+   * Opens the block in the app.
+   */
+  url: string;
 }
 
 /**
@@ -2882,6 +2954,59 @@ export interface Done {
    * Always `true`.
    */
   ok: boolean;
+}
+
+/**
+ * The draft page that was created for review.
+ */
+export interface Draft {
+  /**
+   * Its body.
+   */
+  markdown: string;
+  /**
+   * The model that wrote it.
+   */
+  model: string;
+  /**
+   * The new page's id.
+   */
+  page_id: string;
+  /**
+   * The template or the answer was cut short.
+   */
+  truncated: boolean;
+  /**
+   * Opens it.
+   */
+  url: string;
+}
+
+/**
+ * `POST /v1/assist/draft`.
+ */
+export interface DraftInput {
+  /**
+   * What the page should say.
+   */
+  instructions: string;
+  /**
+   * The model to use.
+   */
+  model: ModelSettings;
+  /**
+   * Where the draft goes (a page id or `space:<slug>`); by default, the
+   * template's space.
+   */
+  parent?: string | null;
+  /**
+   * The page whose structure the draft follows.
+   */
+  template_page_id: string;
+  /**
+   * The new page's title.
+   */
+  title: string;
 }
 
 /**
@@ -5358,6 +5483,29 @@ export interface MergeSection {
 }
 
 /**
+ * Which model to call and how: sent by the browser with every request.
+ */
+export interface ModelSettings {
+  /**
+   * The user's own API key. Optional only for an endpoint an admin
+   * configured that needs none (a self-hosted model).
+   */
+  api_key?: ApiKey | null;
+  /**
+   * The endpoint; the provider's public API when absent.
+   */
+  base_url?: string | null;
+  /**
+   * The model name, such as `claude-opus-5-5`.
+   */
+  model: string;
+  /**
+   * The wire format.
+   */
+  provider: Provider;
+}
+
+/**
  * Dragging a task to another bucket.
  */
 export interface MoveInput {
@@ -6024,6 +6172,11 @@ export interface PropertyKey {
    */
   key: string;
 }
+
+/**
+ * The wire format a model endpoint speaks.
+ */
+export type Provider = "anthropic" | "openai_compatible";
 
 /**
  * A provider, by ID in the path.
@@ -8141,6 +8294,20 @@ export interface SuggestionOut {
 }
 
 /**
+ * `POST /v1/assist/summarize`.
+ */
+export interface SummarizeInput {
+  /**
+   * The model to use.
+   */
+  model: ModelSettings;
+  /**
+   * The page to summarise.
+   */
+  page_id: string;
+}
+
+/**
  * What a sync did.
  */
 export interface SyncView {
@@ -8730,6 +8897,30 @@ export interface TelemetrySettings {
    * Hours between reports.
    */
   interval_hours?: number;
+}
+
+/**
+ * `POST /v1/assist/test`.
+ */
+export interface TestInput {
+  /**
+   * The model to try.
+   */
+  model: ModelSettings;
+}
+
+/**
+ * Whether the model answered.
+ */
+export interface TestResult {
+  /**
+   * What happened, in a sentence.
+   */
+  detail: string;
+  /**
+   * The model answered.
+   */
+  ok: boolean;
 }
 
 /**
@@ -11423,6 +11614,34 @@ export interface Operations {
     input: AdminVerifyAuditEmpty;
     output: ChainReport;
   };
+  /** Ask this space, answered with citations by your own model */
+  "assist.ask": {
+    method: "POST";
+    path: "/v1/assist/ask";
+    input: AskInput;
+    output: Answer;
+  };
+  /** Draft a page from a template with your own model */
+  "assist.draft": {
+    method: "POST";
+    path: "/v1/assist/draft";
+    input: DraftInput;
+    output: Draft;
+  };
+  /** Summarise a page with your own model */
+  "assist.summarize": {
+    method: "POST";
+    path: "/v1/assist/summarize";
+    input: SummarizeInput;
+    output: Answer;
+  };
+  /** Check that your own model answers */
+  "assist.test": {
+    method: "POST";
+    path: "/v1/assist/test";
+    input: TestInput;
+    output: TestResult;
+  };
   /** Add a section */
   "books.add_section": {
     method: "POST";
@@ -12915,6 +13134,10 @@ export const OPERATIONS = {
   "admin.update_settings": { method: "PUT", path: "/v1/admin/settings", mutation: true },
   "admin.usage": { method: "GET", path: "/v1/admin/usage", mutation: false },
   "admin.verify_audit": { method: "POST", path: "/v1/admin/audit/verify", mutation: true },
+  "assist.ask": { method: "POST", path: "/v1/assist/ask", mutation: true },
+  "assist.draft": { method: "POST", path: "/v1/assist/draft", mutation: true },
+  "assist.summarize": { method: "POST", path: "/v1/assist/summarize", mutation: true },
+  "assist.test": { method: "POST", path: "/v1/assist/test", mutation: true },
   "books.add_section": { method: "POST", path: "/v1/books/{book_id}/sections", mutation: true },
   "books.copy_section": { method: "POST", path: "/v1/books/{book_id}/sections/{section_id}/copy", mutation: true },
   "books.create_snapshot": { method: "POST", path: "/v1/books/{book_id}/snapshots", mutation: true },
