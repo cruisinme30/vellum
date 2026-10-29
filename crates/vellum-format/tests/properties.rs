@@ -5,7 +5,7 @@
 //! fixed point that preserves the tree.
 
 use proptest::prelude::*;
-use vellum_format::{parse, serialize};
+use vellum_format::{Block, Document, Inline, parse, serialize};
 
 /// Checks that `src` round-trips through the canonical form.
 fn assert_round_trip(src: &str) -> Result<(), TestCaseError> {
@@ -186,4 +186,23 @@ fn escaped_delimiter_rows_stay_paragraphs() -> Result<(), TestCaseError> {
         assert_round_trip(src)?;
     }
     Ok(())
+}
+
+proptest! {
+    /// Text built by a program (an import, an intake bridge) is written so
+    /// it reads back as the same text: `@everyone`, `2026-11-24` and
+    /// `ENG-1` stay literal instead of turning into extras.
+    #[test]
+    fn literal_text_stays_text(tokens in prop::collection::vec(token(), 1..8)) {
+        let text = tokens.join(" ");
+        let doc = Document {
+            front_matter: None,
+            blocks: vec![Block::Paragraph {
+                content: vec![Inline::Text { text }],
+                id: None,
+            }],
+        };
+        let canonical = serialize(&doc);
+        prop_assert_eq!(parse(&canonical).document, doc, "canonical form:\n{}", canonical);
+    }
 }

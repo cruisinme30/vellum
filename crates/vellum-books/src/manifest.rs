@@ -82,6 +82,10 @@ impl<'de> Deserialize<'de> for NumberingStyle {
 
 /// Someone a section can be restricted to, owned by or reviewed by:
 /// `user:<name>` or `group:<name>`.
+///
+/// In a Vellum workspace the name is the user's or group's ULID in its
+/// canonical upper-case form (`user:01JBK…`), and principals match by
+/// exact string comparison (ADR 0013).
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Principal(String);
 
@@ -111,6 +115,31 @@ impl Principal {
     #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+
+    /// `user:<id>` for a user ID, written in its canonical form.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`BookError::InvalidPrincipal`] when `id` is empty or holds
+    /// whitespace.
+    pub fn user(id: impl fmt::Display) -> Result<Self> {
+        Self::parse(&format!("user:{id}"))
+    }
+
+    /// `group:<id>` for a group ID, written in its canonical form.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Principal::user`].
+    pub fn group(id: impl fmt::Display) -> Result<Self> {
+        Self::parse(&format!("group:{id}"))
+    }
+
+    /// The kind (`user` or `group`) and the name after the colon.
+    #[must_use]
+    pub fn parts(&self) -> (&str, &str) {
+        self.0.split_once(':').unwrap_or(("", &self.0))
     }
 }
 

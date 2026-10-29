@@ -11,9 +11,9 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D64, D65, D66
-- Issue: #103, #104, #105, #106, #107, #108, #109
-- Pull requests: #223
+- Decisions: D64, D65, D66, D141
+- Issue: #103, #104, #105, #106, #107, #108, #109, #296
+- Pull requests: #223, #309
 
 :::
 
@@ -78,12 +78,35 @@ writes, the three-way merge and an identity-based watcher.
   metadata, `book.yaml`, schemas, snapshots) to a fresh ULID and
   substitutes it across the copy, so links inside the copy point inside
   the copy. The copier owns the copy and no grants are copied.
+- A book is copied, and its `book.yaml` read, as the copier sees it:
+  sections they may not see, files beside or beneath those sections and
+  all snapshots stay behind. Their principals are their user and every
+  group the permission engine puts them in; a manager of the book sees
+  all of it (#327, #329).
 - A shortcut is `Name.shortcut.yaml` holding its own ID and the
   target's. Creating one needs view rights on the target; following one
   checks the target again, so a shortcut never grants access.
 - External edits reported by the watcher become versions authored by
   `External`; tree changes scan the touched spaces again, where the node
   follows its ID and a duplicate ID goes to the newcomer.
+
+### D141: the drive index lives in the index database
+
+- `SqlIndex` runs `DriveIndex` on `vellum-db` (ADR 0006), on SQLite and
+  Postgres with the same SQL. The drive reads only its own tables from
+  migration 0003: `drive_spaces`, `drive_nodes`, `drive_links`,
+  `drive_versions` and `drive_activity` with `drive_activity_scope`.
+- None of them references `spaces`, so `vellum reindex`, which clears
+  the shared tables, loses no drive state. Activity is owned by the
+  database, like stars and recents in `user_doc_state`.
+- Every write also keeps the shared tables in step, in the shape a
+  reindex writes: `spaces`, live `folders`, `documents` (trashed ones
+  with `trashed_at`) and `page_ancestors`, where the space is the root.
+- A trashed node keeps the folder it was trashed from in
+  `page_ancestors`, and a node whose parent is gone becomes top level,
+  as `AuthzAccess` hands the tree to the engine.
+- A change of parent or space rebuilds the closure of the node and
+  everything beneath it in one transaction; other writes leave it alone.
 
 ## Alternatives
 
@@ -96,13 +119,16 @@ writes, the three-way merge and an identity-based watcher.
   content would stay visible to Git, sync clients and the file browser.
 - **Trash as a move into `.vellum/trash/`**: chosen, as the PRD layout
   shows.
+- **The drive reading the shared tables directly**: they cannot hold
+  trash state, shortcuts or settings, and a reindex clears them.
 
 ## Consequences
 
-- The SQL `DriveIndex` adapter follows `MemoryIndex` and the end-to-end
-  tests once the index schema for activity, links and versions lands in
-  `vellum-db`.
+- The end-to-end tests run on the memory, SQLite and Postgres indexes,
+  and a test checks the shared tables after every kind of change.
+- After `vellum reindex`, the shared tables show only what the files
+  say (no trash) until the drive next writes a node or scans.
 - The REST and GraphQL operations follow the service seam from
   `vellum-contracts` and map one-to-one to `Drive` methods.
-- Listing a large space reads every node of it from the index; the SQL
-  adapter answers those with indexed queries.
+- Listing a large space reads every node of it from the index. Moving a
+  large folder rewrites its closure rows, one statement per node.

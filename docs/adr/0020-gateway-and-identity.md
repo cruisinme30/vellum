@@ -11,9 +11,9 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D88
-- Issue: none (recorded before the issue rule, D119)
-- Pull requests: #39
+- Decisions: D88, D89, D90
+- Issue: #84, #85, #148, #46, #86, #88
+- Pull requests: #39, #234, #347
 
 :::
 
@@ -54,12 +54,55 @@ live in the gateway crate.
 - Start-up refuses a malformed operation: a bad ID, a path outside
   `/v1/`, a `GET` mutation, or a path parameter missing from the input.
 
+### D89: the gateway owns the edge, including the public-pages origin
+
+- TLS 1.3 only (`rustls` with `aws-lc-rs`), from PEM files or ACME
+  (TLS-ALPN-01); HTTP/1.1 and HTTP/2 share one listener, and shutdown
+  turns `/readyz` to 503 before draining.
+- Every response carries a strict CSP, `nosniff`, frame denial,
+  COOP/CORP and, over HTTPS, HSTS.
+- CSRF: cross-site `Sec-Fetch-Site` and foreign `Origin` are refused;
+  cookie sessions also send `X-CSRF-Token`, an HMAC of the session
+  binding. Bearer tokens are exempt.
+- `Idempotency-Key` stores the first response per caller for 24 hours
+  and replays it; a different request under the key is a 422, a
+  concurrent one a 409.
+- Rate limits reuse the `vellum-security` GCRA limiter per caller.
+- Share links (`/s/{token}`) and published pages (`/p/{path}`) are served
+  only on a separate public origin with a sandboxing CSP and no scripts,
+  through a `PublicSite` port.
+
+### D90: identity issues opaque, hashed credentials and is the `OAuth` server
+
+- Every credential (session cookie, `vlm_` API token, `OAuth` code,
+  access and refresh token, break-glass code) is 32 random bytes behind a
+  type prefix, stored only as its SHA-256. Passwords use Argon2id.
+- Sessions are an `HttpOnly`, `SameSite=Lax` cookie
+  (`__Host-vellum_session` over HTTPS) with 14-day idle and 30-day
+  absolute expiry; the session hash is the CSRF binding.
+- Sign-in locks out an address after 5 failures and an IP after 20, with
+  doubling waits up to 15 minutes. Admin operations need a sign-in within
+  15 minutes; tokens never satisfy that for long.
+- The `OAuth` 2.1 server takes public clients only: PKCE `S256`, Client ID
+  Metadata Documents fetched through the SSRF guard, the built-in
+  `vellum-desktop` client with any-port loopback redirects, RFC 8707
+  audiences (`<base>/mcp` for MCP) and rotating refresh tokens whose
+  reuse revokes the grant.
+- Break-glass: `vellum admin break-glass` writes a one-time code to the
+  data directory; redeeming it opens a 15-minute administrator session.
+- Records live in `.vellum/identity.json` (mode 0600) until the SQL index
+  lands. SSO (OIDC, SAML) follows in its own change.
+
 ## Alternatives
 
 - **Each service ships an `axum` router and a `GraphQL` object**: REST
   and `GraphQL` drift apart, and services pull in HTTP crates.
 - **Hand-written gateway handlers per service**: the gateway changes for
   every endpoint and coverage depends on discipline.
+- **Signed JWT access tokens**: cannot be revoked before expiry, and
+  each resource server would need key distribution; lookups are cheap.
+- **Share pages on the app origin**: user content would run beside the
+  signed-in session's cookies.
 
 ## Consequences
 

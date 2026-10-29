@@ -8,7 +8,7 @@
 name: Tracker
 
 on:
-  pull_request_target:
+  pull_request_target: # zizmor: ignore[dangerous-triggers] -- runs develop's scripts, never the PR's code
     types: [opened, reopened, edited, closed]
 
 permissions:

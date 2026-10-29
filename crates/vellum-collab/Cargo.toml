@@ -27,10 +27,14 @@ thiserror = "2.0.21"
 tokio = { version = "1.54.1", features = ["rt", "sync", "time", "macros"] }
 tracing = "0.1.44"
 tracing-opentelemetry = "0.34.0"
+vellum-crypto = { path = "../vellum-crypto" }
+vellum-db = { path = "../vellum-db" }
 vellum-kernel.workspace = true
 yrs = { version = "0.28.0", features = ["sync"] }
 
 [dev-dependencies]
+tempfile = "3"
+testcontainers-modules = { version = "0.15", features = ["postgres"] }
 axum = { version = "0.8.9", default-features = false, features = ["ws", "tokio", "http1"] }
 # proptest 1.12 moves to rand 0.10 while OpenTelemetry is on rand 0.9.
 proptest = ">=1.11.0, <1.12"
