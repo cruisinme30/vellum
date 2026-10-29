@@ -6,17 +6,71 @@
 //! Each step runs the same command as `.github/workflows/ci.yml`. A step
 //! whose tool is not installed is skipped and named in the summary, so a
 //! contributor can still push; CI runs every step regardless.
+//!
+//! Like CI, the Rust and web steps are skipped when the branch does not touch
+//! them; `scripts/ci/changed-areas.sh` decides for both (ADR 0035, D139).
 
 use std::env;
 use std::ffi::OsString;
 use std::io::{self, Write as _};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::time::Instant;
+
+/// The part of the repository a step checks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Area {
+    Rust,
+    Web,
+    Desktop,
+    /// Always runs: files, docs, secrets and commits.
+    Any,
+}
+
+/// Which areas the branch changed, as `scripts/ci/changed-areas.sh` says.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Areas {
+    rust: bool,
+    web: bool,
+    desktop: bool,
+}
+
+impl Areas {
+    const ALL: Self = Self {
+        rust: true,
+        web: true,
+        desktop: true,
+    };
+
+    /// Parses the script's `rust=true` / `web=false` lines.
+    fn parse(output: &str) -> Self {
+        let flag = |key: &str| {
+            output
+                .lines()
+                .find_map(|line| line.strip_prefix(key)?.strip_prefix('='))
+                .is_none_or(|value| value.trim() != "false")
+        };
+        Self {
+            rust: flag("rust"),
+            web: flag("web"),
+            desktop: flag("desktop"),
+        }
+    }
+
+    const fn includes(self, area: Area) -> bool {
+        match area {
+            Area::Rust => self.rust,
+            Area::Web => self.web,
+            Area::Desktop => self.desktop,
+            Area::Any => true,
+        }
+    }
+}
 
 /// One check: a program, its arguments and where to run it.
 struct Step {
     name: &'static str,
+    area: Area,
     /// The executable that must be on `PATH` for the step to run.
     tool: &'static str,
     program: &'static str,
@@ -30,6 +84,7 @@ impl Step {
     fn new(name: &'static str, program: &'static str, args: &[&str]) -> Self {
         Self {
             name,
+            area: Area::Any,
             tool: program,
             program,
             args: args.iter().map(|&arg| arg.to_owned()).collect(),
@@ -50,6 +105,11 @@ impl Step {
         self
     }
 
+    const fn area(mut self, area: Area) -> Self {
+        self.area = area;
+        self
+    }
+
     fn with_env(mut self, key: &'static str, value: &'static str) -> Self {
         self.env.push((key, value));
         self
@@ -62,21 +122,39 @@ enum Outcome {
     Passed,
     Failed,
     Skipped,
+    /// The branch does not change what the step checks; CI skips it too.
+    NotNeeded,
 }
 
 /// Runs every fast check and fails if any check that ran failed.
 pub fn run() -> Result<(), String> {
     let root = repo_root()?;
     let base = merge_base(&root);
+    let areas = base
+        .as_deref()
+        .map_or(Areas::ALL, |base| changed_areas(&root, base));
     let mut results = Vec::new();
     let started = Instant::now();
 
     for step in steps(base.as_deref(), current_branch(&root).as_deref()) {
-        let outcome = execute(&root, &step);
+        let outcome = if areas.includes(step.area) {
+            execute(&root, &step)
+        } else {
+            Outcome::NotNeeded
+        };
         results.push((step.name, outcome));
     }
-    results.push(("Crate boundaries", boundaries_outcome()));
-    results.push(("Help books and their corpus", help_outcome()));
+    let (boundaries, help) = if areas.rust {
+        (boundaries_outcome(), help_outcome())
+    } else {
+        (Outcome::NotNeeded, Outcome::NotNeeded)
+    };
+    if areas.rust && !docker_available() {
+        // The missing tool is Docker, which the vellum-db Postgres tests need.
+        results.push(("Postgres tests in vellum-db (Docker)", Outcome::Skipped));
+    }
+    results.push(("Crate boundaries", boundaries));
+    results.push(("Help books and their corpus", help));
 
     report(&results, started.elapsed().as_secs());
     if results
@@ -88,11 +166,81 @@ pub fn run() -> Result<(), String> {
     Ok(())
 }
 
+/// The Web job's steps, run in `web/`.
+fn web_steps() -> Vec<Step> {
+    [
+        ("Web install", &["install", "--frozen-lockfile"][..]),
+        ("Web format", &["run", "format:check"]),
+        ("Web types", &["run", "typecheck"]),
+        ("Web lint", &["run", "lint"]),
+        ("Web dead code", &["run", "knip"]),
+        ("Web tests with coverage", &["run", "test:coverage"]),
+        ("Web dependency audit", &["audit"]),
+    ]
+    .into_iter()
+    .map(|(name, args)| Step::new(name, "pnpm", args).in_dir("web").area(Area::Web))
+    .collect()
+}
+
+/// The Desktop job's steps, run in `desktop/`.
+fn desktop_steps() -> Vec<Step> {
+    [
+        ("Desktop install", &["install", "--frozen-lockfile"][..]),
+        ("Desktop format", &["run", "format:check"]),
+        ("Desktop types", &["run", "typecheck"]),
+        ("Desktop lint", &["run", "lint"]),
+        ("Desktop dead code", &["run", "knip"]),
+        ("Desktop tests with coverage", &["run", "test:coverage"]),
+        ("Desktop build", &["run", "build"]),
+        ("Desktop dependency audit", &["audit"]),
+    ]
+    .into_iter()
+    .map(|(name, args)| {
+        Step::new(name, "pnpm", args)
+            .in_dir("desktop")
+            .area(Area::Desktop)
+    })
+    .collect()
+}
+
+/// Test binaries that start Postgres in a container through testcontainers.
+const DOCKER_TESTS: &str = "binary_id(vellum-db::postgres) | binary_id(vellum-db::shards)";
+
+/// Whether a Docker daemon looks reachable: `DOCKER_HOST` is set or the
+/// default socket exists. Cloud sandboxes have neither.
+fn docker_available() -> bool {
+    env::var_os("DOCKER_HOST").is_some() || Path::new("/var/run/docker.sock").exists()
+}
+
+/// The workspace tests. Without Docker, the container-backed Postgres
+/// tests are left out (and reported as skipped); CI always runs them.
+fn rust_tests(docker: bool) -> Step {
+    let mut step = Step::new(
+        "Rust tests",
+        "cargo",
+        &[
+            "nextest",
+            "run",
+            "--workspace",
+            "--locked",
+            "--profile",
+            "ci",
+        ],
+    )
+    .needs("cargo-nextest")
+    .area(Area::Rust);
+    if !docker {
+        step.args.push("-E".to_owned());
+        step.args.push(format!("not ({DOCKER_TESTS})"));
+    }
+    step
+}
+
 /// The fast suite, in the order CI runs it.
 fn steps(base: Option<&str>, branch: Option<&str>) -> Vec<Step> {
     let mut steps = vec![
         // Rust
-        Step::new("Rust format", "cargo", &["fmt", "--all", "--check"]),
+        Step::new("Rust format", "cargo", &["fmt", "--all", "--check"]).area(Area::Rust),
         // `-D warnings` after `--` also denies rustc warnings in every
         // target, matching CI's RUSTFLAGS without invalidating the
         // contributor's normal build cache.
@@ -108,48 +256,30 @@ fn steps(base: Option<&str>, branch: Option<&str>) -> Vec<Step> {
                 "-D",
                 "warnings",
             ],
-        ),
+        )
+        .area(Area::Rust),
         Step::new(
             "Rust docs",
             "cargo",
             &["doc", "--workspace", "--no-deps", "--locked"],
         )
-        .with_env("RUSTDOCFLAGS", "-D warnings"),
-        Step::new(
-            "Rust tests",
-            "cargo",
-            &["nextest", "run", "--workspace", "--locked"],
-        )
-        .needs("cargo-nextest"),
+        .with_env("RUSTDOCFLAGS", "-D warnings")
+        .area(Area::Rust),
+        rust_tests(docker_available()),
         Step::new(
             "Licences, bans, sources and advisories",
             "cargo",
             &["deny", "--locked", "check"],
         )
-        .needs("cargo-deny"),
-        Step::new("RustSec audit", "cargo", &["audit", "--deny", "warnings"]).needs("cargo-audit"),
-        // Web
-        Step::new("Web install", "pnpm", &["install", "--frozen-lockfile"]).in_dir("web"),
-        Step::new("Web format", "pnpm", &["run", "format:check"]).in_dir("web"),
-        Step::new("Web types", "pnpm", &["run", "typecheck"]).in_dir("web"),
-        Step::new("Web lint", "pnpm", &["run", "lint"]).in_dir("web"),
-        Step::new("Web dead code", "pnpm", &["run", "knip"]).in_dir("web"),
-        Step::new("Web tests with coverage", "pnpm", &["run", "test:coverage"]).in_dir("web"),
-        Step::new("Web dependency audit", "pnpm", &["audit"]).in_dir("web"),
-        // Desktop
-        Step::new("Desktop install", "pnpm", &["install", "--frozen-lockfile"]).in_dir("desktop"),
-        Step::new("Desktop format", "pnpm", &["run", "format:check"]).in_dir("desktop"),
-        Step::new("Desktop types", "pnpm", &["run", "typecheck"]).in_dir("desktop"),
-        Step::new("Desktop lint", "pnpm", &["run", "lint"]).in_dir("desktop"),
-        Step::new("Desktop dead code", "pnpm", &["run", "knip"]).in_dir("desktop"),
-        Step::new(
-            "Desktop tests with coverage",
-            "pnpm",
-            &["run", "test:coverage"],
-        )
-        .in_dir("desktop"),
-        Step::new("Desktop build", "pnpm", &["run", "build"]).in_dir("desktop"),
-        Step::new("Desktop dependency audit", "pnpm", &["audit"]).in_dir("desktop"),
+        .needs("cargo-deny")
+        .area(Area::Rust),
+        Step::new("RustSec audit", "cargo", &["audit", "--deny", "warnings"])
+            .needs("cargo-audit")
+            .area(Area::Rust),
+    ];
+    steps.extend(web_steps());
+    steps.extend(desktop_steps());
+    steps.extend([
         // Files, docs and secrets
         Step::new("REUSE headers", "reuse", &["lint"]),
         Step::new("YAML", "yamllint", &["--strict", "."]),
@@ -191,7 +321,7 @@ fn steps(base: Option<&str>, branch: Option<&str>) -> Vec<Step> {
             &[],
         )
         .needs("bash"),
-    ];
+    ]);
 
     if let Some(base) = base {
         let range = format!("--log-opts={base}..HEAD");
@@ -280,6 +410,7 @@ fn report(results: &[(&str, Outcome)], seconds: u64) {
             Outcome::Passed => format!("  pass  {name}"),
             Outcome::Failed => format!("  FAIL  {name}"),
             Outcome::Skipped => format!("  skip  {name} (tool not installed; CI still runs it)"),
+            Outcome::NotNeeded => format!("  skip  {name} (no changes here; CI skips it too)"),
         });
     }
     progress(&lines.join("\n"));
@@ -300,6 +431,31 @@ fn repo_root() -> Result<PathBuf, String> {
 /// The commit where the current branch left `develop`, if known.
 fn merge_base(root: &Path) -> Option<String> {
     git(root, &["merge-base", "origin/develop", "HEAD"])
+}
+
+/// Which areas the commits since `base` touch. Runs everything if the
+/// script or git fails.
+fn changed_areas(root: &Path, base: &str) -> Areas {
+    let Some(paths) = git(root, &["diff", "--name-only", base, "HEAD"]) else {
+        return Areas::ALL;
+    };
+    let output = Command::new(root.join("scripts/ci/changed-areas.sh"))
+        .current_dir(root)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .and_then(|mut child| {
+            if let Some(mut stdin) = child.stdin.take() {
+                stdin.write_all(paths.as_bytes())?;
+            }
+            child.wait_with_output()
+        });
+    match output {
+        Ok(output) if output.status.success() => {
+            Areas::parse(&String::from_utf8_lossy(&output.stdout))
+        }
+        Ok(_) | Err(_) => Areas::ALL,
+    }
 }
 
 fn current_branch(root: &Path) -> Option<String> {
@@ -376,8 +532,50 @@ mod tests {
     }
 
     #[test]
+    fn areas_follow_the_script_output() {
+        assert_eq!(
+            Areas::parse("rust=false\nweb=true\ndesktop=false\n"),
+            Areas {
+                rust: false,
+                web: true,
+                desktop: false
+            }
+        );
+        assert_eq!(Areas::parse(""), Areas::ALL);
+    }
+
+    #[test]
+    fn rust_and_web_steps_are_tagged() {
+        let steps = steps(Some("abc"), None);
+        let area = |name: &str| steps.iter().find(|step| step.name == name).map(|s| s.area);
+        assert_eq!(area("Clippy"), Some(Area::Rust));
+        assert_eq!(area("Rust tests"), Some(Area::Rust));
+        assert_eq!(area("Web lint"), Some(Area::Web));
+        assert_eq!(area("Prose (Vale)"), Some(Area::Any));
+        assert_eq!(area("Desktop lint"), Some(Area::Desktop));
+        let docs_only = Areas {
+            rust: false,
+            web: false,
+            desktop: false,
+        };
+        assert!(!docs_only.includes(Area::Rust));
+        assert!(docs_only.includes(Area::Any));
+    }
+
+    #[test]
     fn missing_tools_are_skipped() {
         let step = Step::new("Nothing", "vellum-no-such-tool", &[]);
         assert_eq!(execute(Path::new("."), &step), Outcome::Skipped);
+    }
+
+    #[test]
+    fn rust_tests_leave_out_container_tests_only_without_docker() {
+        let with = rust_tests(true);
+        assert!(!with.args.iter().any(|arg| arg == "-E"));
+        let without = rust_tests(false);
+        assert_eq!(
+            without.args[without.args.len() - 2..],
+            ["-E".to_owned(), format!("not ({DOCKER_TESTS})")]
+        );
     }
 }

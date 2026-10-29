@@ -2,8 +2,7 @@
 -- SPDX-License-Identifier: AGPL-3.0-only
 
 -- The sync service's change log (vellum-sync, ADR 0029). Postgres dialect of
--- migrations/sqlite; keep the two in step. Numbered 0005 so it does not
--- clash with the shard map (0004) being added in parallel.
+-- migrations/sqlite; keep the two in step.
 --
 -- sync_meta is a single row. Every append locks it first, which serialises
 -- writers, so log positions commit in order and a reader never skips a

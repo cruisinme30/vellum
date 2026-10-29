@@ -9,7 +9,8 @@ use sqlx::Connection as _;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteConnection};
 use vellum_db::{Backend, Error, Index, IndexConfig, IndexKey};
 
-const TABLES: [&str; 12] = [
+const TABLES: [&str; 13] = [
+    "collab_updates",
     "documents",
     "effective_access",
     "folders",

@@ -673,7 +673,98 @@ pub async fn call(
         },
         _ => return Err(CallError::UnknownTool(name.to_owned())),
     };
-    Ok(outcome)
+    Ok(guard_outcome(outcome))
+}
+
+/// Guards every string a tool returns before it leaves this module.
+///
+/// Tools guard their main Markdown themselves, which ties warnings to
+/// block ids. This last pass covers everything else (titles, heading
+/// paths, outlines, rows, error text) and any field a future tool adds.
+/// Warnings it finds carry a JSON pointer in `field`, are merged into
+/// `structuredContent.warnings` without repeating ones a tool already
+/// reported, and are mirrored in `_meta["dev.vellum/warnings"]` so error
+/// results carry them too.
+fn guard_outcome(mut outcome: ToolOutcome) -> ToolOutcome {
+    let mut warnings: Vec<Value> = Vec::new();
+    let structured = match outcome.result.get_mut("structuredContent") {
+        Some(Value::Object(s)) => Some(s),
+        _ => None,
+    };
+    if let Some(s) = structured {
+        if let Some(Value::Array(known)) = s.remove("warnings") {
+            warnings = known;
+        }
+        let mut found = Vec::new();
+        for (key, value) in s.iter_mut() {
+            guard_value(value, &pointer("/structuredContent", key), &mut found);
+        }
+        merge(&mut warnings, found);
+    }
+    let mut found = Vec::new();
+    if let Some(content) = outcome.result.get_mut("content") {
+        guard_value(content, "/content", &mut found);
+    }
+    merge(&mut warnings, found);
+    if let Some(Value::Object(s)) = outcome.result.get_mut("structuredContent") {
+        let _ = s.insert("warnings".into(), Value::Array(warnings.clone()));
+    }
+    if !warnings.is_empty() {
+        let meta = outcome
+            .result
+            .entry("_meta")
+            .or_insert_with(|| Value::Object(Map::new()));
+        if let Value::Object(m) = meta {
+            let _ = m.insert("dev.vellum/warnings".into(), Value::Array(warnings));
+        }
+    }
+    outcome
+}
+
+fn pointer(parent: &str, key: &str) -> String {
+    format!("{parent}/{}", key.replace('~', "~0").replace('/', "~1"))
+}
+
+fn guard_value(value: &mut Value, at: &str, found: &mut Vec<Value>) {
+    match value {
+        Value::String(s) => {
+            let g = safety::guard(s);
+            *s = g.text;
+            for w in g.warnings {
+                let mut w = json!(w);
+                if let Value::Object(o) = &mut w {
+                    let _ = o.insert("field".into(), Value::String(at.to_owned()));
+                }
+                found.push(w);
+            }
+        }
+        Value::Array(items) => {
+            for (i, item) in items.iter_mut().enumerate() {
+                guard_value(item, &format!("{at}/{i}"), found);
+            }
+        }
+        Value::Object(map) => {
+            for (key, item) in map.iter_mut() {
+                guard_value(item, &pointer(at, key), found);
+            }
+        }
+        Value::Null | Value::Bool(_) | Value::Number(_) => {}
+    }
+}
+
+/// Adds warnings not already present, judged by kind, excerpt and reason,
+/// so a finding a tool tied to a block id is not repeated without one.
+fn merge(warnings: &mut Vec<Value>, found: Vec<Value>) {
+    let same = |a: &Value, b: &Value| {
+        ["kind", "excerpt", "reason"]
+            .iter()
+            .all(|k| a.get(k) == b.get(k))
+    };
+    for w in found {
+        if !warnings.iter().any(|known| same(known, &w)) {
+            warnings.push(w);
+        }
+    }
 }
 
 async fn search(ws: &dyn Workspace, actor: &Actor, args: &Map<String, Value>) -> ToolOutcome {
