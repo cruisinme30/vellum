@@ -58,7 +58,7 @@ impl Drive {
             if node.kind == NodeKind::Book {
                 // The raw book.yaml names restricted sections and who may
                 // see them; hand back the reader's view of it instead.
-                if let Some(view) = self.book_view(actor, &node.path).await?.remove(&path) {
+                if let Some(view) = self.book_view(actor, &node).await?.files.remove(&path) {
                     blob.meta.size = view.len() as u64;
                     blob.bytes = view;
                 }

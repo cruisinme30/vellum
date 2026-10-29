@@ -320,10 +320,10 @@ impl Drive {
             if member.id != node.id && !self.may(actor, &member, Permission::View).await? {
                 hidden.push(member.path);
             } else if member.kind == NodeKind::Book {
-                books.push(member.path);
+                books.push(member);
             }
         }
-        books.retain(|b| !hidden.iter().any(|h| b.starts_with(h)));
+        books.retain(|b| !hidden.iter().any(|h| b.path.starts_with(h)));
         let blobs = if node.kind.is_dir() {
             // Build output and in-flight temp files are not content.
             self.blobs_under(&node.path)
@@ -341,15 +341,21 @@ impl Drive {
         };
         // A book's sections narrow access on their own: the copy gets
         // the book as the copier sees it, and never its snapshots.
+        // Files beside or beneath a hidden section stay behind as well.
         let mut files: Vec<(BlobPath, Bytes)> = Vec::with_capacity(blobs.len());
-        for book in &books {
-            files.extend(self.book_view(actor, book).await?);
+        let mut views = Vec::with_capacity(books.len());
+        for book in books {
+            let view = self.book_view(actor, &book).await?;
+            files.extend(view.files.iter().map(|(p, b)| (p.clone(), b.clone())));
+            views.push((book.path, view));
         }
         for (path, _) in blobs {
-            let from_book = books
-                .iter()
-                .any(|b| books::never_copied(b, &path) || books::from_view(b, &path));
-            if !from_book {
+            let left_out = views.iter().any(|(root, view)| {
+                books::never_copied(root, &path)
+                    || books::from_view(root, &path)
+                    || view.withholds(root, &path)
+            });
+            if !left_out {
                 files.push((path.clone(), self.store.get(&path).await?.bytes));
             }
         }

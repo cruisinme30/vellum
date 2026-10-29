@@ -5,7 +5,9 @@
 //! person who can open a book must not get its restricted sections by
 //! copying it, alone or inside a folder, nor through its snapshots, which
 //! hold every section's full text, nor by reading its `book.yaml`
-//! (issue #327, found by the red team).
+//! (issue #327, found by the red team). Files that are not sections
+//! (data, notes, images) beside or beneath a hidden section stay behind
+//! too, and whoever manages the book copies all of it.
 
 use std::sync::Arc;
 
@@ -79,6 +81,18 @@ async fn handbook(store: &LocalStore, dir: &str, hr: UserId) -> TestResult {
         &chapter(salaries, "Salaries", SECRET),
     )
     .await?;
+    for (name, text) in [
+        ("hr/salaries.csv", SECRET.to_owned()),
+        ("hr/notes.txt", SECRET.to_owned()),
+        ("hr/raw.markdown", SECRET.to_owned()),
+        (
+            "hr/charts/pay.svg",
+            format!("<svg><text>{SECRET}</text></svg>"),
+        ),
+        ("images/logo.svg", "<svg/>".to_owned()),
+    ] {
+        put(store, &format!("{root}/{name}"), &text).await?;
+    }
     put(
         store,
         &format!("{root}/.snapshots/v1.json"),
@@ -145,10 +159,9 @@ async fn copies_and_reads_leave_restricted_sections_behind() -> TestResult {
     for source in [book.id, docs.id] {
         let copy = drive.copy_node(&bob, source, mine.id, None).await?;
         let files = files_under(&store, &copy.path).await?;
-        assert!(
-            files.iter().any(|(p, _)| p.ends_with("public.md")),
-            "{files:?}"
-        );
+        for kept in ["public.md", "images/logo.svg"] {
+            assert!(files.iter().any(|(p, _)| p.ends_with(kept)), "{files:?}");
+        }
         for (path, text) in &files {
             assert!(!text.contains(SECRET), "{path} leaks the salaries");
             assert!(!text.contains("Only HR"), "{path} leaks the HR section");
@@ -167,7 +180,18 @@ async fn copies_and_reads_leave_restricted_sections_behind() -> TestResult {
     let copy = drive.copy_node(&alice, book.id, eng.id, None).await?;
     let files = files_under(&store, &copy.path).await?;
     assert!(files.iter().any(|(_, t)| t.contains(SECRET)), "{files:?}");
+    assert!(files.iter().any(|(p, _)| p.ends_with("hr/salaries.csv")));
     assert!(!files.iter().any(|(p, _)| p.contains(".snapshots")));
+
+    // A manager of the book is not restricted by its sections, as with
+    // any other restricted node.
+    let carol_id = UserId::generate();
+    access.grant(carol_id, eng.id, Role::Manager);
+    let carol = Actor::User { user: carol_id };
+    let copy = drive.copy_node(&carol, book.id, eng.id, None).await?;
+    let files = files_under(&store, &copy.path).await?;
+    assert!(files.iter().any(|(p, _)| p.ends_with("hr/salaries.md")));
+    assert!(files.iter().any(|(p, _)| p.ends_with("hr/charts/pay.svg")));
 
     // A book that cannot be loaded is not copied at all.
     put(
