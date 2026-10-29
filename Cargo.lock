@@ -3376,6 +3376,9 @@ dependencies = [
  "rustls",
  "rustls-pki-types",
  "rustls-platform-verifier",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
  "sync_wrapper",
  "tokio",
  "tokio-rustls",
@@ -5190,6 +5193,7 @@ name = "vellum-store"
 version = "0.0.0"
 dependencies = [
  "async-trait",
+ "axum",
  "bytes",
  "diff-match-patch-rs",
  "diffy",
@@ -5198,6 +5202,9 @@ dependencies = [
  "notify",
  "opentelemetry",
  "proptest",
+ "reqwest",
+ "serde",
+ "serde_json",
  "sha2 0.11.1",
  "tempfile",
  "thiserror",

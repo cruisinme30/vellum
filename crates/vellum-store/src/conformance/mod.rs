@@ -53,11 +53,34 @@ fn fail(check: &'static str) -> impl Fn(StoreError) -> Failure {
     }
 }
 
+/// What a backend promises about concurrent writers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Guarantees {
+    /// Preconditions are checked and applied atomically by the backend:
+    /// local folders, S3, Dropbox, `OneDrive`, Git.
+    Atomic,
+    /// Preconditions are checked just before the write, so two writers
+    /// racing within that window can both succeed. Such backends are
+    /// eventually consistent and always merged (Google Drive): the
+    /// watcher and the three-way merge catch the overwritten version.
+    BestEffort,
+}
+
 /// Runs every check in order and stops at the first failure.
 ///
 /// # Errors
 /// Returns the first [`Failure`].
 pub async fn run_all(store: &dyn BlobStore) -> Outcome {
+    run_with(store, Guarantees::Atomic).await
+}
+
+/// Runs the checks that `guarantees` promises, in order, and stops at the
+/// first failure. Sequential precondition checks run for every backend;
+/// only the racing-writers check needs [`Guarantees::Atomic`].
+///
+/// # Errors
+/// Returns the first [`Failure`].
+pub async fn run_with(store: &dyn BlobStore, guarantees: Guarantees) -> Outcome {
     put_get_roundtrip(store).await?;
     missing_blobs(store).await?;
     rename_never_clobbers(store).await?;
@@ -65,7 +88,10 @@ pub async fn run_all(store: &dyn BlobStore) -> Outcome {
     conditional::if_absent(store).await?;
     conditional::if_match(store).await?;
     conditional::conditional_delete(store).await?;
-    conditional::racing_writers_one_wins(store).await
+    if guarantees == Guarantees::Atomic {
+        conditional::racing_writers_one_wins(store).await?;
+    }
+    Ok(())
 }
 
 /// Content survives a round trip and `head` agrees with `get`.
