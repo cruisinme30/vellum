@@ -4,6 +4,8 @@
 #
 # Lints SQL, Dockerfiles, Helm charts and Kubernetes manifests. Each linter
 # runs as soon as its first file exists; a missing tool then fails CI.
+# Outside CI (the local pre-push suite) a missing tool is skipped with a
+# notice instead, like the other optional linters, since CI still runs it.
 set -euo pipefail
 
 failures=0
@@ -23,6 +25,10 @@ run_if_files() {
     return
   fi
   if ! command -v "${tool}" >/dev/null; then
+    if [[ -z "${CI:-}" ]]; then
+      echo "${what}: ${tool} is not installed; skipped locally, CI still runs it."
+      return
+    fi
     echo "::error::${what} exist but ${tool} is not installed in CI."
     failures=$((failures + 1))
     return
