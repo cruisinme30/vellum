@@ -5,6 +5,8 @@
 # release pull requests into main (and by hand); the fuzzers moved to the
 # nightly workflow, which skips nights when develop has not changed.
 # Branch protection on main requires the "Full suite" check.
+# It also fails while the latest nightly load, ZAP, fuzz or chaos run on
+# develop failed (scripts/ci/reliability-gate.sh, ADR 0022 D254).
 #
 # Each test runs once per event: the Rust tests run only in the coverage
 # job and the UI tests only in the end-to-end matrix, not again inside the
@@ -304,10 +306,31 @@ jobs:
         working-directory: deploy/compose
         run: docker compose logs clamav
 
+  reliability:
+    name: Nightly, fuzz and chaos results on develop
+    # The slow reliability checks run on schedule, never here (CI cost
+    # rules); this reads their latest results (ADR 0022, D254).
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read # reads the nightly workflow's runs and jobs
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: The latest load, ZAP, fuzz and chaos runs passed
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/ci/reliability-gate.sh
+
   full-suite:
     name: Full suite
     if: always()
-    needs: [gate, fast, coverage, binary, image, clamav, e2e, links]
+    needs: [gate, fast, coverage, binary, image, clamav, e2e, links, reliability]
     runs-on: ubuntu-24.04
     steps:
       - name: Every check passed
