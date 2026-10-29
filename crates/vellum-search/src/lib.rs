@@ -27,6 +27,7 @@ pub mod backend;
 pub mod conformance;
 pub mod error;
 pub mod fusion;
+pub mod meili_index;
 pub mod model;
 pub mod postgres_index;
 pub mod service;
@@ -38,6 +39,7 @@ pub mod vector;
 pub use access::{Principal, ReadAccess, Stars};
 pub use backend::{Change, IndexEntry, Scope, SearchBackend};
 pub use error::{Result, SearchError};
+pub use meili_index::{MeiliBackend, MeiliConfig};
 pub use model::{
     BlockKind, DocKind, Filters, Fragment, IndexBlock, IndexDocument, SearchHit, SearchPage,
     SearchQuery, StoredBlock, TitleHit,
