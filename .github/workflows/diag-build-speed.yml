@@ -1,0 +1,32 @@
+# Temporary: times the release binary build on Alpine (develop) against the
+# Debian-host build on this branch. Deleted once measured.
+name: "Diag: release build speed"
+on:
+  push:
+    branches: [diag/build-speed]
+permissions:
+  contents: read
+jobs:
+  build:
+    name: ${{ matrix.variant }} ${{ matrix.n }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { variant: alpine, n: 1, ref: develop }
+          - { variant: debian, n: 1, ref: diag/build-speed }
+          - { variant: debian, n: 2, ref: diag/build-speed }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ matrix.ref }}
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build the binary from scratch
+        run: |
+          start=$(date +%s)
+          docker buildx build --no-cache --target binary \
+            --output "type=local,dest=${RUNNER_TEMP}/build" -f deploy/docker/Dockerfile .
+          echo "::notice::${{ matrix.variant }} ${{ matrix.n }}: $(( $(date +%s) - start )) s, $(stat -c %s "${RUNNER_TEMP}/build/vellum") bytes, sha256 $(sha256sum "${RUNNER_TEMP}/build/vellum" | cut -c1-16)"
