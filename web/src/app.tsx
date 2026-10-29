@@ -32,7 +32,8 @@ import { createMockNotificationPreferencesStore } from "./notifications/preferen
 import type { PrivateSpacesApi } from "./platform/private/api";
 import { PrivateSpacesView } from "./platform/private/private-spaces-view";
 import { AppShell } from "./shell/app-shell";
-import { AppearanceProvider } from "./theme/appearance-context";
+import { AppearanceProvider, type OrganisationAppearance } from "./theme/appearance-context";
+import { AppearancePage } from "./theme/appearance-page";
 import { FavoritesView, HomeView } from "./views/home";
 import { AdminView, HelpView, NotFoundView } from "./views/info";
 import { NewPageView } from "./views/new-page";
@@ -84,6 +85,7 @@ export function AppRoutes() {
         <Route path="favorites" element={<FavoritesView />} />
         <Route path="inbox" element={<InboxView />} />
         <Route path="settings/notifications" element={<NotificationSettingsView />} />
+        <Route path="settings/appearance" element={<AppearancePage />} />
         <Route path="settings/private-spaces" element={<PrivateSpacesView />} />
         <Route path="new" element={<NewPageView />} />
         <Route path="my-work" element={<MyWorkPage />} />
@@ -130,6 +132,8 @@ export interface AppServices {
   readonly session?: { readonly auth: AuthApi; readonly status: AuthStatus } | undefined;
   /** Notification settings; the Northstar demo's when absent. */
   readonly notifications?: NotificationServices | undefined;
+  /** Loads the organisation's seed colour and themes; absent in demo mode. */
+  readonly appearance?: (() => Promise<OrganisationAppearance>) | undefined;
 }
 
 function MaybeSession({
@@ -179,6 +183,7 @@ export function AppProviders({
   collections,
   session,
   notifications,
+  appearance,
   children,
 }: AppServices & { readonly children: ReactNode }) {
   const serverApis = useMemo(() => ({ work, books, privateSpaces }), [work, books, privateSpaces]);
@@ -187,7 +192,7 @@ export function AppProviders({
   }));
   return (
     <I18nProvider>
-      <AppearanceProvider>
+      <AppearanceProvider organisation={appearance}>
         <MaybeSession session={session}>
           <WorkspaceProvider store={store} collab={collab} history={history}>
             <SignedInUser>

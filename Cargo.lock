@@ -9197,6 +9197,7 @@ dependencies = [
  "vellum-format",
  "vellum-jobs",
  "vellum-kernel",
+ "vellum-render",
  "zip",
 ]
 

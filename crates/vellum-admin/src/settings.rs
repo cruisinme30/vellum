@@ -129,6 +129,60 @@ impl Default for SecuritySettings {
     }
 }
 
+/// The organisation's look (R-TH-1, R-TH-4; ADR 0007 D245).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(default, deny_unknown_fields)]
+pub struct AppearanceSettings {
+    /// The seed colour every built-in theme is derived from, `#rrggbb`.
+    /// People can still pick their own accent in the app.
+    pub seed: String,
+    /// The theme exports (PDF, HTML, Word) use: a light theme, since
+    /// paper is white.
+    pub export_theme: String,
+    /// The theme of published sites; `auto` follows the reader's system
+    /// light or dark setting.
+    pub site_theme: String,
+}
+
+/// The theme ids exports may use.
+pub const EXPORT_THEMES: [&str; 3] = ["light", "high-contrast", "sepia"];
+/// The theme ids published sites may use.
+pub const SITE_THEMES: [&str; 6] = ["auto", "light", "dark", "high-contrast", "sepia", "dim"];
+
+impl Default for AppearanceSettings {
+    fn default() -> Self {
+        Self {
+            seed: "#4f5b92".to_owned(),
+            export_theme: "light".to_owned(),
+            site_theme: "auto".to_owned(),
+        }
+    }
+}
+
+impl AppearanceSettings {
+    fn problems(&self, problems: &mut Vec<String>) {
+        let seed = self.seed.as_bytes();
+        if seed.len() != 7
+            || seed.first() != Some(&b'#')
+            || !seed.iter().skip(1).all(u8::is_ascii_hexdigit)
+        {
+            problems.push("appearance.seed must be a #rrggbb colour".to_owned());
+        }
+        if !EXPORT_THEMES.contains(&self.export_theme.as_str()) {
+            problems.push(format!(
+                "appearance.export_theme must be one of {}",
+                EXPORT_THEMES.join(", ")
+            ));
+        }
+        if !SITE_THEMES.contains(&self.site_theme.as_str()) {
+            problems.push(format!(
+                "appearance.site_theme must be one of {}",
+                SITE_THEMES.join(", ")
+            ));
+        }
+    }
+}
+
 /// Every admin setting.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
@@ -143,6 +197,8 @@ pub struct AdminSettings {
     pub backups: BackupSettings,
     /// Admin-session security.
     pub security: SecuritySettings,
+    /// The organisation's seed colour and export and site themes.
+    pub appearance: AppearanceSettings,
 }
 
 impl Default for AdminSettings {
@@ -153,6 +209,7 @@ impl Default for AdminSettings {
             observability: ObservabilitySettings::default(),
             backups: BackupSettings::default(),
             security: SecuritySettings::default(),
+            appearance: AppearanceSettings::default(),
         }
     }
 }
@@ -263,6 +320,7 @@ impl AdminSettings {
             1,
             720,
         );
+        self.appearance.problems(&mut problems);
         if problems.is_empty() {
             Ok(())
         } else {
@@ -494,6 +552,37 @@ mod tests {
         let mut http = AdminSettings::default();
         http.telemetry.endpoint = Some("http://insecure".into());
         assert!(http.validate().unwrap_err().message().contains("https://"));
+    }
+
+    #[test]
+    fn appearance_is_checked() {
+        let mut s = AdminSettings::default();
+        s.appearance.seed = "#ABCDEF".into();
+        s.appearance.export_theme = "sepia".into();
+        s.appearance.site_theme = "dim".into();
+        s.validate().unwrap();
+        for (seed, export, site, needle) in [
+            ("red", "light", "auto", "appearance.seed"),
+            ("#12345", "light", "auto", "appearance.seed"),
+            ("#12345g", "light", "auto", "appearance.seed"),
+            ("#123456", "dark", "auto", "export_theme"),
+            ("#123456", "light", "neon", "site_theme"),
+        ] {
+            s.appearance = AppearanceSettings {
+                seed: seed.into(),
+                export_theme: export.into(),
+                site_theme: site.into(),
+            };
+            let err = s.validate().unwrap_err();
+            assert!(
+                err.message().contains(needle),
+                "{needle}: {}",
+                err.message()
+            );
+        }
+        // Settings saved before appearance existed still load.
+        let old: AdminSettings = serde_json::from_str(r#"{"organisation":"Northstar"}"#).unwrap();
+        assert_eq!(old.appearance, AppearanceSettings::default());
     }
 
     #[test]

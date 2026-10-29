@@ -29,4 +29,7 @@ pub use audit::{
     AuditActor, AuditLog, AuditRecord, FileAuditLog, MemoryAuditLog, NewAuditEvent, Outcome,
 };
 pub use service::{AdminPaths, AdminService, Caller};
-pub use settings::{AdminSettings, FileSettingsStore, MemorySettingsStore, SettingsStore};
+pub use settings::{
+    AdminSettings, AppearanceSettings, EXPORT_THEMES, FileSettingsStore, MemorySettingsStore,
+    SITE_THEMES, SettingsStore,
+};

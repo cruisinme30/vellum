@@ -135,6 +135,11 @@ export interface AddSection {
 }
 
 /**
+ * No input.
+ */
+export type AdminAppearanceEmpty = Record<string, unknown>;
+
+/**
  * A finished backup.
  */
 export interface AdminCreateBackupBackupInfo {
@@ -177,6 +182,27 @@ export type AdminCreateBackupEmpty = Record<string, unknown>;
  * No input.
  */
 export type AdminExportAuditEmpty = Record<string, unknown>;
+
+/**
+ * The organisation's look (R-TH-1, R-TH-4; ADR 0007 D245).
+ */
+export interface AdminGetSettingsAppearanceSettings {
+  /**
+   * The theme exports (PDF, HTML, Word) use: a light theme, since
+   * paper is white.
+   */
+  export_theme?: string;
+  /**
+   * The seed colour every built-in theme is derived from, `#rrggbb`.
+   * People can still pick their own accent in the app.
+   */
+  seed?: string;
+  /**
+   * The theme of published sites; `auto` follows the reader's system
+   * light or dark setting.
+   */
+  site_theme?: string;
+}
 
 /**
  * No input.
@@ -235,6 +261,10 @@ export type AdminRunDrillEmpty = Record<string, unknown>;
  * Every admin setting.
  */
 export interface AdminSettings {
+  /**
+   * The organisation's seed colour and export and site themes.
+   */
+  appearance?: AdminGetSettingsAppearanceSettings;
   /**
    * Backups.
    */
@@ -295,6 +325,10 @@ export type AdminTelemetryPreviewEmpty = Record<string, unknown>;
  */
 export interface AdminUpdateSettingsAdminSettings {
   /**
+   * The organisation's seed colour and export and site themes.
+   */
+  appearance?: AdminUpdateSettingsAppearanceSettings;
+  /**
    * Backups.
    */
   backups?: BackupSettings;
@@ -321,6 +355,10 @@ export interface AdminUpdateSettingsAdminSettings {
  */
 export interface AdminUpdateSettingsAdminSettings2 {
   /**
+   * The organisation's seed colour and export and site themes.
+   */
+  appearance?: AdminUpdateSettingsAppearanceSettings2;
+  /**
    * Backups.
    */
   backups?: BackupSettings;
@@ -340,6 +378,48 @@ export interface AdminUpdateSettingsAdminSettings2 {
    * Anonymous usage reporting.
    */
   telemetry?: AdminUpdateSettingsTelemetrySettings2;
+}
+
+/**
+ * The organisation's look (R-TH-1, R-TH-4; ADR 0007 D245).
+ */
+export interface AdminUpdateSettingsAppearanceSettings {
+  /**
+   * The theme exports (PDF, HTML, Word) use: a light theme, since
+   * paper is white.
+   */
+  export_theme?: string;
+  /**
+   * The seed colour every built-in theme is derived from, `#rrggbb`.
+   * People can still pick their own accent in the app.
+   */
+  seed?: string;
+  /**
+   * The theme of published sites; `auto` follows the reader's system
+   * light or dark setting.
+   */
+  site_theme?: string;
+}
+
+/**
+ * The organisation's look (R-TH-1, R-TH-4; ADR 0007 D245).
+ */
+export interface AdminUpdateSettingsAppearanceSettings2 {
+  /**
+   * The theme exports (PDF, HTML, Word) use: a light theme, since
+   * paper is white.
+   */
+  export_theme?: string;
+  /**
+   * The seed colour every built-in theme is derived from, `#rrggbb`.
+   * People can still pick their own accent in the app.
+   */
+  seed?: string;
+  /**
+   * The theme of published sites; `auto` follows the reader's system
+   * light or dark setting.
+   */
+  site_theme?: string;
 }
 
 /**
@@ -466,6 +546,27 @@ export interface AppView {
    * The granted scopes.
    */
   scopes: Scope[];
+}
+
+/**
+ * The organisation's look (R-TH-1, R-TH-4; ADR 0007 D245).
+ */
+export interface AppearanceSettings {
+  /**
+   * The theme exports (PDF, HTML, Word) use: a light theme, since
+   * paper is white.
+   */
+  export_theme?: string;
+  /**
+   * The seed colour every built-in theme is derived from, `#rrggbb`.
+   * People can still pick their own accent in the app.
+   */
+  seed?: string;
+  /**
+   * The theme of published sites; `auto` follows the reader's system
+   * light or dark setting.
+   */
+  site_theme?: string;
 }
 
 export type Array_of_AppView = AppView[];
@@ -8641,6 +8742,13 @@ export interface WorkUpdateIssueIssueOut {
 
 /** Every operation: its method, path, input and output. */
 export interface Operations {
+  /** The organisation's seed colour and export and site themes */
+  "admin.appearance": {
+    method: "GET";
+    path: "/v1/appearance";
+    input: AdminAppearanceEmpty;
+    output: AppearanceSettings;
+  };
   /** Browser timings for a page view or slow call, joined to its trace */
   "admin.client_report": {
     method: "POST";
@@ -9772,6 +9880,7 @@ export interface Operations {
 
 /** How to call each operation, for the runtime in `client.ts`. */
 export const OPERATIONS = {
+  "admin.appearance": { method: "GET", path: "/v1/appearance", mutation: false },
   "admin.client_report": { method: "POST", path: "/v1/telemetry/client", mutation: true },
   "admin.create_backup": { method: "POST", path: "/v1/admin/backups", mutation: true },
   "admin.export_audit": { method: "GET", path: "/v1/admin/audit/export", mutation: false },

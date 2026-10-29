@@ -14,11 +14,29 @@ import {
 
 import { mediaQuery } from "../shell/use-media";
 
-import { applyAppearance, loadAppearance, saveAppearance, type Appearance } from "./appearance";
+import {
+  applyAppearance,
+  loadAppearance,
+  loadReadingFont,
+  saveAppearance,
+  type Appearance,
+} from "./appearance";
+
+/** The organisation's look, from `GET /api/v1/appearance` (R-TH-1, R-TH-4). */
+export interface OrganisationAppearance {
+  /** The organisation's seed colour, `#rrggbb`. */
+  readonly seed: string;
+  /** The theme exports use. */
+  readonly exportTheme: string;
+  /** The theme published sites use; `auto` follows the reader's system. */
+  readonly siteTheme: string;
+}
 
 interface AppearanceState {
   readonly appearance: Appearance;
   readonly update: (patch: Partial<Appearance>) => void;
+  /** The organisation's look; absent in demo mode or until it loads. */
+  readonly organisation: OrganisationAppearance | undefined;
 }
 
 const AppearanceContext = createContext<AppearanceState | undefined>(undefined);
@@ -45,16 +63,47 @@ function storage(): Storage | undefined {
   }
 }
 
-/** Holds the appearance settings and keeps `<html>` themed. */
-export function AppearanceProvider({ children }: { readonly children: ReactNode }) {
+/**
+ * Holds the appearance settings and keeps `<html>` themed. `organisation`
+ * loads the organisation's seed colour, which users follow until they pick
+ * their own; without it (demo mode) Vellum's seed is used.
+ */
+export function AppearanceProvider({
+  organisation: loadOrganisation,
+  children,
+}: {
+  readonly organisation?: (() => Promise<OrganisationAppearance>) | undefined;
+  readonly children: ReactNode;
+}) {
   const [appearance, setAppearance] = useState(() =>
     loadAppearance(storage(), document.documentElement.dataset["theme"]),
   );
+  const [organisation, setOrganisation] = useState<OrganisationAppearance>();
   const dark = useSyncExternalStore(subscribeDark, prefersDark, () => false);
 
   useEffect(() => {
-    applyAppearance(document.documentElement, appearance, dark);
-  }, [appearance, dark]);
+    if (loadOrganisation === undefined) return;
+    let live = true;
+    loadOrganisation().then(
+      (value) => {
+        if (live) setOrganisation(value);
+      },
+      () => {
+        // The app still works with Vellum's own seed.
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [loadOrganisation]);
+
+  useEffect(() => {
+    applyAppearance(document.documentElement, appearance, dark, organisation?.seed);
+  }, [appearance, dark, organisation]);
+
+  useEffect(() => {
+    loadReadingFont(appearance.font);
+  }, [appearance.font]);
 
   const update = useCallback((patch: Partial<Appearance>) => {
     setAppearance((current) => {
@@ -64,7 +113,10 @@ export function AppearanceProvider({ children }: { readonly children: ReactNode 
     });
   }, []);
 
-  const value = useMemo(() => ({ appearance, update }), [appearance, update]);
+  const value = useMemo(
+    () => ({ appearance, update, organisation }),
+    [appearance, update, organisation],
+  );
   return <AppearanceContext value={value}>{children}</AppearanceContext>;
 }
 

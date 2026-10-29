@@ -16,6 +16,8 @@
 //! Build one [`PdfEngine`] per process: loading the fonts is the slow
 //! part, and the engine is shareable across threads.
 
+mod themed;
+
 use std::collections::HashMap;
 use std::time::Instant;
 

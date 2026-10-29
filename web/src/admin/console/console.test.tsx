@@ -172,6 +172,10 @@ describe("settings page", () => {
     const keep = await screen.findByRole("spinbutton", { name: "Backups to keep" });
     await user.clear(keep);
     await user.type(keep, "14");
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Theme for exports (PDF, HTML, Word)" }),
+      "Sepia",
+    );
     await user.click(screen.getByRole("button", { name: "Save" }));
     expect(await screen.findByText("Settings saved.")).toBeDefined();
     const [version, settings] = saveSettings.mock.calls[0] ?? [];
@@ -179,6 +183,11 @@ describe("settings page", () => {
     expect(settings?.backups?.keep).toBe(14);
     expect(settings?.observability?.budgets).toEqual({ read_ms: 200 });
     expect(settings?.telemetry?.install_id).toBe("abc");
+    expect(settings?.appearance).toEqual({
+      seed: "#4f5b92",
+      export_theme: "sepia",
+      site_theme: "auto",
+    });
   });
 
   it("says when another admin saved first", async () => {

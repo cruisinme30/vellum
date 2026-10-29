@@ -49,7 +49,15 @@ describe("ThemeSettings", () => {
     const reset = screen.getByRole("button", { name: "Reset colour" });
     expect(reset).toHaveProperty("disabled", false);
     await user.click(reset);
-    expect(saved()).toMatchObject({ seed: DEFAULT_SEED });
+    expect(saved()).not.toHaveProperty("seed");
+    expect(screen.getByLabelText("Accent colour")).toHaveProperty("value", DEFAULT_SEED);
     expect(reset).toHaveProperty("disabled", true);
+  });
+
+  it("links to the full appearance settings", () => {
+    renderWithProviders(<ThemeSettings />);
+    expect(
+      screen.getByRole("link", { name: "All appearance settings" }).getAttribute("href"),
+    ).toBe("/settings/appearance");
   });
 });

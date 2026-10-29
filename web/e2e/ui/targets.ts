@@ -67,6 +67,9 @@ const APP_TARGETS: Target[] = [
   app("shell", "/"),
   app("sign-in", "/sign-in", { server: "signed-out" }),
   app("setup", "/setup", { server: "new" }),
+  // The theme editor's words and its contrast table change as tokens are
+  // added, so the layout audit covers it rather than a pixel baseline.
+  app("appearance", "/settings/appearance", { visual: false }),
 ];
 
 function htmlFiles(directory: string): string[] {

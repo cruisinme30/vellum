@@ -78,6 +78,19 @@ impl BuiltinTheme {
         }
     }
 
+    /// The built-in theme with this [`id`](Self::id), if any.
+    #[must_use]
+    pub fn from_id(id: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|t| t.id() == id)
+    }
+
+    /// Whether the theme puts dark text on light surfaces, so it can be
+    /// printed on white paper (export themes, R-TH-4).
+    #[must_use]
+    pub const fn is_light(self) -> bool {
+        matches!(self.mode(), Mode::Light)
+    }
+
     const fn mode(self) -> Mode {
         match self {
             Self::Light | Self::HighContrast | Self::Sepia => Mode::Light,
@@ -738,6 +751,17 @@ mod tests {
             assert_eq!(theme.tokens.len(), TOKENS.len());
             assert_eq!(theme.validate(), vec![], "{}", which.id());
         }
+    }
+
+    #[test]
+    fn ids_round_trip() {
+        for which in BuiltinTheme::ALL {
+            assert_eq!(BuiltinTheme::from_id(which.id()), Some(which));
+        }
+        assert_eq!(BuiltinTheme::from_id("Light"), None);
+        assert_eq!(BuiltinTheme::from_id(""), None);
+        assert!(BuiltinTheme::Sepia.is_light());
+        assert!(!BuiltinTheme::Dim.is_light());
     }
 
     #[test]

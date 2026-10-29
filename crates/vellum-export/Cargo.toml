@@ -40,6 +40,7 @@ typst-svg = "0.15.1"
 url = "2.5.8"
 vellum-format = { path = "../vellum-format" }
 vellum-kernel.workspace = true
+vellum-render = { path = "../vellum-render" }
 zip = { version = "9.1.3", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]

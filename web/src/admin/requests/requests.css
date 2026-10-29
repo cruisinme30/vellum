@@ -4,8 +4,8 @@
  */
 
 .vl-requests {
-  font-family: Roboto, system-ui, sans-serif;
-  color: #1d1b20;
+  font-family: var(--vl-font);
+  color: var(--md-on-surface);
   padding: 16px 24px;
 }
 
@@ -20,9 +20,9 @@
 .vl-requests__filters button,
 .vl-requests__table button {
   border-radius: 999px;
-  border: 1px solid #767680;
-  background: #dde1ff;
-  color: #1d1b20;
+  border: 1px solid var(--md-outline);
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
   padding: 6px 14px;
   cursor: pointer;
 }
@@ -36,15 +36,15 @@
 .vl-requests__table td {
   text-align: start;
   padding: 6px 8px;
-  border-block-end: 1px solid #c5c6d0;
+  border-block-end: 1px solid var(--md-outline-variant);
 }
 
 .vl-requests__table tr[aria-selected="true"] {
-  background: #f0f2f9;
+  background: var(--md-surface-container);
 }
 
 .vl-requests__row--error td {
-  color: #ba1a1a;
+  color: var(--md-error);
 }
 
 .vl-waterfall ol {
@@ -67,12 +67,12 @@
 }
 
 .vl-waterfall__row > button:focus-visible {
-  outline: 2px solid #4f5b92;
+  outline: 2px solid var(--md-primary);
 }
 
 .vl-waterfall__track {
   position: relative;
-  background: #f7f8fc;
+  background: var(--md-surface);
   border-radius: 4px;
   min-height: 14px;
 }
@@ -82,15 +82,15 @@
   top: 2px;
   bottom: 2px;
   border-radius: 4px;
-  background: #4f5b92;
+  background: var(--md-primary);
 }
 
 .vl-waterfall__row--browser .vl-waterfall__bar {
-  background: #7d5260;
+  background: var(--md-callout-tip);
 }
 
 .vl-waterfall__row--error .vl-waterfall__bar {
-  background: #ba1a1a;
+  background: var(--md-error);
 }
 
 .vl-waterfall__details {
@@ -123,5 +123,5 @@
 }
 
 .vl-routes__over {
-  color: #ba1a1a;
+  color: var(--md-error);
 }

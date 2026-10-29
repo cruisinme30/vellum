@@ -656,7 +656,7 @@
   inset-inline-start: -1px;
   padding: 0 4px;
   border-radius: 4px 4px 4px 0;
-  color: #ffffff;
+  color: #ffffff; /* fixed: on the fixed caret colours, not a theme token */
   font-size: 0.75rem;
   font-weight: 500;
   line-height: 1.4;
