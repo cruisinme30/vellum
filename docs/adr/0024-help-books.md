@@ -13,6 +13,8 @@ vellum: 1
 - Status: accepted
 - Decisions: D100, D101, D102
 - Requirements: R-HG-1, R-HG-2, R-HG-3, R-HG-4, R-HG-5
+- Issue: #197, #198, #199
+- Pull requests: #218
 
 :::
 
@@ -91,3 +93,7 @@ service (ADR 0013, D67) fixed the on-disk shape of a book.
 - The markdownlint configuration now ignores `docs/*.book/SUMMARY.md` (mdBook uses `#`
   for part titles), reads the page title from front matter only for
   MD025, and allows bare URLs (`::: link <url>` takes one).
+
+## History
+
+- 2026-10-29: accepted in #218.
