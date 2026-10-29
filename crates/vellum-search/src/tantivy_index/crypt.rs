@@ -185,9 +185,9 @@ fn read_header(bytes: &[u8]) -> io::Result<[u8; SALT_LEN]> {
             "index file is not encrypted with this format (wrong key mode?)",
         ));
     }
-    let mut out = [0_u8; SALT_LEN];
-    out.copy_from_slice(salt);
-    Ok(out)
+    // The salt is read from the file header, never a fixed value.
+    <[u8; SALT_LEN]>::try_from(salt)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "short index header"))
 }
 
 /// Decrypts a whole buffer in the file format.
