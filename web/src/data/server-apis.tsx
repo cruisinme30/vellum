@@ -16,6 +16,7 @@ import type { RenderApi } from "../render/api";
 import type { SharingApi } from "../sharing/api";
 import { CopyDiagnostic } from "../shell/copy-diagnostic";
 import type { WorkApi } from "../work/api";
+import type { PlanningApi } from "../work/planning/api";
 
 import type { Loaded } from "./use-loaded";
 
@@ -34,6 +35,7 @@ export interface ServerApis {
   readonly sharing?: SharingApi | undefined;
   /** The signed-in person's API tokens and sign-in factors. */
   readonly account?: AccountApi | undefined;
+  readonly planning?: PlanningApi | undefined;
 }
 
 const ServerApisContext = createContext<ServerApis>({});

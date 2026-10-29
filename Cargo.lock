@@ -9634,6 +9634,7 @@ version = "0.0.0"
 dependencies = [
  "bytes",
  "futures",
+ "jiff",
  "schemars 1.2.3",
  "serde",
  "serde_json",

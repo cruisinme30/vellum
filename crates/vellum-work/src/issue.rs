@@ -287,6 +287,10 @@ pub struct Issue {
         skip_serializing_if = "Option::is_none"
     )]
     pub snoozed_until: Option<OffsetDateTime>,
+    /// How often the issue repeats, such as `2w`; the next one is filed
+    /// once the due date passes (D224).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repeat: Option<crate::recur::Repeat>,
     /// The dialect version, always 1.
     #[serde(default = "one")]
     pub vellum: u8,
@@ -340,6 +344,7 @@ impl Issue {
             canceled_at: None,
             triaged_at: None,
             snoozed_until: None,
+            repeat: None,
             vellum: 1,
             extra: BTreeMap::new(),
             body: String::new(),

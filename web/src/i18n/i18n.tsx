@@ -4,6 +4,8 @@
 import { FluentBundle, FluentResource, type FluentVariable } from "@fluent/bundle";
 import { createContext, use, useMemo, type ReactNode } from "react";
 
+import planning from "../work/planning/planning.ftl?raw";
+
 import en from "./en.ftl?raw";
 
 /** Formats a message by its Fluent id. Unknown ids come back unchanged. */
@@ -25,7 +27,8 @@ export function createTranslator(locale: string, source: string): Translate {
   };
 }
 
-const english = createTranslator("en", en);
+// Each area may keep its messages next to its code; they join one bundle.
+const english = createTranslator("en", `${en}\n${planning}`);
 const I18nContext = createContext<Translate>(english);
 
 /** Provides the translator for the user's locale. English is the only locale so far. */
