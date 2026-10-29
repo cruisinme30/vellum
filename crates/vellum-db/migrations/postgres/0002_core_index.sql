@@ -118,6 +118,9 @@ CREATE TABLE effective_access (
     authz_epoch BIGINT NOT NULL,
     PRIMARY KEY (space_id, subject_id, object_id, relation)
 );
+CREATE INDEX effective_access_subject ON effective_access (
+    subject_id, object_id
+);
 
 -- Per-user state the files do not carry: stars and recents. Database-owned.
 CREATE TABLE user_doc_state (

@@ -69,6 +69,9 @@ impl Index {
     pub async fn open(config: &IndexConfig) -> Result<Self> {
         let index = match config {
             IndexConfig::Sqlite { path, key } => {
+                if let Some(parent) = path.parent() {
+                    std::fs::create_dir_all(parent)?;
+                }
                 let mut options = SqliteConnectOptions::from_str("sqlite://")?
                     .filename(path)
                     .create_if_missing(true)
