@@ -123,6 +123,57 @@ impl PassphraseKdf {
     }
 }
 
+/// Environment variable holding the KEK passphrase itself.
+pub const PASSPHRASE_ENV: &str = "VELLUM_KEK_PASSPHRASE";
+/// Environment variable naming a file that holds the KEK passphrase, for
+/// container secrets mounted as files.
+pub const PASSPHRASE_FILE_ENV: &str = "VELLUM_KEK_PASSPHRASE_FILE";
+
+/// Reads the KEK passphrase from [`PASSPHRASE_ENV`] or the file named by
+/// [`PASSPHRASE_FILE_ENV`]. One trailing newline is dropped from the file.
+/// Returns `None` when neither is set.
+///
+/// # Errors
+/// [`CryptoError::Provider`] if both are set, the passphrase is empty, or the
+/// file cannot be read. Messages name the variable, never its value.
+pub fn passphrase_from_env() -> Result<Option<Zeroizing<Vec<u8>>>, CryptoError> {
+    passphrase_from(|name| std::env::var_os(name), |path| std::fs::read(path))
+}
+
+/// [`passphrase_from_env`] with the environment and file system passed in.
+fn passphrase_from(
+    var: impl Fn(&str) -> Option<std::ffi::OsString>,
+    read: impl Fn(&std::path::Path) -> std::io::Result<Vec<u8>>,
+) -> Result<Option<Zeroizing<Vec<u8>>>, CryptoError> {
+    let inline = var(PASSPHRASE_ENV);
+    let file = var(PASSPHRASE_FILE_ENV);
+    let secret = match (inline, file) {
+        (None, None) => return Ok(None),
+        (Some(_), Some(_)) => {
+            return Err(CryptoError::Provider(format!(
+                "set only one of {PASSPHRASE_ENV} and {PASSPHRASE_FILE_ENV}"
+            )));
+        }
+        (Some(value), None) => Zeroizing::new(value.into_encoded_bytes()),
+        (None, Some(path)) => {
+            let mut bytes = Zeroizing::new(read(std::path::Path::new(&path)).map_err(|e| {
+                CryptoError::Provider(format!("cannot read {PASSPHRASE_FILE_ENV}: {e}"))
+            })?);
+            if bytes.ends_with(b"\n") {
+                let _ = bytes.pop();
+                if bytes.ends_with(b"\r") {
+                    let _ = bytes.pop();
+                }
+            }
+            bytes
+        }
+    };
+    if secret.is_empty() {
+        return Err(CryptoError::Provider("the KEK passphrase is empty".into()));
+    }
+    Ok(Some(secret))
+}
+
 fn decode_hex(text: &str) -> Option<[u8; SALT_LEN]> {
     if text.len() != SALT_LEN * 2 {
         return None;
@@ -138,6 +189,53 @@ fn decode_hex(text: &str) -> Option<[u8; SALT_LEN]> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn env<'a>(
+        pairs: &'a [(&'a str, &'a str)],
+    ) -> impl Fn(&str) -> Option<std::ffi::OsString> + 'a {
+        move |name| {
+            pairs
+                .iter()
+                .find(|(k, _)| *k == name)
+                .map(|(_, v)| v.into())
+        }
+    }
+
+    fn file(content: &'static [u8]) -> impl Fn(&std::path::Path) -> std::io::Result<Vec<u8>> {
+        move |_| Ok(content.to_vec())
+    }
+
+    #[test]
+    fn passphrase_comes_from_the_variable_or_the_file() -> Result<(), CryptoError> {
+        let none = passphrase_from(env(&[]), file(b""))?;
+        assert!(none.is_none());
+        let inline = passphrase_from(env(&[(PASSPHRASE_ENV, "hunter2")]), file(b""))?;
+        assert_eq!(inline.as_deref().map(Vec::as_slice), Some(&b"hunter2"[..]));
+        let from_file = passphrase_from(
+            env(&[(PASSPHRASE_FILE_ENV, "/run/secrets/kek")]),
+            file(b"correct horse\r\n"),
+        )?;
+        assert_eq!(
+            from_file.as_deref().map(Vec::as_slice),
+            Some(&b"correct horse"[..])
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn passphrase_rejects_ambiguous_or_empty_input() {
+        let both = passphrase_from(
+            env(&[(PASSPHRASE_ENV, "a"), (PASSPHRASE_FILE_ENV, "/x")]),
+            file(b"b"),
+        );
+        assert!(matches!(both, Err(CryptoError::Provider(_))));
+        let empty = passphrase_from(env(&[(PASSPHRASE_FILE_ENV, "/x")]), file(b"\n"));
+        assert!(matches!(empty, Err(CryptoError::Provider(_))));
+        let missing = passphrase_from(env(&[(PASSPHRASE_FILE_ENV, "/x")]), |_| {
+            Err(std::io::Error::from(std::io::ErrorKind::NotFound))
+        });
+        assert!(matches!(missing, Err(CryptoError::Provider(m)) if !m.contains("/x")));
+    }
 
     fn cheap() -> Result<PassphraseKdf, CryptoError> {
         PassphraseKdf::with_params(64, 1, 1)
