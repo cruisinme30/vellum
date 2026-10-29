@@ -52,6 +52,9 @@ KMS
 [Rr]e-?wrap(s|ped|ping)?
 [Uu]nwrap(s|ped|ping)?
 [Ll]abeler
+X25519
+HKDF
+[Ss]tanzas?
 comrak
 [Ss]erializ(e|er|ers|able|ed|es|ing)
 [Ss]etext
@@ -122,4 +125,5 @@ Patroni
 Pandoc
 [Kk]anban
 [Cc]ollab
+zizmor
 [Rr]ecents

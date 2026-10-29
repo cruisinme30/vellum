@@ -8,6 +8,7 @@ import type { WorkspaceStore } from "./data/store";
 import { WorkspaceProvider } from "./data/workspace-context";
 import type { CollabConnector } from "./editor/collab/provider";
 import { I18nProvider, useT } from "./i18n/i18n";
+import { KeyboardRoot } from "./keyboard/keyboard-root";
 import { AppShell } from "./shell/app-shell";
 import { AppearanceProvider } from "./theme/appearance-context";
 import { FavoritesView, HomeView } from "./views/home";
@@ -86,9 +87,11 @@ export function AppProviders({
 export function App(services: AppServices) {
   return (
     <AppProviders {...services}>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
+      <KeyboardRoot>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </KeyboardRoot>
     </AppProviders>
   );
 }

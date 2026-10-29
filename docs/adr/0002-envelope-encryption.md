@@ -12,8 +12,8 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D34, D35, D36
-- Issue: #47, #48, #49, #50
-- Pull requests: #22, #29, #238
+- Issue: #47, #48, #49, #50, #186
+- Pull requests: #22, #29, #214, #238
 
 :::
 
@@ -54,6 +54,12 @@ on-disk format and the provider contract in `vellum-crypto`.
 - `LocalKeyring` serves the OS keychain and passphrase cases. A passphrase
   KEK id carries its Argon2id salt and costs, so the passphrase alone
   re-derives the KEK from any envelope header.
+- E2E private spaces use envelope version 2 instead: the DEK is wrapped
+  once per member device key (X25519, HKDF-SHA256, XChaCha20-Poly1305),
+  each stanza tagged with a 16-byte key fingerprint, so the server holds
+  no key that opens it. `vellum-security` owns the member key registry.
+- Adding a member wraps the same DEK again; removing one drops its stanza
+  and new writes get fresh DEKs. `Sealed` stores E2E objects untouched.
 
 ## Alternatives
 

@@ -4,8 +4,8 @@
 //! The ports a room needs: an update log, the document's Markdown file and
 //! the dialect codec.
 //!
-//! Adapters live with the systems they wrap: the Postgres and `SQLite` log
-//! in `vellum-db`, files in `vellum-store`, the codec over `vellum-format`.
+//! [`crate::sql`] stores the log in the index database (`vellum-db`);
+//! files come from `vellum-store` and the codec wraps `vellum-format`.
 //! [`crate::memory`] provides in-memory adapters.
 
 use async_trait::async_trait;
