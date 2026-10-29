@@ -13,7 +13,7 @@ vellum: 1
 - Status: accepted
 - Decisions: D94, D95, D96
 - Issue: #189, #190, #193, #194, #196, and #187 for the budgets
-- Pull requests: pending
+- Pull requests: #245
 
 :::
 
