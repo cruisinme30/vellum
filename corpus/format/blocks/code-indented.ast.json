@@ -21,6 +21,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "vellum serve --data ./northstar\n"
       }
     ]

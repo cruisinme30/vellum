@@ -5,6 +5,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { App } from "./app";
+import { createPlatform, startPlatform } from "./platform/platform";
 
 const container = document.querySelector("#root");
 if (container === null) {
@@ -15,3 +16,5 @@ createRoot(container).render(
     <App />
   </StrictMode>,
 );
+
+void startPlatform(createPlatform(), { production: import.meta.env.PROD });
