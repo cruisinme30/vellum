@@ -13,7 +13,7 @@ use crate::files::{VersionFile, from_yaml, to_yaml};
 use crate::frontmatter;
 use crate::layout;
 use crate::links::{self, Target};
-use crate::model::{ActivityKind, Node, NodeKind, VersionRecord};
+use crate::model::{ActivityKind, Node, NodeKind, Space, VersionRecord};
 use crate::ports::Permission;
 use crate::retention;
 
@@ -344,21 +344,45 @@ impl Drive {
             let space = self.space(space).await?;
             self.authorize(actor, space.id, space.node_id(), Permission::Manage)
                 .await?;
-            let now = u64::try_from(self.clock.now().unix_ms()).unwrap_or(0);
+            self.prune_space(&space).await
+        })
+        .await
+    }
+
+    /// Applies every space's version retention as Vellum itself. Run by
+    /// the scheduler once per cluster (D266). Returns how many versions
+    /// went.
+    ///
+    /// # Errors
+    /// Index or store failures.
+    #[tracing::instrument(name = "drive.prune_all_versions", skip_all, err)]
+    pub async fn prune_all_versions(&self) -> DriveResult<usize> {
+        self.observe("prune_all_versions", async {
             let mut pruned = 0;
-            for node in self.index.nodes(space.id).await? {
-                if node.kind != NodeKind::Page {
-                    continue;
-                }
-                let versions = self.index.versions(node.id).await?;
-                for version in retention::prunable(&versions, &space.settings.retention, now) {
-                    self.delete_version(node.id, version).await?;
-                    pruned += 1;
-                }
+            for space in self.index.spaces().await? {
+                pruned += self.prune_space(&space).await?;
             }
             Ok(pruned)
         })
         .await
+    }
+
+    /// Deletes the versions `space`'s retention policy no longer keeps,
+    /// without a rights check.
+    async fn prune_space(&self, space: &Space) -> DriveResult<usize> {
+        let now = u64::try_from(self.clock.now().unix_ms()).unwrap_or(0);
+        let mut pruned = 0;
+        for node in self.index.nodes(space.id).await? {
+            if node.kind != NodeKind::Page {
+                continue;
+            }
+            let versions = self.index.versions(node.id).await?;
+            for version in retention::prunable(&versions, &space.settings.retention, now) {
+                self.delete_version(node.id, version).await?;
+                pruned += 1;
+            }
+        }
+        Ok(pruned)
     }
 
     /// Removes one version's files and index row.
