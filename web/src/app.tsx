@@ -170,6 +170,27 @@ export interface AppServices {
   readonly appearance?: (() => Promise<OrganisationAppearance>) | undefined;
 }
 
+/**
+ * Loads the organisation's look only once someone is signed in: the server
+ * answers `GET /api/v1/appearance` to signed-in readers, so asking before
+ * sign-in fails on every sign-in and set-up screen.
+ */
+function SessionAppearance({
+  organisation,
+  children,
+}: {
+  readonly organisation: AppServices["appearance"];
+  readonly children: ReactNode;
+}) {
+  const session = useSession();
+  const signedIn = session === undefined || Boolean(session.status.user);
+  return (
+    <AppearanceProvider organisation={signedIn ? organisation : undefined}>
+      {children}
+    </AppearanceProvider>
+  );
+}
+
 function MaybeSession({
   session,
   children,
@@ -232,8 +253,8 @@ export function AppProviders({
   }));
   return (
     <I18nProvider>
-      <AppearanceProvider organisation={appearance}>
-        <MaybeSession session={session}>
+      <MaybeSession session={session}>
+        <SessionAppearance organisation={appearance}>
           <WorkspaceProvider store={store} collab={collab} history={history}>
             <SignedInUser>
               <CollectionsProvider store={collections}>
@@ -245,8 +266,8 @@ export function AppProviders({
               </CollectionsProvider>
             </SignedInUser>
           </WorkspaceProvider>
-        </MaybeSession>
-      </AppearanceProvider>
+        </SessionAppearance>
+      </MaybeSession>
     </I18nProvider>
   );
 }

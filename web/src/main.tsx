@@ -61,13 +61,29 @@ const root = createRoot(container);
 // app runs on the Northstar demo data.
 const http = createHttp();
 const auth = createAuthApi(http);
-let status: Awaited<ReturnType<typeof auth.status>>;
-try {
-  status = await auth.status();
-} catch {
-  // A server that answers with an error: show the demo rather than nothing.
-  status = undefined;
+// Roboto's heavier faces download only once text uses them, so the first
+// paint would set headings and links in the fallback font and then reflow
+// (a layout shift). Fetch them while the server answers, for at most a
+// moment: a slow font still shows its fallback rather than holding the page.
+async function preloadFonts(): Promise<void> {
+  try {
+    await Promise.race([
+      Promise.all(["500 1em Roboto", "700 1em Roboto"].map((font) => document.fonts.load(font))),
+      new Promise((resolve) => setTimeout(resolve, 800)),
+    ]);
+  } catch {
+    // A font that fails to load keeps its fallback.
+  }
 }
+async function loadStatus(): Promise<Awaited<ReturnType<typeof auth.status>>> {
+  try {
+    return await auth.status();
+  } catch {
+    // A server that answers with an error: show the demo rather than nothing.
+    return undefined;
+  }
+}
+const [status] = await Promise.all([loadStatus(), preloadFonts()]);
 root.render(
   <StrictMode>
     <App
