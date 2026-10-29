@@ -1,0 +1,328 @@
+{
+  "document": {
+    "front_matter": {
+      "fields": {
+        "id": "01JB9D3E5F7G9H1J3K5M7N9P1Q",
+        "title": "PRD: Policy simulator",
+        "icon": "📐",
+        "status": "in-review",
+        "owner": "priya",
+        "tags": [
+          "prd",
+          "gateway"
+        ],
+        "verify_every": "90d",
+        "vellum": 1
+      }
+    },
+    "blocks": [
+      {
+        "type": "container",
+        "name": "facts",
+        "arg": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "sections": [
+          [
+            {
+              "type": "list",
+              "start": null,
+              "tight": true,
+              "items": [
+                {
+                  "task": null,
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Owner: "
+                        },
+                        {
+                          "type": "mention",
+                          "handle": "priya"
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                },
+                {
+                  "task": null,
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Status: In review"
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                },
+                {
+                  "task": null,
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Target: "
+                        },
+                        {
+                          "type": "date",
+                          "date": "2027-01-10"
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                },
+                {
+                  "task": null,
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Project: Policy simulator"
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        ]
+      },
+      {
+        "type": "heading",
+        "level": 2,
+        "content": [
+          {
+            "type": "text",
+            "text": "Problem"
+          }
+        ],
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Policy changes ship blind: nobody knows which requests a new rule will"
+          },
+          {
+            "type": "soft_break"
+          },
+          {
+            "type": "text",
+            "text": "block until customers report it."
+          }
+        ],
+        "id": null
+      },
+      {
+        "type": "heading",
+        "level": 2,
+        "content": [
+          {
+            "type": "text",
+            "text": "Requirements"
+          }
+        ],
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null
+      },
+      {
+        "type": "table",
+        "alignments": [
+          "none",
+          "none",
+          "none"
+        ],
+        "header": [
+          [
+            {
+              "type": "text",
+              "text": "#"
+            }
+          ],
+          [
+            {
+              "type": "text",
+              "text": "Requirement"
+            }
+          ],
+          [
+            {
+              "type": "text",
+              "text": "Issue"
+            }
+          ]
+        ],
+        "rows": [
+          [
+            [
+              {
+                "type": "text",
+                "text": "R1"
+              }
+            ],
+            [
+              {
+                "type": "text",
+                "text": "Replay 7 days of traffic in under 10 minutes"
+              }
+            ],
+            [
+              {
+                "type": "issue_key",
+                "key": "ENG-142"
+              }
+            ]
+          ],
+          [
+            [
+              {
+                "type": "text",
+                "text": "R2"
+              }
+            ],
+            [
+              {
+                "type": "text",
+                "text": "Diff report of allowed and blocked requests"
+              }
+            ],
+            [
+              {
+                "type": "issue_key",
+                "key": "ENG-143"
+              }
+            ]
+          ],
+          [
+            [
+              {
+                "type": "text",
+                "text": "R3"
+              }
+            ],
+            [
+              {
+                "type": "text",
+                "text": "Share the report as a PDF"
+              }
+            ],
+            [
+              {
+                "type": "issue_key",
+                "key": "ENG-151"
+              }
+            ]
+          ]
+        ]
+      },
+      {
+        "type": "heading",
+        "level": 2,
+        "content": [
+          {
+            "type": "text",
+            "text": "Plan"
+          }
+        ],
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null
+      },
+      {
+        "type": "fence",
+        "lang": "roadmap",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "range: 2026-10-01 .. 2027-02-28\nReplay engine | 2026-10-01 | 2026-11-15\nDiff report | 2026-11-01 | 2026-12-15\nPDF report | 2026-12-01 | 2027-01-05\nGA | 2027-01-10 | milestone\n"
+      },
+      {
+        "type": "heading",
+        "level": 2,
+        "content": [
+          {
+            "type": "text",
+            "text": "Risks"
+          }
+        ],
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null
+      },
+      {
+        "type": "fence",
+        "lang": "risk-matrix",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "Replay too slow for large tenants | likelihood 3 | impact 4\nPDF layout slips | likelihood 2 | impact 2\n"
+      },
+      {
+        "type": "container",
+        "name": "details",
+        "arg": "Out of scope",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "sections": [
+          [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Simulating policies against synthetic traffic; live A/B of policies."
+                }
+              ],
+              "id": null
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "diagnostics": []
+}

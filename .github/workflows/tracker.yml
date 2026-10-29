@@ -1,0 +1,40 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Marks the task issues a pull request closes as in progress while it is
+# open, so the 1.0 tracker stays current. Runs as pull_request_target so it
+# may write issue labels; it never checks out or runs the pull request's
+# code, only the script on develop.
+name: Tracker
+
+on:
+  pull_request_target:
+    types: [opened, reopened, edited, closed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tracker-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  tracker:
+    name: Tracker
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: develop
+          persist-credentials: false
+      - name: Mark linked task issues
+        run: scripts/ci/tracker-status.sh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_STATE: ${{ github.event.pull_request.state }}

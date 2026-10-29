@@ -1,0 +1,11 @@
+---
+id: 01JB3K9Q7Z5N8M2X4V6T0R1Y3W
+title: Roadmap 2027
+icon: 🗓
+status: verified
+owner: priya
+tags:
+- planning
+verify_every: 90d
+vellum: 1
+---
