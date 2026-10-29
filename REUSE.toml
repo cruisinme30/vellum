@@ -19,6 +19,7 @@ path = [
   "docs/**/*.md",
   "corpus/**/*.md",
   "corpus/**/*.json",
+  "corpus/**/*.html",
   ".gitmessage",
 ]
 precedence = "aggregate"

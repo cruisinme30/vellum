@@ -1,0 +1,231 @@
+<article class="vl-doc">
+<p>Indented code becomes a fenced block:</p>
+<figure class="vl-code">
+<pre>
+<code>vellum serve --data ./northstar
+</code>
+</pre>
+</figure>
+<figure class="vl-code">
+<pre data-lang="bash">
+<code>
+<span class="vl-tok-function">helm</span> rollback gateway 1<span class="vl-tok-punctuation"> -</span>
+<span class="vl-tok-variable">n</span> prod
+</code>
+</pre>
+</figure>
+<figure id="evaluate" class="vl-code highlight">
+<pre data-lang="rust">
+<code>
+<span class="vl-tok-type">fn</span> <span class="vl-tok-function">evaluate</span>
+<span class="vl-tok-punctuation">(</span>
+<span class="vl-tok-variable">request</span>
+<span class="vl-tok-punctuation">:</span> <span class="vl-tok-keyword">&amp;</span>Request<span class="vl-tok-punctuation">)</span> <span class="vl-tok-punctuation">-&gt;</span> Decision <span class="vl-tok-punctuation">{</span>
+    Decision<span class="vl-tok-punctuation">::</span>Allow
+<span class="vl-tok-punctuation">}</span>
+</code>
+</pre>
+</figure>
+<figure class="vl-code">
+<pre data-lang="markdown">
+<code>
+<span class="vl-tok-punctuation">```</span>
+<span class="vl-tok-number">chart</span>
+type: bar
+<span class="vl-tok-punctuation">```</span>
+</code>
+</pre>
+</figure>
+<div class="vl-table-wrap">
+<table class="vl-compare">
+<thead>
+<tr>
+<th scope="col">Feature</th>
+<th scope="col" class="vl-align-center">Vellum</th>
+<th scope="col" class="vl-align-center">Wiki</th>
+<th scope="col" class="vl-align-center">Tracker</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pages</td>
+<td class="vl-align-center">
+<span class="vl-yes" aria-label="Yes">✓</span>
+</td>
+<td class="vl-align-center">
+<span class="vl-yes" aria-label="Yes">✓</span>
+</td>
+<td class="vl-align-center">
+<span class="vl-no" aria-label="No">✗</span>
+</td>
+</tr>
+<tr>
+<td>Issues</td>
+<td class="vl-align-center">
+<span class="vl-yes" aria-label="Yes">✓</span>
+</td>
+<td class="vl-align-center">
+<span class="vl-no" aria-label="No">✗</span>
+</td>
+<td class="vl-align-center">
+<span class="vl-yes" aria-label="Yes">✓</span>
+</td>
+</tr>
+<tr>
+<td>Offline</td>
+<td class="vl-align-center">
+<span class="vl-part" aria-label="Partly">◐</span>
+</td>
+<td class="vl-align-center">
+<span class="vl-no" aria-label="No">✗</span>
+</td>
+<td class="vl-align-center">
+<span class="vl-no" aria-label="No">✗</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h1 id="northstar-handbook">Northstar handbook</h1>
+<h2 id="getting-started">Getting started</h2>
+<h1 id="northstar-handbook-2">Northstar handbook</h1>
+<h2 id="start">Getting started</h2>
+<h3 id="install" class="cli">Install the binary</h3>
+<h4 id="configure-storage">Configure storage</h4>
+<h5 id="choose-a-backend">Choose a backend</h5>
+<h6 id="footnote-level">Footnote level</h6>
+<ul>
+<li>One list</li>
+</ul>
+<ul>
+<li>Another list right after it</li>
+</ul>
+<ol>
+<li>Ordered</li>
+</ol>
+<ol>
+<li>Ordered again</li>
+</ol>
+<ul>
+<li>
+<p>First item has two paragraphs.</p>
+<p>This is the second paragraph of the first item.</p>
+</li>
+<li>
+<p>Second item.</p>
+</li>
+</ul>
+<ol start="7">
+<li>Starts at seven</li>
+<li>Then eight</li>
+</ol>
+<ul>
+<li>Use callouts for warnings and decisions</li>
+<li>One table per comparison<ul>
+<li>Nested two spaces deep</li>
+</ul>
+</li>
+<li>Diagrams for flows and architecture</li>
+</ul>
+<ol>
+<li>Draft the policy</li>
+<li>Run a simulation</li>
+<li>Switch to enforce</li>
+</ol>
+<div class="vl-math">
+<math display="block" id="f0-root" xmlns="http://www.w3.org/1998/Math/MathML">
+<mi>E</mi>
+<mo>=</mo>
+<mi>m</mi>
+<msup>
+<mi>c</mi>
+<mn>2</mn>
+</msup>
+</math>
+</div>
+<p>The F1 score:</p>
+<div class="vl-math">
+<math display="block" id="f1-root" xmlns="http://www.w3.org/1998/Math/MathML">
+<msub>
+<mi>F</mi>
+<mn>1</mn>
+</msub>
+<mo>=</mo>
+<mfrac>
+<mrow>
+<mn>2</mn>
+<mo>⋅</mo>
+<mi>P</mi>
+<mo>⋅</mo>
+<mi>R</mi>
+</mrow>
+<mrow>
+<mi>P</mi>
+<mo>+</mo>
+<mi>R</mi>
+</mrow>
+</mfrac>
+</math>
+</div>
+<blockquote>
+<p>A policy you cannot simulate is a policy you cannot trust.</p>
+<p>— Northstar design principles</p>
+</blockquote>
+<div class="vl-table-wrap">
+<table>
+<thead>
+<tr>
+<th scope="col">#</th>
+<th scope="col">Requirement</th>
+<th scope="col" class="vl-align-center">Owner</th>
+<th scope="col" class="vl-align-right">Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R1</td>
+<td>Replay 7 days of traffic in under 10 minutes</td>
+<td class="vl-align-center">
+<span class="vl-mention" data-handle="dev">@dev</span>
+</td>
+<td class="vl-align-right">
+<span class="vl-chip vl-chip-good">Done</span>
+</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>Diff report: newly blocked, newly allowed</td>
+<td class="vl-align-center">
+<span class="vl-mention" data-handle="priya">@priya</span>
+</td>
+<td class="vl-align-right">
+<span class="vl-chip vl-chip-info">In review</span>
+</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>Pipe | inside a cell</td>
+<td class="vl-align-center">
+<span class="vl-mention" data-handle="maya">@maya</span>
+</td>
+<td class="vl-align-right">
+<span class="vl-chip vl-chip-crit">Blocked</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<ul>
+<li class="vl-task">
+<input type="checkbox" disabled="" checked="">Design doc approved</li>
+<li class="vl-task">
+<input type="checkbox" disabled="" checked="">Replay engine in staging</li>
+<li class="vl-task">
+<input type="checkbox" disabled="">Diff report reviewed by security</li>
+<li class="vl-task">
+<input type="checkbox" disabled="">Customer preview scheduled</li>
+</ul>
+<p>Before the break.</p>
+<hr>
+<p>After the break.</p>
+</article>
