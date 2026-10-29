@@ -54,3 +54,6 @@ KMS
 [Ll]abeler
 mdBook
 Roboto
+SQLCipher
+[Rr]ebuildable
+[Rr]ecents
