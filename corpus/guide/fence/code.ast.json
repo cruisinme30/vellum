@@ -11,6 +11,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "helm rollback gateway 1 -n prod\nkubectl rollout status deploy/gateway\n"
       }
     ]

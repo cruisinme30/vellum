@@ -9,6 +9,11 @@
         "items": [
           {
             "task": null,
+            "attrs": {
+              "id": null,
+              "classes": [],
+              "pairs": []
+            },
             "blocks": [
               {
                 "type": "list",
@@ -17,6 +22,11 @@
                 "items": [
                   {
                     "task": null,
+                    "attrs": {
+                      "id": null,
+                      "classes": [],
+                      "pairs": []
+                    },
                     "blocks": [
                       {
                         "type": "list",
@@ -25,6 +35,11 @@
                         "items": [
                           {
                             "task": null,
+                            "attrs": {
+                              "id": null,
+                              "classes": [],
+                              "pairs": []
+                            },
                             "blocks": []
                           }
                         ]
@@ -37,6 +52,11 @@
           },
           {
             "task": null,
+            "attrs": {
+              "id": null,
+              "classes": [],
+              "pairs": []
+            },
             "blocks": [
               {
                 "type": "list",
@@ -45,6 +65,11 @@
                 "items": [
                   {
                     "task": null,
+                    "attrs": {
+                      "id": null,
+                      "classes": [],
+                      "pairs": []
+                    },
                     "blocks": [
                       {
                         "type": "list",
@@ -53,6 +78,11 @@
                         "items": [
                           {
                             "task": null,
+                            "attrs": {
+                              "id": null,
+                              "classes": [],
+                              "pairs": []
+                            },
                             "blocks": [
                               {
                                 "type": "paragraph",
@@ -93,6 +123,11 @@
         "items": [
           {
             "task": false,
+            "attrs": {
+              "id": null,
+              "classes": [],
+              "pairs": []
+            },
             "blocks": [
               {
                 "type": "paragraph",
