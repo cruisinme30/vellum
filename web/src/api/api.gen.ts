@@ -3882,6 +3882,10 @@ export interface GrantView {
    */
   expires_at?: Timestamp | null;
   /**
+   * The person's handle, when known.
+   */
+  handle?: string | null;
+  /**
    * `user:<id>` or `group:<id>`.
    */
   principal: string;
