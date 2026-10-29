@@ -2730,6 +2730,21 @@ name = "vellum-render"
 version = "0.0.0"
 
 [[package]]
+name = "vellum-sealed-store"
+version = "0.0.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "futures",
+ "opentelemetry",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "vellum-crypto",
+ "vellum-store",
+]
+
+[[package]]
 name = "vellum-security"
 version = "0.0.0"
 dependencies = [
