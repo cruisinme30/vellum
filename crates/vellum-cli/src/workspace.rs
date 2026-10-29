@@ -506,14 +506,22 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
     feeds: Feeds,
     setup: TasksSetup,
 ) -> Result<Workspace, Error> {
+    let drive_access: Arc<dyn vellum_drive::Access> = Arc::new(
+        vellum_drive::authz::AuthzAccess::new(Arc::clone(authz), Arc::clone(&index)),
+    );
     let drive = Arc::new(Drive::new(
         Arc::clone(&store),
         Arc::clone(&index),
-        Arc::new(vellum_drive::authz::AuthzAccess::new(
-            Arc::clone(authz),
-            Arc::clone(&index),
-        )),
+        Arc::clone(&drive_access),
     ));
+    // End-to-end encrypted spaces: device keys and ciphertext (ADR 0043).
+    let e2e = vellum_e2e::E2e::new(
+        Arc::clone(&store),
+        Arc::new(crate::e2e::DriveSpaces::new(
+            Arc::clone(&index),
+            drive_access,
+        )),
+    );
     let lookup = Arc::clone(spaces);
     let space_of: vellum_collections::service::SpaceOf =
         Arc::new(move |path: &BlobPath| lookup.of(path));
@@ -591,6 +599,7 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
             Arc::clone(&work) as Arc<dyn Service>,
             Arc::clone(&tasks) as Arc<dyn Service>,
             Arc::new(pages),
+            Arc::new(e2e),
         ],
         drive,
         collections,

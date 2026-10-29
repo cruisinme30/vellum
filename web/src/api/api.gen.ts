@@ -2105,6 +2105,34 @@ export interface DateSpan {
 export type DateValue = string;
 
 /**
+ * Deletes one object.
+ */
+export interface DeleteObject {
+  /**
+   * The version being deleted.
+   */
+  if_match: string;
+  /**
+   * Its path inside the space folder.
+   */
+  path: string;
+  /**
+   * The space.
+   */
+  space_id: SpaceId;
+}
+
+/**
+ * A deleted object.
+ */
+export interface Deleted {
+  /**
+   * Its path inside the space folder.
+   */
+  path: string;
+}
+
+/**
  * A removed task.
  */
 export interface DeletedView {
@@ -2112,6 +2140,37 @@ export interface DeletedView {
    * Its ID.
    */
   id: string;
+}
+
+/**
+ * One enrolled device.
+ */
+export interface DeviceKeyInfo {
+  /**
+   * When it was enrolled.
+   */
+  added_at: Timestamp;
+  /**
+   * The first 16 bytes of SHA-256 of the key, 32 hex digits, as stored
+   * in envelope stanzas.
+   */
+  fingerprint: string;
+  /**
+   * The device's name.
+   */
+  label: string;
+  /**
+   * True for the caller's own devices.
+   */
+  mine: boolean;
+  /**
+   * The X25519 public key, 64 hex digits.
+   */
+  public_key: string;
+  /**
+   * The member the device belongs to.
+   */
+  user_id: UserId;
 }
 
 /**
@@ -2892,6 +2951,37 @@ export interface DriveUpdateSpaceSpaceView {
 }
 
 /**
+ * One enrolled device.
+ */
+export interface E2eEnrolDeviceKeyInfo {
+  /**
+   * When it was enrolled.
+   */
+  added_at: Timestamp;
+  /**
+   * The first 16 bytes of SHA-256 of the key, 32 hex digits, as stored
+   * in envelope stanzas.
+   */
+  fingerprint: string;
+  /**
+   * The device's name.
+   */
+  label: string;
+  /**
+   * True for the caller's own devices.
+   */
+  mine: boolean;
+  /**
+   * The X25519 public key, 64 hex digits.
+   */
+  public_key: string;
+  /**
+   * The member the device belongs to.
+   */
+  user_id: UserId;
+}
+
+/**
  * Edit a comment.
  */
 export interface EditComment {
@@ -2943,6 +3033,25 @@ export interface EmbedResult {
  * No input.
  */
 export type Empty = Record<string, never>;
+
+/**
+ * Enrols the caller's device in a space.
+ */
+export interface EnrolDevice {
+  /**
+   * A name the members recognise, such as "Dana's laptop".
+   */
+  label: string;
+  /**
+   * The device's X25519 public key, 64 hex digits, as
+   * `vellum private key` prints it.
+   */
+  public_key: string;
+  /**
+   * The space.
+   */
+  space_id: SpaceId;
+}
 
 /**
  * Exports a view as CSV.
@@ -3135,6 +3244,20 @@ export interface Fragment {
    * The text.
    */
   text: string;
+}
+
+/**
+ * Downloads one object.
+ */
+export interface GetObject {
+  /**
+   * Its path inside the space folder.
+   */
+  path: string;
+  /**
+   * The space.
+   */
+  space_id: SpaceId;
 }
 
 /**
@@ -3750,6 +3873,24 @@ export interface ListComments {
 }
 
 /**
+ * Lists a space's objects, a page at a time, in path order.
+ */
+export interface ListObjects {
+  /**
+   * Start after this path (the previous page's `next`).
+   */
+  after?: string | null;
+  /**
+   * At most this many (default and maximum 1000).
+   */
+  limit?: number | null;
+  /**
+   * The space.
+   */
+  space_id: SpaceId;
+}
+
+/**
  * A task list.
  */
 export interface ListView {
@@ -4046,6 +4187,38 @@ export type NumberFormat = "plain" | "percent";
  * A ObjectId as a 26-character ULID.
  */
 export type ObjectId = string;
+
+/**
+ * One object in a space.
+ */
+export interface ObjectInfo {
+  /**
+   * When it last changed.
+   */
+  modified: Timestamp;
+  /**
+   * Its path inside the space folder.
+   */
+  path: string;
+  /**
+   * Its stored size in bytes.
+   */
+  size: number;
+}
+
+/**
+ * A page of objects.
+ */
+export interface ObjectList {
+  /**
+   * Pass as `after` for the next page; absent on the last one.
+   */
+  next?: string | null;
+  /**
+   * The objects, in path order.
+   */
+  objects: ObjectInfo[];
+}
 
 /**
  * The built-in observability tools.
@@ -4362,6 +4535,29 @@ export interface PushKeys {
    * The browser's P-256 public key, base64url.
    */
   p256dh: string;
+}
+
+/**
+ * Uploads a page sealed on the device.
+ */
+export interface PutObject {
+  /**
+   * The recipient envelope, base64. It must be sealed to exactly the
+   * space's current keys.
+   */
+  envelope: string;
+  /**
+   * The version this write replaces; absent to create a new object.
+   */
+  if_match?: string | null;
+  /**
+   * Its path inside the space folder.
+   */
+  path: string;
+  /**
+   * The space.
+   */
+  space_id: SpaceId;
 }
 
 /**
@@ -4701,6 +4897,35 @@ export interface ResolveThread {
 }
 
 /**
+ * Revokes one device key.
+ */
+export interface RevokeDevice {
+  /**
+   * The key's fingerprint, 32 hex digits.
+   */
+  fingerprint: string;
+  /**
+   * The space.
+   */
+  space_id: SpaceId;
+}
+
+/**
+ * What a revocation removed. Members' devices strip these keys from
+ * every envelope in the space (`vellum private reseal`).
+ */
+export interface Revoked {
+  /**
+   * The removed keys.
+   */
+  removed: DeviceKeyInfo[];
+  /**
+   * The space.
+   */
+  space_id: SpaceId;
+}
+
+/**
  * How a rollup is computed.
  */
 export interface RollupInfo {
@@ -4961,6 +5186,24 @@ export interface SaveViewInput {
  * `write:direct`, `work` and `admin`.
  */
 export type Scope = "read" | "write:draft" | "write:direct" | "work" | "admin";
+
+/**
+ * An object's ciphertext.
+ */
+export interface SealedObject {
+  /**
+   * The recipient envelope (or the space's folder manifest), base64.
+   */
+  envelope: string;
+  /**
+   * Its version, for `if_match` on the next write.
+   */
+  etag: string;
+  /**
+   * Its path inside the space folder.
+   */
+  path: string;
+}
 
 /**
  * One block that matched, with what the UI and MCP need to show and cite it.
@@ -5471,6 +5714,25 @@ export interface SpaceKey {
 }
 
 /**
+ * A space's key list: what new pages are sealed to.
+ */
+export interface SpaceKeys {
+  /**
+   * Every enrolled device, oldest first.
+   */
+  keys: DeviceKeyInfo[];
+  /**
+   * The space.
+   */
+  space_id: SpaceId;
+  /**
+   * Changes whenever the list changes; empty while the space has no
+   * keys (it is not private).
+   */
+  version: string;
+}
+
+/**
  * What kind of space.
  */
 export type SpaceKindView = "shared_drive" | "user_drive";
@@ -5483,6 +5745,16 @@ export interface SpaceList {
    * The spaces.
    */
   spaces: SpaceView[];
+}
+
+/**
+ * A space, by ID.
+ */
+export interface SpaceRef {
+  /**
+   * The space.
+   */
+  space_id: SpaceId;
 }
 
 /**
@@ -5601,6 +5873,20 @@ export interface StatusOut {
    * Display name.
    */
   name: string;
+}
+
+/**
+ * A stored object.
+ */
+export interface Stored {
+  /**
+   * Its new version.
+   */
+  etag: string;
+  /**
+   * Its path inside the space folder.
+   */
+  path: string;
 }
 
 /**
@@ -8791,6 +9077,55 @@ export interface Operations {
     input: NodeKey;
     output: VersionList;
   };
+  /** Delete a sealed page */
+  "e2e.delete": {
+    method: "DELETE";
+    path: "/v1/spaces/{space_id}/e2e/object";
+    input: DeleteObject;
+    output: Deleted;
+  };
+  /** Enrol this device in a private space */
+  "e2e.enrol": {
+    method: "POST";
+    path: "/v1/spaces/{space_id}/e2e/keys";
+    input: EnrolDevice;
+    output: E2eEnrolDeviceKeyInfo;
+  };
+  /** Download a sealed page */
+  "e2e.get": {
+    method: "GET";
+    path: "/v1/spaces/{space_id}/e2e/object";
+    input: GetObject;
+    output: SealedObject;
+  };
+  /** List the devices a private space is sealed to */
+  "e2e.keys": {
+    method: "GET";
+    path: "/v1/spaces/{space_id}/e2e/keys";
+    input: SpaceRef;
+    output: SpaceKeys;
+  };
+  /** List a private space's objects */
+  "e2e.objects": {
+    method: "GET";
+    path: "/v1/spaces/{space_id}/e2e/objects";
+    input: ListObjects;
+    output: ObjectList;
+  };
+  /** Upload a page sealed on this device */
+  "e2e.put": {
+    method: "PUT";
+    path: "/v1/spaces/{space_id}/e2e/object";
+    input: PutObject;
+    output: Stored;
+  };
+  /** Revoke a device from a private space */
+  "e2e.revoke": {
+    method: "DELETE";
+    path: "/v1/spaces/{space_id}/e2e/keys/{fingerprint}";
+    input: RevokeDevice;
+    output: Revoked;
+  };
   /** List apps you connected with OAuth */
   "identity.apps": {
     method: "GET";
@@ -9408,6 +9743,13 @@ export const OPERATIONS = {
   "drive.usage": { method: "GET", path: "/v1/drive/spaces/{space_id}/usage", mutation: false },
   "drive.version": { method: "GET", path: "/v1/drive/items/{id}/versions/{version_id}", mutation: false },
   "drive.versions": { method: "GET", path: "/v1/drive/items/{id}/versions", mutation: false },
+  "e2e.delete": { method: "DELETE", path: "/v1/spaces/{space_id}/e2e/object", mutation: true },
+  "e2e.enrol": { method: "POST", path: "/v1/spaces/{space_id}/e2e/keys", mutation: true },
+  "e2e.get": { method: "GET", path: "/v1/spaces/{space_id}/e2e/object", mutation: false },
+  "e2e.keys": { method: "GET", path: "/v1/spaces/{space_id}/e2e/keys", mutation: false },
+  "e2e.objects": { method: "GET", path: "/v1/spaces/{space_id}/e2e/objects", mutation: false },
+  "e2e.put": { method: "PUT", path: "/v1/spaces/{space_id}/e2e/object", mutation: true },
+  "e2e.revoke": { method: "DELETE", path: "/v1/spaces/{space_id}/e2e/keys/{fingerprint}", mutation: true },
   "identity.apps": { method: "GET", path: "/v1/me/apps", mutation: false },
   "identity.create_token": { method: "POST", path: "/v1/me/tokens", mutation: true },
   "identity.create_user": { method: "POST", path: "/v1/admin/users", mutation: true },

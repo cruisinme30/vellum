@@ -19,6 +19,7 @@ mod backup_cli;
 mod cluster;
 mod collab;
 mod docs;
+mod e2e;
 mod feed;
 mod google_http;
 #[cfg(test)]

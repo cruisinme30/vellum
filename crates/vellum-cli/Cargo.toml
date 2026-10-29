@@ -49,6 +49,7 @@ vellum-contracts.workspace = true
 vellum-crypto = { path = "../vellum-crypto", features = ["os-keychain"] }
 vellum-db.workspace = true
 vellum-drive = { path = "../vellum-drive" }
+vellum-e2e = { path = "../vellum-e2e" }
 vellum-format = { path = "../vellum-format" }
 vellum-help.workspace = true
 vellum-identity = { path = "../vellum-identity" }
