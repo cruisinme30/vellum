@@ -101,6 +101,9 @@ summary cannot read or write outside its book.
   Per-file history stays with the version service (R-BK-2). A diff matches
   sections by ID and reports added, removed, moved or given a new number, and
   changed sections with unified patches.
+- A principal in `restrict_to`, `owners` or `reviewers` is
+  `user:<UserId>` or `group:<GroupId>`, with the ID as the kernel ULID
+  in upper case. Matching is exact.
 - Section restrictions only narrow. A section is visible when the viewer
   is in the `restrict_to` set of that section and of every enclosing
   section that has one. A child cannot name someone its parent excludes.
@@ -132,3 +135,6 @@ summary cannot read or write outside its book.
   service on top of this crate through the service seam.
 - The drive watcher must ignore `.mdbook/` and treat `.snapshots/` as book
   data, not documents.
+- Copying a whole book in the drive copies only what the copier may see
+  (`Book::published_view`) and never copies `.snapshots/`, because
+  snapshots hold every section's text (red-team finding, see #322).
