@@ -59,7 +59,7 @@ Threads also stopped work to ask the coordinator for ADR and D numbers.
 - `cargo xtask adr new <slug> --decisions N --issue N` starts a record
   from the template with those numbers. Pushing the branch claims them.
 - `docs/adr/reserved.toml` lists numbers handed out before any branch
-  holds them (D205-D213 and D217-D261 today). The tool counts them as
+  holds them (ADRs 0050-0064, D205-D213 and D217-D261 today). The tool counts them as
   taken, and the check fails when two reservations overlap.
 - `scripts/ci/check-adrs.sh` fails when two records share an ADR number
   or a D number, so collisions between branches fail the integration
@@ -72,8 +72,9 @@ Threads also stopped work to ask the coordinator for ADR and D numbers.
 - **Testing only changed crates in CI**: integrator batches touch most
   crates anyway, and develop would then need its own full run.
 - **A larger runner**: needs a paid plan or an organization.
-- **A numbers file in the repository**: every new record would edit the
-  same file, so merges would conflict.
+- **Every thread records its numbers in one file**: every new record
+  would edit the same file, so merges would conflict. Only the
+  coordinator's rare bulk reservations go in `reserved.toml`.
 
 ## Consequences
 
