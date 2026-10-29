@@ -148,6 +148,13 @@ pub struct Grant {
     pub audience: Vec<String>,
     /// When the user approved it.
     pub created_at: Timestamp,
+    /// When the user last proved their identity before approving it: the
+    /// session's sign-in time, not the approval's. Tokens of the grant
+    /// count as signed in then, so approving a client from an old session
+    /// never yields a credential that passes a recent-sign-in check
+    /// (RT-039). Grants from before this field use `created_at`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auth_time: Option<Timestamp>,
     /// The current refresh token's hash.
     #[serde(with = "hash_b64")]
     pub refresh_hash: SecretHash,
@@ -218,6 +225,9 @@ pub struct PendingCode {
     pub audience: Vec<String>,
     /// The PKCE challenge.
     pub challenge: String,
+    /// When the approving session last proved the user's identity.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auth_time: Option<Timestamp>,
     /// When the code stops working.
     pub expires: Timestamp,
 }
