@@ -12,8 +12,8 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D55, D56, D57
-- Issue: [#97](https://github.com/cruisinme30/vellum/issues/97)
-- Pull requests: [#217](https://github.com/cruisinme30/vellum/pull/217)
+- Issue: [#97](https://github.com/cruisinme30/vellum/issues/97), [#294](https://github.com/cruisinme30/vellum/issues/294)
+- Pull requests: [#217](https://github.com/cruisinme30/vellum/pull/217), [#302](https://github.com/cruisinme30/vellum/pull/302)
 
 :::
 
@@ -77,9 +77,10 @@ flowchart LR
 - A room with an empty log starts from the Markdown file, written with
   `seed`, which succeeds only on an empty log: two nodes never import a
   document twice.
-- Log records hold content, so the `vellum-db` adapter seals each one with
-  the document's data key (ADR 0002), in
-  `collab_updates(space_id, doc_id, seq, update, created_at)`.
+- The log lives in the index database as
+  `collab_updates(space_id, doc_id, seq, payload, created_at)`, owned by the
+  database so a reindex never clears it. Records hold content, so each is
+  sealed with envelope encryption (ADR 0002) and bound to its document.
 - An external edit of the file while a room is open is merged block by
   block, with the room's last version as the base. Where editors changed
   the same block, both versions are kept. Never last-write-wins.
@@ -119,9 +120,9 @@ flowchart LR
 
 - The editor binds `y-prosemirror` to the `content` field and must use
   the node and mark names of the block model schema.
-- `vellum-db`, `vellum-store` and `vellum-format` each add one adapter:
-  the update log, the document files and the codec. Until they land, the
-  in-memory adapters run the service and its tests.
+- The update log, the document files and the codec are adapters over
+  `vellum-db`, `vellum-store` and `vellum-format`; in-memory adapters run
+  the tests.
 - Every new message type takes a tag in the custom range and is ignored
   by servers that do not know it.
 - CI fuzzes the protocol with arbitrary frames and checks with property

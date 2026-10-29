@@ -27,11 +27,23 @@ impl Book {
     /// left as written.
     #[must_use]
     pub fn render_cross_refs(&self, text: &str) -> String {
+        self.render_cross_refs_for(text, |_| true)
+    }
+
+    /// Like [`Book::render_cross_refs`], for a reader who may see only
+    /// the sections `visible` accepts: a cross-reference to any other
+    /// section keeps its `§` text, so its title never shows. Labels keep
+    /// the book's own numbering, so every reader quotes the same numbers.
+    #[must_use]
+    pub fn render_cross_refs_for(&self, text: &str, visible: impl Fn(&NodeId) -> bool) -> String {
         markdown::map_links(text, |link, current| {
             if link.kind != LinkKind::Inline || !current.is_some_and(is_cross_ref_text) {
                 return None;
             }
             let (id, _) = NodeId::from_uri(&link.dest)?;
+            if !visible(&id) {
+                return None;
+            }
             let label = self.label_of(&id).ok()?;
             Some(LinkEdit {
                 text: Some(label),
@@ -96,6 +108,18 @@ mod tests {
             "{services}"
         );
         assert!(services.contains("[the glossary](../glossary.md)"));
+    }
+
+    #[test]
+    fn hidden_targets_keep_their_marker() {
+        let book = handbook();
+        let week = book.text(&id(3)).unwrap();
+        let rendered = book.render_cross_refs_for(week, |target| target != &id(5));
+        assert!(
+            rendered.contains("[§](vellum://doc/01JBK0000000000000000000A5)"),
+            "{rendered}"
+        );
+        assert!(!rendered.contains("Services"));
     }
 
     #[test]

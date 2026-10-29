@@ -18,6 +18,8 @@ mod merge;
 pub mod metered;
 mod path;
 mod reconcile;
+#[cfg(feature = "remote")]
+pub mod remote;
 mod store;
 pub mod watch;
 

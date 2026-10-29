@@ -3,10 +3,11 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 #
 # Builds the project website into a folder (default: _site):
-#   - the landing page from site/,
+#   - the landing page from site/ with its fonts, images and video,
 #   - every help book docs/<name>.book/ with mdBook, at docs/<name>/,
 #   - the architecture decision records docs/adr/ as one more book, at
-#     docs/decisions/.
+#     docs/decisions/,
+#   - the docs home at docs/, listing every guide's parts and chapters.
 # Vellum Markdown is turned into plain CommonMark on the way: front matter
 # is dropped and ::: container fences are unwrapped, so unmodified mdBook
 # can build the books (ADR 0027, D111).
@@ -103,8 +104,9 @@ html_escape() {
 #   - the sidebar toggle is a <label> carrying button ARIA: give it the role;
 #   - code blocks and tables that scroll sideways become focusable;
 #   - task-list checkboxes get a name;
-#   - mdBook's web fonts are dropped (system fonts, see book.css): they load
-#     without font-display, so text appears late and the page shifts;
+#   - mdBook's web fonts are dropped: they load without font-display, so
+#     text appears late and the page shifts (book.css uses the site's own
+#     fonts, which never swap in late);
 #   - headings named like a JavaScript module global (exports, module,
 #     define, require) get a suffix: the browser exposes an element id as
 #     a window property, and mdBook's search and copy libraries then take
@@ -131,6 +133,7 @@ build_book() {
   done
   mkdir -p "${dir}/theme"
   cp "${root}/site/book.css" "${dir}/theme/vellum.css"
+  cp "${root}/site/book-header.hbs" "${dir}/theme/header.hbs"
   cat >"${dir}/book.toml" <<EOF
 [book]
 title = "${toml_title}"
@@ -156,7 +159,8 @@ EOF
 
 rm -rf "${out}"
 mkdir -p "${out}/docs"
-cp "${root}/site/index.html" "${root}/site/style.css" "${root}/site/favicon.svg" "${out}/"
+cp "${root}/site/style.css" "${root}/site/favicon.svg" "${out}/"
+cp -R "${root}/site/fonts" "${root}/site/img" "${root}/site/media" "${out}/"
 
 books=()
 
@@ -204,34 +208,92 @@ EOF
   build_book decisions "Vellum architecture decisions" "${src}"
 fi
 
-# The documentation cards on the landing page.
+# summary_html <name> <summary-file>: the contents of one guide for the
+# docs home: each part with its chapters and their sections, as links into
+# the built book. Chapters before the first part are left out (the guide's
+# own link covers the introduction); chapters after a "---" rule are
+# listed under "Reference".
+summary_html() {
+  awk -v book="$1" '
+    function esc(t) { gsub(/&/, "\\&amp;", t); gsub(/</, "\\&lt;", t); gsub(/>/, "\\&gt;", t); gsub(/"/, "\\&quot;", t); return t }
+    function href(t) {
+      if (t ~ /(^|\/)README\.md$/) sub(/README\.md$/, "index.html", t)
+      else sub(/\.md$/, ".html", t)
+      return book "/" t
+    }
+    function link(line,   title, target) {
+      match(line, /\[[^]]+\]/); title = substr(line, RSTART + 1, RLENGTH - 2)
+      match(line, /\]\([^)]+\)/); target = substr(line, RSTART + 2, RLENGTH - 3)
+      return "<a href=\"" esc(href(target)) "\">" esc(title) "</a>"
+    }
+    function close_sub() { if (sub_open) { printf "</ul>"; sub_open = 0 } }
+    function close_item() { close_sub(); if (item_open) { print "</li>"; item_open = 0 } }
+    function close_part() { close_item(); if (part_open) { print "            </ul>\n          </div>"; part_open = 0 } }
+    function open_part(title) {
+      close_part()
+      print "          <div class=\"part\">\n            <h4>" esc(title) "</h4>\n            <ul>"
+      part_open = 1
+    }
+    /^# / { title = substr($0, 3); if (title != "Summary") { parts = 1; open_part(title) } next }
+    /^---[ \t]*$/ { if (parts) { open_part("Reference"); suffix = 1 } next }
+    (parts && /^- \[/) || (suffix && /^\[/) {
+      close_item(); printf "              <li>%s", link($0); item_open = 1; next
+    }
+    parts && /^[ \t]+- \[/ && item_open {
+      if (!sub_open) { printf "<ul>"; sub_open = 1 }
+      printf "<li>%s</li>", link($0); next
+    }
+    END { close_part() }
+  ' "$2"
+}
+
+# describe <name>: the one-line summary under a guide's title.
 describe() {
   case "$1" in
-    user) echo "Write pages and books, organise the drive, track work and plan your day." ;;
-    admin) echo "Install, configure, secure, back up, upgrade and monitor a deployment." ;;
-    developer) echo "The architecture, the Markdown dialect, the APIs, the MCP server and how to contribute." ;;
-    decisions) echo "Why Vellum is built the way it is, one decision record at a time." ;;
-    *) echo "Read the book." ;;
+    user) echo "For everyone: write pages and books, organise data, track work, plan your day and work with Claude." ;;
+    admin) echo "For whoever runs Vellum: install, configure, secure, back up, upgrade and monitor it." ;;
+    developer) echo "For builders: the architecture, the Markdown dialect, the APIs, the MCP server and how to contribute." ;;
+    *) echo "Read the guide." ;;
   esac
 }
-cards="${work}/cards.html"
-if ((${#books[@]} == 0)); then
-  echo '        <p>The help books are being written. Until they are published here, the <a href="https://github.com/cruisinme30/vellum">repository</a> is the best guide.</p>' >"${cards}"
-else
-  {
-    echo '        <ul class="cards">'
-    for entry in "${books[@]}"; do
-      name="${entry%%$'\t'*}"
-      title="$(html_escape "${entry#*$'\t'}")"
-      printf '          <li><a class="card" href="docs/%s/"><h3>%s</h3><p>%s</p></a></li>\n' \
-        "${name}" "${title}" "$(describe "${name}")"
-    done
-    echo '        </ul>'
-  } >"${cards}"
-fi
-awk -v cards="${cards}" '
-  /<!-- BOOKS -->/ { while ((getline line < cards) > 0) print line; next }
-  { print }
-' "${root}/site/index.html" >"${out}/index.html"
 
-echo "Built the site in ${out} with ${#books[@]} book(s)."
+# The docs home: a card per guide with its parts and chapters.
+cards="${work}/cards.html"
+{
+  echo '        <ul class="books">'
+  for entry in "${books[@]}"; do
+    name="${entry%%$'\t'*}"
+    [[ "${name}" == decisions ]] && continue
+    title="$(html_escape "${entry#*$'\t'}")"
+    echo '          <li class="book">'
+    printf '          <h3><a href="%s/index.html">%s</a></h3>\n' "${name}" "${title}"
+    printf '          <p>%s</p>\n' "$(describe "${name}")"
+    echo '          <div class="parts">'
+    summary_html "${name}" "${root}/docs/${name}.book/SUMMARY.md"
+    echo '          </div>'
+    echo '          </li>'
+  done
+  echo '        </ul>'
+} >"${cards}"
+
+# Counts shown on both pages, so they never go stale.
+pages="$(find "${root}/docs" -path '*.book/*' -name '*.md' -not -name SUMMARY.md | wc -l)"
+crates="$(find "${root}/crates" -mindepth 2 -maxdepth 2 -name Cargo.toml | wc -l)"
+decisions="$(find "${root}/docs/adr" -maxdepth 1 -name '[0-9]*.md' -not -name '0000-*' | wc -l)"
+
+# fill <template> <output>: puts in the guide cards and the counts.
+fill() {
+  awk -v cards="${cards}" -v pages="${pages// /}" -v crates="${crates// /}" -v decisions="${decisions// /}" '
+    /<!-- BOOKS -->/ { while ((getline line < cards) > 0) print line; close(cards); next }
+    {
+      gsub(/<!-- COUNT:pages -->/, pages)
+      gsub(/<!-- COUNT:crates -->/, crates)
+      gsub(/<!-- COUNT:decisions -->/, decisions)
+      print
+    }
+  ' "$1" >"$2"
+}
+fill "${root}/site/index.html" "${out}/index.html"
+fill "${root}/site/docs.html" "${out}/docs/index.html"
+
+echo "Built the site in ${out} with ${#books[@]} book(s) and ${pages} help pages."

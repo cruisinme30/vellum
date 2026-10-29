@@ -187,6 +187,7 @@ impl Writer {
 
     fn text(&mut self, text: &str, starts_line: bool) {
         let chars: Vec<char> = text.chars().collect();
+        let extras = crate::extras::extra_escapes(text);
         let marker_end = if starts_line && self.place != Place::Cell {
             line_start_escape(&chars)
         } else {
@@ -220,7 +221,8 @@ impl Writer {
                     prev.is_some_and(|p| p.is_alphanumeric() || matches!(p, '.' | '_' | '+' | '-'))
                 }
                 _ => false,
-            } || (starts_line && Some(i) == marker_end);
+            } || (starts_line && Some(i) == marker_end)
+                || extras.contains(&i);
             if escape {
                 self.out.push('\\');
             }
