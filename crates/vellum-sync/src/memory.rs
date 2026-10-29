@@ -139,6 +139,7 @@ impl SyncStore for MemoryStore {
         Ok(LogInfo {
             epoch: state.epoch,
             horizon: state.horizon,
+            head: state.head,
         })
     }
 }

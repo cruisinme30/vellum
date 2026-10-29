@@ -332,8 +332,8 @@ impl SyncStore for SqlStore {
     }
 
     async fn info(&self) -> Result<LogInfo, Error> {
-        const INFO: &str = "SELECT epoch, horizon FROM sync_meta WHERE id = 1";
-        let (epoch, horizon): (i64, i64) = match self.index.pool() {
+        const INFO: &str = "SELECT epoch, horizon, head FROM sync_meta WHERE id = 1";
+        let (epoch, horizon, head): (i64, i64, i64) = match self.index.pool() {
             IndexPool::Sqlite(pool) => {
                 let row = traced(SQLITE, "sync.info", sqlx::query(INFO).fetch_one(pool))
                     .await
@@ -341,6 +341,7 @@ impl SyncStore for SqlStore {
                 (
                     row.try_get("epoch").map_err(db_error)?,
                     row.try_get("horizon").map_err(db_error)?,
+                    row.try_get("head").map_err(db_error)?,
                 )
             }
             IndexPool::Postgres(pool) => {
@@ -350,6 +351,7 @@ impl SyncStore for SqlStore {
                 (
                     row.try_get("epoch").map_err(db_error)?,
                     row.try_get("horizon").map_err(db_error)?,
+                    row.try_get("head").map_err(db_error)?,
                 )
             }
             _ => return Err(unsupported()),
@@ -357,6 +359,7 @@ impl SyncStore for SqlStore {
         Ok(LogInfo {
             epoch: to_u64(epoch)?,
             horizon: to_u64(horizon)?,
+            head: to_u64(head)?,
         })
     }
 }
