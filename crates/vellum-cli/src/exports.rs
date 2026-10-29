@@ -81,9 +81,9 @@ const PREVIEW_PAGES: usize = 12;
 /// Largest JSON body the Google routes read.
 const MAX_JSON: usize = 64 * 1024;
 /// How long Google Drive calls may take.
-const GOOGLE_TIMEOUT: Duration = Duration::from_secs(60);
+const GOOGLE_TIMEOUT: Duration = Duration::from_mins(1);
 /// How long a book export may spend reading sections.
-const BOOK_DEADLINE: Duration = Duration::from_secs(60);
+const BOOK_DEADLINE: Duration = Duration::from_mins(1);
 
 /// What the routes share.
 pub struct Transfer<S> {
@@ -144,7 +144,7 @@ impl<S: Scanner + 'static> Transfer<S> {
     }
 }
 
-impl<S> Transfer<S> {
+impl<S: Send + Sync> Transfer<S> {
     /// The ports one export by `actor` uses: figures from the renderer,
     /// images from the page's own files as `actor` may read them, and
     /// calculators from the collections engine.
@@ -161,7 +161,7 @@ impl<S> Transfer<S> {
             live: Arc::new(NoLiveData),
             assets: Arc::new(PageFiles {
                 drive: Arc::clone(&self.drive),
-                actor: actor.clone(),
+                actor: *actor,
             }),
             collections: Arc::new(CollectionsEngine),
         }
@@ -335,7 +335,7 @@ impl From<ExportWarning> for WarningView {
 /// What to export, for the routes and for in-process callers (the MCP
 /// `export` tool).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum ExportItem {
+pub enum ExportItem {
     /// One page.
     Page(ObjectId),
     /// A book, or part of one.
@@ -344,7 +344,7 @@ pub(crate) enum ExportItem {
 
 /// A finished export file.
 #[derive(Debug)]
-pub(crate) struct Exported {
+pub struct Exported {
     /// `<title>.<ext>`.
     pub file_name: String,
     /// The media type.
@@ -361,7 +361,7 @@ enum Made {
     Preview(Preview),
 }
 
-impl<S> Transfer<S> {
+impl<S: Send + Sync> Transfer<S> {
     /// Exports `item` as `principal` sees it: `format` is `pdf`, `docx`,
     /// `html` or `md` (pages only). Needs view rights and the `read`
     /// scope, like the routes.
@@ -372,7 +372,7 @@ impl<S> Transfer<S> {
     /// `not_found` for what the caller cannot see, `invalid_input` for a
     /// bad format or scope, `unavailable` when the export slots are busy.
     #[allow(dead_code)] // the MCP `export` tool calls it
-    pub(crate) async fn export(
+    pub async fn export(
         &self,
         principal: &Principal,
         request_id: vellum_kernel::RequestId,
@@ -763,7 +763,7 @@ async fn import_google<S: Scanner + 'static>(
 }
 
 /// Checks the file, reads it with the importer and writes it to the drive.
-async fn run_import<S: Scanner>(
+async fn run_import<S: Scanner + 'static>(
     transfer: &Transfer<S>,
     actor: &Actor,
     source: Source,

@@ -195,7 +195,7 @@ async fn a_page_exports_to_every_format() -> TestResult {
     assert_eq!(
         headers
             .get(header::X_CONTENT_TYPE_OPTIONS)
-            .map(|v| v.as_bytes()),
+            .map(http::HeaderValue::as_bytes),
         Some(&b"nosniff"[..])
     );
 
@@ -203,7 +203,9 @@ async fn a_page_exports_to_every_format() -> TestResult {
     assert_eq!(status, StatusCode::OK, "{}", String::from_utf8_lossy(&body));
     assert!(body.starts_with(b"%PDF-"));
     assert_eq!(
-        headers.get(header::CONTENT_TYPE).map(|v| v.as_bytes()),
+        headers
+            .get(header::CONTENT_TYPE)
+            .map(http::HeaderValue::as_bytes),
         Some(&b"application/pdf"[..])
     );
 

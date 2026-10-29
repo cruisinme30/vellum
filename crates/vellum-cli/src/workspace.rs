@@ -822,6 +822,7 @@ fn delivery(
 ///
 /// An unreachable database, a wrong key, an unreadable data folder or
 /// invalid integration settings.
+#[allow(clippy::too_many_lines)] // the composition root names every service once
 pub async fn open(
     config: &Config,
     identity: &Arc<Identity>,
