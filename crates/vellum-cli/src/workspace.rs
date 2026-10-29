@@ -32,6 +32,7 @@ use vellum_store::{BlobPath, BlobStore, LocalStore};
 use vellum_work::{UserRef, WorkEvent};
 use vellum_work_service::{Directory, EventSink, SystemClock, WorkService};
 
+use crate::page_render::{Handles, PageRenderService};
 use crate::reindex::{KEY_VAR, index_key};
 
 /// Variable that opens the SQLite index without encryption.
@@ -181,9 +182,10 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
         Arc::clone(&store),
         Arc::new(vellum_books_service::AuthzAccess::new(authz, space_of)),
     ));
+    let directory = Arc::new(IdentityDirectory(Arc::clone(identity)));
     let (work, report) = WorkService::open(
         Arc::clone(&store),
-        Arc::new(IdentityDirectory(Arc::clone(identity))),
+        Arc::clone(&directory) as Arc<dyn Directory>,
         Arc::new(TracingSink),
         Arc::new(SystemClock),
     )
@@ -195,12 +197,23 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
             "some Work files could not be read"
         );
     }
+    let handles: Handles = Arc::new(move |user| {
+        let directory = Arc::clone(&directory);
+        Box::pin(async move { directory.handle(user).await })
+    });
+    let pages = PageRenderService::new(
+        Arc::clone(&drive),
+        Arc::clone(&work),
+        handles,
+        PageRenderService::figures_from_env()?,
+    );
     Ok(Workspace {
         services: vec![
             Arc::new(DriveService::new(Arc::clone(&drive))),
             Arc::new(collections),
             Arc::clone(&books) as Arc<dyn Service>,
             Arc::clone(&work) as Arc<dyn Service>,
+            Arc::new(pages),
         ],
         drive,
         books,

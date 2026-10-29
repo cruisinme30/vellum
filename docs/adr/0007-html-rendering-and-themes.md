@@ -12,7 +12,7 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D49, D50, D51
-- Issue: #73, #75, #76, #77, #81, #408 (and the server side of #79)
+- Issue: #73, #75, #76, #77, #81, #408, #427 (and the server side of #79)
 - Pull request: #241 (and the live issue views that follow it)
 
 :::
@@ -108,3 +108,7 @@ flowchart LR
   id, because the parser drops the indentation that nested filters need.
   The Work side reads the raw YAML from the source and runs the view for
   the reader, so permissions stay with the service.
+- `vellum serve` renders pages for readers at `GET /v1/pages/{id}/render`
+  (#427). The binary owns this route because it joins the drive, which
+  checks that the reader may view the page, with Work, which answers the
+  page's `::: issues` blocks for that reader.

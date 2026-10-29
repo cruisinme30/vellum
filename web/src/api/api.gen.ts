@@ -3009,6 +3009,34 @@ export type NumberFormat = "plain" | "percent";
 export type ObjectId = string;
 
 /**
+ * One heading of the page outline.
+ */
+export interface OutlineEntry {
+  /**
+   * 1 to 6.
+   */
+  level: number;
+  /**
+   * The element id, for `#fragment` links.
+   */
+  id: string;
+  /**
+   * The heading text.
+   */
+  text: string;
+}
+
+/**
+ * Names a page.
+ */
+export interface PageKey {
+  /**
+   * The page.
+   */
+  id: ObjectId;
+}
+
+/**
  * Where to move or copy an item.
  */
 export interface PlaceInput {
@@ -3370,6 +3398,60 @@ export interface RenameInput {
    * Its new title.
    */
   title: string;
+}
+
+/**
+ * Something on the page that rendered with a fallback.
+ */
+export interface RenderWarning {
+  /**
+   * The top-level block it came from, from 0.
+   */
+  block: number;
+  /**
+   * What happened, for the author.
+   */
+  message: string;
+}
+
+/**
+ * A page rendered for the reader.
+ */
+export interface RenderedPageView {
+  /**
+   * The page.
+   */
+  id: ObjectId;
+  /**
+   * The front matter title, or the first level-1 heading.
+   */
+  title?: string | null;
+  /**
+   * Sanitised HTML: one `<article class="vl-doc">`, styled by the theme
+   * stylesheet's `--vl-*` variables.
+   */
+  html: string;
+  /**
+   * The page outline.
+   */
+  outline: OutlineEntry[];
+  /**
+   * Blocks that rendered with a fallback.
+   */
+  warnings: RenderWarning[];
+  /**
+   * Diagrams shown from their last good picture because the diagram
+   * server was unavailable.
+   */
+  stale_figures: number;
+  /**
+   * A strong `ETag` of the HTML (`sha256-…`).
+   */
+  etag: string;
+  /**
+   * The renderer version that produced it.
+   */
+  render_version: number;
 }
 
 /**
@@ -6400,6 +6482,13 @@ export interface Operations {
     input: Empty;
     output: Array_of_UserView;
   };
+  /** Renders a page as sanitised HTML for the reader */
+  "render.page": {
+    method: "GET";
+    path: "/v1/pages/{id}/render";
+    input: PageKey;
+    output: RenderedPageView;
+  };
   /** Applies the waiting triage suggestion as the caller */
   "work.accept_suggestion": {
     method: "POST";
@@ -6691,6 +6780,7 @@ export const OPERATIONS = {
   "identity.update_me": { method: "PATCH", path: "/v1/me", mutation: true },
   "identity.update_user": { method: "PATCH", path: "/v1/admin/users/{id}", mutation: true },
   "identity.users": { method: "GET", path: "/v1/admin/users", mutation: false },
+  "render.page": { method: "GET", path: "/v1/pages/{id}/render", mutation: false },
   "work.accept_suggestion": { method: "POST", path: "/v1/work/issues/{key}/triage/suggestion/accept", mutation: true },
   "work.add_comment": { method: "POST", path: "/v1/work/comments", mutation: true },
   "work.assign_thread": { method: "POST", path: "/v1/work/threads/{thread_id}/assign", mutation: true },
