@@ -93,3 +93,10 @@ pre > code:focus-visible,
   outline: 3px solid var(--links);
   outline-offset: 2px;
 }
+
+/* Inline code is padded from the start, not only once highlight.js adds
+   its class after load, which reflowed the text and shifted the page. */
+:not(pre) > code {
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
