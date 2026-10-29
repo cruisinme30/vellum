@@ -24,8 +24,9 @@ shell, rendered pages, exports and the published website) has to render
 correctly on phones and wide screens, in five themes, at 200 % zoom, in
 right-to-left languages and with long text. axe alone finds accessibility
 rules, not overlapping buttons, text spilling out of a card, a page that
-scrolls sideways or a white screen while the bundle loads. Gourav asked for
-the UI to be red-teamed and kept fixed as features land (#222).
+scrolls sideways or a white screen while the bundle loads. The product
+owner asked for the UI to be red-teamed and kept fixed as features land
+(#222).
 
 ## Decisions
 
@@ -46,7 +47,7 @@ the UI to be red-teamed and kept fixed as features land (#222).
 ### `D124`: the matrix and the theme contract
 
 - Browsers: Chromium, Firefox, WebKit. Viewports: phone 390, tablet 820,
-  laptop 1366, wide 2560 px. `UI_BROWSERS` and `UI_VIEWPORTS` narrow it.
+  laptop 1366, wide 2560 pixels. `UI_BROWSERS` and `UI_VIEWPORTS` narrow it.
 - Modes: light, dark, the five app themes, forced colours, zoom 150, 200
   and 400 %, text at 200 %, WCAG text spacing with a dyslexia font, RTL,
   reduced motion, and a stress mode that lengthens every text with long
