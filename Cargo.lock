@@ -286,6 +286,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "bstr"
+version = "1.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6bb31b46c14244e20ee9984b11bf5c992b91fb6939fea616e3512c8baecdbe5f"
+dependencies = [
+ "memchr",
+ "serde_core",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -628,6 +638,27 @@ checksum = "d045de693cb712d0b22c6a64be5b953f67b3ce00ab5ad3dd5d8b441886ab8e1a"
 dependencies = [
  "quote",
  "syn 3.0.9",
+]
+
+[[package]]
+name = "csv"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "52cd9d68cf7efc6ddfaaee42e7288d3a99d613d4b50f76ce9827ae0c6e14f938"
+dependencies = [
+ "csv-core",
+ "itoa",
+ "ryu",
+ "serde_core",
+]
+
+[[package]]
+name = "csv-core"
+version = "0.1.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "704a3c26996a80471189265814dbc2c257598b96b8a7feae2d31ace646bb9782"
+dependencies = [
+ "memchr",
 ]
 
 [[package]]
@@ -2826,6 +2857,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "ryu"
+version = "1.0.23"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
+
+[[package]]
 name = "ryu-js"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3083,6 +3120,15 @@ name = "simdutf8"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
+
+[[package]]
+name = "similar"
+version = "3.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d2f8bec09ae8fae0f4f265a4559a9334be3929d8504e9b536df0a41302bd1733"
+dependencies = [
+ "bstr",
+]
 
 [[package]]
 name = "siphasher"
@@ -3664,11 +3710,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "vellum-books"
+version = "0.0.0"
+dependencies = [
+ "proptest",
+ "pulldown-cmark",
+ "serde",
+ "serde-saphyr 2.0.0",
+ "serde_json",
+ "similar",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
 name = "vellum-cli"
 version = "0.0.0"
 dependencies = [
  "clap",
+ "thiserror",
  "tracing",
+ "vellum-help",
  "vellum-kernel",
 ]
 
@@ -3679,6 +3741,19 @@ version = "0.0.0"
 [[package]]
 name = "vellum-collections"
 version = "0.0.0"
+dependencies = [
+ "csv",
+ "opentelemetry",
+ "proptest",
+ "schemars",
+ "serde",
+ "serde-saphyr 2.0.0",
+ "serde_json",
+ "thiserror",
+ "time",
+ "tracing",
+ "vellum-kernel",
+]
 
 [[package]]
 name = "vellum-contracts"
@@ -3728,6 +3803,10 @@ dependencies = [
  "tracing",
  "vellum-kernel",
 ]
+
+[[package]]
+name = "vellum-help"
+version = "0.0.0"
 
 [[package]]
 name = "vellum-jobs"
@@ -3811,10 +3890,12 @@ dependencies = [
  "image",
  "proptest",
  "reqwest",
+ "sha2",
  "thiserror",
  "tokio",
  "tracing",
  "url",
+ "vellum-kernel",
 ]
 
 [[package]]

@@ -1,0 +1,30 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "block_quote",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "A policy you cannot simulate"
+              },
+              {
+                "type": "soft_break"
+              },
+              {
+                "type": "text",
+                "text": "is a policy you cannot trust."
+              }
+            ],
+            "id": null
+          }
+        ]
+      }
+    ]
+  },
+  "diagnostics": []
+}

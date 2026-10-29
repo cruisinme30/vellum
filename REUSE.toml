@@ -5,6 +5,8 @@ version = 1
 
 # Files whose format cannot carry a comment header. Vellum Markdown has no
 # raw HTML, so documents in docs/ cannot hold an HTML comment header.
+# book.yaml is rewritten by Vellum, which does not keep comments; golden
+# corpus inputs must be byte-identical to the examples they come from.
 [[annotations]]
 path = [
   "Cargo.lock",
@@ -17,6 +19,8 @@ path = [
   ".lycheeignore",
   ".vale/styles/config/vocabularies/**",
   "docs/**/*.md",
+  "docs/**/book.yaml",
+  "corpus/guide/**",
   "corpus/**/*.md",
   "corpus/**/*.json",
   "corpus/**/*.html",

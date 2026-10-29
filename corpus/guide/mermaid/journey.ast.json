@@ -1,0 +1,19 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "fence",
+        "lang": "mermaid",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "journey\n  title Writing a status update\n  section Draft\n    Open last week's page: 4: Priya\n    Copy the template: 3: Priya\n  section Review\n    Ask for comments: 4: Priya, Dev\n    Resolve comments: 2: Priya\n  section Share\n    Post the link: 5: Priya\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}

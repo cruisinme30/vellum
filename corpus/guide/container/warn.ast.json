@@ -1,0 +1,32 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "container",
+        "name": "warn",
+        "arg": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "sections": [
+          [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "A rewrite is not approved."
+                }
+              ],
+              "id": null
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "diagnostics": []
+}

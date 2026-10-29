@@ -3,9 +3,17 @@
     "default": true,
     "MD013": false,
     "MD024": { "siblings_only": true },
+    // Vellum pages carry their title in front matter and repeat it as the
+    // H1 that plain mdBook shows; only a second H1 in the body is an error.
+    "MD025": { "front_matter_title": "" },
     "MD033": false,
+    // `::: link <url>` and `::: embed <url>` take a bare URL by design.
+    "MD034": false,
     "MD041": false
   },
   "globs": ["**/*.md"],
-  "ignores": ["**/node_modules/**", "target/**", "LICENSES/**", "corpus/format/**", "corpus/render/**"]
+  "ignores": ["**/node_modules/**", "target/**", "LICENSES/**",
+    // Golden corpus inputs are test data, written exactly as the examples
+    // in the guide; mdBook SUMMARY files use # for part titles.
+    "corpus/**", "docs/*.book/SUMMARY.md"]
 }

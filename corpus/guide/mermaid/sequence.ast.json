@@ -1,0 +1,19 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "fence",
+        "lang": "mermaid",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "sequenceDiagram\n  autonumber\n  participant B as Browser\n  participant G as Gateway\n  participant A as API\n  B->>G: GET /d/roadmap\n  alt cached\n    G-->>B: 200 page (ETag)\n  else cache miss\n    G->>A: render page\n    A-->>G: html\n    G-->>B: 200 page\n  end\n  loop every 30 s while idle\n    B->>G: heartbeat\n  end\n  Note over G,A: Every hop carries the traceparent header\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}

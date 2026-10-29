@@ -1,0 +1,6 @@
+- [ ] Call the vendor @today
+- [ ] Draft Q1 plan start:2026-11-03 due:2026-11-10 15:00
+- [ ] Standup notes every:weekday 09:00
+- [ ] Review backups every!:2w
+- [ ] Pay invoice p1 #finance remind:2026-11-01 08:00
+  - [ ] Get the PDF
