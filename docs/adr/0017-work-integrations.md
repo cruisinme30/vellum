@@ -12,6 +12,8 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D79, D80, D81
+- Issue: #147, also #144, #145, #146, #149, #150, #151, #164
+- Pull requests: #227
 
 :::
 
@@ -36,6 +38,18 @@ Two crates carry this work, both in the service layer:
 
 Both are domain logic behind ports. They open no sockets and read no
 tables; adapters supply HTTP, mail, storage and the issue core.
+
+## Options considered
+
+- **One integrations crate with everything**: simplest to start, but it
+  would mix people-facing delivery (inbox, email, push) with tracker
+  automation and give one crate two reasons to change. Not chosen.
+- **Two service crates behind ports** (`vellum-notify` for delivery,
+  `vellum-integrations` for inbound and scheduled work): each tests
+  without a network, database or issue core. Chosen.
+- **Call provider APIs to read pull request state** instead of relying on
+  webhooks: needs a token per repository and polling. Not chosen;
+  webhooks carry everything the rules need.
 
 ## Decisions
 
@@ -83,7 +97,8 @@ tables; adapters supply HTTP, mail, storage and the issue core.
 - **Retries.** Eight attempts over about 45 hours (now, 1 minute,
   5 minutes, 30 minutes, 2, 6, 12 and 24 hours); `Retry-After` is
   honoured up to an hour. 408, 429, 5xx and network errors retry; other
-  4xx do not. 410 Gone removes the endpoint. An endpoint that has failed
+  4xx do not. 410 Gone removes the endpoint, and a push service's 404
+  removes the push subscription. An endpoint that has failed
   ten deliveries in a row over at least 72 hours is paused and its
   owners are emailed.
 - **SSRF.** Every outbound URL goes through the shared guard in
@@ -149,3 +164,7 @@ tables; adapters supply HTTP, mail, storage and the issue core.
 - Webhook receivers written for other trackers need a small change to
   read `Vellum-Signature`; the format follows the common
   timestamp-plus-HMAC pattern, so most libraries already support it.
+
+## History
+
+- 2026-10-29: accepted in #227.
