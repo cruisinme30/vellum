@@ -84,7 +84,9 @@ pub fn export(
     let _guard = span.enter();
     let result = view::run(computer, collection, view, usize::MAX)?;
     let mut w = ::csv::Writer::from_writer(Vec::new());
-    let header: Vec<&str> = result.columns.iter().map(|c| c.name.as_str()).collect();
+    // Column names are user text too: a property named `=HYPERLINK(…)`
+    // would run as a formula in the header row.
+    let header: Vec<String> = result.columns.iter().map(|c| defuse(&c.name)).collect();
     w.write_record(&header)
         .map_err(|e| CsvError::Malformed(e.to_string()))?;
     let mut seen = BTreeSet::new();
@@ -113,9 +115,12 @@ pub fn export(
     Ok(String::from_utf8_lossy(&bytes).into_owned())
 }
 
+/// Characters that make a spreadsheet read a cell as a formula.
+const FORMULA_START: [char; 6] = ['=', '+', '-', '@', '\t', '\r'];
+
 /// Stops spreadsheets from running cell text as a formula.
 fn defuse(text: &str) -> String {
-    if text.starts_with(['=', '+', '-', '@', '\t', '\r']) {
+    if text.starts_with(FORMULA_START) {
         format!("'{text}")
     } else {
         text.to_owned()
@@ -173,7 +178,7 @@ fn read(text: &str) -> Result<(Vec<String>, Vec<Vec<String>>), CsvError> {
         .from_reader(text.as_bytes());
     let mut records = r.records();
     let header: Vec<String> = match records.next() {
-        Some(Ok(h)) => h.iter().map(|s| s.trim().to_owned()).collect(),
+        Some(Ok(h)) => h.iter().map(|s| undefuse(s.trim()).to_owned()).collect(),
         Some(Err(e)) => return Err(CsvError::Malformed(e.to_string())),
         None => return Err(CsvError::NoHeader),
     };
@@ -198,7 +203,7 @@ fn read(text: &str) -> Result<(Vec<String>, Vec<Vec<String>>), CsvError> {
 
 fn undefuse(text: &str) -> &str {
     match text.strip_prefix('\'') {
-        Some(rest) if rest.starts_with(['=', '+', '-', '@']) => rest,
+        Some(rest) if rest.starts_with(FORMULA_START) => rest,
         _ => text,
     }
 }
