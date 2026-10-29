@@ -13,7 +13,7 @@ vellum: 1
 - Status: accepted
 - Decisions: D79, D80, D81
 - Issue: #147, also #144, #145, #146, #149, #150, #151, #164
-- Pull requests: #227
+- Pull requests: #227, #320
 
 :::
 
