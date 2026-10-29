@@ -45,16 +45,15 @@ flowchart LR
 
 ### D55: the editor's tree in `Yjs`, the standard protocol, three extra messages
 
-- A document has two roots: the `XmlFragment` `content`, exactly as
+- A document has two roots: the `XmlFragment` `default`, exactly as
   `y-prosemirror` writes it, and the `Map` `meta` holding front matter.
   Text offsets are UTF-16, as in the browser.
 - The server converts the tree to and from Markdown only through the
   `MarkdownCodec` port, whose adapter is the `vellum-format` parser and
   canonical serializer. The room never writes Markdown of its own.
-- The node schema is fixed in `vellum_collab::markdown`: `ProseMirror`
-  names (`paragraph`, `heading`, `bullet_list`, `code_block`, marks `em`,
-  `strong`, `link`) plus one node per dialect construct. Every corpus file
-  keeps its exact AST through the tree.
+- Node and mark names come from `vellum_contracts::blocks`, generated from
+  `schema/blocks.json` (ADR 0010), so the codec and the editor share one
+  list. Every corpus file keeps its exact AST through the tree.
 - The wire is the stock `Yjs` sync and awareness protocol, so the editor
   uses the unmodified `y-prosemirror` binding.
 - Three messages use the custom tag range: `100` sets the `traceparent`
@@ -122,11 +121,11 @@ flowchart LR
 
 ## Consequences
 
-- The editor binds `y-prosemirror` to the `content` field and must use
-  the node and mark names of the block model schema.
-- The update log, the document files and the codec are adapters over
-  `vellum-db`, `vellum-store` and `vellum-format`; in-memory adapters run
-  the tests.
+- The editor binds `y-prosemirror` to the `default` field; a node or mark
+  added to the dialect is added to `schema/blocks.json` first.
+- The update log (`vellum-db`) and the codec (`vellum-format`) are real
+  adapters; the document files adapter over `vellum-store` is next, and
+  the in-memory adapters still run the tests.
 - Every new message type takes a tag in the custom range and is ignored
   by servers that do not know it.
 - CI fuzzes the protocol with arbitrary frames and checks with property

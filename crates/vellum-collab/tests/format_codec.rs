@@ -11,8 +11,32 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use proptest::prelude::*;
-use vellum_collab::markdown::{from_document, to_document};
-use vellum_collab::{FormatCodec, MarkdownCodec as _, tree};
+use vellum_collab::markdown::{CONTAINER, INLINE_IMAGE, from_document, to_document};
+use vellum_collab::{FormatCodec, MarkdownCodec as _, Node, tree};
+use vellum_contracts::blocks::{MarkType, NodeType};
+
+/// Every node and mark name the codec writes is in the editor's schema.
+fn check_names(nodes: &[Node], out: &mut Vec<String>) {
+    for node in nodes {
+        match node {
+            Node::Element(element) => {
+                let known = NodeType::from_name(&element.name).is_some()
+                    || element.name == CONTAINER
+                    || element.name == INLINE_IMAGE;
+                if !known {
+                    out.push(format!("node {}", element.name));
+                }
+                check_names(&element.children, out);
+            }
+            Node::Text(runs) => out.extend(
+                runs.iter()
+                    .flat_map(|run| run.marks.keys())
+                    .filter(|mark| MarkType::from_name(mark).is_none())
+                    .map(|mark| format!("mark {mark}")),
+            ),
+        }
+    }
+}
 
 fn corpus_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus")
@@ -66,7 +90,13 @@ fn corpus_survives_the_editor_tree() {
         let canonical = vellum_format::serialize(&parsed);
 
         // The tree conversion alone is lossless on the AST.
-        let back = to_document(&from_document(&parsed));
+        let tree = from_document(&parsed);
+        let mut unknown = Vec::new();
+        check_names(&tree.content, &mut unknown);
+        if !unknown.is_empty() {
+            failures.push(format!("{name}: names outside the schema: {unknown:?}"));
+        }
+        let back = to_document(&tree);
         if back != parsed {
             failures.push(format!(
                 "{name}: AST changed\n  before: {parsed:?}\n  after:  {back:?}"

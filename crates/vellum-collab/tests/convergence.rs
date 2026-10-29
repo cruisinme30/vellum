@@ -203,7 +203,7 @@ const TEST: Codec<'static> = Codec {
 };
 const FORMAT: Codec<'static> = Codec {
     codec: &FormatCodec,
-    bold: "strong",
+    bold: "bold",
 };
 
 fn apply(replicas: &[Doc], peer: usize, op: &Op, codec: Codec<'_>) {

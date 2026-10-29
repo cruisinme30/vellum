@@ -26,7 +26,7 @@ use yrs::{
 
 /// Name of the `XmlFragment` root holding the body. The editor binds
 /// `y-prosemirror` to this field.
-pub const CONTENT_FIELD: &str = "content";
+pub const CONTENT_FIELD: &str = "default";
 
 /// Name of the `Map` root holding front matter.
 pub const META_FIELD: &str = "meta";
