@@ -22,6 +22,7 @@ mod private_tests;
 mod reindex;
 mod serve;
 mod services;
+mod watcher;
 mod workspace;
 
 use std::io::Write as _;
