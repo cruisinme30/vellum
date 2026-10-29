@@ -18,7 +18,7 @@ use vellum_kernel::{ObjectId, SpaceId, Timestamp, UserId, VersionId};
 use vellum_store::BlobPath;
 
 use crate::error::{DriveError, DriveResult};
-use crate::model::{Activity, Node, Space, VersionRecord};
+use crate::model::{Activity, DriveTotals, Node, Space, VersionRecord};
 use crate::ports::DriveIndex;
 use crate::sql::SqlIndex;
 
@@ -309,5 +309,26 @@ impl DriveIndex for ShardedIndex {
 
     async fn usage(&self, space: SpaceId) -> DriveResult<u64> {
         self.for_space(space).await?.usage(space).await
+    }
+
+    /// Each shard holds whole spaces, so the totals are the shards' sum.
+    async fn totals(&self, now: Timestamp) -> DriveResult<DriveTotals> {
+        let mut sum = DriveTotals::default();
+        for shard in &self.shards {
+            let t = shard.totals(now).await?;
+            sum.spaces = sum.spaces.saturating_add(t.spaces);
+            sum.folders = sum.folders.saturating_add(t.folders);
+            sum.pages = sum.pages.saturating_add(t.pages);
+            sum.books = sum.books.saturating_add(t.books);
+            sum.collections = sum.collections.saturating_add(t.collections);
+            sum.shortcuts = sum.shortcuts.saturating_add(t.shortcuts);
+            sum.trashed = sum.trashed.saturating_add(t.trashed);
+            sum.file_bytes = sum.file_bytes.saturating_add(t.file_bytes);
+            sum.versions = sum.versions.saturating_add(t.versions);
+            sum.version_bytes = sum.version_bytes.saturating_add(t.version_bytes);
+            sum.events_1d = sum.events_1d.saturating_add(t.events_1d);
+            sum.events_7d = sum.events_7d.saturating_add(t.events_7d);
+        }
+        Ok(sum)
     }
 }
