@@ -12,8 +12,8 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D88, D89, D90
-- Issue: #84, #85, #148, #46, #86, #88, #174
-- Pull requests: #39, #234, #347, #352
+- Issue: #84, #85, #148, #46, #86, #88, #174, #393
+- Pull requests: #39, #234, #347, #352, #418
 
 :::
 
@@ -118,3 +118,9 @@ live in the gateway crate.
   all see the same set. Without an index (a key, plaintext mode or a
   database URL) `vellum serve` runs sign-in only and says why, rather
   than refusing to start.
+- The binary embeds the built web app and the gateway serves it on the
+  app host (#393). The gateway keeps `/api`, `/healthz`, `/readyz`,
+  `/collab` and every mount prefix, matched or not; any other path gets
+  the app's files, or its index for client routes. Those files pass the
+  edge middleware but need no sign-in. The app CSP's `connect-src` also
+  names the host's own `ws`/`wss` origin for live editing.
