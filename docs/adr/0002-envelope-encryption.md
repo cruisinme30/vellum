@@ -59,6 +59,21 @@ on-disk format and the provider contract in `vellum-crypto`.
   KEK id carries its Argon2id salt and costs, so the passphrase alone
   re-derives the KEK from any envelope header.
 
+## KEK backends
+
+Issue [#48](https://github.com/cruisinme30/vellum/issues/48).
+
+- Local KEKs: the OS keychain (macOS Keychain, Windows Credential
+  Manager, the Linux Secret Service) or a passphrase read from
+  `VELLUM_KEK_PASSPHRASE` or the file named by `VELLUM_KEK_PASSPHRASE_FILE`.
+- Remote KEKs live in `vellum-kms`: AWS KMS, Google Cloud KMS and Vault
+  transit, each a `KeyProvider` over plain HTTPS with no cloud SDK. The KEK
+  id names the remote key, so old envelopes still open after a switch and
+  `rewrap` moves them. The KEK id goes along as associated data, so a
+  wrapped DEK opens only under the id its envelope names.
+- Rotation inside the key service (new key versions) needs nothing from
+  Vellum; moving to another key is a normal KEK rotation.
+
 ## Applying it to the blob store
 
 `vellum-sealed-store` wraps any `BlobStore` in `Sealed`, an engine-layer

@@ -27,6 +27,7 @@ area/crypto:
       - any-glob-to-any-file:
           - "crates/vellum-crypto*/**"
           - "crates/vellum-sealed-store/**"
+          - "crates/vellum-kms/**"
 area/security:
   - changed-files:
       - any-glob-to-any-file:
