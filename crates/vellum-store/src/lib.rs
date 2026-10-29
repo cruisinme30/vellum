@@ -17,6 +17,7 @@ pub mod metered;
 mod path;
 mod reconcile;
 mod store;
+pub mod watch;
 
 #[cfg(any(test, feature = "conformance"))]
 pub mod conformance;
