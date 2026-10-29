@@ -108,6 +108,11 @@ area/cli:
   - changed-files:
       - any-glob-to-any-file:
           - "crates/vellum-cli/**"
+area/sync:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-sync/**"
+          - "web/src/platform/store/**"
 area/desktop:
   - changed-files:
       - any-glob-to-any-file:

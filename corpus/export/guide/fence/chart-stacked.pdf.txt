@@ -1,0 +1,8 @@
+Issues closed per cycle
+Bugs Features Chores
+C01 8 5 2
+C02 6 7 3
+C03 9 6 1
+C04 4 9 2
+1 / 1
+

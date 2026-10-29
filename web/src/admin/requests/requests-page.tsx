@@ -168,7 +168,7 @@ export function RequestsPage({ fetcher }: { readonly fetcher?: typeof fetch }) {
   const rows = current(list, filter);
   const detail = selected === undefined ? undefined : current(trace, selected);
   return (
-    <main className="vl-requests">
+    <section className="vl-requests">
       <h1>Requests</h1>
       <Filters onApply={setFilter} />
       {rows.state === "loading" && <p role="status">Loading requests…</p>}
@@ -179,6 +179,6 @@ export function RequestsPage({ fetcher }: { readonly fetcher?: typeof fetch }) {
       {detail?.state === "loading" && <p role="status">Loading trace…</p>}
       {detail?.state === "failed" && <p role="alert">Could not load the trace: {detail.message}</p>}
       {detail?.state === "ready" && <Waterfall trace={detail.value} />}
-    </main>
+    </section>
   );
 }

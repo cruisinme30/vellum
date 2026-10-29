@@ -8,7 +8,7 @@ const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
 test("the command menu opens from the keyboard and passes WCAG 2.2 AA", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1, name: "Vellum" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Main" })).toBeVisible();
   await page.keyboard.press("ControlOrMeta+k");
   const search = page.getByRole("combobox", { name: "Search commands" });
   await expect(search).toBeFocused();

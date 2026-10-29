@@ -111,7 +111,7 @@ export function RoutesPage({ fetcher }: { readonly fetcher?: typeof fetch }) {
 
   const load: Load = loaded?.key === minutes ? loaded.load : { state: "loading" };
   return (
-    <main className="vl-requests">
+    <section className="vl-requests">
       <h1>Routes</h1>
       <label>
         Window{" "}
@@ -131,6 +131,6 @@ export function RoutesPage({ fetcher }: { readonly fetcher?: typeof fetch }) {
       {load.state === "loading" && <p role="status">Loading routes…</p>}
       {load.state === "failed" && <p role="alert">Could not load routes: {load.message}</p>}
       {load.state === "ready" && <RouteTable view={load.value} />}
-    </main>
+    </section>
   );
 }

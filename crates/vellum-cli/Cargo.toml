@@ -30,13 +30,20 @@ tracing = "0.1.44"
 url = "2.5.8"
 vellum-admin = { path = "../vellum-admin" }
 vellum-api = { path = "../vellum-api" }
+vellum-authz = { path = "../vellum-authz" }
+vellum-books-service = { path = "../vellum-books-service" }
+vellum-collections = { path = "../vellum-collections" }
 vellum-contracts.workspace = true
 vellum-db.workspace = true
+vellum-drive = { path = "../vellum-drive" }
 vellum-help.workspace = true
 vellum-identity = { path = "../vellum-identity" }
 vellum-kernel.workspace = true
 vellum-mcp = { path = "../vellum-mcp" }
 vellum-security = { path = "../vellum-security" }
+vellum-store = { path = "../vellum-store" }
+vellum-work = { path = "../vellum-work" }
+vellum-work-service = { path = "../vellum-work-service" }
 
 [dev-dependencies]
 axum = { version = "0.8.9", default-features = false }

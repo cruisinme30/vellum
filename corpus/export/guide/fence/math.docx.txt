@@ -1,0 +1,1 @@
+[Normal] [equation]σ=1Ni=1N(xi−μ)2

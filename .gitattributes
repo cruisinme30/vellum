@@ -8,3 +8,5 @@ Cargo.lock linguist-generated=true
 web/pnpm-lock.yaml linguist-generated=true
 LICENSE linguist-generated=true
 LICENSES/** linguist-generated=true
+crates/vellum-contracts/src/blocks.rs linguist-generated=true
+web/src/editor/schema/blocks.gen.ts linguist-generated=true

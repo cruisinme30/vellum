@@ -1,0 +1,4 @@
+flowchart LR
+  A[Client] --> B{Gateway
+1 / 1
+

@@ -1,0 +1,5 @@
+Option A Option B
+Self-hosted ✓ ✗
+Free SSO ✓ ◐
+1 / 1
+

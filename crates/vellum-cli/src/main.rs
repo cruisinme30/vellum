@@ -21,6 +21,7 @@ mod mcp;
 mod reindex;
 mod serve;
 mod services;
+mod workspace;
 
 use std::io::Write as _;
 use std::process::ExitCode;

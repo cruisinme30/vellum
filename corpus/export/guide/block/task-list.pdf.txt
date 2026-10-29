@@ -1,0 +1,4 @@
+☐ Announce in the deploys channel
+☑︎ Tag the release
+1 / 1
+

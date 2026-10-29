@@ -1,0 +1,7 @@
+| Units | 100 |
+| Price | 12 |
+| Total | 1,200 |
+
+[Normal] [Image: Request path]
+| Note Live data was not available when this was exported on 2026-10-29. |
+

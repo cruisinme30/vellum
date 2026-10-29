@@ -112,6 +112,8 @@ jobs:
         run: cargo nextest run --workspace --locked --profile ci
       - name: Crate boundaries
         run: cargo xtask boundaries
+      - name: Block model is generated from schema/
+        run: cargo xtask schema --check
       - name: Help books and their corpus
         run: cargo xtask help
       - name: Licences, bans, sources and advisories
