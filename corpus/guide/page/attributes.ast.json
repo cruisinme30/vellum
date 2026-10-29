@@ -1,0 +1,87 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "heading",
+        "level": 2,
+        "content": [
+          {
+            "type": "text",
+            "text": "Rollback"
+          }
+        ],
+        "attrs": {
+          "id": "rollback",
+          "classes": [
+            "wide"
+          ],
+          "pairs": []
+        },
+        "id": null
+      },
+      {
+        "type": "container",
+        "name": "info",
+        "arg": "",
+        "attrs": {
+          "id": "note-1",
+          "classes": [],
+          "pairs": []
+        },
+        "sections": [
+          [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Attributes go on the first line of a block."
+                }
+              ],
+              "id": null
+            }
+          ]
+        ]
+      },
+      {
+        "type": "fence",
+        "lang": "chart",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": [
+            [
+              "height",
+              "240"
+            ]
+          ]
+        },
+        "literal": "title: Requests\ntype: bar\nlabels: [Mon, Tue]\nvalues: [3, 5]\n"
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "image",
+            "url": "assets/arch.png",
+            "title": "",
+            "alt": [
+              {
+                "type": "text",
+                "text": "Gateway request path"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": "{width=50% align=right}"
+          }
+        ],
+        "id": null
+      }
+    ]
+  },
+  "diagnostics": []
+}

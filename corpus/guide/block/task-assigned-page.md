@@ -1,0 +1,1 @@
+- [ ] Send the launch checklist to legal @priya 2026-11-12

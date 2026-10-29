@@ -119,6 +119,9 @@ area/docs:
           - "docs/**"
           - "site/**"
           - "*.md"
+          - "crates/vellum-help/**"
+          - "xtask/src/help/**"
+          - "corpus/guide/**"
 area/deploy:
   - changed-files:
       - any-glob-to-any-file:
