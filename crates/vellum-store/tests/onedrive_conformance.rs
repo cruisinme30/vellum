@@ -58,6 +58,11 @@ async fn metered_onedrive_store_conforms() -> TestResult {
 
 /// With a tiny simple-upload limit, nearly every write in the suite goes
 /// through an upload session, including the racing writers.
+///
+/// How many sessions are *created* depends on timing: a racing writer
+/// whose session request arrives after the winner committed is refused at
+/// creation and never opens one. Committed sessions do not: the suite's
+/// sequential writes over one byte commit 9, and exactly one racer wins.
 #[tokio::test(flavor = "multi_thread")]
 async fn onedrive_store_conforms_through_upload_sessions() -> TestResult {
     let limits = Limits {
@@ -68,7 +73,8 @@ async fn onedrive_store_conforms_through_upload_sessions() -> TestResult {
     let fake = FakeGraph::start(limits).await?;
     conformance::run_all(&store(&fake)?).await?;
     assert_no_leaks(&fake);
-    assert!(fake.counters().sessions > 10, "{:?}", fake.counters());
+    let counters = fake.counters();
+    assert_eq!(counters.session_commits, 10, "{counters:?}");
     Ok(())
 }
 

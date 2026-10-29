@@ -67,6 +67,8 @@ pub struct Counters {
     pub simple_uploads: u32,
     /// Upload sessions created.
     pub sessions: u32,
+    /// Upload sessions whose last chunk wrote the file.
+    pub session_commits: u32,
     /// Upload-session chunks accepted.
     pub chunks: u32,
     /// Children pages served after the first (via `$skiptoken`).
@@ -720,6 +722,7 @@ fn upload_chunk(
     }
     drive.ensure_parents(&session.path)?;
     let created = drive.write(&session.path, Bytes::from(session.received));
+    drive.counters.session_commits += 1;
     let status = if created {
         StatusCode::CREATED
     } else {
