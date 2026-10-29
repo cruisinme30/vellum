@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import react from "@vitejs/plugin-react";
+import type { Connect, Plugin } from "vite";
 import { defineConfig } from "vitest/config";
 
 import { vellumServiceWorker } from "./src/platform/pwa/vite-plugin";
@@ -19,8 +20,32 @@ const proxy =
         ]),
       );
 
+/**
+ * Without a server, the dev and preview servers answer the app's
+ * "is a Vellum server here?" check themselves, so the demo starts without
+ * a failed request in the console (the UI suite counts those as errors).
+ */
+const answerDemoStatus: Connect.NextHandleFunction = (request, response, next) => {
+  if (request.url?.split("?")[0] !== "/api/v1/auth/status") {
+    next();
+    return;
+  }
+  response.setHeader("content-type", "application/json");
+  response.end(JSON.stringify({ demo: true }));
+};
+
+const demoMode = (): Plugin => ({
+  name: "vellum-demo-mode",
+  configureServer(developmentServer) {
+    developmentServer.middlewares.use(answerDemoStatus);
+  },
+  configurePreviewServer(previewServer) {
+    previewServer.middlewares.use(answerDemoStatus);
+  },
+});
+
 export default defineConfig({
-  plugins: [react(), vellumServiceWorker()],
+  plugins: [react(), vellumServiceWorker(), ...(proxy === undefined ? [demoMode()] : [])],
   ...(proxy === undefined ? {} : { server: { proxy } }),
   build: {
     sourcemap: true,
