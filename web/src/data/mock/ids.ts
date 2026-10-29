@@ -1,0 +1,19 @@
+// SPDX-FileCopyrightText: 2026 The Vellum contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+
+/** Page ids used by the demo and its tests. */
+export const PAGE = {
+  engHome: "01JB3K9Q7Z5N8M2X4V6T0R1Y3W",
+  gateway: "01JB3KA1C2D3E4F5G6H7J8K9MN",
+  rateLimits: "01JB3KA2C2D3E4F5G6H7J8K9MP",
+  runbook: "01JB3KA3C2D3E4F5G6H7J8K9MQ",
+  onCall: "01JB3KA4C2D3E4F5G6H7J8K9MR",
+  roadmap: "01JB3KA5C2D3E4F5G6H7J8K9MS",
+  prd: "01JB3KB1C2D3E4F5G6H7J8K9MT",
+  interviews: "01JB3KB2C2D3E4F5G6H7J8K9MV",
+  acme: "01JB3KB3C2D3E4F5G6H7J8K9MW",
+  launch: "01JB3KB4C2D3E4F5G6H7J8K9MX",
+  welcome: "01JB3KC1C2D3E4F5G6H7J8K9MY",
+  onboarding: "01JB3KC2C2D3E4F5G6H7J8K9MZ",
+  directory: "01JB3KC3C2D3E4F5G6H7J8K9N0",
+} as const;

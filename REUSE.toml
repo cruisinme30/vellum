@@ -15,6 +15,7 @@ path = [
   "web/tsconfig.json",
   "web/knip.json",
   "web/.prettierrc.json",
+  "schema/*.json",
   "web/public/manifest.webmanifest",
   "web/public/icons/**",
   "desktop/pnpm-lock.yaml",
