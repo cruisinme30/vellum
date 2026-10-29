@@ -12,7 +12,7 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D135, D136, D137
-- Requirements: R-WK-11
+- Requirements: R-WK-13
 - Issue: #258
 - Pull requests: pending
 
