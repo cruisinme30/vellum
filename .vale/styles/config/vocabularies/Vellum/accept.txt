@@ -42,3 +42,4 @@ pnpm
 tsc
 Affero
 [Ww]orkstreams?
+[Ll]abeler
