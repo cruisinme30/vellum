@@ -161,10 +161,16 @@ export function formatBinding(binding: Binding, platform: KeyPlatform): string {
   return binding.map((s) => formatStroke(s, platform)).join(" then ");
 }
 
-/** The platform of the running browser. */
+/**
+ * The platform of the running browser. The operating system's own name wins
+ * over the user agent: WebKit browsers on Linux (GNOME Web, and Playwright's
+ * WebKit) send a Safari-on-Mac user agent but use Ctrl for shortcuts.
+ */
 export function currentPlatform(
   nav: { readonly platform?: string; readonly userAgent?: string } = navigator,
 ): KeyPlatform {
-  const text = `${nav.platform ?? ""} ${nav.userAgent ?? ""}`;
+  // An empty platform (some privacy modes) falls back to the user agent.
+  const text =
+    nav.platform === undefined || nav.platform === "" ? (nav.userAgent ?? "") : nav.platform;
   return /Mac|iPhone|iPad/.test(text) ? "mac" : "other";
 }
