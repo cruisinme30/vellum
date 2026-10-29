@@ -19,7 +19,7 @@
 //! The payload is not bound to the object's path, so renames keep working, and
 //! not to the header, so rotation re-wraps the DEK without touching the payload.
 
-use crate::aead::{self, NONCE_LEN};
+use crate::aead::{self, NONCE_LEN, TAG_LEN};
 use crate::error::CryptoError;
 use crate::key::{KekId, SecretKey};
 use crate::provider::{KeyProvider, WrappedDek};
@@ -109,6 +109,19 @@ fn record<T>(op: &'static str, result: Result<T, CryptoError>) -> Result<T, Cryp
 /// [`CryptoError::Malformed`]/[`CryptoError::UnsupportedVersion`] for bad bytes.
 pub fn kek_of(sealed: &[u8]) -> Result<KekId, CryptoError> {
     decode(sealed).map(|parsed| parsed.wrapped.kek_id)
+}
+
+/// Length of the plaintext inside an envelope, read from the header only.
+///
+/// # Errors
+/// [`CryptoError::Malformed`]/[`CryptoError::UnsupportedVersion`] for bad bytes.
+pub fn plaintext_len(sealed: &[u8]) -> Result<usize, CryptoError> {
+    let parsed = decode(sealed)?;
+    parsed
+        .ciphertext
+        .len()
+        .checked_sub(TAG_LEN)
+        .ok_or(CryptoError::Malformed("truncated payload"))
 }
 
 struct Parsed<'a> {
