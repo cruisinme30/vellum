@@ -1,0 +1,103 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Nightly load test and security scan on the Team profile (docker compose)
+# (ADR 0022, D96). The k6 suite must hold the SLO thresholds, and a p95
+# that grows 10 % or more over deploy/perf/baseline.json fails the run.
+# ZAP runs its baseline scan against the same stack.
+name: Nightly load and security
+
+on:
+  schedule:
+    - cron: "41 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  K6_VERSION: v2.3.0
+
+jobs:
+  load:
+    name: Load test (k6)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build the image
+        run: docker buildx build --load -t vellum:ci -f deploy/docker/Dockerfile .
+      - name: Does the binary serve yet?
+        id: serve
+        run: |
+          if deploy/compose/stack.sh has-serve vellum:ci; then
+            echo "ready=true" >>"${GITHUB_OUTPUT}"
+          else
+            echo "::notice::vellum has no serve command yet; the load test starts once it does."
+          fi
+      - name: Start the Team stack
+        if: steps.serve.outputs.ready == 'true'
+        run: deploy/compose/stack.sh up vellum:ci nightly 7700
+      - uses: grafana/setup-k6-action@43b9fc21641a76002687994433dd586f56e791b1 # v1.2.2
+        if: steps.serve.outputs.ready == 'true'
+        with:
+          k6-version: ${{ env.K6_VERSION }}
+      - name: Run the suite
+        if: steps.serve.outputs.ready == 'true'
+        run: >-
+          k6 run -e BASE_URL=http://127.0.0.1:7700 -e SUMMARY=perf-summary.json
+          deploy/perf/k6/suite.js
+      - name: Install Rust for the gate
+        if: always() && steps.serve.outputs.ready == 'true'
+        run: rustup toolchain install
+      - name: No p95 grew 10 % or more over the baseline
+        if: always() && steps.serve.outputs.ready == 'true'
+        run: >-
+          cargo run --locked --package xtask -- perf-gate
+          --baseline deploy/perf/baseline.json --current perf-summary.json
+      - name: Keep the result as trend data
+        if: always() && steps.serve.outputs.ready == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: perf-summary-${{ github.run_id }}
+          path: perf-summary.json
+          retention-days: 90
+      - name: Server logs
+        if: failure() && steps.serve.outputs.ready == 'true'
+        run: deploy/compose/stack.sh compose nightly logs --tail 300
+
+  zap:
+    name: Security scan (ZAP baseline)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build the image
+        run: docker buildx build --load -t vellum:ci -f deploy/docker/Dockerfile .
+      - name: Does the binary serve yet?
+        id: serve
+        run: |
+          if deploy/compose/stack.sh has-serve vellum:ci; then
+            echo "ready=true" >>"${GITHUB_OUTPUT}"
+          else
+            echo "::notice::vellum has no serve command yet; the ZAP scan starts once it does."
+          fi
+      - name: Start the Team stack
+        if: steps.serve.outputs.ready == 'true'
+        run: deploy/compose/stack.sh up vellum:ci zap 7700
+      - name: ZAP baseline scan
+        if: steps.serve.outputs.ready == 'true'
+        uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25 # v0.15.0
+        with:
+          target: http://localhost:7700
+          rules_file_name: deploy/zap/rules.tsv
+          cmd_options: -a -j
+          fail_action: true
+          allow_issue_writing: false
+          artifact_name: zap-report

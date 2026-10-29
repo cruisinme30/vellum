@@ -1,0 +1,69 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Weekly chaos test on the Organisation profile (ADR 0022, D96): the Helm
+# chart on kind with a Patroni Postgres, under k6 load, while Chaos Mesh
+# kills a Vellum node, a Kroki pod and the Postgres primary. It fails when
+# an SLO threshold breaks or an acknowledged write is lost.
+name: Weekly chaos
+
+on:
+  schedule:
+    - cron: "23 4 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chaos
+  cancel-in-progress: false
+
+jobs:
+  chaos:
+    name: Chaos under load
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build the images
+        run: |
+          docker buildx build --load -t vellum:ci -f deploy/docker/Dockerfile .
+          docker buildx build --load -t vellum-minio:ci deploy/compose/minio
+      - name: Does the binary serve yet?
+        id: serve
+        run: |
+          if deploy/compose/stack.sh has-serve vellum:ci; then
+            echo "ready=true" >>"${GITHUB_OUTPUT}"
+          else
+            echo "::notice::vellum has no serve command yet; the chaos test starts once it does."
+          fi
+      - uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
+        if: steps.serve.outputs.ready == 'true'
+        with:
+          cluster_name: chaos
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        if: steps.serve.outputs.ready == 'true'
+        with:
+          version: v3.19.0
+      - name: Install the Postgres Operator and Chaos Mesh
+        if: steps.serve.outputs.ready == 'true'
+        run: |
+          kind load docker-image vellum:ci vellum-minio:ci --name chaos
+          helm install postgres-operator postgres-operator \
+            --repo https://opensource.zalando.com/postgres-operator/charts/postgres-operator \
+            --version 2.0.3 --wait
+          helm install chaos-mesh chaos-mesh --repo https://charts.chaos-mesh.org --version 2.8.7 \
+            --namespace chaos-mesh --create-namespace --wait \
+            --set chaosDaemon.runtime=containerd \
+            --set chaosDaemon.socketPath=/run/containerd/containerd.sock
+      - name: Run the faults under load
+        if: steps.serve.outputs.ready == 'true'
+        run: deploy/chaos/run.sh
+      - name: Cluster state
+        if: failure() && steps.serve.outputs.ready == 'true'
+        run: |
+          kubectl get pods -A -o wide
+          kubectl get events --sort-by=.lastTimestamp | tail -80
+          kubectl logs -l app.kubernetes.io/component=server --tail=200 --prefix

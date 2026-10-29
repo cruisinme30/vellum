@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# The weekly faults, applied one at a time by run.sh while k6 runs: a
+# Vellum node (and the collab rooms on it), a Kroki pod, and the Postgres
+# primary, which forces a Patroni failover to the synchronous replica.
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: kill-vellum-node
+spec:
+  action: pod-kill
+  mode: one
+  selector:
+    labelSelectors:
+      app.kubernetes.io/component: server
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: kill-kroki
+spec:
+  action: pod-kill
+  mode: one
+  selector:
+    labelSelectors:
+      app.kubernetes.io/component: kroki
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: kill-postgres-primary
+spec:
+  action: pod-kill
+  mode: one
+  selector:
+    labelSelectors:
+      application: spilo
+      spilo-role: master
