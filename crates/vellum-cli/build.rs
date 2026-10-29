@@ -21,13 +21,17 @@ const PLACEHOLDER: &str = "<!doctype html>\n<html lang=\"en\">\n<head>\n\
 <code>pnpm --dir web build</code>, then build the binary again. The API is available \
 under <code>/api</code>.</p>\n</main>\n</body>\n</html>\n";
 
-/// Every file under `dir`, as (`/relative/path`, absolute path), sorted.
+/// Every file under `dir`, as (`/relative/path`, absolute path). Source
+/// maps are left out: they are most of the build's size, and the binary
+/// has a 40 MB budget.
 fn files(root: &Path, dir: &Path, out: &mut Vec<(String, PathBuf)>) -> io::Result<()> {
     for entry in fs::read_dir(dir)? {
         let path = entry?.path();
         if path.is_dir() {
             files(root, &path, out)?;
-        } else if let Ok(relative) = path.strip_prefix(root) {
+        } else if path.extension().is_none_or(|extension| extension != "map")
+            && let Ok(relative) = path.strip_prefix(root)
+        {
             let url: Vec<String> = relative
                 .components()
                 .map(|c| c.as_os_str().to_string_lossy().into_owned())
