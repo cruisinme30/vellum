@@ -14,6 +14,9 @@ mod local;
 mod path;
 mod store;
 
+#[cfg(any(test, feature = "conformance"))]
+pub mod conformance;
+
 pub use error::{StoreError, StoreResult};
 pub use local::LocalStore;
 pub use path::{BlobPath, MAX_PATH_BYTES, TEMP_PREFIX};
