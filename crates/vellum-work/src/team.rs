@@ -247,7 +247,7 @@ impl Team {
     /// Returns [`WorkError::File`] if the YAML is malformed, and the
     /// [`Team::check`] error if the settings break a rule.
     pub fn from_yaml(path: &str, text: &str) -> Result<Self, WorkError> {
-        let team: Self = serde_yaml_ng::from_str(text).map_err(|e| WorkError::File {
+        let team: Self = serde_saphyr::from_str(text).map_err(|e| WorkError::File {
             path: path.to_owned(),
             reason: e.to_string(),
         })?;
@@ -261,7 +261,7 @@ impl Team {
     ///
     /// Returns [`WorkError::File`] if serialisation fails.
     pub fn to_yaml(&self) -> Result<String, WorkError> {
-        serde_yaml_ng::to_string(self).map_err(|e| WorkError::File {
+        serde_saphyr::to_string(self).map_err(|e| WorkError::File {
             path: self.path(),
             reason: e.to_string(),
         })

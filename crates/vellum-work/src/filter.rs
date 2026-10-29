@@ -541,9 +541,9 @@ pub(crate) mod tests {
     #[test]
     fn filters_round_trip_through_yaml() {
         let yaml = "and:\n- field: priority\n  op: is\n  values: [urgent]\n- or:\n  - field: assignee\n    op: is\n    values: ['@me']\n  - not:\n      field: project\n      op: is_empty\n";
-        let f: Filter = serde_yaml_ng::from_str(yaml).unwrap();
+        let f: Filter = serde_saphyr::from_str(yaml).unwrap();
         f.check().unwrap();
-        let back: Filter = serde_yaml_ng::from_str(&serde_yaml_ng::to_string(&f).unwrap()).unwrap();
+        let back: Filter = serde_saphyr::from_str(&serde_saphyr::to_string(&f).unwrap()).unwrap();
         assert_eq!(back, f);
     }
 

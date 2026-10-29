@@ -292,7 +292,7 @@ pub struct Issue {
     pub vellum: u8,
     /// Front matter keys this version does not know, kept verbatim.
     #[serde(flatten)]
-    pub extra: BTreeMap<String, serde_yaml_ng::Value>,
+    pub extra: BTreeMap<String, serde_json::Value>,
     /// The Vellum Markdown body.
     #[serde(skip)]
     pub body: String,
@@ -448,7 +448,7 @@ impl Issue {
         };
         let (front, body) = split_front_matter(text).map_err(|r| file_err(r.to_owned()))?;
         let mut issue: Self =
-            serde_yaml_ng::from_str(front).map_err(|e| file_err(e.to_string()))?;
+            serde_saphyr::from_str(front).map_err(|e| file_err(e.to_string()))?;
         if issue.number == 0 {
             return Err(file_err("number must be 1 or more".to_owned()));
         }
@@ -469,7 +469,7 @@ impl Issue {
     ///
     /// Returns [`WorkError::File`] if the front matter cannot be serialised.
     pub fn to_markdown(&self) -> Result<String, WorkError> {
-        let front = serde_yaml_ng::to_string(self).map_err(|e| WorkError::File {
+        let front = serde_saphyr::to_string(self).map_err(|e| WorkError::File {
             path: self.path(),
             reason: e.to_string(),
         })?;

@@ -300,9 +300,9 @@ mod tests {
     #[test]
     fn estimates_serialise_as_numbers_or_sizes() {
         let yaml =
-            serde_yaml_ng::to_string(&vec![Estimate::Points(3), Estimate::Size(Size::L)]).unwrap();
+            serde_saphyr::to_string(&vec![Estimate::Points(3), Estimate::Size(Size::L)]).unwrap();
         assert_eq!(yaml, "- 3\n- L\n");
-        let back: Vec<Estimate> = serde_yaml_ng::from_str(&yaml).unwrap();
+        let back: Vec<Estimate> = serde_saphyr::from_str(&yaml).unwrap();
         assert_eq!(back, [Estimate::Points(3), Estimate::Size(Size::L)]);
     }
 }

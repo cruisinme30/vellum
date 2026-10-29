@@ -516,8 +516,8 @@ fn views_group_filter_and_order() {
     assert!(mine.check().is_ok());
     assert!(mine.visible_to(&user("x"), |t| t.as_str() == "ENG"));
     assert!(!mine.visible_to(&user("x"), |_| false));
-    let yaml = serde_yaml_ng::to_string(&mine).unwrap();
-    assert_eq!(serde_yaml_ng::from_str::<View>(&yaml).unwrap(), mine);
+    let yaml = serde_saphyr::to_string(&mine).unwrap();
+    assert_eq!(serde_saphyr::from_str::<View>(&yaml).unwrap(), mine);
 }
 
 #[test]

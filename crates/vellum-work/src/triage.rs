@@ -218,7 +218,7 @@ mod tests {
 
     #[test]
     fn the_first_matching_rule_wins() {
-        let rules: Vec<TriageRule> = serde_yaml_ng::from_str(
+        let rules: Vec<TriageRule> = serde_saphyr::from_str(
             "- name: crashes\n  when: {field: title, op: contains, values: [crash]}\n  then: {assignee: dev, labels: [type/bug], priority: 1}\n\
              - name: all\n  when: {and: []}\n  then: {assignee: priya}\n",
         )

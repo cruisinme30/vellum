@@ -263,7 +263,7 @@ impl Cycle {
             path: path.to_owned(),
             reason,
         };
-        let cycle: Self = serde_yaml_ng::from_str(text).map_err(|e| err(e.to_string()))?;
+        let cycle: Self = serde_saphyr::from_str(text).map_err(|e| err(e.to_string()))?;
         if cycle.ends_on <= cycle.starts_on {
             return Err(err("ends_on must be after starts_on".to_owned()));
         }
@@ -276,7 +276,7 @@ impl Cycle {
     ///
     /// Returns [`WorkError::File`] if serialisation fails.
     pub fn to_yaml(&self) -> Result<String, WorkError> {
-        serde_yaml_ng::to_string(self).map_err(|e| WorkError::File {
+        serde_saphyr::to_string(self).map_err(|e| WorkError::File {
             path: self.path(),
             reason: e.to_string(),
         })

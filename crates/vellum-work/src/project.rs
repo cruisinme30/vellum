@@ -203,12 +203,12 @@ fn parse_page<T: serde::de::DeserializeOwned>(
         reason,
     };
     let (front, body) = split_front_matter(text).map_err(|r| err(r.to_owned()))?;
-    let value = serde_yaml_ng::from_str(front).map_err(|e| err(e.to_string()))?;
+    let value = serde_saphyr::from_str(front).map_err(|e| err(e.to_string()))?;
     Ok((value, body.to_owned()))
 }
 
 fn write_page<T: Serialize>(value: &T, body: &str, path: &str) -> Result<String, WorkError> {
-    let front = serde_yaml_ng::to_string(value).map_err(|e| WorkError::File {
+    let front = serde_saphyr::to_string(value).map_err(|e| WorkError::File {
         path: path.to_owned(),
         reason: e.to_string(),
     })?;
