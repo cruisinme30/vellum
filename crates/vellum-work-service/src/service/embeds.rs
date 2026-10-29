@@ -19,7 +19,8 @@ use super::WorkService;
 pub struct EmbedIssue {
     /// Its identifier, such as `ENG-142`.
     pub key: String,
-    /// Where the web app shows it.
+    /// Where the web app shows it (`/i/ENG-142`, as render maps
+    /// `vellum://issue/` links).
     pub href: String,
     /// Its title.
     pub title: String,
@@ -74,7 +75,7 @@ impl EmbedView {
                     .map(|i| {
                         let key = i.key().to_string();
                         EmbedIssue {
-                            href: format!("/work/issues/{key}"),
+                            href: format!("/i/{key}"),
                             key,
                             title: i.title.clone(),
                             state: graph

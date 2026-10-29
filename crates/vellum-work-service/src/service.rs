@@ -47,6 +47,7 @@ use crate::routes;
 pub mod embed;
 pub mod embeds;
 pub mod insights;
+pub mod live;
 pub mod triage;
 
 /// The most issues one list returns.
