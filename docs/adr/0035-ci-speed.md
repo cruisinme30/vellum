@@ -33,7 +33,7 @@ jobs also queued for runners.
 
 - Only pushes to develop save the Rust cache; pull requests restore it.
 - Twenty-five pull request caches would otherwise fill the 10 GB limit and
-  evict develop's cache, turning a 2-minute job into a cold build.
+  evict the develop cache, turning a 2-minute job into a cold build.
 - `.config/nextest.toml` has a `ci` profile that kills a test after
   2 minutes, so a hang fails fast instead of holding the job for 30.
 
@@ -60,7 +60,7 @@ jobs also queued for runners.
 
 - **Split the Rust job into parallel jobs**: each job rebuilds the
   workspace, and runners are the scarce resource, so it would queue more.
-- **sccache**: rust-cache already restores a warm target folder; sccache
+- **`sccache`**: rust-cache already restores a warm target folder; `sccache`
   adds a service for little gain.
 - **CodeQL advanced setup with path filters**: a skipped analysis leaves
   the code scanning gate waiting for results, which blocks merges.
