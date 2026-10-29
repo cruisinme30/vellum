@@ -30,7 +30,7 @@ pub fn seal(
     let cipher = XChaCha20Poly1305::new(key.expose().into());
     let ciphertext = cipher
         .encrypt(
-            XNonce::from_slice(&nonce),
+            &XNonce::from(nonce),
             Payload {
                 msg: plaintext,
                 aad,
@@ -53,7 +53,7 @@ pub fn open(
     let cipher = XChaCha20Poly1305::new(key.expose().into());
     cipher
         .decrypt(
-            XNonce::from_slice(nonce),
+            &XNonce::from(*nonce),
             Payload {
                 msg: ciphertext,
                 aad,
