@@ -183,7 +183,13 @@ impl Root {
     fn head(path: &BlobPath, file: &Path) -> StoreResult<BlobMeta> {
         let mut f = open_file(path, file)?;
         let mut hasher = Sha256::new();
-        let _ = std::io::copy(&mut f, &mut hasher).at(file)?;
+        let mut buf = vec![0_u8; 64 * 1024];
+        loop {
+            match f.read(&mut buf).at(file)? {
+                0 => break,
+                n => hasher.update(buf.get(..n).unwrap_or_default()),
+            }
+        }
         meta(path, &f, file, finish(hasher))
     }
 
