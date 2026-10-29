@@ -378,6 +378,28 @@ notify-device-enable = Turn on push
 notify-device-disable = Turn off push
 notify-device-error = Push couldn't be changed. Try again.
 
+## Private spaces (end-to-end encrypted)
+
+private-title = Private spaces
+private-intro = Pages in a private space are sealed on members' devices. The server stores only ciphertext, so it can't read, search or export them.
+private-device = This device
+private-device-desktop-only = Enrolling a device needs the Vellum desktop app, which keeps the device key in this computer's keychain.
+private-device-fingerprint = Device fingerprint:
+private-no-spaces = You aren't in any shared drives yet.
+private-not-private = Not private. Pages are encrypted at rest with the server's keys.
+private-sealed-to = { $count ->
+    [one] Sealed to 1 device.
+   *[other] Sealed to { $count } devices.
+}
+private-this-device = (this device)
+private-make-private = Make private and enrol this device
+private-enrol = Enrol this device
+private-reseal = Reseal pages for every device
+private-remove = Remove
+private-remove-label = Remove { $device }
+private-removed = Removed { $device }. Reseal the pages from another device so it can't open new versions.
+private-error = That didn't work. Try again.
+
 ## Screens that need a server
 
 needs-server = This screen needs a Vellum server. The demo has no data for it.

@@ -13,6 +13,10 @@ export interface BridgeServices {
   accessToken(): Promise<string | undefined>;
   openExternal(url: string): Promise<void>;
   notify(notice: Notice): void;
+  /** Private spaces; the inputs are checked by the implementation. */
+  privateDeviceKey(): Promise<unknown>;
+  privateEnrol(spaceId: unknown, label: unknown): Promise<unknown>;
+  privateReseal(spaceId: unknown): Promise<unknown>;
 }
 
 /** A notification; `url` is an app path opened on click. */
@@ -42,6 +46,18 @@ export function bridgeHandlers(services: BridgeServices): ReadonlyMap<ChannelNam
         await services.openExternal(input);
       },
     ],
+    [Channel.privateDeviceKey, () => services.privateDeviceKey()],
+    [
+      Channel.privateEnrol,
+      (input) => {
+        const { spaceId, label } = (typeof input === "object" && input !== null ? input : {}) as {
+          spaceId?: unknown;
+          label?: unknown;
+        };
+        return services.privateEnrol(spaceId, label);
+      },
+    ],
+    [Channel.privateReseal, (input) => services.privateReseal(input)],
     [
       Channel.notify,
       (input) => {

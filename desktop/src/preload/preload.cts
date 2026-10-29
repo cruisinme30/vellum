@@ -26,6 +26,19 @@ contextBridge.exposeInMainWorld("vellumDesktop", {
     ipcRenderer.invoke("vellum:open-external", url) as Promise<void>,
   notify: (notice: { title: string; body: string; url: string }): Promise<void> =>
     ipcRenderer.invoke("vellum:notify", notice) as Promise<void>,
+  privateSpaces: {
+    deviceKey: (): Promise<{ publicKey: string; fingerprint: string }> =>
+      ipcRenderer.invoke("vellum:private-device-key") as Promise<{
+        publicKey: string;
+        fingerprint: string;
+      }>,
+    enrol: (spaceId: string, label?: string): Promise<{ lines: string[] }> =>
+      ipcRenderer.invoke("vellum:private-enrol", { spaceId, label }) as Promise<{
+        lines: string[];
+      }>,
+    reseal: (spaceId: string): Promise<{ lines: string[] }> =>
+      ipcRenderer.invoke("vellum:private-reseal", spaceId) as Promise<{ lines: string[] }>,
+  },
   onOpenUrl: (listener: (path: string) => void): (() => void) => {
     const forward = (_event: IpcRendererEvent, path: unknown): void => {
       if (typeof path === "string") listener(path);

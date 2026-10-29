@@ -10,6 +10,7 @@ import { bridgeHandlers, dispatch, parseNotice, type BridgeServices } from "./ip
 const signOut = vi.fn<() => Promise<void>>(() => Promise.resolve());
 const openExternal = vi.fn<(url: string) => Promise<void>>(() => Promise.resolve());
 const notify = vi.fn<BridgeServices["notify"]>();
+const privateEnrol = vi.fn<BridgeServices["privateEnrol"]>(() => Promise.resolve({ lines: [] }));
 
 function services(): BridgeServices {
   return {
@@ -19,6 +20,9 @@ function services(): BridgeServices {
     accessToken: () => Promise.resolve("at"),
     openExternal,
     notify,
+    privateDeviceKey: () => Promise.resolve({ publicKey: "ab", fingerprint: "cd" }),
+    privateEnrol,
+    privateReseal: (spaceId) => Promise.resolve({ lines: [String(spaceId)] }),
   };
 }
 
@@ -36,6 +40,15 @@ describe("ipc", () => {
     expect(openExternal).toHaveBeenCalledWith("https://northstar.dev");
     await dispatch(handlers, Channel.notify, page, { title: "t", body: "b", url: "/p/2?c=1" });
     expect(notify).toHaveBeenCalledWith({ title: "t", body: "b", url: "/p/2?c=1" });
+    expect(await dispatch(handlers, Channel.privateDeviceKey, page)).toEqual({
+      publicKey: "ab",
+      fingerprint: "cd",
+    });
+    await dispatch(handlers, Channel.privateEnrol, page, { spaceId: "S", label: "L" });
+    expect(privateEnrol).toHaveBeenCalledWith("S", "L");
+    await dispatch(handlers, Channel.privateEnrol, page, "junk");
+    expect(privateEnrol.mock.lastCall).toEqual([undefined, undefined]);
+    expect(await dispatch(handlers, Channel.privateReseal, page, "S")).toEqual({ lines: ["S"] });
   });
 
   it("refuses other senders, unknown channels and unsafe input", async () => {
