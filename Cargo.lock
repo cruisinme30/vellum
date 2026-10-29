@@ -2365,6 +2365,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
+ "vellum-kernel",
 ]
 
 [[package]]
