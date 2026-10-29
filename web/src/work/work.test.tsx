@@ -153,6 +153,7 @@ function fakeApi(overrides: Partial<WorkApi> = {}) {
     saveSettings,
     teams: () => Promise.resolve([TEAM]),
     issues: () => Promise.resolve([issue("ENG-7", "Fix sign-in")]),
+    searchIssues: () => Promise.resolve([issue("ENG-7", "Fix sign-in")]),
     issue: (key) => Promise.resolve(issue(key, "Fix sign-in")),
     createIssue,
     setState,

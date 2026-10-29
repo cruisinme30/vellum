@@ -40,6 +40,7 @@ function fakeWork() {
     teams: () => Promise.resolve([TEAM]),
     issues: notUsed,
     issue: notUsed,
+    searchIssues: notUsed,
     createIssue: notUsed,
     fileIssue,
     setState: notUsed,

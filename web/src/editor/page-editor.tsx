@@ -19,6 +19,7 @@ import { useT } from "../i18n/i18n";
 import { Icon } from "../shell/icon";
 import type { WorkApi } from "../work/api";
 
+import type { ChipSources } from "./chips/items";
 import type {
   CollabConnector,
   CollabSession,
@@ -59,6 +60,11 @@ export interface PageEditorProperties {
   readonly work?: WorkApi | undefined;
   /** The signed-in person's handle, to mark their own reactions. */
   readonly me?: string | undefined;
+  /**
+   * People, pages and issues for the `@` and `[[` menus and live issue
+   * chips. Read when the page opens: pass one object for the page's life.
+   */
+  readonly chips?: ChipSources | undefined;
 }
 
 /** What the page around the editor may do with it. */
@@ -190,6 +196,7 @@ function BoundEditor({
   onControls,
   work,
   me,
+  chips,
 }: BoundProperties) {
   const t = useT();
   const live = useLive(session.live);
@@ -221,8 +228,8 @@ function BoundEditor({
     [onControls],
   );
   const base = useMemo(
-    () => vellumExtensions({ t, resolvePage, history: false }),
-    [t, resolvePage],
+    () => vellumExtensions({ t, resolvePage, history: false, chips }),
+    [t, resolvePage, chips],
   );
   const [seeded] = useState(() => {
     if (seed) {

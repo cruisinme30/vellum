@@ -81,6 +81,8 @@ export interface WorkApi extends CommentsApi {
   teams(): Promise<TeamOut[]>;
   /** A team's open issues, most important first. */
   issues(team: string): Promise<IssueOut[]>;
+  /** Issues whose title contains `query`, or the issue with that key, at most 8. */
+  searchIssues(query: string): Promise<IssueOut[]>;
   issue(key: string): Promise<IssueOut>;
   createIssue(issue: NewIssue): Promise<IssueOut>;
   /** Files an issue and says which chip to write where (from a page selection). */
@@ -97,6 +99,7 @@ export interface WorkApi extends CommentsApi {
 }
 
 const WORK = "/api/v1/work";
+const ISSUE_KEY = /^[a-z][a-z0-9]{1,9}-[1-9]\d*$/i;
 const segment = encodeURIComponent;
 const issuePath = (key: string) => `${WORK}/issues/${segment(key)}`;
 
@@ -133,6 +136,21 @@ export function createHttpWorkApi(http: Http): WorkApi {
         show_closed: "none",
       });
       return found.groups.flatMap((group) => group.issues);
+    },
+    async searchIssues(query) {
+      if (ISSUE_KEY.test(query)) {
+        try {
+          return [await http.get<IssueOut>(issuePath(query.toUpperCase()))];
+        } catch {
+          // Not a key after all: search titles.
+        }
+      }
+      const found = await http.get<IssueGroups>(`${WORK}/issues`, {
+        filter: JSON.stringify({ field: "title", op: "contains", values: [query] }),
+        group_by: "none",
+        limit: 8,
+      });
+      return found.groups.flatMap((group) => group.issues).slice(0, 8);
     },
     issue: (key) => http.get<IssueOut>(issuePath(key)),
     async createIssue(issue) {
@@ -196,6 +214,32 @@ function issueBody(issue: NewIssue) {
     description: issue.description,
     source_block: issue.sourceBlock,
     quote: issue.quote,
+  };
+}
+
+/** What an issue chip shows: the title, the state's name and whether it is finished. */
+export interface IssueChipStatus {
+  readonly title: string;
+  readonly state: string;
+  readonly closed: boolean;
+}
+
+/**
+ * Looks up issues for live chips (#93), naming each state the way its team
+ * does; the team list is fetched once.
+ */
+export function issueChipStatus(api: WorkApi): (key: string) => Promise<IssueChipStatus> {
+  let teams: Promise<TeamOut[]> | undefined;
+  return async (key) => {
+    teams ??= api.teams().catch(() => []);
+    const [issue, known] = await Promise.all([api.issue(key), teams]);
+    const team = known.find((candidate) => candidate.key === issue.team);
+    const state = team?.statuses.find((status) => status.key === issue.state)?.name ?? issue.state;
+    return {
+      title: issue.title,
+      state,
+      closed: issue.category === "completed" || issue.category === "canceled",
+    };
   };
 }
 

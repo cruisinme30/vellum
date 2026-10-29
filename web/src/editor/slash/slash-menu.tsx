@@ -17,6 +17,9 @@ export interface SlashMenuProperties {
   readonly listId: string;
   readonly onActive: (optionId: string | undefined) => void;
   readonly ref?: Ref<SlashMenuHandle>;
+  /** Message IDs of the list's name and its empty state; the block menu's by default. */
+  readonly labelKey?: string;
+  readonly emptyKey?: string;
 }
 
 /** Lets the editor forward arrow keys and Enter while focus stays in the text. */
@@ -25,7 +28,16 @@ export interface SlashMenuHandle {
 }
 
 /** The slash menu: a listbox the editor drives with `aria-activedescendant`. */
-export function SlashMenu({ items, command, t, listId, onActive, ref }: SlashMenuProperties) {
+export function SlashMenu({
+  items,
+  command,
+  t,
+  listId,
+  onActive,
+  ref,
+  labelKey = "slash-label",
+  emptyKey = "slash-empty",
+}: SlashMenuProperties) {
   const [active, setActive] = useState(0);
   const list = useRef<HTMLDivElement>(null);
   const index = Math.min(active, Math.max(0, items.length - 1));
@@ -78,7 +90,7 @@ export function SlashMenu({ items, command, t, listId, onActive, ref }: SlashMen
   if (items.length === 0) {
     return (
       <div className="vl-slash" role="status">
-        <p className="vl-muted">{t("slash-empty")}</p>
+        <p className="vl-muted">{t(emptyKey)}</p>
       </div>
     );
   }
@@ -95,7 +107,7 @@ export function SlashMenu({ items, command, t, listId, onActive, ref }: SlashMen
     }
   }
   return (
-    <div className="vl-slash" id={listId} role="listbox" aria-label={t("slash-label")} ref={list}>
+    <div className="vl-slash" id={listId} role="listbox" aria-label={t(labelKey)} ref={list}>
       {runs.map((run, runIndex) => (
         <div
           key={`${run.section}-${String(runIndex)}`}

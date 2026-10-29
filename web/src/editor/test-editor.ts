@@ -12,6 +12,7 @@ import { createElement, createRef, useEffect } from "react";
 import en from "../i18n/en.ftl?raw";
 import { createTranslator } from "../i18n/i18n";
 
+import type { ChipSources } from "./chips/items";
 import type { ChannelFactory } from "./collab/local-connector";
 import { vellumExtensions } from "./extensions";
 import type { ResolvePage } from "./nodes/inline";
@@ -66,12 +67,13 @@ interface EditorHarnessProperties {
   readonly content: JSONContent | string;
   readonly editable?: boolean;
   readonly onEditor?: (editor: Editor) => void;
+  readonly chips?: ChipSources | undefined;
 }
 
 /** A React-mounted Vellum editor, so node views render through portals. */
-function EditorHarness({ content, editable = true, onEditor }: EditorHarnessProperties) {
+function EditorHarness({ content, editable = true, onEditor, chips }: EditorHarnessProperties) {
   const editor = useEditor({
-    extensions: vellumExtensions({ t: english, resolvePage: resolveGateway, history: true }),
+    extensions: vellumExtensions({ t: english, resolvePage: resolveGateway, history: true, chips }),
     content,
     editable,
   });
@@ -84,13 +86,14 @@ function EditorHarness({ content, editable = true, onEditor }: EditorHarnessProp
 /** Renders a React editor, waits for its node views and hands back the Tiptap instance. */
 export async function renderEditor(
   content: JSONContent | string,
-  options: { readonly editable?: boolean } = {},
+  options: { readonly editable?: boolean; readonly chips?: ChipSources } = {},
 ): Promise<{ editor: Editor; unmount: () => void }> {
   let current: Editor | undefined;
   const { unmount } = render(
     createElement(EditorHarness, {
       content,
       editable: options.editable ?? true,
+      chips: options.chips,
       onEditor: (editor: Editor) => {
         current = editor;
       },
