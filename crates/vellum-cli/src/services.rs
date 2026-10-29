@@ -61,6 +61,9 @@ pub struct Services {
     admin: Option<Arc<dyn Service>>,
     /// Books, for their public sites at `/published`.
     books: Option<Arc<vellum_books_service::BooksService>>,
+    /// The admin audit log, which records the admin actions every other
+    /// service serves (D243).
+    admin_audit: Option<Arc<dyn vellum_admin::AuditLog>>,
     /// Where the gateway records per-route metrics.
     observability: Observability,
     /// The drive index, which Admin → Usage counts pages and storage from.
@@ -167,6 +170,7 @@ impl Services {
             tasks: None,
             admin: None,
             books: None,
+            admin_audit: None,
             observability: Observability::new(),
             drive_index: None,
             mcp: None,
@@ -202,6 +206,7 @@ impl Services {
         observability::spawn_sampling(sampler);
         self.audit.attach(service.audit_log());
         observability::spawn_ticks(Arc::clone(&service), Arc::clone(&facts));
+        self.admin_audit = Some(service.audit_log());
         self.admin = Some(observability::api(service, facts));
         self.observability = observability;
         Ok(self)
@@ -324,7 +329,8 @@ impl Services {
         }
     }
 
-    /// Every typed service, in registration order.
+    /// Every typed service, in registration order. With the admin
+    /// console, every other service's admin actions are audited (D243).
     pub fn all(&self) -> Vec<Arc<dyn Service>> {
         let mut all: Vec<Arc<dyn Service>> = vec![
             Arc::new(IdentityService::new(Arc::clone(&self.identity))),
@@ -332,6 +338,12 @@ impl Services {
             Arc::new(WebhooksService::new(Arc::clone(&self.webhooks))),
         ];
         all.extend(self.workspace.iter().cloned());
+        if let Some(log) = &self.admin_audit {
+            all = all
+                .into_iter()
+                .map(|service| vellum_admin::audited::audited(service, Arc::clone(log)))
+                .collect();
+        }
         all.extend(self.admin.iter().cloned());
         all
     }

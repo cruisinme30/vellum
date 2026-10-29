@@ -281,3 +281,74 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+.vl-admin-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.vl-admin-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.vl-admin-badge-off {
+  background: var(--md-error-container, #ffdad6);
+  color: var(--md-on-error-container, #410002);
+}
+
+.vl-admin-panel {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px solid var(--md-outline-variant, var(--md-outline));
+  border-radius: 16px;
+}
+
+.vl-admin-panel h2,
+.vl-admin-panel h3 {
+  margin: 0;
+}
+
+.vl-admin-filters select,
+.vl-admin-form select,
+.vl-admin-table select {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 40px;
+  padding: 0 8px;
+  border: 1px solid var(--md-outline);
+  border-radius: 4px;
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+  font: inherit;
+}
+
+.vl-admin-table tr[aria-current="true"] {
+  background: var(--md-secondary-container, var(--md-surface-container));
+}
+
+.vl-admin-members {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vl-admin-members li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--md-outline-variant, var(--md-outline));
+}

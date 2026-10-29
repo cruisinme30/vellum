@@ -96,6 +96,39 @@ pub enum Permission {
     Manage,
 }
 
+/// A role on a whole space, as an administrator sees and sets it
+/// (ADR 0021, D242). Each role includes the ones before it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum SpaceRole {
+    /// May view.
+    Viewer,
+    /// May view and comment.
+    Commenter,
+    /// May view, comment and edit.
+    Editor,
+    /// May also share, trash, purge and change settings.
+    Manager,
+    /// May also transfer ownership.
+    Owner,
+}
+
+impl SpaceRole {
+    /// Whether the role may manage the space.
+    #[must_use]
+    pub const fn manages(self) -> bool {
+        matches!(self, Self::Manager | Self::Owner)
+    }
+}
+
+/// A person's role on a whole space.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Member {
+    /// The person.
+    pub user: UserId,
+    /// Their strongest live role granted on the space itself.
+    pub role: SpaceRole,
+}
+
 /// The authorization service, as the drive sees it.
 ///
 /// Inheritance lives behind this port: a node's access is its own grants
@@ -125,6 +158,18 @@ pub trait Access: Send + Sync + fmt::Debug {
     /// Every group `user` belongs to right now, nested groups included,
     /// by group ID. Book sections restricted to `group:<ID>` use it.
     async fn groups_of(&self, user: UserId) -> DriveResult<BTreeSet<ObjectId>>;
+    /// The people granted a role on the space itself (not on a folder or
+    /// page in it), by user ID.
+    async fn members(&self, space: SpaceId) -> DriveResult<Vec<Member>>;
+    /// Gives `user` exactly `role` on the space, replacing the roles they
+    /// held on it; `None` removes them. Vellum makes the change as itself:
+    /// the caller has already decided it is allowed.
+    async fn set_member(
+        &self,
+        space: SpaceId,
+        user: UserId,
+        role: Option<SpaceRole>,
+    ) -> DriveResult<()>;
 }
 
 /// The source of the current time, replaceable in tests.

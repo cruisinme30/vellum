@@ -10,6 +10,15 @@ export interface User {
   readonly name: string;
   readonly handle: string;
   readonly admin: boolean;
+  /** Whether the account has a password; without one it signs in with SSO only. */
+  readonly hasPassword?: boolean;
+}
+
+/** `SsoButton`: how single sign-on is offered, when a provider is set up. */
+interface SsoButton {
+  readonly name: string;
+  /** Where the button goes; append `?next=<path>` to return there. */
+  readonly startUrl: string;
 }
 
 /** `AuthStatus`: who is calling and what the workspace needs. */
@@ -18,6 +27,7 @@ export interface AuthStatus {
   readonly credential: string;
   readonly scopes: readonly string[];
   readonly user?: User | null;
+  readonly sso?: SsoButton | null;
 }
 
 /** The first administrator's details (`SetupInput`). */

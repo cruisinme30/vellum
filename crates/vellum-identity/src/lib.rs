@@ -20,9 +20,13 @@
 //!   accounts link by provider user ID or verified email, and SSO
 //!   sessions are ordinary sessions, so they outlive a provider outage.
 //!
+//! - **Groups**: named groups of people; who is in them lives in the
+//!   permission engine ([`groups`]).
+//!
 //! The JSON operations register through [`service::IdentityService`];
 //! cookie and redirect endpoints are routers in [`http`].
 
+pub mod groups;
 pub mod http;
 pub mod identity;
 mod lockout;
@@ -34,6 +38,7 @@ mod shared;
 pub mod sso;
 pub mod store;
 
+pub use groups::{GroupMembers, GroupsService};
 pub use identity::{
     BREAK_GLASS_EMAIL, Identity, IdentityConfig, NewSession, PeopleCounts, Resolved, TokenInfo,
     UserView,

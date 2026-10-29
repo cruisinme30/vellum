@@ -233,6 +233,25 @@ export interface AdminCreateBackupBackupInfo {
 export type AdminCreateBackupEmpty = Record<string, unknown>;
 
 /**
+ * A shared drive an administrator creates.
+ */
+export interface AdminCreateSpace {
+  /**
+   * The display name.
+   */
+  name: string;
+  /**
+   * Who owns it.
+   */
+  owner_id: UserId;
+  /**
+   * The short name in its folder path: lowercase letters, digits and
+   * dashes.
+   */
+  slug: string;
+}
+
+/**
  * No input.
  */
 export type AdminExportAuditEmpty = Record<string, unknown>;
@@ -345,6 +364,34 @@ export interface AdminSettings {
  * No input.
  */
 export type AdminSlosEmpty = Record<string, unknown>;
+
+/**
+ * Every space, for the admin console.
+ */
+export interface AdminSpaceList {
+  /**
+   * Shared drives first, then My Drives, each by name.
+   */
+  spaces: AdminSpaceView[];
+}
+
+/**
+ * A space as the admin console shows it.
+ */
+export interface AdminSpaceView {
+  /**
+   * The people with a role on the whole space.
+   */
+  members: MemberView[];
+  /**
+   * The space, its owner and its settings.
+   */
+  space: SpaceView;
+  /**
+   * Bytes its pages, files, trash and versions use.
+   */
+  used_bytes: number;
+}
 
 /**
  * Persistent scheduler state, kept in `.vellum/admin/state.json`.
@@ -1331,6 +1378,24 @@ export interface ChainReport {
 }
 
 /**
+ * People to add to and remove from a group.
+ */
+export interface ChangeMembers {
+  /**
+   * People to add.
+   */
+  add?: UserId[];
+  /**
+   * The group.
+   */
+  id: ObjectId;
+  /**
+   * People to remove.
+   */
+  remove?: UserId[];
+}
+
+/**
  * What an edit touched.
  */
 export interface Changeset {
@@ -1970,6 +2035,20 @@ export interface CreateFromCsvInput {
    * The collection's title.
    */
   title: string;
+}
+
+/**
+ * A new group.
+ */
+export interface CreateGroup {
+  /**
+   * What the group is for.
+   */
+  description?: string;
+  /**
+   * The display name, unique ignoring case.
+   */
+  name: string;
 }
 
 /**
@@ -2656,6 +2735,16 @@ export interface Directory {
 }
 
 /**
+ * Groups matching a search, in the people picker's shape.
+ */
+export interface DirectoryEntries {
+  /**
+   * Names starting with the query first, then by name.
+   */
+  entries: GroupsSearchDirectoryEntry[];
+}
+
+/**
  * Someone or a group that can be granted access.
  */
 export interface DirectoryEntry {
@@ -2748,6 +2837,65 @@ export interface DrillReport {
    * Whether the restore finished within [`RTO_SECONDS`].
    */
   within_rto: boolean;
+}
+
+/**
+ * A space as the admin console shows it.
+ */
+export interface DriveAdminCreateSpaceAdminSpaceView {
+  /**
+   * The people with a role on the whole space.
+   */
+  members: MemberView[];
+  /**
+   * The space, its owner and its settings.
+   */
+  space: SpaceView;
+  /**
+   * Bytes its pages, files, trash and versions use.
+   */
+  used_bytes: number;
+}
+
+/**
+ * A space as the admin console shows it.
+ */
+export interface DriveAdminSetMemberAdminSpaceView {
+  /**
+   * The people with a role on the whole space.
+   */
+  members: MemberView[];
+  /**
+   * The space, its owner and its settings.
+   */
+  space: SpaceView;
+  /**
+   * Bytes its pages, files, trash and versions use.
+   */
+  used_bytes: number;
+}
+
+/**
+ * No input.
+ */
+export type DriveAdminSpacesNoInput = Record<string, never>;
+
+/**
+ * A space as the admin console shows it.
+ */
+export interface DriveAdminUpdateSpaceAdminSpaceView {
+  /**
+   * The people with a role on the whole space.
+   */
+  members: MemberView[];
+  /**
+   * The space, its owner and its settings.
+   */
+  space: SpaceView;
+  /**
+   * Bytes its pages, files, trash and versions use.
+   */
+  used_bytes: number;
 }
 
 /**
@@ -3698,6 +3846,50 @@ export interface Group {
 }
 
 /**
+ * A deleted group.
+ */
+export interface GroupDeleted {
+  /**
+   * The group that is gone.
+   */
+  id: ObjectId;
+}
+
+/**
+ * A group named in the path.
+ */
+export interface GroupKey {
+  /**
+   * The group.
+   */
+  id: ObjectId;
+}
+
+/**
+ * Every group.
+ */
+export interface GroupList {
+  /**
+   * The groups, by name.
+   */
+  groups: GroupView[];
+}
+
+/**
+ * A group and the people in it.
+ */
+export interface GroupMembersView {
+  /**
+   * The group.
+   */
+  group: GroupView;
+  /**
+   * Its members, by name.
+   */
+  members: UserView[];
+}
+
+/**
  * One group of issues.
  */
 export interface GroupOut {
@@ -3709,6 +3901,108 @@ export interface GroupOut {
    * The group's value (`in-review`, `urgent`, `dev`); `None` is "none".
    */
   key?: string | null;
+}
+
+/**
+ * A group search.
+ */
+export interface GroupSearch {
+  /**
+   * The most results, 1 to 100; 20 when absent.
+   */
+  limit?: number | null;
+  /**
+   * Text the name contains, ignoring case; empty lists every group.
+   */
+  q?: string;
+}
+
+/**
+ * A group as the API shows it.
+ */
+export interface GroupView {
+  /**
+   * When it was created.
+   */
+  created_at: Timestamp;
+  /**
+   * What the group is for.
+   */
+  description: string;
+  /**
+   * The group's ID; grants name it as `group:<ID>`.
+   */
+  id: ObjectId;
+  /**
+   * The display name, unique ignoring case.
+   */
+  name: string;
+}
+
+/**
+ * A group as the API shows it.
+ */
+export interface GroupsCreateGroupView {
+  /**
+   * When it was created.
+   */
+  created_at: Timestamp;
+  /**
+   * What the group is for.
+   */
+  description: string;
+  /**
+   * The group's ID; grants name it as `group:<ID>`.
+   */
+  id: ObjectId;
+  /**
+   * The display name, unique ignoring case.
+   */
+  name: string;
+}
+
+/**
+ * What a people picker shows for one group.
+ */
+export interface GroupsSearchDirectoryEntry {
+  /**
+   * Its description, or "Group".
+   */
+  detail: string;
+  /**
+   * Always `group`.
+   */
+  kind: string;
+  /**
+   * The group's name.
+   */
+  name: string;
+  /**
+   * What a grant names: `group:<ID>`.
+   */
+  principal: string;
+}
+
+/**
+ * A group as the API shows it.
+ */
+export interface GroupsUpdateGroupView {
+  /**
+   * When it was created.
+   */
+  created_at: Timestamp;
+  /**
+   * What the group is for.
+   */
+  description: string;
+  /**
+   * The group's ID; grants name it as `group:<ID>`.
+   */
+  id: ObjectId;
+  /**
+   * The display name, unique ignoring case.
+   */
+  name: string;
 }
 
 /**
@@ -4568,6 +4862,20 @@ export interface MemberInput {
    * The person's handle, with or without `@`.
    */
   member: string;
+}
+
+/**
+ * A person with a role on a whole space.
+ */
+export interface MemberView {
+  /**
+   * Their role.
+   */
+  role: SpaceRoleView;
+  /**
+   * The person.
+   */
+  user_id: UserId;
 }
 
 /**
@@ -6352,6 +6660,24 @@ export interface SessionView {
 }
 
 /**
+ * Sets or removes a person's role on a shared drive.
+ */
+export interface SetMember {
+  /**
+   * Their new role; absent or null removes them.
+   */
+  role?: SpaceRoleView | null;
+  /**
+   * The shared drive.
+   */
+  space_id: SpaceId;
+  /**
+   * The person.
+   */
+  user_id: UserId;
+}
+
+/**
  * `books.set_section_access`: replaces the section's own settings.
  */
 export interface SetSectionAccess {
@@ -6593,6 +6919,11 @@ export interface SpaceRef {
    */
   space_id: SpaceId;
 }
+
+/**
+ * A role on a whole space (ADR 0021, D242).
+ */
+export type SpaceRoleView = "viewer" | "commenter" | "editor" | "manager" | "owner";
 
 /**
  * A space.
@@ -7790,6 +8121,24 @@ export interface Unsubscribe {
    * The push service URL the browser registered.
    */
   endpoint: string;
+}
+
+/**
+ * Changes to a group.
+ */
+export interface UpdateGroup {
+  /**
+   * A new description.
+   */
+  description?: string | null;
+  /**
+   * The group.
+   */
+  id: ObjectId;
+  /**
+   * A new name.
+   */
+  name?: string | null;
 }
 
 /**
@@ -10067,6 +10416,34 @@ export interface Operations {
     input: ActivityInput;
     output: ActivityList;
   };
+  /** Create a shared drive for someone */
+  "drive.admin_create_space": {
+    method: "POST";
+    path: "/v1/admin/spaces";
+    input: AdminCreateSpace;
+    output: DriveAdminCreateSpaceAdminSpaceView;
+  };
+  /** Set or remove someone's role on a shared drive */
+  "drive.admin_set_member": {
+    method: "PUT";
+    path: "/v1/admin/spaces/{space_id}/members/{user_id}";
+    input: SetMember;
+    output: DriveAdminSetMemberAdminSpaceView;
+  };
+  /** List every space with its size and members */
+  "drive.admin_spaces": {
+    method: "GET";
+    path: "/v1/admin/spaces";
+    input: DriveAdminSpacesNoInput;
+    output: AdminSpaceList;
+  };
+  /** Rename any space and change its quota, trash and version settings */
+  "drive.admin_update_space": {
+    method: "PATCH";
+    path: "/v1/admin/spaces/{space_id}";
+    input: UpdateSpace;
+    output: DriveAdminUpdateSpaceAdminSpaceView;
+  };
   /** List the pages that link to a page */
   "drive.backlinks": {
     method: "GET";
@@ -10339,6 +10716,55 @@ export interface Operations {
     path: "/v1/spaces/{space_id}/e2e/keys/{fingerprint}";
     input: RevokeDevice;
     output: Revoked;
+  };
+  /** Add people to a group and remove others */
+  "groups.change_members": {
+    method: "POST";
+    path: "/v1/admin/groups/{id}/members";
+    input: ChangeMembers;
+    output: GroupMembersView;
+  };
+  /** Create a group */
+  "groups.create": {
+    method: "POST";
+    path: "/v1/admin/groups";
+    input: CreateGroup;
+    output: GroupsCreateGroupView;
+  };
+  /** Delete a group; its members lose what it granted */
+  "groups.delete": {
+    method: "DELETE";
+    path: "/v1/admin/groups/{id}";
+    input: GroupKey;
+    output: GroupDeleted;
+  };
+  /** List every group */
+  "groups.list": {
+    method: "GET";
+    path: "/v1/admin/groups";
+    input: Empty;
+    output: GroupList;
+  };
+  /** List a group's members */
+  "groups.members": {
+    method: "GET";
+    path: "/v1/admin/groups/{id}/members";
+    input: GroupKey;
+    output: GroupMembersView;
+  };
+  /** Find groups by name, for choosing who to share with */
+  "groups.search": {
+    method: "GET";
+    path: "/v1/directory/groups";
+    input: GroupSearch;
+    output: DirectoryEntries;
+  };
+  /** Rename a group or change its description */
+  "groups.update": {
+    method: "PATCH";
+    path: "/v1/admin/groups/{id}";
+    input: UpdateGroup;
+    output: GroupsUpdateGroupView;
   };
   /** List apps you connected with OAuth */
   "identity.apps": {
@@ -11036,6 +11462,10 @@ export const OPERATIONS = {
   "collections.update_property": { method: "PATCH", path: "/v1/collections/{collection_id}/properties/{key}", mutation: true },
   "collections.update_row": { method: "PATCH", path: "/v1/collections/{collection_id}/rows/{row_id}", mutation: true },
   "drive.activity": { method: "GET", path: "/v1/drive/items/{id}/activity", mutation: false },
+  "drive.admin_create_space": { method: "POST", path: "/v1/admin/spaces", mutation: true },
+  "drive.admin_set_member": { method: "PUT", path: "/v1/admin/spaces/{space_id}/members/{user_id}", mutation: true },
+  "drive.admin_spaces": { method: "GET", path: "/v1/admin/spaces", mutation: false },
+  "drive.admin_update_space": { method: "PATCH", path: "/v1/admin/spaces/{space_id}", mutation: true },
   "drive.backlinks": { method: "GET", path: "/v1/drive/items/{id}/backlinks", mutation: false },
   "drive.copy": { method: "POST", path: "/v1/drive/items/{id}/copy", mutation: true },
   "drive.create_folder": { method: "POST", path: "/v1/drive/spaces/{space_id}/folders", mutation: true },
@@ -11075,6 +11505,13 @@ export const OPERATIONS = {
   "e2e.objects": { method: "GET", path: "/v1/spaces/{space_id}/e2e/objects", mutation: false },
   "e2e.put": { method: "PUT", path: "/v1/spaces/{space_id}/e2e/object", mutation: true },
   "e2e.revoke": { method: "DELETE", path: "/v1/spaces/{space_id}/e2e/keys/{fingerprint}", mutation: true },
+  "groups.change_members": { method: "POST", path: "/v1/admin/groups/{id}/members", mutation: true },
+  "groups.create": { method: "POST", path: "/v1/admin/groups", mutation: true },
+  "groups.delete": { method: "DELETE", path: "/v1/admin/groups/{id}", mutation: true },
+  "groups.list": { method: "GET", path: "/v1/admin/groups", mutation: false },
+  "groups.members": { method: "GET", path: "/v1/admin/groups/{id}/members", mutation: false },
+  "groups.search": { method: "GET", path: "/v1/directory/groups", mutation: false },
+  "groups.update": { method: "PATCH", path: "/v1/admin/groups/{id}", mutation: true },
   "identity.apps": { method: "GET", path: "/v1/me/apps", mutation: false },
   "identity.create_token": { method: "POST", path: "/v1/me/tokens", mutation: true },
   "identity.create_user": { method: "POST", path: "/v1/admin/users", mutation: true },

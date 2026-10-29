@@ -23,7 +23,7 @@ use vellum_store::BlobPath;
 
 use crate::error::DriveResult;
 use crate::model::{Activity, DriveTotals, Node, Space, VersionRecord};
-use crate::ports::{Access, DriveIndex, Permission};
+use crate::ports::{Access, DriveIndex, Member, Permission, SpaceRole};
 
 #[derive(Debug, Default)]
 struct State {
@@ -458,6 +458,41 @@ impl Access for MemoryAccess {
 
     async fn grant_owner(&self, user: UserId, _space: SpaceId, node: ObjectId) -> DriveResult<()> {
         self.grant(user, node, Role::Manager);
+        Ok(())
+    }
+
+    async fn members(&self, space: SpaceId) -> DriveResult<Vec<Member>> {
+        let root = ObjectId::from(space);
+        let mut out: Vec<Member> = self
+            .lock()
+            .iter()
+            .filter(|((node, _), _)| *node == root)
+            .map(|((_, user), role)| Member {
+                user: *user,
+                role: match role {
+                    Role::Viewer => SpaceRole::Viewer,
+                    Role::Editor => SpaceRole::Editor,
+                    Role::Manager => SpaceRole::Manager,
+                },
+            })
+            .collect();
+        out.sort_by_key(|m| m.user);
+        Ok(out)
+    }
+
+    async fn set_member(
+        &self,
+        space: SpaceId,
+        user: UserId,
+        role: Option<SpaceRole>,
+    ) -> DriveResult<()> {
+        let root = ObjectId::from(space);
+        match role {
+            None => self.revoke(user, root),
+            Some(SpaceRole::Viewer | SpaceRole::Commenter) => self.grant(user, root, Role::Viewer),
+            Some(SpaceRole::Editor) => self.grant(user, root, Role::Editor),
+            Some(SpaceRole::Manager | SpaceRole::Owner) => self.grant(user, root, Role::Manager),
+        }
         Ok(())
     }
 
