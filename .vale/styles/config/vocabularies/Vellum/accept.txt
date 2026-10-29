@@ -77,6 +77,7 @@ Sepia
 WCAG
 MathML
 [Hh]ydrate
+[Pp]recach(e|es|ed|ing)
 [Uu]nstarted
 (?:SLAs?|slas)
 [Ss]lugs?
