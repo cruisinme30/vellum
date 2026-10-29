@@ -11,9 +11,14 @@ import { AdminConsoleProvider } from "./admin/console/context";
 import { SettingsPage } from "./admin/console/settings-page";
 import { UsagePage } from "./admin/console/usage-page";
 import { WebhooksPage } from "./admin/console/webhooks-page";
+import { SpacesPage } from "./admin/console/spaces-page";
+import { UsersPage } from "./admin/console/users-page";
 import { RequestsPage } from "./admin/requests/requests-page";
 import { RoutesPage } from "./admin/routes/routes-page";
 import type { AuthApi, AuthStatus } from "./api/auth";
+import type { Http } from "./api/http";
+import type { ReauthGate } from "./api/reauth";
+import { ReauthPrompt } from "./api/reauth-prompt";
 import { RequireSession, SessionProvider, useSession } from "./api/session";
 import type { BooksApi } from "./books/api";
 import { BookPage, BooksPage } from "./books/books-page";
@@ -105,6 +110,8 @@ export function AppRoutes() {
         <Route path="admin/settings" element={<SettingsPage />} />
         <Route path="admin/backups" element={<BackupsPage />} />
         <Route path="admin/webhooks" element={<WebhooksPage />} />
+        <Route path="admin/users" element={<UsersPage />} />
+        <Route path="admin/spaces" element={<SpacesPage />} />
         <Route path="*" element={<NotFoundView />} />
       </Route>
     </Routes>
@@ -134,6 +141,11 @@ export interface AppServices {
   readonly session?: { readonly auth: AuthApi; readonly status: AuthStatus } | undefined;
   /** Notification settings; the Northstar demo's when absent. */
   readonly notifications?: NotificationServices | undefined;
+  /**
+   * Asks the person to confirm who they are when an action needs a recent
+   * sign-in (D241); `http` is the client without the retry. Server only.
+   */
+  readonly reauth?: { readonly gate: ReauthGate; readonly http: Http } | undefined;
 }
 
 function MaybeSession({
@@ -183,6 +195,7 @@ export function AppProviders({
   collections,
   session,
   notifications,
+  reauth,
   children,
 }: AppServices & { readonly children: ReactNode }) {
   const serverApis = useMemo(() => ({ work, books, privateSpaces }), [work, books, privateSpaces]);
@@ -198,7 +211,12 @@ export function AppProviders({
               <CollectionsProvider store={collections}>
                 <NotificationsProvider services={notifications ?? demoNotifications}>
                   <AdminConsoleProvider api={admin}>
-                    <ServerApisProvider apis={serverApis}>{children}</ServerApisProvider>
+                    <ServerApisProvider apis={serverApis}>
+                      {children}
+                      {reauth !== undefined && (
+                        <ReauthPrompt gate={reauth.gate} http={reauth.http} />
+                      )}
+                    </ServerApisProvider>
                   </AdminConsoleProvider>
                 </NotificationsProvider>
               </CollectionsProvider>

@@ -16,6 +16,7 @@ import { createRoot } from "react-dom/client";
 import { createHttpAdminConsoleApi } from "./admin/console/api";
 import { createAuthApi } from "./api/auth";
 import { createHttp } from "./api/http";
+import { createReauthGate, withReauth } from "./api/reauth";
 import { App } from "./app";
 import { createHttpBooksApi } from "./books/api";
 import { createHttpCollectionsStore } from "./collections/http";
@@ -54,8 +55,12 @@ const root = createRoot(container);
 // When a Vellum server answers, the areas whose API exists use it (issue
 // #392); without one (the dev server alone, the website's demo) the whole
 // app runs on the Northstar demo data.
-const http = createHttp();
-const auth = createAuthApi(http);
+const raw = createHttp();
+const auth = createAuthApi(raw);
+// Every other call asks the person to confirm who they are when the
+// server wants a recent sign-in, then runs again (D241).
+const gate = createReauthGate();
+const http = withReauth(raw, gate);
 let status: Awaited<ReturnType<typeof auth.status>>;
 try {
   status = await auth.status();
@@ -81,6 +86,7 @@ root.render(
         status === undefined ? createMockCollectionsStore() : createHttpCollectionsStore(http)
       }
       session={status === undefined ? undefined : { auth, status }}
+      reauth={status === undefined ? undefined : { gate, http: raw }}
       notifications={
         status === undefined
           ? undefined

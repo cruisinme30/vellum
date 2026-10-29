@@ -21,13 +21,18 @@ use vellum_kernel::{Actor, Error, ObjectId, SpaceId, UserId};
 use vellum_store::{Base, Etag};
 
 use self::api::{
-    ActivityInput, ActivityList, ActivityView, ContentView, CreateFolder, CreatePage,
-    CreateShortcut, CreateSpace, Done, FindInput, Limit, ListChildren, MyDrive, NoInput, NodeKey,
-    NodeList, NodeView, PlaceInput, RecentItem, RecentList, Removed, RenameInput, SaveInput,
-    SaveResult, SaveView, SpaceKey, SpaceKindView, SpaceList, SpaceView, StarInput, TreeInput,
-    TreeView, UpdateSpace, UsageView, VersionContent, VersionKey, VersionList, VersionView,
+    ActivityInput, ActivityList, ActivityView, AdminCreateSpace, AdminSpaceList, AdminSpaceView,
+    ContentView, CreateFolder, CreatePage, CreateShortcut, CreateSpace, Done, FindInput, Limit,
+    ListChildren, MyDrive, NoInput, NodeKey, NodeList, NodeView, PlaceInput, RecentItem,
+    RecentList, Removed, RenameInput, SaveInput, SaveResult, SaveView, SetMember, SpaceKey,
+    SpaceKindView, SpaceList, SpaceView, StarInput, TreeInput, TreeView, UpdateSpace, UsageView,
+    VersionContent, VersionKey, VersionList, VersionView,
 };
 use crate::drive::{Drive, Filter, SaveOutcome, Saved};
+
+/// How recent a sign-in the space admin operations need, the same
+/// window as the user admin operations (R-SE-7, D241).
+pub const ADMIN_FRESH_AUTH: std::time::Duration = std::time::Duration::from_mins(15);
 
 /// The most results a list returns.
 const MAX_LIMIT: usize = 200;
@@ -594,6 +599,116 @@ impl DriveService {
     }
 }
 
+/// What workspace administrators do to spaces (D242). The gateway serves
+/// these only to `admin`-scope credentials with a recent sign-in, so the
+/// drive's own member checks are skipped.
+impl DriveService {
+    async fn admin_spaces(
+        &self,
+        ctx: &RequestContext,
+        _: NoInput,
+    ) -> Result<AdminSpaceList, Error> {
+        ctx.principal.require_scope(Scope::Admin)?;
+        let spaces = self.drive.admin_spaces().await?;
+        Ok(AdminSpaceList {
+            spaces: spaces.into_iter().map(AdminSpaceView::from).collect(),
+        })
+    }
+
+    async fn admin_create_space(
+        &self,
+        ctx: &RequestContext,
+        input: AdminCreateSpace,
+    ) -> Result<AdminSpaceView, Error> {
+        ctx.principal.require_scope(Scope::Admin)?;
+        let space = self
+            .drive
+            .admin_create_space(&input.slug, &input.name, input.owner_id)
+            .await?;
+        Ok(space.into())
+    }
+
+    async fn admin_update_space(
+        &self,
+        ctx: &RequestContext,
+        input: UpdateSpace,
+    ) -> Result<AdminSpaceView, Error> {
+        ctx.principal.require_scope(Scope::Admin)?;
+        let space = self
+            .drive
+            .admin_update_space(input.space_id, input.name.as_deref(), input.settings.into())
+            .await?;
+        Ok(space.into())
+    }
+
+    async fn admin_set_member(
+        &self,
+        ctx: &RequestContext,
+        input: SetMember,
+    ) -> Result<AdminSpaceView, Error> {
+        ctx.principal.require_scope(Scope::Admin)?;
+        let space = self
+            .drive
+            .admin_set_member(input.space_id, input.user_id, input.role.map(Into::into))
+            .await?;
+        Ok(space.into())
+    }
+
+    fn admin(self: &Arc<Self>) -> Vec<Operation> {
+        let s = Arc::clone(self);
+        let list = Operation::query(
+            "drive.admin_spaces",
+            "/v1/admin/spaces",
+            Scope::Admin,
+            move |ctx, input| {
+                let s = Arc::clone(&s);
+                async move { s.admin_spaces(&ctx, input).await }
+            },
+        )
+        .summary("List every space with its size and members");
+        let s = Arc::clone(self);
+        let create = Operation::mutation(
+            "drive.admin_create_space",
+            HttpMethod::Post,
+            "/v1/admin/spaces",
+            Scope::Admin,
+            move |ctx, input| {
+                let s = Arc::clone(&s);
+                async move { s.admin_create_space(&ctx, input).await }
+            },
+        )
+        .summary("Create a shared drive for someone");
+        let s = Arc::clone(self);
+        let update = Operation::mutation(
+            "drive.admin_update_space",
+            HttpMethod::Patch,
+            "/v1/admin/spaces/{space_id}",
+            Scope::Admin,
+            move |ctx, input| {
+                let s = Arc::clone(&s);
+                async move { s.admin_update_space(&ctx, input).await }
+            },
+        )
+        .summary("Rename any space and change its quota, trash and version settings");
+        let s = Arc::clone(self);
+        let member = Operation::mutation(
+            "drive.admin_set_member",
+            HttpMethod::Put,
+            "/v1/admin/spaces/{space_id}/members/{user_id}",
+            Scope::Admin,
+            move |ctx, input| {
+                let s = Arc::clone(&s);
+                async move { s.admin_set_member(&ctx, input).await }
+            },
+        )
+        .summary("Set or remove someone's role on a shared drive");
+        [list, create, update, member]
+            .into_iter()
+            .map(|op| op.fresh_auth(ADMIN_FRESH_AUTH))
+            .collect()
+    }
+}
+
 impl Service for DriveService {
     fn name(&self) -> &'static str {
         "drive"
@@ -602,6 +717,7 @@ impl Service for DriveService {
     fn operations(self: Arc<Self>) -> Vec<Operation> {
         let mut ops = self.reads();
         ops.extend(self.changes());
+        ops.extend(self.admin());
         ops
     }
 

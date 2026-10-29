@@ -228,6 +228,25 @@ export interface AdminCreateBackupBackupInfo {
 export type AdminCreateBackupEmpty = Record<string, unknown>;
 
 /**
+ * A shared drive an administrator creates.
+ */
+export interface AdminCreateSpace {
+  /**
+   * The display name.
+   */
+  name: string;
+  /**
+   * Who owns it.
+   */
+  owner_id: UserId;
+  /**
+   * The short name in its folder path: lowercase letters, digits and
+   * dashes.
+   */
+  slug: string;
+}
+
+/**
  * No input.
  */
 export type AdminExportAuditEmpty = Record<string, unknown>;
@@ -315,6 +334,34 @@ export interface AdminSettings {
  * No input.
  */
 export type AdminSlosEmpty = Record<string, unknown>;
+
+/**
+ * Every space, for the admin console.
+ */
+export interface AdminSpaceList {
+  /**
+   * Shared drives first, then My Drives, each by name.
+   */
+  spaces: AdminSpaceView[];
+}
+
+/**
+ * A space as the admin console shows it.
+ */
+export interface AdminSpaceView {
+  /**
+   * The people with a role on the whole space.
+   */
+  members: MemberView[];
+  /**
+   * The space, its owner and its settings.
+   */
+  space: SpaceView;
+  /**
+   * Bytes its pages, files, trash and versions use.
+   */
+  used_bytes: number;
+}
 
 /**
  * Persistent scheduler state, kept in `.vellum/admin/state.json`.
@@ -2481,6 +2528,60 @@ export interface DrillReport {
 }
 
 /**
+ * A space as the admin console shows it.
+ */
+export interface DriveAdminCreateSpaceAdminSpaceView {
+  /**
+   * The people with a role on the whole space.
+   */
+  members: MemberView[];
+  /**
+   * The space, its owner and its settings.
+   */
+  space: SpaceView;
+  /**
+   * Bytes its pages, files, trash and versions use.
+   */
+  used_bytes: number;
+}
+
+/**
+ * A space as the admin console shows it.
+ */
+export interface DriveAdminSetMemberAdminSpaceView {
+  /**
+   * The people with a role on the whole space.
+   */
+  members: MemberView[];
+  /**
+   * The space, its owner and its settings.
+   */
+  space: SpaceView;
+  /**
+   * Bytes its pages, files, trash and versions use.
+   */
+  used_bytes: number;
+}
+
+/**
+ * A space as the admin console shows it.
+ */
+export interface DriveAdminUpdateSpaceAdminSpaceView {
+  /**
+   * The people with a role on the whole space.
+   */
+  members: MemberView[];
+  /**
+   * The space, its owner and its settings.
+   */
+  space: SpaceView;
+  /**
+   * Bytes its pages, files, trash and versions use.
+   */
+  used_bytes: number;
+}
+
+/**
  * An item in a space.
  */
 export interface DriveCopyNodeView {
@@ -4250,6 +4351,20 @@ export interface MemberInput {
 }
 
 /**
+ * A person with a role on a whole space.
+ */
+export interface MemberView {
+  /**
+   * Their role.
+   */
+  role: SpaceRoleView;
+  /**
+   * The person.
+   */
+  user_id: UserId;
+}
+
+/**
  * A mention by the ID of the comment that made it.
  */
 export interface MentionRef {
@@ -5902,6 +6017,24 @@ export interface SessionView {
 }
 
 /**
+ * Sets or removes a person's role on a shared drive.
+ */
+export interface SetMember {
+  /**
+   * Their new role; absent or null removes them.
+   */
+  role?: SpaceRoleView | null;
+  /**
+   * The shared drive.
+   */
+  space_id: SpaceId;
+  /**
+   * The person.
+   */
+  user_id: UserId;
+}
+
+/**
  * `books.set_section_access`: replaces the section's own settings.
  */
 export interface SetSectionAccess {
@@ -6143,6 +6276,11 @@ export interface SpaceRef {
    */
   space_id: SpaceId;
 }
+
+/**
+ * A role on a whole space (ADR 0021, D242).
+ */
+export type SpaceRoleView = "viewer" | "commenter" | "editor" | "manager" | "owner";
 
 /**
  * A space.
@@ -9508,6 +9646,34 @@ export interface Operations {
     input: ActivityInput;
     output: ActivityList;
   };
+  /** Create a shared drive for someone */
+  "drive.admin_create_space": {
+    method: "POST";
+    path: "/v1/admin/spaces";
+    input: AdminCreateSpace;
+    output: DriveAdminCreateSpaceAdminSpaceView;
+  };
+  /** Set or remove someone's role on a shared drive */
+  "drive.admin_set_member": {
+    method: "PUT";
+    path: "/v1/admin/spaces/{space_id}/members/{user_id}";
+    input: SetMember;
+    output: DriveAdminSetMemberAdminSpaceView;
+  };
+  /** List every space with its size and members */
+  "drive.admin_spaces": {
+    method: "GET";
+    path: "/v1/admin/spaces";
+    input: NoInput;
+    output: AdminSpaceList;
+  };
+  /** Rename any space and change its quota, trash and version settings */
+  "drive.admin_update_space": {
+    method: "PATCH";
+    path: "/v1/admin/spaces/{space_id}";
+    input: UpdateSpace;
+    output: DriveAdminUpdateSpaceAdminSpaceView;
+  };
   /** List the pages that link to a page */
   "drive.backlinks": {
     method: "GET";
@@ -10461,6 +10627,10 @@ export const OPERATIONS = {
   "collections.update_property": { method: "PATCH", path: "/v1/collections/{collection_id}/properties/{key}", mutation: true },
   "collections.update_row": { method: "PATCH", path: "/v1/collections/{collection_id}/rows/{row_id}", mutation: true },
   "drive.activity": { method: "GET", path: "/v1/drive/items/{id}/activity", mutation: false },
+  "drive.admin_create_space": { method: "POST", path: "/v1/admin/spaces", mutation: true },
+  "drive.admin_set_member": { method: "PUT", path: "/v1/admin/spaces/{space_id}/members/{user_id}", mutation: true },
+  "drive.admin_spaces": { method: "GET", path: "/v1/admin/spaces", mutation: false },
+  "drive.admin_update_space": { method: "PATCH", path: "/v1/admin/spaces/{space_id}", mutation: true },
   "drive.backlinks": { method: "GET", path: "/v1/drive/items/{id}/backlinks", mutation: false },
   "drive.copy": { method: "POST", path: "/v1/drive/items/{id}/copy", mutation: true },
   "drive.create_folder": { method: "POST", path: "/v1/drive/spaces/{space_id}/folders", mutation: true },

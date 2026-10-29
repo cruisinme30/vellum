@@ -9,6 +9,7 @@
 //! activity entry. Files are the truth: if a crash lands between the two,
 //! [`Drive::scan`] brings the index back in line.
 
+mod admin;
 mod books;
 mod content;
 mod create;
@@ -34,6 +35,7 @@ use crate::layout;
 use crate::model::{Activity, ActivityKind, Node, NodeKind, Space};
 use crate::ports::{Access, Clock, DriveIndex, Permission, SystemClock};
 
+pub use admin::AdminSpace;
 pub use content::{SaveOutcome, Saved};
 pub use create::MY_DRIVE_NAME;
 pub use order::{MAX_TREE_ITEMS, Tree};

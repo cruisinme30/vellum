@@ -58,6 +58,9 @@ pub struct Services {
     tasks: Option<Arc<TasksService>>,
     /// The admin console (requests, routes, audit, settings, backups).
     admin: Option<Arc<dyn Service>>,
+    /// The admin audit log, which records the admin actions every other
+    /// service serves (D243).
+    audit: Option<Arc<dyn vellum_admin::AuditLog>>,
     /// Where the gateway records per-route metrics.
     observability: Observability,
     /// The drive index, which Admin → Usage counts pages and storage from.
@@ -151,6 +154,7 @@ impl Services {
             rate_counts: None,
             tasks: None,
             admin: None,
+            audit: None,
             observability: Observability::new(),
             drive_index: None,
         })
@@ -180,6 +184,7 @@ impl Services {
         let (sampler, facts) = observability::counted(config, counts);
         observability::spawn_sampling(sampler);
         observability::spawn_ticks(Arc::clone(&service), Arc::clone(&facts));
+        self.audit = Some(service.audit_log());
         self.admin = Some(observability::api(service, facts));
         self.observability = observability;
         Ok(self)
@@ -241,7 +246,8 @@ impl Services {
         }
     }
 
-    /// Every typed service, in registration order.
+    /// Every typed service, in registration order. With the admin
+    /// console, every other service's admin actions are audited (D243).
     pub fn all(&self) -> Vec<Arc<dyn Service>> {
         let mut all: Vec<Arc<dyn Service>> = vec![
             Arc::new(IdentityService::new(Arc::clone(&self.identity))),
@@ -249,6 +255,12 @@ impl Services {
             Arc::new(WebhooksService::new(Arc::clone(&self.webhooks))),
         ];
         all.extend(self.workspace.iter().cloned());
+        if let Some(log) = &self.audit {
+            all = all
+                .into_iter()
+                .map(|service| vellum_admin::audited::audited(service, Arc::clone(log)))
+                .collect();
+        }
         all.extend(self.admin.iter().cloned());
         all
     }

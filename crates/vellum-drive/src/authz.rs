@@ -22,7 +22,7 @@ use vellum_authz::{
 use vellum_kernel::{ObjectId, SpaceId, UserId};
 
 use crate::error::{DriveError, DriveResult};
-use crate::ports::{Access, DriveIndex, Permission};
+use crate::ports::{Access, DriveIndex, Member, Permission, SpaceRole};
 
 /// A store that keeps its own copy of each space's folder tree.
 pub trait TreeSync: Send + Sync {
@@ -180,6 +180,76 @@ impl<S: AuthzStore + TreeSync + 'static> Access for AuthzAccess<S> {
         Ok(())
     }
 
+    async fn members(&self, space: SpaceId) -> DriveResult<Vec<Member>> {
+        let graph = self
+            .authz
+            .store()
+            .load_space(id(space))
+            .await
+            .map_err(access_error)?;
+        let now = now_ms();
+        let mut strongest: BTreeMap<u128, Relation> = BTreeMap::new();
+        for tuple in &graph.tuples {
+            let (Object::Space(object), TupleRelation::Role(role), Subject::User(user)) =
+                (tuple.object, tuple.relation, tuple.subject)
+            else {
+                continue;
+            };
+            if object != id(space) || tuple.expires_at.is_some_and(|at| at <= now) {
+                continue;
+            }
+            let entry = strongest.entry(user.0).or_insert(role);
+            *entry = (*entry).max(role);
+        }
+        Ok(strongest
+            .into_iter()
+            .map(|(user, role)| Member {
+                user: UserId::from_u128(user),
+                role: space_role(role),
+            })
+            .collect())
+    }
+
+    async fn set_member(
+        &self,
+        space: SpaceId,
+        user: UserId,
+        role: Option<SpaceRole>,
+    ) -> DriveResult<()> {
+        let graph = self
+            .authz
+            .store()
+            .load_space(id(space))
+            .await
+            .map_err(access_error)?;
+        let object = Object::Space(id(space));
+        let subject = Subject::User(id(user));
+        let mut changes: Vec<Change> = graph
+            .tuples
+            .iter()
+            .filter(|t| t.object == object && t.subject == subject)
+            .filter_map(|t| match t.relation {
+                TupleRelation::Role(held) if Some(held) != role.map(relation) => {
+                    Some(Change::Revoke {
+                        object,
+                        relation: held,
+                        subject,
+                    })
+                }
+                _ => None,
+            })
+            .collect();
+        if let Some(role) = role {
+            changes.push(Change::Grant(Tuple::role(object, relation(role), subject)));
+        }
+        let _ = self
+            .authz
+            .write(id(space), AuthzActor::System, &changes)
+            .await
+            .map_err(access_error)?;
+        Ok(())
+    }
+
     async fn groups_of(&self, user: UserId) -> DriveResult<BTreeSet<ObjectId>> {
         let groups = self
             .authz
@@ -191,6 +261,30 @@ impl<S: AuthzStore + TreeSync + 'static> Access for AuthzAccess<S> {
             .map(|g| ObjectId::from_u128(g.0))
             .collect())
     }
+}
+
+const fn space_role(relation: Relation) -> SpaceRole {
+    match relation {
+        Relation::Viewer => SpaceRole::Viewer,
+        Relation::Commenter => SpaceRole::Commenter,
+        Relation::Editor => SpaceRole::Editor,
+        Relation::Manager => SpaceRole::Manager,
+        Relation::Owner => SpaceRole::Owner,
+    }
+}
+
+const fn relation(role: SpaceRole) -> Relation {
+    match role {
+        SpaceRole::Viewer => Relation::Viewer,
+        SpaceRole::Commenter => Relation::Commenter,
+        SpaceRole::Editor => Relation::Editor,
+        SpaceRole::Manager => Relation::Manager,
+        SpaceRole::Owner => Relation::Owner,
+    }
+}
+
+fn now_ms() -> i64 {
+    vellum_kernel::Timestamp::now().unix_ms()
 }
 
 fn id(value: impl Into<ObjectId>) -> Id {

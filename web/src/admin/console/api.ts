@@ -2,13 +2,17 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 /**
- * The admin console's audit, settings and backup operations (`/api/v1/admin`,
- * issue #254), over the app's HTTP client so writes carry the CSRF token.
- * Types come from the server's generated client.
+ * The admin console's operations (`/api/v1/admin`): audit, settings and
+ * backups (issue #254), users and spaces (issue #175), over the app's HTTP
+ * client so writes carry the CSRF token and an old sign-in is asked to
+ * confirm again (D241). Types come from the server's generated client.
  */
 
 import type {
+  AdminCreateSpace,
   AdminSettings,
+  AdminSpaceList,
+  AdminSpaceView,
   AdminState,
   AuditList,
   AuditQuery,
@@ -16,8 +20,12 @@ import type {
   BackupFile,
   BackupInfo,
   ChainReport,
+  CreateUser,
   DrillReport,
   UsageCounts,
+  SettingsView,
+  SpaceRoleView,
+  UserView,
   Versioned,
 } from "../../api/api.gen";
 import { ApiError, type Http, type Query } from "../../api/http";
@@ -43,6 +51,34 @@ export interface AdminConsoleApi {
   usage(refresh: boolean): Promise<UsageCounts>;
   /** Webhook subscriptions (#149). */
   readonly webhooks?: WebhooksApi;
+  /** Every account, oldest first. */
+  users(): Promise<UserView[]>;
+  createUser(input: CreateUser): Promise<UserView>;
+  /** Renames, promotes, demotes, blocks or unblocks; blocking ends every session. */
+  updateUser(id: string, change: UserChange): Promise<UserView>;
+  /** Every space with its size and members, shared drives first. */
+  spaces(): Promise<AdminSpaceView[]>;
+  createSpace(input: AdminCreateSpace): Promise<AdminSpaceView>;
+  updateSpace(spaceId: string, change: SpaceChange): Promise<AdminSpaceView>;
+  /** Gives someone exactly `role` on a shared drive; no role removes them. */
+  setMember(
+    spaceId: string,
+    userId: string,
+    role: SpaceRoleView | undefined,
+  ): Promise<AdminSpaceView>;
+}
+
+/** What an admin changes about an account; unset fields stay as they are. */
+export interface UserChange {
+  readonly name?: string;
+  readonly admin?: boolean;
+  readonly disabled?: boolean;
+}
+
+/** A space's new name (unchanged when absent) and its full settings. */
+interface SpaceChange {
+  readonly name?: string;
+  readonly settings: SettingsView;
 }
 
 const ADMIN = "/api/v1/admin";
@@ -84,6 +120,23 @@ export function createHttpAdminConsoleApi(http: Http): AdminConsoleApi {
     runDrill: () => http.send<DrillReport>("POST", `${ADMIN}/backups/drill`),
     usage: (refresh) => http.get<UsageCounts>(`${ADMIN}/usage`, refresh ? { refresh: "true" } : {}),
     webhooks: createHttpWebhooksApi(http),
+    users: () => http.get<UserView[]>(`${ADMIN}/users`),
+    createUser: (input) => http.send<UserView>("POST", `${ADMIN}/users`, input),
+    updateUser: (id, change) =>
+      http.send<UserView>("PATCH", `${ADMIN}/users/${encodeURIComponent(id)}`, change),
+    async spaces() {
+      const list = await http.get<AdminSpaceList>(`${ADMIN}/spaces`);
+      return list.spaces;
+    },
+    createSpace: (input) => http.send<AdminSpaceView>("POST", `${ADMIN}/spaces`, input),
+    updateSpace: (spaceId, change) =>
+      http.send<AdminSpaceView>("PATCH", `${ADMIN}/spaces/${encodeURIComponent(spaceId)}`, change),
+    setMember: (spaceId, userId, role) =>
+      http.send<AdminSpaceView>(
+        "PUT",
+        `${ADMIN}/spaces/${encodeURIComponent(spaceId)}/members/${encodeURIComponent(userId)}`,
+        role === undefined ? {} : { role },
+      ),
   };
 }
 
@@ -99,6 +152,10 @@ export function isConflict(error: unknown): boolean {
 }
 
 export {
+  type AdminSpaceView,
+  type SettingsView,
+  type SpaceRoleView,
+  type UserView,
   type AdminSettings,
   type AdminState,
   type AuditRecord,

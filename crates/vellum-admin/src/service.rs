@@ -55,7 +55,7 @@ impl Caller {
         }
     }
 
-    fn event(&self, action: &str) -> NewAuditEvent {
+    pub(crate) fn event(&self, action: &str) -> NewAuditEvent {
         let mut e = NewAuditEvent::new(self.actor.clone(), action);
         e.request_id.clone_from(&self.request_id);
         e.trace_id.clone_from(&self.trace_id);
@@ -191,6 +191,13 @@ impl<K: KeyProvider + 'static> AdminService<K> {
             state: Mutex::new(()),
             version: version.to_owned(),
         }
+    }
+
+    /// The audit log, for auditing the admin actions other services serve
+    /// (see [`crate::audited`]).
+    #[must_use]
+    pub fn audit_log(&self) -> Arc<dyn AuditLog> {
+        Arc::clone(&self.audit)
     }
 
     // ----- Admin → Requests -------------------------------------------------

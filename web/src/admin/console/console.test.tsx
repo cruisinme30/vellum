@@ -126,6 +126,13 @@ function fakeApi(overrides: Partial<AdminConsoleApi> = {}) {
       }),
     ),
     usage: vi.fn(() => Promise.resolve(USAGE)),
+    users: vi.fn(() => Promise.resolve([])),
+    createUser: vi.fn(() => Promise.reject(new Error("not in this test"))),
+    updateUser: vi.fn(() => Promise.reject(new Error("not in this test"))),
+    spaces: vi.fn(() => Promise.resolve([])),
+    createSpace: vi.fn(() => Promise.reject(new Error("not in this test"))),
+    updateSpace: vi.fn(() => Promise.reject(new Error("not in this test"))),
+    setMember: vi.fn(() => Promise.reject(new Error("not in this test"))),
     ...overrides,
   };
   return { api, audit, settings, saveSettings, state };
