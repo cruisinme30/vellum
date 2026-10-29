@@ -247,6 +247,76 @@ async fn a_new_node_recreates_the_room_from_the_log() {
     );
 }
 
+/// Collab re-home under load (#191, ADR 0061 D268): three editors keep
+/// typing while their node drains. They carry on offline, reconnect to
+/// another node with their documents, and no line from anyone is lost.
+#[tokio::test]
+async fn editors_typing_through_a_drain_lose_nothing_on_the_new_node() {
+    let f = fixture(quick());
+    let key = room();
+    let mut editors = Vec::new();
+    for _ in 0..3 {
+        editors.push(Editor::join(&f.hub, key, Access::Write).await);
+    }
+    let line = |who: usize, n: usize| format!("editor {who} line {n}");
+    for n in 0..10 {
+        for (who, editor) in editors.iter().enumerate() {
+            editor.edit(|doc| add_paragraph(doc, &line(who, n))).await;
+        }
+    }
+
+    // The node drains while they type; edits after this are offline.
+    let drain = {
+        let hub = f.hub.clone();
+        tokio::spawn(async move { hub.shutdown().await })
+    };
+    for n in 10..20 {
+        for (who, editor) in editors.iter().enumerate() {
+            // Typing goes on: sent while the room is open, kept locally after.
+            let before = editor.doc.transact().state_vector();
+            add_paragraph(&editor.doc, &line(who, n));
+            let update = editor.doc.transact().encode_state_as_update_v1(&before);
+            let frame = protocol::encode(&[Message::Sync(SyncMessage::Update(update))]);
+            let _ = editor.connection.send(frame).await;
+        }
+    }
+    drain.await.unwrap();
+    // Every connection is told to go elsewhere; nothing more is sent to it.
+    for editor in &mut editors {
+        let closed = tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                match editor.connection.recv().await {
+                    Some(Outbound::Frame(_)) => {}
+                    other => return other,
+                }
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(closed, Some(Outbound::Close(CloseReason::Shutdown)));
+    }
+
+    // Each reconnects to the new owner with the document it has.
+    let node2 = f.second_node(quick());
+    let mut rejoined = Vec::new();
+    for editor in editors {
+        let doc = editor.doc.clone();
+        rejoined.push(Editor::join_with(&node2, key, Access::Write, editor.user, doc).await);
+    }
+    let complete = |e: &Editor| {
+        let text = e.markdown();
+        (0..3).all(|who| (0..20).all(|n| text.contains(&line(who, n))))
+    };
+    let mut reader = Editor::join(&node2, key, Access::Read).await;
+    for editor in &mut rejoined {
+        editor.pump().await;
+    }
+    assert!(reader.pump_until(complete).await, "{}", reader.markdown());
+    for editor in &mut rejoined {
+        assert!(editor.pump_until(complete).await, "{}", editor.markdown());
+    }
+}
+
 #[tokio::test]
 async fn edits_not_yet_written_replay_from_the_editor_after_a_crash() {
     // A window so long that nothing reaches the log before the "crash".
