@@ -4,8 +4,9 @@
 # Keeps the repository's labels and the project board in step with the code.
 #   Sync labels: applies .github/labels.yml when it changes on develop.
 #   Sync the Vellum 1.0 project: keeps the public "Vellum 1.0" GitHub
-#     Project in step with the task issues, on every issue change and every
-#     six hours. It needs the PROJECT_TOKEN secret (a token with the
+#     Project in step with the task issues every 15 minutes. It is a full
+#     sync, so it runs on a schedule rather than once per issue event,
+#     which used to start dozens of runs an hour. It needs the PROJECT_TOKEN secret (a token with the
 #     `project` scope), because the default GITHUB_TOKEN cannot write a
 #     user-owned project; without the secret the job is skipped.
 # Both run only the scripts on the default branch.
@@ -15,10 +16,8 @@ on:
   push:
     branches: [develop]
     paths: [.github/labels.yml, scripts/ci/sync-labels.sh]
-  issues:
-    types: [opened, edited, closed, reopened, labeled, unlabeled, milestoned, demilestoned]
   schedule:
-    - cron: "17 */6 * * *"
+    - cron: "*/15 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -43,7 +42,7 @@ jobs:
 
   project:
     name: Sync the Vellum 1.0 project
-    if: github.event_name != 'push'
+    if: contains(fromJSON('["schedule", "workflow_dispatch"]'), github.event_name)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     concurrency:
