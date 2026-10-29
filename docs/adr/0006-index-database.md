@@ -12,6 +12,8 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D46, D47, D48
+- Issue: #56
+- Pull requests: #24
 
 :::
 
@@ -22,6 +24,17 @@ index (`vellum reindex`), on SQLite (SQLCipher) in the single binary and
 Postgres in the HA profiles, with `space_id` as the shard key. The crate
 `vellum-db` needs one schema that both backends carry and a clear line
 between what a reindex rebuilds and what only the database holds.
+
+## Options considered
+
+- **sqlx `Any` driver over both backends**: one code path, but it loses
+  `uuid` and typed binds and hides dialect differences. Not chosen; the
+  index keeps one pool per backend behind the same `Index` handle.
+- **IDs as ULID text**: readable in SQL, but 26 bytes per key against 16
+  and no native `uuid` in Postgres. Not chosen.
+- **Reindex writes missing IDs into files**: self-healing, but a rebuild
+  would then change the source of truth. Not chosen; the store and the
+  watcher (ADR 0026) assign IDs.
 
 ## Decisions
 
