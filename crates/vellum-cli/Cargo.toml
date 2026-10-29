@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+[package]
+name = "vellum-cli"
+description = "The single `vellum` binary: server, CLI and MCP over stdio."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[package.metadata.vellum]
+layer = "app"
+
+[[bin]]
+name = "vellum"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.6.7", features = ["derive"] }
+tracing = "0.1.44"
+vellum-kernel.workspace = true
+
+[lints]
+workspace = true
