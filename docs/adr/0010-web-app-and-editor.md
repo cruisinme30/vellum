@@ -57,8 +57,8 @@ start before the API and the collab server exist.
   between tabs; the connector keeps updates in the clients' local
   `DocumentCache` (ADR 0023). The real API and collab server replace the
   adapters, not the views.
-- Themes are Material 3 tonal palettes computed in-house in a perceptual (CIE) colour space, with
-  WCAG 2.2 AA contrast checked in tests. Strings use Fluent; routing uses
+- Themes are Material 3 tonal palettes computed in-house in a perceptual
+  (CIE) colour space, with WCAG 2.2 AA contrast checked in tests. Strings use Fluent; routing uses
   react-router. The editor chunk loads lazily.
 - Why: the shell and editor could ship before the backend, and swapping
   in the server is a transport change only.
