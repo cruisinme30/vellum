@@ -14,7 +14,7 @@ vellum: 1
 - Decisions: D70, D71, D72
 - Requirements: R-EX, R-IM, NFR
 - Issue: #119, #120, #121, #122, #123, #124
-- Pull requests: to be filled in when the pull request opens
+- Pull requests: #286
 
 :::
 
