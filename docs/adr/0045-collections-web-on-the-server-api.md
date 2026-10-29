@@ -11,8 +11,8 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D190, D191, D192, D193
-- Issue: #474
+- Decisions: D190, D191, D192, D193, D205, D206, D207
+- Issue: #474, #497
 - Pull requests: to be linked when merged
 
 :::
@@ -40,9 +40,8 @@ and live `collection` blocks in pages (section 5).
   view fails the same way a hand edit would.
 - The server picks a new property's key from its name; keys and types never
   change afterwards, so row files stay valid.
-- Relations (two-way, they touch two schemas) and a second title are refused;
-  a rename is refused while a formula names the property, because formulas
-  store names in their source.
+- A second title is refused. Relations, type changes and renames follow
+  D205 to D207.
 - A delete drops the view filters, sorts, grouping and dates that used the
   property and is refused while a formula or rollup reads it. Row files keep
   the old field until the row is next saved.
@@ -76,12 +75,34 @@ and live `collection` blocks in pages (section 5).
 - It asks again 400 ms after typing stops and shows at most eight rows; the
   saved page still renders on the server.
 
+### `D205`: a type change rereads rows and never rewrites them
+
+- `update_property` takes a new `type`; titles and relations keep theirs.
+- Row files stay as they are. The rows are read again as the new type, and
+  a value that does not fit is kept as written and listed as a problem, so
+  changing the type back restores it.
+
+### `D206`: relations are added and removed on both sides
+
+- Adding a relation also adds its pair in the target collection (edit
+  access needed there); deleting one removes both sides.
+- Every schema a change touches is checked together and written in turn;
+  if a write fails, the ones already written are put back.
+- Rollups name their relation and the related property by name or key.
+
+### `D207`: a rename rewrites the formulas that name the property
+
+- Each reference becomes `prop("New name")`; the rest of the formula text
+  stays as written.
+
 ## Alternatives
 
 - **Generic `update_schema` taking YAML**: one route, but it hands clients the
   file format and makes partial edits race; typed operations validate intent.
-- **Rewriting formulas on rename**: friendlier, but a text rewrite of
-  expressions risks silent changes; refusing with the formula's name is safe.
+- **Refusing renames that formulas use**: safe but tedious; the rewrite
+  only touches references the parser resolved to that property.
+- **Converting row files on a type change**: loses the original text when a
+  value does not fit; rereading keeps it.
 - **WebSocket or SSE change feed now**: the collab socket is per document and
   the cluster feed is server-side; polling a visible tab is enough for 1.0.
 - **Generated types only**: the generated schema is looser (strings for
@@ -91,7 +112,7 @@ and live `collection` blocks in pages (section 5).
 
 - People manage columns, views and CSV from the browser; `schema.yaml` stays
   the single source of truth.
-- Changing a property's type, adding relations and editing rollups still
-  need `schema.yaml`; follow-up work if users ask.
+- Page embeds that filter by a property's old name stop matching after a
+  rename; views store keys and are unaffected.
 - Visible tabs reload open collection views every 30 seconds; with very
   large views this is a load to watch in the k6 runs.
