@@ -11,6 +11,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "range: 2026-11-01 .. 2027-06-30\nDiscovery | 2026-11-01 | 2026-12-15\nBuild | 2026-12-01 | 2027-04-30\nBeta | 2027-03-01 | 2027-05-10\nLaunch | 2027-05-15 | milestone\n"
       }
     ]
