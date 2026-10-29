@@ -69,10 +69,12 @@ import { NewPageView } from "./views/new-page";
 import { InboxView, SearchView } from "./views/search";
 import { SetupView, SignInView } from "./views/sign-in";
 import type { WorkApi } from "./work/api";
+import type { ConnectionsApi } from "./work/connections-api";
 import { CyclesPage } from "./work/cycles-page";
 import { IssuePage } from "./work/issue-page";
 import { IssuesPage } from "./work/issues-page";
 import { MyIssuesPage } from "./work/my-issues-page";
+import { MyWorkConnectionsPage } from "./work/my-work-connections";
 import { MyWorkPage } from "./work/my-work-page";
 import { QuickAddProvider } from "./work/quick-add";
 import { TeamSettingsPage } from "./work/settings/team-settings-page";
@@ -125,6 +127,7 @@ export function AppRoutes() {
         <Route path="settings/security" element={<SecurityPage />} />
         <Route path="new" element={<NewPageView />} />
         <Route path="my-work" element={<MyWorkPage />} />
+        <Route path="my-work/settings" element={<MyWorkConnectionsPage />} />
         <Route path="issues" element={<IssuesPage />} />
         <Route path="issues/mine" element={<MyIssuesPage />} />
         <Route path="issues/triage" element={<TriagePage />} />
@@ -180,6 +183,8 @@ export interface AppServices {
   readonly admin?: AdminConsoleApi | undefined;
   /** My Work and issues, from a Vellum server; absent in demo mode. */
   readonly work?: WorkApi | undefined;
+  /** My Work's calendar feed, CalDAV, capture and imports; absent in demo mode. */
+  readonly connections?: ConnectionsApi | undefined;
   /** Books, from a Vellum server; absent in demo mode. */
   readonly books?: BooksApi | undefined;
   /** The drive's spaces, trash, activity and settings; absent in demo mode. */
@@ -281,6 +286,7 @@ export function AppProviders({
   render,
   sharing,
   account,
+  connections,
   collections,
   session,
   notifications,
@@ -289,8 +295,30 @@ export function AppProviders({
   children,
 }: AppServices & { readonly children: ReactNode }) {
   const serverApis = useMemo(
-    () => ({ work, books, drive, attachments, privateSpaces, directory, render, sharing, account }),
-    [work, books, drive, attachments, privateSpaces, directory, render, sharing, account],
+    () => ({
+      work,
+      books,
+      drive,
+      attachments,
+      privateSpaces,
+      directory,
+      render,
+      sharing,
+      account,
+      connections,
+    }),
+    [
+      work,
+      books,
+      drive,
+      attachments,
+      privateSpaces,
+      directory,
+      render,
+      sharing,
+      account,
+      connections,
+    ],
   );
   const [demoNotifications] = useState<NotificationServices>(() => ({
     store: createMockNotificationPreferencesStore(),

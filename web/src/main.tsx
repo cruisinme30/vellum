@@ -48,6 +48,7 @@ import { createHttpRenderApi } from "./render/api";
 import { createHttpSharingApi } from "./sharing/api";
 import { createHttpOrganisationAppearance } from "./theme/organisation";
 import { createHttpWorkApi } from "./work/api";
+import { createHttpConnectionsApi } from "./work/connections-api";
 
 // Demo pages keep their edits across reloads in the browser's local
 // database. With a server, the page's room on /collab is the store.
@@ -121,6 +122,7 @@ root.render(
       privateSpaces={status === undefined ? undefined : createHttpPrivateSpacesApi(http)}
       render={status === undefined ? undefined : createHttpRenderApi(http)}
       account={status === undefined ? undefined : createHttpAccountApi(http)}
+      connections={status === undefined ? undefined : createHttpConnectionsApi(http)}
       collections={
         status === undefined ? createMockCollectionsStore() : createHttpCollectionsStore(http)
       }

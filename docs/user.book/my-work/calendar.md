@@ -8,10 +8,15 @@ vellum: 1
 
 ## Calendar feed {#ics}
 
-**My Work → ⋯ → Calendar feed** gives you a private ICS link. Subscribe
-to it in Google Calendar, Apple Calendar or Outlook to see your dated
-tasks next to your meetings. Apps that support CalDAV can also tick
-tasks off. Treat the link like a password; **Reset link** replaces it.
+Open **My Work → Calendars, capture and import** and choose **Get a new
+feed URL** for a private ICS link. Subscribe to it in Google Calendar,
+Apple Calendar or Outlook to see your dated tasks next to your meetings.
+Treat the link like a password: it is shown once, and getting a new one
+stops the old one working. **Turn the feed off** stops it for good.
+
+Task apps that speak CalDAV, such as Apple Reminders and Thunderbird,
+can also edit and tick off tasks. Copy the **CalDAV account URL**, sign in
+with your handle, and use **Make an app password** for the password.
 
 ## Reminders and digest {#reminders}
 
@@ -27,8 +32,8 @@ Notification settings**.
 
 ::: facts
 
-- Email: forward a message to your personal `tasks+…` address from **My Work → Capture**
-- Slack: use the message menu's **Save to Vellum**
+- Email: forward a message to your personal `tasks+…` address, from **Get a new address** in My Work's settings
+- Slack: use the message menu's **Save as task**; the first time, Slack shows a link that connects your account
 - Page: select text and press `⌘⌥↵`, or `T` on a page you can only read
 - Comment: assign the comment to someone
 
@@ -41,6 +46,8 @@ for it. The event links back to the task.
 
 ## Importing tasks {#import}
 
-**Settings → Import** brings tasks in once from Google Tasks, Todoist or
-Things, keeping due dates, lists, subtasks and recurrence where the
-source has them.
+**My Work → Calendars, capture and import → Import** brings tasks in from
+Google Tasks, Todoist or Things, keeping due dates, lists, subtasks and
+recurrence where the source has them. Vellum counts the tasks in the file
+before you import it, and importing the same file again adds only what
+is new.

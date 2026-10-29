@@ -31,7 +31,7 @@ use crate::projection::{self, Entry, MyWork, Target, UpcomingGroup};
 use crate::quickadd::{self, TokenKind};
 use crate::remind;
 use crate::settings::{MyWorkSettingsInput, MyWorkSettingsView, Preferences};
-use crate::{capture, feed};
+use crate::{caldav, capture, feed};
 
 /// How many completed tasks the view shows.
 pub const DONE_SHOWN: usize = 50;
@@ -433,6 +433,19 @@ pub struct ImportedList {
 pub struct ImportView {
     /// The lists written.
     pub lists: Vec<ImportedList>,
+}
+
+/// How the person's tasks reach other apps, for My Work's settings (D298).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct ConnectionsView {
+    /// The CalDAV account URL to give a task app (it signs in with an API token).
+    pub caldav_url: String,
+    /// Whether the server receives capture e-mail (a mail domain is set).
+    pub email: bool,
+    /// Whether Slack capture is set up on the server.
+    pub slack: bool,
+    /// Whether this person is linked to a Slack user.
+    pub slack_linked: bool,
 }
 
 /// A newly issued secret URL or address. It is shown once.
@@ -1223,6 +1236,35 @@ impl TasksService {
         })
     }
 
+    /// Where the person's tasks connect: the CalDAV URL and whether
+    /// e-mail and Slack capture are available (D298). The feed URL and the
+    /// capture address are shown only when issued, since only hashes are kept.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the profile cannot be read.
+    pub async fn connections(
+        &self,
+        user: UserId,
+        _input: NoInput,
+    ) -> Result<ConnectionsView, Error> {
+        let profile = self.workspace.profile(user).await?;
+        let slack = self.config.slack_signing_secret.is_some();
+        let slack_linked = slack && self.workspace.slack_linked(profile.handle.clone()).await?;
+        Ok(ConnectionsView {
+            caldav_url: format!(
+                "{}{}",
+                self.config.base_url.trim_end_matches('/'),
+                caldav::href(&caldav::Resource::Home {
+                    user: profile.handle
+                })
+            ),
+            email: !self.config.mail_domain.trim().is_empty(),
+            slack,
+            slack_linked,
+        })
+    }
+
     /// Turns the calendar feed off.
     ///
     /// # Errors
@@ -1548,6 +1590,13 @@ fn list_operations(s: &Arc<TasksService>) -> Vec<Operation> {
         )
         .summary("Imports tasks from Google Tasks, Todoist or Things")
         .budget(Duration::from_mins(1)),
+        Operation::query(
+            "tasks.connections",
+            "/v1/my-work/connections",
+            Scope::Read,
+            handler!(s, connections),
+        )
+        .summary("Where your tasks connect: CalDAV, e-mail and Slack capture"),
         Operation::mutation(
             "tasks.rotate_feed",
             Post,
