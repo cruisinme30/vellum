@@ -16,6 +16,7 @@ use vellum_private::{PrivateAgent, PrivateSpace};
 use vellum_store::{BlobPath, BlobStore, LocalStore};
 
 use crate::private::{PrivateWorkspace, device_identity, parse_space};
+use crate::private_remote::{E2eClient, RemoteSpaces};
 
 /// Options of `vellum mcp`.
 #[derive(Debug, clap::Args)]
@@ -30,13 +31,19 @@ pub struct McpArgs {
     #[arg(long, requires = "space")]
     private: bool,
     /// A private space as `slug=path`, the path relative to the data folder
-    /// (for example `board=drives/shared/board`). Repeat for more spaces.
+    /// (for example `board=drives/shared/board`); with `--server`, as
+    /// `slug=<space ID>`. Repeat for more spaces.
     #[arg(long, value_parser = parse_space)]
     space: Vec<(String, String)>,
     /// How often to reopen the private spaces, in seconds, to pick up
     /// pages synced since the last pass.
     #[arg(long, default_value_t = 60, value_parser = clap::value_parser!(u64).range(5..))]
     refresh_secs: u64,
+    /// Read the private spaces from this Vellum server instead of the data
+    /// folder. Only ciphertext is downloaded; the token comes from
+    /// `VELLUM_TOKEN`.
+    #[arg(long, requires = "private")]
+    server: Option<String>,
 }
 
 /// Runs the stdio server until standard input closes.
@@ -59,7 +66,7 @@ pub fn run(args: &McpArgs) -> ExitCode {
     };
     let result = runtime.block_on(async {
         if args.private {
-            let agent = open_private(&args.space).await?;
+            let agent = open_private(&args.space, args.server.as_deref()).await?;
             keep_fresh(Arc::clone(&agent), Duration::from_secs(args.refresh_secs));
             // Reads only: write tools are not offered at all.
             serve(
@@ -97,15 +104,24 @@ fn principal(token: &str, user: &str, scopes: &str) -> Principal {
     }
 }
 
-/// Opens the private spaces in the data folder with this device's key.
-async fn open_private(spaces: &[(String, String)]) -> Result<Arc<PrivateAgent>, String> {
-    let config = vellum_kernel::config::Config::load(None).map_err(|e| e.to_string())?;
+/// Opens the private spaces with this device's key: from the data folder,
+/// or from `server` through its `e2e` API.
+async fn open_private(
+    spaces: &[(String, String)],
+    server: Option<&str>,
+) -> Result<Arc<PrivateAgent>, String> {
     let identity = device_identity()?;
-    let store: Arc<dyn BlobStore> = Arc::new(
-        LocalStore::open(&config.data_dir)
-            .await
-            .map_err(|e| format!("cannot open {}: {e}", config.data_dir.display()))?,
-    );
+    let store: Arc<dyn BlobStore> = if let Some(server) = server {
+        let token = std::env::var(crate::private_remote::TOKEN_VAR).unwrap_or_default();
+        Arc::new(RemoteSpaces::new(E2eClient::new(server, &token)?))
+    } else {
+        let config = vellum_kernel::config::Config::load(None).map_err(|e| e.to_string())?;
+        Arc::new(
+            LocalStore::open(&config.data_dir)
+                .await
+                .map_err(|e| format!("cannot open {}: {e}", config.data_dir.display()))?,
+        )
+    };
     let mut opened = Vec::with_capacity(spaces.len());
     for (slug, path) in spaces {
         let root = BlobPath::new(path.as_str()).map_err(|e| format!("{slug}: {e}"))?;

@@ -514,14 +514,7 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
         Arc::clone(&index),
         Arc::clone(&drive_access),
     ));
-    // End-to-end encrypted spaces: device keys and ciphertext (ADR 0043).
-    let e2e = vellum_e2e::E2e::new(
-        Arc::clone(&store),
-        Arc::new(crate::e2e::DriveSpaces::new(
-            Arc::clone(&index),
-            drive_access,
-        )),
-    );
+    let e2e = crate::e2e::service(&store, &index, drive_access);
     let lookup = Arc::clone(spaces);
     let space_of: vellum_collections::service::SpaceOf =
         Arc::new(move |path: &BlobPath| lookup.of(path));

@@ -8964,6 +8964,7 @@ dependencies = [
  "clap",
  "futures",
  "getrandom 0.4.3",
+ "hex",
  "hkdf 0.13.0",
  "hmac 0.13.0",
  "http",

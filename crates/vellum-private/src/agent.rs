@@ -241,7 +241,18 @@ impl PrivateAgent {
             if Kind::of(&entry.path) != Kind::Document {
                 continue;
             }
-            let sealed = self.store.get(&entry.path).await?.bytes;
+            // One page that cannot be fetched (deleted since the listing,
+            // or refused by a server as not end-to-end encrypted) must not
+            // stop the whole pass.
+            let sealed = match self.store.get(&entry.path).await {
+                Ok(blob) => blob.bytes,
+                Err(StoreError::NotFound(_)) => continue,
+                Err(error) => {
+                    report.unreadable += 1;
+                    tracing::warn!(path = %entry.path, %error, "skipped a private page that could not be fetched");
+                    continue;
+                }
+            };
             if !is_recipient_envelope(&sealed) {
                 report.not_sealed += 1;
                 tracing::warn!(path = %entry.path, "skipped a file that is not sealed in a private space");

@@ -10,9 +10,22 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use vellum_drive::{Access, DriveIndex, Permission};
-use vellum_e2e::{Need, SpaceAccess};
+use vellum_e2e::{E2e, Need, SpaceAccess};
 use vellum_kernel::{Error, SpaceId, UserId};
-use vellum_store::BlobPath;
+use vellum_store::{BlobPath, BlobStore};
+
+/// The `e2e` service over the workspace's store, the drive's index and its
+/// permissions: device keys and ciphertext for private spaces.
+pub fn service(
+    store: &Arc<dyn BlobStore>,
+    index: &Arc<dyn DriveIndex>,
+    access: Arc<dyn Access>,
+) -> E2e {
+    E2e::new(
+        Arc::clone(store),
+        Arc::new(DriveSpaces::new(Arc::clone(index), access)),
+    )
+}
 
 /// [`SpaceAccess`] over the drive's index and permissions.
 pub struct DriveSpaces {
