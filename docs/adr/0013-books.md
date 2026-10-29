@@ -13,6 +13,8 @@ vellum: 1
 - Status: accepted
 - Decisions: D67, D68, D69
 - Requirements: R-BK-1 to R-BK-10
+- Issue: #112, #113, #114, #115, #116, #117, #118
+- Pull requests: #212
 
 :::
 

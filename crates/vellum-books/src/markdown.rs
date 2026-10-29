@@ -86,8 +86,7 @@ pub fn front_matter(text: &str, key: &str) -> Option<String> {
 
 fn yaml_scalar(value: &str) -> String {
     let flat = value.split_whitespace().collect::<Vec<_>>().join(" ");
-    serde_saphyr::to_string(&flat)
-        .map_or_else(|_| format!("{flat:?}"), |s| s.trim_end().to_owned())
+    serde_saphyr::to_string(&flat).map_or_else(|_| format!("{flat:?}"), |s| s.trim_end().to_owned())
 }
 
 /// Sets a top-level front-matter field to a single-line string, adding
