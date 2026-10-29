@@ -17,6 +17,7 @@ path = [
   "web/.prettierrc.json",
   "web/public/manifest.webmanifest",
   "web/public/icons/**",
+  "web/e2e/__screenshots__/**",
   "desktop/pnpm-lock.yaml",
   "desktop/package.json",
   "desktop/tsconfig.json",
