@@ -1,17 +1,17 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { lazy, Suspense, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { BrowserRouter, Route, Routes } from "react-router";
 
 import type { AuthApi, AuthStatus } from "./api/auth";
-import { RequireSession, SessionProvider } from "./api/session";
+import { RequireSession, SessionProvider, useSession } from "./api/session";
 import { CollectionView } from "./collections/collection-view";
 import { CollectionsIndexView } from "./collections/collections-index";
 import { CollectionsProvider } from "./collections/context";
 import type { CollectionsStore } from "./collections/store";
 import type { WorkspaceStore } from "./data/store";
-import { WorkspaceProvider } from "./data/workspace-context";
+import { useServices, WorkspaceProvider } from "./data/workspace-context";
 import type { CollabConnector } from "./editor/collab/provider";
 import { I18nProvider, useT } from "./i18n/i18n";
 import { KeyboardRoot } from "./keyboard/keyboard-root";
@@ -105,6 +105,25 @@ function MaybeSession({
   );
 }
 
+/** Tells the workspace store who is signed in, so it loads their drive. */
+function SignedInUser({ children }: { readonly children: ReactNode }) {
+  const { store } = useServices();
+  const session = useSession();
+  const user = session?.status.user ?? undefined;
+  const id = user?.id;
+  const handle = user?.handle;
+  const name = user?.name;
+  useEffect(() => {
+    if (session === undefined) return;
+    store.setUser?.(
+      id === undefined || handle === undefined || name === undefined
+        ? undefined
+        : { id, handle, name },
+    );
+  }, [store, session, id, handle, name]);
+  return children;
+}
+
 /** Providers shared by the app and its tests. */
 export function AppProviders({
   store,
@@ -118,7 +137,9 @@ export function AppProviders({
       <AppearanceProvider>
         <MaybeSession session={session}>
           <WorkspaceProvider store={store} collab={collab}>
-            <CollectionsProvider store={collections}>{children}</CollectionsProvider>
+            <SignedInUser>
+              <CollectionsProvider store={collections}>{children}</CollectionsProvider>
+            </SignedInUser>
           </WorkspaceProvider>
         </MaybeSession>
       </AppearanceProvider>

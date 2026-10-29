@@ -65,6 +65,7 @@ search-count =
        *[other] { $count } pages found
     }
 search-empty = No page matches “{ $query }”.
+search-working = Searching…
 inbox-intro = Pages that mention @{ $handle }.
 inbox-empty = Nobody has mentioned you yet.
 admin-pending = Workspace administration opens here when the identity and admin services land.
@@ -81,6 +82,9 @@ help-key-grid = Move between table cells, edit one, open its row
 help-key-board = Move a board card to the next column
 not-found-title = This page does not exist
 not-found-home = Go home
+workspace-loading = Loading your pages…
+workspace-problem-request = { $message } (request { $request })
+workspace-problem-dismiss = Dismiss
 
 ## Page
 
@@ -91,6 +95,8 @@ page-star = Favorite
 page-status = Status
 page-owner = Owner
 page-updated = Updated
+folder-intro = A folder. The pages in it:
+folder-empty = This folder is empty.
 status-draft = Draft
 status-in-review = In review
 status-verified = Verified

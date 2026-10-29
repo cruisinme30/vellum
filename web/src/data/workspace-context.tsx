@@ -1,11 +1,20 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { createContext, use, useCallback, useSyncExternalStore, type ReactNode } from "react";
+import {
+  createContext,
+  use,
+  useCallback,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 
 import type { CollabConnector } from "../editor/collab/provider";
 
 import type { WorkspaceSnapshot, WorkspaceStore } from "./store";
+import type { SearchHit } from "./types";
 
 interface Services {
   readonly store: WorkspaceStore;
@@ -38,4 +47,30 @@ export function useWorkspace(): WorkspaceSnapshot {
   const subscribe = useCallback((listener: () => void) => store.subscribe(listener), [store]);
   const snapshot = useCallback(() => store.getSnapshot(), [store]);
   return useSyncExternalStore(subscribe, snapshot);
+}
+
+/**
+ * The pages that match a search (`kind: "search"`) or mention a handle
+ * (`kind: "mentions"`), asked again whenever the workspace changes;
+ * `undefined` until the first answer for this text arrives.
+ */
+export function useSearch(
+  kind: "search" | "mentions",
+  text: string,
+): readonly SearchHit[] | undefined {
+  const { store } = useServices();
+  const workspace = useWorkspace();
+  const key = `${kind}:${text}`;
+  const [answer, setAnswer] = useState<{ key: string; hits: SearchHit[] }>();
+  useEffect(() => {
+    let current = true;
+    const asked = kind === "search" ? store.search(text) : store.mentions(text);
+    void asked.then((hits) => {
+      if (current) setAnswer({ key, hits });
+    });
+    return () => {
+      current = false;
+    };
+  }, [store, kind, text, key, workspace]);
+  return answer?.key === key ? answer.hits : undefined;
 }

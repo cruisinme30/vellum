@@ -311,9 +311,11 @@ export function PageTree({ space, pages, currentId, onNavigate }: PageTreeProper
                 move(page.id, how);
               }}
               onAddChild={() => {
-                const child = store.createPage({ spaceId: space.id, parentId: page.id });
-                toggle(page.id, true);
-                open(child.id);
+                void store.createPage({ spaceId: space.id, parentId: page.id }).then((child) => {
+                  if (child === undefined) return;
+                  toggle(page.id, true);
+                  open(child.id);
+                });
               }}
             />
           </div>

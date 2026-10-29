@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { renderWithProviders } from "../test/render-app";
@@ -42,7 +42,9 @@ describe("Sidebar", () => {
     await user.click(screen.getByRole("button", { name: "Add a page to Handbook" }));
     const created = store.getSnapshot().pages.at(-1);
     expect(created).toMatchObject({ spaceId: HANDBOOK, parentId: undefined });
-    expect(location()).toBe(`/p/${created?.id ?? ""}`);
+    await waitFor(() => {
+      expect(location()).toBe(`/p/${created?.id ?? ""}`);
+    });
     expect(onNavigate).toHaveBeenCalledOnce();
     expect(screen.getByRole("treeitem", { name: "Untitled" })).toBeDefined();
   });

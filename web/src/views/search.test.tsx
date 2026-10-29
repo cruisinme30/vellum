@@ -23,21 +23,22 @@ describe("SearchView", () => {
     const { user, location } = renderWithProviders(<SearchView />, "/search");
     await user.type(screen.getByRole("searchbox"), "gateway");
     expect(location()).toBe("/search?q=gateway");
-    const results = screen.getAllByRole("link");
+    const results = await screen.findAllByRole("link");
     expect(screen.getByRole("status").textContent).toBe(`${String(results.length)} pages found`);
     expect(results[0]?.textContent).toContain("Gateway architecture");
   });
 
-  it("reads the query from the URL and counts one result", () => {
+  it("reads the query from the URL and counts one result", async () => {
     renderWithProviders(<SearchView />, "/search?q=acme%20logistics");
     expect(screen.getByRole("searchbox")).toHaveProperty("value", "acme logistics");
-    expect(screen.getByRole("status").textContent).toBe("One page found");
+    expect(screen.getByRole("status").textContent).toBe("Searching…");
+    expect(await screen.findByText("One page found")).toBeDefined();
   });
 
   it("says when nothing matches, and clears back to the hint", async () => {
     const { user, location } = renderWithProviders(<SearchView />, "/search?q=zebra");
+    expect(await screen.findByText("No page matches “zebra”.")).toBeDefined();
     expect(screen.getByRole("status").textContent).toBe("0 pages found");
-    expect(screen.getByText("No page matches “zebra”.")).toBeDefined();
     await user.clear(screen.getByRole("searchbox"));
     expect(location()).toBe("/search");
     expect(screen.getByRole("status").textContent).toBe(
@@ -47,20 +48,22 @@ describe("SearchView", () => {
 });
 
 describe("InboxView", () => {
-  it("lists the pages that mention me", () => {
+  it("lists the pages that mention me", async () => {
     renderWithProviders(<InboxView />);
     expect(screen.getByRole("heading", { level: 1, name: "Inbox" })).toBeDefined();
     expect(screen.getByText("Pages that mention @priya.")).toBeDefined();
-    expect(screen.getAllByRole("link").length).toBeGreaterThan(0);
+    expect(screen.getByRole("status").textContent).toBe("Searching…");
+    const links = await screen.findAllByRole("link");
+    expect(links.length).toBeGreaterThan(0);
   });
 
-  it("says when nobody has mentioned me", () => {
+  it("says when nobody has mentioned me", async () => {
     const { store } = renderWithProviders(<InboxView />);
     act(() => {
       for (const page of store.getSnapshot().pages) {
         store.trashPage(page.id);
       }
     });
-    expect(screen.getByText("Nobody has mentioned you yet.")).toBeDefined();
+    expect(await screen.findByText("Nobody has mentioned you yet.")).toBeDefined();
   });
 });

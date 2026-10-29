@@ -39,7 +39,7 @@ describe("WorkspaceProvider", () => {
     expect(result.current.collab).toBe(collab);
   });
 
-  it("re-renders useWorkspace consumers when the store changes", () => {
+  it("re-renders useWorkspace consumers when the store changes", async () => {
     const store = createNorthstarStore();
     const count = store.getSnapshot().pages.length;
     render(
@@ -48,8 +48,11 @@ describe("WorkspaceProvider", () => {
       </WorkspaceProvider>,
     );
     expect(screen.getByText(`${String(count)} pages`)).toBeDefined();
-    act(() => {
-      store.createPage({ spaceId: store.getSnapshot().spaces[0]?.id ?? "", parentId: undefined });
+    await act(async () => {
+      await store.createPage({
+        spaceId: store.getSnapshot().spaces[0]?.id ?? "",
+        parentId: undefined,
+      });
     });
     expect(screen.getByText(`${String(count + 1)} pages`)).toBeDefined();
   });

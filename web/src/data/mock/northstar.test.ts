@@ -41,13 +41,14 @@ describe("the Northstar demo", () => {
     }
   });
 
-  it("only mentions people of the workspace", () => {
+  it("only mentions people of the workspace", async () => {
     const handles = new Set(NORTHSTAR_PEOPLE.map((person) => person.handle));
     const store = createNorthstarStore();
     for (const handle of ["priya", "dev", "alice", "sam"]) {
       expect(handles.has(handle)).toBe(true);
     }
-    expect(store.mentions("sam").map((hit) => hit.page.id)).toEqual(
+    const mentioned = await store.mentions("sam");
+    expect(mentioned.map((hit) => hit.page.id)).toEqual(
       expect.arrayContaining([PAGE.onCall, PAGE.onboarding]),
     );
   });
@@ -63,8 +64,8 @@ describe("the Northstar demo", () => {
     expect(home?.children.map((node) => node.page.id)).toEqual([PAGE.gateway, PAGE.onCall]);
   });
 
-  it("finds pages by body text", () => {
-    const hits = createNorthstarStore().search("token buckets");
+  it("finds pages by body text", async () => {
+    const hits = await createNorthstarStore().search("token buckets");
     expect(hits.map((hit) => hit.page.id)).toEqual([PAGE.rateLimits]);
   });
 

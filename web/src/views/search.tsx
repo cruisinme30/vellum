@@ -4,20 +4,28 @@
 import { useId } from "react";
 import { useSearchParams } from "react-router";
 
-import { useServices, useWorkspace } from "../data/workspace-context";
+import { useSearch, useWorkspace } from "../data/workspace-context";
 import { useT } from "../i18n/i18n";
 
 import { PageList } from "./page-list";
+
+function searchStatus(
+  t: ReturnType<typeof useT>,
+  query: string,
+  hits: readonly unknown[] | undefined,
+): string {
+  if (query === "") return t("search-hint");
+  if (hits === undefined) return t("search-working");
+  return t("search-count", { count: hits.length });
+}
 
 /** Search across page titles and bodies; the query lives in the URL. */
 export function SearchView() {
   const t = useT();
   const id = useId();
-  const { store } = useServices();
-  useWorkspace();
   const [parameters, setParameters] = useSearchParams();
   const query = parameters.get("q") ?? "";
-  const hits = store.search(query);
+  const hits = useSearch("search", query);
   return (
     <div className="vl-view">
       <h1>{t("nav-search")}</h1>
@@ -38,9 +46,11 @@ export function SearchView() {
         />
       </div>
       <p className="vl-muted" role="status">
-        {query === "" ? t("search-hint") : t("search-count", { count: hits.length })}
+        {searchStatus(t, query, hits)}
       </p>
-      {query !== "" && <PageList items={hits} empty={t("search-empty", { query })} />}
+      {query !== "" && hits !== undefined && (
+        <PageList items={hits} empty={t("search-empty", { query })} />
+      )}
     </div>
   );
 }
@@ -48,13 +58,19 @@ export function SearchView() {
 /** Inbox: pages that mention me. */
 export function InboxView() {
   const t = useT();
-  const { store } = useServices();
   const workspace = useWorkspace();
+  const hits = useSearch("mentions", workspace.me.handle);
   return (
     <div className="vl-view">
       <h1>{t("nav-inbox")}</h1>
       <p className="vl-muted">{t("inbox-intro", { handle: workspace.me.handle })}</p>
-      <PageList items={store.mentions(workspace.me.handle)} empty={t("inbox-empty")} />
+      {hits === undefined ? (
+        <p className="vl-muted" role="status">
+          {t("search-working")}
+        </p>
+      ) : (
+        <PageList items={hits} empty={t("inbox-empty")} />
+      )}
     </div>
   );
 }

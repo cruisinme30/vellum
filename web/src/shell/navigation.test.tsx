@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { matchQueries, renderApp } from "../test/render-app";
@@ -124,6 +124,8 @@ describe("BottomBar", () => {
     await user.click(screen.getByRole("button", { name: "New" }));
     const created = store.getSnapshot().pages.at(-1);
     expect(created?.title).toBe("");
-    expect(location()).toBe(`/p/${created?.id ?? ""}`);
+    await waitFor(() => {
+      expect(location()).toBe(`/p/${created?.id ?? ""}`);
+    });
   });
 });

@@ -34,6 +34,8 @@ export interface PageMeta {
   /** ISO 8601. */
   readonly updatedAt: string;
   readonly starred: boolean;
+  /** A folder of a server's drive: it holds pages and has no body. */
+  readonly folder?: boolean;
 }
 
 /** Where a page goes when it moves. */

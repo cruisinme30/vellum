@@ -50,9 +50,10 @@ export function Sidebar({ currentId, compact, onNavigate }: SidebarProperties) {
               className="vl-icon-button"
               aria-label={t("space-add-page", { space: space.name })}
               onClick={() => {
-                const page = store.createPage({ spaceId: space.id, parentId: undefined });
-                void navigate(`/p/${page.id}`);
-                onNavigate();
+                void store.createPage({ spaceId: space.id, parentId: undefined }).then((page) => {
+                  if (page !== undefined) void navigate(`/p/${page.id}`);
+                  onNavigate();
+                });
               }}
             >
               <Icon name="add" size={20} />
