@@ -5,7 +5,7 @@
 //! Markdown → tree → Yjs → tree → Markdown, and comes back as its
 //! canonical form with the same AST.
 
-#![allow(missing_docs)]
+#![allow(missing_docs, clippy::unwrap_used)]
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -136,10 +136,9 @@ proptest! {
         blocks in prop::collection::vec(block(), 0..6),
         title in prop::option::of("[A-Za-z ]{1,12}"),
     ) {
-        let mut source = String::new();
-        if let Some(title) = title {
-            source.push_str(&format!("---\ntitle: \"{title}\"\ntags: [a, b]\n---\n\n"));
-        }
+        let mut source = title.map_or_else(String::new, |title| {
+            format!("---\ntitle: \"{title}\"\ntags: [a, b]\n---\n\n")
+        });
         source.push_str(&blocks.join("\n\n"));
         source.push('\n');
         let canonical = vellum_format::serialize(&vellum_format::parse(&source).document);

@@ -4,7 +4,12 @@
 //! Property tests: the node tree survives Yjs unchanged, concurrent edits
 //! converge to one document, and that document has one Markdown form.
 
-#![allow(missing_docs, clippy::unwrap_used, clippy::expect_used)]
+#![allow(
+    missing_docs,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing
+)]
 
 mod support;
 
