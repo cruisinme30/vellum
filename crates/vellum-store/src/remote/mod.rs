@@ -10,6 +10,8 @@
 
 #[cfg(feature = "dropbox")]
 pub mod dropbox;
+#[cfg(feature = "gdrive")]
+pub mod gdrive;
 mod oauth;
 #[cfg(feature = "onedrive")]
 pub mod onedrive;

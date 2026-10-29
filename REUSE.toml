@@ -33,6 +33,7 @@ path = [
   "corpus/**/*.json",
   ".gitmessage",
   "deploy/observability/grafana/dashboards/*.json",
+  "deploy/perf/*.json",
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 The Vellum contributors"

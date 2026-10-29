@@ -1,0 +1,79 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Upgrade and restore drill for every release (ADR 0022, D96): upgrade a
+# seeded stack from each of the previous two releases to this one, and
+# restore a backup into a scratch stack, comparing counts each time.
+name: Release drill
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      image:
+        description: "Image to test; empty builds this commit"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: drill-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  drill:
+    name: Upgrade and restore
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: The image under test
+        id: image
+        env:
+          INPUT_IMAGE: ${{ inputs.image }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          if [[ -n "${TAG}" ]]; then
+            image="ghcr.io/${GITHUB_REPOSITORY}:${TAG#v}"
+            docker pull "${image}"
+          elif [[ -n "${INPUT_IMAGE}" ]]; then
+            image="${INPUT_IMAGE}"
+            docker pull "${image}"
+          else
+            image="vellum:ci"
+            docker buildx build --load -t "${image}" -f deploy/docker/Dockerfile .
+          fi
+          echo "image=${image}" >>"${GITHUB_OUTPUT}"
+      - name: Does the binary serve yet?
+        id: serve
+        run: |
+          if deploy/compose/stack.sh has-serve "${{ steps.image.outputs.image }}"; then
+            echo "ready=true" >>"${GITHUB_OUTPUT}"
+          else
+            echo "::notice::vellum has no serve command yet; the drill starts once it does."
+          fi
+      - name: Upgrade from each of the previous two releases
+        if: steps.serve.outputs.ready == 'true'
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          mapfile -t previous < <(gh release list --repo "${GITHUB_REPOSITORY}" --exclude-drafts \
+            --exclude-pre-releases --json tagName --jq '.[].tagName' | grep -vxF "${TAG:-none}" | head -2)
+          if ((${#previous[@]} == 0)); then
+            echo "::notice::No earlier release to upgrade from."
+          fi
+          for tag in "${previous[@]}"; do
+            deploy/drills/upgrade.sh "ghcr.io/${GITHUB_REPOSITORY}:${tag#v}" "${IMAGE}"
+          done
+      - name: Restore a backup into a scratch stack
+        if: steps.serve.outputs.ready == 'true'
+        run: deploy/drills/restore.sh "${{ steps.image.outputs.image }}"

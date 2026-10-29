@@ -108,13 +108,15 @@ async fn passes_conformance_and_hides_the_git_dir() -> TestResult {
     conformance::run_all(&store).await?;
     let listed: Vec<_> = store.list(None).try_collect().await?;
     assert!(listed.iter().all(|e| !e.path.as_str().starts_with(".git")));
-    assert!(store.get(&p(".git/HEAD")?).await.is_err());
-    assert!(
-        store
-            .put(&p(".git/hooks/x")?, Bytes::new(), Precondition::None)
-            .await
-            .is_err()
-    );
+    // The Git directory cannot even be named, in any spelling (#272).
+    for git in [
+        ".git/HEAD",
+        ".git/hooks/x",
+        ".GIT/config",
+        "sub/.git/config",
+    ] {
+        assert!(p(git).is_err(), "{git:?} should be refused");
+    }
     Ok(())
 }
 

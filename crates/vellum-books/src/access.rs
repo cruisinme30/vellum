@@ -13,7 +13,7 @@
 //! reads [`SectionAccess`] to materialise the narrowing in its tuples, and
 //! publishing uses it to leave restricted sections out of public sites.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::Serialize;
 
@@ -21,6 +21,7 @@ use crate::book::Book;
 use crate::error::{BookError, Result};
 use crate::id::NodeId;
 use crate::manifest::Principal;
+use crate::publish::Audience;
 
 /// The effective access settings of one section.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
@@ -95,6 +96,38 @@ impl Book {
     /// Returns [`BookError::UnknownNode`] when the book has no such section.
     pub fn can_view(&self, id: &NodeId, principals: &BTreeSet<Principal>) -> Result<bool> {
         Ok(self.access(id)?.permits(principals))
+    }
+
+    /// The book as someone holding `principals` (their user and groups) may
+    /// see it: every section they cannot see is left out, with its file,
+    /// and nothing else moves. Use it whenever book content leaves the
+    /// book for a reader, such as a copy into their drive or an export.
+    ///
+    /// Book managers and owners see every section; callers give them the
+    /// whole book instead.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error only for an inconsistent book.
+    pub fn view_for(&self, principals: &BTreeSet<Principal>) -> Result<Self> {
+        self.published_view(&Audience::Members(principals.clone()))
+    }
+
+    /// The effective restriction of every section that has one, by
+    /// section: what the authorization service mirrors as `restricted`
+    /// markers and grants.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error only for an inconsistent book.
+    pub fn restrictions(&self) -> Result<BTreeMap<NodeId, BTreeSet<Principal>>> {
+        let mut out = BTreeMap::new();
+        for id in self.manifest.nodes.keys() {
+            if let Some(allowed) = self.access(id)?.restrict_to {
+                let _ = out.insert(id.clone(), allowed);
+            }
+        }
+        Ok(out)
     }
 
     /// Restricts section `id` (and everything under it) to `allowed`, or
@@ -208,6 +241,54 @@ mod tests {
         // The manifest round-trips the settings.
         let yaml = book.manifest_text().unwrap();
         assert!(yaml.contains("restrict_to"), "{yaml}");
+    }
+
+    #[test]
+    fn view_for_and_restrictions() {
+        let mut book = handbook();
+        book.set_restriction(&id(4), Some(set(&["group:staff", "group:sre"])))
+            .unwrap();
+        book.set_restriction(&id(5), Some(set(&["group:sre"])))
+            .unwrap();
+        let restrictions = book.restrictions().unwrap();
+        assert_eq!(
+            restrictions.get(&id(4)),
+            Some(&set(&["group:sre", "group:staff"]))
+        );
+        assert_eq!(restrictions.get(&id(5)), Some(&set(&["group:sre"])));
+        assert!(!restrictions.contains_key(&id(6)));
+        assert!(!restrictions.contains_key(&id(1)));
+        // A child inherits its parent's restriction.
+        book.set_restriction(&id(5), None).unwrap();
+        assert_eq!(
+            book.restrictions().unwrap().get(&id(5)),
+            Some(&set(&["group:sre", "group:staff"]))
+        );
+        book.set_restriction(&id(5), Some(set(&["group:sre"])))
+            .unwrap();
+
+        let staff = book.view_for(&set(&["user:maya", "group:staff"])).unwrap();
+        assert!(staff.contains(&id(4)));
+        assert!(!staff.contains(&id(5)));
+        assert!(
+            !staff
+                .manifest_text()
+                .unwrap()
+                .contains(book.path_of(&id(5)).unwrap().as_str())
+        );
+        let outsider = book.view_for(&set(&["user:guest"])).unwrap();
+        assert!(!outsider.contains(&id(4)));
+        assert!(outsider.contains(&id(1)));
+    }
+
+    #[test]
+    fn principals_from_ids() {
+        let user = Principal::user("01JBK0000000000000000000A1").unwrap();
+        assert_eq!(user.as_str(), "user:01JBK0000000000000000000A1");
+        assert_eq!(user.parts(), ("user", "01JBK0000000000000000000A1"));
+        assert_eq!(Principal::group("G1").unwrap().parts(), ("group", "G1"));
+        assert!(Principal::user("").is_err());
+        assert!(Principal::user("a b").is_err());
     }
 
     #[test]

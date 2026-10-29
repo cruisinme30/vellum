@@ -101,6 +101,55 @@ fn budgets_checks_a_routes_file() {
 }
 
 #[test]
+fn prints_the_api_contracts() {
+    let output = vellum().arg("openapi").output().unwrap();
+    assert!(output.status.success());
+    let doc: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(doc["openapi"], "3.1.1");
+    let output = vellum().arg("graphql-schema").output().unwrap();
+    assert!(output.status.success());
+    assert!(
+        String::from_utf8(output.stdout)
+            .unwrap()
+            .contains("type Query")
+    );
+}
+
+#[test]
+fn serves_health_checks() {
+    use std::io::{Read as _, Write as _};
+
+    let port = std::net::TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .port();
+    let data = std::env::temp_dir().join(format!("vellum-serve-{}", std::process::id()));
+    let mut child = vellum()
+        .arg("serve")
+        .env("VELLUM_BIND", format!("127.0.0.1:{port}"))
+        .env("VELLUM_DATA_DIR", &data)
+        .env("VELLUM_LOG", "warn")
+        .spawn()
+        .unwrap();
+    let mut reply = String::new();
+    for _ in 0..100 {
+        if let Ok(mut stream) = std::net::TcpStream::connect(("127.0.0.1", port)) {
+            stream
+                .write_all(b"GET /healthz HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+                .unwrap();
+            let _ = stream.read_to_string(&mut reply);
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    child.kill().unwrap();
+    let _ = child.wait();
+    let _ = std::fs::remove_dir_all(&data);
+    assert!(reply.starts_with("HTTP/1.1 200"), "{reply}");
+}
+
+#[test]
 fn mcp_demo_answers_discover_over_stdio() {
     use std::io::Write as _;
     use std::process::Stdio;

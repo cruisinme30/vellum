@@ -1,0 +1,66 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# A single MinIO for the chaos run, from the compose rung's image (loaded
+# into kind as vellum-minio:ci). Credentials come from minio-credentials.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: minio }
+  template:
+    metadata:
+      labels: { app: minio }
+    spec:
+      containers:
+        - name: minio
+          image: vellum-minio:ci
+          imagePullPolicy: Never
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom: { secretKeyRef: { name: minio-credentials, key: AWS_ACCESS_KEY_ID } }
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom: { secretKeyRef: { name: minio-credentials, key: AWS_SECRET_ACCESS_KEY } }
+            - { name: MINIO_BROWSER, value: "off" }
+          ports:
+            - containerPort: 9000
+          readinessProbe:
+            httpGet: { path: /minio/health/ready, port: 9000 }
+          volumeMounts:
+            - { name: data, mountPath: /data }
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+spec:
+  selector: { app: minio }
+  ports:
+    - { port: 9000, targetPort: 9000 }
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-bucket
+spec:
+  backoffLimit: 10
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mc
+          image: vellum-minio:ci
+          imagePullPolicy: Never
+          command: ["/bin/sh", "-c"]
+          args:
+            - >-
+              mc alias set local http://minio:9000 "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" &&
+              mc mb --ignore-existing local/vellum && mc version enable local/vellum
+          envFrom:
+            - secretRef: { name: minio-credentials }

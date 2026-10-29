@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Every action is pinned by commit hash, except the SLSA generator: it
+# verifies its own release tag when it builds provenance, so a hash pin
+# makes the provenance unverifiable (slsa-github-generator README,
+# "Referencing SLSA builders and generators").
+rules:
+  unpinned-uses:
+    config:
+      policies:
+        "slsa-framework/slsa-github-generator/*": ref-pin
+        "*": hash-pin

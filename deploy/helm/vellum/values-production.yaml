@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# An example production overlay: ingress, canary releases and two shards.
+#   helm install vellum deploy/helm/vellum -f deploy/helm/vellum/values-production.yaml
+
+image:
+  # Pin the signed release digest; verify it first with cosign (see deploy/README.md).
+  digest: ""
+
+ingress:
+  enabled: true
+  host: vellum.northstar.dev
+
+canary:
+  enabled: true
+
+blob:
+  url: s3://northstar-vellum
+  region: eu-west-1
+
+shards:
+  - name: s0
+  - name: s1
