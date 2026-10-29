@@ -10,6 +10,7 @@ version = 1
 [[annotations]]
 path = [
   "Cargo.lock",
+  "fuzz/Cargo.lock",
   "web/pnpm-lock.yaml",
   "web/package.json",
   "web/tsconfig.json",
