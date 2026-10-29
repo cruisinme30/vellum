@@ -1,0 +1,32 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "container",
+        "name": "info",
+        "arg": "{#id .c k=\"v\"}",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "sections": [
+          []
+        ]
+      },
+      {
+        "type": "fence",
+        "lang": "{#id",
+        "args": ".c}",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": ""
+      }
+    ]
+  },
+  "diagnostics": []
+}

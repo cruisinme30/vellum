@@ -5,18 +5,20 @@
 //!
 //! One JSON-RPC message per line in each direction. Requests run
 //! concurrently; `notifications/cancelled` stops one (including a
-//! `subscriptions/listen` stream). The server exits when standard input
-//! closes. Credentials come from the environment (an API token), as the
+//! `subscriptions/listen` stream). When standard input closes, the server
+//! ends open subscriptions, lets requests already received finish (up to
+//! [`SHUTDOWN_GRACE`]), flushes their responses and exits. Credentials come from the environment (an API token), as the
 //! specification asks for stdio, so no `OAuth` flow runs here.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, PoisonError};
+use std::time::Duration;
 
 use serde_json::Value;
 use tokio::io::{
     AsyncBufReadExt as _, AsyncRead, AsyncReadExt as _, AsyncWrite, AsyncWriteExt as _, BufReader,
 };
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 use tokio::task::{AbortHandle, JoinSet};
 
 use crate::auth::Principal;
@@ -25,6 +27,9 @@ use crate::server::{McpServer, Reply, RequestCtx};
 
 /// Longest accepted line, in bytes.
 const MAX_LINE: usize = 16 * 1024 * 1024;
+
+/// How long requests already received may run after standard input closes.
+pub const SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
 
 type InFlight = Arc<Mutex<HashMap<RequestId, AbortHandle>>>;
 
@@ -59,6 +64,7 @@ where
     });
     let in_flight: InFlight = Arc::default();
     let legacy_version: Arc<Mutex<Option<String>>> = Arc::default();
+    let (shutdown, _) = watch::channel(false);
     let mut tasks = JoinSet::new();
     let mut reader = BufReader::new(input);
     let mut line = String::new();
@@ -120,6 +126,7 @@ where
         let flight = Arc::clone(&in_flight);
         let legacy = Arc::clone(&legacy_version);
         let task_id = id.clone();
+        let mut closing = shutdown.subscribe();
         let handle = tasks.spawn(async move {
             let is_initialize = msg.method == "initialize";
             let reply = server.handle(msg, &ctx).await;
@@ -132,7 +139,12 @@ where
                 Reply::Listen(mut listener) => {
                     let _ = tx.send(listener.acknowledgement().to_line()).await;
                     loop {
-                        if let Some(n) = listener.next().await {
+                        let next = tokio::select! {
+                            n = listener.next() => n,
+                            // Input closed: nobody is left to listen.
+                            _ = closing.wait_for(|closed| *closed) => break,
+                        };
+                        if let Some(n) = next {
                             if tx.send(n.to_line()).await.is_err() {
                                 break;
                             }
@@ -165,9 +177,19 @@ where
         // Reap finished tasks so the set does not grow without bound.
         while tasks.try_join_next().is_some() {}
     }
-    // Standard input closed: stop promptly, as the transport asks.
-    tasks.abort_all();
-    while tasks.join_next().await.is_some() {}
+    // Standard input closed. End subscriptions, but answer the requests
+    // already received: a client may write its last request and close
+    // its end straight away.
+    let _ = shutdown.send(true);
+    let drained = tokio::time::timeout(SHUTDOWN_GRACE, async {
+        while tasks.join_next().await.is_some() {}
+    })
+    .await;
+    if drained.is_err() {
+        tracing::warn!("requests still running after standard input closed; stopping them");
+        tasks.abort_all();
+        while tasks.join_next().await.is_some() {}
+    }
     drop(tx);
     writer.await.map_err(std::io::Error::other)?
 }
