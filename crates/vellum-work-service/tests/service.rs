@@ -464,3 +464,177 @@ async fn a_corrupt_file_is_skipped_not_fatal() {
         "Good"
     );
 }
+
+#[tokio::test]
+async fn forms_file_triage_issues_and_suggestions_wait_for_a_person() {
+    let w = world().await;
+    with_eng(&w).await;
+    // A team with a label and a bug form, set the way an admin would.
+    let path = w.dir.path().join("teams/ENG/team.yaml");
+    let mut yaml = std::fs::read_to_string(&path).unwrap();
+    yaml.push_str(
+        "labels:\n- name: bug\n- name: gateway\nforms:\n- slug: bug\n  title: Report a bug\n  fields:\n  - key: summary\n    label: Summary\n    type: text\n    required: true\n    maps_to: title\n  - key: steps\n    label: Steps\n    type: long_text\n  labels: [bug]\n",
+    );
+    let _ = w
+        .call(
+            "mara",
+            "work.put_team",
+            json!({"team": "ENG", "yaml": yaml}),
+        )
+        .await;
+    let forms = w
+        .call("dev", "work.list_forms", json!({"team": "ENG"}))
+        .await;
+    assert_eq!(forms["forms"][0]["slug"], "bug");
+    assert_eq!(forms["forms"][0]["fields"][1]["kind"], "long_text");
+
+    // A member's submission lands in triage like any outside request.
+    let issue = w
+        .call(
+            "dev",
+            "work.submit_form",
+            json!({"team": "ENG", "slug": "bug", "answers": {"summary": "Gateway times out", "steps": "Upload 2 GB"}}),
+        )
+        .await;
+    assert_eq!(issue["title"], "Gateway times out");
+    assert_eq!(issue["category"], "triage");
+    assert_eq!(issue["labels"], json!(["bug"]));
+    let key = issue["key"].as_str().unwrap().to_owned();
+    let refused = w
+        .call_as(
+            w.principal("dev", ScopeSet::FULL),
+            "work.submit_form",
+            json!({"team": "ENG", "slug": "bug", "answers": {"steps": "no summary"}}),
+        )
+        .await;
+    assert_eq!(refused, Err(ErrorKind::InvalidInput));
+
+    // An assistant reads the brief and proposes; nothing changes yet.
+    let brief = w
+        .call("priya", "work.triage_brief", json!({"key": key}))
+        .await;
+    assert_eq!(brief["team"], "ENG");
+    assert!(brief["suggestion"].is_null());
+    let suggestion = w
+        .call(
+            "priya",
+            "work.suggest_triage",
+            json!({"key": key, "priority": 2, "labels": ["gateway"], "assignee": "priya", "reason": "Gateway timeouts are Priya's area", "model": "assistant"}),
+        )
+        .await;
+    assert_eq!(suggestion["assignee"], "priya");
+    let bad = w
+        .call_as(
+            w.principal("priya", ScopeSet::FULL),
+            "work.suggest_triage",
+            json!({"key": key, "assignee": "nobody", "reason": "x"}),
+        )
+        .await;
+    assert_eq!(bad, Err(ErrorKind::InvalidInput));
+    let still = w.call("dev", "work.get_issue", json!({"key": key})).await;
+    assert_eq!(still["category"], "triage");
+    assert!(still["assignee"].is_null());
+
+    // A person accepts it; the issue leaves triage with the proposed fields.
+    let accepted = w
+        .call("mara", "work.accept_suggestion", json!({"key": key}))
+        .await;
+    assert_eq!(accepted["assignee"], "priya");
+    assert_eq!(accepted["priority"], 2);
+    assert_eq!(accepted["labels"], json!(["bug", "gateway"]));
+    assert_ne!(accepted["category"], "triage");
+    let brief_after = w
+        .call_as(
+            w.principal("dev", ScopeSet::FULL),
+            "work.triage_brief",
+            json!({"key": key}),
+        )
+        .await;
+    assert_eq!(brief_after, Err(ErrorKind::Conflict));
+
+    // A dismissed suggestion leaves the issue in triage, and survives a restart as gone.
+    let other = w
+        .call(
+            "dev",
+            "work.submit_form",
+            json!({"team": "ENG", "slug": "bug", "answers": {"summary": "Login is slow"}}),
+        )
+        .await;
+    let other_key = other["key"].as_str().unwrap().to_owned();
+    let _ = w
+        .call(
+            "priya",
+            "work.suggest_triage",
+            json!({"key": other_key, "priority": 3, "reason": "Minor"}),
+        )
+        .await;
+    let (w, skipped) = w.reopen().await;
+    assert_eq!(skipped, 0);
+    let brief = w
+        .call("dev", "work.triage_brief", json!({"key": other_key}))
+        .await;
+    assert_eq!(brief["suggestion"]["reason"], "Minor");
+    let dismissed = w
+        .call("dev", "work.dismiss_suggestion", json!({"key": other_key}))
+        .await;
+    assert_eq!(dismissed["category"], "triage");
+    let brief = w
+        .call("dev", "work.triage_brief", json!({"key": other_key}))
+        .await;
+    assert!(brief["suggestion"].is_null());
+}
+
+#[tokio::test]
+async fn insights_count_finished_work_by_team_and_refuse_bad_ranges() {
+    let w = world().await;
+    with_eng(&w).await;
+    for (title, state) in [
+        ("Ship login", "done"),
+        ("Fix upload", "done"),
+        ("Plan Q1", "todo"),
+    ] {
+        let _ = w
+            .call(
+                "dev",
+                "work.create_issue",
+                json!({"team": "ENG", "title": title, "state": state, "assignee": "dev"}),
+            )
+            .await;
+    }
+    let answer = w
+        .call(
+            "mara",
+            "work.insights",
+            json!({"team": "ENG", "measure": "throughput", "pivot": "assignee", "from": "2026-10-26", "to": "2026-11-09", "interval": "week"}),
+        )
+        .await;
+    assert_eq!(answer["overall"]["count"], 2);
+    assert_eq!(answer["buckets"][0]["key"], "dev");
+    assert_eq!(answer["buckets"][0]["series"].as_array().unwrap().len(), 2);
+
+    let created = w
+        .call(
+            "mara",
+            "work.insights",
+            json!({"measure": "created", "from": "2026-11-01", "to": "2026-11-03"}),
+        )
+        .await;
+    assert_eq!(created["overall"]["count"], 3);
+
+    for bad in [
+        json!({"from": "2026-11-03", "to": "2026-11-01"}),
+        json!({"from": "2020-01-01", "to": "2026-11-01"}),
+        json!({"measure": "speed", "from": "2026-11-01", "to": "2026-11-03"}),
+        json!({"filter": "{", "from": "2026-11-01", "to": "2026-11-03"}),
+        json!({"from": "Nov 1", "to": "2026-11-03"}),
+    ] {
+        let refused = w
+            .call_as(
+                w.principal("mara", ScopeSet::FULL),
+                "work.insights",
+                bad.clone(),
+            )
+            .await;
+        assert_eq!(refused, Err(ErrorKind::InvalidInput), "{bad}");
+    }
+}
