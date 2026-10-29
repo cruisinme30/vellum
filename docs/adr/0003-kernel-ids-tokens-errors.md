@@ -12,6 +12,8 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D37, D38, D39
+- Issue: none (recorded before the issue rule, D119)
+- Pull requests: #23
 
 :::
 
@@ -39,15 +41,6 @@ settled now.
 - One wrapper type per object kind (`DocId`, `SpaceId`, `IssueId` and so
   on); `ObjectId` is the generic front-matter `id` the watcher reads
   before it knows the kind, and converts to any typed ID.
-- Consequence: IDs reveal their creation time to the millisecond. That is
-  acceptable because an ID is never a capability; access is checked by
-  authorization and share links use separate random tokens (D39).
-
-| Option | Postgres native | Front matter readable | Sorted | Chosen |
-| --- | --- | --- | --- | --- |
-| `UUIDv7` bits, ULID text | ✓ | ✓ | ✓ | ✓ |
-| Plain ULID (no version bits) | ◐ | ✓ | ✓ | ✗ |
-| `UUIDv7` with hyphenated text | ✓ | ◐ | ✓ | ✗ |
 
 ### D38: block IDs are 40 random bits in lowercase `Crockford base32`
 
@@ -74,7 +67,18 @@ settled now.
 - A malformed share token is reported as not found, so a caller cannot
   tell a malformed link from a revoked one.
 
+## Alternatives
+
+- **Plain ULID without version bits**: not a valid `UUID` for Postgres.
+- **`UUIDv7` in hyphenated text**: longer and harder to read in front
+  matter.
+- **Storing share tokens in clear**: a database leak would leak every
+  link.
+
 ## Consequences
+
+- IDs reveal their creation time to the millisecond. An ID is never a
+  capability, so that is acceptable.
 
 - Other crates import IDs, tokens, errors, events, timestamps and config
   from `vellum-kernel` and define none of their own.
