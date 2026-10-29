@@ -259,7 +259,7 @@ impl WorkService {
         _rc: RequestContext,
         i: TeamRef,
     ) -> Result<FormsOut, Error> {
-        let st = self.state.lock().await;
+        let st = self.read_state().await;
         let key = Self::team_key(&st.graph, &i.team)?;
         let forms = st
             .graph
@@ -277,7 +277,7 @@ impl WorkService {
     ) -> Result<IssueOut, Error> {
         let ctx = self.ctx(&rc).await?;
         let submitter = ctx.actor.as_ref().map(|u| format!("@{u}"));
-        let mut st = self.state.lock().await;
+        let mut st = self.write_state().await?;
         let team = Self::team_key(&st.graph, &i.team)?;
         let _ = Self::form(&st.graph, &team, &i.slug)?;
         let id = IssueId::generate();
@@ -295,7 +295,7 @@ impl WorkService {
         _rc: RequestContext,
         i: IssueRef,
     ) -> Result<BriefOut, Error> {
-        let st = self.state.lock().await;
+        let st = self.read_state().await;
         let id = Self::issue_id(&st.graph, &i.key)?;
         let brief = st.graph.triage_brief(&id)?;
         let waiting = st
@@ -312,7 +312,7 @@ impl WorkService {
         i: SuggestTriage,
     ) -> Result<SuggestionOut, Error> {
         let ctx = self.ctx(&rc).await?;
-        let mut st = self.state.lock().await;
+        let mut st = self.write_state().await?;
         let id = Self::issue_id(&st.graph, &i.key)?;
         let suggestion = TriageSuggestion {
             team: i
@@ -349,7 +349,7 @@ impl WorkService {
         i: IssueRef,
     ) -> Result<IssueOut, Error> {
         let ctx = self.ctx(&rc).await?;
-        let mut st = self.state.lock().await;
+        let mut st = self.write_state().await?;
         let id = Self::issue_id(&st.graph, &i.key)?;
         let backup = st.clone();
         let changes = st.graph.accept_suggestion(&id, &ctx)?;
@@ -364,7 +364,7 @@ impl WorkService {
         i: IssueRef,
     ) -> Result<IssueOut, Error> {
         let ctx = self.ctx(&rc).await?;
-        let mut st = self.state.lock().await;
+        let mut st = self.write_state().await?;
         let id = Self::issue_id(&st.graph, &i.key)?;
         let backup = st.clone();
         let changes = st.graph.dismiss_suggestion(&id)?;

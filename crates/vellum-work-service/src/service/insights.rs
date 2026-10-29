@@ -118,7 +118,7 @@ impl WorkService {
         i: InsightsQuery,
     ) -> Result<InsightsOut, Error> {
         let ctx = self.ctx(&rc).await?;
-        let st = self.state.lock().await;
+        let st = self.read_state().await;
         let mut filter = match &i.filter {
             Some(text) => {
                 let f: Filter =
