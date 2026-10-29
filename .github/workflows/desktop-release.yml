@@ -54,6 +54,13 @@ jobs:
         with:
           node-version: 22
           package-manager-cache: false
+      # The server binary embeds web/dist at compile time, so build the web
+      # app first or the binary ships the placeholder page.
+      - name: Web app
+        working-directory: web
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run build
       - name: Server binary (universal on macOS)
         if: runner.os == 'macOS'
         run: |
@@ -65,11 +72,6 @@ jobs:
       - name: Server binary
         if: runner.os != 'macOS'
         run: cargo build --release --locked -p vellum-cli
-      - name: Web app
-        working-directory: web
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm run build
       - name: Desktop app
         working-directory: desktop
         shell: bash
