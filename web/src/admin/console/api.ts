@@ -21,6 +21,8 @@ import type {
 } from "../../api/api.gen";
 import { ApiError, type Http, type Query } from "../../api/http";
 
+import { createHttpWebhooksApi, type WebhooksApi } from "./webhooks-api";
+
 /** The admin console's server operations. */
 export interface AdminConsoleApi {
   /** Audit records, newest first. */
@@ -36,6 +38,8 @@ export interface AdminConsoleApi {
   backups(): Promise<BackupFile[]>;
   backUpNow(): Promise<BackupInfo>;
   runDrill(): Promise<DrillReport>;
+  /** Webhook subscriptions (#149). */
+  readonly webhooks?: WebhooksApi;
 }
 
 const ADMIN = "/api/v1/admin";
@@ -75,6 +79,7 @@ export function createHttpAdminConsoleApi(http: Http): AdminConsoleApi {
     },
     backUpNow: () => http.send<BackupInfo>("POST", `${ADMIN}/backups`),
     runDrill: () => http.send<DrillReport>("POST", `${ADMIN}/backups/drill`),
+    webhooks: createHttpWebhooksApi(http),
   };
 }
 

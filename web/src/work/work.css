@@ -172,3 +172,24 @@
 .vl-work-settings button {
   justify-self: start;
 }
+
+/* The "link Slack" question, opened from Slack's Save as task reply. */
+.vl-work-banner {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--md-outline-variant, var(--md-outline));
+  border-radius: 8px;
+  background: var(--md-surface-container, var(--md-surface));
+}
+
+.vl-work-banner p {
+  margin: 0;
+}
+
+.vl-work-banner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
