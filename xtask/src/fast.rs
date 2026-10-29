@@ -378,6 +378,8 @@ fn steps(base: Option<&str>, branch: Option<&str>, tested: Option<&[String]>) ->
                 "--exclude-path",
                 "web/node_modules",
                 "--exclude-path",
+                "desktop/node_modules",
+                "--exclude-path",
                 "corpus",
                 "**/*.md",
             ],
