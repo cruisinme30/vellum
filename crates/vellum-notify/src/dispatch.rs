@@ -7,8 +7,10 @@
 //!
 //! Pushes held by a snooze are not sent later; the inbox line is there
 //! when the person looks. Emails are queued for [`crate::mail::Mailer`],
-//! which sends them when their delay ends; without a mail server
-//! configured they are counted and skipped.
+//! which sends them when their delay ends, once the server has turned
+//! email on ([`NotifyStore::enable_email`]); until then they are counted
+//! and skipped. So every dispatcher, such as My Work's reminder sender,
+//! emails by each person's preferences without asking for it.
 
 use std::sync::Arc;
 
@@ -43,25 +45,12 @@ pub struct Report {
 pub struct Dispatcher<T> {
     store: Arc<NotifyStore>,
     transport: T,
-    email: bool,
 }
 
 impl<T: HttpTransport> Dispatcher<T> {
     /// A dispatcher over `store`, sending pushes through `transport`.
     pub const fn new(store: Arc<NotifyStore>, transport: T) -> Self {
-        Self {
-            store,
-            transport,
-            email: false,
-        }
-    }
-
-    /// Queues email deliveries for the mailer instead of skipping them;
-    /// call it when a mail server is configured.
-    #[must_use]
-    pub const fn with_email(mut self) -> Self {
-        self.email = true;
-        self
+        Self { store, transport }
     }
 
     /// Delivers `notification` to `to`; `actor`, who caused it, is never
@@ -105,7 +94,7 @@ impl<T: HttpTransport> Dispatcher<T> {
                 }
                 Channel::Push if step.not_before > now => report.held += 1,
                 Channel::Push => self.push(user, notification, now, &mut report).await,
-                Channel::Email if !self.email => report.email_skipped += 1,
+                Channel::Email if !self.store.email_enabled() => report.email_skipped += 1,
                 Channel::Email => {
                     let queued = self.store.update(user, |state| {
                         crate::mail::queue(

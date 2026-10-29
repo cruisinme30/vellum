@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-//! Email delivery: the per-person queue, sending what fell due, the daily
-//! digest and signed one-click unsubscribe links (ADR 0041, D174).
+//! Email delivery: the per-person queue, sending what fell due and signed
+//! one-click unsubscribe links (ADR 0041, D174).
 //!
 //! The dispatcher queues an email for each planned email delivery
 //! ([`queue`]). A timer calls [`Mailer::send_due`], which sends each
@@ -17,18 +17,15 @@
 //! newest notification, sent at the earliest of their times. A failed send
 //! is retried with backoff, five times at most.
 //!
-//! The daily digest ([`Mailer::send_digest`]) lists the person's unread
-//! inbox lines from the last day and their My Work day, at the time they
-//! chose in their preferences. Every email carries an unsubscribe link,
-//! signed with a key kept in the notify state, that mutes the subject (or
-//! turns the digest off) without signing in.
+//! My Work's reminders and morning digest are notifications too (of the
+//! `reminder` kind, sent at once), so they reach email the same way. Every
+//! email carries an unsubscribe link, signed with a key kept in the
+//! notify state, that mutes the subject without signing in.
 
 use std::fmt::Write as _;
 use std::sync::Arc;
 
 use hmac::{Hmac, KeyInit as _, Mac as _};
-use jiff::civil::Date;
-use jiff::tz::TimeZone;
 use jiff::{SignedDuration, Timestamp};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
@@ -46,10 +43,6 @@ use crate::service::NotifyStore;
 pub const MAX_QUEUE: usize = 200;
 /// Sends tried before an email is dropped.
 pub const MAX_ATTEMPTS: u32 = 5;
-/// The most inbox lines one digest lists.
-pub const DIGEST_LINES: usize = 20;
-/// The pseudo-subject whose unsubscribe link turns the digest off.
-pub const DIGEST_SUBJECT: &str = "@digest";
 /// The most subjects one person can mute (as in the preferences API).
 const MAX_MUTED: usize = 1000;
 
@@ -104,8 +97,6 @@ pub struct Contact {
     pub mailbox: Mailbox,
     /// Their handle, for reply addresses.
     pub handle: String,
-    /// Their time zone, for the digest.
-    pub time_zone: TimeZone,
 }
 
 /// Looks people up; the edge layer answers from sign-in.
@@ -153,7 +144,7 @@ pub struct MailReport {
     pub failed: usize,
 }
 
-/// Sends queued notification emails and digests.
+/// Sends queued notification emails.
 pub struct Mailer<M> {
     store: Arc<NotifyStore>,
     transport: M,
@@ -307,51 +298,6 @@ impl<M: MailTransport> Mailer<M> {
         report
     }
 
-    /// Sends `contact` their daily digest if it is due at `now` and there
-    /// is something to say. `my_work` is the My Work summary for the day
-    /// (Markdown), when My Work runs. Returns whether an email went out.
-    ///
-    /// # Errors
-    ///
-    /// The state cannot be saved.
-    pub async fn send_digest(
-        &self,
-        contact: &Contact,
-        my_work: Option<&str>,
-        now: Timestamp,
-    ) -> Result<bool, Error> {
-        let state = self.store.user(contact.user);
-        let Some(day) = digest_due(
-            &state.preferences,
-            state.digest_sent_on,
-            &contact.time_zone,
-            now,
-        ) else {
-            return Ok(false);
-        };
-        let since = now
-            .checked_sub(SignedDuration::from_hours(24))
-            .unwrap_or(now);
-        let unread: Vec<InboxEntry> = state
-            .inbox
-            .iter()
-            .filter(|e| !e.read && e.at > since)
-            .take(DIGEST_LINES)
-            .cloned()
-            .collect();
-        // Mark the day done first, so a crash never sends it twice.
-        self.store.update(contact.user, |s| {
-            s.digest_sent_on = Some(day);
-            Ok(())
-        })?;
-        let my_work = my_work.filter(|m| !m.trim().is_empty());
-        if unread.is_empty() && my_work.is_none() {
-            return Ok(false);
-        }
-        let message = self.digest_email(contact, &unread, my_work, day, now);
-        Ok(self.send(contact, &message, "digest").await)
-    }
-
     async fn send(&self, contact: &Contact, message: &EmailMessage, kind: &'static str) -> bool {
         let bytes = match message.encode() {
             Ok(bytes) => bytes,
@@ -483,66 +429,6 @@ impl<M: MailTransport> Mailer<M> {
             .and_then(|f| f(&n.subject, contact));
         message
     }
-
-    /// The daily digest email.
-    #[must_use]
-    pub fn digest_email(
-        &self,
-        contact: &Contact,
-        unread: &[InboxEntry],
-        my_work: Option<&str>,
-        day: Date,
-        now: Timestamp,
-    ) -> EmailMessage {
-        let settings = self.link("/settings/notifications");
-        let unsubscribe = self.unsubscribe_url(contact.user, DIGEST_SUBJECT);
-        let heading = format!("Your Vellum digest for {}", day.strftime("%A %-d %B"));
-        let mut text = format!("{heading}\n\n");
-        let mut html = format!(
-            "<h1 style=\"font-size:20px;margin:0 0 16px\">{}</h1>",
-            esc(&heading)
-        );
-        if !unread.is_empty() {
-            let _ = write!(text, "Unread notifications ({})\n\n", unread.len());
-            let _ = write!(
-                html,
-                "<h2 style=\"font-size:16px;margin:16px 0 8px\">Unread notifications ({})</h2><ul style=\"padding-left:20px;margin:0\">",
-                unread.len()
-            );
-            for entry in unread {
-                let link = self.link(&entry.url);
-                let _ = writeln!(text, "- {} ({link})", entry.title);
-                let _ = write!(
-                    html,
-                    "<li style=\"margin:0 0 6px\"><a href=\"{}\">{}</a></li>",
-                    esc(&link),
-                    esc(&entry.title)
-                );
-            }
-            text.push('\n');
-            html.push_str("</ul>");
-        }
-        if let Some(markdown) = my_work {
-            let _ = write!(text, "{}\n\n", markdown.trim());
-            html.push_str(&markdown_html(markdown));
-            let _ = write!(text, "Open My Work: {}\n\n", self.link("/my-work"));
-            let _ = write!(
-                html,
-                "<p><a href=\"{}\" style=\"{BUTTON}\">Open My Work</a></p>",
-                esc(&self.link("/my-work"))
-            );
-        }
-        let _ = write!(
-            text,
-            "--\nStop the daily digest: {unsubscribe}\nNotification settings: {settings}\n"
-        );
-        html.push_str(&footer("Stop the daily digest", &unsubscribe, &settings));
-        let mut message = self.envelope(contact, heading, &format!("digest-{day}"), now);
-        message.text = text;
-        message.html = page(&html);
-        message.unsubscribe_url = unsubscribe;
-        message
-    }
 }
 
 const BUTTON: &str = "display:inline-block;padding:8px 14px;border-radius:6px;background:#2f5bd3;color:#ffffff;text-decoration:none;font-weight:600";
@@ -564,55 +450,6 @@ fn footer(stop: &str, unsubscribe: &str, settings: &str) -> String {
         esc(unsubscribe),
         esc(settings)
     )
-}
-
-/// The few Markdown shapes the My Work digest uses, as HTML: headings,
-/// list items and paragraphs. Everything is escaped; nothing in task
-/// titles can add markup.
-fn markdown_html(markdown: &str) -> String {
-    let mut out = String::new();
-    let mut in_list = false;
-    for line in markdown.lines() {
-        let line = line.trim_end();
-        let item = line
-            .strip_prefix("- [ ] ")
-            .or_else(|| line.strip_prefix("- [x] "))
-            .or_else(|| line.strip_prefix("- "))
-            .or_else(|| line.strip_prefix("* "));
-        if item.is_none() && in_list {
-            out.push_str("</ul>");
-            in_list = false;
-        }
-        let plain = |s: &str| esc(&s.replace("**", ""));
-        if let Some(item) = item {
-            if !in_list {
-                out.push_str("<ul style=\"padding-left:20px;margin:0 0 8px\">");
-                in_list = true;
-            }
-            let _ = write!(out, "<li>{}</li>", plain(item));
-        } else if let Some(h) = line.strip_prefix("# ") {
-            let _ = write!(
-                out,
-                "<h2 style=\"font-size:16px;margin:16px 0 8px\">{}</h2>",
-                plain(h)
-            );
-        } else if let Some(h) = line
-            .strip_prefix("## ")
-            .or_else(|| line.strip_prefix("### "))
-        {
-            let _ = write!(
-                out,
-                "<h3 style=\"font-size:14px;margin:12px 0 6px\">{}</h3>",
-                plain(h)
-            );
-        } else if !line.is_empty() {
-            let _ = write!(out, "<p style=\"margin:0 0 8px\">{}</p>", plain(line));
-        }
-    }
-    if in_list {
-        out.push_str("</ul>");
-    }
-    out
 }
 
 /// HTML-escapes text for element content and quoted attributes.
@@ -657,21 +494,6 @@ fn backoff(attempt: u32) -> SignedDuration {
     SignedDuration::from_mins(1_i64 << attempt.clamp(1, 6))
 }
 
-/// Whether the digest is due: the person's digest time has passed today,
-/// in their time zone, and today's has not gone out. Returns the local
-/// date to record.
-#[must_use]
-pub fn digest_due(
-    prefs: &Preferences,
-    sent_on: Option<Date>,
-    time_zone: &TimeZone,
-    now: Timestamp,
-) -> Option<Date> {
-    let at = prefs.digest_at?;
-    let local = now.to_zoned(time_zone.clone());
-    (local.time() >= at && sent_on != Some(local.date())).then(|| local.date())
-}
-
 /// The HMAC behind [`NotifyStore::unsubscribe_token`].
 pub(crate) fn sign_unsubscribe(key: &[u8; 32], user: UserId, subject: &str) -> String {
     #[expect(clippy::expect_used, reason = "HMAC takes keys of any length")]
@@ -684,8 +506,7 @@ pub(crate) fn sign_unsubscribe(key: &[u8; 32], user: UserId, subject: &str) -> S
     b64url(tag.get(..16).unwrap_or_default())
 }
 
-/// Applies an unsubscribe link: mutes `subject` for `user`, or turns the
-/// digest off for [`DIGEST_SUBJECT`].
+/// Applies an unsubscribe link: mutes `subject` for `user`.
 ///
 /// # Errors
 ///
@@ -703,9 +524,7 @@ pub fn unsubscribe(
         ));
     }
     store.update(user, |state| {
-        if subject == DIGEST_SUBJECT {
-            state.preferences.digest_at = None;
-        } else if !state.preferences.muted.contains(subject) {
+        if !state.preferences.muted.contains(subject) {
             if state.preferences.muted.len() >= MAX_MUTED {
                 return Err(Error::new(
                     ErrorKind::InvalidInput,
@@ -719,10 +538,7 @@ pub fn unsubscribe(
             .retain(|q| q.notification.subject != subject);
         Ok(())
     })?;
-    tracing::info!(
-        digest = subject == DIGEST_SUBJECT,
-        "unsubscribed from email"
-    );
+    tracing::info!("unsubscribed from email about a subject");
     Ok(())
 }
 
@@ -785,7 +601,6 @@ mod tests {
                     address: "zoe@northstar.dev".to_owned(),
                 },
                 handle: "zoe".to_owned(),
-                time_zone: TimeZone::get("Europe/Berlin").unwrap_or(TimeZone::UTC),
             })
         }
     }
@@ -929,76 +744,6 @@ mod tests {
         assert!(email.encode().is_ok());
     }
 
-    #[tokio::test]
-    async fn the_digest_goes_once_a_day_at_the_chosen_local_time() {
-        let outbox = Outbox::default();
-        let m = mailer(&outbox);
-        let contact = People.contact(user()).unwrap();
-        file(
-            &m,
-            &note(NotificationKind::Mentioned, "ENG-1", 0),
-            at(1000),
-            true,
-        );
-        // 2027-01-15T08:00:00Z is 09:00 in Berlin, after 07:30.
-        let morning: Timestamp = "2027-01-15T08:00:00Z".parse().unwrap();
-        let early: Timestamp = "2027-01-15T06:00:00Z".parse().unwrap();
-        m.store
-            .update(user(), |s| {
-                for e in &mut s.inbox {
-                    e.at = early;
-                }
-                Ok(())
-            })
-            .unwrap();
-        assert!(
-            !m.send_digest(&contact, None, early).await.unwrap(),
-            "07:00 local"
-        );
-        let md = "# My Work for Friday\n\n- [ ] Pay <invoice>\n";
-        assert!(m.send_digest(&contact, Some(md), morning).await.unwrap());
-        assert!(
-            !m.send_digest(&contact, Some(md), morning).await.unwrap(),
-            "once a day"
-        );
-        let sent = outbox.sent.lock().unwrap();
-        assert_eq!(sent.len(), 1);
-        assert!(
-            sent[0]
-                .1
-                .contains("Subject: Your Vellum digest for Friday 15 January")
-        );
-        drop(sent);
-        let html = m
-            .digest_email(
-                &contact,
-                &[],
-                Some(md),
-                "2027-01-15".parse().unwrap(),
-                morning,
-            )
-            .html;
-        assert!(html.contains("<li>Pay &lt;invoice&gt;</li>"));
-    }
-
-    #[test]
-    fn an_empty_day_sends_no_digest_but_is_recorded() {
-        let outbox = Outbox::default();
-        let m = mailer(&outbox);
-        let contact = People.contact(user()).unwrap();
-        let morning: Timestamp = "2027-01-15T08:00:00Z".parse().unwrap();
-        let sent = block_on(m.send_digest(&contact, Some("  "), morning));
-        assert!(!sent.unwrap());
-        assert!(m.store.user(user()).digest_sent_on.is_some());
-    }
-
-    fn block_on<F: std::future::Future>(f: F) -> F::Output {
-        tokio::runtime::Builder::new_current_thread()
-            .build()
-            .unwrap()
-            .block_on(f)
-    }
-
     #[test]
     fn unsubscribe_links_mute_only_with_a_valid_token() {
         let store = NotifyStore::memory("https://northstar.dev").unwrap();
@@ -1010,9 +755,5 @@ mod tests {
         assert!(unsubscribe(&store, user(), "ENG-1", "AAAA").is_err());
         unsubscribe(&store, user(), "ENG-1", &token).unwrap();
         assert!(store.user(user()).preferences.muted.contains("ENG-1"));
-
-        let digest = store.unsubscribe_token(user(), DIGEST_SUBJECT);
-        unsubscribe(&store, user(), DIGEST_SUBJECT, &digest).unwrap();
-        assert_eq!(store.user(user()).preferences.digest_at, None);
     }
 }

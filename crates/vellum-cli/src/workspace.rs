@@ -686,10 +686,14 @@ fn notify_on_one_replica(
     replica: &Replica,
     queued: tokio::sync::mpsc::Receiver<vellum_work::WorkEvent>,
     work: &Arc<WorkService>,
-    identity: &Arc<Identity>,
-    notify: &Arc<NotifyStore>,
-    delivery: crate::notifications::Delivery,
+    (identity, notify, webhooks): (
+        &Arc<Identity>,
+        &Arc<NotifyStore>,
+        &Arc<Webhooks<SafeTransport>>,
+    ),
+    var: impl Fn(&str) -> Option<String>,
 ) -> Result<(), Error> {
+    let delivery = delivery(identity, notify, webhooks, var)?;
     let ticker = crate::notifications::start(
         queued,
         Arc::clone(work),
@@ -704,27 +708,24 @@ fn notify_on_one_replica(
     Ok(())
 }
 
-/// Webhooks, email, reminders and digests for the notifier.
+/// Webhooks and email for the notifier. With a mail server configured,
+/// email is turned on for every dispatcher over the notify store.
 fn delivery(
     identity: &Arc<Identity>,
     notify: &Arc<NotifyStore>,
     webhooks: &Arc<Webhooks<SafeTransport>>,
-    tasks: &Arc<TasksService>,
     var: impl Fn(&str) -> Option<String>,
 ) -> Result<crate::notifications::Delivery, Error> {
-    // My Work counts "today" in the server's zone (see `TasksSetup`).
-    let time_zone = jiff::tz::TimeZone::system();
-    let mail = crate::mail::setup(var, identity.config().public_url.as_str())?
-        .map(|(outbound, config)| Arc::new(Mailer::new(Arc::clone(notify), outbound, config)));
+    let mail = crate::mail::setup(var, identity.config().public_url.as_str())?.map(
+        |(outbound, config)| {
+            notify.enable_email();
+            Arc::new(Mailer::new(Arc::clone(notify), outbound, config))
+        },
+    );
     Ok(crate::notifications::Delivery {
         webhooks: Arc::clone(webhooks),
         mail,
-        people: Arc::new(crate::mail::People::new(
-            Arc::clone(identity),
-            time_zone.clone(),
-        )),
-        tasks: Arc::clone(tasks),
-        time_zone,
+        people: Arc::new(crate::mail::People::new(Arc::clone(identity))),
     })
 }
 
@@ -735,6 +736,10 @@ fn delivery(
 ///
 /// An unreachable database, a wrong key, an unreadable data folder or
 /// invalid integration settings.
+#[expect(
+    clippy::too_many_lines,
+    reason = "the composition root wires every workspace service in order"
+)]
 pub async fn open(
     config: &Config,
     identity: &Arc<Identity>,
@@ -791,14 +796,12 @@ pub async fn open(
         setup,
     )
     .await?;
-    let delivery = delivery(identity, notify, webhooks, &workspace.tasks, &var)?;
     notify_on_one_replica(
         &replica,
         queued,
         &workspace.work,
-        identity,
-        notify,
-        delivery,
+        (identity, notify, webhooks),
+        &var,
     )?;
     // The watcher starts before the rescan, so nothing edited in between
     // is missed; whatever it sees twice is applied idempotently.

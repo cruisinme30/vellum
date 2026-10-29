@@ -86,10 +86,6 @@ pub struct UserState {
     pub inbox: Vec<InboxEntry>,
     /// Emails waiting for their send time ([`crate::mail`]).
     pub email_queue: Vec<PendingEmail>,
-    /// The local date the last daily digest went out.
-    pub digest_sent_on: Option<jiff::civil::Date>,
-    /// Task reminders up to this time have been sent.
-    pub reminders_until: Option<Timestamp>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -109,6 +105,8 @@ pub struct NotifyStore {
     state: Mutex<State>,
     vapid: VapidKey,
     mail_key: [u8; 32],
+    /// Whether a mail server is configured, so email deliveries queue.
+    email: std::sync::atomic::AtomicBool,
 }
 
 impl std::fmt::Debug for NotifyStore {
@@ -132,6 +130,7 @@ impl NotifyStore {
             state: Mutex::new(State::default()),
             vapid,
             mail_key: random_key()?,
+            email: std::sync::atomic::AtomicBool::new(false),
         })
     }
 
@@ -178,6 +177,7 @@ impl NotifyStore {
             state: Mutex::new(state),
             vapid,
             mail_key,
+            email: std::sync::atomic::AtomicBool::new(false),
         })
     }
 
@@ -185,6 +185,19 @@ impl NotifyStore {
     #[must_use]
     pub const fn vapid(&self) -> &VapidKey {
         &self.vapid
+    }
+
+    /// Turns email on: from now on every dispatcher over this store
+    /// queues email deliveries for the mailer. The server calls it when a
+    /// mail server is configured.
+    pub fn enable_email(&self) {
+        self.email.store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Whether email deliveries are queued.
+    #[must_use]
+    pub fn email_enabled(&self) -> bool {
+        self.email.load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// The signature that lets the link in an email unsubscribe `user`
@@ -379,22 +392,6 @@ pub struct PreferencesView {
     pub muted: BTreeSet<String>,
     /// Non-urgent push and email are held until this time (RFC 3339).
     pub snoozed_until: Option<String>,
-    /// The local time (`HH:MM`) of the daily digest email, or `null` for
-    /// no digest. Left out, it is 07:30.
-    #[serde(default = "default_digest_time")]
-    pub digest_time: Option<String>,
-}
-
-#[expect(
-    clippy::unnecessary_wraps,
-    reason = "serde's default must return the field's type"
-)]
-fn default_digest_time() -> Option<String> {
-    Some(digest_time(crate::notification::DEFAULT_DIGEST_AT))
-}
-
-fn digest_time(time: jiff::civil::Time) -> String {
-    time.strftime("%H:%M").to_string()
 }
 
 const fn kind_name(kind: NotificationKind) -> &'static str {
@@ -434,7 +431,6 @@ impl From<&Preferences> for PreferencesView {
             email_delay_minutes: p.email_delay.as_mins(),
             muted: p.muted.clone(),
             snoozed_until: p.snoozed_until.map(|t| t.to_string()),
-            digest_time: p.digest_at.map(digest_time),
         }
     }
 }
@@ -480,20 +476,11 @@ impl PreferencesView {
             .map(str::parse::<Timestamp>)
             .transpose()
             .map_err(|e| invalid(format!("snoozed_until: {e}")))?;
-        let digest_at = self
-            .digest_time
-            .as_deref()
-            .map(|t| {
-                jiff::civil::Time::strptime("%H:%M", t)
-                    .map_err(|_| invalid("digest_time must be HH:MM, such as 07:30"))
-            })
-            .transpose()?;
         Ok(Preferences {
             channels,
             email_delay,
             muted: self.muted.clone(),
             snoozed_until,
-            digest_at,
         })
     }
 }

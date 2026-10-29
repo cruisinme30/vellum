@@ -18,7 +18,6 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use jiff::civil::Time;
 use jiff::{SignedDuration, Timestamp};
 use serde::{Deserialize, Serialize};
 
@@ -112,21 +111,6 @@ pub struct Preferences {
     pub muted: BTreeSet<String>,
     /// Non-urgent push and email are held until this time.
     pub snoozed_until: Option<Timestamp>,
-    /// The local time the daily digest email goes out; `None` turns it
-    /// off (R-MW-5).
-    #[serde(default = "default_digest_at")]
-    pub digest_at: Option<Time>,
-}
-
-/// The digest goes out at 07:30 local time unless the person changes it.
-pub const DEFAULT_DIGEST_AT: Time = Time::constant(7, 30, 0, 0);
-
-#[expect(
-    clippy::unnecessary_wraps,
-    reason = "serde's default must return the field's type"
-)]
-const fn default_digest_at() -> Option<Time> {
-    Some(DEFAULT_DIGEST_AT)
 }
 
 impl Default for Preferences {
@@ -136,7 +120,6 @@ impl Default for Preferences {
             email_delay: SignedDuration::from_mins(10),
             muted: BTreeSet::new(),
             snoozed_until: None,
-            digest_at: default_digest_at(),
         }
     }
 }

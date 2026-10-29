@@ -9,8 +9,8 @@
 //! | `VELLUM_SMTP_URL` | `smtps://user:pass@smtp.example.com` (TLS), `smtp://user:pass@host:587?tls=required` (STARTTLS), or `file:///path` to write `.eml` files instead (for trying it out) |
 //! | `VELLUM_MAIL_FROM` | the sender, such as `Vellum <notifications@northstar.dev>`; defaults to `notifications@` the public host |
 //!
-//! Without `VELLUM_SMTP_URL` no email is sent: notifications stay in the
-//! inbox and on push. The SMTP password is part of the URL, so treat the
+//! Without `VELLUM_SMTP_URL` no email is sent: notifications, My Work
+//! reminders and digests included, stay in the inbox and on push. The SMTP password is part of the URL, so treat the
 //! variable as a secret.
 
 use std::path::PathBuf;
@@ -21,7 +21,6 @@ use axum::extract::{Query, State};
 use axum::http::{StatusCode, header};
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::get;
-use jiff::tz::TimeZone;
 use lettre::address::Envelope;
 use lettre::{Address, AsyncSmtpTransport, AsyncTransport as _, Tokio1Executor};
 use serde::Deserialize;
@@ -29,7 +28,7 @@ use url::Url;
 use vellum_identity::Identity;
 use vellum_kernel::{Error, ErrorKind, UserId};
 use vellum_notify::email::{MailTransport, Mailbox};
-use vellum_notify::mail::{self, Contact, DIGEST_SUBJECT, Directory, MailConfig};
+use vellum_notify::mail::{self, Contact, Directory, MailConfig};
 use vellum_notify::service::NotifyStore;
 
 /// The SMTP server URL (a secret: it carries the password).
@@ -104,7 +103,7 @@ pub fn setup(
     public_url: &str,
 ) -> Result<Option<(Outbound, MailConfig)>, Error> {
     let Some(raw) = var(SMTP_URL_VAR).filter(|v| !v.trim().is_empty()) else {
-        tracing::info!("no {SMTP_URL_VAR}; notification email and digests are off");
+        tracing::info!("no {SMTP_URL_VAR}; notification email is off");
         return Ok(None);
     };
     let bad = |what: &str| Error::new(ErrorKind::InvalidInput, format!("{SMTP_URL_VAR}: {what}"));
@@ -168,16 +167,12 @@ fn parse_mailbox(text: &str) -> Option<Mailbox> {
 /// People, from sign-in.
 pub struct People {
     identity: Arc<Identity>,
-    time_zone: TimeZone,
 }
 
 impl People {
-    /// The directory over `identity`, with the workspace's time zone.
-    pub const fn new(identity: Arc<Identity>, time_zone: TimeZone) -> Self {
-        Self {
-            identity,
-            time_zone,
-        }
+    /// The directory over `identity`.
+    pub const fn new(identity: Arc<Identity>) -> Self {
+        Self { identity }
     }
 
     /// Everyone who can be emailed.
@@ -201,7 +196,6 @@ impl Directory for People {
                 address: view.email,
             },
             handle: view.handle,
-            time_zone: self.time_zone.clone(),
         })
     }
 }
@@ -253,11 +247,7 @@ fn escape(text: &str) -> String {
 }
 
 fn what(subject: &str) -> String {
-    if subject == DIGEST_SUBJECT {
-        "the daily digest".to_owned()
-    } else {
-        format!("emails about {}", escape(subject))
-    }
+    format!("emails about {}", escape(subject))
 }
 
 async fn confirm(State(store): State<Arc<NotifyStore>>, Query(link): Query<Link>) -> Response {

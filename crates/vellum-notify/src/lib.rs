@@ -10,7 +10,7 @@
 //! |---|---|---|
 //! | Signed webhooks | [`webhook`], [`signature`], [`delivery`] | [`delivery::HttpTransport`] |
 //! | In-app inbox | [`notification`] | stored by the caller |
-//! | Email | [`email`], [`mail`] (queue, digest, unsubscribe) | [`email::MailTransport`] |
+//! | Email | [`email`], [`mail`] (queue, unsubscribe) | [`email::MailTransport`] |
 //! | Web push | [`webpush`] | [`delivery::HttpTransport`] |
 //!
 //! [`service`] serves each person's push subscriptions and preferences

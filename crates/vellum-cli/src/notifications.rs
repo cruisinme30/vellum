@@ -12,26 +12,24 @@
 //! queued for every matching hook.
 //!
 //! A [`Ticker`] pass, run every [`TICK`] on one replica of the cluster,
-//! sends what fell due: webhook deliveries and retries, queued emails, My
-//! Work reminders and each person's daily digest (ADR 0041).
+//! sends what fell due: webhook deliveries and retries, and queued emails
+//! (ADR 0041). My Work's reminders and digest are sent by its own
+//! scheduler as notifications, so they are emailed through the same queue.
 
 use std::collections::BTreeSet;
 use std::sync::Arc;
 use std::time::Duration;
 
-use jiff::{SignedDuration, Timestamp};
+use jiff::Timestamp;
 use tokio::sync::mpsc;
 use vellum_identity::Identity;
 use vellum_kernel::{Error, ErrorKind, UserId};
 use vellum_notify::dispatch::Dispatcher;
 use vellum_notify::endpoint::SafeTransport;
 use vellum_notify::hooks::Webhooks;
-use vellum_notify::mail::{Directory as _, Mailer, digest_due};
-use vellum_notify::notification::{Notification, NotificationKind};
+use vellum_notify::mail::Mailer;
 use vellum_notify::service::NotifyStore;
 use vellum_notify::work::{IssueInfo, IssueLookup, notifications, webhook_events};
-use vellum_tasks::remind;
-use vellum_tasks::service::{NoInput, TasksService};
 use vellum_work::{IssueId, WorkEvent, WorkGraph};
 use vellum_work_service::{EventSink, WorkService};
 
@@ -42,8 +40,6 @@ use crate::mail::{Outbound, People};
 const QUEUE: usize = 4096;
 /// How often due deliveries are sent.
 pub const TICK: Duration = Duration::from_secs(30);
-/// How far back reminders are caught up after a restart.
-const REMINDER_CATCH_UP: SignedDuration = SignedDuration::from_hours(1);
 
 /// The Work service's event sink: logs every event and queues it for
 /// notifications.
@@ -76,33 +72,20 @@ pub struct Delivery {
     pub webhooks: Arc<Webhooks<SafeTransport>>,
     /// Email, when a mail server is configured.
     pub mail: Option<Arc<Mailer<Outbound>>>,
-    /// People to email, and the workspace time zone.
+    /// People to email.
     pub people: Arc<People>,
-    /// My Work, for reminders and the digest.
-    pub tasks: Arc<TasksService>,
-    /// The workspace time zone, for reminders.
-    pub time_zone: jiff::tz::TimeZone,
 }
 
 /// One pass of the delivery timer, cheap to clone into a cluster loop.
 #[derive(Clone)]
 pub struct Ticker {
     delivery: Arc<Delivery>,
-    store: Arc<NotifyStore>,
-    dispatcher: Arc<Dispatcher<SafeTransport>>,
 }
 
 impl Ticker {
-    /// Sends what fell due: webhook deliveries, queued emails, My Work
-    /// reminders and digests.
+    /// Sends what fell due: webhook deliveries and queued emails.
     pub async fn run(&self) {
-        run_due(
-            &self.delivery,
-            &self.store,
-            &self.dispatcher,
-            Timestamp::now(),
-        )
-        .await;
+        run_due(&self.delivery, Timestamp::now()).await;
     }
 }
 
@@ -126,11 +109,7 @@ pub fn start(
             format!("cannot build the push client: {e}"),
         )
     })?;
-    let mut dispatcher = Dispatcher::new(Arc::clone(&store), transport);
-    if delivery.mail.is_some() {
-        dispatcher = dispatcher.with_email();
-    }
-    let dispatcher = Arc::new(dispatcher);
+    let dispatcher = Arc::new(Dispatcher::new(store, transport));
     let webhooks = Arc::clone(&delivery.webhooks);
     {
         let dispatcher = Arc::clone(&dispatcher);
@@ -143,8 +122,6 @@ pub fn start(
     }
     Ok(Ticker {
         delivery: Arc::new(delivery),
-        store,
-        dispatcher,
     })
 }
 
@@ -189,105 +166,13 @@ async fn publish(event: &WorkEvent, work: &WorkService, webhooks: &Webhooks<Safe
 }
 
 /// One pass of the delivery timer.
-async fn run_due<T: vellum_notify::delivery::HttpTransport>(
-    delivery: &Delivery,
-    store: &NotifyStore,
-    dispatcher: &Dispatcher<T>,
-    now: Timestamp,
-) {
+async fn run_due(delivery: &Delivery, now: Timestamp) {
     let _ = delivery.webhooks.run_due(now).await;
-    let people = delivery.people.everyone();
-    reminders(delivery, store, dispatcher, &people, now).await;
     if let Some(mailer) = &delivery.mail {
+        let people = delivery.people.everyone();
         let _ = mailer
             .send_due(&people, delivery.people.as_ref(), now)
             .await;
-        digests(mailer, delivery, &people, now).await;
-    }
-}
-
-/// Notifies each person about My Work reminders that fired since the
-/// last pass (R-MW-5).
-async fn reminders<T: vellum_notify::delivery::HttpTransport>(
-    delivery: &Delivery,
-    store: &NotifyStore,
-    dispatcher: &Dispatcher<T>,
-    people: &[UserId],
-    now: Timestamp,
-) {
-    let settings = remind::Settings::new(delivery.time_zone.clone());
-    let floor = now.checked_sub(REMINDER_CATCH_UP).unwrap_or(now);
-    for user in people {
-        let after = store
-            .user(*user)
-            .reminders_until
-            .map_or(floor, |t| t.max(floor));
-        if after >= now {
-            continue;
-        }
-        let due = match delivery
-            .tasks
-            .reminders_due(*user, &settings, after, now)
-            .await
-        {
-            Ok(due) => due,
-            Err(error) => {
-                tracing::debug!(%error, "reminders skipped");
-                continue;
-            }
-        };
-        for reminder in due {
-            let note = Notification {
-                kind: NotificationKind::Reminder,
-                subject: reminder.task.clone(),
-                title: format!("Reminder: {}", reminder.title),
-                body: String::new(),
-                url: "/my-work".to_owned(),
-                actor: None,
-                at: reminder.at,
-            };
-            let _ = dispatcher.deliver(&note, None, &[*user], now).await;
-        }
-        if let Err(error) = store.update(*user, |s| {
-            s.reminders_until = Some(now);
-            Ok(())
-        }) {
-            tracing::warn!(%error, "reminder progress not saved");
-        }
-    }
-}
-
-/// Sends each person's daily digest when it falls due.
-async fn digests(
-    mailer: &Mailer<Outbound>,
-    delivery: &Delivery,
-    people: &[UserId],
-    now: Timestamp,
-) {
-    for user in people {
-        let Some(contact) = delivery.people.contact(*user) else {
-            continue;
-        };
-        let state = mailer.store().user(*user);
-        if digest_due(
-            &state.preferences,
-            state.digest_sent_on,
-            &contact.time_zone,
-            now,
-        )
-        .is_none()
-        {
-            continue;
-        }
-        let my_work = delivery
-            .tasks
-            .digest(*user, NoInput {})
-            .await
-            .ok()
-            .and_then(|d| d.markdown);
-        if let Err(error) = mailer.send_digest(&contact, my_work.as_deref(), now).await {
-            tracing::warn!(%error, "digest not sent");
-        }
     }
 }
 
