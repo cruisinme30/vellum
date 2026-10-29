@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Decides which parts of the Fast suite a change needs (ADR 0035, D139).
+# Reads changed paths on standard input, one per line, and prints
+# "rust=true|false" and "web=true|false". The Fast suite workflow and
+# `cargo xtask fast` both use it, so they skip the same jobs.
+#
+# Rust is skipped only when every path is documentation that no crate
+# embeds; the help books under docs/*.book are compiled in, so they count
+# as Rust. Web runs only when web/ or the CI itself changes. With no paths
+# (an unknown base), everything runs.
+set -euo pipefail
+
+rust=false
+web=false
+seen=false
+while IFS= read -r path; do
+  [[ -z "${path}" ]] && continue
+  seen=true
+  case "${path}" in
+    .github/workflows/* | scripts/ci/*)
+      rust=true
+      web=true
+      ;;
+    web/*) web=true ;;
+    docs/adr/* | site/* | .github/ISSUE_TEMPLATE/* | .github/pull_request_template.md) ;;
+    */*) rust=true ;;
+    *.md) ;;
+    *) rust=true ;;
+  esac
+done
+
+if [[ "${seen}" == false ]]; then
+  rust=true
+  web=true
+fi
+echo "rust=${rust}"
+echo "web=${web}"
