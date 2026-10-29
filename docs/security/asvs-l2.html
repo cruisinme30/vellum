@@ -83,9 +83,9 @@ footer { margin-top: 48px; color: var(--muted); font-size: 0.9rem; max-width: 70
     controls land, and an independent penetration test before 1.0 checks it.
   </p>
   <div class="facts">
-    <span>As of 2026-10-29</span>
+    <span>As of 2026-10-29, 3:30 PM PT</span>
     <span>Scope: Vellum 1.0, all deployment profiles</span>
-    <span>Decisions: ADR 0002, 0003, 0008, 0020, 0025</span>
+    <span>Decisions: ADR 0002, 0003, 0008, 0020, 0025, 0030, 0032, 0047</span>
   </div>
 
   <div class="summary" id="summary"></div>
@@ -115,87 +115,93 @@ const LABEL = { met: "Met", prog: "In progress", plan: "Planned", na: "Not appli
 
 const CHAPTERS = [
   ["V1 Encoding and sanitization", "", [
-    ["Rendered HTML passes an allow-list sanitizer; the Markdown dialect has no raw HTML", "prog", "R-SE-4", "render"],
-    ["Diagram SVG is sanitized: no scripts, no external references", "prog", "R-SE-4; SVG uploads served as attachment (D104)", "render"],
+    ["Rendered HTML passes an allow-list sanitizer; the Markdown dialect has no raw HTML", "met", "<code>vellum_render::sanitize</code> (ammonia allow-list); the parser has no raw HTML (ADR 0004)", "render"],
+    ["Diagram SVG is sanitized: no scripts, no external references", "met", "<code>sanitize/xml.rs</code>; SVG uploads served as attachment (D104)", "render"],
     ["Server-side requests to user-supplied URLs cannot reach private networks", "met", "<code>vellum_security::ssrf</code>, D103; rebinding-safe resolver, per-hop redirect checks", "security"],
-    ["Database queries are parameterized, never built from strings", "prog", "<code>vellum-db</code> (ADR 0006)", "db"],
+    ["Database queries are parameterized, never built from strings", "met", "<code>sqlx</code> bound parameters throughout <code>vellum-db</code> (ADR 0006)", "db"],
   ]],
   ["V2 Validation and business logic", "", [
     ["Identifiers and tokens are parsed strictly into types", "met", "<code>vellum-kernel</code> IDs and share tokens, D37 to D39, property tests", "kernel"],
     ["Configuration is validated at start-up and rejects unknown keys", "met", "<code>vellum_kernel::Config</code>", "kernel"],
-    ["Anti-automation: per-IP, per-user and per-token rate limits", "met", "<code>vellum_security::rate</code> (GCRA); gateway wiring in progress", "security, gateway"],
+    ["Anti-automation: per-IP, per-user and per-token rate limits", "met", "<code>vellum_security::rate</code> (GCRA) in the gateway; IPv6 /64 buckets and connection caps (ADR 0047)", "security, gateway"],
+    ["Bounded work for hostile input: query, upload and body limits", "met", "Red-team rounds 1 to 4 (ADR 0030, 0047), nightly fuzzing", "red team"],
   ]],
   ["V3 Web frontend security", "", [
-    ["Strict Content-Security-Policy, HSTS, <code>nosniff</code>, frame protection", "prog", "R-SE-2, ADR 0020", "gateway"],
-    ["Cookies are <code>HttpOnly</code>, <code>Secure</code>, <code>SameSite=Lax</code>", "prog", "R-SE-2, ADR 0020", "gateway"],
-    ["Public and shared pages are served from a separate origin", "prog", "R-SE-3", "gateway"],
-    ["Embeds are sandboxed iframes without scripts", "prog", "R-SE-4", "render, web"],
+    ["Strict Content-Security-Policy, HSTS, <code>nosniff</code>, frame protection", "met", "<code>vellum_api::security</code> headers, ADR 0020; ZAP baseline nightly", "gateway"],
+    ["Cookies are <code>HttpOnly</code>, <code>Secure</code>, <code>SameSite=Lax</code>", "met", "<code>vellum-identity</code> session cookies, ADR 0020", "identity"],
+    ["Public and shared pages are served from a separate origin", "met", "<code>VELLUM_PUBLIC_PAGES_URL</code>, R-SE-3", "gateway"],
+    ["Embeds are sandboxed iframes without scripts", "met", "<code>sandbox</code> attribute in the render sanitizer; <code>VELLUM_EMBED_ORIGINS</code> allow-list", "render, web"],
   ]],
   ["V4 API and web service", "", [
-    ["State-changing requests are protected against CSRF", "prog", "ADR 0020", "gateway"],
-    ["Untrusted files are served with a fixed type and <code>attachment</code> disposition", "met", "<code>upload::Kind::inline</code>, D104", "security"],
+    ["State-changing requests are protected against CSRF", "met", "Signed CSRF tokens (<code>VELLUM_CSRF_KEY</code>), ADR 0020", "gateway"],
+    ["Untrusted files are served with a fixed type and attachment disposition", "met", "<code>upload::Kind::inline</code>, D104", "security"],
     ["API errors are typed and never leak internals", "met", "<code>vellum_kernel::ErrorKind</code>, D39", "kernel"],
+    ["Every upload route goes through one check", "met", "<code>vellum_security::upload::check</code> (ClamAV and archive limits)", "security"],
   ]],
   ["V5 File handling", "", [
     ["File type is decided by content, and the extension must match", "met", "<code>upload::sniff</code>, <code>UploadPolicy::clean</code>", "security"],
-    ["Size, dimension and decompression limits", "met", "100 MiB, 16384 px, 512 MiB decode cap", "security"],
+    ["Size, dimension and decompression limits", "met", "100 MiB, 16384 px, 512 MiB decode cap, 200x zip expansion (RT-025)", "security"],
     ["Images are re-encoded to drop metadata and polyglot payloads", "met", "<code>tests/upload.rs</code>", "security"],
     ["File names cannot traverse paths or carry control characters", "met", "<code>upload::safe_file_name</code>; <code>BlobPath</code> in the store", "security, store"],
-    ["Antivirus scanning, failing closed", "met", "<code>upload::Clamd</code> (optional ClamAV)", "security"],
+    ["Antivirus scanning, failing closed", "met", "<code>upload::Clamd</code> (optional ClamAV), bounded concurrency (RT-031)", "security"],
   ]],
   ["V6 Authentication", "", [
-    ["Brute-force protection on sign-in and share passwords", "met", "<code>rate::Lockout</code> primitive; wiring in identity", "security, identity"],
-    ["Passwords hashed with Argon2id; OIDC sign-in", "prog", "ADR 0020", "identity"],
-    ["Admin actions require recent re-authentication", "prog", "R-SE-7", "identity"],
+    ["Brute-force protection on sign-in and share passwords", "met", "<code>vellum_identity::lockout</code>, Argon2 gate (RT-035)", "identity"],
+    ["Passwords hashed with Argon2id; OIDC sign-in", "met", "<code>vellum-identity</code>, <code>VELLUM_OIDC_*</code>, ADR 0020", "identity"],
+    ["Admin actions require recent re-authentication", "met", "<code>fresh_auth</code> on admin operations (5 minutes), R-SE-7", "identity, admin"],
   ]],
   ["V7 Session management", "", [
-    ["Sessions are bound, rotated on sign-in and revocable", "prog", "R-SE-7, ADR 0020", "identity"],
-    ["Sessions survive an identity provider outage; break-glass admin", "prog", "Brief §12", "identity"],
+    ["Sessions are bound, rotated on sign-in and revocable", "met", "Server-side sessions, Postgres-backed for replicas, ADR 0020", "identity"],
+    ["Sessions survive an identity provider outage; break-glass admin", "met", "Local break-glass account, brief &sect;12", "identity"],
   ]],
   ["V8 Authorization", "", [
     ["Deny-by-default relationship-based access control", "met", "<code>vellum-authz</code>, ADR 0008, property tests", "authz"],
-    ["Search results are filtered by a batch access check", "prog", "Search ReadAccess port", "search"],
+    ["Search results are filtered by a batch access check", "met", "<code>Authz::filter</code> in <code>vellum-search</code>", "search"],
+    ["Live editing re-checks access while a socket is open", "met", "<code>Authorizer::recheck</code> every minute (RT-028)", "collab"],
     ["End-to-end spaces refuse every server feature that needs plaintext", "met", "<code>e2e::SpaceMode::allows</code>, D105", "security"],
   ]],
   ["V9 Self-contained tokens", "", [
     ["Share links are opaque random tokens, not self-contained tokens", "met", "22-char base62, SHA-256 at rest, constant-time compare (D39)", "kernel"],
-    ["Access tokens for MCP are validated against the authorization server", "prog", "ADR 0020 (MCP as resource server)", "identity, mcp"],
+    ["Access tokens for MCP are validated against the authorization server", "met", "<code>verify_token</code>, MCP as a resource server (ADR 0019, 0020)", "identity, mcp"],
   ]],
   ["V10 OAuth and OIDC", "", [
-    ["OAuth 2.1 authorization server with PKCE, exact redirect URIs", "prog", "ADR 0020", "identity"],
-    ["OIDC client validates issuer, audience, nonce and signature", "prog", "ADR 0020", "identity"],
+    ["OAuth 2.1 authorization server with PKCE, exact redirect URIs", "met", "<code>vellum_identity::oauth</code>, RFC 8414 metadata", "identity"],
+    ["OIDC client validates issuer, audience, nonce and signature", "met", "<code>vellum_identity::sso</code>", "identity"],
   ]],
   ["V11 Cryptography", "", [
     ["Only reviewed primitives: XChaCha20-Poly1305, Argon2id, X25519, SHA-256", "met", "<code>vellum-crypto</code>, ADR 0002", "crypto"],
     ["All randomness comes from the OS CSPRNG", "met", "<code>getrandom</code> in kernel and crypto", "kernel, crypto"],
     ["Weak (small-order) X25519 public keys are rejected", "met", "<code>e2e::DeviceKey::new</code>", "security"],
-    ["Key rotation re-wraps data keys; KMS and keychain backends", "prog", "ADR 0002", "crypto"],
+    ["Keys live in a key service, reached with role credentials, not static keys", "met", "<code>vellum-kms</code>: AWS KMS (IRSA, Pod Identity, ECS, IMDSv2), Cloud KMS, Vault (D259)", "security"],
+    ["Key rotation re-wraps data keys", "met", "<code>vellum_crypto::rewrap</code>, <code>Sealed::reseal</code>; envelopes name their KEK", "crypto"],
   ]],
   ["V12 Secure communication", "", [
-    ["TLS 1.3 with automatic certificates in the single binary", "plan", "R-SE-2", "gateway"],
-    ["Outbound connections use rustls with certificate validation", "met", "<code>ssrf::SafeClient</code>", "security"],
+    ["TLS 1.3 with automatic certificates in the single binary", "met", "<code>VELLUM_TLS=acme</code> in <code>vellum_api::server</code>, R-SE-2", "gateway"],
+    ["Outbound connections use rustls with certificate validation", "met", "<code>ssrf::SafeClient</code>, <code>vellum-kms</code> clients refuse redirects", "security"],
   ]],
   ["V13 Configuration", "", [
-    ["Secrets never appear in logs or debug output", "met", "Redacted <code>Debug</code> for config and tokens", "kernel"],
-    ["Dependencies checked for advisories, licenses and duplicates", "met", "cargo-deny and cargo-audit in CI", "skeleton"],
-    ["Secrets kept out of the repository", "met", "gitleaks in CI", "skeleton"],
-    ["SBOM, Sigstore signatures, reproducible builds, SLSA level 3", "plan", "R-SE-8", "release"],
+    ["Secrets never appear in logs or debug output", "met", "Redacted Debug for config, tokens and credentials", "kernel"],
+    ["Dependencies checked for advisories, licenses and duplicates", "met", "cargo-deny, cargo-audit, pnpm audit in CI; triaged advisories in <code>osv-scanner.toml</code> (D261)", "security"],
+    ["Secrets kept out of the repository", "met", "gitleaks in CI, GitHub push protection", "security"],
+    ["Build dependencies pinned by hash", "met", "Actions pinned by SHA, linters by hash (D261); OpenSSF Scorecard weekly", "security"],
+    ["SBOM, Sigstore signatures, reproducible builds, SLSA level 3", "met", "CycloneDX SBOM, cosign and SLSA provenance in <code>release.yml</code>, R-SE-8", "release"],
   ]],
   ["V14 Data protection", "", [
-    ["Per-document encryption at rest, on by default", "prog", "<code>vellum-crypto</code>, sealed store, ADR 0002", "crypto"],
+    ["Per-document encryption at rest, on by default", "met", "<code>vellum serve</code> seals every file (<code>at_rest</code>, D260); plaintext is an explicit setting", "security"],
     ["Secret scanning on save, with an admin policy to block", "met", "<code>vellum_security::secrets</code>, D104", "security"],
-    ["End-to-end encrypted private spaces", "prog", "Recipient envelopes (crypto) and <code>e2e::KeyRegistry</code>, D105", "crypto, security"],
-    ["Encrypted backups and a monthly restore drill", "plan", "R-SE-9", "deploy"],
+    ["End-to-end encrypted private spaces", "met", "Recipient envelopes, <code>e2e::KeyRegistry</code>, device enrolment (ADR 0036, 0043)", "crypto, security"],
+    ["Encrypted backups and a monthly restore drill", "met", "<code>vellum_admin::backup</code>, <code>drill.yml</code>", "admin, deploy"],
   ]],
   ["V15 Secure coding and architecture", "", [
     ["No unsafe code; no unwrap, panic or unchecked indexing", "met", "Workspace lints, <code>-D warnings</code> in CI", "skeleton"],
     ["Crate layering is enforced", "met", "<code>cargo xtask boundaries</code>", "skeleton"],
     ["Security controls live in one reviewed crate", "met", "<code>vellum-security</code>, ADR 0025", "security"],
+    ["Independent penetration test before 1.0", "plan", "Scope in <code>docs/security/pen-test-scope.md</code>; needs an outside tester", "security"],
   ]],
   ["V16 Security logging and error handling", "", [
     ["Security events are logged with request IDs and traced", "met", "OpenTelemetry via <code>vellum_kernel::telemetry</code>", "kernel, observability"],
-    ["Append-only, exportable audit log", "plan", "R-SE-9", "observability"],
-    ["Errors fail closed (scanner, limits, authorization)", "met", "D104, ADR 0008", "security, authz"],
+    ["Append-only, exportable audit log", "met", "Hash-chained, sealed audit log in <code>vellum_admin::audit</code>", "admin"],
+    ["Errors fail closed (scanner, limits, authorization, keys)", "met", "D104, ADR 0008; a missing files key stops start-up (D260)", "security, authz"],
   ]],
   ["V17 WebRTC", "Collaboration runs over WebSockets through the gateway; Vellum has no WebRTC.", [
     ["WebRTC media and signalling", "na", "Not used", "n/a"],
