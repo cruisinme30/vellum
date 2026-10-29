@@ -56,5 +56,9 @@ X25519
 HKDF
 [Ss]tanzas?
 [Ee]tags?
+[Mm]utators?
+Yjs
+[Jj]ittered
+Replicache
 mdBook
 Roboto

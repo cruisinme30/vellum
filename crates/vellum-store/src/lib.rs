@@ -10,12 +10,14 @@
 //! is refused instead of silently overwriting newer content.
 
 mod error;
+pub mod layout;
 mod local;
 mod merge;
 pub mod metered;
 mod path;
 mod reconcile;
 mod store;
+pub mod watch;
 
 #[cfg(any(test, feature = "conformance"))]
 pub mod conformance;

@@ -28,11 +28,13 @@ diff-match-patch-rs = "0.5.1"
 diffy = "0.5.2"
 futures = "0.3.34"
 hex = "0.4.3"
+notify = "8.2.0"
 opentelemetry = "0.33.1"
 sha2 = "0.11.1"
 thiserror = "2.0.21"
-tokio = { version = "1.49.0", features = ["rt", "sync"] }
+tokio = { version = "1.49.0", features = ["rt", "sync", "time"] }
 tracing = "0.1.44"
+vellum-kernel.workspace = true
 
 [dev-dependencies]
 proptest = ">=1.11.0, <1.12"
