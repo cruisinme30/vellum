@@ -14,7 +14,7 @@ vellum: 1
 - Decisions: D135, D136, D137
 - Requirements: R-WK-13, R-WK-15, R-WK-16
 - Issue: #258, #319, #389
-- Pull requests: #275, #324
+- Pull requests: #275, #324, #396
 
 :::
 
