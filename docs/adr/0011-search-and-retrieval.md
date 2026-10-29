@@ -66,7 +66,7 @@ runs the same checks against each engine.
   it sits in. Hits carry `vellum://doc/{doc}#{block}` citations.
 - Lexical ranking is the engine's own (BM25 in tantivy, `ts_rank_cd` in
   Postgres). Query words are OR-ed, so more matched words rank higher.
-- With an embedder, the nearest blocks by cosine similarity (floor
+- With an embedding model, the nearest blocks by cosine similarity (floor
   0.35) form a second list. The two lists are fused by reciprocal rank
   with `k = 60` and equal weights. A failed query embedding degrades to
   lexical search instead of failing.
