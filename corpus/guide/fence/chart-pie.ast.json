@@ -11,6 +11,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "title: Traffic by region\ntype: pie\nEurope: 45\nAmericas: 35\nAsia Pacific: 20\nunit: \"%\"\n"
       }
     ]

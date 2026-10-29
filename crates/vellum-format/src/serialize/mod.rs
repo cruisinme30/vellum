@@ -117,7 +117,7 @@ fn block(block: &Block, pos: Pos, alternate: bool) -> String {
         }
         Block::ThematicBreak if pos.columns || pos.file_start || pos.nested => "***\n".to_owned(),
         Block::ThematicBreak => "---\n".to_owned(),
-        Block::BlockQuote { blocks: inner } => {
+        Block::BlockQuote { blocks: inner, id } => {
             let body = blocks(
                 inner,
                 Pos {
@@ -128,26 +128,44 @@ fn block(block: &Block, pos: Pos, alternate: bool) -> String {
                 },
                 "\n",
             );
-            if body.is_empty() {
+            let mut out = if body.is_empty() {
                 ">\n".to_owned()
             } else {
                 prefix_lines(&body, "> ", "> ")
-            }
+            };
+            push_id_line(&mut out, id.as_ref());
+            out
         }
         Block::List(list) => self::list(list, alternate),
         Block::Fence(fence) => self::fence(fence),
-        Block::Math { literal } if !pos.nested && !literal.lines().any(|l| l == "$$") => {
-            format!("$$\n{literal}$$\n")
+        Block::Math { literal, id } if !pos.nested && !literal.lines().any(|l| l == "$$") => {
+            let mut open = "$$".to_owned();
+            push_block_id(&mut open, id.as_ref());
+            format!("{open}\n{literal}$$\n")
         }
-        Block::Math { literal } => self::fence(&Fence {
+        Block::Math { literal, id } => self::fence(&Fence {
             lang: "math".to_owned(),
             args: String::new(),
             attrs: crate::ast::Attributes::default(),
+            id: *id,
             literal: literal.clone(),
         }),
-        Block::Table(table) => self::table(table),
+        Block::Table(table) => {
+            let mut out = self::table(table);
+            push_id_line(&mut out, table.id.as_ref());
+            out
+        }
         Block::Container(container) if pos.nested => alert(container),
         Block::Container(container) => self::container(container),
+    }
+}
+
+/// Writes a table's or quote's block ID on its own line after a blank one.
+fn push_id_line(out: &mut String, id: Option<&vellum_kernel::BlockId>) {
+    if let Some(id) = id {
+        out.push_str("\n^");
+        out.push_str(&id.to_string());
+        out.push('\n');
     }
 }
 
@@ -186,7 +204,22 @@ fn list(list: &List, alternate: bool) -> String {
             file_start: false,
             after_dash: marker == "-",
         };
-        let body = blocks(&item.blocks, pos, if list.tight { "" } else { "\n" });
+        let separator = if list.tight { "" } else { "\n" };
+        let body = match (item.task, item.blocks.split_first()) {
+            (Some(_), Some((Block::Paragraph { content, id }, rest))) => {
+                let mut text = task_text(content, id.as_ref(), &item.attrs);
+                if !rest.is_empty() {
+                    text.push_str(separator);
+                    let rest_pos = Pos {
+                        after_dash: false,
+                        ..pos
+                    };
+                    text.push_str(&blocks(rest, rest_pos, separator));
+                }
+                text
+            }
+            _ => blocks(&item.blocks, pos, separator),
+        };
         let paragraph_first = matches!(item.blocks.first(), Some(Block::Paragraph { .. }));
         if body.is_empty() {
             out.push_str(&marker);
@@ -202,6 +235,26 @@ fn list(list: &List, alternate: bool) -> String {
         }
     }
     out
+}
+
+/// A task item's first paragraph: its text, the `{…}` span (D82), then
+/// the block ID.
+fn task_text(
+    content: &[crate::ast::Inline],
+    id: Option<&vellum_kernel::BlockId>,
+    attrs: &crate::ast::Attributes,
+) -> String {
+    let mut text = inline::write(content, Place::Paragraph);
+    let attrs = attrs_after(&text, attrs);
+    if !attrs.is_empty() {
+        if !text.is_empty() {
+            text.push(' ');
+        }
+        text.push_str(&attrs);
+    }
+    push_block_id(&mut text, id);
+    text.push('\n');
+    text
 }
 
 fn fence(fence: &Fence) -> String {
@@ -224,6 +277,7 @@ fn fence(fence: &Fence) -> String {
         }
         info.push_str(&args);
     }
+    push_block_id(&mut info, fence.id.as_ref());
     let attrs = attrs_after(&info, &fence.attrs);
     if !attrs.is_empty() {
         if !info.is_empty() {
@@ -278,11 +332,9 @@ fn table(table: &Table) -> String {
 fn container(container: &Container) -> String {
     let colons = ":".repeat(3 + nesting_depth(container));
     let mut out = colons.clone();
-    for part in [
-        &container.name,
-        &container.arg,
-        &attrs_after(&container.arg, &container.attrs),
-    ] {
+    let mut arg = container.arg.clone();
+    push_block_id(&mut arg, container.id.as_ref());
+    for part in [&container.name, &arg, &attrs_after(&arg, &container.attrs)] {
         if !part.is_empty() {
             out.push(' ');
             out.push_str(part);
@@ -302,10 +354,10 @@ fn container(container: &Container) -> String {
         .map(|s| blocks(s, pos, "\n"))
         .collect();
     let mut body = sections.join("\n---\n\n");
-    // The parser drops an empty first column (a split before any content),
-    // so an empty first column is written with a split in front of it.
-    if columns && sections.len() > 1 && sections.first().is_some_and(String::is_empty) {
-        body.insert_str(0, "---\n");
+    // The parser drops one empty column before the first split, so an
+    // empty first column needs a split of its own.
+    if sections.len() > 1 && sections.first().is_some_and(String::is_empty) {
+        body.insert_str(0, "---\n\n");
     }
     // Blank lines around the body keep lists and fences apart from the
     // `:::` lines, as markdownlint (MD031, MD032) expects.
@@ -355,10 +407,9 @@ fn alert(container: &Container) -> String {
         _ => "NOTE",
     };
     let mut head = format!("[!{kind}]");
-    for part in [
-        &container.arg,
-        &attrs_after(&container.arg, &container.attrs),
-    ] {
+    let mut arg = container.arg.clone();
+    push_block_id(&mut arg, container.id.as_ref());
+    for part in [&arg, &attrs_after(&arg, &container.attrs)] {
         if !part.is_empty() {
             head.push(' ');
             head.push_str(part);

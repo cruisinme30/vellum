@@ -47,7 +47,8 @@ mod store;
 
 pub use engine::{Actor, Authz, Change, Clock, Decision, Error};
 pub use graph::{
-    Access, Directory, GraphError, Materialised, SpaceGraph, materialise, next_expiry,
+    Access, Directory, FOREVER, GraphError, Levels, Materialised, SpaceGraph, materialise,
+    next_expiry,
 };
 pub use memory::MemoryStore;
 pub use model::{Id, Object, Permission, Principal, Relation, Subject, Tuple, TupleRelation};

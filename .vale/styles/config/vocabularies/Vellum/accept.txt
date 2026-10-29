@@ -69,6 +69,19 @@ Yjs
 Replicache
 mdBook
 Roboto
+GitLab
+[Gg]it[Hh]ub
+Sentry
+Jira
+Atlassian
+VAPID
+HMAC
+(?:SSRF|ssrf)
+RFC
+[Uu]nmerged
+[Tt]rigrams?
+[Ww]ebhooks?
+[Rr]ebinding
 [Pp]recach(e|es|ed|ing)
 [Uu]nstarted
 (?:SLAs?|slas)
@@ -109,3 +122,4 @@ Patroni
 Pandoc
 [Kk]anban
 [Cc]ollab
+[Rr]ecents

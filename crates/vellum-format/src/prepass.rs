@@ -66,6 +66,7 @@ struct Opener {
     name: String,
     arg: String,
     attrs: crate::ast::Attributes,
+    id: Option<vellum_kernel::BlockId>,
 }
 
 impl Scanner<'_, '_, '_> {
@@ -101,8 +102,8 @@ impl Scanner<'_, '_, '_> {
                 let block = self.container(opener, line.number);
                 push(&mut sections, block);
                 continue;
-            } else if bare == "$$"
-                && let Some(math) = self.math()
+            } else if let Some(id) = math_opener(bare)
+                && let Some(math) = self.math(id)
             {
                 self.flush(&mut run, &mut sections);
                 push(&mut sections, math);
@@ -148,13 +149,14 @@ impl Scanner<'_, '_, '_> {
             name: opener.name,
             arg: opener.arg,
             attrs: opener.attrs,
+            id: opener.id,
             sections,
         })
     }
 
     /// Reads a `$$` block after its opening line. Without a closing `$$`
     /// line it is not math, and the opening line is read as Markdown.
-    fn math(&mut self) -> Option<Block> {
+    fn math(&mut self, id: Option<vellum_kernel::BlockId>) -> Option<Block> {
         let rest = self.lines.get(self.next..)?;
         let end = rest
             .iter()
@@ -165,7 +167,7 @@ impl Scanner<'_, '_, '_> {
         if !literal.is_empty() && !literal.ends_with('\n') {
             literal.push('\n');
         }
-        Some(Block::Math { literal })
+        Some(Block::Math { literal, id })
     }
 
     fn report_too_deep(&mut self, line: usize) {
@@ -248,21 +250,38 @@ fn push(sections: &mut [Vec<Block>], block: Block) {
     }
 }
 
+/// Reads a `$$` line that opens math, with an optional block ID:
+/// `Some(None)` for `$$`, `Some(Some(id))` for `$$ ^blk-…`.
+#[expect(
+    clippy::option_option,
+    reason = "the outer option says whether the line opens math, the inner one holds its ID"
+)]
+fn math_opener(line: &str) -> Option<Option<vellum_kernel::BlockId>> {
+    let rest = line.strip_prefix("$$")?;
+    if rest.is_empty() {
+        return Some(None);
+    }
+    let id = rest.strip_prefix(' ')?.strip_prefix('^')?.parse().ok()?;
+    Some(Some(id))
+}
+
 /// Parses the part of an opening line after the colons.
 fn parse_opener(rest: &str) -> Option<Opener> {
     let rest = rest.trim();
     let (head, attrs) = attrs::split_trailing(rest);
+    let (head, id) = crate::extras::split_block_id(head);
     let (name, arg) = head.split_once(char::is_whitespace).unwrap_or((head, ""));
     let valid_name = name.starts_with(|c: char| c.is_ascii_alphabetic())
         && name
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'));
-    if !(valid_name || (name.is_empty() && !attrs.is_empty())) {
+    if !(valid_name || (name.is_empty() && (!attrs.is_empty() || id.is_some()))) {
         return None;
     }
     Some(Opener {
         name: name.to_owned(),
         arg: arg.trim().to_owned(),
         attrs,
+        id,
     })
 }

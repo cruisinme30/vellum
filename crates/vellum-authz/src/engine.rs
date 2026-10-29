@@ -188,7 +188,11 @@ impl<S: AuthzStore> Authz<S> {
             authz.epoch = field::Empty,
         );
         async {
-            let row = self.store.lookup(space, principal, object).await?;
+            let rows = self
+                .store
+                .lookup(space, principal, object, (self.clock)())
+                .await?;
+            let row = rows.into_iter().max();
             let decision = Decision {
                 allowed: row.is_some_and(|(r, _)| r.implies(permission.required())),
                 relation: row.map(|(r, _)| r),
@@ -232,11 +236,13 @@ impl<S: AuthzStore> Authz<S> {
             authz.rows = field::Empty,
         );
         async {
-            let rows = self.store.list(space, principal).await?;
+            let rows = self.store.list(space, principal, (self.clock)()).await?;
             let ids: Vec<Id> = rows
                 .into_iter()
                 .filter(|(_, r)| r.implies(permission.required()))
                 .map(|(id, _)| id)
+                .collect::<BTreeSet<Id>>()
+                .into_iter()
                 .collect();
             let _ = Span::current().record("authz.rows", ids.len());
             Ok(ids)
@@ -265,7 +271,10 @@ impl<S: AuthzStore> Authz<S> {
             authz.allowed = field::Empty,
         );
         async {
-            let rows = self.store.lookup_many(principal, objects).await?;
+            let rows = self
+                .store
+                .lookup_many(principal, objects, (self.clock)())
+                .await?;
             let allowed: BTreeSet<Id> = rows
                 .into_iter()
                 .filter(|(_, r)| r.implies(permission.required()))
@@ -286,7 +295,7 @@ impl<S: AuthzStore> Authz<S> {
     /// Fails only if the index cannot be read.
     pub async fn spaces(&self, principal: Principal) -> Result<Vec<Id>, Error> {
         let span = tracing::info_span!("authz.spaces");
-        async { Ok(self.store.spaces_of(principal).await?) }
+        async { Ok(self.store.spaces_of(principal, (self.clock)()).await?) }
             .instrument(span)
             .await
     }
@@ -380,8 +389,11 @@ impl<S: AuthzStore> Authz<S> {
             .await
     }
 
-    /// Removes expired tuples from a space and re-materialises it. Returns
-    /// when the next sweep is due, so a job can schedule it.
+    /// Garbage-collects expired tuples: the space's grants and every
+    /// expired group membership, then re-materialises the space to drop
+    /// dead rows. Access is already exact without it (rows carry their
+    /// expiry); this only reclaims space. Returns when something next
+    /// expires, so a job can schedule the next run.
     ///
     /// # Errors
     ///
@@ -397,12 +409,19 @@ impl<S: AuthzStore> Authz<S> {
                 .filter(|t| !t.is_live(now))
                 .map(Tuple::key)
                 .collect();
-            if !expired.is_empty() {
-                let _ = self
-                    .recompute(space, Vec::new(), expired, |_| Ok(Some(Scope::All)))
-                    .await?;
+            let members = self.store.load_directory().await?;
+            let dead_members: Vec<TupleKey> = members
+                .iter()
+                .filter(|t| !t.is_live(now))
+                .map(Tuple::key)
+                .collect();
+            if !dead_members.is_empty() {
+                self.store.write_directory(Vec::new(), dead_members).await?;
             }
-            Ok(graph::next_expiry(&graph.tuples, now))
+            let _ = self
+                .recompute(space, Vec::new(), expired, |_| Ok(Some(Scope::All)))
+                .await?;
+            Ok(graph::next_expiry(graph.tuples.iter().chain(&members), now))
         }
         .instrument(span)
         .await
@@ -460,9 +479,9 @@ impl<S: AuthzStore> Authz<S> {
         };
         let held = self
             .store
-            .lookup(space, Principal::User(user), object_id)
+            .lookup(space, Principal::User(user), object_id, (self.clock)())
             .await?;
-        if held.is_some_and(|(r, _)| r.implies(change.needs())) {
+        if held.iter().any(|(r, _)| r.implies(change.needs())) {
             Ok(())
         } else {
             tracing::info!(
@@ -494,7 +513,7 @@ impl<S: AuthzStore> Authz<S> {
                 let span = tracing::debug_span!("authz.materialise", authz.rows = field::Empty);
                 let _entered = span.enter();
                 let materialised = graph::materialise(&graph, &directory, now)?;
-                let rows = rows_in(&graph, &materialised, &scope);
+                let rows = rows_in(&graph, &materialised, &scope, now);
                 let _ = span.record("authz.rows", rows.len());
                 rows
             };
@@ -601,7 +620,7 @@ fn apply(graph: &mut SpaceGraph, upsert: &[Tuple], delete: &[TupleKey]) {
     graph.tuples.extend_from_slice(upsert);
 }
 
-fn rows_in(graph: &SpaceGraph, m: &Materialised, scope: &Scope) -> Vec<EffectiveRow> {
+fn rows_in(graph: &SpaceGraph, m: &Materialised, scope: &Scope, now: i64) -> Vec<EffectiveRow> {
     let wanted = |object: &Id| match scope {
         Scope::All => true,
         Scope::Objects(set) => set.contains(object),
@@ -611,13 +630,17 @@ fn rows_in(graph: &SpaceGraph, m: &Materialised, scope: &Scope) -> Vec<Effective
         .chain(m.nodes.iter().map(|(id, a)| (*id, a)))
         .filter(|(object, _)| wanted(object))
         .flat_map(|(object, access)| {
-            access
-                .iter()
-                .map(move |(principal, relation)| EffectiveRow {
-                    object,
-                    principal: *principal,
-                    relation: *relation,
-                })
+            access.iter().flat_map(move |(principal, levels)| {
+                levels
+                    .rows(now)
+                    .into_iter()
+                    .map(move |(relation, valid_until)| EffectiveRow {
+                        object,
+                        principal: *principal,
+                        relation,
+                        valid_until,
+                    })
+            })
         })
         .collect()
 }

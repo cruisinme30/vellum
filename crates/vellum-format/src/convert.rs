@@ -50,6 +50,34 @@ pub fn markdown(
     cx.blocks(root)
 }
 
+/// Gives a table or block quote the ID written on its own line after it:
+/// an ID-only paragraph that directly follows one without an ID.
+fn attach_trailing_ids(blocks: Vec<Block>) -> Vec<Block> {
+    let mut out: Vec<Block> = Vec::with_capacity(blocks.len());
+    for block in blocks {
+        if let Block::Paragraph {
+            content,
+            id: Some(id),
+        } = &block
+            && content.is_empty()
+        {
+            match out.last_mut() {
+                Some(Block::Table(table)) if table.id.is_none() => {
+                    table.id = Some(*id);
+                    continue;
+                }
+                Some(Block::BlockQuote { id: quote_id, .. }) if quote_id.is_none() => {
+                    *quote_id = Some(*id);
+                    continue;
+                }
+                _ => {}
+            }
+        }
+        out.push(block);
+    }
+    out
+}
+
 /// Marks which lines of `src` belong to code blocks, as comrak reads the
 /// whole text. Directive lines inside code are content, not directives.
 pub fn code_lines(src: &str) -> Vec<bool> {
@@ -116,10 +144,11 @@ impl Cx<'_> {
     }
 
     fn blocks<'a>(&mut self, parent: &'a AstNode<'a>) -> Vec<Block> {
-        parent
+        let blocks = parent
             .children()
             .flat_map(|node| self.block(node))
-            .collect()
+            .collect();
+        attach_trailing_ids(blocks)
     }
 
     fn raw_html(&mut self, node: &AstNode<'_>) {
@@ -162,15 +191,18 @@ impl Cx<'_> {
             NodeValue::ThematicBreak => Block::ThematicBreak,
             NodeValue::BlockQuote | NodeValue::MultilineBlockQuote(_) => Block::BlockQuote {
                 blocks: self.nested_blocks(node),
+                id: None,
             },
             NodeValue::Alert(alert) => {
                 // Read the title as a container line would be read.
                 let title = alert.title.unwrap_or_default();
                 let (arg, attrs) = crate::attrs::split_trailing(title.trim());
+                let (arg, id) = extras::split_block_id(arg);
                 Block::Container(Container {
                     name: callout_name(alert.alert_type).to_owned(),
                     arg: arg.to_owned(),
                     attrs,
+                    id,
                     sections: vec![self.nested_blocks(node)],
                 })
             }
@@ -190,15 +222,16 @@ impl Cx<'_> {
                 if !literal.is_empty() && !literal.ends_with('\n') {
                     literal.push('\n');
                 }
-                let info = code.info.trim();
+                let (info, id) = extras::split_block_id(code.info.trim());
                 let (lang, args) = info.split_once(char::is_whitespace).unwrap_or((info, ""));
                 if lang == "math" && args.trim().is_empty() && attrs.is_empty() {
-                    Block::Math { literal }
+                    Block::Math { literal, id }
                 } else {
                     Block::Fence(Fence {
                         lang: lang.to_owned(),
                         args: args.trim().to_owned(),
                         attrs,
+                        id,
                         literal,
                     })
                 }
@@ -219,9 +252,55 @@ impl Cx<'_> {
             NodeValue::TaskItem(task) => Some(task.symbol.is_some()),
             _ => None,
         };
+        if self.depth >= crate::MAX_NESTING {
+            return ListItem {
+                task,
+                attrs: Attributes::default(),
+                blocks: self.nested_blocks(node),
+            };
+        }
+        self.depth += 1;
+        let mut attrs = Attributes::default();
+        let blocks = match (task, node.first_child()) {
+            (Some(_), Some(first)) if matches!(first.data().value, NodeValue::Paragraph) => {
+                // A task's `{…}` span (D82) ends its first paragraph, before
+                // the block ID; it is read before dates and mentions are.
+                let mut content = self.inlines(first);
+                let mut id = extras::take_block_id(&mut content);
+                if let Some(Inline::Text { text }) = content.last_mut() {
+                    let (before, found) = crate::attrs::split_trailing(text);
+                    if before.len() < text.trim_end().len() {
+                        attrs = found;
+                        *text = before.to_owned();
+                        trim_end(&mut content);
+                        // `text ^blk-… {}` writes the ID last, so read it again.
+                        if id.is_none() {
+                            id = extras::take_block_id(&mut content);
+                        }
+                    }
+                }
+                let mut blocks = Vec::new();
+                if !content.is_empty() || id.is_some() || !attrs.is_empty() {
+                    blocks.push(Block::Paragraph {
+                        content: extras::recognize(extras::merge_text(content)),
+                        id,
+                    });
+                }
+                blocks.extend(
+                    first
+                        .following_siblings()
+                        .skip(1)
+                        .flat_map(|n| self.block(n)),
+                );
+                attach_trailing_ids(blocks)
+            }
+            _ => self.blocks(node),
+        };
+        self.depth -= 1;
         ListItem {
             task,
-            blocks: self.nested_blocks(node),
+            attrs,
+            blocks,
         }
     }
 
@@ -236,6 +315,7 @@ impl Cx<'_> {
             alignments: alignments.iter().map(|a| convert_alignment(*a)).collect(),
             header,
             rows: rows.collect(),
+            id: None,
         })
     }
 
@@ -325,6 +405,24 @@ fn trim_ends(mut content: Vec<Inline>) -> Vec<Inline> {
         *text = text.trim_end().to_owned();
     }
     extras::merge_text(content)
+}
+
+/// Drops trailing whitespace and line breaks from inline content.
+fn trim_end(content: &mut Vec<Inline>) {
+    loop {
+        match content.last_mut() {
+            Some(Inline::SoftBreak | Inline::HardBreak) => {}
+            Some(Inline::Text { text }) => {
+                let len = text.trim_end().len();
+                if len > 0 {
+                    text.truncate(len);
+                    return;
+                }
+            }
+            _ => return,
+        }
+        content.truncate(content.len() - 1);
+    }
 }
 
 /// Replaces line breaks with spaces, recursively.
