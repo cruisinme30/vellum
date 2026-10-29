@@ -58,3 +58,8 @@ Yjs
 Replicache
 mdBook
 Roboto
+[Uu]nstarted
+SLAs?
+[Ss]lugs?
+[Aa]ssignees?
+[Bb]acklog
