@@ -1,0 +1,124 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "table",
+        "alignments": [
+          "none",
+          "center",
+          "center",
+          "center"
+        ],
+        "header": [
+          [
+            {
+              "type": "text",
+              "text": "Feature"
+            }
+          ],
+          [
+            {
+              "type": "text",
+              "text": "Vellum"
+            }
+          ],
+          [
+            {
+              "type": "text",
+              "text": "Wiki"
+            }
+          ],
+          [
+            {
+              "type": "text",
+              "text": "Tracker"
+            }
+          ]
+        ],
+        "rows": [
+          [
+            [
+              {
+                "type": "text",
+                "text": "Pages"
+              }
+            ],
+            [
+              {
+                "type": "text",
+                "text": "✓"
+              }
+            ],
+            [
+              {
+                "type": "text",
+                "text": "✓"
+              }
+            ],
+            [
+              {
+                "type": "text",
+                "text": "✗"
+              }
+            ]
+          ],
+          [
+            [
+              {
+                "type": "text",
+                "text": "Issues"
+              }
+            ],
+            [
+              {
+                "type": "text",
+                "text": "✓"
+              }
+            ],
+            [
+              {
+                "type": "text",
+                "text": "✗"
+              }
+            ],
+            [
+              {
+                "type": "text",
+                "text": "✓"
+              }
+            ]
+          ],
+          [
+            [
+              {
+                "type": "text",
+                "text": "Offline"
+              }
+            ],
+            [
+              {
+                "type": "text",
+                "text": "◐"
+              }
+            ],
+            [
+              {
+                "type": "text",
+                "text": "✗"
+              }
+            ],
+            [
+              {
+                "type": "text",
+                "text": "✗"
+              }
+            ]
+          ]
+        ],
+        "id": null
+      }
+    ]
+  },
+  "diagnostics": []
+}

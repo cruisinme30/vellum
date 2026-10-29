@@ -185,17 +185,23 @@ export class LocalStore implements ReadTx {
       });
       this.#reject(pushed.rejected);
     }
-    const pull = await this.#options.transport.pull(this.#clientId, this.#cursor);
-    this.#pending = this.#pending.filter((mutation) => mutation.id > pull.lastMutationId);
-    this.#cursor = pull.cursor;
-    const touched = this.#view.rebase(pull.patches, pull.reset, this.#pending);
-    this.#persist(() => commitPull(this.#options.database, pull, pull.lastMutationId));
-    this.#notify(touched);
+    let pulled = 0;
+    let more = true;
+    while (more) {
+      const pull = await this.#options.transport.pull(this.#clientId, this.#cursor);
+      this.#pending = this.#pending.filter((mutation) => mutation.id > pull.lastMutationId);
+      this.#cursor = pull.cursor;
+      const touched = this.#view.rebase(pull.patches, pull.reset, this.#pending);
+      this.#persist(() => commitPull(this.#options.database, pull, pull.lastMutationId));
+      this.#notify(touched);
+      pulled += pull.patches.length;
+      more = pull.more === true;
+    }
     telemetry().histogram("vellum.client.sync.round_trip_ms", performance.now() - started, {
       pushed: batch.length,
     });
     await this.flushed();
-    return { pushed: batch.length, pulled: pull.patches.length, pending: this.#pending.length };
+    return { pushed: batch.length, pulled, pending: this.#pending.length };
   }
 
   #reject(rejected: readonly RejectedMutation[]): void {

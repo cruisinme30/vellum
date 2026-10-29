@@ -1,0 +1,25 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Line one"
+          },
+          {
+            "type": "hard_break"
+          },
+          {
+            "type": "text",
+            "text": "Line two"
+          }
+        ],
+        "id": null
+      }
+    ]
+  },
+  "diagnostics": []
+}

@@ -14,6 +14,9 @@ repository = "https://github.com/cruisinme30/vellum"
 publish = false
 
 [workspace.dependencies]
+vellum-contracts = { path = "crates/vellum-contracts" }
+vellum-db = { path = "crates/vellum-db" }
+vellum-help = { path = "crates/vellum-help" }
 vellum-kernel = { path = "crates/vellum-kernel" }
 
 # The lint baseline from the engineering standards. CI runs with

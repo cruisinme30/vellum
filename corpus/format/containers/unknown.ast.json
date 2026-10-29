@@ -1,0 +1,39 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "container",
+        "name": "sparkle",
+        "arg": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null,
+        "sections": [
+          [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Unknown containers show their content as ordinary blocks."
+                }
+              ],
+              "id": null
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "diagnostics": [
+    {
+      "line": 1,
+      "code": "unknown_container",
+      "message": "`::: sparkle` is not a Vellum container; its content is shown as is"
+    }
+  ]
+}

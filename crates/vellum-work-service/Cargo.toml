@@ -1,0 +1,38 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+[package]
+name = "vellum-work-service"
+description = "The Work service: every issue tracking and comment operation, served through the gateway as REST, OpenAPI and GraphQL."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[package.metadata.vellum]
+layer = "service"
+
+[lints]
+workspace = true
+
+[dependencies]
+bytes = "1.12.1"
+futures = "0.3.34"
+schemars = "1.2.3"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+time = { version = "0.3.55", features = ["formatting", "parsing", "macros"] }
+tokio = { version = "1.49.0", features = ["sync", "time"] }
+tracing = "0.1.44"
+vellum-contracts = { path = "../vellum-contracts" }
+vellum-kernel.workspace = true
+vellum-render = { path = "../vellum-render" }
+vellum-store = { path = "../vellum-store" }
+vellum-work = { path = "../vellum-work" }
+
+[dev-dependencies]
+vellum-format = { path = "../vellum-format" }
+tempfile = "3.27.0"
+tokio = { version = "1.49.0", features = ["macros", "rt-multi-thread"] }

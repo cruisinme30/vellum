@@ -1,0 +1,44 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "fence",
+        "lang": "mermaid",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null,
+        "literal": "flowchart LR\n  A[Request] --> B{Allowed?}\n  B -->|yes| C[Serve]\n  B -->|no| D[Block]\n"
+      },
+      {
+        "type": "fence",
+        "lang": "d2",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null,
+        "literal": "gateway -> engine: evaluate\n"
+      },
+      {
+        "type": "fence",
+        "lang": "plantuml",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null,
+        "literal": "@startuml\nAlice -> Bob: hello\n@enduml\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}

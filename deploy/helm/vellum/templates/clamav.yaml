@@ -1,0 +1,133 @@
+{{/*
+SPDX-FileCopyrightText: 2026 The Vellum contributors
+SPDX-License-Identifier: AGPL-3.0-only
+
+ClamAV scans every upload over INSTREAM (#298). clamd and freshclam share
+a signature volume: an init container seeds it from the signatures baked
+into the image, so clamd starts even before the first update succeeds.
+*/}}
+{{- if .Values.clamav.enabled }}
+{{- $fullname := include "vellum.fullname" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $fullname }}-clamav
+  labels:
+    {{- include "vellum.labels" . | nindent 4 }}
+    {{- include "vellum.clamavSelector" . | nindent 4 }}
+data:
+  clamd.conf: |
+    {{- .Files.Get "files/clamd.conf" | nindent 4 }}
+  freshclam.conf: |
+    {{- .Files.Get "files/freshclam.conf" | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}-clamav
+  labels:
+    {{- include "vellum.labels" . | nindent 4 }}
+    {{- include "vellum.clamavSelector" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.clamav.replicaCount }}
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      {{- include "vellum.clamavSelector" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "vellum.labels" . | nindent 8 }}
+        {{- include "vellum.clamavSelector" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ printf "%s%s" (.Files.Get "files/clamd.conf") (.Files.Get "files/freshclam.conf") | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  {{- include "vellum.clamavSelector" . | nindent 18 }}
+      initContainers:
+        - name: seed
+          image: {{ include "vellum.image" (dict "image" .Values.clamav.image "default" "") }}
+          imagePullPolicy: Always
+          command: ["cp", "-R", "/var/lib/clamav/.", "/db/"]
+          resources:
+            {{- toYaml .Values.clamav.updaterResources | nindent 12 }}
+          securityContext:
+            {{- include "vellum.containerSecurity" . | nindent 12 }}
+          volumeMounts:
+            - { name: db, mountPath: /db }
+      containers:
+        - name: clamd
+          image: {{ include "vellum.image" (dict "image" .Values.clamav.image "default" "") }}
+          imagePullPolicy: Always
+          command: ["clamd", "--config-file=/etc/vellum/clamd.conf"]
+          ports:
+            - { name: clamd, containerPort: 3310, protocol: TCP }
+          # Loading the signatures takes up to a few minutes.
+          startupProbe:
+            tcpSocket: { port: clamd }
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "echo PING | nc 127.0.0.1 3310 | grep -q PONG"]
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 4
+          readinessProbe:
+            tcpSocket: { port: clamd }
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.clamav.resources | nindent 12 }}
+          securityContext:
+            {{- include "vellum.containerSecurity" . | nindent 12 }}
+          volumeMounts:
+            - { name: db, mountPath: /var/lib/clamav }
+            - { name: config, mountPath: /etc/vellum, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+        - name: freshclam
+          image: {{ include "vellum.image" (dict "image" .Values.clamav.image "default" "") }}
+          imagePullPolicy: Always
+          command: ["freshclam", "--config-file=/etc/vellum/freshclam.conf", "--stdout", "--daemon"]
+          resources:
+            {{- toYaml .Values.clamav.updaterResources | nindent 12 }}
+          securityContext:
+            {{- include "vellum.containerSecurity" . | nindent 12 }}
+          volumeMounts:
+            - { name: db, mountPath: /var/lib/clamav }
+            - { name: config, mountPath: /etc/vellum, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: db
+          emptyDir: { sizeLimit: 1Gi }
+        - name: tmp
+          emptyDir: { sizeLimit: 1Gi }
+        - name: config
+          configMap:
+            name: {{ $fullname }}-clamav
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}-clamav
+  labels:
+    {{- include "vellum.labels" . | nindent 4 }}
+    {{- include "vellum.clamavSelector" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "vellum.clamavSelector" . | nindent 4 }}
+  ports:
+    - { name: clamd, port: 3310, targetPort: clamd, protocol: TCP }
+{{- end }}

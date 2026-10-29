@@ -1,0 +1,190 @@
+{
+  "document": {
+    "front_matter": {
+      "fields": {
+        "id": "01JB9J8K0M2N4P6Q8R0S2T4V6W",
+        "title": "Buyers compare on audit, not price",
+        "status": "verified",
+        "owner": "maya",
+        "tags": [
+          "pricing",
+          "research"
+        ],
+        "vellum": 1
+      }
+    },
+    "blocks": [
+      {
+        "type": "container",
+        "name": "facts",
+        "arg": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null,
+        "sections": [
+          [
+            {
+              "type": "list",
+              "start": null,
+              "tight": true,
+              "items": [
+                {
+                  "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Interviews: 7 of 9"
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                },
+                {
+                  "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Confidence: high"
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                },
+                {
+                  "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Segment: regulated enterprises"
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        ]
+      },
+      {
+        "type": "block_quote",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "We only shortlisted gateways that could show us every blocked"
+              },
+              {
+                "type": "soft_break"
+              },
+              {
+                "type": "text",
+                "text": "request for a year."
+              }
+            ],
+            "id": null
+          }
+        ],
+        "id": null
+      },
+      {
+        "type": "heading",
+        "level": 2,
+        "content": [
+          {
+            "type": "text",
+            "text": "Evidence"
+          }
+        ],
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null
+      },
+      {
+        "type": "list",
+        "start": null,
+        "tight": true,
+        "items": [
+          {
+            "task": null,
+            "attrs": {
+              "id": null,
+              "classes": [],
+              "pairs": []
+            },
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "wiki_link",
+                    "target": "Interview 03: bank, platform team",
+                    "label": null
+                  }
+                ],
+                "id": null
+              }
+            ]
+          },
+          {
+            "task": null,
+            "attrs": {
+              "id": null,
+              "classes": [],
+              "pairs": []
+            },
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "wiki_link",
+                    "target": "Interview 07: insurer, security team",
+                    "label": null
+                  }
+                ],
+                "id": null
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "diagnostics": []
+}

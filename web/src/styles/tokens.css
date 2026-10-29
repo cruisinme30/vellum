@@ -1,0 +1,200 @@
+/*
+ * SPDX-FileCopyrightText: 2026 The Vellum contributors
+ * SPDX-License-Identifier: AGPL-3.0-only
+ *
+ * Material 3 tokens. The light theme below is the first paint; the theme
+ * code then writes every --md-* property for the chosen theme and seed.
+ */
+:root {
+  --md-primary: #4f5b92;
+  --md-on-primary: #ffffff;
+  --md-primary-container: #dde1ff;
+  --md-on-primary-container: #07164b;
+  --md-secondary-container: #e0e1f9;
+  --md-on-secondary-container: #191a2c;
+  --md-surface: #f7f8fc;
+  --md-surface-container-lowest: #ffffff;
+  --md-surface-container-low: #f3f4fa;
+  --md-surface-container: #f0f2f9;
+  --md-surface-container-high: #e6e8ee;
+  --md-surface-container-highest: #e2e2e9;
+  --md-on-surface: #1d1b20;
+  --md-on-surface-variant: #46464f;
+  --md-outline: #767680;
+  --md-outline-variant: #c5c6d0;
+  --md-inverse-surface: #2f3036;
+  --md-inverse-on-surface: #f1f0f7;
+  --md-error: #ba1a1a;
+  --md-on-error: #ffffff;
+  --md-scrim: #000000;
+
+  --vl-font: "Roboto", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --vl-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  --vl-radius-s: 8px;
+  --vl-radius-m: 16px;
+  --vl-radius-l: 28px;
+  --vl-space: 8px;
+  --vl-row: 36px;
+  --vl-motion: 200ms cubic-bezier(0.2, 0, 0, 1);
+
+  color-scheme: light;
+  font-family: var(--vl-font);
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--md-on-surface);
+  background: var(--md-surface);
+}
+
+:root[data-density="compact"] {
+  --vl-space: 6px;
+  --vl-row: 30px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --vl-motion: 0ms linear;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+  /* Long words, URLs and unspaced scripts wrap instead of widening the page. */
+  overflow-wrap: anywhere;
+}
+
+/* Flex and grid children may shrink below their content's width. */
+:where(#root) :where(*) {
+  min-width: 0;
+}
+
+:focus-visible {
+  outline: 3px solid var(--md-primary);
+  outline-offset: 2px;
+}
+
+a {
+  color: var(--md-primary);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.vl-muted {
+  color: var(--md-on-surface-variant);
+}
+
+.vl-icon {
+  display: block;
+  flex: none;
+  fill: currentcolor;
+}
+
+.vl-icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+}
+
+.vl-icon-button:hover,
+.vl-text-button:hover {
+  background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+}
+
+.vl-icon-button[aria-pressed="true"] {
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+.vl-text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 40px;
+  padding: 0 16px 0 12px;
+  border: 0;
+  border-radius: 20px;
+  background: transparent;
+  color: var(--md-primary);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.vl-text-button:disabled {
+  color: color-mix(in srgb, var(--md-on-surface) 38%, transparent);
+  cursor: default;
+}
+
+.vl-link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--md-primary);
+  text-align: start;
+  cursor: pointer;
+}
+
+.vl-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: var(--vl-radius-s);
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+  font-size: 0.875em;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.vl-inline-input {
+  min-width: 0;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: var(--vl-radius-s);
+  background: transparent;
+}
+
+.vl-inline-input:hover,
+.vl-inline-input:focus {
+  border-color: var(--md-outline);
+}
+
+.vl-field {
+  display: grid;
+  gap: 2px;
+  font-size: 0.875rem;
+  color: var(--md-on-surface-variant);
+}
+
+.vl-field input,
+.vl-search input {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--md-outline);
+  border-radius: var(--vl-radius-s);
+  background: var(--md-surface-container-lowest);
+  color: var(--md-on-surface);
+}

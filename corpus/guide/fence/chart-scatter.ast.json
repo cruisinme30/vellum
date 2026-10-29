@@ -1,0 +1,20 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "fence",
+        "lang": "chart",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null,
+        "literal": "title: Latency against payload size\ntype: scatter\nx: Payload (KB)\ny: Latency (ms)\nGateway: [[2, 21], [8, 30], [16, 38], [32, 61]]\nLegacy proxy: [[2, 35], [8, 52], [16, 70], [32, 118]]\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}

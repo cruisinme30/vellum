@@ -1,0 +1,26 @@
+{
+  "document": {
+    "front_matter": {
+      "raw": "title: [unclosed\n"
+    },
+    "blocks": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "The page still renders when its front matter is broken."
+          }
+        ],
+        "id": null
+      }
+    ]
+  },
+  "diagnostics": [
+    {
+      "line": 2,
+      "code": "front_matter_yaml",
+      "message": "front matter is not valid YAML: unclosed bracket '[' at line 1, column 8"
+    }
+  ]
+}

@@ -86,8 +86,12 @@ fn world() -> impl Strategy<Value = World> {
                 3 => (1..=USERS).prop_map(|u| Subject::User(Id(u))),
                 1 => (0..GROUPS).prop_map(|g| Subject::Group(Id(50 + g))),
             ],
+            prop::option::weighted(0.25, 0_i64..2_500),
         )
-            .prop_map(|(g, s)| Tuple::member(Id(50 + g), s));
+            .prop_map(|(g, s, e)| Tuple {
+                expires_at: e,
+                ..Tuple::member(Id(50 + g), s)
+            });
         (
             Just(parents),
             prop::collection::vec(role, 0..16),
@@ -115,19 +119,48 @@ fn principals() -> Vec<Principal> {
     out
 }
 
-/// The rules written as a walk up the tree, independent of the
-/// top-down materialisation.
-fn reference(g: &SpaceGraph, dir: &Directory, p: Principal, node: Id) -> Option<Relation> {
+/// Whether `p` is in `group` at time `t`, by plain reachability over the
+/// memberships live at `t` (independent of `Directory`).
+fn in_group(members: &[Tuple], group: Id, p: Principal, t: i64) -> bool {
+    let mut seen = vec![group];
+    let mut stack = vec![group];
+    while let Some(g) = stack.pop() {
+        for m in members
+            .iter()
+            .filter(|m| m.object == Object::Group(g) && m.is_live(t))
+        {
+            match m.subject {
+                Subject::Group(inner) if !seen.contains(&inner) => {
+                    seen.push(inner);
+                    stack.push(inner);
+                }
+                other if other.principal() == Some(p) => return true,
+                _ => {}
+            }
+        }
+    }
+    false
+}
+
+/// The rules written as a walk up the tree at one instant, independent of
+/// the top-down, time-ranged materialisation.
+fn reference(
+    g: &SpaceGraph,
+    members: &[Tuple],
+    p: Principal,
+    node: Id,
+    t: i64,
+) -> Option<Relation> {
     let grant_on = |object: Object| -> Option<Relation> {
         g.tuples
             .iter()
-            .filter(|t| t.object == object && t.is_live(NOW))
-            .filter_map(|t| match t.relation {
-                TupleRelation::Role(r) => Some((t.subject, r)),
+            .filter(|tu| tu.object == object && tu.is_live(t))
+            .filter_map(|tu| match tu.relation {
+                TupleRelation::Role(r) => Some((tu.subject, r)),
                 _ => None,
             })
             .filter(|(s, _)| match s {
-                Subject::Group(id) => dir.expand(*id).contains(&p),
+                Subject::Group(id) => in_group(members, *id, p, t),
                 other => other.principal() == Some(p),
             })
             .map(|(_, r)| r)
@@ -136,7 +169,7 @@ fn reference(g: &SpaceGraph, dir: &Directory, p: Principal, node: Id) -> Option<
     let restricted = |n: Id| {
         g.tuples
             .iter()
-            .any(|t| t.object == Object::Node(n) && t.relation == TupleRelation::Restricted)
+            .any(|tu| tu.object == Object::Node(n) && tu.relation == TupleRelation::Restricted)
     };
     let mut local = None;
     let mut cur = node;
@@ -145,7 +178,7 @@ fn reference(g: &SpaceGraph, dir: &Directory, p: Principal, node: Id) -> Option<
         let parent = g.parents.get(&cur).copied().flatten();
         if restricted(cur) {
             let above = match parent {
-                Some(par) => reference(g, dir, p, par),
+                Some(par) => reference(g, members, p, par, t),
                 None => grant_on(Object::Space(SPACE)),
             };
             return match above {
@@ -166,7 +199,10 @@ fn access_of(w: &World) -> BTreeMap<(Principal, Id), Relation> {
     let m = materialise(&w.graph, &dir, NOW).unwrap();
     m.nodes
         .iter()
-        .flat_map(|(n, a)| a.iter().map(move |(p, r)| ((*p, *n), *r)))
+        .flat_map(|(n, a)| {
+            a.iter()
+                .filter_map(move |(p, l)| Some(((*p, *n), l.at(NOW)?)))
+        })
         .collect()
 }
 
@@ -177,13 +213,17 @@ proptest! {
     fn materialise_matches_reference(w in world()) {
         let dir = Directory::new(&w.members, NOW);
         let m = materialise(&w.graph, &dir, NOW).unwrap();
-        for p in principals() {
-            for &node in w.graph.parents.keys() {
-                prop_assert_eq!(
-                    m.nodes[&node].get(&p).copied(),
-                    reference(&w.graph, &dir, p, node),
-                    "principal {:?} node {}", p, node
-                );
+        // Rows computed once at NOW must stay exact as grants and
+        // memberships expire later, with no sweep in between.
+        for t in [NOW, 1_200, 1_700, 2_100, 3_000] {
+            for p in principals() {
+                for &node in w.graph.parents.keys() {
+                    prop_assert_eq!(
+                        m.nodes[&node].get(&p).and_then(|l| l.at(t)),
+                        reference(&w.graph, &w.members, p, node, t),
+                        "principal {:?} node {} at {}", p, node, t
+                    );
+                }
             }
         }
     }
@@ -236,12 +276,12 @@ proptest! {
             let explicit = moved.graph.tuples.iter()
                 .filter(|t| t.object == Object::Node(node) && t.is_live(NOW))
                 .filter_map(|t| match (t.relation, t.subject) {
-                    (TupleRelation::Role(r), Subject::Group(g)) => dir.expand(g).contains(&p).then_some(r),
+                    (TupleRelation::Role(r), Subject::Group(g)) => in_group(&moved.members, g, p, NOW).then_some(r),
                     (TupleRelation::Role(r), s) => (s.principal() == Some(p)).then_some(r),
                     _ => None,
                 })
                 .max();
-            prop_assert_eq!(m.nodes[&node].get(&p).copied(), explicit);
+            prop_assert_eq!(m.nodes[&node].get(&p).and_then(|l| l.at(NOW)), explicit);
         }
     }
 }
@@ -258,11 +298,7 @@ proptest! {
             let store = MemoryStore::new();
             store.set_tree(SPACE, w.graph.parents.clone()).unwrap();
             let authz = Authz::with_clock(store, std::sync::Arc::new(|| NOW));
-            for m in &w.members {
-                if let (Object::Group(g), s) = (m.object, m.subject) {
-                    authz.update_group(g, &[s], &[]).await.unwrap();
-                }
-            }
+            vellum_authz::AuthzStore::write_directory(authz.store(), w.members.clone(), vec![]).await.unwrap();
             let live: Vec<Tuple> = w.graph.tuples.iter().copied().filter(|t| t.is_live(NOW)).collect();
             for (i, t) in live.iter().enumerate() {
                 let change = match t.relation {
@@ -282,25 +318,15 @@ proptest! {
                     let _ = authz.write(SPACE, Actor::System, &[Change::Revoke { object: old.object, relation: r, subject: old.subject }]).await.unwrap();
                 }
             }
-            let mut incremental = BTreeMap::new();
-            for p in principals() {
-                for (o, r) in authz.store().list_for_test(SPACE, p).await {
-                    let _ = incremental.insert((p, o), r);
-                }
-            }
+            let incremental = snapshot(authz.store()).await;
             let _ = authz.rebuild(SPACE).await.unwrap();
-            let mut rebuilt = BTreeMap::new();
-            for p in principals() {
-                for (o, r) in authz.store().list_for_test(SPACE, p).await {
-                    let _ = rebuilt.insert((p, o), r);
-                }
-            }
+            let rebuilt = snapshot(authz.store()).await;
             prop_assert_eq!(&incremental, &rebuilt);
             // And checks agree with the rows.
             for p in principals() {
                 for &n in w.graph.parents.keys() {
                     let d = authz.check(SPACE, p, n, Permission::Read).await.unwrap();
-                    prop_assert_eq!(d.relation, rebuilt.get(&(p, n)).copied());
+                    prop_assert_eq!(d.relation, rebuilt.get(&(NOW, p, n)).copied());
                 }
             }
             Ok(())
@@ -308,14 +334,20 @@ proptest! {
     }
 }
 
-trait ListForTest {
-    async fn list_for_test(&self, space: Id, p: Principal) -> Vec<(Id, Relation)>;
-}
-
-impl ListForTest for MemoryStore {
-    async fn list_for_test(&self, space: Id, p: Principal) -> Vec<(Id, Relation)> {
-        vellum_authz::AuthzStore::list(self, space, p)
-            .await
-            .unwrap()
+/// The strongest live relation per (time, principal, object), read back
+/// through the store at a few instants.
+async fn snapshot(store: &MemoryStore) -> BTreeMap<(i64, Principal, Id), Relation> {
+    let mut out = BTreeMap::new();
+    for t in [NOW, 1_700, 2_100] {
+        for p in principals() {
+            for (o, r) in vellum_authz::AuthzStore::list(store, SPACE, p, t)
+                .await
+                .unwrap()
+            {
+                let slot = out.entry((t, p, o)).or_insert(r);
+                *slot = (*slot).max(r);
+            }
+        }
     }
+    out
 }

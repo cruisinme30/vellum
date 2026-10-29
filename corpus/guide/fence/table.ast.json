@@ -1,0 +1,20 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "fence",
+        "lang": "table",
+        "args": "sortable bar=Share sum=Value",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null,
+        "literal": "Name, Value, Share\nAlpha, 120, 40\nBeta, 90, 30\nGamma, 90, 30\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}

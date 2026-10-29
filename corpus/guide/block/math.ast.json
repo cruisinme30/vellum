@@ -1,0 +1,13 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "math",
+        "literal": "F_1 = \\frac{2PR}{P+R}\n",
+        "id": null
+      }
+    ]
+  },
+  "diagnostics": []
+}

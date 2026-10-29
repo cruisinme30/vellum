@@ -1,0 +1,20 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "fence",
+        "lang": "mermaid",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null,
+        "literal": "mindmap\n  root((Vellum 1.0))\n    Write\n      Pages\n      Books\n      Diagrams\n    Organise\n      Drive\n      Collections\n    Plan\n      Issues\n      Cycles\n      My Work\n    Connect\n      MCP\n      API\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}

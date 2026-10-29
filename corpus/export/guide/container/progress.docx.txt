@@ -1,0 +1,3 @@
+[Normal] Replay engine — 100%
+[Normal] Diff report — 70%
+[Normal] PDF report — 15%

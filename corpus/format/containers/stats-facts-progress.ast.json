@@ -1,0 +1,218 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "container",
+        "name": "stats",
+        "arg": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null,
+        "sections": [
+          [
+            {
+              "type": "list",
+              "start": null,
+              "tight": true,
+              "items": [
+                {
+                  "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "94% · Injections caught · ▲ 6 pts"
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                },
+                {
+                  "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "38 ms · p95 latency · ▼ 12 ms"
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        ]
+      },
+      {
+        "type": "container",
+        "name": "facts",
+        "arg": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null,
+        "sections": [
+          [
+            {
+              "type": "list",
+              "start": null,
+              "tight": true,
+              "items": [
+                {
+                  "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Owner: Priya S."
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                },
+                {
+                  "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Status: In review"
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                },
+                {
+                  "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Target: "
+                        },
+                        {
+                          "type": "date",
+                          "date": "2026-11-24"
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        ]
+      },
+      {
+        "type": "container",
+        "name": "progress",
+        "arg": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null,
+        "sections": [
+          [
+            {
+              "type": "list",
+              "start": null,
+              "tight": true,
+              "items": [
+                {
+                  "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Replay engine · 100%"
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                },
+                {
+                  "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Diff report · 70%"
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "diagnostics": []
+}

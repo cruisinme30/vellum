@@ -1,0 +1,43 @@
+{{/*
+SPDX-FileCopyrightText: 2026 The Vellum contributors
+SPDX-License-Identifier: AGPL-3.0-only
+*/}}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "vellum.fullname" . }}
+  labels:
+    {{- include "vellum.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "vellum.selector" . | nindent 6 }}
+{{- if .Values.kroki.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "vellum.fullname" . }}-kroki
+  labels:
+    {{- include "vellum.labels" . | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      {{- include "vellum.krokiSelector" . | nindent 6 }}
+{{- end }}
+{{- if .Values.clamav.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "vellum.fullname" . }}-clamav
+  labels:
+    {{- include "vellum.labels" . | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      {{- include "vellum.clamavSelector" . | nindent 6 }}
+{{- end }}

@@ -1,0 +1,71 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "container",
+        "name": "info",
+        "arg": "",
+        "attrs": {
+          "id": "gateway",
+          "classes": [
+            "wide"
+          ],
+          "pairs": [
+            [
+              "owner",
+              "Priya S."
+            ]
+          ]
+        },
+        "id": null,
+        "sections": [
+          [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Attributes go on the opening line."
+                }
+              ],
+              "id": null
+            }
+          ]
+        ]
+      },
+      {
+        "type": "container",
+        "name": "",
+        "arg": "",
+        "attrs": {
+          "id": "anonymous",
+          "classes": [],
+          "pairs": []
+        },
+        "id": null,
+        "sections": [
+          [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "A container with only attributes."
+                }
+              ],
+              "id": null
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "diagnostics": [
+    {
+      "line": 7,
+      "code": "unknown_container",
+      "message": "`::: ` is not a Vellum container; its content is shown as is"
+    }
+  ]
+}

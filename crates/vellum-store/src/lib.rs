@@ -10,12 +10,16 @@
 //! is refused instead of silently overwriting newer content.
 
 mod error;
+#[cfg(feature = "git")]
+pub mod git;
 pub mod layout;
 mod local;
 mod merge;
 pub mod metered;
 mod path;
 mod reconcile;
+#[cfg(feature = "remote")]
+pub mod remote;
 mod store;
 pub mod watch;
 

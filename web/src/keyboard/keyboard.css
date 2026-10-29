@@ -1,0 +1,82 @@
+/* SPDX-FileCopyrightText: 2026 The Vellum contributors */
+/* SPDX-License-Identifier: AGPL-3.0-only */
+
+/* The ⌘K menu and the shortcut sheet float over the page. Colours follow
+   the system theme until the app shell's design tokens land. */
+
+.command-menu,
+.shortcut-sheet {
+  position: fixed;
+  inset: 12vh auto auto 50%;
+  transform: translateX(-50%);
+  width: min(36rem, calc(100vw - 2rem));
+  max-height: 70vh;
+  overflow: auto;
+  padding: 0.5rem;
+  border: 1px solid CanvasText;
+  border-radius: 0.75rem;
+  background: Canvas;
+  color: CanvasText;
+  box-shadow: 0 1rem 3rem rgb(0 0 0 / 30%);
+  z-index: 1000;
+}
+
+.command-menu input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.75rem;
+  font: inherit;
+  font-size: 1.05rem;
+}
+
+.command-menu [role="option"] {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+}
+
+/* The selected command uses the theme's selected-item colours: WebKit's
+   system Highlight with white text is only 3.8:1. Forced-colours mode keeps
+   the system pair. */
+.command-menu [role="option"][aria-selected="true"] {
+  background: var(--md-secondary-container, Highlight);
+  color: var(--md-on-secondary-container, HighlightText);
+}
+
+@media (forced-colors: active) {
+  .command-menu [role="option"][aria-selected="true"] {
+    background: Highlight;
+    color: HighlightText;
+  }
+}
+
+.command-menu kbd,
+.shortcut-sheet kbd {
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.shortcut-sheet table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.shortcut-sheet td {
+  padding: 0.25rem 0.5rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .command-menu,
+  .shortcut-sheet {
+    animation: keyboard-pop 80ms ease-out;
+  }
+}
+
+@keyframes keyboard-pop {
+  from {
+    opacity: 0;
+  }
+}

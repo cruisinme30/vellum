@@ -134,12 +134,22 @@ impl BlobStore for LocalStore {
 
     fn list(&self, dir: Option<&BlobPath>) -> BoxStream<'static, StoreResult<BlobEntry>> {
         let root = Arc::clone(&self.0);
-        let start = dir.map_or_else(|| root.dir.clone(), |d| root.dir.join(d.as_str()));
-        let span = tracing::info_span!("list", backend = "local", dir = ?dir.map(BlobPath::as_str));
+        let dir = dir.cloned();
+        let span = tracing::info_span!("list", backend = "local", dir = ?dir.as_ref().map(BlobPath::as_str));
         futures::stream::once(async move {
             let (tx, rx) = tokio::sync::mpsc::channel(256);
             drop(tokio::task::spawn_blocking(move || {
-                span.in_scope(|| walk(&root.dir, &start, &tx));
+                span.in_scope(|| {
+                    // Resolve like a read, so a symlinked parent folder
+                    // cannot make the walk start outside the root (#272).
+                    match dir
+                        .as_ref()
+                        .map_or_else(|| Ok(root.dir.clone()), |d| root.resolve(d))
+                    {
+                        Ok(start) => walk(&root.dir, &start, &tx),
+                        Err(e) => drop(tx.blocking_send(Err(e))),
+                    }
+                });
             }));
             futures::stream::unfold(rx, |mut rx| async { rx.recv().await.map(|i| (i, rx)) })
         })
@@ -273,7 +283,13 @@ fn walk(root: &Path, start: &Path, tx: &Sender) {
             Err(e) if e.kind() == ErrorKind::NotFound => continue,
             Err(e) => return drop(tx.blocking_send(Err(io(&next, e)))),
         };
-        if meta.is_dir() {
+        let git_dir = next
+            .file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(crate::path::is_git_dir);
+        if meta.is_dir() && git_dir {
+            // A repository's own directory is never content (#272).
+        } else if meta.is_dir() {
             match fs::read_dir(&next) {
                 Ok(entries) => stack.extend(entries.filter_map(Result::ok).map(|e| e.path())),
                 Err(e) => return drop(tx.blocking_send(Err(io(&next, e)))),

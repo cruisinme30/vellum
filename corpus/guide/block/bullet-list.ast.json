@@ -1,0 +1,109 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "list",
+        "start": null,
+        "tight": true,
+        "items": [
+          {
+            "task": null,
+            "attrs": {
+              "id": null,
+              "classes": [],
+              "pairs": []
+            },
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Bullet"
+                  }
+                ],
+                "id": null
+              }
+            ]
+          },
+          {
+            "task": null,
+            "attrs": {
+              "id": null,
+              "classes": [],
+              "pairs": []
+            },
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Another"
+                  }
+                ],
+                "id": null
+              },
+              {
+                "type": "list",
+                "start": null,
+                "tight": true,
+                "items": [
+                  {
+                    "task": null,
+                    "attrs": {
+                      "id": null,
+                      "classes": [],
+                      "pairs": []
+                    },
+                    "blocks": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "Nested (two spaces)"
+                          }
+                        ],
+                        "id": null
+                      },
+                      {
+                        "type": "list",
+                        "start": null,
+                        "tight": true,
+                        "items": [
+                          {
+                            "task": null,
+                            "attrs": {
+                              "id": null,
+                              "classes": [],
+                              "pairs": []
+                            },
+                            "blocks": [
+                              {
+                                "type": "paragraph",
+                                "content": [
+                                  {
+                                    "type": "text",
+                                    "text": "Deeper"
+                                  }
+                                ],
+                                "id": null
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "diagnostics": []
+}

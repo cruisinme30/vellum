@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+apiVersion: v2
+name: vellum
+description: >-
+  Vellum, the self-hosted workspace where every object is a Markdown file:
+  the Organisation profile with two of everything, a Patroni Postgres
+  replica per shard and shards by space.
+type: application
+version: 0.1.0
+appVersion: "0.0.0"
+kubeVersion: ">=1.29.0-0"
+home: https://github.com/cruisinme30/vellum
+sources:
+  - https://github.com/cruisinme30/vellum
+keywords: [wiki, documents, markdown, issue-tracking]
+maintainers:
+  - name: The Vellum contributors
+    url: https://github.com/cruisinme30/vellum
+annotations:
+  artifacthub.io/license: AGPL-3.0-only

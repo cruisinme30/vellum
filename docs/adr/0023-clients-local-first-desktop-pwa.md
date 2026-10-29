@@ -12,8 +12,9 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D97, D98, D99
-- Requirements: brief §3 (desktop, mobile), §8 (sub-100 ms perceived
-  latency), §11 (E2E private spaces), R-WK-6, R-MW-5, R-LT-4, R-SE-10
+- Issue: #182 (desktop), #185 (PWA); also #91, #184 and #186
+- Pull requests: #34, #139, #263
+- Requirements: R-WK-6, R-MW-5, R-LT-4, R-SE-10
 
 :::
 
@@ -44,11 +45,16 @@ every client must run the same editor build.
   integration off, a strict content security policy and no remote
   content in privileged windows. External links open in the system
   browser. The bridge exposes functions, never `ipcRenderer` itself.
-- Layout (including the phone layout with a bottom bar) belongs to the
-  web shell in `web/src/shell/`; the platform layer never renders
-  navigation.
-- Native iOS and Android shells are release 1.1 per the brief and are out
-  of scope here; they will reuse `web/src/platform/` unchanged.
+- The PWA precaches the app shell with content revisions and serves it
+  cache-first, so it starts offline. APIs, sign-in and MCP always go to
+  the network; records reach the device only through the store (D98),
+  never the HTTP cache. A new deployment offers a reload rather than
+  swapping code under an open editor.
+- Web Push uses VAPID keys held by the notifications service. Permission
+  is asked only from a click; a payload links only to Vellum's origin.
+- Layout, including the phone layout, belongs to `web/src/shell/`.
+  Native iOS and Android shells (release 1.1) will reuse
+  `web/src/platform/` unchanged.
 
 ### D98: the local-first store is push/pull with named mutators
 
@@ -72,20 +78,13 @@ every client must run the same editor build.
   database so a page opens offline and the CRDT merges on reconnect. The
   web app keeps recent pages within a 50 MiB budget, evicting the least
   recently used; the desktop app pins whole spaces.
-- One database per server origin and account, so another person signing
-  in on the same device never sees the previous cache. Sign-out deletes it.
-- Sync timing: 50 ms after a change (one push per burst of typing),
-  every 30 s while idle, at once on reconnect, and with jittered
-  exponential backoff to 60 s on retryable failures. Non-retryable
-  failures (401, 403, malformed responses) stop sync and raise a banner.
-- Perceived latency is measured, not assumed: the client records
-  `vellum.client.mutation.perceived_ms` (mutation to subscribers
-  notified) and `vellum.client.sync.round_trip_ms`, with a request ID and
-  `traceparent` on every sync call so client and server traces join.
-- Rejected alternatives: Replicache, Zero and ElectricSQL each tie the
-  server to a separate service or to Postgres logical replication, which
-  the single binary on SQLite cannot offer. The contract above runs on
-  both index back ends.
+- One database per server origin and account; sign-out deletes it.
+- Sync runs 50 ms after a change, every 30 s while idle and at once on
+  reconnect, with jittered backoff to 60 s. 401, 403 and malformed
+  responses stop sync and raise a banner.
+- The client records `vellum.client.mutation.perceived_ms` and
+  `vellum.client.sync.round_trip_ms`, with `traceparent` on every sync
+  call, so perceived latency is measured, not assumed.
 
 ### D99: desktop sign-in, secrets, signing and private spaces
 
@@ -98,6 +97,10 @@ every client must run the same editor build.
   (`basic_text` back end) the app keeps tokens in memory only and asks
   people to sign in again after a restart, rather than store a token
   that any local process could read.
+- Pages load from the privileged `app://vellum/` scheme, which also
+  forwards `/api/*` to the server and adds the access token in the main
+  process. Local mode runs the bundled `vellum serve` on a loopback port
+  with the `single` profile and waits for `/readyz`.
 - Releases are built with electron-builder. macOS builds are signed and
   notarised when the repository secrets `APPLE_ID`,
   `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`, `CSC_LINK` and
@@ -117,6 +120,15 @@ every client must run the same editor build.
   running, unlocked app, which answers from its local index. Reads only;
   model-made writes to a private space become local drafts for review,
   as everywhere else.
+
+## Alternatives
+
+- **Replicache, Zero or ElectricSQL**: each ties the server to a
+  separate service or to Postgres logical replication, which the single
+  binary on SQLite cannot offer.
+- **A separate desktop UI**: two editors to keep in step.
+- **Sign-in in a web view**: RFC 8252 advises against it, and it exposes
+  passwords to the app.
 
 ## Consequences
 

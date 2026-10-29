@@ -1,0 +1,82 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "list",
+        "start": 1,
+        "tight": true,
+        "items": [
+          {
+            "task": null,
+            "attrs": {
+              "id": null,
+              "classes": [],
+              "pairs": []
+            },
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "First"
+                  }
+                ],
+                "id": null
+              }
+            ]
+          },
+          {
+            "task": null,
+            "attrs": {
+              "id": null,
+              "classes": [],
+              "pairs": []
+            },
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Second"
+                  }
+                ],
+                "id": null
+              },
+              {
+                "type": "list",
+                "start": 1,
+                "tight": true,
+                "items": [
+                  {
+                    "task": null,
+                    "attrs": {
+                      "id": null,
+                      "classes": [],
+                      "pairs": []
+                    },
+                    "blocks": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "Sub-step"
+                          }
+                        ],
+                        "id": null
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "diagnostics": []
+}

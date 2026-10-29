@@ -1,0 +1,256 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "heading",
+        "level": 1,
+        "content": [
+          {
+            "type": "text",
+            "text": "Summary"
+          }
+        ],
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "link",
+            "url": "README.md",
+            "title": "",
+            "content": [
+              {
+                "type": "text",
+                "text": "Introduction"
+              }
+            ]
+          }
+        ],
+        "id": null
+      },
+      {
+        "type": "heading",
+        "level": 1,
+        "content": [
+          {
+            "type": "text",
+            "text": "Part I · Joining"
+          }
+        ],
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null
+      },
+      {
+        "type": "list",
+        "start": null,
+        "tight": true,
+        "items": [
+          {
+            "task": null,
+            "attrs": {
+              "id": null,
+              "classes": [],
+              "pairs": []
+            },
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "link",
+                    "url": "onboarding/README.md",
+                    "title": "",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Onboarding"
+                      }
+                    ]
+                  }
+                ],
+                "id": null
+              },
+              {
+                "type": "list",
+                "start": null,
+                "tight": true,
+                "items": [
+                  {
+                    "task": null,
+                    "attrs": {
+                      "id": null,
+                      "classes": [],
+                      "pairs": []
+                    },
+                    "blocks": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "link",
+                            "url": "onboarding/first-week.md",
+                            "title": "",
+                            "content": [
+                              {
+                                "type": "text",
+                                "text": "Your first week"
+                              }
+                            ]
+                          }
+                        ],
+                        "id": null
+                      }
+                    ]
+                  },
+                  {
+                    "task": null,
+                    "attrs": {
+                      "id": null,
+                      "classes": [],
+                      "pairs": []
+                    },
+                    "blocks": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "link",
+                            "url": "",
+                            "title": "",
+                            "content": [
+                              {
+                                "type": "text",
+                                "text": "Security training"
+                              }
+                            ]
+                          }
+                        ],
+                        "id": null
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "heading",
+        "level": 1,
+        "content": [
+          {
+            "type": "text",
+            "text": "Part II · How it works"
+          }
+        ],
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null
+      },
+      {
+        "type": "list",
+        "start": null,
+        "tight": true,
+        "items": [
+          {
+            "task": null,
+            "attrs": {
+              "id": null,
+              "classes": [],
+              "pairs": []
+            },
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "link",
+                    "url": "architecture/README.md",
+                    "title": "",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Architecture"
+                      }
+                    ]
+                  }
+                ],
+                "id": null
+              },
+              {
+                "type": "list",
+                "start": null,
+                "tight": true,
+                "items": [
+                  {
+                    "task": null,
+                    "attrs": {
+                      "id": null,
+                      "classes": [],
+                      "pairs": []
+                    },
+                    "blocks": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "link",
+                            "url": "architecture/services.md",
+                            "title": "",
+                            "content": [
+                              {
+                                "type": "text",
+                                "text": "Services"
+                              }
+                            ]
+                          }
+                        ],
+                        "id": null
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "thematic_break"
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "link",
+            "url": "glossary.md",
+            "title": "",
+            "content": [
+              {
+                "type": "text",
+                "text": "Glossary"
+              }
+            ]
+          }
+        ],
+        "id": null
+      }
+    ]
+  },
+  "diagnostics": []
+}

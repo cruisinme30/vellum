@@ -35,15 +35,21 @@ gitGraph
    kebab case: `feat/typed-ids`, `fix/watcher-rename`, `docs/adr-0002`.
    CI rejects other names (Dependabot's `dependabot/…` excepted). Open the
    pull request against `develop`.
-2. Merge through the merge queue: `gh pr merge --auto --squash`, or
-   **Merge when ready** on GitHub. The queue tests each pull request on
-   top of the ones ahead of it and merges it once **Fast suite** passes
-   there, so parallel pull requests never race each other into `develop`.
-   If `Cargo.lock` or `web/pnpm-lock.yaml` conflicts, merge `develop` into
-   your branch and run `cargo xtask relock`.
-3. At regular intervals a maintainer opens a pull request from `develop`
-   into `main`. It merges with a merge commit, never a squash, so history
-   stays shared.
+2. Merge with auto-merge: `gh pr merge --auto --squash`, or **Enable
+   auto-merge** on GitHub. The pull request squash-merges itself once
+   **Fast suite** is green. Pull requests are not re-tested on top of each
+   other, so the fast suite also runs on every push to `develop`. When
+   it fails there, the **Repo: develop is red alarm** workflow opens a
+   "develop is red" issue. Whoever merged the breaking change fixes or
+   reverts it, others hold their merges, and the issue closes itself
+   when `develop` is green again. If `Cargo.lock` or `web/pnpm-lock.yaml`
+   conflicts, merge `develop` into your branch and run
+   `cargo xtask relock`.
+3. At regular intervals a maintainer cuts a release branch,
+   `chore/release-YYYY-MM-DD`, from a green `develop` commit and opens a
+   pull request from it into `main`. A frozen snapshot lets the full
+   suite finish while `develop` keeps moving. It merges with a merge
+   commit, never a squash, so history stays shared.
 4. Releases are cut by tagging `main` (`vX.Y.Z`, semver).
 5. An urgent fix branches from `main`, merges into `main` through the full
    suite, then `main` merges back into `develop`.
@@ -52,8 +58,21 @@ gitGraph
 
 | Suite | Runs on | Contents |
 | --- | --- | --- |
-| Fast (`ci.yml`) | every pull request into `develop` or `main`, each merge queue entry, pushes to `develop` | rustfmt, clippy, rustdoc, unit and property tests (nextest), crate boundaries, cargo-deny, cargo-audit; Prettier, tsc, ESLint, knip, Vitest with 85 % coverage, pnpm audit; REUSE, yamllint, shellcheck, markdownlint, Vale, local links, gitleaks, infrastructure linters; Conventional Commits, DCO, branch name and description template |
-| Full (`full.yml`) | every pull request into `main`, pushes to `main`, nightly | the fast suite, plus Rust line coverage of at least 85 %, the release build, Playwright end-to-end with axe accessibility checks, and external link checks |
+| Fast (`ci.yml`) | every pull request into `develop`, pushes to `develop` (only the areas the push changed) | rustfmt, clippy, rustdoc, unit and property tests (nextest), crate boundaries, cargo-deny, cargo-audit; Prettier, tsc, ESLint, knip, Vitest with 85 % coverage, pnpm audit; the UI layout suite in Chromium at phone and laptop size; REUSE, yamllint, shellcheck, markdownlint, Vale, local links, gitleaks, infrastructure linters; Conventional Commits, DCO, branch name and description template; linked issue and decision record |
+| Full (`full.yml`) | release pull requests into `main` only | the fast suite, plus Rust line coverage of at least 85 %, the reproducible release build and image within their budgets, Playwright end-to-end and the full UI suite (Chromium, Firefox and WebKit at four sizes, with visual baselines), and external link checks |
+
+CodeQL (`codeql.yml`) scans release pull requests, pushes to `main` and
+`develop` weekly. The nightly load test, security scan and fuzz runs skip a night when
+`develop` has not changed since the last green night.
+
+No workflow run cancels another: a new push starts its own run and
+older runs finish, so every commit gets a result. Each test runs once
+per event. Inside the full suite, the Rust tests run
+only in the coverage job and the UI tests only in the browser matrix, not
+again in its copy of the fast suite. A release pull request must come
+from a `chore/release-…` branch: one opened straight from `develop` fails
+the **Release source** check, because every merge into `develop` would
+restart the whole suite.
 
 Further layers join the full suite as their code lands: golden corpus,
 integration with testcontainers, contract, performance, chaos, security
@@ -76,10 +95,85 @@ cargo xtask fast
 ```
 
 A check whose tool is not installed is skipped and named in the summary;
-CI still runs it. Install `markdownlint-cli2`, `vale`, `lychee`,
-`gitleaks`, `reuse`, `yamllint` and `shellcheck` to run every check. In
-an emergency, `git push --no-verify` skips the hook, but CI still gates
-the merge.
+CI still runs it. The same goes for tests that need Docker: without a
+Docker daemon, `cargo xtask fast` leaves out the container tests and says
+so, and CI runs them. Local builds skip debug info and incremental
+caches (`CARGO_PROFILE_DEV_DEBUG=0`, `CARGO_INCREMENTAL=0`) so a workspace
+test build fits a small disk; set either variable yourself to override.
+Install `markdownlint-cli2`, `vale`, `lychee`, `gitleaks`, `reuse`,
+`yamllint` and `shellcheck` to run every check. In an emergency,
+`git push --no-verify` skips the hook, but CI still gates the merge.
+
+### Tests that need containers
+
+A test that starts a container through testcontainers is named after the
+engine it starts: its name contains `postgres` or `meilisearch`, for
+example `postgres_round_trips_a_page`. Without Docker, `cargo xtask fast`
+leaves out every test with one of those words in its name, so a new
+container test needs no list change. A test that starts a different
+engine adds that engine's name to `DOCKER_TESTS` in `xtask/src/fast.rs`.
+
+### UI quality suite
+
+`web/e2e/ui/` opens every app view and every website and help book page in
+each display mode (themes, zoom, 200 % text, right-to-left, long text) and
+fails on overlapping or clipped elements, sideways scrolling, missing
+images or fonts, console errors, layout shift, invisible keyboard focus,
+blank loading states and axe WCAG 2.2 AA violations
+([ADR 0031](docs/adr/0031-ui-quality-suite.md)). Add a new view's route to
+`web/e2e/ui/targets.ts`. Run it locally with:
+
+```sh
+scripts/ci/build-site.sh _site
+cd web && UI_SITE_DIR=../_site pnpm exec playwright test e2e/ui
+```
+
+`UI_BROWSERS`, `UI_VIEWPORTS` and `UI_SCOPE` widen or narrow the run.
+`UI_SCOPE=full` (the release check) adds every help page in the default
+mode; `UI_SCOPE=exhaustive` checks every help page in every mode. Visual baselines are refreshed with `scripts/ci/ui-baselines.sh`.
+
+## Workflows
+
+Each workflow name starts with a word that says when it runs, so related
+ones sit together in the Actions tab. The required checks are job names
+(`Fast suite`, `Labels`, `Full suite`, CodeQL) and do not change when a
+workflow is renamed.
+
+| Workflow | File | Runs on |
+| --- | --- | --- |
+| Checks: fast suite | `ci.yml` | pull requests into `develop`, pushes to `develop` |
+| Checks: full suite (release PRs) | `full.yml` | release pull requests into `main` |
+| Checks: labels and tracker | `pr-housekeeping.yml` | every pull request event |
+| PR: auto-merge Dependabot patches | `dependabot-auto-merge.yml` | Dependabot pull requests |
+| Security: CodeQL | `codeql.yml` | release pull requests, pushes to `main`, weekly |
+| Security: weekly Scorecard | `scorecard.yml` | weekly |
+| Scheduled: nightly load, security and fuzz, chaos on Sundays | `nightly.yml` | nightly; skips when `develop` is unchanged |
+| Release: server, desktop and drill | `release.yml` | version tags |
+| Repo: sync labels and project board | `repo-sync.yml` | label file changes, issue changes, every six hours |
+| Repo: develop is red alarm | `develop-health.yml` | after the fast suite runs on `develop` |
+| Website: build and deploy | `site.yml` | website changes, pushes to `main` |
+
+## Issues and decision records
+
+Every change is traceable to the discussion that led to it.
+
+- **One issue per feature or fix.** Open a GitHub issue before starting.
+  Keep the discussion there: the problem, the options, the questions and
+  the answers, so the issue is the feature's full history.
+- **The pull request links it.** Put `Closes #N` (or `Refs #N` when the
+  issue stays open) in the **Issue** section of the description.
+- **A feature records its decisions.** Copy `docs/adr/0000-template.md`
+  to `docs/adr/NNNN-<slug>.md`, ask for the next record and decision
+  numbers, and fill it in. Every record has the same four sections,
+  **Context**, **Decisions**, **Alternatives** and **Consequences**, plus
+  the issue and pull requests in its facts block. Keep it short: under
+  150 lines and at most six bullets in a row; the **Decision records**
+  check enforces both. When a feature only extends an existing decision,
+  update that record or name it as `ADR NNNN` in the description.
+
+The **Issue and decision record** check in the fast suite enforces this.
+Release pull requests, Dependabot, and `chore` or `ci` pull requests are
+exempt.
 
 ## Commits and pull requests
 
@@ -94,9 +188,14 @@ CI enforces every rule in this section on each pull request.
 - **Pull request title**: a Conventional Commits subject, because it
   becomes the squash commit on `develop`.
 - **Pull request description**: the template in
-  `.github/pull_request_template.md`. Summary, Requirements, Changes,
-  Tests, Observability and Security must each be filled in; write "None"
-  with a reason when one does not apply.
+  `.github/pull_request_template.md`, written so a reader with no project
+  context can follow it. **Why** (the problem and who it affects, in
+  plain words), **What changed**, **How to verify**, and **Security and
+  operations** must each be filled in; write "None" with a reason when
+  one does not apply. Never name a decision or record bare: "D67" or
+  "ADR 0013" goes with a few words saying what it decided and a link,
+  for example "chapters use lowercase file names
+  ([D67 in ADR 0013](docs/adr/0013-books.md))". CI checks both.
 - **Developer Certificate of Origin**: sign off every commit with
   `git commit -s`. The sign-off must match the commit author.
 - **Signed commits** (planned): sign with GPG, SSH or S/MIME so GitHub
@@ -109,12 +208,13 @@ CI enforces every rule in this section on each pull request.
 ## Labels
 
 Labels are code: `.github/labels.yml` defines them and the Sync labels
-workflow applies changes when that file lands on `develop`.
+workflow (**Repo: sync labels and project board**) applies changes when
+that file lands on `develop`.
 
 | Group | Labels | Set by |
 | --- | --- | --- |
 | `type/*` | `feat fix docs refactor perf test build ci chore style revert` | the pull request title |
-| `area/*` | `kernel contracts format store crypto db render export authz collab collections pages work my-work api jobs mcp cli editor web ci docs deploy` | changed paths (`.github/labeler.yml`), or by hand |
+| `area/*` | `kernel contracts format store crypto db render export authz collab collections pages work notify my-work api jobs mcp cli sync desktop editor web ci docs deploy` | changed paths (`.github/labeler.yml`), or by hand |
 | `phase/*` | `foundation format editor drive-books collections work mywork-mcp clients-release` | by hand, following the build order |
 | `status/*` | `in-progress blocked ready-to-merge` | by hand |
 | `priority/p0` | every requirement is P0 | by hand |
@@ -129,7 +229,8 @@ check. When a new crate lands, add its path to `.github/labeler.yml`.
 
 Formatted; zero lint warnings; tests at the right layer; tracing spans and
 metrics for any new I/O; public items documented; user guide updated if the
-change is visible; an ADR in `docs/adr/` if a decision was made; reviewed
+change is visible; a linked issue, and for a feature an ADR in
+`docs/adr/` that links it; reviewed
 by someone who did not write it; CI green.
 
 ## Branch protection
@@ -140,9 +241,9 @@ Set these under **Settings → Rules → Rulesets** on GitHub.
 | --- | --- | --- |
 | Require a pull request (0 approvals while there is one maintainer) | yes | yes |
 | Required status checks | `Fast suite` | `Full suite` |
-| Merge queue (squash, groups of up to 5) | yes | no |
-| Require branches to be up to date | no (the merge queue does it) | yes |
+| Auto-merge (squash on `develop`) | yes | no |
+| Require branches to be up to date | no (Develop health catches combinations) | yes |
 | Require signed commits | planned | planned |
 | Require linear history | yes (squash merge) | no (merge commits from `develop`) |
 | Block force pushes and deletion | yes | yes |
-| Restrict who can push | — | maintainers only, and only from `develop` or a hotfix |
+| Restrict who can push | — | maintainers only, and only from a release branch or a hotfix |

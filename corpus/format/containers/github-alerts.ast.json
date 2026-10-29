@@ -1,0 +1,66 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "container",
+        "name": "note",
+        "arg": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null,
+        "sections": [
+          [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "GitHub-style callouts are accepted."
+                }
+              ],
+              "id": null
+            }
+          ]
+        ]
+      },
+      {
+        "type": "container",
+        "name": "warn",
+        "arg": "Read this first",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null,
+        "sections": [
+          [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "They become "
+                },
+                {
+                  "type": "code",
+                  "code": ":::"
+                },
+                {
+                  "type": "text",
+                  "text": " containers."
+                }
+              ],
+              "id": null
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "diagnostics": []
+}

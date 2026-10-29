@@ -1,0 +1,33 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "fence",
+        "lang": "rust",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": [
+            [
+              "title",
+              "limits.rs"
+            ],
+            [
+              "lines",
+              "1"
+            ],
+            [
+              "hl",
+              "3-4"
+            ]
+          ]
+        },
+        "id": null,
+        "literal": "pub fn allowed(rate: u32, burst: u32) -> bool {\n    let budget = rate.saturating_mul(2);\n    let used = burst;\n    used <= budget\n}\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}

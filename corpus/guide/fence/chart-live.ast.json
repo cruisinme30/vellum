@@ -1,0 +1,37 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "fence",
+        "lang": "chart",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": [
+            [
+              "source",
+              "collection:01JB4Q8ZK2W6T9R3M5N7P1X0YC"
+            ],
+            [
+              "x",
+              "Target"
+            ],
+            [
+              "y",
+              "Estimate"
+            ],
+            [
+              "agg",
+              "sum"
+            ]
+          ]
+        },
+        "id": null,
+        "literal": "title: Points due per week\ntype: bar\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}

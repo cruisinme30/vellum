@@ -1,0 +1,171 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# The Team rung of the deployment ladder (ADR 0022, D94): Vellum with
+# Postgres, MinIO for blobs, Kroki for diagrams and ClamAV for uploads.
+#
+#   cp deploy/compose/.env.example deploy/compose/.env   # then edit it
+#   docker compose -f deploy/compose/compose.yaml up -d
+#
+# Every image is pinned by digest. Only Vellum publishes a port; the other
+# services are reachable on the internal network alone.
+
+name: vellum
+
+x-restart: &restart
+  restart: unless-stopped
+
+x-hardening: &hardening
+  read_only: true
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+
+services:
+  vellum:
+    <<: [*restart, *hardening]
+    image: ${VELLUM_IMAGE:-ghcr.io/cruisinme30/vellum:latest}
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    command: ["serve"]
+    ports:
+      - "${VELLUM_PORT:-7700}:7700"
+    environment:
+      VELLUM_PROFILE: team
+      VELLUM_BIND: 0.0.0.0:7700
+      VELLUM_DATA_DIR: /data
+      VELLUM_PUBLIC_URL: ${VELLUM_PUBLIC_URL:-http://localhost:7700}
+      VELLUM_DATABASE_URL: postgres://vellum:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/vellum
+      VELLUM_BLOB_URL: s3://vellum
+      VELLUM_S3_ENDPOINT: http://minio:9000
+      VELLUM_S3_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: vellum
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
+      VELLUM_KROKI_URL: http://kroki:8000
+      VELLUM_CLAMD_ADDRESS: clamav:3310
+      VELLUM_KEK_PASSPHRASE_FILE: /run/secrets/vellum_kek
+      VELLUM_CSRF_KEY_FILE: /run/secrets/vellum_csrf
+      VELLUM_LOG: ${VELLUM_LOG:-info}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    secrets: [vellum_kek, vellum_csrf]
+    volumes:
+      - vellum-data:/data
+    tmpfs: [/tmp]
+    stop_grace_period: 30s
+    depends_on:
+      postgres: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
+      kroki: { condition: service_healthy }
+      # Not "healthy": the first signature download takes minutes, and
+      # uploads are refused (never stored unscanned) until clamd is up.
+      clamav: { condition: service_started }
+
+  postgres:
+    <<: *restart
+    image: postgres:17.6-alpine3.22@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94
+    environment:
+      POSTGRES_USER: vellum
+      POSTGRES_DB: vellum
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_INITDB_ARGS: --data-checksums
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    shm_size: 256m
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "vellum", "-d", "vellum"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    <<: [*restart, *hardening]
+    image: vellum-minio:RELEASE.2025-10-15T17-29-55Z
+    build:
+      context: minio
+    environment:
+      MINIO_ROOT_USER: vellum
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
+      MINIO_BROWSER: "off"
+      MC_HOST_local: http://vellum:${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}@127.0.0.1:9000
+    volumes:
+      - minio-data:/data
+    tmpfs: [/tmp]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Creates the bucket with versioning on (blob RPO, see the brief), then exits.
+  minio-init:
+    <<: *hardening
+    image: vellum-minio:RELEASE.2025-10-15T17-29-55Z
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - mc mb --ignore-existing local/vellum && mc version enable local/vellum
+    depends_on:
+      minio: { condition: service_healthy }
+    environment:
+      MC_HOST_local: http://vellum:${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}@minio:9000
+    tmpfs: [/tmp]
+
+  kroki:
+    <<: [*restart, *hardening]
+    image: yuzutech/kroki:0.28.0@sha256:710a5e8d57344769846695431ceefc02aaf908e9958c9d459171d2255ee2f7f5
+    environment:
+      KROKI_SAFE_MODE: secure
+      KROKI_EXCALIDRAW_HOST: kroki-excalidraw
+      KROKI_DIAGRAMSNET_HOST: kroki-diagramsnet
+    tmpfs: [/tmp]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+
+  kroki-excalidraw:
+    <<: *restart
+    image: yuzutech/kroki-excalidraw:0.28.0@sha256:fddd0bac124f259b5cbcae664b32fed9da1a8b2fda8d4cd8edf04e8349ee6ef8
+
+  kroki-diagramsnet:
+    <<: *restart
+    image: yuzutech/kroki-diagramsnet:0.28.0@sha256:6139cb660c4a2526c2e2e0f7fff64b9b92ac4d8398f85fde53cf25bb6521383b
+
+  # Scans every upload (INSTREAM over TCP). Signatures live in a volume and
+  # freshclam refreshes them; the config is shared with the Helm chart.
+  clamav:
+    <<: [*restart, *hardening]
+    image: clamav/clamav:1.5.4@sha256:bda39705e291105049c3936e2803ac90b955172af8030f94f05dce1252df6c6d
+    user: clamav
+    entrypoint: ["/sbin/tini", "--", "/bin/sh", "-c"]
+    command:
+      # The image ships signatures, so clamd still starts if the first
+      # update fails; freshclam keeps retrying in the background.
+      - >-
+        freshclam --config-file=/etc/vellum/freshclam.conf --stdout
+        || echo "Signature update failed; starting with the signatures on disk.";
+        freshclam --config-file=/etc/vellum/freshclam.conf --stdout --daemon &
+        exec clamd --config-file=/etc/vellum/clamd.conf
+    volumes:
+      - clamav-db:/var/lib/clamav
+      - ../helm/vellum/files/clamd.conf:/etc/vellum/clamd.conf:ro
+      - ../helm/vellum/files/freshclam.conf:/etc/vellum/freshclam.conf:ro
+    tmpfs: [/tmp]
+    healthcheck:
+      test: ["CMD-SHELL", "echo PING | nc 127.0.0.1 3310 | grep -q PONG"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10m
+
+secrets:
+  vellum_kek:
+    file: ${VELLUM_KEK_FILE:-./secrets/kek-passphrase}
+  vellum_csrf:
+    file: ${VELLUM_CSRF_FILE:-./secrets/csrf-key}
+
+volumes:
+  vellum-data:
+  postgres-data:
+  minio-data:
+  clamav-db:

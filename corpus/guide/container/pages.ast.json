@@ -1,0 +1,72 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "container",
+        "name": "pages",
+        "arg": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null,
+        "sections": [
+          [
+            {
+              "type": "list",
+              "start": null,
+              "tight": true,
+              "items": [
+                {
+                  "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "wiki_link",
+                          "target": "Runbook: deploy",
+                          "label": null
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                },
+                {
+                  "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "wiki_link",
+                          "target": "Onboarding checklist",
+                          "label": null
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "diagnostics": []
+}

@@ -1,0 +1,84 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Coverage-guided fuzz targets (ADR 0030). Run with the nightly toolchain:
+#   cargo +nightly fuzz run format_roundtrip
+# The nightly full suite runs every target for a fixed time budget.
+
+[package]
+name = "vellum-fuzz"
+version = "0.0.0"
+edition = "2024"
+license = "AGPL-3.0-only"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+futures = { version = "0.3", default-features = false, features = ["executor"] }
+arbitrary = { version = "1", features = ["derive"] }
+libfuzzer-sys = "0.4"
+vellum-collab = { path = "../crates/vellum-collab" }
+vellum-collections = { path = "../crates/vellum-collections" }
+vellum-crypto = { path = "../crates/vellum-crypto" }
+vellum-format = { path = "../crates/vellum-format" }
+vellum-kernel = { path = "../crates/vellum-kernel" }
+vellum-mcp = { path = "../crates/vellum-mcp" }
+vellum-store = { path = "../crates/vellum-store" }
+
+# Not part of the main workspace: fuzzing needs nightly and sanitizers.
+[workspace]
+members = ["."]
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "format_roundtrip"
+path = "fuzz_targets/format_roundtrip.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "blob_path"
+path = "fuzz_targets/blob_path.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "merge3"
+path = "fuzz_targets/merge3.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "formula"
+path = "fuzz_targets/formula.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "collab_frames"
+path = "fuzz_targets/collab_frames.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "mcp_messages"
+path = "fuzz_targets/mcp_messages.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "envelope"
+path = "fuzz_targets/envelope.rs"
+test = false
+doc = false
+bench = false

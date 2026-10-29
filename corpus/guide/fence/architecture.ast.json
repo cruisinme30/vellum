@@ -1,0 +1,20 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "fence",
+        "lang": "architecture",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null,
+        "literal": "Clients: Web app, Mobile app, MCP client\nEdge: Gateway\nServices: API, Render, Worker\nData: Postgres, Object store\nWeb app -> Gateway\nMobile app -> Gateway\nMCP client -> Gateway\nGateway -> API\nAPI -> Render\nAPI -> Postgres\nWorker -> Object store\nRender -> Object store\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}

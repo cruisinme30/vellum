@@ -1,0 +1,4 @@
+| Requests per second | 2,000 |
+| Cost per million requests | 0.4 |
+| Monthly cost | $2,073.6 |
+

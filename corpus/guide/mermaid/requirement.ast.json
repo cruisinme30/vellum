@@ -1,0 +1,20 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "fence",
+        "lang": "mermaid",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null,
+        "literal": "requirementDiagram\n  requirement replay {\n    id: R1\n    text: Replay 7 days of traffic in under 10 minutes\n    risk: medium\n    verifymethod: test\n  }\n  element replay_engine {\n    type: service\n  }\n  element load_test {\n    type: \"load test\"\n  }\n  replay_engine - satisfies -> replay\n  load_test - verifies -> replay\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}

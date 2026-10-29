@@ -11,7 +11,9 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D88
+- Decisions: D88, D89, D90
+- Issue: #84, #85, #148, #46, #86, #87, #88, #174, #407, #393, #429
+- Pull requests: #39, #234, #347, #352, #363
 
 :::
 
@@ -52,11 +54,67 @@ live in the gateway crate.
 - Start-up refuses a malformed operation: a bad ID, a path outside
   `/v1/`, a `GET` mutation, or a path parameter missing from the input.
 
-| Option | One source for REST and `GraphQL` | Services free of HTTP crates | Typed contract tests | Chosen |
-| --- | --- | --- | --- | --- |
-| Typed operation registry | ✓ | ✓ | ✓ | ✓ |
-| Each service ships an `axum` router and a `GraphQL` object | ✗ | ✗ | ◐ | ✗ |
-| Hand-written gateway handlers per service | ◐ | ✓ | ◐ | ✗ |
+### D89: the gateway owns the edge, including the public-pages origin
+
+- TLS 1.3 only (`rustls` with `aws-lc-rs`), from PEM files or ACME
+  (TLS-ALPN-01); HTTP/1.1 and HTTP/2 share one listener, and shutdown
+  turns `/readyz` to 503 before draining.
+- Every response carries a strict CSP, `nosniff`, frame denial,
+  COOP/CORP and, over HTTPS, HSTS.
+- CSRF: cross-site `Sec-Fetch-Site` and foreign `Origin` are refused;
+  cookie sessions also send `X-CSRF-Token`, an HMAC of the session
+  binding. Bearer tokens are exempt.
+- `Idempotency-Key` stores the first response per caller for 24 hours
+  and replays it; a different request under the key is a 422, a
+  concurrent one a 409.
+- Rate limits reuse the `vellum-security` GCRA limiter per caller.
+- Share links (`/s/{token}`) and published pages (`/p/{path}`) are served
+  only on a separate public origin with a sandboxing CSP and no scripts,
+  through a `PublicSite` port.
+
+### D90: identity issues opaque, hashed credentials and is the `OAuth` server
+
+- Every credential (session cookie, `vlm_` API token, `OAuth` code,
+  access and refresh token, break-glass code) is 32 random bytes behind a
+  type prefix, stored only as its SHA-256. Passwords use Argon2id.
+- Sessions are an `HttpOnly`, `SameSite=Lax` cookie
+  (`__Host-vellum_session` over HTTPS) with 14-day idle and 30-day
+  absolute expiry; the session hash is the CSRF binding.
+- Sign-in locks out an address after 5 failures and an IP after 20, with
+  doubling waits up to 15 minutes. Admin operations need a sign-in within
+  15 minutes; tokens never satisfy that for long.
+- The `OAuth` 2.1 server takes public clients only: PKCE `S256`, Client ID
+  Metadata Documents fetched through the SSRF guard, the built-in
+  `vellum-desktop` client with any-port loopback redirects, RFC 8707
+  audiences (`<base>/mcp` for MCP) and rotating refresh tokens whose
+  reuse revokes the grant.
+- Break-glass: `vellum admin break-glass` writes a one-time code to the
+  data directory; redeeming it opens a 15-minute administrator session.
+- Records live in `.vellum/identity.json` (mode 0600) until the SQL index
+  lands.
+
+Single sign-on uses one `OpenID Connect` provider, set by `VELLUM_OIDC_*`
+variables. Vellum is a relying party with the code flow, PKCE, `state`
+(also kept in a short-lived cookie, against login CSRF) and `nonce`. ID
+tokens must be `RS256` or `ES256` from the provider's key set, verified
+with `aws-lc-rs`. An account links by the provider's user ID, else by a
+verified email; new member accounts are created only for listed domains,
+never administrators. A single sign-on session is an ordinary session, so
+it outlives a provider outage, and password and break-glass sign-in stay
+available. Re-authentication asks the provider for a fresh sign-in.
+
+## Alternatives
+
+- **Each service ships an `axum` router and a `GraphQL` object**: REST
+  and `GraphQL` drift apart, and services pull in HTTP crates.
+- **Hand-written gateway handlers per service**: the gateway changes for
+  every endpoint and coverage depends on discipline.
+- **Signed JWT access tokens**: cannot be revoked before expiry, and
+  each resource server would need key distribution; lookups are cheap.
+- **Share pages on the app origin**: user content would run beside the
+  signed-in session's cookies.
+- **An `OpenID Connect` client crate**: the flow is small, and the crates
+  pull in a second HTTP stack that would bypass the SSRF guard.
 
 ## Consequences
 
@@ -67,3 +125,25 @@ live in the gateway crate.
   shapes are out of scope by design.
 - ID types need `JsonSchema` implementations to appear in inputs; the
   kernel provides them.
+- `vellum-cli` is the composition root: `services.rs` builds every service
+  once, and `vellum serve`, `vellum openapi` and `vellum graphql-schema`
+  all see the same set. With no index key or database set, `vellum serve`
+  keeps a new key in `.vellum/keys/index.key` and warns, so it starts
+  with no settings (#174). An index whose key is gone is refused.
+- Clients get typed calls for free: `vellum openapi --typescript` turns
+  the same document into `web/src/api/api.gen.ts`, and a contract test
+  fails when the committed file no longer matches the server, so an API
+  change shows up as a type error in the web app, not at run time.
+
+The binary also embeds the built web app, and the gateway serves it on
+the app host (#393). The gateway keeps `/api`, `/healthz`, `/readyz`,
+`/collab` and every mount prefix, matched or not; any other path gets the
+app's files, or its index for client routes. Those files pass the edge
+middleware but need no sign-in. The `connect-src` of the app's CSP also names
+the host's own `ws`/`wss` origin for live editing.
+
+With an index, `vellum serve` also runs search in the same process. Its
+tantivy index is sealed with a key derived from the index key, so the two
+never share a key. A row hit is checked against its collection, as rows
+have no node of their own. A pending single sign-on lives in one replica's
+memory, so several replicas need sticky sessions for `/auth/sso/*`.

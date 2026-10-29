@@ -12,6 +12,8 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D52, D53, D54
+- Issue: #58, #59, #267, #269, #329
+- Pull requests: #32, #281, #303, #341
 
 :::
 
@@ -76,9 +78,22 @@ come from ADR 0006. This ADR fixes the rules that turn them into answers.
 - The epoch is returned with every check and exposed per space, so
   caches (render, search, MCP resources) key on it and drop entries the
   moment access changes.
-- Expiring grants stay correct through a sweep job: `sweep_expired`
-  deletes due tuples, re-materialises, and returns when the next sweep is
-  due.
+- Expiry fails closed with no job running: each row carries
+  `valid_until`, the earliest expiry along its best derivation (grant,
+  group memberships), with one row per relation that outlives the
+  stronger ones. Lookups skip rows past it; `sweep_expired` only deletes
+  dead tuples and rows (#267, #269).
+
+## Alternatives
+
+- **Walk the tree on every check**: cost grows with depth and breaks the
+  one-lookup rule.
+- **Compute access in a background job**: changes would show late,
+  missing the 1 s target.
+- **Groups as principals in `effective_access`**: a check would need a
+  membership join.
+- **Expiry enforced only by a sweep job**: access outlives its expiry
+  whenever the job is late or down.
 
 ## Consequences
 
@@ -88,7 +103,10 @@ come from ADR 0006. This ADR fixes the rules that turn them into answers.
 - `effective_access` grows as nodes × principals with access. Groups keep
   tuple counts small; the rows are what makes one-lookup checks possible.
 - The engine talks to the index through the `AuthzStore` port. The
-  in-memory adapter is the reference; the SQL adapter on `vellum-db`
-  implements the same port and runs the same tests.
+  in-memory adapter is the reference; `SqlStore` on `vellum-db` (SQLite
+  and Postgres) implements the same port, and a differential property
+  test holds it to the reference, including expiry.
 - Search and the drive call `filter`, `spaces`, `accessible` and
-  `tree_changed`; they never read the grant tables themselves.
+  `tree_changed`; they never read the grant tables themselves. Rules the
+  engine does not hold, such as a book's `restrict_to`, use `groups_of`
+  for a person's live groups, nested ones included.

@@ -20,13 +20,135 @@
 //!   inherited access is recomputed from the new parent (R-DR-2).
 //! - **Shortcuts** are ordinary nodes. Nothing here follows a shortcut to
 //!   its target, so a shortcut never grants access to it (R-DR-3).
+//! - **Expiry** is exact without a sweep. Each principal's access is a
+//!   [`Levels`]: for every relation, the time until which they hold at
+//!   least that relation, taking the best derivation through grants and
+//!   group memberships and the earliest expiry along each. Rows carry that
+//!   time and checks ignore rows past it, so access fails closed the
+//!   moment a grant or membership expires (D54).
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::model::{Id, Object, Principal, Relation, Subject, Tuple, TupleRelation};
 
-/// Effective access on one object: each principal's strongest relation.
-pub type Access = BTreeMap<Principal, Relation>;
+/// "Never expires" as a validity time.
+pub const FOREVER: i64 = i64::MAX;
+/// "Never held" as a validity time.
+const NEVER: i64 = i64::MIN;
+
+const fn until(expires_at: Option<i64>) -> i64 {
+    match expires_at {
+        Some(at) => at,
+        None => FOREVER,
+    }
+}
+
+/// One principal's access on one object over time.
+///
+/// For each relation, the UTC epoch millisecond until which (exclusive)
+/// they hold at least that relation. Weaker relations are always held at
+/// least as long.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Levels([i64; 5]);
+
+impl Default for Levels {
+    fn default() -> Self {
+        Self([NEVER; 5])
+    }
+}
+
+const fn level(r: Relation) -> usize {
+    r as usize
+}
+
+impl Levels {
+    /// Holding `relation` (and everything below it) until `until`.
+    #[must_use]
+    pub fn granting(relation: Relation, until: i64) -> Self {
+        let mut out = Self::default();
+        for (i, slot) in out.0.iter_mut().enumerate() {
+            if i <= level(relation) {
+                *slot = until;
+            }
+        }
+        out
+    }
+
+    /// Until when the principal holds at least `relation`.
+    #[must_use]
+    pub const fn until(&self, relation: Relation) -> i64 {
+        let [viewer, commenter, editor, manager, owner] = self.0;
+        match relation {
+            Relation::Viewer => viewer,
+            Relation::Commenter => commenter,
+            Relation::Editor => editor,
+            Relation::Manager => manager,
+            Relation::Owner => owner,
+        }
+    }
+
+    /// The strongest relation held at `now_ms`, if any.
+    #[must_use]
+    pub fn at(&self, now_ms: i64) -> Option<Relation> {
+        Relation::ALL
+            .into_iter()
+            .rev()
+            .find(|r| self.until(*r) > now_ms)
+    }
+
+    /// Whether nothing is held after `now_ms`.
+    #[must_use]
+    pub fn is_dead(&self, now_ms: i64) -> bool {
+        self.at(now_ms).is_none()
+    }
+
+    /// Either derivation: the later time at each level.
+    #[must_use]
+    pub fn or(mut self, other: Self) -> Self {
+        for (a, b) in self.0.iter_mut().zip(other.0) {
+            *a = (*a).max(b);
+        }
+        self
+    }
+
+    /// Both must hold: the earlier time at each level.
+    #[must_use]
+    pub fn and(mut self, other: Self) -> Self {
+        for (a, b) in self.0.iter_mut().zip(other.0) {
+            *a = (*a).min(b);
+        }
+        self
+    }
+
+    /// The part of `self` held while it is at least a manager: what a
+    /// restriction cannot take away.
+    #[must_use]
+    pub const fn managing(self) -> Self {
+        let manager = self.until(Relation::Manager);
+        let [_, _, _, _, owner] = self.0;
+        Self([manager, manager, manager, manager, owner])
+    }
+
+    /// The rows that describe these levels after `now_ms`: the strongest
+    /// relation first, then each weaker one that outlives every stronger
+    /// one. `None` means it never expires.
+    #[must_use]
+    pub fn rows(&self, now_ms: i64) -> Vec<(Relation, Option<i64>)> {
+        let mut out = Vec::new();
+        let mut best = now_ms;
+        for r in Relation::ALL.into_iter().rev() {
+            let t = self.until(r);
+            if t > best {
+                out.push((r, (t != FOREVER).then_some(t)));
+                best = t;
+            }
+        }
+        out
+    }
+}
+
+/// Effective access on one object, per principal.
+pub type Access = BTreeMap<Principal, Levels>;
 
 /// Everything materialisation needs to know about one space.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -67,53 +189,75 @@ impl SpaceGraph {
     }
 }
 
-/// Group membership across the workspace: `group#member@subject` tuples.
+/// Group membership across the workspace: `group#member@subject` tuples,
+/// each with the time it stops counting.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Directory {
-    members: BTreeMap<Id, BTreeSet<Subject>>,
+    members: BTreeMap<Id, BTreeMap<Subject, i64>>,
 }
 
 impl Directory {
     /// Builds the directory from membership tuples, dropping any that are
-    /// not memberships or have expired.
+    /// not memberships or have already expired at `now_ms`.
     #[must_use]
     pub fn new(tuples: &[Tuple], now_ms: i64) -> Self {
-        let mut members: BTreeMap<Id, BTreeSet<Subject>> = BTreeMap::new();
+        let mut members: BTreeMap<Id, BTreeMap<Subject, i64>> = BTreeMap::new();
         for t in tuples {
             if let (Object::Group(group), TupleRelation::Member) = (t.object, t.relation)
                 && t.is_live(now_ms)
             {
-                let _ = members.entry(group).or_default().insert(t.subject);
+                let slot = members
+                    .entry(group)
+                    .or_default()
+                    .entry(t.subject)
+                    .or_insert(NEVER);
+                *slot = (*slot).max(until(t.expires_at));
             }
         }
         Self { members }
     }
 
-    /// Every principal in a group, through nested groups. Cycles are
-    /// harmless: each group is visited once.
+    /// Every principal in a group, through nested groups, with the time
+    /// until which they are a member: the best path, where a path lasts
+    /// until its earliest expiring membership. Cycles are harmless.
     #[must_use]
-    pub fn expand(&self, group: Id) -> BTreeSet<Principal> {
-        let mut seen = BTreeSet::new();
-        let mut out = BTreeSet::new();
+    pub fn expand(&self, group: Id) -> BTreeMap<Principal, i64> {
+        let mut best: BTreeMap<Id, i64> = BTreeMap::from([(group, FOREVER)]);
+        let mut out: BTreeMap<Principal, i64> = BTreeMap::new();
         let mut stack = vec![group];
         while let Some(g) = stack.pop() {
-            if !seen.insert(g) {
-                continue;
-            }
-            for subject in self.members.get(&g).into_iter().flatten() {
-                match subject.principal() {
-                    Some(p) => {
-                        let _ = out.insert(p);
+            let reach = best.get(&g).copied().unwrap_or(NEVER);
+            for (subject, &edge) in self.members.get(&g).into_iter().flatten() {
+                let t = reach.min(edge);
+                match (subject.principal(), subject) {
+                    (Some(p), _) => {
+                        let slot = out.entry(p).or_insert(NEVER);
+                        *slot = (*slot).max(t);
                     }
-                    None => {
-                        if let Subject::Group(inner) = subject {
+                    (None, Subject::Group(inner)) => {
+                        if best.get(inner).is_none_or(|&old| t > old) {
+                            let _ = best.insert(*inner, t);
                             stack.push(*inner);
                         }
                     }
+                    (None, _) => {}
                 }
             }
         }
         out
+    }
+
+    /// Every group `principal` belongs to, directly or through nested
+    /// groups, counting only memberships still live when the directory
+    /// was built.
+    #[must_use]
+    pub fn groups_of(&self, principal: Principal) -> BTreeSet<Id> {
+        let subject = Subject::from(principal);
+        self.members
+            .iter()
+            .filter(|(_, subjects)| subjects.contains_key(&subject))
+            .flat_map(|(&group, _)| self.containing(group))
+            .collect()
     }
 
     /// Every group that contains `group`, directly or through nesting,
@@ -125,7 +269,7 @@ impl Directory {
             let before = out.len();
             for (&g, subjects) in &self.members {
                 if subjects
-                    .iter()
+                    .keys()
                     .any(|s| matches!(s, Subject::Group(inner) if out.contains(inner)))
                 {
                     let _ = out.insert(g);
@@ -186,23 +330,33 @@ fn expand_grants<'a>(
         let TupleRelation::Role(relation) = t.relation else {
             continue;
         };
-        let principals = match t.subject {
+        let grant_until = until(t.expires_at);
+        let principals: BTreeMap<Principal, i64> = match t.subject {
             Subject::Group(g) => directory.expand(g),
-            other => other.principal().into_iter().collect(),
+            other => other
+                .principal()
+                .into_iter()
+                .map(|p| (p, FOREVER))
+                .collect(),
         };
-        for p in principals {
-            raise(&mut access, p, relation);
+        for (p, member_until) in principals {
+            raise(
+                &mut access,
+                p,
+                Levels::granting(relation, grant_until.min(member_until)),
+            );
         }
     }
     access
 }
 
-fn raise(access: &mut Access, principal: Principal, relation: Relation) {
-    let slot = access.entry(principal).or_insert(relation);
-    *slot = (*slot).max(relation);
+fn raise(access: &mut Access, principal: Principal, levels: Levels) {
+    let slot = access.entry(principal).or_default();
+    *slot = slot.or(levels);
 }
 
-/// Computes effective access for every node of a space.
+/// Computes effective access for every node of a space, exact for every
+/// time from `now_ms` on.
 ///
 /// # Errors
 ///
@@ -223,7 +377,9 @@ pub fn materialise(
     let mut restricted = BTreeSet::new();
     for t in &graph.tuples {
         match (t.object, t.relation) {
-            (Object::Node(n), TupleRelation::Restricted) if t.is_live(now_ms) => {
+            // A restriction that expires would widen access later; treat
+            // it as permanent until it is removed, which fails closed.
+            (Object::Node(n), TupleRelation::Restricted) => {
                 let _ = restricted.insert(n);
             }
             (object, TupleRelation::Role(_)) => on_object.entry(object).or_default().push(t),
@@ -238,7 +394,7 @@ pub fn materialise(
         )
     };
 
-    let space = grants(Object::Space(graph.space));
+    let space = prune(grants(Object::Space(graph.space)), now_ms);
     let children = graph.children();
     let mut nodes = BTreeMap::new();
     // (node, the parent's access, the ceiling in force above the node)
@@ -251,28 +407,27 @@ pub fn materialise(
         let (access, ceiling) = if restricted.contains(&node) {
             let mut access: Access = parent_access
                 .iter()
-                .filter(|(_, r)| **r >= Relation::Manager)
-                .map(|(p, r)| (*p, *r))
+                .map(|(p, l)| (*p, l.managing()))
                 .collect();
-            for (p, r) in own {
-                if let Some(&above) = parent_access.get(&p) {
-                    raise(&mut access, p, r.min(above));
+            for (p, l) in own {
+                if let Some(above) = parent_access.get(&p) {
+                    raise(&mut access, p, l.and(*above));
                 }
             }
-            (access, Some(parent_access))
+            (prune(access, now_ms), Some(parent_access))
         } else {
             let mut access = parent_access;
-            for (p, r) in own {
+            for (p, l) in own {
                 match &ceiling {
-                    None => raise(&mut access, p, r),
+                    None => raise(&mut access, p, l),
                     Some(cap) => {
-                        if let Some(&limit) = cap.get(&p) {
-                            raise(&mut access, p, r.min(limit));
+                        if let Some(limit) = cap.get(&p) {
+                            raise(&mut access, p, l.and(*limit));
                         }
                     }
                 }
             }
-            (access, ceiling)
+            (prune(access, now_ms), ceiling)
         };
         for &child in children.get(&Some(node)).into_iter().flatten() {
             frames.push((child, access.clone(), ceiling.clone()));
@@ -285,8 +440,14 @@ pub fn materialise(
     Ok(Materialised { space, nodes })
 }
 
-/// The earliest expiry after `now_ms` among `tuples`, when a sweep must
-/// run to keep materialised access exact.
+fn prune(mut access: Access, now_ms: i64) -> Access {
+    access.retain(|_, l| !l.is_dead(now_ms));
+    access
+}
+
+/// The earliest expiry after `now_ms` among `tuples`: when a sweep can
+/// next delete something. Sweeps only collect garbage; access is already
+/// exact without them.
 #[must_use]
 pub fn next_expiry<'a>(tuples: impl IntoIterator<Item = &'a Tuple>, now_ms: i64) -> Option<i64> {
     tuples
@@ -346,16 +507,25 @@ mod tests {
             ],
         );
         let m = materialise(&g, &Directory::default(), 0).unwrap();
-        assert_eq!(m.nodes[&Id(1)].get(&BOB), Some(&Relation::Editor));
-        assert_eq!(m.nodes[&Id(2)].get(&BOB), None);
-        assert_eq!(m.nodes[&Id(3)].get(&BOB), None);
-        assert_eq!(m.nodes[&Id(3)].get(&ALICE), Some(&Relation::Manager));
+        assert_eq!(
+            m.nodes[&Id(1)].get(&BOB).and_then(|l| l.at(0)),
+            Some(Relation::Editor)
+        );
+        assert_eq!(m.nodes[&Id(2)].get(&BOB).and_then(|l| l.at(0)), None);
+        assert_eq!(m.nodes[&Id(3)].get(&BOB).and_then(|l| l.at(0)), None);
+        assert_eq!(
+            m.nodes[&Id(3)].get(&ALICE).and_then(|l| l.at(0)),
+            Some(Relation::Manager)
+        );
 
         // Granting bob owner on the restricted node is capped at editor.
         let mut g = g;
         g.tuples.push(node(2, Relation::Owner, BOB));
         let m = materialise(&g, &Directory::default(), 0).unwrap();
-        assert_eq!(m.nodes[&Id(3)].get(&BOB), Some(&Relation::Editor));
+        assert_eq!(
+            m.nodes[&Id(3)].get(&BOB).and_then(|l| l.at(0)),
+            Some(Relation::Editor)
+        );
     }
 
     #[test]
@@ -371,8 +541,34 @@ mod tests {
             ],
             0,
         );
-        assert_eq!(d.expand(Id(10)), BTreeSet::from([ALICE]));
+        assert_eq!(d.expand(Id(10)), BTreeMap::from([(ALICE, FOREVER)]));
         assert_eq!(d.containing(Id(11)), BTreeSet::from([Id(10), Id(11)]));
+    }
+
+    #[test]
+    fn levels_rows_and_paths() {
+        let l =
+            Levels::granting(Relation::Editor, 50).or(Levels::granting(Relation::Viewer, FOREVER));
+        assert_eq!(l.at(10), Some(Relation::Editor));
+        assert_eq!(l.at(50), Some(Relation::Viewer));
+        assert_eq!(
+            l.rows(10),
+            vec![(Relation::Editor, Some(50)), (Relation::Viewer, None)]
+        );
+        assert_eq!(l.rows(60), vec![(Relation::Viewer, None)]);
+        assert!(Levels::granting(Relation::Owner, 5).is_dead(5));
+        // alice is in 10 via 11 until 30 (11 ⊂ 10 until 30, alice ⊂ 11 until 90),
+        // and directly until 20: the best path wins.
+        let d = Directory::new(
+            &[
+                Tuple::member(Id(10), Subject::Group(Id(11))).expiring(30),
+                Tuple::member(Id(11), ALICE.into()).expiring(90),
+                Tuple::member(Id(10), ALICE.into()).expiring(20),
+            ],
+            0,
+        );
+        assert_eq!(d.expand(Id(10)), BTreeMap::from([(ALICE, 30)]));
+        assert_eq!(d.expand(Id(11)), BTreeMap::from([(ALICE, 90)]));
     }
 
     #[test]

@@ -1,0 +1,37 @@
+vellum: 1
+id: 01M63C8QH9D9FNR642PVPJCGM7
+title: Developer guide
+numbering: decimal
+max_depth: 3
+export_profile: default
+nodes:
+  01M63CFE63GFD2V5SWXEVC6X36:
+    path: README.md
+  01M63CFE63ZFX97JHBJ4SFCAYS:
+    path: architecture/README.md
+  01M63CFE64BJ2G7XH5ZGSJ7T8R:
+    path: architecture/crates.md
+  01M63CFE64R1N91EY461P6BRTF:
+    path: architecture/data-flow.md
+  01M63CFE64ZRPDA1PGS1AMF6GK:
+    path: dialect/README.md
+  01M63CFE64ZMZJHT10X2CF9FJX:
+    path: dialect/block-model.md
+  01M63CFE6597AEJEXQFBJ1VETP:
+    path: dialect/corpus.md
+  01M63CFE65GQD3E9GX2ZASQZJ0:
+    path: api/README.md
+  01M63CFE659WYPH242VNS9ARAX:
+    path: api/webhooks.md
+  01M63CFE6534FYF57RQC9JDD77:
+    path: api/mcp.md
+  01M63CFE668Q6YQ8SXHWXWBQCG:
+    path: extending/storage-adapter.md
+  01M63CFE66BW169QP9T1MJWF2B:
+    path: extending/blocks.md
+  01M63CFE66526T2MPAZ2NY485F:
+    path: contributing/README.md
+  01M63CFE669ES7E5ECEZ0VCM61:
+    path: contributing/standards.md
+  01M63CFE66RJXGYW4SR9CQQRYC:
+    path: contributing/help-books.md

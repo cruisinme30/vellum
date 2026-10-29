@@ -7,10 +7,22 @@ SPDX-License-Identifier: AGPL-3.0-only
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#4F5B92" />
+    <meta
+      name="description"
+      content="A self-hosted workspace where every object is a Markdown file."
+    />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icons/icon-192.png" type="image/png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <title>Vellum</title>
   </head>
   <body>
-    <div id="root"></div>
+    <!-- Shown until React mounts, and stays if the bundle fails to load (#247). -->
+    <div id="root"><p role="status">Loading Vellum…</p></div>
+    <noscript
+      ><p>Vellum needs JavaScript. Turn it on in your browser settings, then reload.</p></noscript
+    >
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
