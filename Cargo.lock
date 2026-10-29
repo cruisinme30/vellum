@@ -5234,7 +5234,7 @@ name = "vellum-tasks"
 version = "0.0.0"
 dependencies = [
  "csv",
- "hmac",
+ "hmac 0.13.0",
  "jiff",
  "mail-parser",
  "opentelemetry",
