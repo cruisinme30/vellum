@@ -192,7 +192,7 @@ pub struct RpcError {
     pub message: String,
     /// Structured detail.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub data: Option<Value>,
+    pub data: Option<Box<Value>>,
 }
 
 impl RpcError {
@@ -209,7 +209,7 @@ impl RpcError {
     /// Adds structured data.
     #[must_use]
     pub fn with_data(mut self, data: Value) -> Self {
-        self.data = Some(data);
+        self.data = Some(Box::new(data));
         self
     }
 
