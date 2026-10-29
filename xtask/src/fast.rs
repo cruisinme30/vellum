@@ -247,12 +247,11 @@ fn report(results: &[(&str, Outcome)], seconds: u64) {
         format!("Fast suite, run locally in {seconds} s:"),
     ];
     for (name, outcome) in results {
-        let mark = match outcome {
-            Outcome::Passed => "pass",
-            Outcome::Failed => "FAIL",
-            Outcome::Skipped => "skip (tool not installed; CI still runs it)",
-        };
-        lines.push(format!("  {mark:<5} {name}"));
+        lines.push(match outcome {
+            Outcome::Passed => format!("  pass  {name}"),
+            Outcome::Failed => format!("  FAIL  {name}"),
+            Outcome::Skipped => format!("  skip  {name} (tool not installed; CI still runs it)"),
+        });
     }
     progress(&lines.join("\n"));
 }
