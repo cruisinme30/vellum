@@ -20,7 +20,7 @@ flowchart LR
   KEK -->|held by| H[Keychain, KMS, Vault or passphrase]
 ```
 
-## Where the workspace key lives {#kek}
+## Where the workspace key lives {#workspace-key}
 
 | Option | Fits |
 | --- | --- |

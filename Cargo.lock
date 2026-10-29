@@ -2636,7 +2636,9 @@ name = "vellum-cli"
 version = "0.0.0"
 dependencies = [
  "clap",
+ "thiserror",
  "tracing",
+ "vellum-help",
  "vellum-kernel",
 ]
 
@@ -2686,6 +2688,10 @@ version = "0.0.0"
 
 [[package]]
 name = "vellum-format"
+version = "0.0.0"
+
+[[package]]
+name = "vellum-help"
 version = "0.0.0"
 
 [[package]]

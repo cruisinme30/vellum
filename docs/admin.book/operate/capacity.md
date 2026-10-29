@@ -28,5 +28,5 @@ space, so a large space never shares a node's capacity with every other.
 ## Caches {#caches}
 
 Pages are rendered when they are saved and served from a cache with
-ETags, so reads cost almost nothing. Put a CDN in front of the public
+`ETag` headers, so reads cost almost nothing. Put a CDN in front of the public
 site; private pages are cached per permission set.
