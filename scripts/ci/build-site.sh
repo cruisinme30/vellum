@@ -103,12 +103,15 @@ html_escape() {
 #   - the sidebar toggle is a <label> carrying button ARIA: give it the role;
 #   - code blocks and tables that scroll sideways become focusable;
 #   - task-list checkboxes get a name;
+#   - mdBook's web fonts are dropped (system fonts, see book.css): they load
+#     without font-display, so text appears late and the page shifts;
 #   - headings named like a JavaScript module global (exports, module,
 #     define, require) get a suffix: the browser exposes an element id as
 #     a window property, and mdBook's search and copy libraries then take
 #     the page for CommonJS and fail.
 fix_html() {
   find "$1" -name '*.html' -exec sed -i -E \
+    -e '/<link rel="stylesheet" href="fonts\/fonts-[0-9a-f]*\.css">/d' \
     -e 's/<label id="mdbook-sidebar-toggle" /<label id="mdbook-sidebar-toggle" role="button" /' \
     -e 's/<pre([^>]*)><code( |>)/<pre\1><code tabindex="0"\2/g' \
     -e 's/<div class="table-wrapper">/<div class="table-wrapper" tabindex="0">/g' \

@@ -11,6 +11,12 @@ html {
   font-family: Roboto, system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
 }
 
+/* System fonts only: build-site.sh drops mdBook's web fonts, whose late
+   swap shifted the page as it loaded (#249). */
+:root {
+  --mono-font: "Roboto Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
 .light {
   --bg: #f7f8fc;
   --fg: #1d1b20;
