@@ -110,7 +110,7 @@ writes, the three-way merge and an identity-based watcher.
 
 ### D146: the drive's operations on the gateway
 
-- `DriveService` declares 32 operations on the `vellum-contracts` seam
+- `DriveService` declares 33 operations (D170 added the tree) on the seam
   (ADR 0020), each one a REST route, an OpenAPI entry and a `GraphQL`
   field. Each maps to one `Drive` method, so the drive's checks decide.
 - Reads need the `read` scope and changes need `write:direct`. Callers
