@@ -109,6 +109,8 @@ export function driveAnswer(path: string): unknown {
     [/^\/api\/v1\/drive\/items\/[^/]+\/activity$/, ACTIVITY],
     [/^\/api\/v1\/drive\/items\/[^/]+\/backlinks$/, { items: [ITEMS[3]] }],
     [/^\/api\/v1\/drive\/items\/F1$/, ITEMS[0]],
+    // The organisation's look, which the app loads once someone signs in.
+    [/^\/api\/v1\/appearance$/, { seed: "#4f5b92", export_theme: "light", site_theme: "auto" }],
   ];
   return routes.find(([pattern]) => pattern.test(path))?.[1];
 }
