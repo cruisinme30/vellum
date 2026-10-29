@@ -63,7 +63,7 @@ impl Drive {
             let mut trashed = node.clone();
             for member in members {
                 let mut after = member.clone();
-                after.path = layout::rebase(&member.path, &node.path, &item)?;
+                after.path = layout::rebase_member(node.kind, &member.path, &node.path, &item)?;
                 after.trash = Some(TrashState {
                     trashed_at: now,
                     trashed_by: *actor,
@@ -113,7 +113,7 @@ impl Drive {
             let mut restored = node.clone();
             for member in self.entry_members(&node).await? {
                 let mut after = member.clone();
-                after.path = layout::rebase(&member.path, &node.path, &path)?;
+                after.path = layout::rebase_member(node.kind, &member.path, &node.path, &path)?;
                 after.trash = None;
                 if member.id == node.id {
                     after.parent = parent;

@@ -78,24 +78,24 @@ impl Drive {
         } else {
             let meta = self.store.head(dir).await?;
             let _ = blobs.insert(meta.path, meta.size);
+            // A copied page brings the pages nested under it (D168).
+            if let Some(nested) = self.children_dir(NodeKind::Page, dir).await? {
+                blobs.extend(self.blobs_under(&nested).await?);
+            }
         }
         let mut seen: HashSet<ObjectId> = HashSet::new();
         let mut report = ScanReport::default();
         let mut found = self
             .discover(space, &blobs, &HashSet::new(), &mut seen, &mut report)
             .await?;
-        let mut folders = self.folder_paths(space.id).await?;
-        for (node, _) in &found {
-            if node.kind == NodeKind::Folder {
-                let _ = folders.insert(node.path.clone(), node.id);
-            }
-        }
+        let mut holders = self.container_paths(space.id).await?;
+        holders.extend(containers(found.iter().map(|(n, _)| n)));
         let mut out = Vec::with_capacity(found.len());
         for (node, text) in &mut found {
             node.parent = if &node.path == dir {
                 parent
             } else {
-                parent_of(&node.path, &folders)
+                parent_of(&node.path, &holders)
             };
             node.created_by = creator;
             self.index.put_node(node).await?;
@@ -207,13 +207,9 @@ impl Drive {
             let _ = known.insert(layout::id_file(node.kind, &node.path)?);
         }
         let mut found = self.discover(space, &blobs, &known, seen, report).await?;
-        let folders: HashMap<BlobPath, ObjectId> = found
-            .iter()
-            .filter(|(n, _)| n.kind == NodeKind::Folder)
-            .map(|(n, _)| (n.path.clone(), n.id))
-            .collect();
+        let holders = containers(found.iter().map(|(n, _)| n));
         for (node, _) in &mut found {
-            node.parent = parent_of(&node.path, &folders);
+            node.parent = parent_of(&node.path, &holders);
             if let Some(old) = existing.get(&node.id) {
                 node.created_by = old.created_by;
                 if old.path != node.path || !old.is_live() {
@@ -237,7 +233,12 @@ impl Drive {
                 if live.contains(&member.id) {
                     continue;
                 }
-                let path = layout::rebase(&member.original_path, &top.original_path, &item)?;
+                let path = layout::rebase_member(
+                    top.kind,
+                    &member.original_path,
+                    &top.original_path,
+                    &item,
+                )?;
                 let size = if member.kind.is_dir() {
                     all.range(path.clone()..)
                         .take_while(|(p, _)| p.starts_with(&path))
@@ -518,16 +519,11 @@ impl Drive {
         Ok(())
     }
 
-    /// Live folder paths of a space, for finding parents.
-    async fn folder_paths(&self, space: SpaceId) -> DriveResult<HashMap<BlobPath, ObjectId>> {
-        Ok(self
-            .index
-            .nodes(space)
-            .await?
-            .into_iter()
-            .filter(|n| n.is_live() && n.kind == NodeKind::Folder)
-            .map(|n| (n.path, n.id))
-            .collect())
+    /// The directories of a space's live folders and pages, for finding
+    /// parents.
+    async fn container_paths(&self, space: SpaceId) -> DriveResult<HashMap<BlobPath, ObjectId>> {
+        let nodes = self.index.nodes(space).await?;
+        Ok(containers(nodes.iter().filter(|n| n.is_live())))
     }
 
     async fn read_yaml<T: serde::de::DeserializeOwned>(&self, path: &BlobPath) -> DriveResult<T> {
@@ -536,11 +532,31 @@ impl Drive {
     }
 }
 
-/// The nearest folder above `path`, if any.
-fn parent_of(path: &BlobPath, folders: &HashMap<BlobPath, ObjectId>) -> Option<ObjectId> {
+/// The directories that hold other nodes: each folder's own, and the one
+/// beside each page (D168). A folder wins over a page of the same name.
+fn containers<'a>(nodes: impl Iterator<Item = &'a Node>) -> HashMap<BlobPath, ObjectId> {
+    let mut out = HashMap::new();
+    let mut folders = Vec::new();
+    for node in nodes {
+        match node.kind {
+            NodeKind::Folder => folders.push((node.path.clone(), node.id)),
+            NodeKind::Page => {
+                if let Some(dir) = layout::page_dir(&node.path) {
+                    let _ = out.insert(dir, node.id);
+                }
+            }
+            NodeKind::Book | NodeKind::Collection | NodeKind::Shortcut => {}
+        }
+    }
+    out.extend(folders);
+    out
+}
+
+/// The nearest folder or page above `path`, if any.
+fn parent_of(path: &BlobPath, holders: &HashMap<BlobPath, ObjectId>) -> Option<ObjectId> {
     let mut dir = path.parent();
     while let Some(d) = dir {
-        if let Some(id) = folders.get(&d) {
+        if let Some(id) = holders.get(&d) {
             return Some(*id);
         }
         dir = d.parent();

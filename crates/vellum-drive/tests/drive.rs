@@ -817,6 +817,189 @@ async fn external_edits_and_renames_come_in_through_the_watcher(kind: Kind) -> T
     Ok(())
 }
 
+async fn pages_nest_under_pages(kind: Kind) -> TestResult {
+    let w = world(kind).await?;
+    let eng = w
+        .drive
+        .create_space(&w.alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .await?;
+    let plan = w
+        .drive
+        .create_page(&w.alice, eng.id, None, "Plan", "[child](Plan/Goals.md)\n")
+        .await?;
+    let goals = w
+        .drive
+        .create_page(
+            &w.alice,
+            eng.id,
+            Some(plan.id),
+            "Goals",
+            "[up](../Plan.md)\n",
+        )
+        .await?;
+    assert_eq!(goals.path.as_str(), "drives/shared/eng/Plan/Goals.md");
+    assert_eq!(goals.parent, Some(plan.id));
+    let deep = w
+        .drive
+        .create_page(&w.alice, eng.id, Some(goals.id), "Q1", "")
+        .await?;
+    assert_eq!(deep.path.as_str(), "drives/shared/eng/Plan/Goals/Q1.md");
+    let listed = w.drive.list(&w.alice, eng.id, Some(plan.id)).await?;
+    assert_eq!(
+        listed.iter().map(|n| n.id).collect::<Vec<_>>(),
+        vec![goals.id]
+    );
+
+    // A folder may not take the name of a page that holds pages.
+    let folder = w
+        .drive
+        .create_folder(&w.alice, eng.id, None, "Plan")
+        .await?;
+    assert_eq!(folder.path.as_str(), "drives/shared/eng/Plan (2)");
+
+    // A page cannot move under its own nested pages.
+    assert!(matches!(
+        w.drive
+            .move_node(&w.alice, plan.id, eng.id, Some(deep.id))
+            .await,
+        Err(DriveError::Invalid(_))
+    ));
+
+    // Renaming carries the nested pages, and links between them hold.
+    let renamed = w.drive.rename(&w.alice, plan.id, "Roadmap").await?;
+    assert_eq!(renamed.path.as_str(), "drives/shared/eng/Roadmap.md");
+    let goals = w.node(goals.id).await?;
+    assert_eq!(goals.path.as_str(), "drives/shared/eng/Roadmap/Goals.md");
+    assert_eq!(goals.parent, Some(plan.id));
+    assert_eq!(
+        w.node(deep.id).await?.path.as_str(),
+        "drives/shared/eng/Roadmap/Goals/Q1.md"
+    );
+    assert!(w.text(&goals).await?.contains("[up](../Roadmap.md)"));
+    assert!(w.text(&renamed).await?.contains("(Roadmap/Goals.md)"));
+
+    // Moving into a folder carries them too.
+    let moved = w
+        .drive
+        .move_node(&w.alice, plan.id, eng.id, Some(folder.id))
+        .await?;
+    assert_eq!(moved.path.as_str(), "drives/shared/eng/Plan (2)/Roadmap.md");
+    assert_eq!(
+        w.node(deep.id).await?.path.as_str(),
+        "drives/shared/eng/Plan (2)/Roadmap/Goals/Q1.md"
+    );
+
+    // Trash and restore keep the nested pages attached.
+    let _ = w.drive.trash(&w.alice, plan.id).await?;
+    assert!(!w.node(deep.id).await?.is_live());
+    let restored = w.drive.restore(&w.alice, plan.id).await?;
+    assert_eq!(restored.path, moved.path);
+    let deep_back = w.node(deep.id).await?;
+    assert!(deep_back.is_live());
+    assert_eq!(deep_back.parent, Some(goals.id));
+
+    // A copy brings fresh copies of the nested pages.
+    let copy = w.drive.copy_node(&w.alice, plan.id, eng.id, None).await?;
+    let nested = w.drive.list(&w.alice, eng.id, Some(copy.id)).await?;
+    assert_eq!(nested.len(), 1);
+    assert_ne!(nested.first().map(|n| n.id), Some(goals.id));
+
+    // A rebuilt index finds the same tree.
+    let index = w.databases.index().await?;
+    let access = Arc::new(MemoryAccess::new(index.clone()));
+    let rebuilt = Drive::new(w.store.clone(), index.clone(), access);
+    let _ = rebuilt.scan().await?;
+    let again = index.node(deep.id).await?.ok_or("nested page lost")?;
+    assert_eq!(again.parent, Some(goals.id));
+    let goals_again = index.node(goals.id).await?.ok_or("nested page lost")?;
+    assert_eq!(goals_again.parent, Some(plan.id));
+    Ok(())
+}
+
+async fn siblings_keep_their_order_and_the_tree_comes_whole(kind: Kind) -> TestResult {
+    let w = world(kind).await?;
+    let eng = w
+        .drive
+        .create_space(&w.alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .await?;
+    let apple = w.drive.create_page(&w.alice, eng.id, None, "A", "").await?;
+    let berry = w.drive.create_page(&w.alice, eng.id, None, "B", "").await?;
+    let cherry = w.drive.create_page(&w.alice, eng.id, None, "C", "").await?;
+    let ids = |nodes: &[Node]| nodes.iter().map(|n| n.id).collect::<Vec<_>>();
+    // Without a stored order: by title.
+    assert_eq!(
+        ids(&w.drive.list(&w.alice, eng.id, None).await?),
+        vec![apple.id, berry.id, cherry.id]
+    );
+
+    let _ = w.drive.reorder(&w.alice, cherry.id, 0).await?;
+    let _ = w.drive.reorder(&w.alice, apple.id, 1).await?;
+    assert_eq!(
+        ids(&w.drive.list(&w.alice, eng.id, None).await?),
+        vec![cherry.id, apple.id, berry.id]
+    );
+    // A new page goes after the ordered ones.
+    let date = w
+        .drive
+        .create_page(&w.alice, eng.id, None, "0 first by name", "")
+        .await?;
+    let order = w.drive.list(&w.alice, eng.id, None).await?;
+    assert_eq!(ids(&order), vec![cherry.id, apple.id, berry.id, date.id]);
+
+    // Nest pages and read the whole tree in one answer.
+    let apple1 = w
+        .drive
+        .create_page(&w.alice, eng.id, Some(apple.id), "A1", "")
+        .await?;
+    let apple2 = w
+        .drive
+        .create_page(&w.alice, eng.id, Some(apple.id), "A2", "")
+        .await?;
+    let _ = w.drive.reorder(&w.alice, apple2.id, 0).await?;
+    let tree = w.drive.tree(&w.alice, eng.id, None, None, 100).await?;
+    assert!(!tree.truncated);
+    assert_eq!(
+        ids(&tree.items),
+        vec![cherry.id, apple.id, apple2.id, apple1.id, berry.id, date.id]
+    );
+    let top = w.drive.tree(&w.alice, eng.id, None, Some(1), 100).await?;
+    assert_eq!(
+        ids(&top.items),
+        vec![cherry.id, apple.id, berry.id, date.id]
+    );
+    let under = w
+        .drive
+        .tree(&w.alice, eng.id, Some(apple.id), None, 100)
+        .await?;
+    assert_eq!(ids(&under.items), vec![apple2.id, apple1.id]);
+    let cut = w.drive.tree(&w.alice, eng.id, None, None, 2).await?;
+    assert!(cut.truncated);
+    assert_eq!(cut.items.len(), 2);
+
+    // Bob sees only what he may open, and nothing under what he can't.
+    w.access.grant(w.bob_id, berry.id, Role::Viewer);
+    w.access.grant(w.bob_id, apple1.id, Role::Viewer);
+    assert!(w.drive.tree(&w.bob, eng.id, None, None, 100).await.is_err());
+    w.access.grant(w.bob_id, eng.node_id(), Role::Viewer);
+    w.access.revoke(w.bob_id, berry.id);
+    let all = w.drive.tree(&w.bob, eng.id, None, None, 100).await?;
+    assert_eq!(all.items.len(), 6);
+
+    // The order survives a rebuilt index, because it lives in the files.
+    let index = w.databases.index().await?;
+    let access = Arc::new(MemoryAccess::new(index.clone()));
+    let rebuilt = Drive::new(w.store.clone(), index.clone(), access);
+    let _ = rebuilt.scan().await?;
+    let tree = rebuilt
+        .tree(&Actor::System, eng.id, None, None, 100)
+        .await?;
+    assert_eq!(
+        ids(&tree.items),
+        vec![cherry.id, apple.id, apple2.id, apple1.id, berry.id, date.id]
+    );
+    Ok(())
+}
+
 /// Runs each test on every index.
 macro_rules! on_every_index {
     ($($name:ident),* $(,)?) => {$(
@@ -853,4 +1036,6 @@ on_every_index!(
     concurrent_edits_merge_or_make_a_conflict_copy,
     the_index_rebuilds_from_files,
     external_edits_and_renames_come_in_through_the_watcher,
+    pages_nest_under_pages,
+    siblings_keep_their_order_and_the_tree_comes_whole,
 );

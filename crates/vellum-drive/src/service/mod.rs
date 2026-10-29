@@ -24,8 +24,8 @@ use self::api::{
     ActivityInput, ActivityList, ActivityView, ContentView, CreateFolder, CreatePage,
     CreateShortcut, CreateSpace, Done, FindInput, Limit, ListChildren, MyDrive, NoInput, NodeKey,
     NodeList, NodeView, PlaceInput, RecentItem, RecentList, Removed, RenameInput, SaveInput,
-    SaveResult, SaveView, SpaceKey, SpaceKindView, SpaceList, SpaceView, StarInput, UpdateSpace,
-    UsageView, VersionContent, VersionKey, VersionList, VersionView,
+    SaveResult, SaveView, SpaceKey, SpaceKindView, SpaceList, SpaceView, StarInput, TreeInput,
+    TreeView, UpdateSpace, UsageView, VersionContent, VersionKey, VersionList, VersionView,
 };
 use crate::drive::{Drive, Filter, SaveOutcome, Saved};
 
@@ -33,6 +33,8 @@ use crate::drive::{Drive, Filter, SaveOutcome, Saved};
 const MAX_LIMIT: usize = 200;
 /// Results a list returns when the caller does not say.
 const DEFAULT_LIMIT: usize = 50;
+/// Items a tree returns when the caller does not say.
+const DEFAULT_TREE_LIMIT: usize = 2_000;
 
 /// Serves the drive over the gateway.
 #[derive(Debug, Clone)]
@@ -141,6 +143,23 @@ impl DriveService {
             .list(&actor(ctx)?, input.space_id, input.parent_id)
             .await?;
         Ok(NodeList::of(&nodes))
+    }
+
+    async fn tree(&self, ctx: &RequestContext, input: TreeInput) -> Result<TreeView, Error> {
+        let tree = self
+            .drive
+            .tree(
+                &actor(ctx)?,
+                input.space_id,
+                input.root_id,
+                input.depth,
+                input.limit.unwrap_or(DEFAULT_TREE_LIMIT),
+            )
+            .await?;
+        Ok(TreeView {
+            items: tree.items.iter().map(NodeView::from).collect(),
+            truncated: tree.truncated,
+        })
     }
 
     async fn get(&self, ctx: &RequestContext, input: NodeKey) -> Result<NodeView, Error> {
@@ -376,18 +395,26 @@ impl DriveService {
     }
 
     async fn move_node(&self, ctx: &RequestContext, input: PlaceInput) -> Result<NodeView, Error> {
-        let node = self
+        let actor = actor(ctx)?;
+        let mut node = self
             .drive
-            .move_node(&actor(ctx)?, input.id, input.space_id, input.parent_id)
+            .move_node(&actor, input.id, input.space_id, input.parent_id)
             .await?;
+        if let Some(index) = input.index {
+            node = self.drive.reorder(&actor, node.id, index).await?;
+        }
         Ok(NodeView::from(&node))
     }
 
     async fn copy_node(&self, ctx: &RequestContext, input: PlaceInput) -> Result<NodeView, Error> {
-        let node = self
+        let actor = actor(ctx)?;
+        let mut node = self
             .drive
-            .copy_node(&actor(ctx)?, input.id, input.space_id, input.parent_id)
+            .copy_node(&actor, input.id, input.space_id, input.parent_id)
             .await?;
+        if let Some(index) = input.index {
+            node = self.drive.reorder(&actor, node.id, index).await?;
+        }
         Ok(NodeView::from(&node))
     }
 
@@ -444,6 +471,8 @@ impl DriveService {
                 "List items in other people's My Drives shared with you"),
             op!(self, query "drive.list", "/v1/drive/spaces/{space_id}/items", list,
                 "List the items in a folder or at the top of a space"),
+            op!(self, query "drive.tree", "/v1/drive/spaces/{space_id}/tree", tree,
+                "List every item in a space, or under one item, in tree order"),
             op!(self, query "drive.get", "/v1/drive/items/{id}", get, "Get an item"),
             op!(self, query "drive.read", "/v1/drive/items/{id}/content", read,
                 "Read a page's content and its etag"),
