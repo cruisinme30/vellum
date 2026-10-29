@@ -100,3 +100,7 @@ holder = "#525"
 [[reservation]]
 decisions = "D299"
 holder = "#528"
+
+[[reservation]]
+adrs = "0070"
+holder = "red team round 5 (#529)"
