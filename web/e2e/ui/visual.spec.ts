@@ -3,6 +3,7 @@
 
 import { expect, test } from "./fixtures";
 import { settle } from "./harness";
+import { fakeServer } from "./server";
 import { TARGETS } from "./targets";
 
 /**
@@ -21,6 +22,7 @@ for (const target of TARGETS.filter((candidate) => candidate.visual)) {
   for (const scheme of ["light", "dark"] as const) {
     test(`${target.name} looks the same (${scheme})`, async ({ page }) => {
       await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
+      await fakeServer(page, target.server);
       await page.goto(target.url);
       await settle(page);
       const name = `${target.name.replaceAll(/[^\w.-]+/g, "_")}-${scheme}.png`;
