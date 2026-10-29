@@ -49,3 +49,11 @@ holder = "books thread: people picker"
 [[reservation]]
 decisions = "D273-D275"
 holder = "admin thread: groups"
+
+[[reservation]]
+decisions = "D276"
+holder = "editor thread: sharing, ADR 0054"
+
+[[reservation]]
+decisions = "D277"
+holder = "drive thread: uploads UI, ADR 0052"
