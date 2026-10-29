@@ -32,7 +32,13 @@ pub fn equal(a: &[u8], b: &[u8]) -> bool {
 }
 
 /// Whether `signature_hex` is the hex HMAC of `parts` under `key`.
+///
+/// An empty key is a secret nobody configured. HMAC accepts it, so
+/// anyone could sign with it; every signature is refused instead.
 pub fn verify_hex(key: &[u8], parts: &[&[u8]], signature_hex: &str) -> bool {
+    if key.is_empty() {
+        return false;
+    }
     let expected = hex(&hmac_sha256(key, parts));
     equal(
         expected.as_bytes(),
@@ -57,5 +63,7 @@ mod tests {
             "5BDCC146BF60754E6A042426089575C75A003F089D2739839DEC58B964EC3843"
         ));
         assert!(!verify_hex(b"Jefe", &[b"x"], "00"));
+        let unkeyed = hex(&hmac_sha256(b"", &[b"x"]));
+        assert!(!verify_hex(b"", &[b"x"], &unkeyed));
     }
 }

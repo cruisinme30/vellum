@@ -19,6 +19,10 @@
 //! | `collections.create_row` | `POST /v1/collections/{collection_id}/rows` | `write:direct` |
 //! | `collections.update_row` | `PATCH /v1/collections/{collection_id}/rows/{row_id}` | `write:direct` |
 //! | `collections.delete_row` | `DELETE /v1/collections/{collection_id}/rows/{row_id}` | `write:direct` |
+//! | `collections.save_view` | `PUT /v1/collections/{collection_id}/views/{view}` | `write:direct` |
+//! | `collections.delete_view` | `DELETE /v1/collections/{collection_id}/views/{view}` | `write:direct` |
+//! | `collections.embed` | `GET /v1/collections/embed` | `read` |
+//! | `collections.chart` | `GET /v1/collections/chart` | `read` |
 //!
 //! Reading a collection needs read access to it and to every collection
 //! its relations point at, because relation cells show related titles
@@ -44,11 +48,42 @@ use vellum_store::BlobStore;
 
 pub use access::{Access, AuthzAccess, Need, SpaceOf};
 pub use api::{
-    CollectionInfo, CollectionKey, CollectionList, CollectionSummary, CreateRowInput,
-    ListCollections, PropertyInfo, QueryInput, RelationInfo, RollupInfo, RowDetail, RowKey,
-    RowWritten, UpdateRowInput, ViewInfo,
+    ChartInput, CollectionInfo, CollectionKey, CollectionList, CollectionSummary, CreateRowInput,
+    EmbedInput, EmbedResult, ListCollections, PropertyInfo, QueryInput, RelationInfo, RollupInfo,
+    RowDetail, RowKey, RowWritten, SaveViewInput, UpdateRowInput, ViewInfo, ViewKey,
 };
 pub use state::{MAX_FILE_BYTES, MAX_ROWS_PER_COLLECTION};
+
+/// Most saved views one collection may have.
+pub const MAX_VIEWS: usize = 64;
+/// Longest view name, in characters.
+pub const MAX_VIEW_NAME_CHARS: usize = 100;
+
+fn one_or_many(items: &[String]) -> OneOrMany {
+    match items {
+        [] => OneOrMany::None,
+        [one] => OneOrMany::One(one.clone()),
+        many => OneOrMany::Many(many.to_vec()),
+    }
+}
+
+fn view_name(name: &str) -> Result<String, Error> {
+    let name = name.trim();
+    if name.is_empty()
+        || name.chars().count() > MAX_VIEW_NAME_CHARS
+        || name.chars().any(char::is_control)
+    {
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            format!("a view name needs 1 to {MAX_VIEW_NAME_CHARS} printable characters"),
+        ));
+    }
+    Ok(name.to_owned())
+}
+
+fn same_name(a: &str, b: &str) -> bool {
+    a.trim().to_lowercase() == b.trim().to_lowercase()
+}
 
 use crate::compute::Computer;
 use crate::value::DateValue;
@@ -162,14 +197,22 @@ impl CollectionsService {
         Ok(())
     }
 
+    /// Checks edit access to `id`, and with `mirrored` also to the other
+    /// side of each two-way relation (row edits write there too).
     async fn require_edit(
         &self,
         state: &State,
         principal: &Principal,
         id: CollectionId,
+        mirrored: bool,
     ) -> Result<(), Error> {
         self.require_read(state, principal, id).await?;
-        for target in state.write_set(id) {
+        let targets = if mirrored {
+            state.write_set(id)
+        } else {
+            std::collections::BTreeSet::from([id])
+        };
+        for target in targets {
             let Ok(f) = state.folder(target) else {
                 continue;
             };
@@ -281,11 +324,7 @@ impl CollectionsService {
                 ));
             }
         };
-        let list = |items: &[String]| match items {
-            [] => OneOrMany::None,
-            [one] => OneOrMany::One(one.clone()),
-            many => OneOrMany::Many(many.to_vec()),
-        };
+        let list = one_or_many;
         let overlay = ViewDefRaw {
             name: Some(def.name.clone()),
             kind: input.kind,
@@ -361,7 +400,7 @@ impl CollectionsService {
                     "collections were not loaded",
                 ));
             };
-            self.require_edit(state, &ctx.principal, id).await?;
+            self.require_edit(state, &ctx.principal, id, true).await?;
             let changed = state.ws.apply(edit)?;
             let result = state.write(self.store.as_ref(), &changed).await;
             crate::telemetry::wrote(op, result.is_ok());
@@ -441,6 +480,288 @@ impl CollectionsService {
     }
 }
 
+impl CollectionsService {
+    /// Changes a collection's schema under the write lock and writes
+    /// `schema.yaml`; returns the collection as it now stands.
+    async fn edit_schema<F>(
+        &self,
+        ctx: &RequestContext,
+        op: &'static str,
+        id: CollectionId,
+        change: F,
+    ) -> Result<CollectionInfo, Error>
+    where
+        F: FnOnce(&mut crate::schema::Schema) -> Result<(), Error> + Send,
+    {
+        let span = tracing::info_span!("collections.edit_schema", op, collection = %id);
+        async move {
+            let mut guard = self.state.write().await;
+            if guard.is_none() {
+                *guard = Some(State::load(self.store.as_ref()).await?);
+            }
+            let Some(state) = guard.as_mut() else {
+                return Err(Error::new(
+                    ErrorKind::Internal,
+                    "collections were not loaded",
+                ));
+            };
+            self.require_edit(state, &ctx.principal, id, false).await?;
+            let mut schema = state
+                .ws
+                .collection(id)
+                .map(|c| c.schema().clone())
+                .ok_or_else(|| {
+                    Error::new(ErrorKind::NotFound, format!("collection {id} not found"))
+                })?;
+            change(&mut schema)?;
+            state.ws.set_schema(schema)?;
+            let result = state.write_schema(self.store.as_ref(), id).await;
+            crate::telemetry::wrote(op, result.is_ok());
+            if let Err(e) = result {
+                *guard = None;
+                return Err(e);
+            }
+            let info = match (state.ws.collection(id), state.folder(id)) {
+                (Some(c), Ok(f)) => CollectionInfo::new(
+                    c.schema(),
+                    f.path.as_str().to_owned(),
+                    f.diagnostics.clone(),
+                ),
+                _ => return Err(Error::new(ErrorKind::Internal, "collection vanished")),
+            };
+            drop(guard);
+            Ok(info)
+        }
+        .instrument(span)
+        .await
+    }
+
+    /// Saves a view: replaces the one with this name (and renames it when
+    /// asked) or adds a new one at the end.
+    ///
+    /// # Errors
+    ///
+    /// `invalid_input` for a bad name, filter, sort or property;
+    /// `conflict` when the new name is taken or `schema.yaml` changed on
+    /// disk; `permission_denied` without edit access.
+    pub async fn save_view(
+        &self,
+        ctx: &RequestContext,
+        input: SaveViewInput,
+    ) -> Result<CollectionInfo, Error> {
+        let name = view_name(&input.view)?;
+        let new_name = input.rename_to.as_deref().map(view_name).transpose()?;
+        self.edit_schema(ctx, "save_view", input.collection_id, move |schema| {
+            let raw = ViewDefRaw {
+                name: Some(new_name.clone().unwrap_or_else(|| name.clone())),
+                kind: Some(input.kind.unwrap_or_default()),
+                filter: one_or_many(&input.filter),
+                sort: one_or_many(&input.sort),
+                group: input.group.clone(),
+                hide: one_or_many(&input.hide),
+                date: input.date.clone(),
+                end: input.end.clone(),
+                limit: input.limit,
+            };
+            let def = ViewDef::from_raw(&raw, schema)?;
+            let at = schema.views.iter().position(|v| same_name(&v.name, &name));
+            if let Some(new) = &new_name {
+                let taken = schema
+                    .views
+                    .iter()
+                    .enumerate()
+                    .any(|(i, v)| Some(i) != at && same_name(&v.name, new));
+                if taken {
+                    return Err(Error::new(
+                        ErrorKind::Conflict,
+                        format!("a view named {new:?} already exists"),
+                    ));
+                }
+            }
+            if let Some(slot) = at.and_then(|i| schema.views.get_mut(i)) {
+                *slot = def;
+            } else if schema.views.len() >= MAX_VIEWS {
+                return Err(Error::new(
+                    ErrorKind::InvalidInput,
+                    format!("a collection may have at most {MAX_VIEWS} views"),
+                ));
+            } else {
+                schema.views.push(def);
+            }
+            Ok(())
+        })
+        .await
+    }
+
+    /// Deletes a saved view.
+    ///
+    /// # Errors
+    ///
+    /// `not_found` when there is no view with that name.
+    pub async fn delete_view(
+        &self,
+        ctx: &RequestContext,
+        key: ViewKey,
+    ) -> Result<CollectionInfo, Error> {
+        let name = key.view;
+        self.edit_schema(ctx, "delete_view", key.collection_id, move |schema| {
+            let before = schema.views.len();
+            schema.views.retain(|v| !same_name(&v.name, &name));
+            if schema.views.len() == before {
+                return Err(Error::new(
+                    ErrorKind::NotFound,
+                    format!("no view named {name:?}"),
+                ));
+            }
+            Ok(())
+        })
+        .await
+    }
+}
+
+impl CollectionsService {
+    fn view_operations(this: &Arc<Self>) -> Vec<Operation> {
+        let s = Arc::clone(this);
+        let save_view = Operation::mutation(
+            "collections.save_view",
+            HttpMethod::Put,
+            "/v1/collections/{collection_id}/views/{view}",
+            Scope::WriteDirect,
+            move |ctx, input: SaveViewInput| {
+                let s = Arc::clone(&s);
+                async move { s.save_view(&ctx, input).await }
+            },
+        )
+        .summary("Save a view: its layout, filters, sorts, grouping and hidden columns");
+        let s = Arc::clone(this);
+        let delete_view = Operation::mutation(
+            "collections.delete_view",
+            HttpMethod::Delete,
+            "/v1/collections/{collection_id}/views/{view}",
+            Scope::WriteDirect,
+            move |ctx, key: ViewKey| {
+                let s = Arc::clone(&s);
+                async move { s.delete_view(&ctx, key).await }
+            },
+        )
+        .summary("Delete a saved view");
+        vec![save_view, delete_view]
+    }
+}
+
+fn embed_error(e: &crate::fence::EmbedError) -> Error {
+    Error::new(ErrorKind::InvalidInput, e.0.clone())
+}
+
+impl CollectionsService {
+    /// Runs the view a `collection` block in a page asks for, as
+    /// `principal` sees it. The renderer and exporters call this directly;
+    /// the web app calls `collections.embed`.
+    ///
+    /// # Errors
+    ///
+    /// `invalid_input` with a readable message for a malformed block or
+    /// an unknown view or property; `not_found` when the collection does
+    /// not exist or the caller cannot read it.
+    pub async fn resolve_embed(
+        &self,
+        principal: &Principal,
+        fence: &str,
+    ) -> Result<EmbedResult, Error> {
+        let embed = crate::fence::CollectionEmbed::parse(fence).map_err(|e| embed_error(&e))?;
+        let state = self.read().await?;
+        self.require_read(&state, principal, embed.id).await?;
+        let (title, path) = match (state.ws.collection(embed.id), state.folder(embed.id)) {
+            (Some(c), Ok(f)) => (c.schema().title.clone(), f.path.as_str().to_owned()),
+            _ => {
+                return Err(Error::new(
+                    ErrorKind::NotFound,
+                    format!("collection {} not found", embed.id),
+                ));
+            }
+        };
+        let mut computer = Computer::new(&state.ws, (self.clock)());
+        let result = embed.resolve(&mut computer);
+        drop(computer);
+        drop(state);
+        Ok(EmbedResult {
+            collection_id: embed.id,
+            title,
+            path,
+            result: result.map_err(|e| embed_error(&e))?,
+        })
+    }
+
+    /// Computes a collection chart's data, as `principal` sees it.
+    ///
+    /// # Errors
+    ///
+    /// `invalid_input` for a source that is not `collection:<id>`, a
+    /// missing `x`, an unknown property, view or aggregation; `not_found`
+    /// when the collection cannot be read.
+    pub async fn resolve_chart(
+        &self,
+        principal: &Principal,
+        input: ChartInput,
+    ) -> Result<crate::fence::ChartData, Error> {
+        let mut attrs = std::collections::BTreeMap::from([
+            ("source".to_owned(), input.source),
+            ("x".to_owned(), input.x),
+        ]);
+        for (k, v) in [
+            ("view", input.view),
+            ("y", input.y),
+            ("series", input.series),
+            ("agg", input.agg),
+        ] {
+            if let Some(v) = v {
+                let _ = attrs.insert(k.to_owned(), v);
+            }
+        }
+        let source = crate::fence::ChartSource::from_attrs(&attrs)
+            .map_err(|e| embed_error(&e))?
+            .ok_or_else(|| {
+                Error::new(
+                    ErrorKind::InvalidInput,
+                    "a chart source must be collection:<id>",
+                )
+            })?;
+        let state = self.read().await?;
+        self.require_read(&state, principal, source.id).await?;
+        let mut computer = Computer::new(&state.ws, (self.clock)());
+        let data = source.resolve(&mut computer);
+        drop(computer);
+        drop(state);
+        data.map_err(|e| embed_error(&e))
+    }
+
+    fn embed_operations(this: &Arc<Self>) -> Vec<Operation> {
+        let s = Arc::clone(this);
+        let embed = Operation::query(
+            "collections.embed",
+            "/v1/collections/embed",
+            Scope::Read,
+            move |ctx, input: EmbedInput| {
+                let s = Arc::clone(&s);
+                async move { s.resolve_embed(&ctx.principal, &input.fence).await }
+            },
+        )
+        .summary("Show the live rows of a collection block in a page");
+        let s = Arc::clone(this);
+        let chart = Operation::query(
+            "collections.chart",
+            "/v1/collections/chart",
+            Scope::Read,
+            move |ctx, input: ChartInput| {
+                let s = Arc::clone(&s);
+                async move { s.resolve_chart(&ctx.principal, input).await }
+            },
+        )
+        .summary("Compute a chart's data from a collection");
+        vec![embed, chart]
+    }
+}
+
 impl Service for CollectionsService {
     fn name(&self) -> &'static str {
         "collections"
@@ -515,6 +836,8 @@ impl Service for CollectionsService {
             },
         )
         .summary("Change a row's values or body");
+        let views = Self::view_operations(&self);
+        let embeds = Self::embed_operations(&self);
         let s = self;
         let delete_row = Operation::mutation(
             "collections.delete_row",
@@ -527,9 +850,12 @@ impl Service for CollectionsService {
             },
         )
         .summary("Delete a row and unlink it");
-        vec![
+        let mut ops = vec![
             list, get, query, get_row, create_row, update_row, delete_row,
-        ]
+        ];
+        ops.extend(views);
+        ops.extend(embeds);
+        ops
     }
 
     fn readiness(&self) -> BoxFuture<'_, Readiness> {
