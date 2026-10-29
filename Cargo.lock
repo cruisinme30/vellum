@@ -6708,8 +6708,10 @@ dependencies = [
 name = "vellum-cli"
 version = "0.0.0"
 dependencies = [
+ "async-trait",
  "axum",
  "base64 0.23.1",
+ "bytes",
  "clap",
  "getrandom 0.4.3",
  "http",
@@ -6717,6 +6719,7 @@ dependencies = [
  "serde_json",
  "serde_urlencoded",
  "sha2 0.11.1",
+ "tempfile",
  "thiserror",
  "tokio",
  "tower",
@@ -6724,12 +6727,15 @@ dependencies = [
  "url",
  "vellum-api",
  "vellum-contracts",
+ "vellum-crypto",
  "vellum-db",
  "vellum-help",
  "vellum-identity",
  "vellum-kernel",
  "vellum-mcp",
+ "vellum-private",
  "vellum-security",
+ "vellum-store",
 ]
 
 [[package]]
@@ -7014,6 +7020,27 @@ dependencies = [
 [[package]]
 name = "vellum-pages"
 version = "0.0.0"
+
+[[package]]
+name = "vellum-private"
+version = "0.0.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "futures",
+ "serde",
+ "serde-saphyr",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "vellum-crypto",
+ "vellum-format",
+ "vellum-kernel",
+ "vellum-search",
+ "vellum-store",
+ "zeroize",
+]
 
 [[package]]
 name = "vellum-render"

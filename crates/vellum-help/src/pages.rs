@@ -739,6 +739,7 @@ pub static ANCHORS: &[(&str, &str)] = &[
     ("ai.connect", "user/ai/README.md#connect"),
     ("ai.tools", "user/ai/README.md#tools"),
     ("ai.scopes", "user/ai/README.md#scopes"),
+    ("ai.private", "user/ai/README.md#private"),
     ("ai.drafts", "user/ai/drafts.md#review"),
     ("admin.overview", "admin/README.md"),
     ("admin.deployment", "admin/deploy/README.md#migrate"),

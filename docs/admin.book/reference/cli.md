@@ -13,7 +13,8 @@ Every command accepts `--config <file>` and `--data-dir <folder>`, and
 | --- | --- |
 | `vellum serve` | Runs the server |
 | `vellum docs` | Lists the help books built into this binary, or prints a page |
-| `vellum mcp` | Runs the MCP server over standard input and output |
+| `vellum mcp` | Runs the MCP server over standard input and output; `--private` serves the end-to-end encrypted spaces sealed to this device, read-only |
+| `vellum private key` | Prints this device's public key and fingerprint, for enrolling it in private spaces |
 | `vellum new` | Creates a page, book or collection from the command line |
 | `vellum open` | Opens a page in the browser |
 | `vellum search` | Searches from the command line |

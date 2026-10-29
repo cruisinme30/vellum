@@ -6,43 +6,47 @@
 
 use std::process::ExitCode;
 use std::sync::Arc;
+use std::time::Duration;
 
 use vellum_mcp::auth::{Principal, ScopeSet};
 use vellum_mcp::memory::{MemoryAudit, MemoryWorkspace};
+use vellum_mcp::ports::Workspace;
 use vellum_mcp::server::{McpServer, ServerConfig};
+use vellum_private::{PrivateAgent, PrivateSpace};
+use vellum_store::{BlobPath, BlobStore, LocalStore};
+
+use crate::private::{PrivateWorkspace, device_identity, parse_space};
 
 /// Options of `vellum mcp`.
 #[derive(Debug, clap::Args)]
 pub struct McpArgs {
     /// Serve the in-memory Northstar demo workspace instead of this
     /// machine's workspace.
-    #[arg(long)]
+    #[arg(long, conflicts_with = "private")]
     demo: bool,
+    /// Serve the end-to-end encrypted private spaces sealed to this device,
+    /// read-only. The pages are opened in memory with the device key from
+    /// the OS keychain; nothing decrypted is written to disk.
+    #[arg(long, requires = "space")]
+    private: bool,
+    /// A private space as `slug=path`, the path relative to the data folder
+    /// (for example `board=drives/shared/board`). Repeat for more spaces.
+    #[arg(long, value_parser = parse_space)]
+    space: Vec<(String, String)>,
+    /// How often to reopen the private spaces, in seconds, to pick up
+    /// pages synced since the last pass.
+    #[arg(long, default_value_t = 60, value_parser = clap::value_parser!(u64).range(5..))]
+    refresh_secs: u64,
 }
 
 /// Runs the stdio server until standard input closes.
 pub fn run(args: &McpArgs) -> ExitCode {
-    if !args.demo {
+    if !args.demo && !args.private {
         tracing::error!(
-            "the workspace services are not wired into the binary yet; run `vellum mcp --demo` to try the server"
+            "the workspace services are not wired into the binary yet; run `vellum mcp --demo` to try the server, or `vellum mcp --private --space slug=path` for private spaces"
         );
         return ExitCode::FAILURE;
     }
-    let scopes =
-        std::env::var("VELLUM_SCOPES").unwrap_or_else(|_| "read write:draft work".to_owned());
-    let principal = Principal {
-        token_id: "demo".into(),
-        user_id: "usr_priya".into(),
-        user_name: "Priya".into(),
-        client_id: "stdio".into(),
-        client_name: "Local MCP client".into(),
-        scopes: ScopeSet::parse(&scopes),
-    };
-    let server = Arc::new(McpServer::new(
-        Arc::new(MemoryWorkspace::northstar()),
-        Arc::new(MemoryAudit::default()),
-        ServerConfig::default(),
-    ));
     let runtime = match tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
@@ -53,18 +57,104 @@ pub fn run(args: &McpArgs) -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    tracing::info!(scopes = %principal.scopes, "serving MCP over stdio");
-    let result = runtime.block_on(vellum_mcp::stdio::serve(
-        server,
-        principal,
-        tokio::io::stdin(),
-        tokio::io::stdout(),
-    ));
+    let result = runtime.block_on(async {
+        if args.private {
+            let agent = open_private(&args.space).await?;
+            keep_fresh(Arc::clone(&agent), Duration::from_secs(args.refresh_secs));
+            // Reads only: write tools are not offered at all.
+            serve(
+                Arc::new(PrivateWorkspace::new(agent)),
+                principal("private", "local", "read"),
+            )
+            .await
+        } else {
+            let scopes = std::env::var("VELLUM_SCOPES")
+                .unwrap_or_else(|_| "read write:draft work".to_owned());
+            serve(
+                Arc::new(MemoryWorkspace::northstar()),
+                principal("demo", "usr_priya", &scopes),
+            )
+            .await
+        }
+    });
     match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
-            tracing::error!(%error, "the MCP stdio transport failed");
-            ExitCode::FAILURE
+            tracing::error!(%error, "vellum mcp failed");
+            crate::fail(&error)
         }
     }
+}
+
+fn principal(token: &str, user: &str, scopes: &str) -> Principal {
+    Principal {
+        token_id: token.into(),
+        user_id: user.into(),
+        user_name: user.into(),
+        client_id: "stdio".into(),
+        client_name: "Local MCP client".into(),
+        scopes: ScopeSet::parse(scopes),
+    }
+}
+
+/// Opens the private spaces in the data folder with this device's key.
+async fn open_private(spaces: &[(String, String)]) -> Result<Arc<PrivateAgent>, String> {
+    let config = vellum_kernel::config::Config::load(None).map_err(|e| e.to_string())?;
+    let identity = device_identity()?;
+    let store: Arc<dyn BlobStore> = Arc::new(
+        LocalStore::open(&config.data_dir)
+            .await
+            .map_err(|e| format!("cannot open {}: {e}", config.data_dir.display()))?,
+    );
+    let mut opened = Vec::with_capacity(spaces.len());
+    for (slug, path) in spaces {
+        let root = BlobPath::new(path.as_str()).map_err(|e| format!("{slug}: {e}"))?;
+        opened.push(
+            PrivateSpace::open(store.as_ref(), &identity, slug, root)
+                .await
+                .map_err(|e| format!("{slug}: {e}"))?,
+        );
+    }
+    tracing::info!(
+        fingerprint = %identity.fingerprint_hex(),
+        spaces = opened.len(),
+        "opening private spaces"
+    );
+    let agent = PrivateAgent::new(identity, store, opened).map_err(|e| e.to_string())?;
+    let report = agent.refresh().await.map_err(|e| e.to_string())?;
+    tracing::info!(
+        opened = report.opened,
+        not_for_this_device = report.not_for_this_device,
+        unreadable = report.unreadable,
+        not_sealed = report.not_sealed,
+        "private spaces ready"
+    );
+    Ok(Arc::new(agent))
+}
+
+/// Reopens the spaces every `every`, so pages synced in since start show up.
+fn keep_fresh(agent: Arc<PrivateAgent>, every: Duration) {
+    drop(tokio::spawn(async move {
+        let mut tick = tokio::time::interval(every);
+        // The first tick is immediate, and the spaces were just opened.
+        let _ = tick.tick().await;
+        loop {
+            let _ = tick.tick().await;
+            if let Err(error) = agent.refresh().await {
+                tracing::warn!(%error, "could not reopen the private spaces");
+            }
+        }
+    }));
+}
+
+async fn serve(workspace: Arc<dyn Workspace>, principal: Principal) -> Result<(), String> {
+    let server = Arc::new(McpServer::new(
+        workspace,
+        Arc::new(MemoryAudit::default()),
+        ServerConfig::default(),
+    ));
+    tracing::info!(scopes = %principal.scopes, "serving MCP over stdio");
+    vellum_mcp::stdio::serve(server, principal, tokio::io::stdin(), tokio::io::stdout())
+        .await
+        .map_err(|e| format!("the MCP stdio transport failed: {e}"))
 }
