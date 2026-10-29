@@ -284,7 +284,12 @@ fn container(container: &Container) -> String {
         .iter()
         .map(|s| blocks(s, pos, "\n"))
         .collect();
-    let body = sections.join("\n---\n\n");
+    let mut body = sections.join("\n---\n\n");
+    // The parser drops an empty first column (a split before any content),
+    // so an empty first column is written with a split in front of it.
+    if columns && sections.len() > 1 && sections.first().is_some_and(String::is_empty) {
+        body.insert_str(0, "---\n");
+    }
     // Blank lines around the body keep lists and fences apart from the
     // `:::` lines, as markdownlint (MD031, MD032) expects.
     if !body.is_empty() {

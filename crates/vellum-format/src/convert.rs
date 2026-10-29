@@ -31,12 +31,20 @@ fn options() -> Options<'static> {
 }
 
 /// Parses `src` as Markdown. `first_line` is the 1-based line of `src` in the
-/// file, used for diagnostics.
-pub fn markdown(src: &str, first_line: usize, diagnostics: &mut Vec<Diagnostic>) -> Vec<Block> {
+/// file, used for diagnostics; `depth` is the number of containers around it.
+pub fn markdown(
+    src: &str,
+    first_line: usize,
+    depth: usize,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Vec<Block> {
     let arena = Arena::new();
     let root = parse_document(&arena, src, &options());
     let mut cx = Cx {
         line_offset: first_line.saturating_sub(1),
+        depth,
+        inline_depth: 0,
+        too_deep: false,
         diagnostics,
     };
     cx.blocks(root)
@@ -46,7 +54,11 @@ pub fn markdown(src: &str, first_line: usize, diagnostics: &mut Vec<Diagnostic>)
 /// whole text. Directive lines inside code are content, not directives.
 pub fn code_lines(src: &str) -> Vec<bool> {
     let arena = Arena::new();
-    let root = parse_document(&arena, src, &options());
+    // Alerts do not change what is code, and comrak's alert check is
+    // quadratic in a run of `>` (see `prepass::space_quote_runs`).
+    let mut options = options();
+    options.extension.alerts = false;
+    let root = parse_document(&arena, src, &options);
     let mut code = vec![false; src.split_inclusive('\n').count()];
     for node in root.descendants() {
         if let NodeValue::CodeBlock(_) = node.data().value {
@@ -63,10 +75,46 @@ pub fn code_lines(src: &str) -> Vec<bool> {
 
 struct Cx<'d> {
     line_offset: usize,
+    /// Block nesting around the node being converted.
+    depth: usize,
+    /// Inline nesting around the node being converted.
+    inline_depth: usize,
+    /// Whether the too-deep diagnostic has been reported.
+    too_deep: bool,
     diagnostics: &'d mut Vec<Diagnostic>,
 }
 
 impl Cx<'_> {
+    /// Converts the children of a block quote, callout or list item one
+    /// level down, or flattens them to text past [`crate::MAX_NESTING`].
+    fn nested_blocks<'a>(&mut self, parent: &'a AstNode<'a>) -> Vec<Block> {
+        if self.depth >= crate::MAX_NESTING {
+            self.report_too_deep(parent);
+            let text = descendant_text(parent);
+            if text.is_empty() {
+                return Vec::new();
+            }
+            let mut content = vec![Inline::Text { text }];
+            let id = extras::take_block_id(&mut content);
+            return vec![Block::Paragraph {
+                content: extras::recognize(content),
+                id,
+            }];
+        }
+        self.depth += 1;
+        let blocks = self.blocks(parent);
+        self.depth -= 1;
+        blocks
+    }
+
+    fn report_too_deep(&mut self, node: &AstNode<'_>) {
+        if !self.too_deep {
+            self.too_deep = true;
+            let line = node.data().sourcepos.start.line + self.line_offset;
+            self.diagnostics.push(crate::prepass::too_deep(line));
+        }
+    }
+
     fn blocks<'a>(&mut self, parent: &'a AstNode<'a>) -> Vec<Block> {
         parent
             .children()
@@ -113,7 +161,7 @@ impl Cx<'_> {
             }
             NodeValue::ThematicBreak => Block::ThematicBreak,
             NodeValue::BlockQuote | NodeValue::MultilineBlockQuote(_) => Block::BlockQuote {
-                blocks: self.blocks(node),
+                blocks: self.nested_blocks(node),
             },
             NodeValue::Alert(alert) => {
                 // Read the title as a container line would be read.
@@ -123,7 +171,7 @@ impl Cx<'_> {
                     name: callout_name(alert.alert_type).to_owned(),
                     arg: arg.to_owned(),
                     attrs,
-                    sections: vec![self.blocks(node)],
+                    sections: vec![self.nested_blocks(node)],
                 })
             }
             NodeValue::List(list) => Block::List(List {
@@ -167,7 +215,7 @@ impl Cx<'_> {
         };
         ListItem {
             task,
-            blocks: self.blocks(node),
+            blocks: self.nested_blocks(node),
         }
     }
 
@@ -186,10 +234,18 @@ impl Cx<'_> {
     }
 
     fn inlines<'a>(&mut self, parent: &'a AstNode<'a>) -> Vec<Inline> {
+        if self.inline_depth >= crate::MAX_NESTING {
+            self.report_too_deep(parent);
+            return vec![Inline::Text {
+                text: descendant_text(parent),
+            }];
+        }
+        self.inline_depth += 1;
         let mut out = Vec::new();
         for node in parent.children() {
             self.inline(node, &mut out);
         }
+        self.inline_depth -= 1;
         extras::merge_text(out)
     }
 
@@ -304,6 +360,29 @@ const fn convert_alignment(alignment: TableAlignment) -> Alignment {
         TableAlignment::Center => Alignment::Center,
         TableAlignment::Right => Alignment::Right,
     }
+}
+
+/// The text under a comrak node, gathered without recursion: text and
+/// code as they are, line breaks and block boundaries as spaces.
+fn descendant_text<'a>(node: &'a AstNode<'a>) -> String {
+    let mut out = String::new();
+    for d in node.descendants().skip(1) {
+        match &d.data().value {
+            NodeValue::Text(text) => out.push_str(text),
+            NodeValue::Code(code) => out.push_str(&code.literal),
+            NodeValue::CodeBlock(code) => out.push_str(&code.literal),
+            NodeValue::HtmlInline(html) => out.push_str(html),
+            NodeValue::HtmlBlock(html) => out.push_str(&html.literal),
+            NodeValue::SoftBreak | NodeValue::LineBreak | NodeValue::Paragraph
+                if !out.is_empty() && !out.ends_with(' ') =>
+            {
+                out.push(' ');
+            }
+            _ => {}
+        }
+    }
+    let collapsed: Vec<&str> = out.split_whitespace().collect();
+    collapsed.join(" ")
 }
 
 /// The text of inline content, without markup.

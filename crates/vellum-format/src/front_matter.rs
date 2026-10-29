@@ -137,7 +137,7 @@ pub fn parse(yaml: &str, diagnostics: &mut Vec<Diagnostic>) -> FrontMatter {
     if yaml.trim().is_empty() {
         return FrontMatter::Fields(Map::new());
     }
-    let value = match serde_saphyr::from_str::<Value>(yaml) {
+    let value = match serde_saphyr::from_str_with_options::<Value>(yaml, yaml_options()) {
         Ok(value) => value,
         Err(error) => {
             // The YAML starts on line 2 of the file, after the `---` line.
@@ -170,6 +170,22 @@ pub fn parse(yaml: &str, diagnostics: &mut Vec<Diagnostic>) -> FrontMatter {
     let map = canonical_order(map);
     check_fields(&map, diagnostics);
     FrontMatter::Fields(map)
+}
+
+/// Limits for front matter, far tighter than the library defaults: front
+/// matter is a short list of properties, and the default nesting depth of
+/// 64 is enough to overflow a 1 `MiB` stack in a debug build (D120).
+fn yaml_options() -> serde_saphyr::Options {
+    serde_saphyr::options! {
+        budget: serde_saphyr::budget! {
+            max_depth: 16,
+            max_nodes: 20_000,
+            max_aliases: 1_000,
+            max_anchors: 1_000,
+            max_events: 100_000,
+            max_total_scalar_bytes: 4 * 1024 * 1024,
+        },
+    }
 }
 
 fn canonical_order(mut map: Map<String, Value>) -> Map<String, Value> {
