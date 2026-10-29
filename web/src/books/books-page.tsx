@@ -7,6 +7,7 @@ import { failureText } from "../data/failure";
 import { Ready, ServerScreen } from "../data/server-apis";
 import { useLoaded } from "../data/use-loaded";
 import { useT } from "../i18n/i18n";
+import { ExportButton } from "../transfer/export-button";
 
 import type { BookInfo, BooksApi, BookSummary, TocLine, TocNode } from "./api";
 import { MarkdownReader } from "./markdown";
@@ -113,12 +114,23 @@ function Section({
   readonly book: string;
   readonly section: string;
 }) {
+  const t = useT();
   const loaded = useLoaded(() => api.section(book, section), [api, book, section], failureText);
   return (
     <Ready loaded={loaded}>
       {(found) => (
         <article className="vl-book-section">
           <h2>{found.number == undefined ? found.title : `${found.number} ${found.title}`}</h2>
+          <ExportButton
+            label={t("export-section")}
+            target={{
+              kind: "book",
+              id: book,
+              title: found.title,
+              scope: "subtree",
+              section: found.id,
+            }}
+          />
           <MarkdownReader markdown={found.markdown} title={found.title} />
         </article>
       )}
@@ -143,6 +155,10 @@ function Book({
         <Link to="/books">{t("books")}</Link>
       </p>
       <h1>{info.title}</h1>
+      <ExportButton
+        label={t("export-book")}
+        target={{ kind: "book", id: info.id, title: info.title, scope: "whole" }}
+      />
       <div className="vl-book">
         <nav className="vl-book-toc" aria-label={t("books-contents")}>
           <TocList book={info.id} lines={info.toc} current={shown} />

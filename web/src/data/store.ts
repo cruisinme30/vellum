@@ -68,6 +68,8 @@ export interface WorkspaceStore {
    * it loads that person's spaces, or empties when nobody is.
    */
   setUser?(user: SignedInUser | undefined): void;
+  /** Loads the spaces and pages again, after a change made elsewhere (an import). */
+  refresh?(): void;
 }
 
 /** Seed data for an in-memory store. */

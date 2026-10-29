@@ -33,6 +33,7 @@ import { createPlatform, startPlatform } from "./platform/platform";
 import { createHttpPrivateSpacesApi } from "./platform/private/api";
 import { DocumentCache } from "./platform/store/document-cache";
 import { openLocalDatabase } from "./platform/store/persistence";
+import { createHttpTransferApi } from "./transfer/api";
 import { createHttpWorkApi } from "./work/api";
 
 // Demo pages keep their edits across reloads in the browser's local
@@ -77,6 +78,7 @@ root.render(
       work={status === undefined ? undefined : createHttpWorkApi(http)}
       books={status === undefined ? undefined : createHttpBooksApi(http)}
       privateSpaces={status === undefined ? undefined : createHttpPrivateSpacesApi(http)}
+      transfer={status === undefined ? undefined : createHttpTransferApi(http)}
       collections={
         status === undefined ? createMockCollectionsStore() : createHttpCollectionsStore(http)
       }
