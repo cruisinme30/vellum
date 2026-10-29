@@ -1,0 +1,69 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Packaging for macOS (notarised, universal), Windows (NSIS) and Linux
+# (AppImage and deb). Signing material comes only from the environment; see
+# .github/workflows/desktop-release.yml and ADR 0023 (D99).
+appId: dev.vellum.desktop
+productName: Vellum
+copyright: Copyright © 2026 The Vellum contributors
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**
+  - package.json
+  - "!**/*.map"
+# The built web app and the `vellum` server binary for local mode.
+extraResources:
+  - from: ../web/dist
+    to: web
+  - from: ../target/release/${env.VELLUM_BINARY}
+    to: bin/${env.VELLUM_BINARY}
+protocols:
+  - name: Vellum link
+    schemes: [vellum]
+asar: true
+electronFuses:
+  runAsNode: false
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  grantFileProtocolExtraPrivileges: false
+mac:
+  category: public.app-category.productivity
+  target:
+    - target: dmg
+      arch: [universal]
+    - target: zip
+      arch: [universal]
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  # Notarisation reads APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD and APPLE_TEAM_ID;
+  # the release workflow turns it off when those secrets are missing.
+  notarize: true
+win:
+  target:
+    - target: nsis
+      arch: [x64, arm64]
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+linux:
+  category: Office
+  maintainer: The Vellum contributors
+  target:
+    - target: AppImage
+      arch: [x64, arm64]
+    - target: deb
+      arch: [x64, arm64]
+publish:
+  provider: github
+  owner: cruisinme30
+  repo: vellum
+  releaseType: draft

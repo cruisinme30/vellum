@@ -70,6 +70,8 @@ pub enum Block {
     BlockQuote {
         /// Quoted blocks.
         blocks: Vec<Self>,
+        /// Block ID, written `^blk-…` on its own line after the quote.
+        id: Option<BlockId>,
     },
     /// A bullet, ordered or task list.
     List(List),
@@ -80,6 +82,8 @@ pub enum Block {
     Math {
         /// `TeX` source, without the delimiters.
         literal: String,
+        /// Block ID, written after the opening `$$`.
+        id: Option<BlockId>,
     },
     /// A GFM table.
     Table(Table),
@@ -103,6 +107,9 @@ pub struct List {
 pub struct ListItem {
     /// `Some(done)` for a task item (`[ ]` / `[x]`).
     pub task: Option<bool>,
+    /// A task item's trailing `{…}` span (D82), written at the end of its
+    /// first paragraph, before the block ID. Always empty for other items.
+    pub attrs: Attributes,
     /// The item's blocks.
     pub blocks: Vec<Block>,
 }
@@ -116,6 +123,8 @@ pub struct Fence {
     pub args: String,
     /// Trailing `{#id .class}` attributes.
     pub attrs: Attributes,
+    /// Block ID, the last word of the info string before the attributes.
+    pub id: Option<BlockId>,
     /// The body, each line ending in `\n`.
     pub literal: String,
 }
@@ -202,6 +211,8 @@ pub struct Table {
     pub header: Vec<Vec<Inline>>,
     /// Body rows of cells.
     pub rows: Vec<Vec<Vec<Inline>>>,
+    /// Block ID, written `^blk-…` on its own line after the table.
+    pub id: Option<BlockId>,
 }
 
 /// A `:::` container.
@@ -213,6 +224,8 @@ pub struct Container {
     pub arg: String,
     /// Trailing `{#id .class}` attributes.
     pub attrs: Attributes,
+    /// Block ID, the last word of the opening line before the attributes.
+    pub id: Option<BlockId>,
     /// The body. `columns` has one entry per column, split by `---` lines;
     /// every other container has exactly one entry.
     pub sections: Vec<Vec<Block>>,
