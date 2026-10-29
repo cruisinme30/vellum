@@ -12,6 +12,8 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D85, D86, D87
+- Issue: #165, #166, #167, #168, #169, #170
+- Pull requests: #210
 - Crate: `vellum-mcp` (layer `edge`)
 
 :::
@@ -32,6 +34,19 @@ request carries its protocol version and client capabilities in `_meta`;
 `server/discover` replaces the handshake; `subscriptions/listen` replaces
 `resources/subscribe` and the standalone GET stream. Where the spec and
 the brief differ, the decisions below say which way we went.
+
+## Options considered
+
+- **Target 2025-11-25 only**: what most clients send today, but it needs
+  sessions and a handshake the brief's revision removed. Rejected; we
+  accept it as a fallback instead (D86).
+- **Target 2026-07-28 only**: matches the brief, but would turn away most
+  clients in the field for now. Rejected for the same reason.
+- **Filter `tools/list` by scope**: hides tools a token cannot call, but
+  makes the list differ per token and breaks client caches. Rejected in
+  favour of a fixed list and call-time checks (D85).
+- **Run our own authorization server inside the MCP crate**: duplicates
+  identity. Rejected; MCP is a resource server only (D87).
 
 ## Decisions
 
@@ -116,3 +131,7 @@ the brief differ, the decisions below say which way we went.
 - `vellum mcp` without `--demo` fails with a clear message until the
   workspace services are wired into the binary; that wiring belongs to
   the app crate.
+
+## History
+
+- 2026-10-29: accepted in #210.
