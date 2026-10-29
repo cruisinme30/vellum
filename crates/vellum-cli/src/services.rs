@@ -56,6 +56,8 @@ pub struct Services {
     admin: Option<Arc<dyn Service>>,
     /// Where the gateway records per-route metrics.
     observability: Observability,
+    /// The drive index, which Admin → Usage counts pages and storage from.
+    drive_index: Option<Arc<dyn vellum_drive::DriveIndex>>,
 }
 
 impl std::fmt::Debug for Services {
@@ -135,12 +137,16 @@ impl Services {
             tasks: None,
             admin: None,
             observability: Observability::new(),
+            drive_index: None,
         })
     }
 
     /// Adds the admin console over `config`'s data folder, reading and
     /// writing the same trace buffer and route metrics as `observability`.
-    /// Scheduled backups, drills and usage reports start running.
+    /// Scheduled backups, drills and usage reports start running, and the
+    /// usage counts (Admin → Usage, `vellum.usage.*`) are taken every few
+    /// minutes. Call it after [`Self::with_workspace`], so pages and storage
+    /// are counted too.
     ///
     /// # Errors
     ///
@@ -151,7 +157,13 @@ impl Services {
         observability: Observability,
         var: impl Fn(&str) -> Option<String>,
     ) -> Result<Self, Error> {
-        let (service, facts) = observability::open(config, &observability, var).await?;
+        let counts = Arc::new(observability::WorkspaceCounts {
+            identity: Arc::clone(&self.identity),
+            drive: self.drive_index.clone(),
+        });
+        let (service, _) = observability::open(config, &observability, var).await?;
+        let (sampler, facts) = observability::counted(config, counts);
+        observability::spawn_sampling(sampler);
         observability::spawn_ticks(Arc::clone(&service), Arc::clone(&facts));
         self.admin = Some(observability::api(service, facts));
         self.observability = observability;
@@ -182,6 +194,7 @@ impl Services {
         self.replica = opened.replica;
         self.rate_counts = opened.rate_counts;
         self.tasks = opened.tasks;
+        self.drive_index = opened.drive_index;
         Ok(self)
     }
 

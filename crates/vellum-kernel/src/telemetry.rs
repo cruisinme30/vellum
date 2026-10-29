@@ -250,6 +250,16 @@ pub fn subscriber_with(
     Ok((subscriber, TelemetryGuard { providers }))
 }
 
+/// The meter for `scope` on the process's meter provider.
+///
+/// Instruments made from it export over OTLP once [`init`] installed an
+/// exporter, and cost nothing otherwise. Observable gauges registered on it are read at each
+/// export, so their callbacks should only read cached values.
+#[must_use]
+pub fn meter(scope: &'static str) -> opentelemetry::metrics::Meter {
+    opentelemetry::global::meter(scope)
+}
+
 /// Whether a `tracing` target belongs to the export pipeline itself.
 fn is_exporter_target(target: &str) -> bool {
     ["opentelemetry", "hyper", "reqwest", "h2", "rustls"]

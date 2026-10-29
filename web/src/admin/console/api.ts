@@ -17,6 +17,7 @@ import type {
   BackupInfo,
   ChainReport,
   DrillReport,
+  UsageCounts,
   Versioned,
 } from "../../api/api.gen";
 import { ApiError, type Http, type Query } from "../../api/http";
@@ -36,6 +37,8 @@ export interface AdminConsoleApi {
   backups(): Promise<BackupFile[]>;
   backUpNow(): Promise<BackupInfo>;
   runDrill(): Promise<DrillReport>;
+  /** People, content, storage and activity; `refresh` counts again now. */
+  usage(refresh: boolean): Promise<UsageCounts>;
 }
 
 const ADMIN = "/api/v1/admin";
@@ -75,6 +78,7 @@ export function createHttpAdminConsoleApi(http: Http): AdminConsoleApi {
     },
     backUpNow: () => http.send<BackupInfo>("POST", `${ADMIN}/backups`),
     runDrill: () => http.send<DrillReport>("POST", `${ADMIN}/backups/drill`),
+    usage: (refresh) => http.get<UsageCounts>(`${ADMIN}/usage`, refresh ? { refresh: "true" } : {}),
   };
 }
 
@@ -96,5 +100,6 @@ export {
   type BackupFile,
   type ChainReport,
   type DrillReport,
+  type UsageCounts,
   type Versioned,
 } from "../../api/api.gen";

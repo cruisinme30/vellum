@@ -63,7 +63,7 @@ export function PendingView({ title, body }: { readonly title: string; readonly 
   );
 }
 
-const ADMIN_SCREENS = ["audit", "settings", "backups", "requests", "routes"] as const;
+const ADMIN_SCREENS = ["usage", "audit", "settings", "backups", "requests", "routes"] as const;
 
 /** Admin: the console's screens, and the signed-in account. */
 export function AdminView() {

@@ -20,6 +20,18 @@ Every response carries a `Server-Timing` header and a request ID. Error
 dialogs in the app show the request ID with **Copy diagnostic**, so a
 user's report leads you straight to the trace.
 
+## Usage {#usage-counts}
+
+**Admin → Usage** shows who uses the server and how much it holds:
+accounts, administrators, open sessions and API tokens; people active
+today, this week and this month; drives, pages, books, collections,
+folders, the trash and saved versions; bytes stored; and changes made
+today and this week. The counts are taken every five minutes; **Count
+now** counts again. They are exact and stay on the server.
+
+The same numbers are exported as `vellum.usage.*` metrics (Prometheus
+names `vellum_usage_*`), charted by the **Vellum: usage** dashboard.
+
 ## Exporting {#export}
 
 Set `OTEL_EXPORTER_OTLP_ENDPOINT` to send everything to an OpenTelemetry
@@ -46,4 +58,5 @@ writes a flame graph of the server while it handles that route.
 
 Vellum can send anonymous usage counts to the project to guide its
 development. It is off unless you turn it on in **Admin → Telemetry**,
-and the page shows exactly what would be sent.
+and the page shows exactly what would be sent. Reports carry rough size
+ranges (such as 11–50 people), never the exact counts on Admin → Usage.

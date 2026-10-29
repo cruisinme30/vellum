@@ -9,6 +9,7 @@ import { AuditPage } from "./admin/console/audit-page";
 import { BackupsPage } from "./admin/console/backups-page";
 import { AdminConsoleProvider } from "./admin/console/context";
 import { SettingsPage } from "./admin/console/settings-page";
+import { UsagePage } from "./admin/console/usage-page";
 import { RequestsPage } from "./admin/requests/requests-page";
 import { RoutesPage } from "./admin/routes/routes-page";
 import type { AuthApi, AuthStatus } from "./api/auth";
@@ -96,6 +97,7 @@ export function AppRoutes() {
         <Route path="data/:collectionId" element={<CollectionView />} />
         <Route path="help" element={<HelpView />} />
         <Route path="admin" element={<AdminView />} />
+        <Route path="admin/usage" element={<UsagePage />} />
         <Route path="admin/requests" element={<RequestsPage />} />
         <Route path="admin/routes" element={<RoutesPage />} />
         <Route path="admin/audit" element={<AuditPage />} />

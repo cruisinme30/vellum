@@ -7228,6 +7228,104 @@ export interface UpdateUser {
 }
 
 /**
+ * The workspace's size and activity at one moment.
+ */
+export interface UsageCounts {
+  /**
+   * People seen in the last 24 hours.
+   */
+  active_users_1d: number;
+  /**
+   * People seen in the last 30 days.
+   */
+  active_users_30d: number;
+  /**
+   * People seen in the last 7 days.
+   */
+  active_users_7d: number;
+  /**
+   * Enabled administrators.
+   */
+  admins: number;
+  /**
+   * Personal API tokens.
+   */
+  api_tokens: number;
+  /**
+   * Live books.
+   */
+  books: number;
+  /**
+   * Live collections.
+   */
+  collections: number;
+  /**
+   * Accounts that may sign in.
+   */
+  enabled_users: number;
+  /**
+   * Drive activity entries (edits, moves, shares…) in the last 24 hours.
+   */
+  events_1d: number;
+  /**
+   * Drive activity entries in the last 7 days.
+   */
+  events_7d: number;
+  /**
+   * Bytes of current files, live and trashed.
+   */
+  file_bytes: number;
+  /**
+   * Live folders.
+   */
+  folders: number;
+  /**
+   * Live pages.
+   */
+  pages: number;
+  /**
+   * When the counts were taken (Unix milliseconds); 0 before the first
+   * sample.
+   */
+  sampled_at_ms: number;
+  /**
+   * Browser sessions that have not expired.
+   */
+  sessions: number;
+  /**
+   * Spaces (shared and personal drives).
+   */
+  spaces: number;
+  /**
+   * Items in the trash.
+   */
+  trashed: number;
+  /**
+   * Accounts, enabled or not.
+   */
+  users: number;
+  /**
+   * Bytes of saved versions.
+   */
+  version_bytes: number;
+  /**
+   * Saved page versions.
+   */
+  versions: number;
+}
+
+/**
+ * How fresh the usage counts must be.
+ */
+export interface UsageInput {
+  /**
+   * Count again now instead of answering from the last sample (at most
+   * five minutes old).
+   */
+  refresh?: boolean;
+}
+
+/**
  * Exactly what is sent.
  */
 export interface UsageReport {
@@ -8746,6 +8844,13 @@ export interface Operations {
     input: SettingsUpdate;
     output: AdminUpdateSettingsVersioned;
   };
+  /** People, pages, storage and activity on this server, counted at most five minutes ago */
+  "admin.usage": {
+    method: "GET";
+    path: "/v1/admin/usage";
+    input: UsageInput;
+    output: UsageCounts;
+  };
   /** Checks the audit log's hash chain end to end */
   "admin.verify_audit": {
     method: "POST";
@@ -9787,6 +9892,7 @@ export const OPERATIONS = {
   "admin.state": { method: "GET", path: "/v1/admin/state", mutation: false },
   "admin.telemetry_preview": { method: "GET", path: "/v1/admin/telemetry/preview", mutation: false },
   "admin.update_settings": { method: "PUT", path: "/v1/admin/settings", mutation: true },
+  "admin.usage": { method: "GET", path: "/v1/admin/usage", mutation: false },
   "admin.verify_audit": { method: "POST", path: "/v1/admin/audit/verify", mutation: true },
   "books.add_section": { method: "POST", path: "/v1/books/{book_id}/sections", mutation: true },
   "books.create_snapshot": { method: "POST", path: "/v1/books/{book_id}/snapshots", mutation: true },
