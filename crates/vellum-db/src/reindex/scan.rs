@@ -326,7 +326,8 @@ impl Header {
         if bytes.iter().all(u8::is_ascii_whitespace) {
             return Ok(Self::default());
         }
-        serde_yaml_ng::from_slice(bytes).map_err(|e| e.to_string())
+        let text = std::str::from_utf8(bytes).map_err(|e| e.to_string())?;
+        serde_saphyr::from_str(text).map_err(|e| e.to_string())
     }
 
     /// Reads the YAML between the opening `---` line and the next `---` line.
