@@ -70,6 +70,54 @@ pub struct QueryInput {
     pub limit: Option<usize>,
 }
 
+/// Resolves a `collection` block embedded in a page.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct EmbedInput {
+    /// The block's body, as written in the page:
+    /// `id: <collection id>`, then optional `view`, `type`, `filter`,
+    /// `sort`, `group`, `hide`, `date`, `end` and `limit` lines.
+    pub fence: String,
+}
+
+/// The current rows of an embedded view.
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EmbedResult {
+    /// The collection.
+    pub collection_id: CollectionId,
+    /// Its title, for the block's caption.
+    pub title: String,
+    /// The `name.collection` folder, for an "open" link.
+    pub path: String,
+    /// The view after the block's overrides.
+    pub result: crate::view::ViewResult,
+}
+
+/// A chart whose data comes from a collection:
+/// `source=collection:<id> x=… y=…` on a `chart` block.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ChartInput {
+    /// `collection:<collection id>`.
+    pub source: String,
+    /// The view whose rows feed the chart; the first view when absent.
+    #[serde(default)]
+    pub view: Option<String>,
+    /// The category property (x axis).
+    pub x: String,
+    /// The value property; rows are counted when absent.
+    #[serde(default)]
+    pub y: Option<String>,
+    /// A property that splits rows into series.
+    #[serde(default)]
+    pub series: Option<String>,
+    /// How values sharing a category combine: `sum`, `count`, `avg`,
+    /// `min` or `max`.
+    #[serde(default)]
+    pub agg: Option<String>,
+}
+
 /// Creates a row.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

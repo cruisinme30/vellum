@@ -106,7 +106,11 @@ skip = [
     { crate = "toml_datetime@0.6", reason = "pulled by toml 0.8 (Typst 0.15)" },
     { crate = "winnow@0.7", reason = "pulled by toml 0.8 (Typst 0.15)" },
 ]
-skip-tree = []
+skip-tree = [
+    # Linux Secret Service (os-keychain feature only) still uses the previous
+    # RustCrypto generation (sha2 0.10, cipher 0.4) for its session encryption.
+    { crate = "dbus-secret-service@4", depth = 20, reason = "Linux keychain; waiting for its RustCrypto 0.11 release" },
+]
 
 [sources]
 unknown-registry = "deny"
