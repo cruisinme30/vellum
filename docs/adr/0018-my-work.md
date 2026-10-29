@@ -12,7 +12,7 @@ vellum: 1
 - Date: `2026-10-29`
 - Status: accepted
 - Decisions: `D82`, `D83`, `D84`
-- Issue: `#152` (with `#153`–`#156`, `#158`, `#159`, `#161`, `#163`, `#442`)
+- Issue: `#152` (with `#153`–`#156`, `#158`, `#159`, `#161`, `#162`, `#163`, `#442`)
 - Pull requests: `#243`
 
 :::
@@ -31,8 +31,8 @@ port.
 ### `D82`: task fields live in a trailing attribute span
 
 - A task is a checklist item with a `^blk-` ID; its fields are a `{…}`
-  span before the ID, keys in the order `when start due rrule recur_from
-  remind p labels list done src`. Unknown keys are kept.
+  span before the ID, keys in the order `when start due block rrule
+  recur_from remind p labels list done src gcal`. Unknown keys are kept.
 - An inline ISO date is the deadline when there is no `due` (D19);
   `@handle` mentions are assignees; nested items are subtasks.
 - Completing a repeating task moves it to its next date and leaves it
@@ -70,6 +70,8 @@ port.
 - **Dataview-style inline fields**: collide with prose. Rejected.
 - **`VTODO` items in the subscribed feed**: most calendar apps ignore them.
 - **Tombstones for CalDAV sync**: need storage the crate does not own.
+- **Writing to the person's main Google calendar**: needs full calendar
+  access. Rejected for a `calendar.app.created` calendar of our own.
 
 ## Consequences
 
@@ -82,4 +84,9 @@ port.
 - The feed, CalDAV and capture routes are mounted cross-site, so a browser
   cookie never counts there. CalDAV signs in with an API token, sent as a
   bearer token or as the HTTP Basic password.
-- Time-blocking (`#162`) and non-English quick-add are follow-ups.
+- Time blocks (`#162`) are `block=YYYY-MM-DDTHH:MM/minutes`, synced every
+  five minutes with a "Vellum" Google calendar that the app creates. The
+  event ID is kept as `gcal=`; a move in the calendar wins over the file.
+  The server needs `VELLUM_GOOGLE_CLIENT_ID`, `VELLUM_GOOGLE_CLIENT_SECRET`
+  and the redirect URI `<public URL>/connect/google/callback`.
+- Non-English quick-add is a follow-up.

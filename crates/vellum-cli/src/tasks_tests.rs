@@ -278,6 +278,22 @@ Message-ID: <m1@northstar.dev>\r\nContent-Type: text/plain\r\n\r\nIt expires soo
             .contains("Renew the domain")
     );
 
+    // The Google callback is mounted, and says so when Google is not set up.
+    let callback = send(
+        &f.app,
+        finish(request("GET", "/connect/google/callback?state=x&code=y")),
+    )
+    .await;
+    assert_eq!(
+        callback.status,
+        StatusCode::SERVICE_UNAVAILABLE,
+        "{}",
+        callback.text
+    );
+    let status = f.get("/api/v1/my-work/google").await;
+    assert_eq!(status.status, StatusCode::OK, "{}", status.text);
+    assert_eq!(status.json()["configured"], json!(false));
+
     // Secrets are stored as hashes, never as the token itself.
     let secrets = std::fs::read_to_string(f.dir.join(".vellum/tasks/secrets.json")).unwrap();
     let feed_token = path
