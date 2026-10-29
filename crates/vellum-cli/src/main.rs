@@ -61,6 +61,7 @@ mod search;
 mod serve;
 mod services;
 mod shards_cli;
+mod sharing;
 #[cfg(test)]
 mod sso_tests;
 mod task_prefs;

@@ -58,6 +58,7 @@ pub struct DriveService {
     drive: Arc<Drive>,
     handles: Option<Handles>,
     writes: Option<Arc<dyn PageWrites>>,
+    sharing: Option<Arc<crate::sharing::Sharing>>,
 }
 
 impl std::fmt::Debug for DriveService {
@@ -66,6 +67,7 @@ impl std::fmt::Debug for DriveService {
             .field("drive", &self.drive)
             .field("handles", &self.handles.is_some())
             .field("writes", &self.writes)
+            .field("sharing", &self.sharing.is_some())
             .finish()
     }
 }
@@ -78,6 +80,7 @@ impl DriveService {
             drive,
             handles: None,
             writes: None,
+            sharing: None,
         }
     }
 
@@ -86,6 +89,14 @@ impl DriveService {
     #[must_use]
     pub fn with_handles(mut self, handles: Handles) -> Self {
         self.handles = Some(handles);
+        self
+    }
+
+    /// Serves sharing (#95); without it the sharing operations answer
+    /// `unavailable`.
+    #[must_use]
+    pub fn with_sharing(mut self, sharing: Arc<crate::sharing::Sharing>) -> Self {
+        self.sharing = Some(sharing);
         self
     }
 
@@ -170,6 +181,8 @@ macro_rules! op {
         .summary($summary)
     }};
 }
+
+pub mod sharing;
 
 /// Reads.
 impl DriveService {
@@ -718,6 +731,7 @@ impl Service for DriveService {
         let mut ops = self.reads();
         ops.extend(self.changes());
         ops.extend(self.admin());
+        ops.extend(self.sharing_ops());
         ops
     }
 

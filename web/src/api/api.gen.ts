@@ -2137,6 +2137,24 @@ export interface CreateIssue {
 }
 
 /**
+ * A share link to make.
+ */
+export interface CreateLinkInput {
+  /**
+   * When it stops working; leave unset for no end.
+   */
+  expires_at?: Timestamp | null;
+  /**
+   * The page.
+   */
+  id: ObjectId;
+  /**
+   * A password the visitor must give, 8 characters or more.
+   */
+  password?: string | null;
+}
+
+/**
  * A new list.
  */
 export interface CreateListInput {
@@ -2335,6 +2353,24 @@ export interface CreatedIssue {
    * The new issue.
    */
   issue: IssueOut;
+}
+
+/**
+ * A new share link, with the only copy of its token.
+ */
+export interface CreatedLink {
+  /**
+   * The link.
+   */
+  link: LinkView;
+  /**
+   * The token. It is not stored and cannot be shown again.
+   */
+  token: string;
+  /**
+   * The link to hand out, on the public origin.
+   */
+  url: string;
 }
 
 /**
@@ -3406,6 +3442,16 @@ export type DriveSharedWithMeNoInput = Record<string, never>;
 /**
  * An operation that returns nothing else.
  */
+export interface DriveRevokeLinkDone {
+  /**
+   * Always true.
+   */
+  ok: boolean;
+}
+
+/**
+ * An operation that returns nothing else.
+ */
 export interface DriveStarDone {
   /**
    * Always true.
@@ -3825,6 +3871,24 @@ export interface GoogleView {
    * Whether the person has connected their calendar.
    */
   connected: boolean;
+}
+
+/**
+ * A grant made on the item.
+ */
+export interface GrantView {
+  /**
+   * When it stops counting; unset for no end.
+   */
+  expires_at?: Timestamp | null;
+  /**
+   * `user:<id>` or `group:<id>`.
+   */
+  principal: string;
+  /**
+   * The role.
+   */
+  role: RoleView;
 }
 
 /**
@@ -4727,6 +4791,16 @@ export interface Limit {
 }
 
 /**
+ * Names a share link.
+ */
+export interface LinkKey {
+  /**
+   * The link.
+   */
+  link_id: ShareId;
+}
+
+/**
  * A link on an issue.
  */
 export interface LinkOut {
@@ -4742,6 +4816,36 @@ export interface LinkOut {
    * URL; `vellum://doc/<id>#blk-…` for document blocks.
    */
   url: string;
+}
+
+/**
+ * A share link, without its token.
+ */
+export interface LinkView {
+  /**
+   * When.
+   */
+  created_at: Timestamp;
+  /**
+   * Who made it.
+   */
+  created_by: UserId;
+  /**
+   * When it stops working; unset for no end.
+   */
+  expires_at?: Timestamp | null;
+  /**
+   * Whether it asks for a password.
+   */
+  has_password: boolean;
+  /**
+   * The link.
+   */
+  id: ShareId;
+  /**
+   * Whether it still opens (not revoked, not expired).
+   */
+  live: boolean;
 }
 
 /**
@@ -6111,6 +6215,11 @@ export interface Revoked {
 }
 
 /**
+ * A role granted on an item.
+ */
+export type RoleView = "viewer" | "commenter" | "editor" | "manager" | "owner";
+
+/**
  * How a rollup is computed.
  */
 export interface RollupInfo {
@@ -6824,6 +6933,57 @@ export interface SetupInput {
  * How serious a diagnostic is.
  */
 export type Severity = "warning" | "error";
+
+/**
+ * A ShareId as a 26-character ULID.
+ */
+export type ShareId = string;
+
+/**
+ * A grant to make.
+ */
+export interface ShareInput {
+  /**
+   * When it stops counting; leave unset for no end.
+   */
+  expires_at?: Timestamp | null;
+  /**
+   * The item.
+   */
+  id: ObjectId;
+  /**
+   * `user:<id>` or `group:<id>`.
+   */
+  principal: string;
+  /**
+   * The role; `owner` is refused.
+   */
+  role: RoleView;
+}
+
+/**
+ * Who has access to an item through grants on it, and its share links.
+ */
+export interface SharingView {
+  /**
+   * Grants on this item, strongest role first. Access inherited from a
+   * folder or the space is not listed.
+   */
+  grants: GrantView[];
+  /**
+   * The item.
+   */
+  item: NodeView;
+  /**
+   * Share links, newest first, revoked ones included.
+   */
+  links: LinkView[];
+  /**
+   * Whether the item can have share links (pages only, with a public
+   * origin configured).
+   */
+  links_allowed: boolean;
+}
 
 /**
  * An open issue with a similar title.
@@ -8183,6 +8343,20 @@ export interface Unread {
    * How many lines are unread.
    */
   unread: number;
+}
+
+/**
+ * A grant to remove.
+ */
+export interface UnshareInput {
+  /**
+   * The item.
+   */
+  id: ObjectId;
+  /**
+   * `user:<id>` or `group:<id>`.
+   */
+  principal: string;
 }
 
 /**
@@ -10759,6 +10933,13 @@ export interface Operations {
     input: CreateFolder;
     output: DriveCreateFolderNodeView;
   };
+  /** Make a share link to a page, optionally expiring and password-protected */
+  "drive.create_link": {
+    method: "POST";
+    path: "/v1/drive/items/{id}/links";
+    input: CreateLinkInput;
+    output: CreatedLink;
+  };
   /** Create a page */
   "drive.create_page": {
     method: "POST";
@@ -10878,12 +11059,26 @@ export interface Operations {
     input: VersionKey;
     output: SaveView;
   };
+  /** Revoke a share link */
+  "drive.revoke_link": {
+    method: "DELETE";
+    path: "/v1/drive/links/{link_id}";
+    input: LinkKey;
+    output: DriveRevokeLinkDone;
+  };
   /** Save a page, merging changes made meanwhile */
   "drive.save": {
     method: "PUT";
     path: "/v1/drive/items/{id}/content";
     input: SaveInput;
     output: SaveView;
+  };
+  /** Give a person or group a role on an item */
+  "drive.share": {
+    method: "PUT";
+    path: "/v1/drive/items/{id}/grants";
+    input: ShareInput;
+    output: SharingView;
   };
   /** List the shared drives you can open */
   "drive.shared_drives": {
@@ -10898,6 +11093,13 @@ export interface Operations {
     path: "/v1/drive/shared-with-me";
     input: DriveSharedWithMeNoInput;
     output: NodeList;
+  };
+  /** List who has access to an item and its share links */
+  "drive.sharing": {
+    method: "GET";
+    path: "/v1/drive/items/{id}/sharing";
+    input: NodeKey;
+    output: SharingView;
   };
   /** Star or unstar an item */
   "drive.star": {
@@ -10933,6 +11135,13 @@ export interface Operations {
     path: "/v1/drive/spaces/{space_id}/tree";
     input: TreeInput;
     output: TreeView;
+  };
+  /** Remove the roles a person or group holds on an item */
+  "drive.unshare": {
+    method: "DELETE";
+    path: "/v1/drive/items/{id}/grants/{principal}";
+    input: UnshareInput;
+    output: SharingView;
   };
   /** Rename a space and change its quota, trash and version settings */
   "drive.update_space": {
@@ -11798,6 +12007,7 @@ export const OPERATIONS = {
   "drive.backlinks": { method: "GET", path: "/v1/drive/items/{id}/backlinks", mutation: false },
   "drive.copy": { method: "POST", path: "/v1/drive/items/{id}/copy", mutation: true },
   "drive.create_folder": { method: "POST", path: "/v1/drive/spaces/{space_id}/folders", mutation: true },
+  "drive.create_link": { method: "POST", path: "/v1/drive/items/{id}/links", mutation: true },
   "drive.create_page": { method: "POST", path: "/v1/drive/spaces/{space_id}/pages", mutation: true },
   "drive.create_shortcut": { method: "POST", path: "/v1/drive/spaces/{space_id}/shortcuts", mutation: true },
   "drive.create_space": { method: "POST", path: "/v1/drive/spaces", mutation: true },
@@ -11815,14 +12025,18 @@ export const OPERATIONS = {
   "drive.resolve_shortcut": { method: "GET", path: "/v1/drive/items/{id}/target", mutation: false },
   "drive.restore": { method: "POST", path: "/v1/drive/items/{id}/restore", mutation: true },
   "drive.restore_version": { method: "POST", path: "/v1/drive/items/{id}/versions/{version_id}/restore", mutation: true },
+  "drive.revoke_link": { method: "DELETE", path: "/v1/drive/links/{link_id}", mutation: true },
   "drive.save": { method: "PUT", path: "/v1/drive/items/{id}/content", mutation: true },
+  "drive.share": { method: "PUT", path: "/v1/drive/items/{id}/grants", mutation: true },
   "drive.shared_drives": { method: "GET", path: "/v1/drive/shared-drives", mutation: false },
   "drive.shared_with_me": { method: "GET", path: "/v1/drive/shared-with-me", mutation: false },
+  "drive.sharing": { method: "GET", path: "/v1/drive/items/{id}/sharing", mutation: false },
   "drive.star": { method: "PUT", path: "/v1/drive/items/{id}/star", mutation: true },
   "drive.starred": { method: "GET", path: "/v1/drive/starred", mutation: false },
   "drive.trash": { method: "POST", path: "/v1/drive/items/{id}/trash", mutation: true },
   "drive.trash_list": { method: "GET", path: "/v1/drive/spaces/{space_id}/trash", mutation: false },
   "drive.tree": { method: "GET", path: "/v1/drive/spaces/{space_id}/tree", mutation: false },
+  "drive.unshare": { method: "DELETE", path: "/v1/drive/items/{id}/grants/{principal}", mutation: true },
   "drive.update_space": { method: "PATCH", path: "/v1/drive/spaces/{space_id}", mutation: true },
   "drive.usage": { method: "GET", path: "/v1/drive/spaces/{space_id}/usage", mutation: false },
   "drive.version": { method: "GET", path: "/v1/drive/items/{id}/versions/{version_id}", mutation: false },
