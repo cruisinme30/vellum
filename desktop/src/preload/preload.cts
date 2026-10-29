@@ -36,8 +36,10 @@ contextBridge.exposeInMainWorld("vellumDesktop", {
       ipcRenderer.invoke("vellum:private-enrol", { spaceId, label }) as Promise<{
         lines: string[];
       }>,
-    reseal: (spaceId: string): Promise<{ lines: string[] }> =>
-      ipcRenderer.invoke("vellum:private-reseal", spaceId) as Promise<{ lines: string[] }>,
+    reseal: (spaceId: string, trust?: string[]): Promise<{ lines: string[] }> =>
+      ipcRenderer.invoke("vellum:private-reseal", { spaceId, trust }) as Promise<{
+        lines: string[];
+      }>,
   },
   onOpenUrl: (listener: (path: string) => void): (() => void) => {
     const forward = (_event: IpcRendererEvent, path: unknown): void => {
