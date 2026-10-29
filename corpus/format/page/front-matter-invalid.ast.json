@@ -18,9 +18,9 @@
   },
   "diagnostics": [
     {
-      "line": 3,
+      "line": 2,
       "code": "front_matter_yaml",
-      "message": "front matter is not valid YAML: did not find expected ',' or ']' at line 2 column 1, while parsing a flow sequence at line 1 column 8"
+      "message": "front matter is not valid YAML: unclosed bracket '[' at line 1, column 8"
     }
   ]
 }

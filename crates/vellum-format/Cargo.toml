@@ -20,7 +20,8 @@ workspace = true
 [dependencies]
 comrak = { version = "0.59.0", default-features = false, features = ["attributes"] }
 serde = { version = "1.0.229", features = ["derive"] }
-serde_yaml_ng = "0.10.0"
+serde-saphyr = { version = "2.0.0", default-features = false, features = ["serialize", "deserialize"] }
+serde_json = { version = "1.0.154", features = ["preserve_order"] }
 tracing = "0.1.44"
 vellum-kernel.workspace = true
 

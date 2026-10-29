@@ -6,9 +6,13 @@
 //! Known page fields come first in a fixed order (`id`, `title`, `icon`,
 //! `cover`, `status`, `owner`, `tags`, `verify_every`, `vellum`); other keys
 //! (issue, task and row fields) follow in the order they were written.
+//!
+//! YAML is read and written with `serde-saphyr`, a parser in safe Rust,
+//! into JSON-shaped values: front matter keys are strings, and values are
+//! strings, numbers, booleans, lists and mappings.
 
 use serde::Serialize;
-use serde_yaml_ng::{Mapping, Value};
+pub use serde_json::{Map, Value};
 use vellum_kernel::ObjectId;
 
 use crate::diagnostic::{Diagnostic, DiagnosticCode};
@@ -34,7 +38,7 @@ pub const DIALECT_VERSION: u64 = 1;
 #[serde(rename_all = "snake_case")]
 pub enum FrontMatter {
     /// A YAML mapping, keys in canonical order.
-    Fields(Mapping),
+    Fields(Map<String, Value>),
     /// YAML that could not be read as a mapping, kept verbatim (each line
     /// ending in `\n`) so the file survives a round trip.
     Raw(String),
@@ -100,7 +104,7 @@ impl FrontMatter {
     #[must_use]
     pub fn tags(&self) -> Vec<&str> {
         self.get("tags")
-            .and_then(Value::as_sequence)
+            .and_then(Value::as_array)
             .map(|tags| tags.iter().filter_map(Value::as_str).collect())
             .unwrap_or_default()
     }
@@ -130,21 +134,30 @@ pub fn split(src: &str) -> Option<(&str, &str, usize)> {
 /// Reads front matter YAML. Never fails: bad YAML is kept verbatim and
 /// reported in `diagnostics`.
 pub fn parse(yaml: &str, diagnostics: &mut Vec<Diagnostic>) -> FrontMatter {
-    let value = match serde_yaml_ng::from_str::<Value>(yaml) {
+    if yaml.trim().is_empty() {
+        return FrontMatter::Fields(Map::new());
+    }
+    let value = match serde_saphyr::from_str::<Value>(yaml) {
         Ok(value) => value,
         Err(error) => {
-            let line = error.location().map_or(1, |l| l.line() + 1);
+            // The YAML starts on line 2 of the file, after the `---` line.
+            let line = error
+                .location()
+                .and_then(|l| usize::try_from(l.line()).ok())
+                .map_or(2, |l| l + 1);
+            let message = error.without_snippet().to_string();
+            let message = message.lines().next().unwrap_or_default();
             diagnostics.push(Diagnostic::new(
                 line,
                 DiagnosticCode::FrontMatterYaml,
-                format!("front matter is not valid YAML: {error}"),
+                format!("front matter is not valid YAML: {message}"),
             ));
             return FrontMatter::Raw(yaml.to_owned());
         }
     };
     let map = match value {
-        Value::Mapping(map) => map,
-        Value::Null => Mapping::new(),
+        Value::Object(map) => map,
+        Value::Null => Map::new(),
         _ => {
             diagnostics.push(Diagnostic::new(
                 2,
@@ -159,18 +172,18 @@ pub fn parse(yaml: &str, diagnostics: &mut Vec<Diagnostic>) -> FrontMatter {
     FrontMatter::Fields(map)
 }
 
-fn canonical_order(mut map: Mapping) -> Mapping {
-    let mut ordered = Mapping::with_capacity(map.len());
+fn canonical_order(mut map: Map<String, Value>) -> Map<String, Value> {
+    let mut ordered = Map::with_capacity(map.len());
     for key in KNOWN_KEYS {
         if let Some(value) = map.shift_remove(key) {
-            let _ = ordered.insert(Value::from(key), value);
+            let _ = ordered.insert(key.to_owned(), value);
         }
     }
     ordered.extend(map);
     ordered
 }
 
-fn check_fields(map: &Mapping, diagnostics: &mut Vec<Diagnostic>) {
+fn check_fields(map: &Map<String, Value>, diagnostics: &mut Vec<Diagnostic>) {
     let mut field = |message: String| {
         diagnostics.push(Diagnostic::new(
             0,
@@ -207,7 +220,7 @@ fn check_fields(map: &Mapping, diagnostics: &mut Vec<Diagnostic>) {
     }
     if let Some(tags) = map.get("tags")
         && !tags
-            .as_sequence()
+            .as_array()
             .is_some_and(|t| t.iter().all(Value::is_string))
     {
         field(format!(
@@ -218,7 +231,7 @@ fn check_fields(map: &Mapping, diagnostics: &mut Vec<Diagnostic>) {
 }
 
 fn show(value: &Value) -> String {
-    serde_yaml_ng::to_string(value)
+    serde_saphyr::to_string(value)
         .map(|s| s.trim_end().to_owned())
         .unwrap_or_default()
 }
@@ -228,7 +241,7 @@ pub fn write(front_matter: &FrontMatter, out: &mut String) {
     out.push_str("---\n");
     match front_matter {
         FrontMatter::Fields(map) if map.is_empty() => {}
-        FrontMatter::Fields(map) => match serde_yaml_ng::to_string(map) {
+        FrontMatter::Fields(map) => match serde_saphyr::to_string(map) {
             Ok(yaml) => out.push_str(&yaml),
             // A parsed mapping always serializes; keep the file valid anyway.
             Err(error) => tracing::error!(%error, "front matter could not be written"),
