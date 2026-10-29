@@ -1,0 +1,61 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "list",
+        "start": null,
+        "tight": true,
+        "items": [
+          {
+            "task": false,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Call "
+                  },
+                  {
+                    "type": "mention",
+                    "handle": "priya"
+                  },
+                  {
+                    "type": "text",
+                    "text": " about the EU quota {due="
+                  },
+                  {
+                    "type": "date",
+                    "date": "2026-11-02"
+                  },
+                  {
+                    "type": "text",
+                    "text": " priority=high}"
+                  }
+                ],
+                "id": "blk-a1b2c3d4"
+              }
+            ]
+          },
+          {
+            "task": true,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Ship the replay engine {#replay .done}"
+                  }
+                ],
+                "id": "blk-b2c3d4e5"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "diagnostics": []
+}
