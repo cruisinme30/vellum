@@ -45,6 +45,7 @@ mod reminders;
 mod search;
 mod serve;
 mod services;
+mod sharing;
 #[cfg(test)]
 mod sso_tests;
 mod task_prefs;

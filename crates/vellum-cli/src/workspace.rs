@@ -426,6 +426,7 @@ struct Workspace {
     work: Arc<WorkService>,
     tasks: Arc<TasksService>,
     space_of: vellum_collections::service::SpaceOf,
+    sharing: Arc<vellum_drive::sharing::Sharing>,
 }
 
 /// What `vellum serve` mounts for the workspace.
@@ -444,6 +445,8 @@ pub struct Opened {
     pub rate_counts: Option<vellum_db::rate::SharedCounts>,
     /// My Work, which also serves the feed, CalDAV and capture routes.
     pub tasks: Option<Arc<TasksService>>,
+    /// Share links on the public origin (#95).
+    pub public: Option<Arc<dyn vellum_api::public::PublicSite>>,
 }
 
 /// My Work's settings: where its secrets live and what it links to.
@@ -494,6 +497,86 @@ struct Feeds {
     rows: Option<Arc<dyn IndexFeed>>,
     /// Page text saved through the API, for live editing rooms.
     pages: Option<Arc<dyn vellum_drive::PageWrites>>,
+    /// Share links (#95).
+    sharing: SharingSetup,
+}
+
+/// Warns when the files are shared but the index is this machine's own.
+fn warn_if_index_is_local(local_files: bool, index: &IndexConfig) {
+    if !local_files && matches!(index, IndexConfig::Sqlite { .. }) {
+        tracing::warn!(
+            "files are in a shared bucket but the index is this machine's SQLite file; \
+             run one replica only, or set a database URL"
+        );
+    }
+}
+
+/// Where share links are kept, and the origin they open on (#95).
+struct SharingSetup {
+    links: Arc<dyn vellum_drive::sharing::ShareLinks>,
+    public_origin: Option<String>,
+}
+
+impl SharingSetup {
+    /// Links in the index, opening on `VELLUM_PUBLIC_PAGES_URL`.
+    fn sql(index: &Index, var: impl Fn(&str) -> Option<String>) -> Self {
+        Self {
+            links: Arc::new(vellum_drive::sharing::sql::SqlShareLinks::new(
+                index.clone(),
+            )),
+            public_origin: var("VELLUM_PUBLIC_PAGES_URL").filter(|u| !u.trim().is_empty()),
+        }
+    }
+
+    /// Links in memory with no public origin, for describing the API.
+    fn memory() -> Self {
+        Self {
+            links: Arc::new(vellum_drive::sharing::MemoryShareLinks::default()),
+            public_origin: None,
+        }
+    }
+}
+
+/// The drive over the permission engine, and sharing over both.
+fn drive_parts<S: AuthzStore + TreeSync + 'static>(
+    store: &Arc<dyn BlobStore>,
+    authz: &Arc<Authz<S>>,
+    index: &Arc<dyn DriveIndex>,
+    setup: SharingSetup,
+) -> (
+    Arc<Drive>,
+    Arc<dyn vellum_drive::Access>,
+    Arc<vellum_drive::sharing::Sharing>,
+) {
+    let access = Arc::new(vellum_drive::authz::AuthzAccess::new(
+        Arc::clone(authz),
+        Arc::clone(index),
+    ));
+    let drive_access: Arc<dyn vellum_drive::Access> = access.clone();
+    let drive = Arc::new(Drive::new(
+        Arc::clone(store),
+        Arc::clone(index),
+        Arc::clone(&drive_access),
+    ));
+    let sharing = vellum_drive::sharing::Sharing::new(
+        Arc::clone(&drive),
+        access,
+        setup.links,
+        Arc::new(crate::sharing::IdentityPasswords),
+    )
+    .with_public_origin(setup.public_origin);
+    (drive, drive_access, Arc::new(sharing))
+}
+
+/// Share links served on the public origin, rendered like pages.
+fn public_site(
+    sharing: &Arc<vellum_drive::sharing::Sharing>,
+) -> Result<Arc<dyn vellum_api::public::PublicSite>, Error> {
+    let renderer = vellum_render::Renderer::new(PageRenderService::figures_from_env()?);
+    Ok(Arc::new(crate::sharing::SharedPages::new(
+        Arc::clone(sharing),
+        renderer,
+    )))
 }
 
 /// Builds the services over `store`, `authz` and the drive's `index`.
@@ -506,14 +589,7 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
     feeds: Feeds,
     setup: TasksSetup,
 ) -> Result<Workspace, Error> {
-    let drive_access: Arc<dyn vellum_drive::Access> = Arc::new(
-        vellum_drive::authz::AuthzAccess::new(Arc::clone(authz), Arc::clone(&index)),
-    );
-    let drive = Arc::new(Drive::new(
-        Arc::clone(&store),
-        Arc::clone(&index),
-        Arc::clone(&drive_access),
-    ));
+    let (drive, drive_access, sharing) = drive_parts(&store, authz, &index, feeds.sharing);
     let e2e = crate::e2e::service(&store, &index, drive_access);
     let lookup = Arc::clone(spaces);
     let space_of: vellum_collections::service::SpaceOf =
@@ -579,8 +655,9 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
         handles,
         PageRenderService::figures_from_env()?,
     );
-    let mut drive_service =
-        DriveService::new(Arc::clone(&drive)).with_handles(drive_handles(identity));
+    let mut drive_service = DriveService::new(Arc::clone(&drive))
+        .with_handles(drive_handles(identity))
+        .with_sharing(Arc::clone(&sharing));
     if let Some(writes) = feeds.pages {
         drive_service = drive_service.with_page_writes(writes);
     }
@@ -600,6 +677,7 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
         work,
         tasks,
         space_of,
+        sharing,
     })
 }
 
@@ -702,12 +780,7 @@ pub async fn open(
         store: files,
         local,
     } = open_files(config, bucket).await?;
-    if !local && matches!(index_config, IndexConfig::Sqlite { .. }) {
-        tracing::warn!(
-            "files are in a shared bucket but the index is this machine's SQLite file; \
-             run one replica only, or set a database URL"
-        );
-    }
+    warn_if_index_is_local(local, &index_config);
     tracing::info!(backend = files.backend(), "workspace files opened");
     // Follow the feed from before anything is loaded, so no change made
     // meanwhile is missed.
@@ -735,6 +808,7 @@ pub async fn open(
             events,
             rows: Some(rows),
             pages: Some(Arc::clone(&live_pages) as Arc<dyn vellum_drive::PageWrites>),
+            sharing: SharingSetup::sql(&index, &var),
         },
         setup,
     )
@@ -792,6 +866,7 @@ pub async fn open(
         replica: Some(replica),
         rate_counts: Some(rate_counts),
         tasks: Some(workspace.tasks),
+        public: Some(public_site(&workspace.sharing)?),
     })
 }
 
@@ -823,6 +898,7 @@ pub async fn describe(
             events: Arc::new(TracingSink),
             rows: None,
             pages: None,
+            sharing: SharingSetup::memory(),
         },
         setup,
     )

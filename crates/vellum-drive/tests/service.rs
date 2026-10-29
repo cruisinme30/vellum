@@ -157,9 +157,16 @@ async fn every_operation_is_in_openapi_and_graphql() -> TestResult {
         .filter_map(|op| op["operationId"].as_str().map(str::to_owned))
         .filter(|id| id.starts_with("drive"))
         .collect();
-    assert_eq!(ids.len(), 33, "{ids:?}");
+    assert_eq!(ids.len(), 38, "{ids:?}");
     let sdl = w.gateway.graphql_sdl();
-    for needle in ["driveGet(", "driveCreatePage(", "driveFind(", "driveSave("] {
+    for needle in [
+        "driveGet(",
+        "driveCreatePage(",
+        "driveFind(",
+        "driveSave(",
+        "driveSharing(",
+        "driveCreateLink(",
+    ] {
         assert!(sdl.contains(needle), "SDL lacks {needle}");
     }
     Ok(())

@@ -234,6 +234,9 @@ pub fn app_gateway(services: &services::Services, config: GatewayConfig) -> Resu
     if let Some(exempt) = crate::limits::forwarded_joins(|k| std::env::var(k).ok()) {
         builder = builder.rate_exempt(exempt);
     }
+    if let Some(site) = services.public_site() {
+        builder = builder.public_site(site);
+    }
     services
         .mount(builder)
         // Live editing is mounted at `/collab` with the services (#415);

@@ -52,6 +52,8 @@ pub struct Services {
     rate_counts: Option<vellum_db::rate::SharedCounts>,
     /// My Work, for its feed, CalDAV and capture routes.
     tasks: Option<Arc<TasksService>>,
+    /// Share links on the public origin, when an index is configured.
+    public: Option<Arc<dyn vellum_api::public::PublicSite>>,
     /// The admin console (requests, routes, audit, settings, backups).
     admin: Option<Arc<dyn Service>>,
     /// Where the gateway records per-route metrics.
@@ -133,6 +135,7 @@ impl Services {
             replica: None,
             rate_counts: None,
             tasks: None,
+            public: None,
             admin: None,
             observability: Observability::new(),
         })
@@ -182,7 +185,13 @@ impl Services {
         self.replica = opened.replica;
         self.rate_counts = opened.rate_counts;
         self.tasks = opened.tasks;
+        self.public = opened.public;
         Ok(self)
+    }
+
+    /// Share links on the public origin, when an index is configured.
+    pub fn public_site(&self) -> Option<Arc<dyn vellum_api::public::PublicSite>> {
+        self.public.clone()
     }
 
     /// Rate-limit counts shared with the other replicas, when an index is
