@@ -53,10 +53,29 @@ pub trait Access: Send + Sync + 'static {
         path: &BlobPath,
         need: Need,
     ) -> Result<bool, Error>;
+
+    /// Whether `principal` may create a collection inside `folder`
+    /// (`need` is [`Need::Edit`]). Denied unless an adapter says otherwise.
+    ///
+    /// # Errors
+    ///
+    /// Only when the decision cannot be made.
+    async fn allowed_in(
+        &self,
+        principal: &Principal,
+        folder: &BlobPath,
+        need: Need,
+    ) -> Result<bool, Error> {
+        let _ = (principal, folder, need);
+        Ok(false)
+    }
 }
 
 /// Finds the space a collection folder belongs to.
 pub type SpaceOf = Arc<dyn Fn(&BlobPath) -> Option<Id> + Send + Sync>;
+
+/// Finds the authz node of a drive folder, from the index.
+pub type NodeOf = Arc<dyn Fn(&BlobPath) -> Option<Id> + Send + Sync>;
 
 /// [`Access`] backed by the authorization engine.
 ///
@@ -66,6 +85,7 @@ pub type SpaceOf = Arc<dyn Fn(&BlobPath) -> Option<Id> + Send + Sync>;
 pub struct AuthzAccess<S> {
     authz: Arc<Authz<S>>,
     space_of: SpaceOf,
+    node_of: Option<NodeOf>,
 }
 
 impl<S> fmt::Debug for AuthzAccess<S> {
@@ -79,7 +99,46 @@ impl<S> AuthzAccess<S> {
     /// space.
     #[must_use]
     pub fn new(authz: Arc<Authz<S>>, space_of: SpaceOf) -> Self {
-        Self { authz, space_of }
+        Self {
+            authz,
+            space_of,
+            node_of: None,
+        }
+    }
+
+    /// Lets the adapter answer [`Access::allowed_in`] by looking up a
+    /// folder's authz node; without it, creating collections is denied.
+    #[must_use]
+    pub fn with_folders(mut self, node_of: NodeOf) -> Self {
+        self.node_of = Some(node_of);
+        self
+    }
+
+    async fn check(
+        &self,
+        principal: &Principal,
+        space: Option<Id>,
+        node: Id,
+        need: Need,
+    ) -> Result<bool, Error>
+    where
+        S: AuthzStore,
+    {
+        let (Some(who), Some(space)) = (subject(principal), space) else {
+            return Ok(false);
+        };
+        let permission = match need {
+            Need::Read => Permission::Read,
+            Need::Edit => Permission::Edit,
+        };
+        let decision = self
+            .authz
+            .check(space, who, node, permission)
+            .await
+            .map_err(|e| {
+                Error::new(ErrorKind::Unavailable, "access could not be checked").with_source(e)
+            })?;
+        Ok(decision.allowed)
     }
 }
 
@@ -104,21 +163,26 @@ impl<S: AuthzStore + 'static> Access for AuthzAccess<S> {
         path: &BlobPath,
         need: Need,
     ) -> Result<bool, Error> {
-        let (Some(who), Some(space)) = (subject(principal), (self.space_of)(path)) else {
+        self.check(
+            principal,
+            (self.space_of)(path),
+            Id(collection.as_u128()),
+            need,
+        )
+        .await
+    }
+
+    async fn allowed_in(
+        &self,
+        principal: &Principal,
+        folder: &BlobPath,
+        need: Need,
+    ) -> Result<bool, Error> {
+        let Some(node) = self.node_of.as_ref().and_then(|f| f(folder)) else {
             return Ok(false);
         };
-        let permission = match need {
-            Need::Read => Permission::Read,
-            Need::Edit => Permission::Edit,
-        };
-        let decision = self
-            .authz
-            .check(space, who, Id(collection.as_u128()), permission)
+        self.check(principal, (self.space_of)(folder), node, need)
             .await
-            .map_err(|e| {
-                Error::new(ErrorKind::Unavailable, "access could not be checked").with_source(e)
-            })?;
-        Ok(decision.allowed)
     }
 }
 
@@ -139,7 +203,7 @@ mod tests {
         let node = Id(collection.as_u128());
         let store = MemoryStore::new();
         store
-            .set_tree(space, BTreeMap::from([(node, None)]))
+            .set_tree(space, BTreeMap::from([(node, None), (Id(77), None)]))
             .unwrap();
         let authz = Arc::new(Authz::new(store));
         let user = UserId::generate();
@@ -148,8 +212,17 @@ mod tests {
             Relation::Viewer,
             Subject::User(Id(user.as_u128())),
         );
+        let folder_grant = Tuple::role(
+            Object::Node(Id(77)),
+            Relation::Editor,
+            Subject::User(Id(user.as_u128())),
+        );
         let _ = authz
-            .write(space, Actor::System, &[Change::Grant(grant)])
+            .write(
+                space,
+                Actor::System,
+                &[Change::Grant(grant), Change::Grant(folder_grant)],
+            )
             .await
             .unwrap();
         let access = AuthzAccess::new(
@@ -196,6 +269,12 @@ mod tests {
                 .await
                 .unwrap()
         );
+        let ops = BlobPath::new("drives/shared/Ops").unwrap();
+        assert!(!access.allowed_in(&ana, &ops, Need::Edit).await.unwrap());
+        let folder = Id(77);
+        let access = access.with_folders(Arc::new(move |_: &BlobPath| Some(folder)));
+        assert!(access.allowed_in(&ana, &ops, Need::Edit).await.unwrap());
+        assert!(!access.allowed_in(&anon, &ops, Need::Edit).await.unwrap());
         assert_eq!(Need::Edit.as_str(), "edit");
         assert!(format!("{access:?}").contains("AuthzAccess"));
     }
