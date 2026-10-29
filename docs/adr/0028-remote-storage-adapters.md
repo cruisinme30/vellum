@@ -34,24 +34,6 @@ as one binary, so each backend it does not use should cost nothing. And
 the four HTTP backends differ widely in how they support conditional
 writes.
 
-## Options considered
-
-- **Cloud SDKs** (`aws-sdk-s3`, generated Google and Microsoft clients):
-  complete, but each pulls a large tree with its own HTTP and crypto
-  stacks, which breaks the duplicate-version ban and grows the binary.
-  Not chosen.
-- **Apache `OpenDAL`**: one crate for all four services, and the brief's
-  "`OpenDAL`-style" trait comes from it. It brings a second `digest` and
-  `hashbrown` generation and its own conditional-write model, which would
-  sit under ours. Not chosen; the trait stays `OpenDAL`-style.
-- **Hand-written adapters over the `reqwest` client already in the tree**:
-  more code to own, but each adapter maps its backend's conditional
-  requests straight onto `Precondition`, and the dependency cost is
-  one optional `hmac` for S3 signing. Chosen.
-- **Git through `libgit2` or `gix`**: `libgit2` adds a C dependency and
-  `OpenSSL`; `gix` cannot push yet. Running the `git` command-line tool
-  uses the credentials the operator already set up. Chosen.
-
 ## Decisions
 
 ### `D113`: hand-written HTTP adapters, one cargo feature each
@@ -104,6 +86,24 @@ writes.
   is met by routing every conflicting file through the merge path; the
   only difference from a rebase is the shape of the history.
 
+## Alternatives
+
+- **Cloud SDKs** (`aws-sdk-s3`, generated Google and Microsoft clients):
+  complete, but each pulls a large tree with its own HTTP and crypto
+  stacks, which breaks the duplicate-version ban and grows the binary.
+  Not chosen.
+- **Apache `OpenDAL`**: one crate for all four services, and the brief's
+  "`OpenDAL`-style" trait comes from it. It brings a second `digest` and
+  `hashbrown` generation and its own conditional-write model, which would
+  sit under ours. Not chosen; the trait stays `OpenDAL`-style.
+- **Hand-written adapters over the `reqwest` client already in the tree**:
+  more code to own, but each adapter maps its backend's conditional
+  requests straight onto `Precondition`, and the dependency cost is
+  one optional `hmac` for S3 signing. Chosen.
+- **Git through `libgit2` or `gix`**: `libgit2` adds a C dependency and
+  `OpenSSL`; `gix` cannot push yet. Running the `git` command-line tool
+  uses the credentials the operator already set up. Chosen.
+
 ## Consequences
 
 - Each new HTTP backend is a module plus a fake server for its tests, with
@@ -116,8 +116,3 @@ writes.
 - Google Drive users can briefly see two writers' versions; the merge
   path, not the backend, guarantees nothing is lost.
 - The Git backend needs `git` in the runtime image.
-
-## History
-
-- `2026-10-29`: accepted; adapters built against issues `#54`, `#55`,
-  `#110` and `#111`.

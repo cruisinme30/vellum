@@ -148,6 +148,7 @@ fn steps(base: Option<&str>, branch: Option<&str>) -> Vec<Step> {
             ],
         )
         .needs("shellcheck"),
+        Step::new("Decision records", "scripts/ci/check-adrs.sh", &[]).needs("bash"),
         Step::new("Markdown", "markdownlint-cli2", &[]),
         Step::new(
             "Prose (Vale)",

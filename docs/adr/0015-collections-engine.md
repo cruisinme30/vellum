@@ -51,11 +51,6 @@ and pushes computed rows to the index and search.
   Filters and sorts are written as text (`st != Done`, `e desc`) and accept
   either keys or names when read.
 
-| Option | Files stay small | Merge-safe | Readable on GitHub | Chosen |
-| --- | --- | --- | --- | --- |
-| Derive on save, keep in the index | ✓ | ✓ | ◐ | ✓ |
-| Write computed values to front matter | ✗ | ✗ | ✓ | ✗ |
-
 ### D74: both sides of a two-way relation are stored and kept in step
 
 - A relation names its target collection (`to`) and, when two-way, the
@@ -94,6 +89,13 @@ and pushes computed rows to the index and search.
   ignores case; lists match when any item matches. Sorts put empty values
   last and order select options as the schema lists them.
 - CSV export prefixes text a spreadsheet would run as a formula with `'`.
+
+## Alternatives
+
+- **Write computed values to front matter**: files grow, and merges and
+  outside edits can leave them disagreeing with their inputs.
+- **Store only one side of a relation**: a row file would not read on
+  its own, and the index could not be rebuilt from either side.
 
 ## Consequences
 
