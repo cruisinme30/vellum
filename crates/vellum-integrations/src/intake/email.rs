@@ -9,8 +9,11 @@
 //! | `ENG@intake.northstar.dev` or `issues+ENG@northstar.dev` | new issue in ENG's triage |
 //! | `reply+ENG-142.<user>.<tag>@northstar.dev` | comment on ENG-142 as `<user>` |
 //!
-//! The reply tag is an HMAC of the issue key and user ID, so a reply
-//! address cannot be forged for another issue or person. Mail marked
+//! The reply tag is an HMAC of the issue key, the user ID and the address
+//! the notification went to, so a reply address cannot be forged for
+//! another issue or person, and a forwarded notification does not let
+//! someone else comment as the user. With no reply secret configured,
+//! replies are refused. Mail marked
 //! `Auto-Submitted` or `Precedence: bulk/list/junk` is dropped, which stops
 //! loops with auto-responders. The mail adapter passes only messages its
 //! SPF/DKIM/DMARC check accepted.
@@ -19,6 +22,7 @@ use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
 
 use super::Routing;
+use super::text::Body;
 use crate::inbound::InboundError;
 use crate::mac;
 use crate::model::{IssueDraft, IssueKey, Source, one_line};
@@ -338,18 +342,39 @@ pub fn strip_quoted(text: &str) -> String {
     kept.join("\n").trim().to_owned()
 }
 
-fn reply_tag(secret: &[u8], key: &IssueKey, user: &str) -> String {
+/// The tag binds the issue, the user and the address the notification was
+/// sent to, so a reply only counts when it comes back from that address.
+/// A forwarded notification or a mailing-list copy carries a valid tag,
+/// but whoever replies from another address is not taken for the user.
+fn reply_tag(secret: &[u8], key: &IssueKey, user: &str, email: &str) -> String {
     let user = user.to_ascii_lowercase();
-    let tag = mac::hmac_sha256(secret, &[key.to_string().as_bytes(), b":", user.as_bytes()]);
+    let email = email.trim().to_lowercase();
+    let tag = mac::hmac_sha256(
+        secret,
+        &[
+            key.to_string().as_bytes(),
+            b":",
+            user.as_bytes(),
+            b":",
+            email.as_bytes(),
+        ],
+    );
     mac::hex(tag.get(..10).unwrap_or_default())
 }
 
-/// The reply address for notification emails about `key` sent to `user`.
+/// The reply address for notification emails about `key` sent to `user`
+/// at `email`. Replies are accepted only from `email`.
 #[must_use]
-pub fn reply_address(secret: &[u8], key: &IssueKey, user: &str, domain: &str) -> String {
+pub fn reply_address(
+    secret: &[u8],
+    key: &IssueKey,
+    user: &str,
+    email: &str,
+    domain: &str,
+) -> String {
     format!(
         "reply+{key}.{user}.{}@{domain}",
-        reply_tag(secret, key, user)
+        reply_tag(secret, key, user, email)
     )
     .to_ascii_lowercase()
 }
@@ -408,9 +433,16 @@ pub fn classify(mail: &Mail, settings: &EmailSettings) -> EmailIntake {
             let Ok(key) = IssueKey::parse(key) else {
                 return EmailIntake::Ignored("malformed reply address");
             };
+            // With no secret anyone could compute a tag, so replies are
+            // refused rather than trusted.
+            if settings.reply_secret.is_empty() {
+                return EmailIntake::Ignored("reply addresses are not configured");
+            }
             // Addresses may be lower-cased in transit, so tags are computed
             // over the lower-case user ID (ULIDs are case-insensitive).
-            let expected = reply_tag(&settings.reply_secret, &key, user);
+            // The sender is part of the tag, so a reply from anyone but the
+            // notified address does not match.
+            let expected = reply_tag(&settings.reply_secret, &key, user, &mail.from);
             if !mac::equal(expected.as_bytes(), tag.as_bytes()) {
                 return EmailIntake::Ignored("reply address tag does not match");
             }
@@ -449,7 +481,7 @@ pub fn classify(mail: &Mail, settings: &EmailSettings) -> EmailIntake {
                     message_id: mail.message_id.clone(),
                 },
             );
-            draft.description = strip_quoted(&mail.text);
+            draft.description = Body::new().text(&strip_quoted(&mail.text)).finish();
             draft.reporter = Some(mail.from.clone());
             return EmailIntake::NewIssue(Box::new(draft));
         }
@@ -527,7 +559,13 @@ Content-Type: multipart/alternative; boundary=b2\n\n--b2\nContent-Type: text/htm
     #[test]
     fn replies_become_comments() -> Result<(), InboundError> {
         let key = IssueKey::parse("ENG-142").map_err(InboundError::malformed)?;
-        let address = reply_address(b"reply-secret", &key, "01JD3Z", "northstar.dev");
+        let address = reply_address(
+            b"reply-secret",
+            &key,
+            "01JD3Z",
+            "bo@northstar.dev",
+            "northstar.dev",
+        );
         let raw = format!(
             "From: bo@northstar.dev\nTo: {address}\nSubject: Re: ENG-142\n\n\
 Looks good, shipping it.\n\nOn Tue, Nov 24, 2026 at 9:00 AM Vellum wrote:\n> old text\n"
@@ -536,7 +574,7 @@ Looks good, shipping it.\n\nOn Tue, Nov 24, 2026 at 9:00 AM Vellum wrote:\n> old
         assert_eq!(
             classify(&mail, &settings()),
             EmailIntake::Comment {
-                key,
+                key: key.clone(),
                 user: "01jd3z".to_owned(),
                 body: "Looks good, shipping it.".to_owned()
             }
@@ -548,6 +586,26 @@ Looks good, shipping it.\n\nOn Tue, Nov 24, 2026 at 9:00 AM Vellum wrote:\n> old
         assert_eq!(
             classify(&parse(forged.as_bytes())?, &settings()),
             EmailIntake::Ignored("reply address tag does not match")
+        );
+        // A forwarded notification: the tag is valid but the sender is not
+        // the user it was sent to.
+        let forwarded = raw.replace("From: bo@", "From: eve@");
+        assert_eq!(
+            classify(&parse(forwarded.as_bytes())?, &settings()),
+            EmailIntake::Ignored("reply address tag does not match")
+        );
+        // A tag made with an empty key must not pass when no secret is set.
+        let unset = EmailSettings {
+            reply_secret: Vec::new(),
+            ..settings()
+        };
+        let keyless = raw.replace(
+            &address,
+            &reply_address(b"", &key, "01JD3Z", "bo@northstar.dev", "northstar.dev"),
+        );
+        assert_eq!(
+            classify(&parse(keyless.as_bytes())?, &unset),
+            EmailIntake::Ignored("reply addresses are not configured")
         );
         Ok(())
     }

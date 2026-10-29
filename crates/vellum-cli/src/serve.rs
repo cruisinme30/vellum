@@ -216,8 +216,12 @@ pub fn run(config_path: Option<&Path>) -> Result<(), Error> {
         .map_err(|e| {
             Error::new(ErrorKind::Internal, "cannot start the async runtime").with_source(e)
         })?;
+    let app_origin = gateway.app_origin.clone();
     runtime.block_on(async move {
-        let gateway = services::mount(GatewayBuilder::new(gateway, services::VERSION)).build()?;
+        let services = services::Services::open(&app_origin, Some(&config.data_dir))?;
+        let gateway = services
+            .mount(GatewayBuilder::new(gateway, services::VERSION))
+            .build()?;
         tracing::info!(bind = %serve_config.bind, app = %host_of(&config.public_url.clone().unwrap_or_default()), "starting vellum");
         serve(gateway, serve_config, shutdown_signal()).await
     })

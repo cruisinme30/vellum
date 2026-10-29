@@ -131,16 +131,26 @@ impl<K: Eq + Hash + Clone> RateLimiter<K> {
     }
 }
 
+/// Keys a [`Lockout`] tracks unless told otherwise.
+pub const DEFAULT_LOCKOUT_KEYS: usize = 100_000;
+
 /// Exponential back-off after repeated failures.
 ///
 /// The first `free_attempts` failures cost nothing; each later failure
 /// doubles the wait, starting at `base` and capped at `max`. A success
 /// clears the key.
+///
+/// The table is bounded (#273): a key whose lockout ended more than `max`
+/// ago is forgotten, and when the table is full the entries that unlock
+/// soonest are dropped first, so a flood of new keys cannot exhaust memory
+/// and evicts the attacker's own heavily locked keys last.
 #[derive(Debug)]
 pub struct Lockout<K> {
     free_attempts: u32,
     base: Duration,
     max: Duration,
+    max_keys: usize,
+    // Failures so far and when the key may try again.
     state: Mutex<HashMap<K, (u32, Instant)>>,
 }
 
@@ -148,11 +158,48 @@ impl<K: Eq + Hash + Clone> Lockout<K> {
     /// Creates a lockout policy.
     #[must_use]
     pub fn new(free_attempts: u32, base: Duration, max: Duration) -> Self {
+        Self::with_max_keys(free_attempts, base, max, DEFAULT_LOCKOUT_KEYS)
+    }
+
+    /// Creates a lockout policy tracking at most `max_keys` keys.
+    #[must_use]
+    pub fn with_max_keys(
+        free_attempts: u32,
+        base: Duration,
+        max: Duration,
+        max_keys: usize,
+    ) -> Self {
         Self {
             free_attempts,
             base,
             max,
+            max_keys: max_keys.max(1),
             state: Mutex::new(HashMap::new()),
+        }
+    }
+
+    /// Number of keys currently tracked.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.state.lock().map_or(0, |t| t.len())
+    }
+
+    /// Whether no keys are tracked.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Forgets keys whose lockout ended more than `max` ago; if the table
+    /// is still full, drops the half that unlocks soonest.
+    fn evict(&self, state: &mut HashMap<K, (u32, Instant)>, now: Instant) {
+        state.retain(|_, (_, until)| until.checked_add(self.max).is_none_or(|t| t > now));
+        if state.len() >= self.max_keys {
+            let mut untils: Vec<Instant> = state.values().map(|(_, until)| *until).collect();
+            untils.sort_unstable();
+            if let Some(&cutoff) = untils.get(untils.len() / 2) {
+                state.retain(|_, (_, until)| *until > cutoff);
+            }
         }
     }
 
@@ -180,6 +227,9 @@ impl<K: Eq + Hash + Clone> Lockout<K> {
             .state
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if !state.contains_key(key) && state.len() >= self.max_keys {
+            self.evict(&mut state, now);
+        }
         let failures = state.get(key).map_or(0, |&(n, _)| n).saturating_add(1);
         let over = failures.saturating_sub(self.free_attempts);
         let wait = if over == 0 {
