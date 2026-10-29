@@ -7058,6 +7058,7 @@ dependencies = [
  "uuid",
  "vellum-authz",
  "vellum-contracts",
+ "vellum-db",
  "vellum-kernel",
  "zeroize",
 ]

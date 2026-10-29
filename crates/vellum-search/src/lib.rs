@@ -35,6 +35,7 @@ pub mod model;
 pub mod onnx;
 pub mod postgres_index;
 pub mod service;
+mod stars;
 pub mod tantivy_index;
 pub mod telemetry;
 pub mod text;
