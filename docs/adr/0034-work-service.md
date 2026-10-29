@@ -12,8 +12,8 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D135, D136, D137
-- Requirements: R-WK-13
-- Issue: #258
+- Requirements: R-WK-13, R-WK-16
+- Issue: #258, #319
 - Pull requests: #275
 
 :::
@@ -82,3 +82,8 @@ the seam.
   per-team locks if large workspaces need it.
 - Cloning the state for rollback costs memory per write; revisit with
   undo logs if workspaces grow past tens of thousands of issues.
+- Intake forms and triage suggestions are operations like any other.
+  Submitting a form needs the `work` scope; anonymous submission
+  through a public form's share link waits on share links and rate
+  limits in the gateway. A suggestion is stored, and only a person's
+  accept applies it.
