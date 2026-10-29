@@ -12,9 +12,9 @@ use testcontainers_modules::postgres::Postgres;
 use testcontainers_modules::testcontainers::runners::AsyncRunner as _;
 use testcontainers_modules::testcontainers::{ContainerAsync, ImageExt as _};
 use uuid::Uuid;
+use vellum_db::changes::{DriveChanges, Position};
 use vellum_db::{Index, IndexConfig, IndexPool};
 use vellum_kernel::{DocId, ObjectId, SpaceId};
-use vellum_search::drive_feed::Fingerprints;
 use vellum_search::{DocumentSource as _, DriveSource, PostgresBackend, conformance};
 use vellum_store::{BlobStore, LocalStore};
 
@@ -112,13 +112,11 @@ async fn drive_feed_reads_pages_from_postgres() {
         ]
     );
     assert_eq!(loaded.blocks.len(), 1);
-    assert_eq!(
-        Fingerprints::read(&index)
-            .await
-            .unwrap()
-            .keys()
-            .copied()
-            .collect::<Vec<_>>(),
-        vec![doc]
-    );
+    // The insert was logged by the trigger, and committed, so it is
+    // visible past a position from before it.
+    let log = DriveChanges::new((*index).clone());
+    let batch = log.read(Position::default(), 10).await.unwrap();
+    assert_eq!(batch.pages, vec![Uuid::from_u128(page)]);
+    assert!(batch.next > Position::default());
+    assert!(log.read(batch.next, 10).await.unwrap().pages.is_empty());
 }
