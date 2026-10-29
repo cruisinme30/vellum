@@ -23,3 +23,7 @@ holder = "15 gap workstreams: workstream n gets ADR 0049+n (drive UI, workstream
 [[reservation]]
 decisions = "D267-D270"
 holder = "reliability gates thread: degraded modes (#191) and the page render cache (#74), ADR 0061"
+
+[[reservation]]
+decisions = "D299"
+holder = "reliability gates thread: perf gates from the 1.0 audit (#528), ADR 0061"

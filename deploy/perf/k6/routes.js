@@ -16,6 +16,7 @@ export const routes = {
   spaces: '/api/v1/drive/spaces',
   createPage: (space) => `/api/v1/drive/spaces/${space}/pages`,
   content: (id) => `/api/v1/drive/items/${id}/content`,
+  render: (id) => `/api/v1/pages/${id}/render`,
   collectionQuery: (id) => `/api/v1/collections/${id}/query`,
   search: (q) => `/api/v1/search?q=${encodeURIComponent(q)}`,
   issues: '/api/v1/work/issues',
