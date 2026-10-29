@@ -608,6 +608,44 @@ async fn drive_extras(app: &axum::Router, cookie: &str, space_id: &str, page_id:
     .await;
     assert_eq!(tree.status, StatusCode::OK, "{}", tree.text);
     assert_eq!(tree.json()["items"][0]["id"], page_id, "{}", tree.text);
+    uploads_are_served(app, cookie, page_id).await;
+}
+
+/// A file larger than the API's `10 MiB` body limit uploads to a page, and
+/// the upload needs the CSRF token like any other change.
+async fn uploads_are_served(app: &axum::Router, cookie: &str, page_id: &str) {
+    let path = format!("/api/v1/attachments/{page_id}?name=big.txt");
+    let big = vec![b'a'; 11 * 1024 * 1024];
+    let post = |token: Option<&str>| {
+        let mut builder = request("POST", &path)
+            .header(header::COOKIE, cookie)
+            .header(header::ORIGIN, ORIGIN)
+            .header(header::CONTENT_LENGTH, big.len());
+        if let Some(token) = token {
+            builder = builder.header("x-csrf-token", token);
+        }
+        builder.body(Body::from(big.clone())).unwrap()
+    };
+    let forged = send(app, post(None)).await;
+    assert_eq!(forged.status, StatusCode::FORBIDDEN, "{}", forged.text);
+    let token = csrf(app, cookie).await;
+    let uploaded = send(app, post(Some(&token))).await;
+    assert_eq!(uploaded.status, StatusCode::CREATED, "{}", uploaded.text);
+    let url = uploaded.json()["url"].as_str().unwrap().to_owned();
+    let fetched = send(
+        app,
+        finish(request("GET", &url).header(header::COOKIE, cookie)),
+    )
+    .await;
+    assert_eq!(fetched.status, StatusCode::OK);
+    assert_eq!(fetched.text.len(), big.len());
+    let anonymous = send(app, finish(request("GET", &url))).await;
+    assert_eq!(
+        anonymous.status,
+        StatusCode::UNAUTHORIZED,
+        "{}",
+        anonymous.text
+    );
 }
 
 /// `vellum serve` with a plaintext index: the workspace services answer a

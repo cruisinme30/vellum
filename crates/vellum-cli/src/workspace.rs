@@ -516,6 +516,8 @@ pub struct Opened {
     )>,
     /// Books, which also serve published sites at `/published`.
     pub books: Option<Arc<BooksService>>,
+    /// The drive, which also takes file uploads (see [`crate::uploads`]).
+    pub drive: Option<Arc<Drive>>,
 }
 
 /// My Work's settings: where its secrets live and what it links to.
@@ -1040,7 +1042,9 @@ pub async fn open(
         events.clone(),
     );
     task_jobs(&replica, &workspace.tasks, notify, &config.data_dir)?;
-    workspace.services.push(Arc::new(Storage::new(store, !local)));
+    workspace
+        .services
+        .push(Arc::new(Storage::new(store, !local)));
     Ok(Opened {
         services: workspace.services,
         hooks,
@@ -1051,6 +1055,7 @@ pub async fn open(
         drive_index: Some(drive_index),
         mcp: Some((mcp, events)),
         books: Some(workspace.books),
+        drive: Some(workspace.drive),
     })
 }
 

@@ -24,12 +24,13 @@ use vellum_kernel::{Config, Error, ErrorKind};
 use vellum_notify::endpoint::{self, SafeTransport};
 use vellum_notify::hooks::{HookStore, Webhooks, WebhooksService};
 use vellum_notify::service::{NotifyService, NotifyStore};
+use vellum_security::upload::{Clamd, UploadPolicy};
 use vellum_tasks::service::TasksService;
 
 use crate::collab::Collab;
 use crate::identity::{GuardedFetcher, GuardedSsoHttp, IdentityAuthenticator};
 use crate::observability::{self, Observability};
-use crate::workspace;
+use crate::{uploads, workspace};
 
 /// The binary's version, shown in `/healthz` and the API documents.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -71,6 +72,10 @@ pub struct Services {
     mcp_workspace: Option<Arc<dyn vellum_mcp::ports::Workspace>>,
     /// Where MCP calls are audited.
     audit: Arc<crate::mcp_serve::AuditTrail>,
+    /// The drive, for file uploads, when an index is configured.
+    drive: Option<Arc<vellum_drive::Drive>>,
+    /// The virus scanner every upload goes through, when one is set.
+    scanner: Option<Arc<Clamd>>,
 }
 
 impl std::fmt::Debug for Services {
@@ -167,6 +172,8 @@ impl Services {
             mcp: None,
             mcp_workspace: None,
             audit: Arc::default(),
+            drive: None,
+            scanner: None,
         })
     }
 
@@ -246,7 +253,29 @@ impl Services {
             self.mcp_workspace = Some(workspace);
         }
         self.books = opened.books;
+        self.drive = opened.drive;
         Ok(self)
+    }
+
+    /// Scans every upload with `scanner` (`VELLUM_CLAMD_ADDRESS`).
+    #[must_use]
+    pub fn with_scanner(mut self, scanner: Option<Clamd>) -> Self {
+        self.scanner = scanner.map(Arc::new);
+        self
+    }
+
+    /// The upload routes, mounted at [`uploads::PREFIX`] by [`Self::mount`].
+    /// Without a workspace index they answer 503.
+    pub fn uploads(&self) -> axum::Router {
+        self.drive
+            .as_ref()
+            .map_or_else(uploads::unavailable_router, |drive| {
+                uploads::router(
+                    Arc::clone(drive),
+                    self.scanner.clone(),
+                    UploadPolicy::default(),
+                )
+            })
     }
 
     /// Rate-limit counts shared with the other replicas, when an index is
@@ -347,7 +376,13 @@ impl Services {
             .mount("/collab", self.collab())
             // The help books, for the app's `?` buttons (ADR 0024, D256).
             .mount(crate::help_http::PREFIX, Self::help())
+            .mount_uploads(uploads::PREFIX, self.uploads(), upload_body_limit())
     }
+}
+
+/// The largest upload body: the upload policy's file limit.
+fn upload_body_limit() -> usize {
+    usize::try_from(UploadPolicy::default().max_bytes).unwrap_or(usize::MAX)
 }
 
 /// A gateway built only to describe the API: no listener, in-memory

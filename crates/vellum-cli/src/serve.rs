@@ -202,6 +202,8 @@ fn connection_limits(
             })
             .transpose()?
             .unwrap_or(per_ip_default),
+        // Large files on slow links get time for their size (D213).
+        upload_prefix: Some(crate::uploads::PREFIX),
         ..vellum_api::server::ConnectionLimits::default()
     })
 }
@@ -352,6 +354,7 @@ pub fn run(config_path: Option<&Path>, observability: Observability) -> Result<(
             services::Services::open_with_store(&app_origin, Some(&config.data_dir), store, sso)?
             .with_workspace(&config, |k| std::env::var(k).ok())
             .await?
+            .with_scanner(scanner)
             .with_admin(&config, observability, |k| std::env::var(k).ok())
             .await?;
         tracing::info!(services = ?services, "services ready");
