@@ -4,7 +4,8 @@
     "blocks": [
       {
         "type": "math",
-        "literal": "\\sigma = \\sqrt{\\frac{1}{N}\\sum_{i=1}^{N}(x_i - \\mu)^2}\n"
+        "literal": "\\sigma = \\sqrt{\\frac{1}{N}\\sum_{i=1}^{N}(x_i - \\mu)^2}\n",
+        "id": null
       }
     ]
   },

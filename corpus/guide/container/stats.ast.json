@@ -11,6 +11,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "sections": [
           [
             {
@@ -20,6 +21,11 @@
               "items": [
                 {
                   "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
                   "blocks": [
                     {
                       "type": "paragraph",
@@ -35,6 +41,11 @@
                 },
                 {
                   "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
                   "blocks": [
                     {
                       "type": "paragraph",
@@ -50,6 +61,11 @@
                 },
                 {
                   "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
                   "blocks": [
                     {
                       "type": "paragraph",

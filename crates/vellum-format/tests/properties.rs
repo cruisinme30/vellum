@@ -127,6 +127,13 @@ fn line() -> impl Strategy<Value = String> {
         "::: details Why",
         "::: {#x}",
         "===",
+        "$$ ^blk-b0000001",
+        "```js ^blk-b0000002 {title=\"x\"}",
+        "::: info ^blk-b0000003",
+        "::: details Why ^blk-b0000004 {open}",
+        "> [!TIP] Hint ^blk-b0000005",
+        "- [ ] Ship {due=\"2026-11-02\"} ^blk-b0000006",
+        "^blk-b0000007",
     ]);
     (prefix, prop::collection::vec(token(), 0..8)).prop_map(|(prefix, tokens)| {
         let gap = if prefix.is_empty() || prefix.ends_with(' ') {
@@ -161,4 +168,22 @@ proptest! {
     fn dialect_documents_round_trip(src in document()) {
         assert_round_trip(&src)?;
     }
+}
+
+/// A paragraph line that only looks like a table's delimiter row once its
+/// escapes are dropped. Saving must keep the escape, or the paragraph comes
+/// back as a table (found by the `format_roundtrip` fuzz target, #300).
+#[test]
+fn escaped_delimiter_rows_stay_paragraphs() -> Result<(), TestCaseError> {
+    for src in [
+        "a\n:\\-",
+        "a\n:\\-:",
+        "a\n:\\-\\-\\-",
+        "a\n\\:--",
+        "a\n\\:-\\-:",
+        ":::  k=\"v\"*** }\n:\\-",
+    ] {
+        assert_round_trip(src)?;
+    }
+    Ok(())
 }

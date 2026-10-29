@@ -6,6 +6,8 @@ extends: default
 ignore: |
   web/node_modules/
   web/pnpm-lock.yaml
+  desktop/node_modules/
+  desktop/pnpm-lock.yaml
   target/
   # Helm templates are Go templates; helm lint checks them.
   deploy/helm/*/templates/
