@@ -17,6 +17,7 @@ use vellum_kernel::telemetry::{self, TelemetryConfig};
 mod admin;
 mod docs;
 mod mcp;
+mod reindex;
 
 /// Vellum: a self-hosted workspace where every object is a Markdown file.
 #[derive(Debug, Parser)]
@@ -38,6 +39,8 @@ enum Command {
     /// Fail when a route's p95 latency is over its budget (a CI gate after
     /// a load test).
     Budgets(vellum_admin::budgets::BudgetsArgs),
+    /// Rebuild the index from the files in the data folder.
+    Reindex(reindex::Args),
 }
 
 fn main() -> ExitCode {
@@ -74,6 +77,7 @@ fn main() -> ExitCode {
         Some(Command::Mcp(args)) => mcp::run(&args),
         Some(Command::Profile(args)) => admin::profile(&args),
         Some(Command::Budgets(args)) => admin::budgets(&args),
+        Some(Command::Reindex(args)) => reindex::run(&args),
         Some(Command::Docs(_)) | None => {
             tracing::info!("vellum started; no command given");
             ExitCode::SUCCESS
