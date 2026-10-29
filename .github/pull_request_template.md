@@ -42,4 +42,5 @@ integration, contract, e2e, performance. -->
 - [ ] Every commit is signed off (`git commit -s`)
 - [ ] Public items documented; user guide updated if visible
 - [ ] ADR added if a decision was made
-- [ ] Under 400 changed lines, or labelled `size/exempt` with a reason
+- [ ] One feature per pull request, complete with its tests and docs
+- [ ] Labels: `type/*` and `area/*` (set automatically), plus `phase/*`

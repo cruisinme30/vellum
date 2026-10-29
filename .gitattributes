@@ -3,7 +3,7 @@
 
 * text=auto eol=lf
 
-# Generated files: hidden in diffs and excluded from the PR size limit.
+# Generated files: collapsed in GitHub diffs.
 Cargo.lock linguist-generated=true
 web/pnpm-lock.yaml linguist-generated=true
 LICENSE linguist-generated=true
