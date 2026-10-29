@@ -74,7 +74,7 @@ reads included (#191).
 - The instance profile is only tried when the bucket is on AWS itself:
   with a custom endpoint (MinIO, R2) and no keys, startup fails clearly
   instead of probing `169.254.169.254`.
-- Errors name the source and STS's error code, never a token or key.
+- Errors name the source and the error code STS returned, never a token or key.
 
 ## Alternatives
 
