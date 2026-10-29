@@ -113,17 +113,13 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/develop' }}
       - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
         with:
-          tool: cargo-nextest,cargo-deny,cargo-audit,mdbook
+          tool: cargo-deny,cargo-audit,mdbook
       - name: Format
         run: cargo fmt --all --check
       - name: Clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Docs
         run: cargo doc --workspace --no-deps --locked
-      - name: Tests
-        # The full suite runs these same tests in its coverage job.
-        if: ${{ !inputs.full-suite }}
-        run: cargo nextest run --workspace --locked --profile ci
       - name: Crate boundaries
         run: cargo xtask boundaries
       - name: Block model is generated from schema/
@@ -134,6 +130,32 @@ jobs:
         run: cargo deny --locked check
       - name: RustSec audit
         run: cargo audit --deny warnings
+
+  rust-tests:
+    # Its own job, so building and running the tests (the longest step)
+    # starts at once instead of after clippy, docs and the policy checks
+    # (ADR 0049, D215). The full suite runs these same tests in its
+    # coverage job.
+    name: Rust tests
+    needs: changes
+    if: needs.changes.outputs.rust == 'true' && !inputs.full-suite
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          # The cache key includes the job, so tests keep their own
+          # build artefacts apart from clippy's. Only develop saves.
+          save-if: ${{ github.ref == 'refs/heads/develop' }}
+      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+        with:
+          tool: cargo-nextest
+      - name: Tests
+        run: cargo nextest run --workspace --locked --profile ci
 
   web:
     name: Web
@@ -171,11 +193,17 @@ jobs:
         run: pnpm audit
 
   ui:
-    name: UI layout (quick)
+    # Two shards of four workers each: 334 tests took 7.3 minutes on one
+    # runner's default two workers (ADR 0049, D214).
+    name: UI layout (quick ${{ matrix.shard }}/2)
     needs: changes
     if: needs.changes.outputs.ui == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     env:
       # Keep in step with site.yml.
       MDBOOK_VERSION: 0.5.4
@@ -211,11 +239,11 @@ jobs:
           UI_BROWSERS: chromium
           UI_VIEWPORTS: phone,laptop
           UI_SITE_DIR: ../_site
-        run: pnpm exec playwright test e2e/ui
+        run: pnpm exec playwright test e2e/ui --shard=${{ matrix.shard }}/2 --workers=4
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: ui-quick-report
+          name: ui-quick-report-${{ matrix.shard }}
           path: |
             web/playwright-report
             web/test-results
@@ -407,7 +435,7 @@ jobs:
   fast-suite:
     name: Fast suite
     if: always()
-    needs: [changes, rust, web, desktop, ui, hygiene, commits, traceability, dependencies]
+    needs: [changes, rust, rust-tests, web, desktop, ui, hygiene, commits, traceability, dependencies]
     runs-on: ubuntu-24.04
     steps:
       # A job skipped by the changed-areas filter counts as not applicable.

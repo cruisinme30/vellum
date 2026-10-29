@@ -43,6 +43,15 @@ dbg_macro = "deny"
 print_stdout = "deny"
 large_futures = "warn"
 
+# Debug and test builds keep line numbers for backtraces but drop the full
+# debug info: about 140 test binaries link faster, and the CI cache and
+# cloud sandboxes' target directories shrink (ADR 0049, D215).
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
 [profile.release]
 lto = "thin"
 codegen-units = 1
