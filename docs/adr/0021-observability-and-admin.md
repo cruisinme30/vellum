@@ -12,7 +12,7 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D91, D92, D93
-- Issue: #177, #176, #178, #179, #180, #181, #192
+- Issue: #177, #176, #178, #179, #180, #181, #192, #45 (kernel telemetry)
 - Pull requests: #254
 
 :::
