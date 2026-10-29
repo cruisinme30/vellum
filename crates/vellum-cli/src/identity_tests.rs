@@ -457,6 +457,17 @@ async fn the_desktop_app_signs_in_with_oauth() {
     .await;
     assert_eq!(status.json()["user"]["name"], "Priya", "{}", status.text);
 
+    let info = send(
+        &app,
+        finish(
+            request("GET", "/oauth/userinfo")
+                .header(header::AUTHORIZATION, format!("Bearer {access}")),
+        ),
+    )
+    .await;
+    assert_eq!(info.json()["email"], "priya@northstar.dev", "{}", info.text);
+    assert!(metadata.json()["userinfo_endpoint"].is_string());
+
     let rotated = token_request(
         &app,
         &[

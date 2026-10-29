@@ -444,6 +444,28 @@ async fn revoke(State(identity): Shared, Form(request): Form<Revoke>) -> Respons
     }
 }
 
+async fn userinfo(State(identity): Shared, headers: HeaderMap) -> Response {
+    let token = headers
+        .get(header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .unwrap_or_default();
+    match identity.userinfo(token.trim()) {
+        Ok(info) => oauth_json(StatusCode::OK, &info),
+        Err(e) => {
+            let mut response = oauth_json(
+                StatusCode::UNAUTHORIZED,
+                &json!({ "error": "invalid_token", "error_description": e.message() }),
+            );
+            let _ = response.headers_mut().insert(
+                header::WWW_AUTHENTICATE,
+                HeaderValue::from_static("Bearer error=\"invalid_token\""),
+            );
+            response
+        }
+    }
+}
+
 /// The `OAuth` endpoints, to mount cross-site at `/oauth`.
 pub fn oauth_router(identity: Arc<Identity>) -> Router {
     Router::new()
@@ -451,6 +473,7 @@ pub fn oauth_router(identity: Arc<Identity>) -> Router {
         .route("/consent.js", get(consent_js))
         .route("/token", post(token))
         .route("/revoke", post(revoke))
+        .route("/userinfo", get(userinfo))
         .with_state(identity)
 }
 

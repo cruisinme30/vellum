@@ -337,6 +337,7 @@ impl Identity {
             "authorization_endpoint": format!("{base}/oauth/authorize"),
             "token_endpoint": format!("{base}/oauth/token"),
             "revocation_endpoint": format!("{base}/oauth/revoke"),
+            "userinfo_endpoint": format!("{base}/oauth/userinfo"),
             "response_types_supported": ["code"],
             "response_modes_supported": ["query"],
             "grant_types_supported": ["authorization_code", "refresh_token"],
@@ -766,6 +767,24 @@ impl Identity {
             let grants = &s.grants;
             s.access_tokens.retain(|_, t| grants.contains_key(&t.grant));
         })
+    }
+
+    /// The `OpenID Connect`-style user info for a bearer token: `sub`,
+    /// `email`, `preferred_username` and `name`. Desktop and MCP clients
+    /// use it to label the signed-in account.
+    ///
+    /// # Errors
+    ///
+    /// As [`Identity::verify_token`].
+    pub fn userinfo(&self, token: &str) -> Result<Value, Error> {
+        let info = self.verify_token(token)?;
+        let user = self.user(info.user)?;
+        Ok(json!({
+            "sub": user.id.to_string(),
+            "email": user.email,
+            "preferred_username": user.email,
+            "name": user.name,
+        }))
     }
 
     /// Lists a user's `OAuth` grants (connected apps).
