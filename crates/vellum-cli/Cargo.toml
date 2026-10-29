@@ -22,6 +22,7 @@ path = "src/main.rs"
 async-trait = "0.1"
 base64 = "0.23.1"
 clap = { version = "4.6.7", features = ["derive"] }
+futures = "0.3.34"
 getrandom = "0.4"
 http = "1.5.0"
 serde_json = "1.0.154"
@@ -43,7 +44,7 @@ vellum-kernel.workspace = true
 vellum-mcp = { path = "../vellum-mcp" }
 vellum-private = { path = "../vellum-private", features = ["os-keychain"] }
 vellum-security = { path = "../vellum-security" }
-vellum-store = { path = "../vellum-store" }
+vellum-store = { path = "../vellum-store", features = ["s3"] }
 vellum-work = { path = "../vellum-work" }
 vellum-work-service = { path = "../vellum-work-service" }
 
