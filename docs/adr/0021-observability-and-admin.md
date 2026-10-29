@@ -62,6 +62,8 @@ memory must stay bounded, and none of it may leak workspace content.
   backup does not expose the workspace keys.
 - The restore drill restores into scratch space, checks every hash and
   fails when it takes longer than the 15-minute RTO.
+- `vellum serve` reads the backup key from `VELLUM_BACKUP_KEY`. Without it
+  the key is kept in `.vellum/keys/` and the server warns at every start.
 
 ## Alternatives
 

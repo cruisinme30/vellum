@@ -20,6 +20,7 @@ mod identity;
 mod identity_tests;
 mod integrations;
 mod mcp;
+mod observability;
 mod private;
 #[cfg(test)]
 mod private_tests;
@@ -209,11 +210,14 @@ fn main() -> ExitCode {
         },
         Command::Serve { config } => {
             let telemetry_config = TelemetryConfig::from_env("vellum", env!("CARGO_PKG_VERSION"));
-            let _guard = match telemetry::init(&telemetry_config) {
+            // The recorder fills the buffer behind Admin → Requests.
+            let observability = observability::Observability::new();
+            let recorder = Box::new(observability.recorder());
+            let _guard = match telemetry::init_with(&telemetry_config, Some(recorder)) {
                 Ok(guard) => guard,
                 Err(error) => return fail(&error),
             };
-            match serve::run(config.as_deref()) {
+            match serve::run(config.as_deref(), observability) {
                 Ok(()) => ExitCode::SUCCESS,
                 Err(error) => {
                     tracing::error!(error = %error, "vellum serve failed");

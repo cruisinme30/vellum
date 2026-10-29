@@ -37,8 +37,9 @@ use crate::public::{NothingPublished, PublicSite};
 use crate::registry::{RegisteredOp, Registry};
 use crate::request_id::REQUEST_ID;
 use crate::security::{CSRF_HEADER, Surface, apply_headers, check_csrf, csrf_token};
-use crate::timing::{RequestObservation, collect};
 use crate::{graphql, input, openapi};
+use vellum_observe::server_timing::collect;
+use vellum_observe::{RequestObservation, RouteMetrics, UNMATCHED_ROUTE};
 use vellum_security::rate::{Quota, RateLimiter};
 
 /// Largest response body stored for idempotent replay.
@@ -66,6 +67,7 @@ pub struct GatewayBuilder {
     public_site: Arc<dyn PublicSite>,
     breaker: BreakerPolicy,
     mounts: Vec<Mount>,
+    metrics: RouteMetrics,
 }
 
 impl std::fmt::Debug for GatewayBuilder {
@@ -98,6 +100,7 @@ impl GatewayBuilder {
             public_site: Arc::new(NothingPublished),
             breaker: BreakerPolicy::default(),
             mounts: Vec::new(),
+            metrics: RouteMetrics::new(),
         }
     }
 
@@ -133,6 +136,15 @@ impl GatewayBuilder {
     #[must_use]
     pub const fn breaker_policy(mut self, policy: BreakerPolicy) -> Self {
         self.breaker = policy;
+        self
+    }
+
+    /// Sets where per-route rate, errors, duration and in-flight counts
+    /// are recorded. Pass the same instance to the admin console so it
+    /// shows what this gateway served.
+    #[must_use]
+    pub fn route_metrics(mut self, metrics: RouteMetrics) -> Self {
+        self.metrics = metrics;
         self
     }
 
@@ -192,6 +204,7 @@ impl GatewayBuilder {
             draining: AtomicBool::new(false),
             openapi,
             graphql,
+            metrics: self.metrics,
         });
         let app = app_router(&state, self.mounts);
         let public = crate::public::router(self.public_site);
@@ -211,6 +224,7 @@ struct Shared {
     draining: AtomicBool,
     openapi: Value,
     graphql: async_graphql::dynamic::Schema,
+    metrics: RouteMetrics,
 }
 
 /// The assembled gateway.
@@ -322,11 +336,21 @@ async fn observe(
     let route = request
         .extensions()
         .get::<MatchedPath>()
-        .map_or_else(|| "unmatched".to_owned(), |p| p.as_str().to_owned());
-    let obs = RequestObservation::begin(request.method().as_str(), &route, &id.to_string());
+        .map_or_else(|| UNMATCHED_ROUTE.to_owned(), |p| p.as_str().to_owned());
+    let traceparent = request
+        .headers()
+        .get("traceparent")
+        .and_then(|v| v.to_str().ok());
+    let obs = RequestObservation::begin(
+        &state.metrics,
+        request.method().as_str(),
+        &route,
+        traceparent,
+        &id.to_string(),
+    );
     let span = obs.span().clone();
     let (mut response, timings) = collect(next.run(request).instrument(span)).await;
-    let done = obs.finish(response.status().as_u16(), &timings);
+    let done = obs.finish(response.status().as_u16(), timings);
     let headers = response.headers_mut();
     if let Ok(value) = HeaderValue::from_str(&id.to_string()) {
         let _ = headers.insert(REQUEST_ID, value);

@@ -8928,6 +8928,7 @@ dependencies = [
  "tracing",
  "vellum-contracts",
  "vellum-kernel",
+ "vellum-observe",
  "vellum-security",
 ]
 
@@ -9018,6 +9019,7 @@ dependencies = [
  "vellum-integrations",
  "vellum-kernel",
  "vellum-mcp",
+ "vellum-observe",
  "vellum-private",
  "vellum-security",
  "vellum-store",

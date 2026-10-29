@@ -7,7 +7,8 @@
 //! [`Services::mount`] (with any raw routers), so `vellum serve`, the
 //! OpenAPI document and the `GraphQL` schema all see the same set.
 //! Identity always runs; the workspace services (collections, books,
-//! Work) join when an index is configured.
+//! Work) join when an index is configured, and the admin console when
+//! `vellum serve` opens it over the data folder.
 
 use std::path::Path;
 use std::sync::Arc;
@@ -20,6 +21,7 @@ use vellum_identity::{Identity, IdentityConfig, IdentityService, Store, http as 
 use vellum_kernel::{Config, Error, ErrorKind};
 
 use crate::identity::{GuardedFetcher, IdentityAuthenticator};
+use crate::observability::{self, Observability};
 use crate::workspace;
 
 /// The binary's version, shown in `/healthz` and the API documents.
@@ -33,6 +35,10 @@ pub struct Services {
     workspace: Vec<Arc<dyn Service>>,
     /// The integration receivers, when an integration secret is set.
     hooks: Option<axum::Router>,
+    /// The admin console (requests, routes, audit, settings, backups).
+    admin: Option<Arc<dyn Service>>,
+    /// Where the gateway records per-route metrics.
+    observability: Observability,
 }
 
 impl std::fmt::Debug for Services {
@@ -43,6 +49,7 @@ impl std::fmt::Debug for Services {
                 &self.workspace.iter().map(|s| s.name()).collect::<Vec<_>>(),
             )
             .field("hooks", &self.hooks.is_some())
+            .field("admin", &self.admin.is_some())
             .finish_non_exhaustive()
     }
 }
@@ -73,7 +80,29 @@ impl Services {
             identity: Arc::new(identity),
             workspace: Vec::new(),
             hooks: None,
+            admin: None,
+            observability: Observability::new(),
         })
+    }
+
+    /// Adds the admin console over `config`'s data folder, reading and
+    /// writing the same trace buffer and route metrics as `observability`.
+    /// Scheduled backups, drills and usage reports start running.
+    ///
+    /// # Errors
+    ///
+    /// A malformed key, an unreadable folder or a broken audit chain.
+    pub async fn with_admin(
+        mut self,
+        config: &Config,
+        observability: Observability,
+        var: impl Fn(&str) -> Option<String>,
+    ) -> Result<Self, Error> {
+        let (service, facts) = observability::open(config, &observability, var).await?;
+        observability::spawn_ticks(Arc::clone(&service), Arc::clone(&facts));
+        self.admin = Some(observability::api(service, facts));
+        self.observability = observability;
+        Ok(self)
     }
 
     /// Adds the workspace services for `config` (see [`workspace`]).
@@ -97,6 +126,7 @@ impl Services {
         let mut all: Vec<Arc<dyn Service>> =
             vec![Arc::new(IdentityService::new(Arc::clone(&self.identity)))];
         all.extend(self.workspace.iter().cloned());
+        all.extend(self.admin.iter().cloned());
         all
     }
 
@@ -112,6 +142,7 @@ impl Services {
             builder = builder.mount_cross_site("/hooks", hooks.clone());
         }
         builder
+            .route_metrics(self.observability.metrics.clone())
             .authenticator(Arc::new(IdentityAuthenticator::new(Arc::clone(identity))))
             .mount("/auth", identity_http::browser_router(Arc::clone(identity)))
             .mount_cross_site("/oauth", identity_http::oauth_router(Arc::clone(identity)))
@@ -134,8 +165,10 @@ pub fn contract_gateway() -> Result<Gateway, Error> {
             Error::new(ErrorKind::Internal, "cannot start the async runtime").with_source(e)
         })?;
     let described = runtime.block_on(workspace::describe(&scratch, &services.identity));
+    let admin = observability::describe(&scratch);
     let _ = std::fs::remove_dir_all(&scratch);
     services.workspace = described?;
+    services.admin = Some(admin?);
     services
         .mount(GatewayBuilder::new(
             GatewayConfig::new("http://localhost", vec![0; 32]),

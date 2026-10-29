@@ -595,11 +595,50 @@ async fn edge_headers() -> TestResult {
             .to_owned()
     };
     assert_eq!(h("x-request-id"), id);
-    assert!(h("server-timing").starts_with("total;dur="));
+    assert!(h("server-timing").contains("total;dur="));
+    assert!(h("server-timing").contains("traceparent;desc=\"00-"));
     assert!(h("content-security-policy").contains("default-src 'none'"));
     assert_eq!(h("x-content-type-options"), "nosniff");
     assert!(h("strict-transport-security").contains("max-age="));
     assert_eq!(h("cross-origin-opener-policy"), "same-origin");
+    Ok(())
+}
+
+#[tokio::test]
+async fn joins_the_callers_trace_and_counts_the_route() -> TestResult {
+    let metrics = vellum_observe::RouteMetrics::new();
+    let gw = GatewayBuilder::new(config(), "1.0.0-test")
+        .service(Arc::new(Notes {
+            created: AtomicUsize::new(0),
+            ready: Readiness::Ready,
+        }) as Arc<dyn Service>)
+        .authenticator(Arc::new(FakeAuth))
+        .route_metrics(metrics.clone())
+        .build()?;
+    let trace = "4bf92f3577b34da6a3ce929d0e0e4736";
+    let request = Request::get("/api/v1/notes/count")
+        .header("host", "vellum.northstar.dev")
+        .header("traceparent", format!("00-{trace}-00f067aa0ba902b7-01"))
+        .body(Body::empty())?;
+    let reply = send(&gw, request).await?;
+    let timing = reply
+        .headers
+        .get("server-timing")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_default();
+    // The browser joins its own timings to this trace through the header.
+    assert!(
+        timing.contains(&format!("traceparent;desc=\"00-{trace}-")),
+        "{timing}"
+    );
+    let routes = metrics.snapshot(1);
+    let route = routes
+        .iter()
+        .find(|r| r.route == "/api/v1/notes/count")
+        .ok_or("the route was not counted")?;
+    assert_eq!(route.method, "GET");
+    assert_eq!(route.counts.requests, 1);
+    assert_eq!(metrics.in_flight(), 0);
     Ok(())
 }
 
