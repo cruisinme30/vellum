@@ -114,7 +114,7 @@ workflow applies changes when that file lands on `develop`.
 | Group | Labels | Set by |
 | --- | --- | --- |
 | `type/*` | `feat fix docs refactor perf test build ci chore style revert` | the pull request title |
-| `area/*` | `kernel contracts format store crypto db render export authz collab collections pages work my-work api jobs mcp cli editor web ci docs deploy` | changed paths (`.github/labeler.yml`), or by hand |
+| `area/*` | `kernel contracts format store crypto db render export authz collab collections pages work my-work api jobs mcp cli sync desktop editor web ci docs deploy` | changed paths (`.github/labeler.yml`), or by hand |
 | `phase/*` | `foundation format editor drive-books collections work mywork-mcp clients-release` | by hand, following the build order |
 | `status/*` | `in-progress blocked ready-to-merge` | by hand |
 | `priority/p0` | every requirement is P0 | by hand |
