@@ -22,7 +22,7 @@ interface Endpoints {
   readonly authorization: string;
   readonly token: string;
   readonly revocation: string | undefined;
-  readonly userinfo: string | undefined;
+  readonly userinfo: string;
 }
 
 export interface AuthDeps {
@@ -46,7 +46,7 @@ export async function discover(server: string, fetcher: Fetch): Promise<Endpoint
     authorization: `${server}/oauth/authorize`,
     token: `${server}/oauth/token`,
     revocation: `${server}/oauth/revoke`,
-    userinfo: undefined,
+    userinfo: `${server}/oauth/userinfo`,
   };
   const response = await fetcher(`${server}/.well-known/oauth-authorization-server`, {
     headers: { accept: "application/json" },
@@ -57,7 +57,7 @@ export async function discover(server: string, fetcher: Fetch): Promise<Endpoint
     authorization: sameOrigin(server, metadata["authorization_endpoint"]) ?? fallback.authorization,
     token: sameOrigin(server, metadata["token_endpoint"]) ?? fallback.token,
     revocation: sameOrigin(server, metadata["revocation_endpoint"]),
-    userinfo: sameOrigin(server, metadata["userinfo_endpoint"]),
+    userinfo: sameOrigin(server, metadata["userinfo_endpoint"]) ?? fallback.userinfo,
   };
 }
 
@@ -183,7 +183,6 @@ export class Session {
 
   private async account(endpoints: Endpoints, accessToken: string): Promise<string> {
     const host = new URL(this.server).host;
-    if (endpoints.userinfo === undefined) return host;
     const response = await this.deps.fetch(endpoints.userinfo, {
       headers: { authorization: `Bearer ${accessToken}`, accept: "application/json" },
     });
