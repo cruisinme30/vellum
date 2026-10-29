@@ -18,6 +18,7 @@ layer = "service"
 workspace = true
 
 [dependencies]
+axum = { version = "0.8.9", default-features = false, features = ["json", "tokio"] }
 base64 = "0.23.1"
 hmac = "0.13.0"
 jiff = { version = "0.2.38", features = ["serde"] }
@@ -34,4 +35,5 @@ vellum-kernel.workspace = true
 vellum-work = { path = "../vellum-work" }
 
 [dev-dependencies]
+tower = { version = "0.5.3", features = ["util"] }
 tokio = { version = "1.54.1", features = ["rt", "macros"] }
