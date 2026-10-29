@@ -56,8 +56,9 @@ owner asked for the UI to be red-teamed and kept fixed as features land
   the app must read that attribute at start so the suite can set it.
 - Targets: app routes listed in `targets.ts`, plus every HTML page of the
   built website and help books, found on disk.
-- Fast suite: Chromium at phone and laptop on a quick subset. Full suite
-  and nightly: every browser, viewport and page.
+- Fast suite: Chromium at phone and laptop on a quick subset. Full suite:
+  every browser, viewport and page; help pages that share a template get
+  the default mode only ([ADR 0035](0035-ci-speed.md), D165).
 
 ### `D125`: visual baselines only for stable screens, in a pinned container
 
@@ -83,6 +84,6 @@ owner asked for the UI to be red-teamed and kept fixed as features land
 - A new view is covered by adding its route to `targets.ts`; a new help
   book page is covered automatically.
 - Layout bugs fail the fast suite before they merge, with a screenshot.
-- The full matrix takes tens of minutes, so it runs on main and nightly.
+- The full matrix runs on release pull requests into main, in about 10 minutes.
 - Revisit when the renderer lands: add the golden corpus pages as targets
   with baselines, and PDF and Word exports rendered to images.

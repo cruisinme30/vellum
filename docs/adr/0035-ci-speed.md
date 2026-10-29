@@ -11,9 +11,9 @@ vellum: 1
 
 - Date: `2026-10-29`
 - Status: accepted
-- Decisions: `D138`, `D139`, `D140`
-- Issue: `#264`
-- Pull requests: `chore/ci-speed`
+- Decisions: `D138`, `D139`, `D140`, `D165`, `D166`, `D167`
+- Issue: `#264`, `#446`
+- Pull requests: `chore/ci-speed`, `chore/ci-dedupe-tests`, `chore/release-ci-speed`
 
 :::
 
@@ -26,6 +26,13 @@ analysis takes about 6 minutes plus 1 to 2 minutes in the queue. Once the
 develop ruleset required CodeQL results, every merge waited 8 to 10
 minutes. The repository ran about 100 workflow runs every 15 minutes, so
 jobs also queued for runners.
+
+The release check had its own problem. Full suite run 40903463496 (release
+pull request #443) used about 190 runner minutes in its first 35 minutes
+and had not finished. Its 12 browser jobs took 22 to 31 minutes each,
+about 25,500 UI checks in total: every one of the ~135 pages of the help
+books and decision records, in 15 display modes, 3 browsers and 4 screen
+sizes. The two from-scratch release builds ran one after the other.
 
 ## Decisions
 
@@ -61,6 +68,34 @@ jobs also queued for runners.
   alert blocks the release into main.
 - Merges into develop wait only for the Fast suite and Labels.
 
+### `D165`: help pages that share a template get the default mode only
+
+- In the full suite, every app route, the landing page, the docs home and
+  each book's first and print pages get every check of
+  [ADR 0031](0031-ui-quality-suite.md): all display modes, loading and
+  keyboard focus.
+- Every other help page is a "sweep" page: it gets the layout audit, axe
+  and the error checks in the default mode only, in every browser and size.
+- Why: the chapters share one mdBook template, and a book's print page
+  lays out every chapter's content, so the other modes repeated the same
+  checks page by page. Checks per browser drop from 8,520 to 1,320.
+- `UI_SCOPE=exhaustive` (a choice when starting the Full suite by hand)
+  still runs every page in every mode.
+
+### `D166`: the two reproducible builds run side by side
+
+- Two jobs each build the release binary from scratch and upload it; the
+  image job compares them byte for byte, builds the image and checks the
+  budgets. The release check waits for one build instead of two.
+- The builds now run on different machines, which makes the
+  reproducibility check stricter, not weaker.
+
+### `D167`: two browser shards, inside the concurrency limit
+
+- The browser matrix is 3 browsers times 2 shards, about 10 minutes each.
+- Six jobs instead of twelve keep the Full suite under the account's
+  20 concurrent jobs, so no browser job waits for a runner.
+
 ## Alternatives
 
 - **Split the Rust job into parallel jobs**: each job rebuilds the
@@ -71,6 +106,11 @@ jobs also queued for runners.
   the code scanning gate waiting for results, which blocks merges.
 - **Keep CodeQL on develop with the default suite**: still about
   6 minutes for Rust.
+
+- **More workers per browser job**: the loading checks time first paint
+  on a throttled network, and a busier runner would make them flaky.
+- **Warm the coverage cache from develop**: coverage is not on the release
+  check's longest path (about 11 minutes against about 19 for the builds).
 
 ## Consequences
 
@@ -88,3 +128,8 @@ From 2026-10-29, develop is pushed about every two hours after the full
 suite passes locally. A push to develop runs the Fast suite once for the
 areas it changed, the Full suite runs only on release pull requests, the
 nightly jobs skip unchanged nights, and no run cancels another.
+
+The release check (D165-D167) aims at about 20 minutes of wall time and
+about 140 runner minutes, down from more than 40 minutes and about 420. A
+layout bug that shows only on one help chapter in a non-default mode is
+caught by the exhaustive run, not by the release check.

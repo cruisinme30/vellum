@@ -128,8 +128,9 @@ scripts/ci/build-site.sh _site
 cd web && UI_SITE_DIR=../_site pnpm exec playwright test e2e/ui
 ```
 
-`UI_BROWSERS`, `UI_VIEWPORTS` and `UI_SCOPE=full` widen or narrow the
-run. Visual baselines are refreshed with `scripts/ci/ui-baselines.sh`.
+`UI_BROWSERS`, `UI_VIEWPORTS` and `UI_SCOPE` widen or narrow the run.
+`UI_SCOPE=full` (the release check) adds every help page in the default
+mode; `UI_SCOPE=exhaustive` checks every help page in every mode. Visual baselines are refreshed with `scripts/ci/ui-baselines.sh`.
 
 ## Issues and decision records
 
