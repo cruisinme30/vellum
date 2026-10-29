@@ -53,6 +53,7 @@ import { createMockNotificationPreferencesStore } from "./notifications/preferen
 import type { DirectoryApi } from "./people/directory";
 import type { PrivateSpacesApi } from "./platform/private/api";
 import { PrivateSpacesView } from "./platform/private/private-spaces-view";
+import type { SharingApi } from "./sharing/api";
 import { AppShell } from "./shell/app-shell";
 import { AppearanceProvider, type OrganisationAppearance } from "./theme/appearance-context";
 import { AppearancePage } from "./theme/appearance-page";
@@ -178,6 +179,8 @@ export interface AppServices {
   readonly privateSpaces?: PrivateSpacesApi | undefined;
   /** The people directory, from a Vellum server; absent in demo mode. */
   readonly directory?: DirectoryApi | undefined;
+  /** Sharing, from a Vellum server; absent in demo mode. */
+  readonly sharing?: SharingApi | undefined;
   readonly collections: CollectionsStore;
   /** Present when a Vellum server answered; absent in demo mode. */
   readonly session?: { readonly auth: AuthApi; readonly status: AuthStatus } | undefined;
@@ -260,6 +263,7 @@ export function AppProviders({
   attachments,
   privateSpaces,
   directory,
+  sharing,
   collections,
   session,
   notifications,
@@ -268,8 +272,8 @@ export function AppProviders({
   children,
 }: AppServices & { readonly children: ReactNode }) {
   const serverApis = useMemo(
-    () => ({ work, books, drive, attachments, privateSpaces, directory }),
-    [work, books, drive, attachments, privateSpaces, directory],
+    () => ({ work, books, drive, attachments, privateSpaces, directory, sharing }),
+    [work, books, drive, attachments, privateSpaces, directory, sharing],
   );
   const [demoNotifications] = useState<NotificationServices>(() => ({
     store: createMockNotificationPreferencesStore(),
