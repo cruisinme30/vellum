@@ -1,0 +1,126 @@
+/*
+ * SPDX-FileCopyrightText: 2026 The Vellum contributors
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+/* Notification settings */
+.vl-notify section {
+  margin-top: 32px;
+}
+
+.vl-notify h2 {
+  font-size: 1.25rem;
+  font-weight: 500;
+}
+
+/* The table scrolls on its own on a phone, never the page. */
+.vl-notify-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.vl-notify-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.vl-notify-table caption {
+  padding-bottom: 8px;
+  text-align: start;
+}
+
+.vl-notify-table th,
+.vl-notify-table td {
+  padding: 8px;
+  border-bottom: 1px solid var(--md-outline-variant);
+}
+
+.vl-notify-table thead th {
+  font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Channel columns stay as narrow as their heading; the kind column takes the rest. */
+.vl-notify-table td,
+.vl-notify-table thead th:not(:first-child) {
+  width: 1%;
+}
+
+@media (max-width: 479.98px) {
+  .vl-notify-table th,
+  .vl-notify-table td {
+    padding: 8px 4px;
+  }
+}
+
+.vl-notify-table thead th:first-child,
+.vl-notify-table tbody th {
+  font-weight: 400;
+  text-align: start;
+}
+
+.vl-notify-table td {
+  text-align: center;
+}
+
+.vl-notify-table input[type="checkbox"] {
+  width: 24px;
+  height: 24px;
+  accent-color: var(--md-primary);
+}
+
+.vl-notify-urgent {
+  display: inline-block;
+  margin-inline-start: 8px;
+  padding: 0 8px;
+  border-radius: var(--vl-radius-s);
+  border: 1px solid var(--md-error);
+  color: var(--md-error);
+  font-size: 0.75rem;
+  line-height: 1.5rem;
+}
+
+.vl-notify-select,
+.vl-notify-add input {
+  min-height: 48px;
+  max-width: 100%;
+  padding: 0 12px;
+  border: 1px solid var(--md-outline);
+  border-radius: var(--vl-radius-s);
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+}
+
+.vl-notify-chips,
+.vl-notify-actions,
+.vl-notify-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+}
+
+.vl-notify-actions {
+  align-items: center;
+  margin-top: 32px;
+}
+
+.vl-notify-muted {
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.vl-notify-muted li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--md-outline-variant);
+}
+
+.vl-notify-muted code {
+  overflow-wrap: anywhere;
+}
