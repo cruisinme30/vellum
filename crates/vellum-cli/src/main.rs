@@ -12,6 +12,7 @@
 //! device's key for end-to-end encrypted private spaces.
 
 mod docs;
+mod feed;
 mod identity;
 #[cfg(test)]
 mod identity_tests;

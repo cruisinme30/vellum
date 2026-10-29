@@ -412,6 +412,24 @@ impl DriveIndex for SqlIndex {
                 .execute(&mut *tx)
             );
             let _ = project_space!(tx, system, id, now);
+            // Other replicas reload their space lists (ADR 0038).
+            let (seq,): (i64,) = run!(
+                system,
+                "space.announce",
+                sqlx::query_as("UPDATE cluster_feed SET head = head + 1 WHERE id = 1 RETURNING head")
+                    .fetch_one(&mut *tx)
+            );
+            let _ = run!(
+                system,
+                "space.announce",
+                sqlx::query(
+                    "INSERT INTO cluster_changes (seq, topic, subject, origin) VALUES ($1, $2, $3, '')"
+                )
+                .bind(seq)
+                .bind(vellum_db::feed::SPACES)
+                .bind(space.root.as_str())
+                .execute(&mut *tx)
+            );
             tx.commit().await.map_err(db_error)?;
             Ok(())
         })

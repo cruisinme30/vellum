@@ -12,7 +12,9 @@
 //!
 //! At startup the drive rescans the data folder, and a file watcher then
 //! keeps the index in step with edits made outside Vellum (see
-//! [`crate::watcher`]).
+//! [`crate::watcher`]). Writes are announced in the index's change feed,
+//! and each replica follows it to keep its caches fresh (see
+//! [`crate::feed`]).
 
 use std::path::Path;
 use std::sync::{Arc, RwLock};
@@ -22,6 +24,7 @@ use vellum_authz::{Authz, AuthzStore, Id, MemoryStore, SqlStore};
 use vellum_books_service::BooksService;
 use vellum_collections::CollectionsService;
 use vellum_contracts::{BoxFuture, Service};
+use vellum_db::feed::Feed;
 use vellum_db::{Index, IndexConfig};
 use vellum_drive::authz::TreeSync;
 use vellum_drive::sql::SqlIndex;
@@ -32,12 +35,14 @@ use vellum_store::{BlobPath, BlobStore, LocalStore};
 use vellum_work::{UserRef, WorkEvent};
 use vellum_work_service::{Directory, EventSink, SystemClock, WorkService};
 
+use crate::feed::{AnnouncingStore, Caches};
 use crate::reindex::{KEY_VAR, index_key};
 
 /// Variable that opens the SQLite index without encryption.
 pub const PLAINTEXT_VAR: &str = "VELLUM_INDEX_PLAINTEXT";
 
-/// How often the space list behind permission checks is reloaded.
+/// How often the space list behind permission checks is reloaded in full,
+/// as a backstop to the change feed.
 const SPACES_REFRESH: Duration = Duration::from_secs(30);
 
 fn unavailable(what: &str, e: impl std::fmt::Display) -> Error {
@@ -132,11 +137,13 @@ impl EventSink for TracingSink {
     }
 }
 
-/// The opened services, plus the two the file watcher drives and Work,
-/// which the integration receivers act through.
+/// The opened services, plus the two the file watcher drives, collections
+/// for the change feed, and Work, which the integration receivers act
+/// through.
 struct Workspace {
     services: Vec<Arc<dyn Service>>,
     drive: Arc<Drive>,
+    collections: Arc<CollectionsService>,
     books: Arc<BooksService>,
     work: Arc<WorkService>,
 }
@@ -170,13 +177,13 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
     let lookup = Arc::clone(spaces);
     let space_of: vellum_collections::service::SpaceOf =
         Arc::new(move |path: &BlobPath| lookup.of(path));
-    let collections = CollectionsService::new(
+    let collections = Arc::new(CollectionsService::new(
         Arc::clone(&store),
         Arc::new(vellum_collections::service::AuthzAccess::new(
             Arc::clone(&authz),
             Arc::clone(&space_of),
         )),
-    );
+    ));
     let books = Arc::new(BooksService::new(
         Arc::clone(&store),
         Arc::new(vellum_books_service::AuthzAccess::new(authz, space_of)),
@@ -198,11 +205,12 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
     Ok(Workspace {
         services: vec![
             Arc::new(DriveService::new(Arc::clone(&drive))),
-            Arc::new(collections),
+            Arc::clone(&collections) as Arc<dyn Service>,
             Arc::clone(&books) as Arc<dyn Service>,
             Arc::clone(&work) as Arc<dyn Service>,
         ],
         drive,
+        collections,
         books,
         work,
     })
@@ -230,11 +238,20 @@ pub async fn open(
     let index = Index::open(&index_config)
         .await
         .map_err(|e| unavailable("cannot open the index", e))?;
-    let store: Arc<dyn BlobStore> = Arc::new(
+    let files: Arc<dyn BlobStore> = Arc::new(
         LocalStore::open(&config.data_dir)
             .await
             .map_err(|e| unavailable("cannot open the data folder", e))?,
     );
+    // Follow the feed from before anything is loaded, so no change made
+    // meanwhile is missed.
+    let feed = Feed::new(index.clone());
+    let me = crate::feed::origin(&var);
+    let cursor = feed
+        .head()
+        .await
+        .map_err(|e| unavailable("cannot read the change feed", e))?;
+    let store: Arc<dyn BlobStore> = Arc::new(AnnouncingStore::new(files, feed.clone(), &me));
     let authz = Arc::new(Authz::new(SqlStore::new(index.clone())));
     let drive_index = Arc::new(SqlIndex::new(index));
     let spaces = Arc::new(Spaces::default());
@@ -255,6 +272,25 @@ pub async fn open(
     }
     let hooks = crate::integrations::hooks(&store, &workspace.work, &var).await?;
     spaces.replace(load_spaces(drive_index.as_ref()).await?);
+    let (reload, from) = (Arc::clone(&spaces), Arc::clone(&drive_index));
+    crate::feed::follow(
+        feed,
+        me,
+        cursor,
+        Caches {
+            collections: Arc::clone(&workspace.collections),
+            books: Arc::clone(&workspace.books),
+            spaces: Box::new(move || {
+                let (reload, from) = (Arc::clone(&reload), Arc::clone(&from));
+                Box::pin(async move {
+                    match load_spaces(from.as_ref()).await {
+                        Ok(list) => reload.replace(list),
+                        Err(error) => tracing::warn!(%error, "space list not reloaded"),
+                    }
+                })
+            }),
+        },
+    );
     let refresh = Arc::clone(&spaces);
     drop(tokio::spawn(async move {
         let mut tick = tokio::time::interval(SPACES_REFRESH);

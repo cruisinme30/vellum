@@ -15,7 +15,7 @@ use bytes::Bytes;
 use futures::TryStreamExt as _;
 use vellum_kernel::{CollectionId, DocId, Error, ErrorKind};
 use vellum_store::layout::{Kind, SYSTEM_DIR};
-use vellum_store::{BlobPath, BlobStore, Etag, Precondition, StoreError};
+use vellum_store::{BlobEntry, BlobPath, BlobStore, Etag, Precondition, StoreError};
 
 use crate::error::Diagnostic;
 use crate::row::{Row, slug};
@@ -83,6 +83,79 @@ fn is_row_of(path: &BlobPath, collection: &BlobPath) -> bool {
         && path.file_name().to_ascii_lowercase().ends_with(".md")
 }
 
+/// Reads one collection folder: its schema at `schema_path` and the row
+/// files in `rows` (sorted by path). `None` when the schema is unreadable
+/// or invalid, so the folder is skipped.
+async fn read_folder(
+    store: &dyn BlobStore,
+    dir: &BlobPath,
+    schema_path: &BlobPath,
+    schema_size: u64,
+    mut row_files: Vec<&BlobEntry>,
+) -> Result<Option<(Collection, Folder)>, Error> {
+    let Some((schema_text, schema_etag)) = read_text(store, schema_path, schema_size).await? else {
+        return Ok(None);
+    };
+    let schema = match Schema::from_yaml(&schema_text) {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::warn!(path = %schema_path, error = %e, "skipping a collection with an invalid schema");
+            return Ok(None);
+        }
+    };
+    let mut folder = Folder {
+        path: dir.clone(),
+        schema: (schema_path.clone(), schema_etag),
+        rows: BTreeMap::new(),
+        diagnostics: Vec::new(),
+    };
+    if row_files.len() > MAX_ROWS_PER_COLLECTION {
+        folder.diagnostics.push(Diagnostic::error(
+            dir.as_str(),
+            format!("only the first {MAX_ROWS_PER_COLLECTION} rows are loaded"),
+        ));
+        row_files.truncate(MAX_ROWS_PER_COLLECTION);
+    }
+    let mut collection = Collection::new(schema);
+    for entry in row_files {
+        let Some((text, etag)) = read_text(store, &entry.path, entry.size).await? else {
+            folder.diagnostics.push(Diagnostic::error(
+                entry.path.as_str(),
+                "the file is too large or vanished and was skipped",
+            ));
+            continue;
+        };
+        let (mut row, mut diags) = Row::parse(&text, collection.schema(), entry.path.as_str());
+        folder.diagnostics.append(&mut diags);
+        if folder.rows.contains_key(&row.id) {
+            // A copied file: keep both rows, but the copy needs its
+            // own identity before it can be saved.
+            let fresh = DocId::generate();
+            folder.diagnostics.push(Diagnostic::warning(
+                entry.path.as_str(),
+                format!("row id {} is used twice; assigned {fresh}", row.id),
+            ));
+            row.id = fresh;
+        }
+        let _ = folder.rows.insert(row.id, (entry.path.clone(), etag));
+        collection.insert_row(row);
+    }
+    Ok(Some((collection, folder)))
+}
+
+/// The `name.collection` folder that `path` is in or is, if any.
+#[must_use]
+pub fn collection_dir(path: &BlobPath) -> Option<BlobPath> {
+    let mut at = Some(path.clone());
+    while let Some(p) = at {
+        if p.file_name().to_ascii_lowercase().ends_with(".collection") {
+            return Some(p);
+        }
+        at = p.parent();
+    }
+    None
+}
+
 impl State {
     /// Reads every collection in the store.
     pub async fn load(store: &dyn BlobStore) -> Result<Self, Error> {
@@ -103,18 +176,18 @@ impl State {
         let mut state = Self::default();
         let mut total_rows = 0;
         for (dir, schema_path, size, _) in schemas {
-            let Some((schema_text, schema_etag)) = read_text(store, &schema_path, size).await?
+            let mut row_files: Vec<_> = entries
+                .iter()
+                .filter(|e| is_row_of(&e.path, &dir))
+                .collect();
+            row_files.sort_by(|a, b| a.path.cmp(&b.path));
+            let Some((collection, folder)) =
+                read_folder(store, &dir, &schema_path, size, row_files).await?
             else {
                 continue;
             };
-            let schema = match Schema::from_yaml(&schema_text) {
-                Ok(s) => s,
-                Err(e) => {
-                    tracing::warn!(path = %schema_path, error = %e, "skipping a collection with an invalid schema");
-                    continue;
-                }
-            };
-            if let Some(first) = state.folders.get_mut(&schema.id) {
+            let id = collection.id();
+            if let Some(first) = state.folders.get_mut(&id) {
                 tracing::warn!(path = %dir, first = %first.path, "skipping a collection whose id is already used");
                 first.diagnostics.push(Diagnostic::warning(
                     dir.as_str(),
@@ -122,51 +195,7 @@ impl State {
                 ));
                 continue;
             }
-            let mut row_files: Vec<_> = entries
-                .iter()
-                .filter(|e| is_row_of(&e.path, &dir))
-                .collect();
-            row_files.sort_by(|a, b| a.path.cmp(&b.path));
-            let mut folder = Folder {
-                path: dir.clone(),
-                schema: (schema_path.clone(), schema_etag),
-                rows: BTreeMap::new(),
-                diagnostics: Vec::new(),
-            };
-            if row_files.len() > MAX_ROWS_PER_COLLECTION {
-                folder.diagnostics.push(Diagnostic::error(
-                    dir.as_str(),
-                    format!("only the first {MAX_ROWS_PER_COLLECTION} rows are loaded"),
-                ));
-                row_files.truncate(MAX_ROWS_PER_COLLECTION);
-            }
-            let mut collection = Collection::new(schema);
-            for entry in row_files {
-                let Some((text, etag)) = read_text(store, &entry.path, entry.size).await? else {
-                    folder.diagnostics.push(Diagnostic::error(
-                        entry.path.as_str(),
-                        "the file is too large or vanished and was skipped",
-                    ));
-                    continue;
-                };
-                let (mut row, mut diags) =
-                    Row::parse(&text, collection.schema(), entry.path.as_str());
-                folder.diagnostics.append(&mut diags);
-                if folder.rows.contains_key(&row.id) {
-                    // A copied file: keep both rows, but the copy needs its
-                    // own identity before it can be saved.
-                    let fresh = DocId::generate();
-                    folder.diagnostics.push(Diagnostic::warning(
-                        entry.path.as_str(),
-                        format!("row id {} is used twice; assigned {fresh}", row.id),
-                    ));
-                    row.id = fresh;
-                }
-                let _ = folder.rows.insert(row.id, (entry.path.clone(), etag));
-                collection.insert_row(row);
-            }
             total_rows += collection.len();
-            let id = collection.id();
             if let Err(e) = state.ws.insert(collection) {
                 tracing::warn!(path = %dir, error = %e, "skipping a collection whose links do not check");
                 continue;
@@ -175,6 +204,58 @@ impl State {
         }
         crate::telemetry::loaded(total_rows, started);
         Ok(state)
+    }
+
+    /// Re-reads only the collection folders in `dirs`, after another
+    /// replica changed files in them (ADR 0038). A folder that is gone is
+    /// dropped. Fails, leaving the state half updated, when the result
+    /// would differ from a full load (a repeated id, a relation to a
+    /// collection that went): the caller then drops everything instead.
+    pub async fn reload(
+        &mut self,
+        store: &dyn BlobStore,
+        dirs: &BTreeSet<BlobPath>,
+    ) -> Result<(), Error> {
+        let differs = |why: &str| Error::new(ErrorKind::Conflict, why.to_owned());
+        for dir in dirs {
+            let old = self
+                .folders
+                .iter()
+                .find(|(_, f)| f.path == *dir)
+                .map(|(id, _)| *id);
+            if let Some(id) = old {
+                let _ = self.folders.remove(&id);
+                let _ = self.ws.remove(id);
+            }
+            let entries: Vec<BlobEntry> = match store.list(Some(dir)).try_collect().await {
+                Ok(entries) => entries,
+                Err(StoreError::NotFound(_)) => Vec::new(),
+                Err(e) => return Err(store_error(e)),
+            };
+            let schema_path = dir.join(SCHEMA_FILE).map_err(store_error)?;
+            let Some(schema) = entries.iter().find(|e| e.path == schema_path) else {
+                continue;
+            };
+            let mut row_files: Vec<_> = entries.iter().filter(|e| is_row_of(&e.path, dir)).collect();
+            row_files.sort_by(|a, b| a.path.cmp(&b.path));
+            let Some((collection, folder)) =
+                read_folder(store, dir, &schema_path, schema.size, row_files).await?
+            else {
+                continue;
+            };
+            let id = collection.id();
+            if self.folders.contains_key(&id) {
+                return Err(differs("a reloaded collection repeats another's id"));
+            }
+            self.ws
+                .insert(collection)
+                .map_err(|_| differs("a reloaded collection's links do not check"))?;
+            let _ = self.folders.insert(id, folder);
+        }
+        // A collection that went may still be a relation target.
+        self.ws
+            .check_links()
+            .map_err(|_| differs("a relation points at a collection that went"))
     }
 
     /// The folder of a loaded collection.
