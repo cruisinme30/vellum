@@ -7,11 +7,13 @@ import "@fontsource/roboto/700.css";
 import "./styles/tokens.css";
 import "./styles/shell.css";
 import "./styles/editor.css";
+import "./styles/collections.css";
 
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { App } from "./app";
+import { createMockCollectionsStore } from "./collections/mock";
 import { createNorthstarStore } from "./data/mock/northstar";
 import { lazyCache } from "./editor/collab/lazy-cache";
 import { createLocalConnector } from "./editor/collab/local-connector";
@@ -28,7 +30,11 @@ if (container === null) {
 }
 createRoot(container).render(
   <StrictMode>
-    <App store={createNorthstarStore()} collab={createLocalConnector({ cache })} />
+    <App
+      store={createNorthstarStore()}
+      collab={createLocalConnector({ cache })}
+      collections={createMockCollectionsStore()}
+    />
   </StrictMode>,
 );
 
