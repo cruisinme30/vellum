@@ -12,6 +12,8 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D109, D110, D111
+- Issue: none (recorded before the issue rule, D119)
+- Pull requests: #31
 
 :::
 
@@ -55,11 +57,25 @@ project has no budget for hosting, and the repository is public.
   `:::` containers, leaving code fences untouched, so unmodified mdBook
   renders them. Diagrams and charts show as their source until the
   renderer can publish them.
+- Relative links are rewritten for the published layout: `<name>.book/`
+  becomes `<name>/` and `README.md` becomes `index.md`, which mdBook turns
+  into `index.html`, so links between and within books resolve.
 - mdBook is pinned (0.5.4) and its download checked against a SHA-256.
 - The `Website` workflow builds the site on every pull request that
   touches it, and deploys it with `actions/deploy-pages` on every push to
   `main`. The site therefore always matches the last release train, not
   work in progress on `develop`.
-- One-time setup by the repository owner: Settings, Pages, Source set to
-  "GitHub Actions", and `main` allowed to deploy to the `github-pages`
-  environment.
+
+## Alternatives
+
+- **Paid hosting or a custom domain now**: no budget, and relative
+  links make the move cheap later.
+- **A static site generator with a theme**: more tooling and scripts
+  for one page.
+- **Deploy from `develop`**: the site would show unreleased work.
+
+## Consequences
+
+- The site always matches the last release, not work in progress.
+- One-time setup by the repository owner: Settings, Pages, Source set
+  to "GitHub Actions", and `main` allowed to deploy to `github-pages`.
