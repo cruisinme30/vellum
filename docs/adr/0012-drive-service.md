@@ -67,7 +67,7 @@ writes, the three-way merge and an identity-based watcher.
   earlier sits in its own entry, so restoring its folder later leaves
   it in the trash: restore is exact. Members restore through their
   entry. A restored node whose folder is gone lands at the space root;
-  a taken name gets a ` (2)` suffix.
+  a taken name gets a numbered suffix such as `Notes (2)`.
 - Entries older than the space's `trash_days` (default 30) are purged by
   `purge_expired`. Purge removes files, versions and index rows.
 - Every content write stores a version at
