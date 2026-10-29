@@ -483,7 +483,8 @@ mod tests {
         ));
         let other = format!("/collab/{}/{}", room(2).space, room(2).doc);
         assert!(!is_signed_forward(key, &header, &other));
-        assert!(!is_signed_forward(&[8; 32], &header, &path));
+        let wrong: Vec<u8> = key.iter().map(|b| b ^ 0xff).collect();
+        assert!(!is_signed_forward(&wrong, &header, &path));
         assert!(!is_signed_forward(key, "forged", &path));
         assert!(!is_signed_forward(key, &header, "/collab"));
     }
