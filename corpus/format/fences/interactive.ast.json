@@ -1,0 +1,41 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "fence",
+        "lang": "calculator",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "units: Units = 100 [0..1000 step 10]\nprice: Price = 12\ntotal: Total = units * price\n"
+      },
+      {
+        "type": "fence",
+        "lang": "image",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "src: images/architecture.png\nalt: Request path\ncaption: How a request flows\n"
+      },
+      {
+        "type": "fence",
+        "lang": "collection",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "source: collection:01JB7Z3K8Q4W5N6P7R8S9T0V20\nview: Board\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}

@@ -1,0 +1,29 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "image",
+            "url": "assets/request-path.svg",
+            "title": "",
+            "alt": [
+              {
+                "type": "text",
+                "text": "Northstar gateway request path"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": "{width=60%}"
+          }
+        ],
+        "id": null
+      }
+    ]
+  },
+  "diagnostics": []
+}

@@ -1,0 +1,101 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "container",
+        "name": "steps",
+        "arg": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "sections": [
+          [
+            {
+              "type": "list",
+              "start": 1,
+              "tight": true,
+              "items": [
+                {
+                  "task": null,
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "strong",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Confirm the dashboard"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " is green"
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                },
+                {
+                  "task": null,
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "strong",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Announce"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " in the deploys channel"
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                },
+                {
+                  "task": null,
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "strong",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Tag"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " the release"
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "diagnostics": []
+}

@@ -1,0 +1,29 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Indented code becomes a fenced block:"
+          }
+        ],
+        "id": null
+      },
+      {
+        "type": "fence",
+        "lang": "",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "vellum serve --data ./northstar\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}
