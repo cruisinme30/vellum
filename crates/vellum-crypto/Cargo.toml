@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+[package]
+name = "vellum-crypto"
+description = "Envelope encryption at rest: per-object DEKs wrapped by a pluggable KEK provider."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[package.metadata.vellum]
+layer = "foundation"
+
+[lints]
+workspace = true
+
+[dependencies]
+chacha20poly1305 = { version = "0.10.1", default-features = false, features = ["alloc"] }
+getrandom = "0.4.3"
+thiserror = "2.0.21"
+tracing = "0.1.44"
+zeroize = { version = "1.9.1", features = ["derive"] }
+
+[dev-dependencies]
+# proptest 1.12 moves to rand 0.10 while OpenTelemetry is on rand 0.9;
+# cargo-deny bans the duplicate until they meet.
+proptest = ">=1.11.0, <1.12"
+tokio = { version = "1.54.1", features = ["macros", "rt"] }
