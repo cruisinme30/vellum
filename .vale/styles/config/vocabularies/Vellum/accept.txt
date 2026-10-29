@@ -69,6 +69,7 @@ Yjs
 Replicache
 mdBook
 Roboto
+[Pp]recach(e|es|ed|ing)
 [Uu]nstarted
 (?:SLAs?|slas)
 [Ss]lugs?
@@ -79,7 +80,6 @@ Excalidraw
 Rao
 Fischer
 Ortiz
-[Ww]ikilinks?
 Tiptap
 toc
 [Rr]ebuildable
@@ -88,7 +88,6 @@ Sigstore
 ymin
 ymax
 [Uu]nthemed
-[Uu]nstarted
 tokio
 sqlx
 sonarjs
@@ -97,7 +96,6 @@ onwards
 iCalendar
 divs
 [Cc]yclomatic
-comrak
 [Bb]acklinks?
 axum
 ULIDs
@@ -111,3 +109,4 @@ Patroni
 Pandoc
 [Kk]anban
 [Cc]ollab
+[Rr]ecents
