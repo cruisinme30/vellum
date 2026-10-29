@@ -44,6 +44,16 @@ every client must run the same editor build.
   integration off, a strict content security policy and no remote
   content in privileged windows. External links open in the system
   browser. The bridge exposes functions, never `ipcRenderer` itself.
+- The PWA precaches the app shell (the build output, icons and manifest,
+  each with a content revision) and serves it cache-first, so it starts
+  offline and in well under 2 s. APIs, sign-in and MCP always go to the
+  network; records and pages reach the device only through the
+  local-first store (D98), never through the HTTP cache. A new
+  deployment installs a new worker, and the app offers a reload instead
+  of swapping code under an open editor.
+- Web Push uses VAPID keys held by the notifications service; the app
+  asks for permission only from a click, and a push payload can link
+  only to Vellum's own origin.
 - Layout (including the phone layout with a bottom bar) belongs to the
   web shell in `web/src/shell/`; the platform layer never renders
   navigation.
