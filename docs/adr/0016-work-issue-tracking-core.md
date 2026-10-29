@@ -92,6 +92,17 @@ answers those.
   `InitiativeId`, `ViewId`) join the kernel's ID list, so no crate
   defines its own.
 
+## Alternatives
+
+- **A separate alias table file**: another file to keep in step with
+  the issues, and a lost or merged copy could hand out a used number.
+- **An issue database instead of files**: breaks the rule that every
+  object is a Markdown file a person can read, diff and restore.
+- **A text query language for views and rules**: harder to validate and
+  to build in the UI; D15 already chose structured filters.
+- **SLA risk from wall-clock hours left**: one threshold cannot fit both
+  a 24 hour and a one week clock, so risk is a share of the time used.
+
 ## Consequences
 
 - The service layer owns persistence: it loads every Work file into a
