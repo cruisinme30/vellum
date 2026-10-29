@@ -42,4 +42,13 @@ pnpm
 tsc
 Affero
 [Ww]orkstreams?
+Argon2id
+XChaCha20
+Poly1305
+DEKs?
+KEKs?
+KMS
+[Kk]eyring
+[Rr]e-?wrap(s|ped|ping)?
+[Uu]nwrap(s|ped|ping)?
 [Ll]abeler
