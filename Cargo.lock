@@ -6137,6 +6137,8 @@ dependencies = [
  "diffy",
  "futures",
  "hex",
+ "hmac 0.13.0",
+ "httpdate",
  "notify",
  "opentelemetry",
  "proptest",
