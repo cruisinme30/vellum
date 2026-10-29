@@ -3,15 +3,20 @@
 
 # Nightly load test and security scan on the Team profile (docker compose)
 # (ADR 0022, D96). The k6 suite must hold the SLO thresholds, and a p95
-# that grows 10 % or more over deploy/perf/baseline.json fails the run.
+# that grows 10 % or more over the median of the last five green nights
+# fails the run (D254; deploy/perf/baseline.json until there are any).
+# `vellum budgets` then fails the night when a route is over its p95 budget
+# (R-OB-4), the same marks the admin console shows.
 # ZAP runs its baseline scan against the same stack, and each fuzz target
 # runs for five minutes. A night is skipped when develop has not changed
 # since the last green night.
 #
 # On Sunday nights it also runs the chaos test on the Organisation profile:
 # the Helm chart on kind with a Patroni Postgres, under k6 load, while Chaos
-# Mesh kills a Vellum node, a Kroki pod and the Postgres primary. It fails
-# when an SLO threshold breaks or an acknowledged write is lost.
+# Mesh kills a Vellum node, a Kroki pod and the Postgres primary, restarts
+# the blob store and slows the database (D255). It fails when an SLO
+# threshold breaks or an acknowledged write is lost. Release pull requests
+# check the latest results of both (full.yml, D254).
 name: "Scheduled: nightly load, security and fuzz, chaos on Sundays"
 
 on:
@@ -78,6 +83,9 @@ jobs:
     if: needs.changed.outputs.run == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    permissions:
+      contents: read
+      actions: read # downloads the summaries of the last green nights
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -113,19 +121,32 @@ jobs:
       - name: Every route within its latency budget
         if: always() && steps.serve.outputs.ready == 'true'
         run: |
-          if docker run --rm vellum:ci budgets --help >/dev/null 2>&1; then
-            docker run --rm --network host vellum:ci budgets --server http://127.0.0.1:7700
-          else
-            echo "::notice::vellum has no budgets command yet; per-route budgets start once it does."
-          fi
+          token="$(deploy/perf/admin-token.sh http://127.0.0.1:7700)"
+          echo "::add-mask::${token}"
+          docker run --rm --network host -e VELLUM_TOKEN="${token}" vellum:ci \
+            budgets --server http://127.0.0.1:7700
       - name: Install Rust for the gate
         if: always() && steps.serve.outputs.ready == 'true'
         run: rustup toolchain install
-      - name: No p95 grew 10 % or more over the baseline
+      - name: Fetch the last five green nights
+        if: always() && steps.serve.outputs.ready == 'true'
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p perf-history
+          runs="repos/${GH_REPO}/actions/workflows/nightly.yml/runs"
+          for id in $(gh api "${runs}?branch=develop&event=schedule&status=success&per_page=5" \
+              --jq '.workflow_runs[].id'); do
+            gh run download "${id}" --pattern 'perf-summary-*' --dir "perf-history/${id}" ||
+              echo "Run ${id} kept no summary (a skipped night)."
+          done
+      - name: No p95 grew 10 % or more over recent nights
         if: always() && steps.serve.outputs.ready == 'true'
         run: >-
           cargo run --locked --package xtask -- perf-gate
-          --baseline deploy/perf/baseline.json --current perf-summary.json
+          --baseline deploy/perf/baseline.json --history perf-history
+          --current perf-summary.json
       - name: Keep the result as trend data
         if: always() && steps.serve.outputs.ready == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
