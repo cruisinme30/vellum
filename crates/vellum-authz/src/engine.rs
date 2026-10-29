@@ -300,6 +300,26 @@ impl<S: AuthzStore> Authz<S> {
             .await
     }
 
+    /// Every group `principal` belongs to right now, including groups
+    /// reached through nested membership. Expired memberships do not count.
+    /// For callers that match `group:<id>` rules outside the engine, such
+    /// as book-section restrictions in `book.yaml`.
+    ///
+    /// # Errors
+    ///
+    /// Fails only if the index cannot be read.
+    pub async fn groups_of(&self, principal: Principal) -> Result<BTreeSet<Id>, Error> {
+        let span = tracing::info_span!("authz.groups_of", authz.groups = field::Empty);
+        async {
+            let directory = Directory::new(&self.store.load_directory().await?, (self.clock)());
+            let groups = directory.groups_of(principal);
+            let _ = Span::current().record("authz.groups", groups.len());
+            Ok(groups)
+        }
+        .instrument(span)
+        .await
+    }
+
     /// The space's current authz epoch. Caches keyed on it (render, search,
     /// MCP resources) are invalidated by any permission change.
     ///

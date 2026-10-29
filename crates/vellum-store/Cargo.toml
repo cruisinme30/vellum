@@ -30,6 +30,8 @@ dropbox = ["remote"]
 onedrive = ["remote"]
 # Amazon S3 and S3-compatible object stores (MinIO, R2, LocalStack).
 s3 = ["remote", "dep:hmac", "dep:httpdate"]
+# Google Drive (API v3).
+gdrive = ["remote"]
 
 [dependencies]
 async-trait = "0.1.92"
@@ -56,4 +58,4 @@ axum = { version = "0.8.9", default-features = false, features = ["http1", "toki
 proptest = ">=1.11.0, <1.12"
 tempfile = "3.27.0"
 tokio = { version = "1.49.0", features = ["macros", "rt-multi-thread"] }
-vellum-store = { path = ".", features = ["conformance", "git", "dropbox", "onedrive", "s3"] }
+vellum-store = { path = ".", features = ["conformance", "git", "dropbox", "onedrive", "s3", "gdrive"] }

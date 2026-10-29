@@ -12,8 +12,8 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D52, D53, D54
-- Issue: #58, #59, #267, #269
-- Pull requests: #32, #281, #303
+- Issue: #58, #59, #267, #269, #329
+- Pull requests: #32, #281, #303, #341
 
 :::
 
@@ -107,4 +107,6 @@ come from ADR 0006. This ADR fixes the rules that turn them into answers.
   and Postgres) implements the same port, and a differential property
   test holds it to the reference, including expiry.
 - Search and the drive call `filter`, `spaces`, `accessible` and
-  `tree_changed`; they never read the grant tables themselves.
+  `tree_changed`; they never read the grant tables themselves. Rules the
+  engine does not hold, such as a book's `restrict_to`, use `groups_of`
+  for a person's live groups, nested ones included.
