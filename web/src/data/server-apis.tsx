@@ -11,6 +11,7 @@ import type { HelpTopic } from "../help/topics.gen";
 import { useT } from "../i18n/i18n";
 import type { DirectoryApi } from "../people/directory";
 import type { PrivateSpacesApi } from "../platform/private/api";
+import type { SharingApi } from "../sharing/api";
 import type { WorkApi } from "../work/api";
 
 import type { Loaded } from "./use-loaded";
@@ -24,6 +25,8 @@ export interface ServerApis {
   readonly privateSpaces?: PrivateSpacesApi | undefined;
   /** People (and groups) to pick for access and sharing. */
   readonly directory?: DirectoryApi | undefined;
+  /** Who has access to an item, and share links. */
+  readonly sharing?: SharingApi | undefined;
 }
 
 const ServerApisContext = createContext<ServerApis>({});
