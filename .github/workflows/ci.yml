@@ -8,7 +8,7 @@ name: Fast suite
 on:
   pull_request:
     branches: [develop]
-    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [develop]
   workflow_call:
@@ -129,7 +129,7 @@ jobs:
         run: scripts/ci/lint-infra.sh
 
   commits:
-    name: Commits and size
+    name: Commits and description
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -162,13 +162,6 @@ jobs:
       - name: Commit template and DCO sign-off
         run: >-
           scripts/ci/check-commits.sh
-          ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }}
-      - name: Size under 400 lines
-        if: >-
-          github.event.pull_request.base.ref == 'develop' &&
-          !contains(github.event.pull_request.labels.*.name, 'size/exempt')
-        run: >-
-          scripts/ci/check-pr-size.sh
           ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }}
 
   fast-suite:

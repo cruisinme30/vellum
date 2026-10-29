@@ -46,7 +46,7 @@ gitGraph
 
 | Suite | Runs on | Contents |
 | --- | --- | --- |
-| Fast (`ci.yml`) | every pull request into `develop` or `main`, pushes to `develop` | rustfmt, clippy, rustdoc, unit and property tests (nextest), crate boundaries, cargo-deny, cargo-audit; Prettier, tsc, ESLint, knip, Vitest with 85 % coverage, pnpm audit; REUSE, yamllint, shellcheck, markdownlint, Vale, local links, gitleaks, infrastructure linters; Conventional Commits, DCO and PR size |
+| Fast (`ci.yml`) | every pull request into `develop` or `main`, pushes to `develop` | rustfmt, clippy, rustdoc, unit and property tests (nextest), crate boundaries, cargo-deny, cargo-audit; Prettier, tsc, ESLint, knip, Vitest with 85 % coverage, pnpm audit; REUSE, yamllint, shellcheck, markdownlint, Vale, local links, gitleaks, infrastructure linters; Conventional Commits, DCO, branch name and description template |
 | Full (`full.yml`) | every pull request into `main`, pushes to `main`, nightly | the fast suite, plus Rust line coverage of at least 85 %, the release build, Playwright end-to-end with axe accessibility checks, and external link checks |
 
 Further layers join the full suite as their code lands: golden corpus,
@@ -89,9 +89,9 @@ CI enforces every rule in this section on each pull request.
 - **Signed commits** (planned): sign with GPG, SSH or S/MIME so GitHub
   marks them verified. Branch protection will require this once every
   contributor, including automated ones, has a signing key set up.
-- **Size**: a pull request changes fewer than 400 lines, not counting
-  generated files marked in `.gitattributes`. A maintainer can apply the
-  `size/exempt` label when a larger change cannot be split.
+- **Scope**: one pull request per feature, complete with its tests and
+  docs, not one per commit or step. There is no line limit; keep commits
+  inside the pull request small and logical so the history reads well.
 
 ## Definition of done
 
