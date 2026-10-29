@@ -70,13 +70,13 @@ Replicache
 mdBook
 Roboto
 GitLab
-GitHub
+[Gg]it[Hh]ub
 Sentry
 Jira
 Atlassian
 VAPID
 HMAC
-SSRF
+(?:SSRF|ssrf)
 RFC
 [Uu]nmerged
 [Tt]rigrams?
