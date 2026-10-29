@@ -1,0 +1,23 @@
+---
+id: 01JB7B2D4F6H8K0M3P5R7T9V1X
+title: Replay 7 days in under 10 minutes
+vellum: 1
+team: ENG
+number: 142
+state: in-review
+priority: 1
+estimate: 5
+assignee: dev
+labels:
+- gateway
+project: 01JB7C3E5G7J9L1N4Q6S8U0W2Y
+cycle: 2027-C04
+relations:
+- blocked_by: 01JB7D4F6H8K0M2P5R7T9V1X3Z
+due: "2027-01-10"
+---
+
+The replay engine reads seven days of traffic from the audit log.
+
+- [ ] Stream from the audit log
+- [ ] Parallelise by tenant

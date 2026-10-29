@@ -26,7 +26,8 @@ pub use error::{Error, ErrorKind, Result};
 pub use event::{Actor, Event, EventKind};
 pub use id::{
     BlobId, BookId, CollectionId, CommentId, DocId, DriveId, EventId, FolderId, IdParseError,
-    IssueId, ObjectId, RequestId, ShareId, SpaceId, TaskId, TeamId, UserId, VersionId,
+    InitiativeId, IssueId, MilestoneId, ObjectId, ProjectId, ProjectUpdateId, RequestId, ShareId,
+    SpaceId, TaskId, TeamId, UserId, VersionId, ViewId,
 };
 pub use share::{ShareToken, ShareTokenError, ShareTokenHash};
 pub use timestamp::{Timestamp, TimestampError};

@@ -12,6 +12,8 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D106, D107, D108
+- Issue: none (recorded before the issue rule, D119)
+- Pull requests: #37
 
 :::
 
@@ -33,9 +35,6 @@ file system notifications into changes by identity.
   become `-`. Leading dots and trailing dots or spaces are trimmed.
   Windows device names (`CON`, `COM1`, …) get a suffix. Names are cut on
   a character boundary to 200 bytes.
-- Consequence: conflict copies read naturally
-  (`Q3 plan (conflict 2026-10-29 alice).md`), and the same tree works on
-  every backend.
 
 ### D107: the watcher reports changes by identity
 
@@ -66,7 +65,17 @@ file system notifications into changes by identity.
 - The same reconcile code serves local folders now and S3 events or
   cloud-drive change feeds later; only the feed differs.
 
+## Alternatives
+
+- **Lowercase slugs**: the folder would not read like the app.
+- **Identity by path**: an outside rename would look like a delete and a
+  create, losing history and links.
+- **Trust the feed's rename events**: feeds split, merge or drop them.
+
 ## Consequences
+
+- Conflict copies read naturally, and the same tree works on every
+  backend.
 
 - The index applies changes in order and calls the three-way merge from
   ADR 0005 when a modified document has a live editing session.

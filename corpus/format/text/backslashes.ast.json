@@ -1,0 +1,28 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Inline math stays readable: $\\frac{2PR}{P+R}$ and C:\\Users\\northstar."
+          }
+        ],
+        "id": null
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Escaped marks stay escaped: *not emphasis* and a trailing backslash\\"
+          }
+        ],
+        "id": null
+      }
+    ]
+  },
+  "diagnostics": []
+}

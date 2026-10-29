@@ -1,0 +1,19 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "fence",
+        "lang": "mermaid",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "stateDiagram-v2\n  [*] --> Draft\n  Draft --> InReview: request review\n  InReview --> Draft: changes requested\n  InReview --> Verified: approve\n  Verified --> Outdated: verify_every elapses\n  Outdated --> Verified: re-verify\n  Verified --> [*]\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}
