@@ -13,7 +13,7 @@ vellum: 1
 - Status: accepted
 - Decisions: D46, D47, D48, D142
 - Issue: #56, #230
-- Pull requests: #24, #SHARDPR
+- Pull requests: #24, #299
 
 :::
 
