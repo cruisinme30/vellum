@@ -9479,6 +9479,7 @@ dependencies = [
  "tracing",
  "url",
  "vellum-kernel",
+ "zip",
 ]
 
 [[package]]
