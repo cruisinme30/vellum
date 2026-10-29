@@ -12,8 +12,8 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D49, D50, D51
-- Issue: #73, #75, #76, #77, #81 (and the server side of #79)
-- Pull request: #241
+- Issue: #73, #75, #76, #77, #81, #408 (and the server side of #79)
+- Pull request: #241 (and the live issue views that follow it)
 
 :::
 
@@ -103,3 +103,8 @@ flowchart LR
 - Live parts (collection views, `@today`, the today line on roadmaps,
   sortable tables, calculators) render a correct static version and leave
   `data-*` hooks for the web client to hydrate.
+- `::: issues` blocks render live lists and boards through
+  `Resolver::issues`. The renderer passes only the block's position and
+  id, because the parser drops the indentation that nested filters need.
+  The Work side reads the raw YAML from the source and runs the view for
+  the reader, so permissions stay with the service.

@@ -157,6 +157,15 @@
 .vl-calculator input { accent-color: var(--vl-primary); }
 .vl-calc-result { font-size: 1.25em; font-weight: 600; }
 .vl-collection, .vl-live-placeholder { border: 1px dashed var(--vl-outline); border-radius: var(--vl-radius); padding: 0.75em 1em; color: var(--vl-on-surface-variant); }
+.vl-issues { margin: 1em 0; }
+.vl-issue-list { list-style: none; padding: 0; margin: 0 0 1em; }
+.vl-issue-row { display: flex; flex-wrap: wrap; gap: 0.5em; align-items: baseline; padding: 0.35em 0; border-bottom: 1px solid var(--vl-outline-variant); }
+.vl-issue-title { flex: 1 1 12em; }
+.vl-issue-state, .vl-issue-priority, .vl-issue-assignee, .vl-count { font-size: 0.85em; color: var(--vl-on-surface-variant); }
+.vl-issues-board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(14em, 1fr); gap: 1em; overflow-x: auto; }
+.vl-issues-col { background: var(--vl-surface-container); border-radius: var(--vl-radius); padding: 0.5em 0.75em; }
+.vl-issues-col .vl-issue-row { flex-direction: column; gap: 0.15em; }
+.vl-issues-empty, .vl-issues-more { color: var(--vl-on-surface-variant); }
 
 @media (prefers-reduced-motion: reduce) { .vl-doc * { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
 @media print { .vl-doc { background: none; } .vl-details { border: 0; } .vl-embed { display: none; } }

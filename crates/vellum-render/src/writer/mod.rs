@@ -10,6 +10,7 @@
 mod container;
 mod fence;
 mod inline;
+mod issues;
 
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
@@ -58,6 +59,7 @@ pub struct Writer<'a> {
     toc_marks: Vec<usize>,
     block: usize,
     depth: usize,
+    issue_blocks: usize,
 }
 
 /// The prefix of every id taken from page content. A hyphen keeps the name
@@ -84,6 +86,7 @@ impl<'a> Writer<'a> {
             toc_marks: Vec::new(),
             block: 0,
             depth: 0,
+            issue_blocks: 0,
         }
     }
 

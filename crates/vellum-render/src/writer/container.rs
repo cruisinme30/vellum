@@ -52,6 +52,7 @@ impl Writer<'_> {
             ContainerKind::Link => self.link_card(c),
             ContainerKind::Embed => self.embed(c),
             ContainerKind::Pages => self.pages(c),
+            ContainerKind::Unknown if c.name == "issues" => self.issues(c),
             ContainerKind::Unknown => {
                 self.out.push_str("<div");
                 self.attrs("vl-container", &c.attrs);
