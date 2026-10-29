@@ -11,9 +11,11 @@
 //! rebuilds the index from the data folder; `vellum private` manages this
 //! device's key for end-to-end encrypted private spaces. `vellum profile`
 //! and `vellum budgets` ask a running server for a flame graph and for
-//! routes over their latency budget.
+//! routes over their latency budget. `vellum admin` issues break-glass
+//! codes and takes, lists and restores encrypted backups.
 
 mod admin;
+mod backup_cli;
 mod collab;
 mod docs;
 mod feed;
@@ -33,8 +35,11 @@ mod private;
 #[cfg(test)]
 mod private_tests;
 mod reindex;
+mod search;
 mod serve;
 mod services;
+#[cfg(test)]
+mod sso_tests;
 mod tasks;
 mod tasks_http;
 #[cfg(test)]
@@ -109,6 +114,39 @@ enum AdminCommand {
         #[arg(long)]
         config: Option<std::path::PathBuf>,
     },
+    /// Takes an encrypted backup of the data folder now, into the
+    /// destination set in the admin console, and prunes old ones.
+    Backup {
+        /// The configuration file, to find the data directory.
+        #[arg(long)]
+        config: Option<std::path::PathBuf>,
+    },
+    /// Lists the backups in the configured destination.
+    Backups {
+        /// The configuration file, to find the data directory.
+        #[arg(long)]
+        config: Option<std::path::PathBuf>,
+    },
+    /// Restores a backup into an empty folder and checks every file.
+    Restore(backup_cli::RestoreArgs),
+}
+
+/// Runs an async admin command on a fresh runtime and prints its lines.
+fn run_admin<F>(f: impl FnOnce() -> F) -> ExitCode
+where
+    F: std::future::Future<Output = Result<Vec<String>, vellum_kernel::Error>>,
+{
+    let runtime = match tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(runtime) => runtime,
+        Err(error) => return fail(&error),
+    };
+    match runtime.block_on(f()) {
+        Ok(lines) => print(&lines.join("\n")),
+        Err(error) => fail(&error),
+    }
 }
 
 fn break_glass(config: Option<&std::path::Path>) -> ExitCode {
@@ -194,6 +232,15 @@ fn main() -> ExitCode {
             mcp::run(&args)
         }
         Command::Admin(AdminCommand::BreakGlass { config }) => break_glass(config.as_deref()),
+        Command::Admin(AdminCommand::Backup { config }) => {
+            with_telemetry(|| run_admin(|| backup_cli::backup_now(config.as_deref())))
+        }
+        Command::Admin(AdminCommand::Backups { config }) => {
+            with_telemetry(|| run_admin(|| backup_cli::list(config.as_deref())))
+        }
+        Command::Admin(AdminCommand::Restore(args)) => {
+            with_telemetry(|| run_admin(|| backup_cli::restore(&args)))
+        }
         Command::Private(command) => match private::run(&command) {
             Ok(lines) => print(&lines.join("\n")),
             Err(error) => fail(&error),

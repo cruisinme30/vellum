@@ -30,14 +30,17 @@ server it came from: copy that file somewhere else, or set the variable.
 
 The audit log is sealed with `VELLUM_ADMIN_KEY`, or with
 `.vellum/keys/admin.key` when the variable is not set. Losing that key
-makes the audit log unreadable, so back it up with the workspace keys.
+makes the audit log unreadable, so back it up with the workspace keys. The
+same goes for `.vellum/keys/index.key`, which holds the index key when
+`VELLUM_INDEX_KEY` is not set. Backups never include the key folder.
 
 ## Taking backups {#take}
 
 Turn on scheduled backups in the admin settings
 (`PUT /api/v1/admin/settings`, under `backups`), or take one now with
 `POST /api/v1/admin/backups`. Both need an administrator who signed in
-within the last five minutes. Each backup is a `.vbk` file of sealed
+within the last five minutes. On the server itself, `vellum admin backup`
+takes one now, and `vellum admin backups` lists them. Each backup is a `.vbk` file of sealed
 4 MiB chunks and a manifest holding every file's hash. It lands in
 `.vellum/backups/` unless the settings name another folder. Point that
 at a different disk or a mounted bucket.
@@ -59,7 +62,7 @@ Once a quarter, also restore by hand onto a spare machine:
 ::: steps
 
 1. **Copy** the latest `.vbk` file and the backup key to the spare machine
-2. **Restore** into an empty data folder and start `vellum serve` on it
+2. **Restore** with `vellum admin restore <file> --into <empty folder>`, with `VELLUM_BACKUP_KEY` set, then start `vellum serve` on that folder
 3. **Open** a few known pages and an end-to-end encrypted space from the desktop app
 4. **Record** the drill and its duration in the operations log
 

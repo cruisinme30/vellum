@@ -58,6 +58,18 @@ pub struct User {
     pub disabled: bool,
     /// When the account was created.
     pub created_at: Timestamp,
+    /// Single sign-on identities that sign in as this user.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sso: Vec<SsoLink>,
+}
+
+/// A provider's user, linked to a Vellum account on first sign-in.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SsoLink {
+    /// The provider's issuer URL.
+    pub issuer: String,
+    /// The provider's stable user ID (`sub`).
+    pub subject: String,
 }
 
 /// How a browser session was established.
@@ -575,6 +587,7 @@ mod tests {
                         admin: true,
                         disabled: false,
                         created_at: Timestamp::now(),
+                        sso: Vec::new(),
                     },
                 );
                 let _ = s.sessions.insert(

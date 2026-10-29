@@ -45,7 +45,7 @@ impl Reply {
 }
 
 fn gateway(public_pages: bool, files: Option<&'static [(&'static str, &'static [u8])]>) -> Router {
-    let services = Services::open(ORIGIN, None).unwrap();
+    let services = Services::open(ORIGIN, None, None).unwrap();
     let mut config = GatewayConfig::new(ORIGIN, vec![3; 32]);
     config.rate_per_second = 10_000;
     config.rate_burst = 10_000;

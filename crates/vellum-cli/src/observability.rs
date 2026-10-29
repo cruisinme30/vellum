@@ -109,7 +109,12 @@ impl UsageFactsSource for ServerFacts {
     }
 }
 
-fn keyring(id: &str, bytes: &[u8]) -> Result<LocalKeyring, Error> {
+/// A keyring holding one key, named `id`.
+///
+/// # Errors
+///
+/// The key is not 32 bytes.
+pub fn keyring(id: &str, bytes: &[u8]) -> Result<LocalKeyring, Error> {
     let crypto = |e: vellum_crypto::CryptoError| {
         Error::new(ErrorKind::Internal, format!("cannot load the {id} key")).with_source(e)
     };

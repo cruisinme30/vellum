@@ -36,7 +36,7 @@ impl Fixture {
         std::fs::create_dir_all(&dir).unwrap();
         let mut config = vellum_kernel::Config::default();
         config.data_dir = dir.clone();
-        let services = Services::open(ORIGIN, Some(&dir))
+        let services = Services::open(ORIGIN, Some(&dir), None)
             .unwrap()
             .with_workspace(&config, |k| {
                 (k == crate::workspace::PLAINTEXT_VAR).then(|| "1".to_owned())
