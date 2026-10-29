@@ -55,3 +55,4 @@ KMS
 X25519
 HKDF
 [Ss]tanzas?
+[Ee]tags?
