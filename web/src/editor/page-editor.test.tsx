@@ -9,7 +9,7 @@ import { PAGE } from "../data/mock/ids";
 import { NORTHSTAR_BODIES } from "../data/mock/northstar-pages";
 
 import { createLocalConnector } from "./collab/local-connector";
-import type { CollabConnector } from "./collab/provider";
+import type { CollabConnector, LiveConnection, LiveState } from "./collab/provider";
 import { body, h, p, wiki } from "./content";
 import { PageEditor, type PageEditorProperties } from "./page-editor";
 import { memoryChannels, resolveGateway, settle } from "./test-editor";
@@ -23,6 +23,7 @@ function editorProperties(
 ): PageEditorProperties {
   return {
     pageId: "page-1",
+    spaceId: "space-1",
     seed,
     connector,
     user,
@@ -40,6 +41,36 @@ function editorOf(element: HTMLElement | undefined): Editor {
   }
   return editor;
 }
+
+/** A local session with a server state the test drives. */
+function serverConnector(initial: LiveState) {
+  const { factory } = memoryChannels();
+  const local = createLocalConnector({ channel: factory });
+  let state = initial;
+  const listeners = new Set<() => void>();
+  const live: LiveConnection = {
+    getSnapshot: () => state,
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    done: () => Promise.resolve(),
+  };
+  const connector: CollabConnector = {
+    open: (id, space) => ({ ...local.open(id, space), live }),
+  };
+  const set = (next: Partial<LiveState>) => {
+    state = { ...state, ...next };
+    act(() => {
+      for (const listener of listeners) {
+        listener();
+      }
+    });
+  };
+  return { connector, set };
+}
+
+const notice = () => screen.getByRole("status");
 
 const editors = () => screen.getAllByRole("textbox", { name: "Page body" });
 
@@ -202,5 +233,62 @@ describe("PageEditor", () => {
     await settle();
     expect(editors()[0]?.querySelector(".vl-facts")).not.toBeNull();
     expect(editors()[0]?.querySelector(".vl-toc")).not.toBeNull();
+  });
+
+  describe("on a server", () => {
+    it("opens the room named by the page's space", async () => {
+      const { factory } = memoryChannels();
+      const local = createLocalConnector({ channel: factory });
+      const open = vi.fn((id: string, space: string) => local.open(id, space));
+      render(
+        <PageEditor {...editorProperties({ open }, { pageId: "01JPAGE", spaceId: "01JSPACE" })} />,
+      );
+      await settle();
+      expect(open).toHaveBeenCalledWith("01JPAGE", "01JSPACE");
+    });
+
+    it("is read-only with a notice until the server lets this person write", async () => {
+      const { connector, set } = serverConnector({
+        status: "online",
+        canWrite: false,
+        peers: new Map(),
+      });
+      render(<PageEditor {...editorProperties(connector)} />);
+      await settle();
+      const editor = editorOf(editors()[0]);
+      expect(editor.isEditable).toBe(false);
+      expect(notice().textContent).toBe("You can view this page but not edit it.");
+      set({ canWrite: true });
+      expect(editor.isEditable).toBe(true);
+      expect(notice().textContent).toBe("");
+    });
+
+    it("keeps editing offline and says the changes will sync", async () => {
+      const { connector, set } = serverConnector({
+        status: "online",
+        canWrite: true,
+        peers: new Map(),
+      });
+      render(<PageEditor {...editorProperties(connector)} />);
+      await settle();
+      set({ status: "offline" });
+      expect(editorOf(editors()[0]).isEditable).toBe(true);
+      expect(notice().textContent).toContain("Offline.");
+      set({ status: "connecting" });
+      expect(notice().textContent).toBe("Connecting to the server…");
+    });
+
+    it("stops editing when access is revoked", async () => {
+      const { connector, set } = serverConnector({
+        status: "online",
+        canWrite: true,
+        peers: new Map(),
+      });
+      render(<PageEditor {...editorProperties(connector)} />);
+      await settle();
+      set({ status: "revoked", canWrite: false });
+      expect(editorOf(editors()[0]).isEditable).toBe(false);
+      expect(notice().textContent).toContain("access to this page was removed");
+    });
   });
 });

@@ -144,6 +144,10 @@ fence-rendered = The { $lang } block is drawn by the renderer when the page is s
 fence-kroki = The { $lang } diagram is drawn by the diagram service when it is enabled; otherwise the source is shown.
 chart-summary = { $title }: { $summary }
 editor-loading = Opening the page…
+editor-connecting = Connecting to the server…
+editor-offline = Offline. Your changes are kept and sync when the connection returns.
+editor-read-only = You can view this page but not edit it.
+editor-revoked = Your access to this page was removed. Reload to see what you can open.
 
 ## Collections
 
