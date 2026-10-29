@@ -12,8 +12,8 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D79, D80, D81
-- Issue: #147, also #144, #145, #146, #149, #150, #151, #164
-- Pull requests: #227, #320
+- Issue: #147, also #144, #145, #146, #149, #150, #151, #164, #390
+- Pull requests: #227, #320, #338
 
 :::
 
@@ -64,10 +64,13 @@ and reach the issue core only through the `WorkCommands` port.
 
 - Every inbound webhook is verified over the raw body in constant time
   before parsing. Intake builds drafts for the team's triage inbox, each
-  with a source ID so retries never file twice.
-- Email replies go to `reply+KEY.user.tag@`, where the tag is an HMAC,
-  so a reply cannot be forged for another issue or user. Automatic mail
-  is dropped to stop loops.
+  with a source ID so retries never file twice. Outside text becomes
+  plain text nodes, never pasted Markdown, so it cannot add links,
+  images, mentions or containers.
+- Email replies go to `reply+KEY.user.tag@`, where the tag is an HMAC
+  over the issue, the user and the address notified, so a reply cannot
+  be forged or forwarded. No secret means no replies. Automatic mail is
+  dropped to stop loops.
 - Imports create issues oldest first, keep source IDs as aliases, skip
   what exists and link relations in a second pass. Unknown people stay
   unassigned with a warning.
@@ -95,7 +98,8 @@ and reach the issue core only through the `WorkCommands` port.
   with a reason through `WorkCommands`, by a bot user audited like a
   person.
 - Receivers keep the raw request body, so they mount on the gateway as
-  raw routes rather than typed operations.
+  raw routes (`vellum_integrations::receive`) rather than typed
+  operations. A provider with no secret configured gets `404`.
 - Webhook receivers written for other trackers must read
   `Vellum-Signature`; the timestamp-plus-HMAC shape is common.
 - `vellum_integrations::work::GraphWork` implements the port over the

@@ -1,0 +1,5 @@
+| 🛰 Edge listener Terminates TLS. | ⚖️ Policy engine Evaluates rules. |
+
+[ListParagraph/0] Confirm the dashboardis green
+[ListParagraph/0] Announcein #eng-deploys
+[ListParagraph/0] Tagthe release

@@ -14,6 +14,8 @@
 //!   only on Vellum crates in strictly lower layers. Crates in the same
 //!   layer (for example two services) can never depend on each other, so a
 //!   service cannot reach into another service's storage.
+//! - `cargo xtask schema [--check]` generates the editor's and the server's
+//!   views of the block model from `schema/blocks.json`.
 //! - `cargo xtask help` checks the help books in `docs/`, and
 //!   `cargo xtask help write` regenerates the files derived from them.
 //! - `cargo xtask budgets` checks the binary's size, cold start, idle
@@ -29,9 +31,11 @@ mod fast;
 mod help;
 mod perf_gate;
 mod relock;
+mod schema;
 
 const USAGE: &str = "usage: cargo xtask <fast | install-hooks | relock | boundaries | \
-                     help [check|write] | budgets | perf-gate>";
+                     help [check|write] | budgets | perf-gate | \
+                     schema [--check]>";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -47,6 +51,7 @@ fn main() -> ExitCode {
         Some("help") => help::run(mode),
         Some("budgets") => budgets::run(rest),
         Some("perf-gate") => perf_gate::run(rest),
+        Some("schema") => schema::run(rest),
         _ => Err(USAGE.to_owned()),
     };
     match result {

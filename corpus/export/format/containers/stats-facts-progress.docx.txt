@@ -1,0 +1,8 @@
+| 94% Injections caught ▲ 6 pts | 38 ms p95 latency ▼ 12 ms |
+
+| Owner | Priya S. |
+| Status | In review |
+| Target | 2026-11-24 |
+
+[Normal] Replay engine — 100%
+[Normal] Diff report — 70%

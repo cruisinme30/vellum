@@ -8,13 +8,22 @@
 //! `vellum graphql-schema` print the API contracts the clients are
 //! generated from. `vellum docs` reads the help books built into the
 //! binary; `vellum mcp` serves the MCP server over stdio; `vellum reindex`
-//! rebuilds the index from the data folder.
+//! rebuilds the index from the data folder; `vellum private` manages this
+//! device's key for end-to-end encrypted private spaces.
 
 mod docs;
+mod identity;
+#[cfg(test)]
+mod identity_tests;
 mod mcp;
+mod private;
+#[cfg(test)]
+mod private_tests;
 mod reindex;
 mod serve;
 mod services;
+mod watcher;
+mod workspace;
 
 use std::io::Write as _;
 use std::process::ExitCode;
@@ -44,12 +53,47 @@ enum Command {
         #[arg(long)]
         config: Option<std::path::PathBuf>,
     },
+    /// Administration that needs access to the server's files.
+    #[command(subcommand)]
+    Admin(AdminCommand),
     /// Prints the OpenAPI 3.1 document of every service.
     Openapi,
     /// Prints the `GraphQL` schema of every service.
     GraphqlSchema,
     /// Rebuild the index from the files in the data folder.
     Reindex(reindex::Args),
+    /// End-to-end encrypted private spaces on this device.
+    #[command(subcommand)]
+    Private(private::PrivateCommand),
+}
+
+/// Administration subcommands.
+#[derive(Debug, Subcommand)]
+enum AdminCommand {
+    /// Issues a one-time code for a 15-minute administrator session, for
+    /// when no administrator can sign in (SSO down, accounts lost).
+    /// Redeem it in the browser with `POST /auth/break-glass`.
+    BreakGlass {
+        /// The configuration file, to find the data directory.
+        #[arg(long)]
+        config: Option<std::path::PathBuf>,
+    },
+}
+
+fn break_glass(config: Option<&std::path::Path>) -> ExitCode {
+    let config = match vellum_kernel::Config::load(config) {
+        Ok(c) => c,
+        Err(error) => return fail(&error),
+    };
+    let lifetime = std::time::Duration::from_mins(15);
+    match vellum_identity::Identity::issue_break_glass(&config.data_dir, lifetime) {
+        Ok(code) => print(&format!(
+            "Break-glass code (valid once, for 15 minutes):\n{code}\n\n\
+             Redeem it on the sign-in page, or with\n\
+             curl -X POST -H 'content-type: application/json' -d '{{\"code\":\"<code>\"}}' <url>/auth/break-glass"
+        )),
+        Err(error) => fail(&error),
+    }
 }
 
 fn fail(message: &dyn std::fmt::Display) -> ExitCode {
@@ -106,6 +150,11 @@ fn main() -> ExitCode {
             let _entered = span.enter();
             mcp::run(&args)
         }
+        Command::Admin(AdminCommand::BreakGlass { config }) => break_glass(config.as_deref()),
+        Command::Private(command) => match private::run(&command) {
+            Ok(lines) => print(&lines.join("\n")),
+            Err(error) => fail(&error),
+        },
         Command::Reindex(args) => {
             let telemetry_config = TelemetryConfig::from_env("vellum", env!("CARGO_PKG_VERSION"));
             let _guard = match telemetry::init(&telemetry_config) {

@@ -10,14 +10,14 @@
 //! Owners are `owner` tuples written as Vellum itself, since a creator has
 //! no access yet to grant from.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fmt;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use vellum_authz::{
     Actor as AuthzActor, Authz, AuthzStore, Change, Id, MemoryStore, Object, Principal, Relation,
-    Subject, Tuple, TupleRelation,
+    SqlStore, Subject, Tuple, TupleRelation,
 };
 use vellum_kernel::{ObjectId, SpaceId, UserId};
 
@@ -36,6 +36,15 @@ pub trait TreeSync: Send + Sync {
 impl TreeSync for MemoryStore {
     fn set_parents(&self, space: Id, parents: BTreeMap<Id, Option<Id>>) -> DriveResult<()> {
         self.set_tree(space, parents).map_err(access_error)
+    }
+}
+
+/// The SQL store reads the tree from `page_ancestors`, which the drive's
+/// [`crate::sql::SqlIndex`] keeps in step on every write (D141), so there
+/// is nothing to hand over. Pair it with that index on the same database.
+impl TreeSync for SqlStore {
+    fn set_parents(&self, _space: Id, _parents: BTreeMap<Id, Option<Id>>) -> DriveResult<()> {
+        Ok(())
     }
 }
 
@@ -161,6 +170,18 @@ impl<S: AuthzStore + TreeSync + 'static> Access for AuthzAccess<S> {
             .await
             .map_err(access_error)?;
         Ok(())
+    }
+
+    async fn groups_of(&self, user: UserId) -> DriveResult<BTreeSet<ObjectId>> {
+        let groups = self
+            .authz
+            .groups_of(principal(user))
+            .await
+            .map_err(access_error)?;
+        Ok(groups
+            .into_iter()
+            .map(|g| ObjectId::from_u128(g.0))
+            .collect())
     }
 }
 

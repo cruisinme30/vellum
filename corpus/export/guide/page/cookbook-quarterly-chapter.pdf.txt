@@ -1,0 +1,10 @@
+Engineering
+11 of 14 34 99.97%
+Goals met Average velocity Availability
+▲ 3 ▲ 4 pts ▬ 0
+title: Points shipped by quarter
+type: bar
+Note
+Live data was not available when this was exported on 2026-10-29.
+1 / 1
+

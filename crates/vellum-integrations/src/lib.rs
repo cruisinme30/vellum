@@ -15,6 +15,7 @@
 //! | [`create_url`] | The prefilled create-issue URL |
 //! | [`insights`] | Cycle time, lead time and triage time |
 //! | [`triage`] | AI-suggested triage through the user's own model |
+//! | [`receive`] | HTTP receivers for GitHub, GitLab, Slack, Sentry and inbound mail |
 //! | [`work`] | The [`model::WorkCommands`] port over the issue tracker engine |
 //!
 //! The issue core owns issues, states and numbering. This crate reads it
@@ -29,6 +30,7 @@ pub mod inbound;
 pub mod insights;
 pub mod intake;
 pub mod model;
+pub mod receive;
 pub mod recurring;
 pub mod triage;
 pub mod work;

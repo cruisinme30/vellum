@@ -14,7 +14,7 @@ use bytes::Bytes;
 use serde_json::json;
 use vellum_collections::service::{
     Access, ChartInput, CollectionsService, CreateFromCsvInput, CreateRowInput, ExportCsvInput,
-    ImportCsvInput, Need, QueryInput, RowKey, SaveViewInput, UpdateRowInput, ViewKey,
+    ImportCsvInput, IndexFeed, Need, QueryInput, RowKey, SaveViewInput, UpdateRowInput, ViewKey,
 };
 use vellum_collections::{DateValue, Value, ViewKind};
 use vellum_contracts::{
@@ -1128,4 +1128,130 @@ async fn creates_a_collection_from_csv() {
         kind(f.service.create_from_csv(&c, blank).await),
         ErrorKind::InvalidInput
     );
+}
+
+#[derive(Default)]
+struct Feed(Mutex<Vec<DocId>>);
+
+impl IndexFeed for Feed {
+    fn rows_changed(&self, rows: Vec<DocId>) {
+        self.0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .extend(rows);
+    }
+}
+
+#[cfg(test)]
+fn take(feed: &Feed) -> BTreeSet<String> {
+    std::mem::take(&mut *feed.0.lock().unwrap())
+        .into_iter()
+        .map(|d| d.to_string())
+        .collect()
+}
+
+#[tokio::test]
+async fn feeds_search_rows_with_computed_values() {
+    let f = fixture().await;
+    let feed = Arc::new(Feed::default());
+    let service = CollectionsService::new(f.store.clone(), f.grants.clone())
+        .with_clock(Arc::new(|| DateValue::ymd(2026, 10, 29).unwrap()))
+        .with_index_feed(feed.clone());
+    let ana = UserId::generate();
+    f.grants.grant(ana, REQS, Need::Edit);
+    f.grants.grant(ana, RELS, Need::Edit);
+    let reqs = REQS.parse().unwrap();
+
+    // Every row is listed for a rebuild; the empty collection adds none.
+    let all: BTreeSet<String> = service
+        .index_rows()
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|d| d.to_string())
+        .collect();
+    assert_eq!(all, BTreeSet::from([R1.into(), R2.into(), V10.into()]));
+
+    // A row renders its stored and computed values as text.
+    let r1 = service
+        .index_row(R1.parse().unwrap())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(r1.title, "Replay 7 days");
+    assert_eq!(r1.collection_title, "Requirements");
+    assert_eq!(r1.folder, REQS_DIR);
+    assert_eq!(r1.path, format!("{REQS_DIR}/rows/replay.md"));
+    assert_eq!(r1.body, "Replay notes.\n");
+    let fields: Vec<(&str, &str, bool)> = r1
+        .fields
+        .iter()
+        .map(|x| (x.name.as_str(), x.text.as_str(), x.computed))
+        .collect();
+    assert_eq!(
+        fields,
+        [
+            ("Estimate", "8", false),
+            ("Done", "Yes", false),
+            ("Release", "v1.0", false),
+            ("Remaining", "0", true),
+        ]
+    );
+
+    // Editing a requirement re-indexes it and the release whose rollup reads it.
+    let _ = service
+        .update_row(
+            &ctx(ana),
+            UpdateRowInput {
+                collection_id: reqs,
+                row_id: R1.parse().unwrap(),
+                values: BTreeMap::from([("est".to_owned(), Value::Number(13.0))]),
+                body: None,
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(take(&feed), BTreeSet::from([R1.into(), V10.into()]));
+    let v10 = service
+        .index_row(V10.parse().unwrap())
+        .await
+        .unwrap()
+        .unwrap();
+    let points = v10.fields.iter().find(|x| x.key == "pts").unwrap();
+    assert_eq!((points.text.as_str(), points.computed), ("13", true));
+
+    // A deleted row is fed once more and then reads as gone.
+    let _ = service
+        .delete_row(
+            &ctx(ana),
+            RowKey {
+                collection_id: reqs,
+                row_id: R2.parse().unwrap(),
+            },
+        )
+        .await
+        .unwrap();
+    assert!(take(&feed).contains(R2));
+    assert!(
+        service
+            .index_row(R2.parse().unwrap())
+            .await
+            .unwrap()
+            .is_none()
+    );
+
+    // Imports feed the rows they create.
+    let imported = service
+        .import_csv(
+            &ctx(ana),
+            ImportCsvInput {
+                collection_id: reqs,
+                csv: "Requirement,Estimate\nAudit log,3\n".into(),
+                dry_run: false,
+            },
+        )
+        .await
+        .unwrap();
+    let new_row = imported.changed.written.first().unwrap().row.to_string();
+    assert!(take(&feed).contains(&new_row));
 }

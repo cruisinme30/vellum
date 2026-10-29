@@ -155,6 +155,13 @@ pub fn run() -> Result<(), String> {
     }
     results.push(("Crate boundaries", boundaries));
     results.push(("Help books and their corpus", help));
+    // The block model feeds both the Rust and the web code.
+    let schema = if areas.rust || areas.web {
+        schema_outcome()
+    } else {
+        Outcome::NotNeeded
+    };
+    results.push(("Block model", schema));
 
     report(&results, started.elapsed().as_secs());
     if results
@@ -384,6 +391,17 @@ fn execute(root: &Path, step: &Step) -> Outcome {
 fn boundaries_outcome() -> Outcome {
     progress("==> Crate boundaries");
     match crate::boundaries::run() {
+        Ok(()) => Outcome::Passed,
+        Err(message) => {
+            progress(&message);
+            Outcome::Failed
+        }
+    }
+}
+
+fn schema_outcome() -> Outcome {
+    progress("==> Block model is generated from schema/");
+    match crate::schema::run(&["--check".to_owned()]) {
         Ok(()) => Outcome::Passed,
         Err(message) => {
             progress(&message);

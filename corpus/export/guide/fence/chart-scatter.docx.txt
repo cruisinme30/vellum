@@ -1,0 +1,3 @@
+[Normal] Latency against payload size
+|  | Gateway | Legacy proxy |
+

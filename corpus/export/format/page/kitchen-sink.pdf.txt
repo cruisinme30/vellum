@@ -1,0 +1,22 @@
+Policy simulator design
+Contents
+Policy simulator design . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . ⁠1
+Purpose . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . ⁠1
+Request path . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . ⁠1
+Open decisions . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . ⁠1
+Purpose
+Replay 7 days of traffic against a draft policy before it ships. Tracked in ENG-142, due 2026-11-24.
+7 days 10 min
+Replayed traffic Target replay time
+▼ 5 min
+Request path
+sequenceDiagram
+  Client->>Gateway: request
+  Gateway->>Engine: evaluate
+Decision Warning
+Ship the simulator first. The diff report needs security review.
+Open decisions
+☐ Decide the retention for replay data @priya
+☑︎ Pick the storage backend
+1 / 1
+

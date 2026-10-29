@@ -11,9 +11,9 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D64, D65, D66, D141
-- Issue: #103, #104, #105, #106, #107, #108, #109, #296
-- Pull requests: #223, #309
+- Decisions: D64, D65, D66, D141, D146
+- Issue: #103, #104, #105, #106, #107, #108, #109, #296, #368
+- Pull requests: #223, #309, #371
 
 :::
 
@@ -78,6 +78,11 @@ writes, the three-way merge and an identity-based watcher.
   metadata, `book.yaml`, schemas, snapshots) to a fresh ULID and
   substitutes it across the copy, so links inside the copy point inside
   the copy. The copier owns the copy and no grants are copied.
+- A book is copied, and its `book.yaml` read, as the copier sees it:
+  sections they may not see, files beside or beneath those sections and
+  all snapshots stay behind. Their principals are their user and every
+  group the permission engine puts them in; a manager of the book sees
+  all of it (#327, #329).
 - A shortcut is `Name.shortcut.yaml` holding its own ID and the
   target's. Creating one needs view rights on the target; following one
   checks the target again, so a shortcut never grants access.
@@ -103,6 +108,16 @@ writes, the three-way merge and an identity-based watcher.
 - A change of parent or space rebuilds the closure of the node and
   everything beneath it in one transaction; other writes leave it alone.
 
+### D146: the drive's operations on the gateway
+
+- `DriveService` declares 32 operations on the `vellum-contracts` seam
+  (ADR 0020), each one a REST route, an OpenAPI entry and a `GraphQL`
+  field. Each maps to one `Drive` method, so the drive's checks decide.
+- Reads need the `read` scope and changes need `write:direct`. Callers
+  act as themselves; share links and anonymous callers have no drive.
+- Inputs and outputs are plain JSON views, so internal types stay free
+  to change. Saves send the content and etag they read.
+
 ## Alternatives
 
 - **Put the drive in `vellum-pages`**: the brief lists that crate for
@@ -123,7 +138,7 @@ writes, the three-way merge and an identity-based watcher.
   and a test checks the shared tables after every kind of change.
 - After `vellum reindex`, the shared tables show only what the files
   say (no trash) until the drive next writes a node or scans.
-- The REST and GraphQL operations follow the service seam from
-  `vellum-contracts` and map one-to-one to `Drive` methods.
+- `vellum serve` serves the drive once the composition root opens it
+  with its store, index and permission engine.
 - Listing a large space reads every node of it from the index. Moving a
   large folder rewrites its closure rows, one statement per node.

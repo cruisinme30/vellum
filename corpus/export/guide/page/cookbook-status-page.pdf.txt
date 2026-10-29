@@ -1,0 +1,16 @@
+Gateway status, week 45
+99.97% 38 ms 3
+Availability p95 latency Incidents
+▲ 0.02 pts ▼ 4 ms ▬ 0
+p95 latency this week
+Mon 44ms
+Tue 41ms
+Wed 40ms
+Thu 39ms
+Fri 38ms
+Decision
+The new cache cut read latency by 9%.
+Warning
+The EU region migration slips a week while we wait for the new database quota (OPS-31).
+1 / 1
+

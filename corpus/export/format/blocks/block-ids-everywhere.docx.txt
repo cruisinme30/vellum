@@ -1,0 +1,21 @@
+[Heading1] Block IDs on every block
+[Normal] A paragraph.
+[Quote] A quote keeps its ID on its own line after it.
+| Region | Revenue |
+| EMEA | 120 |
+
+[Code] fn main() {}
+|  |  |
+| Q1 | 3 |
+| Q2 | 5 |
+
+[Normal] [equation]E=mc2
+| Info Callouts carry the ID on their opening line. |
+
+| 94% Uptime | [Image: Gateway diagram] |
+
+[ListParagraph/0] A list item with a quote:
+[Quote] Quoted inside a list.
+[Normal] [equation]a2+b2
+| Warning Alerts carry it in the title. |
+

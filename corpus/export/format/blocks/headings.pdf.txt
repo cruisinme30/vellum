@@ -1,0 +1,8 @@
+Northstar handbook
+Getting started
+Install the binary
+Configure storage
+Choose a backend
+Footnote level
+1 / 1
+

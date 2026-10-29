@@ -12,6 +12,8 @@ Northstar
 [Ss]ign(s|ed)?
 [Ss]erialize
 Kroki
+Docmost
+Gotenberg
 MinIO
 Postgres
 ProseMirror
@@ -72,6 +74,18 @@ Yjs
 Replicache
 mdBook
 Roboto
+merman
+Cytoscape
+PlantUML
+Graphviz
+Sepia
+WCAG
+MathML
+[Hh]ydrate
+[Tt]antivy
+Meilisearch
+BM25
+ONNX
 GitLab
 [Gg]it[Hh]ub
 Sentry
