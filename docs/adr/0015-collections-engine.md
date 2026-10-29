@@ -102,6 +102,8 @@ each request through an access port backed by authorization.
   `.vellum/trash/collections/<collection>/<row>.md`.
 - When two folders share a collection ID, the older `schema.yaml` keeps
   it and the copy is reported, not loaded.
+- A CSV import is all or nothing: rows are applied to a copy before any
+  file is written. A dry run reports the same result without writing.
 
 ### D133: reading or editing a collection covers what it links to
 
@@ -111,7 +113,8 @@ each request through an access port backed by authorization.
   `not_found`.
 - Editing also needs edit access to the other side of each two-way
   relation, because the engine mirrors links into those row files.
-- Row writes need the `write:direct` scope; reads need `read`.
+- Row writes need the `write:direct` scope; reads need `read`. Creating
+  a collection from CSV needs edit access to the drive folder.
 
 ### D134: `vellum-collections` is a service-layer crate
 

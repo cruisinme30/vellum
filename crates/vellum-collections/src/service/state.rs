@@ -222,6 +222,47 @@ impl State {
         Ok(())
     }
 
+    /// Writes a new collection folder `dir` with every file of
+    /// `collection`, then loads it. Fails with `conflict` when the folder
+    /// already holds a collection.
+    pub async fn create(
+        &mut self,
+        store: &dyn BlobStore,
+        dir: BlobPath,
+        collection: Collection,
+    ) -> Result<(), Error> {
+        let names = collection.file_names();
+        let mut folder = Folder {
+            path: dir.clone(),
+            rows: BTreeMap::new(),
+            diagnostics: Vec::new(),
+        };
+        let by_name: BTreeMap<&String, DocId> = names.iter().map(|(id, n)| (n, *id)).collect();
+        for (rel, text) in collection.files()? {
+            let path = dir.join(&rel).map_err(store_error)?;
+            let meta = match store
+                .put(&path, Bytes::from(text), Precondition::IfAbsent)
+                .await
+            {
+                Ok(meta) => meta,
+                Err(StoreError::AlreadyExists(_) | StoreError::PreconditionFailed { .. }) => {
+                    return Err(Error::new(
+                        ErrorKind::Conflict,
+                        format!("{dir} already exists"),
+                    ));
+                }
+                Err(e) => return Err(store_error(e)),
+            };
+            if let Some(id) = by_name.get(&rel) {
+                let _ = folder.rows.insert(*id, (path, meta.etag));
+            }
+        }
+        let id = collection.id();
+        self.ws.insert(collection)?;
+        let _ = self.folders.insert(id, folder);
+        Ok(())
+    }
+
     async fn write_row(&mut self, store: &dyn BlobStore, r: RowRef) -> Result<(), Error> {
         let (text, title) = {
             let c = self.ws.collection(r.collection).ok_or_else(|| {
