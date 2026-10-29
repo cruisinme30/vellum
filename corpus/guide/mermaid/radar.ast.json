@@ -11,6 +11,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "radar-beta\n  title Gateway options\n  axis perf[\"Performance\"], cost[\"Cost\"], ops[\"Operability\"], sec[\"Security\"], fit[\"Fit\"]\n  curve a[\"Build\"]{4, 2, 3, 5, 5}\n  curve b[\"Buy\"]{3, 4, 4, 4, 3}\n  max 5\n"
       }
     ]

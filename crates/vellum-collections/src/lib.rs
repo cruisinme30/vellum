@@ -1,11 +1,13 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-//! The collections engine: schemas, rows, relations, rollups and formulas.
+//! Collections: schemas, rows, relations, rollups, formulas and views.
 //!
 //! A collection is a folder: `schema.yaml` plus one page per row in
-//! `rows/*.md`. This crate turns those files into typed data and back, and
-//! does everything that needs no I/O:
+//! `rows/*.md`. Most of this crate is the domain: it turns those files
+//! into typed data and back, and does everything that needs no I/O. The
+//! [`service`] module serves it over the gateway, reading and writing the
+//! files through the blob store.
 //!
 //! | Module | What it does |
 //! |---|---|
@@ -17,6 +19,7 @@
 //! | [`view`] | table, board, gallery, calendar, timeline and list views |
 //! | [`mod@csv`] | CSV import (with type inference) and export |
 //! | [`fence`] | the `collection` fence and `source=collection:` charts |
+//! | [`service`] | the `collections.*` operations over a blob store and access checks |
 //!
 //! The save path is: apply an [`Edit`] to the [`Workspace`], write the
 //! files named in the [`Changeset`], then recompute
@@ -48,6 +51,7 @@ pub mod fence;
 pub mod formula;
 pub mod row;
 pub mod schema;
+pub mod service;
 pub mod telemetry;
 pub mod value;
 pub mod view;
@@ -60,6 +64,7 @@ pub use fence::{ChartData, ChartSource, CollectionEmbed, EmbedError};
 pub use formula::{Formula, FormulaError, Span};
 pub use row::Row;
 pub use schema::{Aggregation, NumberFormat, Property, PropertyType, Schema, SelectOption};
+pub use service::CollectionsService;
 pub use value::{DateValue, Value};
 pub use view::{Filter, FilterOp, QueryError, Sort, ViewDef, ViewKind, ViewResult};
 pub use workspace::{Changeset, Collection, Edit, RowRef, Workspace};
