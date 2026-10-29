@@ -92,7 +92,7 @@ export function oversizedBody() {
 
 // RT-001: a few KB of nesting once overflowed the stack and killed the
 // process. Whatever the answer, it must come back, and quickly.
-const deep = JSON.stringify({ title: 'Deep', body: `${'> '.repeat(4000)}deep\n` });
+const deep = JSON.stringify({ space_id: SPACE, title: 'Deep', body: `${'> '.repeat(4000)}deep\n` });
 export function deepDocument() {
   const res = watch(
     http.post(`${BASE}${routes.createPage(SPACE)}`, deep, { headers: json }),
@@ -111,7 +111,7 @@ export function wideQuery() {
 
 // RT-006: anonymous floods are limited, never answered with errors.
 export function anonymousBurst() {
-  const res = watch(http.get(`${BASE}${routes.page(DOC)}`), 'anonymous_burst');
+  const res = watch(http.get(`${BASE}${routes.content(DOC)}`), 'anonymous_burst');
   check(res, { 'anonymous refused or limited': (r) => [401, 403, 404, 429].includes(r.status) });
 }
 
