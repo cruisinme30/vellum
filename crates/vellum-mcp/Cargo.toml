@@ -16,3 +16,23 @@ layer = "edge"
 
 [lints]
 workspace = true
+
+[dependencies]
+async-trait = "0.1.92"
+axum = { version = "0.8.9", default-features = false, features = ["http1", "json", "query", "tokio"] }
+base64 = "0.23.1"
+futures-util = { version = "0.3.34", default-features = false, features = ["std"] }
+opentelemetry = "0.33.1"
+opentelemetry_sdk = "0.33.1"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+thiserror = "2.0.21"
+tokio = { version = "1.54.1", features = ["io-util", "macros", "rt", "sync", "time"] }
+tracing = "0.1.44"
+tracing-opentelemetry = "0.34.0"
+vellum-kernel.workspace = true
+
+[dev-dependencies]
+http-body-util = "0.1.5"
+tokio = { version = "1.54.1", features = ["io-util", "macros", "rt-multi-thread", "sync", "time", "test-util"] }
+tower = { version = "0.5.3", features = ["util"] }
