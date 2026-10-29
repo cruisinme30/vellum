@@ -34,6 +34,7 @@ readonly NEXTEST=0.9.120
 readonly DENY=0.19.0
 readonly AUDIT=0.22.0
 readonly MARKDOWNLINT=0.24.0
+readonly MDBOOK=0.5.4
 
 installed=()
 failed=()
@@ -82,6 +83,10 @@ want cargo-deny from_tarball cargo-deny \
 want cargo-audit from_tarball cargo-audit \
   "${gh_release}/rustsec/rustsec/releases/download/cargo-audit%2Fv${AUDIT}/cargo-audit-x86_64-unknown-linux-musl-v${AUDIT}.tgz" \
   "cargo-audit-x86_64-unknown-linux-musl-v${AUDIT}/cargo-audit"
+# mdBook builds the website the UI layout checks audit.
+want mdbook from_tarball mdbook \
+  "${gh_release}/rust-lang/mdBook/releases/download/v${MDBOOK}/mdbook-v${MDBOOK}-x86_64-unknown-linux-gnu.tar.gz" \
+  mdbook
 
 # Python linters, pinned like CI. sqlfluff 4 rejects the migrations.
 pip_tool() {
