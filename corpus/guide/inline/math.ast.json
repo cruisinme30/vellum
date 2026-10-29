@@ -1,0 +1,18 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "The F1 score is $\\frac{2PR}{P+R}$."
+          }
+        ],
+        "id": null
+      }
+    ]
+  },
+  "diagnostics": []
+}

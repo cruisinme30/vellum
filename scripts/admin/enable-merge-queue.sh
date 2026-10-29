@@ -8,6 +8,9 @@
 # joins the queue (gh pr merge --auto --squash).
 #
 # Needs a repository admin: run it once with `gh` signed in as the owner.
+# GitHub offers merge queues only on repositories owned by an organisation;
+# on a personal repository the queue step fails with HTTP 422, and only
+# the auto-merge setting applies.
 # Run it only after the merge_group triggers are on develop, or the queue
 # waits forever for checks that never start.
 set -euo pipefail

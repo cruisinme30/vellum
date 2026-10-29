@@ -1,0 +1,78 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "container",
+        "name": "facts",
+        "arg": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "sections": [
+          [
+            {
+              "type": "list",
+              "start": null,
+              "tight": true,
+              "items": [
+                {
+                  "task": null,
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Owner: Priya Shah"
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                },
+                {
+                  "task": null,
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Status: In review"
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                },
+                {
+                  "task": null,
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Target: "
+                        },
+                        {
+                          "type": "date",
+                          "date": "2026-11-24"
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "diagnostics": []
+}

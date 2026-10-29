@@ -16,16 +16,18 @@
 //!   service cannot reach into another service's storage.
 //! - `cargo xtask schema [--check]` generates the editor's and the server's
 //!   views of the block model from `schema/blocks.json`.
+//! - `cargo xtask help` checks the help books in `docs/`, and
+//!   `cargo xtask help write` regenerates the files derived from them.
 
 use std::process::{Command, ExitCode};
 
 mod boundaries;
 mod fast;
+mod help;
 mod relock;
 mod schema;
 
-const USAGE: &str =
-    "usage: cargo xtask <fast | install-hooks | relock | boundaries | schema [--check]>";
+const USAGE: &str = "usage: cargo xtask <fast | install-hooks | relock | boundaries | help [check|write] | schema [--check]>";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -34,6 +36,9 @@ fn main() -> ExitCode {
         Some((command, [])) if command == "install-hooks" => install_hooks(),
         Some((command, [])) if command == "relock" => relock::run(),
         Some((command, [])) if command == "boundaries" => boundaries::run(),
+        Some((command, rest)) if command == "help" && rest.len() <= 1 => {
+            help::run(rest.first().map(String::as_str))
+        }
         Some((command, rest)) if command == "schema" => schema::run(rest),
         _ => Err(USAGE.to_owned()),
     };

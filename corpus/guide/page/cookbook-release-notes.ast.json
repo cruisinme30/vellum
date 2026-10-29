@@ -1,0 +1,212 @@
+{
+  "document": {
+    "front_matter": {
+      "fields": {
+        "id": "01JB9H7J9K1M3N5P7Q9R1S3T5V",
+        "title": "Release notes, cycle 2027-C04",
+        "status": "draft",
+        "owner": "priya",
+        "tags": [
+          "release-notes"
+        ],
+        "vellum": 1
+      }
+    },
+    "blocks": [
+      {
+        "type": "container",
+        "name": "info",
+        "arg": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "sections": [
+          [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Drafted by Claude for "
+                },
+                {
+                  "type": "mention",
+                  "handle": "priya"
+                },
+                {
+                  "type": "text",
+                  "text": " from 14 issues completed in 2027-C04."
+                }
+              ],
+              "id": null
+            }
+          ]
+        ]
+      },
+      {
+        "type": "heading",
+        "level": 2,
+        "content": [
+          {
+            "type": "text",
+            "text": "Features"
+          }
+        ],
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null
+      },
+      {
+        "type": "list",
+        "start": null,
+        "tight": true,
+        "items": [
+          {
+            "task": null,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Replay seven days of traffic in under ten minutes ("
+                  },
+                  {
+                    "type": "issue_key",
+                    "key": "ENG-142"
+                  },
+                  {
+                    "type": "text",
+                    "text": ")"
+                  }
+                ],
+                "id": null
+              }
+            ]
+          },
+          {
+            "task": null,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Diff report of allowed and blocked requests ("
+                  },
+                  {
+                    "type": "issue_key",
+                    "key": "ENG-143"
+                  },
+                  {
+                    "type": "text",
+                    "text": ")"
+                  }
+                ],
+                "id": null
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "heading",
+        "level": 2,
+        "content": [
+          {
+            "type": "text",
+            "text": "Fixes"
+          }
+        ],
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null
+      },
+      {
+        "type": "list",
+        "start": null,
+        "tight": true,
+        "items": [
+          {
+            "task": null,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Rate limits no longer reset when a replica restarts ("
+                  },
+                  {
+                    "type": "issue_key",
+                    "key": "ENG-158"
+                  },
+                  {
+                    "type": "text",
+                    "text": ")"
+                  }
+                ],
+                "id": null
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "heading",
+        "level": 2,
+        "content": [
+          {
+            "type": "text",
+            "text": "Chores"
+          }
+        ],
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null
+      },
+      {
+        "type": "list",
+        "start": null,
+        "tight": true,
+        "items": [
+          {
+            "task": null,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Upgraded the TLS library ("
+                  },
+                  {
+                    "type": "issue_key",
+                    "key": "ENG-160"
+                  },
+                  {
+                    "type": "text",
+                    "text": ")"
+                  }
+                ],
+                "id": null
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "diagnostics": []
+}

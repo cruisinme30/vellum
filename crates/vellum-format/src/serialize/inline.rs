@@ -196,7 +196,10 @@ impl Writer {
             let prev = i.checked_sub(1).and_then(|p| chars.get(p)).copied();
             let next = chars.get(i + 1).copied();
             let escape = match c {
-                '\\' | '`' | '*' | '[' | ']' | '<' | '~' | '^' | '|' => true,
+                // A backslash is literal unless it comes before ASCII
+                // punctuation or a line end; the next node is unknown here.
+                '\\' => next.is_none_or(|n| n.is_ascii_punctuation()),
+                '`' | '*' | '[' | ']' | '<' | '~' | '^' | '|' => true,
                 '_' => {
                     !(prev.is_some_and(char::is_alphanumeric)
                         && next.is_some_and(char::is_alphanumeric))
