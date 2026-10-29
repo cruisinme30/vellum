@@ -30,6 +30,7 @@ pub mod fusion;
 pub mod indexer;
 pub mod meili_index;
 pub mod model;
+pub mod onnx;
 pub mod postgres_index;
 pub mod service;
 pub mod tantivy_index;
@@ -46,6 +47,7 @@ pub use model::{
     BlockKind, DocKind, Filters, Fragment, IndexBlock, IndexDocument, SearchHit, SearchPage,
     SearchQuery, StoredBlock, TitleHit,
 };
+pub use onnx::{OnnxConfig, OnnxEmbedder};
 pub use postgres_index::PostgresBackend;
 pub use service::{Context, SearchService, Tuning, Update};
 pub use tantivy_index::{IndexKey, Location, Opened, TantivyBackend, TantivyConfig};

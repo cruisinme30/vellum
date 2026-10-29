@@ -4755,6 +4755,7 @@ dependencies = [
  "chacha20poly1305",
  "getrandom 0.4.3",
  "proptest",
+ "prost",
  "reqwest",
  "serde",
  "serde_json",
