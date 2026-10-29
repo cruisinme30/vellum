@@ -14,7 +14,7 @@ vellum: 1
 - Decisions: D135, D136, D137
 - Requirements: R-WK-13
 - Issue: #258
-- Pull requests: pending
+- Pull requests: #275
 
 :::
 
@@ -68,7 +68,7 @@ the seam.
 - **Separate REST handlers and a GraphQL schema**: two surfaces to keep
   in step; the seam gives both from one list.
 - **Exposing the engine's file types directly**: every new front matter
-  key would change the API, and custom serde would leak into schemas.
+  key would change the API, and custom `serde` code would leak into schemas.
 - **Writing files outside the lock**: faster, but two commands could
   interleave writes and leave the disk out of step with memory.
 - **Refusing to start on a bad file**: one hand edit would take Work
