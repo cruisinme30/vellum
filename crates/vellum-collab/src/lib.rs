@@ -36,6 +36,7 @@ pub mod placement;
 pub mod ports;
 pub mod protocol;
 mod room;
+pub mod sql;
 pub mod trace;
 pub mod tree;
 pub mod ws;

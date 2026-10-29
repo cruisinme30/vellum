@@ -102,6 +102,9 @@ pub(crate) fn all(s: &Arc<WorkService>) -> Vec<Operation> {
             s.list_cycles(c, i).await
         })
         .summary("Lists a team's cycles with burn-up and velocity"),
+        query(s, "work.insights", "/v1/work/insights", |s, c, i| async move { s.insights(c, i).await })
+            .summary("Measures lead, cycle and triage time, throughput and intake")
+            .description("Percentiles (p50, p85, p95) and means in hours over a date range, for all issues or a filter, optionally broken down by team, assignee, priority, label, project, cycle or estimate and split into weeks or months."),
         // Issues.
         query(s, "work.query_issues", "/v1/work/issues", |s, c, i| async move { s.query_issues(c, i).await })
             .summary("Lists issues by filter, grouped and ordered"),
@@ -124,6 +127,31 @@ pub(crate) fn all(s: &Arc<WorkService>) -> Vec<Operation> {
             s.triage_issue(c, i).await
         })
         .summary("Accepts, declines, marks duplicate or snoozes an issue in triage"),
+        // Intake forms and suggested triage.
+        query(s, "work.list_forms", "/v1/work/teams/{team}/forms", |s, c, i| async move { s.list_forms(c, i).await })
+            .summary("Lists a team's intake forms"),
+        mutation(s, "work.submit_form", Post, "/v1/work/teams/{team}/forms/{slug}", Work, |s, c, i| async move {
+            s.submit_form(c, i).await
+        })
+        .summary("Submits answers to an intake form as a triage issue"),
+        query(s, "work.triage_brief", "/v1/work/issues/{key}/triage/brief", |s, c, i| async move {
+            s.triage_brief(c, i).await
+        })
+        .summary("Gets what an assistant needs to suggest a triage decision")
+        .description("The issue, the teams it could go to with their labels and people, open issues with similar titles, and any suggestion already waiting."),
+        mutation(s, "work.suggest_triage", Put, "/v1/work/issues/{key}/triage/suggestion", Work, |s, c, i| async move {
+            s.suggest_triage(c, i).await
+        })
+        .summary("Proposes a triage decision for a person to accept")
+        .description("The proposal is checked and stored on the issue; nothing else changes until a person accepts it."),
+        mutation(s, "work.accept_suggestion", Post, "/v1/work/issues/{key}/triage/suggestion/accept", Work, |s, c, i| async move {
+            s.accept_suggestion(c, i).await
+        })
+        .summary("Applies the waiting triage suggestion as the caller"),
+        mutation(s, "work.dismiss_suggestion", Delete, "/v1/work/issues/{key}/triage/suggestion", Work, |s, c, i| async move {
+            s.dismiss_suggestion(c, i).await
+        })
+        .summary("Drops the waiting triage suggestion"),
         // My Issues and My Work.
         query(s, "work.my_issues", "/v1/work/me/issues", |s, c, i| async move { s.my_issues(c, i).await })
             .summary("Lists my issues in focus order"),

@@ -32,6 +32,8 @@ pub const MAX_FILE_BYTES: u64 = 4 * 1024 * 1024;
 pub struct Folder {
     /// The `name.collection` directory.
     pub path: BlobPath,
+    /// The `schema.yaml` file and the etag it was read or written at.
+    pub schema: (BlobPath, Etag),
     /// Each row's file and the etag it was read or written at.
     pub rows: BTreeMap<DocId, (BlobPath, Etag)>,
     /// Problems found while loading.
@@ -101,7 +103,8 @@ impl State {
         let mut state = Self::default();
         let mut total_rows = 0;
         for (dir, schema_path, size, _) in schemas {
-            let Some((schema_text, _)) = read_text(store, &schema_path, size).await? else {
+            let Some((schema_text, schema_etag)) = read_text(store, &schema_path, size).await?
+            else {
                 continue;
             };
             let schema = match Schema::from_yaml(&schema_text) {
@@ -126,6 +129,7 @@ impl State {
             row_files.sort_by(|a, b| a.path.cmp(&b.path));
             let mut folder = Folder {
                 path: dir.clone(),
+                schema: (schema_path.clone(), schema_etag),
                 rows: BTreeMap::new(),
                 diagnostics: Vec::new(),
             };
@@ -219,6 +223,32 @@ impl State {
         for r in &changes.deleted {
             self.trash_row(store, *r).await?;
         }
+        Ok(())
+    }
+
+    /// Rewrites a collection's `schema.yaml` from the loaded schema, if
+    /// the file still has the etag it was read at.
+    pub async fn write_schema(
+        &mut self,
+        store: &dyn BlobStore,
+        id: CollectionId,
+    ) -> Result<(), Error> {
+        let text = self
+            .ws
+            .collection(id)
+            .ok_or_else(|| Error::new(ErrorKind::NotFound, format!("collection {id} not found")))?
+            .schema()
+            .to_yaml()?;
+        let folder = self
+            .folders
+            .get_mut(&id)
+            .ok_or_else(|| Error::new(ErrorKind::NotFound, format!("collection {id} not found")))?;
+        let (path, etag) = folder.schema.clone();
+        let meta = store
+            .put(&path, Bytes::from(text), Precondition::IfMatch(etag))
+            .await
+            .map_err(store_error)?;
+        folder.schema = (path, meta.etag);
         Ok(())
     }
 

@@ -9,7 +9,7 @@
 name: Develop health
 
 on:
-  workflow_run:
+  workflow_run: # zizmor: ignore[dangerous-triggers] -- no checkout; reads only the run's metadata
     workflows: [Fast suite]
     types: [completed]
     branches: [develop]
