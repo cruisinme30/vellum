@@ -1,4 +1,0 @@
-// SPDX-FileCopyrightText: 2026 The Vellum contributors
-// SPDX-License-Identifier: AGPL-3.0-only
-
-//! TODO stub.

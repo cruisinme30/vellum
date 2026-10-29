@@ -6,12 +6,12 @@
 //!
 //! # Export
 //!
-//! Every export starts from [`vellum_format::Document`]s. [`lower`] turns
+//! Every export starts from [`vellum_format::Document`]s. [`lower()`] turns
 //! them into a [`Flow`]: the document as print and office formats see it,
 //! with containers and data fences already mapped to the shapes the PRD
 //! block catalogue asks for, live blocks frozen to their current state,
 //! charts and diagrams drawn as SVG and images loaded. A book export first
-//! goes through [`book`], which picks a section, subtree or the whole book,
+//! goes through [`book::lower_book`], which picks a section, subtree or the whole book,
 //! turns depth into heading levels, numbers the sections and resolves
 //! cross-references.
 //!
@@ -26,10 +26,12 @@
 //!
 //! # Import
 //!
-//! [`import`] reads an outside source into an [`import::ImportSet`]: Vellum
-//! documents with fresh IDs, links rewritten to `vellum://doc/<id>`, and
-//! their attachments. Callers serialise each document with
-//! `vellum_format::serialize` and write it through the store.
+//! [`import::import`] reads a Markdown folder, Obsidian vault, Outline,
+//! Docmost, Notion or Confluence export, or a Word file (and
+//! [`import::google_doc`] a Google Doc) into an [`import::ImportSet`]:
+//! canonical Vellum Markdown pages with fresh IDs and links rewritten to
+//! `vellum://doc/<id>`, their attachments, and databases as collections.
+//! Callers write the files through the store.
 //!
 //! Every export and import runs in a `tracing` span and records metrics
 //! through the global OpenTelemetry meter ([`metrics`]).
