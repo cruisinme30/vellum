@@ -9,6 +9,11 @@
 //! [`crate::protocol`]. The [`Authorizer`] decides who the caller is and
 //! what they may do before the upgrade; a caller it refuses never reaches
 //! a room.
+//!
+//! With a [`Cluster`], a connection for a room another replica owns is
+//! forwarded there after authorization (see [`crate::cluster`]), and a
+//! request forwarded by a peer is trusted by its signed join instead of
+//! being authorized again.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -26,6 +31,7 @@ use tokio::time::{Instant, interval};
 use tracing::{Instrument as _, info_span, warn};
 use vellum_kernel::{DocId, ErrorKind, Result, SpaceId, UserId};
 
+use crate::cluster::{Cluster, FORWARD_HEADER, Node, Route};
 use crate::hub::{Access, CloseReason, Hub, JoinRequest, Outbound, RoomKey};
 use crate::trace::TraceParent;
 
@@ -49,17 +55,42 @@ pub trait Authorizer: Send + Sync + 'static {
     async fn authorize(&self, request: &Parts, room: RoomKey) -> Result<(UserId, Access)>;
 }
 
+/// How long a replica waits to reach a room's owner before serving the
+/// room itself.
+const FORWARD_CONNECT: Duration = Duration::from_secs(2);
+
 #[derive(Clone)]
 struct AppState {
     hub: Hub,
     authorizer: Arc<dyn Authorizer>,
+    cluster: Option<Arc<Cluster>>,
 }
 
-/// The router to mount under the collab prefix.
+/// The router to mount under the collab prefix, for a single replica.
 pub fn router(hub: Hub, authorizer: Arc<dyn Authorizer>) -> Router {
     Router::new()
         .route("/{space_id}/{doc_id}", get(upgrade))
-        .with_state(AppState { hub, authorizer })
+        .with_state(AppState {
+            hub,
+            authorizer,
+            cluster: None,
+        })
+}
+
+/// The router for one of several replicas: connections reach the replica
+/// that owns their room. Start [`Cluster::spawn`] alongside it.
+pub fn clustered_router(
+    hub: Hub,
+    authorizer: Arc<dyn Authorizer>,
+    cluster: Arc<Cluster>,
+) -> Router {
+    Router::new()
+        .route("/{space_id}/{doc_id}", get(upgrade))
+        .with_state(AppState {
+            hub,
+            authorizer,
+            cluster: Some(cluster),
+        })
 }
 
 async fn upgrade(
@@ -72,9 +103,22 @@ async fn upgrade(
         return (StatusCode::NOT_FOUND, "document not found").into_response();
     };
     let room = RoomKey { space, doc };
-    let (user, access) = match state.authorizer.authorize(&parts, room).await {
-        Ok(granted) => granted,
-        Err(err) => return (status_of(err.kind()), err.message().to_owned()).into_response(),
+    // A join a peer forwarded: it authorized the editor already.
+    let forwarded = parts
+        .headers
+        .get(FORWARD_HEADER)
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_owned);
+    let (user, access, from_peer) = match (&state.cluster, forwarded) {
+        (Some(cluster), Some(header)) => match cluster.verify(&header, room) {
+            Some((user, access)) => (user, access, true),
+            None => return (StatusCode::FORBIDDEN, "bad forwarded join").into_response(),
+        },
+        (None, Some(_)) => return (StatusCode::FORBIDDEN, "bad forwarded join").into_response(),
+        (_, None) => match state.authorizer.authorize(&parts, room).await {
+            Ok((user, access)) => (user, access, false),
+            Err(err) => return (status_of(err.kind()), err.message().to_owned()).into_response(),
+        },
     };
     let request = JoinRequest {
         room,
@@ -84,9 +128,135 @@ async fn upgrade(
     };
     let limit = state.hub.config().max_message_bytes;
     let hub = state.hub;
-    ws.max_message_size(limit)
-        .max_frame_size(limit)
-        .on_upgrade(move |socket| serve(socket, hub, request))
+    // A forwarded join is served here even if this replica's list says
+    // otherwise, so two lists that disagree for a moment never loop.
+    let route = match &state.cluster {
+        Some(cluster) if !from_peer => cluster.route(&room),
+        _ => Route::Local,
+    };
+    let ws = ws.max_message_size(limit).max_frame_size(limit);
+    match (route, state.cluster) {
+        (Route::Remote(owner), Some(cluster)) => {
+            let hop = Hop {
+                url: format!(
+                    "ws://{}{}/{}/{}",
+                    owner.address,
+                    cluster.config().prefix,
+                    room.space,
+                    room.doc
+                ),
+                join: cluster.sign(&request),
+                origin: parts.headers.get(axum::http::header::ORIGIN).cloned(),
+                owner,
+            };
+            ws.on_upgrade(move |socket| forward(socket, hop, hub, request))
+        }
+        _ => ws.on_upgrade(move |socket| serve(socket, hub, request)),
+    }
+}
+
+/// Where and how to forward one connection.
+struct Hop {
+    url: String,
+    join: String,
+    origin: Option<axum::http::HeaderValue>,
+    owner: Node,
+}
+
+/// Relays an editor's socket to the room's owner. If the owner cannot be
+/// reached in time (it may have just died), this replica serves the room.
+async fn forward(socket: WebSocket, hop: Hop, hub: Hub, request: JoinRequest) {
+    use tokio_tungstenite::tungstenite::client::IntoClientRequest as _;
+    let span = info_span!("collab.forward", room = %request.room, owner = %hop.owner.name);
+    if let Some(trace) = request.traceparent {
+        trace.parent(&span);
+    }
+    let upstream = async {
+        let mut call = hop.url.as_str().into_client_request().ok()?;
+        let headers = call.headers_mut();
+        let _ = headers.insert(FORWARD_HEADER, hop.join.parse().ok()?);
+        if let Some(origin) = &hop.origin {
+            let _ = headers.insert(
+                axum::http::header::ORIGIN,
+                origin.to_str().ok()?.parse().ok()?,
+            );
+        }
+        if let Some(trace) = request.traceparent {
+            let _ = headers.insert("traceparent", trace.to_string().parse().ok()?);
+        }
+        match tokio::time::timeout(FORWARD_CONNECT, tokio_tungstenite::connect_async(call)).await {
+            Ok(Ok((stream, _))) => Some(stream),
+            Ok(Err(err)) => {
+                warn!(%err, "room owner unreachable; serving the room here");
+                None
+            }
+            Err(_) => {
+                warn!("room owner timed out; serving the room here");
+                None
+            }
+        }
+    }
+    .instrument(span.clone())
+    .await;
+    match upstream {
+        Some(stream) => relay(socket, stream).instrument(span).await,
+        None => serve(socket, hub, request).await,
+    }
+}
+
+/// Copies frames both ways until either side closes.
+async fn relay<S>(socket: WebSocket, upstream: tokio_tungstenite::WebSocketStream<S>)
+where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+{
+    use tokio_tungstenite::tungstenite::Message as Up;
+    let (mut client_tx, mut client_rx) = socket.split();
+    let (mut up_tx, mut up_rx) = upstream.split();
+    loop {
+        tokio::select! {
+            from_client = client_rx.next() => {
+                let out = match from_client {
+                    Some(Ok(WsMessage::Binary(b))) => Up::Binary(b),
+                    Some(Ok(WsMessage::Text(t))) => Up::Text(t.as_str().into()),
+                    Some(Ok(WsMessage::Ping(b))) => Up::Ping(b),
+                    Some(Ok(WsMessage::Pong(b))) => Up::Pong(b),
+                    Some(Ok(WsMessage::Close(_)) | Err(_)) | None => {
+                        let _closed = up_tx.send(Up::Close(None)).await;
+                        break;
+                    }
+                };
+                if up_tx.send(out).await.is_err() {
+                    let _closed = client_tx.send(close(CloseReason::Shutdown.code(), "room closed")).await;
+                    break;
+                }
+            }
+            from_owner = up_rx.next() => {
+                let out = match from_owner {
+                    Some(Ok(Up::Binary(b))) => WsMessage::Binary(b),
+                    Some(Ok(Up::Text(t))) => WsMessage::Text(t.as_str().into()),
+                    Some(Ok(Up::Ping(b))) => WsMessage::Ping(b),
+                    Some(Ok(Up::Pong(b))) => WsMessage::Pong(b),
+                    Some(Ok(Up::Frame(_))) => continue,
+                    Some(Ok(Up::Close(frame))) => {
+                        let frame = frame.map(|f| CloseFrame {
+                            code: f.code.into(),
+                            reason: f.reason.as_str().into(),
+                        });
+                        let _closed = client_tx.send(WsMessage::Close(frame)).await;
+                        break;
+                    }
+                    Some(Err(_)) | None => {
+                        let _closed = client_tx.send(close(CloseReason::Shutdown.code(), "room closed")).await;
+                        break;
+                    }
+                };
+                if client_tx.send(out).await.is_err() {
+                    let _closed = up_tx.send(Up::Close(None)).await;
+                    break;
+                }
+            }
+        }
+    }
 }
 
 const fn status_of(kind: ErrorKind) -> StatusCode {
