@@ -11,6 +11,7 @@ import { CopyDiagnostic } from "../../shell/copy-diagnostic";
 
 import { type AdminConsoleApi, type AdminState, type BackupFile, type DrillReport } from "./api";
 import { AdminScreen } from "./context";
+import { ScrollRegion } from "./scroll-region";
 
 const TIME = new Intl.DateTimeFormat("en", {
   month: "short",
@@ -75,7 +76,7 @@ function BackupTable({ backups }: { readonly backups: readonly BackupFile[] }) {
     return <p>{t("admin-backups-empty")}</p>;
   }
   return (
-    <div className="vl-admin-scroll">
+    <ScrollRegion label={t("admin-backups-caption")}>
       <table className="vl-admin-table">
         <caption>{t("admin-backups-caption")}</caption>
         <thead>
@@ -93,7 +94,7 @@ function BackupTable({ backups }: { readonly backups: readonly BackupFile[] }) {
           ))}
         </tbody>
       </table>
-    </div>
+    </ScrollRegion>
   );
 }
 

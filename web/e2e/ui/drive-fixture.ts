@@ -100,7 +100,9 @@ export function driveAnswer(path: string): unknown {
     ],
     [/^\/api\/v1\/drive\/search$/, { items: ITEMS.slice(2, 4) }],
     [/^\/api\/v1\/drive\/spaces\/[^/]+\/items$/, { items: ITEMS }],
-    [/^\/api\/v1\/drive\/spaces\/[^/]+\/tree$/, { items: ITEMS.slice(0, 4), truncated: false }],
+    // Only My Drive holds these; another space's tree would show them twice.
+    [/^\/api\/v1\/drive\/spaces\/S1\/tree$/, { items: ITEMS.slice(0, 4), truncated: false }],
+    [/^\/api\/v1\/drive\/spaces\/[^/]+\/tree$/, { items: [], truncated: false }],
     [/^\/api\/v1\/drive\/spaces\/[^/]+\/trash$/, { items: TRASH }],
     [
       /^\/api\/v1\/drive\/spaces\/[^/]+\/usage$/,

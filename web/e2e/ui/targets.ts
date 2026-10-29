@@ -4,6 +4,7 @@
 import { readdirSync, statSync } from "node:fs";
 import path from "node:path";
 
+import { HANDBOOK } from "./northstar-server";
 import type { ServerState } from "./server";
 
 /**
@@ -51,16 +52,49 @@ export const SITE_DIR = path.resolve(
 const app = (
   name: string,
   route: string,
-  options: { server?: ServerState; visual?: boolean } = {},
+  options: { server?: ServerState; visual?: boolean; fast?: boolean } = {},
 ): Target => ({
   name: `app ${name}`,
   url: `http://127.0.0.1:${String(APP_PORT)}${route}`,
   app: true,
-  fast: true,
+  fast: options.fast ?? true,
   sweep: false,
   visual: options.visual ?? true,
   ...(options.server === undefined ? {} : { server: options.server }),
 });
+
+/**
+ * The other screens that need a server (D285), signed in to the Northstar
+ * stand-in with a fixed clock. A few stand for them in the fast suite;
+ * the full suite opens them all. Their figures and dates come from the
+ * fixture, so they can have pixel baselines.
+ */
+const screen = (name: string, route: string, fast = false): Target =>
+  app(name, route, { server: "signed-in", fast, visual: fast });
+
+function serverScreens(): Target[] {
+  return [
+    screen("home (server)", "/"),
+    screen("my-work", "/my-work", true),
+    screen("issues", "/issues", true),
+    screen("issue", "/issues/ENG-12"),
+    screen("books", "/books"),
+    screen("book section", `/books/${HANDBOOK}/setup`, true),
+    screen("appearance (server)", "/settings/appearance"),
+    screen("notification settings", "/settings/notifications"),
+    screen("private spaces", "/settings/private-spaces"),
+    screen("admin", "/admin"),
+    screen("admin usage", "/admin/usage", true),
+    screen("admin requests", "/admin/requests"),
+    screen("admin routes", "/admin/routes"),
+    screen("admin audit", "/admin/audit"),
+    screen("admin settings", "/admin/settings"),
+    screen("admin backups", "/admin/backups"),
+    screen("admin webhooks", "/admin/webhooks"),
+    screen("help", "/help"),
+    screen("collections (server)", "/data"),
+  ];
+}
 
 // Baselines are made in the Playwright container (scripts/ci/ui-baselines.sh).
 const APP_TARGETS: Target[] = [
@@ -74,6 +108,14 @@ const APP_TARGETS: Target[] = [
   app("drive trash", "/drive/s/S1/trash", { server: "drive", visual: false }),
   app("drive settings", "/drive/s/S2/settings", { server: "drive", visual: false }),
   app("drive search", "/drive/search?q=plan&kind=page", { server: "drive", visual: false }),
+  app("drive recent", "/drive/recent", { server: "drive", visual: false, fast: false }),
+  app("drive starred", "/drive/starred", { server: "drive", visual: false, fast: false }),
+  app("drive shared drives", "/drive/shared", { server: "drive", visual: false, fast: false }),
+  app("drive shared with me", "/drive/shared-with-me", {
+    server: "drive",
+    visual: false,
+    fast: false,
+  }),
   // The theme editor's words and its contrast table change as tokens are
   // added, so the layout audit covers it rather than a pixel baseline.
   app("appearance", "/settings/appearance", { visual: false }),
@@ -83,6 +125,7 @@ const APP_TARGETS: Target[] = [
   app("triage", "/issues/triage", { server: "work", visual: false }),
   app("cycles", "/issues/cycles", { server: "work", visual: false }),
   app("team settings", "/issues/settings", { server: "work", visual: false }),
+  ...serverScreens(),
 ];
 
 function htmlFiles(directory: string): string[] {

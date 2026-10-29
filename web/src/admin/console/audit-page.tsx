@@ -10,6 +10,7 @@ import { CopyDiagnostic } from "../../shell/copy-diagnostic";
 
 import { formText, type AdminConsoleApi, type AuditRecord, type ChainReport } from "./api";
 import { AdminScreen } from "./context";
+import { ScrollRegion } from "./scroll-region";
 
 /** Records per page. */
 const PAGE = 50;
@@ -52,7 +53,7 @@ function AuditTable({ records }: { readonly records: readonly AuditRecord[] }) {
     return <p>{t("admin-audit-empty")}</p>;
   }
   return (
-    <div className="vl-admin-scroll">
+    <ScrollRegion label={t("admin-audit-caption")}>
       <table className="vl-admin-table">
         <caption>{t("admin-audit-caption")}</caption>
         <thead>
@@ -72,7 +73,7 @@ function AuditTable({ records }: { readonly records: readonly AuditRecord[] }) {
           ))}
         </tbody>
       </table>
-    </div>
+    </ScrollRegion>
   );
 }
 

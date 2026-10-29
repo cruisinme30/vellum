@@ -639,15 +639,23 @@ kbd {
   padding: 0 24px;
 }
 
+/*
+ * Fixed tracks, not wrapping flex: on a phone the four pills only just fit
+ * one row, so the fallback font wrapped them and Roboto unwrapped them,
+ * shifting the page (CLS 0.25, D285). Two or four columns never depend on
+ * the font.
+ */
 .vl-home-shortcuts {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
   gap: 8px;
+  max-width: 40rem;
   margin: 0 0 16px;
 }
 
 .vl-home-shortcuts a {
   padding: 6px 16px;
+  text-align: center;
   border: 1px solid var(--md-outline-variant);
   border-radius: 999px;
   color: var(--md-primary);
