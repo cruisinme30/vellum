@@ -86,8 +86,9 @@ CI enforces every rule in this section on each pull request.
   with a reason when one does not apply.
 - **Developer Certificate of Origin**: sign off every commit with
   `git commit -s`. The sign-off must match the commit author.
-- **Signed commits**: sign with GPG, SSH or S/MIME so GitHub marks them
-  verified. Branch protection enforces this.
+- **Signed commits** (planned): sign with GPG, SSH or S/MIME so GitHub
+  marks them verified. Branch protection will require this once every
+  contributor, including automated ones, has a signing key set up.
 - **Size**: a pull request changes fewer than 400 lines, not counting
   generated files marked in `.gitattributes`. A maintainer can apply the
   `size/exempt` label when a larger change cannot be split.
@@ -105,10 +106,10 @@ Set these under **Settings → Rules → Rulesets** on GitHub.
 
 | Setting | `develop` | `main` |
 | --- | --- | --- |
-| Require a pull request, 1 approval, dismiss stale approvals | yes | yes |
+| Require a pull request (0 approvals while there is one maintainer) | yes | yes |
 | Required status checks | `Fast suite` | `Full suite` |
 | Require branches to be up to date | yes | yes |
-| Require signed commits | yes | yes |
+| Require signed commits | planned | planned |
 | Require linear history | yes (squash merge) | no (merge commits from `develop`) |
 | Block force pushes and deletion | yes | yes |
 | Restrict who can push | — | maintainers only, and only from `develop` or a hotfix |

@@ -58,8 +58,11 @@ full suite.
   kernel, contracts, foundation, engine, service, edge, app. A crate may
   depend only on strictly lower layers, so services can never reach into
   each other. `cargo xtask boundaries` enforces this in CI.
-- Signed commits are enforced by branch protection, not CI, because CI
-  cannot verify a signature against GitHub's key registry.
+- Signed commits will be enforced by branch protection, not CI, because
+  CI cannot verify a signature against GitHub's key registry. The rule
+  stays off until every contributor, automated ones included, can sign.
+- Pull requests need no approval while there is a single maintainer, who
+  cannot approve pull requests opened under their own account.
 
 ## Gate inventory
 
