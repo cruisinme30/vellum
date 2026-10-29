@@ -4,6 +4,8 @@
 import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { BrowserRouter, Route, Routes } from "react-router";
 
+import { RequestsPage } from "./admin/requests/requests-page";
+import { RoutesPage } from "./admin/routes/routes-page";
 import type { AuthApi, AuthStatus } from "./api/auth";
 import { RequireSession, SessionProvider, useSession } from "./api/session";
 import { CollectionView } from "./collections/collection-view";
@@ -70,6 +72,8 @@ export function AppRoutes() {
         <Route path="data/:collectionId" element={<CollectionView />} />
         <Route path="help" element={<HelpView />} />
         <Route path="admin" element={<AdminView />} />
+        <Route path="admin/requests" element={<RequestsPage />} />
+        <Route path="admin/routes" element={<RoutesPage />} />
         <Route path="*" element={<NotFoundView />} />
       </Route>
     </Routes>

@@ -37,6 +37,7 @@ thiserror = "2.0.21"
 tokio = { version = "1.54.1", features = ["io-std", "macros", "rt-multi-thread", "signal"] }
 tracing = "0.1.44"
 url = "2.5.8"
+vellum-admin = { path = "../vellum-admin" }
 vellum-api = { path = "../vellum-api" }
 vellum-authz = { path = "../vellum-authz" }
 vellum-books-service = { path = "../vellum-books-service" }
@@ -53,6 +54,7 @@ vellum-integrations = { path = "../vellum-integrations" }
 vellum-kernel.workspace = true
 vellum-mcp = { path = "../vellum-mcp" }
 vellum-notify = { path = "../vellum-notify" }
+vellum-observe = { path = "../vellum-observe" }
 vellum-private = { path = "../vellum-private", features = ["os-keychain"] }
 vellum-render = { path = "../vellum-render" }
 vellum-security = { path = "../vellum-security" }

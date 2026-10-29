@@ -86,7 +86,12 @@ fn execute(args: &Args) -> Result<Vec<String>, String> {
 /// Parses a 32-byte key written as 64 hex characters.
 pub fn index_key(hex: Option<&str>) -> Result<IndexKey, String> {
     let hex = hex.ok_or_else(|| format!("set {KEY_VAR} to the index key, or pass --plaintext"))?;
-    let bad = || format!("{KEY_VAR} must be 64 hexadecimal characters");
+    parse_hex_key(KEY_VAR, hex).map(IndexKey::new)
+}
+
+/// Parses the 32-byte key in variable `var`, written as 64 hex characters.
+pub fn parse_hex_key(var: &str, hex: &str) -> Result<[u8; 32], String> {
+    let bad = || format!("{var} must be 64 hexadecimal characters");
     if hex.len() != 64 {
         return Err(bad());
     }
@@ -95,7 +100,7 @@ pub fn index_key(hex: Option<&str>) -> Result<IndexKey, String> {
         let text = std::str::from_utf8(pair).map_err(|_| bad())?;
         *byte = u8::from_str_radix(text, 16).map_err(|_| bad())?;
     }
-    Ok(IndexKey::new(key))
+    Ok(key)
 }
 
 #[cfg(test)]

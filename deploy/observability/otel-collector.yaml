@@ -1,0 +1,67 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# OpenTelemetry Collector for Vellum (ADR 0021).
+#
+# Vellum sends traces, metrics and logs over OTLP when
+# OTEL_EXPORTER_OTLP_ENDPOINT points here. The collector exposes metrics to
+# Prometheus (rules in prometheus/) and forwards traces and logs to any
+# OTLP backend, such as Grafana Tempo and Loki. Set TRACES_ENDPOINT and
+# LOGS_ENDPOINT, or remove the pipelines you do not run.
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 20
+  batch: {}
+  # Request bodies and credentials never reach telemetry, but strip the
+  # headers that could carry them in case a library records them.
+  attributes/scrub:
+    actions:
+      - key: http.request.header.authorization
+        action: delete
+      - key: http.request.header.cookie
+        action: delete
+      - key: http.response.header.set-cookie
+        action: delete
+
+exporters:
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    resource_to_telemetry_conversion:
+      enabled: true
+  otlp/traces:
+    endpoint: ${env:TRACES_ENDPOINT}
+    tls:
+      insecure: true
+  otlphttp/logs:
+    endpoint: ${env:LOGS_ENDPOINT}
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, attributes/scrub, batch]
+      exporters: [otlp/traces]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [prometheus]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, attributes/scrub, batch]
+      exporters: [otlphttp/logs]

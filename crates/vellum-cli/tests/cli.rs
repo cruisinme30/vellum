@@ -43,11 +43,73 @@ fn rejects_an_invalid_log_filter() {
 }
 
 #[test]
+fn profile_renders_a_folded_file() {
+    let dir = std::env::temp_dir().join(format!("vellum-cli-profile-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let input = dir.join("in.folded");
+    let out = dir.join("out.svg");
+    std::fs::write(&input, "http.request;db.query 900\n").unwrap();
+    let output = vellum()
+        .args(["profile", "--input"])
+        .arg(&input)
+        .arg("--out")
+        .arg(&out)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(std::fs::read_to_string(&out).unwrap().starts_with("<svg"));
+    let failed = vellum()
+        .args(["profile", "--input"])
+        .arg(dir.join("missing"))
+        .output()
+        .unwrap();
+    assert!(!failed.status.success());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn budgets_checks_a_routes_file() {
+    let dir = std::env::temp_dir().join(format!("vellum-cli-budgets-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let input = dir.join("routes.json");
+    std::fs::write(
+        &input,
+        r#"{"minutes":15,"routes":[],"in_flight":0,"process":{},"buffer":{}}"#,
+    )
+    .unwrap();
+    let passed = vellum()
+        .args(["budgets", "--input"])
+        .arg(&input)
+        .output()
+        .unwrap();
+    assert!(
+        passed.status.success(),
+        "{}",
+        String::from_utf8_lossy(&passed.stderr)
+    );
+    let failed = vellum()
+        .args(["budgets", "--input"])
+        .arg(dir.join("missing.json"))
+        .output()
+        .unwrap();
+    assert!(!failed.status.success());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn prints_the_api_contracts() {
     let output = vellum().arg("openapi").output().unwrap();
     assert!(output.status.success());
     let doc: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(doc["openapi"], "3.1.1");
+    // The admin console is part of the API the clients are generated from.
+    for path in ["/v1/admin/requests", "/v1/admin/routes", "/v1/admin/audit"] {
+        assert!(doc["paths"].get(path).is_some(), "{path} is missing");
+    }
     let output = vellum().arg("graphql-schema").output().unwrap();
     assert!(output.status.success());
     assert!(
@@ -74,21 +136,39 @@ fn serves_health_checks() {
         .env("VELLUM_LOG", "warn")
         .spawn()
         .unwrap();
+    let get = |path: &str| {
+        let mut stream = std::net::TcpStream::connect(("127.0.0.1", port)).ok()?;
+        let request =
+            format!("GET {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
+        stream.write_all(request.as_bytes()).ok()?;
+        let mut reply = String::new();
+        let _ = stream.read_to_string(&mut reply);
+        Some(reply)
+    };
     let mut reply = String::new();
     for _ in 0..100 {
-        if let Ok(mut stream) = std::net::TcpStream::connect(("127.0.0.1", port)) {
-            stream
-                .write_all(b"GET /healthz HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
-                .unwrap();
-            let _ = stream.read_to_string(&mut reply);
+        if let Some(r) = get("/healthz") {
+            reply = r;
             break;
         }
         std::thread::sleep(std::time::Duration::from_millis(50));
     }
+    // The admin console is mounted (and closed to anonymous callers), and
+    // every response carries the trace id for the browser to join.
+    let admin = get("/api/v1/admin/requests").unwrap_or_default();
+    let keys = data.join(".vellum").join("keys");
+    let made_keys = keys.join("admin.key").is_file() && keys.join("backup.key").is_file();
+    let made_audit = data.join(".vellum").join("audit").is_dir();
     child.kill().unwrap();
     let _ = child.wait();
     let _ = std::fs::remove_dir_all(&data);
     assert!(reply.starts_with("HTTP/1.1 200"), "{reply}");
+    assert!(
+        reply.to_ascii_lowercase().contains("traceparent;desc="),
+        "{reply}"
+    );
+    assert!(admin.starts_with("HTTP/1.1 401"), "{admin}");
+    assert!(made_keys && made_audit);
 }
 
 #[test]

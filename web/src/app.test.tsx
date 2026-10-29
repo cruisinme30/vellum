@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { App } from "./app";
 import { createMockCollectionsStore } from "./collections/mock";
@@ -23,6 +23,16 @@ describe("AppRoutes", () => {
     renderApp(path);
     expect(screen.getByRole("heading", { level: 1, name: heading })).toBeDefined();
     expect(screen.getByRole("main")).toBeDefined();
+  });
+
+  it.each([
+    ["/admin/requests", "Requests", { requests: [] }],
+    ["/admin/routes", "Routes", { minutes: 15, routes: [], in_flight: 0 }],
+  ])("mounts the admin page at %s", (path, heading, body) => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(body));
+    renderApp(path);
+    expect(screen.getByRole("heading", { level: 1, name: heading })).toBeDefined();
+    fetchSpy.mockRestore();
   });
 
   it("shows a loading status, then the page editor", async () => {

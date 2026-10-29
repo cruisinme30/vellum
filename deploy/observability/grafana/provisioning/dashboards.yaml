@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Loads the Vellum dashboards into Grafana. Mount grafana/dashboards at
+# /var/lib/grafana/dashboards/vellum.
+
+apiVersion: 1
+
+providers:
+  - name: vellum
+    folder: Vellum
+    type: file
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards/vellum

@@ -17,5 +17,4 @@ pub mod registry;
 pub mod request_id;
 pub mod security;
 pub mod server;
-pub mod timing;
 pub mod typescript;
