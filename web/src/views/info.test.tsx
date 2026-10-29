@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { SLASH_ITEMS } from "../editor/slash/items";
 import { renderWithProviders } from "../test/render-app";
 
-import { AdminView, CollectionsView, HelpView, NotFoundView, PendingView } from "./info";
+import { AdminView, HelpView, NotFoundView, PendingView } from "./info";
 
 describe("HelpView", () => {
   it("lists the keyboard shortcuts", () => {
@@ -33,12 +33,6 @@ describe("pending views", () => {
     renderWithProviders(<PendingView title="Later" body="Coming soon." />);
     expect(screen.getByRole("heading", { level: 1, name: "Later" })).toBeDefined();
     expect(screen.getByText("Coming soon.")).toBeDefined();
-  });
-
-  it("explains collections", () => {
-    renderWithProviders(<CollectionsView />);
-    expect(screen.getByRole("heading", { level: 1, name: "Data" })).toBeDefined();
-    expect(screen.getByText(/collections engine lands/)).toBeDefined();
   });
 
   it("explains administration", () => {
