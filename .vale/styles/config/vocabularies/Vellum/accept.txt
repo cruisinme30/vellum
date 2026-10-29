@@ -111,3 +111,15 @@ Patroni
 Pandoc
 [Kk]anban
 [Cc]ollab
+Grafana
+Prometheus
+Loki
+Tempo
+SLOs?
+SLIs?
+RTO
+[Ww]aterfalls?
+[Hh]ash-chained
+JSONL
+KiB
+MiB

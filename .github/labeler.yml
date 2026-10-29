@@ -134,3 +134,11 @@ area/deploy:
   - changed-files:
       - any-glob-to-any-file:
           - "deploy/**"
+area/observability:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-observe/**"
+          - "crates/vellum-admin/**"
+          - "deploy/observability/**"
+          - "web/src/admin/**"
+          - "web/src/platform/client-telemetry*"

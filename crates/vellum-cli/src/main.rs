@@ -6,13 +6,15 @@
 //! One binary runs every Vellum service. Subcommands (`serve`, `reindex`,
 //! and the rest) arrive with their workstreams. `vellum docs` reads the
 //! help books built into the binary; `vellum mcp` serves the MCP server
-//! over stdio.
+//! over stdio. `vellum profile` and `vellum budgets` ask a running server
+//! for a flame graph and for routes over their latency budget.
 
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
 use vellum_kernel::telemetry::{self, TelemetryConfig};
 
+mod admin;
 mod docs;
 mod mcp;
 
@@ -31,6 +33,11 @@ enum Command {
     Docs(docs::DocsArgs),
     /// Serve the MCP server over stdio for a local AI client.
     Mcp(mcp::McpArgs),
+    /// Draw a flame graph of where a running server spends its time.
+    Profile(vellum_admin::profile::ProfileArgs),
+    /// Fail when a route's p95 latency is over its budget (a CI gate after
+    /// a load test).
+    Budgets(vellum_admin::budgets::BudgetsArgs),
 }
 
 fn main() -> ExitCode {
@@ -65,6 +72,8 @@ fn main() -> ExitCode {
     let _entered = span.enter();
     match cli.command {
         Some(Command::Mcp(args)) => mcp::run(&args),
+        Some(Command::Profile(args)) => admin::profile(&args),
+        Some(Command::Budgets(args)) => admin::budgets(&args),
         Some(Command::Docs(_)) | None => {
             tracing::info!("vellum started; no command given");
             ExitCode::SUCCESS

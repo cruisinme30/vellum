@@ -1,11 +1,20 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import { RequestsPage } from "./admin/requests/requests-page";
+import { RoutesPage } from "./admin/routes/routes-page";
+
 /**
  * The application shell. The editor, drive and work views mount here as
  * their workstreams land.
  */
-export function App() {
+export function App({ path = globalThis.location.pathname }: { readonly path?: string }) {
+  if (path.startsWith("/admin/requests")) {
+    return <RequestsPage />;
+  }
+  if (path.startsWith("/admin/routes")) {
+    return <RoutesPage />;
+  }
   return (
     <main>
       <h1>Vellum</h1>
