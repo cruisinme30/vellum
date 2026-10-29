@@ -33,17 +33,13 @@ export interface ActivityList {
  */
 export interface ActivityView {
   /**
-   * Who did it.
-   */
-  actor: ActorView;
-  /**
    * When it happened.
    */
   at: Timestamp;
   /**
-   * The old name or path, for renames and moves.
+   * Who did it.
    */
-  from?: string | null;
+  actor: ActorView;
   /**
    * The item it happened to.
    */
@@ -54,6 +50,10 @@ export interface ActivityView {
    * `version_restored`.
    */
   kind: string;
+  /**
+   * The old name or path, for renames and moves.
+   */
+  from?: string | null;
   /**
    * The new name or path, for renames and moves.
    */
@@ -70,11 +70,11 @@ export type ActorView = {
    */
   user: UserId;
 } | {
+  type: "model";
   /**
    * The person.
    */
   on_behalf_of: UserId;
-  type: "model";
 } | {
   type: "external";
 } | {
@@ -86,30 +86,30 @@ export type ActorView = {
  */
 export interface AddComment {
   /**
-   * "Assign to" this handle.
+   * Where to start a thread: an issue key, a document ID or
+   * `<doc id>#blk-…`. Leave unset for a reply.
    */
-  assign_to?: string | null;
-  /**
-   * Body in Vellum Markdown.
-   */
-  body: string;
-  /**
-   * Written by a model for the user (MCP); shown with a badge.
-   */
-  by_model?: boolean;
-  /**
-   * The selected text, for a block thread.
-   */
-  quote?: string | null;
+  target?: string | null;
   /**
    * The comment to reply to.
    */
   reply_to?: string | null;
   /**
-   * Where to start a thread: an issue key, a document ID or
-   * `<doc id>#blk-…`. Leave unset for a reply.
+   * The selected text, for a block thread.
    */
-  target?: string | null;
+  quote?: string | null;
+  /**
+   * Body in Vellum Markdown.
+   */
+  body: string;
+  /**
+   * "Assign to" this handle.
+   */
+  assign_to?: string | null;
+  /**
+   * Written by a model for the user (MCP); shown with a badge.
+   */
+  by_model?: boolean;
 }
 
 /**
@@ -117,21 +117,21 @@ export interface AddComment {
  */
 export interface AddSection {
   /**
-   * Its Markdown body.
-   */
-  body?: string;
-  /**
    * The book.
    */
   book_id: BookId;
   /**
-   * Where it goes.
-   */
-  place: BooksAddSectionPlaceInput;
-  /**
    * The new section's title.
    */
   title: string;
+  /**
+   * Its Markdown body.
+   */
+  body?: string;
+  /**
+   * Where it goes.
+   */
+  place: BooksAddSectionPlaceInput;
 }
 
 /**
@@ -156,13 +156,13 @@ export interface ApiError {
    */
   message: string;
   /**
-   * The request ID, as in the `X-Request-Id` header.
-   */
-  request_id: string;
-  /**
    * Whether retrying the same request later may succeed.
    */
   retryable: boolean;
+  /**
+   * The request ID, as in the `X-Request-Id` header.
+   */
+  request_id: string;
 }
 
 /**
@@ -170,9 +170,9 @@ export interface ApiError {
  */
 export interface AppView {
   /**
-   * The resources it may call.
+   * The grant ID.
    */
-  audience: string[];
+  id: string;
   /**
    * The client ID.
    */
@@ -182,17 +182,17 @@ export interface AppView {
    */
   clientName: string;
   /**
-   * When it was approved.
-   */
-  createdAt: Timestamp;
-  /**
-   * The grant ID.
-   */
-  id: string;
-  /**
    * The granted scopes.
    */
   scopes: Scope[];
+  /**
+   * The resources it may call.
+   */
+  audience: string[];
+  /**
+   * When it was approved.
+   */
+  createdAt: Timestamp;
 }
 
 export type Array_of_AppView = AppView[];
@@ -208,13 +208,13 @@ export type Array_of_UserView = UserView[];
  */
 export interface AssignThread {
   /**
-   * Handle; unset or empty unassigns.
-   */
-  assignee?: string | null;
-  /**
    * Thread ID.
    */
   thread_id: string;
+  /**
+   * Handle; unset or empty unassigns.
+   */
+  assignee?: string | null;
 }
 
 /**
@@ -222,25 +222,25 @@ export interface AssignThread {
  */
 export interface AssignmentOut {
   /**
-   * When.
+   * Thread ID.
    */
-  assigned_at?: string | null;
-  /**
-   * Who assigned it.
-   */
-  assigned_by?: string | null;
-  /**
-   * The quoted text or the start of the comment.
-   */
-  summary: string;
+  thread: string;
   /**
    * Where it is.
    */
   target: TargetOut;
   /**
-   * Thread ID.
+   * Who assigned it.
    */
-  thread: string;
+  assigned_by?: string | null;
+  /**
+   * When.
+   */
+  assigned_at?: string | null;
+  /**
+   * The quoted text or the start of the comment.
+   */
+  summary: string;
 }
 
 /**
@@ -263,21 +263,21 @@ export type At = "before" | "after" | "first_child_of" | "last_child_of" | "star
  */
 export interface AuthStatus {
   /**
-   * How the caller authenticated.
-   */
-  credential: string;
-  /**
    * Whether the workspace still needs its first administrator.
    */
   needsSetup: boolean;
   /**
-   * The caller's scopes.
-   */
-  scopes: Scope[];
-  /**
    * The signed-in user, if any.
    */
   user?: UserView | null;
+  /**
+   * How the caller authenticated.
+   */
+  credential: string;
+  /**
+   * The caller's scopes.
+   */
+  scopes: Scope[];
 }
 
 /**
@@ -294,21 +294,21 @@ export interface BookInfo {
    */
   id: BookId;
   /**
-   * The deepest nesting allowed.
+   * Its title.
    */
-  max_depth: number;
+  title: string;
   /**
    * `decimal`, `outline` or `none`.
    */
   numbering: string;
   /**
+   * The deepest nesting allowed.
+   */
+  max_depth: number;
+  /**
    * The caller's role on the book: `viewer` to `owner`.
    */
   role: string;
-  /**
-   * Its title.
-   */
-  title: string;
   /**
    * The table of contents, without the sections the caller cannot see.
    */
@@ -344,13 +344,13 @@ export interface BookSummary {
    */
   id: BookId;
   /**
-   * The `.book` folder.
-   */
-  path: string;
-  /**
    * Its title.
    */
   title: string;
+  /**
+   * The `.book` folder.
+   */
+  path: string;
 }
 
 /**
@@ -363,20 +363,28 @@ export interface BooksAddSectionPlaceInput {
    */
   at: At;
   /**
-   * The region `start` and `end` refer to; `numbered` by default.
-   */
-  region?: Region | null;
-  /**
    * The section `before`, `after`, `first_child_of` and
    * `last_child_of` refer to.
    */
   section?: string | null;
+  /**
+   * The region `start` and `end` refer to; `numbered` by default.
+   */
+  region?: Region | null;
 }
 
 /**
  * A snapshot's header.
  */
 export interface BooksCreateSnapshotSnapshotInfo {
+  /**
+   * The tag, such as `v1.0`.
+   */
+  tag: string;
+  /**
+   * What it marks.
+   */
+  message: string;
   /**
    * When it was taken (RFC 3339).
    */
@@ -385,14 +393,6 @@ export interface BooksCreateSnapshotSnapshotInfo {
    * Who took it (`user:<id>`).
    */
   created_by: string;
-  /**
-   * What it marks.
-   */
-  message: string;
-  /**
-   * The tag, such as `v1.0`.
-   */
-  tag: string;
 }
 
 /**
@@ -405,14 +405,14 @@ export interface BooksMoveSectionPlaceInput {
    */
   at: At;
   /**
-   * The region `start` and `end` refer to; `numbered` by default.
-   */
-  region?: Region | null;
-  /**
    * The section `before`, `after`, `first_child_of` and
    * `last_child_of` refer to.
    */
   section?: string | null;
+  /**
+   * The region `start` and `end` refer to; `numbered` by default.
+   */
+  region?: Region | null;
 }
 
 /**
@@ -430,14 +430,6 @@ export interface BooksRemoveSectionRemoved {
  */
 export interface BooksSetSectionAccessSectionAccessInfo {
   /**
-   * Its own `restrict_to`, as `book.yaml` stores it.
-   */
-  own_restrict_to?: string[] | null;
-  /**
-   * Effective owners.
-   */
-  owners: string[];
-  /**
    * Who may see it (`user:<id>`, `group:<id>`), when it is restricted:
    * the intersection of its own and every enclosing restriction.
    */
@@ -446,6 +438,14 @@ export interface BooksSetSectionAccessSectionAccessInfo {
    * The sections whose restrictions apply, outermost first.
    */
   restricted_by: string[];
+  /**
+   * Its own `restrict_to`, as `book.yaml` stores it.
+   */
+  own_restrict_to?: string[] | null;
+  /**
+   * Effective owners.
+   */
+  owners: string[];
   /**
    * Effective reviewers.
    */
@@ -457,21 +457,17 @@ export interface BooksSetSectionAccessSectionAccessInfo {
  */
 export interface BriefOut {
   /**
-   * The start of its description.
-   */
-  body: string;
-  /**
    * The issue's identifier.
    */
   key: string;
   /**
-   * Open issues with similar titles, closest first.
+   * Its title.
    */
-  similar: SimilarOut[];
+  title: string;
   /**
-   * The suggestion already waiting, if any.
+   * The start of its description.
    */
-  suggestion?: SuggestionOut | null;
+  body: string;
   /**
    * The team whose inbox holds it.
    */
@@ -481,9 +477,13 @@ export interface BriefOut {
    */
   teams: TeamOptionOut[];
   /**
-   * Its title.
+   * Open issues with similar titles, closest first.
    */
-  title: string;
+  similar: SimilarOut[];
+  /**
+   * The suggestion already waiting, if any.
+   */
+  suggestion?: SuggestionOut | null;
 }
 
 /**
@@ -509,10 +509,6 @@ export interface BucketOut {
  */
 export interface BurnOut {
   /**
-   * Points completed.
-   */
-  completed: number;
-  /**
    * The day.
    */
   date: string;
@@ -520,6 +516,10 @@ export interface BurnOut {
    * Points in scope.
    */
   scope: number;
+  /**
+   * Points completed.
+   */
+  completed: number;
 }
 
 /**
@@ -560,6 +560,10 @@ export type CellValue = {
  */
 export interface CellView {
   /**
+   * The typed value (absent on error).
+   */
+  value?: Value | null;
+  /**
    * The value as display text: numbers formatted, relations as titles.
    */
   display: string;
@@ -567,10 +571,6 @@ export interface CellView {
    * The inline error, if the cell failed to compute.
    */
   error?: CellError | null;
-  /**
-   * The typed value (absent on error).
-   */
-  value?: Value | null;
 }
 
 /**
@@ -578,27 +578,19 @@ export interface CellView {
  */
 export interface Changeset {
   /**
-   * Rows whose files must be deleted.
-   */
-  deleted: RowRef[];
-  /**
    * Rows whose files must be written (created or changed).
    */
   written: RowRef[];
+  /**
+   * Rows whose files must be deleted.
+   */
+  deleted: RowRef[];
 }
 
 /**
  * Data for a chart, ready for the renderer.
  */
 export interface ChartData {
-  /**
-   * The categories, in axis order.
-   */
-  categories: string[];
-  /**
-   * The series.
-   */
-  series: Series[];
   /**
    * The x-axis label.
    */
@@ -607,6 +599,14 @@ export interface ChartData {
    * The y-axis label.
    */
   yLabel: string;
+  /**
+   * The categories, in axis order.
+   */
+  categories: string[];
+  /**
+   * The series.
+   */
+  series: Series[];
 }
 
 /**
@@ -614,15 +614,6 @@ export interface ChartData {
  * `source=collection:<id> x=… y=…` on a `chart` block.
  */
 export interface ChartInput {
-  /**
-   * How values sharing a category combine: `sum`, `count`, `avg`,
-   * `min` or `max`.
-   */
-  agg?: string | null;
-  /**
-   * A property that splits rows into series.
-   */
-  series?: string | null;
   /**
    * `collection:<collection id>`.
    */
@@ -639,6 +630,15 @@ export interface ChartInput {
    * The value property; rows are counted when absent.
    */
   y?: string | null;
+  /**
+   * A property that splits rows into series.
+   */
+  series?: string | null;
+  /**
+   * How values sharing a category combine: `sum`, `count`, `avg`,
+   * `min` or `max`.
+   */
+  agg?: string | null;
 }
 
 /**
@@ -646,13 +646,13 @@ export interface ChartInput {
  */
 export interface ChipOut {
   /**
-   * Block ID.
-   */
-  block: string;
-  /**
    * Document ID.
    */
   doc: string;
+  /**
+   * Block ID.
+   */
+  block: string;
   /**
    * The key to write.
    */
@@ -669,13 +669,13 @@ export type CollectionId = string;
  */
 export interface CollectionInfo {
   /**
-   * Problems found while loading its files.
-   */
-  diagnostics: Diagnostic[];
-  /**
    * The collection's ID.
    */
   id: CollectionId;
+  /**
+   * Its title.
+   */
+  title: string;
   /**
    * The `name.collection` folder.
    */
@@ -685,13 +685,13 @@ export interface CollectionInfo {
    */
   properties: PropertyInfo[];
   /**
-   * Its title.
-   */
-  title: string;
-  /**
    * Saved views in tab order.
    */
   views: ViewInfo[];
+  /**
+   * Problems found while loading its files.
+   */
+  diagnostics: Diagnostic[];
 }
 
 /**
@@ -723,6 +723,10 @@ export interface CollectionSummary {
    */
   id: CollectionId;
   /**
+   * Its title.
+   */
+  title: string;
+  /**
    * The `name.collection` folder.
    */
   path: string;
@@ -730,10 +734,6 @@ export interface CollectionSummary {
    * How many rows it has.
    */
   rows: number;
-  /**
-   * Its title.
-   */
-  title: string;
   /**
    * Saved view names, in tab order.
    */
@@ -745,13 +745,13 @@ export interface CollectionSummary {
  */
 export interface CollectionsCreateFromCsvCollectionInfo {
   /**
-   * Problems found while loading its files.
-   */
-  diagnostics: Diagnostic[];
-  /**
    * The collection's ID.
    */
   id: CollectionId;
+  /**
+   * Its title.
+   */
+  title: string;
   /**
    * The `name.collection` folder.
    */
@@ -761,13 +761,13 @@ export interface CollectionsCreateFromCsvCollectionInfo {
    */
   properties: PropertyInfo[];
   /**
-   * Its title.
-   */
-  title: string;
-  /**
    * Saved views in tab order.
    */
   views: ViewInfo[];
+  /**
+   * Problems found while loading its files.
+   */
+  diagnostics: Diagnostic[];
 }
 
 /**
@@ -775,19 +775,9 @@ export interface CollectionsCreateFromCsvCollectionInfo {
  */
 export interface CollectionsCreateFromCsvCsvImported {
   /**
-   * Row files written, including links mirrored into other collections.
+   * Whether anything was written.
    */
-  changed: Changeset;
-  /**
-   * The collection after the import: its properties (inferred, for a
-   * new collection) and views.
-   */
-  collection: CollectionsCreateFromCsvCollectionInfo;
-  /**
-   * Problems with individual cells; their values were kept as text or
-   * left empty.
-   */
-  diagnostics: Diagnostic[];
+  written: boolean;
   /**
    * Rows created (or that would be).
    */
@@ -797,9 +787,19 @@ export interface CollectionsCreateFromCsvCsvImported {
    */
   skippedColumns: string[];
   /**
-   * Whether anything was written.
+   * Problems with individual cells; their values were kept as text or
+   * left empty.
    */
-  written: boolean;
+  diagnostics: Diagnostic[];
+  /**
+   * The collection after the import: its properties (inferred, for a
+   * new collection) and views.
+   */
+  collection: CollectionsCreateFromCsvCollectionInfo;
+  /**
+   * Row files written, including links mirrored into other collections.
+   */
+  changed: Changeset;
 }
 
 /**
@@ -807,10 +807,6 @@ export interface CollectionsCreateFromCsvCsvImported {
  */
 export interface CollectionsCreateRowRowDetail {
   /**
-   * The page's Markdown body.
-   */
-  body: string;
-  /**
    * The collection.
    */
   collectionId: CollectionId;
@@ -819,13 +815,17 @@ export interface CollectionsCreateRowRowDetail {
    */
   path: string;
   /**
+   * The row's title.
+   */
+  title: string;
+  /**
    * Values by property key; computed cells may hold an inline error.
    */
   row: ComputedRow;
   /**
-   * The row's title.
+   * The page's Markdown body.
    */
-  title: string;
+  body: string;
 }
 
 /**
@@ -833,10 +833,6 @@ export interface CollectionsCreateRowRowDetail {
  */
 export interface CollectionsDeleteRowRowDetail {
   /**
-   * The page's Markdown body.
-   */
-  body: string;
-  /**
    * The collection.
    */
   collectionId: CollectionId;
@@ -845,13 +841,17 @@ export interface CollectionsDeleteRowRowDetail {
    */
   path: string;
   /**
+   * The row's title.
+   */
+  title: string;
+  /**
    * Values by property key; computed cells may hold an inline error.
    */
   row: ComputedRow;
   /**
-   * The row's title.
+   * The page's Markdown body.
    */
-  title: string;
+  body: string;
 }
 
 /**
@@ -859,13 +859,13 @@ export interface CollectionsDeleteRowRowDetail {
  */
 export interface CollectionsDeleteRowRowWritten {
   /**
-   * Every row file written or removed, including mirrored relations.
-   */
-  changed: Changeset;
-  /**
    * The row after the write; absent after a delete.
    */
   row?: CollectionsDeleteRowRowDetail | null;
+  /**
+   * Every row file written or removed, including mirrored relations.
+   */
+  changed: Changeset;
 }
 
 /**
@@ -877,6 +877,18 @@ export interface CollectionsEmbedViewResult {
    */
   collection: CollectionId;
   /**
+   * The collection title.
+   */
+  title: string;
+  /**
+   * The view name.
+   */
+  view: string;
+  /**
+   * The layout.
+   */
+  kind: ViewKind;
+  /**
    * Visible columns, title first.
    */
   columns: Column[];
@@ -885,14 +897,6 @@ export interface CollectionsEmbedViewResult {
    */
   groups: Group[];
   /**
-   * The layout.
-   */
-  kind: ViewKind;
-  /**
-   * The collection title.
-   */
-  title: string;
-  /**
    * Rows matching the filters, before the limit.
    */
   total: number;
@@ -900,10 +904,6 @@ export interface CollectionsEmbedViewResult {
    * Whether the limit cut rows off.
    */
   truncated: boolean;
-  /**
-   * The view name.
-   */
-  view: string;
 }
 
 /**
@@ -911,13 +911,13 @@ export interface CollectionsEmbedViewResult {
  */
 export interface CollectionsImportCsvCollectionInfo {
   /**
-   * Problems found while loading its files.
-   */
-  diagnostics: Diagnostic[];
-  /**
    * The collection's ID.
    */
   id: CollectionId;
+  /**
+   * Its title.
+   */
+  title: string;
   /**
    * The `name.collection` folder.
    */
@@ -927,23 +927,19 @@ export interface CollectionsImportCsvCollectionInfo {
    */
   properties: PropertyInfo[];
   /**
-   * Its title.
-   */
-  title: string;
-  /**
    * Saved views in tab order.
    */
   views: ViewInfo[];
+  /**
+   * Problems found while loading its files.
+   */
+  diagnostics: Diagnostic[];
 }
 
 /**
  * One row with every value, stored and computed.
  */
 export interface CollectionsUpdateRowRowDetail {
-  /**
-   * The page's Markdown body.
-   */
-  body: string;
   /**
    * The collection.
    */
@@ -953,13 +949,17 @@ export interface CollectionsUpdateRowRowDetail {
    */
   path: string;
   /**
+   * The row's title.
+   */
+  title: string;
+  /**
    * Values by property key; computed cells may hold an inline error.
    */
   row: ComputedRow;
   /**
-   * The row's title.
+   * The page's Markdown body.
    */
-  title: string;
+  body: string;
 }
 
 /**
@@ -967,27 +967,19 @@ export interface CollectionsUpdateRowRowDetail {
  */
 export interface CollectionsUpdateRowRowWritten {
   /**
-   * Every row file written or removed, including mirrored relations.
-   */
-  changed: Changeset;
-  /**
    * The row after the write; absent after a delete.
    */
   row?: CollectionsUpdateRowRowDetail | null;
+  /**
+   * Every row file written or removed, including mirrored relations.
+   */
+  changed: Changeset;
 }
 
 /**
  * A column of a view result.
  */
 export interface Column {
-  /**
-   * Whether the value can be edited (stored, not computed).
-   */
-  editable: boolean;
-  /**
-   * Number display format, for numeric columns.
-   */
-  format: NumberFormat;
   /**
    * Property key.
    */
@@ -997,13 +989,21 @@ export interface Column {
    */
   name: string;
   /**
+   * Property type name (`number`, `select`…).
+   */
+  type: string;
+  /**
+   * Number display format, for numeric columns.
+   */
+  format: NumberFormat;
+  /**
    * Options, for select and multi-select columns.
    */
   options: SelectOption[];
   /**
-   * Property type name (`number`, `select`…).
+   * Whether the value can be edited (stored, not computed).
    */
-  type: string;
+  editable: boolean;
 }
 
 /**
@@ -1011,13 +1011,13 @@ export interface Column {
  */
 export interface CommentOut {
   /**
+   * Comment ID.
+   */
+  id: string;
+  /**
    * Author handle.
    */
   author: string;
-  /**
-   * Body in Vellum Markdown; empty once deleted.
-   */
-  body: string;
   /**
    * Whether a model wrote it for the author.
    */
@@ -1027,21 +1027,21 @@ export interface CommentOut {
    */
   created_at: string;
   /**
-   * Deleted, kept as a marker for its replies.
-   */
-  deleted: boolean;
-  /**
    * Last edited.
    */
   edited_at?: string | null;
   /**
-   * Comment ID.
+   * Body in Vellum Markdown; empty once deleted.
    */
-  id: string;
+  body: string;
   /**
    * Reactions: emoji and the handles that chose it.
    */
   reactions: ReactionOut[];
+  /**
+   * Deleted, kept as a marker for its replies.
+   */
+  deleted: boolean;
 }
 
 /**
@@ -1069,19 +1069,23 @@ export interface CommentResult {
  */
 export interface ComputedRow {
   /**
-   * Values by property key.
-   */
-  cells: Record<string, CellValue>;
-  /**
    * The row.
    */
   id: DocId;
+  /**
+   * Values by property key.
+   */
+  cells: Record<string, CellValue>;
 }
 
 /**
  * A page's content.
  */
 export interface ContentView {
+  /**
+   * The item.
+   */
+  item: NodeView;
   /**
    * The text; absent for a file that is not UTF-8 text.
    */
@@ -1090,10 +1094,6 @@ export interface ContentView {
    * The content's version tag; send it back as `base_etag` to save.
    */
   etag: string;
-  /**
-   * The item.
-   */
-  item: NodeView;
 }
 
 /**
@@ -1101,31 +1101,23 @@ export interface ContentView {
  */
 export interface CreateFolder {
   /**
-   * Its name.
+   * The space.
    */
-  name: string;
+  space_id: SpaceId;
   /**
    * The folder to create it in; the top of the space when absent.
    */
   parent_id?: ObjectId | null;
   /**
-   * The space.
+   * Its name.
    */
-  space_id: SpaceId;
+  name: string;
 }
 
 /**
  * Creates a new collection from a CSV file, inferring property types.
  */
 export interface CreateFromCsvInput {
-  /**
-   * The CSV text; the first row is the header.
-   */
-  csv: string;
-  /**
-   * Infer the schema and report it, without writing.
-   */
-  dry_run?: boolean;
   /**
    * The drive folder to create the `Title.collection` folder in.
    */
@@ -1134,6 +1126,14 @@ export interface CreateFromCsvInput {
    * The collection's title.
    */
   title: string;
+  /**
+   * The CSV text; the first row is the header.
+   */
+  csv: string;
+  /**
+   * Infer the schema and report it, without writing.
+   */
+  dry_run?: boolean;
 }
 
 /**
@@ -1141,65 +1141,65 @@ export interface CreateFromCsvInput {
  */
 export interface CreateIssue {
   /**
-   * Assignee handle.
+   * Team key.
    */
-  assignee?: string | null;
+  team: string;
+  /**
+   * Title.
+   */
+  title: string;
   /**
    * Description in Vellum Markdown.
    */
   description?: string;
   /**
-   * Due date, `YYYY-MM-DD`.
+   * Template name, applied first.
    */
-  due?: string | null;
-  /**
-   * Estimate (`3`, `M`).
-   */
-  estimate?: string | null;
-  /**
-   * Intake (form, email, Slack): goes to triage when the team uses it.
-   */
-  intake?: boolean;
-  /**
-   * Label references.
-   */
-  labels?: string[];
-  /**
-   * Parent issue key.
-   */
-  parent?: string | null;
-  /**
-   * Priority 0–4.
-   */
-  priority?: number | null;
-  /**
-   * Project ID.
-   */
-  project?: string | null;
-  /**
-   * The selected text, for a block.
-   */
-  quote?: string | null;
-  /**
-   * `<doc id>#blk-…` when filed from a page.
-   */
-  source_block?: string | null;
+  template?: string | null;
   /**
    * Status slug; the team default (or triage, for intake) when unset.
    */
   state?: string | null;
   /**
-   * Team key.
+   * Priority 0–4.
    */
-  team: string;
+  priority?: number | null;
   /**
-   * Template name, applied first.
+   * Estimate (`3`, `M`).
    */
-  template?: string | null;
+  estimate?: string | null;
   /**
-   * Title.
+   * Assignee handle.
    */
-  title: string;
+  assignee?: string | null;
+  /**
+   * Label references.
+   */
+  labels?: string[];
+  /**
+   * Project ID.
+   */
+  project?: string | null;
+  /**
+   * Parent issue key.
+   */
+  parent?: string | null;
+  /**
+   * Due date, `YYYY-MM-DD`.
+   */
+  due?: string | null;
+  /**
+   * `<doc id>#blk-…` when filed from a page.
+   */
+  source_block?: string | null;
+  /**
+   * The selected text, for a block.
+   */
+  quote?: string | null;
+  /**
+   * Intake (form, email, Slack): goes to triage when the team uses it.
+   */
+  intake?: boolean;
 }
 
 /**
@@ -1207,31 +1207,27 @@ export interface CreateIssue {
  */
 export interface CreatePage {
   /**
-   * Its Markdown body.
+   * The space.
    */
-  body?: string;
+  space_id: SpaceId;
   /**
    * The folder to create it in; the top of the space when absent.
    */
   parent_id?: ObjectId | null;
   /**
-   * The space.
-   */
-  space_id: SpaceId;
-  /**
    * Its title.
    */
   title: string;
+  /**
+   * Its Markdown body.
+   */
+  body?: string;
 }
 
 /**
  * Creates a row.
  */
 export interface CreateRowInput {
-  /**
-   * The row page's Markdown body.
-   */
-  body?: string;
   /**
    * The collection.
    */
@@ -1240,6 +1236,10 @@ export interface CreateRowInput {
    * Values by property key or name.
    */
   values?: Record<string, Value>;
+  /**
+   * The row page's Markdown body.
+   */
+  body?: string;
 }
 
 /**
@@ -1247,13 +1247,13 @@ export interface CreateRowInput {
  */
 export interface CreateShortcut {
   /**
-   * The folder to put it in; the top of the space when absent.
-   */
-  parent_id?: ObjectId | null;
-  /**
    * The space to put it in.
    */
   space_id: SpaceId;
+  /**
+   * The folder to put it in; the top of the space when absent.
+   */
+  parent_id?: ObjectId | null;
   /**
    * The item it points at.
    */
@@ -1269,13 +1269,13 @@ export interface CreateSnapshot {
    */
   book_id: BookId;
   /**
-   * What it marks.
-   */
-  message?: string;
-  /**
    * The tag: letters, digits, `.`, `-` and `_`.
    */
   tag: string;
+  /**
+   * What it marks.
+   */
+  message?: string;
 }
 
 /**
@@ -1287,14 +1287,14 @@ export interface CreateSpace {
    */
   kind: SpaceKindView;
   /**
-   * The display name.
-   */
-  name: string;
-  /**
    * The short name in its folder path: lowercase letters, digits and
    * dashes.
    */
   slug: string;
+  /**
+   * The display name.
+   */
+  name: string;
 }
 
 /**
@@ -1306,6 +1306,10 @@ export interface CreateTeam {
    */
   key: string;
   /**
+   * Display name.
+   */
+  name: string;
+  /**
    * Lead handle.
    */
   lead?: string | null;
@@ -1313,20 +1317,12 @@ export interface CreateTeam {
    * Member handles.
    */
   members?: string[];
-  /**
-   * Display name.
-   */
-  name: string;
 }
 
 /**
  * A new API token.
  */
 export interface CreateToken {
-  /**
-   * Days until it expires; never when absent.
-   */
-  expiresInDays?: number | null;
   /**
    * A label, such as "CI" or "Claude Desktop".
    */
@@ -1335,16 +1331,16 @@ export interface CreateToken {
    * The scopes to grant, no more than your own.
    */
   scopes: Scope[];
+  /**
+   * Days until it expires; never when absent.
+   */
+  expiresInDays?: number | null;
 }
 
 /**
  * A user an administrator creates.
  */
 export interface CreateUser {
-  /**
-   * Whether the user administers the workspace.
-   */
-  admin?: boolean;
   /**
    * The sign-in address.
    */
@@ -1357,6 +1353,10 @@ export interface CreateUser {
    * An initial password; absent for SSO-only accounts.
    */
   password?: string | null;
+  /**
+   * Whether the user administers the workspace.
+   */
+  admin?: boolean;
 }
 
 /**
@@ -1364,14 +1364,14 @@ export interface CreateUser {
  */
 export interface CreatedIssue {
   /**
+   * The new issue.
+   */
+  issue: IssueOut;
+  /**
    * For an issue filed from a block: the chip the caller writes into
    * the document (the document belongs to the drive, not Work).
    */
   chip?: ChipOut | null;
-  /**
-   * The new issue.
-   */
-  issue: IssueOut;
 }
 
 /**
@@ -1379,13 +1379,13 @@ export interface CreatedIssue {
  */
 export interface CreatedToken {
   /**
-   * The token's details.
-   */
-  details: TokenView;
-  /**
    * The token, starting `vlm_`. Store it now; it is not shown again.
    */
   token: string;
+  /**
+   * The token's details.
+   */
+  details: TokenView;
 }
 
 /**
@@ -1393,13 +1393,13 @@ export interface CreatedToken {
  */
 export interface CsvExport {
   /**
-   * The CSV text: a header row, then one line per row.
-   */
-  csv: string;
-  /**
    * A suggested file name (`Requirements - Open.csv`).
    */
   fileName: string;
+  /**
+   * The CSV text: a header row, then one line per row.
+   */
+  csv: string;
 }
 
 /**
@@ -1407,19 +1407,9 @@ export interface CsvExport {
  */
 export interface CsvImported {
   /**
-   * Row files written, including links mirrored into other collections.
+   * Whether anything was written.
    */
-  changed: Changeset;
-  /**
-   * The collection after the import: its properties (inferred, for a
-   * new collection) and views.
-   */
-  collection: CollectionsImportCsvCollectionInfo;
-  /**
-   * Problems with individual cells; their values were kept as text or
-   * left empty.
-   */
-  diagnostics: Diagnostic[];
+  written: boolean;
   /**
    * Rows created (or that would be).
    */
@@ -1429,27 +1419,25 @@ export interface CsvImported {
    */
   skippedColumns: string[];
   /**
-   * Whether anything was written.
+   * Problems with individual cells; their values were kept as text or
+   * left empty.
    */
-  written: boolean;
+  diagnostics: Diagnostic[];
+  /**
+   * The collection after the import: its properties (inferred, for a
+   * new collection) and views.
+   */
+  collection: CollectionsImportCsvCollectionInfo;
+  /**
+   * Row files written, including links mirrored into other collections.
+   */
+  changed: Changeset;
 }
 
 /**
  * A cycle.
  */
 export interface CycleOut {
-  /**
-   * Daily burn-up: date, scope points, completed points.
-   */
-  burn_up: BurnOut[];
-  /**
-   * Completed points recorded so far.
-   */
-  completed_points: number;
-  /**
-   * Day after the last.
-   */
-  ends_on: string;
   /**
    * Key, such as `2026-C44`.
    */
@@ -1462,6 +1450,18 @@ export interface CycleOut {
    * First day.
    */
   starts_on: string;
+  /**
+   * Day after the last.
+   */
+  ends_on: string;
+  /**
+   * Completed points recorded so far.
+   */
+  completed_points: number;
+  /**
+   * Daily burn-up: date, scope points, completed points.
+   */
+  burn_up: BurnOut[];
 }
 
 /**
@@ -1483,13 +1483,13 @@ export interface CyclesOut {
  */
 export interface DateSpan {
   /**
-   * End (equal to start for single-day entries).
-   */
-  end: DateValue;
-  /**
    * Start.
    */
   start: DateValue;
+  /**
+   * End (equal to start for single-day entries).
+   */
+  end: DateValue;
 }
 
 /**
@@ -1505,6 +1505,10 @@ export type DateValue = string;
  */
 export interface Diagnostic {
   /**
+   * How serious it is.
+   */
+  severity: Severity;
+  /**
    * The file or CSV line it refers to.
    */
   location: string;
@@ -1512,20 +1516,12 @@ export interface Diagnostic {
    * What happened, for people.
    */
   message: string;
-  /**
-   * How serious it is.
-   */
-  severity: Severity;
 }
 
 /**
  * A section whose text changed.
  */
 export interface DiffChanged {
-  /**
-   * Lines added.
-   */
-  added: number;
   /**
    * The section.
    */
@@ -1535,13 +1531,17 @@ export interface DiffChanged {
    */
   label: string;
   /**
-   * A unified diff of the file.
+   * Lines added.
    */
-  patch: string;
+  added: number;
   /**
    * Lines removed.
    */
   removed: number;
+  /**
+   * A unified diff of the file.
+   */
+  patch: string;
 }
 
 /**
@@ -1568,13 +1568,13 @@ export interface DiffInput {
  */
 export interface DiffMoved {
   /**
-   * Its label before.
-   */
-  from: string;
-  /**
    * The section.
    */
   id: string;
+  /**
+   * Its label before.
+   */
+  from: string;
   /**
    * Its label after.
    */
@@ -1591,17 +1591,17 @@ export interface DiffOutput {
    */
   added: DiffSection[];
   /**
-   * Sections whose text changed.
+   * Sections only in the older version.
    */
-  changed: DiffChanged[];
+  removed: DiffSection[];
   /**
    * Sections that moved, were renumbered or renamed.
    */
   moved: DiffMoved[];
   /**
-   * Sections only in the older version.
+   * Sections whose text changed.
    */
-  removed: DiffSection[];
+  changed: DiffChanged[];
   /**
    * Book settings that changed.
    */
@@ -1646,25 +1646,25 @@ export interface Done {
  */
 export interface DriveCopyNodeView {
   /**
-   * Who created it, when known.
-   */
-  created_by?: UserId | null;
-  /**
    * The item.
    */
   id: ObjectId;
+  /**
+   * The space it is in.
+   */
+  space_id: SpaceId;
   /**
    * What it is.
    */
   kind: NodeKindView;
   /**
-   * When it last changed.
-   */
-  modified: Timestamp;
-  /**
    * The folder it is in; absent at the top of the space.
    */
   parent_id?: ObjectId | null;
+  /**
+   * Its title.
+   */
+  title: string;
   /**
    * Its path in the workspace folder.
    */
@@ -1674,17 +1674,17 @@ export interface DriveCopyNodeView {
    */
   size: number;
   /**
-   * The space it is in.
+   * When it last changed.
    */
-  space_id: SpaceId;
+  modified: Timestamp;
+  /**
+   * Who created it, when known.
+   */
+  created_by?: UserId | null;
   /**
    * What a shortcut points at.
    */
   target_id?: ObjectId | null;
-  /**
-   * Its title.
-   */
-  title: string;
   /**
    * When it was trashed; absent for a live item.
    */
@@ -1696,25 +1696,25 @@ export interface DriveCopyNodeView {
  */
 export interface DriveCreateFolderNodeView {
   /**
-   * Who created it, when known.
-   */
-  created_by?: UserId | null;
-  /**
    * The item.
    */
   id: ObjectId;
+  /**
+   * The space it is in.
+   */
+  space_id: SpaceId;
   /**
    * What it is.
    */
   kind: NodeKindView;
   /**
-   * When it last changed.
-   */
-  modified: Timestamp;
-  /**
    * The folder it is in; absent at the top of the space.
    */
   parent_id?: ObjectId | null;
+  /**
+   * Its title.
+   */
+  title: string;
   /**
    * Its path in the workspace folder.
    */
@@ -1724,17 +1724,17 @@ export interface DriveCreateFolderNodeView {
    */
   size: number;
   /**
-   * The space it is in.
+   * When it last changed.
    */
-  space_id: SpaceId;
+  modified: Timestamp;
+  /**
+   * Who created it, when known.
+   */
+  created_by?: UserId | null;
   /**
    * What a shortcut points at.
    */
   target_id?: ObjectId | null;
-  /**
-   * Its title.
-   */
-  title: string;
   /**
    * When it was trashed; absent for a live item.
    */
@@ -1746,25 +1746,25 @@ export interface DriveCreateFolderNodeView {
  */
 export interface DriveCreatePageNodeView {
   /**
-   * Who created it, when known.
-   */
-  created_by?: UserId | null;
-  /**
    * The item.
    */
   id: ObjectId;
+  /**
+   * The space it is in.
+   */
+  space_id: SpaceId;
   /**
    * What it is.
    */
   kind: NodeKindView;
   /**
-   * When it last changed.
-   */
-  modified: Timestamp;
-  /**
    * The folder it is in; absent at the top of the space.
    */
   parent_id?: ObjectId | null;
+  /**
+   * Its title.
+   */
+  title: string;
   /**
    * Its path in the workspace folder.
    */
@@ -1774,17 +1774,17 @@ export interface DriveCreatePageNodeView {
    */
   size: number;
   /**
-   * The space it is in.
+   * When it last changed.
    */
-  space_id: SpaceId;
+  modified: Timestamp;
+  /**
+   * Who created it, when known.
+   */
+  created_by?: UserId | null;
   /**
    * What a shortcut points at.
    */
   target_id?: ObjectId | null;
-  /**
-   * Its title.
-   */
-  title: string;
   /**
    * When it was trashed; absent for a live item.
    */
@@ -1796,25 +1796,25 @@ export interface DriveCreatePageNodeView {
  */
 export interface DriveCreateShortcutNodeView {
   /**
-   * Who created it, when known.
-   */
-  created_by?: UserId | null;
-  /**
    * The item.
    */
   id: ObjectId;
+  /**
+   * The space it is in.
+   */
+  space_id: SpaceId;
   /**
    * What it is.
    */
   kind: NodeKindView;
   /**
-   * When it last changed.
-   */
-  modified: Timestamp;
-  /**
    * The folder it is in; absent at the top of the space.
    */
   parent_id?: ObjectId | null;
+  /**
+   * Its title.
+   */
+  title: string;
   /**
    * Its path in the workspace folder.
    */
@@ -1824,17 +1824,17 @@ export interface DriveCreateShortcutNodeView {
    */
   size: number;
   /**
-   * The space it is in.
+   * When it last changed.
    */
-  space_id: SpaceId;
+  modified: Timestamp;
+  /**
+   * Who created it, when known.
+   */
+  created_by?: UserId | null;
   /**
    * What a shortcut points at.
    */
   target_id?: ObjectId | null;
-  /**
-   * Its title.
-   */
-  title: string;
   /**
    * When it was trashed; absent for a live item.
    */
@@ -1854,6 +1854,10 @@ export interface DriveCreateSpaceSpaceView {
    */
   kind: SpaceKindView;
   /**
+   * The short name in its folder path.
+   */
+  slug: string;
+  /**
    * The display name.
    */
   name: string;
@@ -1865,10 +1869,6 @@ export interface DriveCreateSpaceSpaceView {
    * Quota, trash and version settings.
    */
   settings: SettingsView;
-  /**
-   * The short name in its folder path.
-   */
-  slug: string;
 }
 
 /**
@@ -1876,25 +1876,25 @@ export interface DriveCreateSpaceSpaceView {
  */
 export interface DriveGetNodeView {
   /**
-   * Who created it, when known.
-   */
-  created_by?: UserId | null;
-  /**
    * The item.
    */
   id: ObjectId;
+  /**
+   * The space it is in.
+   */
+  space_id: SpaceId;
   /**
    * What it is.
    */
   kind: NodeKindView;
   /**
-   * When it last changed.
-   */
-  modified: Timestamp;
-  /**
    * The folder it is in; absent at the top of the space.
    */
   parent_id?: ObjectId | null;
+  /**
+   * Its title.
+   */
+  title: string;
   /**
    * Its path in the workspace folder.
    */
@@ -1904,17 +1904,17 @@ export interface DriveGetNodeView {
    */
   size: number;
   /**
-   * The space it is in.
+   * When it last changed.
    */
-  space_id: SpaceId;
+  modified: Timestamp;
+  /**
+   * Who created it, when known.
+   */
+  created_by?: UserId | null;
   /**
    * What a shortcut points at.
    */
   target_id?: ObjectId | null;
-  /**
-   * Its title.
-   */
-  title: string;
   /**
    * When it was trashed; absent for a live item.
    */
@@ -1926,25 +1926,25 @@ export interface DriveGetNodeView {
  */
 export interface DriveMoveNodeView {
   /**
-   * Who created it, when known.
-   */
-  created_by?: UserId | null;
-  /**
    * The item.
    */
   id: ObjectId;
+  /**
+   * The space it is in.
+   */
+  space_id: SpaceId;
   /**
    * What it is.
    */
   kind: NodeKindView;
   /**
-   * When it last changed.
-   */
-  modified: Timestamp;
-  /**
    * The folder it is in; absent at the top of the space.
    */
   parent_id?: ObjectId | null;
+  /**
+   * Its title.
+   */
+  title: string;
   /**
    * Its path in the workspace folder.
    */
@@ -1954,17 +1954,17 @@ export interface DriveMoveNodeView {
    */
   size: number;
   /**
-   * The space it is in.
+   * When it last changed.
    */
-  space_id: SpaceId;
+  modified: Timestamp;
+  /**
+   * Who created it, when known.
+   */
+  created_by?: UserId | null;
   /**
    * What a shortcut points at.
    */
   target_id?: ObjectId | null;
-  /**
-   * Its title.
-   */
-  title: string;
   /**
    * When it was trashed; absent for a live item.
    */
@@ -1986,25 +1986,25 @@ export interface DrivePurgeDone {
  */
 export interface DriveRenameNodeView {
   /**
-   * Who created it, when known.
-   */
-  created_by?: UserId | null;
-  /**
    * The item.
    */
   id: ObjectId;
+  /**
+   * The space it is in.
+   */
+  space_id: SpaceId;
   /**
    * What it is.
    */
   kind: NodeKindView;
   /**
-   * When it last changed.
-   */
-  modified: Timestamp;
-  /**
    * The folder it is in; absent at the top of the space.
    */
   parent_id?: ObjectId | null;
+  /**
+   * Its title.
+   */
+  title: string;
   /**
    * Its path in the workspace folder.
    */
@@ -2014,17 +2014,17 @@ export interface DriveRenameNodeView {
    */
   size: number;
   /**
-   * The space it is in.
+   * When it last changed.
    */
-  space_id: SpaceId;
+  modified: Timestamp;
+  /**
+   * Who created it, when known.
+   */
+  created_by?: UserId | null;
   /**
    * What a shortcut points at.
    */
   target_id?: ObjectId | null;
-  /**
-   * Its title.
-   */
-  title: string;
   /**
    * When it was trashed; absent for a live item.
    */
@@ -2036,25 +2036,25 @@ export interface DriveRenameNodeView {
  */
 export interface DriveResolveShortcutNodeView {
   /**
-   * Who created it, when known.
-   */
-  created_by?: UserId | null;
-  /**
    * The item.
    */
   id: ObjectId;
+  /**
+   * The space it is in.
+   */
+  space_id: SpaceId;
   /**
    * What it is.
    */
   kind: NodeKindView;
   /**
-   * When it last changed.
-   */
-  modified: Timestamp;
-  /**
    * The folder it is in; absent at the top of the space.
    */
   parent_id?: ObjectId | null;
+  /**
+   * Its title.
+   */
+  title: string;
   /**
    * Its path in the workspace folder.
    */
@@ -2064,17 +2064,17 @@ export interface DriveResolveShortcutNodeView {
    */
   size: number;
   /**
-   * The space it is in.
+   * When it last changed.
    */
-  space_id: SpaceId;
+  modified: Timestamp;
+  /**
+   * Who created it, when known.
+   */
+  created_by?: UserId | null;
   /**
    * What a shortcut points at.
    */
   target_id?: ObjectId | null;
-  /**
-   * Its title.
-   */
-  title: string;
   /**
    * When it was trashed; absent for a live item.
    */
@@ -2086,25 +2086,25 @@ export interface DriveResolveShortcutNodeView {
  */
 export interface DriveRestoreNodeView {
   /**
-   * Who created it, when known.
-   */
-  created_by?: UserId | null;
-  /**
    * The item.
    */
   id: ObjectId;
+  /**
+   * The space it is in.
+   */
+  space_id: SpaceId;
   /**
    * What it is.
    */
   kind: NodeKindView;
   /**
-   * When it last changed.
-   */
-  modified: Timestamp;
-  /**
    * The folder it is in; absent at the top of the space.
    */
   parent_id?: ObjectId | null;
+  /**
+   * Its title.
+   */
+  title: string;
   /**
    * Its path in the workspace folder.
    */
@@ -2114,17 +2114,17 @@ export interface DriveRestoreNodeView {
    */
   size: number;
   /**
-   * The space it is in.
+   * When it last changed.
    */
-  space_id: SpaceId;
+  modified: Timestamp;
+  /**
+   * Who created it, when known.
+   */
+  created_by?: UserId | null;
   /**
    * What a shortcut points at.
    */
   target_id?: ObjectId | null;
-  /**
-   * Its title.
-   */
-  title: string;
   /**
    * When it was trashed; absent for a live item.
    */
@@ -2146,25 +2146,25 @@ export interface DriveStarDone {
  */
 export interface DriveTrashNodeView {
   /**
-   * Who created it, when known.
-   */
-  created_by?: UserId | null;
-  /**
    * The item.
    */
   id: ObjectId;
+  /**
+   * The space it is in.
+   */
+  space_id: SpaceId;
   /**
    * What it is.
    */
   kind: NodeKindView;
   /**
-   * When it last changed.
-   */
-  modified: Timestamp;
-  /**
    * The folder it is in; absent at the top of the space.
    */
   parent_id?: ObjectId | null;
+  /**
+   * Its title.
+   */
+  title: string;
   /**
    * Its path in the workspace folder.
    */
@@ -2174,17 +2174,17 @@ export interface DriveTrashNodeView {
    */
   size: number;
   /**
-   * The space it is in.
+   * When it last changed.
    */
-  space_id: SpaceId;
+  modified: Timestamp;
+  /**
+   * Who created it, when known.
+   */
+  created_by?: UserId | null;
   /**
    * What a shortcut points at.
    */
   target_id?: ObjectId | null;
-  /**
-   * Its title.
-   */
-  title: string;
   /**
    * When it was trashed; absent for a live item.
    */
@@ -2204,6 +2204,10 @@ export interface DriveUpdateSpaceSpaceView {
    */
   kind: SpaceKindView;
   /**
+   * The short name in its folder path.
+   */
+  slug: string;
+  /**
    * The display name.
    */
   name: string;
@@ -2215,10 +2219,6 @@ export interface DriveUpdateSpaceSpaceView {
    * Quota, trash and version settings.
    */
   settings: SettingsView;
-  /**
-   * The short name in its folder path.
-   */
-  slug: string;
 }
 
 /**
@@ -2226,13 +2226,13 @@ export interface DriveUpdateSpaceSpaceView {
  */
 export interface EditComment {
   /**
-   * New body.
-   */
-  body: string;
-  /**
    * Comment ID.
    */
   comment_id: string;
+  /**
+   * New body.
+   */
+  body: string;
 }
 
 /**
@@ -2256,6 +2256,10 @@ export interface EmbedResult {
    */
   collectionId: CollectionId;
   /**
+   * Its title, for the block's caption.
+   */
+  title: string;
+  /**
    * The `name.collection` folder, for an "open" link.
    */
   path: string;
@@ -2263,10 +2267,6 @@ export interface EmbedResult {
    * The view after the block's overrides.
    */
   result: CollectionsEmbedViewResult;
-  /**
-   * Its title, for the block's caption.
-   */
-  title: string;
 }
 
 /**
@@ -2298,17 +2298,13 @@ export interface FieldOut {
    */
   key: string;
   /**
-   * `text`, `long_text`, `select` or `email`.
-   */
-  kind: string;
-  /**
    * The question.
    */
   label: string;
   /**
-   * Where the answer goes: `description`, `title`, `priority` or `label`.
+   * `text`, `long_text`, `select` or `email`.
    */
-  maps_to: string;
+  kind: string;
   /**
    * The choices of a `select` question.
    */
@@ -2317,6 +2313,10 @@ export interface FieldOut {
    * Whether an answer is needed.
    */
   required: boolean;
+  /**
+   * Where the answer goes: `description`, `title`, `priority` or `label`.
+   */
+  maps_to: string;
 }
 
 /**
@@ -2324,21 +2324,13 @@ export interface FieldOut {
  */
 export interface FindInput {
   /**
+   * Case-insensitive text the title must contain.
+   */
+  title?: string | null;
+  /**
    * Who created the item.
    */
   created_by?: UserId | null;
-  /**
-   * Kinds to keep; all when empty.
-   */
-  kinds?: NodeKindView[];
-  /**
-   * At most this many, 1 to 200; 50 when absent.
-   */
-  limit?: number | null;
-  /**
-   * A space or folder the item must be in, at any depth.
-   */
-  location?: ObjectId | null;
   /**
    * Modified at or after this time.
    */
@@ -2348,13 +2340,21 @@ export interface FindInput {
    */
   modified_before?: Timestamp | null;
   /**
+   * Kinds to keep; all when empty.
+   */
+  kinds?: NodeKindView[];
+  /**
+   * A space or folder the item must be in, at any depth.
+   */
+  location?: ObjectId | null;
+  /**
    * Only items the caller starred.
    */
   starred?: boolean;
   /**
-   * Case-insensitive text the title must contain.
+   * At most this many, 1 to 200; 50 when absent.
    */
-  title?: string | null;
+  limit?: number | null;
 }
 
 /**
@@ -2376,18 +2376,6 @@ export interface FocusedIssue {
  */
 export interface FormOut {
   /**
-   * Help shown above the questions.
-   */
-  description: string;
-  /**
-   * The questions, in order.
-   */
-  fields: FieldOut[];
-  /**
-   * Whether people outside the workspace may submit through a share link.
-   */
-  public: boolean;
-  /**
    * The form's slug, unique in its team.
    */
   slug: string;
@@ -2395,6 +2383,18 @@ export interface FormOut {
    * The form's title, such as "Request access".
    */
   title: string;
+  /**
+   * Help shown above the questions.
+   */
+  description: string;
+  /**
+   * Whether people outside the workspace may submit through a share link.
+   */
+  public: boolean;
+  /**
+   * The questions, in order.
+   */
+  fields: FieldOut[];
 }
 
 /**
@@ -2412,6 +2412,10 @@ export interface FormsOut {
  */
 export interface Group {
   /**
+   * The group's value; `None` for the "no value" group or an ungrouped view.
+   */
+  value?: Value | null;
+  /**
    * The heading to show.
    */
   label: string;
@@ -2419,10 +2423,6 @@ export interface Group {
    * The rows.
    */
   rows: RowView[];
-  /**
-   * The group's value; `None` for the "no value" group or an ungrouped view.
-   */
-  value?: Value | null;
 }
 
 /**
@@ -2430,13 +2430,13 @@ export interface Group {
  */
 export interface GroupOut {
   /**
-   * The issues, in order.
-   */
-  issues: IssueOut[];
-  /**
    * The group's value (`in-review`, `urgent`, `dev`); `None` is "none".
    */
   key?: string | null;
+  /**
+   * The issues, in order.
+   */
+  issues: IssueOut[];
 }
 
 /**
@@ -2444,37 +2444,37 @@ export interface GroupOut {
  */
 export interface IdentityCreateUserUserView {
   /**
-   * Whether the user administers the workspace.
+   * The user's ID.
    */
-  admin: boolean;
-  /**
-   * When the account was created.
-   */
-  createdAt: Timestamp;
-  /**
-   * Whether sign-in is blocked.
-   */
-  disabled: boolean;
+  id: UserId;
   /**
    * The sign-in address.
    */
   email: string;
   /**
+   * The display name.
+   */
+  name: string;
+  /**
    * The unique handle used for assignees and mentions.
    */
   handle: string;
+  /**
+   * Whether the user administers the workspace.
+   */
+  admin: boolean;
+  /**
+   * Whether sign-in is blocked.
+   */
+  disabled: boolean;
   /**
    * Whether the account has a password (otherwise SSO only).
    */
   hasPassword: boolean;
   /**
-   * The user's ID.
+   * When the account was created.
    */
-  id: UserId;
-  /**
-   * The display name.
-   */
-  name: string;
+  createdAt: Timestamp;
 }
 
 /**
@@ -2482,37 +2482,37 @@ export interface IdentityCreateUserUserView {
  */
 export interface IdentitySetupUserView {
   /**
-   * Whether the user administers the workspace.
+   * The user's ID.
    */
-  admin: boolean;
-  /**
-   * When the account was created.
-   */
-  createdAt: Timestamp;
-  /**
-   * Whether sign-in is blocked.
-   */
-  disabled: boolean;
+  id: UserId;
   /**
    * The sign-in address.
    */
   email: string;
   /**
+   * The display name.
+   */
+  name: string;
+  /**
    * The unique handle used for assignees and mentions.
    */
   handle: string;
+  /**
+   * Whether the user administers the workspace.
+   */
+  admin: boolean;
+  /**
+   * Whether sign-in is blocked.
+   */
+  disabled: boolean;
   /**
    * Whether the account has a password (otherwise SSO only).
    */
   hasPassword: boolean;
   /**
-   * The user's ID.
+   * When the account was created.
    */
-  id: UserId;
-  /**
-   * The display name.
-   */
-  name: string;
+  createdAt: Timestamp;
 }
 
 /**
@@ -2520,37 +2520,37 @@ export interface IdentitySetupUserView {
  */
 export interface IdentityUpdateMeUserView {
   /**
-   * Whether the user administers the workspace.
+   * The user's ID.
    */
-  admin: boolean;
-  /**
-   * When the account was created.
-   */
-  createdAt: Timestamp;
-  /**
-   * Whether sign-in is blocked.
-   */
-  disabled: boolean;
+  id: UserId;
   /**
    * The sign-in address.
    */
   email: string;
   /**
+   * The display name.
+   */
+  name: string;
+  /**
    * The unique handle used for assignees and mentions.
    */
   handle: string;
+  /**
+   * Whether the user administers the workspace.
+   */
+  admin: boolean;
+  /**
+   * Whether sign-in is blocked.
+   */
+  disabled: boolean;
   /**
    * Whether the account has a password (otherwise SSO only).
    */
   hasPassword: boolean;
   /**
-   * The user's ID.
+   * When the account was created.
    */
-  id: UserId;
-  /**
-   * The display name.
-   */
-  name: string;
+  createdAt: Timestamp;
 }
 
 /**
@@ -2558,37 +2558,37 @@ export interface IdentityUpdateMeUserView {
  */
 export interface IdentityUpdateUserUserView {
   /**
-   * Whether the user administers the workspace.
+   * The user's ID.
    */
-  admin: boolean;
-  /**
-   * When the account was created.
-   */
-  createdAt: Timestamp;
-  /**
-   * Whether sign-in is blocked.
-   */
-  disabled: boolean;
+  id: UserId;
   /**
    * The sign-in address.
    */
   email: string;
   /**
+   * The display name.
+   */
+  name: string;
+  /**
    * The unique handle used for assignees and mentions.
    */
   handle: string;
+  /**
+   * Whether the user administers the workspace.
+   */
+  admin: boolean;
+  /**
+   * Whether sign-in is blocked.
+   */
+  disabled: boolean;
   /**
    * Whether the account has a password (otherwise SSO only).
    */
   hasPassword: boolean;
   /**
-   * The user's ID.
+   * When the account was created.
    */
-  id: UserId;
-  /**
-   * The display name.
-   */
-  name: string;
+  createdAt: Timestamp;
 }
 
 /**
@@ -2615,13 +2615,13 @@ export interface ImportCsvInput {
  */
 export interface InsightsOut {
   /**
-   * Per breakdown value, largest first.
-   */
-  buckets: BucketOut[];
-  /**
    * Everything together.
    */
   overall: StatsOut;
+  /**
+   * Per breakdown value, largest first.
+   */
+  buckets: BucketOut[];
 }
 
 /**
@@ -2629,17 +2629,13 @@ export interface InsightsOut {
  */
 export interface InsightsQuery {
   /**
+   * Only this team's issues (its key).
+   */
+  team?: string | null;
+  /**
    * A filter as JSON, the same as a view's; empty means all issues.
    */
   filter?: string | null;
-  /**
-   * First day of the range, `YYYY-MM-DD`.
-   */
-  from: string;
-  /**
-   * Split each breakdown into `week`s or `month`s.
-   */
-  interval?: string | null;
   /**
    * `lead_time` (default), `cycle_time`, `triage_time`, `throughput`
    * or `created`.
@@ -2651,13 +2647,17 @@ export interface InsightsQuery {
    */
   pivot?: string | null;
   /**
-   * Only this team's issues (its key).
+   * First day of the range, `YYYY-MM-DD`.
    */
-  team?: string | null;
+  from: string;
   /**
    * Day after the last day of the range, `YYYY-MM-DD`.
    */
   to: string;
+  /**
+   * Split each breakdown into `week`s or `month`s.
+   */
+  interval?: string | null;
 }
 
 /**
@@ -2675,50 +2675,6 @@ export interface IssueGroups {
  */
 export interface IssueOut {
   /**
-   * Earlier identifiers that still resolve.
-   */
-  aliases: string[];
-  /**
-   * Assignee handle.
-   */
-  assignee?: string | null;
-  /**
-   * Canceled.
-   */
-  canceled_at?: string | null;
-  /**
-   * The status's category.
-   */
-  category: string;
-  /**
-   * Completed.
-   */
-  completed_at?: string | null;
-  /**
-   * Created.
-   */
-  created_at: string;
-  /**
-   * Creator handle.
-   */
-  creator?: string | null;
-  /**
-   * Cycle key, such as `2026-C44`.
-   */
-  cycle?: string | null;
-  /**
-   * The description, in Vellum Markdown; left out of lists.
-   */
-  description?: string | null;
-  /**
-   * Due date.
-   */
-  due?: string | null;
-  /**
-   * Estimate as written (`3`, `M`).
-   */
-  estimate?: string | null;
-  /**
    * Issue ID; stable across moves.
    */
   id: string;
@@ -2726,50 +2682,6 @@ export interface IssueOut {
    * Identifier, such as `ENG-142`.
    */
   key: string;
-  /**
-   * Label references.
-   */
-  labels: string[];
-  /**
-   * Links: pull requests, the source block, documents.
-   */
-  links: LinkOut[];
-  /**
-   * Milestone ID.
-   */
-  milestone?: string | null;
-  /**
-   * Parent issue key.
-   */
-  parent?: string | null;
-  /**
-   * Priority 0 (none) to 4 (low); 1 is urgent.
-   */
-  priority: number;
-  /**
-   * Project ID.
-   */
-  project?: string | null;
-  /**
-   * Relations to other issues.
-   */
-  relations: RelationOut[];
-  /**
-   * The running or last SLA.
-   */
-  sla?: SlaOut | null;
-  /**
-   * Work started.
-   */
-  started_at?: string | null;
-  /**
-   * Status slug.
-   */
-  state: string;
-  /**
-   * Subscriber handles.
-   */
-  subscribers: string[];
   /**
    * Team key.
    */
@@ -2779,9 +2691,97 @@ export interface IssueOut {
    */
   title: string;
   /**
+   * Status slug.
+   */
+  state: string;
+  /**
+   * The status's category.
+   */
+  category: string;
+  /**
+   * Priority 0 (none) to 4 (low); 1 is urgent.
+   */
+  priority: number;
+  /**
+   * Estimate as written (`3`, `M`).
+   */
+  estimate?: string | null;
+  /**
+   * Assignee handle.
+   */
+  assignee?: string | null;
+  /**
+   * Creator handle.
+   */
+  creator?: string | null;
+  /**
+   * Label references.
+   */
+  labels: string[];
+  /**
+   * Project ID.
+   */
+  project?: string | null;
+  /**
+   * Milestone ID.
+   */
+  milestone?: string | null;
+  /**
+   * Cycle key, such as `2026-C44`.
+   */
+  cycle?: string | null;
+  /**
+   * Parent issue key.
+   */
+  parent?: string | null;
+  /**
+   * Relations to other issues.
+   */
+  relations: RelationOut[];
+  /**
+   * Subscriber handles.
+   */
+  subscribers: string[];
+  /**
+   * Earlier identifiers that still resolve.
+   */
+  aliases: string[];
+  /**
+   * Links: pull requests, the source block, documents.
+   */
+  links: LinkOut[];
+  /**
+   * Due date.
+   */
+  due?: string | null;
+  /**
+   * The running or last SLA.
+   */
+  sla?: SlaOut | null;
+  /**
+   * Created.
+   */
+  created_at: string;
+  /**
    * Last updated.
    */
   updated_at: string;
+  /**
+   * Work started.
+   */
+  started_at?: string | null;
+  /**
+   * Completed.
+   */
+  completed_at?: string | null;
+  /**
+   * Canceled.
+   */
+  canceled_at?: string | null;
+  /**
+   * The description, in Vellum Markdown; left out of lists.
+   */
+  description?: string | null;
 }
 
 /**
@@ -2809,17 +2809,17 @@ export interface Limit {
  */
 export interface LinkOut {
   /**
-   * `source`, `doc`, `pull_request` or another kind.
+   * URL; `vellum://doc/<id>#blk-…` for document blocks.
    */
-  kind?: string | null;
+  url: string;
   /**
    * Title.
    */
   title?: string | null;
   /**
-   * URL; `vellum://doc/<id>#blk-…` for document blocks.
+   * `source`, `doc`, `pull_request` or another kind.
    */
-  url: string;
+  kind?: string | null;
 }
 
 /**
@@ -2832,13 +2832,13 @@ export type ListBooks = Record<string, unknown>;
  */
 export interface ListChildren {
   /**
-   * The folder; the top of the space when absent.
-   */
-  parent_id?: ObjectId | null;
-  /**
    * The space.
    */
   space_id: SpaceId;
+  /**
+   * The folder; the top of the space when absent.
+   */
+  parent_id?: ObjectId | null;
 }
 
 /**
@@ -2879,13 +2879,13 @@ export interface MoveSection {
    */
   book_id: BookId;
   /**
-   * Where it goes.
-   */
-  place: BooksMoveSectionPlaceInput;
-  /**
    * The section to move, with everything under it.
    */
   section_id: string;
+  /**
+   * Where it goes.
+   */
+  place: BooksMoveSectionPlaceInput;
 }
 
 /**
@@ -2953,25 +2953,25 @@ export interface NodeList {
  */
 export interface NodeView {
   /**
-   * Who created it, when known.
-   */
-  created_by?: UserId | null;
-  /**
    * The item.
    */
   id: ObjectId;
+  /**
+   * The space it is in.
+   */
+  space_id: SpaceId;
   /**
    * What it is.
    */
   kind: NodeKindView;
   /**
-   * When it last changed.
-   */
-  modified: Timestamp;
-  /**
    * The folder it is in; absent at the top of the space.
    */
   parent_id?: ObjectId | null;
+  /**
+   * Its title.
+   */
+  title: string;
   /**
    * Its path in the workspace folder.
    */
@@ -2981,17 +2981,17 @@ export interface NodeView {
    */
   size: number;
   /**
-   * The space it is in.
+   * When it last changed.
    */
-  space_id: SpaceId;
+  modified: Timestamp;
+  /**
+   * Who created it, when known.
+   */
+  created_by?: UserId | null;
   /**
    * What a shortcut points at.
    */
   target_id?: ObjectId | null;
-  /**
-   * Its title.
-   */
-  title: string;
   /**
    * When it was trashed; absent for a live item.
    */
@@ -3017,13 +3017,13 @@ export interface PlaceInput {
    */
   id: ObjectId;
   /**
-   * The folder it goes into; the top of the space when absent.
-   */
-  parent_id?: ObjectId | null;
-  /**
    * The space it goes to.
    */
   space_id: SpaceId;
+  /**
+   * The folder it goes into; the top of the space when absent.
+   */
+  parent_id?: ObjectId | null;
 }
 
 /**
@@ -3049,37 +3049,37 @@ export interface ProjectOut {
    */
   id: string;
   /**
-   * Issues in the project.
+   * Title.
    */
-  issues: number;
-  /**
-   * Lead handle.
-   */
-  lead?: string | null;
-  /**
-   * The project file, front matter and spec.
-   */
-  markdown: string;
-  /**
-   * Percent complete by points.
-   */
-  percent: number;
+  title: string;
   /**
    * planned, started, paused, completed or canceled.
    */
   status: string;
   /**
-   * Target date.
+   * Lead handle.
    */
-  target_date?: string | null;
+  lead?: string | null;
   /**
    * Team keys.
    */
   teams: string[];
   /**
-   * Title.
+   * Target date.
    */
-  title: string;
+  target_date?: string | null;
+  /**
+   * Issues in the project.
+   */
+  issues: number;
+  /**
+   * Percent complete by points.
+   */
+  percent: number;
+  /**
+   * The project file, front matter and spec.
+   */
+  markdown: string;
 }
 
 /**
@@ -3107,18 +3107,6 @@ export interface ProjectsOut {
  */
 export interface PropertyInfo {
   /**
-   * Whether the value is computed (and read-only).
-   */
-  computed: boolean;
-  /**
-   * Number display format, where it applies.
-   */
-  format?: NumberFormat | null;
-  /**
-   * For a formula: its source text.
-   */
-  formula?: string | null;
-  /**
    * Stable key used in row front matter.
    */
   key: string;
@@ -3126,6 +3114,14 @@ export interface PropertyInfo {
    * Display name.
    */
   name: string;
+  /**
+   * The type name (`title`, `select`, `formula`, …).
+   */
+  type: string;
+  /**
+   * Whether the value is computed (and read-only).
+   */
+  computed: boolean;
   /**
    * Options of a select or multi-select.
    */
@@ -3139,9 +3135,13 @@ export interface PropertyInfo {
    */
   rollup?: RollupInfo | null;
   /**
-   * The type name (`title`, `select`, `formula`, …).
+   * For a formula: its source text.
    */
-  type: string;
+  formula?: string | null;
+  /**
+   * Number display format, where it applies.
+   */
+  format?: NumberFormat | null;
 }
 
 /**
@@ -3149,13 +3149,13 @@ export interface PropertyInfo {
  */
 export interface PutProject {
   /**
-   * The whole `project.md`.
-   */
-  markdown: string;
-  /**
    * Project ID; must match the file.
    */
   project_id: string;
+  /**
+   * The whole `project.md`.
+   */
+  markdown: string;
 }
 
 /**
@@ -3181,9 +3181,21 @@ export interface QueryInput {
    */
   collection_id: CollectionId;
   /**
+   * A saved view's name; the first view when absent.
+   */
+  view?: string | null;
+  /**
+   * Another layout for this query only.
+   */
+  kind?: ViewKind | null;
+  /**
    * Extra filters, added to the view's (`Status = Done`).
    */
   filter?: string[];
+  /**
+   * Sort keys replacing the view's (`Due desc`).
+   */
+  sort?: string[];
   /**
    * Group-by property, replacing the view's.
    */
@@ -3193,27 +3205,19 @@ export interface QueryInput {
    */
   hide?: string[];
   /**
-   * Another layout for this query only.
-   */
-  kind?: ViewKind | null;
-  /**
    * Most rows to return.
    */
   limit?: number | null;
-  /**
-   * Sort keys replacing the view's (`Due desc`).
-   */
-  sort?: string[];
-  /**
-   * A saved view's name; the first view when absent.
-   */
-  view?: string | null;
 }
 
 /**
  * Which issues to list, and how.
  */
 export interface QueryIssues {
+  /**
+   * Limit to one team.
+   */
+  team?: string | null;
   /**
    * A Work filter as JSON text, such as
    * `{"field":"assignee","op":"is","values":["@me"]}`.
@@ -3224,25 +3228,21 @@ export interface QueryIssues {
    */
   group_by?: string | null;
   /**
-   * list or board.
-   */
-  layout?: string | null;
-  /**
-   * At most this many issues (default 250, at most 1000).
-   */
-  limit?: number | null;
-  /**
    * priority, updated, created, due, estimate or title.
    */
   order_by?: string | null;
+  /**
+   * list or board.
+   */
+  layout?: string | null;
   /**
    * `all`, `past_week`, `past_month` or `none`.
    */
   show_closed?: string | null;
   /**
-   * Limit to one team.
+   * At most this many issues (default 250, at most 1000).
    */
-  team?: string | null;
+  limit?: number | null;
 }
 
 /**
@@ -3268,13 +3268,13 @@ export interface React {
  */
 export interface ReactionOut {
   /**
-   * Handles.
-   */
-  by: string[];
-  /**
    * The emoji.
    */
   emoji: string;
+  /**
+   * Handles.
+   */
+  by: string[];
 }
 
 /**
@@ -3311,13 +3311,13 @@ export type Region = "prefix" | "numbered" | "suffix";
  */
 export interface RelationIn {
   /**
-   * The other issue's key.
-   */
-  issue: string;
-  /**
    * `blocks`, `blocked_by`, `related` or `duplicate_of`.
    */
   kind: string;
+  /**
+   * The other issue's key.
+   */
+  issue: string;
 }
 
 /**
@@ -3325,13 +3325,13 @@ export interface RelationIn {
  */
 export interface RelationInfo {
   /**
-   * The paired property there, for a two-way relation.
-   */
-  back?: string | null;
-  /**
    * The related collection.
    */
   to: CollectionId;
+  /**
+   * The paired property there, for a two-way relation.
+   */
+  back?: string | null;
 }
 
 /**
@@ -3339,13 +3339,13 @@ export interface RelationInfo {
  */
 export interface RelationOut {
   /**
-   * The other issue's key.
-   */
-  issue: string;
-  /**
    * `blocks`, `blocked_by`, `related` or `duplicate_of`.
    */
   kind: string;
+  /**
+   * The other issue's key.
+   */
+  issue: string;
 }
 
 /**
@@ -3377,13 +3377,13 @@ export interface RenameInput {
  */
 export interface ResolveThread {
   /**
-   * Resolve (`true`, the default) or reopen.
-   */
-  resolved?: boolean;
-  /**
    * Thread ID.
    */
   thread_id: string;
+  /**
+   * Resolve (`true`, the default) or reopen.
+   */
+  resolved?: boolean;
 }
 
 /**
@@ -3391,27 +3391,23 @@ export interface ResolveThread {
  */
 export interface RollupInfo {
   /**
-   * How values are combined.
+   * The relation property followed.
    */
-  agg: Aggregation;
+  via: string;
   /**
    * The property read on related rows.
    */
   prop: string;
   /**
-   * The relation property followed.
+   * How values are combined.
    */
-  via: string;
+  agg: Aggregation;
 }
 
 /**
  * One row with every value, stored and computed.
  */
 export interface RowDetail {
-  /**
-   * The page's Markdown body.
-   */
-  body: string;
   /**
    * The collection.
    */
@@ -3421,13 +3417,17 @@ export interface RowDetail {
    */
   path: string;
   /**
+   * The row's title.
+   */
+  title: string;
+  /**
    * Values by property key; computed cells may hold an inline error.
    */
   row: ComputedRow;
   /**
-   * The row's title.
+   * The page's Markdown body.
    */
-  title: string;
+  body: string;
 }
 
 /**
@@ -3463,21 +3463,21 @@ export interface RowRef {
  */
 export interface RowView {
   /**
-   * Cells, aligned with [`ViewResult::columns`].
-   */
-  cells: CellView[];
-  /**
    * The row page.
    */
   id: DocId;
   /**
-   * Dates, for calendar and timeline views.
-   */
-  span?: DateSpan | null;
-  /**
    * The title text.
    */
   title: string;
+  /**
+   * Cells, aligned with [`ViewResult::columns`].
+   */
+  cells: CellView[];
+  /**
+   * Dates, for calendar and timeline views.
+   */
+  span?: DateSpan | null;
 }
 
 /**
@@ -3485,19 +3485,23 @@ export interface RowView {
  */
 export interface RowWritten {
   /**
-   * Every row file written or removed, including mirrored relations.
-   */
-  changed: Changeset;
-  /**
    * The row after the write; absent after a delete.
    */
   row?: CollectionsCreateRowRowDetail | null;
+  /**
+   * Every row file written or removed, including mirrored relations.
+   */
+  changed: Changeset;
 }
 
 /**
  * A new version of a page's content.
  */
 export interface SaveInput {
+  /**
+   * The page.
+   */
+  id: ObjectId;
   /**
    * The content the edit started from, as read.
    */
@@ -3510,10 +3514,6 @@ export interface SaveInput {
    * The edited content.
    */
   content: string;
-  /**
-   * The page.
-   */
-  id: ObjectId;
 }
 
 /**
@@ -3526,10 +3526,6 @@ export type SaveResult = "written" | "merged" | "conflicted";
  */
 export interface SaveView {
   /**
-   * The conflict copy holding the new content, after a conflict.
-   */
-  conflict_copy?: NodeView | null;
-  /**
    * The page after the save.
    */
   item: NodeView;
@@ -3541,6 +3537,10 @@ export interface SaveView {
    * The version written; absent after a conflict.
    */
   version_id?: VersionId | null;
+  /**
+   * The conflict copy holding the new content, after a conflict.
+   */
+  conflict_copy?: NodeView | null;
 }
 
 /**
@@ -3554,17 +3554,25 @@ export interface SaveViewInput {
    */
   collection_id: CollectionId;
   /**
-   * Date property for calendar and timeline.
+   * The view's name.
    */
-  date?: string | null;
+  view: string;
   /**
-   * End-date property for timeline bars.
+   * A new name, to rename the view.
    */
-  end?: string | null;
+  rename_to?: string | null;
+  /**
+   * The layout; a table when absent.
+   */
+  kind?: ViewKind | null;
   /**
    * Filters, all of which must match.
    */
   filter?: string[];
+  /**
+   * Sort keys, most significant first.
+   */
+  sort?: string[];
   /**
    * Group-by property (board columns, table sections).
    */
@@ -3574,25 +3582,17 @@ export interface SaveViewInput {
    */
   hide?: string[];
   /**
-   * The layout; a table when absent.
+   * Date property for calendar and timeline.
    */
-  kind?: ViewKind | null;
+  date?: string | null;
+  /**
+   * End-date property for timeline bars.
+   */
+  end?: string | null;
   /**
    * Most rows to show.
    */
   limit?: number | null;
-  /**
-   * A new name, to rename the view.
-   */
-  rename_to?: string | null;
-  /**
-   * Sort keys, most significant first.
-   */
-  sort?: string[];
-  /**
-   * The view's name.
-   */
-  view: string;
 }
 
 /**
@@ -3608,14 +3608,6 @@ export type Scope = "read" | "write:draft" | "write:direct" | "work" | "admin";
  */
 export interface SectionAccessInfo {
   /**
-   * Its own `restrict_to`, as `book.yaml` stores it.
-   */
-  own_restrict_to?: string[] | null;
-  /**
-   * Effective owners.
-   */
-  owners: string[];
-  /**
    * Who may see it (`user:<id>`, `group:<id>`), when it is restricted:
    * the intersection of its own and every enclosing restriction.
    */
@@ -3624,6 +3616,14 @@ export interface SectionAccessInfo {
    * The sections whose restrictions apply, outermost first.
    */
   restricted_by: string[];
+  /**
+   * Its own `restrict_to`, as `book.yaml` stores it.
+   */
+  own_restrict_to?: string[] | null;
+  /**
+   * Effective owners.
+   */
+  owners: string[];
   /**
    * Effective reviewers.
    */
@@ -3635,10 +3635,6 @@ export interface SectionAccessInfo {
  */
 export interface SectionDoc {
   /**
-   * Its access settings; only for book managers and owners.
-   */
-  access?: SectionAccessInfo | null;
-  /**
    * The book.
    */
   book_id: BookId;
@@ -3647,13 +3643,13 @@ export interface SectionDoc {
    */
   id: string;
   /**
+   * Its title.
+   */
+  title: string;
+  /**
    * Its cross-reference label.
    */
   label: string;
-  /**
-   * The body with cross-references filled in (`§2.3 Services`).
-   */
-  markdown: string;
   /**
    * Its number in the book's style, if numbered.
    */
@@ -3663,17 +3659,21 @@ export interface SectionDoc {
    */
   path: string;
   /**
-   * Whether a restriction applies to it.
+   * The body with cross-references filled in (`§2.3 Services`).
    */
-  restricted: boolean;
+  markdown: string;
   /**
    * The whole file, front matter included.
    */
   source: string;
   /**
-   * Its title.
+   * Whether a restriction applies to it.
    */
-  title: string;
+  restricted: boolean;
+  /**
+   * Its access settings; only for book managers and owners.
+   */
+  access?: SectionAccessInfo | null;
 }
 
 /**
@@ -3695,13 +3695,13 @@ export interface SectionKey {
  */
 export interface SelectOption {
   /**
-   * A palette colour name for chips, if set.
-   */
-  color?: string | null;
-  /**
    * The option text, as stored in row files.
    */
   name: string;
+  /**
+   * A palette colour name for chips, if set.
+   */
+  color?: string | null;
 }
 
 /**
@@ -3728,25 +3728,25 @@ export type SessionMethod = "password" | "break_glass" | "sso";
  */
 export interface SessionView {
   /**
-   * When it was created.
-   */
-  createdAt: Timestamp;
-  /**
-   * When it ends.
-   */
-  expiresAt: Timestamp;
-  /**
    * The session ID.
    */
   id: string;
+  /**
+   * How it was established.
+   */
+  method: SessionMethod;
+  /**
+   * When it was created.
+   */
+  createdAt: Timestamp;
   /**
    * When it was last used, to within a few minutes.
    */
   lastSeenAt: Timestamp;
   /**
-   * How it was established.
+   * When it ends.
    */
-  method: SessionMethod;
+  expiresAt: Timestamp;
   /**
    * The browser that holds it.
    */
@@ -3762,9 +3762,9 @@ export interface SetSectionAccess {
    */
   book_id: BookId;
   /**
-   * Its owners; empty inherits them.
+   * The section.
    */
-  owners?: string[];
+  section_id: string;
   /**
    * Who may see it and everything under it (`user:<id>`,
    * `group:<id>`); empty lifts its own restriction. It can only narrow
@@ -3772,27 +3772,19 @@ export interface SetSectionAccess {
    */
   restrict_to: string[];
   /**
+   * Its owners; empty inherits them.
+   */
+  owners?: string[];
+  /**
    * Its reviewers; empty inherits them.
    */
   reviewers?: string[];
-  /**
-   * The section.
-   */
-  section_id: string;
 }
 
 /**
  * A space's settings.
  */
 export interface SettingsView {
-  /**
-   * Days one version a day is kept after that.
-   */
-  daily_days: number;
-  /**
-   * Days every version of a page is kept.
-   */
-  keep_all_days: number;
   /**
    * The most bytes the space may hold, trash and versions included;
    * no limit when absent.
@@ -3802,6 +3794,14 @@ export interface SettingsView {
    * Days an item stays in the trash before it is purged.
    */
   trash_days: number;
+  /**
+   * Days every version of a page is kept.
+   */
+  keep_all_days: number;
+  /**
+   * Days one version a day is kept after that.
+   */
+  daily_days: number;
   /**
    * Weeks one version a week is kept after that; forever when absent.
    */
@@ -3840,13 +3840,13 @@ export interface SimilarOut {
    */
   key: string;
   /**
-   * Shared title words, in percent.
-   */
-  overlap: number;
-  /**
    * Its title.
    */
   title: string;
+  /**
+   * Shared title words, in percent.
+   */
+  overlap: number;
 }
 
 /**
@@ -3854,27 +3854,35 @@ export interface SimilarOut {
  */
 export interface SlaOut {
   /**
-   * When it breaches.
-   */
-  breaches_at: string;
-  /**
    * The SLA rule's name.
    */
   kind: string;
   /**
-   * gray, yellow, orange or red.
+   * When it breaches.
    */
-  risk: string;
+  breaches_at: string;
   /**
    * When it stopped (closed or met).
    */
   stopped_at?: string | null;
+  /**
+   * gray, yellow, orange or red.
+   */
+  risk: string;
 }
 
 /**
  * A snapshot's header.
  */
 export interface SnapshotInfo {
+  /**
+   * The tag, such as `v1.0`.
+   */
+  tag: string;
+  /**
+   * What it marks.
+   */
+  message: string;
   /**
    * When it was taken (RFC 3339).
    */
@@ -3883,14 +3891,6 @@ export interface SnapshotInfo {
    * Who took it (`user:<id>`).
    */
   created_by: string;
-  /**
-   * What it marks.
-   */
-  message: string;
-  /**
-   * The tag, such as `v1.0`.
-   */
-  tag: string;
 }
 
 /**
@@ -3946,6 +3946,10 @@ export interface SpaceView {
    */
   kind: SpaceKindView;
   /**
+   * The short name in its folder path.
+   */
+  slug: string;
+  /**
    * The display name.
    */
   name: string;
@@ -3957,10 +3961,6 @@ export interface SpaceView {
    * Quota, trash and version settings.
    */
   settings: SettingsView;
-  /**
-   * The short name in its folder path.
-   */
-  slug: string;
 }
 
 /**
@@ -3969,13 +3969,13 @@ export interface SpaceView {
  */
 export interface Span {
   /**
-   * One past the last character.
-   */
-  end: number;
-  /**
    * First character, counting from 0.
    */
   start: number;
+  /**
+   * One past the last character.
+   */
+  end: number;
 }
 
 /**
@@ -4001,10 +4001,6 @@ export interface StatsOut {
    */
   count: number;
   /**
-   * Mean, in hours.
-   */
-  mean_hours?: number | null;
-  /**
    * Median, in hours; absent for counts.
    */
   p50_hours?: number | null;
@@ -4016,17 +4012,16 @@ export interface StatsOut {
    * 95th percentile, in hours.
    */
   p95_hours?: number | null;
+  /**
+   * Mean, in hours.
+   */
+  mean_hours?: number | null;
 }
 
 /**
  * A status in a team's workflow.
  */
 export interface StatusOut {
-  /**
-   * One of triage, backlog, unstarted, started, completed, canceled,
-   * duplicate.
-   */
-  category: string;
   /**
    * Slug, such as `in-review`.
    */
@@ -4035,6 +4030,11 @@ export interface StatusOut {
    * Display name.
    */
   name: string;
+  /**
+   * One of triage, backlog, unstarted, started, completed, canceled,
+   * duplicate.
+   */
+  category: string;
 }
 
 /**
@@ -4042,23 +4042,39 @@ export interface StatusOut {
  */
 export interface SubmitForm {
   /**
-   * Answers by question key.
+   * The team's key.
    */
-  answers?: Record<string, string>;
+  team: string;
   /**
    * The form's slug.
    */
   slug: string;
   /**
-   * The team's key.
+   * Answers by question key.
    */
-  team: string;
+  answers?: Record<string, string>;
 }
 
 /**
  * A proposed triage decision for an issue.
  */
 export interface SuggestTriage {
+  /**
+   * The issue.
+   */
+  key: string;
+  /**
+   * The team to move it to.
+   */
+  team?: string | null;
+  /**
+   * The priority, 0 (none) to 4 (low).
+   */
+  priority?: number | null;
+  /**
+   * Labels to add.
+   */
+  labels?: string[];
   /**
    * Who should own it (a handle).
    */
@@ -4068,29 +4084,13 @@ export interface SuggestTriage {
    */
   duplicate_of?: string | null;
   /**
-   * The issue.
-   */
-  key: string;
-  /**
-   * Labels to add.
-   */
-  labels?: string[];
-  /**
-   * Which assistant is suggesting, as it names itself.
-   */
-  model?: string;
-  /**
-   * The priority, 0 (none) to 4 (low).
-   */
-  priority?: number | null;
-  /**
    * Why, in a sentence or two; shown next to the suggestion.
    */
   reason: string;
   /**
-   * The team to move it to.
+   * Which assistant is suggesting, as it names itself.
    */
-  team?: string | null;
+  model?: string;
 }
 
 /**
@@ -4098,37 +4098,37 @@ export interface SuggestTriage {
  */
 export interface SuggestionOut {
   /**
-   * Who should own the issue.
+   * The team to move the issue to, if not its current one.
    */
-  assignee?: string | null;
-  /**
-   * When it was made (RFC 3339).
-   */
-  at: string;
-  /**
-   * The issue this one repeats.
-   */
-  duplicate_of?: string | null;
-  /**
-   * Labels to add.
-   */
-  labels: string[];
-  /**
-   * Which assistant made it.
-   */
-  model: string;
+  team?: string | null;
   /**
    * The priority, 0 (none) to 4 (low).
    */
   priority?: number | null;
   /**
+   * Labels to add.
+   */
+  labels: string[];
+  /**
+   * Who should own the issue.
+   */
+  assignee?: string | null;
+  /**
+   * The issue this one repeats.
+   */
+  duplicate_of?: string | null;
+  /**
    * Why, in a sentence or two.
    */
   reason: string;
   /**
-   * The team to move the issue to, if not its current one.
+   * Which assistant made it.
    */
-  team?: string | null;
+  model: string;
+  /**
+   * When it was made (RFC 3339).
+   */
+  at: string;
 }
 
 /**
@@ -4136,17 +4136,17 @@ export interface SuggestionOut {
  */
 export interface TargetOut {
   /**
-   * The block ID, for a block.
+   * The issue key, for an issue.
    */
-  block?: string | null;
+  issue?: string | null;
   /**
    * The document ID, for a page or block.
    */
   doc?: string | null;
   /**
-   * The issue key, for an issue.
+   * The block ID, for a block.
    */
-  issue?: string | null;
+  block?: string | null;
 }
 
 /**
@@ -4158,13 +4158,13 @@ export interface TeamOptionOut {
    */
   key: string;
   /**
-   * Labels usable on the team's issues.
-   */
-  labels: string[];
-  /**
    * The team name.
    */
   name: string;
+  /**
+   * Labels usable on the team's issues.
+   */
+  labels: string[];
   /**
    * People who can be assigned.
    */
@@ -4176,14 +4176,6 @@ export interface TeamOptionOut {
  */
 export interface TeamOut {
   /**
-   * Whether the team runs cycles.
-   */
-  cycles: boolean;
-  /**
-   * The status new issues get.
-   */
-  default_status: string;
-  /**
    * Team ID.
    */
   id: string;
@@ -4192,9 +4184,13 @@ export interface TeamOut {
    */
   key: string;
   /**
-   * Label references (`group/name` or `name`).
+   * Display name.
    */
-  labels: string[];
+  name: string;
+  /**
+   * IANA time zone for cycles and recurring work.
+   */
+  timezone: string;
   /**
    * The team lead's handle.
    */
@@ -4204,25 +4200,29 @@ export interface TeamOut {
    */
   members: string[];
   /**
-   * Display name.
-   */
-  name: string;
-  /**
    * Statuses in board order.
    */
   statuses: StatusOut[];
   /**
-   * Template names.
+   * The status new issues get.
    */
-  templates: string[];
-  /**
-   * IANA time zone for cycles and recurring work.
-   */
-  timezone: string;
+  default_status: string;
   /**
    * Whether intake issues go to triage first.
    */
   triage: boolean;
+  /**
+   * Whether the team runs cycles.
+   */
+  cycles: boolean;
+  /**
+   * Label references (`group/name` or `name`).
+   */
+  labels: string[];
+  /**
+   * Template names.
+   */
+  templates: string[];
 }
 
 /**
@@ -4250,21 +4250,21 @@ export interface TeamsOut {
  */
 export interface ThreadOut {
   /**
-   * Assignee handle ("assign to").
-   */
-  assignee?: string | null;
-  /**
-   * Comments, oldest first.
-   */
-  comments: CommentOut[];
-  /**
    * Thread ID (the first comment's ID).
    */
   id: string;
   /**
+   * What the thread is on.
+   */
+  target: TargetOut;
+  /**
    * The quoted text.
    */
   quote?: string | null;
+  /**
+   * Assignee handle ("assign to").
+   */
+  assignee?: string | null;
   /**
    * When resolved; unset while open.
    */
@@ -4274,9 +4274,9 @@ export interface ThreadOut {
    */
   resolved_by?: string | null;
   /**
-   * What the thread is on.
+   * Comments, oldest first.
    */
-  target: TargetOut;
+  comments: CommentOut[];
 }
 
 /**
@@ -4309,21 +4309,13 @@ export type TocLine = TocNode | {
  */
 export interface TocNode {
   /**
-   * Nested chapters.
-   */
-  children: TocNode[];
-  /**
-   * Nesting depth, 1 at the top.
-   */
-  depth: number;
-  /**
-   * Whether the chapter is a draft without a file.
-   */
-  draft: boolean;
-  /**
    * The section ID; absent for a draft.
    */
   id?: string | null;
+  /**
+   * The navigation title.
+   */
+  title: string;
   /**
    * The cross-reference label, such as `§2.3 Services`.
    */
@@ -4333,23 +4325,43 @@ export interface TocNode {
    */
   number?: string | null;
   /**
-   * The part this chapter falls under.
+   * Nesting depth, 1 at the top.
    */
-  part?: string | null;
+  depth: number;
   /**
    * The chapter file inside the book folder; absent for a draft.
    */
   path?: string | null;
   /**
-   * The navigation title.
+   * The part this chapter falls under.
    */
-  title: string;
+  part?: string | null;
+  /**
+   * Whether the chapter is a draft without a file.
+   */
+  draft: boolean;
+  /**
+   * Nested chapters.
+   */
+  children: TocNode[];
 }
 
 /**
  * An API token as listed (never the secret).
  */
 export interface TokenView {
+  /**
+   * The token ID.
+   */
+  id: string;
+  /**
+   * Its label.
+   */
+  name: string;
+  /**
+   * The granted scopes.
+   */
+  scopes: Scope[];
   /**
    * When it was created.
    */
@@ -4359,21 +4371,9 @@ export interface TokenView {
    */
   expiresAt?: Timestamp | null;
   /**
-   * The token ID.
-   */
-  id: string;
-  /**
    * When it was last used, to within a few minutes.
    */
   lastUsedAt?: Timestamp | null;
-  /**
-   * Its label.
-   */
-  name: string;
-  /**
-   * The granted scopes.
-   */
-  scopes: Scope[];
 }
 
 /**
@@ -4381,25 +4381,25 @@ export interface TokenView {
  */
 export interface TriageIssue {
   /**
+   * The issue.
+   */
+  key: string;
+  /**
    * `accept`, `decline`, `duplicate` or `snooze`.
    */
   action: string;
   /**
-   * For duplicate: the original issue's key.
+   * For accept: the status to move to.
    */
-  duplicate_of?: string | null;
-  /**
-   * The issue.
-   */
-  key: string;
+  state?: string | null;
   /**
    * For decline: why.
    */
   reason?: string | null;
   /**
-   * For accept: the status to move to.
+   * For duplicate: the original issue's key.
    */
-  state?: string | null;
+  duplicate_of?: string | null;
   /**
    * For snooze: until when (RFC 3339).
    */
@@ -4411,69 +4411,69 @@ export interface TriageIssue {
  */
 export interface UpdateIssue {
   /**
-   * Labels to add.
+   * The issue (`ENG-142`, alias or ID).
    */
-  add_labels?: string[];
+  key: string;
   /**
-   * Relations to add.
+   * New title.
    */
-  add_relations?: RelationIn[];
-  /**
-   * New assignee handle; empty clears.
-   */
-  assignee?: string | null;
-  /**
-   * Cycle key; empty clears.
-   */
-  cycle?: string | null;
+  title?: string | null;
   /**
    * New description.
    */
   description?: string | null;
   /**
-   * Due date; empty clears.
+   * New status slug.
    */
-  due?: string | null;
-  /**
-   * New estimate; empty clears.
-   */
-  estimate?: string | null;
-  /**
-   * The issue (`ENG-142`, alias or ID).
-   */
-  key: string;
-  /**
-   * Parent issue key; empty clears.
-   */
-  parent?: string | null;
+  state?: string | null;
   /**
    * New priority 0–4.
    */
   priority?: number | null;
   /**
-   * Project ID; empty clears.
+   * New estimate; empty clears.
    */
-  project?: string | null;
+  estimate?: string | null;
+  /**
+   * New assignee handle; empty clears.
+   */
+  assignee?: string | null;
+  /**
+   * Labels to add.
+   */
+  add_labels?: string[];
   /**
    * Labels to remove.
    */
   remove_labels?: string[];
   /**
+   * Project ID; empty clears.
+   */
+  project?: string | null;
+  /**
+   * Cycle key; empty clears.
+   */
+  cycle?: string | null;
+  /**
+   * Parent issue key; empty clears.
+   */
+  parent?: string | null;
+  /**
+   * Due date; empty clears.
+   */
+  due?: string | null;
+  /**
+   * Relations to add.
+   */
+  add_relations?: RelationIn[];
+  /**
    * Relations to remove.
    */
   remove_relations?: RelationIn[];
   /**
-   * New status slug.
-   */
-  state?: string | null;
-  /**
    * Subscribe (`true`) or unsubscribe the caller.
    */
   subscribe?: boolean | null;
-  /**
-   * New title.
-   */
-  title?: string | null;
 }
 
 /**
@@ -4491,10 +4491,6 @@ export interface UpdateMe {
  */
 export interface UpdateRowInput {
   /**
-   * A new body, when it changes.
-   */
-  body?: string | null;
-  /**
    * The collection.
    */
   collection_id: CollectionId;
@@ -4506,16 +4502,16 @@ export interface UpdateRowInput {
    * Values by property key or name; an `empty` value clears one.
    */
   values?: Record<string, Value>;
+  /**
+   * A new body, when it changes.
+   */
+  body?: string | null;
 }
 
 /**
  * `books.update_section`.
  */
 export interface UpdateSection {
-  /**
-   * A new Markdown body; the front matter is kept.
-   */
-  body?: string | null;
   /**
    * The book.
    */
@@ -4528,12 +4524,20 @@ export interface UpdateSection {
    * A new title (renames the file too).
    */
   title?: string | null;
+  /**
+   * A new Markdown body; the front matter is kept.
+   */
+  body?: string | null;
 }
 
 /**
  * Changes to a space.
  */
 export interface UpdateSpace {
+  /**
+   * The space.
+   */
+  space_id: SpaceId;
   /**
    * A new display name; unchanged when absent.
    */
@@ -4542,24 +4546,12 @@ export interface UpdateSpace {
    * The new settings, replacing the old ones.
    */
   settings: SettingsView;
-  /**
-   * The space.
-   */
-  space_id: SpaceId;
 }
 
 /**
  * Changes an administrator makes to a user.
  */
 export interface UpdateUser {
-  /**
-   * Grant or remove administrator rights.
-   */
-  admin?: boolean | null;
-  /**
-   * Block or allow sign-in. Blocking ends every session and token.
-   */
-  disabled?: boolean | null;
   /**
    * The user's ID.
    */
@@ -4568,6 +4560,14 @@ export interface UpdateUser {
    * A new display name.
    */
   name?: string | null;
+  /**
+   * Grant or remove administrator rights.
+   */
+  admin?: boolean | null;
+  /**
+   * Block or allow sign-in. Blocking ends every session and token.
+   */
+  disabled?: boolean | null;
 }
 
 /**
@@ -4575,13 +4575,13 @@ export interface UpdateUser {
  */
 export interface UsageView {
   /**
-   * The quota; no limit when absent.
-   */
-  quota_bytes?: number | null;
-  /**
    * Bytes used, trash and versions included.
    */
   used_bytes: number;
+  /**
+   * The quota; no limit when absent.
+   */
+  quota_bytes?: number | null;
 }
 
 /**
@@ -4594,37 +4594,37 @@ export type UserId = string;
  */
 export interface UserView {
   /**
-   * Whether the user administers the workspace.
+   * The user's ID.
    */
-  admin: boolean;
-  /**
-   * When the account was created.
-   */
-  createdAt: Timestamp;
-  /**
-   * Whether sign-in is blocked.
-   */
-  disabled: boolean;
+  id: UserId;
   /**
    * The sign-in address.
    */
   email: string;
   /**
+   * The display name.
+   */
+  name: string;
+  /**
    * The unique handle used for assignees and mentions.
    */
   handle: string;
+  /**
+   * Whether the user administers the workspace.
+   */
+  admin: boolean;
+  /**
+   * Whether sign-in is blocked.
+   */
+  disabled: boolean;
   /**
    * Whether the account has a password (otherwise SSO only).
    */
   hasPassword: boolean;
   /**
-   * The user's ID.
+   * When the account was created.
    */
-  id: UserId;
-  /**
-   * The display name.
-   */
-  name: string;
+  createdAt: Timestamp;
 }
 
 /**
@@ -4656,13 +4656,13 @@ export type Value = {
  */
 export interface VersionContent {
   /**
-   * The text; absent if it is not UTF-8 text.
-   */
-  content?: string | null;
-  /**
    * The version.
    */
   id: VersionId;
+  /**
+   * The text; absent if it is not UTF-8 text.
+   */
+  content?: string | null;
 }
 
 /**
@@ -4699,10 +4699,6 @@ export interface VersionList {
  */
 export interface VersionView {
   /**
-   * Who wrote it.
-   */
-  author: ActorView;
-  /**
    * The version.
    */
   id: VersionId;
@@ -4710,6 +4706,10 @@ export interface VersionView {
    * Its size in bytes.
    */
   size: number;
+  /**
+   * Who wrote it.
+   */
+  author: ActorView;
 }
 
 /**
@@ -4717,17 +4717,21 @@ export interface VersionView {
  */
 export interface ViewInfo {
   /**
-   * Date property for calendar and timeline.
+   * The view's name.
    */
-  date?: string | null;
+  name: string;
   /**
-   * End-date property for timeline bars.
+   * The layout.
    */
-  end?: string | null;
+  kind: ViewKind;
   /**
    * Filters, all of which must match.
    */
   filters: string[];
+  /**
+   * Sort keys, most significant first.
+   */
+  sorts: string[];
   /**
    * Group-by property key.
    */
@@ -4737,21 +4741,17 @@ export interface ViewInfo {
    */
   hidden: string[];
   /**
-   * The layout.
+   * Date property for calendar and timeline.
    */
-  kind: ViewKind;
+  date?: string | null;
+  /**
+   * End-date property for timeline bars.
+   */
+  end?: string | null;
   /**
    * Most rows shown.
    */
   limit?: number | null;
-  /**
-   * The view's name.
-   */
-  name: string;
-  /**
-   * Sort keys, most significant first.
-   */
-  sorts: string[];
 }
 
 /**
@@ -4782,6 +4782,18 @@ export interface ViewResult {
    */
   collection: CollectionId;
   /**
+   * The collection title.
+   */
+  title: string;
+  /**
+   * The view name.
+   */
+  view: string;
+  /**
+   * The layout.
+   */
+  kind: ViewKind;
+  /**
    * Visible columns, title first.
    */
   columns: Column[];
@@ -4790,14 +4802,6 @@ export interface ViewResult {
    */
   groups: Group[];
   /**
-   * The layout.
-   */
-  kind: ViewKind;
-  /**
-   * The collection title.
-   */
-  title: string;
-  /**
    * Rows matching the filters, before the limit.
    */
   total: number;
@@ -4805,60 +4809,12 @@ export interface ViewResult {
    * Whether the limit cut rows off.
    */
   truncated: boolean;
-  /**
-   * The view name.
-   */
-  view: string;
 }
 
 /**
  * An issue.
  */
 export interface WorkAcceptSuggestionIssueOut {
-  /**
-   * Earlier identifiers that still resolve.
-   */
-  aliases: string[];
-  /**
-   * Assignee handle.
-   */
-  assignee?: string | null;
-  /**
-   * Canceled.
-   */
-  canceled_at?: string | null;
-  /**
-   * The status's category.
-   */
-  category: string;
-  /**
-   * Completed.
-   */
-  completed_at?: string | null;
-  /**
-   * Created.
-   */
-  created_at: string;
-  /**
-   * Creator handle.
-   */
-  creator?: string | null;
-  /**
-   * Cycle key, such as `2026-C44`.
-   */
-  cycle?: string | null;
-  /**
-   * The description, in Vellum Markdown; left out of lists.
-   */
-  description?: string | null;
-  /**
-   * Due date.
-   */
-  due?: string | null;
-  /**
-   * Estimate as written (`3`, `M`).
-   */
-  estimate?: string | null;
   /**
    * Issue ID; stable across moves.
    */
@@ -4868,50 +4824,6 @@ export interface WorkAcceptSuggestionIssueOut {
    */
   key: string;
   /**
-   * Label references.
-   */
-  labels: string[];
-  /**
-   * Links: pull requests, the source block, documents.
-   */
-  links: LinkOut[];
-  /**
-   * Milestone ID.
-   */
-  milestone?: string | null;
-  /**
-   * Parent issue key.
-   */
-  parent?: string | null;
-  /**
-   * Priority 0 (none) to 4 (low); 1 is urgent.
-   */
-  priority: number;
-  /**
-   * Project ID.
-   */
-  project?: string | null;
-  /**
-   * Relations to other issues.
-   */
-  relations: RelationOut[];
-  /**
-   * The running or last SLA.
-   */
-  sla?: SlaOut | null;
-  /**
-   * Work started.
-   */
-  started_at?: string | null;
-  /**
-   * Status slug.
-   */
-  state: string;
-  /**
-   * Subscriber handles.
-   */
-  subscribers: string[];
-  /**
    * Team key.
    */
   team: string;
@@ -4920,23 +4832,103 @@ export interface WorkAcceptSuggestionIssueOut {
    */
   title: string;
   /**
+   * Status slug.
+   */
+  state: string;
+  /**
+   * The status's category.
+   */
+  category: string;
+  /**
+   * Priority 0 (none) to 4 (low); 1 is urgent.
+   */
+  priority: number;
+  /**
+   * Estimate as written (`3`, `M`).
+   */
+  estimate?: string | null;
+  /**
+   * Assignee handle.
+   */
+  assignee?: string | null;
+  /**
+   * Creator handle.
+   */
+  creator?: string | null;
+  /**
+   * Label references.
+   */
+  labels: string[];
+  /**
+   * Project ID.
+   */
+  project?: string | null;
+  /**
+   * Milestone ID.
+   */
+  milestone?: string | null;
+  /**
+   * Cycle key, such as `2026-C44`.
+   */
+  cycle?: string | null;
+  /**
+   * Parent issue key.
+   */
+  parent?: string | null;
+  /**
+   * Relations to other issues.
+   */
+  relations: RelationOut[];
+  /**
+   * Subscriber handles.
+   */
+  subscribers: string[];
+  /**
+   * Earlier identifiers that still resolve.
+   */
+  aliases: string[];
+  /**
+   * Links: pull requests, the source block, documents.
+   */
+  links: LinkOut[];
+  /**
+   * Due date.
+   */
+  due?: string | null;
+  /**
+   * The running or last SLA.
+   */
+  sla?: SlaOut | null;
+  /**
+   * Created.
+   */
+  created_at: string;
+  /**
    * Last updated.
    */
   updated_at: string;
+  /**
+   * Work started.
+   */
+  started_at?: string | null;
+  /**
+   * Completed.
+   */
+  completed_at?: string | null;
+  /**
+   * Canceled.
+   */
+  canceled_at?: string | null;
+  /**
+   * The description, in Vellum Markdown; left out of lists.
+   */
+  description?: string | null;
 }
 
 /**
  * A team and its workflow.
  */
 export interface WorkCreateTeamTeamOut {
-  /**
-   * Whether the team runs cycles.
-   */
-  cycles: boolean;
-  /**
-   * The status new issues get.
-   */
-  default_status: string;
   /**
    * Team ID.
    */
@@ -4946,9 +4938,13 @@ export interface WorkCreateTeamTeamOut {
    */
   key: string;
   /**
-   * Label references (`group/name` or `name`).
+   * Display name.
    */
-  labels: string[];
+  name: string;
+  /**
+   * IANA time zone for cycles and recurring work.
+   */
+  timezone: string;
   /**
    * The team lead's handle.
    */
@@ -4958,25 +4954,29 @@ export interface WorkCreateTeamTeamOut {
    */
   members: string[];
   /**
-   * Display name.
-   */
-  name: string;
-  /**
    * Statuses in board order.
    */
   statuses: StatusOut[];
   /**
-   * Template names.
+   * The status new issues get.
    */
-  templates: string[];
-  /**
-   * IANA time zone for cycles and recurring work.
-   */
-  timezone: string;
+  default_status: string;
   /**
    * Whether intake issues go to triage first.
    */
   triage: boolean;
+  /**
+   * Whether the team runs cycles.
+   */
+  cycles: boolean;
+  /**
+   * Label references (`group/name` or `name`).
+   */
+  labels: string[];
+  /**
+   * Template names.
+   */
+  templates: string[];
 }
 
 /**
@@ -4984,50 +4984,6 @@ export interface WorkCreateTeamTeamOut {
  */
 export interface WorkDismissSuggestionIssueOut {
   /**
-   * Earlier identifiers that still resolve.
-   */
-  aliases: string[];
-  /**
-   * Assignee handle.
-   */
-  assignee?: string | null;
-  /**
-   * Canceled.
-   */
-  canceled_at?: string | null;
-  /**
-   * The status's category.
-   */
-  category: string;
-  /**
-   * Completed.
-   */
-  completed_at?: string | null;
-  /**
-   * Created.
-   */
-  created_at: string;
-  /**
-   * Creator handle.
-   */
-  creator?: string | null;
-  /**
-   * Cycle key, such as `2026-C44`.
-   */
-  cycle?: string | null;
-  /**
-   * The description, in Vellum Markdown; left out of lists.
-   */
-  description?: string | null;
-  /**
-   * Due date.
-   */
-  due?: string | null;
-  /**
-   * Estimate as written (`3`, `M`).
-   */
-  estimate?: string | null;
-  /**
    * Issue ID; stable across moves.
    */
   id: string;
@@ -5035,50 +4991,6 @@ export interface WorkDismissSuggestionIssueOut {
    * Identifier, such as `ENG-142`.
    */
   key: string;
-  /**
-   * Label references.
-   */
-  labels: string[];
-  /**
-   * Links: pull requests, the source block, documents.
-   */
-  links: LinkOut[];
-  /**
-   * Milestone ID.
-   */
-  milestone?: string | null;
-  /**
-   * Parent issue key.
-   */
-  parent?: string | null;
-  /**
-   * Priority 0 (none) to 4 (low); 1 is urgent.
-   */
-  priority: number;
-  /**
-   * Project ID.
-   */
-  project?: string | null;
-  /**
-   * Relations to other issues.
-   */
-  relations: RelationOut[];
-  /**
-   * The running or last SLA.
-   */
-  sla?: SlaOut | null;
-  /**
-   * Work started.
-   */
-  started_at?: string | null;
-  /**
-   * Status slug.
-   */
-  state: string;
-  /**
-   * Subscriber handles.
-   */
-  subscribers: string[];
   /**
    * Team key.
    */
@@ -5088,9 +5000,97 @@ export interface WorkDismissSuggestionIssueOut {
    */
   title: string;
   /**
+   * Status slug.
+   */
+  state: string;
+  /**
+   * The status's category.
+   */
+  category: string;
+  /**
+   * Priority 0 (none) to 4 (low); 1 is urgent.
+   */
+  priority: number;
+  /**
+   * Estimate as written (`3`, `M`).
+   */
+  estimate?: string | null;
+  /**
+   * Assignee handle.
+   */
+  assignee?: string | null;
+  /**
+   * Creator handle.
+   */
+  creator?: string | null;
+  /**
+   * Label references.
+   */
+  labels: string[];
+  /**
+   * Project ID.
+   */
+  project?: string | null;
+  /**
+   * Milestone ID.
+   */
+  milestone?: string | null;
+  /**
+   * Cycle key, such as `2026-C44`.
+   */
+  cycle?: string | null;
+  /**
+   * Parent issue key.
+   */
+  parent?: string | null;
+  /**
+   * Relations to other issues.
+   */
+  relations: RelationOut[];
+  /**
+   * Subscriber handles.
+   */
+  subscribers: string[];
+  /**
+   * Earlier identifiers that still resolve.
+   */
+  aliases: string[];
+  /**
+   * Links: pull requests, the source block, documents.
+   */
+  links: LinkOut[];
+  /**
+   * Due date.
+   */
+  due?: string | null;
+  /**
+   * The running or last SLA.
+   */
+  sla?: SlaOut | null;
+  /**
+   * Created.
+   */
+  created_at: string;
+  /**
    * Last updated.
    */
   updated_at: string;
+  /**
+   * Work started.
+   */
+  started_at?: string | null;
+  /**
+   * Completed.
+   */
+  completed_at?: string | null;
+  /**
+   * Canceled.
+   */
+  canceled_at?: string | null;
+  /**
+   * The description, in Vellum Markdown; left out of lists.
+   */
+  description?: string | null;
 }
 
 /**
@@ -5098,50 +5098,6 @@ export interface WorkDismissSuggestionIssueOut {
  */
 export interface WorkGetIssueIssueOut {
   /**
-   * Earlier identifiers that still resolve.
-   */
-  aliases: string[];
-  /**
-   * Assignee handle.
-   */
-  assignee?: string | null;
-  /**
-   * Canceled.
-   */
-  canceled_at?: string | null;
-  /**
-   * The status's category.
-   */
-  category: string;
-  /**
-   * Completed.
-   */
-  completed_at?: string | null;
-  /**
-   * Created.
-   */
-  created_at: string;
-  /**
-   * Creator handle.
-   */
-  creator?: string | null;
-  /**
-   * Cycle key, such as `2026-C44`.
-   */
-  cycle?: string | null;
-  /**
-   * The description, in Vellum Markdown; left out of lists.
-   */
-  description?: string | null;
-  /**
-   * Due date.
-   */
-  due?: string | null;
-  /**
-   * Estimate as written (`3`, `M`).
-   */
-  estimate?: string | null;
-  /**
    * Issue ID; stable across moves.
    */
   id: string;
@@ -5149,50 +5105,6 @@ export interface WorkGetIssueIssueOut {
    * Identifier, such as `ENG-142`.
    */
   key: string;
-  /**
-   * Label references.
-   */
-  labels: string[];
-  /**
-   * Links: pull requests, the source block, documents.
-   */
-  links: LinkOut[];
-  /**
-   * Milestone ID.
-   */
-  milestone?: string | null;
-  /**
-   * Parent issue key.
-   */
-  parent?: string | null;
-  /**
-   * Priority 0 (none) to 4 (low); 1 is urgent.
-   */
-  priority: number;
-  /**
-   * Project ID.
-   */
-  project?: string | null;
-  /**
-   * Relations to other issues.
-   */
-  relations: RelationOut[];
-  /**
-   * The running or last SLA.
-   */
-  sla?: SlaOut | null;
-  /**
-   * Work started.
-   */
-  started_at?: string | null;
-  /**
-   * Status slug.
-   */
-  state: string;
-  /**
-   * Subscriber handles.
-   */
-  subscribers: string[];
   /**
    * Team key.
    */
@@ -5202,9 +5114,97 @@ export interface WorkGetIssueIssueOut {
    */
   title: string;
   /**
+   * Status slug.
+   */
+  state: string;
+  /**
+   * The status's category.
+   */
+  category: string;
+  /**
+   * Priority 0 (none) to 4 (low); 1 is urgent.
+   */
+  priority: number;
+  /**
+   * Estimate as written (`3`, `M`).
+   */
+  estimate?: string | null;
+  /**
+   * Assignee handle.
+   */
+  assignee?: string | null;
+  /**
+   * Creator handle.
+   */
+  creator?: string | null;
+  /**
+   * Label references.
+   */
+  labels: string[];
+  /**
+   * Project ID.
+   */
+  project?: string | null;
+  /**
+   * Milestone ID.
+   */
+  milestone?: string | null;
+  /**
+   * Cycle key, such as `2026-C44`.
+   */
+  cycle?: string | null;
+  /**
+   * Parent issue key.
+   */
+  parent?: string | null;
+  /**
+   * Relations to other issues.
+   */
+  relations: RelationOut[];
+  /**
+   * Subscriber handles.
+   */
+  subscribers: string[];
+  /**
+   * Earlier identifiers that still resolve.
+   */
+  aliases: string[];
+  /**
+   * Links: pull requests, the source block, documents.
+   */
+  links: LinkOut[];
+  /**
+   * Due date.
+   */
+  due?: string | null;
+  /**
+   * The running or last SLA.
+   */
+  sla?: SlaOut | null;
+  /**
+   * Created.
+   */
+  created_at: string;
+  /**
    * Last updated.
    */
   updated_at: string;
+  /**
+   * Work started.
+   */
+  started_at?: string | null;
+  /**
+   * Completed.
+   */
+  completed_at?: string | null;
+  /**
+   * Canceled.
+   */
+  canceled_at?: string | null;
+  /**
+   * The description, in Vellum Markdown; left out of lists.
+   */
+  description?: string | null;
 }
 
 /**
@@ -5216,51 +5216,43 @@ export interface WorkGetProjectProjectOut {
    */
   id: string;
   /**
-   * Issues in the project.
+   * Title.
    */
-  issues: number;
-  /**
-   * Lead handle.
-   */
-  lead?: string | null;
-  /**
-   * The project file, front matter and spec.
-   */
-  markdown: string;
-  /**
-   * Percent complete by points.
-   */
-  percent: number;
+  title: string;
   /**
    * planned, started, paused, completed or canceled.
    */
   status: string;
   /**
-   * Target date.
+   * Lead handle.
    */
-  target_date?: string | null;
+  lead?: string | null;
   /**
    * Team keys.
    */
   teams: string[];
   /**
-   * Title.
+   * Target date.
    */
-  title: string;
+  target_date?: string | null;
+  /**
+   * Issues in the project.
+   */
+  issues: number;
+  /**
+   * Percent complete by points.
+   */
+  percent: number;
+  /**
+   * The project file, front matter and spec.
+   */
+  markdown: string;
 }
 
 /**
  * A team and its workflow.
  */
 export interface WorkGetTeamTeamOut {
-  /**
-   * Whether the team runs cycles.
-   */
-  cycles: boolean;
-  /**
-   * The status new issues get.
-   */
-  default_status: string;
   /**
    * Team ID.
    */
@@ -5270,9 +5262,13 @@ export interface WorkGetTeamTeamOut {
    */
   key: string;
   /**
-   * Label references (`group/name` or `name`).
+   * Display name.
    */
-  labels: string[];
+  name: string;
+  /**
+   * IANA time zone for cycles and recurring work.
+   */
+  timezone: string;
   /**
    * The team lead's handle.
    */
@@ -5282,25 +5278,29 @@ export interface WorkGetTeamTeamOut {
    */
   members: string[];
   /**
-   * Display name.
-   */
-  name: string;
-  /**
    * Statuses in board order.
    */
   statuses: StatusOut[];
   /**
-   * Template names.
+   * The status new issues get.
    */
-  templates: string[];
-  /**
-   * IANA time zone for cycles and recurring work.
-   */
-  timezone: string;
+  default_status: string;
   /**
    * Whether intake issues go to triage first.
    */
   triage: boolean;
+  /**
+   * Whether the team runs cycles.
+   */
+  cycles: boolean;
+  /**
+   * Label references (`group/name` or `name`).
+   */
+  labels: string[];
+  /**
+   * Template names.
+   */
+  templates: string[];
 }
 
 /**
@@ -5318,50 +5318,6 @@ export type WorkListTeamsNoInput = Record<string, unknown>;
  */
 export interface WorkMoveIssueIssueOut {
   /**
-   * Earlier identifiers that still resolve.
-   */
-  aliases: string[];
-  /**
-   * Assignee handle.
-   */
-  assignee?: string | null;
-  /**
-   * Canceled.
-   */
-  canceled_at?: string | null;
-  /**
-   * The status's category.
-   */
-  category: string;
-  /**
-   * Completed.
-   */
-  completed_at?: string | null;
-  /**
-   * Created.
-   */
-  created_at: string;
-  /**
-   * Creator handle.
-   */
-  creator?: string | null;
-  /**
-   * Cycle key, such as `2026-C44`.
-   */
-  cycle?: string | null;
-  /**
-   * The description, in Vellum Markdown; left out of lists.
-   */
-  description?: string | null;
-  /**
-   * Due date.
-   */
-  due?: string | null;
-  /**
-   * Estimate as written (`3`, `M`).
-   */
-  estimate?: string | null;
-  /**
    * Issue ID; stable across moves.
    */
   id: string;
@@ -5369,50 +5325,6 @@ export interface WorkMoveIssueIssueOut {
    * Identifier, such as `ENG-142`.
    */
   key: string;
-  /**
-   * Label references.
-   */
-  labels: string[];
-  /**
-   * Links: pull requests, the source block, documents.
-   */
-  links: LinkOut[];
-  /**
-   * Milestone ID.
-   */
-  milestone?: string | null;
-  /**
-   * Parent issue key.
-   */
-  parent?: string | null;
-  /**
-   * Priority 0 (none) to 4 (low); 1 is urgent.
-   */
-  priority: number;
-  /**
-   * Project ID.
-   */
-  project?: string | null;
-  /**
-   * Relations to other issues.
-   */
-  relations: RelationOut[];
-  /**
-   * The running or last SLA.
-   */
-  sla?: SlaOut | null;
-  /**
-   * Work started.
-   */
-  started_at?: string | null;
-  /**
-   * Status slug.
-   */
-  state: string;
-  /**
-   * Subscriber handles.
-   */
-  subscribers: string[];
   /**
    * Team key.
    */
@@ -5422,9 +5334,97 @@ export interface WorkMoveIssueIssueOut {
    */
   title: string;
   /**
+   * Status slug.
+   */
+  state: string;
+  /**
+   * The status's category.
+   */
+  category: string;
+  /**
+   * Priority 0 (none) to 4 (low); 1 is urgent.
+   */
+  priority: number;
+  /**
+   * Estimate as written (`3`, `M`).
+   */
+  estimate?: string | null;
+  /**
+   * Assignee handle.
+   */
+  assignee?: string | null;
+  /**
+   * Creator handle.
+   */
+  creator?: string | null;
+  /**
+   * Label references.
+   */
+  labels: string[];
+  /**
+   * Project ID.
+   */
+  project?: string | null;
+  /**
+   * Milestone ID.
+   */
+  milestone?: string | null;
+  /**
+   * Cycle key, such as `2026-C44`.
+   */
+  cycle?: string | null;
+  /**
+   * Parent issue key.
+   */
+  parent?: string | null;
+  /**
+   * Relations to other issues.
+   */
+  relations: RelationOut[];
+  /**
+   * Subscriber handles.
+   */
+  subscribers: string[];
+  /**
+   * Earlier identifiers that still resolve.
+   */
+  aliases: string[];
+  /**
+   * Links: pull requests, the source block, documents.
+   */
+  links: LinkOut[];
+  /**
+   * Due date.
+   */
+  due?: string | null;
+  /**
+   * The running or last SLA.
+   */
+  sla?: SlaOut | null;
+  /**
+   * Created.
+   */
+  created_at: string;
+  /**
    * Last updated.
    */
   updated_at: string;
+  /**
+   * Work started.
+   */
+  started_at?: string | null;
+  /**
+   * Completed.
+   */
+  completed_at?: string | null;
+  /**
+   * Canceled.
+   */
+  canceled_at?: string | null;
+  /**
+   * The description, in Vellum Markdown; left out of lists.
+   */
+  description?: string | null;
 }
 
 /**
@@ -5441,51 +5441,43 @@ export interface WorkPutProjectProjectOut {
    */
   id: string;
   /**
-   * Issues in the project.
+   * Title.
    */
-  issues: number;
-  /**
-   * Lead handle.
-   */
-  lead?: string | null;
-  /**
-   * The project file, front matter and spec.
-   */
-  markdown: string;
-  /**
-   * Percent complete by points.
-   */
-  percent: number;
+  title: string;
   /**
    * planned, started, paused, completed or canceled.
    */
   status: string;
   /**
-   * Target date.
+   * Lead handle.
    */
-  target_date?: string | null;
+  lead?: string | null;
   /**
    * Team keys.
    */
   teams: string[];
   /**
-   * Title.
+   * Target date.
    */
-  title: string;
+  target_date?: string | null;
+  /**
+   * Issues in the project.
+   */
+  issues: number;
+  /**
+   * Percent complete by points.
+   */
+  percent: number;
+  /**
+   * The project file, front matter and spec.
+   */
+  markdown: string;
 }
 
 /**
  * A team and its workflow.
  */
 export interface WorkPutTeamTeamOut {
-  /**
-   * Whether the team runs cycles.
-   */
-  cycles: boolean;
-  /**
-   * The status new issues get.
-   */
-  default_status: string;
   /**
    * Team ID.
    */
@@ -5495,9 +5487,13 @@ export interface WorkPutTeamTeamOut {
    */
   key: string;
   /**
-   * Label references (`group/name` or `name`).
+   * Display name.
    */
-  labels: string[];
+  name: string;
+  /**
+   * IANA time zone for cycles and recurring work.
+   */
+  timezone: string;
   /**
    * The team lead's handle.
    */
@@ -5507,25 +5503,29 @@ export interface WorkPutTeamTeamOut {
    */
   members: string[];
   /**
-   * Display name.
-   */
-  name: string;
-  /**
    * Statuses in board order.
    */
   statuses: StatusOut[];
   /**
-   * Template names.
+   * The status new issues get.
    */
-  templates: string[];
-  /**
-   * IANA time zone for cycles and recurring work.
-   */
-  timezone: string;
+  default_status: string;
   /**
    * Whether intake issues go to triage first.
    */
   triage: boolean;
+  /**
+   * Whether the team runs cycles.
+   */
+  cycles: boolean;
+  /**
+   * Label references (`group/name` or `name`).
+   */
+  labels: string[];
+  /**
+   * Template names.
+   */
+  templates: string[];
 }
 
 /**
@@ -5533,50 +5533,6 @@ export interface WorkPutTeamTeamOut {
  */
 export interface WorkSubmitFormIssueOut {
   /**
-   * Earlier identifiers that still resolve.
-   */
-  aliases: string[];
-  /**
-   * Assignee handle.
-   */
-  assignee?: string | null;
-  /**
-   * Canceled.
-   */
-  canceled_at?: string | null;
-  /**
-   * The status's category.
-   */
-  category: string;
-  /**
-   * Completed.
-   */
-  completed_at?: string | null;
-  /**
-   * Created.
-   */
-  created_at: string;
-  /**
-   * Creator handle.
-   */
-  creator?: string | null;
-  /**
-   * Cycle key, such as `2026-C44`.
-   */
-  cycle?: string | null;
-  /**
-   * The description, in Vellum Markdown; left out of lists.
-   */
-  description?: string | null;
-  /**
-   * Due date.
-   */
-  due?: string | null;
-  /**
-   * Estimate as written (`3`, `M`).
-   */
-  estimate?: string | null;
-  /**
    * Issue ID; stable across moves.
    */
   id: string;
@@ -5584,50 +5540,6 @@ export interface WorkSubmitFormIssueOut {
    * Identifier, such as `ENG-142`.
    */
   key: string;
-  /**
-   * Label references.
-   */
-  labels: string[];
-  /**
-   * Links: pull requests, the source block, documents.
-   */
-  links: LinkOut[];
-  /**
-   * Milestone ID.
-   */
-  milestone?: string | null;
-  /**
-   * Parent issue key.
-   */
-  parent?: string | null;
-  /**
-   * Priority 0 (none) to 4 (low); 1 is urgent.
-   */
-  priority: number;
-  /**
-   * Project ID.
-   */
-  project?: string | null;
-  /**
-   * Relations to other issues.
-   */
-  relations: RelationOut[];
-  /**
-   * The running or last SLA.
-   */
-  sla?: SlaOut | null;
-  /**
-   * Work started.
-   */
-  started_at?: string | null;
-  /**
-   * Status slug.
-   */
-  state: string;
-  /**
-   * Subscriber handles.
-   */
-  subscribers: string[];
   /**
    * Team key.
    */
@@ -5637,9 +5549,97 @@ export interface WorkSubmitFormIssueOut {
    */
   title: string;
   /**
+   * Status slug.
+   */
+  state: string;
+  /**
+   * The status's category.
+   */
+  category: string;
+  /**
+   * Priority 0 (none) to 4 (low); 1 is urgent.
+   */
+  priority: number;
+  /**
+   * Estimate as written (`3`, `M`).
+   */
+  estimate?: string | null;
+  /**
+   * Assignee handle.
+   */
+  assignee?: string | null;
+  /**
+   * Creator handle.
+   */
+  creator?: string | null;
+  /**
+   * Label references.
+   */
+  labels: string[];
+  /**
+   * Project ID.
+   */
+  project?: string | null;
+  /**
+   * Milestone ID.
+   */
+  milestone?: string | null;
+  /**
+   * Cycle key, such as `2026-C44`.
+   */
+  cycle?: string | null;
+  /**
+   * Parent issue key.
+   */
+  parent?: string | null;
+  /**
+   * Relations to other issues.
+   */
+  relations: RelationOut[];
+  /**
+   * Subscriber handles.
+   */
+  subscribers: string[];
+  /**
+   * Earlier identifiers that still resolve.
+   */
+  aliases: string[];
+  /**
+   * Links: pull requests, the source block, documents.
+   */
+  links: LinkOut[];
+  /**
+   * Due date.
+   */
+  due?: string | null;
+  /**
+   * The running or last SLA.
+   */
+  sla?: SlaOut | null;
+  /**
+   * Created.
+   */
+  created_at: string;
+  /**
    * Last updated.
    */
   updated_at: string;
+  /**
+   * Work started.
+   */
+  started_at?: string | null;
+  /**
+   * Completed.
+   */
+  completed_at?: string | null;
+  /**
+   * Canceled.
+   */
+  canceled_at?: string | null;
+  /**
+   * The description, in Vellum Markdown; left out of lists.
+   */
+  description?: string | null;
 }
 
 /**
@@ -5647,37 +5647,37 @@ export interface WorkSubmitFormIssueOut {
  */
 export interface WorkSuggestTriageSuggestionOut {
   /**
-   * Who should own the issue.
+   * The team to move the issue to, if not its current one.
    */
-  assignee?: string | null;
-  /**
-   * When it was made (RFC 3339).
-   */
-  at: string;
-  /**
-   * The issue this one repeats.
-   */
-  duplicate_of?: string | null;
-  /**
-   * Labels to add.
-   */
-  labels: string[];
-  /**
-   * Which assistant made it.
-   */
-  model: string;
+  team?: string | null;
   /**
    * The priority, 0 (none) to 4 (low).
    */
   priority?: number | null;
   /**
+   * Labels to add.
+   */
+  labels: string[];
+  /**
+   * Who should own the issue.
+   */
+  assignee?: string | null;
+  /**
+   * The issue this one repeats.
+   */
+  duplicate_of?: string | null;
+  /**
    * Why, in a sentence or two.
    */
   reason: string;
   /**
-   * The team to move the issue to, if not its current one.
+   * Which assistant made it.
    */
-  team?: string | null;
+  model: string;
+  /**
+   * When it was made (RFC 3339).
+   */
+  at: string;
 }
 
 /**
@@ -5685,50 +5685,6 @@ export interface WorkSuggestTriageSuggestionOut {
  */
 export interface WorkTriageIssueIssueOut {
   /**
-   * Earlier identifiers that still resolve.
-   */
-  aliases: string[];
-  /**
-   * Assignee handle.
-   */
-  assignee?: string | null;
-  /**
-   * Canceled.
-   */
-  canceled_at?: string | null;
-  /**
-   * The status's category.
-   */
-  category: string;
-  /**
-   * Completed.
-   */
-  completed_at?: string | null;
-  /**
-   * Created.
-   */
-  created_at: string;
-  /**
-   * Creator handle.
-   */
-  creator?: string | null;
-  /**
-   * Cycle key, such as `2026-C44`.
-   */
-  cycle?: string | null;
-  /**
-   * The description, in Vellum Markdown; left out of lists.
-   */
-  description?: string | null;
-  /**
-   * Due date.
-   */
-  due?: string | null;
-  /**
-   * Estimate as written (`3`, `M`).
-   */
-  estimate?: string | null;
-  /**
    * Issue ID; stable across moves.
    */
   id: string;
@@ -5736,50 +5692,6 @@ export interface WorkTriageIssueIssueOut {
    * Identifier, such as `ENG-142`.
    */
   key: string;
-  /**
-   * Label references.
-   */
-  labels: string[];
-  /**
-   * Links: pull requests, the source block, documents.
-   */
-  links: LinkOut[];
-  /**
-   * Milestone ID.
-   */
-  milestone?: string | null;
-  /**
-   * Parent issue key.
-   */
-  parent?: string | null;
-  /**
-   * Priority 0 (none) to 4 (low); 1 is urgent.
-   */
-  priority: number;
-  /**
-   * Project ID.
-   */
-  project?: string | null;
-  /**
-   * Relations to other issues.
-   */
-  relations: RelationOut[];
-  /**
-   * The running or last SLA.
-   */
-  sla?: SlaOut | null;
-  /**
-   * Work started.
-   */
-  started_at?: string | null;
-  /**
-   * Status slug.
-   */
-  state: string;
-  /**
-   * Subscriber handles.
-   */
-  subscribers: string[];
   /**
    * Team key.
    */
@@ -5789,9 +5701,97 @@ export interface WorkTriageIssueIssueOut {
    */
   title: string;
   /**
+   * Status slug.
+   */
+  state: string;
+  /**
+   * The status's category.
+   */
+  category: string;
+  /**
+   * Priority 0 (none) to 4 (low); 1 is urgent.
+   */
+  priority: number;
+  /**
+   * Estimate as written (`3`, `M`).
+   */
+  estimate?: string | null;
+  /**
+   * Assignee handle.
+   */
+  assignee?: string | null;
+  /**
+   * Creator handle.
+   */
+  creator?: string | null;
+  /**
+   * Label references.
+   */
+  labels: string[];
+  /**
+   * Project ID.
+   */
+  project?: string | null;
+  /**
+   * Milestone ID.
+   */
+  milestone?: string | null;
+  /**
+   * Cycle key, such as `2026-C44`.
+   */
+  cycle?: string | null;
+  /**
+   * Parent issue key.
+   */
+  parent?: string | null;
+  /**
+   * Relations to other issues.
+   */
+  relations: RelationOut[];
+  /**
+   * Subscriber handles.
+   */
+  subscribers: string[];
+  /**
+   * Earlier identifiers that still resolve.
+   */
+  aliases: string[];
+  /**
+   * Links: pull requests, the source block, documents.
+   */
+  links: LinkOut[];
+  /**
+   * Due date.
+   */
+  due?: string | null;
+  /**
+   * The running or last SLA.
+   */
+  sla?: SlaOut | null;
+  /**
+   * Created.
+   */
+  created_at: string;
+  /**
    * Last updated.
    */
   updated_at: string;
+  /**
+   * Work started.
+   */
+  started_at?: string | null;
+  /**
+   * Completed.
+   */
+  completed_at?: string | null;
+  /**
+   * Canceled.
+   */
+  canceled_at?: string | null;
+  /**
+   * The description, in Vellum Markdown; left out of lists.
+   */
+  description?: string | null;
 }
 
 /**
@@ -5799,50 +5799,6 @@ export interface WorkTriageIssueIssueOut {
  */
 export interface WorkUpdateIssueIssueOut {
   /**
-   * Earlier identifiers that still resolve.
-   */
-  aliases: string[];
-  /**
-   * Assignee handle.
-   */
-  assignee?: string | null;
-  /**
-   * Canceled.
-   */
-  canceled_at?: string | null;
-  /**
-   * The status's category.
-   */
-  category: string;
-  /**
-   * Completed.
-   */
-  completed_at?: string | null;
-  /**
-   * Created.
-   */
-  created_at: string;
-  /**
-   * Creator handle.
-   */
-  creator?: string | null;
-  /**
-   * Cycle key, such as `2026-C44`.
-   */
-  cycle?: string | null;
-  /**
-   * The description, in Vellum Markdown; left out of lists.
-   */
-  description?: string | null;
-  /**
-   * Due date.
-   */
-  due?: string | null;
-  /**
-   * Estimate as written (`3`, `M`).
-   */
-  estimate?: string | null;
-  /**
    * Issue ID; stable across moves.
    */
   id: string;
@@ -5850,50 +5806,6 @@ export interface WorkUpdateIssueIssueOut {
    * Identifier, such as `ENG-142`.
    */
   key: string;
-  /**
-   * Label references.
-   */
-  labels: string[];
-  /**
-   * Links: pull requests, the source block, documents.
-   */
-  links: LinkOut[];
-  /**
-   * Milestone ID.
-   */
-  milestone?: string | null;
-  /**
-   * Parent issue key.
-   */
-  parent?: string | null;
-  /**
-   * Priority 0 (none) to 4 (low); 1 is urgent.
-   */
-  priority: number;
-  /**
-   * Project ID.
-   */
-  project?: string | null;
-  /**
-   * Relations to other issues.
-   */
-  relations: RelationOut[];
-  /**
-   * The running or last SLA.
-   */
-  sla?: SlaOut | null;
-  /**
-   * Work started.
-   */
-  started_at?: string | null;
-  /**
-   * Status slug.
-   */
-  state: string;
-  /**
-   * Subscriber handles.
-   */
-  subscribers: string[];
   /**
    * Team key.
    */
@@ -5903,9 +5815,97 @@ export interface WorkUpdateIssueIssueOut {
    */
   title: string;
   /**
+   * Status slug.
+   */
+  state: string;
+  /**
+   * The status's category.
+   */
+  category: string;
+  /**
+   * Priority 0 (none) to 4 (low); 1 is urgent.
+   */
+  priority: number;
+  /**
+   * Estimate as written (`3`, `M`).
+   */
+  estimate?: string | null;
+  /**
+   * Assignee handle.
+   */
+  assignee?: string | null;
+  /**
+   * Creator handle.
+   */
+  creator?: string | null;
+  /**
+   * Label references.
+   */
+  labels: string[];
+  /**
+   * Project ID.
+   */
+  project?: string | null;
+  /**
+   * Milestone ID.
+   */
+  milestone?: string | null;
+  /**
+   * Cycle key, such as `2026-C44`.
+   */
+  cycle?: string | null;
+  /**
+   * Parent issue key.
+   */
+  parent?: string | null;
+  /**
+   * Relations to other issues.
+   */
+  relations: RelationOut[];
+  /**
+   * Subscriber handles.
+   */
+  subscribers: string[];
+  /**
+   * Earlier identifiers that still resolve.
+   */
+  aliases: string[];
+  /**
+   * Links: pull requests, the source block, documents.
+   */
+  links: LinkOut[];
+  /**
+   * Due date.
+   */
+  due?: string | null;
+  /**
+   * The running or last SLA.
+   */
+  sla?: SlaOut | null;
+  /**
+   * Created.
+   */
+  created_at: string;
+  /**
    * Last updated.
    */
   updated_at: string;
+  /**
+   * Work started.
+   */
+  started_at?: string | null;
+  /**
+   * Completed.
+   */
+  completed_at?: string | null;
+  /**
+   * Canceled.
+   */
+  canceled_at?: string | null;
+  /**
+   * The description, in Vellum Markdown; left out of lists.
+   */
+  description?: string | null;
 }
 
 /** Every operation: its method, path, input and output. */
