@@ -570,9 +570,8 @@ pub(crate) mod fixtures {
 ";
 
     pub fn id(n: u8) -> NodeId {
-        NodeId::parse(&format!("01JBK0000000000000000000A{n}")).unwrap_or_else(|_| {
-            SequentialIds::default().next_id()
-        })
+        NodeId::parse(&format!("01JBK0000000000000000000A{n}"))
+            .unwrap_or_else(|_| SequentialIds::default().next_id())
     }
 
     pub fn handbook() -> Book {
@@ -585,7 +584,12 @@ pub(crate) mod fixtures {
                 "Your first week",
                 "Read [§](vellum://doc/01JBK0000000000000000000A5) first.\n\n## Day one\n\nBadge.\n\n## Day two\n\nLaptop.",
             ),
-            ("architecture/README.md", 4, "Architecture", "The big picture."),
+            (
+                "architecture/README.md",
+                4,
+                "Architecture",
+                "The big picture.",
+            ),
             (
                 "architecture/services.md",
                 5,
@@ -606,7 +610,12 @@ pub(crate) mod fixtures {
             );
         }
         let mut ids = SequentialIds::new("01JBK00009");
-        match Book::load(&manifest, SUMMARY, |p| files.get(p.as_str()).cloned(), &mut ids) {
+        match Book::load(
+            &manifest,
+            SUMMARY,
+            |p| files.get(p.as_str()).cloned(),
+            &mut ids,
+        ) {
             Ok((book, _)) => book,
             Err(e) => unreachable!("fixture must load: {e}"),
         }
@@ -632,10 +641,7 @@ mod tests {
             section: Section::Numbered,
             path: vec![1, 1],
         };
-        assert_eq!(
-            book.numbers().get(&draft),
-            Some(&SectionNumber(vec![1, 2]))
-        );
+        assert_eq!(book.numbers().get(&draft), Some(&SectionNumber(vec![1, 2])));
         Ok(())
     }
 
@@ -648,7 +654,10 @@ mod tests {
         let summary = book
             .summary_text()
             .replace("architecture/services.md", "architecture/svc.md")
-            .replace("[Glossary](glossary.md)", "[Glossary](glossary.md)\n\n[Notes](notes.md)\n\n[Later](later.md)");
+            .replace(
+                "[Glossary](glossary.md)",
+                "[Glossary](glossary.md)\n\n[Notes](notes.md)\n\n[Later](later.md)",
+            );
         let mut files: BTreeMap<String, String> = book
             .files()
             .iter()
@@ -656,14 +665,22 @@ mod tests {
             .collect();
         let _ = files.insert("notes.md".into(), "Just notes.\n".into());
         let mut ids = SequentialIds::new("01JBK00008");
-        let (loaded, repairs) =
-            Book::load(&manifest, &summary, |p| files.get(p.as_str()).cloned(), &mut ids)?;
+        let (loaded, repairs) = Book::load(
+            &manifest,
+            &summary,
+            |p| files.get(p.as_str()).cloned(),
+            &mut ids,
+        )?;
         assert!(repairs.contains(&Repair::Renamed {
             id: id(5),
             from: ChapterPath::parse("architecture/services.md")?,
             to: ChapterPath::parse("architecture/svc.md")?,
         }));
-        assert!(repairs.iter().any(|r| matches!(r, Repair::IdAssigned { path, .. } if path.as_str() == "notes.md")));
+        assert!(
+            repairs.iter().any(
+                |r| matches!(r, Repair::IdAssigned { path, .. } if path.as_str() == "notes.md")
+            )
+        );
         let created = repairs.iter().find_map(|r| match r {
             Repair::CreatedMissing { id, path } if path.as_str() == "later.md" => Some(id.clone()),
             _ => None,
@@ -677,16 +694,20 @@ mod tests {
             .id_at(&ChapterPath::parse("notes.md")?)
             .cloned()
             .ok_or_else(|| BookError::Inconsistent("notes".into()))?;
-        assert_eq!(markdown::front_matter(loaded.text(&notes)?, "title").as_deref(), Some("Notes"));
+        assert_eq!(
+            markdown::front_matter(loaded.text(&notes)?, "title").as_deref(),
+            Some("Notes")
+        );
         Ok(())
     }
 
     #[test]
     fn duplicate_ids_are_reissued() -> Result<()> {
         let book = handbook();
-        let summary = book
-            .summary_text()
-            .replace("[Glossary](glossary.md)", "[Glossary](glossary.md)\n\n[Copy](copy.md)");
+        let summary = book.summary_text().replace(
+            "[Glossary](glossary.md)",
+            "[Glossary](glossary.md)\n\n[Copy](copy.md)",
+        );
         let mut files: BTreeMap<String, String> = book
             .files()
             .iter()
@@ -701,7 +722,11 @@ mod tests {
             |p| files.get(p.as_str()).cloned(),
             &mut ids,
         )?;
-        assert!(repairs.iter().any(|r| matches!(r, Repair::Reidentified { old, .. } if old == &id(6))));
+        assert!(
+            repairs
+                .iter()
+                .any(|r| matches!(r, Repair::Reidentified { old, .. } if old == &id(6)))
+        );
         Ok(())
     }
 

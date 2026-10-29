@@ -260,7 +260,9 @@ impl Book {
                 continue;
             };
             let edits = ops::rewrite_relative(&text, source.dir(), "", &parked, &sources);
-            let _ = self.files.insert(temp.clone(), markdown::apply(&text, edits));
+            let _ = self
+                .files
+                .insert(temp.clone(), markdown::apply(&text, edits));
         }
         for (id, mut entry) in subtree.entries {
             if let Some(temp) = parked.get(&entry.path) {
@@ -320,7 +322,12 @@ pub struct Transfer {
 ///
 /// As for [`Book::take`] and [`Book::graft`]; on error neither book is
 /// changed.
-pub fn move_between(source: &mut Book, node: &NodeRef, target: &mut Book, place: &Place) -> Result<Transfer> {
+pub fn move_between(
+    source: &mut Book,
+    node: &NodeRef,
+    target: &mut Book,
+    place: &Place,
+) -> Result<Transfer> {
     let mut trial_source = source.clone();
     let subtree = trial_source.take(node)?;
     let assets = subtree.assets.clone();
@@ -368,7 +375,12 @@ pub fn copy_between(
 ///
 /// Returns an error if the copy cannot be assembled (it never should for a
 /// consistent book).
-pub fn copy_book(source: &Book, new_id: BookId, title: &str, ids: &mut dyn IdSource) -> Result<(Book, BTreeMap<NodeId, NodeId>)> {
+pub fn copy_book(
+    source: &Book,
+    new_id: BookId,
+    title: &str,
+    ids: &mut dyn IdSource,
+) -> Result<(Book, BTreeMap<NodeId, NodeId>)> {
     let map: BTreeMap<NodeId, NodeId> = source
         .manifest
         .nodes
@@ -401,10 +413,18 @@ mod tests {
     use crate::summary::Section;
 
     fn other_book() -> Book {
-        let mut book = Book::new(BookId::parse("01JBK00000000000000000B01K").unwrap(), "Runbooks");
+        let mut book = Book::new(
+            BookId::parse("01JBK00000000000000000B01K").unwrap(),
+            "Runbooks",
+        );
         let mut ids = SequentialIds::new("01JBK00006");
         let _ = book
-            .add_section(&Place::End(Section::Numbered), "On call", "Pager rota.", &mut ids)
+            .add_section(
+                &Place::End(Section::Numbered),
+                "On call",
+                "Pager rota.",
+                &mut ids,
+            )
             .unwrap();
         book
     }
@@ -413,7 +433,10 @@ mod tests {
     fn move_architecture_to_another_book() {
         let mut source = handbook();
         let mut target = other_book();
-        let on_call = target.id_at(&ChapterPath::parse("on-call.md").unwrap()).unwrap().clone();
+        let on_call = target
+            .id_at(&ChapterPath::parse("on-call.md").unwrap())
+            .unwrap()
+            .clone();
         let transfer = move_between(
             &mut source,
             &id(4).into(),
@@ -435,7 +458,12 @@ mod tests {
             services.contains("[the glossary](vellum://doc/01JBK0000000000000000000A6)"),
             "{services}"
         );
-        assert!(source.moved_away().iter().any(|p| p.as_str() == "architecture/services.md"));
+        assert!(
+            source
+                .moved_away()
+                .iter()
+                .any(|p| p.as_str() == "architecture/services.md")
+        );
         // The source summary no longer lists them.
         assert!(!source.summary_text().contains("architecture"));
     }
@@ -461,7 +489,12 @@ mod tests {
             Some(new_week.as_str())
         );
         // The week page linked to Services (outside the copy): still the original.
-        assert!(target.text(new_week).unwrap().contains("vellum://doc/01JBK0000000000000000000A5"));
+        assert!(
+            target
+                .text(new_week)
+                .unwrap()
+                .contains("vellum://doc/01JBK0000000000000000000A5")
+        );
         // The source is untouched.
         assert_eq!(source, handbook());
         // The draft child came along.
@@ -476,9 +509,16 @@ mod tests {
             .copy_section(&id(4).into(), &Place::After(id(4).into()), &mut ids)
             .unwrap();
         let copy = map.get(&id(4)).unwrap();
-        assert_eq!(book.path_of(copy).unwrap().as_str(), "architecture-2/README.md");
+        assert_eq!(
+            book.path_of(copy).unwrap().as_str(),
+            "architecture-2/README.md"
+        );
         let services_copy = map.get(&id(5)).unwrap();
-        assert!(book.text(services_copy).unwrap().contains("(vellum://doc/01JBK0000000000000000000A6)"));
+        assert!(
+            book.text(services_copy)
+                .unwrap()
+                .contains("(vellum://doc/01JBK0000000000000000000A6)")
+        );
         assert_eq!(book.label_of(services_copy).unwrap(), "§3.1 Services");
         // Grafting the same ids twice is refused.
         let subtree = book.extract(&id(4).into()).unwrap();
@@ -489,9 +529,13 @@ mod tests {
     fn copy_a_whole_book() {
         let source = handbook();
         let mut ids = SequentialIds::new("01JBK00005");
-        let (copy, map) =
-            copy_book(&source, BookId::parse("01JBK00000000000000000B02K").unwrap(), "Handbook copy", &mut ids)
-                .unwrap();
+        let (copy, map) = copy_book(
+            &source,
+            BookId::parse("01JBK00000000000000000B02K").unwrap(),
+            "Handbook copy",
+            &mut ids,
+        )
+        .unwrap();
         assert_eq!(map.len(), 6);
         let week = map.get(&id(3)).unwrap();
         let services = map.get(&id(5)).unwrap();

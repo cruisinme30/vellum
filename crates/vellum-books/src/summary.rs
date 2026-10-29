@@ -136,7 +136,11 @@ impl Slot {
     pub fn parent(&self) -> Option<Self> {
         (self.path.len() > 1).then(|| Self {
             section: self.section,
-            path: self.path.get(..self.path.len() - 1).unwrap_or_default().to_vec(),
+            path: self
+                .path
+                .get(..self.path.len() - 1)
+                .unwrap_or_default()
+                .to_vec(),
         })
     }
 
@@ -413,7 +417,12 @@ fn link(chapter: &Chapter) -> String {
 /// Escapes text so a `CommonMark` parser reads it back verbatim.
 fn escape(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
-    for c in text.split_whitespace().collect::<Vec<_>>().join(" ").chars() {
+    for c in text
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .chars()
+    {
         if matches!(
             c,
             '\\' | '[' | ']' | '*' | '_' | '`' | '<' | '>' | '&' | '!' | '~' | '|' | '#' | '$'
@@ -663,7 +672,10 @@ mod tests {
             .chapter(&Slot::top(Section::Numbered, 1))
             .ok_or_else(|| BookError::UnknownPosition("onboarding".into()))?;
         assert_eq!(onboarding.children.len(), 2);
-        assert_eq!(onboarding.children.get(1).and_then(|c| c.location.clone()), None);
+        assert_eq!(
+            onboarding.children.get(1).and_then(|c| c.location.clone()),
+            None
+        );
         Ok(())
     }
 

@@ -91,7 +91,10 @@ mod tests {
         assert!(rendered.contains("[§1.1 Services]"), "{rendered}");
         // Empty link text works too, and ordinary links are untouched.
         let services = book.render_cross_refs(book.text(&id(5)).unwrap());
-        assert!(services.contains("[§2 Onboarding](vellum://doc/"), "{services}");
+        assert!(
+            services.contains("[§2 Onboarding](vellum://doc/"),
+            "{services}"
+        );
         assert!(services.contains("[the glossary](../glossary.md)"));
     }
 

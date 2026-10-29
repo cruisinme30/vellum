@@ -85,7 +85,8 @@ pub fn front_matter(text: &str, key: &str) -> Option<String> {
 
 fn yaml_scalar(value: &str) -> String {
     let flat = value.split_whitespace().collect::<Vec<_>>().join(" ");
-    serde_yaml_ng::to_string(&flat).map_or_else(|_| format!("{flat:?}"), |s| s.trim_end().to_owned())
+    serde_yaml_ng::to_string(&flat)
+        .map_or_else(|_| format!("{flat:?}"), |s| s.trim_end().to_owned())
 }
 
 /// Sets a top-level front-matter field to a single-line string, adding
@@ -102,7 +103,11 @@ pub fn set_front_matter(text: &str, key: &str, value: &str) -> String {
     out.push_str(text.get(..yaml.start).unwrap_or_default());
     let mut replaced = false;
     let mut skipping = false;
-    for existing in text.get(yaml.clone()).unwrap_or_default().split_inclusive('\n') {
+    for existing in text
+        .get(yaml.clone())
+        .unwrap_or_default()
+        .split_inclusive('\n')
+    {
         if skipping && existing.starts_with([' ', '\t']) {
             continue;
         }
@@ -313,7 +318,9 @@ pub fn headings(text: &str) -> Vec<HeadingRef> {
                 let Some((level, range, id, text)) = current.take() else {
                     continue;
                 };
-                let start = body.get(..range.start).map_or(0, |b| b.rfind('\n').map_or(0, |i| i + 1));
+                let start = body
+                    .get(..range.start)
+                    .map_or(0, |b| b.rfind('\n').map_or(0, |i| i + 1));
                 let end = body
                     .get(range.end..)
                     .and_then(|rest| {
@@ -356,7 +363,9 @@ fn heading_source(raw: &str) -> String {
         return line.to_owned();
     }
     let lines: Vec<&str> = raw.lines().collect();
-    let content = lines.get(..lines.len().saturating_sub(1)).unwrap_or_default();
+    let content = lines
+        .get(..lines.len().saturating_sub(1))
+        .unwrap_or_default();
     content
         .iter()
         .map(|l| l.trim())
@@ -421,7 +430,10 @@ pub struct LinkEdit {
 /// Rewrites links in a file. `edit` sees each link and its current text
 /// (for inline links) and returns what to change, if anything.
 #[must_use]
-pub fn map_links(text: &str, mut edit: impl FnMut(&LinkRef, Option<&str>) -> Option<LinkEdit>) -> String {
+pub fn map_links(
+    text: &str,
+    mut edit: impl FnMut(&LinkRef, Option<&str>) -> Option<LinkEdit>,
+) -> String {
     let mut edits = Vec::new();
     for link in links(text) {
         let current = link.text_range.clone().and_then(|r| text.get(r));
@@ -449,7 +461,10 @@ pub fn map_links(text: &str, mut edit: impl FnMut(&LinkRef, Option<&str>) -> Opt
 pub fn escape_link_text(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     for c in text.chars() {
-        if matches!(c, '\\' | '[' | ']' | '*' | '_' | '`' | '<' | '>' | '&' | '!' | '$') {
+        if matches!(
+            c,
+            '\\' | '[' | ']' | '*' | '_' | '`' | '<' | '>' | '&' | '!' | '$'
+        ) {
             out.push('\\');
         }
         out.push(c);
@@ -553,6 +568,9 @@ Setext heading
             apply(text, vec![(4..5, "E".into()), (0..1, "A".into())]),
             "AbcdEf"
         );
-        assert_eq!(apply(text, vec![(0..3, "x".into()), (2..4, "y".into())]), "xdef");
+        assert_eq!(
+            apply(text, vec![(0..3, "x".into()), (2..4, "y".into())]),
+            "xdef"
+        );
     }
 }

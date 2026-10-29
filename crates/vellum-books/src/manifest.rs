@@ -300,7 +300,10 @@ nodes:
         assert_eq!(manifest.numbering, NumberingStyle::Decimal);
         assert_eq!(manifest.max_depth, 4);
         let id = NodeId::parse("01JBK0000000000000000000A1")?;
-        let entry = manifest.nodes.get(&id).ok_or_else(|| BookError::UnknownNode(id.clone()))?;
+        let entry = manifest
+            .nodes
+            .get(&id)
+            .ok_or_else(|| BookError::UnknownNode(id.clone()))?;
         assert_eq!(entry.path.as_str(), "onboarding/README.md");
         assert_eq!(manifest.id_at(&entry.path), Some(&id));
         Ok(())

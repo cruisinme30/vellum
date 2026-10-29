@@ -139,9 +139,15 @@ impl Book {
         // A placeholder path; relayout gives it its real name.
         let temp = self.unique_path("", &format!("{}.md", path::slugify(&title)))?;
         let mut summary = self.summary.clone();
-        summary.insert(&slot, Item::Chapter(Chapter::new(title.clone(), temp.clone())))?;
+        summary.insert(
+            &slot,
+            Item::Chapter(Chapter::new(title.clone(), temp.clone())),
+        )?;
         self.summary = summary;
-        let _ = self.manifest.nodes.insert(id.clone(), NodeEntry::new(temp.clone()));
+        let _ = self
+            .manifest
+            .nodes
+            .insert(id.clone(), NodeEntry::new(temp.clone()));
         let _ = self
             .files
             .insert(temp, markdown::new_chapter(&id, &title, None, body));
@@ -160,7 +166,8 @@ impl Book {
         let title = clean_title(title)?;
         let slot = self.place(place)?;
         self.check_depth(&slot, 1)?;
-        self.summary.insert(&slot, Item::Chapter(Chapter::draft(title)))?;
+        self.summary
+            .insert(&slot, Item::Chapter(Chapter::draft(title)))?;
         Ok(slot)
     }
 
@@ -169,7 +176,12 @@ impl Book {
     /// # Errors
     ///
     /// Returns an error when `slot` is not a draft.
-    pub fn write_draft(&mut self, slot: &Slot, body: &str, ids: &mut dyn IdSource) -> Result<NodeId> {
+    pub fn write_draft(
+        &mut self,
+        slot: &Slot,
+        body: &str,
+        ids: &mut dyn IdSource,
+    ) -> Result<NodeId> {
         let chapter = self
             .summary
             .chapter(slot)
@@ -183,7 +195,10 @@ impl Book {
         if let Some(chapter) = self.summary.chapter_mut(slot) {
             chapter.location = Some(temp.clone());
         }
-        let _ = self.manifest.nodes.insert(id.clone(), NodeEntry::new(temp.clone()));
+        let _ = self
+            .manifest
+            .nodes
+            .insert(id.clone(), NodeEntry::new(temp.clone()));
         let _ = self
             .files
             .insert(temp, markdown::new_chapter(&id, &title, None, body));
@@ -326,7 +341,11 @@ impl Book {
 
     /// Moves files so the folder mirrors the tree under each root, then
     /// rewrites links. `stems` forces a file name for some slots (rename).
-    pub(crate) fn relayout(&mut self, roots: &[Slot], stems: &BTreeMap<Slot, String>) -> Result<()> {
+    pub(crate) fn relayout(
+        &mut self,
+        roots: &[Slot],
+        stems: &BTreeMap<Slot, String>,
+    ) -> Result<()> {
         let mut roots: Vec<Slot> = roots
             .iter()
             .filter(|s| self.summary.chapter(s).is_some())
@@ -361,10 +380,18 @@ impl Book {
         let Some(chapter) = self.summary.chapter(slot) else {
             return String::new();
         };
-        assigned.get(slot).or(chapter.location.as_ref()).map_or_else(
-            || join_dir(&self.parent_dir(slot, assigned), &path::slugify(&chapter.name)),
-            ChapterPath::children_dir,
-        )
+        assigned
+            .get(slot)
+            .or(chapter.location.as_ref())
+            .map_or_else(
+                || {
+                    join_dir(
+                        &self.parent_dir(slot, assigned),
+                        &path::slugify(&chapter.name),
+                    )
+                },
+                ChapterPath::children_dir,
+            )
     }
 
     fn parent_dir(&self, slot: &Slot, assigned: &BTreeMap<Slot, ChapterPath>) -> String {
@@ -418,7 +445,11 @@ impl Book {
                 });
                 let mut n = 1;
                 loop {
-                    let candidate_stem = if n == 1 { stem.clone() } else { format!("{stem}-{n}") };
+                    let candidate_stem = if n == 1 {
+                        stem.clone()
+                    } else {
+                        format!("{stem}-{n}")
+                    };
                     let candidate_dir = join_dir(&dir, &candidate_stem);
                     let prefix = format!("{candidate_dir}/");
                     let busy = taken
@@ -459,7 +490,10 @@ impl Book {
         }
         let mut rewritten = BTreeMap::new();
         for (path, text) in &files {
-            let old_dir = reverse.get(path).map_or_else(|| path.dir(), |old| old.dir()).to_owned();
+            let old_dir = reverse
+                .get(path)
+                .map_or_else(|| path.dir(), |old| old.dir())
+                .to_owned();
             let new_dir = path.dir();
             let edits = rewrite_relative(text, &old_dir, new_dir, moves, &before);
             if !edits.is_empty() {
@@ -483,7 +517,10 @@ impl Book {
     }
 }
 
-fn rewrite_summary(summary: &mut crate::summary::Summary, moves: &BTreeMap<ChapterPath, ChapterPath>) {
+fn rewrite_summary(
+    summary: &mut crate::summary::Summary,
+    moves: &BTreeMap<ChapterPath, ChapterPath>,
+) {
     fn visit(chapter: &mut Chapter, moves: &BTreeMap<ChapterPath, ChapterPath>) {
         if let Some(new) = chapter.location.as_ref().and_then(|p| moves.get(p)) {
             chapter.location = Some(new.clone());
@@ -617,7 +654,10 @@ mod tests {
         // Glossary (suffix) moves under Services (a leaf).
         book.move_section(&id(6).into(), &Place::LastChildOf(id(5).into()))
             .unwrap();
-        assert_eq!(book.path_of(&id(5)).unwrap().as_str(), "architecture/services/README.md");
+        assert_eq!(
+            book.path_of(&id(5)).unwrap().as_str(),
+            "architecture/services/README.md"
+        );
         assert_eq!(
             book.path_of(&id(6)).unwrap().as_str(),
             "architecture/services/glossary.md"
@@ -625,8 +665,15 @@ mod tests {
         assert_eq!(book.label_of(&id(6)).unwrap(), "§2.1.1 Glossary");
         // The relative link from services to the glossary still resolves.
         let services = book.text(&id(5)).unwrap();
-        assert!(services.contains("[the glossary](glossary.md)"), "{services}");
-        assert!(book.moved_away().iter().any(|p| p.as_str() == "glossary.md"));
+        assert!(
+            services.contains("[the glossary](glossary.md)"),
+            "{services}"
+        );
+        assert!(
+            book.moved_away()
+                .iter()
+                .any(|p| p.as_str() == "glossary.md")
+        );
         assert_consistent(&book);
     }
 
@@ -659,13 +706,15 @@ mod tests {
     #[test]
     fn refuses_bad_moves() {
         let mut book = handbook();
-        assert!(book
-            .move_section(&id(2).into(), &Place::LastChildOf(id(3).into()))
-            .is_err());
+        assert!(
+            book.move_section(&id(2).into(), &Place::LastChildOf(id(3).into()))
+                .is_err()
+        );
         // Prefix chapters cannot have children.
-        assert!(book
-            .move_section(&id(6).into(), &Place::LastChildOf(id(1).into()))
-            .is_err());
+        assert!(
+            book.move_section(&id(6).into(), &Place::LastChildOf(id(1).into()))
+                .is_err()
+        );
         // Nothing changed.
         assert_eq!(book, handbook());
         book.set_max_depth(2).unwrap();
@@ -684,13 +733,27 @@ mod tests {
         let mut book = handbook();
         let mut ids = SequentialIds::new("01JBK00007");
         let new = book
-            .add_section(&Place::LastChildOf(id(4).into()), "Data stores", "Postgres.", &mut ids)
+            .add_section(
+                &Place::LastChildOf(id(4).into()),
+                "Data stores",
+                "Postgres.",
+                &mut ids,
+            )
             .unwrap();
-        assert_eq!(book.path_of(&new).unwrap().as_str(), "architecture/data-stores.md");
+        assert_eq!(
+            book.path_of(&new).unwrap().as_str(),
+            "architecture/data-stores.md"
+        );
         assert_eq!(book.label_of(&new).unwrap(), "§2.2 Data stores");
         book.rename(&id(4).into(), "System design").unwrap();
-        assert_eq!(book.path_of(&id(4)).unwrap().as_str(), "system-design/README.md");
-        assert_eq!(book.path_of(&new).unwrap().as_str(), "system-design/data-stores.md");
+        assert_eq!(
+            book.path_of(&id(4)).unwrap().as_str(),
+            "system-design/README.md"
+        );
+        assert_eq!(
+            book.path_of(&new).unwrap().as_str(),
+            "system-design/data-stores.md"
+        );
         assert_eq!(
             markdown::front_matter(book.text(&id(4)).unwrap(), "title").as_deref(),
             Some("System design")
@@ -698,7 +761,11 @@ mod tests {
         assert!(book.text(&id(5)).unwrap().contains("(../glossary.md)"));
         let removed = book.remove_section(&id(4).into()).unwrap();
         assert_eq!(removed.len(), 3);
-        assert!(book.removed().iter().any(|p| p.as_str() == "system-design/data-stores.md"));
+        assert!(
+            book.removed()
+                .iter()
+                .any(|p| p.as_str() == "system-design/data-stores.md")
+        );
         assert!(!paths(&book).iter().any(|p| p.starts_with("system-design")));
         assert_consistent(&book);
     }
@@ -712,8 +779,13 @@ mod tests {
             path: vec![1, 1],
         }));
         let draft_slot = draft_slot.unwrap();
-        let new = book.write_draft(&draft_slot, "Phishing drills.", &mut ids).unwrap();
-        assert_eq!(book.path_of(&new).unwrap().as_str(), "onboarding/security-training.md");
+        let new = book
+            .write_draft(&draft_slot, "Phishing drills.", &mut ids)
+            .unwrap();
+        assert_eq!(
+            book.path_of(&new).unwrap().as_str(),
+            "onboarding/security-training.md"
+        );
         let later = book
             .add_draft(&Place::End(Section::Numbered), "Roadmap")
             .unwrap();
@@ -728,11 +800,23 @@ mod tests {
 
     #[test]
     fn slot_adjustment() {
-        let mut dest = Slot { section: Section::Numbered, path: vec![3, 1] };
+        let mut dest = Slot {
+            section: Section::Numbered,
+            path: vec![3, 1],
+        };
         adjust_after_removal(&mut dest, &Slot::top(Section::Numbered, 1));
         assert_eq!(dest.path, vec![2, 1]);
-        let mut same_level = Slot { section: Section::Numbered, path: vec![1, 4] };
-        adjust_after_removal(&mut same_level, &Slot { section: Section::Numbered, path: vec![1, 2] });
+        let mut same_level = Slot {
+            section: Section::Numbered,
+            path: vec![1, 4],
+        };
+        adjust_after_removal(
+            &mut same_level,
+            &Slot {
+                section: Section::Numbered,
+                path: vec![1, 2],
+            },
+        );
         assert_eq!(same_level.path, vec![1, 3]);
     }
 }

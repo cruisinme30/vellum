@@ -41,11 +41,16 @@ impl ChapterPath {
         if path.starts_with('/') {
             return Err(fail("must be relative"));
         }
-        if path
-            .chars()
-            .any(|c| c.is_control() || matches!(c, '\\' | ':' | '<' | '>' | '#' | '?' | '%' | '"' | '|' | '*'))
-        {
-            return Err(fail("control characters and \\ : < > # ? % \" | * are not allowed"));
+        if path.chars().any(|c| {
+            c.is_control()
+                || matches!(
+                    c,
+                    '\\' | ':' | '<' | '>' | '#' | '?' | '%' | '"' | '|' | '*'
+                )
+        }) {
+            return Err(fail(
+                "control characters and \\ : < > # ? % \" | * are not allowed",
+            ));
         }
         for segment in path.split('/') {
             if segment.is_empty() {
@@ -79,7 +84,9 @@ impl ChapterPath {
     /// The file name, such as `services.md`.
     #[must_use]
     pub fn file_name(&self) -> &str {
-        self.0.rsplit_once('/').map_or(self.0.as_str(), |(_, name)| name)
+        self.0
+            .rsplit_once('/')
+            .map_or(self.0.as_str(), |(_, name)| name)
     }
 
     /// Whether this is a `README.md`, the landing page of a folder.
@@ -156,8 +163,7 @@ pub fn relative(from_dir: &str, target: &str) -> String {
 /// Returns `None` when the link climbs above the root or is not relative.
 #[must_use]
 pub fn resolve(from_dir: &str, href: &str) -> Option<String> {
-    if href.is_empty() || href.starts_with('/') || href.contains("://") || href.starts_with('#')
-    {
+    if href.is_empty() || href.starts_with('/') || href.contains("://") || href.starts_with('#') {
         return None;
     }
     if href.split_once(':').is_some_and(|(scheme, _)| {

@@ -92,18 +92,29 @@ impl Book {
                 needed: slot.depth() + 1,
             });
         }
-        let keep = text.get(..first.range.start).unwrap_or_default().trim_end().to_owned();
+        let keep = text
+            .get(..first.range.start)
+            .unwrap_or_default()
+            .trim_end()
+            .to_owned();
         let delta = 1 - isize::from(level);
         // Plan each new section before changing anything.
         let mut pieces = Vec::new();
         for (index, cut) in cuts.iter().enumerate() {
-            let end = cuts.get(index + 1).map_or(text.len(), |next| next.range.start);
+            let end = cuts
+                .get(index + 1)
+                .map_or(text.len(), |next| next.range.start);
             let body = text.get(cut.range.end..end).unwrap_or_default();
             let anchors: BTreeSet<String> = markdown::headings(body)
                 .into_iter()
                 .map(|h| h.anchor)
                 .collect();
-            pieces.push((cut.text.clone(), cut.anchor.clone(), shift_headings(body, delta), anchors));
+            pieces.push((
+                cut.text.clone(),
+                cut.anchor.clone(),
+                shift_headings(body, delta),
+                anchors,
+            ));
         }
         let mut new_ids = Vec::new();
         let mut redirects: BTreeMap<String, Redirect> = BTreeMap::new();
@@ -134,47 +145,7 @@ impl Book {
         parent_text.push('\n');
         let path = self.path_of(id)?.clone();
         let _ = self.files.insert(path, parent_text);
-        // Links to `parent#anchor` (and `#anchor` inside the pieces) now go
-        // to the new sections.
-        let new_set: BTreeSet<NodeId> = new_ids.iter().cloned().collect();
-        let paths: Vec<_> = self.files.keys().cloned().collect();
-        for path in paths {
-            let in_piece = self.id_at(&path).is_some_and(|i| new_set.contains(i));
-            let Some(text) = self.files.get(&path) else {
-                continue;
-            };
-            let updated = markdown::map_links(text, |link, _| {
-                if link.kind == LinkKind::Image {
-                    return None;
-                }
-                let redirect = if let Some(fragment) = link.dest.strip_prefix('#') {
-                    if in_piece {
-                        // Same-page links inside a new section: to the
-                        // section now holding the anchor, or back to the parent.
-                        return Some(LinkEdit {
-                            dest: Some(redirects.get(fragment).map_or_else(
-                                || format!("{}#{fragment}", id.uri()),
-                                Redirect::uri,
-                            )),
-                            ..LinkEdit::default()
-                        });
-                    }
-                    // Same-page links in the parent: only if the anchor moved.
-                    redirects.get(fragment)?
-                } else {
-                    let (target, fragment) = NodeId::from_uri(&link.dest)?;
-                    if &target != id {
-                        return None;
-                    }
-                    redirects.get(fragment?)?
-                };
-                Some(LinkEdit {
-                    dest: Some(redirect.uri()),
-                    ..LinkEdit::default()
-                })
-            });
-            let _ = self.files.insert(path, updated);
-        }
+        self.retarget_split(id, &new_ids, &redirects);
         Ok(new_ids)
     }
 
@@ -195,7 +166,9 @@ impl Book {
             .cloned()
             .ok_or_else(|| BookError::UnknownNode(id.clone()))?;
         if chapter.children.is_empty() {
-            return Err(BookError::NotAllowed(format!("section {id} has no children")));
+            return Err(BookError::NotAllowed(format!(
+                "section {id} has no children"
+            )));
         }
         let mut used: BTreeSet<String> = markdown::headings(self.text(id)?)
             .into_iter()
@@ -229,7 +202,11 @@ impl Book {
             let _ = write!(appended, "\n{}", markdown::heading_line(level, &heading));
             if let Some(child_id) = child.location.as_ref().and_then(|p| self.id_at(p)) {
                 let body = markdown::body(self.text(child_id)?);
-                let max_inner = markdown::headings(body).iter().map(|h| h.level).max().unwrap_or(0);
+                let max_inner = markdown::headings(body)
+                    .iter()
+                    .map(|h| h.level)
+                    .max()
+                    .unwrap_or(0);
                 if usize::from(max_inner) + depth > 6 {
                     return Err(BookError::NotAllowed(format!(
                         "headings in {} would go deeper than level 6",
@@ -267,7 +244,62 @@ impl Book {
         }
         let path = self.path_of(id)?.clone();
         let _ = self.files.insert(path, text);
-        // Retarget links to removed sections.
+        self.retarget_merged(&redirects);
+        Ok(redirects)
+    }
+
+    /// After a split: links to `parent#anchor` (and `#anchor` inside the
+    /// new sections) go to the sections that now hold the anchors.
+    fn retarget_split(
+        &mut self,
+        id: &NodeId,
+        new_ids: &[NodeId],
+        redirects: &BTreeMap<String, Redirect>,
+    ) {
+        let new_set: BTreeSet<NodeId> = new_ids.iter().cloned().collect();
+        let paths: Vec<_> = self.files.keys().cloned().collect();
+        for path in paths {
+            let in_piece = self.id_at(&path).is_some_and(|i| new_set.contains(i));
+            let Some(text) = self.files.get(&path) else {
+                continue;
+            };
+            let updated = markdown::map_links(text, |link, _| {
+                if link.kind == LinkKind::Image {
+                    return None;
+                }
+                let redirect =
+                    if let Some(fragment) = link.dest.strip_prefix('#') {
+                        if in_piece {
+                            // Same-page links inside a new section: to the
+                            // section now holding the anchor, or back to the parent.
+                            return Some(LinkEdit {
+                                dest: Some(redirects.get(fragment).map_or_else(
+                                    || format!("{}#{fragment}", id.uri()),
+                                    Redirect::uri,
+                                )),
+                                ..LinkEdit::default()
+                            });
+                        }
+                        // Same-page links in the parent: only if the anchor moved.
+                        redirects.get(fragment)?
+                    } else {
+                        let (target, fragment) = NodeId::from_uri(&link.dest)?;
+                        if &target != id {
+                            return None;
+                        }
+                        redirects.get(fragment?)?
+                    };
+                Some(LinkEdit {
+                    dest: Some(redirect.uri()),
+                    ..LinkEdit::default()
+                })
+            });
+            let _ = self.files.insert(path, updated);
+        }
+    }
+
+    /// After a merge: links to removed sections go to their headings.
+    fn retarget_merged(&mut self, redirects: &BTreeMap<NodeId, Redirect>) {
         let paths: Vec<_> = self.files.keys().cloned().collect();
         for path in paths {
             let Some(text) = self.files.get(&path) else {
@@ -276,10 +308,8 @@ impl Book {
             let updated = markdown::map_links(text, |link, _| {
                 let (target, fragment) = NodeId::from_uri(&link.dest)?;
                 let redirect: &Redirect = redirects.get(&target)?;
-                let dest = fragment.map_or_else(
-                    || redirect.uri(),
-                    |f| format!("{}#{f}", redirect.id.uri()),
-                );
+                let dest = fragment
+                    .map_or_else(|| redirect.uri(), |f| format!("{}#{f}", redirect.id.uri()));
                 Some(LinkEdit {
                     dest: Some(dest),
                     ..LinkEdit::default()
@@ -287,7 +317,6 @@ impl Book {
             });
             let _ = self.files.insert(path, updated);
         }
-        Ok(redirects)
     }
 }
 
@@ -313,7 +342,10 @@ mod tests {
             book.path_of(new.first().unwrap()).unwrap().as_str(),
             "onboarding/first-week/day-one.md"
         );
-        assert_eq!(markdown::body(book.text(new.first().unwrap()).unwrap()).trim(), "Badge.");
+        assert_eq!(
+            markdown::body(book.text(new.first().unwrap()).unwrap()).trim(),
+            "Badge."
+        );
         let week = book.text(&id(3)).unwrap();
         assert!(!week.contains("Day one"), "{week}");
         assert!(week.contains("Read [§]"), "{week}");
@@ -323,7 +355,10 @@ mod tests {
         let week = book.text(&id(3)).unwrap();
         assert!(week.contains("## Day one\n\nBadge."), "{week}");
         assert!(week.contains("## Day two\n\nLaptop."), "{week}");
-        assert_eq!(book.path_of(&id(3)).unwrap().as_str(), "onboarding/first-week.md");
+        assert_eq!(
+            book.path_of(&id(3)).unwrap().as_str(),
+            "onboarding/first-week.md"
+        );
         assert!(book.removed().len() >= 2);
     }
 
@@ -340,13 +375,18 @@ mod tests {
         let mut ids = SequentialIds::new("01JBK00004");
         let new = book.split_headings(&id(3), Some(2), &mut ids).unwrap();
         let day_two = new.get(1).unwrap();
-        assert!(book.text(&id(6)).unwrap().contains(&format!("[day two]({})", day_two.uri())));
+        assert!(
+            book.text(&id(6))
+                .unwrap()
+                .contains(&format!("[day two]({})", day_two.uri()))
+        );
         // And merging sends it back to the heading.
         let _ = book.merge_into_headings(&id(3)).unwrap();
-        assert!(book
-            .text(&id(6))
-            .unwrap()
-            .contains(&format!("[day two]({}#day-two)", id(3).uri())));
+        assert!(
+            book.text(&id(6))
+                .unwrap()
+                .contains(&format!("[day two]({}#day-two)", id(3).uri()))
+        );
     }
 
     #[test]
@@ -355,10 +395,20 @@ mod tests {
         book.set_max_depth(4).unwrap();
         let mut ids = SequentialIds::new("01JBK00004");
         let a = book
-            .add_section(&Place::LastChildOf(id(5).into()), "Gateway", "## Limits\n\nFast.", &mut ids)
+            .add_section(
+                &Place::LastChildOf(id(5).into()),
+                "Gateway",
+                "## Limits\n\nFast.",
+                &mut ids,
+            )
             .unwrap();
         let _ = book
-            .add_section(&Place::LastChildOf(a.into()), "Gateway", "Nested.", &mut ids)
+            .add_section(
+                &Place::LastChildOf(a.into()),
+                "Gateway",
+                "Nested.",
+                &mut ids,
+            )
             .unwrap();
         let _ = book.merge_into_headings(&id(4)).unwrap();
         let text = book.text(&id(4)).unwrap();

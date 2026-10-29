@@ -12,7 +12,9 @@ use std::fmt::Write as _;
 use crate::manifest::NumberingStyle;
 
 /// A section number such as `2.3`, held as its components (`[2, 3]`).
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 #[serde(transparent)]
 pub struct SectionNumber(pub Vec<u32>);
 
