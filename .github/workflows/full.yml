@@ -36,6 +36,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
+      actions: read
 
   coverage:
     name: Rust coverage
@@ -47,6 +48,8 @@ jobs:
           persist-credentials: false
       - run: rustup toolchain install
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          save-if: ${{ github.event_name != 'pull_request' }}
       - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
         with:
           tool: cargo-nextest,cargo-llvm-cov,mdbook
@@ -69,6 +72,8 @@ jobs:
           persist-credentials: false
       - run: rustup toolchain install
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          save-if: ${{ github.event_name != 'pull_request' }}
       - run: cargo build --release --locked --package vellum-cli
       - name: Binary runs
         run: target/release/vellum --version

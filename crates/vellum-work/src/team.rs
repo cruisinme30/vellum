@@ -158,6 +158,9 @@ pub struct Team {
     /// Issue templates.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub templates: Vec<Template>,
+    /// Intake forms that let anyone file a well-formed triage issue.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub forms: Vec<crate::intake::IntakeForm>,
 }
 
 fn utc() -> String {
@@ -192,6 +195,7 @@ impl Team {
             sla: SlaPolicy::standard(),
             labels: Vec::new(),
             templates: Vec::new(),
+            forms: Vec::new(),
         })
     }
 
@@ -229,6 +233,13 @@ impl Team {
         for (i, t) in self.templates.iter().enumerate() {
             if self.templates.iter().skip(i + 1).any(|u| u.name == t.name) {
                 return Err(fail(format!("template {} is defined twice", t.name)));
+            }
+        }
+        for (i, f) in self.forms.iter().enumerate() {
+            f.check()
+                .map_err(|r| fail(format!("form {}: {r}", f.slug)))?;
+            if self.forms.iter().skip(i + 1).any(|g| g.slug == f.slug) {
+                return Err(fail(format!("form {} is defined twice", f.slug)));
             }
         }
         Ok(())
