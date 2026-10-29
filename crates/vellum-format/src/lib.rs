@@ -5,7 +5,8 @@
 //!
 //! Vellum Markdown is `CommonMark` 0.31 + GFM, YAML front matter, `:::`
 //! containers with Pandoc attributes, data fences, `$$` math and block IDs.
-//! Raw HTML is never interpreted. The [`ast`] module is the document model.
+//! Raw HTML is never interpreted. The [`ast`] module is the document model;
+//! [`serialize`] writes it back as canonical Markdown.
 //!
 //! [`parse`] never fails: problems are reported as [`Diagnostic`]s next to a
 //! readable fallback, so a page always renders.
@@ -17,6 +18,7 @@ pub mod diagnostic;
 mod extras;
 pub mod front_matter;
 mod prepass;
+mod serialize;
 
 pub use ast::{
     Alignment, Attributes, Block, Container, ContainerKind, Document, Fence, FenceKind, Inline,
@@ -25,6 +27,7 @@ pub use ast::{
 pub use convert::plain_text;
 pub use diagnostic::{Diagnostic, DiagnosticCode};
 pub use front_matter::{FrontMatter, Status};
+pub use serialize::serialize;
 
 /// A parsed document and the problems found while reading it.
 #[derive(Debug, Clone, PartialEq, Eq)]

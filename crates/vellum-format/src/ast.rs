@@ -6,7 +6,7 @@
 //! The AST is owned, serde-serialisable and in canonical form: two inputs
 //! that mean the same thing parse to equal trees (indented code becomes a
 //! fence, `GitHub` alerts become callout containers, raw HTML becomes text,
-//! adjacent text runs are merged). The serializer writes it back as
+//! adjacent text runs are merged). [`crate::serialize()`] writes it back as
 //! canonical Markdown, and parsing that output yields the same tree.
 
 use serde::Serialize;
