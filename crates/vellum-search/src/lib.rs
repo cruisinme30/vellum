@@ -23,6 +23,7 @@
 
 pub mod access;
 pub mod api;
+mod authz;
 pub mod backend;
 #[doc(hidden)]
 pub mod conformance;
