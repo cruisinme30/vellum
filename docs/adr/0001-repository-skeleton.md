@@ -39,6 +39,10 @@ full suite.
   and external link checks. Golden corpus, integration, contract,
   performance, chaos, security scans and the upgrade drill join it as
   their code lands.
+- Pull requests auto-merge into `develop` once their fast suite is
+  green. A red push to `develop` opens a "develop is red" issue that
+  holds other merges until it is fixed.
+- Releases are cut from a frozen branch, `chore/release-YYYY-MM-DD`.
 
 ### D32: licence and headers
 

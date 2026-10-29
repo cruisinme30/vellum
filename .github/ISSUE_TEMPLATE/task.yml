@@ -1,0 +1,64 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# One issue per 1.0 feature. The issue holds the feature's whole history:
+# the request, discussion, decisions, interface agreements and pull
+# requests. The pull request that ships it says "Closes #N", and the
+# feature's ADR in docs/adr/ links back here.
+name: Task
+description: A feature-sized piece of the 1.0 scope, closed by one pull request.
+title: "<Area>: <feature>"
+labels: ["task", "priority/p0"]
+body:
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What the feature does, in two or three sentences.
+    validations:
+      required: true
+  - type: input
+    id: requirements
+    attributes:
+      label: Requirements
+      description: Requirement and decision IDs from the brief and PRD, such as R-DR-4 or D12.
+    validations:
+      required: true
+  - type: input
+    id: owner
+    attributes:
+      label: Owner thread
+      description: The work thread that builds this feature.
+    validations:
+      required: true
+  - type: input
+    id: adr
+    attributes:
+      label: ADR
+      description: The decision record in docs/adr/ for this feature, such as ADR 0012. It must link back to this issue.
+    validations:
+      required: true
+  - type: input
+    id: prs
+    attributes:
+      label: Pull requests
+      description: 'Pull requests for this feature. Each one says "Closes #N" or "Refs #N".'
+      value: None yet
+  - type: textarea
+    id: history
+    attributes:
+      label: History
+      description: >-
+        Dated entries for the request, discussion, decisions and interface
+        agreements. Add later entries as comments on this issue.
+      value: "- YYYY-MM-DD: Task created."
+    validations:
+      required: true
+  - type: checkboxes
+    id: done
+    attributes:
+      label: Definition of done
+      options:
+        - label: 'One pull request for the feature, merged into develop, with "Closes #N" in its description'
+        - label: The ADR links back to this issue, and this issue links the ADR
+        - label: Tests at the right layer, tracing on new I/O, public items documented
