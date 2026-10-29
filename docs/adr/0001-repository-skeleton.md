@@ -11,7 +11,7 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D31, D32, D33, D112, D113
+- Decisions: D31, D32, D33, D112, D119
 
 :::
 
@@ -74,7 +74,7 @@ full suite.
 - This was first recorded under D33 and renumbered so that each decision
   has one number.
 
-### D113: every change is traceable
+### D119: every change is traceable
 
 - Every pull request, except releases, Dependabot, `chore` and `ci`,
   links a GitHub issue that holds the discussion behind it.
