@@ -1,0 +1,22 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "The F1 score:"
+          }
+        ],
+        "id": null
+      },
+      {
+        "type": "math",
+        "literal": "F_1 = \\frac{2 \\cdot P \\cdot R}{P + R}\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}
