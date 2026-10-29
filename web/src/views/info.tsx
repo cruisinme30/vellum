@@ -14,6 +14,8 @@ const SHORTCUTS: readonly [keys: string, id: string][] = [
   ["@name · [[Page]] · ENG-142 · 2026-11-24", "help-key-inline"],
   ["Alt Shift ↑ ↓ ← →", "help-key-tree"],
   ["Shift F10", "help-key-menu"],
+  ["↑ ↓ ← → · Enter · F2 · Shift Enter", "help-key-grid"],
+  ["Alt ← →", "help-key-board"],
 ];
 
 /** Help: shortcuts and every block the slash menu inserts. */
@@ -53,12 +55,6 @@ export function PendingView({ title, body }: { readonly title: string; readonly 
       <p className="vl-muted">{body}</p>
     </div>
   );
-}
-
-/** Data: collections. */
-export function CollectionsView() {
-  const t = useT();
-  return <PendingView title={t("nav-data")} body={t("data-pending")} />;
 }
 
 /** Admin. */

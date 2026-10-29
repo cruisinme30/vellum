@@ -1,0 +1,4 @@
+Text can be bold, italic, struck, highlighted, code , H2O and x2.
+Marks nest: bold italic, bold with italic inside and italic with bold inside.
+1 / 1
+

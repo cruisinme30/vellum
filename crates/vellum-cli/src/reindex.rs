@@ -11,7 +11,7 @@ use vellum_kernel::config::Config;
 
 /// Environment variable holding the 64-hex-character index key, until the
 /// keyring supplies it.
-const KEY_VAR: &str = "VELLUM_INDEX_KEY";
+pub const KEY_VAR: &str = "VELLUM_INDEX_KEY";
 
 /// Arguments of `vellum reindex`.
 #[derive(Debug, clap::Args)]
@@ -84,7 +84,7 @@ fn execute(args: &Args) -> Result<Vec<String>, String> {
 }
 
 /// Parses a 32-byte key written as 64 hex characters.
-fn index_key(hex: Option<&str>) -> Result<IndexKey, String> {
+pub fn index_key(hex: Option<&str>) -> Result<IndexKey, String> {
     let hex = hex.ok_or_else(|| format!("set {KEY_VAR} to the index key, or pass --plaintext"))?;
     let bad = || format!("{KEY_VAR} must be 64 hexadecimal characters");
     if hex.len() != 64 {

@@ -1,0 +1,4 @@
+| Note GitHub-style callouts are accepted. |
+
+| Warning They become ::: containers. |
+

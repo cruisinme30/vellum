@@ -1,0 +1,3 @@
+| Info Attributes go on the opening line. |
+
+[Normal] A container with only attributes.

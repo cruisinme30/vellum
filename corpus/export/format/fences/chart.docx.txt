@@ -1,0 +1,7 @@
+[Normal] Blocked requests per week
+|  |  |
+| W40 | 120 |
+| W41 | 185 |
+| W42 | 160 |
+| W43 | 240 |
+

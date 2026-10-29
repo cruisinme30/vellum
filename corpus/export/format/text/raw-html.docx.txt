@@ -1,0 +1,2 @@
+[Normal] Raw HTML is shown as text: <b>bold</b> stays literal.
+[Normal] <div class="note"> Never interpreted. </div>

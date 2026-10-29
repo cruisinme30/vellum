@@ -1,0 +1,10 @@
+block-beta
+  columns 3
+  client["Client"] space gateway["Gateway"]
+  space space space
+  db[("Audit log")] space backend["Backend"]
+  client --> gateway
+  gateway --> backend
+  gateway --> db
+1 / 1
+

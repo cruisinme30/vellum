@@ -1,0 +1,7 @@
+[ListParagraph/0] Use callouts for warnings and decisions
+[ListParagraph/0] One table per comparison
+[ListParagraph/1] Nested two spaces deep
+[ListParagraph/0] Diagrams for flows and architecture
+[ListParagraph/0] Draft the policy
+[ListParagraph/0] Run a simulation
+[ListParagraph/0] Switch to enforce

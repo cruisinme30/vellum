@@ -1,0 +1,1 @@
+[Code] @startumlactor Developerparticipant Gatewaydatabase "Audit log" as AuditDeveloper -> Gateway: POST /ordersGateway -> Audit: write decisionGateway --> Developer: 201 Created@enduml

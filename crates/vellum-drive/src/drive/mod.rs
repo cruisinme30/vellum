@@ -127,6 +127,14 @@ impl Drive {
         result
     }
 
+    /// Whether the index answers, for readiness probes.
+    ///
+    /// # Errors
+    /// The index failure.
+    pub async fn ready(&self) -> DriveResult<()> {
+        self.index.spaces().await.map(|_| ())
+    }
+
     /// Fails unless `actor` holds `permission` on `node` in `space`.
     ///
     /// People are checked through the access port. A model acting for a

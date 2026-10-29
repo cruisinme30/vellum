@@ -1,0 +1,6 @@
+[Heading1] Northstar handbook
+[Heading2] Getting started
+[Heading3] Install the binary
+[Heading4] Configure storage
+[Heading5] Choose a backend
+[Heading6] Footnote level

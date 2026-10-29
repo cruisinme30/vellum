@@ -1,0 +1,12 @@
+| Info The gateway is the single entry point. |
+
+| Warning A rewrite is not approved. |
+
+| Decision Ship the simulator before the Q4 review. |
+
+| Critical Never roll back the audit writer separately. |
+
+| Tip Press / to insert any block. |
+
+| Note Northstar runs on one binary. |
+

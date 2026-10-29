@@ -462,9 +462,13 @@ impl Identity {
             |hash| password::verify(password, hash),
         );
         let Some(user) = user.filter(|_| verified) else {
-            let _ = self.email_lockout.fail(&email, now);
+            // The back-off starts now, after the slow password check, not
+            // when the attempt began: otherwise a check slower than the
+            // first wait (1 s) would let the next attempt straight through.
+            let failed_at = Instant::now();
+            let _ = self.email_lockout.fail(&email, failed_at);
             if let Some(ip) = ip {
-                let _ = self.ip_lockout.fail(&ip, now);
+                let _ = self.ip_lockout.fail(&ip, failed_at);
             }
             tracing::info!(event = "identity.sign_in_failed", "sign-in failed");
             return Err(wrong_credentials());
