@@ -16,18 +16,15 @@ interface KnownIssue {
   test: RegExp;
 }
 
-const KNOWN: readonly KnownIssue[] = [
-  // The shell has no base stylesheet yet, so long words widen the page.
-  { issue: 293, rule: "horizontal-overflow", test: /^app shell › stress$/ },
-  { issue: 293, rule: "text-overflows-box", test: /^app shell › stress$/ },
-  { issue: 293, rule: "outside-viewport", test: /^app shell › stress$/ },
-];
+// Empty while no UI bug is open; add an entry with its issue when one is filed.
+const KNOWN: readonly KnownIssue[] = [];
 
 /** Splits problems into new ones and ones already tracked by an issue. */
 export function triage(problems: Problem[], title: string): { fresh: Problem[]; known: string[] } {
   const fresh: Problem[] = [];
   const known: string[] = [];
   for (const problem of problems) {
+    // eslint-disable-next-line sonarjs/no-empty-collection -- empty until a bug is filed
     const entry = KNOWN.find(
       (candidate) => candidate.rule === problem.rule && candidate.test.test(title),
     );

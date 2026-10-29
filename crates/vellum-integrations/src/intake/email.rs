@@ -398,7 +398,7 @@ pub enum EmailIntake {
 }
 
 /// Settings for email intake.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct EmailSettings {
     /// Team routing.
     pub routing: Routing,
@@ -410,6 +410,19 @@ pub struct EmailSettings {
     pub reply_domain: String,
     /// The secret for reply tags.
     pub reply_secret: Vec<u8>,
+}
+
+impl std::fmt::Debug for EmailSettings {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // The reply secret never reaches logs.
+        f.debug_struct("EmailSettings")
+            .field("routing", &self.routing)
+            .field("intake_domain", &self.intake_domain)
+            .field("plus_prefix", &self.plus_prefix)
+            .field("reply_domain", &self.reply_domain)
+            .field("reply_secret", &"<redacted>")
+            .finish()
+    }
 }
 
 /// Decides what to do with a parsed message.

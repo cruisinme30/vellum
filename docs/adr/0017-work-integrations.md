@@ -12,7 +12,7 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D79, D80, D81
-- Issue: #147, also #144, #145, #146, #149, #150, #151, #164
+- Issue: #147, also #144, #145, #146, #149, #150, #151, #164, #390
 - Pull requests: #227, #320, #338
 
 :::
@@ -98,7 +98,8 @@ and reach the issue core only through the `WorkCommands` port.
   with a reason through `WorkCommands`, by a bot user audited like a
   person.
 - Receivers keep the raw request body, so they mount on the gateway as
-  raw routes rather than typed operations.
+  raw routes (`vellum_integrations::receive`) rather than typed
+  operations. A provider with no secret configured gets `404`.
 - Webhook receivers written for other trackers must read
   `Vellum-Signature`; the timestamp-plus-HMAC shape is common.
 - `vellum_integrations::work::GraphWork` implements the port over the
