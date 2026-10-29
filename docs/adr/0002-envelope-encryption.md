@@ -12,7 +12,8 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D34, D35, D36
-- Issues: [#47](https://github.com/cruisinme30/vellum/issues/47), [#49](https://github.com/cruisinme30/vellum/issues/49), [#50](https://github.com/cruisinme30/vellum/issues/50), [#186](https://github.com/cruisinme30/vellum/issues/186)
+- Issue: #47, #49, #50, #186
+- Pull requests: #22, #29, #214
 
 :::
 
@@ -36,8 +37,6 @@ on-disk format and the provider contract in `vellum-crypto`.
   object: magic `\0VLE`, version, KEK id, wrapped DEK, nonce, ciphertext.
   A Markdown file never starts with a NUL byte, so plaintext and sealed
   objects are told apart without metadata.
-- Consequence: deleting one object's header shreds that object, and a
-  backup restores keys and data together.
 
 ### D35: the payload is bound to neither the path nor the header
 
@@ -47,10 +46,6 @@ on-disk format and the provider contract in `vellum-crypto`.
 - Rotation (`rewrap`) unwraps the DEK with the old KEK, wraps it with the
   current one and rewrites only the header. Retired KEKs stay in the
   keyring until no header names them.
-- Consequence: someone with write access to the store could swap two whole
-  sealed objects. That is an integrity threat to the store itself, covered
-  by authorization, the audit log and the index's content hashes, not by
-  encryption at rest.
 
 ### D36: providers own the KEK and the wrapped form
 
@@ -59,39 +54,29 @@ on-disk format and the provider contract in `vellum-crypto`.
 - `LocalKeyring` serves the OS keychain and passphrase cases. A passphrase
   KEK id carries its Argon2id salt and costs, so the passphrase alone
   re-derives the KEK from any envelope header.
+- E2E private spaces use envelope version 2 instead: the DEK is wrapped
+  once per member device key (X25519, HKDF-SHA256, XChaCha20-Poly1305),
+  each stanza tagged with a 16-byte key fingerprint, so the server holds
+  no key that opens it. `vellum-security` owns the member key registry.
+- Adding a member wraps the same DEK again; removing one drops its stanza
+  and new writes get fresh DEKs. `Sealed` stores E2E objects untouched.
 
-## Applying it to the blob store
+## Alternatives
 
-`vellum-sealed-store` wraps any `BlobStore` in `Sealed`, an engine-layer
-crate because `vellum-crypto` and `vellum-store` are both foundation.
+- **One DEK per document in a lookup table**: an extra table to back up
+  and keep in step, for no gain over one DEK per object.
+- **Bind the payload to its path**: renames would need re-encryption.
+- **Bind the payload to the header**: rotation would rewrite every
+  payload instead of one header.
 
-- Writes follow the space's mode: sealed by default, as is in a plaintext
-  space. Reads open an envelope wherever one is found and pass plaintext
-  through, so a space stays readable while it switches mode. A plaintext
-  object in an encrypted space is counted and logged until `reseal`
-  rewrites it.
-- `reseal` is the one migration and rotation step: it seals, re-wraps or
-  opens an object as the policy now wants, guarded by `IfMatch`.
-- Etags are the stored bytes' etags, so preconditions pass through. `get`,
-  `head`, `put` and `rename` report plaintext sizes (`head` reads the
-  object to find it); listings report stored sizes because they never
-  read content.
+## Consequences
 
-## E2E private spaces: recipient envelopes (version 2)
-
-Part of D36: the key-handling side of E2E private spaces lives in
-`vellum-crypto::recipients`; the member key registry, space policy and
-wiring belong to the security work built on it.
-
-- A version 2 envelope keeps the version 1 payload and wraps its DEK once
-  per member: an ephemeral X25519 key, HKDF-SHA256 over the shared secret,
-  and XChaCha20-Poly1305. Each stanza carries a 16-byte fingerprint of the
-  member's public key, so a device finds its stanza without trial
-  decryption.
-- Adding a member wraps the same DEK again; removing one drops its stanza.
-  Neither touches the payload. A removed member who kept an old DEK can
-  still read that version, so new writes always get fresh DEKs.
-- The crate builds for `wasm32-unknown-unknown`, so the desktop and PWA
-  clients open these envelopes in the browser.
-- `Sealed` stores an E2E space's objects only as version 2 envelopes,
-  refuses plaintext there, returns them untouched, and never reseals them.
+- Deleting one object's header shreds that object, and a backup
+  restores keys and data together.
+- Someone with write access to the store could swap two sealed objects;
+  authorization, the audit log and content hashes cover that.
+- `vellum-sealed-store` (engine layer) wraps any `BlobStore`: sealed
+  writes by default, reads that accept both forms while a space switches
+  mode, and `reseal` as the one migration and rotation step.
+- `head`, `get`, `put` and `rename` report plaintext sizes; listings
+  report stored sizes because they never read content.
