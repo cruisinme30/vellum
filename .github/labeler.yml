@@ -72,6 +72,11 @@ area/work:
   - changed-files:
       - any-glob-to-any-file:
           - "crates/vellum-work*/**"
+          - "crates/vellum-integrations/**"
+area/notify:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-notify/**"
 area/my-work:
   - changed-files:
       - any-glob-to-any-file:
