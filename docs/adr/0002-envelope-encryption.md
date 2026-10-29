@@ -75,3 +75,22 @@ crate because `vellum-crypto` and `vellum-store` are both foundation.
   `head`, `put` and `rename` report plaintext sizes (`head` reads the
   object to find it); listings report stored sizes because they never
   read content.
+
+## E2E private spaces: recipient envelopes (version 2)
+
+Part of D36: the key-handling side of E2E private spaces lives in
+`vellum-crypto::recipients`; the member key registry, space policy and
+wiring belong to the security work built on it.
+
+- A version 2 envelope keeps the version 1 payload and wraps its DEK once
+  per member: an ephemeral X25519 key, HKDF-SHA256 over the shared secret,
+  and XChaCha20-Poly1305. Each stanza carries a 16-byte fingerprint of the
+  member's public key, so a device finds its stanza without trial
+  decryption.
+- Adding a member wraps the same DEK again; removing one drops its stanza.
+  Neither touches the payload. A removed member who kept an old DEK can
+  still read that version, so new writes always get fresh DEKs.
+- The crate builds for `wasm32-unknown-unknown`, so the desktop and PWA
+  clients open these envelopes in the browser.
+- `Sealed` stores an E2E space's objects only as version 2 envelopes,
+  refuses plaintext there, returns them untouched, and never reseals them.

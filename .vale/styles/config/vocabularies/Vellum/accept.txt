@@ -52,3 +52,6 @@ KMS
 [Rr]e-?wrap(s|ped|ping)?
 [Uu]nwrap(s|ped|ping)?
 [Ll]abeler
+X25519
+HKDF
+[Ss]tanzas?
