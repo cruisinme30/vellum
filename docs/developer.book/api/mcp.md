@@ -26,7 +26,7 @@ implemented.
 
 ## Tools {#tools}
 
-`search`, `get_doc`, `get_blocks`, `get_outline`, `create_draft`, `propose_edit`, `create_issue`, `update_issue`, `add_comment`, `create_task`, `query_collection`, `upsert_rows`, `export` and `list_changes`.
+`search`, `get_doc`, `get_blocks`, `get_outline`, `get_template`, `create_draft`, `propose_edit`, `create_issue`, `update_issue`, `add_comment`, `create_task`, `query_collection`, `upsert_rows`, `export` and `list_changes`.
 
 ## Resources {#resources}
 

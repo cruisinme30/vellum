@@ -19,7 +19,7 @@ use crate::ports::{
     Actor, Attribution, AuditEvent, AuditSink, Block, BlockEdit, BlockSelector, Change, ChangePage,
     CollectionQuery, Document, EditProposal, ExportArtifact, ExportRequest, Issue, IssueUpdate,
     Listing, ListingPage, NewComment, NewIssue, NewPage, NewTask, OutlineNode, RowPage, RowUpsert,
-    SearchHit, SearchQuery, SiteInfo, Workspace, WorkspaceError, WriteMode, WriteReceipt,
+    SearchHit, SearchQuery, SiteInfo, Template, Workspace, WorkspaceError, WriteMode, WriteReceipt,
 };
 
 /// A page held in memory.
@@ -754,6 +754,19 @@ impl Workspace for MemoryWorkspace {
             items,
             next_cursor: (end < all.len()).then(|| end.to_string()),
         })
+    }
+
+    async fn list_templates(&self, _actor: &Actor) -> Result<Vec<Template>, WorkspaceError> {
+        Ok(self
+            .lock()
+            .templates
+            .keys()
+            .map(|name| Template {
+                name: name.clone(),
+                title: name.to_uppercase(),
+                uri: format!("vellum://template/{name}"),
+            })
+            .collect())
     }
 
     async fn get_template(&self, _actor: &Actor, name: &str) -> Result<String, WorkspaceError> {
