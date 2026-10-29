@@ -51,6 +51,7 @@ skip = [
     { crate = "syn@2", reason = "proc-macro ecosystem is moving from syn 2 to 3" },
     { crate = "getrandom@0.3", reason = "older crates still on 0.3 during the 0.4 move" },
     { crate = "r-efi@5", reason = "pulled by getrandom 0.3" },
+    { crate = "miniz_oxide@0.8", reason = "png still on 0.8 while flate2 moved to 0.9" },
 ]
 skip-tree = []
 

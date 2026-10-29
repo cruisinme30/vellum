@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+[package]
+name = "vellum-sealed-store"
+description = "A BlobStore decorator that seals every object with envelope encryption, with plaintext spaces as an explicit opt-out."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[package.metadata.vellum]
+layer = "engine"
+
+[lints]
+workspace = true
+
+[dependencies]
+async-trait = "0.1.92"
+bytes = "1.12.1"
+futures = "0.3.34"
+opentelemetry = "0.33.1"
+tracing = "0.1.44"
+vellum-crypto = { path = "../vellum-crypto" }
+vellum-store = { path = "../vellum-store" }
+
+[dev-dependencies]
+tempfile = "3.27.0"
+tokio = { version = "1.49.0", features = ["macros", "rt-multi-thread"] }
+vellum-store = { path = "../vellum-store", features = ["conformance"] }
