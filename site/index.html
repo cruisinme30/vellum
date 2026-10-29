@@ -9,197 +9,649 @@ SPDX-License-Identifier: AGPL-3.0-only
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'"
+      content="default-src 'none'; style-src 'self'; img-src 'self'; font-src 'self'; media-src 'self'; base-uri 'none'; form-action 'none'"
     />
     <meta name="referrer" content="no-referrer" />
     <meta name="color-scheme" content="light dark" />
-    <title>Vellum: the workspace that lives in your folders</title>
+    <title>Vellum: docs, data and work in one app you own</title>
     <meta
       name="description"
-      content="Vellum is an open-source, self-hosted workspace for documents, books, databases, issue tracking and tasks. Every object is a Markdown file in a real folder, and an MCP server lets AI models work under your own permissions."
+      content="Vellum is a free, open-source workspace you run yourself. It replaces separate tools for documents, wikis, databases, issue tracking and to-do lists, keeps every page as a plain Markdown file, and lets Claude help only with your approval."
     />
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="preload" href="fonts/google-sans-flex-latin.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <a class="skip" href="#main">Skip to content</a>
+
     <header class="top">
-      <nav class="bar" aria-label="Site">
+      <nav class="wrap bar" aria-label="Site">
         <a class="brand" href="./">
-          <img src="favicon.svg" alt="" width="28" height="28" />
+          <img src="favicon.svg" alt="" width="30" height="30" />
           <span>Vellum</span>
         </a>
-        <ul class="links">
-          <li><a href="#features">Features</a></li>
-          <li><a href="#install">Install</a></li>
-          <li><a href="#docs">Docs</a></li>
-          <li>
-            <a class="pill tonal" href="https://github.com/cruisinme30/vellum">GitHub</a>
-          </li>
+        <ul class="nav">
+          <li><a href="#tour">Product</a></li>
+          <li><a href="#ai">AI</a></li>
+          <li><a href="#compare">Compare</a></li>
+          <li><a href="#start">Get started</a></li>
+          <li><a href="docs/">Docs</a></li>
         </ul>
+        <div class="end">
+          <a class="btn out" href="https://github.com/cruisinme30/vellum">GitHub</a>
+          <a class="btn pri" href="docs/">Read the docs</a>
+        </div>
       </nav>
     </header>
 
+    <p class="status">
+      <b>Vellum is in development.</b> Version 1.0 is not out yet. This page
+      and its screens show what 1.0 will ship.
+    </p>
+
     <main id="main">
-      <section class="hero">
-        <p class="eyebrow">Open source · Self-hosted · AGPL-3.0</p>
-        <h1>The workspace that lives in your folders.</h1>
+      <section class="wrap hero" aria-labelledby="hero-title">
+        <h1 id="hero-title">Docs, data and work in one app <span class="grad">you own.</span></h1>
         <p class="lede">
-          Documents, books, databases, issue tracking, tasks and a drive in one
-          small binary. Every object is a Markdown file you can open, grep,
-          back up and put in Git. The database is only an index you can rebuild.
+          Vellum is a free, open-source workspace you run on your own computer
+          or server. It does the jobs of <b>Notion, Confluence, Jira, Linear
+          and Google Docs</b> in one app, keeps every page as a plain Markdown
+          file you can open anywhere, and lets Claude help only when you
+          approve.
         </p>
-        <p class="actions">
-          <a class="pill filled" href="#install">Get started</a>
-          <a class="pill outlined" href="https://github.com/cruisinme30/vellum">View the source</a>
-        </p>
-        <p class="status">
-          Vellum is in active development toward its 1.0 release. Follow along
-          on GitHub.
-        </p>
-      </section>
-
-      <section class="band" aria-labelledby="files-title">
-        <div class="split">
-          <div>
-            <h2 id="files-title">Your files, not our format</h2>
-            <p>
-              A page is a <code>.md</code> file. A book is a folder with a
-              <code>SUMMARY.md</code> that builds with unmodified mdBook. A
-              collection is a folder with one page per row. Edit them in Vellum, in your editor
-              or with a script, and Vellum notices and merges the change.
-            </p>
-            <p>
-              Stop the server and your workspace is still there: readable,
-              searchable and yours.
-            </p>
-          </div>
-          <pre class="tree" tabindex="0" aria-label="Example workspace folder"><code>northstar/
-├─ drives/shared/product/
-│  ├─ roadmap.md
-│  ├─ handbook.book/
-│  │  ├─ book.yaml
-│  │  ├─ SUMMARY.md
-│  │  └─ welcome.md
-│  └─ customers.collection/
-│     ├─ schema.yaml
-│     └─ rows/acme.md
-├─ teams/NS/issues/NS-142.md
-└─ tasks/ana/inbox.md</code></pre>
+        <div class="ctas">
+          <a class="btn pri" href="#film"><span class="play" aria-hidden="true">▶</span>Watch the 30-second tour</a>
+          <a class="btn ton" href="docs/">Read the docs</a>
         </div>
-      </section>
+        <ul class="meta" aria-label="At a glance">
+          <li>Free for any team size</li>
+          <li>Runs on a laptop</li>
+          <li>Open source (AGPL-3.0)</li>
+        </ul>
 
-      <section id="features" aria-labelledby="features-title">
-        <h2 id="features-title">One workspace instead of six tools</h2>
-        <ul class="cards">
-          <li class="card">
-            <h3>Pages and real-time editing</h3>
-            <p>
-              A block editor with comments, history and live collaboration,
-              exporting to PDF, Word, HTML and Markdown.
-            </p>
-          </li>
-          <li class="card">
-            <h3>Books</h3>
-            <p>
-              Long documents as a tree of pages with numbering, cross-references
-              and whole-book export. Publish one as a static site.
-            </p>
-          </li>
-          <li class="card">
-            <h3>Collections</h3>
-            <p>
-              Databases with typed properties, relations and formulas, shown as
-              tables, boards, calendars and galleries.
-            </p>
-          </li>
-          <li class="card">
-            <h3>Work</h3>
-            <p>
-              Fast issue tracking with cycles, triage, projects and Git
-              automation, keyboard first.
-            </p>
-          </li>
-          <li class="card">
-            <h3>My Work</h3>
-            <p>
-              Your personal tasks next to the issues assigned to you, with
-              reminders and a daily digest.
-            </p>
-          </li>
-          <li class="card">
-            <h3>Drive</h3>
-            <p>
-              Spaces, folders, favourites and sharing that organise all of it,
-              with attachments stored where you choose.
-            </p>
-          </li>
-          <li class="card">
-            <h3>An AI door, on your terms</h3>
-            <p>
-              A built-in MCP server lets Claude and other models search, read and
-              draft with your permissions. Their edits arrive as drafts for you
-              to accept.
-            </p>
-          </li>
-          <li class="card">
-            <h3>Encrypted by default</h3>
-            <p>
-              Every document is encrypted at rest with its own key. Private
-              spaces can be end-to-end encrypted.
-            </p>
-          </li>
-          <li class="card">
-            <h3>Laptop to organisation</h3>
-            <p>
-              One binary idles under 80 MB on a laptop and scales out to a highly
-              available cluster with the same code.
-            </p>
-          </li>
+        <div class="film" id="film">
+          <div class="browser">
+            <div class="chrome" aria-hidden="true">
+              <i></i><i></i><i></i>
+              <span class="url">northstar.dev / Product / Gateway 2.0 launch plan</span>
+            </div>
+            <video
+              class="loop"
+              autoplay
+              muted
+              loop
+              playsinline
+              controls
+              preload="metadata"
+              poster="media/vellum-tour-poster.jpg"
+              width="1280"
+              height="800"
+              aria-label="Product tour, 27 seconds, no sound. The transcript is below the video."
+            >
+              <source src="media/vellum-tour.webm" type="video/webm" />
+              <source src="media/vellum-tour.mp4" type="video/mp4" />
+            </video>
+            <video
+              class="calm"
+              controls
+              muted
+              playsinline
+              preload="none"
+              poster="media/vellum-tour-poster.jpg"
+              width="1280"
+              height="800"
+              aria-label="Product tour, 27 seconds, no sound. Press play to watch. The transcript is below the video."
+            >
+              <source src="media/vellum-tour.webm" type="video/webm" />
+              <source src="media/vellum-tour.mp4" type="video/mp4" />
+            </video>
+          </div>
+          <ol class="chapters" aria-label="What the tour shows">
+            <li><b>0:00</b>Write a page</li>
+            <li><b>0:06</b>Insert a chart with /</li>
+            <li><b>0:10</b>See the file on disk</li>
+            <li><b>0:15</b>Approve Claude's edit</li>
+            <li><b>0:21</b>An issue closes itself</li>
+          </ol>
+          <details class="transcript">
+            <summary>Read the tour as text</summary>
+            <ol>
+              <li>Priya types a title and a paragraph into the Gateway 2.0 launch plan.</li>
+              <li>She types <code>/ch</code> and picks Chart. A chart of the launch numbers appears in the page.</li>
+              <li>The view splits: on the right is the same page as a <code>.md</code> file, with the new chart as a few lines of text.</li>
+              <li>She asks Claude to add acceptance criteria. Claude shows the pages it searched and proposes an edit on an approval card. Nothing changes until she selects Accept.</li>
+              <li>On the engineering board, issue ENG-482 moves to Done by itself when its pull request is merged.</li>
+            </ol>
+          </details>
+        </div>
+
+        <ul class="replaces" aria-label="Tools Vellum replaces">
+          <li>One app instead of</li>
+          <li><s>Notion</s></li>
+          <li><s>Confluence</s></li>
+          <li><s>Jira</s></li>
+          <li><s>Linear</s></li>
+          <li><s>Google Docs</s></li>
+          <li><s>Todoist</s></li>
+          <li><s>Google Drive</s></li>
         </ul>
       </section>
 
-      <section id="install" class="band" aria-labelledby="install-title">
-        <h2 id="install-title">Install</h2>
-        <p>
-          Vellum 1.0 will ship as a single signed binary, a container image and a
-          Helm chart. Until then, build it from source. You need Rust (the
-          pinned version installs itself), Node 22 and pnpm 10.
-        </p>
-        <pre class="code" tabindex="0" aria-label="Install commands"><code>git clone https://github.com/cruisinme30/vellum
-cd vellum
-cargo build --release
-pnpm --dir web install</code></pre>
-        <p>
-          The <a href="https://github.com/cruisinme30/vellum/blob/develop/CONTRIBUTING.md">contributing guide</a>
-          explains the branches and the checks every change passes.
+      <section class="wrap sec" id="why" aria-labelledby="why-title">
+        <div class="sec-h">
+          <span class="kicker">Why it's worth your time</span>
+          <h2 id="why-title">Less to pay for. Less to run. Nothing to lose.</h2>
+          <p>
+            Most teams rent five tools that can't see each other's data and
+            keep it in formats only they can read. Vellum is one app, on your
+            own machine, writing files you can open with anything.
+          </p>
+        </div>
+        <div class="reasons">
+          <div class="reason">
+            <div class="big">$0</div>
+            <h3>Per seat, forever</h3>
+            <p>No per-user price, no paid tier you get pushed into, and no feature held back for an "Enterprise" plan.</p>
+          </div>
+          <div class="reason">
+            <div class="big">1<small>app</small></div>
+            <h3>Instead of five</h3>
+            <p>Docs, wiki, databases, issues and your to-do list share one search, one set of permissions and one history.</p>
+          </div>
+          <div class="reason">
+            <div class="big">100<small>%</small></div>
+            <h3>Plain Markdown</h3>
+            <p>Every page, row, issue and task is a file. Stop using Vellum tomorrow and you still have all of it.</p>
+          </div>
+          <div class="reason">
+            <div class="big">80<small>MB</small></div>
+            <h3>One small program</h3>
+            <p>Uses under 80 MB of memory at idle on a laptop, and grows into a high-availability cluster without changing apps.</p>
+          </div>
+        </div>
+        <p class="note">Figures are the targets for 1.0, checked by automated tests on every change.</p>
+      </section>
+
+      <section class="wrap sec tour" id="tour" aria-labelledby="tour-title">
+        <div class="sec-h">
+          <span class="kicker">See how it works</span>
+          <h2 id="tour-title">Everything a team writes and tracks.</h2>
+          <p>
+            Pick a part of the product. Every screen shows Northstar, the
+            demo workspace that comes with Vellum, and links to its guide.
+          </p>
+        </div>
+        <input type="radio" name="tour" id="t1" checked />
+        <input type="radio" name="tour" id="t2" />
+        <input type="radio" name="tour" id="t3" />
+        <input type="radio" name="tour" id="t4" />
+        <input type="radio" name="tour" id="t5" />
+        <input type="radio" name="tour" id="t6" />
+        <div class="ttabs">
+          <label for="t1"><i aria-hidden="true"></i>Write together</label>
+          <label for="t2"><i aria-hidden="true"></i>Organise data</label>
+          <label for="t3"><i aria-hidden="true"></i>Track work</label>
+          <label for="t4"><i aria-hidden="true"></i>Plan your day</label>
+          <label for="t5"><i aria-hidden="true"></i>Publish books</label>
+          <label for="t6"><i aria-hidden="true"></i>Ask Claude</label>
+        </div>
+
+        <div class="tpanel p1">
+          <div>
+            <h3>Write together, in real time.</h3>
+            <p>A fast editor with live cursors, comments and history. Type <code>/</code> on an empty line to add any block: callouts, charts, diagrams or live issue chips.</p>
+            <ul>
+              <li>See who's on the page and what they're editing</li>
+              <li>Charts and diagrams that update from your data</li>
+              <li>Export to PDF, Word, HTML or Markdown</li>
+            </ul>
+            <p class="how"><b>Try it:</b> select New, then Page, and press / on an empty line.<br /><a href="docs/user/start/editor.html">Guide: the editor</a></p>
+          </div>
+          <div class="shot"><img src="img/editor.jpg" alt="The Vellum editor showing the Gateway 2.0 launch plan with a chart, live issue chips, a collaborator's cursor and a comment thread" loading="lazy" width="1600" height="1000" /></div>
+        </div>
+
+        <div class="tpanel p2">
+          <div>
+            <h3>Databases, without the spreadsheet.</h3>
+            <p>Collections hold typed data: numbers, dates, people, links between records and formulas. Show the same rows as a table, board, calendar or gallery.</p>
+            <ul>
+              <li>Link customers to the issues that affect them</li>
+              <li>Formulas and roll-ups across those links</li>
+              <li>Each row is a Markdown file</li>
+            </ul>
+            <p class="how"><b>Try it:</b> select New, then Collection.<br /><a href="docs/user/data/index.html">Guide: collections</a></p>
+          </div>
+          <div class="shot"><img src="img/collection.jpg" alt="The Customers collection as a table with plan, seats, yearly revenue, usage, health, linked issues, owners and renewal dates" loading="lazy" width="1600" height="1000" /></div>
+        </div>
+
+        <div class="tpanel p3">
+          <div>
+            <h3>Issue tracking at keyboard speed.</h3>
+            <p>Teams, cycles, triage and projects, built for engineers. Link a pull request and the issue moves itself when it merges.</p>
+            <ul>
+              <li>Press C for a new issue, ⌘K for any command</li>
+              <li>Cycles that roll unfinished work over</li>
+              <li>Import from Linear and Jira</li>
+            </ul>
+            <p class="how"><b>Try it:</b> open Work, pick your team and press C.<br /><a href="docs/user/work/index.html">Guide: issues and teams</a></p>
+          </div>
+          <div class="shot"><img src="img/board.jpg" alt="The engineering team's cycle 14 board with Backlog, Todo, In progress and Done columns" loading="lazy" width="1600" height="1000" /></div>
+        </div>
+
+        <div class="tpanel p4">
+          <div>
+            <h3>Your day, in one list.</h3>
+            <p>My Work puts your own tasks next to the issues assigned to you, with reminders, repeating tasks and a daily digest.</p>
+            <ul>
+              <li>Press Q anywhere to add a task</li>
+              <li>Type dates in plain English</li>
+              <li>A calendar feed for any calendar app</li>
+            </ul>
+            <p class="how"><b>Try it:</b> press Q and type "Plan cycle 15 goals monday".<br /><a href="docs/user/my-work/index.html">Guide: My Work</a></p>
+          </div>
+          <div class="shot"><img src="img/mywork.jpg" alt="My Work for Priya Shah with today's tasks, an assigned issue, a draft from Claude and upcoming repeating tasks" loading="lazy" width="1600" height="1000" /></div>
+        </div>
+
+        <div class="tpanel p5">
+          <div>
+            <h3>Long documents, done properly.</h3>
+            <p>Books turn pages into chapters with numbered headings, figures and cross-references, then export the whole thing or publish it as a website.</p>
+            <ul>
+              <li>Numbered sections and figure captions</li>
+              <li>PDF and Word with a table of contents</li>
+              <li>Builds with standard mdBook</li>
+            </ul>
+            <p class="how"><b>Try it:</b> select New, then Book. When it's ready, select Export.<br /><a href="docs/user/books/index.html">Guide: books</a></p>
+          </div>
+          <div class="shot"><img src="img/book.jpg" alt="Exporting the Engineering handbook book as a PDF, with a preview of two numbered pages" loading="lazy" width="1600" height="1000" /></div>
+        </div>
+
+        <div class="tpanel p6">
+          <div>
+            <h3>An assistant that asks first.</h3>
+            <p>Claude searches and reads with your permissions, says which pages it used, and proposes changes as drafts. Nothing changes until you accept.</p>
+            <ul>
+              <li>Answers point to the exact paragraphs they came from</li>
+              <li>Every request is logged and rate limited</li>
+              <li>Works with Claude Desktop, Claude Code and Cursor</li>
+            </ul>
+            <p class="how"><b>Try it:</b> open Settings, then AI, and pick your app.<br /><a href="docs/user/ai/index.html">Guide: connect Claude</a></p>
+          </div>
+          <div class="shot"><img src="img/ai.jpg" alt="The Claude panel beside the launch plan, showing the pages it searched, an answer with sources and a proposed edit with Accept, Edit then accept and Discard buttons" loading="lazy" width="1600" height="1000" /></div>
+        </div>
+      </section>
+
+      <section class="wrap sec" aria-labelledby="files-title">
+        <div class="files">
+          <div>
+            <span class="kicker">Your files, not our database</span>
+            <h2 id="files-title">Stop the server. Your work is still there.</h2>
+            <p>
+              Vellum saves every page as a Markdown file in an ordinary
+              folder. Open it in any editor, search it, back it up or keep it
+              in Git. Change it outside Vellum and Vellum picks up the change.
+            </p>
+            <p>
+              The database is only an index for speed. Delete it and Vellum
+              rebuilds it from the folder.
+            </p>
+            <ul class="facts" aria-label="What is in the folder">
+              <li>.md pages</li>
+              <li>.book folders</li>
+              <li>.collection rows</li>
+              <li>works with Git</li>
+            </ul>
+            <p class="more"><a href="docs/user/drive/external-edits.html">Guide: external edits and Git</a></p>
+          </div>
+          <div class="stack" data-allow-overlap>
+            <span class="lab a">In Vellum</span>
+            <div class="s1"><img src="img/editor.jpg" alt="The launch plan in the Vellum editor" loading="lazy" width="1600" height="1000" /></div>
+            <div class="s2"><img src="img/files.jpg" alt="The same launch plan as a Markdown file open in a code editor" loading="lazy" width="1600" height="1000" /></div>
+            <span class="lab b">gateway-2-launch.md</span>
+          </div>
+        </div>
+      </section>
+
+      <div class="wrap" id="ai">
+        <section class="ai" aria-labelledby="ai-title">
+          <div>
+            <span class="kicker">AI on your terms</span>
+            <h2 id="ai-title">Let Claude help. Keep the last word.</h2>
+            <p>
+              Vellum has a built-in MCP server, the open standard AI apps use
+              to work with other tools. Any MCP app can search and draft in
+              your workspace, seeing only what you can see. Its changes wait
+              for you as drafts.
+            </p>
+            <ol class="flow">
+              <li><i>1</i><span><b>Ask</b>"Add the acceptance criteria from the support thread."</span></li>
+              <li><i>2</i><span><b>It searches what you can see</b>Every step is shown to you and logged.</span></li>
+              <li><i>3</i><span><b>You decide</b>Accept, edit then accept, or discard. Nothing changes until you do.</span></li>
+            </ol>
+            <ul class="clients" aria-label="Works with">
+              <li>Claude Desktop</li>
+              <li>Claude Code</li>
+              <li>Cursor</li>
+              <li>Any MCP app</li>
+            </ul>
+            <p class="more"><a href="docs/user/ai/drafts.html">Guide: drafts and review</a> · <a href="docs/developer/api/mcp.html">The MCP server</a></p>
+          </div>
+          <div class="shot"><img src="img/ai-dark.jpg" alt="Claude proposing an edit to the launch plan and waiting for approval, in the dark theme" loading="lazy" width="1600" height="1000" /></div>
+        </section>
+      </div>
+
+      <section class="wrap sec" id="compare" aria-labelledby="compare-title">
+        <div class="sec-h">
+          <span class="kicker">Compare</span>
+          <h2 id="compare-title">How Vellum compares.</h2>
+          <p>
+            Each of these tools is excellent at its own job. Vellum covers the
+            whole set, and it's the only one that keeps your work as plain
+            files on a server you control.
+          </p>
+        </div>
+        <div class="cmp-wrap" tabindex="0" role="region" aria-labelledby="compare-title">
+          <table class="cmp">
+            <caption>
+              The Vellum column is what 1.0 will ship. The others are from
+              each product's public pages, checked in October 2026.
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Feature</th>
+                <th scope="col" class="v">Vellum<small>open source</small></th>
+                <th scope="col">Notion</th>
+                <th scope="col">Confluence<small>with Jira</small></th>
+                <th scope="col">Linear</th>
+                <th scope="col">Obsidian</th>
+                <th scope="col">Plane</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Open source</th>
+                <td class="v"><span class="y">AGPL</span></td>
+                <td><span class="n">No</span></td>
+                <td><span class="n">No</span></td>
+                <td><span class="n">No</span></td>
+                <td><span class="n">No</span></td>
+                <td><span class="y">AGPL</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Runs on your own server</th>
+                <td class="v"><span class="y">Yes</span></td>
+                <td><span class="n">No</span></td>
+                <td><span class="p">Paid Data Center</span></td>
+                <td><span class="n">No</span></td>
+                <td><span class="p">Desktop app only</span></td>
+                <td><span class="y">Yes</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Your work as plain files<small>readable without the app</small></th>
+                <td class="v"><span class="y">Yes</span></td>
+                <td><span class="p">Export only</span></td>
+                <td><span class="p">Export only</span></td>
+                <td><span class="p">Export only</span></td>
+                <td><span class="y">Yes</span></td>
+                <td><span class="p">Export only</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Docs and wiki</th>
+                <td class="v"><span class="y">Yes</span></td>
+                <td><span class="y">Yes</span></td>
+                <td><span class="y">Yes</span></td>
+                <td><span class="p">Project docs</span></td>
+                <td><span class="y">Yes</span></td>
+                <td><span class="p">Pages</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Databases with views</th>
+                <td class="v"><span class="y">Yes</span></td>
+                <td><span class="y">Yes</span></td>
+                <td><span class="p">Cloud only</span></td>
+                <td><span class="n">No</span></td>
+                <td><span class="p">Bases</span></td>
+                <td><span class="n">No</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Issue tracking with cycles</th>
+                <td class="v"><span class="y">Yes</span></td>
+                <td><span class="p">Sprints</span></td>
+                <td><span class="y">Jira</span></td>
+                <td><span class="y">Yes</span></td>
+                <td><span class="n">No</span></td>
+                <td><span class="y">Yes</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Book-length documents<small>numbered, exported as one PDF</small></th>
+                <td class="v"><span class="y">Yes</span></td>
+                <td><span class="n">No</span></td>
+                <td><span class="p">Page tree</span></td>
+                <td><span class="n">No</span></td>
+                <td><span class="p">Plugin</span></td>
+                <td><span class="n">No</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Real-time co-editing</th>
+                <td class="v"><span class="y">Yes</span></td>
+                <td><span class="y">Yes</span></td>
+                <td><span class="y">Yes</span></td>
+                <td><span class="y">Yes</span></td>
+                <td><span class="n">No</span></td>
+                <td><span class="y">Yes</span></td>
+              </tr>
+              <tr>
+                <th scope="row">End-to-end encrypted spaces</th>
+                <td class="v"><span class="y">Yes</span></td>
+                <td><span class="n">No</span></td>
+                <td><span class="n">No</span></td>
+                <td><span class="n">No</span></td>
+                <td><span class="y">With Sync</span></td>
+                <td><span class="n">No</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Price for a team of 50</th>
+                <td class="v"><b>Free</b></td>
+                <td>Per seat</td>
+                <td>Per seat<small>free up to 10 users</small></td>
+                <td>Per seat</td>
+                <td>Free app<small>sync is paid</small></td>
+                <td>Free self-hosted<small>paid plans add features</small></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <ul class="legend" aria-label="Key">
+          <li><span class="y">Yes</span></li>
+          <li><span class="p">Partly, as noted</span></li>
+          <li><span class="n">No</span></li>
+          <li>Spotted a mistake? <a href="https://github.com/cruisinme30/vellum/issues">Tell us</a> and we'll fix it.</li>
+        </ul>
+      </section>
+
+      <section class="wrap sec" aria-labelledby="run-title">
+        <div class="sec-h">
+          <span class="kicker">Less to run</span>
+          <h2 id="run-title">One program, not a cluster of services.</h2>
+          <p>
+            A typical self-hosted workspace needs a database, a cache, a queue,
+            file storage and a search engine before it shows a single page.
+            Vellum starts as one program and adds pieces only when you outgrow
+            it.
+          </p>
+        </div>
+        <div class="run">
+          <div class="runc">
+            <h3>A typical self-hosted stack</h3>
+            <p>Ten parts to install and keep running.</p>
+            <ul class="boxes">
+              <li>web app</li>
+              <li>API server</li>
+              <li>background worker</li>
+              <li>scheduler</li>
+              <li>PostgreSQL</li>
+              <li>Redis</li>
+              <li>message queue</li>
+              <li>object storage</li>
+              <li>search engine</li>
+              <li>reverse proxy</li>
+            </ul>
+          </div>
+          <div class="runc">
+            <h3>Vellum, on a laptop or for a team</h3>
+            <p>Everything in one process, HTTPS certificates included.</p>
+            <ul class="boxes">
+              <li class="one"><img src="favicon.svg" alt="" width="28" height="28" />vellum serve</li>
+            </ul>
+            <dl class="mini">
+              <div><dt>&lt; 80 MB</dt><dd>memory at idle</dd></div>
+              <div><dt>&lt; 2 s</dt><dd>to start</dd></div>
+              <div><dt>&lt; 40 MB</dt><dd>download</dd></div>
+            </dl>
+          </div>
+        </div>
+        <p class="note">
+          1.0 targets. Add PostgreSQL, object storage and Kubernetes when you
+          need high availability. <a href="docs/admin/deploy/index.html">Guide: choosing a deployment</a>
         </p>
       </section>
 
-      <section id="docs" aria-labelledby="docs-title">
-        <h2 id="docs-title">Documentation</h2>
-        <!-- BOOKS -->
+      <section class="wrap sec" id="start" aria-labelledby="start-title">
+        <div class="sec-h">
+          <span class="kicker">Get started</span>
+          <h2 id="start-title">Up and running in three steps.</h2>
+          <p>This is how setup works once 1.0 is released.</p>
+        </div>
+        <ol class="steps">
+          <li class="step">
+            <h3>Install one file</h3>
+            <p>A signed program for macOS, Linux and Windows. A Docker image and a Helm chart too.</p>
+            <pre class="code" tabindex="0" aria-label="Check the installed version"><code>vellum --version</code></pre>
+          </li>
+          <li class="step">
+            <h3>Start it</h3>
+            <p>Point it at a folder, open <code>http://127.0.0.1:7700</code> and create the first account.</p>
+            <pre class="code" tabindex="0" aria-label="Start Vellum with a data folder"><code>vellum serve --data-dir ~/vellum</code></pre>
+          </li>
+          <li class="step">
+            <h3>Invite your team</h3>
+            <p>Add sign-in with your company's single sign-on, then connect Claude if you like.</p>
+            <pre class="code" tabindex="0" aria-label="Connect Claude Code to Vellum"><code>claude mcp add vellum -- vellum mcp</code></pre>
+          </li>
+        </ol>
+        <div class="today">
+          <p><b>What you can do today.</b> Read every guide on this site. Build Vellum from source and read the same guides in your terminal:</p>
+          <pre class="code" tabindex="0" aria-label="Build Vellum and open the user guide"><code>git clone https://github.com/cruisinme30/vellum
+cd vellum &amp;&amp; cargo build --release
+./target/release/vellum docs user</code></pre>
+          <p>
+            <a href="docs/admin/deploy/single-binary.html">Guide: install the single binary</a> ·
+            <a href="docs/admin/reference/cli.html">Command reference</a>
+          </p>
+        </div>
       </section>
 
-      <section class="band" aria-labelledby="licence-title">
-        <h2 id="licence-title">Free software, no lock-in</h2>
-        <p>
-          Vellum is licensed under the
-          <a href="https://github.com/cruisinme30/vellum/blob/develop/LICENSE">GNU Affero General Public License v3.0</a>.
-          There is no per-seat price and no hosted tier you are pushed toward.
-          Contributions are welcome under the Developer Certificate of Origin.
-        </p>
+      <section class="wrap sec" id="learn" aria-labelledby="learn-title">
+        <div class="sec-h">
+          <span class="kicker">Learn Vellum</span>
+          <h2 id="learn-title">A guide for every role.</h2>
+          <p>
+            All the documentation lives on this site. The same guides ship
+            inside the app, where <kbd>?</kbd> opens the page about the screen
+            you're on.
+          </p>
+        </div>
+        <div class="learn">
+          <a class="lc feat" href="docs/">
+            <span class="n2"><!-- COUNT:pages --></span>
+            <h3>Help centre</h3>
+            <p>Every guide, a cookbook of step-by-step recipes and every keyboard shortcut.</p>
+            <span class="go">Open the help centre →</span>
+          </a>
+          <a class="lc" href="docs/user/index.html">
+            <h3>Using Vellum</h3>
+            <p>Your first ten minutes, writing, data, books, work, My Work and AI.</p>
+            <span class="go">User guide →</span>
+          </a>
+          <a class="lc" href="docs/admin/index.html">
+            <h3>Running a server</h3>
+            <p>Install, sign-in, encryption, backups, upgrades and monitoring.</p>
+            <span class="go">Admin guide →</span>
+          </a>
+          <a class="lc" href="docs/developer/index.html">
+            <h3>Building on Vellum</h3>
+            <p>The architecture, the APIs, the MCP server and how to contribute.</p>
+            <span class="go">Developer guide →</span>
+          </a>
+        </div>
       </section>
+
+      <section class="wrap sec" aria-labelledby="open-title">
+        <div class="sec-h">
+          <span class="kicker">Built in the open</span>
+          <h2 id="open-title">Every decision is public.</h2>
+          <p>
+            Vellum is a personal open-source project. Its code, its tests and
+            the reasons behind each design choice are all public.
+          </p>
+        </div>
+        <dl class="open">
+          <div><dt><!-- COUNT:crates --></dt><dd>Rust packages, each with one job</dd></div>
+          <div><dt><!-- COUNT:decisions --></dt><dd><a href="docs/decisions/index.html">design decisions</a>, written down</dd></div>
+          <div><dt><!-- COUNT:pages --></dt><dd>help pages, built into the app</dd></div>
+          <div><dt>0</dt><dd>trackers or cookies on this site</dd></div>
+        </dl>
+      </section>
+
+      <div class="wrap">
+        <section class="final" aria-labelledby="final-title">
+          <h2 id="final-title">Own your workspace.</h2>
+          <div>
+            <p>Free, open source and yours to keep. Start with the tour, then read how it works.</p>
+            <div class="ctas">
+              <a class="btn pri" href="docs/">Read the docs</a>
+              <a class="btn out" href="https://github.com/cruisinme30/vellum">Follow on GitHub</a>
+            </div>
+          </div>
+        </section>
+      </div>
     </main>
 
     <footer class="foot">
-      <p>
-        Vellum is a personal open-source project.
-        <a href="https://github.com/cruisinme30/vellum">Source</a> ·
-        <a href="https://github.com/cruisinme30/vellum/blob/develop/SECURITY.md">Security</a> ·
-        <a href="https://github.com/cruisinme30/vellum/blob/develop/LICENSE">Licence</a>
-      </p>
-      <p class="quiet">This site sets no cookies and loads nothing from other servers.</p>
+      <div class="wrap fcols">
+        <div>
+          <a class="brand" href="./"><img src="favicon.svg" alt="" width="30" height="30" /><span>Vellum</span></a>
+          <p>An open-source workspace for docs, data and work. A personal project. This site sets no cookies and loads nothing from other servers.</p>
+        </div>
+        <nav aria-labelledby="f-product">
+          <h2 id="f-product">Product</h2>
+          <ul>
+            <li><a href="#tour">Tour</a></li>
+            <li><a href="#ai">AI</a></li>
+            <li><a href="#compare">Compare</a></li>
+            <li><a href="#start">Get started</a></li>
+          </ul>
+        </nav>
+        <nav aria-labelledby="f-learn">
+          <h2 id="f-learn">Learn</h2>
+          <ul>
+            <li><a href="docs/">Help centre</a></li>
+            <li><a href="docs/user/cookbook/index.html">Cookbook</a></li>
+            <li><a href="docs/user/start/shortcuts.html">Keyboard shortcuts</a></li>
+            <li><a href="docs/admin/reference/cli.html">Command reference</a></li>
+            <li><a href="docs/decisions/index.html">Design decisions</a></li>
+          </ul>
+        </nav>
+        <nav aria-labelledby="f-project">
+          <h2 id="f-project">Project</h2>
+          <ul>
+            <li><a href="https://github.com/cruisinme30/vellum">Source code</a></li>
+            <li><a href="https://github.com/cruisinme30/vellum/blob/develop/SECURITY.md">Security</a></li>
+            <li><a href="https://github.com/cruisinme30/vellum/blob/develop/LICENSE">Licence (AGPL-3.0)</a></li>
+          </ul>
+        </nav>
+      </div>
     </footer>
   </body>
 </html>

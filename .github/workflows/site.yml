@@ -1,10 +1,11 @@
 # SPDX-FileCopyrightText: 2026 The Vellum contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 
-# The project website (ADR 0027): the landing page in site/ plus the help
-# books and decision records from docs/, built with mdBook. Pull requests
-# that touch it get a build check; pushes to main publish it on GitHub
-# Pages (Settings -> Pages -> Source must be "GitHub Actions").
+# The project website (ADR 0027): the landing page and docs home in site/
+# plus the help books and decision records from docs/, built with mdBook.
+# Pull requests that touch it get a build and a check of the result;
+# pushes to main publish it on GitHub Pages (Settings -> Pages -> Source
+# must be "GitHub Actions").
 name: Website
 
 on:
@@ -14,6 +15,7 @@ on:
       - "site/**"
       - "docs/**"
       - "scripts/ci/build-site.sh"
+      - "scripts/ci/check-site.sh"
       - ".github/workflows/site.yml"
   push:
     branches: [main]
@@ -49,6 +51,8 @@ jobs:
           echo "MDBOOK=${RUNNER_TEMP}/mdbook" >> "${GITHUB_ENV}"
       - name: Build
         run: scripts/ci/build-site.sh _site
+      - name: Check
+        run: scripts/ci/check-site.sh _site
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: _site
