@@ -53,5 +53,9 @@ KMS
 [Uu]nwrap(s|ped|ping)?
 [Ll]abeler
 [Ee]tags?
+[Mm]utators?
+Yjs
+[Jj]ittered
+Replicache
 mdBook
 Roboto
