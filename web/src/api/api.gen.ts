@@ -3869,7 +3869,8 @@ export interface MoveSection {
  */
 export interface MyDrive {
   /**
-   * The space; absent until it is created.
+   * The space. It is made on the first visit when the account has
+   * none yet, so it is always present.
    */
   space?: SpaceView | null;
 }
@@ -4146,7 +4147,12 @@ export interface PlaceInput {
    */
   id: ObjectId;
   /**
-   * The folder it goes into; the top of the space when absent.
+   * Where it goes among its new siblings, counted without it: 0 is
+   * first. When absent the order is left as it was.
+   */
+  index?: number | null;
+  /**
+   * The folder or page it goes into; the top of the space when absent.
    */
   parent_id?: ObjectId | null;
   /**
@@ -6551,6 +6557,43 @@ export interface TraceInput {
 }
 
 /**
+ * A space's tree, or the part of it under one item.
+ */
+export interface TreeInput {
+  /**
+   * How many levels to return; all when absent.
+   */
+  depth?: number | null;
+  /**
+   * At most this many items, 1 to 10000; 2000 when absent.
+   */
+  limit?: number | null;
+  /**
+   * The folder or page to start under; the whole space when absent.
+   */
+  root_id?: ObjectId | null;
+  /**
+   * The space.
+   */
+  space_id: SpaceId;
+}
+
+/**
+ * Items in tree order: depth first, siblings in their stored order.
+ * Each item names its parent.
+ */
+export interface TreeView {
+  /**
+   * The items you can open.
+   */
+  items: NodeView[];
+  /**
+   * True when the limit cut the tree short.
+   */
+  truncated: boolean;
+}
+
+/**
  * A triage decision.
  */
 export interface TriageIssue {
@@ -8601,7 +8644,7 @@ export interface Operations {
     input: PlaceInput;
     output: DriveMoveNodeView;
   };
-  /** Get your My Drive */
+  /** Get your My Drive, made for you if you have none yet */
   "drive.my_drive": {
     method: "GET";
     path: "/v1/drive/my-drive";
@@ -8712,6 +8755,13 @@ export interface Operations {
     path: "/v1/drive/spaces/{space_id}/trash";
     input: SpaceKey;
     output: NodeList;
+  };
+  /** List every item in a space, or under one item, in tree order */
+  "drive.tree": {
+    method: "GET";
+    path: "/v1/drive/spaces/{space_id}/tree";
+    input: TreeInput;
+    output: TreeView;
   };
   /** Rename a space and change its quota, trash and version settings */
   "drive.update_space": {
@@ -9353,6 +9403,7 @@ export const OPERATIONS = {
   "drive.starred": { method: "GET", path: "/v1/drive/starred", mutation: false },
   "drive.trash": { method: "POST", path: "/v1/drive/items/{id}/trash", mutation: true },
   "drive.trash_list": { method: "GET", path: "/v1/drive/spaces/{space_id}/trash", mutation: false },
+  "drive.tree": { method: "GET", path: "/v1/drive/spaces/{space_id}/tree", mutation: false },
   "drive.update_space": { method: "PATCH", path: "/v1/drive/spaces/{space_id}", mutation: true },
   "drive.usage": { method: "GET", path: "/v1/drive/spaces/{space_id}/usage", mutation: false },
   "drive.version": { method: "GET", path: "/v1/drive/items/{id}/versions/{version_id}", mutation: false },
