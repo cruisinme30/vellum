@@ -24,9 +24,9 @@ vellum: 1
 | `formula` | A value computed from other properties | 1.5 |
 | `created` | Who created the row and when | Priya Shah, 2026-10-02 |
 
-Select **Properties** on a collection to rename a property, change a
-the options of a select or a formula, delete a property, or add a new one at
-the end. Deleting a property also removes the filters, sorts and
+Select **Properties** on a collection to rename a property, change
+the options of a select or a formula, delete a property, or add a new
+one at the end. Deleting a property also removes the filters, sorts and
 grouping that used it; Vellum refuses while a formula or rollup still
 reads it. A property's type is fixed once it is added: add a new
 property of the type you want instead. Relations link two collections,
