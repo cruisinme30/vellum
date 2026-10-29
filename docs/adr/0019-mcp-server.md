@@ -35,19 +35,6 @@ request carries its protocol version and client capabilities in `_meta`;
 `resources/subscribe` and the standalone GET stream. Where the spec and
 the brief differ, the decisions below say which way we went.
 
-## Options considered
-
-- **Target 2025-11-25 only**: what most clients send today, but it needs
-  sessions and a handshake the brief's revision removed. Rejected; we
-  accept it as a fallback instead (D86).
-- **Target 2026-07-28 only**: matches the brief, but would turn away most
-  clients in the field for now. Rejected for the same reason.
-- **Filter `tools/list` by scope**: hides tools a token cannot call, but
-  makes the list differ per token and breaks client caches. Rejected in
-  favour of a fixed list and call-time checks (D85).
-- **Run our own authorization server inside the MCP crate**: duplicates
-  identity. Rejected; MCP is a resource server only (D87).
-
 ## Decisions
 
 ### D85: scopes, drafts and a fixed tool list
@@ -121,6 +108,19 @@ the brief differ, the decisions below say which way we went.
   streams `subscriptions/listen` over SSE with keep-alive comments;
   closing the stream cancels the subscription.
 
+## Alternatives
+
+- **Target 2025-11-25 only**: what most clients send today, but it needs
+  sessions and a handshake the brief's revision removed. Rejected; we
+  accept it as a fallback instead (D86).
+- **Target 2026-07-28 only**: matches the brief, but would turn away most
+  clients in the field for now. Rejected for the same reason.
+- **Filter `tools/list` by scope**: hides tools a token cannot call, but
+  makes the list differ per token and breaks client caches. Rejected in
+  favour of a fixed list and call-time checks (D85).
+- **Run our own authorization server inside the MCP crate**: duplicates
+  identity. Rejected; MCP is a resource server only (D87).
+
 ## Consequences
 
 - Clients on either protocol era work today, and dropping 2025-11-25
@@ -131,7 +131,3 @@ the brief differ, the decisions below say which way we went.
 - `vellum mcp` without `--demo` fails with a clear message until the
   workspace services are wired into the binary; that wiring belongs to
   the app crate.
-
-## History
-
-- 2026-10-29: accepted in #210.

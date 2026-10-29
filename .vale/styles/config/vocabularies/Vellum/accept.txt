@@ -69,6 +69,11 @@ Yjs
 Replicache
 mdBook
 Roboto
+[Uu]nstarted
+(?:SLAs?|slas)
+[Ss]lugs?
+[Aa]ssignees?
+[Bb]acklog
 Excalidraw
 [Pp]riya
 Rao
@@ -106,3 +111,4 @@ Patroni
 Pandoc
 [Kk]anban
 [Cc]ollab
+zizmor

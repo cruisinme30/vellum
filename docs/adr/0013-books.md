@@ -56,19 +56,19 @@ handbook.book/
   uses, so both read a summary the same way. Vellum writes it back in one
   canonical form that parses to the same tree.
 - Vellum writes a `book.toml` (`src = "."`, `build-dir = ".mdbook"`) on
-  every save, so `mdbook build` works on the folder as it is.
-- The folder mirrors the tree: a section with children is
+  every save, so `mdbook build` works on the folder as it is. The folder
+  mirrors the tree: a section with children is
   `<slug>/README.md` with its children beside it, a leaf is `<slug>.md`.
   When a section gains or loses children, or moves, its files move.
-- Chapter file names are lowercase slugs (`first-week.md`). This is a
-  deliberate exception to D106 (readable titles) because a book folder
-  doubles as an mdBook source and its paths become public page addresses.
+- Chapter file names are lowercase slugs (`first-week.md`), an exception
+  to D106, because the paths become public page addresses.
 - Numbering follows mdBook: only numbered chapters get numbers, drafts
   count, parts and separators do not, numbering continues across parts.
   `outline` style writes `II.C.4.a.iv.6`.
-- Paths in `SUMMARY.md` and `book.yaml` are checked: relative, no `..`, no
-  hidden segments, no symbolic links followed, `.md` only. A hostile
-  summary cannot read or write outside its book.
+
+Paths in `SUMMARY.md` and `book.yaml` are checked: relative, no `..`, no
+hidden segments, no symbolic links followed, `.md` only. A hostile
+summary cannot read or write outside its book.
 
 ### D68: links and structure edits
 
@@ -114,6 +114,14 @@ handbook.book/
 - Two outputs: an mdBook source tree, and a static HTML site rendered
   through the render service's `Renderer` port, with numbered navigation,
   previous and next links, `toc.json`, a stylesheet and no scripts.
+
+## Alternatives
+
+- **Store numbers in files**: every reorder would rewrite many files.
+- **A Vellum-only manifest without `SUMMARY.md`**: plain mdBook could not
+  build the book.
+- **Snapshots in version history**: they would depend on retention and
+  not travel with the folder.
 
 ## Consequences
 
