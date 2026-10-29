@@ -72,11 +72,30 @@ export async function fakeDrive(page: Page, owner: string): Promise<FakeDrive> {
 
   const notFound = { status: 404, json: { code: "not_found", message: "no such item" } };
 
+  /** The items under `parent`, depth first, each list in its stored order. */
+  const depthFirst = (parent?: string): Item[] =>
+    items
+      .filter((item) => item.parent_id === parent)
+      .flatMap((item) => [item, ...depthFirst(item.id)]);
+
+  /** Moves an item under a new parent, at `index` among its new siblings. */
+  const move = (item: Item, body: Record<string, unknown>) => {
+    const parent = body["parent_id"];
+    const index = body["index"];
+    items.splice(items.indexOf(item), 1);
+    if (typeof parent === "string") item.parent_id = parent;
+    else delete item.parent_id;
+    const siblings = items.filter((entry) => entry.parent_id === item.parent_id);
+    const before = typeof index === "number" ? siblings[index] : undefined;
+    items.splice(before === undefined ? items.length : items.indexOf(before), 0, item);
+  };
+
   /** The answer to a read, or `undefined` for an unknown route. */
   const read = (path: string, query: URLSearchParams): unknown => {
     if (path === "/my-drive") return { space: SPACE };
     if (path === "/shared-drives") return { spaces: [] };
     if (path === "/starred") return { items: items.filter((item) => starred.has(item.id)) };
+    if (path === `/spaces/${SPACE.id}/tree`) return { items: depthFirst(), truncated: false };
     if (path === `/spaces/${SPACE.id}/items`) {
       const parent = query.get("parent_id") ?? undefined;
       return { items: items.filter((item) => item.parent_id === parent) };
@@ -120,6 +139,7 @@ export async function fakeDrive(page: Page, owner: string): Promise<FakeDrive> {
       return { ok: true };
     }
     if (action === "trash") items.splice(items.indexOf(item), 1);
+    if (action === "move") move(item, body);
     return item;
   };
 
@@ -150,6 +170,14 @@ export async function fakeDrive(page: Page, owner: string): Promise<FakeDrive> {
     return route.fulfill({ json: change(method, item, parts[3], body) });
   };
   await page.route("**/api/v1/drive/**", handle);
+  // Full-text search, over titles only: enough to show the app asks it.
+  await page.route("**/api/v1/search?*", (route) => {
+    const q = (new URL(route.request().url()).searchParams.get("q") ?? "").toLowerCase();
+    const hits = items
+      .filter((item) => item.title.toLowerCase().includes(q))
+      .map((item) => ({ doc: item.id, snippet: [{ text: item.title, hit: true }] }));
+    return route.fulfill({ json: { hits, has_more: false, hybrid: false } });
+  });
   return {
     items,
     starred,

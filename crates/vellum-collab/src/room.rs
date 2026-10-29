@@ -655,7 +655,11 @@ impl Room {
         // The file now holds `theirs`; the next version is measured from it.
         self.last_markdown = self.deps.codec.to_markdown(&theirs).ok();
         if delta != EMPTY_UPDATE {
+            // The file already holds this change: it needs a new version
+            // only if the room had unsaved edits of its own.
+            let had_edits = self.dirty;
             self.record_edit(None, delta);
+            self.dirty = had_edits;
         }
         Ok(())
     }

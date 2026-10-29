@@ -6,18 +6,52 @@
   margin-top: 8px;
 }
 
-.vl-toolbar {
+/* The toolbar and the save controls stay in view while the page scrolls. */
+.vl-editor-bar {
   position: sticky;
   top: 0;
   z-index: 10;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 2px;
+  gap: 4px 8px;
   margin-bottom: 8px;
   padding: 4px;
   border-radius: var(--vl-radius-l);
   background: var(--md-surface-container);
+}
+
+.vl-toolbar {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.vl-editor-save {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  margin-inline-start: auto;
+}
+
+.vl-save-status {
+  padding-inline: 8px;
+  color: var(--md-on-surface-variant);
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.vl-save-status[data-status="failed"] {
+  color: var(--md-error);
+}
+
+.vl-done-button {
+  min-height: 36px;
+  padding: 0 20px;
 }
 
 .vl-editor-notice {
@@ -661,4 +695,113 @@
   color: var(--md-on-surface-variant);
   font-family: var(--vl-font-mono, monospace);
   font-size: 0.8rem;
+}
+
+/* Version history: a side panel like the collection row panel. */
+.vl-history-panel {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-end: 0;
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(440px, 100vw);
+  padding: 16px 24px 32px;
+  overflow-y: auto;
+  background: var(--md-surface-container-low);
+  color: var(--md-on-surface);
+  box-shadow: -2px 0 12px rgb(0 0 0 / 20%);
+}
+
+.vl-history-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.vl-history-head h2 {
+  margin: 6px 0 4px;
+  font-size: 1.5rem;
+  font-weight: 400;
+}
+
+.vl-history-notice p {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--vl-radius-m);
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+.vl-version-list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vl-version {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-height: 48px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--vl-radius-m);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.vl-version:hover {
+  background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+}
+
+.vl-version[aria-pressed="true"] {
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+.vl-version-meta {
+  color: var(--md-on-surface-variant);
+  font-size: 0.875rem;
+}
+
+.vl-version[aria-pressed="true"] .vl-version-meta {
+  color: inherit;
+}
+
+.vl-version-preview {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+.vl-version-text {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 12px;
+  border-radius: var(--vl-radius-m);
+  background: var(--md-surface-container);
+  font-size: 0.875rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.vl-version-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.vl-version-confirm p {
+  flex-basis: 100%;
+  margin: 0;
 }

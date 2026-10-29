@@ -11,11 +11,9 @@ import {
   createMockNotificationPreferencesStore,
   DEFAULT_PREFERENCES,
   defaultChannels,
-  formatMinutes,
   fromWire,
   isUrgent,
   KINDS,
-  parseMinutes,
   PREFERENCES_PATH,
   toWire,
   withChannel,
@@ -55,32 +53,10 @@ describe("withChannel", () => {
   });
 });
 
-describe("durations", () => {
-  it.each([
-    ["PT10M", 10],
-    ["PT1H30M", 90],
-    ["PT0S", 0],
-    ["PT90S", 1],
-    ["10m", 10],
-    ["1h 30m", 90],
-    ["2 hours", 120],
-    ["", 10],
-    ["PT", 10],
-    ["soon", 10],
-  ])("reads %j as %i minutes", (text, minutes) => {
-    expect(parseMinutes(text)).toBe(minutes);
-  });
-
-  it("writes ISO 8601", () => {
-    expect(formatMinutes(0)).toBe("PT0S");
-    expect(formatMinutes(30)).toBe("PT30M");
-  });
-});
-
 describe("wire form", () => {
   const wire: PreferencesWire = {
     channels: { mentioned: ["push", "in_app", "carrier_pigeon"], future_kind: ["email"] },
-    email_delay: "PT5M",
+    email_delay_minutes: 5,
     muted: ["ENG-142", "ENG-142"],
     snoozed_until: NULL,
   };
@@ -94,11 +70,26 @@ describe("wire form", () => {
     });
   });
 
+  it("keeps only the kinds that differ from the defaults", () => {
+    // The server lists every kind.
+    const full: PreferencesWire = {
+      channels: { mentioned: ["in_app", "email", "push"], state_changed: ["in_app", "push"] },
+      email_delay_minutes: 10,
+      muted: [],
+    };
+    expect(fromWire(full).channels).toEqual({ state_changed: ["in_app", "push"] });
+  });
+
+  it("keeps the email delay within what the server accepts", () => {
+    expect(fromWire({ ...wire, email_delay_minutes: 5000 }).emailDelayMinutes).toBe(1440);
+    expect(toWire({ ...DEFAULT_PREFERENCES, emailDelayMinutes: -3 }).email_delay_minutes).toBe(0);
+  });
+
   it("round-trips, leaving snoozed_until out when not snoozed", () => {
     const app = fromWire(wire);
     expect(toWire(app)).toEqual({
       channels: { mentioned: ["in_app", "push"] },
-      email_delay: "PT5M",
+      email_delay_minutes: 5,
       muted: ["ENG-142"],
     });
     const snoozed = { ...app, snoozedUntil: "2026-10-30T09:00:00Z" };
@@ -111,7 +102,7 @@ describe("stores", () => {
   it("reads and writes the server's preferences", async () => {
     const stored: PreferencesWire = {
       channels: {},
-      email_delay: "PT10M",
+      email_delay_minutes: 10,
       muted: [],
       snoozed_until: NULL,
     };
@@ -126,7 +117,7 @@ describe("stores", () => {
     const saved = await store.save({ ...DEFAULT_PREFERENCES, emailDelayMinutes: 0 });
     expect(send).toHaveBeenCalledWith("PUT", PREFERENCES_PATH, {
       channels: {},
-      email_delay: "PT0S",
+      email_delay_minutes: 0,
       muted: [],
     });
     expect(saved.emailDelayMinutes).toBe(0);

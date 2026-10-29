@@ -7,14 +7,15 @@ import type { Http } from "../api/http";
  * Notification preferences: which channels each kind of notification uses,
  * how long email waits, what is muted and whether everything is snoozed.
  *
- * The model mirrors `vellum_notify::Preferences`, so the wire body is its
- * serde form:
+ * The wire body is the server's `PreferencesView` (`/api/v1/notifications/preferences`):
  *
  * ```json
  * { "channels": { "mentioned": ["in_app", "push"] },
- *   "email_delay": "PT10M", "muted": ["ENG-142"], "snoozed_until": null }
+ *   "email_delay_minutes": 10, "muted": ["ENG-142"], "snoozed_until": null }
  * ```
  *
+ * The server lists every kind; the app keeps only those that differ from
+ * the defaults.
  * A kind missing from `channels` uses its defaults, which
  * {@link defaultChannels} copies from `NotificationKind::default_channels`.
  */
@@ -120,66 +121,50 @@ export const DEFAULT_PREFERENCES: NotificationPreferences = {
   muted: [],
 };
 
-/** The serde form of `vellum_notify::Preferences`. */
+/** The server's `PreferencesView`. */
 export interface PreferencesWire {
   readonly channels: Readonly<Record<string, readonly string[]>>;
-  readonly email_delay: string;
+  /** Minutes email waits for the inbox entry to be read (0 to 1440). */
+  readonly email_delay_minutes: number;
   readonly muted: readonly string[];
   /** `null` or absent: not snoozed. */
   readonly snoozed_until?: string | null;
 }
+
+/** The longest email delay the server accepts: a day. */
+const MAX_EMAIL_DELAY = 1440;
 
 const isKind = (value: string): value is NotificationKind =>
   (KINDS as readonly string[]).includes(value);
 const isChannel = (value: string): value is Channel =>
   (CHANNELS as readonly string[]).includes(value);
 
+const sameChannels = (a: readonly Channel[], b: readonly Channel[]) =>
+  a.length === b.length && a.every((each) => b.includes(each));
+
 /**
- * Reads a duration as whole minutes. jiff writes ISO 8601 (`PT10M`) or its
- * friendly form (`10m`, `1h 30m`); both are runs of a number and a unit.
- * Anything without one counts as the default.
+ * Wire → app. Unknown kinds and channels (from a newer server) are
+ * dropped, and so are kinds left at their defaults.
  */
-export function parseMinutes(duration: string): number {
-  const text = duration.replaceAll(/\s/g, "").replace(/^PT/i, "").toLowerCase();
-  const perUnit: Readonly<Record<string, number>> = { h: 60, m: 1, s: 1 / 60 };
-  let minutes = 0;
-  let found = false;
-  let digits = "";
-  for (const character of text) {
-    if (character >= "0" && character <= "9") {
-      digits += character;
-      continue;
-    }
-    const factor = perUnit[character];
-    if (factor !== undefined && digits !== "") {
-      minutes += Number(digits) * factor;
-      found = true;
-    }
-    digits = "";
-  }
-  return found ? Math.floor(minutes) : DEFAULT_PREFERENCES.emailDelayMinutes;
-}
-
-/** Writes whole minutes as ISO 8601, which jiff reads. */
-export function formatMinutes(minutes: number): string {
-  return minutes <= 0 ? "PT0S" : `PT${String(Math.round(minutes))}M`;
-}
-
-/** Wire → app. Unknown kinds and channels (from a newer server) are dropped. */
 export function fromWire(wire: PreferencesWire): NotificationPreferences {
   const channels: Partial<Record<NotificationKind, readonly Channel[]>> = {};
   for (const [kind, list] of Object.entries(wire.channels)) {
-    if (isKind(kind)) channels[kind] = CHANNELS.filter((channel) => list.includes(channel));
+    if (!isKind(kind)) continue;
+    const known = CHANNELS.filter((channel) => list.includes(channel));
+    if (!sameChannels(known, defaultChannels(kind))) channels[kind] = known;
   }
+  const delay = Number.isFinite(wire.email_delay_minutes)
+    ? wire.email_delay_minutes
+    : DEFAULT_PREFERENCES.emailDelayMinutes;
   return {
     channels,
-    emailDelayMinutes: parseMinutes(wire.email_delay),
+    emailDelayMinutes: Math.min(MAX_EMAIL_DELAY, Math.max(0, Math.floor(delay))),
     muted: [...new Set(wire.muted)],
     snoozedUntil: wire.snoozed_until ?? undefined,
   };
 }
 
-/** App → wire. */
+/** App → wire. Kinds left out keep their defaults on the server. */
 export function toWire(preferences: NotificationPreferences): PreferencesWire {
   const channels: Record<string, readonly string[]> = {};
   for (const kind of KINDS) {
@@ -188,10 +173,13 @@ export function toWire(preferences: NotificationPreferences): PreferencesWire {
   }
   const wire = {
     channels,
-    email_delay: formatMinutes(preferences.emailDelayMinutes),
+    email_delay_minutes: Math.min(
+      MAX_EMAIL_DELAY,
+      Math.max(0, Math.round(preferences.emailDelayMinutes)),
+    ),
     muted: preferences.muted,
   };
-  // serde reads a missing `Option` as `None`.
+  // A missing `snoozed_until` means not snoozed.
   return preferences.snoozedUntil === undefined
     ? wire
     : { ...wire, snoozed_until: preferences.snoozedUntil };
@@ -205,7 +193,7 @@ export interface NotificationPreferencesStore {
 }
 
 /** The server's preferences of the signed-in person. */
-export const PREFERENCES_PATH = "/api/v1/me/notification-preferences";
+export const PREFERENCES_PATH = "/api/v1/notifications/preferences";
 
 /** Reads and writes the signed-in person's preferences on a Vellum server. */
 export function createHttpNotificationPreferencesStore(http: Http): NotificationPreferencesStore {

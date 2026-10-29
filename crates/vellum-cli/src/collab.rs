@@ -20,7 +20,7 @@
 
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use async_trait::async_trait;
 use axum::Router;
@@ -38,8 +38,10 @@ use vellum_collab::{
 use vellum_contracts::{CredentialKind, Principal, Scope};
 use vellum_crypto::{KekId, LocalKeyring, SecretKey};
 use vellum_db::Index;
-use vellum_drive::{Access as DriveAccess, Drive, DriveError, NodeKind, Permission, Saved};
-use vellum_kernel::{Actor, Error, ErrorKind, ObjectId, RequestId, Result, UserId};
+use vellum_drive::{
+    Access as DriveAccess, Drive, DriveError, NodeKind, PageWrites, Permission, Saved,
+};
+use vellum_kernel::{Actor, DocId, Error, ErrorKind, ObjectId, RequestId, Result, SpaceId, UserId};
 use vellum_store::Base;
 
 /// Name of the key, in the data folder, that seals the change log.
@@ -49,6 +51,7 @@ const LOG_KEY_FILE: &str = "collab-log.key";
 #[derive(Clone)]
 pub struct Collab {
     hub: Hub,
+    files: Arc<DriveFiles>,
     authorizer: Arc<dyn Authorizer>,
 }
 
@@ -75,9 +78,10 @@ impl Collab {
         authenticator: Arc<dyn Authenticator>,
     ) -> Result<Self> {
         let keyring = log_keyring(data_dir)?;
+        let files = Arc::new(DriveFiles::new(Arc::clone(&drive)));
         let hub = Hub::new(
             Arc::new(SqlUpdateStore::new(index, Envelope(keyring))),
-            Arc::new(DriveFiles::new(Arc::clone(&drive))),
+            Arc::clone(&files) as Arc<dyn DocumentFiles>,
             Arc::new(FormatCodec),
             CollabConfig::default(),
         );
@@ -87,7 +91,11 @@ impl Collab {
             origin: app_origin.trim_end_matches('/').to_owned(),
             authenticator: Some(authenticator),
         });
-        Ok(Self { hub, authorizer })
+        Ok(Self {
+            hub,
+            files,
+            authorizer,
+        })
     }
 
     /// The router to mount at `/collab`.
@@ -128,6 +136,61 @@ fn log_keyring(data_dir: &Path) -> Result<LocalKeyring> {
     let kek =
         KekId::new("collab-log-1").map_err(|e| Error::new(ErrorKind::Internal, e.to_string()))?;
     Ok(LocalKeyring::new(kek, SecretKey::from_bytes(array)))
+}
+
+/// Hands page text written through the API (a save, a restored version)
+/// to the page's live-editing room, so editors see it and the room does
+/// not later write its old text back over it (D172). The drive service
+/// is built before the hub, so the hub is attached once it exists.
+#[derive(Default)]
+pub struct LivePages {
+    target: OnceLock<(Hub, Arc<DriveFiles>)>,
+}
+
+impl std::fmt::Debug for LivePages {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LivePages")
+            .field("attached", &self.target.get().is_some())
+            .finish()
+    }
+}
+
+impl LivePages {
+    /// Starts handing writes to `collab`'s rooms.
+    pub fn attach(&self, collab: &Collab) {
+        let _first = self
+            .target
+            .set((collab.hub.clone(), Arc::clone(&collab.files)));
+    }
+}
+
+impl PageWrites for LivePages {
+    fn page_written(&self, space: SpaceId, page: ObjectId) {
+        let Some((hub, files)) = self.target.get().cloned() else {
+            return;
+        };
+        let room = RoomKey {
+            space,
+            doc: DocId::from(page),
+        };
+        drop(tokio::spawn(async move {
+            if let Err(error) = merge_written(&hub, &files, room).await {
+                tracing::warn!(%room, %error, "a written page did not reach its live-editing room");
+            }
+        }));
+    }
+}
+
+/// Merges the page file's text into its room and makes it the base of the
+/// room's next save.
+async fn merge_written(hub: &Hub, files: &DriveFiles, room: RoomKey) -> Result<()> {
+    let Some(base) = files.current(room).await? else {
+        return Ok(());
+    };
+    let text = String::from_utf8_lossy(&base.bytes).into_owned();
+    hub.merge_markdown(room, text).await?;
+    files.remember(room, base);
+    Ok(())
 }
 
 /// The page as the room last saw it: what three-way merges start from.

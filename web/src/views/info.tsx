@@ -8,6 +8,8 @@ import { useSession } from "../api/session";
 import { SLASH_ITEMS } from "../editor/slash/items";
 import { useT } from "../i18n/i18n";
 
+import "../admin/console/console.css";
+
 import { describeError } from "./sign-in";
 
 const SHORTCUTS: readonly [keys: string, id: string][] = [
@@ -61,12 +63,25 @@ export function PendingView({ title, body }: { readonly title: string; readonly 
   );
 }
 
-/** Admin. */
+const ADMIN_SCREENS = ["audit", "settings", "backups", "requests", "routes"] as const;
+
+/** Admin: the console's screens, and the signed-in account. */
 export function AdminView() {
   const t = useT();
   return (
     <>
-      <PendingView title={t("nav-admin")} body={t("admin-pending")} />
+      <div className="vl-view">
+        <h1>{t("nav-admin")}</h1>
+        <p className="vl-muted">{t("admin-intro")}</p>
+        <ul className="vl-admin-links">
+          {ADMIN_SCREENS.map((screen) => (
+            <li key={screen}>
+              <Link to={`/admin/${screen}`}>{t(`admin-${screen}`)}</Link>
+              <span className="vl-muted">{t(`admin-${screen}-summary`)}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
       <AccountSection />
     </>
   );

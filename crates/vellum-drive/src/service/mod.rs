@@ -17,7 +17,7 @@ use bytes::Bytes;
 use vellum_contracts::{
     BoxFuture, HttpMethod, Operation, Readiness, RequestContext, Scope, Service,
 };
-use vellum_kernel::{Actor, Error, UserId};
+use vellum_kernel::{Actor, Error, ObjectId, SpaceId, UserId};
 use vellum_store::{Base, Etag};
 
 use self::api::{
@@ -39,11 +39,20 @@ const DEFAULT_TREE_LIMIT: usize = 2_000;
 /// Looks up a person's handle, for naming the My Drive made for them.
 pub type Handles = Arc<dyn Fn(UserId) -> Option<String> + Send + Sync>;
 
+/// Told when a page's text is written through the API: a save, or a
+/// version restored. Live editing implements it so a page open in the
+/// editor takes the new text instead of writing over it later (D172).
+pub trait PageWrites: Send + Sync + std::fmt::Debug {
+    /// The page's content changed. Called after the write; must not block.
+    fn page_written(&self, space: SpaceId, page: ObjectId);
+}
+
 /// Serves the drive over the gateway.
 #[derive(Clone)]
 pub struct DriveService {
     drive: Arc<Drive>,
     handles: Option<Handles>,
+    writes: Option<Arc<dyn PageWrites>>,
 }
 
 impl std::fmt::Debug for DriveService {
@@ -51,6 +60,7 @@ impl std::fmt::Debug for DriveService {
         f.debug_struct("DriveService")
             .field("drive", &self.drive)
             .field("handles", &self.handles.is_some())
+            .field("writes", &self.writes)
             .finish()
     }
 }
@@ -62,6 +72,7 @@ impl DriveService {
         Self {
             drive,
             handles: None,
+            writes: None,
         }
     }
 
@@ -71,6 +82,23 @@ impl DriveService {
     pub fn with_handles(mut self, handles: Handles) -> Self {
         self.handles = Some(handles);
         self
+    }
+
+    /// Tells `writes` about every page text written through the API.
+    #[must_use]
+    pub fn with_page_writes(mut self, writes: Arc<dyn PageWrites>) -> Self {
+        self.writes = Some(writes);
+        self
+    }
+
+    /// Passes a written page on, unless the save went to a conflict copy
+    /// and left the page as it was.
+    fn written(&self, outcome: &SaveOutcome) {
+        if let Some(writes) = &self.writes
+            && !matches!(outcome.saved, Saved::Conflicted { .. })
+        {
+            writes.page_written(outcome.node.space, outcome.node.id);
+        }
     }
 }
 
@@ -397,6 +425,7 @@ impl DriveService {
             .drive
             .save(&actor(ctx)?, input.id, base, Bytes::from(input.content))
             .await?;
+        self.written(&outcome);
         Ok(saved(&outcome))
     }
 
@@ -409,6 +438,7 @@ impl DriveService {
             .drive
             .restore_version(&actor(ctx)?, input.id, input.version_id)
             .await?;
+        self.written(&outcome);
         Ok(saved(&outcome))
     }
 

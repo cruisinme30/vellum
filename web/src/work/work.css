@@ -1,0 +1,125 @@
+/*
+ * SPDX-FileCopyrightText: 2026 The Vellum contributors
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+/* My Work and issues. */
+
+.vl-work {
+  max-width: 880px;
+}
+
+.vl-work-add,
+.vl-work-comment {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 12px;
+  margin: 12px 0 20px;
+}
+
+.vl-work-add label,
+.vl-work-comment label {
+  display: grid;
+  flex: 1 1 280px;
+  gap: 4px;
+  font-size: 0.875rem;
+}
+
+.vl-work-add input,
+.vl-work-comment textarea,
+.vl-work-filters select {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--md-outline);
+  border-radius: 4px;
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+  font: inherit;
+}
+
+.vl-work-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.vl-task-list,
+.vl-issue-list,
+.vl-comment-list {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 20px;
+  padding: 0;
+  list-style: none;
+}
+
+.vl-task {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  min-height: 40px;
+}
+
+.vl-task label {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.vl-task input {
+  width: 18px;
+  height: 18px;
+}
+
+.vl-task-overdue small {
+  color: var(--md-error);
+}
+
+.vl-issue-list a {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.vl-issue-list a:hover,
+.vl-issue-list a:focus-visible {
+  background: var(--md-surface-container);
+}
+
+.vl-issue-key {
+  color: var(--md-on-surface-variant);
+  font-variant-numeric: tabular-nums;
+}
+
+.vl-issue-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.vl-issue-description,
+.vl-comment-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.vl-comment-list li {
+  padding: 8px 12px;
+  border-left: 3px solid var(--md-outline-variant);
+}
+
+.vl-comment-list p {
+  margin: 0 0 4px;
+}
