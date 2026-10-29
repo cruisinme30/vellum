@@ -225,14 +225,32 @@ impl UploadPolicy {
     }
 }
 
-/// Keeps the last path segment, drops control and reserved characters and
+/// Invisible formatting characters that can disguise a name: bidi
+/// overrides and isolates (`invoice\u{202e}fdp.txt` shows as `invoicetxt.pdf`,
+/// #273), zero-width marks and the byte order mark.
+const fn is_format_char(c: char) -> bool {
+    matches!(
+        c,
+        '\u{200b}'..='\u{200f}'
+            | '\u{202a}'..='\u{202e}'
+            | '\u{2060}'..='\u{206f}'
+            | '\u{feff}'
+            | '\u{061c}'
+    )
+}
+
+/// Keeps the last path segment, drops control, formatting and reserved characters and
 /// leading dots, and caps the length at 200 bytes.
 #[must_use]
 pub fn safe_file_name(name: &str) -> String {
     let base = name.rsplit(['/', '\\']).next().unwrap_or_default();
     let cleaned: String = base
         .chars()
-        .filter(|c| !c.is_control() && !matches!(c, '<' | '>' | ':' | '"' | '|' | '?' | '*'))
+        .filter(|c| {
+            !c.is_control()
+                && !is_format_char(*c)
+                && !matches!(c, '<' | '>' | ':' | '"' | '|' | '?' | '*')
+        })
         .collect();
     let mut cleaned = cleaned.trim().trim_start_matches('.').to_owned();
     while cleaned.len() > 200 {
