@@ -17,7 +17,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use schemars::JsonSchema;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use vellum_contracts::{Operation, RequestContext, Scope, Service};
 use vellum_kernel::{BlockId, DocId, Error, ErrorKind, ObjectId, SpaceId, UserId};
 
@@ -83,6 +83,13 @@ pub struct ContextInput {
     pub doc_id: DocId,
     /// The block, `blk-xxxxxxxx`.
     pub block_id: BlockId,
+}
+
+/// `search.titles` output.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct TitlesPage {
+    /// The matching titles, best first.
+    pub hits: Vec<TitleHit>,
 }
 
 /// The search service as the gateway sees it.
@@ -205,7 +212,7 @@ impl Service for SearchApi {
                             .service
                             .titles(&principal, &input.q, &filters, input.limit.unwrap_or(10))
                             .await?;
-                        Ok(hits)
+                        Ok(TitlesPage { hits })
                     }
                 },
             )
@@ -306,7 +313,7 @@ mod tests {
             .call(ctx(ada.clone()), json!({ "q": "gatew" }))
             .await
             .unwrap();
-        assert!(titles.as_array().is_some_and(|t| !t.is_empty()));
+        assert!(titles["hits"].as_array().is_some_and(|t| !t.is_empty()));
 
         let context = ops[2]
             .call(

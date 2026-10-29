@@ -42,7 +42,7 @@ pub mod text;
 pub mod vector;
 
 pub use access::{Principal, ReadAccess, Stars};
-pub use api::SearchApi;
+pub use api::{SearchApi, TitlesPage};
 pub use backend::{Change, IndexEntry, Scope, SearchBackend};
 pub use error::{Result, SearchError};
 pub use indexer::{DocumentSource, Indexer, IndexerConfig, rebuild};
