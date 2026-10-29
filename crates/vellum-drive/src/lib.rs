@@ -29,7 +29,7 @@ pub mod sharded;
 pub mod sql;
 
 pub use drive::{
-    Attachment, Drive, Filter, MAX_ATTACHMENTS, MAX_TREE_ITEMS, MY_DRIVE_NAME, OP_SECONDS,
+    Attachment, Drive, Filter, Imported, MAX_ATTACHMENTS, MAX_IMPORT_FILES, MAX_TREE_ITEMS, MY_DRIVE_NAME, OP_SECONDS,
     OPS_TOTAL, SaveOutcome, Saved, Tree,
 };
 pub use error::{DriveError, DriveResult};
