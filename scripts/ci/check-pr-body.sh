@@ -6,7 +6,8 @@
 # (.github/pull_request_template.md). Reads the body from $PR_BODY.
 # - Every required section is present and filled in.
 # - A decision (D12) or record (ADR 0012) is never named bare: its line
-#   also carries a link and a few words saying what it is.
+#   also carries a link and a few words saying what it is. Text in
+#   `code` is exempt, so an ID can be quoted as an example.
 set -euo pipefail
 
 required=(Why "What changed" "How to verify" "Security and operations")
@@ -37,7 +38,7 @@ while IFS= read -r line; do
     echo "::error::Explain this reference in plain words and link it: ${line}"
     failures=$((failures + 1))
   fi
-done < <(grep -E '\b(D[0-9]{1,3}|ADR ?[0-9]{4})\b' <<<"${body}" | grep -vE '^\s*```' || true)
+done < <(perl -pe 's/`[^`]*`//g' <<<"${body}" | grep -E '\b(D[0-9]{1,3}|ADR ?[0-9]{4})\b' || true)
 
 if ((failures > 0)); then
   echo "See .github/pull_request_template.md: a reader should follow the description without knowing project IDs."
