@@ -16,7 +16,7 @@ use vellum_collections::service::{
     Access, ChartInput, CollectionsService, CreateFromCsvInput, CreateRowInput, ExportCsvInput,
     ImportCsvInput, IndexFeed, Need, QueryInput, RowKey, SaveViewInput, UpdateRowInput, ViewKey,
 };
-use vellum_collections::{DateValue, Value, ViewKind};
+use vellum_collections::{DateValue, Value, ViewKind, view};
 use vellum_contracts::{
     CredentialKind, Principal, Readiness, RequestContext, Scope, ScopeSet, Service,
 };
@@ -322,6 +322,34 @@ async fn queries_views_with_overrides() {
     bad.filter = vec!["Nope = 1".into()];
     assert_eq!(
         kind(f.service.query(&c, bad).await),
+        ErrorKind::InvalidInput
+    );
+
+    // RT-026 (#461): every filter runs against every row, so one request with
+    // thousands of filters (or a megabyte needle) used to hold the
+    // service for minutes. Both are refused up front now.
+    let mut many = q(None);
+    many.filter = vec!["Requirement contains zz".into(); view::MAX_FILTERS + 1];
+    assert_eq!(
+        kind(f.service.query(&c, many).await),
+        ErrorKind::InvalidInput
+    );
+    let mut most = q(None);
+    most.filter = vec!["Requirement not contains zz".into(); view::MAX_FILTERS];
+    assert!(f.service.query(&c, most).await.is_ok());
+    let mut long = q(None);
+    long.filter = vec![format!(
+        "Requirement contains {}",
+        "z".repeat(view::MAX_CLAUSE_CHARS)
+    )];
+    assert_eq!(
+        kind(f.service.query(&c, long).await),
+        ErrorKind::InvalidInput
+    );
+    let mut sorts = q(None);
+    sorts.sort = vec!["Estimate asc".into(); view::MAX_SORTS + 1];
+    assert_eq!(
+        kind(f.service.query(&c, sorts).await),
         ErrorKind::InvalidInput
     );
 }
