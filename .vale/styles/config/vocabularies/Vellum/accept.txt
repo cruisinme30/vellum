@@ -73,6 +73,7 @@ Roboto
 Meilisearch
 BM25
 ONNX
+[Pp]recach(e|es|ed|ing)
 [Uu]nstarted
 (?:SLAs?|slas)
 [Ss]lugs?
