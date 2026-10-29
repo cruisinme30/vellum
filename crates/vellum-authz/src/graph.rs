@@ -247,6 +247,19 @@ impl Directory {
         out
     }
 
+    /// Every group `principal` belongs to, directly or through nested
+    /// groups, counting only memberships still live when the directory
+    /// was built.
+    #[must_use]
+    pub fn groups_of(&self, principal: Principal) -> BTreeSet<Id> {
+        let subject = Subject::from(principal);
+        self.members
+            .iter()
+            .filter(|(_, subjects)| subjects.contains_key(&subject))
+            .flat_map(|(&group, _)| self.containing(group))
+            .collect()
+    }
+
     /// Every group that contains `group`, directly or through nesting,
     /// including `group` itself.
     #[must_use]

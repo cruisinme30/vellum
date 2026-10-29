@@ -237,7 +237,8 @@ mod tests {
     #[test]
     fn classifies_the_layout() -> StoreResult<()> {
         assert_eq!(kind(".vellum/index.sqlite"), Kind::System);
-        assert_eq!(kind("drives/shared/Ops/.git/HEAD"), Kind::System);
+        // `.git` cannot even be named as a blob path (#272).
+        assert!(BlobPath::new("drives/shared/Ops/.git/HEAD").is_err());
         assert_eq!(kind("drives/users/ana/.Plan.md.swp"), Kind::Scratch);
         assert_eq!(kind("drives/users/ana/Plan.md~"), Kind::Scratch);
         assert_eq!(
