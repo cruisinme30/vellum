@@ -26,8 +26,9 @@ replace_group() {
   fi
 }
 
-# Type from the Conventional Commits title.
-if check_subject "${TITLE}"; then
+# Type from the Conventional Commits title (any length; the title check
+# enforces the limit).
+if check_bot_subject "${TITLE}"; then
   type="${TITLE%%[(:!]*}"
   replace_group "type/" "type/${type}"
 fi
