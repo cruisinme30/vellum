@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use testcontainers_modules::testcontainers::core::{IntoContainerPort as _, WaitFor};
+use testcontainers_modules::testcontainers::core::IntoContainerPort as _;
 use testcontainers_modules::testcontainers::runners::AsyncRunner as _;
 use testcontainers_modules::testcontainers::{ContainerAsync, GenericImage, ImageExt as _};
 use vellum_search::conformance;
@@ -24,17 +24,32 @@ async fn start()
     }
     let container = GenericImage::new("getmeili/meilisearch", "v1.24")
         .with_exposed_port(7700.tcp())
-        .with_wait_for(WaitFor::message_on_stdout("Server listening on"))
         .with_env_var("MEILI_MASTER_KEY", KEY)
         .with_env_var("MEILI_NO_ANALYTICS", "true")
         .start()
         .await?;
     let port = container.get_host_port_ipv4(7700).await?;
-    Ok((
-        Some(container),
-        format!("http://127.0.0.1:{port}"),
-        KEY.to_owned(),
-    ))
+    let url = format!("http://127.0.0.1:{port}");
+    wait_healthy(&url).await?;
+    Ok((Some(container), url, KEY.to_owned()))
+}
+
+/// Polls `/health` until the server answers, for up to a minute. Meilisearch
+/// has no stable start-up log line to wait for.
+async fn wait_healthy(url: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let client = reqwest::Client::new();
+    for _ in 0..120 {
+        let ok = client
+            .get(format!("{url}/health"))
+            .send()
+            .await
+            .is_ok_and(|r| r.status().is_success());
+        if ok {
+            return Ok(());
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    }
+    Err("Meilisearch did not become healthy within a minute".into())
 }
 
 #[tokio::test]
