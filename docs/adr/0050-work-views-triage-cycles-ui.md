@@ -50,7 +50,7 @@ saved views had no server side.
   as `not`) is kept as is and can be cleared.
 - Cards move between status or priority columns by dragging or with
   Shift+arrow, announced to screen readers. J/K (and H/L on a board) move
-  the focus; `C` and the `G` chords come from the shared keymap, which a
+  the focus; `C` and the `G` chords come from the shared shortcut table, which a
   screen now joins with `useScreenCommands`.
 - While a change reloads the view, the last result stays on screen.
 

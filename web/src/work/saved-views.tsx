@@ -179,7 +179,7 @@ export function Statuses({ team }: { readonly team: TeamOut }) {
                 <dd key={status.key}>
                   {status.name}
                   {status.key === team.default_status && (
-                    <span className="vl-chip">{t("work-status-default")}</span>
+                    <span className="vl-work-chip">{t("work-status-default")}</span>
                   )}
                 </dd>
               ))}

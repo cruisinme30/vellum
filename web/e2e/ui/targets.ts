@@ -67,6 +67,11 @@ const APP_TARGETS: Target[] = [
   app("shell", "/"),
   app("sign-in", "/sign-in", { server: "signed-out" }),
   app("setup", "/setup", { server: "new" }),
+  app("issues board", "/issues?layout=board", { server: "work", visual: false }),
+  app("issues list", "/issues?group=assignee", { server: "work", visual: false }),
+  app("my issues", "/issues/mine", { server: "work", visual: false }),
+  app("triage", "/issues/triage", { server: "work", visual: false }),
+  app("cycles", "/issues/cycles", { server: "work", visual: false }),
 ];
 
 function htmlFiles(directory: string): string[] {

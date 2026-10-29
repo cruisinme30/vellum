@@ -321,52 +321,52 @@
   margin-top: 8px;
 }
 
-.vl-chips {
+.vl-work-chips {
   display: inline-flex;
   flex-wrap: wrap;
   gap: 4px;
   justify-content: flex-end;
 }
 
-.vl-chip {
+/* Chips keep the body text colour so they read in every theme; the
+   border and weight carry the emphasis. */
+.vl-work-chip {
   display: inline-block;
+  max-width: 100%;
   padding: 1px 8px;
-  border: 1px solid var(--md-outline-variant);
+  border: 1px solid var(--md-outline);
   border-radius: 10px;
-  color: var(--md-on-surface-variant);
-  font-size: 0.75rem;
+  color: var(--md-on-surface);
+  font-size: 0.8125rem;
   line-height: 1.5;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .vl-priority-urgent {
+  border-width: 2px;
   border-color: var(--md-error);
-  color: var(--md-error);
   font-weight: 600;
 }
 
 .vl-priority-high {
-  border-color: var(--md-tertiary, var(--md-primary));
-  color: var(--md-tertiary, var(--md-primary));
+  border-color: var(--md-primary);
+  font-weight: 600;
 }
 
 /* SLA risk: colour plus words, never colour alone. */
 .vl-sla-yellow {
-  border-color: #a07800;
-  background: color-mix(in srgb, #f2c200 18%, transparent);
-  color: var(--md-on-surface);
+  border-width: 2px;
+  border-color: #c9a000;
 }
 
 .vl-sla-orange {
-  border-color: #c25700;
-  background: color-mix(in srgb, #ff8a00 22%, transparent);
-  color: var(--md-on-surface);
+  border-width: 2px;
+  border-color: #e07000;
 }
 
 .vl-sla-red {
+  border-width: 2px;
   border-color: var(--md-error);
-  background: var(--md-error-container, color-mix(in srgb, red 18%, transparent));
-  color: var(--md-on-error-container, var(--md-on-surface));
   font-weight: 600;
 }
 
@@ -411,7 +411,7 @@
   box-shadow: 0 1px 2px color-mix(in srgb, var(--md-shadow, black) 20%, transparent);
 }
 
-.vl-results-board .vl-chips {
+.vl-results-board .vl-work-chips {
   justify-content: flex-start;
 }
 
@@ -555,18 +555,26 @@
   background: var(--md-surface-container);
 }
 
+/* Chips sit on their own line under the title, so long text in either
+   never pushes the row wider than its column. */
+.vl-results .vl-issue-list a,
+.vl-work .vl-issue-list a[data-issue],
+.vl-triage-item > a {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.vl-issue-list a[data-issue] .vl-work-chips,
+.vl-triage-item .vl-work-chips {
+  grid-column: 1 / -1;
+  min-width: 0;
+  justify-content: flex-start;
+}
+
+.vl-work-chips:empty {
+  display: none;
+}
+
 @media (max-width: 600px) {
-  .vl-issue-list a,
-  .vl-triage-item > a {
-    grid-template-columns: auto 1fr;
-  }
-
-  .vl-issue-list .vl-chips,
-  .vl-triage-item .vl-chips {
-    grid-column: 1 / -1;
-    justify-content: flex-start;
-  }
-
   .vl-cycle-table {
     display: block;
     overflow-x: auto;

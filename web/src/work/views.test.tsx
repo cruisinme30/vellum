@@ -192,9 +192,10 @@ describe("issue views", () => {
   it("goes to triage with the G T chord", async () => {
     renderAt("/issues?team=ENG", fakeApi(), <Route path="issues" element={<IssuesPage />} />);
     await screen.findByRole("link", { name: /ENG-1/ });
-    fireEvent.keyDown(document.body, { key: "g" });
-    fireEvent.keyDown(document.body, { key: "t" });
+    // The screen's commands register in an effect; press again until they have.
     await waitFor(() => {
+      fireEvent.keyDown(document.body, { key: "g" });
+      fireEvent.keyDown(document.body, { key: "t" });
       expect(where()).toBe("/issues/triage?team=ENG");
     });
   });

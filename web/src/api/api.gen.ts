@@ -4212,6 +4212,16 @@ export interface ListView {
 }
 
 /**
+ * Which saved views to list.
+ */
+export interface ListViews {
+  /**
+   * Only views scoped to this team, plus views that span every team.
+   */
+  team?: string | null;
+}
+
+/**
  * The person's task lists.
  */
 export interface ListsView {
@@ -4943,6 +4953,52 @@ export interface PutTeam {
    * The whole `team.yaml`.
    */
   yaml: string;
+}
+
+/**
+ * Replace a saved view the caller owns.
+ */
+export interface PutView {
+  /**
+   * A Work filter as JSON text.
+   */
+  filter?: string | null;
+  /**
+   * status (default), assignee, priority, project, cycle, label, team or none.
+   */
+  group_by?: string | null;
+  /**
+   * `list` (default) or `board`.
+   */
+  layout?: string | null;
+  /**
+   * The name, 1 to 120 characters.
+   */
+  name: string;
+  /**
+   * priority (default), updated, created, due, estimate or title.
+   */
+  order_by?: string | null;
+  /**
+   * `all`, `past_week` (default), `past_month` or `none`.
+   */
+  show_closed?: string | null;
+  /**
+   * Whether sub-issues show alongside their parents (default true).
+   */
+  show_sub_issues?: boolean | null;
+  /**
+   * Scope the view to one team.
+   */
+  team?: string | null;
+  /**
+   * The view ID.
+   */
+  view_id: string;
+  /**
+   * `private` (default), `team` or `workspace`.
+   */
+  visibility?: string | null;
 }
 
 /**
@@ -7866,6 +7922,48 @@ export interface Versioned {
 }
 
 /**
+ * A saved view's settings.
+ */
+export interface ViewIn {
+  /**
+   * A Work filter as JSON text.
+   */
+  filter?: string | null;
+  /**
+   * status (default), assignee, priority, project, cycle, label, team or none.
+   */
+  group_by?: string | null;
+  /**
+   * `list` (default) or `board`.
+   */
+  layout?: string | null;
+  /**
+   * The name, 1 to 120 characters.
+   */
+  name: string;
+  /**
+   * priority (default), updated, created, due, estimate or title.
+   */
+  order_by?: string | null;
+  /**
+   * `all`, `past_week` (default), `past_month` or `none`.
+   */
+  show_closed?: string | null;
+  /**
+   * Whether sub-issues show alongside their parents (default true).
+   */
+  show_sub_issues?: boolean | null;
+  /**
+   * Scope the view to one team.
+   */
+  team?: string | null;
+  /**
+   * `private` (default), `team` or `workspace`.
+   */
+  visibility?: string | null;
+}
+
+/**
  * A saved view, in the text form `schema.yaml` uses.
  */
 export interface ViewInfo {
@@ -7927,6 +8025,66 @@ export interface ViewKey {
 export type ViewKind = "table" | "board" | "gallery" | "calendar" | "timeline" | "list";
 
 /**
+ * A saved view.
+ */
+export interface ViewOut {
+  /**
+   * The filter as JSON text, in the shape `query_issues` takes.
+   */
+  filter: string;
+  /**
+   * status, assignee, priority, project, cycle, label, team or none.
+   */
+  group_by: string;
+  /**
+   * The view ID.
+   */
+  id: string;
+  /**
+   * `list` or `board`.
+   */
+  layout: string;
+  /**
+   * The name.
+   */
+  name: string;
+  /**
+   * priority, updated, created, due, estimate or title.
+   */
+  order_by: string;
+  /**
+   * Who made it; only they can change or delete it.
+   */
+  owner: string;
+  /**
+   * `all`, `past_week`, `past_month` or `none`.
+   */
+  show_closed: string;
+  /**
+   * Whether sub-issues show alongside their parents.
+   */
+  show_sub_issues: boolean;
+  /**
+   * The team it is scoped to, or none for every team.
+   */
+  team?: string | null;
+  /**
+   * `private`, `team` or `workspace`.
+   */
+  visibility: string;
+}
+
+/**
+ * A saved view by ID.
+ */
+export interface ViewRef {
+  /**
+   * The view ID.
+   */
+  view_id: string;
+}
+
+/**
  * The result of running a view.
  */
 export interface ViewResult {
@@ -7962,6 +8120,16 @@ export interface ViewResult {
    * The view name.
    */
   view: string;
+}
+
+/**
+ * The saved views the caller can open.
+ */
+export interface ViewsOut {
+  /**
+   * Views, by name.
+   */
+  views: ViewOut[];
 }
 
 /**
@@ -8268,6 +8436,66 @@ export interface WorkCreateTeamTeamOut {
    * Whether intake issues go to triage first.
    */
   triage: boolean;
+}
+
+/**
+ * A saved view.
+ */
+export interface WorkCreateViewViewOut {
+  /**
+   * The filter as JSON text, in the shape `query_issues` takes.
+   */
+  filter: string;
+  /**
+   * status, assignee, priority, project, cycle, label, team or none.
+   */
+  group_by: string;
+  /**
+   * The view ID.
+   */
+  id: string;
+  /**
+   * `list` or `board`.
+   */
+  layout: string;
+  /**
+   * The name.
+   */
+  name: string;
+  /**
+   * priority, updated, created, due, estimate or title.
+   */
+  order_by: string;
+  /**
+   * Who made it; only they can change or delete it.
+   */
+  owner: string;
+  /**
+   * `all`, `past_week`, `past_month` or `none`.
+   */
+  show_closed: string;
+  /**
+   * Whether sub-issues show alongside their parents.
+   */
+  show_sub_issues: boolean;
+  /**
+   * The team it is scoped to, or none for every team.
+   */
+  team?: string | null;
+  /**
+   * `private`, `team` or `workspace`.
+   */
+  visibility: string;
+}
+
+/**
+ * Nothing to return.
+ */
+export interface WorkDeleteViewDone {
+  /**
+   * Always true.
+   */
+  ok: boolean;
 }
 
 /**
@@ -8802,6 +9030,56 @@ export interface WorkPutTeamTeamOut {
    * Whether intake issues go to triage first.
    */
   triage: boolean;
+}
+
+/**
+ * A saved view.
+ */
+export interface WorkPutViewViewOut {
+  /**
+   * The filter as JSON text, in the shape `query_issues` takes.
+   */
+  filter: string;
+  /**
+   * status, assignee, priority, project, cycle, label, team or none.
+   */
+  group_by: string;
+  /**
+   * The view ID.
+   */
+  id: string;
+  /**
+   * `list` or `board`.
+   */
+  layout: string;
+  /**
+   * The name.
+   */
+  name: string;
+  /**
+   * priority, updated, created, due, estimate or title.
+   */
+  order_by: string;
+  /**
+   * Who made it; only they can change or delete it.
+   */
+  owner: string;
+  /**
+   * `all`, `past_week`, `past_month` or `none`.
+   */
+  show_closed: string;
+  /**
+   * Whether sub-issues show alongside their parents.
+   */
+  show_sub_issues: boolean;
+  /**
+   * The team it is scoped to, or none for every team.
+   */
+  team?: string | null;
+  /**
+   * `private`, `team` or `workspace`.
+   */
+  visibility: string;
 }
 
 /**
@@ -10229,12 +10507,26 @@ export interface Operations {
     input: CreateTeam;
     output: WorkCreateTeamTeamOut;
   };
+  /** Saves a view */
+  "work.create_view": {
+    method: "POST";
+    path: "/v1/work/views";
+    input: ViewIn;
+    output: WorkCreateViewViewOut;
+  };
   /** Deletes my comment, or any comment as an admin */
   "work.delete_comment": {
     method: "DELETE";
     path: "/v1/work/comments/{comment_id}";
     input: CommentRef;
     output: CommentResult;
+  };
+  /** Deletes a saved view the caller owns */
+  "work.delete_view": {
+    method: "DELETE";
+    path: "/v1/work/views/{view_id}";
+    input: ViewRef;
+    output: WorkDeleteViewDone;
   };
   /** Drops the waiting triage suggestion */
   "work.dismiss_suggestion": {
@@ -10320,6 +10612,13 @@ export interface Operations {
     input: NoInput;
     output: TeamsOut;
   };
+  /** Lists the saved views the caller can open */
+  "work.list_views": {
+    method: "GET";
+    path: "/v1/work/views";
+    input: ListViews;
+    output: ViewsOut;
+  };
   /** Moves an issue to another team; the old key keeps working */
   "work.move_issue": {
     method: "POST";
@@ -10354,6 +10653,13 @@ export interface Operations {
     path: "/v1/work/teams/{team}";
     input: PutTeam;
     output: WorkPutTeamTeamOut;
+  };
+  /** Replaces a saved view the caller owns */
+  "work.put_view": {
+    method: "PUT";
+    path: "/v1/work/views/{view_id}";
+    input: PutView;
+    output: WorkPutViewViewOut;
   };
   /** Lists issues by filter, grouped and ordered */
   "work.query_issues": {
@@ -10564,7 +10870,9 @@ export const OPERATIONS = {
   "work.assign_thread": { method: "POST", path: "/v1/work/threads/{thread_id}/assign", mutation: true },
   "work.create_issue": { method: "POST", path: "/v1/work/issues", mutation: true },
   "work.create_team": { method: "POST", path: "/v1/work/teams", mutation: true },
+  "work.create_view": { method: "POST", path: "/v1/work/views", mutation: true },
   "work.delete_comment": { method: "DELETE", path: "/v1/work/comments/{comment_id}", mutation: true },
+  "work.delete_view": { method: "DELETE", path: "/v1/work/views/{view_id}", mutation: true },
   "work.dismiss_suggestion": { method: "DELETE", path: "/v1/work/issues/{key}/triage/suggestion", mutation: true },
   "work.edit_comment": { method: "PATCH", path: "/v1/work/comments/{comment_id}", mutation: true },
   "work.get_issue": { method: "GET", path: "/v1/work/issues/{key}", mutation: false },
@@ -10577,11 +10885,13 @@ export const OPERATIONS = {
   "work.list_forms": { method: "GET", path: "/v1/work/teams/{team}/forms", mutation: false },
   "work.list_projects": { method: "GET", path: "/v1/work/projects", mutation: false },
   "work.list_teams": { method: "GET", path: "/v1/work/teams", mutation: false },
+  "work.list_views": { method: "GET", path: "/v1/work/views", mutation: false },
   "work.move_issue": { method: "POST", path: "/v1/work/issues/{key}/move", mutation: true },
   "work.my_assignments": { method: "GET", path: "/v1/work/me/assignments", mutation: false },
   "work.my_issues": { method: "GET", path: "/v1/work/me/issues", mutation: false },
   "work.put_project": { method: "PUT", path: "/v1/work/projects/{project_id}", mutation: true },
   "work.put_team": { method: "PUT", path: "/v1/work/teams/{team}", mutation: true },
+  "work.put_view": { method: "PUT", path: "/v1/work/views/{view_id}", mutation: true },
   "work.query_issues": { method: "GET", path: "/v1/work/issues", mutation: false },
   "work.react": { method: "POST", path: "/v1/work/comments/{comment_id}/reactions", mutation: true },
   "work.resolve_thread": { method: "POST", path: "/v1/work/threads/{thread_id}/resolve", mutation: true },

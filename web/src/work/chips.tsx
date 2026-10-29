@@ -30,7 +30,7 @@ function PriorityChip({ priority }: { readonly priority: number }) {
   const name = priorityName(priority);
   if (name === "none") return;
   return (
-    <span className={`vl-chip vl-chip-priority vl-priority-${name}`}>
+    <span className={`vl-work-chip vl-work-chip-priority vl-priority-${name}`}>
       {t(`work-priority-${name}`)}
     </span>
   );
@@ -51,7 +51,7 @@ function SlaChip({ sla }: { readonly sla: SlaOut | null | undefined }) {
     ? sla.breaches_at
     : due.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric" });
   return (
-    <span className={`vl-chip vl-sla vl-sla-${risk}`} title={sla.breaches_at}>
+    <span className={`vl-work-chip vl-sla vl-sla-${risk}`} title={sla.breaches_at}>
       {t(`work-sla-${risk}`, { when })}
     </span>
   );
@@ -60,14 +60,14 @@ function SlaChip({ sla }: { readonly sla: SlaOut | null | undefined }) {
 /** The row of chips an issue shows in lists and on cards. */
 export function IssueChips({ issue }: { readonly issue: IssueOut }) {
   return (
-    <span className="vl-chips">
+    <span className="vl-work-chips">
       <PriorityChip priority={issue.priority} />
       <SlaChip sla={issue.sla} />
       {issue.estimate !== undefined && issue.estimate !== null && (
-        <span className="vl-chip">{issue.estimate}</span>
+        <span className="vl-work-chip">{issue.estimate}</span>
       )}
       {issue.assignee !== undefined && issue.assignee !== null && (
-        <span className="vl-chip vl-chip-person">@{issue.assignee}</span>
+        <span className="vl-work-chip vl-work-chip-person">@{issue.assignee}</span>
       )}
     </span>
   );
