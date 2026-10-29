@@ -137,7 +137,9 @@ each request through an access port backed by authorization.
 
 - The web app calls `collections.list`, `get`, `query`, `get_row` and
   the row writes, with JSON Schema for every input and output.
-- Render, an engine crate, cannot depend on this one; it resolves
-  `collection` fences and charts through a port this service implements.
+- Pages show `collection` blocks and `source=collection:` charts live
+  through `collections.embed` and `collections.chart`, checked as the
+  reader. A bad block is a readable `invalid_input` the page shows in
+  place; an unreadable collection is `not_found`, never shown.
 - Still to come: pushing computed rows to the index and search (D73),
   saving views, CSV and embed operations (#128 to #132).

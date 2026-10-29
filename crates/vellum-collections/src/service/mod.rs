@@ -21,6 +21,8 @@
 //! | `collections.delete_row` | `DELETE /v1/collections/{collection_id}/rows/{row_id}` | `write:direct` |
 //! | `collections.save_view` | `PUT /v1/collections/{collection_id}/views/{view}` | `write:direct` |
 //! | `collections.delete_view` | `DELETE /v1/collections/{collection_id}/views/{view}` | `write:direct` |
+//! | `collections.embed` | `GET /v1/collections/embed` | `read` |
+//! | `collections.chart` | `GET /v1/collections/chart` | `read` |
 //!
 //! Reading a collection needs read access to it and to every collection
 //! its relations point at, because relation cells show related titles
@@ -46,9 +48,9 @@ use vellum_store::BlobStore;
 
 pub use access::{Access, AuthzAccess, Need, SpaceOf};
 pub use api::{
-    CollectionInfo, CollectionKey, CollectionList, CollectionSummary, CreateRowInput,
-    ListCollections, PropertyInfo, QueryInput, RelationInfo, RollupInfo, RowDetail, RowKey,
-    RowWritten, SaveViewInput, UpdateRowInput, ViewInfo, ViewKey,
+    ChartInput, CollectionInfo, CollectionKey, CollectionList, CollectionSummary, CreateRowInput,
+    EmbedInput, EmbedResult, ListCollections, PropertyInfo, QueryInput, RelationInfo, RollupInfo,
+    RowDetail, RowKey, RowWritten, SaveViewInput, UpdateRowInput, ViewInfo, ViewKey,
 };
 pub use state::{MAX_FILE_BYTES, MAX_ROWS_PER_COLLECTION};
 
@@ -647,6 +649,119 @@ impl CollectionsService {
     }
 }
 
+fn embed_error(e: &crate::fence::EmbedError) -> Error {
+    Error::new(ErrorKind::InvalidInput, e.0.clone())
+}
+
+impl CollectionsService {
+    /// Runs the view a `collection` block in a page asks for, as
+    /// `principal` sees it. The renderer and exporters call this directly;
+    /// the web app calls `collections.embed`.
+    ///
+    /// # Errors
+    ///
+    /// `invalid_input` with a readable message for a malformed block or
+    /// an unknown view or property; `not_found` when the collection does
+    /// not exist or the caller cannot read it.
+    pub async fn resolve_embed(
+        &self,
+        principal: &Principal,
+        fence: &str,
+    ) -> Result<EmbedResult, Error> {
+        let embed = crate::fence::CollectionEmbed::parse(fence).map_err(|e| embed_error(&e))?;
+        let state = self.read().await?;
+        self.require_read(&state, principal, embed.id).await?;
+        let (title, path) = match (state.ws.collection(embed.id), state.folder(embed.id)) {
+            (Some(c), Ok(f)) => (c.schema().title.clone(), f.path.as_str().to_owned()),
+            _ => {
+                return Err(Error::new(
+                    ErrorKind::NotFound,
+                    format!("collection {} not found", embed.id),
+                ));
+            }
+        };
+        let mut computer = Computer::new(&state.ws, (self.clock)());
+        let result = embed.resolve(&mut computer);
+        drop(computer);
+        drop(state);
+        Ok(EmbedResult {
+            collection_id: embed.id,
+            title,
+            path,
+            result: result.map_err(|e| embed_error(&e))?,
+        })
+    }
+
+    /// Computes a collection chart's data, as `principal` sees it.
+    ///
+    /// # Errors
+    ///
+    /// `invalid_input` for a source that is not `collection:<id>`, a
+    /// missing `x`, an unknown property, view or aggregation; `not_found`
+    /// when the collection cannot be read.
+    pub async fn resolve_chart(
+        &self,
+        principal: &Principal,
+        input: ChartInput,
+    ) -> Result<crate::fence::ChartData, Error> {
+        let mut attrs = std::collections::BTreeMap::from([
+            ("source".to_owned(), input.source),
+            ("x".to_owned(), input.x),
+        ]);
+        for (k, v) in [
+            ("view", input.view),
+            ("y", input.y),
+            ("series", input.series),
+            ("agg", input.agg),
+        ] {
+            if let Some(v) = v {
+                let _ = attrs.insert(k.to_owned(), v);
+            }
+        }
+        let source = crate::fence::ChartSource::from_attrs(&attrs)
+            .map_err(|e| embed_error(&e))?
+            .ok_or_else(|| {
+                Error::new(
+                    ErrorKind::InvalidInput,
+                    "a chart source must be collection:<id>",
+                )
+            })?;
+        let state = self.read().await?;
+        self.require_read(&state, principal, source.id).await?;
+        let mut computer = Computer::new(&state.ws, (self.clock)());
+        let data = source.resolve(&mut computer);
+        drop(computer);
+        drop(state);
+        data.map_err(|e| embed_error(&e))
+    }
+
+    fn embed_operations(this: &Arc<Self>) -> Vec<Operation> {
+        let s = Arc::clone(this);
+        let embed = Operation::query(
+            "collections.embed",
+            "/v1/collections/embed",
+            Scope::Read,
+            move |ctx, input: EmbedInput| {
+                let s = Arc::clone(&s);
+                async move { s.resolve_embed(&ctx.principal, &input.fence).await }
+            },
+        )
+        .summary("Show the live rows of a collection block in a page");
+        let s = Arc::clone(this);
+        let chart = Operation::query(
+            "collections.chart",
+            "/v1/collections/chart",
+            Scope::Read,
+            move |ctx, input: ChartInput| {
+                let s = Arc::clone(&s);
+                async move { s.resolve_chart(&ctx.principal, input).await }
+            },
+        )
+        .summary("Compute a chart's data from a collection");
+        vec![embed, chart]
+    }
+}
+
 impl Service for CollectionsService {
     fn name(&self) -> &'static str {
         "collections"
@@ -722,6 +837,7 @@ impl Service for CollectionsService {
         )
         .summary("Change a row's values or body");
         let views = Self::view_operations(&self);
+        let embeds = Self::embed_operations(&self);
         let s = self;
         let delete_row = Operation::mutation(
             "collections.delete_row",
@@ -738,6 +854,7 @@ impl Service for CollectionsService {
             list, get, query, get_row, create_row, update_row, delete_row,
         ];
         ops.extend(views);
+        ops.extend(embeds);
         ops
     }
 
