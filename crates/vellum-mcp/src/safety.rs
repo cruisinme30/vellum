@@ -8,15 +8,26 @@
 //! [`guard`]:
 //!
 //! 1. Invisible text is stripped: zero-width and bidirectional control
-//!    characters, Unicode tag characters, supplementary variation
-//!    selectors, and Markdown comment lines (`[//]: # (…)`) that render as
-//!    nothing but would reach the model.
+//!    characters, Unicode tag characters, blank fillers, supplementary
+//!    variation selectors, runs of variation selectors (hidden data
+//!    smuggled behind an emoji), and Markdown comment lines
+//!    (`[//]: # (…)`) that render as nothing but would reach the model.
+//!    Link reference definitions with a title are reported too, because
+//!    the title is never shown on the page.
 //! 2. Blocks that read like instructions to a model are flagged in a
 //!    `warnings` list with their block id, so the client can show them
 //!    and the model can treat them with suspicion. They are not removed:
 //!    a page about prompt injection must still be readable.
+//!
+//! Matching runs on a folded copy of each block ([`fold`]): Unicode
+//! compatibility forms (NFKC), common Cyrillic and Greek look-alikes
+//! mapped to Latin, joiners removed, case folded and all whitespace
+//! collapsed. This is a heuristic that raises the bar; it cannot make
+//! prompt injection impossible, which is why model output still lands as
+//! drafts.
 
 use serde::Serialize;
+use unicode_normalization::UnicodeNormalization as _;
 
 /// Something the guard noticed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -48,13 +59,111 @@ pub const fn is_invisible(c: char) -> bool {
         '\u{00AD}'                 // soft hyphen
         | '\u{180E}'               // Mongolian vowel separator
         | '\u{200B}' | '\u{200C}'  // zero-width space, non-joiner
+        | '\u{034F}'               // combining grapheme joiner
+        | '\u{115F}' | '\u{1160}'  // Hangul choseong and jungseong fillers
         | '\u{200E}' | '\u{200F}'  // LRM, RLM
         | '\u{202A}'..='\u{202E}'  // bidi embeddings and overrides
-        | '\u{2060}'..='\u{2064}'  // word joiner, invisible operators
-        | '\u{2066}'..='\u{2069}'  // bidi isolates
+        | '\u{2060}'..='\u{2069}'  // word joiner, invisible operators, bidi isolates
+        | '\u{3164}'               // Hangul filler
         | '\u{FEFF}'               // zero-width no-break space
+        | '\u{FFA0}'               // half-width Hangul filler
         | '\u{E0000}'..='\u{E007F}'  // tag characters
         | '\u{E0100}'..='\u{E01EF}') // supplementary variation selectors
+}
+
+/// Whether a character is a variation selector (U+FE00–U+FE0F).
+const fn is_variation_selector(c: char) -> bool {
+    matches!(c, '\u{FE00}'..='\u{FE0F}')
+}
+
+/// Removes invisible characters and runs of two or more variation
+/// selectors; a single selector after a character (an emoji's U+FE0F)
+/// is kept. Returns how many characters were removed.
+fn strip_invisible(line: &str, out: &mut String) -> usize {
+    let mut removed = 0;
+    let chars: Vec<char> = line.chars().collect();
+    let mut i = 0;
+    while let Some(&c) = chars.get(i) {
+        if is_variation_selector(c) {
+            let run = chars
+                .get(i..)
+                .unwrap_or_default()
+                .iter()
+                .take_while(|x| is_variation_selector(**x))
+                .count();
+            if run == 1 {
+                out.push(c);
+            } else {
+                removed += run;
+            }
+            i += run;
+            continue;
+        }
+        if is_invisible(c) {
+            removed += 1;
+        } else {
+            out.push(c);
+        }
+        i += 1;
+    }
+    removed
+}
+
+/// Maps common Cyrillic and Greek look-alikes to the Latin letter they
+/// imitate. NFKC handles full-width and other compatibility forms.
+const fn unconfuse(c: char) -> char {
+    match c {
+        'а' | 'α' => 'a',
+        'в' | 'β' => 'b',
+        'с' | 'ϲ' => 'c',
+        'ԁ' => 'd',
+        'е' | 'ε' => 'e',
+        'һ' => 'h',
+        'і' | 'ι' | 'ı' => 'i',
+        'ј' => 'j',
+        'к' | 'κ' => 'k',
+        'м' => 'm',
+        'п' | 'η' => 'n',
+        'о' | 'ο' | 'σ' => 'o',
+        'р' | 'ρ' => 'p',
+        'ԛ' => 'q',
+        'г' => 'r',
+        'ѕ' => 's',
+        'т' | 'τ' => 't',
+        'υ' => 'u',
+        'ѵ' | 'ν' => 'v',
+        'ԝ' | 'ω' => 'w',
+        'х' | 'χ' => 'x',
+        'у' | 'γ' => 'y',
+        'ᴢ' => 'z',
+        other => other,
+    }
+}
+
+/// The copy of a block that patterns are matched against.
+///
+/// NFKC, lower-cased, look-alikes mapped to Latin, joiners and selectors
+/// dropped, and every run of whitespace (newlines included) collapsed to
+/// one space.
+#[must_use]
+pub fn fold(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut space = false;
+    for c in text.nfkc().flat_map(char::to_lowercase) {
+        if c.is_whitespace() {
+            space = !out.is_empty();
+            continue;
+        }
+        if c == '\u{200D}' || is_variation_selector(c) || is_invisible(c) {
+            continue;
+        }
+        if space {
+            out.push(' ');
+            space = false;
+        }
+        out.push(unconfuse(c));
+    }
+    out
 }
 
 /// Markdown comment idioms that render as nothing.
@@ -62,6 +171,46 @@ fn is_comment_line(line: &str) -> bool {
     let t = line.trim();
     (t.starts_with("[//]:") || t.starts_with("[comment]:") || t.starts_with("[_]:"))
         && (t.contains("# (") || t.contains("<> (") || t.contains("#("))
+}
+
+/// A link reference definition with a title, which renders as nothing.
+fn is_titled_reference(line: &str) -> bool {
+    let t = line.trim();
+    let Some(rest) = t.strip_prefix('[') else {
+        return false;
+    };
+    let Some((label, rest)) = rest.split_once("]:") else {
+        return false;
+    };
+    if label.is_empty() || label.starts_with('^') {
+        return false;
+    }
+    let mut parts = rest.trim_start().splitn(2, char::is_whitespace);
+    let _destination = parts.next();
+    parts.next().map(str::trim).is_some_and(|title| {
+        title.len() >= 2
+            && matches!(
+                (title.chars().next(), title.chars().last()),
+                (Some('"'), Some('"')) | (Some('\''), Some('\'')) | (Some('('), Some(')'))
+            )
+    })
+}
+
+/// Turn markers that open a fake conversation turn.
+const TURN_MARKERS: [&str; 4] = ["assistant:", "system:", "human:", "user:"];
+
+/// Whether a line, once leading Markdown marks are removed, opens a fake
+/// conversation turn.
+fn is_fake_turn(line: &str) -> bool {
+    let bare = line.trim_start_matches(|c: char| {
+        c.is_whitespace() || matches!(c, '*' | '_' | '>' | '#' | '-' | '+' | '~' | '`')
+    });
+    let folded = fold(bare);
+    let unmarked: String = folded
+        .chars()
+        .filter(|c| !matches!(c, '*' | '_' | '`'))
+        .collect();
+    TURN_MARKERS.iter().any(|m| unmarked.starts_with(m))
 }
 
 /// Phrases that address a model rather than a human reader.
@@ -147,13 +296,15 @@ pub fn guard(markdown: &str) -> Guarded {
             });
             continue;
         }
-        for c in line.chars() {
-            if is_invisible(c) {
-                stripped_chars += 1;
-            } else {
-                out.push(c);
-            }
+        if is_titled_reference(line) {
+            warnings.push(Warning {
+                kind: "invisible_text",
+                block_id: None,
+                excerpt: excerpt(line),
+                reason: "a link reference title, which is not shown on the page".into(),
+            });
         }
+        stripped_chars += strip_invisible(line, &mut out);
     }
     if stripped_chars > 0 {
         warnings.push(Warning {
@@ -164,18 +315,15 @@ pub fn guard(markdown: &str) -> Guarded {
         });
     }
     for block in out.split("\n\n") {
-        let lower = block.to_lowercase();
+        let folded = fold(block);
         let found = INSTRUCTION_PATTERNS
             .iter()
-            .find(|(p, _)| lower.contains(p))
+            .find(|(p, _)| folded.contains(p))
             .map(|(_, r)| *r)
             .or_else(|| {
-                lower
+                block
                     .lines()
-                    .any(|l| {
-                        let l = l.trim_start();
-                        l.starts_with("assistant:") || l.starts_with("system:")
-                    })
+                    .any(is_fake_turn)
                     .then_some("contains a fake conversation turn")
             });
         if let Some(reason) = found {
