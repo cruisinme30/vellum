@@ -18,6 +18,7 @@ import { createHttpAdminConsoleApi } from "./admin/console/api";
 import { createAuthApi } from "./api/auth";
 import { createHttp } from "./api/http";
 import { App } from "./app";
+import { createHttpAttachmentsApi } from "./attachments/api";
 import { createHttpBooksApi } from "./books/api";
 import { createHttpCollectionsStore } from "./collections/http";
 import { createMockCollectionsStore } from "./collections/mock";
@@ -82,6 +83,7 @@ root.render(
       books={status === undefined ? undefined : createHttpBooksApi(http)}
       drive={status === undefined ? undefined : createHttpDriveApi(http)}
       directory={status === undefined ? undefined : createHttpDirectory(http)}
+      attachments={status === undefined ? undefined : createHttpAttachmentsApi(http)}
       privateSpaces={status === undefined ? undefined : createHttpPrivateSpacesApi(http)}
       collections={
         status === undefined ? createMockCollectionsStore() : createHttpCollectionsStore(http)

@@ -1,0 +1,52 @@
+/*
+ * SPDX-FileCopyrightText: 2026 The Vellum contributors
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+/* A page's files panel and the upload button. */
+
+.vl-files-panel {
+  margin-block: 16px;
+  padding: 16px;
+  border-radius: var(--vl-radius-m);
+  background: var(--md-surface-container-low);
+  overflow-wrap: anywhere;
+}
+
+.vl-files-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.vl-files-head h2 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.vl-files-list {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vl-files-list li,
+.vl-upload,
+.vl-files-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.vl-files-list a {
+  min-inline-size: 0;
+  color: var(--md-primary);
+}
+
+.vl-files-notice:empty {
+  display: none;
+}
