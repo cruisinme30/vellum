@@ -191,15 +191,44 @@ fn decode_entities(text: &str) -> String {
     out
 }
 
+/// Removes inline HTML tags (`<b>`, `</span>`, `<a href=…>`) so a tag
+/// cannot split a word. A `<` that does not open a tag is kept.
+fn strip_tags(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(at) = rest.find('<') {
+        out.push_str(rest.get(..at).unwrap_or_default());
+        let tail = rest.get(at + 1..).unwrap_or_default();
+        let opens_tag = tail
+            .trim_start_matches('/')
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_ascii_alphabetic());
+        let end = tail
+            .char_indices()
+            .take(512)
+            .find(|(_, c)| *c == '>' || *c == '\n')
+            .filter(|(_, c)| *c == '>');
+        if opens_tag && let Some((i, _)) = end {
+            rest = tail.get(i + 1..).unwrap_or_default();
+        } else {
+            out.push('<');
+            rest = tail;
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
 /// The skeleton of some text that patterns are matched against.
 ///
-/// HTML entities decoded; NFKD with combining marks and format
+/// HTML entities decoded and inline tags removed; NFKD with combining marks and format
 /// characters removed; inline Markdown marks removed; every run of
 /// whitespace collapsed to one space; then the Unicode confusables
 /// skeleton (UTS #39), lower-cased.
 #[must_use]
 pub fn fold(text: &str) -> String {
-    let decoded = decode_entities(text);
+    let decoded = strip_tags(&decode_entities(text));
     let mut plain = String::with_capacity(decoded.len());
     let mut space = false;
     for c in decoded.nfkd().flat_map(char::to_lowercase) {
@@ -221,11 +250,28 @@ pub fn fold(text: &str) -> String {
         .collect()
 }
 
-/// Splits folded text into words.
-fn words(folded: &str) -> impl Iterator<Item = &str> {
-    folded
-        .split(|c: char| !c.is_alphanumeric())
+/// Splits folded text into words. A hyphenated word is kept whole when,
+/// without its hyphens, it is a word the guard looks for ("pre-vious"),
+/// and split at the hyphens otherwise.
+fn words(folded: &str, known: impl Fn(&str) -> bool) -> Vec<String> {
+    let mut out = Vec::new();
+    for token in folded
+        .split(|c: char| !(c.is_alphanumeric() || c == '-'))
         .filter(|w| !w.is_empty())
+    {
+        let joined: String = token.chars().filter(|c| *c != '-').collect();
+        if token.contains('-') && !known(&joined) {
+            out.extend(
+                token
+                    .split('-')
+                    .filter(|w| !w.is_empty())
+                    .map(str::to_owned),
+            );
+        } else if !joined.is_empty() {
+            out.push(joined);
+        }
+    }
+    out
 }
 
 /// Markdown comment idioms that render as nothing: `[//]: # …`,
@@ -271,11 +317,19 @@ fn is_title(text: &str) -> bool {
 /// Words that open a fake conversation turn.
 const ROLES: [&str; 4] = ["assistant", "system", "human", "user"];
 
-/// Whether a line opens a fake conversation turn: a role name followed by
-/// a colon, a closing bracket or `>`, once list numbers, table bars and
-/// Markdown marks are trimmed; or a role name alone as a heading or in
-/// brackets.
-fn is_fake_turn(line: &str) -> bool {
+/// A line that looks like a conversation turn.
+struct Turn {
+    /// The folded role name.
+    role: String,
+    /// What the turn says: the rest of the line, or the next line for a
+    /// bare role heading.
+    content: String,
+}
+
+/// Reads a conversation turn marker: a role name followed by a colon, a
+/// closing bracket or `>`, once list numbers, table bars and Markdown
+/// marks are trimmed; or a role name alone as a heading or in brackets.
+fn turn(line: &str, next: Option<&str>) -> Option<Turn> {
     let mut rest = line.trim_start();
     let mut framed = false;
     loop {
@@ -302,17 +356,74 @@ fn is_fake_turn(line: &str) -> bool {
         }
     }
     let folded = fold(rest);
-    ROLES.iter().any(|role| {
+    ROLES.iter().find_map(|role| {
         let role = fold(role);
-        folded.strip_prefix(role.as_str()).is_some_and(|after| {
-            let after = after.trim_start();
-            after
-                .chars()
-                .next()
-                .map_or(framed, |c| matches!(c, ':' | ']' | '>' | ')' | '|'))
-        })
+        let after = folded.strip_prefix(role.as_str())?.trim_start();
+        let content = match after.chars().next() {
+            None if framed => fold(next.unwrap_or_default()),
+            Some(c) if matches!(c, ':' | ']' | '>' | ')' | '|') => {
+                after.get(c.len_utf8()..).unwrap_or_default().to_owned()
+            }
+            _ => return None,
+        };
+        Some(Turn { role, content })
     })
 }
+
+/// Words that make a turn read as an assistant acting or being told to
+/// act, rather than a label in ordinary prose ("System: Linux").
+const ACTIONS: [&str; 30] = [
+    "approve",
+    "approved",
+    "approving",
+    "delete",
+    "deleted",
+    "deleting",
+    "remove",
+    "export",
+    "exporting",
+    "send",
+    "sending",
+    "email",
+    "forward",
+    "share",
+    "upload",
+    "reveal",
+    "leak",
+    "ignore",
+    "run",
+    "execute",
+    "call",
+    "transfer",
+    "grant",
+    "sure",
+    "okay",
+    "ok",
+    "certainly",
+    "done",
+    "please",
+    "must",
+];
+
+/// Verbs that ask a model to disclose what it was told.
+const DISCLOSE: [&str; 9] = [
+    "reveal", "print", "show", "repeat", "output", "leak", "display", "dump", "recite",
+];
+
+/// Words that, after "you are now", recast the model.
+const RECAST: [&str; 11] = [
+    "a",
+    "an",
+    "in",
+    "dan",
+    "called",
+    "named",
+    "unrestricted",
+    "jailbroken",
+    "free",
+    "my",
+    "no",
+];
 
 /// Verbs that tell a model to drop what it was told.
 const OVERRIDE_VERBS: [&str; 8] = [
@@ -362,10 +473,11 @@ const INSTRUCTIONS: [&str; 13] = [
 ];
 
 /// Fixed word sequences that address a model, with the reason.
-const SEQUENCES: [(&[&str], &str); 9] = [
-    (&["new", "instructions"], "introduces new instructions"),
-    (&["system", "prompt"], "refers to the model's system prompt"),
-    (&["you", "are", "now"], "tries to change the model's role"),
+const SEQUENCES: [(&[&str], &str); 5] = [
+    (
+        &["from", "now", "on", "you", "are"],
+        "tries to change the model's role",
+    ),
     (
         &["do", "not", "tell", "the", "user"],
         "asks the model to hide something from the user",
@@ -373,14 +485,6 @@ const SEQUENCES: [(&[&str], &str); 9] = [
     (
         &["don", "t", "tell", "the", "user"],
         "asks the model to hide something from the user",
-    ),
-    (
-        &["forget", "your", "instructions"],
-        "asks the model to drop its instructions",
-    ),
-    (
-        &["ignore", "your", "instructions"],
-        "asks the model to drop its instructions",
     ),
     (&["call", "the", "tool"], "tells the model to call a tool"),
     (
@@ -398,7 +502,15 @@ struct Vocabulary {
     fillers: Vec<String>,
     earlier: Vec<String>,
     instructions: Vec<String>,
+    actions: Vec<String>,
+    disclose: Vec<String>,
+    recast: Vec<String>,
     above: String,
+    your: String,
+    system_prompt: [String; 2],
+    you_are_now: [String; 3],
+    assistant: String,
+    new_instructions: String,
     sequences: Vec<(Vec<String>, &'static str)>,
 }
 
@@ -410,13 +522,33 @@ impl Vocabulary {
             fillers: f(&FILLERS),
             earlier: f(&EARLIER),
             instructions: f(&INSTRUCTIONS),
+            actions: f(&ACTIONS),
+            disclose: f(&DISCLOSE),
+            recast: f(&RECAST),
             above: fold("above"),
+            your: fold("your"),
+            system_prompt: [fold("system"), fold("prompt")],
+            you_are_now: [fold("you"), fold("are"), fold("now")],
+            assistant: fold("assistant"),
+            new_instructions: fold("new instructions:"),
             sequences: SEQUENCES.iter().map(|(seq, why)| (f(seq), *why)).collect(),
         }
     }
 
+    /// Whether a word is one the patterns look for.
+    fn knows(&self, word: &str) -> bool {
+        [
+            &self.verbs,
+            &self.earlier,
+            &self.instructions,
+            &self.actions,
+        ]
+        .iter()
+        .any(|list| list.iter().any(|w| w == word))
+    }
+
     /// Whether the words from `at` read as "ignore … previous …
-    /// instructions".
+    /// instructions" or "ignore your … instructions".
     fn is_override(&self, words: &[(String, usize)], at: usize) -> bool {
         let word = |i: usize| words.get(i).map(|(w, _)| w.as_str());
         let is = |i: usize, list: &[String]| word(i).is_some_and(|w| list.iter().any(|x| x == w));
@@ -425,9 +557,15 @@ impl Vocabulary {
         }
         let mut i = at + 1;
         let mut fillers = 0;
+        let mut addressed = false;
         while is(i, &self.fillers) && fillers < 3 {
+            addressed |= word(i) == Some(self.your.as_str());
             i += 1;
             fillers += 1;
+        }
+        // "override your guidelines": "your" means the model's own.
+        if addressed && is(i, &self.instructions) {
+            return true;
         }
         if !is(i, &self.earlier) {
             return false;
@@ -443,10 +581,43 @@ impl Vocabulary {
         is(j, &self.instructions)
     }
 
+    /// Whether the words from `at` ask the model to reveal its system
+    /// prompt ("print the system prompt").
+    fn is_disclosure(&self, words: &[(String, usize)], at: usize) -> bool {
+        let word = |i: usize| words.get(i).map(|(w, _)| w.as_str());
+        let is = |i: usize, list: &[String]| word(i).is_some_and(|w| list.iter().any(|x| x == w));
+        if !is(at, &self.disclose) {
+            return false;
+        }
+        let mut i = at + 1;
+        while is(i, &self.fillers) && i < at + 4 {
+            i += 1;
+        }
+        let [system, prompt] = &self.system_prompt;
+        word(i) == Some(system.as_str())
+            && (word(i + 1) == Some(prompt.as_str()) || is(i + 1, &self.instructions))
+    }
+
+    /// Whether the words from `at` read "you are now a/an/in …".
+    fn is_recast(&self, words: &[(String, usize)], at: usize) -> bool {
+        let word = |i: usize| words.get(i).map(|(w, _)| w.as_str());
+        self.you_are_now
+            .iter()
+            .enumerate()
+            .all(|(k, w)| word(at + k) == Some(w.as_str()))
+            && word(at + 3).is_some_and(|w| self.recast.iter().any(|x| x == w))
+    }
+
     /// The reason a sequence starting at `at` is flagged, if it is.
     fn matches(&self, words: &[(String, usize)], at: usize) -> Option<&'static str> {
         if self.is_override(words, at) {
             return Some("asks the model to drop its instructions");
+        }
+        if self.is_disclosure(words, at) {
+            return Some("asks the model to reveal its system prompt");
+        }
+        if self.is_recast(words, at) {
+            return Some("tries to change the model's role");
         }
         self.sequences.iter().find_map(|(seq, why)| {
             seq.iter()
@@ -454,6 +625,25 @@ impl Vocabulary {
                 .all(|(k, w)| words.get(at + k).is_some_and(|(x, _)| x == w))
                 .then_some(*why)
         })
+    }
+
+    /// Whether a block holds a fake conversation: a turn that reads as an
+    /// action, or a back-and-forth that includes an assistant turn.
+    fn has_fake_turn(&self, block: &str) -> bool {
+        let lines: Vec<&str> = block.lines().collect();
+        let turns: Vec<Turn> = lines
+            .iter()
+            .enumerate()
+            .filter_map(|(i, line)| turn(line, lines.get(i + 1).copied()))
+            .collect();
+        let acting = turns.iter().any(|t| {
+            words(&t.content, |_| false)
+                .iter()
+                .any(|w| self.actions.iter().any(|a| a == w))
+        });
+        let conversation = turns.iter().any(|t| t.role == self.assistant)
+            && turns.iter().any(|t| t.role != self.assistant);
+        acting || conversation
     }
 }
 
@@ -543,6 +733,33 @@ fn strip(markdown: &str, warnings: &mut Vec<Warning>) -> (String, String) {
     (out, prose)
 }
 
+/// Whether lower-cased text has an HTML tag that hides its content.
+fn hidden_by_markup(lower: &str) -> bool {
+    let mut rest = lower;
+    while let Some(at) = rest.find('<') {
+        let tail = rest.get(at + 1..).unwrap_or_default();
+        let end = tail.find('>').unwrap_or(tail.len());
+        let tag = tail.get(..end).unwrap_or_default();
+        if tag.chars().next().is_some_and(|c| c.is_ascii_alphabetic()) {
+            let squeezed: String = tag.chars().filter(|c| !c.is_whitespace()).collect();
+            let attribute_hidden = tag
+                .split(|c: char| c.is_whitespace() || c == '/')
+                .skip(1)
+                .any(|a| a == "hidden" || a.starts_with("hidden="));
+            if attribute_hidden
+                || squeezed.contains("aria-hidden=\"true\"")
+                || squeezed.contains("aria-hidden='true'")
+                || squeezed.contains("display:none")
+                || squeezed.contains("visibility:hidden")
+            {
+                return true;
+            }
+        }
+        rest = tail;
+    }
+    false
+}
+
 /// Reports HTML that hides its content: comments and `<details>`.
 fn hidden_html(text: &str, warnings: &mut Vec<Warning>) {
     let lower = text.to_lowercase();
@@ -558,6 +775,12 @@ fn hidden_html(text: &str, warnings: &mut Vec<Warning>) {
             "an HTML comment, which is not shown on the page",
         ));
         from = end;
+    }
+    if hidden_by_markup(&lower) {
+        warnings.push(hidden(
+            text,
+            "HTML marked hidden (hidden, aria-hidden or display:none)",
+        ));
     }
     if lower.contains("<details") {
         warnings.push(hidden(
@@ -587,8 +810,9 @@ pub fn guard(markdown: &str) -> Guarded {
                 .split_inclusive(char::is_whitespace)
                 .filter(|w| !w.trim().starts_with("^blk-"))
                 .collect();
-            words(&fold(&text))
-                .map(|w| (w.to_owned(), b))
+            words(&fold(&text), |w| vocabulary.knows(w))
+                .into_iter()
+                .map(|w| (w, b))
                 .collect::<Vec<_>>()
         })
         .collect();
@@ -615,9 +839,13 @@ pub fn guard(markdown: &str) -> Guarded {
                     .then_some("contains chat-template control tokens")
             })
             .or_else(|| {
-                block
-                    .lines()
-                    .any(is_fake_turn)
+                fold(block)
+                    .contains(&vocabulary.new_instructions)
+                    .then_some("introduces new instructions")
+            })
+            .or_else(|| {
+                vocabulary
+                    .has_fake_turn(block)
                     .then_some("contains a fake conversation turn")
             });
         if let Some(reason) = found {
