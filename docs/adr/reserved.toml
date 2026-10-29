@@ -57,3 +57,50 @@ holder = "editor thread: sharing, ADR 0054"
 [[reservation]]
 decisions = "D277"
 holder = "drive thread: uploads UI, ADR 0052"
+
+[[reservation]]
+decisions = "D278"
+holder = "#437 collab replicas"
+
+[[reservation]]
+adrs = "0067"
+decisions = "D279-D280"
+holder = "binary size"
+
+[[reservation]]
+decisions = "D281-D284"
+holder = "red team round 4"
+
+[[reservation]]
+decisions = "D285"
+holder = "UI sweep"
+
+[[reservation]]
+adrs = "0068"
+decisions = "D286-D289"
+holder = "rendered blocks (#522)"
+
+[[reservation]]
+adrs = "0069"
+decisions = "D290-D294"
+holder = "identity (#523)"
+
+[[reservation]]
+decisions = "D295-D296"
+holder = "#526 and #527"
+
+[[reservation]]
+decisions = "D297"
+holder = "#524"
+
+[[reservation]]
+decisions = "D298"
+holder = "#525"
+
+[[reservation]]
+decisions = "D299"
+holder = "#528"
+
+[[reservation]]
+adrs = "0070"
+holder = "red team round 5 (#529)"
