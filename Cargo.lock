@@ -5748,6 +5748,7 @@ dependencies = [
  "jsonschema",
  "oas3",
  "rcgen",
+ "rustix",
  "rustls",
  "rustls-acme",
  "rustls-pki-types",

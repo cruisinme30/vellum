@@ -134,6 +134,7 @@ pub fn edge(config: &Config, var: impl Fn(&str) -> Option<String>) -> Result<Edg
             bind: config.bind,
             tls,
             redirect_http,
+            limits: vellum_api::server::ConnectionLimits::default(),
         },
         csrf_key,
     })
