@@ -142,4 +142,34 @@ pub trait Workspace: Send + Sync + 'static {
         team: String,
         slack_user: String,
     ) -> BoxFuture<'_, Result<Option<UserId>, Error>>;
+
+    /// Links a Slack user to `user`, replacing any earlier link of that
+    /// Slack user (#163). The caller has checked the Slack user's code.
+    fn link_slack(
+        &self,
+        user: UserId,
+        team: String,
+        slack_user: String,
+    ) -> BoxFuture<'_, Result<(), Error>> {
+        let _ = (user, team, slack_user);
+        Box::pin(async {
+            Err(Error::new(
+                vellum_kernel::ErrorKind::Unavailable,
+                "Slack linking is not available here",
+            ))
+        })
+    }
+
+    /// Removes every Slack link of `user`; returns how many there were.
+    fn unlink_slack(&self, user: UserId) -> BoxFuture<'_, Result<usize, Error>> {
+        let _ = user;
+        Box::pin(async { Ok(0) })
+    }
+
+    /// Posts a reply only the Slack user sees to a Slack `response_url`
+    /// (always under `https://hooks.slack.com/`). Best effort.
+    fn slack_say(&self, response_url: String, text: String) -> BoxFuture<'_, ()> {
+        let _ = (response_url, text);
+        Box::pin(async {})
+    }
 }

@@ -459,6 +459,13 @@ pub struct DigestView {
 #[derive(Debug, Clone, Copy, Default, Deserialize, JsonSchema)]
 pub struct NoInput {}
 
+/// A code from Slack's "Save as task" reply.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct SlackLinkInput {
+    /// The `slack_link` value from the link Slack showed.
+    pub code: String,
+}
+
 /// A quick-add line to parse.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct ParseInput {
@@ -1257,6 +1264,41 @@ impl TasksService {
         Ok(Done {})
     }
 
+    /// Links the Slack user named by a code from the "Save as task"
+    /// shortcut to the caller (#163, D177).
+    ///
+    /// # Errors
+    ///
+    /// Slack capture not set up, or a forged or expired code.
+    pub async fn link_slack(&self, user: UserId, input: SlackLinkInput) -> Result<Done, Error> {
+        let Some(secret) = &self.config.slack_signing_secret else {
+            return Err(Error::new(
+                ErrorKind::Unavailable,
+                "Slack capture is not set up on this server",
+            ));
+        };
+        let (team, slack_user) = capture::read_slack_link_code(secret, &input.code, self.now())
+            .map_err(|_| {
+                Error::new(
+                    ErrorKind::InvalidInput,
+                    "this Slack link is not valid or has expired; use Save as task in Slack again",
+                )
+            })?;
+        self.workspace.link_slack(user, team, slack_user).await?;
+        tracing::info!("Slack account linked for capture");
+        Ok(Done {})
+    }
+
+    /// Removes the caller's Slack links.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the workspace does.
+    pub async fn unlink_slack(&self, user: UserId, _input: NoInput) -> Result<Done, Error> {
+        let _ = self.workspace.unlink_slack(user).await?;
+        Ok(Done {})
+    }
+
     /// Today's digest (R-MW-5); the notifications service sends it.
     ///
     /// # Errors
@@ -1538,6 +1580,22 @@ fn list_operations(s: &Arc<TasksService>) -> Vec<Operation> {
             handler!(s, revoke_capture),
         )
         .summary("Turns capture by e-mail off"),
+        Operation::mutation(
+            "tasks.link_slack",
+            Post,
+            "/v1/my-work/slack-link",
+            Scope::WriteDirect,
+            handler!(s, link_slack),
+        )
+        .summary("Links your Slack account for Save as task, with the code Slack showed you"),
+        Operation::mutation(
+            "tasks.unlink_slack",
+            Delete,
+            "/v1/my-work/slack-link",
+            Scope::WriteDirect,
+            handler!(s, unlink_slack),
+        )
+        .summary("Unlinks your Slack account"),
     ]
 }
 
