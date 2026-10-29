@@ -100,6 +100,6 @@ flowchart LR
 - `syntect` brings in `bincode` 1.3.3, which is unmaintained but complete;
   it is ignored in `deny.toml` and `.cargo/audit.toml` until `syntect`
   moves off it.
-- Live parts (collection views, `@today`, the roadmap's today line,
+- Live parts (collection views, `@today`, the today line on roadmaps,
   sortable tables, calculators) render a correct static version and leave
   `data-*` hooks for the web client to hydrate.
