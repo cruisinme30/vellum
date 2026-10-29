@@ -551,7 +551,7 @@ impl Queue {
         Ok(each!(self.index, pool, system => traced(
             system,
             "jobs.prune",
-            sqlx::query("DELETE FROM jobs WHERE state IN ('done', 'failed') AND updated_ms < $1")
+            sqlx::query("DELETE FROM jobs WHERE state IN ('done', 'failed') AND updated_ms <= $1")
                 .bind(before)
                 .execute(pool),
         )
