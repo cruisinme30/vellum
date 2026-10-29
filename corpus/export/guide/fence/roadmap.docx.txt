@@ -1,0 +1,5 @@
+[Normal] Roadmap as of 2026-10-29
+[ListParagraph/0] Discovery: 2026-11-01 → 2026-12-15
+[ListParagraph/0] Build: 2026-12-01 → 2027-04-30
+[ListParagraph/0] Beta: 2027-03-01 → 2027-05-10
+[ListParagraph/0] Launch: 2027-05-15 (milestone)

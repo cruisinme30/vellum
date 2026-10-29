@@ -32,6 +32,7 @@ path = [
   "corpus/guide/**",
   "corpus/**/*.md",
   "corpus/**/*.json",
+  "corpus/**/*.txt",
   ".gitmessage",
   "deploy/perf/*.json",
 ]

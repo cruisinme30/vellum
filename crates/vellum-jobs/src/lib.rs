@@ -3,5 +3,7 @@
 
 //! Background jobs: render, export, digests and maintenance.
 //!
-//! This crate is a placeholder in the repository skeleton. Its first real
-//! code lands with its workstream in the build order.
+//! - [`export`]: the collections engine behind export and import, wired
+//!   to export's ports.
+
+pub mod export;

@@ -1,0 +1,18 @@
+[Heading1] Policy simulator design
+[TOCHeading] Contents
+[TOC1] 
+[TOC1] Policy simulator design
+[TOC2] Purpose
+[TOC2] Request path
+[TOC2] Open decisions
+[Heading2] Purpose
+[Normal] Replay 7 days of traffic against a draft policy before it ships. Tracked in ENG-142, due 2026-11-24.
+| 7 days Replayed traffic | 10 min Target replay time ▼ 5 min |
+
+[Heading2] Request path
+[Code] sequenceDiagram  Client->>Gateway: request  Gateway->>Engine: evaluate
+| Decision Ship the simulator first. | Warning The diff report needs security review. |
+
+[Heading2] Open decisions
+[ListParagraph/0] ☐ Decide the retention for replay data @priya
+[ListParagraph/0] ☑ Pick the storage backend
