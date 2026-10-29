@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/cruisinme30/vellum/schema/blocks.schema.json",
+  "title": "Vellum block model",
+  "description": "The shape of schema/blocks.json. `cargo xtask schema` checks the cross-references.",
+  "type": "object",
+  "required": ["version", "sections", "nodes", "marks"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "integer", "minimum": 1 },
+    "sections": { "type": "array", "items": { "type": "string" } },
+    "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+    "marks": { "type": "array", "items": { "$ref": "#/$defs/mark" } }
+  },
+  "$defs": {
+    "name": { "type": "string", "pattern": "^[a-z][A-Za-z0-9]*$" },
+    "impl": { "enum": ["tiptap", "generic", "custom"] },
+    "attrs": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["type", "default"],
+        "additionalProperties": false,
+        "properties": {
+          "type": { "enum": ["string", "integer", "boolean", "enum"] },
+          "values": { "type": "array", "items": { "type": "string" } },
+          "default": { "type": ["string", "integer", "boolean"] },
+          "min": { "type": "integer" },
+          "max": { "type": "integer" },
+          "transient": { "type": "boolean" }
+        }
+      }
+    },
+    "slash": {
+      "type": "object",
+      "required": ["title", "description", "keywords", "section", "icon"],
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "keywords": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "section": { "type": "string" },
+        "icon": { "type": "string" },
+        "attrs": { "type": "object" },
+        "template": { "type": "string" }
+      }
+    },
+    "node": {
+      "type": "object",
+      "required": ["name", "doc", "impl"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "doc": { "type": "string" },
+        "impl": { "$ref": "#/$defs/impl" },
+        "group": { "type": "string" },
+        "content": { "type": "string" },
+        "marks": { "type": "string" },
+        "inline": { "type": "boolean" },
+        "atom": { "type": "boolean" },
+        "code": { "type": "boolean" },
+        "defining": { "type": "boolean" },
+        "isolating": { "type": "boolean" },
+        "draggable": { "type": "boolean" },
+        "blockId": { "type": "boolean" },
+        "markdown": { "type": "string" },
+        "attrs": { "$ref": "#/$defs/attrs" },
+        "slash": { "type": "array", "items": { "$ref": "#/$defs/slash" } }
+      }
+    },
+    "mark": {
+      "type": "object",
+      "required": ["name", "doc", "impl", "markdown"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "doc": { "type": "string" },
+        "impl": { "$ref": "#/$defs/impl" },
+        "markdown": { "type": "string" },
+        "excludes": { "type": "string" },
+        "attrs": { "$ref": "#/$defs/attrs" }
+      }
+    }
+  }
+}

@@ -13,6 +13,7 @@ path = [
   "web/tsconfig.json",
   "web/knip.json",
   "web/.prettierrc.json",
+  "schema/*.json",
   ".markdownlint-cli2.jsonc",
   ".lycheeignore",
   ".vale/styles/config/vocabularies/**",

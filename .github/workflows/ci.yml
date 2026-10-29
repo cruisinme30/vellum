@@ -51,6 +51,8 @@ jobs:
         run: cargo nextest run --workspace --locked
       - name: Crate boundaries
         run: cargo xtask boundaries
+      - name: Block model is generated from schema/
+        run: cargo xtask schema --check
       - name: Licences, bans, sources and advisories
         run: cargo deny --locked check
       - name: RustSec audit

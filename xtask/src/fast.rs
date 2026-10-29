@@ -76,6 +76,7 @@ pub fn run() -> Result<(), String> {
         results.push((step.name, outcome));
     }
     results.push(("Crate boundaries", boundaries_outcome()));
+    results.push(("Block model", schema_outcome()));
 
     report(&results, started.elapsed().as_secs());
     if results
@@ -233,6 +234,17 @@ fn execute(root: &Path, step: &Step) -> Outcome {
 fn boundaries_outcome() -> Outcome {
     progress("==> Crate boundaries");
     match crate::boundaries::run() {
+        Ok(()) => Outcome::Passed,
+        Err(message) => {
+            progress(&message);
+            Outcome::Failed
+        }
+    }
+}
+
+fn schema_outcome() -> Outcome {
+    progress("==> Block model is generated from schema/");
+    match crate::schema::run(&["--check".to_owned()]) {
         Ok(()) => Outcome::Passed,
         Err(message) => {
             progress(&message);

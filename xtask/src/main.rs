@@ -14,22 +14,27 @@
 //!   only on Vellum crates in strictly lower layers. Crates in the same
 //!   layer (for example two services) can never depend on each other, so a
 //!   service cannot reach into another service's storage.
+//! - `cargo xtask schema [--check]` generates the editor's and the server's
+//!   views of the block model from `schema/blocks.json`.
 
 use std::process::{Command, ExitCode};
 
 mod boundaries;
 mod fast;
 mod relock;
+mod schema;
 
-const USAGE: &str = "usage: cargo xtask <fast | install-hooks | relock | boundaries>";
+const USAGE: &str =
+    "usage: cargo xtask <fast | install-hooks | relock | boundaries | schema [--check]>";
 
 fn main() -> ExitCode {
-    let command = std::env::args().nth(1);
-    let result = match command.as_deref() {
-        Some("fast") => fast::run(),
-        Some("install-hooks") => install_hooks(),
-        Some("relock") => relock::run(),
-        Some("boundaries") => boundaries::run(),
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let result = match args.split_first() {
+        Some((command, [])) if command == "fast" => fast::run(),
+        Some((command, [])) if command == "install-hooks" => install_hooks(),
+        Some((command, [])) if command == "relock" => relock::run(),
+        Some((command, [])) if command == "boundaries" => boundaries::run(),
+        Some((command, rest)) if command == "schema" => schema::run(rest),
         _ => Err(USAGE.to_owned()),
     };
     match result {
