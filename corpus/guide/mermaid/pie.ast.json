@@ -11,6 +11,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "pie showData\n  title Time spent this cycle\n  \"Features\" : 55\n  \"Bugs\" : 30\n  \"Chores\" : 15\n"
       }
     ]

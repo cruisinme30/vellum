@@ -9,6 +9,11 @@
         "items": [
           {
             "task": false,
+            "attrs": {
+              "id": null,
+              "classes": [],
+              "pairs": []
+            },
             "blocks": [
               {
                 "type": "paragraph",

@@ -11,6 +11,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "helm rollback gateway 1 -n prod\n"
       },
       {
@@ -24,6 +25,7 @@
           ],
           "pairs": []
         },
+        "id": null,
         "literal": "fn evaluate(request: &Request) -> Decision {\n    Decision::Allow\n}\n"
       },
       {
@@ -35,6 +37,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "```chart\ntype: bar\n```\n"
       }
     ]

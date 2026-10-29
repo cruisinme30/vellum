@@ -1,0 +1,101 @@
+// SPDX-FileCopyrightText: 2026 The Vellum contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+
+//! `vellum reindex`: rebuild the index from the workspace folder.
+
+use std::io::Write as _;
+use std::process::ExitCode;
+
+use vellum_db::{Index, IndexConfig, IndexKey, PlainFiles};
+use vellum_kernel::config::Config;
+
+/// Environment variable holding the 64-hex-character index key, until the
+/// keyring supplies it.
+const KEY_VAR: &str = "VELLUM_INDEX_KEY";
+
+/// Arguments of `vellum reindex`.
+#[derive(Debug, clap::Args)]
+pub struct Args {
+    /// Open the SQLite index without encryption (plaintext mode only).
+    #[arg(long)]
+    plaintext: bool,
+}
+
+/// Runs the command and reports the outcome on standard output.
+pub fn run(args: &Args) -> ExitCode {
+    match execute(args) {
+        Ok(lines) => {
+            let mut out = std::io::stdout().lock();
+            for line in lines {
+                let _ = writeln!(out, "{line}");
+            }
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            tracing::error!(%error, "reindex failed");
+            let _ = writeln!(std::io::stderr(), "vellum reindex: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn execute(args: &Args) -> Result<Vec<String>, String> {
+    let config = Config::load(None).map_err(|e| e.to_string())?;
+    let index_config = if let Some(url) = &config.database_url {
+        IndexConfig::postgres(url.clone())
+    } else if args.plaintext {
+        IndexConfig::sqlite(config.data_dir.join(".vellum/index.sqlite"), None)
+    } else {
+        let key = index_key(std::env::var(KEY_VAR).ok().as_deref())?;
+        IndexConfig::sqlite(config.data_dir.join(".vellum/index.sqlite"), Some(key))
+    };
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| e.to_string())?;
+    let report = runtime
+        .block_on(async {
+            let index = Index::open(&index_config).await?;
+            let report = index.reindex(&config.data_dir, PlainFiles).await;
+            index.close().await;
+            report
+        })
+        .map_err(|e| e.to_string())?;
+    let mut lines = vec![format!(
+        "Indexed {} spaces, {} folders and {} documents; skipped {} paths.",
+        report.spaces,
+        report.folders,
+        report.documents,
+        report.problems.len()
+    )];
+    lines.extend(report.problems.iter().map(|p| format!("  skipped {p}")));
+    Ok(lines)
+}
+
+/// Parses a 32-byte key written as 64 hex characters.
+fn index_key(hex: Option<&str>) -> Result<IndexKey, String> {
+    let hex = hex.ok_or_else(|| format!("set {KEY_VAR} to the index key, or pass --plaintext"))?;
+    let bad = || format!("{KEY_VAR} must be 64 hexadecimal characters");
+    if hex.len() != 64 {
+        return Err(bad());
+    }
+    let mut key = [0_u8; 32];
+    for (byte, pair) in key.iter_mut().zip(hex.as_bytes().chunks(2)) {
+        let text = std::str::from_utf8(pair).map_err(|_| bad())?;
+        *byte = u8::from_str_radix(text, 16).map_err(|_| bad())?;
+    }
+    Ok(IndexKey::new(key))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::index_key;
+
+    #[test]
+    fn key_must_be_64_hex_characters() {
+        assert!(index_key(Some(&"ab".repeat(32))).is_ok());
+        assert!(index_key(Some("abc")).is_err());
+        assert!(index_key(Some(&"zz".repeat(32))).is_err());
+        assert!(index_key(None).unwrap_err().contains("--plaintext"));
+    }
+}

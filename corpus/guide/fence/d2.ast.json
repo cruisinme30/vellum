@@ -11,6 +11,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "direction: right\nclient: Client\ngateway: Gateway {\n  policy: Policy engine\n  audit: Audit writer\n}\nbackend: Backend\nclient -> gateway.policy: request\ngateway.policy -> backend: allowed\ngateway.policy -> gateway.audit: decision\n"
       }
     ]
