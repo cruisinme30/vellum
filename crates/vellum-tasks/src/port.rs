@@ -12,10 +12,11 @@
 use jiff::Timestamp;
 use jiff::tz::TimeZone;
 use vellum_contracts::BoxFuture;
-use vellum_kernel::{DocId, Error, ShareTokenHash, UserId};
+use vellum_kernel::{CommentId, DocId, Error, ShareTokenHash, UserId};
 
 use crate::model::Task;
 use crate::projection::FileContext;
+use crate::settings::Preferences;
 
 /// A signed-in person as My Work needs them.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -26,8 +27,11 @@ pub struct Profile {
     pub handle: String,
     /// Their display name.
     pub display_name: String,
-    /// Their time zone; "today" is their local date.
+    /// The zone My Work counts in for them: their own choice, else the
+    /// server's. "Today" is their local date.
     pub time_zone: TimeZone,
+    /// Their My Work settings.
+    pub preferences: Preferences,
 }
 
 /// A Markdown file that may hold checklist tasks.
@@ -61,8 +65,9 @@ pub trait Workspace: Send + Sync + 'static {
     /// and lists, lists shared with them, and documents that mention them.
     fn task_files(&self, user: UserId) -> BoxFuture<'_, Result<Vec<Document>, Error>>;
 
-    /// Issues assigned to the user, comments that assign them and review
-    /// requests, already projected as tasks (R-MW-1's union).
+    /// Issues assigned to the user, comments that assign them, comments
+    /// that mention them and that they have not answered or dismissed, and
+    /// review requests, already projected as tasks (R-MW-1's union).
     fn assigned(&self, user: UserId) -> BoxFuture<'_, Result<Vec<Task>, Error>>;
 
     /// Reads a file the user can open.
@@ -116,6 +121,20 @@ pub trait Workspace: Send + Sync + 'static {
         kind: SecretKind,
         hash: ShareTokenHash,
     ) -> BoxFuture<'_, Result<Option<UserId>, Error>>;
+
+    /// Stores the user's My Work settings.
+    fn save_preferences(
+        &self,
+        user: UserId,
+        preferences: Preferences,
+    ) -> BoxFuture<'_, Result<(), Error>>;
+
+    /// Takes a mention out of the user's My Work without answering it.
+    fn dismiss_mention(&self, user: UserId, comment: CommentId)
+    -> BoxFuture<'_, Result<(), Error>>;
+
+    /// Everyone whose reminders and digest the server sends.
+    fn people(&self) -> BoxFuture<'_, Result<Vec<UserId>, Error>>;
 
     /// The Vellum user linked to a Slack user in a Slack workspace.
     fn slack_user(

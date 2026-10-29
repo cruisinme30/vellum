@@ -88,7 +88,10 @@ pub fn belongs_to(task: &Task, me: &str, owner: Option<&str>) -> bool {
                 }
             }
         }
-        Source::Issue { .. } | Source::Comment { .. } | Source::Review { .. } => true,
+        Source::Issue { .. }
+        | Source::Comment { .. }
+        | Source::Mention { .. }
+        | Source::Review { .. } => true,
     }
 }
 
@@ -142,7 +145,7 @@ pub fn bucket(task: &Task, today: Date) -> Bucket {
             Origin::Inbox => Bucket::Inbox,
             Origin::List | Origin::Doc => Bucket::Anytime,
         },
-        Source::Comment { .. } => Bucket::Inbox,
+        Source::Comment { .. } | Source::Mention { .. } => Bucket::Inbox,
         Source::Review { .. } => Bucket::Today,
         Source::Issue { category, .. } => match category {
             IssueCategory::Started => Bucket::Today,

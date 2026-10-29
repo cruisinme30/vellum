@@ -20,6 +20,8 @@ pub mod quickadd;
 pub mod raw;
 pub mod recur;
 pub mod remind;
+pub mod schedule;
 pub mod service;
+pub mod settings;
 pub mod telemetry;
 pub mod timeblock;
