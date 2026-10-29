@@ -27,6 +27,8 @@ fn options() -> Options<'static> {
     ext.alerts = true;
     ext.header_attributes = true;
     ext.fenced_code_attributes = true;
+    // Escaped characters stay visible, so `\@team` is not a mention.
+    options.parse.escaped_char_spans = true;
     options
 }
 
@@ -311,8 +313,20 @@ impl Cx<'_> {
                 title: link.title,
                 alt: self.inlines(node),
             },
+            NodeValue::Escaped => {
+                let text: String = node
+                    .children()
+                    .filter_map(|child| match &child.data().value {
+                        NodeValue::Text(text) => Some(text.to_string()),
+                        _ => None,
+                    })
+                    .collect();
+                Inline::Text {
+                    text: extras::mark_escape(&text),
+                }
+            }
             NodeValue::WikiLink(link) => {
-                let label = plain_text(&self.inlines(node));
+                let label = plain_text(&self.inlines(node)).replace(extras::ESCAPED, "");
                 Inline::WikiLink {
                     label: (label != link.url && !label.is_empty()).then_some(label),
                     target: link.url,
