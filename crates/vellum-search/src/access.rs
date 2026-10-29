@@ -8,7 +8,8 @@
 //! batch check before anything is returned, so a grant or revocation is
 //! visible to search as soon as authorization sees it, with no reindex.
 //! Both calls must deny by default: an unknown principal reads nothing.
-//! `vellum_authz::Authz` implements [`ReadAccess`] for production use.
+//! `vellum_authz::Authz` implements [`ReadAccess`] and `vellum_db::Index`
+//! implements [`Stars`] for production use.
 
 use std::collections::HashSet;
 
