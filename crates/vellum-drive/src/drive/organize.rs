@@ -189,7 +189,8 @@ impl Drive {
     /// Copies a node (a folder with everything in it) into `parent` of
     /// `space`. Every copied node gets a fresh ID, and links inside the
     /// copy are re-pointed at the copies (R-DR-3). The copier owns the
-    /// copy; no grants are copied.
+    /// copy; no grants are copied. Anything inside a folder that the
+    /// copier cannot view is left out.
     ///
     /// # Errors
     /// `NotFound`, `PermissionDenied`, `Invalid`, `QuotaExceeded`.
@@ -219,6 +220,15 @@ impl Drive {
                     "cannot copy a folder into itself".into(),
                 ));
             }
+            // What the copier cannot view stays behind: a restricted
+            // folder or page inside a folder they can see must not reach
+            // them as a copy they own.
+            let mut hidden = Vec::new();
+            for member in self.subtree(&node).await? {
+                if member.id != node.id && !self.may(actor, &member, Permission::View).await? {
+                    hidden.push(member.path);
+                }
+            }
             let blobs = if node.kind.is_dir() {
                 // Build output and in-flight temp files are not content.
                 self.blobs_under(&node.path)
@@ -228,6 +238,7 @@ impl Drive {
                         !p.segments().any(|s| s == ".mdbook")
                             && !p.file_name().contains(".vellum-tmp")
                             && vellum_store::layout::Kind::of(p).is_content()
+                            && !hidden.iter().any(|h| p.starts_with(h))
                     })
                     .collect()
             } else {
