@@ -8521,6 +8521,7 @@ dependencies = [
  "jsonschema",
  "oas3",
  "rcgen",
+ "rustix",
  "rustls",
  "rustls-acme",
  "rustls-pki-types",
@@ -9011,6 +9012,7 @@ dependencies = [
  "uuid",
  "vellum-authz",
  "vellum-contracts",
+ "vellum-db",
  "vellum-kernel",
  "zeroize",
 ]

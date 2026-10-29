@@ -5,6 +5,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { App } from "./app";
+import { createMockCollectionsStore } from "./collections/mock";
 import { createNorthstarStore, PAGE } from "./data/mock/northstar";
 import { createTestCollab, renderApp } from "./test/render-app";
 
@@ -49,7 +50,13 @@ describe("AppRoutes", () => {
 
 describe("App", () => {
   it("renders the shell in a browser router", () => {
-    render(<App store={createNorthstarStore()} collab={createTestCollab()} />);
+    render(
+      <App
+        store={createNorthstarStore()}
+        collab={createTestCollab()}
+        collections={createMockCollectionsStore()}
+      />,
+    );
     expect(screen.getByRole("navigation", { name: "Main" })).toBeDefined();
     expect(screen.getByRole("heading", { level: 1, name: "Good to see you, Priya" })).toBeDefined();
   });
