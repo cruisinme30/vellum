@@ -408,6 +408,11 @@ pub fn classify(mail: &Mail, settings: &EmailSettings) -> EmailIntake {
             let Ok(key) = IssueKey::parse(key) else {
                 return EmailIntake::Ignored("malformed reply address");
             };
+            // With no secret anyone could compute a tag, so replies are
+            // refused rather than trusted.
+            if settings.reply_secret.is_empty() {
+                return EmailIntake::Ignored("reply addresses are not configured");
+            }
             // Addresses may be lower-cased in transit, so tags are computed
             // over the lower-case user ID (ULIDs are case-insensitive).
             let expected = reply_tag(&settings.reply_secret, &key, user);
@@ -536,7 +541,7 @@ Looks good, shipping it.\n\nOn Tue, Nov 24, 2026 at 9:00 AM Vellum wrote:\n> old
         assert_eq!(
             classify(&mail, &settings()),
             EmailIntake::Comment {
-                key,
+                key: key.clone(),
                 user: "01jd3z".to_owned(),
                 body: "Looks good, shipping it.".to_owned()
             }
@@ -548,6 +553,19 @@ Looks good, shipping it.\n\nOn Tue, Nov 24, 2026 at 9:00 AM Vellum wrote:\n> old
         assert_eq!(
             classify(&parse(forged.as_bytes())?, &settings()),
             EmailIntake::Ignored("reply address tag does not match")
+        );
+        // A tag made with an empty key must not pass when no secret is set.
+        let unset = EmailSettings {
+            reply_secret: Vec::new(),
+            ..settings()
+        };
+        let keyless = raw.replace(
+            &address,
+            &reply_address(b"", &key, "01JD3Z", "northstar.dev"),
+        );
+        assert_eq!(
+            classify(&parse(keyless.as_bytes())?, &unset),
+            EmailIntake::Ignored("reply addresses are not configured")
         );
         Ok(())
     }
