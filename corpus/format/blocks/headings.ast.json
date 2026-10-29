@@ -1,0 +1,106 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "heading",
+        "level": 1,
+        "content": [
+          {
+            "type": "text",
+            "text": "Northstar handbook"
+          }
+        ],
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null
+      },
+      {
+        "type": "heading",
+        "level": 2,
+        "content": [
+          {
+            "type": "text",
+            "text": "Getting started"
+          }
+        ],
+        "attrs": {
+          "id": "start",
+          "classes": [],
+          "pairs": []
+        },
+        "id": null
+      },
+      {
+        "type": "heading",
+        "level": 3,
+        "content": [
+          {
+            "type": "text",
+            "text": "Install the binary"
+          }
+        ],
+        "attrs": {
+          "id": "install",
+          "classes": [
+            "cli"
+          ],
+          "pairs": []
+        },
+        "id": null
+      },
+      {
+        "type": "heading",
+        "level": 4,
+        "content": [
+          {
+            "type": "text",
+            "text": "Configure storage"
+          }
+        ],
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null
+      },
+      {
+        "type": "heading",
+        "level": 5,
+        "content": [
+          {
+            "type": "text",
+            "text": "Choose a backend"
+          }
+        ],
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null
+      },
+      {
+        "type": "heading",
+        "level": 6,
+        "content": [
+          {
+            "type": "text",
+            "text": "Footnote level"
+          }
+        ],
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null
+      }
+    ]
+  },
+  "diagnostics": []
+}

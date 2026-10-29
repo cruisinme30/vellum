@@ -1,0 +1,134 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "list",
+        "start": null,
+        "tight": true,
+        "items": [
+          {
+            "task": null,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Use callouts for warnings and decisions"
+                  }
+                ],
+                "id": null
+              }
+            ]
+          },
+          {
+            "task": null,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "One table per comparison"
+                  }
+                ],
+                "id": null
+              },
+              {
+                "type": "list",
+                "start": null,
+                "tight": true,
+                "items": [
+                  {
+                    "task": null,
+                    "blocks": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "Nested two spaces deep"
+                          }
+                        ],
+                        "id": null
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "task": null,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Diagrams for flows and architecture"
+                  }
+                ],
+                "id": null
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "start": 1,
+        "tight": true,
+        "items": [
+          {
+            "task": null,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Draft the policy"
+                  }
+                ],
+                "id": null
+              }
+            ]
+          },
+          {
+            "task": null,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Run a simulation"
+                  }
+                ],
+                "id": null
+              }
+            ]
+          },
+          {
+            "task": null,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Switch to enforce"
+                  }
+                ],
+                "id": null
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "diagnostics": []
+}
