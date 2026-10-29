@@ -53,12 +53,12 @@ breaker; if Kroki is down, pages show the last drawing and the source.
 Mermaid and architecture diagrams are drawn inside Vellum and never need
 Kroki. Leave Kroki out if your users do not need those types.
 
-## Virus scanning {#clamav}
+## Virus scanning {#virus-scanning}
 
 The compose stack runs ClamAV next to Vellum, and the Helm chart runs two
 copies of it. Every upload, up to the 100 MiB limit, is streamed to it
 before it is stored. If ClamAV is down, uploads are refused rather than
-stored unscanned. ClamAV needs about 1.5 GiB of memory and fetches new
+stored without a scan. ClamAV needs about 1.5 GiB of memory and fetches new
 signatures every two hours.
 
 Point the upload scanner at it in **Admin → Security → Uploads**: the
