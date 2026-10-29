@@ -23,6 +23,7 @@ export function HomeView() {
     <div className="vl-view">
       <h1>{t("home-greeting", { name: (user?.name ?? workspace.me.name).replace(/ .*/s, "") })}</h1>
       <nav className="vl-home-shortcuts" aria-label={t("home-shortcuts")}>
+        <Link to="/drive">{t("drive")}</Link>
         <Link to="/my-work">{t("my-work")}</Link>
         <Link to="/issues">{t("issues")}</Link>
         <Link to="/books">{t("books")}</Link>

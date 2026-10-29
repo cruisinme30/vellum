@@ -23,6 +23,7 @@ import { createMockCollectionsStore } from "./collections/mock";
 import { createHttpPageHistory } from "./data/history";
 import { createHttpWorkspaceStore } from "./data/http";
 import { createNorthstarStore } from "./data/mock/northstar";
+import { createHttpDriveApi } from "./drive/api";
 import { lazyCache } from "./editor/collab/lazy-cache";
 import { createLocalConnector } from "./editor/collab/local-connector";
 import { createSocketConnector } from "./editor/collab/socket-connector";
@@ -76,6 +77,7 @@ root.render(
       admin={status === undefined ? undefined : createHttpAdminConsoleApi(http)}
       work={status === undefined ? undefined : createHttpWorkApi(http)}
       books={status === undefined ? undefined : createHttpBooksApi(http)}
+      drive={status === undefined ? undefined : createHttpDriveApi(http)}
       privateSpaces={status === undefined ? undefined : createHttpPrivateSpacesApi(http)}
       collections={
         status === undefined ? createMockCollectionsStore() : createHttpCollectionsStore(http)

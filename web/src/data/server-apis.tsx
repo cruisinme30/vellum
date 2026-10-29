@@ -4,6 +4,7 @@
 import { createContext, use, type ReactNode } from "react";
 
 import type { BooksApi } from "../books/api";
+import type { DriveApi } from "../drive/api";
 import { useT } from "../i18n/i18n";
 import type { PrivateSpacesApi } from "../platform/private/api";
 import type { WorkApi } from "../work/api";
@@ -14,6 +15,7 @@ import type { Loaded } from "./use-loaded";
 export interface ServerApis {
   readonly work?: WorkApi | undefined;
   readonly books?: BooksApi | undefined;
+  readonly drive?: DriveApi | undefined;
   readonly privateSpaces?: PrivateSpacesApi | undefined;
 }
 
