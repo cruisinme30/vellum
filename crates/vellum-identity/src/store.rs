@@ -31,6 +31,10 @@ pub struct User {
     pub email: String,
     /// The display name.
     pub name: String,
+    /// A unique, stable handle (`priya`, `priya-2`) that Work files use
+    /// for assignees and mentions. Never changes once assigned.
+    #[serde(default)]
+    pub handle: String,
     /// The Argon2id hash; `None` for accounts that sign in only by SSO.
     pub password_hash: Option<String>,
     /// Whether the user administers the workspace.
@@ -161,6 +165,42 @@ impl State {
     #[must_use]
     pub fn user_by_email(&self, email: &str) -> Option<&User> {
         self.users.values().find(|u| u.email == email)
+    }
+
+    /// A free handle derived from an email address: the local part,
+    /// lower-cased, with characters outside `a-z 0-9 . _ -` replaced by
+    /// `-`, at most 60 characters, and `-2`, `-3`... appended on collision.
+    #[must_use]
+    pub fn free_handle(&self, email: &str) -> String {
+        let local = email.split('@').next().unwrap_or_default().to_lowercase();
+        let mut base: String = local
+            .chars()
+            .map(|c| {
+                if c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '.' | '_' | '-') {
+                    c
+                } else {
+                    '-'
+                }
+            })
+            .take(60)
+            .collect();
+        if !base.starts_with(|c: char| c.is_ascii_alphanumeric()) {
+            base.insert(0, 'u');
+        }
+        let taken = |h: &str| self.users.values().any(|u| u.handle == h);
+        if !taken(&base) {
+            return base;
+        }
+        (2..=u32::MAX)
+            .map(|n| format!("{base}-{n}"))
+            .find(|h| !taken(h))
+            .unwrap_or(base)
+    }
+
+    /// Finds a user by handle.
+    #[must_use]
+    pub fn user_by_handle(&self, handle: &str) -> Option<&User> {
+        self.users.values().find(|u| u.handle == handle)
     }
 
     /// Finds a session by the hash of its cookie.
@@ -361,6 +401,7 @@ mod tests {
                         id,
                         email: "priya@northstar.dev".into(),
                         name: "Priya".into(),
+                        handle: "priya".into(),
                         password_hash: None,
                         admin: true,
                         disabled: false,
@@ -383,6 +424,9 @@ mod tests {
                 );
             })
             .unwrap();
+        assert_eq!(store.read(|s| s.free_handle("Priya@other.dev")), "priya-2");
+        assert_eq!(store.read(|s| s.free_handle("Ann+Lee@x.dev")), "ann-lee");
+        assert_eq!(store.read(|s| s.free_handle("_x@x.dev")), "u_x");
         let reopened = Store::open(&dir).unwrap();
         assert_eq!(reopened.read(Clone::clone), store.read(Clone::clone));
         #[cfg(unix)]

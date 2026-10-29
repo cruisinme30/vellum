@@ -142,6 +142,8 @@ pub struct UserView {
     pub email: String,
     /// The display name.
     pub name: String,
+    /// The unique handle used for assignees and mentions.
+    pub handle: String,
     /// Whether the user administers the workspace.
     pub admin: bool,
     /// Whether sign-in is blocked.
@@ -158,6 +160,7 @@ impl From<&User> for UserView {
             id: user.id,
             email: user.email.clone(),
             name: user.name.clone(),
+            handle: user.handle.clone(),
             admin: user.admin,
             disabled: user.disabled,
             has_password: user.password_hash.is_some(),
@@ -325,10 +328,11 @@ impl Identity {
             }
             None => None,
         };
-        let user = User {
+        let mut user = User {
             id: UserId::generate(),
             email,
             name,
+            handle: String::new(),
             password_hash,
             admin,
             disabled: false,
@@ -341,6 +345,7 @@ impl Identity {
                     "an account with this email already exists",
                 ));
             }
+            user.handle = s.free_handle(&user.email);
             let view = UserView::from(&user);
             let _ = s.users.insert(user.id, user);
             Ok(view)
@@ -951,6 +956,7 @@ impl Identity {
                 id: UserId::generate(),
                 email: BREAK_GLASS_EMAIL.to_owned(),
                 name: "Break-glass administrator".to_owned(),
+                handle: s.free_handle("break-glass@local"),
                 password_hash: None,
                 admin: true,
                 disabled: false,
@@ -960,6 +966,13 @@ impl Identity {
             let _ = s.users.insert(id, user);
             id
         })
+    }
+
+    /// The user behind a handle, for services that store handles.
+    #[must_use]
+    pub fn user_by_handle(&self, handle: &str) -> Option<UserView> {
+        self.store
+            .read(|s| s.user_by_handle(handle).map(UserView::from))
     }
 
     /// Reads the records for a closure (used by the `OAuth` server).
