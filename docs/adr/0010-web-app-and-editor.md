@@ -43,7 +43,7 @@ start before the API and the collab server exist.
 
 - Markdown conversion happens only on the server. The browser edits a
   Yjs document bound with `@tiptap/y-tiptap`; block IDs (`blk-` plus 8
-  Crockford base32 characters, as `vellum_kernel::BlockId`) are assigned
+  base32 characters, as `vellum_kernel::BlockId`) are assigned
   client-side by an extension that skips remote transactions and
   re-assigns duplicates.
 - Why: one parser and serializer (ADR 0004) keeps the canonical form in
@@ -57,7 +57,7 @@ start before the API and the collab server exist.
   between tabs; the connector keeps updates in the clients' local
   `DocumentCache` (ADR 0023). The real API and collab server replace the
   adapters, not the views.
-- Themes are Material 3 tonal palettes computed in-house in CIE LCh, with
+- Themes are Material 3 tonal palettes computed in-house in a perceptual (CIE) colour space, with
   WCAG 2.2 AA contrast checked in tests. Strings use Fluent; routing uses
   react-router. The editor chunk loads lazily.
 - Why: the shell and editor could ship before the backend, and swapping
@@ -70,8 +70,8 @@ start before the API and the collab server exist.
   disagree on edge cases (D59).
 - **`y-indexeddb`**: rejected in favour of the shared `DocumentCache`, so
   one store owns offline data (D60).
-- **`@material/material-color-utilities`**: dropped; its extensionless
-  ESM imports break under Node and the tests (D60).
+- **`@material/material-color-utilities`**: dropped; its ESM imports
+  lack file extensions, which break under Node and the tests (D60).
 
 ## Consequences
 
