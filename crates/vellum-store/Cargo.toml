@@ -28,6 +28,8 @@ remote = ["dep:reqwest", "dep:serde", "dep:serde_json"]
 dropbox = ["remote"]
 # OneDrive and SharePoint document libraries via Microsoft Graph.
 onedrive = ["remote"]
+# Google Drive (API v3).
+gdrive = ["remote"]
 
 [dependencies]
 async-trait = "0.1.92"
@@ -52,4 +54,4 @@ axum = { version = "0.8.9", default-features = false, features = ["http1", "toki
 proptest = ">=1.11.0, <1.12"
 tempfile = "3.27.0"
 tokio = { version = "1.49.0", features = ["macros", "rt-multi-thread"] }
-vellum-store = { path = ".", features = ["conformance", "git", "dropbox", "onedrive"] }
+vellum-store = { path = ".", features = ["conformance", "git", "dropbox", "onedrive", "gdrive"] }

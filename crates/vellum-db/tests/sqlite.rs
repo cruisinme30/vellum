@@ -9,9 +9,15 @@ use sqlx::Connection as _;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteConnection};
 use vellum_db::{Backend, Error, Index, IndexConfig, IndexKey};
 
-const TABLES: [&str; 10] = [
+const TABLES: [&str; 16] = [
     "collab_updates",
     "documents",
+    "drive_activity",
+    "drive_activity_scope",
+    "drive_links",
+    "drive_nodes",
+    "drive_spaces",
+    "drive_versions",
     "effective_access",
     "folders",
     "grants",

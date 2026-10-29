@@ -24,6 +24,7 @@ pub mod memory;
 pub mod model;
 pub mod ports;
 pub mod retention;
+pub mod sql;
 
 pub use drive::{Drive, Filter, OP_SECONDS, OPS_TOTAL, SaveOutcome, Saved};
 pub use error::{DriveError, DriveResult};
