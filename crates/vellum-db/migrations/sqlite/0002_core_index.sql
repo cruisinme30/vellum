@@ -112,13 +112,15 @@ CREATE TABLE grants (
 CREATE INDEX grants_subject ON grants (space_id, subject_type, subject_id);
 
 -- Materialised effective access, stamped with the space's authz epoch
--- it was computed at.
+-- it was computed at. valid_until (epoch ms, NULL = no expiry) lets a
+-- check reject an expired row without waiting for a sweep.
 CREATE TABLE effective_access (
     space_id BLOB NOT NULL,
     subject_id BLOB NOT NULL,
     object_id BLOB NOT NULL,
     relation TEXT NOT NULL,
     authz_epoch INTEGER NOT NULL,
+    valid_until INTEGER,
     PRIMARY KEY (space_id, subject_id, object_id, relation)
 );
 CREATE INDEX effective_access_subject ON effective_access (
