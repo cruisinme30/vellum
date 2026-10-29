@@ -162,7 +162,8 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/develop' }}
       - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
         with:
-          tool: cargo-nextest
+          # The books tests build a published tree with mdBook.
+          tool: cargo-nextest,mdbook
       - name: Tests
         run: cargo nextest run --workspace --locked --profile ci
 
