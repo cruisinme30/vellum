@@ -13,7 +13,7 @@ vellum: 1
 - Status: accepted
 - Decisions: D55, D56, D57
 - Issue: [#97](https://github.com/cruisinme30/vellum/issues/97), [#294](https://github.com/cruisinme30/vellum/issues/294)
-- Pull requests: [#217](https://github.com/cruisinme30/vellum/pull/217)
+- Pull requests: [#217](https://github.com/cruisinme30/vellum/pull/217), [#302](https://github.com/cruisinme30/vellum/pull/302)
 
 :::
 
