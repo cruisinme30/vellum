@@ -666,12 +666,7 @@ impl Calculator {
                 }
                 calc.inputs.push(input);
             } else {
-                let (formula, unit) = match rhs.strip_suffix(')').and_then(|r| r.rsplit_once('(')) {
-                    Some((formula, unit)) if !formula.trim().is_empty() => {
-                        (formula.trim(), Some(unit.trim().to_owned()))
-                    }
-                    _ => (rhs, None),
-                };
+                let (formula, unit) = split_unit(rhs);
                 calc.outputs.push(CalculatorOutput {
                     key,
                     label,
@@ -681,6 +676,28 @@ impl Calculator {
             }
         }
         problems.done(calc)
+    }
+}
+
+/// Splits a trailing ` (unit)` off a formula. A parenthesis that is part
+/// of the formula (`a * (b + c)`, `round(x)`) is not a unit: a unit
+/// follows whitespace, and the formula before it must not end in an
+/// operator.
+fn split_unit(rhs: &str) -> (&str, Option<String>) {
+    let Some((formula, unit)) = rhs.strip_suffix(')').and_then(|r| r.rsplit_once('(')) else {
+        return (rhs, None);
+    };
+    let trimmed = formula.trim_end();
+    let is_unit = !trimmed.is_empty()
+        && formula.ends_with(char::is_whitespace)
+        && !trimmed.ends_with([
+            '+', '-', '*', '/', '^', '%', '(', ',', '=', '<', '>', '&', '|', '!',
+        ])
+        && !unit.trim().is_empty();
+    if is_unit {
+        (trimmed, Some(unit.trim().to_owned()))
+    } else {
+        (rhs, None)
     }
 }
 
