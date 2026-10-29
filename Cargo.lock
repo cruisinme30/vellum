@@ -3076,6 +3076,23 @@ name = "vellum-format"
 version = "0.0.0"
 
 [[package]]
+name = "vellum-integrations"
+version = "0.0.0"
+dependencies = [
+ "base64",
+ "hmac",
+ "jiff",
+ "serde",
+ "serde_json",
+ "sha2",
+ "subtle",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "url",
+]
+
+[[package]]
 name = "vellum-jobs"
 version = "0.0.0"
 
@@ -3127,7 +3144,6 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
- "vellum-kernel",
 ]
 
 [[package]]
