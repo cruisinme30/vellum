@@ -817,10 +817,6 @@ fn delivery(
 ///
 /// An unreachable database, a wrong key, an unreadable data folder or
 /// invalid integration settings.
-#[expect(
-    clippy::too_many_lines,
-    reason = "the composition root wires every workspace service in order"
-)]
 pub async fn open(
     config: &Config,
     identity: &Arc<Identity>,
