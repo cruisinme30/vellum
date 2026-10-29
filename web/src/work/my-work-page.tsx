@@ -361,7 +361,14 @@ export function MyWorkPage() {
   const t = useT();
   return (
     <ServerScreen api="work" title={t("my-work")} className="vl-work">
-      {(api) => <MyWork api={api} />}
+      {(api) => (
+        <>
+          <p className="vl-work-links">
+            <Link to="/my-work/settings">{t("connections-open")}</Link>
+          </p>
+          <MyWork api={api} />
+        </>
+      )}
     </ServerScreen>
   );
 }

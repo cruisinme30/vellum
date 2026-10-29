@@ -41,8 +41,10 @@ import { NewPageView } from "./views/new-page";
 import { InboxView, SearchView } from "./views/search";
 import { SetupView, SignInView } from "./views/sign-in";
 import type { WorkApi } from "./work/api";
+import type { ConnectionsApi } from "./work/connections-api";
 import { IssuePage } from "./work/issue-page";
 import { IssuesPage } from "./work/issues-page";
+import { MyWorkConnectionsPage } from "./work/my-work-connections";
 import { MyWorkPage } from "./work/my-work-page";
 
 // The editor is most of the bundle, so it loads with the first page opened.
@@ -89,6 +91,7 @@ export function AppRoutes() {
         <Route path="settings/private-spaces" element={<PrivateSpacesView />} />
         <Route path="new" element={<NewPageView />} />
         <Route path="my-work" element={<MyWorkPage />} />
+        <Route path="my-work/settings" element={<MyWorkConnectionsPage />} />
         <Route path="issues" element={<IssuesPage />} />
         <Route path="issues/:issueKey" element={<IssuePage />} />
         <Route path="books" element={<BooksPage />} />
@@ -125,6 +128,8 @@ export interface AppServices {
   readonly admin?: AdminConsoleApi | undefined;
   /** My Work and issues, from a Vellum server; absent in demo mode. */
   readonly work?: WorkApi | undefined;
+  /** My Work's calendar feed, CalDAV, capture and imports; absent in demo mode. */
+  readonly connections?: ConnectionsApi | undefined;
   /** Books, from a Vellum server; absent in demo mode. */
   readonly books?: BooksApi | undefined;
   /** Private spaces' device keys, from a Vellum server; absent in demo mode. */
@@ -180,12 +185,16 @@ export function AppProviders({
   work,
   books,
   privateSpaces,
+  connections,
   collections,
   session,
   notifications,
   children,
 }: AppServices & { readonly children: ReactNode }) {
-  const serverApis = useMemo(() => ({ work, books, privateSpaces }), [work, books, privateSpaces]);
+  const serverApis = useMemo(
+    () => ({ work, books, privateSpaces, connections }),
+    [work, books, privateSpaces, connections],
+  );
   const [demoNotifications] = useState<NotificationServices>(() => ({
     store: createMockNotificationPreferencesStore(),
   }));

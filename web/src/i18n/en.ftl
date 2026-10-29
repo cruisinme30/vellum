@@ -632,6 +632,60 @@ my-work-settings-digest = Morning digest at
 my-work-settings-digest-hint = Reminders on a date without a time count from the start of your day. Clear the digest time to stop the digest.
 my-work-settings-save = Save settings
 my-work-settings-saved = Settings saved.
+connections-open = Calendars, capture and import
+connections-title = My Work settings
+connections-back = Back to My Work
+connections-copy = Copy
+connections-copied = Copied.
+connections-calendar = Calendar
+connections-calendar-intro = Show your tasks in a calendar app, or edit them in a task app that speaks CalDAV.
+connections-feed-url = Your calendar feed URL
+connections-feed-new = Get a new feed URL
+connections-feed-revoke = Turn the feed off
+connections-feed-off = The feed is off. Its URL no longer works.
+connections-feed-hint = Subscribe to the URL in Google Calendar, Apple Calendar or Outlook. It is shown only once; getting a new one stops the old one working.
+connections-caldav = Task apps (CalDAV)
+connections-caldav-url = CalDAV account URL
+connections-caldav-apple = Apple Reminders: Settings, Calendar, Accounts, Add Account, Other, Add CalDAV Account. Choose Manual and paste the URL; the user name is your handle and the password is an app password.
+connections-caldav-thunderbird = Thunderbird: New Calendar, On the Network, paste the URL and sign in with your handle and an app password.
+connections-caldav-password = Make an app password
+connections-caldav-password-label = App password (shown once)
+connections-caldav-token-name = CalDAV task app
+connections-capture = Capture
+connections-capture-intro = Send things to your Inbox from e-mail and Slack.
+connections-email = E-mail
+connections-email-address = Your capture address
+connections-email-new = Get a new address
+connections-email-revoke = Turn capture by e-mail off
+connections-email-off = Capture by e-mail is off. The address no longer works.
+connections-email-unavailable = This server does not receive capture e-mail. An administrator can set a mail domain.
+connections-slack = Slack
+connections-slack-unavailable = Slack capture is not set up on this server. An administrator can add the Vellum Slack app.
+connections-slack-how = In Slack, open a message's menu and choose Save as task. The first time, Slack shows a link that connects your account.
+connections-slack-linked = Your Slack account is connected. Save as task puts messages in your Inbox.
+connections-slack-unlink = Disconnect Slack
+connections-import = Import
+connections-import-intro = Bring tasks over from another app. Each list becomes a list here; importing the same file again adds only what is new.
+connections-import-from = From
+connections-import-google_tasks = Google Tasks (Takeout Tasks.json)
+connections-import-todoist = Todoist (project CSV)
+connections-import-things = Things (JSON)
+connections-import-file = Export file
+connections-import-project = List name for this project
+connections-import-button = Import
+connections-import-preview =
+    { $count ->
+        [0] { $file } holds no tasks Vellum can read.
+        [one] { $file } holds one task.
+       *[other] { $file } holds { $count } tasks.
+    }
+connections-import-unreadable = { $file } is not an export from that app.
+connections-import-done = Imported.
+connections-import-list =
+    { $count ->
+        [one] { $list }: one task added
+       *[other] { $list }: { $count } tasks added
+    }
 
 ## Issues
 
