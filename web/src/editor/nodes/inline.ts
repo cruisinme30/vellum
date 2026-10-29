@@ -12,7 +12,7 @@ import type { NodeType } from "@tiptap/pm/model";
 
 import type { NodeName } from "../schema/blocks.gen";
 import { nodeSpec, tiptapAttributes } from "../schema/spec";
-import { safeUrl } from "../urls";
+import { mediaUrl } from "../urls";
 
 /**
  * An input rule that turns the `token` group of a match into an inline atom
@@ -224,7 +224,7 @@ export const InlineImage = Node.create({
   draggable: true,
   parseHTML: () => [{ tag: 'img[data-type="inlineImage"]', priority: 60 }],
   renderHTML: ({ node, HTMLAttributes }) => {
-    const source = safeUrl(String(node.attrs["src"]));
+    const source = mediaUrl(String(node.attrs["src"]));
     const title = String(node.attrs["title"]);
     return [
       "img",

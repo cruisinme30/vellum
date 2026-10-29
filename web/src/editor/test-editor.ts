@@ -7,7 +7,7 @@ import { Editor, type JSONContent } from "@tiptap/core";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { DecorationSet } from "@tiptap/pm/view";
 import { EditorContent, useEditor, type ReactNodeViewProps } from "@tiptap/react";
-import { createElement, createRef, useEffect } from "react";
+import { createElement, createRef, useEffect, type ComponentType, type ReactNode } from "react";
 
 import en from "../i18n/en.ftl?raw";
 import { createTranslator } from "../i18n/i18n";
@@ -86,7 +86,12 @@ function EditorHarness({ content, editable = true, onEditor, chips }: EditorHarn
 /** Renders a React editor, waits for its node views and hands back the Tiptap instance. */
 export async function renderEditor(
   content: JSONContent | string,
-  options: { readonly editable?: boolean; readonly chips?: ChipSources } = {},
+  options: {
+    readonly editable?: boolean;
+    readonly chips?: ChipSources;
+    /** Providers around the editor, such as the page's files. */
+    readonly wrapper?: ComponentType<{ children: ReactNode }>;
+  } = {},
 ): Promise<{ editor: Editor; unmount: () => void }> {
   let current: Editor | undefined;
   const { unmount } = render(
@@ -98,6 +103,7 @@ export async function renderEditor(
         current = editor;
       },
     }),
+    options.wrapper === undefined ? {} : { wrapper: options.wrapper },
   );
   // React node views render in a microtask after the editor mounts.
   await act(async () => {

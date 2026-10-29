@@ -3,6 +3,7 @@
 
 import { createContext, use, type ReactNode } from "react";
 
+import type { AttachmentsApi } from "../attachments/api";
 import type { BooksApi } from "../books/api";
 import type { DriveApi } from "../drive/api";
 import { ViewTitle } from "../help/help-link";
@@ -19,6 +20,7 @@ export interface ServerApis {
   readonly work?: WorkApi | undefined;
   readonly books?: BooksApi | undefined;
   readonly drive?: DriveApi | undefined;
+  readonly attachments?: AttachmentsApi | undefined;
   readonly privateSpaces?: PrivateSpacesApi | undefined;
   /** People (and groups) to pick for access and sharing. */
   readonly directory?: DirectoryApi | undefined;
