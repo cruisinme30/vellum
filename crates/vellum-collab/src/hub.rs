@@ -370,6 +370,25 @@ impl Hub {
         self.registry.lock().len()
     }
 
+    /// The rooms open in this process.
+    #[must_use]
+    pub fn rooms(&self) -> Vec<RoomKey> {
+        self.registry.lock().keys().copied().collect()
+    }
+
+    /// Drains one room, as [`Self::shutdown`] does for all: its updates are
+    /// saved and its editors are disconnected, so they reconnect to the
+    /// replica that owns the room now.
+    pub async fn release(&self, room: RoomKey) {
+        let Some(entry) = self.registry.lock().get(&room).cloned() else {
+            return;
+        };
+        let (ack, done) = oneshot::channel();
+        if entry.ctl.send(Control::Shutdown(ack)).is_ok() {
+            let _gone = done.await;
+        }
+    }
+
     /// Drains every room: appends pending updates, writes Markdown
     /// versions and closes connections so editors reconnect elsewhere.
     pub async fn shutdown(&self) {

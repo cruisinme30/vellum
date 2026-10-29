@@ -20,13 +20,15 @@
 //!   [`MarkdownCodec`] (the dialect's canonical serializer) and compacts its
 //!   log.
 //! * A room is re-created from the log on any node, so a lost node costs a
-//!   reconnect; [`placement`] decides which node owns a room.
+//!   reconnect; [`placement`] decides which node owns a room, and
+//!   [`cluster`] routes each connection there.
 //! * W3C `traceparent` is accepted on the upgrade request and per message,
 //!   so editor telemetry joins the server trace ([`trace`]).
 //!
 //! Persistence and Markdown conversion are ports ([`ports`]); [`memory`]
 //! holds in-memory adapters for tests and the zero-config profile.
 
+pub mod cluster;
 mod config;
 mod hub;
 pub mod markdown;
