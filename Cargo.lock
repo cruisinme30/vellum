@@ -2360,6 +2360,12 @@ version = "0.0.0"
 [[package]]
 name = "vellum-authz"
 version = "0.0.0"
+dependencies = [
+ "proptest",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
 
 [[package]]
 name = "vellum-cli"
