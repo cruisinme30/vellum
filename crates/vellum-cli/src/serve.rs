@@ -27,8 +27,8 @@
 //! | `VELLUM_OIDC_ALLOWED_DOMAINS` | Comma-separated email domains that get an account on first sign-in |
 //! | `VELLUM_OIDC_AUTO_CREATE` | `false` to sign in existing accounts only |
 //!
-//! Without an index (a key, plaintext or a database URL) the server runs
-//! sign-in only; collections, books and Work need the index.
+//! With none of these, the SQLite index key is made on the first start and
+//! kept in `.vellum/keys/index.key`, so `vellum serve` needs no settings.
 
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};

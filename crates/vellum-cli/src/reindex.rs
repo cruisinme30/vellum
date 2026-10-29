@@ -61,8 +61,13 @@ fn execute(args: &Args) -> Result<Vec<String>, String> {
         } else if args.plaintext {
             IndexConfig::sqlite(config.data_dir.join(".vellum/index.sqlite"), None)
         } else {
-            let key = index_key(std::env::var(KEY_VAR).ok().as_deref())?;
-            IndexConfig::sqlite(config.data_dir.join(".vellum/index.sqlite"), Some(key))
+            // The server's key: the variable, or the one kept beside the data.
+            let key = crate::workspace::sqlite_key(&config, |k| std::env::var(k).ok())
+                .map_err(|e| e.to_string())?;
+            IndexConfig::sqlite(
+                config.data_dir.join(".vellum/index.sqlite"),
+                key.map(IndexKey::new),
+            )
         };
         runtime.block_on(async {
             let index = Index::open(&index_config).await?;
@@ -81,11 +86,6 @@ fn execute(args: &Args) -> Result<Vec<String>, String> {
     )];
     lines.extend(report.problems.iter().map(|p| format!("  skipped {p}")));
     Ok(lines)
-}
-
-/// Parses a 32-byte key written as 64 hex characters.
-pub fn index_key(hex: Option<&str>) -> Result<IndexKey, String> {
-    key_bytes(hex).map(IndexKey::new)
 }
 
 /// The raw bytes of a key written as 64 hex characters.
@@ -110,13 +110,13 @@ pub fn parse_hex_key(var: &str, hex: &str) -> Result<[u8; 32], String> {
 
 #[cfg(test)]
 mod tests {
-    use super::index_key;
+    use super::key_bytes;
 
     #[test]
     fn key_must_be_64_hex_characters() {
-        assert!(index_key(Some(&"ab".repeat(32))).is_ok());
-        assert!(index_key(Some("abc")).is_err());
-        assert!(index_key(Some(&"zz".repeat(32))).is_err());
-        assert!(index_key(None).unwrap_err().contains("--plaintext"));
+        assert!(key_bytes(Some(&"ab".repeat(32))).is_ok());
+        assert!(key_bytes(Some("abc")).is_err());
+        assert!(key_bytes(Some(&"zz".repeat(32))).is_err());
+        assert!(key_bytes(None).unwrap_err().contains("--plaintext"));
     }
 }

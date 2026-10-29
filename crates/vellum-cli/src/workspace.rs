@@ -5,11 +5,11 @@
 //! live editing, over the files in the data folder, the index database and the
 //! permission engine.
 //!
-//! `vellum serve` opens them when an index is configured: Postgres through
-//! the kernel's `database_url`, or the SQLite index in the data folder,
-//! encrypted with `VELLUM_INDEX_KEY` (or plaintext when
-//! `VELLUM_INDEX_PLAINTEXT=1`). Without one the server still starts, with
-//! sign-in only, and says why.
+//! `vellum serve` opens them over an index: Postgres through the kernel's
+//! `database_url`, or the SQLite index in the data folder, encrypted with
+//! `VELLUM_INDEX_KEY` (or plaintext when `VELLUM_INDEX_PLAINTEXT=1`). With
+//! neither, the key is made on the first start and kept in
+//! `.vellum/keys/index.key`, so `vellum serve` needs no settings.
 //!
 //! Workspace files live in the data folder, or in a shared S3 bucket when
 //! `VELLUM_BLOB_URL` names one (`s3://bucket[/prefix]`, with
@@ -36,7 +36,7 @@ use vellum_collections::CollectionsService;
 use vellum_collections::service::IndexFeed;
 use vellum_contracts::{BoxFuture, Operation, Readiness, Service};
 use vellum_db::feed::Feed;
-use vellum_db::{Index, IndexConfig};
+use vellum_db::{Index, IndexConfig, IndexKey};
 use vellum_drive::authz::{AuthzAccess as DriveAuthzAccess, TreeSync};
 use vellum_drive::sql::SqlIndex;
 use vellum_drive::{Drive, DriveIndex, DriveService};
@@ -54,7 +54,7 @@ use crate::collab::Collab;
 use crate::feed::{AnnouncingStore, Caches};
 use crate::google_http::{self, Endpoints, FileLinks, GoogleHttp};
 use crate::page_render::{Handles, PageRenderService};
-use crate::reindex::{KEY_VAR, index_key, key_bytes};
+use crate::reindex::{KEY_VAR, key_bytes};
 use crate::tasks::{DriveTasks, Parts, TasksSettings};
 
 /// The mail domain that receives My Work capture e-mail.
@@ -86,30 +86,72 @@ fn unavailable(what: &str, e: impl std::fmt::Display) -> Error {
     Error::new(ErrorKind::Unavailable, format!("{what}: {e}"))
 }
 
-/// The index settings for `config`, or `None` with the reason when no
-/// index is configured.
+/// The file under `.vellum/keys` that holds the index key when
+/// `VELLUM_INDEX_KEY` is not set.
+pub const KEY_FILE: &str = "index.key";
+
+/// The SQLite index key: `VELLUM_INDEX_KEY`, then nothing in plaintext
+/// mode, then the key kept beside the data in `.vellum/keys/index.key`,
+/// made on the first start so `vellum serve` needs no settings.
 ///
 /// # Errors
 ///
-/// A key that is set but malformed.
+/// A malformed key, an index file left without its key (made with a key
+/// that is not set now), or a key folder that cannot be written.
+pub fn sqlite_key(
+    config: &Config,
+    var: impl Fn(&str) -> Option<String>,
+) -> Result<Option<[u8; 32]>, Error> {
+    if let Some(hex) = var(KEY_VAR) {
+        return key_bytes(Some(&hex))
+            .map(Some)
+            .map_err(|e| Error::new(ErrorKind::InvalidInput, e));
+    }
+    if var(PLAINTEXT_VAR).is_some_and(|v| matches!(v.as_str(), "1" | "true" | "yes")) {
+        return Ok(None);
+    }
+    let vellum = config.data_dir.join(".vellum");
+    if !vellum.join("keys").join(KEY_FILE).exists() && vellum.join("index.sqlite").exists() {
+        // A new key cannot open the old index; never replace it silently.
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            format!(
+                "the index in {} was made with a key that is not set now: set {KEY_VAR}, \
+                 or restore .vellum/keys/{KEY_FILE}",
+                vellum.display()
+            ),
+        ));
+    }
+    let bytes = crate::keys::key_file(&config.data_dir, KEY_FILE)?;
+    bytes
+        .get(..32)
+        .and_then(|k| <[u8; 32]>::try_from(k).ok())
+        .map(Some)
+        .ok_or_else(|| Error::new(ErrorKind::Internal, "the index key file is too short"))
+}
+
+/// The index settings for `config`: Postgres when a database URL is set,
+/// otherwise SQLite in the data folder, sealed with [`sqlite_key`].
+///
+/// # Errors
+///
+/// As [`sqlite_key`].
 pub fn index_config(
     config: &Config,
     var: impl Fn(&str) -> Option<String>,
-) -> Result<Result<IndexConfig, String>, Error> {
+) -> Result<IndexConfig, Error> {
     if let Some(url) = &config.database_url {
-        return Ok(Ok(IndexConfig::postgres(url.clone())));
+        return Ok(IndexConfig::postgres(url.clone()));
     }
     let path = config.data_dir.join(".vellum").join("index.sqlite");
-    if let Some(hex) = var(KEY_VAR) {
-        let key = index_key(Some(&hex)).map_err(|e| Error::new(ErrorKind::InvalidInput, e))?;
-        return Ok(Ok(IndexConfig::sqlite(path, Some(key))));
+    let key = sqlite_key(config, &var)?;
+    if key.is_some() && var(KEY_VAR).is_none() {
+        tracing::warn!(
+            "the index key is kept in the data folder (.vellum/keys/{KEY_FILE}); \
+             copy it somewhere safe and set {KEY_VAR}"
+        );
     }
-    if var(PLAINTEXT_VAR).is_some_and(|v| matches!(v.as_str(), "1" | "true" | "yes")) {
-        return Ok(Ok(IndexConfig::sqlite(path, None)));
-    }
-    Ok(Err(format!(
-        "no index is configured: set {KEY_VAR}, {PLAINTEXT_VAR}=1 or a database URL"
-    )))
+    Ok(IndexConfig::sqlite(path, key.map(IndexKey::new)))
 }
 
 /// Where the workspace files live.
@@ -484,8 +526,8 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
     })
 }
 
-/// The search index key, derived from the index key; `None` leaves the
-/// index unsealed (Postgres and plaintext mode).
+/// The key the search index is derived from; `None` leaves it unsealed
+/// (Postgres and plaintext mode).
 fn search_key(
     config: &Config,
     var: impl Fn(&str) -> Option<String>,
@@ -493,10 +535,7 @@ fn search_key(
     if config.database_url.is_some() {
         return Ok(None);
     }
-    var(KEY_VAR)
-        .map(|hex| key_bytes(Some(&hex)))
-        .transpose()
-        .map_err(|e| Error::new(ErrorKind::InvalidInput, e))
+    sqlite_key(config, var)
 }
 
 /// Syncs every user's time blocks with Google Calendar, every few minutes.
@@ -530,13 +569,7 @@ pub async fn open(
     let setup = TasksSetup::new(identity, Some(&config.data_dir), &var);
     let bucket = bucket(&var)?;
     let key = search_key(config, &var)?;
-    let index_config = match index_config(config, &var)? {
-        Ok(c) => c,
-        Err(why) => {
-            tracing::warn!("{why}; serving sign-in only, without the workspace API");
-            return Ok(Opened::default());
-        }
-    };
+    let index_config = index_config(config, &var)?;
     let index = Index::open(&index_config)
         .await
         .map_err(|e| unavailable("cannot open the index", e))?;
@@ -749,31 +782,48 @@ mod tests {
     }
 
     #[test]
-    fn index_needs_a_key_plaintext_or_a_database() {
-        let config = Config::default();
+    fn index_uses_a_key_plaintext_a_database_or_a_kept_key() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut config = Config::default();
+        config.data_dir = dir.path().to_path_buf();
         let vars = |pairs: &[(&str, &str)]| -> HashMap<String, String> {
             pairs
                 .iter()
                 .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
                 .collect()
         };
-        let none = vars(&[]);
-        assert!(
-            index_config(&config, |k| none.get(k).cloned())
-                .unwrap()
-                .is_err()
-        );
         let plain = vars(&[(PLAINTEXT_VAR, "1")]);
         assert!(matches!(
             index_config(&config, |k| plain.get(k).cloned()).unwrap(),
-            Ok(IndexConfig::Sqlite { key: None, .. })
+            IndexConfig::Sqlite { key: None, .. }
         ));
         let keyed = vars(&[(KEY_VAR, &"ab".repeat(32))]);
         assert!(matches!(
             index_config(&config, |k| keyed.get(k).cloned()).unwrap(),
-            Ok(IndexConfig::Sqlite { key: Some(_), .. })
+            IndexConfig::Sqlite { key: Some(_), .. }
         ));
         let bad = vars(&[(KEY_VAR, "nope")]);
         assert!(index_config(&config, |k| bad.get(k).cloned()).is_err());
+        assert!(!dir.path().join(".vellum/keys").join(KEY_FILE).exists());
+
+        // With no settings, a key is made once and kept beside the data.
+        let none = vars(&[]);
+        let first = sqlite_key(&config, |k| none.get(k).cloned()).unwrap();
+        assert!(first.is_some());
+        assert_eq!(
+            sqlite_key(&config, |k| none.get(k).cloned()).unwrap(),
+            first
+        );
+        assert!(matches!(
+            index_config(&config, |k| none.get(k).cloned()).unwrap(),
+            IndexConfig::Sqlite { key: Some(_), .. }
+        ));
+
+        // An index whose key is gone is refused, not silently re-keyed.
+        std::fs::remove_file(dir.path().join(".vellum/keys").join(KEY_FILE)).unwrap();
+        std::fs::write(dir.path().join(".vellum/index.sqlite"), b"sealed").unwrap();
+        let error = sqlite_key(&config, |k| none.get(k).cloned()).unwrap_err();
+        assert!(error.to_string().contains(KEY_VAR), "{error}");
+        assert!(!dir.path().join(".vellum/keys").join(KEY_FILE).exists());
     }
 }

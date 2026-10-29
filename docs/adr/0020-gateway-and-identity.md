@@ -127,9 +127,9 @@ available. Re-authentication asks the provider for a fresh sign-in.
   kernel provides them.
 - `vellum-cli` is the composition root: `services.rs` builds every service
   once, and `vellum serve`, `vellum openapi` and `vellum graphql-schema`
-  all see the same set. Without an index (a key, plaintext mode or a
-  database URL) `vellum serve` runs sign-in only and says why, rather
-  than refusing to start.
+  all see the same set. With no index key or database set, `vellum serve`
+  keeps a new key in `.vellum/keys/index.key` and warns, so it starts
+  with no settings (#174). An index whose key is gone is refused.
 - Clients get typed calls for free: `vellum openapi --typescript` turns
   the same document into `web/src/api/api.gen.ts`, and a contract test
   fails when the committed file no longer matches the server, so an API

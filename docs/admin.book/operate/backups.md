@@ -30,7 +30,9 @@ server it came from: copy that file somewhere else, or set the variable.
 
 The audit log is sealed with `VELLUM_ADMIN_KEY`, or with
 `.vellum/keys/admin.key` when the variable is not set. Losing that key
-makes the audit log unreadable, so back it up with the workspace keys.
+makes the audit log unreadable, so back it up with the workspace keys. The
+same goes for `.vellum/keys/index.key`, which holds the index key when
+`VELLUM_INDEX_KEY` is not set. Backups never include the key folder.
 
 ## Taking backups {#take}
 
