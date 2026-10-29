@@ -8,7 +8,12 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Http } from "../api/http";
+import { createNorthstarStore } from "../data/mock/northstar";
 import { ServerApisProvider } from "../data/server-apis";
+import type { WorkspaceStore } from "../data/store";
+import { WorkspaceProvider } from "../data/workspace-context";
+import type { CollabConnector } from "../editor/collab/provider";
+import { createMemoryCommentsApi } from "../editor/comments/memory-comments";
 import { I18nProvider } from "../i18n/i18n";
 
 import {
@@ -132,6 +137,8 @@ function fakeApi(overrides: Partial<WorkApi> = {}) {
     }),
   );
   const api: WorkApi = {
+    ...createMemoryCommentsApi("ana"),
+    fileIssue: (created) => Promise.resolve({ issue: issue("ENG-9", created.title) }),
     myWork,
     addTask,
     setDone,
@@ -177,15 +184,28 @@ function fakeApi(overrides: Partial<WorkApi> = {}) {
   };
 }
 
-function renderAt(path: string, api: WorkApi | undefined, routes: ReactNode) {
+const collab: CollabConnector = {
+  open: () => {
+    throw new Error("no editor in these tests");
+  },
+};
+
+function renderAt(
+  path: string,
+  api: WorkApi | undefined,
+  routes: ReactNode,
+  store: WorkspaceStore = createNorthstarStore(),
+) {
   const user = userEvent.setup();
   render(
     <I18nProvider>
-      <ServerApisProvider apis={{ work: api }}>
-        <MemoryRouter initialEntries={[path]}>
-          <Routes>{routes}</Routes>
-        </MemoryRouter>
-      </ServerApisProvider>
+      <WorkspaceProvider store={store} collab={collab}>
+        <ServerApisProvider apis={{ work: api }}>
+          <MemoryRouter initialEntries={[path]}>
+            <Routes>{routes}</Routes>
+          </MemoryRouter>
+        </ServerApisProvider>
+      </WorkspaceProvider>
     </I18nProvider>,
   );
   return user;
@@ -342,6 +362,30 @@ describe("issues", () => {
     await user.type(screen.getByRole("textbox", { name: "Add a comment" }), "Fixed in 1.0.1");
     await user.click(screen.getByRole("button", { name: "Comment" }));
     expect(addComment).toHaveBeenCalledWith("ENG-7", "Fixed in 1.0.1");
+  });
+
+  it("starts a doc from an issue and opens it", async () => {
+    const { api } = fakeApi();
+    const store = createNorthstarStore();
+    const createPage = vi.spyOn(store, "createPage");
+    const user = renderAt(
+      "/issues/ENG-7",
+      api,
+      <>
+        <Route path="issues/:issueKey" element={<IssuePage />} />
+        <Route path="p/:pageId" element={<p>opened page</p>} />
+      </>,
+      store,
+    );
+    await user.click(await screen.findByRole("button", { name: "Create doc from issue" }));
+    expect(await screen.findByText("opened page")).toBeDefined();
+    expect(createPage).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "ENG-7 Fix sign-in", body: "Issue: ENG-7\n" }),
+    );
+    const created = store.getSnapshot().pages.find((page) => page.title === "ENG-7 Fix sign-in");
+    expect(created && store.seedFor(created.id)?.content?.[0]?.content?.[0]?.text).toBe(
+      "Issue: ENG-7",
+    );
   });
 
   it("shows a failure with its message", async () => {
