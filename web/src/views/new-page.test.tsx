@@ -8,11 +8,12 @@ import { createNorthstarStore } from "../data/mock/northstar";
 import { renderApp } from "../test/render-app";
 
 describe("NewPageView", () => {
-  it("creates one page in the first space and opens it", async () => {
+  it("creates one page in the first space and opens it", { timeout: 15_000 }, async () => {
     const store = createNorthstarStore();
     const before = store.getSnapshot().pages.length;
     const { location } = renderApp("/new?source=pwa-shortcut", store);
-    await screen.findByRole("textbox", { name: "Page title" });
+    // The page view loads lazily, which is slow under coverage.
+    await screen.findByRole("textbox", { name: "Page title" }, { timeout: 10_000 });
     expect(location()).toMatch(/^\/p\//);
     expect(store.getSnapshot().pages).toHaveLength(before + 1);
   });
