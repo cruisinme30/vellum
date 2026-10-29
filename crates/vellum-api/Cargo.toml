@@ -43,6 +43,7 @@ tower-http = { version = "0.6.11", features = ["catch-panic", "compression-br", 
 tracing = "0.1.44"
 vellum-contracts.workspace = true
 vellum-kernel.workspace = true
+vellum-observe = { path = "../vellum-observe" }
 vellum-security = { path = "../vellum-security" }
 
 [target.'cfg(unix)'.dependencies]

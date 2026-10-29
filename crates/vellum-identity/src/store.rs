@@ -3,12 +3,18 @@
 
 //! The identity records and where they are kept.
 //!
-//! Every record lives in one [`State`], held in memory and, when a path is
-//! given, written after each change to `.vellum/identity.json` in the data
-//! directory (mode 0600, replaced atomically). Identity data is small
-//! (users, live sessions, tokens), so one file keeps a single-binary
-//! install free of a database until the SQL index lands. Secrets appear
-//! only as SHA-256 hashes; passwords only as Argon2id hashes.
+//! Every record lives in one [`State`]. Where the state is kept depends on
+//! how the server runs:
+//!
+//! - **The single binary** keeps it in memory and writes it after each
+//!   change to `.vellum/identity.json` in the data directory (mode 0600,
+//!   replaced atomically).
+//! - **Several replicas** keep it in the index database
+//!   ([`Store::shared`], ADR 0037, D160), so a sign-in, a revoked session
+//!   or a lockout on one replica holds on every other.
+//!
+//! Secrets appear only as SHA-256 hashes; passwords only as Argon2id
+//! hashes; lockout keys only as SHA-256 hashes of the address.
 
 use std::collections::BTreeMap;
 use std::io::Write as _;
@@ -20,7 +26,16 @@ use serde::{Deserialize, Serialize};
 use vellum_contracts::Scope;
 use vellum_kernel::{Error, ErrorKind, Timestamp, UserId};
 
+use crate::oauth::Client;
 use crate::secret::SecretHash;
+use crate::shared::Shared;
+
+/// How long a lockout record outlives the end of its lockout.
+const LOCKOUT_MEMORY: std::time::Duration = std::time::Duration::from_mins(15);
+/// At most this many lockout records are kept; beyond it, the half that
+/// unlocks soonest is dropped (the attacker's own heavily locked keys go
+/// last).
+const MAX_LOCKOUTS: usize = 10_000;
 
 /// A person who can sign in.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -145,6 +160,56 @@ pub struct AccessToken {
     pub expires_at: Timestamp,
 }
 
+/// Failed sign-in attempts against one address or client IP, shared by
+/// every replica.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Attempts {
+    /// Failures since the last success.
+    pub failures: u32,
+    /// When the next attempt is allowed.
+    pub until: Timestamp,
+}
+
+/// An `OAuth` consent screen waiting for the user's answer.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PendingConsent {
+    /// The signed-in user who was asked.
+    pub user: UserId,
+    /// The client asking.
+    pub client: Client,
+    /// Where to send the browser back.
+    pub redirect_uri: String,
+    /// The client's `state`, returned unchanged.
+    pub state: Option<String>,
+    /// The scopes asked for, within the user's ceiling.
+    pub scopes: Vec<Scope>,
+    /// The resources (RFC 8707) the tokens will be for.
+    pub audience: Vec<String>,
+    /// The PKCE challenge.
+    pub challenge: String,
+    /// When the screen stops working.
+    pub expires: Timestamp,
+}
+
+/// An `OAuth` authorization code waiting to be exchanged, once.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PendingCode {
+    /// The user who approved.
+    pub user: UserId,
+    /// The client it was issued to.
+    pub client: Client,
+    /// The redirect URI the exchange must repeat.
+    pub redirect_uri: String,
+    /// The approved scopes.
+    pub scopes: Vec<Scope>,
+    /// The resources the tokens will be for.
+    pub audience: Vec<String>,
+    /// The PKCE challenge.
+    pub challenge: String,
+    /// When the code stops working.
+    pub expires: Timestamp,
+}
+
 /// Every identity record.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct State {
@@ -158,6 +223,17 @@ pub struct State {
     pub grants: BTreeMap<String, Grant>,
     /// `OAuth` access tokens by the base64 of their hash.
     pub access_tokens: BTreeMap<String, AccessToken>,
+    /// Lockout counters by the hex SHA-256 of `email:<address>` or
+    /// `ip:<address>`. Only filled when the store is shared; a single
+    /// process counts in memory.
+    #[serde(default)]
+    pub lockouts: BTreeMap<String, Attempts>,
+    /// `OAuth` consent screens by the base64 of their ID's hash.
+    #[serde(default)]
+    pub oauth_consents: BTreeMap<String, PendingConsent>,
+    /// `OAuth` authorization codes by the base64 of their hash.
+    #[serde(default)]
+    pub oauth_codes: BTreeMap<String, PendingCode>,
 }
 
 impl State {
@@ -218,6 +294,26 @@ impl State {
         let grants = &self.grants;
         self.access_tokens
             .retain(|_, t| t.expires_at > now && grants.contains_key(&t.grant));
+        self.oauth_consents.retain(|_, c| c.expires > now);
+        self.oauth_codes.retain(|_, c| c.expires > now);
+        let forget = i64::try_from(LOCKOUT_MEMORY.as_millis()).unwrap_or(i64::MAX);
+        self.lockouts
+            .retain(|_, a| a.until.unix_ms().saturating_add(forget) > now.unix_ms());
+    }
+
+    /// Makes room for one more lockout record.
+    pub fn bound_lockouts(&mut self, now: Timestamp) {
+        if self.lockouts.len() < MAX_LOCKOUTS {
+            return;
+        }
+        self.sweep(now);
+        if self.lockouts.len() >= MAX_LOCKOUTS {
+            let mut untils: Vec<i64> = self.lockouts.values().map(|a| a.until.unix_ms()).collect();
+            untils.sort_unstable();
+            if let Some(&cutoff) = untils.get(untils.len() / 2) {
+                self.lockouts.retain(|_, a| a.until.unix_ms() > cutoff);
+            }
+        }
     }
 
     /// Revokes every credential of a user.
@@ -231,21 +327,78 @@ impl State {
     }
 }
 
-/// The records, in memory and optionally on disk.
+/// The records: in memory and optionally a file, or in the index database.
 #[derive(Debug)]
-pub struct Store {
-    path: Option<PathBuf>,
-    state: Mutex<State>,
+pub struct Store(Backend);
+
+#[derive(Debug)]
+enum Backend {
+    Local {
+        path: Option<PathBuf>,
+        state: Mutex<State>,
+    },
+    Shared(Shared),
 }
 
 impl Store {
     /// A store that lives only in memory, for tests and demos.
     #[must_use]
     pub fn memory() -> Self {
-        Self {
+        Self(Backend::Local {
             path: None,
             state: Mutex::new(State::default()),
+        })
+    }
+
+    /// A store in the index database at `config`, shared by every replica
+    /// that opens the same database. Opening applies pending migrations.
+    ///
+    /// # Errors
+    ///
+    /// [`ErrorKind::Unavailable`] if the database cannot be opened or read.
+    pub fn shared(config: vellum_db::IndexConfig) -> Result<Self, Error> {
+        Ok(Self(Backend::Shared(Shared::open(config)?)))
+    }
+
+    /// Whether replicas share these records (and so must share lockouts).
+    #[must_use]
+    pub const fn is_shared(&self) -> bool {
+        matches!(self.0, Backend::Shared(_))
+    }
+
+    /// Moves the records of a single-binary install into this store, once:
+    /// when the store has no users and `<data_dir>/.vellum/identity.json`
+    /// exists, its records are copied in and the file is renamed to
+    /// `identity.json.imported`. Returns whether anything was imported.
+    ///
+    /// # Errors
+    ///
+    /// [`ErrorKind::Internal`] if the file cannot be read, parsed or
+    /// renamed, and the errors of [`Store::write`].
+    pub fn import_file(&self, data_dir: &Path) -> Result<bool, Error> {
+        let file = Self::open(data_dir)?;
+        let imported = file.read(Clone::clone);
+        if imported.users.is_empty() {
+            return Ok(false);
         }
+        let copied = self.write(|s| {
+            if s.users.is_empty() {
+                *s = imported;
+                true
+            } else {
+                false
+            }
+        })?;
+        if copied {
+            let path = data_dir.join(".vellum").join("identity.json");
+            std::fs::rename(&path, path.with_extension("json.imported")).map_err(|e| {
+                Error::new(
+                    ErrorKind::Internal,
+                    format!("cannot rename {}: {e}", path.display()),
+                )
+            })?;
+        }
+        Ok(copied)
     }
 
     /// Opens (or starts) the store file `<data_dir>/.vellum/identity.json`.
@@ -271,34 +424,50 @@ impl Store {
                 ));
             }
         };
-        Ok(Self {
+        Ok(Self(Backend::Local {
             path: Some(path),
             state: Mutex::new(state),
-        })
+        }))
     }
 
-    /// Reads the records.
+    /// Reads the records. A shared store reads the database's current
+    /// records (falling back to the last ones seen if it is unreachable).
     pub fn read<R>(&self, f: impl FnOnce(&State) -> R) -> R {
-        f(&self.state.lock().unwrap_or_else(PoisonError::into_inner))
+        match &self.0 {
+            Backend::Local { state, .. } => {
+                f(&state.lock().unwrap_or_else(PoisonError::into_inner))
+            }
+            Backend::Shared(shared) => shared.read(f),
+        }
     }
 
-    /// Changes the records and saves them. The change is kept in memory
-    /// even when saving fails, so a full disk degrades to memory-only
-    /// rather than refusing every sign-in; the error is returned.
+    /// Changes the records and saves them.
+    ///
+    /// A file store keeps the change in memory even when saving fails, so a
+    /// full disk degrades to memory-only rather than refusing every
+    /// sign-in; the error is returned. A shared store keeps nothing when
+    /// the database refuses the change, so replicas never disagree.
     ///
     /// # Errors
     ///
-    /// [`ErrorKind::Internal`] if the file cannot be written.
+    /// [`ErrorKind::Internal`] if the file cannot be written, and
+    /// [`ErrorKind::Unavailable`] if the database cannot be.
     pub fn write<R>(&self, f: impl FnOnce(&mut State) -> R) -> Result<R, Error> {
-        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
-        let result = f(&mut state);
-        if let Some(path) = &self.path {
-            let bytes = serde_json::to_vec(&*state)
-                .map_err(|e| Error::new(ErrorKind::Internal, format!("encode identity: {e}")))?;
-            drop(state);
-            save(path, &bytes)?;
+        match &self.0 {
+            Backend::Local { path, state } => {
+                let mut state = state.lock().unwrap_or_else(PoisonError::into_inner);
+                let result = f(&mut state);
+                if let Some(path) = path {
+                    let bytes = serde_json::to_vec(&*state).map_err(|e| {
+                        Error::new(ErrorKind::Internal, format!("encode identity: {e}"))
+                    })?;
+                    drop(state);
+                    save(path, &bytes)?;
+                }
+                Ok(result)
+            }
+            Backend::Shared(shared) => shared.write(f),
         }
-        Ok(result)
     }
 }
 

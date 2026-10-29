@@ -35,6 +35,13 @@
   box-shadow: 0 1px 3px rgb(0 0 0 / 30%);
 }
 
+.vl-filled-button:disabled {
+  background: color-mix(in srgb, var(--md-on-surface) 12%, transparent);
+  color: color-mix(in srgb, var(--md-on-surface) 38%, transparent);
+  box-shadow: none;
+  cursor: default;
+}
+
 /* Option colours use the callout hues, which every theme keeps legible. */
 .vl-chip[data-color="blue"] {
   background: var(--md-callout-info-bg);

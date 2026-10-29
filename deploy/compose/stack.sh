@@ -34,6 +34,8 @@ write_env() {
     kek="${state}/${project}.kek"
     random >"${kek}"
   fi
+  local csrf="${state}/${project}.csrf"
+  [[ -s "${csrf}" ]] || head -c 32 /dev/urandom | base64 >"${csrf}"
   cat >"${state}/${project}.env" <<ENV
 VELLUM_IMAGE=${image}
 VELLUM_PORT=${port}
@@ -41,6 +43,7 @@ VELLUM_PUBLIC_URL=http://localhost:${port}
 POSTGRES_PASSWORD=$(random)
 MINIO_ROOT_PASSWORD=$(random)
 VELLUM_KEK_FILE=${kek}
+VELLUM_CSRF_FILE=${csrf}
 VELLUM_LOG=info
 OTEL_EXPORTER_OTLP_ENDPOINT=
 ENV

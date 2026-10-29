@@ -8,6 +8,7 @@ import "./styles/tokens.css";
 import "./styles/shell.css";
 import "./styles/editor.css";
 import "./styles/collections.css";
+import "./styles/notifications.css";
 
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
@@ -21,17 +22,28 @@ import { createHttpWorkspaceStore } from "./data/http";
 import { createNorthstarStore } from "./data/mock/northstar";
 import { lazyCache } from "./editor/collab/lazy-cache";
 import { createLocalConnector } from "./editor/collab/local-connector";
+import { createSocketConnector } from "./editor/collab/socket-connector";
+import { createBrowserPushDevice } from "./notifications/device";
+import { createHttpNotificationPreferencesStore } from "./notifications/preferences";
+import { startClientTelemetry } from "./platform/client-telemetry-start";
 import { createPlatform, startPlatform } from "./platform/platform";
 import { DocumentCache } from "./platform/store/document-cache";
 import { openLocalDatabase } from "./platform/store/persistence";
 
-// Pages keep their edits across reloads in the browser's local database.
+// Demo pages keep their edits across reloads in the browser's local
+// database. With a server, the page's room on /collab is the store.
 const cache = lazyCache(async () => new DocumentCache(await openLocalDatabase("vellum-northstar")));
 
 const container = document.querySelector("#root");
 if (container === null) {
   throw new Error("Vellum: the #root element is missing from index.html");
 }
+startClientTelemetry({
+  performance,
+  location,
+  document,
+  Observer: globalThis.PerformanceObserver,
+});
 const root = createRoot(container);
 
 // When a Vellum server answers, the areas whose API exists use it (issue
@@ -54,11 +66,19 @@ root.render(
           ? createNorthstarStore()
           : createHttpWorkspaceStore(http, { user: status.user ?? undefined })
       }
-      collab={createLocalConnector({ cache })}
+      collab={status === undefined ? createLocalConnector({ cache }) : createSocketConnector()}
       collections={
         status === undefined ? createMockCollectionsStore() : createHttpCollectionsStore(http)
       }
       session={status === undefined ? undefined : { auth, status }}
+      notifications={
+        status === undefined
+          ? undefined
+          : {
+              store: createHttpNotificationPreferencesStore(http),
+              device: createBrowserPushDevice(),
+            }
+      }
     />
   </StrictMode>,
 );

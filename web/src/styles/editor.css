@@ -20,6 +20,15 @@
   background: var(--md-surface-container);
 }
 
+.vl-editor-notice {
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  border-radius: var(--vl-radius-m);
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+  font-size: 0.875rem;
+}
+
 .vl-toolbar-gap {
   flex: 1;
 }

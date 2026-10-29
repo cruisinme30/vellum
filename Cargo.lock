@@ -601,7 +601,7 @@ dependencies = [
  "sha1 0.10.7",
  "sync_wrapper",
  "tokio",
- "tokio-tungstenite 0.29.0",
+ "tokio-tungstenite",
  "tower",
  "tower-layer",
  "tower-service",
@@ -7605,19 +7605,7 @@ dependencies = [
  "futures-util",
  "log",
  "tokio",
- "tungstenite 0.29.0",
-]
-
-[[package]]
-name = "tokio-tungstenite"
-version = "0.30.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17a073bfed563fa236697a068031408a93cd9522e08abf9933ead3e73411bd71"
-dependencies = [
- "futures-util",
- "log",
- "tokio",
- "tungstenite 0.30.0",
+ "tungstenite",
 ]
 
 [[package]]
@@ -8113,22 +8101,6 @@ dependencies = [
  "log",
  "rand 0.9.5",
  "sha1 0.10.7",
- "thiserror",
-]
-
-[[package]]
-name = "tungstenite"
-version = "0.30.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e48ac77174b19c110a50ab2128b24215ac9cb40e0e12e093fb602d175c569d22"
-dependencies = [
- "bytes",
- "data-encoding",
- "http",
- "httparse",
- "log",
- "rand 0.10.3",
- "sha1 0.11.0",
  "thiserror",
 ]
 
@@ -8869,6 +8841,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "vellum-admin"
+version = "0.0.0"
+dependencies = [
+ "async-trait",
+ "base64 0.22.1",
+ "clap",
+ "getrandom 0.4.3",
+ "hex",
+ "opentelemetry",
+ "proptest",
+ "reqwest",
+ "schemars 1.2.3",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "vellum-contracts",
+ "vellum-crypto",
+ "vellum-kernel",
+ "vellum-observe",
+]
+
+[[package]]
 name = "vellum-api"
 version = "0.0.0"
 dependencies = [
@@ -8901,6 +8900,7 @@ dependencies = [
  "tracing",
  "vellum-contracts",
  "vellum-kernel",
+ "vellum-observe",
  "vellum-security",
 ]
 
@@ -8967,6 +8967,8 @@ dependencies = [
  "http",
  "http-body-util",
  "jiff",
+ "reqwest",
+ "schemars 1.2.3",
  "serde",
  "serde-saphyr 2.0.0",
  "serde_json",
@@ -8978,23 +8980,29 @@ dependencies = [
  "tower",
  "tracing",
  "url",
+ "vellum-admin",
  "vellum-api",
  "vellum-authz",
  "vellum-books-service",
+ "vellum-collab",
  "vellum-collections",
  "vellum-contracts",
  "vellum-crypto",
  "vellum-db",
  "vellum-drive",
+ "vellum-format",
  "vellum-help",
  "vellum-identity",
  "vellum-integrations",
  "vellum-kernel",
  "vellum-mcp",
  "vellum-notify",
+ "vellum-observe",
  "vellum-private",
+ "vellum-render",
  "vellum-security",
  "vellum-store",
+ "vellum-tasks",
  "vellum-work",
  "vellum-work-service",
 ]
@@ -9007,14 +9015,18 @@ dependencies = [
  "axum",
  "bytes",
  "futures-util",
+ "hex",
+ "hmac 0.13.0",
  "opentelemetry",
  "proptest",
  "serde_json",
+ "sha2 0.11.1",
+ "subtle",
  "tempfile",
  "testcontainers-modules",
  "thiserror",
  "tokio",
- "tokio-tungstenite 0.30.0",
+ "tokio-tungstenite",
  "tracing",
  "tracing-opentelemetry",
  "vellum-contracts",
@@ -9194,11 +9206,14 @@ dependencies = [
  "serde_urlencoded",
  "sha2 0.11.1",
  "subtle",
+ "tempfile",
+ "testcontainers-modules",
  "tokio",
  "tower",
  "tracing",
  "url",
  "vellum-contracts",
+ "vellum-db",
  "vellum-kernel",
  "vellum-security",
 ]
@@ -9328,6 +9343,25 @@ dependencies = [
  "vellum-kernel",
  "vellum-security",
  "vellum-work",
+]
+
+[[package]]
+name = "vellum-observe"
+version = "0.0.0"
+dependencies = [
+ "getrandom 0.4.3",
+ "hex",
+ "opentelemetry",
+ "proptest",
+ "schemars 1.2.3",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-opentelemetry",
+ "tracing-subscriber",
+ "vellum-kernel",
 ]
 
 [[package]]

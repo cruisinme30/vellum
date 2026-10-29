@@ -455,6 +455,15 @@ impl Comments {
         Ok(())
     }
 
+    /// Removes the thread stored at `path` (its file changed or was
+    /// removed by another replica), returning it.
+    pub fn unload_path(&mut self, path: &str) -> Option<Thread> {
+        let id = self.threads.values().find(|t| t.path() == path)?.id;
+        let old = self.threads.remove(&id)?;
+        self.unindex(&old);
+        Some(old)
+    }
+
     fn index(&mut self, thread: &Thread) {
         for c in &thread.comments {
             let _ = self.by_comment.insert(c.id, thread.id);

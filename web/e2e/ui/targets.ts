@@ -4,6 +4,8 @@
 import { readdirSync, statSync } from "node:fs";
 import path from "node:path";
 
+import type { ServerState } from "./server";
+
 /**
  * What the UI suite opens (ADR 0031, D123). App routes are listed by hand
  * as views land; the static site (landing page and help books) is found
@@ -30,6 +32,8 @@ export interface Target {
    * layout audit already covers those pages.
    */
   visual: boolean;
+  /** What the stand-in server says; absent for the demo and the site. */
+  server?: ServerState;
 }
 
 /** quick (the default): the fast subset; full: every page; exhaustive: every page in every mode. */
@@ -44,16 +48,27 @@ export const SITE_DIR = path.resolve(
   process.env["UI_SITE_DIR"] ?? "../site",
 );
 
-const app = (name: string, route: string): Target => ({
+const app = (
+  name: string,
+  route: string,
+  options: { server?: ServerState; visual?: boolean } = {},
+): Target => ({
   name: `app ${name}`,
   url: `http://127.0.0.1:${String(APP_PORT)}${route}`,
   app: true,
   fast: true,
   sweep: false,
-  visual: true,
+  visual: options.visual ?? true,
+  ...(options.server === undefined ? {} : { server: options.server }),
 });
 
-const APP_TARGETS: Target[] = [app("shell", "/")];
+// Sign-in and set-up have no visual baselines yet; they are made in the
+// Playwright container (scripts/ci/ui-baselines.sh), then `visual` turns on.
+const APP_TARGETS: Target[] = [
+  app("shell", "/"),
+  app("sign-in", "/sign-in", { server: "signed-out", visual: false }),
+  app("setup", "/setup", { server: "new", visual: false }),
+];
 
 function htmlFiles(directory: string): string[] {
   let entries: string[];

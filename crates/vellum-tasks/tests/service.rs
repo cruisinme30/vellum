@@ -139,7 +139,7 @@ impl Workspace for Mem {
         _user: UserId,
         path: String,
         text: String,
-    ) -> BoxFuture<'_, Result<(), Error>> {
+    ) -> BoxFuture<'_, Result<DocId, Error>> {
         let id = lists::read_meta(&text).id.unwrap();
         let mut state = self.state.lock().unwrap();
         let _ = state.files.insert(
@@ -150,7 +150,7 @@ impl Workspace for Mem {
                 version: 1,
             },
         );
-        ready(Ok(()))
+        ready(Ok(id))
     }
 
     fn set_member(
@@ -265,7 +265,8 @@ impl Fixture {
         self.service
             .handle_raw(RawRequest {
                 method: method.into(),
-                path: path.into(),
+                path: path.split_once('?').map_or(path, |(p, _)| p).into(),
+                query: path.split_once('?').map_or("", |(_, q)| q).into(),
                 headers: headers
                     .iter()
                     .map(|(n, v)| ((*n).to_owned(), (*v).to_owned()))
@@ -327,7 +328,7 @@ fn operations_are_unique_and_versioned() {
     ids.sort_unstable();
     ids.dedup();
     assert_eq!(ids.len(), count);
-    assert_eq!(count, 18);
+    assert_eq!(count, 22);
 }
 
 #[tokio::test]
@@ -750,6 +751,7 @@ DTSTAMP:20261103T100000Z\r\nSUMMARY:From the phone\r\nDUE;VALUE=DATE:20261110\r\
         .handle_raw(RawRequest {
             method: "PROPFIND".into(),
             path: "/dav/".into(),
+            query: String::new(),
             headers: Vec::new(),
             body: Vec::new(),
             principal: Principal::anonymous(),
@@ -763,6 +765,7 @@ DTSTAMP:20261103T100000Z\r\nSUMMARY:From the phone\r\nDUE;VALUE=DATE:20261110\r\
         .handle_raw(RawRequest {
             method: "DELETE".into(),
             path: object_path,
+            query: String::new(),
             headers: Vec::new(),
             body: Vec::new(),
             principal: f.principal(&[Scope::Read]),
@@ -844,4 +847,430 @@ async fn the_digest_and_reminders() {
         .unwrap();
     assert_eq!(due.len(), 1, "{}", f.file("tasks/ana/inbox.md"));
     assert_eq!(due[0].at.to_string(), "2026-11-03T08:30:00Z");
+}
+
+// --- Google Calendar --------------------------------------------------
+
+/// A Google Calendar in memory: events keep their offset form, as the
+/// real API returns them, and every change bumps the sync token.
+#[derive(Default)]
+struct FakeGoogle {
+    state: Mutex<FakeCalendar>,
+}
+
+#[derive(Default)]
+struct FakeCalendar {
+    events: BTreeMap<String, serde_json::Value>,
+    changed: Vec<(u64, String)>,
+    clock: u64,
+    next_id: u64,
+    revoked: bool,
+}
+
+impl FakeCalendar {
+    fn touch(&mut self, id: &str) {
+        self.clock += 1;
+        self.changed.push((self.clock, id.to_owned()));
+    }
+
+    fn offset_form(value: &mut serde_json::Value) {
+        for key in ["start", "end"] {
+            let Some(at) = value.get_mut(key) else {
+                continue;
+            };
+            let zone = at["timeZone"].as_str().unwrap_or("UTC").to_owned();
+            if let Some(local) = at["dateTime"].as_str()
+                && let Ok(local) = local.parse::<jiff::civil::DateTime>()
+            {
+                let zoned = local.to_zoned(TimeZone::get(&zone).unwrap()).unwrap();
+                at["dateTime"] = zoned.strftime("%Y-%m-%dT%H:%M:%S%:z").to_string().into();
+            }
+        }
+    }
+
+    fn merge(target: &mut serde_json::Value, patch: &serde_json::Value) {
+        if let (Some(target), Some(patch)) = (target.as_object_mut(), patch.as_object()) {
+            for (k, v) in patch {
+                let _ = target.insert(k.clone(), v.clone());
+            }
+        }
+    }
+}
+
+impl FakeGoogle {
+    fn event(&self, id: &str) -> serde_json::Value {
+        self.state.lock().unwrap().events[id].clone()
+    }
+
+    /// The person edits the calendar directly.
+    fn user_edit(&self, id: &str, change: &serde_json::Value) {
+        let mut state = self.state.lock().unwrap();
+        let mut event = state
+            .events
+            .get(id)
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!({"id": id, "status": "confirmed"}));
+        FakeCalendar::merge(&mut event, change);
+        FakeCalendar::offset_form(&mut event);
+        let _ = state.events.insert(id.to_owned(), event);
+        state.touch(id);
+    }
+}
+
+impl vellum_tasks::google::GoogleCalendar for FakeGoogle {
+    fn exchange(
+        &self,
+        code: String,
+        verifier: String,
+        redirect: String,
+    ) -> BoxFuture<'_, Result<String, Error>> {
+        assert_eq!(code, "the-code");
+        assert!(verifier.len() >= 43);
+        assert_eq!(
+            redirect,
+            "https://vellum.northstar.dev/connect/google/callback"
+        );
+        ready(Ok("refresh-1".to_owned()))
+    }
+
+    fn create_calendar(
+        &self,
+        grant: String,
+        name: String,
+        zone: String,
+    ) -> BoxFuture<'_, Result<String, Error>> {
+        assert_eq!(
+            (grant.as_str(), name.as_str(), zone.as_str()),
+            ("refresh-1", "Vellum", "Europe/London")
+        );
+        ready(Ok("cal-1".to_owned()))
+    }
+
+    fn changes(
+        &self,
+        _grant: String,
+        calendar: String,
+        sync_token: Option<String>,
+    ) -> BoxFuture<'_, Result<vellum_tasks::google::Changes, Error>> {
+        assert_eq!(calendar, "cal-1");
+        let state = self.state.lock().unwrap();
+        let since: u64 = sync_token
+            .as_deref()
+            .and_then(|t| t.strip_prefix('t'))
+            .and_then(|t| t.parse().ok())
+            .unwrap_or(0);
+        let mut ids: Vec<&String> = state
+            .changed
+            .iter()
+            .filter(|(at, _)| *at > since)
+            .map(|(_, id)| id)
+            .collect();
+        ids.dedup();
+        let events = ids.iter().map(|id| state.events[*id].clone()).collect();
+        ready(Ok(vellum_tasks::google::Changes::Page {
+            events,
+            next_sync_token: Some(format!("t{}", state.clock)),
+        }))
+    }
+
+    fn insert(
+        &self,
+        _grant: String,
+        _calendar: String,
+        mut body: serde_json::Value,
+    ) -> BoxFuture<'_, Result<String, Error>> {
+        let mut state = self.state.lock().unwrap();
+        state.next_id += 1;
+        let id = format!("e{}", state.next_id);
+        body["id"] = id.clone().into();
+        body["status"] = "confirmed".into();
+        FakeCalendar::offset_form(&mut body);
+        let _ = state.events.insert(id.clone(), body);
+        state.touch(&id);
+        ready(Ok(id))
+    }
+
+    fn patch(
+        &self,
+        _grant: String,
+        _calendar: String,
+        event: String,
+        body: serde_json::Value,
+    ) -> BoxFuture<'_, Result<(), Error>> {
+        let mut state = self.state.lock().unwrap();
+        let Some(mut current) = state.events.get(&event).cloned() else {
+            return ready(Err(Error::new(ErrorKind::NotFound, "no such event")));
+        };
+        FakeCalendar::merge(&mut current, &body);
+        FakeCalendar::offset_form(&mut current);
+        let _ = state.events.insert(event.clone(), current);
+        state.touch(&event);
+        ready(Ok(()))
+    }
+
+    fn delete(
+        &self,
+        _grant: String,
+        _calendar: String,
+        event: String,
+    ) -> BoxFuture<'_, Result<(), Error>> {
+        let mut state = self.state.lock().unwrap();
+        if let Some(e) = state.events.get_mut(&event) {
+            e["status"] = "cancelled".into();
+            state.touch(&event);
+        }
+        ready(Ok(()))
+    }
+
+    fn revoke(&self, grant: String) -> BoxFuture<'_, Result<(), Error>> {
+        assert_eq!(grant, "refresh-1");
+        self.state.lock().unwrap().revoked = true;
+        ready(Ok(()))
+    }
+}
+
+#[derive(Default)]
+struct MemLinks(Mutex<HashMap<UserId, vellum_tasks::google::GoogleLink>>);
+
+impl vellum_tasks::google::GoogleLinks for MemLinks {
+    fn link(
+        &self,
+        user: UserId,
+    ) -> BoxFuture<'_, Result<Option<vellum_tasks::google::GoogleLink>, Error>> {
+        ready(Ok(self.0.lock().unwrap().get(&user).cloned()))
+    }
+
+    fn set_link(
+        &self,
+        user: UserId,
+        link: Option<vellum_tasks::google::GoogleLink>,
+    ) -> BoxFuture<'_, Result<(), Error>> {
+        let mut map = self.0.lock().unwrap();
+        match link {
+            Some(link) => {
+                let _ = map.insert(user, link);
+            }
+            None => {
+                let _ = map.remove(&user);
+            }
+        }
+        ready(Ok(()))
+    }
+
+    fn linked(&self) -> BoxFuture<'_, Result<Vec<UserId>, Error>> {
+        ready(Ok(self.0.lock().unwrap().keys().copied().collect()))
+    }
+}
+
+fn query_value(url: &str, name: &str) -> String {
+    url.split(['?', '&'])
+        .find_map(|pair| pair.strip_prefix(&format!("{name}=")))
+        .unwrap()
+        .to_owned()
+}
+
+#[tokio::test]
+async fn time_blocks_sync_with_google_calendar_both_ways() {
+    let mut f = fixture();
+    let google = Arc::new(FakeGoogle::default());
+    let config = Config {
+        base_url: "https://vellum.northstar.dev".into(),
+        mail_domain: "northstar.dev".into(),
+        slack_signing_secret: None,
+    };
+    let service = TasksService::new(f.mem.clone(), config)
+        .with_clock(Arc::new(|| {
+            "2026-11-03T10:00:00Z".parse::<Timestamp>().unwrap()
+        }))
+        .with_google(vellum_tasks::google::Google::new(
+            google.clone(),
+            Arc::new(MemLinks::default()),
+            "client-1",
+        ));
+    f.service = Arc::new(service);
+    let sync = || f.service.google_sync(f.user, NoInput {});
+
+    // Connecting: consent, then the callback stores the link.
+    let status = f.service.google_status(f.user, NoInput {}).await.unwrap();
+    assert!(status.configured && !status.connected);
+    let url = f
+        .service
+        .google_connect(f.user, NoInput {})
+        .await
+        .unwrap()
+        .value;
+    assert!(url.starts_with("https://accounts.google.com/o/oauth2/v2/auth?client_id=client-1&"));
+    assert!(url.contains("calendar.app.created") && url.contains("code_challenge_method=S256"));
+    let state = query_value(&url, "state");
+    let expired = f
+        .raw(
+            "GET",
+            "/connect/google/callback?state=nope&code=the-code",
+            &[],
+            "",
+        )
+        .await;
+    assert_eq!(
+        header(&expired, "Location"),
+        Some("https://vellum.northstar.dev/my-work?google=expired")
+    );
+    let back = f
+        .raw(
+            "GET",
+            &format!("/connect/google/callback?state={state}&code=the-code"),
+            &[],
+            "",
+        )
+        .await;
+    assert_eq!(back.status, 303);
+    assert_eq!(
+        header(&back, "Location"),
+        Some("https://vellum.northstar.dev/my-work?google=connected")
+    );
+    assert!(
+        f.service
+            .google_status(f.user, NoInput {})
+            .await
+            .unwrap()
+            .connected
+    );
+    // A consent link works once.
+    let again = f
+        .raw(
+            "GET",
+            &format!("/connect/google/callback?state={state}&code=the-code"),
+            &[],
+            "",
+        )
+        .await;
+    assert_eq!(
+        header(&again, "Location"),
+        Some("https://vellum.northstar.dev/my-work?google=expired")
+    );
+
+    // A block on a task becomes an event.
+    let id = f.add("Write the report").await;
+    let _ = f
+        .service
+        .update(
+            f.user,
+            UpdateInput {
+                task: id.clone(),
+                block: Some("2026-11-03T14:00/90".into()),
+                ..UpdateInput::default()
+            },
+        )
+        .await
+        .unwrap();
+    let report = sync().await.unwrap();
+    assert_eq!(report.created, 1, "{report:?}");
+    assert!(
+        f.file("tasks/ana/inbox.md")
+            .contains("block=2026-11-03T14:00/90 gcal=e1")
+    );
+    let event = google.event("e1");
+    assert_eq!(event["start"]["dateTime"], "2026-11-03T14:00:00+00:00");
+    assert_eq!(
+        event["extendedProperties"]["private"]["vellumTask"],
+        id.as_str()
+    );
+
+    // Its own echo changes nothing.
+    assert_eq!(
+        sync().await.unwrap(),
+        vellum_tasks::google::SyncView::default()
+    );
+
+    // Moving the event in Google moves the block.
+    google.user_edit(
+        "e1",
+        &serde_json::json!({
+            "start": {"dateTime": "2026-11-03T16:00:00", "timeZone": "Europe/London"},
+            "end": {"dateTime": "2026-11-03T17:00:00", "timeZone": "Europe/London"},
+        }),
+    );
+    assert_eq!(sync().await.unwrap().moved, 1);
+    assert!(
+        f.file("tasks/ana/inbox.md")
+            .contains("block=2026-11-03T16:00/60 gcal=e1")
+    );
+
+    // Renaming the task updates the event.
+    let _ = f
+        .service
+        .update(
+            f.user,
+            UpdateInput {
+                task: id.clone(),
+                title: Some("Write the final report".into()),
+                ..UpdateInput::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(sync().await.unwrap().updated, 1);
+    assert_eq!(google.event("e1")["summary"], "Write the final report");
+
+    // A new event in the Vellum calendar becomes a task.
+    google.user_edit(
+        "g7",
+        &serde_json::json!({
+            "summary": "Dentist",
+            "start": {"dateTime": "2026-11-04T09:00:00", "timeZone": "Europe/London"},
+            "end": {"dateTime": "2026-11-04T09:45:00", "timeZone": "Europe/London"},
+        }),
+    );
+    assert_eq!(sync().await.unwrap().adopted, 1);
+    let inbox = f.file("tasks/ana/inbox.md");
+    assert!(
+        inbox.contains("- [ ] Dentist {block=2026-11-04T09:00/45 src=gcal:g7 gcal=g7}"),
+        "{inbox}"
+    );
+    assert!(google.event("g7")["extendedProperties"]["private"]["vellumTask"].is_string());
+
+    // Deleting the event in Google unblocks the task; it stays.
+    google.user_edit("e1", &serde_json::json!({"status": "cancelled"}));
+    assert_eq!(sync().await.unwrap().unblocked, 1);
+    let inbox = f.file("tasks/ana/inbox.md");
+    assert!(
+        inbox.contains("- [ ] Write the final report ^blk-"),
+        "{inbox}"
+    );
+
+    // Deleting the task deletes its event.
+    let dentist = f
+        .service
+        .my_work(f.user, NoInput {})
+        .await
+        .unwrap()
+        .sections
+        .iter()
+        .flat_map(|s| s.tasks.iter())
+        .find(|t| t.title == "Dentist")
+        .unwrap()
+        .id
+        .clone();
+    let _ = f
+        .service
+        .delete(f.user, TaskRef { task: dentist })
+        .await
+        .unwrap();
+    assert_eq!(sync().await.unwrap().deleted, 1);
+    assert_eq!(google.event("g7")["status"], "cancelled");
+
+    // Disconnecting revokes the grant.
+    let _ = f
+        .service
+        .google_disconnect(f.user, NoInput {})
+        .await
+        .unwrap();
+    assert!(google.state.lock().unwrap().revoked);
+    assert!(
+        !f.service
+            .google_status(f.user, NoInput {})
+            .await
+            .unwrap()
+            .connected
+    );
+    assert!(sync().await.is_err());
 }

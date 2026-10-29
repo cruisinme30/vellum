@@ -26,7 +26,7 @@ use crate::projection;
 use crate::service::{Me, TasksService};
 
 /// The path prefixes [`TasksService::handle_raw`] serves.
-pub const PREFIXES: [&str; 3] = [FEED_PREFIX, caldav::PREFIX, "/capture/"];
+pub const PREFIXES: [&str; 4] = [FEED_PREFIX, caldav::PREFIX, "/capture/", "/connect/"];
 
 /// The calendar feed: `GET /feeds/tasks/<token>.ics`.
 pub const FEED_PREFIX: &str = "/feeds/tasks/";
@@ -48,6 +48,8 @@ pub struct RawRequest {
     pub method: String,
     /// The path, without the query string.
     pub path: String,
+    /// The query string, without `?`.
+    pub query: String,
     /// Headers; names are matched without regard to case.
     pub headers: Vec<(String, String)>,
     /// The body.
@@ -85,7 +87,7 @@ impl RawResponse {
         }
     }
 
-    fn with_header(mut self, name: &str, value: impl Into<String>) -> Self {
+    pub(crate) fn with_header(mut self, name: &str, value: impl Into<String>) -> Self {
         self.headers.push((name.to_owned(), value.into()));
         self
     }
@@ -95,7 +97,12 @@ impl RawResponse {
         self.with_header("Content-Type", content_type)
     }
 
-    fn text(status: u16, text: &str) -> Self {
+    /// A `303 See Other` to `location`.
+    pub(crate) fn redirect(location: &str) -> Self {
+        Self::new(303).with_header("Location", location)
+    }
+
+    pub(crate) fn text(status: u16, text: &str) -> Self {
         Self::new(status).with_body("text/plain; charset=utf-8", text)
     }
 
@@ -213,6 +220,8 @@ impl TasksService {
             self.capture_email(&request).await
         } else if path == CAPTURE_SLACK {
             self.capture_slack(&request).await
+        } else if path == crate::google::CALLBACK {
+            self.google_callback(&request).await
         } else {
             Ok(RawResponse::text(404, "not found"))
         };

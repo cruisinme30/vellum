@@ -57,6 +57,7 @@ pub struct TasksService {
     pub(crate) workspace: Arc<dyn Workspace>,
     pub(crate) config: Config,
     clock: Clock,
+    pub(crate) google: Option<Arc<crate::google::Google>>,
 }
 
 impl std::fmt::Debug for TasksService {
@@ -77,7 +78,7 @@ fn not_found(message: &'static str) -> Error {
     Error::new(ErrorKind::NotFound, message)
 }
 
-fn edit_error(err: EditError) -> Error {
+pub(crate) fn edit_error(err: EditError) -> Error {
     Error::new(ErrorKind::NotFound, "no such task").with_source(err)
 }
 
@@ -104,6 +105,8 @@ pub struct FieldsView {
     pub labels: Vec<String>,
     /// When it was completed (UTC).
     pub done_at: Option<String>,
+    /// A time block: local start and minutes, `2026-11-03T15:00/90`.
+    pub block: Option<String>,
 }
 
 impl FieldsView {
@@ -127,6 +130,7 @@ impl FieldsView {
             priority: fields.priority.map(crate::model::Priority::level),
             labels: many("labels"),
             done_at: text("done"),
+            block: text("block"),
         }
     }
 }
@@ -511,6 +515,9 @@ pub struct UpdateInput {
     pub priority: Option<String>,
     /// Comma-separated labels.
     pub labels: Option<String>,
+    /// A time block, `YYYY-MM-DDTHH:MM/<minutes>`, shown in Google
+    /// Calendar when it is connected.
+    pub block: Option<String>,
 }
 
 /// A new list.
@@ -634,6 +641,7 @@ impl TasksService {
             workspace,
             config,
             clock: Arc::new(Timestamp::now),
+            google: None,
         }
     }
 
@@ -780,16 +788,14 @@ impl TasksService {
         if let Some(file) = files.iter().find(is_target) {
             return Ok(file.context.doc);
         }
-        let id = DocId::generate();
         let title = title.unwrap_or("Inbox");
         let path = if title == "Inbox" {
             lists::inbox_path(handle)
         } else {
             lists::list_path(handle, title)
         };
-        let text = lists::new_list(id, title, handle);
-        self.workspace.create(user, path, text).await?;
-        Ok(id)
+        let text = lists::new_list(DocId::generate(), title, handle);
+        self.workspace.create(user, path, text).await
     }
 
     /// Adds a task from a quick-add line (R-MW-3).
@@ -920,6 +926,7 @@ impl TasksService {
             ("remind", &input.remind),
             ("p", &input.priority),
             ("labels", &input.labels),
+            ("block", &input.block),
         ];
         if let Some(title) = &input.title
             && title.trim().is_empty()
@@ -1125,9 +1132,9 @@ impl TasksService {
                     .await?;
                 (file.context.doc, added)
             } else {
-                let id = DocId::generate();
-                let text = import::render_list(&list, id, &me.profile.handle);
-                self.workspace
+                let text = import::render_list(&list, DocId::generate(), &me.profile.handle);
+                let id = self
+                    .workspace
                     .create(
                         user,
                         lists::list_path(&me.profile.handle, &list.title),
@@ -1283,6 +1290,7 @@ impl Service for TasksService {
     fn operations(self: Arc<Self>) -> Vec<Operation> {
         let mut operations = task_operations(&self);
         operations.extend(list_operations(&self));
+        operations.extend(google_operations(&self));
         operations
     }
 }
@@ -1437,5 +1445,43 @@ fn list_operations(s: &Arc<TasksService>) -> Vec<Operation> {
             handler!(s, revoke_capture),
         )
         .summary("Turns capture by e-mail off"),
+    ]
+}
+
+fn google_operations(s: &Arc<TasksService>) -> Vec<Operation> {
+    use HttpMethod::{Delete, Post};
+    vec![
+        Operation::query(
+            "tasks.google_status",
+            "/v1/my-work/google",
+            Scope::Read,
+            handler!(s, google_status),
+        )
+        .summary("Whether Google Calendar time-blocking is set up and connected"),
+        Operation::mutation(
+            "tasks.google_connect",
+            Post,
+            "/v1/my-work/google/connect",
+            Scope::WriteDirect,
+            handler!(s, google_connect),
+        )
+        .summary("Starts connecting Google Calendar; returns Google's consent page"),
+        Operation::mutation(
+            "tasks.google_sync",
+            Post,
+            "/v1/my-work/google/sync",
+            Scope::WriteDirect,
+            handler!(s, google_sync),
+        )
+        .summary("Syncs time blocks with Google Calendar now")
+        .budget(Duration::from_mins(1)),
+        Operation::mutation(
+            "tasks.google_disconnect",
+            Delete,
+            "/v1/my-work/google",
+            Scope::WriteDirect,
+            handler!(s, google_disconnect),
+        )
+        .summary("Disconnects Google Calendar"),
     ]
 }

@@ -16,6 +16,7 @@
 //! | `VELLUM_ACME_DIRECTORY` | ACME directory URL; default Let's Encrypt |
 //! | `VELLUM_HTTP_REDIRECT` | Address of a plain-HTTP listener redirecting to HTTPS |
 //! | `VELLUM_CSRF_KEY` | Base64 key shared by replicas; default a per-install key file |
+//! | `VELLUM_CSRF_KEY_FILE` | A file holding that base64 key (a Docker or Kubernetes secret) |
 //! | `VELLUM_EMBED_ORIGINS` | Comma-separated origins allowed in sandboxed embeds |
 //! | `VELLUM_CLAMD_ADDRESS` | `host:port` of `ClamAV`, the default upload virus scanner |
 //! | `VELLUM_INDEX_KEY` | 64 hex characters: the key of the SQLite index |
@@ -31,7 +32,11 @@ use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
 use vellum_api::config::{GatewayConfig, host_of};
 use vellum_api::gateway::{Gateway, GatewayBuilder};
+
+use crate::observability::Observability;
 use vellum_api::server::{ServeConfig, Tls, serve};
+use vellum_db::IndexConfig;
+use vellum_identity::Store;
 use vellum_kernel::{Config, Error, ErrorKind};
 use vellum_security::upload::Clamd;
 
@@ -128,18 +133,24 @@ pub fn edge(config: &Config, var: impl Fn(&str) -> Option<String>) -> Result<Edg
                 .map_err(|e| invalid("VELLUM_HTTP_REDIRECT", e))
         })
         .transpose()?;
-    let csrf_key = var("VELLUM_CSRF_KEY")
-        .map(|k| {
-            STANDARD
-                .decode(k.trim())
-                .map_err(|e| invalid("VELLUM_CSRF_KEY", e))
-        })
+    let (csrf_var, csrf_text) = match var("VELLUM_CSRF_KEY") {
+        Some(key) => ("VELLUM_CSRF_KEY", Some(key)),
+        None => match var("VELLUM_CSRF_KEY_FILE") {
+            Some(path) => (
+                "VELLUM_CSRF_KEY_FILE",
+                Some(
+                    std::fs::read_to_string(path.trim())
+                        .map_err(|e| invalid("VELLUM_CSRF_KEY_FILE", e))?,
+                ),
+            ),
+            None => ("VELLUM_CSRF_KEY", None),
+        },
+    };
+    let csrf_key = csrf_text
+        .map(|k| STANDARD.decode(k.trim()).map_err(|e| invalid(csrf_var, e)))
         .transpose()?;
     if csrf_key.as_ref().is_some_and(|k| k.len() < 32) {
-        return Err(invalid(
-            "VELLUM_CSRF_KEY",
-            "must decode to at least 32 bytes",
-        ));
+        return Err(invalid(csrf_var, "must decode to at least 32 bytes"));
     }
     let scanner = var("VELLUM_CLAMD_ADDRESS")
         .map(|a| a.trim().to_owned())
@@ -161,8 +172,18 @@ pub fn edge(config: &Config, var: impl Fn(&str) -> Option<String>) -> Result<Edg
 /// Reads the install's CSRF key, creating it (32 random bytes, owner-only)
 /// on first start.
 fn csrf_key_file(data_dir: &Path) -> Result<Vec<u8>, Error> {
+    key_file(data_dir, "gateway-csrf.key")
+}
+
+/// The 32-byte key in `.vellum/keys/<name>`, created (readable by the owner
+/// only) on first use.
+///
+/// # Errors
+///
+/// The key folder cannot be created or the file cannot be written.
+pub fn key_file(data_dir: &Path, name: &str) -> Result<Vec<u8>, Error> {
     let dir = data_dir.join(".vellum").join("keys");
-    let path = dir.join("gateway-csrf.key");
+    let path = dir.join(name);
     let io = |e: std::io::Error| {
         Error::new(
             ErrorKind::Unavailable,
@@ -226,12 +247,28 @@ async fn shutdown_signal() {
     tracing::info!("shutdown signal received");
 }
 
+/// Where sign-in records live: with a database URL, in the database so
+/// every replica shares them (ADR 0037, D160), importing a single-binary
+/// `identity.json` the first time; otherwise in that file.
+fn identity_store(config: &Config) -> Result<Store, Error> {
+    let Some(url) = &config.database_url else {
+        return Store::open(&config.data_dir);
+    };
+    let store = Store::shared(IndexConfig::postgres(url.clone()))?;
+    if store.import_file(&config.data_dir)? {
+        tracing::info!(
+            "imported identity.json into the database; the file is now identity.json.imported"
+        );
+    }
+    Ok(store)
+}
+
 /// Runs the server until a shutdown signal.
 ///
 /// # Errors
 ///
 /// Configuration, key-file, TLS or listener errors.
-pub fn run(config_path: Option<&Path>) -> Result<(), Error> {
+pub fn run(config_path: Option<&Path>, observability: Observability) -> Result<(), Error> {
     let config = Config::load(config_path)
         .map_err(|e| Error::new(ErrorKind::InvalidInput, e.to_string()).with_source(e))?;
     let Edge {
@@ -243,6 +280,12 @@ pub fn run(config_path: Option<&Path>) -> Result<(), Error> {
     if let Some(scanner) = &scanner {
         tracing::info!(?scanner, "default upload virus scanner");
     }
+    if csrf_key.is_none() && config.database_url.is_some() {
+        tracing::warn!(
+            "VELLUM_CSRF_KEY is not set: each replica makes its own key, so forms \
+             fail when requests move between replicas; set it from a shared secret"
+        );
+    }
     gateway.csrf_key = match csrf_key {
         Some(key) => key,
         None => csrf_key_file(&config.data_dir)?,
@@ -253,10 +296,14 @@ pub fn run(config_path: Option<&Path>) -> Result<(), Error> {
         .map_err(|e| {
             Error::new(ErrorKind::Internal, "cannot start the async runtime").with_source(e)
         })?;
+    let store = identity_store(&config)?;
     let app_origin = gateway.app_origin.clone();
     runtime.block_on(async move {
-        let services = services::Services::open(&app_origin, Some(&config.data_dir))?
+        let services =
+            services::Services::open_with_store(&app_origin, Some(&config.data_dir), store)?
             .with_workspace(&config, |k| std::env::var(k).ok())
+            .await?
+            .with_admin(&config, observability, |k| std::env::var(k).ok())
             .await?;
         tracing::info!(services = ?services, "services ready");
         if !web::BUILT {
@@ -264,7 +311,13 @@ pub fn run(config_path: Option<&Path>) -> Result<(), Error> {
         }
         let gateway = app_gateway(&services, gateway)?;
         tracing::info!(bind = %serve_config.bind, app = %host_of(&config.public_url.clone().unwrap_or_default()), "starting vellum");
-        serve(gateway, serve_config, shutdown_signal()).await
+        // Live-editing sockets stay open until their rooms close, so save
+        // and close the rooms before the server waits for connections.
+        let stop = async move {
+            shutdown_signal().await;
+            services.shutdown().await;
+        };
+        serve(gateway, serve_config, stop).await
     })
 }
 
@@ -335,6 +388,10 @@ mod tests {
                 "VELLUM_HTTP_REDIRECT",
             ),
             (vec![("VELLUM_CSRF_KEY", "c2hvcnQ=")], "VELLUM_CSRF_KEY"),
+            (
+                vec![("VELLUM_CSRF_KEY_FILE", "/nonexistent/csrf")],
+                "VELLUM_CSRF_KEY_FILE",
+            ),
         ] {
             let err = edge_with(&vars)
                 .err()
@@ -342,6 +399,27 @@ mod tests {
                 .unwrap_or_default();
             assert!(err.starts_with(key), "{err}");
         }
+    }
+
+    #[test]
+    fn csrf_key_can_come_from_a_secret_file() -> Result<(), Error> {
+        let dir = std::env::temp_dir().join(format!("vellum-csrf-secret-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).map_err(|e| invalid("dir", e))?;
+        let path = dir.join("csrf");
+        let key = STANDARD.encode([9u8; 32]);
+        std::fs::write(&path, format!("{key}\n")).map_err(|e| invalid("write", e))?;
+        let path = path.display().to_string();
+        let e = edge_with(&[("VELLUM_CSRF_KEY_FILE", path.as_str())])?;
+        assert_eq!(e.csrf_key, Some(vec![9u8; 32]));
+        // The variable wins over the file.
+        let direct = STANDARD.encode([3u8; 32]);
+        let e = edge_with(&[
+            ("VELLUM_CSRF_KEY", direct.as_str()),
+            ("VELLUM_CSRF_KEY_FILE", path.as_str()),
+        ])?;
+        assert_eq!(e.csrf_key, Some(vec![3u8; 32]));
+        let _ = std::fs::remove_dir_all(&dir);
+        Ok(())
     }
 
     #[test]

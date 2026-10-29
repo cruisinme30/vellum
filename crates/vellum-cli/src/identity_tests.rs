@@ -19,16 +19,16 @@ use vellum_api::gateway::GatewayBuilder;
 
 use crate::services::{Services, VERSION};
 
-const ORIGIN: &str = "http://localhost";
+pub const ORIGIN: &str = "http://localhost";
 
-struct Reply {
-    status: StatusCode,
-    headers: http::HeaderMap,
-    text: String,
+pub struct Reply {
+    pub status: StatusCode,
+    pub headers: http::HeaderMap,
+    pub text: String,
 }
 
 impl Reply {
-    fn json(&self) -> Value {
+    pub fn json(&self) -> Value {
         serde_json::from_str(&self.text).unwrap_or(Value::Null)
     }
 }
@@ -45,7 +45,7 @@ fn app(data_dir: Option<&std::path::Path>) -> Router {
         .router()
 }
 
-async fn send(app: &Router, request: Request<Body>) -> Reply {
+pub async fn send(app: &Router, request: Request<Body>) -> Reply {
     let response = app.clone().oneshot(request).await.unwrap();
     let status = response.status();
     let headers = response.headers().clone();
@@ -57,14 +57,14 @@ async fn send(app: &Router, request: Request<Body>) -> Reply {
     }
 }
 
-fn request(method: &str, path: &str) -> http::request::Builder {
+pub fn request(method: &str, path: &str) -> http::request::Builder {
     Request::builder()
         .method(method)
         .uri(path)
         .header(header::HOST, "localhost")
 }
 
-fn json_request(method: &str, path: &str, body: &Value) -> http::request::Builder {
+pub fn json_request(method: &str, path: &str, body: &Value) -> http::request::Builder {
     request(method, path)
         .header(header::CONTENT_TYPE, "application/json")
         .header(header::ORIGIN, ORIGIN)
@@ -73,7 +73,7 @@ fn json_request(method: &str, path: &str, body: &Value) -> http::request::Builde
 
 /// Builds a JSON request; the body travels in a header above only to keep
 /// the builder chain readable, and is moved into the body here.
-fn finish(builder: http::request::Builder) -> Request<Body> {
+pub fn finish(builder: http::request::Builder) -> Request<Body> {
     let mut request = builder.body(Body::empty()).unwrap();
     if let Some(body) = request.headers_mut().remove("x-body") {
         *request.body_mut() = Body::from(body.as_bytes().to_vec());
@@ -86,7 +86,7 @@ fn cookie_of(reply: &Reply) -> String {
     set.split(';').next().unwrap().to_owned()
 }
 
-async fn csrf(app: &Router, cookie: &str) -> String {
+pub async fn csrf(app: &Router, cookie: &str) -> String {
     let reply = send(
         app,
         finish(request("GET", "/api/csrf").header(header::COOKIE, cookie)),
@@ -95,7 +95,7 @@ async fn csrf(app: &Router, cookie: &str) -> String {
     reply.json()["token"].as_str().unwrap().to_owned()
 }
 
-async fn signed_in_admin(app: &Router) -> String {
+pub async fn signed_in_admin(app: &Router) -> String {
     let setup = send(
         app,
         finish(json_request(
@@ -550,6 +550,33 @@ async fn break_glass_opens_a_short_admin_session_once() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// Live editing is mounted. A test request carries no connection to
+/// upgrade, so the socket handler answers 426 instead of a missing route.
+async fn live_editing_is_mounted(app: &axum::Router) {
+    let collab = format!(
+        "/collab/{}/{}",
+        vellum_kernel::SpaceId::generate(),
+        vellum_kernel::DocId::generate()
+    );
+    let anonymous = send(
+        app,
+        finish(
+            request("GET", &collab)
+                .header(header::CONNECTION, "upgrade")
+                .header(header::UPGRADE, "websocket")
+                .header(header::SEC_WEBSOCKET_VERSION, "13")
+                .header(header::SEC_WEBSOCKET_KEY, "AAAAAAAAAAAAAAAAAAAAAA=="),
+        ),
+    )
+    .await;
+    assert_eq!(
+        anonymous.status,
+        StatusCode::UPGRADE_REQUIRED,
+        "{}",
+        anonymous.text
+    );
+}
+
 /// `vellum serve` with a plaintext index: the workspace services answer a
 /// signed-in user and turn away anonymous callers.
 #[tokio::test(flavor = "multi_thread")]
@@ -593,6 +620,8 @@ async fn workspace_services_answer_signed_in_users() {
         "{}",
         anonymous.text
     );
+
+    live_editing_is_mounted(&app).await;
 
     let cookie = signed_in_admin(&app).await;
     for path in ["/api/v1/books", "/api/v1/collections", "/api/v1/work/teams"] {
@@ -656,6 +685,7 @@ async fn workspace_services_answer_signed_in_users() {
         }
     }
     assert!(seen.contains("external"), "no external version: {seen}");
+    services.shutdown().await;
     let _ = std::fs::remove_dir_all(&dir);
 }
 

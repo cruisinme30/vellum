@@ -27,15 +27,23 @@ fn pascal(id: &str) -> String {
         .unwrap_or_default()
 }
 
-/// Replaces `#/$defs/<name>` references using `names`.
-fn rewrite_refs(value: &Value, names: &BTreeMap<String, String>) -> Value {
+/// Replaces `#/$defs/<name>` references using `names`. A bare `#` is the
+/// root schema itself (a recursive type such as a task's subtasks), stored
+/// under `root`.
+fn rewrite_refs(value: &Value, names: &BTreeMap<String, String>, root: &str) -> Value {
     match value {
         Value::Object(map) => Value::Object(
             map.iter()
                 .map(|(k, v)| {
                     if let Some(name) = v
                         .as_str()
-                        .and_then(|r| r.strip_prefix("#/$defs/"))
+                        .and_then(|r| {
+                            if r == "#" {
+                                Some(root)
+                            } else {
+                                r.strip_prefix("#/$defs/")
+                            }
+                        })
                         .filter(|_| k == "$ref")
                     {
                         let target = names.get(name).map_or(name, String::as_str);
@@ -44,11 +52,13 @@ fn rewrite_refs(value: &Value, names: &BTreeMap<String, String>) -> Value {
                             Value::String(format!("#/components/schemas/{target}")),
                         );
                     }
-                    (k.clone(), rewrite_refs(v, names))
+                    (k.clone(), rewrite_refs(v, names, root))
                 })
                 .collect(),
         ),
-        Value::Array(items) => Value::Array(items.iter().map(|v| rewrite_refs(v, names)).collect()),
+        Value::Array(items) => {
+            Value::Array(items.iter().map(|v| rewrite_refs(v, names, root)).collect())
+        }
         other => other.clone(),
     }
 }
@@ -83,7 +93,7 @@ impl Components {
         loop {
             let mut changed = false;
             for (name, schema) in &all {
-                let rewritten = rewrite_refs(schema, &names);
+                let rewritten = rewrite_refs(schema, &names, &title);
                 let current = names.get(name).cloned().unwrap_or_else(|| name.clone());
                 if self
                     .schemas
@@ -108,7 +118,7 @@ impl Components {
         }
         for (name, schema) in &all {
             let target = names.get(name).cloned().unwrap_or_else(|| name.clone());
-            let rewritten = rewrite_refs(schema, &names);
+            let rewritten = rewrite_refs(schema, &names, &title);
             let _ = self.schemas.entry(target).or_insert(rewritten);
         }
         let target = names.get(&title).cloned().unwrap_or(title);
@@ -334,5 +344,22 @@ mod tests {
             json!({"$ref": "#/components/schemas/Fallback"})
         );
         assert_eq!(pascal("pages.create_draft"), "PagesCreateDraft");
+    }
+
+    #[test]
+    fn a_recursive_root_refers_to_its_own_component() {
+        let mut c = Components::default();
+        let task = json!({"title": "TaskView", "type": "object",
+            "properties": {"subtasks": {"type": "array", "items": {"$ref": "#"}}}});
+        assert_eq!(
+            c.add_root(&task, "F", "Tasks"),
+            json!({"$ref": "#/components/schemas/TaskView"})
+        );
+        assert_eq!(
+            c.schemas()
+                .get("TaskView")
+                .and_then(|t| t.pointer("/properties/subtasks/items/$ref")),
+            Some(&json!("#/components/schemas/TaskView"))
+        );
     }
 }

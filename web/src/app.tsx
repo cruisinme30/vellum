@@ -1,9 +1,11 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { lazy, Suspense, useEffect, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { BrowserRouter, Route, Routes } from "react-router";
 
+import { RequestsPage } from "./admin/requests/requests-page";
+import { RoutesPage } from "./admin/routes/routes-page";
 import type { AuthApi, AuthStatus } from "./api/auth";
 import { RequireSession, SessionProvider, useSession } from "./api/session";
 import { CollectionView } from "./collections/collection-view";
@@ -15,6 +17,9 @@ import { useServices, WorkspaceProvider } from "./data/workspace-context";
 import type { CollabConnector } from "./editor/collab/provider";
 import { I18nProvider, useT } from "./i18n/i18n";
 import { KeyboardRoot } from "./keyboard/keyboard-root";
+import { NotificationsProvider, type NotificationServices } from "./notifications/context";
+import { NotificationSettingsView } from "./notifications/notification-settings";
+import { createMockNotificationPreferencesStore } from "./notifications/preferences";
 import { AppShell } from "./shell/app-shell";
 import { AppearanceProvider } from "./theme/appearance-context";
 import { FavoritesView, HomeView } from "./views/home";
@@ -63,6 +68,7 @@ export function AppRoutes() {
         <Route path="search" element={<SearchView />} />
         <Route path="favorites" element={<FavoritesView />} />
         <Route path="inbox" element={<InboxView />} />
+        <Route path="settings/notifications" element={<NotificationSettingsView />} />
         <Route path="new" element={<NewPageView />} />
         {/* My Work lands with the tasks service; until then, mentions are the closest view. */}
         <Route path="my-work" element={<InboxView />} />
@@ -70,6 +76,8 @@ export function AppRoutes() {
         <Route path="data/:collectionId" element={<CollectionView />} />
         <Route path="help" element={<HelpView />} />
         <Route path="admin" element={<AdminView />} />
+        <Route path="admin/requests" element={<RequestsPage />} />
+        <Route path="admin/routes" element={<RoutesPage />} />
         <Route path="*" element={<NotFoundView />} />
       </Route>
     </Routes>
@@ -87,6 +95,8 @@ export interface AppServices {
   readonly collections: CollectionsStore;
   /** Present when a Vellum server answered; absent in demo mode. */
   readonly session?: { readonly auth: AuthApi; readonly status: AuthStatus } | undefined;
+  /** Notification settings; the Northstar demo's when absent. */
+  readonly notifications?: NotificationServices | undefined;
 }
 
 function MaybeSession({
@@ -130,15 +140,23 @@ export function AppProviders({
   collab,
   collections,
   session,
+  notifications,
   children,
 }: AppServices & { readonly children: ReactNode }) {
+  const [demoNotifications] = useState<NotificationServices>(() => ({
+    store: createMockNotificationPreferencesStore(),
+  }));
   return (
     <I18nProvider>
       <AppearanceProvider>
         <MaybeSession session={session}>
           <WorkspaceProvider store={store} collab={collab}>
             <SignedInUser>
-              <CollectionsProvider store={collections}>{children}</CollectionsProvider>
+              <CollectionsProvider store={collections}>
+                <NotificationsProvider services={notifications ?? demoNotifications}>
+                  {children}
+                </NotificationsProvider>
+              </CollectionsProvider>
             </SignedInUser>
           </WorkspaceProvider>
         </MaybeSession>

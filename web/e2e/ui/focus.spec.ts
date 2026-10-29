@@ -5,6 +5,7 @@ import type { Page } from "@playwright/test";
 
 import { expect, test } from "./fixtures";
 import { settle, type Problem, describe as lines } from "./harness";
+import { fakeServer } from "./server";
 import { TARGETS } from "./targets";
 
 /**
@@ -97,6 +98,7 @@ for (const target of TARGETS.filter((candidate) => !candidate.sweep)) {
   test(`${target.name} keyboard focus`, async ({ page, browserName, isMobile }, testInfo) => {
     // WebKit skips links on Tab unless the OS setting is on; phones have no Tab key.
     test.skip(browserName === "webkit" || isMobile, "no Tab navigation to test");
+    await fakeServer(page, target.server);
     await page.goto(target.url);
     await settle(page);
     const problems: Problem[] = [];

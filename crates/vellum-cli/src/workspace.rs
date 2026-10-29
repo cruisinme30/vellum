@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-//! The workspace services: the drive, collections, books and Work, over the
-//! files in the data folder, the index database and the permission engine.
+//! The workspace services: the drive, collections, books, Work, My Work and
+//! live editing, over the files in the data folder, the index database and the
+//! permission engine.
 //!
 //! `vellum serve` opens them when an index is configured: Postgres through
 //! the kernel's `database_url`, or the SQLite index in the data folder,
@@ -10,35 +11,72 @@
 //! `VELLUM_INDEX_PLAINTEXT=1`). Without one the server still starts, with
 //! sign-in only, and says why.
 //!
-//! At startup the drive rescans the data folder, and a file watcher then
-//! keeps the index in step with edits made outside Vellum (see
-//! [`crate::watcher`]).
+//! Workspace files live in the data folder, or in a shared S3 bucket when
+//! `VELLUM_BLOB_URL` names one (`s3://bucket[/prefix]`, with
+//! `VELLUM_S3_ENDPOINT`, `VELLUM_S3_REGION` and the `AWS_*` keys). Several
+//! replicas need the bucket and a Postgres index, so they all see one
+//! workspace and a restarted pod loses nothing.
+//!
+//! At startup the drive rescans the files. For a data folder, a file
+//! watcher then keeps the index in step with edits made outside Vellum
+//! (see [`crate::watcher`]); a bucket is only written through Vellum.
+//! Writes are announced in the index's change feed, and each replica
+//! follows it to keep its caches fresh (see [`crate::feed`]).
 
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
+use futures::StreamExt as _;
 use vellum_authz::{Authz, AuthzStore, Id, MemoryStore, SqlStore};
 use vellum_books_service::BooksService;
 use vellum_collections::CollectionsService;
-use vellum_contracts::{BoxFuture, Service};
+use vellum_contracts::{BoxFuture, Operation, Readiness, Service};
+use vellum_db::feed::Feed;
 use vellum_db::{Index, IndexConfig};
-use vellum_drive::authz::TreeSync;
+use vellum_drive::authz::{AuthzAccess as DriveAuthzAccess, TreeSync};
 use vellum_drive::sql::SqlIndex;
 use vellum_drive::{Drive, DriveIndex, DriveService};
 use vellum_identity::Identity;
 use vellum_kernel::{Config, Error, ErrorKind, UserId};
 use vellum_notify::service::NotifyStore;
-use vellum_store::{BlobPath, BlobStore, LocalStore};
+use vellum_store::remote::s3::{S3Config, S3Store};
+use vellum_store::{BlobPath, BlobStore, LocalStore, StoreError};
+use vellum_tasks::google::Google;
+use vellum_tasks::service::{Config as TasksConfig, TasksService};
 use vellum_work::{UserRef, WorkEvent};
 use vellum_work_service::{Directory, EventSink, SystemClock, WorkService};
 
+use crate::collab::Collab;
+use crate::feed::{AnnouncingStore, Caches};
+use crate::google_http::{self, Endpoints, FileLinks, GoogleHttp};
+use crate::page_render::{Handles, PageRenderService};
 use crate::reindex::{KEY_VAR, index_key};
+use crate::tasks::{DriveTasks, Parts, TasksSettings};
+
+/// The mail domain that receives My Work capture e-mail.
+pub const MAIL_DOMAIN_VAR: &str = "VELLUM_MAIL_DOMAIN";
+
+/// The Slack app's signing secret, for capture from Slack.
+pub const SLACK_SECRET_VAR: &str = "VELLUM_SLACK_SIGNING_SECRET";
+
+/// How often time blocks sync with Google Calendar.
+const GOOGLE_SYNC_EVERY: Duration = Duration::from_mins(5);
 
 /// Variable that opens the SQLite index without encryption.
 pub const PLAINTEXT_VAR: &str = "VELLUM_INDEX_PLAINTEXT";
 
-/// How often the space list behind permission checks is reloaded.
+/// Variable naming the shared blob store; unset keeps files in the data
+/// folder.
+pub const BLOB_URL_VAR: &str = "VELLUM_BLOB_URL";
+
+/// Folder the readiness probe lists. It is normally empty; any answer but
+/// an error means the store is reachable. Listing, unlike a lookup, does
+/// not log a missing file as an error on every probe.
+const PROBE: &str = ".vellum/ready";
+
+/// How often the space list behind permission checks is reloaded in full,
+/// as a backstop to the change feed.
 const SPACES_REFRESH: Duration = Duration::from_secs(30);
 
 fn unavailable(what: &str, e: impl std::fmt::Display) -> Error {
@@ -71,6 +109,93 @@ pub fn index_config(
     )))
 }
 
+/// Where the workspace files live.
+struct Files {
+    store: Arc<dyn BlobStore>,
+    /// A folder on this machine, which the file watcher can follow.
+    local: bool,
+}
+
+/// The shared bucket `VELLUM_BLOB_URL` names, or `None` to keep files in
+/// the data folder.
+///
+/// # Errors
+///
+/// A blob URL that is not `s3://`, or missing S3 settings.
+fn bucket(var: impl Fn(&str) -> Option<String>) -> Result<Option<S3Config>, Error> {
+    let Some(url) = var(BLOB_URL_VAR).filter(|v| !v.is_empty()) else {
+        return Ok(None);
+    };
+    if !url.starts_with("s3://") {
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            format!(
+                "{BLOB_URL_VAR} must be an s3:// URL; leave it unset to keep files in the data folder"
+            ),
+        ));
+    }
+    S3Config::from_vars(var).map(Some).map_err(|e| {
+        Error::new(
+            ErrorKind::InvalidInput,
+            format!("cannot use the blob store: {e}"),
+        )
+    })
+}
+
+/// Opens `bucket`, or the data folder when there is none.
+///
+/// # Errors
+///
+/// The S3 client cannot start, or the data folder cannot be opened.
+async fn open_files(config: &Config, bucket: Option<S3Config>) -> Result<Files, Error> {
+    let Some(bucket) = bucket else {
+        let store = LocalStore::open(&config.data_dir)
+            .await
+            .map_err(|e| unavailable("cannot open the data folder", e))?;
+        return Ok(Files {
+            store: Arc::new(store),
+            local: true,
+        });
+    };
+    let store = S3Store::new(bucket).map_err(|e| unavailable("cannot use the blob store", e))?;
+    Ok(Files {
+        store: Arc::new(store),
+        local: false,
+    })
+}
+
+/// Reports whether the blob store answers, for `/readyz`. It has no
+/// operations of its own.
+#[derive(Debug)]
+struct Storage(Arc<dyn BlobStore>);
+
+impl Service for Storage {
+    fn name(&self) -> &'static str {
+        "storage"
+    }
+
+    fn operations(self: Arc<Self>) -> Vec<Operation> {
+        Vec::new()
+    }
+
+    fn readiness(&self) -> BoxFuture<'_, Readiness> {
+        Box::pin(probe(self.0.as_ref()))
+    }
+}
+
+async fn probe(store: &dyn BlobStore) -> Readiness {
+    let Ok(path) = BlobPath::new(PROBE) else {
+        return Readiness::Ready;
+    };
+    match store.list(Some(&path)).next().await {
+        None | Some(Ok(_) | Err(StoreError::NotFound(_))) => Readiness::Ready,
+        Some(Err(e)) => Readiness::NotReady(format!(
+            "the {} blob store is unreachable: {e}",
+            store.backend()
+        )),
+    }
+}
+
 /// The spaces and their folders, newest first by folder depth, for the
 /// synchronous path-to-space lookup the permission adapters need.
 #[derive(Debug, Default)]
@@ -93,6 +218,49 @@ impl Spaces {
             .find(|(root, _)| path.starts_with(root))
             .map(|(_, id)| *id)
     }
+}
+
+/// Follows the change feed into this replica's caches, and reloads the
+/// space list in full every [`SPACES_REFRESH`] as a backstop.
+fn keep_fresh(
+    feed: Feed,
+    me: String,
+    cursor: i64,
+    workspace: &Workspace,
+    spaces: &Arc<Spaces>,
+    drive_index: Arc<SqlIndex>,
+) {
+    let (reload, from) = (Arc::clone(spaces), Arc::clone(&drive_index));
+    crate::feed::follow(
+        feed,
+        me,
+        cursor,
+        Caches {
+            collections: Arc::clone(&workspace.collections),
+            books: Arc::clone(&workspace.books),
+            spaces: Box::new(move || {
+                let (reload, from) = (Arc::clone(&reload), Arc::clone(&from));
+                Box::pin(async move {
+                    match load_spaces(from.as_ref()).await {
+                        Ok(list) => reload.replace(list),
+                        Err(error) => tracing::warn!(%error, "space list not reloaded"),
+                    }
+                })
+            }),
+        },
+    );
+    let refresh = Arc::clone(spaces);
+    drop(tokio::spawn(async move {
+        let mut tick = tokio::time::interval(SPACES_REFRESH);
+        tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        loop {
+            let _ = tick.tick().await;
+            match load_spaces(drive_index.as_ref()).await {
+                Ok(list) => refresh.replace(list),
+                Err(error) => tracing::warn!(%error, "space list not refreshed"),
+            }
+        }
+    }));
 }
 
 async fn load_spaces(drive: &dyn DriveIndex) -> Result<Vec<(BlobPath, Id)>, Error> {
@@ -138,13 +306,16 @@ impl EventSink for TracingSink {
     }
 }
 
-/// The opened services, plus the two the file watcher drives and Work,
-/// which the integration receivers act through.
+/// The opened services, plus the two the file watcher drives, collections
+/// for the change feed, and Work, which the integration receivers act
+/// through.
 struct Workspace {
     services: Vec<Arc<dyn Service>>,
     drive: Arc<Drive>,
+    collections: Arc<CollectionsService>,
     books: Arc<BooksService>,
     work: Arc<WorkService>,
+    tasks: Arc<TasksService>,
 }
 
 /// What `vellum serve` mounts for the workspace.
@@ -155,6 +326,50 @@ pub struct Opened {
     /// The integration receivers, to mount cross-site at `/hooks`, when an
     /// integration secret is set (see [`crate::integrations`]).
     pub hooks: Option<axum::Router>,
+    /// Live editing, when an index is configured.
+    pub collab: Option<Collab>,
+    /// My Work, which also serves the feed, CalDAV and capture routes.
+    pub tasks: Option<Arc<TasksService>>,
+}
+
+/// My Work's settings: where its secrets live and what it links to.
+pub struct TasksSetup {
+    /// The adapter's settings.
+    pub settings: TasksSettings,
+    /// The service's settings.
+    pub config: TasksConfig,
+    /// The Google `OAuth` client (ID and secret), for time-blocking.
+    pub google: Option<(String, String)>,
+}
+
+impl TasksSetup {
+    /// The settings for a server at `identity`'s public URL.
+    pub fn new(
+        identity: &Identity,
+        data_dir: Option<&Path>,
+        var: impl Fn(&str) -> Option<String>,
+    ) -> Self {
+        let url = identity.config().public_url.clone();
+        let mail_domain = var(MAIL_DOMAIN_VAR)
+            .or_else(|| url.host_str().map(str::to_owned))
+            .unwrap_or_else(|| "localhost".to_owned());
+        Self {
+            settings: TasksSettings {
+                dir: data_dir.map(|d| d.join(".vellum").join("tasks")),
+                time_zone: None,
+            },
+            config: TasksConfig {
+                base_url: url.as_str().trim_end_matches('/').to_owned(),
+                mail_domain,
+                slack_signing_secret: var(SLACK_SECRET_VAR)
+                    .filter(|s| !s.is_empty())
+                    .map(String::into_bytes),
+            },
+            google: var(google_http::CLIENT_ID_VAR)
+                .filter(|s| !s.is_empty())
+                .zip(var(google_http::CLIENT_SECRET_VAR).filter(|s| !s.is_empty())),
+        }
+    }
 }
 
 /// Builds the services over `store`, `authz` and the drive's `index`.
@@ -165,32 +380,37 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
     spaces: &Arc<Spaces>,
     identity: &Arc<Identity>,
     events: Arc<dyn EventSink>,
+    setup: TasksSetup,
 ) -> Result<Workspace, Error> {
     let drive = Arc::new(Drive::new(
         Arc::clone(&store),
         Arc::clone(&index),
         Arc::new(vellum_drive::authz::AuthzAccess::new(
             Arc::clone(&authz),
-            index,
+            Arc::clone(&index),
         )),
     ));
     let lookup = Arc::clone(spaces);
     let space_of: vellum_collections::service::SpaceOf =
         Arc::new(move |path: &BlobPath| lookup.of(path));
-    let collections = CollectionsService::new(
+    let collections = Arc::new(CollectionsService::new(
         Arc::clone(&store),
         Arc::new(vellum_collections::service::AuthzAccess::new(
             Arc::clone(&authz),
             Arc::clone(&space_of),
         )),
-    );
+    ));
     let books = Arc::new(BooksService::new(
         Arc::clone(&store),
-        Arc::new(vellum_books_service::AuthzAccess::new(authz, space_of)),
+        Arc::new(vellum_books_service::AuthzAccess::new(
+            Arc::clone(&authz),
+            space_of,
+        )),
     ));
+    let directory = Arc::new(IdentityDirectory(Arc::clone(identity)));
     let (work, report) = WorkService::open(
         Arc::clone(&store),
-        Arc::new(IdentityDirectory(Arc::clone(identity))),
+        Arc::clone(&directory) as Arc<dyn Directory>,
         events,
         Arc::new(SystemClock),
     )
@@ -202,16 +422,48 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
             "some Work files could not be read"
         );
     }
+    let adapter = DriveTasks::open(
+        Parts {
+            drive: Arc::clone(&drive),
+            store,
+            index,
+            authz,
+            identity: Arc::clone(identity),
+            work: Arc::clone(&work),
+        },
+        &setup.settings,
+    )?;
+    let mut tasks = TasksService::new(Arc::new(adapter), setup.config);
+    if let Some((id, secret)) = setup.google {
+        let api = GoogleHttp::new(Endpoints::google()?, id.clone(), secret)?;
+        let links = FileLinks::new(setup.settings.dir.map(|d| d.join("google")));
+        tasks = tasks.with_google(Google::new(Arc::new(api), Arc::new(links), id));
+    }
+    let tasks = Arc::new(tasks);
+    let handles: Handles = Arc::new(move |user| {
+        let directory = Arc::clone(&directory);
+        Box::pin(async move { directory.handle(user).await })
+    });
+    let pages = PageRenderService::new(
+        Arc::clone(&drive),
+        Arc::clone(&work),
+        handles,
+        PageRenderService::figures_from_env()?,
+    );
     Ok(Workspace {
         services: vec![
             Arc::new(DriveService::new(Arc::clone(&drive))),
-            Arc::new(collections),
+            Arc::clone(&collections) as Arc<dyn Service>,
             Arc::clone(&books) as Arc<dyn Service>,
             Arc::clone(&work) as Arc<dyn Service>,
+            Arc::clone(&tasks) as Arc<dyn Service>,
+            Arc::new(pages),
         ],
         drive,
+        collections,
         books,
         work,
+        tasks,
     })
 }
 
@@ -226,8 +478,11 @@ pub async fn open(
     config: &Config,
     identity: &Arc<Identity>,
     notify: &Arc<NotifyStore>,
+    app_origin: &str,
     var: impl Fn(&str) -> Option<String> + Send + Sync,
 ) -> Result<Opened, Error> {
+    let setup = TasksSetup::new(identity, Some(&config.data_dir), &var);
+    let bucket = bucket(&var)?;
     let index_config = match index_config(config, &var)? {
         Ok(c) => c,
         Err(why) => {
@@ -238,22 +493,38 @@ pub async fn open(
     let index = Index::open(&index_config)
         .await
         .map_err(|e| unavailable("cannot open the index", e))?;
-    let store: Arc<dyn BlobStore> = Arc::new(
-        LocalStore::open(&config.data_dir)
-            .await
-            .map_err(|e| unavailable("cannot open the data folder", e))?,
-    );
+    let Files {
+        store: files,
+        local,
+    } = open_files(config, bucket).await?;
+    if !local && matches!(index_config, IndexConfig::Sqlite { .. }) {
+        tracing::warn!(
+            "files are in a shared bucket but the index is this machine's SQLite file; \
+             run one replica only, or set a database URL"
+        );
+    }
+    tracing::info!(backend = files.backend(), "workspace files opened");
+    // Follow the feed from before anything is loaded, so no change made
+    // meanwhile is missed.
+    let feed = Feed::new(index.clone());
+    let me = crate::feed::origin(&var);
+    let cursor = feed
+        .head()
+        .await
+        .map_err(|e| unavailable("cannot read the change feed", e))?;
+    let store: Arc<dyn BlobStore> = Arc::new(AnnouncingStore::new(files, feed.clone(), &me));
     let authz = Arc::new(Authz::new(SqlStore::new(index.clone())));
-    let drive_index = Arc::new(SqlIndex::new(index));
+    let drive_index = Arc::new(SqlIndex::new(index.clone()));
     let spaces = Arc::new(Spaces::default());
     let (events, queued) = crate::notifications::channel();
     let workspace = build(
         Arc::clone(&store),
-        authz,
+        Arc::clone(&authz),
         Arc::clone(&drive_index) as Arc<dyn DriveIndex>,
         &spaces,
         identity,
         events,
+        setup,
     )
     .await?;
     crate::notifications::start(
@@ -264,28 +535,44 @@ pub async fn open(
     )?;
     // The watcher starts before the rescan, so nothing edited in between
     // is missed; whatever it sees twice is applied idempotently.
-    crate::watcher::start(&config.data_dir, &store, &workspace.drive, &workspace.books).await?;
+    if local {
+        crate::watcher::start(&config.data_dir, &store, &workspace.drive, &workspace.books).await?;
+    }
     match workspace.drive.scan().await {
-        Ok(report) => tracing::info!(?report, "drive index rebuilt from the data folder"),
+        Ok(report) => tracing::info!(?report, "drive index rebuilt from the workspace files"),
         Err(error) => tracing::warn!(%error, "drive rescan failed; the index may be stale"),
     }
     let hooks = crate::integrations::hooks(&store, &workspace.work, &var).await?;
+    let collab = Collab::open(
+        Arc::clone(&workspace.drive),
+        Arc::new(DriveAuthzAccess::new(
+            authz,
+            Arc::clone(&drive_index) as Arc<dyn DriveIndex>,
+        )),
+        index,
+        &config.data_dir,
+        app_origin,
+    )?;
     spaces.replace(load_spaces(drive_index.as_ref()).await?);
-    let refresh = Arc::clone(&spaces);
+    keep_fresh(feed, me, cursor, &workspace, &spaces, drive_index);
+    let timer = Arc::clone(&workspace.tasks);
     drop(tokio::spawn(async move {
-        let mut tick = tokio::time::interval(SPACES_REFRESH);
+        let mut tick = tokio::time::interval(GOOGLE_SYNC_EVERY);
         tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         loop {
             let _ = tick.tick().await;
-            match load_spaces(drive_index.as_ref()).await {
-                Ok(list) => refresh.replace(list),
-                Err(error) => tracing::warn!(%error, "space list not refreshed"),
+            if let Err(error) = timer.google_sync_all().await {
+                tracing::warn!(%error, "Google Calendar sync skipped");
             }
         }
     }));
+    let mut services = workspace.services;
+    services.push(Arc::new(Storage(store)));
     Ok(Opened {
-        services: workspace.services,
+        services,
         hooks,
+        collab: Some(collab),
+        tasks: Some(workspace.tasks),
     })
 }
 
@@ -306,6 +593,7 @@ pub async fn describe(
     );
     let authz = Arc::new(Authz::new(MemoryStore::new()));
     let index = Arc::new(vellum_drive::memory::MemoryIndex::new());
+    let setup = TasksSetup::new(identity, None, |_| None);
     let workspace = build(
         store,
         authz,
@@ -313,6 +601,7 @@ pub async fn describe(
         &Arc::new(Spaces::default()),
         identity,
         Arc::new(TracingSink),
+        setup,
     )
     .await?;
     Ok(workspace.services)
@@ -326,6 +615,66 @@ mod tests {
 
     fn path(p: &str) -> BlobPath {
         BlobPath::new(p).unwrap()
+    }
+
+    fn lookup<'a>(pairs: &'a [(&'a str, &'a str)]) -> impl Fn(&str) -> Option<String> + 'a {
+        move |name| {
+            pairs
+                .iter()
+                .find(|(k, _)| *k == name)
+                .map(|(_, v)| (*v).to_owned())
+        }
+    }
+
+    #[tokio::test]
+    async fn files_stay_local_unless_a_bucket_is_named() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut config = Config::default();
+        config.data_dir = dir.path().to_path_buf();
+        let none = bucket(lookup(&[(BLOB_URL_VAR, "")])).unwrap();
+        let local = open_files(&config, none).await.unwrap();
+        assert!(local.local);
+        assert_eq!(local.store.backend(), "local");
+        assert_eq!(probe(local.store.as_ref()).await, Readiness::Ready);
+
+        let named = bucket(lookup(&[
+            (BLOB_URL_VAR, "s3://vellum/ws"),
+            ("VELLUM_S3_ENDPOINT", "http://127.0.0.1:9"),
+            ("AWS_ACCESS_KEY_ID", "id"),
+            ("AWS_SECRET_ACCESS_KEY", "secret"),
+        ]))
+        .unwrap();
+        let shared = open_files(&config, named).await.unwrap();
+        assert!(!shared.local);
+        assert_eq!(shared.store.backend(), "s3");
+    }
+
+    #[test]
+    fn a_bad_blob_url_or_missing_keys_stop_startup() {
+        for vars in [
+            &[(BLOB_URL_VAR, "file:///data")][..],
+            &[(BLOB_URL_VAR, "s3://vellum")][..],
+        ] {
+            let error = bucket(lookup(vars)).err().unwrap();
+            assert_eq!(error.kind(), ErrorKind::InvalidInput);
+            assert!(!error.to_string().contains("secret"));
+        }
+    }
+
+    #[tokio::test]
+    async fn an_unreachable_bucket_is_not_ready() {
+        // Port 9 (discard) refuses connections on a test machine.
+        let store = S3Config::from_vars(lookup(&[
+            (BLOB_URL_VAR, "s3://vellum"),
+            ("VELLUM_S3_ENDPOINT", "http://127.0.0.1:9"),
+            ("AWS_ACCESS_KEY_ID", "id"),
+            ("AWS_SECRET_ACCESS_KEY", "secret"),
+        ]))
+        .and_then(S3Store::new)
+        .unwrap();
+        assert!(
+            matches!(probe(&store).await, Readiness::NotReady(reason) if reason.contains("s3"))
+        );
     }
 
     #[test]

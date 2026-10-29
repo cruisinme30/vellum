@@ -9,21 +9,36 @@
 //! generated from. `vellum docs` reads the help books built into the
 //! binary; `vellum mcp` serves the MCP server over stdio; `vellum reindex`
 //! rebuilds the index from the data folder; `vellum private` manages this
-//! device's key for end-to-end encrypted private spaces.
+//! device's key for end-to-end encrypted private spaces. `vellum profile`
+//! and `vellum budgets` ask a running server for a flame graph and for
+//! routes over their latency budget.
 
+mod admin;
+mod collab;
 mod docs;
+mod feed;
+mod google_http;
+#[cfg(test)]
+mod google_http_tests;
 mod identity;
 #[cfg(test)]
 mod identity_tests;
 mod integrations;
+mod keys;
 mod mcp;
 mod notifications;
+mod observability;
+mod page_render;
 mod private;
 #[cfg(test)]
 mod private_tests;
 mod reindex;
 mod serve;
 mod services;
+mod tasks;
+mod tasks_http;
+#[cfg(test)]
+mod tasks_tests;
 #[cfg(test)]
 mod typescript_tests;
 mod watcher;
@@ -76,6 +91,11 @@ enum Command {
     /// End-to-end encrypted private spaces on this device.
     #[command(subcommand)]
     Private(private::PrivateCommand),
+    /// Draw a flame graph of where a running server spends its time.
+    Profile(vellum_admin::profile::ProfileArgs),
+    /// Fail when a route's p95 latency is over its budget (a CI gate after
+    /// a load test).
+    Budgets(vellum_admin::budgets::BudgetsArgs),
 }
 
 /// Administration subcommands.
@@ -140,6 +160,18 @@ fn no_command() -> ExitCode {
     ExitCode::SUCCESS
 }
 
+/// Runs `f` with telemetry on, inside the `vellum.cli` span.
+fn with_telemetry(f: impl FnOnce() -> ExitCode) -> ExitCode {
+    let config = TelemetryConfig::from_env("vellum", env!("CARGO_PKG_VERSION"));
+    let _guard = match telemetry::init(&config) {
+        Ok(guard) => guard,
+        Err(error) => return fail(&error),
+    };
+    let span = tracing::info_span!("vellum.cli", version = env!("CARGO_PKG_VERSION"));
+    let _entered = span.enter();
+    f()
+}
+
 fn main() -> ExitCode {
     let cli = Cli::parse();
     let Some(command) = cli.command else {
@@ -176,6 +208,8 @@ fn main() -> ExitCode {
             let _entered = span.enter();
             reindex::run(&args)
         }
+        Command::Profile(args) => with_telemetry(|| admin::profile(&args)),
+        Command::Budgets(args) => with_telemetry(|| admin::budgets(&args)),
         Command::Openapi { typescript } => match services::contract_gateway() {
             Ok(gateway) if typescript => {
                 print(vellum_api::typescript::client(gateway.openapi()).trim_end())
@@ -191,11 +225,14 @@ fn main() -> ExitCode {
         },
         Command::Serve { config } => {
             let telemetry_config = TelemetryConfig::from_env("vellum", env!("CARGO_PKG_VERSION"));
-            let _guard = match telemetry::init(&telemetry_config) {
+            // The recorder fills the buffer behind Admin → Requests.
+            let observability = observability::Observability::new();
+            let recorder = Box::new(observability.recorder());
+            let _guard = match telemetry::init_with(&telemetry_config, Some(recorder)) {
                 Ok(guard) => guard,
                 Err(error) => return fail(&error),
             };
-            match serve::run(config.as_deref()) {
+            match serve::run(config.as_deref(), observability) {
                 Ok(()) => ExitCode::SUCCESS,
                 Err(error) => {
                     tracing::error!(error = %error, "vellum serve failed");

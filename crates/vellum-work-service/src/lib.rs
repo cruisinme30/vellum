@@ -13,6 +13,7 @@
 //! See ADR 0034 (D135 to D137).
 
 pub mod api;
+pub mod journal;
 pub mod ports;
 pub mod routes;
 mod service;
@@ -25,7 +26,7 @@ pub use ports::{Clock, Directory, EventLog, EventSink, FixedClock, StaticDirecto
 pub use service::embed::Outcome;
 pub use service::embeds::{EmbedGroup, EmbedIssue, EmbedResult, EmbedView};
 pub use service::live::LiveIssues;
-pub use service::{DEFAULT_LIST, LoadReport, MAX_LIST, WorkService};
+pub use service::{DEFAULT_LIST, LoadReport, MAX_LIST, READ_FRESH, WorkService};
 
 impl Service for WorkService {
     fn name(&self) -> &'static str {

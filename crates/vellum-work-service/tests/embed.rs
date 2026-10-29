@@ -43,7 +43,7 @@ async fn a_bot_command_is_written_announced_or_rolled_back() {
     )
     .unwrap();
     svc.transact(bot.clone(), |graph, _, _| {
-        graph.insert_team(team)?;
+        graph.insert_team(team.clone())?;
         let mut changes = Changes::default();
         let _ = changes.teams.insert(TeamKey::parse("ENG")?);
         Ok((changes, None, ()))

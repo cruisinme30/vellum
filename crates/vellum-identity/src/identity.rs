@@ -13,8 +13,8 @@ use subtle::ConstantTimeEq as _;
 use url::Url;
 use vellum_contracts::{CredentialKind, Principal, Scope, ScopeSet};
 use vellum_kernel::{Error, ErrorKind, Timestamp, UserId};
-use vellum_security::rate::Lockout;
 
+use crate::lockout::{Key, Lockouts};
 use crate::oauth::{ClientMetadataFetcher, NoMetadataFetch, OAuthState};
 use crate::password;
 use crate::secret::{self, Kind, SecretHash};
@@ -173,8 +173,7 @@ impl From<&User> for UserView {
 pub struct Identity {
     config: IdentityConfig,
     store: Store,
-    email_lockout: Lockout<String>,
-    ip_lockout: Lockout<IpAddr>,
+    lockouts: Lockouts,
     pub(crate) oauth: OAuthState,
     pub(crate) fetcher: Arc<dyn ClientMetadataFetcher>,
 }
@@ -256,8 +255,7 @@ impl Identity {
         Self {
             config,
             store,
-            email_lockout: Lockout::new(5, Duration::from_secs(1), Duration::from_mins(15)),
-            ip_lockout: Lockout::new(20, Duration::from_secs(1), Duration::from_mins(15)),
+            lockouts: Lockouts::new(),
             oauth: OAuthState::default(),
             fetcher: Arc::new(NoMetadataFetch),
         }
@@ -445,13 +443,13 @@ impl Identity {
         let now = Instant::now();
         let email = email.trim().to_lowercase();
         if let Some(ip) = ip {
-            self.ip_lockout
-                .check(&ip, now)
-                .map_err(|l| locked(l.retry_after))?;
+            self.lockouts
+                .check(&self.store, Key::Ip(ip), now)
+                .map_err(locked)?;
         }
-        self.email_lockout
-            .check(&email, now)
-            .map_err(|l| locked(l.retry_after))?;
+        self.lockouts
+            .check(&self.store, Key::Email(&email), now)
+            .map_err(locked)?;
         let user = self.store.read(|s| s.user_by_email(&email).cloned());
         let stored = user.as_ref().and_then(|u| u.password_hash.as_deref());
         let verified = stored.map_or_else(
@@ -466,14 +464,15 @@ impl Identity {
             // when the attempt began: otherwise a check slower than the
             // first wait (1 s) would let the next attempt straight through.
             let failed_at = Instant::now();
-            let _ = self.email_lockout.fail(&email, failed_at);
+            self.lockouts
+                .fail(&self.store, Key::Email(&email), failed_at);
             if let Some(ip) = ip {
-                let _ = self.ip_lockout.fail(&ip, failed_at);
+                self.lockouts.fail(&self.store, Key::Ip(ip), failed_at);
             }
             tracing::info!(event = "identity.sign_in_failed", "sign-in failed");
             return Err(wrong_credentials());
         };
-        self.email_lockout.succeed(&email);
+        self.lockouts.succeed(&self.store, Key::Email(&email));
         if user.disabled {
             return Err(Error::new(
                 ErrorKind::PermissionDenied,
@@ -904,9 +903,9 @@ impl Identity {
     ) -> Result<NewSession, Error> {
         let now = Instant::now();
         if let Some(ip) = ip {
-            self.ip_lockout
-                .check(&ip, now)
-                .map_err(|l| locked(l.retry_after))?;
+            self.lockouts
+                .check(&self.store, Key::Ip(ip), now)
+                .map_err(locked)?;
         }
         let refused = || {
             Error::new(
@@ -928,7 +927,7 @@ impl Identity {
         });
         if !valid {
             if let Some(ip) = ip {
-                let _ = self.ip_lockout.fail(&ip, now);
+                self.lockouts.fail(&self.store, Key::Ip(ip), now);
             }
             tracing::warn!(
                 event = "identity.break_glass_refused",

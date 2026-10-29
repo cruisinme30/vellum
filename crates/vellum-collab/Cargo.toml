@@ -22,10 +22,15 @@ async-trait = "0.1.89"
 axum = { version = "0.8.9", default-features = false, features = ["ws"] }
 bytes = "1.12.1"
 futures-util = { version = "0.3.31", default-features = false, features = ["sink", "std"] }
+hex = "0.4.3"
+hmac = "0.13.0"
 opentelemetry = "0.33.1"
 serde_json = { version = "1.0.154", features = ["preserve_order"] }
+sha2 = "0.11.1"
+subtle = "2.6.1"
 thiserror = "2.0.21"
 tokio = { version = "1.54.1", features = ["rt", "sync", "time", "macros"] }
+tokio-tungstenite = "0.29"
 tracing = "0.1.44"
 tracing-opentelemetry = "0.34.0"
 vellum-contracts = { path = "../vellum-contracts" }
@@ -42,4 +47,4 @@ axum = { version = "0.8.9", default-features = false, features = ["ws", "tokio",
 # proptest 1.12 moves to rand 0.10 while OpenTelemetry is on rand 0.9.
 proptest = ">=1.11.0, <1.12"
 tokio = { version = "1.54.1", features = ["rt-multi-thread", "net", "test-util"] }
-tokio-tungstenite = "0.30"
+tokio-tungstenite = "0.29"

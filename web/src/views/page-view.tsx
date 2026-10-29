@@ -150,6 +150,7 @@ export function PageView() {
           </dl>
           <PageEditor
             pageId={page.id}
+            spaceId={page.spaceId}
             seed={store.seedFor(page.id)}
             connector={collab}
             user={user}

@@ -306,11 +306,13 @@ impl ServiceWork {
 
     /// Runs one step in a transaction as `actor`. When the step fails,
     /// the service puts memory back and the step's own error is returned,
-    /// so a missing issue stays "not found" for the receiver.
+    /// so a missing issue stays "not found" for the receiver. The service
+    /// may run the step again when another replica committed first, so
+    /// it must not consume what it captures.
     async fn run<R: Send>(
         &self,
         actor: UserRef,
-        step: impl FnOnce(
+        mut step: impl FnMut(
             &mut vellum_work::WorkGraph,
             &mut vellum_work::Comments,
             &vellum_work::Ctx,
@@ -364,7 +366,7 @@ impl WorkCommands for ServiceWork {
         let span = tracing::info_span!("work.create_issue", team = %draft.team);
         tracing::Instrument::instrument(
             self.run(self.bot.clone(), |graph, _, ctx| {
-                let (key, changes) = steps::create_issue(graph, draft, ctx)?;
+                let (key, changes) = steps::create_issue(graph, draft.clone(), ctx)?;
                 Ok((changes.unwrap_or_default(), None, key))
             }),
             span,
@@ -559,7 +561,7 @@ mod tests {
         )
         .unwrap();
         work.transact(UserRef::parse("admin").unwrap(), |graph, _, _| {
-            graph.insert_team(team)?;
+            graph.insert_team(team.clone())?;
             let mut changes = Changes::default();
             let _ = changes.teams.insert(TeamKey::parse("ENG")?);
             Ok((changes, None, ()))

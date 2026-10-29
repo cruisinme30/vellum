@@ -135,9 +135,282 @@ export interface AddSection {
 }
 
 /**
+ * A finished backup.
+ */
+export interface AdminCreateBackupBackupInfo {
+  /**
+   * The backup file name.
+   */
+  name: string;
+  /**
+   * When it started.
+   */
+  created_at: Timestamp;
+  /**
+   * Files included.
+   */
+  files: number;
+  /**
+   * Plaintext bytes.
+   */
+  bytes: number;
+  /**
+   * Size of the backup file.
+   */
+  size: number;
+  /**
+   * How long it took, in milliseconds.
+   */
+  duration_ms: number;
+  /**
+   * Symbolic links skipped (never followed).
+   */
+  skipped_links: number;
+}
+
+/**
+ * No input.
+ */
+export type AdminCreateBackupEmpty = Record<string, unknown>;
+
+/**
+ * No input.
+ */
+export type AdminExportAuditEmpty = Record<string, unknown>;
+
+/**
+ * No input.
+ */
+export type AdminGetSettingsEmpty = Record<string, unknown>;
+
+/**
+ * No input.
+ */
+export type AdminListBackupsEmpty = Record<string, unknown>;
+
+/**
+ * The outcome of a restore drill.
+ */
+export interface AdminRunDrillDrillReport {
+  /**
+   * The backup drilled.
+   */
+  backup: string;
+  /**
+   * When the drill ran.
+   */
+  ran_at: Timestamp;
+  /**
+   * Whether every file restored and matched the manifest within the RTO.
+   */
+  passed: boolean;
+  /**
+   * Files verified.
+   */
+  files: number;
+  /**
+   * Bytes verified.
+   */
+  bytes: number;
+  /**
+   * Restore time in milliseconds.
+   */
+  duration_ms: number;
+  /**
+   * Whether the restore finished within [`RTO_SECONDS`].
+   */
+  within_rto: boolean;
+  /**
+   * Why the drill failed, when it did.
+   */
+  error?: string | null;
+}
+
+/**
+ * No input.
+ */
+export type AdminRunDrillEmpty = Record<string, unknown>;
+
+/**
+ * Every admin setting.
+ */
+export interface AdminSettings {
+  /**
+   * The organisation's display name.
+   */
+  organisation?: string;
+  /**
+   * Anonymous usage reporting.
+   */
+  telemetry?: TelemetrySettings;
+  /**
+   * Built-in observability.
+   */
+  observability?: ObservabilitySettings;
+  /**
+   * Backups.
+   */
+  backups?: BackupSettings;
+  /**
+   * Admin-session security.
+   */
+  security?: SecuritySettings;
+}
+
+/**
+ * No input.
+ */
+export type AdminSlosEmpty = Record<string, unknown>;
+
+/**
+ * Persistent scheduler state, kept in `.vellum/admin/state.json`.
+ */
+export interface AdminState {
+  /**
+   * The last successful backup.
+   */
+  last_backup?: BackupInfo | null;
+  /**
+   * The last restore drill, passed or not.
+   */
+  last_drill?: DrillReport | null;
+  /**
+   * When anonymous telemetry was last sent, Unix milliseconds.
+   */
+  last_telemetry_ms?: number | null;
+}
+
+/**
+ * No input.
+ */
+export type AdminStateEmpty = Record<string, unknown>;
+
+/**
+ * No input.
+ */
+export type AdminTelemetryPreviewEmpty = Record<string, unknown>;
+
+/**
+ * Every admin setting.
+ */
+export interface AdminUpdateSettingsAdminSettings {
+  /**
+   * The organisation's display name.
+   */
+  organisation?: string;
+  /**
+   * Anonymous usage reporting.
+   */
+  telemetry?: AdminUpdateSettingsTelemetrySettings;
+  /**
+   * Built-in observability.
+   */
+  observability?: ObservabilitySettings;
+  /**
+   * Backups.
+   */
+  backups?: BackupSettings;
+  /**
+   * Admin-session security.
+   */
+  security?: SecuritySettings;
+}
+
+/**
+ * Every admin setting.
+ */
+export interface AdminUpdateSettingsAdminSettings2 {
+  /**
+   * The organisation's display name.
+   */
+  organisation?: string;
+  /**
+   * Anonymous usage reporting.
+   */
+  telemetry?: AdminUpdateSettingsTelemetrySettings2;
+  /**
+   * Built-in observability.
+   */
+  observability?: ObservabilitySettings;
+  /**
+   * Backups.
+   */
+  backups?: BackupSettings;
+  /**
+   * Admin-session security.
+   */
+  security?: SecuritySettings;
+}
+
+/**
+ * Opt-in anonymous usage reporting.
+ */
+export interface AdminUpdateSettingsTelemetrySettings {
+  /**
+   * Whether reports are sent. Off until an admin turns it on.
+   */
+  enabled?: boolean;
+  /**
+   * Where reports go (HTTPS).
+   */
+  endpoint?: string | null;
+  /**
+   * A random id for this installation, unrelated to anything else.
+   */
+  install_id?: string;
+  /**
+   * Hours between reports.
+   */
+  interval_hours?: number;
+}
+
+/**
+ * Opt-in anonymous usage reporting.
+ */
+export interface AdminUpdateSettingsTelemetrySettings2 {
+  /**
+   * Whether reports are sent. Off until an admin turns it on.
+   */
+  enabled?: boolean;
+  /**
+   * Where reports go (HTTPS).
+   */
+  endpoint?: string | null;
+  /**
+   * A random id for this installation, unrelated to anything else.
+   */
+  install_id?: string;
+  /**
+   * Hours between reports.
+   */
+  interval_hours?: number;
+}
+
+/**
+ * Settings with the version they were stored at.
+ */
+export interface AdminUpdateSettingsVersioned {
+  /**
+   * Increases by one on every save; 0 before the first.
+   */
+  version: number;
+  /**
+   * The settings.
+   */
+  settings: AdminUpdateSettingsAdminSettings2;
+}
+
+/**
+ * No input.
+ */
+export type AdminVerifyAuditEmpty = Record<string, unknown>;
+
+/**
  * How rollups combine the related rows' values.
  */
 export type Aggregation = "count" | "sum" | "avg" | "min" | "max" | "checked" | "pct" | "unique" | "show";
+
+export type AnyValue = unknown;
 
 /**
  * The JSON body of every error response, REST and GraphQL alike
@@ -259,6 +532,93 @@ export interface AssignmentsOut {
 export type At = "before" | "after" | "first_child_of" | "last_child_of" | "start" | "end";
 
 /**
+ * Who acted, as recorded. Mirrors `vellum_kernel::Actor` with the API
+ * token or MCP client when there is one.
+ */
+export interface AuditActor {
+  /**
+   * `user`, `model`, `api_token`, `break_glass`, `external` or `system`.
+   */
+  kind: string;
+  /**
+   * The person, when there is one.
+   */
+  user_id?: string | null;
+  /**
+   * The API token, MCP client or session that carried the call.
+   */
+  via?: string | null;
+}
+
+/**
+ * The audit log as JSON Lines.
+ */
+export interface AuditExport {
+  /**
+   * One record per line, oldest first.
+   */
+  jsonl: string;
+}
+
+/**
+ * Audit records, newest first.
+ */
+export interface AuditList {
+  /**
+   * The records.
+   */
+  records: AuditRecord[];
+}
+
+/**
+ * Filters for [`AuditLog::list`].
+ */
+export interface AuditQuery {
+  /**
+   * Only this action.
+   */
+  action?: string | null;
+  /**
+   * Only this person.
+   */
+  user_id?: string | null;
+  /**
+   * Only records before this sequence number (paging cursor).
+   */
+  before?: number | null;
+  /**
+   * At most this many records (default 100, capped at [`MAX_LIST`]).
+   */
+  limit?: number | null;
+}
+
+/**
+ * A stored, chained record.
+ */
+export interface AuditRecord {
+  /**
+   * Position in the log, from 1.
+   */
+  seq: number;
+  /**
+   * When it was appended.
+   */
+  at: Timestamp;
+  /**
+   * The event.
+   */
+  event: NewAuditEvent;
+  /**
+   * The previous record's hash, or [`GENESIS`].
+   */
+  prev_hash: string;
+  /**
+   * SHA-256 over `prev_hash` and this record's canonical JSON.
+   */
+  hash: string;
+}
+
+/**
  * Who is calling and what the workspace needs.
  */
 export interface AuthStatus {
@@ -278,6 +638,91 @@ export interface AuthStatus {
    * The caller's scopes.
    */
   scopes: Scope[];
+}
+
+/**
+ * A backup file on disk.
+ */
+export interface BackupFile {
+  /**
+   * The file name.
+   */
+  name: string;
+  /**
+   * Its size in bytes.
+   */
+  size: number;
+}
+
+/**
+ * A finished backup.
+ */
+export interface BackupInfo {
+  /**
+   * The backup file name.
+   */
+  name: string;
+  /**
+   * When it started.
+   */
+  created_at: Timestamp;
+  /**
+   * Files included.
+   */
+  files: number;
+  /**
+   * Plaintext bytes.
+   */
+  bytes: number;
+  /**
+   * Size of the backup file.
+   */
+  size: number;
+  /**
+   * How long it took, in milliseconds.
+   */
+  duration_ms: number;
+  /**
+   * Symbolic links skipped (never followed).
+   */
+  skipped_links: number;
+}
+
+/**
+ * The backups on disk, newest first.
+ */
+export interface BackupList {
+  /**
+   * The backups.
+   */
+  backups: BackupFile[];
+}
+
+/**
+ * Scheduled encrypted backups.
+ */
+export interface BackupSettings {
+  /**
+   * Whether scheduled backups run.
+   */
+  enabled?: boolean;
+  /**
+   * Hours between backups.
+   */
+  interval_hours?: number;
+  /**
+   * Backups kept; older ones are deleted.
+   */
+  keep?: number;
+  /**
+   * Directory backups are written to; relative paths are under the
+   * data directory.
+   */
+  destination?: string;
+  /**
+   * Days between automatic restore drills (brief §11: monthly).
+   */
+  drill_interval_days?: number;
 }
 
 /**
@@ -487,6 +932,11 @@ export interface BriefOut {
 }
 
 /**
+ * A bucket of the view.
+ */
+export type BucketName = "inbox" | "today" | "evening" | "upcoming" | "anytime" | "someday" | "done";
+
+/**
  * One breakdown value.
  */
 export interface BucketOut {
@@ -502,6 +952,28 @@ export interface BucketOut {
    * Per interval, when asked for; every interval is present.
    */
   series: PointOut[];
+}
+
+/**
+ * The budgets for every route.
+ */
+export interface Budgets {
+  /**
+   * The p95 budget for reads without a rule, in milliseconds.
+   */
+  read_ms?: number;
+  /**
+   * The p95 budget for writes without a rule, in milliseconds.
+   */
+  write_ms?: number;
+  /**
+   * Routes with fewer requests in the window are not judged.
+   */
+  min_requests?: number;
+  /**
+   * Budgets for particular routes.
+   */
+  routes?: RouteBudget[];
 }
 
 /**
@@ -571,6 +1043,38 @@ export interface CellView {
    * The inline error, if the cell failed to compute.
    */
   error?: CellError | null;
+}
+
+/**
+ * Where and how the chain is broken.
+ */
+export interface ChainBreak {
+  /**
+   * The sequence number where the problem was found.
+   */
+  seq: number;
+  /**
+   * What is wrong.
+   */
+  reason: string;
+}
+
+/**
+ * The result of checking the chain.
+ */
+export interface ChainReport {
+  /**
+   * Records checked.
+   */
+  records: number;
+  /**
+   * The head hash.
+   */
+  head: string;
+  /**
+   * The first problem found, if any.
+   */
+  broken_at?: ChainBreak | null;
 }
 
 /**
@@ -1065,6 +1569,34 @@ export interface CommentResult {
 }
 
 /**
+ * Completing a task.
+ */
+export interface CompleteInput {
+  /**
+   * The task ID.
+   */
+  task: string;
+  /**
+   * Also complete its open subtasks.
+   */
+  cascade?: boolean;
+}
+
+/**
+ * The result of completing a task.
+ */
+export interface CompleteView {
+  /**
+   * The task after the change.
+   */
+  task: TaskView;
+  /**
+   * For a repeating task: the date it moved to. It stays open.
+   */
+  next?: string | null;
+}
+
+/**
  * Every property of one row, stored and computed, by key.
  */
 export interface ComputedRow {
@@ -1137,6 +1669,25 @@ export interface CreateFromCsvInput {
 }
 
 /**
+ * A new task.
+ */
+export interface CreateInput {
+  /**
+   * The quick-add line: title plus phrases such as `tomorrow 3pm`,
+   * `every weekday`, `#list`, `@label`, `+person`, `p1`.
+   */
+  text: string;
+  /**
+   * The list to add to when the line names none; the Inbox otherwise.
+   */
+  list?: string | null;
+  /**
+   * A task ID to add a subtask under.
+   */
+  parent?: string | null;
+}
+
+/**
  * A new issue.
  */
 export interface CreateIssue {
@@ -1200,6 +1751,16 @@ export interface CreateIssue {
    * Intake (form, email, Slack): goes to triage when the team uses it.
    */
   intake?: boolean;
+}
+
+/**
+ * A new list.
+ */
+export interface CreateListInput {
+  /**
+   * Its title.
+   */
+  title: string;
 }
 
 /**
@@ -1498,6 +2059,16 @@ export interface DateSpan {
 export type DateValue = string;
 
 /**
+ * A removed task.
+ */
+export interface DeletedView {
+  /**
+   * Its ID.
+   */
+  id: string;
+}
+
+/**
  * A problem found while loading files or importing CSV.
  *
  * Loading never fails on a bad row: the row still loads, the offending
@@ -1627,6 +2198,16 @@ export interface DiffSection {
 }
 
 /**
+ * The daily digest.
+ */
+export interface DigestView {
+  /**
+   * Vellum Markdown, or nothing when the day is clear.
+   */
+  markdown?: string | null;
+}
+
+/**
  * A DocId as a 26-character ULID.
  */
 export type DocId = string;
@@ -1639,6 +2220,44 @@ export interface Done {
    * Always `true`.
    */
   ok: boolean;
+}
+
+/**
+ * The outcome of a restore drill.
+ */
+export interface DrillReport {
+  /**
+   * The backup drilled.
+   */
+  backup: string;
+  /**
+   * When the drill ran.
+   */
+  ran_at: Timestamp;
+  /**
+   * Whether every file restored and matched the manifest within the RTO.
+   */
+  passed: boolean;
+  /**
+   * Files verified.
+   */
+  files: number;
+  /**
+   * Bytes verified.
+   */
+  bytes: number;
+  /**
+   * Restore time in milliseconds.
+   */
+  duration_ms: number;
+  /**
+   * Whether the restore finished within [`RTO_SECONDS`].
+   */
+  within_rto: boolean;
+  /**
+   * Why the drill failed, when it did.
+   */
+  error?: string | null;
 }
 
 /**
@@ -2320,6 +2939,52 @@ export interface FieldOut {
 }
 
 /**
+ * A task's fields as strings, in the attribute-span syntax (D82).
+ */
+export interface FieldsView {
+  /**
+   * `evening`, `anytime` or `someday`.
+   */
+  when?: string | null;
+  /**
+   * Start date, `YYYY-MM-DD`.
+   */
+  start?: string | null;
+  /**
+   * Deadline, `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM`.
+   */
+  due?: string | null;
+  /**
+   * RFC 5545 repeat rule, without `RRULE:`.
+   */
+  rrule?: string | null;
+  /**
+   * `completion` when the next date counts from completion.
+   */
+  recur_from?: string | null;
+  /**
+   * Reminders: ISO durations relative to the deadline, or local times.
+   */
+  remind: string[];
+  /**
+   * Priority 1 (highest) to 4.
+   */
+  priority?: number | null;
+  /**
+   * Labels.
+   */
+  labels: string[];
+  /**
+   * When it was completed (UTC).
+   */
+  done_at?: string | null;
+  /**
+   * A time block: local start and minutes, `2026-11-03T15:00/90`.
+   */
+  block?: string | null;
+}
+
+/**
  * Search filters; every filter given must match.
  */
 export interface FindInput {
@@ -2408,6 +3073,20 @@ export interface FormsOut {
 }
 
 /**
+ * Whether Google Calendar is set up and connected.
+ */
+export interface GoogleView {
+  /**
+   * Whether the server has a Google `OAuth` client.
+   */
+  configured: boolean;
+  /**
+   * Whether the person has connected their calendar.
+   */
+  connected: boolean;
+}
+
+/**
  * A group of rows (one board column or table section).
  */
 export interface Group {
@@ -2437,6 +3116,24 @@ export interface GroupOut {
    * The issues, in order.
    */
   issues: IssueOut[];
+}
+
+/**
+ * A phrase to highlight in the quick-add box.
+ */
+export interface HighlightView {
+  /**
+   * Start, in UTF-16 code units (`JavaScript` string indices).
+   */
+  start: number;
+  /**
+   * End, exclusive, in UTF-16 code units.
+   */
+  end: number;
+  /**
+   * What it set.
+   */
+  kind: TasksParseTokenView;
 }
 
 /**
@@ -2611,6 +3308,57 @@ export interface ImportCsvInput {
 }
 
 /**
+ * Which app an export comes from.
+ */
+export type ImportFrom = "google_tasks" | "todoist" | "things";
+
+/**
+ * An export to import.
+ */
+export interface ImportInput {
+  /**
+   * The app.
+   */
+  from: ImportFrom;
+  /**
+   * The export's text.
+   */
+  content: string;
+  /**
+   * The list title for a Todoist CSV, which does not name its project.
+   */
+  project?: string | null;
+}
+
+/**
+ * The result of an import.
+ */
+export interface ImportView {
+  /**
+   * The lists written.
+   */
+  lists: ImportedList[];
+}
+
+/**
+ * One list written by an import.
+ */
+export interface ImportedList {
+  /**
+   * The list's document.
+   */
+  doc: DocId;
+  /**
+   * Its title.
+   */
+  title: string;
+  /**
+   * How many items were added; items already imported are skipped.
+   */
+  added: number;
+}
+
+/**
  * An inbox line, as the API shows it.
  */
 export interface InboxItem {
@@ -2674,6 +3422,20 @@ export interface InboxQuery {
    * Only unread lines.
    */
   unread_only?: boolean;
+}
+
+/**
+ * What the browser reported, joined to its server trace.
+ */
+export interface IngestedOutput {
+  /**
+   * Spans added.
+   */
+  spans: number;
+  /**
+   * Whether the server trace was still in the buffer.
+   */
+  joined: boolean;
 }
 
 /**
@@ -2923,6 +3685,46 @@ export interface ListComments {
 }
 
 /**
+ * A task list.
+ */
+export interface ListView {
+  /**
+   * The list's document.
+   */
+  doc: DocId;
+  /**
+   * The title.
+   */
+  title: string;
+  /**
+   * Whether it is the person's Inbox.
+   */
+  inbox: boolean;
+  /**
+   * The owner's handle.
+   */
+  owner?: string | null;
+  /**
+   * Members' handles.
+   */
+  members: string[];
+  /**
+   * How many open items it holds.
+   */
+  open: number;
+}
+
+/**
+ * The person's task lists.
+ */
+export interface ListsView {
+  /**
+   * Inbox first, then by title.
+   */
+  lists: ListView[];
+}
+
+/**
  * Which lines to mark read.
  */
 export interface MarkRead {
@@ -2934,6 +3736,35 @@ export interface MarkRead {
    * Every line instead.
    */
   all?: boolean;
+}
+
+/**
+ * Sharing a list.
+ */
+export interface MemberInput {
+  /**
+   * The list's document.
+   */
+  list_id: DocId;
+  /**
+   * The person's handle, with or without `@`.
+   */
+  member: string;
+}
+
+/**
+ * Dragging a task to another bucket.
+ */
+export interface MoveInput {
+  /**
+   * The task ID.
+   */
+  task: string;
+  /**
+   * `inbox`, `today`, `evening`, `anytime`, `someday` or a date
+   * (`YYYY-MM-DD`). Moves the start date; the deadline stays.
+   */
+  to: string;
 }
 
 /**
@@ -2996,6 +3827,58 @@ export interface MyIssuesOut {
    * Issues in focus order.
    */
   issues: FocusedIssue[];
+}
+
+/**
+ * My Work for the signed-in person.
+ */
+export interface MyWorkView {
+  /**
+   * The person's local date.
+   */
+  today: string;
+  /**
+   * How many open tasks the view shows.
+   */
+  open: number;
+  /**
+   * The sections in order; empty ones are left out.
+   */
+  sections: SectionView[];
+}
+
+/**
+ * An event to append.
+ */
+export interface NewAuditEvent {
+  /**
+   * Who acted.
+   */
+  actor: AuditActor;
+  /**
+   * What they did, as `<service>.<action>`, such as `admin.settings_update`.
+   */
+  action: string;
+  /**
+   * What they acted on, such as a document or setting id.
+   */
+  target?: string | null;
+  /**
+   * How it ended.
+   */
+  outcome: Outcome;
+  /**
+   * The request id shown to the user.
+   */
+  request_id?: string | null;
+  /**
+   * The W3C trace id, to open the request in Admin → Requests.
+   */
+  trace_id?: string | null;
+  /**
+   * Action-specific details; never document content or secrets.
+   */
+  details: Record<string, unknown>;
 }
 
 /**
@@ -3099,6 +3982,97 @@ export type NumberFormat = "plain" | "percent";
 export type ObjectId = string;
 
 /**
+ * The built-in observability tools.
+ */
+export interface ObservabilitySettings {
+  /**
+   * Traces kept for Admin → Requests.
+   */
+  trace_buffer_capacity?: number;
+  /**
+   * Memory budget for those traces, in `MiB`.
+   */
+  trace_buffer_mib?: number;
+  /**
+   * Requests slower than this are highlighted, in milliseconds.
+   */
+  slow_request_ms?: number;
+  /**
+   * The p95 latency budget of every route (R-OB-4).
+   */
+  budgets?: Budgets;
+}
+
+/**
+ * How an audited action ended.
+ */
+export type Outcome = "success" | "denied" | "failure";
+
+/**
+ * One heading of the page outline.
+ */
+export interface OutlineEntry {
+  /**
+   * 1 to 6.
+   */
+  level: number;
+  /**
+   * The element id, for `#fragment` links.
+   */
+  id: string;
+  /**
+   * The heading text.
+   */
+  text: string;
+}
+
+/**
+ * Names a page.
+ */
+export interface PageKey {
+  /**
+   * The page.
+   */
+  id: ObjectId;
+}
+
+/**
+ * A quick-add line to parse.
+ */
+export interface ParseInput {
+  /**
+   * The line as typed.
+   */
+  text: string;
+}
+
+/**
+ * A parsed quick-add line.
+ */
+export interface ParseView {
+  /**
+   * The title without the recognised phrases.
+   */
+  title: string;
+  /**
+   * The fields the phrases set.
+   */
+  fields: FieldsView;
+  /**
+   * The list named with `#list`.
+   */
+  list?: string | null;
+  /**
+   * People named with `+person`.
+   */
+  assignees: string[];
+  /**
+   * Phrases to highlight.
+   */
+  highlights: HighlightView[];
+}
+
+/**
  * Where to move or copy an item.
  */
 export interface PlaceInput {
@@ -3151,6 +4125,34 @@ export interface PreferencesView {
    * Non-urgent push and email are held until this time (RFC 3339).
    */
   snoozed_until?: string | null;
+}
+
+/**
+ * What to profile.
+ */
+export interface ProfileInput {
+  /**
+   * How far back to look, in seconds (default 60).
+   */
+  seconds?: number | null;
+  /**
+   * Only this route template.
+   */
+  route?: string | null;
+}
+
+/**
+ * The profile endpoint's response.
+ */
+export interface ProfileResponse {
+  /**
+   * Folded stacks, one `frame;frame;frame microseconds` line each.
+   */
+  folded: string;
+  /**
+   * Traces included.
+   */
+  traces: number;
 }
 
 /**
@@ -3520,6 +4522,100 @@ export interface RenameInput {
 }
 
 /**
+ * Something on the page that rendered with a fallback.
+ */
+export interface RenderWarning {
+  /**
+   * The top-level block it came from, from 0.
+   */
+  block: number;
+  /**
+   * What happened, for the author.
+   */
+  message: string;
+}
+
+/**
+ * A page rendered for the reader.
+ */
+export interface RenderedPageView {
+  /**
+   * The page.
+   */
+  id: ObjectId;
+  /**
+   * The front matter title, or the first level-1 heading.
+   */
+  title?: string | null;
+  /**
+   * Sanitised HTML: one `<article class="vl-doc">`, styled by the theme
+   * stylesheet's `--vl-*` variables.
+   */
+  html: string;
+  /**
+   * The page outline.
+   */
+  outline: OutlineEntry[];
+  /**
+   * Blocks that rendered with a fallback.
+   */
+  warnings: RenderWarning[];
+  /**
+   * Diagrams shown from their last good picture because the diagram
+   * server was unavailable.
+   */
+  stale_figures: number;
+  /**
+   * A strong `ETag` of the HTML (`sha256-…`).
+   */
+  etag: string;
+  /**
+   * The renderer version that produced it.
+   */
+  render_version: number;
+}
+
+/**
+ * Filters for the request list.
+ */
+export interface RequestsInput {
+  /**
+   * Only this route template.
+   */
+  route?: string | null;
+  /**
+   * Only requests at least this long, in milliseconds.
+   */
+  min_duration_ms?: number | null;
+  /**
+   * Only failed requests.
+   */
+  errors_only?: boolean;
+  /**
+   * A request id or trace id.
+   */
+  id?: string | null;
+  /**
+   * Only requests older than this cursor.
+   */
+  before?: number | null;
+  /**
+   * At most this many rows (up to 500).
+   */
+  limit?: number | null;
+}
+
+/**
+ * The request list, newest first.
+ */
+export interface RequestsOutput {
+  /**
+   * One summary per request.
+   */
+  requests: unknown[];
+}
+
+/**
  * Resolve or reopen a thread.
  */
 export interface ResolveThread {
@@ -3549,6 +4645,51 @@ export interface RollupInfo {
    * How values are combined.
    */
   agg: Aggregation;
+}
+
+/**
+ * A budget for one route, or every route under a prefix.
+ */
+export interface RouteBudget {
+  /**
+   * The HTTP method, or every method when absent.
+   */
+  method?: string | null;
+  /**
+   * A route template such as `/v1/pages/{id}`, or a prefix ending in
+   * `*` such as `/v1/export/*`.
+   */
+  route: string;
+  /**
+   * The p95 budget in milliseconds.
+   */
+  p95_ms: number;
+}
+
+/**
+ * Live RED and saturation figures for the console.
+ */
+export interface RoutesView {
+  /**
+   * The window in minutes.
+   */
+  minutes: number;
+  /**
+   * Per-route figures, busiest first.
+   */
+  routes: unknown[];
+  /**
+   * Requests in progress.
+   */
+  in_flight: number;
+  /**
+   * Process memory and CPU.
+   */
+  process: unknown;
+  /**
+   * The ring buffer's counters.
+   */
+  buffer: unknown;
 }
 
 /**
@@ -3751,6 +4892,16 @@ export interface SaveViewInput {
 export type Scope = "read" | "write:draft" | "write:direct" | "work" | "admin";
 
 /**
+ * A newly issued secret URL or address. It is shown once.
+ */
+export interface SecretView {
+  /**
+   * The feed URL or capture address.
+   */
+  value: string;
+}
+
+/**
  * Who may see, own and review a section.
  */
 export interface SectionAccessInfo {
@@ -3835,6 +4986,42 @@ export interface SectionKey {
    * The section (its front-matter ID).
    */
   section_id: string;
+}
+
+/**
+ * One section of My Work.
+ */
+export interface SectionView {
+  /**
+   * The bucket.
+   */
+  bucket: BucketName;
+  /**
+   * For Upcoming: the day (`YYYY-MM-DD`) within the next seven.
+   */
+  day?: string | null;
+  /**
+   * For Upcoming: the Monday of a later week.
+   */
+  week_of?: string | null;
+  /**
+   * The tasks, in display order.
+   */
+  tasks: TaskView[];
+}
+
+/**
+ * Admin-session security.
+ */
+export interface SecuritySettings {
+  /**
+   * Admin actions need a sign-in this recent, in minutes.
+   */
+  fresh_auth_minutes?: number;
+  /**
+   * Session lifetime in hours.
+   */
+  session_hours?: number;
 }
 
 /**
@@ -3929,6 +5116,20 @@ export interface SetSectionAccess {
 }
 
 /**
+ * New settings and the version they replace.
+ */
+export interface SettingsUpdate {
+  /**
+   * The version read; the save fails if someone saved since.
+   */
+  expected_version: number;
+  /**
+   * The settings.
+   */
+  settings: AdminUpdateSettingsAdminSettings;
+}
+
+/**
  * A space's settings.
  */
 export interface SettingsView {
@@ -4016,6 +5217,16 @@ export interface SlaOut {
    * gray, yellow, orange or red.
    */
   risk: string;
+}
+
+/**
+ * The SLOs.
+ */
+export interface SlosOutput {
+  /**
+   * Each SLO with its burn rates and remaining budget.
+   */
+  slos: unknown[];
 }
 
 /**
@@ -4297,6 +5508,36 @@ export interface SuggestionOut {
 }
 
 /**
+ * What a sync did.
+ */
+export interface SyncView {
+  /**
+   * Events created for tasks.
+   */
+  created: number;
+  /**
+   * Events updated from tasks.
+   */
+  updated: number;
+  /**
+   * Events deleted.
+   */
+  deleted: number;
+  /**
+   * Tasks moved because their event moved.
+   */
+  moved: number;
+  /**
+   * Tasks whose event was deleted, so they lost their block.
+   */
+  unblocked: number;
+  /**
+   * Tasks added from new events.
+   */
+  adopted: number;
+}
+
+/**
  * What a thread is on.
  */
 export interface TargetOut {
@@ -4312,6 +5553,436 @@ export interface TargetOut {
    * The block ID, for a block.
    */
   block?: string | null;
+}
+
+/**
+ * Where a task comes from.
+ */
+export type TaskKind = "checklist" | "issue" | "comment" | "review";
+
+/**
+ * A task by ID.
+ */
+export interface TaskRef {
+  /**
+   * The task ID.
+   */
+  task: string;
+}
+
+/**
+ * One task in a view.
+ */
+export interface TaskView {
+  /**
+   * The task ID: `<doc>.<block>` for checklist items.
+   */
+  id: string;
+  /**
+   * Where it comes from.
+   */
+  kind: TaskKind;
+  /**
+   * The title, as Vellum Markdown inline text.
+   */
+  title: string;
+  /**
+   * Whether it is completed.
+   */
+  done: boolean;
+  /**
+   * Whether its deadline has passed.
+   */
+  overdue: boolean;
+  /**
+   * The document it lives in, for checklist items and comments.
+   */
+  doc?: DocId | null;
+  /**
+   * The list's title, for items in task lists.
+   */
+  list?: string | null;
+  /**
+   * The issue key, for issues.
+   */
+  issue_key?: string | null;
+  /**
+   * The fields.
+   */
+  fields: FieldsView;
+  /**
+   * People mentioned in the item, without `@`.
+   */
+  assignees: string[];
+  /**
+   * Subtasks.
+   */
+  subtasks: TaskView[];
+}
+
+/**
+ * A task list.
+ */
+export interface TasksCreateListListView {
+  /**
+   * The list's document.
+   */
+  doc: DocId;
+  /**
+   * The title.
+   */
+  title: string;
+  /**
+   * Whether it is the person's Inbox.
+   */
+  inbox: boolean;
+  /**
+   * The owner's handle.
+   */
+  owner?: string | null;
+  /**
+   * Members' handles.
+   */
+  members: string[];
+  /**
+   * How many open items it holds.
+   */
+  open: number;
+}
+
+/**
+ * One task in a view.
+ */
+export interface TasksCreateTaskView {
+  /**
+   * The task ID: `<doc>.<block>` for checklist items.
+   */
+  id: string;
+  /**
+   * Where it comes from.
+   */
+  kind: TaskKind;
+  /**
+   * The title, as Vellum Markdown inline text.
+   */
+  title: string;
+  /**
+   * Whether it is completed.
+   */
+  done: boolean;
+  /**
+   * Whether its deadline has passed.
+   */
+  overdue: boolean;
+  /**
+   * The document it lives in, for checklist items and comments.
+   */
+  doc?: DocId | null;
+  /**
+   * The list's title, for items in task lists.
+   */
+  list?: string | null;
+  /**
+   * The issue key, for issues.
+   */
+  issue_key?: string | null;
+  /**
+   * The fields.
+   */
+  fields: FieldsView;
+  /**
+   * People mentioned in the item, without `@`.
+   */
+  assignees: string[];
+  /**
+   * Subtasks.
+   */
+  subtasks: TasksCreateTaskView[];
+}
+
+/**
+ * No input.
+ */
+export type TasksDigestNoInput = Record<string, unknown>;
+
+/**
+ * No input.
+ */
+export type TasksGoogleConnectNoInput = Record<string, unknown>;
+
+/**
+ * An acknowledgement with nothing to return.
+ */
+export type TasksGoogleDisconnectDone = Record<string, unknown>;
+
+/**
+ * No input.
+ */
+export type TasksGoogleDisconnectNoInput = Record<string, unknown>;
+
+/**
+ * No input.
+ */
+export type TasksGoogleStatusNoInput = Record<string, unknown>;
+
+/**
+ * No input.
+ */
+export type TasksGoogleSyncNoInput = Record<string, unknown>;
+
+/**
+ * No input.
+ */
+export type TasksListsNoInput = Record<string, unknown>;
+
+/**
+ * One task in a view.
+ */
+export interface TasksMoveTaskView {
+  /**
+   * The task ID: `<doc>.<block>` for checklist items.
+   */
+  id: string;
+  /**
+   * Where it comes from.
+   */
+  kind: TaskKind;
+  /**
+   * The title, as Vellum Markdown inline text.
+   */
+  title: string;
+  /**
+   * Whether it is completed.
+   */
+  done: boolean;
+  /**
+   * Whether its deadline has passed.
+   */
+  overdue: boolean;
+  /**
+   * The document it lives in, for checklist items and comments.
+   */
+  doc?: DocId | null;
+  /**
+   * The list's title, for items in task lists.
+   */
+  list?: string | null;
+  /**
+   * The issue key, for issues.
+   */
+  issue_key?: string | null;
+  /**
+   * The fields.
+   */
+  fields: FieldsView;
+  /**
+   * People mentioned in the item, without `@`.
+   */
+  assignees: string[];
+  /**
+   * Subtasks.
+   */
+  subtasks: TasksMoveTaskView[];
+}
+
+/**
+ * No input.
+ */
+export type TasksMyWorkNoInput = Record<string, unknown>;
+
+/**
+ * What a recognised quick-add phrase set.
+ */
+export type TasksParseTokenView = "due" | "start" | "recurrence" | "when" | "list" | "label" | "person" | "priority" | "reminder";
+
+/**
+ * One task in a view.
+ */
+export interface TasksReopenTaskView {
+  /**
+   * The task ID: `<doc>.<block>` for checklist items.
+   */
+  id: string;
+  /**
+   * Where it comes from.
+   */
+  kind: TaskKind;
+  /**
+   * The title, as Vellum Markdown inline text.
+   */
+  title: string;
+  /**
+   * Whether it is completed.
+   */
+  done: boolean;
+  /**
+   * Whether its deadline has passed.
+   */
+  overdue: boolean;
+  /**
+   * The document it lives in, for checklist items and comments.
+   */
+  doc?: DocId | null;
+  /**
+   * The list's title, for items in task lists.
+   */
+  list?: string | null;
+  /**
+   * The issue key, for issues.
+   */
+  issue_key?: string | null;
+  /**
+   * The fields.
+   */
+  fields: FieldsView;
+  /**
+   * People mentioned in the item, without `@`.
+   */
+  assignees: string[];
+  /**
+   * Subtasks.
+   */
+  subtasks: TasksReopenTaskView[];
+}
+
+/**
+ * An acknowledgement with nothing to return.
+ */
+export type TasksRevokeCaptureDone = Record<string, unknown>;
+
+/**
+ * No input.
+ */
+export type TasksRevokeCaptureNoInput = Record<string, unknown>;
+
+/**
+ * An acknowledgement with nothing to return.
+ */
+export type TasksRevokeFeedDone = Record<string, unknown>;
+
+/**
+ * No input.
+ */
+export type TasksRevokeFeedNoInput = Record<string, unknown>;
+
+/**
+ * No input.
+ */
+export type TasksRotateCaptureNoInput = Record<string, unknown>;
+
+/**
+ * No input.
+ */
+export type TasksRotateFeedNoInput = Record<string, unknown>;
+
+/**
+ * A task list.
+ */
+export interface TasksShareListListView {
+  /**
+   * The list's document.
+   */
+  doc: DocId;
+  /**
+   * The title.
+   */
+  title: string;
+  /**
+   * Whether it is the person's Inbox.
+   */
+  inbox: boolean;
+  /**
+   * The owner's handle.
+   */
+  owner?: string | null;
+  /**
+   * Members' handles.
+   */
+  members: string[];
+  /**
+   * How many open items it holds.
+   */
+  open: number;
+}
+
+/**
+ * A task list.
+ */
+export interface TasksUnshareListListView {
+  /**
+   * The list's document.
+   */
+  doc: DocId;
+  /**
+   * The title.
+   */
+  title: string;
+  /**
+   * Whether it is the person's Inbox.
+   */
+  inbox: boolean;
+  /**
+   * The owner's handle.
+   */
+  owner?: string | null;
+  /**
+   * Members' handles.
+   */
+  members: string[];
+  /**
+   * How many open items it holds.
+   */
+  open: number;
+}
+
+/**
+ * One task in a view.
+ */
+export interface TasksUpdateTaskView {
+  /**
+   * The task ID: `<doc>.<block>` for checklist items.
+   */
+  id: string;
+  /**
+   * Where it comes from.
+   */
+  kind: TaskKind;
+  /**
+   * The title, as Vellum Markdown inline text.
+   */
+  title: string;
+  /**
+   * Whether it is completed.
+   */
+  done: boolean;
+  /**
+   * Whether its deadline has passed.
+   */
+  overdue: boolean;
+  /**
+   * The document it lives in, for checklist items and comments.
+   */
+  doc?: DocId | null;
+  /**
+   * The list's title, for items in task lists.
+   */
+  list?: string | null;
+  /**
+   * The issue key, for issues.
+   */
+  issue_key?: string | null;
+  /**
+   * The fields.
+   */
+  fields: FieldsView;
+  /**
+   * People mentioned in the item, without `@`.
+   */
+  assignees: string[];
+  /**
+   * Subtasks.
+   */
+  subtasks: TasksUpdateTaskView[];
 }
 
 /**
@@ -4408,6 +6079,28 @@ export interface TeamsOut {
    * Teams by key.
    */
   teams: TeamOut[];
+}
+
+/**
+ * Opt-in anonymous usage reporting.
+ */
+export interface TelemetrySettings {
+  /**
+   * Whether reports are sent. Off until an admin turns it on.
+   */
+  enabled?: boolean;
+  /**
+   * Where reports go (HTTPS).
+   */
+  endpoint?: string | null;
+  /**
+   * A random id for this installation, unrelated to anything else.
+   */
+  install_id?: string;
+  /**
+   * Hours between reports.
+   */
+  interval_hours?: number;
 }
 
 /**
@@ -4542,6 +6235,16 @@ export interface TokenView {
 }
 
 /**
+ * One trace.
+ */
+export interface TraceInput {
+  /**
+   * The 32-hex-digit W3C trace id.
+   */
+  trace_id: string;
+}
+
+/**
  * A triage decision.
  */
 export interface TriageIssue {
@@ -4589,6 +6292,58 @@ export interface Unsubscribe {
    * The push service URL the browser registered.
    */
   endpoint: string;
+}
+
+/**
+ * Changes to a task. Each field present replaces the old value; an
+ * empty string clears it.
+ */
+export interface UpdateInput {
+  /**
+   * The task ID.
+   */
+  task: string;
+  /**
+   * The new title.
+   */
+  title?: string | null;
+  /**
+   * `evening`, `anytime` or `someday`.
+   */
+  when?: string | null;
+  /**
+   * `YYYY-MM-DD`.
+   */
+  start?: string | null;
+  /**
+   * `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM`.
+   */
+  due?: string | null;
+  /**
+   * An RFC 5545 rule such as `FREQ=WEEKLY;BYDAY=MO`.
+   */
+  rrule?: string | null;
+  /**
+   * `schedule` or `completion`.
+   */
+  recur_from?: string | null;
+  /**
+   * Comma-separated reminders, such as `-PT15M,2026-11-03T09:00`.
+   */
+  remind?: string | null;
+  /**
+   * `1` to `4`.
+   */
+  priority?: string | null;
+  /**
+   * Comma-separated labels.
+   */
+  labels?: string | null;
+  /**
+   * A time block, `YYYY-MM-DDTHH:MM/<minutes>`, shown in Google
+   * Calendar when it is connected.
+   */
+  block?: string | null;
 }
 
 /**
@@ -4756,6 +6511,56 @@ export interface UpdateUser {
 }
 
 /**
+ * Exactly what is sent.
+ */
+export interface UsageReport {
+  /**
+   * [`REPORT_SCHEMA`].
+   */
+  schema: number;
+  /**
+   * The random installation id.
+   */
+  install_id: string;
+  /**
+   * The Vellum version.
+   */
+  version: string;
+  /**
+   * `linux`, `macos` or `windows`.
+   */
+  os: string;
+  /**
+   * `x86_64` or `aarch64`.
+   */
+  arch: string;
+  /**
+   * The deployment profile.
+   */
+  profile: string;
+  /**
+   * The database.
+   */
+  database: string;
+  /**
+   * Size bucket of active people.
+   */
+  users: string;
+  /**
+   * Size bucket of spaces.
+   */
+  spaces: string;
+  /**
+   * Size bucket of documents.
+   */
+  documents: string;
+  /**
+   * Optional features turned on, sorted.
+   */
+  features: string[];
+}
+
+/**
  * How much of its quota a space uses.
  */
 export interface UsageView {
@@ -4898,6 +6703,20 @@ export interface VersionView {
 }
 
 /**
+ * Settings with the version they were stored at.
+ */
+export interface Versioned {
+  /**
+   * Increases by one on every save; 0 before the first.
+   */
+  version: number;
+  /**
+   * The settings.
+   */
+  settings: AdminSettings;
+}
+
+/**
  * A saved view, in the text form `schema.yaml` uses.
  */
 export interface ViewInfo {
@@ -4994,6 +6813,16 @@ export interface ViewResult {
    * Whether the limit cut rows off.
    */
   truncated: boolean;
+}
+
+/**
+ * A window in minutes.
+ */
+export interface WindowInput {
+  /**
+   * Minutes, 1 to 60 (default 15).
+   */
+  minutes?: number | null;
 }
 
 /**
@@ -6095,6 +7924,118 @@ export interface WorkUpdateIssueIssueOut {
 
 /** Every operation: its method, path, input and output. */
 export interface Operations {
+  /** Browser timings for a page view or slow call, joined to its trace */
+  "admin.client_report": {
+    method: "POST";
+    path: "/v1/telemetry/client";
+    input: AnyValue;
+    output: IngestedOutput;
+  };
+  /** Takes an encrypted backup now */
+  "admin.create_backup": {
+    method: "POST";
+    path: "/v1/admin/backups";
+    input: AdminCreateBackupEmpty;
+    output: AdminCreateBackupBackupInfo;
+  };
+  /** The whole audit log as JSON Lines; the export is audited */
+  "admin.export_audit": {
+    method: "GET";
+    path: "/v1/admin/audit/export";
+    input: AdminExportAuditEmpty;
+    output: AuditExport;
+  };
+  /** One request's trace with every span */
+  "admin.get_request": {
+    method: "GET";
+    path: "/v1/admin/requests/{trace_id}";
+    input: TraceInput;
+    output: AnyValue;
+  };
+  /** The admin settings and their version */
+  "admin.get_settings": {
+    method: "GET";
+    path: "/v1/admin/settings";
+    input: AdminGetSettingsEmpty;
+    output: Versioned;
+  };
+  /** Audit records, newest first */
+  "admin.list_audit": {
+    method: "GET";
+    path: "/v1/admin/audit";
+    input: AuditQuery;
+    output: AuditList;
+  };
+  /** Backups on disk, newest first */
+  "admin.list_backups": {
+    method: "GET";
+    path: "/v1/admin/backups";
+    input: AdminListBackupsEmpty;
+    output: BackupList;
+  };
+  /** Recent requests from the trace buffer, newest first */
+  "admin.list_requests": {
+    method: "GET";
+    path: "/v1/admin/requests";
+    input: RequestsInput;
+    output: RequestsOutput;
+  };
+  /** Folded span stacks of recent requests, for vellum profile */
+  "admin.profile": {
+    method: "GET";
+    path: "/v1/admin/profile";
+    input: ProfileInput;
+    output: ProfileResponse;
+  };
+  /** Rate, errors, latency and saturation per route, against its budget */
+  "admin.routes": {
+    method: "GET";
+    path: "/v1/admin/routes";
+    input: WindowInput;
+    output: RoutesView;
+  };
+  /** Restores the newest backup into scratch space and checks it */
+  "admin.run_drill": {
+    method: "POST";
+    path: "/v1/admin/backups/drill";
+    input: AdminRunDrillEmpty;
+    output: AdminRunDrillDrillReport;
+  };
+  /** Service level objectives, burn rates and remaining error budget */
+  "admin.slos": {
+    method: "GET";
+    path: "/v1/admin/slos";
+    input: AdminSlosEmpty;
+    output: SlosOutput;
+  };
+  /** When backups, drills and telemetry last ran */
+  "admin.state": {
+    method: "GET";
+    path: "/v1/admin/state";
+    input: AdminStateEmpty;
+    output: AdminState;
+  };
+  /** Exactly what anonymous telemetry would send */
+  "admin.telemetry_preview": {
+    method: "GET";
+    path: "/v1/admin/telemetry/preview";
+    input: AdminTelemetryPreviewEmpty;
+    output: UsageReport;
+  };
+  /** Replaces the settings if nobody saved since expected_version */
+  "admin.update_settings": {
+    method: "PUT";
+    path: "/v1/admin/settings";
+    input: SettingsUpdate;
+    output: AdminUpdateSettingsVersioned;
+  };
+  /** Checks the audit log's hash chain end to end */
+  "admin.verify_audit": {
+    method: "POST";
+    path: "/v1/admin/audit/verify";
+    input: AdminVerifyAuditEmpty;
+    output: ChainReport;
+  };
   /** Add a section */
   "books.add_section": {
     method: "POST";
@@ -6634,6 +8575,167 @@ export interface Operations {
     input: PreferencesView;
     output: PreferencesView;
   };
+  /** Renders a page as sanitised HTML for the reader */
+  "render.page": {
+    method: "GET";
+    path: "/v1/pages/{id}/render";
+    input: PageKey;
+    output: RenderedPageView;
+  };
+  /** Completes a task; a repeating task moves to its next date */
+  "tasks.complete": {
+    method: "POST";
+    path: "/v1/tasks/{task}/complete";
+    input: CompleteInput;
+    output: CompleteView;
+  };
+  /** Adds a task from a quick-add line */
+  "tasks.create": {
+    method: "POST";
+    path: "/v1/tasks";
+    input: CreateInput;
+    output: TasksCreateTaskView;
+  };
+  /** Creates a task list */
+  "tasks.create_list": {
+    method: "POST";
+    path: "/v1/task-lists";
+    input: CreateListInput;
+    output: TasksCreateListListView;
+  };
+  /** Removes a task and its subtasks */
+  "tasks.delete": {
+    method: "DELETE";
+    path: "/v1/tasks/{task}";
+    input: TaskRef;
+    output: DeletedView;
+  };
+  /** Today's digest as Vellum Markdown */
+  "tasks.digest": {
+    method: "GET";
+    path: "/v1/my-work/digest";
+    input: TasksDigestNoInput;
+    output: DigestView;
+  };
+  /** Starts connecting Google Calendar; returns Google's consent page */
+  "tasks.google_connect": {
+    method: "POST";
+    path: "/v1/my-work/google/connect";
+    input: TasksGoogleConnectNoInput;
+    output: SecretView;
+  };
+  /** Disconnects Google Calendar */
+  "tasks.google_disconnect": {
+    method: "DELETE";
+    path: "/v1/my-work/google";
+    input: TasksGoogleDisconnectNoInput;
+    output: TasksGoogleDisconnectDone;
+  };
+  /** Whether Google Calendar time-blocking is set up and connected */
+  "tasks.google_status": {
+    method: "GET";
+    path: "/v1/my-work/google";
+    input: TasksGoogleStatusNoInput;
+    output: GoogleView;
+  };
+  /** Syncs time blocks with Google Calendar now */
+  "tasks.google_sync": {
+    method: "POST";
+    path: "/v1/my-work/google/sync";
+    input: TasksGoogleSyncNoInput;
+    output: SyncView;
+  };
+  /** Imports tasks from Google Tasks, Todoist or Things */
+  "tasks.import": {
+    method: "POST";
+    path: "/v1/tasks/import";
+    input: ImportInput;
+    output: ImportView;
+  };
+  /** Lists the person's task lists and lists shared with them */
+  "tasks.lists": {
+    method: "GET";
+    path: "/v1/task-lists";
+    input: TasksListsNoInput;
+    output: ListsView;
+  };
+  /** Moves a task to another bucket or day */
+  "tasks.move": {
+    method: "POST";
+    path: "/v1/tasks/{task}/move";
+    input: MoveInput;
+    output: TasksMoveTaskView;
+  };
+  /** Lists My Work: Inbox, Today, Evening, Upcoming, Anytime, Someday, Done */
+  "tasks.my_work": {
+    method: "GET";
+    path: "/v1/my-work";
+    input: TasksMyWorkNoInput;
+    output: MyWorkView;
+  };
+  /** Parses a quick-add line for highlighting */
+  "tasks.parse": {
+    method: "GET";
+    path: "/v1/tasks/parse";
+    input: ParseInput;
+    output: ParseView;
+  };
+  /** Reopens a completed task */
+  "tasks.reopen": {
+    method: "POST";
+    path: "/v1/tasks/{task}/reopen";
+    input: TaskRef;
+    output: TasksReopenTaskView;
+  };
+  /** Turns capture by e-mail off */
+  "tasks.revoke_capture": {
+    method: "DELETE";
+    path: "/v1/my-work/capture-address";
+    input: TasksRevokeCaptureNoInput;
+    output: TasksRevokeCaptureDone;
+  };
+  /** Turns the calendar feed off */
+  "tasks.revoke_feed": {
+    method: "DELETE";
+    path: "/v1/my-work/feed";
+    input: TasksRevokeFeedNoInput;
+    output: TasksRevokeFeedDone;
+  };
+  /** Issues a new capture e-mail address and revokes the old one */
+  "tasks.rotate_capture": {
+    method: "POST";
+    path: "/v1/my-work/capture-address";
+    input: TasksRotateCaptureNoInput;
+    output: SecretView;
+  };
+  /** Issues a new calendar feed URL and revokes the old one */
+  "tasks.rotate_feed": {
+    method: "POST";
+    path: "/v1/my-work/feed";
+    input: TasksRotateFeedNoInput;
+    output: SecretView;
+  };
+  /** Shares a list with someone */
+  "tasks.share_list": {
+    method: "POST";
+    path: "/v1/task-lists/{list_id}/members";
+    input: MemberInput;
+    output: TasksShareListListView;
+  };
+  /** Stops sharing a list with someone */
+  "tasks.unshare_list": {
+    method: "DELETE";
+    path: "/v1/task-lists/{list_id}/members/{member}";
+    input: MemberInput;
+    output: TasksUnshareListListView;
+  };
+  /** Edits a task's title or fields */
+  "tasks.update": {
+    method: "PATCH";
+    path: "/v1/tasks/{task}";
+    input: UpdateInput;
+    output: TasksUpdateTaskView;
+  };
   /** Applies the waiting triage suggestion as the caller */
   "work.accept_suggestion": {
     method: "POST";
@@ -6855,6 +8957,22 @@ export interface Operations {
 
 /** How to call each operation, for the runtime in `client.ts`. */
 export const OPERATIONS = {
+  "admin.client_report": { method: "POST", path: "/v1/telemetry/client", mutation: true },
+  "admin.create_backup": { method: "POST", path: "/v1/admin/backups", mutation: true },
+  "admin.export_audit": { method: "GET", path: "/v1/admin/audit/export", mutation: false },
+  "admin.get_request": { method: "GET", path: "/v1/admin/requests/{trace_id}", mutation: false },
+  "admin.get_settings": { method: "GET", path: "/v1/admin/settings", mutation: false },
+  "admin.list_audit": { method: "GET", path: "/v1/admin/audit", mutation: false },
+  "admin.list_backups": { method: "GET", path: "/v1/admin/backups", mutation: false },
+  "admin.list_requests": { method: "GET", path: "/v1/admin/requests", mutation: false },
+  "admin.profile": { method: "GET", path: "/v1/admin/profile", mutation: false },
+  "admin.routes": { method: "GET", path: "/v1/admin/routes", mutation: false },
+  "admin.run_drill": { method: "POST", path: "/v1/admin/backups/drill", mutation: true },
+  "admin.slos": { method: "GET", path: "/v1/admin/slos", mutation: false },
+  "admin.state": { method: "GET", path: "/v1/admin/state", mutation: false },
+  "admin.telemetry_preview": { method: "GET", path: "/v1/admin/telemetry/preview", mutation: false },
+  "admin.update_settings": { method: "PUT", path: "/v1/admin/settings", mutation: true },
+  "admin.verify_audit": { method: "POST", path: "/v1/admin/audit/verify", mutation: true },
   "books.add_section": { method: "POST", path: "/v1/books/{book_id}/sections", mutation: true },
   "books.create_snapshot": { method: "POST", path: "/v1/books/{book_id}/snapshots", mutation: true },
   "books.diff": { method: "GET", path: "/v1/books/{book_id}/diff", mutation: false },
@@ -6932,6 +9050,29 @@ export const OPERATIONS = {
   "notify.push_unsubscribe": { method: "DELETE", path: "/v1/push/subscriptions", mutation: true },
   "notify.read": { method: "POST", path: "/v1/notifications/read", mutation: true },
   "notify.set_preferences": { method: "PUT", path: "/v1/notifications/preferences", mutation: true },
+  "render.page": { method: "GET", path: "/v1/pages/{id}/render", mutation: false },
+  "tasks.complete": { method: "POST", path: "/v1/tasks/{task}/complete", mutation: true },
+  "tasks.create": { method: "POST", path: "/v1/tasks", mutation: true },
+  "tasks.create_list": { method: "POST", path: "/v1/task-lists", mutation: true },
+  "tasks.delete": { method: "DELETE", path: "/v1/tasks/{task}", mutation: true },
+  "tasks.digest": { method: "GET", path: "/v1/my-work/digest", mutation: false },
+  "tasks.google_connect": { method: "POST", path: "/v1/my-work/google/connect", mutation: true },
+  "tasks.google_disconnect": { method: "DELETE", path: "/v1/my-work/google", mutation: true },
+  "tasks.google_status": { method: "GET", path: "/v1/my-work/google", mutation: false },
+  "tasks.google_sync": { method: "POST", path: "/v1/my-work/google/sync", mutation: true },
+  "tasks.import": { method: "POST", path: "/v1/tasks/import", mutation: true },
+  "tasks.lists": { method: "GET", path: "/v1/task-lists", mutation: false },
+  "tasks.move": { method: "POST", path: "/v1/tasks/{task}/move", mutation: true },
+  "tasks.my_work": { method: "GET", path: "/v1/my-work", mutation: false },
+  "tasks.parse": { method: "GET", path: "/v1/tasks/parse", mutation: false },
+  "tasks.reopen": { method: "POST", path: "/v1/tasks/{task}/reopen", mutation: true },
+  "tasks.revoke_capture": { method: "DELETE", path: "/v1/my-work/capture-address", mutation: true },
+  "tasks.revoke_feed": { method: "DELETE", path: "/v1/my-work/feed", mutation: true },
+  "tasks.rotate_capture": { method: "POST", path: "/v1/my-work/capture-address", mutation: true },
+  "tasks.rotate_feed": { method: "POST", path: "/v1/my-work/feed", mutation: true },
+  "tasks.share_list": { method: "POST", path: "/v1/task-lists/{list_id}/members", mutation: true },
+  "tasks.unshare_list": { method: "DELETE", path: "/v1/task-lists/{list_id}/members/{member}", mutation: true },
+  "tasks.update": { method: "PATCH", path: "/v1/tasks/{task}", mutation: true },
   "work.accept_suggestion": { method: "POST", path: "/v1/work/issues/{key}/triage/suggestion/accept", mutation: true },
   "work.add_comment": { method: "POST", path: "/v1/work/comments", mutation: true },
   "work.assign_thread": { method: "POST", path: "/v1/work/threads/{thread_id}/assign", mutation: true },
