@@ -6,11 +6,11 @@
 # develop. The Fast suite runs on every push to develop; this workflow
 # raises one "develop is red" issue when that run fails and closes it when
 # develop is green again.
-name: Develop health
+name: "Repo: develop is red alarm"
 
 on:
   workflow_run: # zizmor: ignore[dangerous-triggers] -- no checkout; reads only the run's metadata
-    workflows: [Fast suite]
+    workflows: ["Checks: fast suite"]
     types: [completed]
     branches: [develop]
 

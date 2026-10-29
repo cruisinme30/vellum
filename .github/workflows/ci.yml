@@ -3,7 +3,7 @@
 
 # The fast suite: gates every pull request into develop, again in the merge
 # queue, and is part of the full suite for main. Branch protection requires the "Fast suite" check.
-name: Fast suite
+name: "Checks: fast suite"
 
 on:
   pull_request:

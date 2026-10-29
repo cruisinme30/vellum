@@ -11,7 +11,7 @@
 # - weekly on develop, so alerts on the default branch stay current for
 #   triage.
 # Same languages and query suite as the default setup had.
-name: CodeQL
+name: "Security: CodeQL"
 
 on:
   pull_request:

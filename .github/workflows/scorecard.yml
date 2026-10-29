@@ -5,7 +5,7 @@
 # practices weekly, publishes the result to
 # the OpenSSF API for the README badge, and uploads findings to code
 # scanning (Security -> Code scanning, tool "Scorecard").
-name: Scorecard
+name: "Security: weekly Scorecard"
 
 on:
   # Weekly, not on every push to develop: the score changes slowly and
