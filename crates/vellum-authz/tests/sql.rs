@@ -349,7 +349,9 @@ fn postgres_matches_the_reference() {
         .enable_all()
         .build()
         .unwrap();
-    let (_container, index): (ContainerAsync<Postgres>, Index) = rt.block_on(async {
+    // Keeps a runtime in scope if a failing case unwinds past the container.
+    let _context = rt.enter();
+    let (container, index): (ContainerAsync<Postgres>, Index) = rt.block_on(async {
         let container = Postgres::default()
             .with_tag("17-alpine")
             .start()
@@ -361,6 +363,12 @@ fn postgres_matches_the_reference() {
         (container, index)
     });
     differential(&index, &rt, 24);
+    // The container must be removed inside the runtime: dropping it outside
+    // one panics.
+    rt.block_on(async move {
+        drop(index);
+        container.rm().await.unwrap();
+    });
 }
 
 #[tokio::test]
