@@ -83,6 +83,9 @@ skip-tree = [
     # merman's HTML label rewriting uses lol_html 3, which is on cssparser
     # 0.36 and phf 0.13; ammonia is on cssparser 0.38 and phf 0.14.
     { crate = "lol_html@3", reason = "merman-core pins lol_html 3 (older cssparser and phf)" },
+    # Linux Secret Service (os-keychain feature only) still uses the previous
+    # RustCrypto generation (sha2 0.10, cipher 0.4) for its session encryption.
+    { crate = "dbus-secret-service@4", depth = 20, reason = "Linux keychain; waiting for its RustCrypto 0.11 release" },
 ]
 
 [sources]
