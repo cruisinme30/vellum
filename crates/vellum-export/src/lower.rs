@@ -24,7 +24,12 @@ use vellum_format::{
     Alignment, Block, Container, ContainerKind, Document, Fence, FenceKind, Inline, ListItem,
 };
 
-use crate::data;
+use vellum_format::blocks::{
+    Architecture, Board, Calculator, Cards, Chart, DataTable, Facts, Image as ImageFence, Progress,
+    Read, RiskMatrix, Roadmap, Stats, Steps, Tabs, Timeline, Trend,
+};
+
+use crate::calc::{self, display_number};
 use crate::error::ExportWarning;
 use crate::flow::{
     Align, Asset, Bar, Card, Cell, Flow, Item, Layout, Media, Node, Span, Stat, Style, Table,
@@ -241,9 +246,15 @@ impl<'p> Session<'p> {
         let ports = self.ports;
         let figures = join_all(wants.figures.into_iter().map(|fence| async move {
             let key = fence_key(&fence);
-            let result = if data::arg(&fence, "source").is_some() {
+            let live =
+                fence.kind() == FenceKind::Chart && Chart::parse(&fence).data.source.is_some();
+            let result = if live {
                 match ports.live.chart(&fence).await {
-                    Ok(resolved) => ports.figures.render(&resolved).await.map(|svg| (svg, Some(resolved))),
+                    Ok(resolved) => ports
+                        .figures
+                        .render(&resolved)
+                        .await
+                        .map(|svg| (svg, Some(resolved))),
                     Err(error) => Err(FigureError::Unavailable(error.0)),
                 }
             } else {
@@ -251,9 +262,10 @@ impl<'p> Session<'p> {
             };
             (key, result)
         }));
-        let collections = join_all(wants.collections.into_iter().map(|fence| async move {
-            (fence_key(&fence), ports.live.collection(&fence).await)
-        }));
+        let collections =
+            join_all(wants.collections.into_iter().map(|fence| async move {
+                (fence_key(&fence), ports.live.collection(&fence).await)
+            }));
         let images = join_all(
             wants
                 .images
@@ -288,9 +300,18 @@ impl<'p> Session<'p> {
         let mut answers = Answers {
             figures: HashMap::new(),
             collections: collections.into_iter().collect(),
-            issues: issues.into_iter().filter_map(|(k, v)| Some((k, v?))).collect(),
-            pages: pages.into_iter().filter_map(|(k, v)| Some((k, v?))).collect(),
-            people: people.into_iter().filter_map(|(k, v)| Some((k, v?))).collect(),
+            issues: issues
+                .into_iter()
+                .filter_map(|(k, v)| Some((k, v?)))
+                .collect(),
+            pages: pages
+                .into_iter()
+                .filter_map(|(k, v)| Some((k, v?)))
+                .collect(),
+            people: people
+                .into_iter()
+                .filter_map(|(k, v)| Some((k, v?)))
+                .collect(),
         };
         for (url, result) in images {
             let name = match result {
@@ -304,17 +325,16 @@ impl<'p> Session<'p> {
             let _ = self.by_url.insert(url, name);
         }
         for (key, result) in figures {
-            let value = match result {
-                Ok((svg, resolved)) => match self.add_figure(&svg) {
-                    Some(asset) => Ok(FigureAnswer {
-                        asset,
-                        svg,
-                        resolved,
-                    }),
-                    None => Err(FigureError::Unavailable("too many figures".into())),
-                },
-                Err(error) => Err(error),
-            };
+            let value = result.and_then(|(svg, resolved)| {
+                let asset = self
+                    .add_figure(&svg)
+                    .ok_or_else(|| FigureError::Unavailable("too many figures".into()))?;
+                Ok(FigureAnswer {
+                    asset,
+                    svg,
+                    resolved,
+                })
+            });
             let _ = answers.figures.insert(key, value);
         }
         answers
@@ -379,7 +399,12 @@ fn px(value: f64) -> Option<u32> {
 fn image_size(media: Media, bytes: &[u8]) -> (Option<u32>, Option<u32>) {
     let be32 = |at: usize| -> Option<u32> {
         let b = bytes.get(at..at + 4)?;
-        Some(u32::from_be_bytes([*b.first()?, *b.get(1)?, *b.get(2)?, *b.get(3)?]))
+        Some(u32::from_be_bytes([
+            *b.first()?,
+            *b.get(1)?,
+            *b.get(2)?,
+            *b.get(3)?,
+        ]))
     };
     let le16 = |at: usize| -> Option<u32> {
         let b = bytes.get(at..at + 2)?;
@@ -399,10 +424,12 @@ fn jpeg_size(bytes: &[u8]) -> (Option<u32>, Option<u32>) {
         if marker_lead != 0xFF {
             break;
         }
-        let len = bytes
-            .get(at + 2..at + 4)
-            .map(|b| usize::from(u16::from_be_bytes([b.first().copied().unwrap_or(0), b.get(1).copied().unwrap_or(0)])))
-            .unwrap_or(0);
+        let len = bytes.get(at + 2..at + 4).map_or(0, |b| {
+            usize::from(u16::from_be_bytes([
+                b.first().copied().unwrap_or(0),
+                b.get(1).copied().unwrap_or(0),
+            ]))
+        });
         if matches!(marker, 0xC0..=0xC3 | 0xC5..=0xC7 | 0xC9..=0xCB | 0xCD..=0xCF) {
             let h = bytes.get(at + 5..at + 7).map(|b| {
                 u32::from(u16::from_be_bytes([
@@ -548,10 +575,7 @@ impl Wants {
 }
 
 fn image_fence_src(fence: &Fence) -> Option<String> {
-    data::pairs(&fence.literal)
-        .into_iter()
-        .find(|(k, _)| k == "src" || k == "url")
-        .map(|(_, v)| v)
+    Some(ImageFence::parse(fence).data.src).filter(|src| !src.is_empty())
 }
 
 struct FigureAnswer {
@@ -580,6 +604,20 @@ impl Ctx<'_, '_> {
         self.session
             .warnings
             .push(ExportWarning::new(location, message));
+    }
+
+    /// Takes typed block data, turning lines that could not be read into
+    /// warnings.
+    fn read<T>(&mut self, block: &str, read: Read<T>) -> T {
+        for problem in read.diagnostics {
+            let location = if problem.line == 0 {
+                block.to_owned()
+            } else {
+                format!("{block}, line {}", problem.line)
+            };
+            self.warn(location, problem.message);
+        }
+        read.data
     }
 
     fn blocks(&mut self, blocks: &[Block]) -> Vec<Node> {
@@ -613,7 +651,7 @@ impl Ctx<'_, '_> {
                 let anchor = id
                     .and_then(|id| self.block_anchor(&id.to_string()))
                     .unwrap_or_else(|| {
-                        self.unique_anchor(attrs.id.clone().unwrap_or_else(|| slug(&text)))
+                        self.unique_anchor(&attrs.id.clone().unwrap_or_else(|| slug(&text)))
                     });
                 out.push(Node::Heading {
                     level: level.saturating_add(self.opts.heading_offset).clamp(1, 6),
@@ -654,7 +692,7 @@ impl Ctx<'_, '_> {
             .filter(|anchor| self.session.anchors.insert(anchor.clone()))
     }
 
-    fn unique_anchor(&mut self, base: String) -> String {
+    fn unique_anchor(&mut self, base: &str) -> String {
         let base = format!("{}{}", self.opts.anchor_prefix, base);
         let mut anchor = base.clone();
         let mut n = 1;
@@ -682,14 +720,9 @@ impl Ctx<'_, '_> {
         }
     }
 
-    fn image_block(&mut self, url: &str, alt: &str, caption: &str) -> Node {
-        match self.session.by_url.get(url).cloned().flatten() {
-            Some(asset) => Node::Image {
-                asset,
-                alt: alt.to_owned(),
-                caption: caption.to_owned(),
-            },
-            None => Node::Paragraph {
+    fn image_block(&self, url: &str, alt: &str, caption: &str) -> Node {
+        let Some(asset) = self.session.by_url.get(url).cloned().flatten() else {
+            return Node::Paragraph {
                 spans: vec![Span::Text {
                     text: format!("[Image: {}]", if alt.is_empty() { url } else { alt }),
                     style: Style {
@@ -698,7 +731,12 @@ impl Ctx<'_, '_> {
                     },
                 }],
                 anchor: None,
-            },
+            };
+        };
+        Node::Image {
+            asset,
+            alt: alt.to_owned(),
+            caption: caption.to_owned(),
         }
     }
 
@@ -752,16 +790,9 @@ impl Ctx<'_, '_> {
             FenceKind::Calculator => out.push(self.calculator(fence)),
             FenceKind::Collection => self.collection(fence, out),
             FenceKind::Image => {
-                let pairs = data::pairs(&fence.literal);
-                let get = |key: &str| {
-                    pairs
-                        .iter()
-                        .find(|(k, _)| k == key)
-                        .map(|(_, v)| v.clone())
-                        .unwrap_or_default()
-                };
-                let src = image_fence_src(fence).unwrap_or_default();
-                out.push(self.image_block(&src, &get("alt"), &get("caption")));
+                let image = self.read(&fence.lang, ImageFence::parse(fence));
+                let caption = image.caption.unwrap_or_default();
+                out.push(self.image_block(&image.src, &image.alt, &caption));
             }
         }
     }
@@ -773,9 +804,11 @@ impl Ctx<'_, '_> {
             Some(Ok(answer)) => {
                 let caption = if fence.kind() == FenceKind::Chart {
                     let source = answer.resolved.as_ref().unwrap_or(fence);
-                    let title = data::chart(source).title;
+                    let title = Chart::parse(source).data.title;
                     if answer.resolved.is_some() {
-                        format!("{title} (as of {})", self.opts.as_of).trim().to_owned()
+                        format!("{title} (as of {})", self.opts.as_of)
+                            .trim()
+                            .to_owned()
                     } else {
                         title
                     }
@@ -804,7 +837,8 @@ impl Ctx<'_, '_> {
     }
 
     fn chart_table(&mut self, fence: &Fence, out: &mut Vec<Node>) {
-        let chart = data::chart(fence);
+        let chart = self.read(&fence.lang, Chart::parse(fence));
+        let unit = chart.unit.clone().unwrap_or_default();
         if chart.series.is_empty() {
             out.push(Node::Code {
                 lang: fence.lang.clone(),
@@ -816,17 +850,25 @@ impl Ctx<'_, '_> {
             out.push(caption_paragraph(&chart.title));
         }
         let mut header = vec![Cell::text("")];
-        header.extend(chart.series.iter().map(|(name, _)| Cell::text(name.clone())));
+        header.extend(
+            chart
+                .series
+                .iter()
+                .map(|series| Cell::text(series.name.clone())),
+        );
         let rows = chart
             .labels
             .iter()
             .enumerate()
             .map(|(i, label)| {
                 let mut row = vec![Cell::text(label.clone())];
-                row.extend(chart.series.iter().map(|(_, values)| {
-                    Cell::text(values.get(i).map_or_else(String::new, |v| {
-                        format!("{}{}", data::display_number(*v), chart.unit)
-                    }))
+                row.extend(chart.series.iter().map(|series| {
+                    Cell::text(
+                        series
+                            .values
+                            .get(i)
+                            .map_or_else(String::new, |v| format!("{}{unit}", display_number(*v))),
+                    )
                 }));
                 row
             })
@@ -842,23 +884,24 @@ impl Ctx<'_, '_> {
     }
 
     fn architecture_list(&mut self, fence: &Fence, out: &mut Vec<Node>) {
-        let arch = data::architecture(fence);
+        let arch = self.read(&fence.lang, Architecture::parse(fence));
         let mut items: Vec<Item> = arch
             .lanes
             .iter()
-            .map(|(lane, members)| text_item(&format!("{lane}: {}", members.join(", "))))
+            .map(|lane| text_item(&format!("{}: {}", lane.name, lane.items.join(", "))))
             .collect();
-        items.extend(
-            arch.links
-                .iter()
-                .map(|(from, to)| text_item(&format!("{from} → {to}"))),
-        );
+        items.extend(arch.arrows.iter().map(|arrow| {
+            let label = arrow
+                .label
+                .as_ref()
+                .map_or_else(String::new, |label| format!(" ({label})"));
+            text_item(&format!("{} → {}{label}", arrow.from, arrow.to))
+        }));
         out.push(Node::List { start: None, items });
     }
 
     fn timeline_table(&mut self, fence: &Fence, out: &mut Vec<Node>) {
-        let events = data::timeline(fence);
-        let has_detail = events.iter().any(|e| !e.detail.is_empty());
+        let events = self.read(&fence.lang, Timeline::parse(fence)).items;
         let rows = events
             .into_iter()
             .map(|event| {
@@ -866,13 +909,13 @@ impl Ctx<'_, '_> {
                     spans: vec![Span::bold(event.when)],
                     shade: None,
                 }];
-                if has_detail && !event.detail.is_empty() {
+                if let Some(detail) = event.detail {
                     row.push(Cell {
                         spans: vec![
                             Span::plain(event.title),
                             Span::Break,
                             Span::Text {
-                                text: event.detail,
+                                text: detail,
                                 style: Style {
                                     italic: true,
                                     ..Style::default()
@@ -896,8 +939,11 @@ impl Ctx<'_, '_> {
     }
 
     fn roadmap_list(&mut self, fence: &Fence, out: &mut Vec<Node>) {
-        let (_, bars) = data::roadmap(fence);
-        out.push(caption_paragraph(&format!("Roadmap as of {}", self.opts.as_of)));
+        let bars = self.read(&fence.lang, Roadmap::parse(fence)).rows;
+        out.push(caption_paragraph(&format!(
+            "Roadmap as of {}",
+            self.opts.as_of
+        )));
         let items = bars
             .into_iter()
             .map(|bar| {
@@ -918,7 +964,7 @@ impl Ctx<'_, '_> {
     }
 
     fn risk_list(&mut self, fence: &Fence, out: &mut Vec<Node>) {
-        let mut risks = data::risks(fence);
+        let mut risks = self.read(&fence.lang, RiskMatrix::parse(fence)).risks;
         risks.sort_by_key(|r| std::cmp::Reverse(u16::from(r.likelihood) * u16::from(r.impact)));
         let items = risks
             .into_iter()
@@ -940,16 +986,16 @@ impl Ctx<'_, '_> {
     }
 
     fn board_blocks(&mut self, fence: &Fence, out: &mut Vec<Node>) {
-        let columns = data::board(fence);
+        let columns = self.read(&fence.lang, Board::parse(fence)).columns;
         let lowered: Vec<(String, Node)> = columns
             .into_iter()
             .map(|column| {
                 let items = column
                     .cards
                     .into_iter()
-                    .map(|(text, tag)| {
-                        let mut spans = vec![Span::plain(text)];
-                        if let Some(tag) = tag {
+                    .map(|card| {
+                        let mut spans = vec![Span::plain(card.text)];
+                        if let Some(tag) = card.tag {
                             spans.push(Span::plain(" "));
                             spans.push(Span::Text {
                                 text: format!("[{tag}]"),
@@ -987,7 +1033,7 @@ impl Ctx<'_, '_> {
     }
 
     fn csv_table(&mut self, fence: &Fence) -> Node {
-        let table = data::csv_table(fence);
+        let table = self.read(&fence.lang, DataTable::parse(fence));
         let numeric: Vec<bool> = (0..table.header.len())
             .map(|i| {
                 !table.rows.is_empty()
@@ -1005,30 +1051,35 @@ impl Ctx<'_, '_> {
         let mut rows: Vec<Vec<Cell>> = table
             .rows
             .iter()
-            .map(|row| row.iter().map(|v| self.status_cell(v)).collect())
+            .map(|row| row.iter().map(|v| status_cell(v)).collect())
             .collect();
-        if let Some(sum) = data::arg(fence, "sum") {
-            if let Some(index) = table.header.iter().position(|h| *h == sum) {
+        let sums: Vec<usize> = table
+            .sum
+            .iter()
+            .filter_map(|sum| table.header.iter().position(|h| h.trim() == sum.trim()))
+            .collect();
+        if !sums.is_empty() {
+            let mut row: Vec<Cell> = table.header.iter().map(|_| Cell::text("")).collect();
+            if let Some(first) = row.first_mut() {
+                *first = Cell {
+                    spans: vec![Span::bold("Total")],
+                    shade: None,
+                };
+            }
+            for index in sums {
                 let total: f64 = table
                     .rows
                     .iter()
                     .filter_map(|row| row.get(index)?.replace(',', "").trim().parse::<f64>().ok())
                     .sum();
-                let mut row: Vec<Cell> = table.header.iter().map(|_| Cell::text("")).collect();
-                if let Some(first) = row.first_mut() {
-                    *first = Cell {
-                        spans: vec![Span::bold("Total")],
-                        shade: None,
-                    };
-                }
                 if let Some(cell) = row.get_mut(index) {
                     *cell = Cell {
-                        spans: vec![Span::bold(data::display_number(total))],
+                        spans: vec![Span::bold(display_number(total))],
                         shade: None,
                     };
                 }
-                rows.push(row);
             }
+            rows.push(row);
         }
         Node::Table(Table {
             style: TableStyle::Data,
@@ -1042,23 +1093,26 @@ impl Ctx<'_, '_> {
     }
 
     fn calculator(&mut self, fence: &Fence) -> Node {
-        let (inputs, outputs) = data::calculator(fence);
-        let mut rows: Vec<Vec<Cell>> = inputs
+        let calc = self.read(&fence.lang, Calculator::parse(fence));
+        let values = calc::outputs(&calc, &self.opts.as_of);
+        let mut rows: Vec<Vec<Cell>> = calc
+            .inputs
             .iter()
             .map(|input| {
                 vec![
                     Cell::text(input.label.clone()),
-                    Cell::text(data::display_number(input.value)),
+                    Cell::text(display_number(input.value)),
                 ]
             })
             .collect();
-        for output in outputs {
-            let value = match &output.value {
-                Ok(value) if output.unit == "$" || output.unit == "€" || output.unit == "£" => {
-                    format!("{}{}", output.unit, data::display_number(*value))
+        for (output, (unit, value)) in calc.outputs.into_iter().zip(values) {
+            let unit = unit.unwrap_or_default();
+            let value = match &value {
+                Ok(value) if unit == "$" || unit == "€" || unit == "£" => {
+                    format!("{unit}{}", display_number(*value))
                 }
-                Ok(value) if output.unit.is_empty() => data::display_number(*value),
-                Ok(value) => format!("{} {}", data::display_number(*value), output.unit),
+                Ok(value) if unit.is_empty() => display_number(*value),
+                Ok(value) => format!("{} {unit}", display_number(*value)),
                 Err(error) => {
                     self.warn("calculator", error.clone());
                     format!("Error: {error}")
@@ -1100,8 +1154,7 @@ impl Ctx<'_, '_> {
                         .rows
                         .iter()
                         .map(|row| {
-                            let mut cells: Vec<Cell> =
-                                row.iter().map(|v| self.status_cell(v)).collect();
+                            let mut cells: Vec<Cell> = row.iter().map(|v| status_cell(v)).collect();
                             cells.resize_with(snapshot.columns.len(), || Cell::text(""));
                             cells
                         })
@@ -1122,10 +1175,11 @@ impl Ctx<'_, '_> {
         let compare = is_compare_matrix(table);
         let cell = |ctx: &mut Self, inlines: &[Inline], first: bool| -> Cell {
             let text = inline_text(inlines);
-            if compare && !first {
-                if let Some(symbol) = compare_symbol(&text) {
-                    return Cell::text(symbol);
-                }
+            if compare
+                && !first
+                && let Some(symbol) = compare_symbol(&text)
+            {
+                return Cell::text(symbol);
             }
             Cell {
                 spans: ctx.spans(inlines),
@@ -1168,15 +1222,9 @@ impl Ctx<'_, '_> {
         })
     }
 
-    fn status_cell(&self, text: &str) -> Cell {
-        Cell {
-            spans: vec![Span::plain(text)],
-            shade: status_tone(text),
-        }
-    }
-
     // ---- containers ---------------------------------------------------
 
+    #[allow(clippy::too_many_lines)] // one arm per container kind
     fn container(&mut self, container: &Container, out: &mut Vec<Node>) {
         let body: Vec<&Block> = container.sections.iter().flatten().collect();
         match container.kind() {
@@ -1202,37 +1250,59 @@ impl Ctx<'_, '_> {
                     .collect();
                 out.push(Node::Columns { columns });
             }
-            ContainerKind::Tabs => self.tabs(&body, out),
+            ContainerKind::Tabs => {
+                let tabs = self.read(&container.name, Tabs::parse(container)).tabs;
+                for tab in tabs {
+                    let title = self.spans(&tab.title);
+                    let blocks = self.blocks(&tab.blocks);
+                    out.push(Node::Titled { title, blocks });
+                }
+            }
             ContainerKind::Toc => out.push(Node::Toc { depth: 3 }),
             ContainerKind::Stats => {
-                let tiles = list_items(&body)
-                    .map(|item| {
-                        let text = item_text(item);
-                        let mut parts = text.split(" · ").map(str::trim);
-                        let value = parts.next().unwrap_or_default().to_owned();
-                        let label = parts.next().unwrap_or_default().to_owned();
-                        let delta = parts.collect::<Vec<_>>().join(" · ");
-                        let trend = trend(&delta);
+                let tiles = self
+                    .read(&container.name, Stats::parse(container))
+                    .items
+                    .into_iter()
+                    .map(|stat| {
+                        let arrow = match stat.trend {
+                            Some(Trend::Up) => "▲ ",
+                            Some(Trend::Down) => "▼ ",
+                            Some(Trend::Flat) => "▬ ",
+                            None => "",
+                        };
+                        let delta = stat
+                            .delta
+                            .map(|d| format!("{arrow}{}", inline_text(&d)))
+                            .unwrap_or_default();
                         Stat {
-                            value,
-                            label,
+                            value: inline_text(&stat.value),
+                            label: inline_text(&stat.label),
                             delta,
-                            trend,
+                            trend: stat.trend.map(|t| match t {
+                                Trend::Up => Tone::Good,
+                                Trend::Down => Tone::Crit,
+                                Trend::Flat => Tone::Note,
+                            }),
                         }
                     })
                     .collect();
                 out.push(Node::Stats { tiles });
             }
             ContainerKind::Facts => {
-                let rows = list_items(&body)
-                    .map(|item| {
-                        let (key, value) = self.fact(item);
+                let facts = self.read(&container.name, Facts::parse(container)).items;
+                let rows = facts
+                    .iter()
+                    .map(|fact| {
                         vec![
                             Cell {
-                                spans: vec![Span::bold(key)],
+                                spans: vec![Span::bold(inline_text(&fact.key))],
                                 shade: None,
                             },
-                            value,
+                            Cell {
+                                spans: self.spans(&fact.value),
+                                shade: status_tone(&inline_text(&fact.value)),
+                            },
                         ]
                     })
                     .collect();
@@ -1244,28 +1314,61 @@ impl Ctx<'_, '_> {
                 }));
             }
             ContainerKind::Cards => {
-                let cards = list_items(&body).map(|item| self.card(item)).collect();
+                let cards = self
+                    .read(&container.name, Cards::parse(container))
+                    .cards
+                    .iter()
+                    .map(|card| Card {
+                        icon: card.icon.clone().unwrap_or_default(),
+                        title: inline_text(&card.title),
+                        spans: self.spans(&card.body),
+                    })
+                    .collect();
                 out.push(Node::Cards { cards });
             }
             ContainerKind::Progress => {
-                let bars = list_items(&body)
-                    .map(|item| {
-                        let text = item_text(item);
-                        let (label, pct) = text.rsplit_once('·').unwrap_or((&text, ""));
-                        let percent = pct
-                            .trim()
-                            .trim_end_matches('%')
-                            .trim()
-                            .parse::<f64>()
-                            .unwrap_or(0.0)
-                            .clamp(0.0, 100.0);
-                        Bar {
-                            label: label.trim().to_owned(),
-                            percent,
-                        }
+                let bars = self
+                    .read(&container.name, Progress::parse(container))
+                    .items
+                    .iter()
+                    .map(|item| Bar {
+                        label: inline_text(&item.label),
+                        percent: item.percent.clamp(0.0, 100.0),
                     })
                     .collect();
                 out.push(Node::Progress { bars });
+            }
+            ContainerKind::Steps => {
+                let steps = self.read(&container.name, Steps::parse(container)).steps;
+                let items = steps
+                    .iter()
+                    .map(|step| {
+                        let mut spans = Vec::new();
+                        self.inlines(
+                            &step.title,
+                            Style {
+                                bold: true,
+                                ..Style::default()
+                            },
+                            &mut spans,
+                        );
+                        if !step.body.is_empty() {
+                            spans.push(Span::Break);
+                            spans.extend(self.spans(&step.body));
+                        }
+                        Item {
+                            check: None,
+                            blocks: vec![Node::Paragraph {
+                                spans,
+                                anchor: None,
+                            }],
+                        }
+                    })
+                    .collect();
+                out.push(Node::List {
+                    start: Some(1),
+                    items,
+                });
             }
             ContainerKind::Link | ContainerKind::Embed => {
                 let text = body
@@ -1294,7 +1397,7 @@ impl Ctx<'_, '_> {
                     text: rest,
                 });
             }
-            ContainerKind::Steps | ContainerKind::Pages | ContainerKind::Unknown => {
+            ContainerKind::Pages | ContainerKind::Unknown => {
                 let blocks = self.blocks_ref(&body);
                 out.extend(blocks);
             }
@@ -1307,92 +1410,6 @@ impl Ctx<'_, '_> {
             self.block(block, &mut out);
         }
         out
-    }
-
-    /// Tabs print one after another under their `##` titles.
-    fn tabs(&mut self, body: &[&Block], out: &mut Vec<Node>) {
-        let mut title: Option<Vec<Span>> = None;
-        let mut current: Vec<&Block> = Vec::new();
-        for block in body {
-            if let Block::Heading { level: 2, content, .. } = block {
-                if let Some(title) = title.take() {
-                    let blocks = self.blocks_ref(&current);
-                    out.push(Node::Titled { title, blocks });
-                } else if !current.is_empty() {
-                    out.extend(self.blocks_ref(&current));
-                }
-                current.clear();
-                title = Some(self.spans(content));
-            } else {
-                current.push(block);
-            }
-        }
-        match title {
-            Some(title) => {
-                let blocks = self.blocks_ref(&current);
-                out.push(Node::Titled { title, blocks });
-            }
-            None => out.extend(self.blocks_ref(&current)),
-        }
-    }
-
-    fn fact(&mut self, item: &ListItem) -> (String, Cell) {
-        let inlines = item_inlines(item);
-        // Split the inlines at the first ": " in a text run.
-        let mut key = String::new();
-        let mut rest: Vec<Inline> = Vec::new();
-        let mut split = false;
-        for inline in &inlines {
-            if split {
-                rest.push(inline.clone());
-                continue;
-            }
-            match inline {
-                Inline::Text { text } => match text.split_once(':') {
-                    Some((k, v)) => {
-                        key.push_str(k);
-                        let v = v.trim_start();
-                        if !v.is_empty() {
-                            rest.push(Inline::Text { text: v.to_owned() });
-                        }
-                        split = true;
-                    }
-                    None => key.push_str(text),
-                },
-                other => key.push_str(&inline_text(std::slice::from_ref(other))),
-            }
-        }
-        let text = inline_text(&rest);
-        let cell = Cell {
-            spans: self.spans(&rest),
-            shade: status_tone(&text),
-        };
-        (key.trim().to_owned(), cell)
-    }
-
-    fn card(&mut self, item: &ListItem) -> Card {
-        let inlines = item_inlines(item);
-        let mut icon = String::new();
-        let mut title = String::new();
-        let mut rest: Vec<Inline> = Vec::new();
-        for inline in &inlines {
-            match inline {
-                Inline::Strong { content } if title.is_empty() => title = inline_text(content),
-                Inline::Text { text } if title.is_empty() => icon.push_str(text.trim()),
-                other => rest.push(other.clone()),
-            }
-        }
-        if let Some(Inline::Text { text }) = rest.first_mut() {
-            *text = text.trim_start().to_owned();
-        }
-        if title.is_empty() {
-            title = std::mem::take(&mut icon);
-        }
-        Card {
-            icon,
-            title,
-            spans: self.spans(&rest),
-        }
     }
 
     // ---- inlines ------------------------------------------------------
@@ -1409,6 +1426,7 @@ impl Ctx<'_, '_> {
         }
     }
 
+    #[allow(clippy::too_many_lines)] // one arm per inline kind
     fn inline(&mut self, inline: &Inline, style: Style, out: &mut Vec<Span>) {
         match inline {
             Inline::Text { text } => push_text(out, text, style),
@@ -1454,22 +1472,19 @@ impl Ctx<'_, '_> {
                 },
                 out,
             ),
-            Inline::Subscript { content } => self.inlines(
-                content,
-                Style { sub: true, ..style },
-                out,
-            ),
-            Inline::Superscript { content } => self.inlines(
-                content,
-                Style { sup: true, ..style },
-                out,
-            ),
+            Inline::Subscript { content } => {
+                self.inlines(content, Style { sub: true, ..style }, out);
+            }
+            Inline::Superscript { content } => {
+                self.inlines(content, Style { sup: true, ..style }, out);
+            }
             Inline::Link { url, content, .. } => {
                 let mut spans = Vec::new();
                 self.inlines(content, style, &mut spans);
                 self.link(url, spans, out);
             }
-            Inline::Image { url, alt, .. } => match self.session.by_url.get(url).cloned().flatten() {
+            Inline::Image { url, alt, .. } => match self.session.by_url.get(url).cloned().flatten()
+            {
                 Some(asset) => out.push(Span::Image {
                     asset,
                     alt: inline_text(alt),
@@ -1508,10 +1523,10 @@ impl Ctx<'_, '_> {
                 push_text(out, &format!("@{name}"), style);
             }
             Inline::IssueKey { key } => {
-                let text = match self.answers.issues.get(key) {
-                    Some(chip) => format!("{key} {} ({})", chip.title, chip.status),
-                    None => key.clone(),
-                };
+                let text = self.answers.issues.get(key).map_or_else(
+                    || key.clone(),
+                    |chip| format!("{key} {} ({})", chip.title, chip.status),
+                );
                 push_text(out, &text, style);
             }
             Inline::Date { date } => {
@@ -1527,7 +1542,7 @@ impl Ctx<'_, '_> {
 
     /// A link: a cross-reference when the target is in this export, a web
     /// link otherwise, or plain text when it has nowhere to go.
-    fn link(&mut self, url: &str, spans: Vec<Span>, out: &mut Vec<Span>) {
+    fn link(&self, url: &str, spans: Vec<Span>, out: &mut Vec<Span>) {
         if let Some(rest) = url.strip_prefix("vellum://doc/") {
             let (doc, fragment) = rest.split_once('#').unwrap_or((rest, ""));
             let target = if fragment.is_empty() {
@@ -1558,14 +1573,14 @@ impl Ctx<'_, '_> {
             }
             return;
         }
-        if let Some(fragment) = url.strip_prefix('#') {
-            if let Some((anchor, text)) = self.opts.refs.blocks.get(fragment) {
-                out.push(Span::Xref {
-                    anchor: anchor.clone(),
-                    text: text.clone(),
-                });
-                return;
-            }
+        if let Some(fragment) = url.strip_prefix('#')
+            && let Some((anchor, text)) = self.opts.refs.blocks.get(fragment)
+        {
+            out.push(Span::Xref {
+                anchor: anchor.clone(),
+                text: text.clone(),
+            });
+            return;
         }
         if is_safe_url(url) {
             out.push(Span::Link {
@@ -1593,11 +1608,10 @@ fn push_text(out: &mut Vec<Span>, text: &str, style: Style) {
         text: last,
         style: last_style,
     }) = out.last_mut()
+        && *last_style == style
     {
-        if *last_style == style {
-            last.push_str(text);
-            return;
-        }
+        last.push_str(text);
+        return;
     }
     out.push(Span::Text {
         text: text.to_owned(),
@@ -1646,39 +1660,11 @@ const fn fallback_name(kind: FenceKind) -> &'static str {
     }
 }
 
-fn list_items<'a>(body: &'a [&'a Block]) -> impl Iterator<Item = &'a ListItem> {
-    body.iter()
-        .filter_map(|block| match block {
-            Block::List(list) => Some(list.items.iter()),
-            _ => None,
-        })
-        .flatten()
-}
-
-fn item_inlines(item: &ListItem) -> Vec<Inline> {
-    item.blocks
-        .iter()
-        .filter_map(|block| match block {
-            Block::Paragraph { content, .. } => Some(content.clone()),
-            _ => None,
-        })
-        .flatten()
-        .collect()
-}
-
-fn item_text(item: &ListItem) -> String {
-    inline_text(&item_inlines(item))
-}
-
-fn trend(delta: &str) -> Option<Tone> {
-    if delta.contains('▲') {
-        Some(Tone::Good)
-    } else if delta.contains('▼') {
-        Some(Tone::Crit)
-    } else if delta.contains('▬') {
-        Some(Tone::Note)
-    } else {
-        None
+/// A cell whose status word, if it holds one, is shown as a chip.
+fn status_cell(text: &str) -> Cell {
+    Cell {
+        spans: vec![Span::plain(text)],
+        shade: status_tone(text),
     }
 }
 

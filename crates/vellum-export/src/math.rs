@@ -76,10 +76,7 @@ pub fn parse(tex: &str) -> Result<Node, MathError> {
     };
     let node = parser.row(&[])?;
     if let Some(tok) = parser.peek() {
-        return Err(MathError(format!(
-            "unexpected `{}`",
-            tok.text()
-        )));
+        return Err(MathError(format!("unexpected `{}`", tok.text())));
     }
     Ok(node)
 }
@@ -476,13 +473,12 @@ impl Parser<'_> {
     fn environment(&mut self) -> Result<Node, MathError> {
         let env = self.braced_text()?;
         let (open, close) = match env.as_str() {
-            "matrix" => ("", ""),
+            "matrix" | "cases" | "aligned" | "align" | "align*" | "gathered" => ("", ""),
             "pmatrix" => ("(", ")"),
             "bmatrix" => ("[", "]"),
             "Bmatrix" => ("{", "}"),
             "vmatrix" => ("|", "|"),
             "Vmatrix" => ("‖", "‖"),
-            "cases" | "aligned" | "align" | "align*" | "gathered" => ("", ""),
             other => return Err(MathError(format!("environment `{other}`"))),
         };
         let mut rows = Vec::new();
@@ -619,7 +615,7 @@ fn symbol(name: &str) -> Option<(&'static str, char)> {
     })
 }
 
-fn is_big_operator(node: &Node) -> Option<char> {
+const fn is_big_operator(node: &Node) -> Option<char> {
     match node {
         Node::Sym(_, c @ ('∑' | '∏' | '∫' | '∬' | '∮' | '⋃' | '⋂')) => Some(*c),
         _ => None,
@@ -682,12 +678,7 @@ fn typst(node: &Node, out: &mut String) {
             }
             out.push(')');
         }
-        Node::Accent(name, _, body) => {
-            let _ = write!(out, "{name}(");
-            typst(body, out);
-            out.push(')');
-        }
-        Node::Font(name, body) => {
+        Node::Accent(name, _, body) | Node::Font(name, body) => {
             let _ = write!(out, "{name}(");
             typst(body, out);
             out.push(')');
@@ -747,8 +738,8 @@ fn typst_delim(delim: &str, out: &mut String) {
     match delim {
         "." => out.push_str("\"\""),
         "(" | ")" | "[" | "]" | "|" => out.push_str(delim),
-        "{" => out.push_str("{"),
-        "}" => out.push_str("}"),
+        "{" => out.push('{'),
+        "}" => out.push('}'),
         other => {
             let _ = write!(out, "\"{}\"", escape_typst_string(other));
         }
@@ -778,7 +769,11 @@ fn omml_run(text: &str, plain: bool, out: &mut String) {
     if plain {
         out.push_str("<m:rPr><m:sty m:val=\"p\"/></m:rPr>");
     }
-    let _ = write!(out, "<m:t xml:space=\"preserve\">{}</m:t></m:r>", xml_escape(text));
+    let _ = write!(
+        out,
+        "<m:t xml:space=\"preserve\">{}</m:t></m:r>",
+        xml_escape(text)
+    );
 }
 
 fn omml_e(node: &Node, out: &mut String) {
@@ -788,6 +783,7 @@ fn omml_e(node: &Node, out: &mut String) {
 }
 
 /// Writes OMML (Office Math Markup Language) for Word.
+#[allow(clippy::too_many_lines)] // one arm per node kind
 fn omml(node: &Node, out: &mut String) {
     match node {
         Node::Row(items) => {
@@ -804,9 +800,8 @@ fn omml(node: &Node, out: &mut String) {
                 i += 1;
             }
         }
-        Node::Var(c) => omml_run(&c.to_string(), false, out),
+        Node::Var(c) | Node::Sym(_, c) => omml_run(&c.to_string(), false, out),
         Node::Num(n) => omml_run(n, false, out),
-        Node::Sym(_, c) => omml_run(&c.to_string(), false, out),
         Node::Func(name) => {
             out.push_str("<m:func><m:fName>");
             omml_run(name, true, out);
@@ -835,11 +830,7 @@ fn omml(node: &Node, out: &mut String) {
         }
         Node::Script { base, sub, sup } => {
             if let Some(op) = is_big_operator(base) {
-                omml_nary(
-                    (op, sub.as_deref(), sup.as_deref()),
-                    None,
-                    out,
-                );
+                omml_nary((op, sub.as_deref(), sup.as_deref()), None, out);
                 return;
             }
             let (tag, parts): (&str, Vec<(&str, &Node)>) = match (sub, sup) {
@@ -921,9 +912,7 @@ fn omml(node: &Node, out: &mut String) {
             }
         }
         Node::Cases(rows) => {
-            out.push_str(
-                "<m:d><m:dPr><m:begChr m:val=\"{\"/><m:endChr m:val=\"\"/></m:dPr><m:e>",
-            );
+            out.push_str("<m:d><m:dPr><m:begChr m:val=\"{\"/><m:endChr m:val=\"\"/></m:dPr><m:e>");
             omml_matrix(rows, out);
             out.push_str("</m:e></m:d>");
         }

@@ -6,7 +6,7 @@
 //! Export writes the flow as Word with PNG figures and formula images
 //! (Google Docs reads neither SVG nor OMML) and uploads it with conversion
 //! to a Google Doc. Import downloads a Google Doc as Word and hands it to
-//! the Word importer. Calls use the person's own OAuth access token, so
+//! the Word importer. Calls use the person's own `OAuth` access token, so
 //! Drive applies their permissions; the token is never logged.
 
 use std::fmt::Write as _;
@@ -29,7 +29,7 @@ pub const DOCX: &str = "application/vnd.openxmlformats-officedocument.wordproces
 /// Largest Word file downloaded for import.
 const MAX_IMPORT_BYTES: usize = 100 * 1024 * 1024;
 
-/// An OAuth 2.0 access token with the `drive.file` scope (export) or
+/// An `OAuth` 2.0 access token with the `drive.file` scope (export) or
 /// `drive.readonly` (import). Its `Debug` output is redacted.
 #[derive(Clone, PartialEq, Eq)]
 pub struct AccessToken(String);
@@ -141,11 +141,14 @@ impl Drive {
                 ..DocxOptions::default()
             },
         )?;
-        let mut metadata = serde_json::json!({ "name": name, "mimeType": GOOGLE_DOC });
+        let mut metadata = serde_json::Map::new();
+        let _ = metadata.insert("name".into(), name.into());
+        let _ = metadata.insert("mimeType".into(), GOOGLE_DOC.into());
         if let Some(folder) = folder {
             check_id(folder).map_err(|m| ExportError::Invalid(m.into()))?;
-            metadata["parents"] = serde_json::json!([folder]);
+            let _ = metadata.insert("parents".into(), serde_json::json!([folder]));
         }
+        let metadata = serde_json::Value::Object(metadata);
         let boundary = "vellum-export-boundary-7c1e";
         let mut body = Vec::with_capacity(bytes.len() + 512);
         let mut head = String::new();
@@ -181,14 +184,11 @@ impl Drive {
         if !status.is_success() {
             return Err(ExportError::Remote {
                 service: "drive",
-                message: drive_message(status, response.text().await.unwrap_or_default()),
+                message: drive_message(status, &response.text().await.unwrap_or_default()),
                 retryable: status.is_server_error() || status.as_u16() == 429,
             });
         }
-        response
-            .json::<DriveFile>()
-            .await
-            .map_err(export_remote)
+        response.json::<DriveFile>().await.map_err(export_remote)
     }
 
     /// Downloads the Google Doc `file_id` as Word, for the Word importer.
@@ -206,7 +206,9 @@ impl Drive {
         check_id(file_id).map_err(|m| ImportError::format("gdocs", m))?;
         let meta_url = self
             .api
-            .join(&format!("files/{file_id}?fields=name,mimeType&supportsAllDrives=true"))
+            .join(&format!(
+                "files/{file_id}?fields=name,mimeType&supportsAllDrives=true"
+            ))
             .map_err(|e| ImportError::format("gdocs", e.to_string()))?;
         let meta: serde_json::Value = self
             .get(meta_url, token)
@@ -274,7 +276,7 @@ impl Drive {
         } else {
             Err(ImportError::Remote {
                 service: "drive",
-                message: drive_message(status, response.text().await.unwrap_or_default()),
+                message: drive_message(status, &response.text().await.unwrap_or_default()),
                 retryable: status.is_server_error() || status.as_u16() == 429,
             })
         }
@@ -296,8 +298,8 @@ fn check_id(id: &str) -> Result<(), &'static str> {
 }
 
 /// Drive's error message, without echoing anything that could hold a token.
-fn drive_message(status: reqwest::StatusCode, body: String) -> String {
-    let message = serde_json::from_str::<serde_json::Value>(&body)
+fn drive_message(status: reqwest::StatusCode, body: &str) -> String {
+    let message = serde_json::from_str::<serde_json::Value>(body)
         .ok()
         .and_then(|v| {
             v.pointer("/error/message")
@@ -436,11 +438,11 @@ mod tests {
     fn drive_errors_keep_only_the_message() {
         let body = r#"{"error":{"code":403,"message":"Insufficient permissions"}}"#;
         assert_eq!(
-            drive_message(reqwest::StatusCode::FORBIDDEN, body.into()),
+            drive_message(reqwest::StatusCode::FORBIDDEN, body),
             "HTTP 403 Forbidden: Insufficient permissions"
         );
         assert_eq!(
-            drive_message(reqwest::StatusCode::BAD_GATEWAY, "<html>".into()),
+            drive_message(reqwest::StatusCode::BAD_GATEWAY, "<html>"),
             "HTTP 502 Bad Gateway"
         );
     }

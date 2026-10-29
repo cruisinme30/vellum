@@ -52,7 +52,11 @@ pub fn rasterize_svg(svg: &[u8], scale: f32) -> Option<Vec<u8>> {
         (size.height() * scale).ceil().max(1.0) as u32,
     );
     let mut pixmap = Pixmap::new(width, height)?;
-    resvg::render(&tree, Transform::from_scale(scale, scale), &mut pixmap.as_mut());
+    resvg::render(
+        &tree,
+        Transform::from_scale(scale, scale),
+        &mut pixmap.as_mut(),
+    );
     pixmap.encode_png().ok()
 }
 

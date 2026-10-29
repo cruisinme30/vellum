@@ -35,7 +35,7 @@
 //! through the global OpenTelemetry meter ([`metrics`]).
 
 pub mod book;
-pub mod data;
+mod calc;
 pub mod docx;
 pub mod error;
 pub mod flow;

@@ -128,7 +128,10 @@ impl Default for PrintTheme {
             size: 10.5,
             lang: "en".to_owned(),
             fonts: Fonts {
-                body: vec!["Libertinus Serif".to_owned(), "New Computer Modern".to_owned()],
+                body: vec![
+                    "Libertinus Serif".to_owned(),
+                    "New Computer Modern".to_owned(),
+                ],
                 mono: vec!["DejaVu Sans Mono".to_owned()],
             },
             // Material 3 roles from the brief's seed (#4F5B92).
@@ -327,7 +330,8 @@ fn typeset_error(errors: &[SourceDiagnostic]) -> ExportError {
 }
 
 fn json<T: Serialize>(value: &T) -> Result<Vec<u8>, ExportError> {
-    serde_json::to_vec(value).map_err(|e| ExportError::Typeset(format!("cannot encode the flow: {e}")))
+    serde_json::to_vec(value)
+        .map_err(|e| ExportError::Typeset(format!("cannot encode the flow: {e}")))
 }
 
 /// Typst interns file IDs for the life of the process, so the names used
@@ -369,10 +373,7 @@ impl World for Job<'_> {
     }
 
     fn file(&self, id: FileId) -> FileResult<Bytes> {
-        self.files
-            .get(&id)
-            .cloned()
-            .ok_or(FileError::AccessDenied)
+        self.files.get(&id).cloned().ok_or(FileError::AccessDenied)
     }
 
     fn font(&self, index: usize) -> Option<Font> {
@@ -392,7 +393,11 @@ fn page_text(frame: &Frame) -> String {
     let mut lines: Vec<Vec<Run>> = Vec::new();
     for run in runs {
         match lines.last_mut() {
-            Some(line) if line.first().is_some_and(|first| (first.y - run.y).abs() < 2.0) => {
+            Some(line)
+                if line
+                    .first()
+                    .is_some_and(|first| (first.y - run.y).abs() < 2.0) =>
+            {
                 line.push(run);
             }
             _ => lines.push(vec![run]),
@@ -437,8 +442,10 @@ fn collect_runs(frame: &Frame, origin: Point, out: &mut Vec<Run>) {
                 width: text.width().to_pt(),
                 text: text.text.to_string(),
             }),
-            FrameItem::Shape(..) | FrameItem::Image(..) | FrameItem::Link(..) | FrameItem::Tag(_) => {
-            }
+            FrameItem::Shape(..)
+            | FrameItem::Image(..)
+            | FrameItem::Link(..)
+            | FrameItem::Tag(_) => {}
         }
     }
 }

@@ -98,7 +98,9 @@ impl Gotenberg {
             .text("landscape", if page.landscape { "true" } else { "false" });
         for (name, bytes) in &page.files {
             if name == "index.html" || name.contains('/') || name.contains("..") {
-                return Err(ExportError::Invalid(format!("bad screen asset name {name}")));
+                return Err(ExportError::Invalid(format!(
+                    "bad screen asset name {name}"
+                )));
             }
             form = form.part("files", Part::bytes(bytes.clone()).file_name(name.clone()));
         }
@@ -119,7 +121,9 @@ impl Gotenberg {
         }
         let bytes = response.bytes().await.map_err(remote)?;
         if bytes.len() > MAX_PDF_BYTES {
-            return Err(ExportError::TooLarge("the screen PDF is over 200 MB".into()));
+            return Err(ExportError::TooLarge(
+                "the screen PDF is over 200 MB".into(),
+            ));
         }
         if !bytes.starts_with(b"%PDF-") {
             return Err(ExportError::Remote {

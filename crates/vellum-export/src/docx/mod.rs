@@ -246,6 +246,7 @@ impl<'a> Writer<'a> {
 
     // ---- package ------------------------------------------------------
 
+    #[allow(clippy::too_many_lines)] // one straight list of package parts
     fn package(mut self) -> Result<Vec<u8>, ExportError> {
         let (width, height) = match self.options.page {
             PageSize::A4 => (11_906, 16_838),
@@ -297,9 +298,9 @@ impl<'a> Writer<'a> {
         let deflate = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
         let stored = SimpleFileOptions::default().compression_method(CompressionMethod::Stored);
         let put = |zip: &mut ZipWriter<Cursor<Vec<u8>>>,
-                       name: &str,
-                       bytes: &[u8],
-                       options: SimpleFileOptions|
+                   name: &str,
+                   bytes: &[u8],
+                   options: SimpleFileOptions|
          -> Result<(), ExportError> {
             zip.start_file(name, options)
                 .map_err(|e| ExportError::Write(e.to_string()))?;
@@ -312,7 +313,12 @@ impl<'a> Writer<'a> {
             parts::content_types(&media_types).as_bytes(),
             deflate,
         )?;
-        put(&mut zip, "_rels/.rels", parts::PACKAGE_RELS.as_bytes(), deflate)?;
+        put(
+            &mut zip,
+            "_rels/.rels",
+            parts::PACKAGE_RELS.as_bytes(),
+            deflate,
+        )?;
         put(
             &mut zip,
             "docProps/core.xml",
@@ -344,15 +350,30 @@ impl<'a> Writer<'a> {
             parts::numbering(&self.nums).as_bytes(),
             deflate,
         )?;
-        put(&mut zip, "word/settings.xml", parts::SETTINGS.as_bytes(), deflate)?;
-        put(&mut zip, "word/footer1.xml", parts::FOOTER.as_bytes(), deflate)?;
+        put(
+            &mut zip,
+            "word/settings.xml",
+            parts::SETTINGS.as_bytes(),
+            deflate,
+        )?;
+        put(
+            &mut zip,
+            "word/footer1.xml",
+            parts::FOOTER.as_bytes(),
+            deflate,
+        )?;
         for media in &self.media {
             let options = if media.media == Media::Svg {
                 deflate
             } else {
                 stored
             };
-            put(&mut zip, &format!("word/{}", media.path), &media.bytes, options)?;
+            put(
+                &mut zip,
+                &format!("word/{}", media.path),
+                &media.bytes,
+                options,
+            )?;
         }
         let cursor = zip
             .finish()
@@ -426,9 +447,7 @@ impl<'a> Writer<'a> {
             Node::Code { text, .. } => self.code(text),
             Node::Math { tex, .. } => self.math(tex),
             Node::Table(table) => self.table(table),
-            Node::Rule => self.body.push_str(concat!(
-                r#"<w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="6" w:space="1" w:color="C5C6D0"/></w:pBdr></w:pPr></w:p>"#
-            )),
+            Node::Rule => self.body.push_str("<w:p><w:pPr><w:pBdr><w:bottom w:val=\"single\" w:sz=\"6\" w:space=\"1\" w:color=\"C5C6D0\"/></w:pBdr></w:pPr></w:p>"),
             Node::Callout { tone, blocks } => self.callout(*tone, blocks, depth),
             Node::Titled { title, blocks } => {
                 self.styled_paragraph("Subheading", title);
@@ -482,7 +501,7 @@ impl<'a> Writer<'a> {
             }
             Node::Progress { bars } => {
                 for bar in bars {
-                    let text = format!("{} — {}%", bar.label, crate::data::display_number(bar.percent));
+                    let text = format!("{} — {}%", bar.label, crate::calc::display_number(bar.percent));
                     self.styled_paragraph("Normal", &[Span::plain(text)]);
                 }
             }
@@ -568,9 +587,9 @@ impl<'a> Writer<'a> {
 
     fn ensure_paragraph(&mut self, before: usize) {
         let added = self.body.get(before..).unwrap_or_default();
-        if !added.contains("<w:p>") && !added.contains("<w:p ") && !added.contains("<w:p/>") {
-            self.body.push_str("<w:p/>");
-        } else if added.ends_with("</w:tbl>") {
+        let has_paragraph =
+            added.contains("<w:p>") || added.contains("<w:p ") || added.contains("<w:p/>");
+        if !has_paragraph || added.ends_with("</w:tbl>") {
             self.body.push_str("<w:p/>");
         }
     }
@@ -594,10 +613,7 @@ impl<'a> Writer<'a> {
                     Node::Paragraph { spans, anchor } if first => {
                         let mut runs = String::new();
                         if let Some(done) = item.check {
-                            self.runs(
-                                &[Span::plain(if done { "☑ " } else { "☐ " })],
-                                &mut runs,
-                            );
+                            self.runs(&[Span::plain(if done { "☑ " } else { "☐ " })], &mut runs);
                         }
                         self.runs(spans, &mut runs);
                         let runs = self.bookmarked(anchor.as_deref(), runs);
@@ -656,14 +672,11 @@ impl<'a> Writer<'a> {
     }
 
     fn math(&mut self, tex: &str) {
-        if self.options.math == MathMode::Equation {
-            if let Ok(omml) = math::to_omml(tex) {
-                let _ = write!(
-                    self.body,
-                    "<w:p><m:oMathPara>{omml}</m:oMathPara></w:p>"
-                );
-                return;
-            }
+        if self.options.math == MathMode::Equation
+            && let Ok(omml) = math::to_omml(tex)
+        {
+            let _ = write!(self.body, "<w:p><m:oMathPara>{omml}</m:oMathPara></w:p>");
+            return;
         }
         self.code(tex);
     }
@@ -712,8 +725,7 @@ impl<'a> Writer<'a> {
         };
         self.table_open("VellumTable", &widths, false);
         if !table.header.is_empty() {
-            self.body
-                .push_str("<w:tr><w:trPr><w:tblHeader/></w:trPr>");
+            self.body.push_str("<w:tr><w:trPr><w:tblHeader/></w:trPr>");
             for (i, cell) in table.header.iter().enumerate() {
                 self.cell_open(Some("F0F2F9"), None);
                 let mut runs = String::new();
@@ -806,9 +818,7 @@ impl<'a> Writer<'a> {
     /// A contents field Word refreshes on open, with entries already filled
     /// in for viewers that do not update fields.
     fn toc(&mut self, depth: u8) {
-        self.body.push_str(concat!(
-            r#"<w:p><w:pPr><w:pStyle w:val="TOCHeading"/></w:pPr><w:r><w:t>Contents</w:t></w:r></w:p>"#
-        ));
+        self.body.push_str("<w:p><w:pPr><w:pStyle w:val=\"TOCHeading\"/></w:pPr><w:r><w:t>Contents</w:t></w:r></w:p>");
         let mut entries = Vec::new();
         collect_headings(&self.flow.blocks, depth, &mut entries);
         let _ = write!(
@@ -833,9 +843,8 @@ impl<'a> Writer<'a> {
                 xml(&text)
             );
         }
-        self.body.push_str(
-            r#"<w:p><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>"#,
-        );
+        self.body
+            .push_str(r#"<w:p><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>"#);
     }
 
     // ---- images -------------------------------------------------------
@@ -904,7 +913,12 @@ impl<'a> Writer<'a> {
         (emu(w * scale), emu(h * scale))
     }
 
-    fn drawing(&mut self, asset_name: &str, alt: &str, points: Option<(f64, f64)>) -> Option<String> {
+    fn drawing(
+        &mut self,
+        asset_name: &str,
+        alt: &str,
+        points: Option<(f64, f64)>,
+    ) -> Option<String> {
         let asset = self.asset(asset_name)?;
         let (png_rel, svg_rel) = self.image_rel(asset)?;
         let (cx, cy) = self.extent(asset, points);
@@ -943,10 +957,7 @@ impl<'a> Writer<'a> {
                     r#"<w:p><w:pPr><w:keepNext/><w:jc w:val="center"/></w:pPr>{run}</w:p>"#
                 );
             }
-            None => self.styled_paragraph(
-                "Caption",
-                &[Span::plain(format!("[Image: {alt}]"))],
-            ),
+            None => self.styled_paragraph("Caption", &[Span::plain(format!("[Image: {alt}]"))]),
         }
     }
 
@@ -979,12 +990,10 @@ impl<'a> Writer<'a> {
                         xml(&name)
                     );
                 }
-                Span::Image { asset, alt } => {
-                    match self.drawing(asset, alt, Some((12.0, 12.0))) {
-                        Some(run) => out.push_str(&run),
-                        None => text_run(alt, Style::default(), None, out),
-                    }
-                }
+                Span::Image { asset, alt } => match self.drawing(asset, alt, Some((12.0, 12.0))) {
+                    Some(run) => out.push_str(&run),
+                    None => text_run(alt, Style::default(), None, out),
+                },
             }
         }
     }
@@ -1025,7 +1034,11 @@ fn text_run(text: &str, style: Style, char_style: Option<&str>, out: &mut String
     }
     out.push_str("<w:r>");
     let mut props = String::new();
-    let char_style = if style.code { Some("CodeChar") } else { char_style };
+    let char_style = if style.code {
+        Some("CodeChar")
+    } else {
+        char_style
+    };
     if let Some(cs) = char_style {
         let _ = write!(props, r#"<w:rStyle w:val="{cs}"/>"#);
     }
@@ -1056,7 +1069,7 @@ fn text_run(text: &str, style: Style, char_style: Option<&str>, out: &mut String
     );
 }
 
-fn align_ppr(align: Option<Align>) -> &'static str {
+const fn align_ppr(align: Option<Align>) -> &'static str {
     match align {
         Some(Align::Center) => r#"<w:pPr><w:jc w:val="center"/></w:pPr>"#,
         Some(Align::Right) => r#"<w:pPr><w:jc w:val="right"/></w:pPr>"#,
@@ -1105,10 +1118,10 @@ fn collect_headings(nodes: &[Node], depth: u8, out: &mut Vec<(u8, String, Option
                 anchor,
                 outlined: true,
             } if *level <= depth => {
-                let text = match number {
-                    Some(n) => format!("{n}  {}", plain_text(spans)),
-                    None => plain_text(spans),
-                };
+                let text = number.as_ref().map_or_else(
+                    || plain_text(spans),
+                    |n| format!("{n}  {}", plain_text(spans)),
+                );
                 out.push((*level, text, anchor.clone()));
             }
             Node::Callout { blocks, .. } | Node::Titled { blocks, .. } | Node::Quote { blocks } => {
@@ -1125,7 +1138,10 @@ mod tests {
 
     #[test]
     fn xml_escaping_covers_markup_and_control_characters() {
-        assert_eq!(xml("a<b & \"c\" 'd'"), "a&lt;b &amp; &quot;c&quot; &apos;d&apos;");
+        assert_eq!(
+            xml("a<b & \"c\" 'd'"),
+            "a&lt;b &amp; &quot;c&quot; &apos;d&apos;"
+        );
         assert_eq!(xml("bell\u{7}tab\t"), "belltab\t");
     }
 

@@ -270,7 +270,7 @@ pub struct Item {
 }
 
 /// A table.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Table {
     /// How the table is styled.
     pub style: TableStyle,
@@ -285,7 +285,7 @@ pub struct Table {
 impl Table {
     /// Number of columns.
     #[must_use]
-    pub fn columns(&self) -> usize {
+    pub const fn columns(&self) -> usize {
         self.align.len()
     }
 }
@@ -313,7 +313,7 @@ pub enum Align {
 }
 
 /// A table cell.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Cell {
     /// The cell text.
     pub spans: Vec<Span>,
@@ -393,7 +393,7 @@ pub struct Stat {
 }
 
 /// A card.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Card {
     /// A leading icon (usually an emoji); may be empty.
     pub icon: String,
