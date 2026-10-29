@@ -25,6 +25,7 @@ path = [
   "corpus/guide/**",
   "corpus/**/*.md",
   "corpus/**/*.json",
+  "corpus/**/*.txt",
   ".gitmessage",
 ]
 precedence = "aggregate"

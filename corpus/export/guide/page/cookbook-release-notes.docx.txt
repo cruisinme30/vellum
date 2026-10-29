@@ -1,0 +1,10 @@
+[Title] Release notes, cycle 2027-C04
+| Info Drafted by Claude for @priya from 14 issues completed in 2027-C04. |
+
+[Heading2] Features
+[ListParagraph/0] Replay seven days of traffic in under ten minutes (ENG-142)
+[ListParagraph/0] Diff report of allowed and blocked requests (ENG-143)
+[Heading2] Fixes
+[ListParagraph/0] Rate limits no longer reset when a replica restarts (ENG-158)
+[Heading2] Chores
+[ListParagraph/0] Upgraded the TLS library (ENG-160)

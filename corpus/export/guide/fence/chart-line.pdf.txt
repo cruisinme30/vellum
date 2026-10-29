@@ -1,0 +1,8 @@
+p95 latency
+Mon 52ms
+Tue 48ms
+Wed 50ms
+Thu 41ms
+Fri 38ms
+1 / 1
+

@@ -1,0 +1,10 @@
+stateDiagram-v2
+  [*] --> Draft
+  Draft --> InReview: request review
+  InReview --> Draft: changes requested
+  InReview --> Verified: approve
+  Verified --> Outdated: verify_every elapses
+  Outdated --> Verified: re-verify
+  Verified --> [*]
+1 / 1
+

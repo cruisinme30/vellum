@@ -1,0 +1,3 @@
+[ListParagraph/0] Confirm the dashboardis green
+[ListParagraph/0] Announcein the deploys channel
+[ListParagraph/0] Tagthe release

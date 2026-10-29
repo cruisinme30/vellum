@@ -1,0 +1,6 @@
+Catch rate by attack class
+Direct 60
+Indirect 30
+Multi-turn 10
+1 / 1
+

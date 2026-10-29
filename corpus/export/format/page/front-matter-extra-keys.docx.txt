@@ -1,0 +1,2 @@
+[Title] Fix SSO redirect loop
+[Normal] The redirect loop happens when the IdP session expires first.

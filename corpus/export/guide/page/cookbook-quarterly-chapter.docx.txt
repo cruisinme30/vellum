@@ -1,0 +1,6 @@
+[Title] Engineering
+| 11 of 14 Goals met ▲ 3 | 34 Average velocity ▲ 4 pts | 99.97% Availability ▬ 0 |
+
+[Code] title: Points shipped by quartertype: bar
+| Note Live data was not available when this was exported on 2026-10-29. |
+
