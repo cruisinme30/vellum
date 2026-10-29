@@ -67,6 +67,13 @@ const APP_TARGETS: Target[] = [
   app("shell", "/"),
   app("sign-in", "/sign-in", { server: "signed-out" }),
   app("setup", "/setup", { server: "new" }),
+  // The Drive (ADR 0052) against a stand-in drive; its dates and sizes
+  // follow the browser's locale, so no pixel baselines.
+  app("drive", "/drive", { server: "drive", visual: false }),
+  app("drive folder", "/drive/s/S1/f/F1", { server: "drive", visual: false }),
+  app("drive trash", "/drive/s/S1/trash", { server: "drive", visual: false }),
+  app("drive settings", "/drive/s/S2/settings", { server: "drive", visual: false }),
+  app("drive search", "/drive/search?q=plan&kind=page", { server: "drive", visual: false }),
 ];
 
 function htmlFiles(directory: string): string[] {

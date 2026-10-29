@@ -25,6 +25,18 @@ import type { PageHistory } from "./data/history";
 import { ServerApisProvider } from "./data/server-apis";
 import type { WorkspaceStore } from "./data/store";
 import { useServices, WorkspaceProvider } from "./data/workspace-context";
+import type { DriveApi } from "./drive/api";
+import {
+  MyDrivePage,
+  RecentPage,
+  SharedDrivesPage,
+  SharedWithMePage,
+  SpacePage,
+  StarredPage,
+} from "./drive/drive-page";
+import { DriveSearchPage } from "./drive/search-page";
+import { DriveSettingsPage } from "./drive/settings-page";
+import { TrashPage } from "./drive/trash-page";
 import type { CollabConnector } from "./editor/collab/provider";
 import { I18nProvider, useT } from "./i18n/i18n";
 import { KeyboardRoot } from "./keyboard/keyboard-root";
@@ -94,6 +106,16 @@ export function AppRoutes() {
         <Route path="books" element={<BooksPage />} />
         <Route path="books/:bookId" element={<BookPage />} />
         <Route path="books/:bookId/:sectionId" element={<BookPage />} />
+        <Route path="drive" element={<MyDrivePage />} />
+        <Route path="drive/shared" element={<SharedDrivesPage />} />
+        <Route path="drive/shared-with-me" element={<SharedWithMePage />} />
+        <Route path="drive/starred" element={<StarredPage />} />
+        <Route path="drive/recent" element={<RecentPage />} />
+        <Route path="drive/search" element={<DriveSearchPage />} />
+        <Route path="drive/s/:spaceId" element={<SpacePage />} />
+        <Route path="drive/s/:spaceId/f/:folderId" element={<SpacePage />} />
+        <Route path="drive/s/:spaceId/trash" element={<TrashPage />} />
+        <Route path="drive/s/:spaceId/settings" element={<DriveSettingsPage />} />
         <Route path="data" element={<CollectionsIndexView />} />
         <Route path="data/:collectionId" element={<CollectionView />} />
         <Route path="help" element={<HelpView />} />
@@ -127,6 +149,8 @@ export interface AppServices {
   readonly work?: WorkApi | undefined;
   /** Books, from a Vellum server; absent in demo mode. */
   readonly books?: BooksApi | undefined;
+  /** The drive's spaces, trash, activity and settings; absent in demo mode. */
+  readonly drive?: DriveApi | undefined;
   /** Private spaces' device keys, from a Vellum server; absent in demo mode. */
   readonly privateSpaces?: PrivateSpacesApi | undefined;
   readonly collections: CollectionsStore;
@@ -179,13 +203,17 @@ export function AppProviders({
   admin,
   work,
   books,
+  drive,
   privateSpaces,
   collections,
   session,
   notifications,
   children,
 }: AppServices & { readonly children: ReactNode }) {
-  const serverApis = useMemo(() => ({ work, books, privateSpaces }), [work, books, privateSpaces]);
+  const serverApis = useMemo(
+    () => ({ work, books, drive, privateSpaces }),
+    [work, books, drive, privateSpaces],
+  );
   const [demoNotifications] = useState<NotificationServices>(() => ({
     store: createMockNotificationPreferencesStore(),
   }));
