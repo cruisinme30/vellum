@@ -6,6 +6,8 @@ extends: default
 ignore: |
   web/node_modules/
   web/pnpm-lock.yaml
+  desktop/node_modules/
+  desktop/pnpm-lock.yaml
   target/
 
 rules:

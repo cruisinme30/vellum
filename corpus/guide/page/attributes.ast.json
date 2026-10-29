@@ -29,6 +29,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "sections": [
           [
             {
@@ -58,6 +59,7 @@
             ]
           ]
         },
+        "id": null,
         "literal": "title: Requests\ntype: bar\nlabels: [Mon, Tue]\nvalues: [3, 5]\n"
       },
       {

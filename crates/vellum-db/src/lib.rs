@@ -19,12 +19,14 @@ mod config;
 mod error;
 mod index;
 mod reindex;
+mod shard;
 mod telemetry;
 
 pub use config::{IndexConfig, IndexKey};
 pub use error::{Error, Result};
 pub use index::{Backend, Index, IndexPool};
 pub use reindex::{FileReader, PlainFiles, Problem, ProblemKind, ReindexReport};
+pub use shard::{MAIN_URL_VAR, SHARDS_VAR, Shard, ShardedIndex, ShardsConfig, shard_url_var};
 pub use telemetry::{RowCount, traced};
 
 /// The sqlx version this crate is built on, so dependants share one copy.

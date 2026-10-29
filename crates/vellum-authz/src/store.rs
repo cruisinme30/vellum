@@ -23,8 +23,12 @@ pub struct EffectiveRow {
     pub object: Id,
     /// Who has access.
     pub principal: Principal,
-    /// Their strongest relation.
+    /// A relation they hold.
     pub relation: Relation,
+    /// When the row stops counting (UTC epoch ms, exclusive); `None`
+    /// means never. Lookups ignore rows past it, so expiry fails closed
+    /// without waiting for a sweep.
+    pub valid_until: Option<i64>,
 }
 
 /// Which effective rows a commit replaces.
@@ -97,36 +101,44 @@ pub trait AuthzStore: Send + Sync {
     /// Applies a commit atomically and returns the new epoch.
     fn commit(&self, commit: Commit) -> impl Future<Output = Result<u64, StoreError>> + Send;
 
-    /// The principal's relation on one object, with the epoch it was
-    /// computed at. One indexed read.
+    /// The principal's live rows on one object at `now_ms` (rows whose
+    /// `valid_until` is unset or later), each with the epoch it was
+    /// computed at. One indexed read; the caller takes the strongest.
     fn lookup(
         &self,
         space: Id,
         principal: Principal,
         object: Id,
-    ) -> impl Future<Output = Result<Option<(Relation, u64)>, StoreError>> + Send;
+        now_ms: i64,
+    ) -> impl Future<Output = Result<Vec<(Relation, u64)>, StoreError>> + Send;
 
     /// Every object in the space the principal can reach, with their
     /// relation. One indexed range read; used to filter search and lists.
+    /// Only rows live at `now_ms`; an object may appear once per relation.
     fn list(
         &self,
         space: Id,
         principal: Principal,
+        now_ms: i64,
     ) -> impl Future<Output = Result<Vec<(Id, Relation)>, StoreError>> + Send;
 
     /// The principal's relation on each of `objects` that it can reach,
     /// across spaces. One indexed read on `(subject_id, object_id)`; used
     /// by search to filter a page of hits.
+    /// Only rows live at `now_ms`; an object may appear once per relation.
     fn lookup_many(
         &self,
         principal: Principal,
         objects: &[Id],
+        now_ms: i64,
     ) -> impl Future<Output = Result<Vec<(Id, Relation)>, StoreError>> + Send;
 
-    /// Every space in which the principal can reach at least one object.
+    /// Every space in which the principal can reach at least one object
+    /// at `now_ms`.
     fn spaces_of(
         &self,
         principal: Principal,
+        now_ms: i64,
     ) -> impl Future<Output = Result<Vec<Id>, StoreError>> + Send;
 
     /// The space's current epoch.

@@ -11,6 +11,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "flowchart TB\n  subgraph Edge\n    GW[Gateway + CDN]\n  end\n  subgraph Stateless\n    API[API] --> REN[Render]\n    API --> EXP[Export]\n  end\n  subgraph Stateful\n    COL[(Collab rooms)]\n    IDX[(Index + search)]\n  end\n  GW --> API\n  GW -. websocket .-> COL\n  COL --> IDX\n  REN --> BLOB[(Blob store)]\n  API --> BLOB\n  classDef store fill:#DDE1FF,stroke:#4F5B92;\n  class COL,IDX,BLOB store;\n"
       }
     ]

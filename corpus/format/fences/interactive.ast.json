@@ -11,6 +11,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "units: Units = 100 [0..1000 step 10]\nprice: Price = 12\ntotal: Total = units * price\n"
       },
       {
@@ -22,6 +23,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "src: images/architecture.png\nalt: Request path\ncaption: How a request flows\n"
       },
       {
@@ -33,6 +35,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "source: collection:01JB7Z3K8Q4W5N6P7R8S9T0V20\nview: Board\n"
       }
     ]
