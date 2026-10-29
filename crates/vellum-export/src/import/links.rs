@@ -13,7 +13,7 @@ pub fn inlines_mut(blocks: &mut [Block], f: &mut impl FnMut(&mut Vec<Inline>)) {
             Block::Paragraph { content, .. } | Block::Heading { content, .. } => {
                 walk_inlines(content, f);
             }
-            Block::BlockQuote { blocks } => inlines_mut(blocks, f),
+            Block::BlockQuote { blocks, .. } => inlines_mut(blocks, f),
             Block::List(list) => {
                 for item in &mut list.items {
                     inlines_mut(&mut item.blocks, f);

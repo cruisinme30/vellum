@@ -488,7 +488,7 @@ impl Wants {
             Block::Paragraph { content, .. } | Block::Heading { content, .. } => {
                 self.inlines(content);
             }
-            Block::BlockQuote { blocks } => self.blocks(blocks, target),
+            Block::BlockQuote { blocks, .. } => self.blocks(blocks, target),
             Block::List(list) => {
                 for item in &list.items {
                     self.blocks(&item.blocks, target);
@@ -664,7 +664,7 @@ impl Ctx<'_, '_> {
                 });
             }
             Block::ThematicBreak => out.push(Node::Rule),
-            Block::BlockQuote { blocks } => out.push(Node::Quote {
+            Block::BlockQuote { blocks, .. } => out.push(Node::Quote {
                 blocks: self.blocks(blocks),
             }),
             Block::List(list) => out.push(Node::List {
@@ -672,7 +672,7 @@ impl Ctx<'_, '_> {
                 items: list.items.iter().map(|item| self.item(item)).collect(),
             }),
             Block::Fence(fence) => self.fence(fence, out),
-            Block::Math { literal } => out.push(self.math(literal)),
+            Block::Math { literal, .. } => out.push(self.math(literal)),
             Block::Table(table) => out.push(self.table(table)),
             Block::Container(container) => self.container(container, out),
         }

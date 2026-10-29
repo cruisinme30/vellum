@@ -437,7 +437,7 @@ fn flatten_blocks(blocks: &[Block], out: &mut Vec<Inline>) {
             Block::Fence(fence) => out.push(Inline::Code {
                 code: fence.literal.trim_end().replace('\n', " "),
             }),
-            Block::BlockQuote { blocks } => flatten_blocks(blocks, out),
+            Block::BlockQuote { blocks, .. } => flatten_blocks(blocks, out),
             Block::Container(container) => {
                 for section in &container.sections {
                     flatten_blocks(section, out);
@@ -451,7 +451,7 @@ fn flatten_blocks(blocks: &[Block], out: &mut Vec<Inline>) {
                     }
                 }
             }
-            Block::Math { literal } => out.push(Inline::Code {
+            Block::Math { literal, .. } => out.push(Inline::Code {
                 code: literal.clone(),
             }),
             Block::ThematicBreak => {}

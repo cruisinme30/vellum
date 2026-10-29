@@ -318,7 +318,7 @@ fn collect_block_refs(blocks: &[Block], prefix: &str, label: &str, refs: &mut Re
                     .blocks
                     .insert(id.clone(), (format!("{prefix}{id}"), label.to_owned()));
             }
-            Block::BlockQuote { blocks } => collect_block_refs(blocks, prefix, label, refs),
+            Block::BlockQuote { blocks, .. } => collect_block_refs(blocks, prefix, label, refs),
             Block::List(list) => {
                 for item in &list.items {
                     collect_block_refs(&item.blocks, prefix, label, refs);
