@@ -17,6 +17,7 @@ import { createHttp } from "./api/http";
 import { App } from "./app";
 import { createHttpCollectionsStore } from "./collections/http";
 import { createMockCollectionsStore } from "./collections/mock";
+import { createHttpWorkspaceStore } from "./data/http";
 import { createNorthstarStore } from "./data/mock/northstar";
 import { lazyCache } from "./editor/collab/lazy-cache";
 import { createLocalConnector } from "./editor/collab/local-connector";
@@ -48,7 +49,11 @@ try {
 root.render(
   <StrictMode>
     <App
-      store={createNorthstarStore()}
+      store={
+        status === undefined
+          ? createNorthstarStore()
+          : createHttpWorkspaceStore(http, { user: status.user ?? undefined })
+      }
       collab={createLocalConnector({ cache })}
       collections={
         status === undefined ? createMockCollectionsStore() : createHttpCollectionsStore(http)

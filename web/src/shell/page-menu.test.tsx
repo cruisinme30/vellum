@@ -120,7 +120,9 @@ describe("PageMenu", () => {
     await choose("Platform roadmap 2027", "Add subpage");
     const child = store.getSnapshot().pages.find((p) => p.parentId === PAGE.roadmap);
     expect(child).toBeDefined();
-    expect(location()).toBe(`/p/${child?.id ?? ""}`);
+    await waitFor(() => {
+      expect(location()).toBe(`/p/${child?.id ?? ""}`);
+    });
     expect(screen.getByRole("treeitem", { name: "Platform roadmap 2027" })).toHaveProperty(
       "ariaExpanded",
       "true",

@@ -4,13 +4,15 @@
 import { useCallback, useMemo } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
-import { ancestors } from "../data/tree";
+import { ancestors, siblings } from "../data/tree";
+import type { PageMeta } from "../data/types";
 import { useServices, useWorkspace } from "../data/workspace-context";
 import { PageEditor } from "../editor/page-editor";
 import { useT } from "../i18n/i18n";
 import { Icon } from "../shell/icon";
 
 import { NotFoundView } from "./info";
+import { PageList } from "./page-list";
 
 const CARET_COLORS = ["#b3261e", "#00658f", "#386a20", "#7d5260", "#4f5b92"];
 
@@ -59,7 +61,13 @@ export function PageView() {
   );
 
   if (!page) {
-    return <NotFoundView />;
+    return workspace.loading === true ? (
+      <p className="vl-muted" role="status">
+        {t("workspace-loading")}
+      </p>
+    ) : (
+      <NotFoundView />
+    );
   }
   const updated = new Date(page.updatedAt).toLocaleDateString("en", {
     month: "short",
@@ -116,32 +124,60 @@ export function PageView() {
           <Icon name={page.starred ? "star-fill" : "star"} />
         </button>
       </header>
-      <dl className="vl-page-props">
-        <div>
-          <dt>{t("page-status")}</dt>
-          <dd>
-            <span className={`vl-chip vl-status-${page.status}`}>{t(`status-${page.status}`)}</span>
-          </dd>
-        </div>
-        <div>
-          <dt>{t("page-owner")}</dt>
-          <dd>{owner?.name ?? page.owner}</dd>
-        </div>
-        <div>
-          <dt>{t("page-updated")}</dt>
-          <dd>
-            <time dateTime={page.updatedAt}>{updated}</time>
-          </dd>
-        </div>
-      </dl>
-      <PageEditor
-        pageId={page.id}
-        seed={store.seedFor(page.id)}
-        connector={collab}
-        user={user}
-        resolvePage={resolvePage}
-        onOpenPage={onOpenPage}
-      />
+      {page.folder === true ? (
+        <FolderContents pages={pages} folder={page} />
+      ) : (
+        <>
+          <dl className="vl-page-props">
+            <div>
+              <dt>{t("page-status")}</dt>
+              <dd>
+                <span className={`vl-chip vl-status-${page.status}`}>
+                  {t(`status-${page.status}`)}
+                </span>
+              </dd>
+            </div>
+            <div>
+              <dt>{t("page-owner")}</dt>
+              <dd>{owner?.name ?? page.owner}</dd>
+            </div>
+            <div>
+              <dt>{t("page-updated")}</dt>
+              <dd>
+                <time dateTime={page.updatedAt}>{updated}</time>
+              </dd>
+            </div>
+          </dl>
+          <PageEditor
+            pageId={page.id}
+            seed={store.seedFor(page.id)}
+            connector={collab}
+            user={user}
+            resolvePage={resolvePage}
+            onOpenPage={onOpenPage}
+          />
+        </>
+      )}
     </article>
+  );
+}
+
+/** A drive folder in place of a page body: the pages in it. */
+function FolderContents({
+  pages,
+  folder,
+}: {
+  readonly pages: readonly PageMeta[];
+  readonly folder: PageMeta;
+}) {
+  const t = useT();
+  return (
+    <section>
+      <p className="vl-muted">{t("folder-intro")}</p>
+      <PageList
+        items={siblings(pages, folder.spaceId, folder.id).map((child) => ({ page: child }))}
+        empty={t("folder-empty")}
+      />
+    </section>
   );
 }

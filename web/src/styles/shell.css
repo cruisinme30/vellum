@@ -327,6 +327,26 @@
   outline: none;
 }
 
+/* A change or load the server refused. */
+.vl-problem {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 880px;
+  margin: 0 auto 16px;
+  padding: 8px 16px;
+  border: 1px solid var(--md-error);
+  border-radius: var(--vl-radius-s);
+  color: var(--md-error);
+}
+
+.vl-problem p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .vl-view,
 .vl-page {
   max-width: 880px;

@@ -106,11 +106,11 @@ describe("createMemoryStore", () => {
     expect(snapshot.pages).toHaveLength(3);
   });
 
-  it("creates a page after its siblings and notifies listeners", () => {
+  it("creates a page after its siblings and notifies listeners", async () => {
     const store = createStore();
     const listener = vi.fn();
     const unsubscribe = store.subscribe(listener);
-    const created = store.createPage({ spaceId: SPACE, parentId: "parent", title: "New" });
+    const created = await store.createPage({ spaceId: SPACE, parentId: "parent", title: "New" });
     expect(created).toMatchObject({
       parentId: "parent",
       position: 2,
@@ -122,14 +122,14 @@ describe("createMemoryStore", () => {
     expect(store.getSnapshot().pages).toContain(created);
     expect(listener).toHaveBeenCalledTimes(1);
     unsubscribe();
-    store.createPage({ spaceId: SPACE, parentId: undefined });
+    await store.createPage({ spaceId: SPACE, parentId: undefined });
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
-  it("creates the first page of an empty parent with an empty title", () => {
-    const created = createStore().createPage({ spaceId: SPACE, parentId: "child" });
-    expect(created.position).toBe(1);
-    expect(created.title).toBe("");
+  it("creates the first page of an empty parent with an empty title", async () => {
+    const created = await createStore().createPage({ spaceId: SPACE, parentId: "child" });
+    expect(created?.position).toBe(1);
+    expect(created?.title).toBe("");
   });
 
   it("renames and stars a page", () => {
@@ -160,57 +160,68 @@ describe("createMemoryStore", () => {
     expect(store.getSnapshot().pages.map((entry) => entry.id)).toEqual(["other"]);
   });
 
+  it("never has a problem to dismiss", () => {
+    const store = createStore();
+    const before = store.getSnapshot();
+    store.dismissProblem();
+    expect(store.getSnapshot()).toBe(before);
+  });
+
   it("serves seed bodies", () => {
     const store = createStore();
     expect(store.seedFor("parent")).toBe(SEED.bodies["parent"]);
     expect(store.seedFor("missing")).toBeUndefined();
   });
 
-  it("uses the real clock by default", () => {
-    const created = createMemoryStore(SEED).createPage({ spaceId: SPACE, parentId: undefined });
-    expect(Number.isNaN(Date.parse(created.updatedAt))).toBe(false);
+  it("uses the real clock by default", async () => {
+    const created = await createMemoryStore(SEED).createPage({
+      spaceId: SPACE,
+      parentId: undefined,
+    });
+    expect(Number.isNaN(Date.parse(created?.updatedAt ?? ""))).toBe(false);
   });
 });
 
 describe("search", () => {
-  it("returns nothing for a blank query", () => {
-    expect(createStore().search("   ")).toEqual([]);
+  it("returns nothing for a blank query", async () => {
+    expect(await createStore().search("   ")).toEqual([]);
   });
 
-  it("ranks title matches first, then by title", () => {
-    const hits = createStore().search("Gateway");
+  it("ranks title matches first, then by title", async () => {
+    const hits = await createStore().search("Gateway");
     expect(hits.map((hit) => hit.page.id)).toEqual(["parent", "other"]);
     expect(hits[0]?.snippet).toContain("gateway");
     expect(hits[1]?.snippet).toBe("Mentions the gateway too");
   });
 
-  it("matches titles without a body match", () => {
-    const hits = createStore().search("budget");
+  it("matches titles without a body match", async () => {
+    const hits = await createStore().search("budget");
     expect(hits.map((hit) => [hit.page.id, hit.snippet])).toEqual([["other", ""]]);
   });
 
-  it("trims long snippets with ellipses on both sides", () => {
-    const [hit] = createStore().search("needle");
+  it("trims long snippets with ellipses on both sides", async () => {
+    const [hit] = await createStore().search("needle");
     expect(hit?.snippet.startsWith("…")).toBe(true);
     expect(hit?.snippet.endsWith("…")).toBe(true);
     expect(hit?.snippet).toContain("needle");
   });
 
-  it("sorts several title matches alphabetically", () => {
+  it("sorts several title matches alphabetically", async () => {
     const store = createStore();
     store.renamePage("child", "A gateway child");
-    expect(store.search("gateway").map((hit) => hit.page.id)).toEqual(["child", "parent", "other"]);
+    const hits = await store.search("gateway");
+    expect(hits.map((hit) => hit.page.id)).toEqual(["child", "parent", "other"]);
   });
 });
 
 describe("mentions", () => {
-  it("lists pages that mention a handle, newest first, with a snippet", () => {
-    const hits = createStore().mentions("dev");
+  it("lists pages that mention a handle, newest first, with a snippet", async () => {
+    const hits = await createStore().mentions("dev");
     expect(hits.map((hit) => hit.page.id)).toEqual(["child", "parent"]);
     expect(squash(hits[1]?.snippet ?? "")).toBe("Ask @dev about the gateway .");
   });
 
-  it("is empty for a handle nobody mentions", () => {
-    expect(createStore().mentions("nobody")).toEqual([]);
+  it("is empty for a handle nobody mentions", async () => {
+    expect(await createStore().mentions("nobody")).toEqual([]);
   });
 });

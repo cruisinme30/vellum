@@ -14,16 +14,43 @@ export interface WorkspaceSnapshot {
   readonly spaces: readonly Space[];
   /** Pages that are not in the trash. */
   readonly pages: readonly PageMeta[];
+  /** True while the pages are still on their way from the server. */
+  readonly loading?: boolean;
+  /** The last change or load that failed, until it is dismissed. */
+  readonly problem?: StoreProblem | undefined;
+}
+
+/** A failed load or change, as the shell shows it. */
+export interface StoreProblem {
+  /** Safe to show as is. */
+  readonly message: string;
+  /** The server's request ID, to quote when reporting it. */
+  readonly requestId?: string;
+}
+
+/** Who is signed in, as the server knows them. */
+export interface SignedInUser extends Person {
+  readonly id: string;
 }
 
 /**
  * The workspace port. The mock adapter below serves the Northstar demo;
- * the HTTP adapter replaces it when the API lands, without touching views.
+ * the HTTP adapter (`./http`) serves the drive of a Vellum server.
+ *
+ * Reads are synchronous snapshots. Changes apply at once and settle in the
+ * background; one that fails is undone and shows as the snapshot's
+ * `problem`. Creating a page waits for its ID, and search may ask the
+ * server, so those two answer with promises that never reject.
  */
 export interface WorkspaceStore {
   getSnapshot(): WorkspaceSnapshot;
   subscribe(listener: () => void): () => void;
-  createPage(input: { spaceId: string; parentId: string | undefined; title?: string }): PageMeta;
+  /** The new page, or `undefined` when it could not be created. */
+  createPage(input: {
+    spaceId: string;
+    parentId: string | undefined;
+    title?: string;
+  }): Promise<PageMeta | undefined>;
   renamePage(id: string, title: string): void;
   toggleStar(id: string): void;
   movePage(id: string, target: MoveTarget): void;
@@ -31,9 +58,16 @@ export interface WorkspaceStore {
   trashPage(id: string): void;
   /** The body a page's collab document starts from, if it has never been opened. */
   seedFor(id: string): JSONContent | undefined;
-  search(query: string): SearchHit[];
+  search(query: string): Promise<SearchHit[]>;
   /** Pages that mention a handle, newest first: the inbox. */
-  mentions(handle: string): SearchHit[];
+  mentions(handle: string): Promise<SearchHit[]>;
+  /** Clears the snapshot's `problem`. */
+  dismissProblem(): void;
+  /**
+   * Tells the store who is signed in, when the app runs against a server:
+   * it loads that person's spaces, or empties when nobody is.
+   */
+  setUser?(user: SignedInUser | undefined): void;
 }
 
 /** Seed data for an in-memory store. */
@@ -145,7 +179,7 @@ export function createMemoryStore(seed: WorkspaceSeed, clock: () => Date = () =>
         starred: false,
       };
       setPages([...snapshot.pages, page]);
-      return page;
+      return Promise.resolve(page);
     },
     renamePage(id, title) {
       patch(id, (p) => ({ ...p, title, updatedAt: stamp() }));
@@ -161,33 +195,38 @@ export function createMemoryStore(seed: WorkspaceSeed, clock: () => Date = () =>
       setPages(snapshot.pages.filter((p) => !gone.has(p.id)));
     },
     seedFor: (id) => bodies.get(id),
-    search(raw) {
-      const query = raw.trim().toLowerCase();
-      if (query === "") {
-        return [];
-      }
-      const hits: SearchHit[] = [];
-      for (const page of snapshot.pages) {
-        const body = plainText(bodies.get(page.id));
-        const inTitle = page.title.toLowerCase().includes(query);
-        const text = snippet(body, query);
-        if (inTitle || text !== "") {
-          hits.push({ page, snippet: text });
-        }
-      }
-      return hits.toSorted(
-        (a, b) =>
-          Number(b.page.title.toLowerCase().includes(query)) -
-            Number(a.page.title.toLowerCase().includes(query)) ||
-          a.page.title.localeCompare(b.page.title),
-      );
-    },
-    mentions(handle) {
-      return snapshot.pages
-        .filter((page) => mentionsHandle(bodies.get(page.id), handle))
-        .toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-        .map((page) => ({ page, snippet: snippet(plainText(bodies.get(page.id)), `@${handle}`) }));
+    search: (raw) => Promise.resolve(search(raw)),
+    mentions: (handle) => Promise.resolve(mentions(handle)),
+    dismissProblem() {
+      // The memory store never fails.
     },
   };
+  function search(raw: string): SearchHit[] {
+    const query = raw.trim().toLowerCase();
+    if (query === "") {
+      return [];
+    }
+    const hits: SearchHit[] = [];
+    for (const page of snapshot.pages) {
+      const body = plainText(bodies.get(page.id));
+      const inTitle = page.title.toLowerCase().includes(query);
+      const text = snippet(body, query);
+      if (inTitle || text !== "") {
+        hits.push({ page, snippet: text });
+      }
+    }
+    return hits.toSorted(
+      (a, b) =>
+        Number(b.page.title.toLowerCase().includes(query)) -
+          Number(a.page.title.toLowerCase().includes(query)) ||
+        a.page.title.localeCompare(b.page.title),
+    );
+  }
+  function mentions(handle: string): SearchHit[] {
+    return snapshot.pages
+      .filter((page) => mentionsHandle(bodies.get(page.id), handle))
+      .toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .map((page) => ({ page, snippet: snippet(plainText(bodies.get(page.id)), `@${handle}`) }));
+  }
   return store;
 }
