@@ -52,6 +52,14 @@ jobs:
         run: >-
           k6 run -e BASE_URL=http://127.0.0.1:7700 -e SUMMARY=perf-summary.json
           deploy/perf/k6/suite.js
+      - name: Every route within its latency budget
+        if: always() && steps.serve.outputs.ready == 'true'
+        run: |
+          if docker run --rm vellum:ci budgets --help >/dev/null 2>&1; then
+            docker run --rm --network host vellum:ci budgets --server http://127.0.0.1:7700
+          else
+            echo "::notice::vellum has no budgets command yet; per-route budgets start once it does."
+          fi
       - name: Install Rust for the gate
         if: always() && steps.serve.outputs.ready == 'true'
         run: rustup toolchain install

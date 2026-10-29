@@ -131,7 +131,9 @@ they test.
   lands, so the API thread meets the budgets and SLOs from its first day.
 - Endpoint paths the load tests use live in one file,
   `deploy/perf/k6/routes.js`, for the API and collab threads to keep true.
-- The restore drill uses `pg_dump` and `mc mirror` until encrypted
-  backups (#192) ship; it then switches to `vellum backup`.
+- The restore drill drives `vellum backup` and `vellum restore` (#192)
+  once the binary has them, and copies the database and bucket directly
+  until then. The nightly run also calls `vellum budgets --server` for
+  per-route latency budgets (#179) once that command exists.
 - GitHub-hosted runners are noisy; if the 10 % gate flaps, move the
   nightly job to a dedicated runner rather than widening the gate.
