@@ -5,5 +5,7 @@
 //!
 //! - [`ssrf`]: outbound HTTP that can only reach the public internet, for
 //!   link previews, embeds, webhooks and imports.
+//! - [`rate`]: keyed rate limits and sign-in lockout.
 
+pub mod rate;
 pub mod ssrf;
