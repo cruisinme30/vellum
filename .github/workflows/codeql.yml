@@ -13,13 +13,15 @@
 # Same languages and query suite as the default setup had.
 name: CodeQL
 
+#
+# Paused (ADR 0035, D140): the CodeQL default setup is still switched on in
+# the repository settings, and GitHub rejects advanced-setup uploads while
+# it is. Until it is switched off, this workflow runs only by hand and the
+# default setup keeps scanning. Once it is off, restore these triggers:
+#   pull_request: {branches: [main]}
+#   push: {branches: [main]}
+#   schedule: [{cron: "29 5 * * 1"}]
 on:
-  pull_request:
-    branches: [main]
-  push:
-    branches: [main]
-  schedule:
-    - cron: "29 5 * * 1"
   workflow_dispatch:
 
 permissions: {}

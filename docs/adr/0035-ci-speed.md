@@ -67,6 +67,10 @@ sizes. The two from-scratch release builds ran one after the other.
   [ADR 0032](0032-repository-security-controls.md). A high or critical
   alert blocks the release into main.
 - Merges into develop wait only for the Fast suite and Labels.
+- Until the CodeQL default setup is switched off in the repository
+  settings, `codeql.yml` runs only when started by hand, so code is not
+  scanned twice; the default setup keeps gating main meanwhile. Restore
+  its triggers once the default setup is off.
 
 ### `D165`: help pages that share a template get the default mode only
 
