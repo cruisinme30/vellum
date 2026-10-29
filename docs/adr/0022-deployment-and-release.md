@@ -115,8 +115,8 @@ they test.
   today) was chosen over Alpine (a shell to patch) and `scratch` (no CA
   bundle, no non-root user).
 - **MinIO**: building the last community release from pinned source was
-  chosen over an unpatched old image or switching the brief's choice to
-  another S3 server. Any S3 endpoint still works.
+  chosen over an old image without security fixes, or over switching the
+  brief's choice to another S3 server. Any S3 endpoint still works.
 - **Patroni**: the Zalando Postgres Operator (Patroni inside) was chosen
   over a Bitnami chart (no synchronous failover) and CloudNativePG (not
   Patroni, which the brief names).

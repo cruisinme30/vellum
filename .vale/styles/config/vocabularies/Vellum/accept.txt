@@ -131,4 +131,4 @@ Bitnami
 Flagger
 [Rr]unbooks?
 Kubernetes
-Helm
+[Hh]elm
