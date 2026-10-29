@@ -355,6 +355,25 @@ pub struct Assignment {
     pub summary: String,
 }
 
+/// An unanswered mention of someone in an open thread, as My Work lists
+/// it (#472).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Mention {
+    /// The comment that mentions the person.
+    pub comment: CommentId,
+    /// Its thread.
+    pub thread: CommentId,
+    /// Where the thread is.
+    pub target: Target,
+    /// Who wrote the comment.
+    pub author: UserRef,
+    /// When it was posted.
+    #[serde(with = "crate::timestamp")]
+    pub at: OffsetDateTime,
+    /// The first line of the comment.
+    pub summary: String,
+}
+
 /// The input for posting a comment.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NewComment {
@@ -546,6 +565,37 @@ impl Comments {
             })
             .collect();
         out.sort_by_key(|a| (a.assigned_at, a.thread));
+        out
+    }
+
+    /// Open threads where someone else mentioned `user` and `user` has not
+    /// written since, newest first, one per thread. Threads assigned to
+    /// `user` are left out: [`Self::assignments`] lists them.
+    #[must_use]
+    pub fn mentions_of(&self, user: &UserRef) -> Vec<Mention> {
+        let mut out: Vec<Mention> =
+            self.threads
+                .values()
+                .filter(|t| !t.is_resolved() && t.assignee.as_ref() != Some(user))
+                .filter_map(|t| {
+                    let live: Vec<&Comment> = t.live().collect();
+                    let answered = live.iter().rposition(|c| &c.author == user);
+                    let start = answered.map_or(0, |i| i + 1);
+                    let comment =
+                        live.get(start..)?.iter().rev().find(|c| {
+                            &c.author != user && c.mentions().iter().any(|m| m == user)
+                        })?;
+                    Some(Mention {
+                        comment: comment.id,
+                        thread: t.id,
+                        target: t.target.clone(),
+                        author: comment.author.clone(),
+                        at: comment.created_at,
+                        summary: first_line(&comment.body),
+                    })
+                })
+                .collect();
+        out.sort_by(|a, b| b.at.cmp(&a.at).then(b.comment.cmp(&a.comment)));
         out
     }
 
@@ -973,6 +1023,11 @@ fn summary(thread: &Thread) -> String {
         .as_deref()
         .or_else(|| thread.live().next().map(|c| c.body.as_str()))
         .unwrap_or_default();
+    first_line(text)
+}
+
+/// The first line of `text`, cut to 120 characters.
+fn first_line(text: &str) -> String {
     let line = text.lines().next().unwrap_or_default().trim();
     if line.chars().count() > 120 {
         let cut: String = line.chars().take(119).collect();
