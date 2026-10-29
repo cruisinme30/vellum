@@ -27,7 +27,8 @@ const hasText = (page: Page): Promise<boolean> =>
   // eslint-disable-next-line unicorn/prefer-dom-node-text-content
   page.evaluate(() => (document.body as HTMLElement | null)?.innerText.trim() !== "");
 
-for (const target of TARGETS) {
+// Sweep pages share the template of the pages checked here (D165).
+for (const target of TARGETS.filter((candidate) => !candidate.sweep)) {
   test.describe(`${target.name} loading`, () => {
     test("shows content quickly and without jumping on a slow network", async ({
       page,

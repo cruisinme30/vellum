@@ -132,5 +132,5 @@ The binary also embeds the built web app, and the gateway serves it on
 the app host (#393). The gateway keeps `/api`, `/healthz`, `/readyz`,
 `/collab` and every mount prefix, matched or not; any other path gets the
 app's files, or its index for client routes. Those files pass the edge
-middleware but need no sign-in. The app CSP's `connect-src` also names
+middleware but need no sign-in. The `connect-src` of the app's CSP also names
 the host's own `ws`/`wss` origin for live editing.

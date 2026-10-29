@@ -19,6 +19,14 @@ export interface Target {
   /** Part of the quick subset in the fast suite. */
   fast: boolean;
   /**
+   * Checked in the default display mode only (D165). The help-book
+   * chapters share one mdBook template, and each book's print page, which
+   * gets every check, already lays out every chapter's content, so the
+   * other modes would repeat those checks page by page.
+   * UI_SCOPE=exhaustive checks these pages in every mode too.
+   */
+  sweep: boolean;
+  /**
    * Has a visual baseline. Only stable screens qualify: a pixel baseline
    * of a page whose words change every week fails for no reason, and the
    * layout audit already covers those pages.
@@ -27,6 +35,9 @@ export interface Target {
   /** What the stand-in server says; absent for the demo and the site. */
   server?: ServerState;
 }
+
+/** quick (the default): the fast subset; full: every page; exhaustive: every page in every mode. */
+const scope = process.env["UI_SCOPE"] ?? "quick";
 
 export const APP_PORT = 4173;
 export const SITE_PORT = 4174;
@@ -46,6 +57,7 @@ const app = (
   url: `http://127.0.0.1:${String(APP_PORT)}${route}`,
   app: true,
   fast: true,
+  sweep: false,
   visual: options.visual ?? true,
   ...(options.server === undefined ? {} : { server: options.server }),
 });
@@ -80,8 +92,9 @@ function siteTargets(): Target[] {
     .map((file) => path.relative(SITE_DIR, file).split(path.sep).join("/"))
     .filter((relative) => !SKIP.has(path.posix.basename(relative)))
     .toSorted((a, b) => a.localeCompare(b));
-  // The fast subset: the landing page, each book's first page and its print page.
-  const fast = new Set(["index.html"]);
+  // The fast subset, and the pages every check runs on in the full suite:
+  // the landing page, the docs home, each book's first page and its print page.
+  const fast = new Set(["index.html", "docs/index.html"]);
   for (const page of pages) {
     const book = /^docs\/[^/]+\//.exec(page)?.[0];
     if (book !== undefined) {
@@ -94,13 +107,14 @@ function siteTargets(): Target[] {
     url: `http://127.0.0.1:${String(SITE_PORT)}/${page}`,
     app: false,
     fast: fast.has(page),
+    sweep: !fast.has(page) && scope !== "exhaustive",
     visual: false,
   }));
 }
 
-const quick = process.env["UI_SCOPE"] !== "full";
+const quick = scope !== "full" && scope !== "exhaustive";
 
-/** Every target in scope: the fast subset unless UI_SCOPE=full. */
+/** Every target in scope: the fast subset unless UI_SCOPE is full or exhaustive. */
 export const TARGETS: readonly Target[] = [...APP_TARGETS, ...siteTargets()].filter(
   (target) => !quick || target.fast,
 );
