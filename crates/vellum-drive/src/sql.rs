@@ -1029,9 +1029,9 @@ impl DriveIndex for SqlIndex {
                 system,
                 "totals.nodes",
                 sqlx::query_as(
-                    "SELECT kind, CASE WHEN trash IS NULL THEN 1 ELSE 0 END AS live, \
+                    "SELECT kind, CAST(CASE WHEN trash IS NULL THEN 1 ELSE 0 END AS BIGINT) AS live, \
                      COUNT(*), CAST(COALESCE(SUM(byte_size), 0) AS BIGINT) \
-                     FROM drive_nodes GROUP BY kind, CASE WHEN trash IS NULL THEN 1 ELSE 0 END",
+                     FROM drive_nodes GROUP BY kind, live",
                 )
                 .fetch_all(pool)
             );
