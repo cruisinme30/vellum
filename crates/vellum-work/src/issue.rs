@@ -447,8 +447,7 @@ impl Issue {
             reason,
         };
         let (front, body) = split_front_matter(text).map_err(|r| file_err(r.to_owned()))?;
-        let mut issue: Self =
-            serde_saphyr::from_str(front).map_err(|e| file_err(e.to_string()))?;
+        let mut issue: Self = serde_saphyr::from_str(front).map_err(|e| file_err(e.to_string()))?;
         if issue.number == 0 {
             return Err(file_err("number must be 1 or more".to_owned()));
         }
