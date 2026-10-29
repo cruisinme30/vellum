@@ -21,23 +21,28 @@ use crate::diagnostic::{Diagnostic, DiagnosticCode};
 struct Line<'a> {
     text: &'a str,
     number: usize,
+    /// Inside a code block, where text is kept byte for byte.
+    code: bool,
 }
 
 /// Parses `body`, whose first line is line `first_line` of the file.
 pub fn blocks(body: &str, first_line: usize, diagnostics: &mut Vec<Diagnostic>) -> Vec<Block> {
+    let code = convert::code_lines(body);
     let lines: Vec<Line<'_>> = body
         .split_inclusive('\n')
         .enumerate()
         .map(|(i, text)| Line {
             text,
             number: first_line + i,
+            code: code.get(i).copied().unwrap_or(false),
         })
         .collect();
-    let code = convert::code_lines(body);
     let mut scanner = Scanner {
         lines: &lines,
         code: &code,
         next: 0,
+        depth: 0,
+        too_deep: false,
         diagnostics,
     };
     let (mut sections, _) = scanner.scan(false, true);
@@ -49,6 +54,10 @@ struct Scanner<'l, 'a, 'd> {
     /// Lines inside code blocks, where directives are not recognised.
     code: &'l [bool],
     next: usize,
+    /// Containers open around the line being read.
+    depth: usize,
+    /// Whether the too-deep diagnostic has been reported.
+    too_deep: bool,
     diagnostics: &'d mut Vec<Diagnostic>,
 }
 
@@ -83,6 +92,12 @@ impl Scanner<'_, '_, '_> {
             } else if colons >= 3
                 && let Some(opener) = parse_opener(bare.get(colons..).unwrap_or_default())
             {
+                if self.depth >= crate::MAX_NESTING {
+                    // Too deep: the opening line is read as text.
+                    self.report_too_deep(line.number);
+                    run.push(line);
+                    continue;
+                }
                 self.flush(&mut run, &mut sections);
                 let block = self.container(opener, line.number);
                 push(&mut sections, block);
@@ -116,7 +131,9 @@ impl Scanner<'_, '_, '_> {
                 ),
             ));
         }
+        self.depth += 1;
         let (mut sections, closed) = self.scan(kind == ContainerKind::Columns, false);
+        self.depth -= 1;
         if !closed {
             self.diagnostics.push(Diagnostic::new(
                 line,
@@ -153,17 +170,78 @@ impl Scanner<'_, '_, '_> {
         Some(Block::Math { literal, id })
     }
 
+    fn report_too_deep(&mut self, line: usize) {
+        if !self.too_deep {
+            self.too_deep = true;
+            self.diagnostics.push(too_deep(line));
+        }
+    }
+
     fn flush(&mut self, run: &mut Vec<Line<'_>>, sections: &mut [Vec<Block>]) {
         let Some(first) = run.first() else {
             return;
         };
-        let text: String = run.iter().map(|l| l.text).collect();
-        let blocks = convert::markdown(&text, first.number, self.diagnostics);
+        let text: String = run
+            .iter()
+            .map(|l| {
+                if l.code {
+                    std::borrow::Cow::Borrowed(l.text)
+                } else {
+                    space_quote_runs(l.text)
+                }
+            })
+            .collect();
+        let blocks = convert::markdown(&text, first.number, self.depth, self.diagnostics);
         if let Some(section) = sections.last_mut() {
             section.extend(blocks);
         }
         run.clear();
     }
+}
+
+/// Longest run of `>` handed to comrak unchanged.
+const MAX_QUOTE_RUN: usize = 32;
+
+/// Breaks runs of more than [`MAX_QUOTE_RUN`] `>` with a space.
+///
+/// comrak's alert check rescans the rest of a `>` run at every quote
+/// level, so one line of 100 000 `>` takes seconds. A space between quote
+/// markers changes nothing in Markdown, and content that deep is shown
+/// as plain text anyway. Code lines never reach this function.
+fn space_quote_runs(line: &str) -> std::borrow::Cow<'_, str> {
+    let too_long = line
+        .split(|c| c != '>')
+        .any(|run| run.len() > MAX_QUOTE_RUN);
+    if !too_long {
+        return std::borrow::Cow::Borrowed(line);
+    }
+    let mut out = String::with_capacity(line.len() + line.len() / MAX_QUOTE_RUN);
+    let mut run = 0;
+    for c in line.chars() {
+        if c == '>' {
+            if run == MAX_QUOTE_RUN {
+                out.push(' ');
+                run = 0;
+            }
+            run += 1;
+        } else {
+            run = 0;
+        }
+        out.push(c);
+    }
+    std::borrow::Cow::Owned(out)
+}
+
+/// The diagnostic for content nested deeper than [`crate::MAX_NESTING`].
+pub fn too_deep(line: usize) -> Diagnostic {
+    Diagnostic::new(
+        line,
+        DiagnosticCode::NestingTooDeep,
+        format!(
+            "content nests more than {} levels deep; the deeper part is shown as plain text",
+            crate::MAX_NESTING
+        ),
+    )
 }
 
 fn push(sections: &mut [Vec<Block>], block: Block) {

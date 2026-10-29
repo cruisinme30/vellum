@@ -14,7 +14,7 @@
     reason = "locks are held for single await-free blocks"
 )]
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use async_trait::async_trait;
@@ -307,27 +307,40 @@ impl Role {
     }
 }
 
-/// Role grants on spaces and nodes, inherited down the folder tree of a
-/// [`MemoryIndex`]. Deny by default.
+/// Role grants on spaces and nodes, inherited down the folder tree of any
+/// [`DriveIndex`]. Deny by default.
 #[derive(Debug)]
 pub struct MemoryAccess {
-    index: Arc<MemoryIndex>,
+    index: Arc<dyn DriveIndex>,
     grants: Mutex<HashMap<(ObjectId, UserId), Role>>,
+    groups: Mutex<BTreeMap<UserId, BTreeSet<ObjectId>>>,
 }
 
 impl MemoryAccess {
     /// Grants nothing to anyone yet.
     #[must_use]
-    pub fn new(index: Arc<MemoryIndex>) -> Self {
+    pub fn new(index: Arc<dyn DriveIndex>) -> Self {
         Self {
             index,
             grants: Mutex::new(HashMap::new()),
+            groups: Mutex::new(BTreeMap::new()),
         }
     }
 
     /// Grants `role` on a node, or on a whole space via its ID.
     pub fn grant(&self, user: UserId, node: impl Into<ObjectId>, role: Role) {
         let _ = self.lock().insert((node.into(), user), role);
+    }
+
+    /// Makes `user` a member of `group`.
+    pub fn join(&self, user: UserId, group: ObjectId) {
+        let _ = self
+            .groups
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .entry(user)
+            .or_default()
+            .insert(group);
     }
 
     /// Removes a grant made on `node` itself.
@@ -339,13 +352,32 @@ impl MemoryAccess {
         self.grants.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    fn role(&self, user: UserId, node: ObjectId) -> Option<Role> {
-        let chain = self.index.chain(node);
+    /// The parent chain of a node, innermost first, ending at the space.
+    async fn chain(&self, node: ObjectId) -> DriveResult<Vec<ObjectId>> {
+        let mut chain = vec![node];
+        let mut current = self.index.node(node).await?;
+        while let Some(n) = current {
+            match n.parent {
+                Some(parent) if !chain.contains(&parent) => {
+                    chain.push(parent);
+                    current = self.index.node(parent).await?;
+                }
+                _ => {
+                    chain.push(n.space.into());
+                    break;
+                }
+            }
+        }
+        Ok(chain)
+    }
+
+    async fn role(&self, user: UserId, node: ObjectId) -> DriveResult<Option<Role>> {
+        let chain = self.chain(node).await?;
         let grants = self.lock();
-        chain
+        Ok(chain
             .iter()
             .filter_map(|id| grants.get(&(*id, user)).copied())
-            .max()
+            .max())
     }
 }
 
@@ -360,6 +392,7 @@ impl Access for MemoryAccess {
     ) -> DriveResult<bool> {
         Ok(self
             .role(user, node)
+            .await?
             .is_some_and(|role| role.allows(permission)))
     }
 
@@ -386,7 +419,7 @@ impl Access for MemoryAccess {
     async fn accessible(&self, user: UserId, space: SpaceId) -> DriveResult<Vec<ObjectId>> {
         let mut out = Vec::new();
         for node in self.index.nodes(space).await? {
-            if self.role(user, node.id).is_some() {
+            if self.role(user, node.id).await?.is_some() {
                 out.push(node.id);
             }
         }
@@ -401,5 +434,15 @@ impl Access for MemoryAccess {
     async fn grant_owner(&self, user: UserId, _space: SpaceId, node: ObjectId) -> DriveResult<()> {
         self.grant(user, node, Role::Manager);
         Ok(())
+    }
+
+    async fn groups_of(&self, user: UserId) -> DriveResult<BTreeSet<ObjectId>> {
+        Ok(self
+            .groups
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(&user)
+            .cloned()
+            .unwrap_or_default())
     }
 }

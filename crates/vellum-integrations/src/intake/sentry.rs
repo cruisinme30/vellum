@@ -16,6 +16,7 @@ use std::collections::BTreeMap;
 use serde_json::Value;
 
 use super::Routing;
+use super::text::{Body, Fact};
 use crate::inbound::{InboundError, text};
 use crate::mac;
 use crate::model::{IssueDraft, Priority, Source, one_line};
@@ -101,23 +102,15 @@ pub fn to_draft(
     );
     draft.priority = Some(priority(level));
     let _ = draft.labels.insert("sentry".to_owned());
-    let mut facts = vec![format!(
-        "- Level: {}",
-        if level.is_empty() { "unknown" } else { level }
-    )];
-    if !culprit.is_empty() {
-        facts.push(format!("- Culprit: `{}`", culprit.replace('`', "'")));
-    }
-    if !project.is_empty() {
-        facts.push(format!("- Project: {project}"));
-    }
-    if !short_id.is_empty() {
-        facts.push(format!("- Sentry ID: {short_id}"));
-    }
-    draft.description = format!(
-        "::: facts\n\n{}\n\n:::\n\n[Open in Sentry]({link})\n",
-        facts.join("\n")
-    );
+    draft.description = Body::new()
+        .facts(&[
+            Fact::new("Level", if level.is_empty() { "unknown" } else { level }),
+            Fact::code("Culprit", culprit),
+            Fact::new("Project", project),
+            Fact::new("Sentry ID", short_id),
+        ])
+        .link("Open in Sentry", link)
+        .finish();
     Ok(Some(draft))
 }
 
