@@ -272,9 +272,13 @@ async fn set_up_sign_in_and_manage_tokens() {
 async fn repeated_failures_lock_the_address_out() {
     let app = app(None);
     let _cookie = signed_in_admin(&app).await;
-    let mut last = StatusCode::OK;
-    for _ in 0..7 {
-        last = send(
+    // The lock starts at one second after five failures and doubles with
+    // each further failure. A slow machine can spend over a second on one
+    // password check, so keep trying until the lock outlasts an attempt
+    // rather than assuming the seventh try lands inside it.
+    let mut statuses = Vec::new();
+    for _ in 0..12 {
+        let status = send(
             &app,
             finish(json_request(
                 "POST",
@@ -284,8 +288,20 @@ async fn repeated_failures_lock_the_address_out() {
         )
         .await
         .status;
+        statuses.push(status);
+        if status == StatusCode::TOO_MANY_REQUESTS {
+            break;
+        }
     }
-    assert_eq!(last, StatusCode::TOO_MANY_REQUESTS);
+    assert!(
+        statuses[..5].iter().all(|s| *s == StatusCode::UNAUTHORIZED),
+        "the first five failures are plain refusals: {statuses:?}"
+    );
+    assert_eq!(
+        statuses.last(),
+        Some(&StatusCode::TOO_MANY_REQUESTS),
+        "{statuses:?}"
+    );
 }
 
 fn pkce() -> (String, String) {
