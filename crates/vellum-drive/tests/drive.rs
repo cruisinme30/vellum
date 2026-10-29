@@ -167,6 +167,20 @@ async fn pages_live_in_real_folders() -> TestResult {
         w.drive.starred(&w.alice).await?.first().map(|n| n.id),
         Some(plan.id)
     );
+    let filter = vellum_drive::Filter {
+        starred: true,
+        ..vellum_drive::Filter::default()
+    };
+    assert_eq!(w.drive.find(&w.alice, &filter, 10).await?.len(), 1);
+    let filter = vellum_drive::Filter {
+        title: Some("roadmap".into()),
+        kinds: vec![NodeKind::Page],
+        location: Some(specs.id),
+        owner: Some(w.alice_id),
+        ..vellum_drive::Filter::default()
+    };
+    assert_eq!(w.drive.find(&w.alice, &filter, 10).await?.len(), 2);
+    assert!(w.drive.find(&w.bob, &filter, 10).await?.is_empty());
     w.drive.star(&w.alice, plan.id, false).await?;
     assert!(w.drive.starred(&w.alice).await?.is_empty());
     Ok(())

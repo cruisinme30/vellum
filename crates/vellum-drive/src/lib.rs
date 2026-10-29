@@ -25,7 +25,7 @@ pub mod model;
 pub mod ports;
 pub mod retention;
 
-pub use drive::{Drive, OP_SECONDS, OPS_TOTAL, SaveOutcome, Saved};
+pub use drive::{Drive, Filter, OP_SECONDS, OPS_TOTAL, SaveOutcome, Saved};
 pub use error::{DriveError, DriveResult};
 pub use model::{
     Activity, ActivityKind, Node, NodeKind, RetentionPolicy, ScanReport, Space, SpaceKind,

@@ -33,6 +33,7 @@ use crate::model::{Activity, ActivityKind, Node, NodeKind, Space};
 use crate::ports::{Access, Clock, DriveIndex, Permission, SystemClock};
 
 pub use content::{SaveOutcome, Saved};
+pub use views::Filter;
 
 /// Counter of drive operations, labelled `op` and `outcome`.
 pub const OPS_TOTAL: &str = "vellum_drive_ops_total";

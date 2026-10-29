@@ -123,7 +123,7 @@ pub mod blob_path {
 /// # Errors
 /// Fails only if the value cannot be represented in YAML.
 pub fn to_yaml<T: Serialize>(value: &T) -> DriveResult<String> {
-    serde_yaml_ng::to_string(value).map_err(|e| DriveError::Malformed {
+    serde_saphyr::to_string(value).map_err(|e| DriveError::Malformed {
         path: String::new(),
         reason: e.to_string(),
     })
@@ -134,7 +134,7 @@ pub fn to_yaml<T: Serialize>(value: &T) -> DriveResult<String> {
 /// # Errors
 /// Returns [`DriveError::Malformed`] when the bytes are not the expected YAML.
 pub fn from_yaml<T: DeserializeOwned>(path: &BlobPath, bytes: &[u8]) -> DriveResult<T> {
-    serde_yaml_ng::from_slice(bytes).map_err(|e| DriveError::Malformed {
+    serde_saphyr::from_slice(bytes).map_err(|e| DriveError::Malformed {
         path: path.to_string(),
         reason: e.to_string(),
     })

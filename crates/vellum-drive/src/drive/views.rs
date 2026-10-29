@@ -337,3 +337,99 @@ impl Drive {
         Ok(out)
     }
 }
+
+/// Drive search filters (R-DR-9). Empty fields do not filter.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Filter {
+    /// Case-insensitive text the title must contain.
+    pub title: Option<String>,
+    /// Who created the item.
+    pub owner: Option<UserId>,
+    /// Modified at or after.
+    pub modified_after: Option<Timestamp>,
+    /// Modified before.
+    pub modified_before: Option<Timestamp>,
+    /// Kinds to keep; empty keeps all.
+    pub kinds: Vec<NodeKind>,
+    /// A space or folder the item must be in, at any depth.
+    pub location: Option<ObjectId>,
+    /// Only items the caller starred.
+    pub starred: bool,
+}
+
+impl Drive {
+    /// Finds live items the caller may view that match `filter`, most
+    /// recently modified first, up to `limit`.
+    ///
+    /// # Errors
+    /// Index or authorization failures.
+    #[tracing::instrument(name = "drive.find", skip_all, err)]
+    pub async fn find(
+        &self,
+        actor: &Actor,
+        filter: &Filter,
+        limit: usize,
+    ) -> DriveResult<Vec<Node>> {
+        self.observe("find", async {
+            let spaces: Vec<SpaceId> = match Self::user_of(actor) {
+                Some(user) => self.access.spaces(user).await?,
+                None => self
+                    .index
+                    .spaces()
+                    .await?
+                    .into_iter()
+                    .map(|s| s.id)
+                    .collect(),
+            };
+            let starred: HashSet<ObjectId> = match (filter.starred, Self::user_of(actor)) {
+                (true, Some(user)) => self.index.starred(user).await?.into_iter().collect(),
+                _ => HashSet::new(),
+            };
+            let needle = filter.title.as_ref().map(|t| t.to_lowercase());
+            let mut hits = Vec::new();
+            for space in spaces {
+                let nodes = self.index.nodes(space).await?;
+                let location = match filter.location {
+                    None => None,
+                    Some(loc) if loc.as_u128() == space.as_u128() => None,
+                    Some(loc) => match nodes.iter().find(|n| n.id == loc) {
+                        Some(folder) => Some(folder.path.clone()),
+                        None => continue,
+                    },
+                };
+                for node in nodes {
+                    let keep = node.is_live()
+                        && filter.location.is_none_or(|loc| {
+                            loc.as_u128() == space.as_u128()
+                                || location
+                                    .as_ref()
+                                    .is_some_and(|p| node.path.starts_with(p) && node.id != loc)
+                        })
+                        && needle
+                            .as_ref()
+                            .is_none_or(|n| node.title.to_lowercase().contains(n))
+                        && filter.owner.is_none_or(|o| node.created_by == Some(o))
+                        && filter.modified_after.is_none_or(|t| node.modified >= t)
+                        && filter.modified_before.is_none_or(|t| node.modified < t)
+                        && (filter.kinds.is_empty() || filter.kinds.contains(&node.kind))
+                        && (!filter.starred || starred.contains(&node.id));
+                    if keep {
+                        hits.push(node);
+                    }
+                }
+            }
+            hits.sort_by_key(|n| std::cmp::Reverse(n.modified));
+            let mut out = Vec::new();
+            for node in hits {
+                if out.len() >= limit {
+                    break;
+                }
+                if self.may(actor, &node, Permission::View).await? {
+                    out.push(node);
+                }
+            }
+            Ok(out)
+        })
+        .await
+    }
+}
