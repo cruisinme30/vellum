@@ -4388,9 +4388,12 @@ name = "vellum-authz"
 version = "0.0.0"
 dependencies = [
  "proptest",
+ "tempfile",
+ "testcontainers-modules",
  "thiserror",
  "tokio",
  "tracing",
+ "vellum-db",
  "vellum-kernel",
 ]
 
