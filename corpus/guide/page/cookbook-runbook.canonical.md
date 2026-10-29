@@ -12,7 +12,9 @@ vellum: 1
 ---
 
 ::: crit
+
 Never roll back the audit writer separately from the gateway.
+
 :::
 
 ## Decide
@@ -37,8 +39,10 @@ result: Replicas needed = round(rps / per + 1) (replicas)
 ## Roll back
 
 ::: steps
+
 1. **Find the last good release** with `helm history gateway -n prod`
 2. **Roll back** with `helm rollback gateway <revision> -n prod`
 3. **Watch** `kubectl rollout status deploy/gateway -n prod`
 4. **Announce** in the incidents channel and open an OPS issue
+
 :::

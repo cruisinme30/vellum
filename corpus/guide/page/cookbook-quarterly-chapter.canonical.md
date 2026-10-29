@@ -5,9 +5,11 @@ vellum: 1
 ---
 
 ::: stats
+
 - 11 of 14 · Goals met · ▲ 3
 - 34 · Average velocity · ▲ 4 pts
 - 99\.97% · Availability · ▬ 0
+
 :::
 
 ```chart {source="collection:01JB9G6H8J0K2M4N6P8Q0R2S4T" x="Quarter" y="Points" agg="sum"}

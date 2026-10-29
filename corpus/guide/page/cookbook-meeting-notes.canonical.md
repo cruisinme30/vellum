@@ -10,15 +10,19 @@ vellum: 1
 ---
 
 ::: facts
+
 - Date: 2026-11-02
 - Attendees: @priya @dev @maya @sam
 - Next: 2026-11-09
+
 :::
 
 ## Decisions
 
 ::: good
+
 Ship the diff report behind a flag on 2026-11-24.
+
 :::
 
 ## Notes

@@ -58,7 +58,9 @@ flowchart LR
 - `serialize(&Document)` writes one canonical text: `-` bullets and `.`
   markers (alternating `*` and `)` for adjacent lists), backtick fences
   sized to their content, `***` for rules where `---` would be
-  ambiguous, front matter keys in page order, and minimal escapes.
+  ambiguous, front matter keys in page order, blank lines inside
+  `:::` containers (so the output passes markdownlint), and minimal
+  escapes (a backslash is doubled only before punctuation).
   `parse(serialize(d)) == d` for every parsed `d`.
 
 ### D41: the directive pre-pass works on lines outside code
