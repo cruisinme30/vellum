@@ -7,11 +7,12 @@
 //! Vellum crate. It carries the observability baseline ([`telemetry`]) and
 //! typed object IDs ([`id`])
 //! block IDs ([`block`]), share-link tokens ([`share`]), the shared error
-//! type ([`error`]) and timestamps ([`timestamp`]).
+//! type ([`error`]), timestamps ([`timestamp`]) and domain events ([`event`]).
 
 mod base32;
 pub mod block;
 pub mod error;
+pub mod event;
 pub mod id;
 pub mod share;
 pub mod telemetry;
@@ -19,6 +20,7 @@ pub mod timestamp;
 
 pub use block::BlockId;
 pub use error::{Error, ErrorKind, Result};
+pub use event::{Actor, Event, EventKind};
 pub use id::{
     BlobId, BookId, CollectionId, CommentId, DocId, DriveId, EventId, FolderId, IdParseError,
     IssueId, ObjectId, RequestId, ShareId, SpaceId, TaskId, TeamId, UserId, VersionId,
