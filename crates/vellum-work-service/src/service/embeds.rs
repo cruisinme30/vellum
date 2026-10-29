@@ -114,7 +114,7 @@ impl WorkService {
             today: now.date(),
             actor: Some(viewer.clone()),
         };
-        let st = self.state.lock().await;
+        let st = self.read_state().await;
         blocks
             .into_iter()
             .map(|b| EmbedResult {

@@ -10,13 +10,14 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use bytes::Bytes;
 use futures::StreamExt;
 use time::format_description::well_known::Rfc3339;
 use time::macros::format_description;
 use time::{Date, OffsetDateTime};
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, MutexGuard};
 use tracing::{info, instrument, warn};
 use vellum_contracts::{Operation, RequestContext, Scope};
 use vellum_kernel::{CommentId, Error, ErrorKind, TeamId};
@@ -41,6 +42,7 @@ use crate::api::{
     ResolveThread, TeamOut, TeamRef, ThreadOut, ThreadsOut, TriageIssue, UpdateIssue, invalid,
     parse_name,
 };
+use crate::journal::{self, CatchUp};
 use crate::ports::{Clock, Directory, EventSink};
 use crate::routes;
 
@@ -63,6 +65,10 @@ pub struct State {
     pub(crate) comments: Comments,
     /// Where each project page lives; titles can change, paths do not.
     project_paths: BTreeMap<ProjectId, String>,
+    /// The journal revision this copy reflects (see [`crate::journal`]).
+    pub(crate) seen: u64,
+    /// When this copy last compared itself with the journal for a read.
+    checked: Option<Instant>,
 }
 
 /// The Work service: issue tracking and comments for one workspace.
@@ -78,6 +84,56 @@ pub struct WorkService {
     events: Arc<dyn EventSink>,
     clock: Arc<dyn Clock>,
     state: Mutex<State>,
+    /// Names this replica in journal entries.
+    writer: String,
+    /// How stale a read may be before it checks the journal again.
+    read_fresh: Duration,
+}
+
+/// How long reads may serve this replica's copy before checking for other
+/// replicas' writes. Keeps cross-replica staleness well under a second.
+pub const READ_FRESH: Duration = Duration::from_millis(250);
+
+/// How long a writer waits for another replica's pending write.
+const WAIT_FOR_WRITER: Duration = Duration::from_secs(10);
+
+/// How many times a command is retried after losing a race.
+pub const ATTEMPTS: usize = 8;
+
+/// The message of the internal error that asks for a retry.
+const RACE: &str = "another replica changed Work first; retrying";
+
+/// Whether `e` is a lost race that the command should simply run again.
+pub fn is_race(e: &Error) -> bool {
+    e.kind() == ErrorKind::Conflict && e.message() == RACE
+}
+
+/// Runs `f` until it does not lose a race to another replica.
+///
+/// # Errors
+///
+/// The command's own error, or `conflict` after too many lost races.
+pub async fn retrying<T, F, Fut>(mut f: F) -> Result<T, Error>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = Result<T, Error>>,
+{
+    let mut last = None;
+    for _ in 0..ATTEMPTS {
+        match f().await {
+            Err(e) if is_race(&e) => last = Some(e),
+            other => return other,
+        }
+    }
+    Err(last.map_or_else(
+        || Error::new(ErrorKind::Conflict, RACE),
+        |_| {
+            Error::new(
+                ErrorKind::Conflict,
+                "Work is busy on another replica; try again",
+            )
+        },
+    ))
 }
 
 impl std::fmt::Debug for WorkService {
@@ -113,27 +169,13 @@ impl WorkService {
         events: Arc<dyn EventSink>,
         clock: Arc<dyn Clock>,
     ) -> Result<(Self, LoadReport), Error> {
-        let mut state = State::default();
-        let mut report = LoadReport::default();
-        let mut paths = Vec::new();
-        for dir in ["teams", "projects", ".comments"] {
-            paths.extend(list(store.as_ref(), dir).await?);
-        }
-        // Teams first: issues and cycles need their team.
-        paths.sort_by_key(|p| (!p.ends_with("/team.yaml"), p.clone()));
-        for path in paths {
-            match load_one(store.as_ref(), &mut state, &path).await {
-                Ok(true) => report.loaded += 1,
-                Ok(false) => {}
-                Err(e) => {
-                    warn!(path, error = %e, "skipped a Work file");
-                    report.skipped += 1;
-                }
-            }
-        }
+        let head = journal::read(store.as_ref()).await?;
+        let (mut state, report) = load_all(store.as_ref()).await?;
+        state.seen = head.journal.readable_rev(journal::now_ms());
         info!(
             loaded = report.loaded,
             skipped = report.skipped,
+            rev = state.seen,
             "Work loaded"
         );
         let service = Self {
@@ -142,6 +184,8 @@ impl WorkService {
             events,
             clock,
             state: Mutex::new(state),
+            writer: writer_name(),
+            read_fresh: READ_FRESH,
         };
         Ok((service, report))
     }
@@ -155,8 +199,12 @@ impl WorkService {
     /// Returns `unavailable` if the files cannot be written.
     #[instrument(skip_all)]
     pub async fn run_daily(&self) -> Result<(), Error> {
+        retrying(|| self.run_daily_once()).await
+    }
+
+    async fn run_daily_once(&self) -> Result<(), Error> {
         let now = self.clock.now();
-        let mut st = self.state.lock().await;
+        let mut st = self.write_state().await?;
         let backup = st.clone();
         let mut changes = st.graph.daily(now, now.date())?;
         let sla = st.graph.sla_tick(now);
@@ -164,6 +212,86 @@ impl WorkService {
         changes.events.extend(sla.events);
         self.commit(&mut st, backup, changes, None, Vec::new(), None)
             .await
+    }
+
+    // ----- replicas -----
+
+    /// The state for a query: this replica's copy, checked against the
+    /// journal at most every [`READ_FRESH`]. If the journal cannot be read
+    /// the copy is served as it is.
+    pub(crate) async fn read_state(&self) -> MutexGuard<'_, State> {
+        let mut st = self.state.lock().await;
+        let due = st.checked.is_none_or(|t| t.elapsed() >= self.read_fresh);
+        if due {
+            if let Err(e) = self.sync(&mut st, false).await {
+                warn!(error = %e, "Work served from this replica's copy");
+            }
+            st.checked = Some(Instant::now());
+        }
+        st
+    }
+
+    /// The state for a command: waits out another replica's pending write
+    /// and loads everything committed before it.
+    ///
+    /// # Errors
+    ///
+    /// `unavailable` when the journal cannot be read, or another replica
+    /// holds Work for longer than ten seconds.
+    pub(crate) async fn write_state(&self) -> Result<MutexGuard<'_, State>, Error> {
+        let mut st = self.state.lock().await;
+        self.sync(&mut st, true).await?;
+        st.checked = Some(Instant::now());
+        Ok(st)
+    }
+
+    /// Loads what other replicas committed since `st.seen`.
+    async fn sync(&self, st: &mut State, writing: bool) -> Result<(), Error> {
+        let started = Instant::now();
+        let head = loop {
+            let head = journal::read(self.store.as_ref()).await?;
+            if !writing || head.journal.blocking(journal::now_ms()).is_none() {
+                break head;
+            }
+            if started.elapsed() > WAIT_FOR_WRITER {
+                return Err(Error::new(
+                    ErrorKind::Unavailable,
+                    "another replica is still writing Work; try again",
+                ));
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        };
+        let target = head.journal.readable_rev(journal::now_ms());
+        match head.journal.catch_up(st.seen, target) {
+            CatchUp::Current => Ok(()),
+            CatchUp::Paths { paths, rev } => {
+                let mut next = st.clone();
+                match apply_paths(self.store.as_ref(), &mut next, &paths).await {
+                    Ok(()) => {
+                        next.seen = rev;
+                        *st = next;
+                        Ok(())
+                    }
+                    Err(e) => {
+                        info!(reason = %e, "Work rebuilt from files");
+                        self.reload(st, rev).await
+                    }
+                }
+            }
+            CatchUp::Reload { rev } => self.reload(st, rev).await,
+        }
+    }
+
+    async fn reload(&self, st: &mut State, rev: u64) -> Result<(), Error> {
+        let (mut fresh, report) = load_all(self.store.as_ref()).await?;
+        fresh.seen = rev;
+        fresh.checked = st.checked;
+        info!(
+            loaded = report.loaded,
+            rev, "Work reloaded for another replica's changes"
+        );
+        *st = fresh;
+        Ok(())
     }
 
     // ----- helpers -----
@@ -227,9 +355,57 @@ impl WorkService {
             events.extend(cc.events);
         }
         events.extend(changes.events);
-        if let Err(e) = self.write_all(&writes, &deletes).await {
-            *st = backup;
-            return Err(e);
+        let mut paths: Vec<String> = writes.iter().map(|(p, _)| p.clone()).collect();
+        paths.extend(deletes.iter().cloned());
+        if !paths.is_empty() {
+            // Claim the next revision; losing the claim means another
+            // replica committed first, so the command runs again on fresh
+            // state.
+            let head = journal::read(self.store.as_ref()).await;
+            let head = match head {
+                Ok(h) => h,
+                Err(e) => {
+                    *st = backup;
+                    return Err(e);
+                }
+            };
+            let now = journal::now_ms();
+            if head.journal.rev != st.seen || head.journal.blocking(now).is_some() {
+                *st = backup;
+                return Err(Error::new(ErrorKind::Conflict, RACE));
+            }
+            let claimed = head.journal.claim(paths, &self.writer, now);
+            let etag = match journal::write(self.store.as_ref(), &claimed, head.etag.as_ref()).await
+            {
+                Ok(Some(etag)) => etag,
+                Ok(None) => {
+                    *st = backup;
+                    return Err(Error::new(ErrorKind::Conflict, RACE));
+                }
+                Err(e) => {
+                    *st = backup;
+                    return Err(e);
+                }
+            };
+            let written = self.write_all(&writes, &deletes).await;
+            // Mark the entry done even when a write failed: the files that
+            // did land are what every replica, this one included, loads.
+            match journal::write(
+                self.store.as_ref(),
+                &claimed.finish(claimed.rev),
+                Some(&etag),
+            )
+            .await
+            {
+                Ok(Some(_)) => {}
+                Ok(None) => warn!(rev = claimed.rev, "a Work write outlived its lease"),
+                Err(e) => warn!(rev = claimed.rev, error = %e, "Work journal entry left pending"),
+            }
+            if let Err(e) = written {
+                *st = backup;
+                return Err(e);
+            }
+            st.seen = claimed.rev;
         }
         if !events.is_empty() {
             self.events.publish_by(actor, events);
@@ -285,14 +461,14 @@ impl WorkService {
         _rc: RequestContext,
         _: NoInput,
     ) -> Result<routes::TeamsOut, Error> {
-        let st = self.state.lock().await;
+        let st = self.read_state().await;
         Ok(routes::TeamsOut {
             teams: st.graph.teams().map(TeamOut::of).collect(),
         })
     }
 
     pub(crate) async fn get_team(&self, _rc: RequestContext, i: TeamRef) -> Result<TeamOut, Error> {
-        let st = self.state.lock().await;
+        let st = self.read_state().await;
         let key = Self::team_key(&st.graph, &i.team)?;
         st.graph
             .team(&key)
@@ -305,7 +481,7 @@ impl WorkService {
         _rc: RequestContext,
         i: IssueRef,
     ) -> Result<IssueOut, Error> {
-        let st = self.state.lock().await;
+        let st = self.read_state().await;
         let id = Self::issue_id(&st.graph, &i.key)?;
         let issue = st
             .graph
@@ -321,7 +497,7 @@ impl WorkService {
     ) -> Result<IssueGroups, Error> {
         let ctx = self.ctx(&rc).await?;
         let me = ctx.actor.clone();
-        let st = self.state.lock().await;
+        let st = self.read_state().await;
         let team = i
             .team
             .as_deref()
@@ -380,7 +556,7 @@ impl WorkService {
         _rc: RequestContext,
         i: TeamRef,
     ) -> Result<IssueGroups, Error> {
-        let st = self.state.lock().await;
+        let st = self.read_state().await;
         let key = Self::team_key(&st.graph, &i.team)?;
         let now = self.clock.now();
         let issues = st
@@ -407,7 +583,7 @@ impl WorkService {
             .map(|t| parse_name("tab", t))
             .transpose()?
             .unwrap_or(Tab::Assigned);
-        let st = self.state.lock().await;
+        let st = self.read_state().await;
         let issues = my_issues(&st.graph, &me, tab, &ctx, &[])
             .into_iter()
             .map(|(focus, issue)| FocusedIssue {
@@ -423,7 +599,7 @@ impl WorkService {
         _rc: RequestContext,
         i: TeamRef,
     ) -> Result<CyclesOut, Error> {
-        let st = self.state.lock().await;
+        let st = self.read_state().await;
         let key = Self::team_key(&st.graph, &i.team)?;
         let today = self.clock.now().date();
         Ok(CyclesOut {
@@ -437,7 +613,7 @@ impl WorkService {
         _rc: RequestContext,
         _: NoInput,
     ) -> Result<routes::ProjectsOut, Error> {
-        let st = self.state.lock().await;
+        let st = self.read_state().await;
         Ok(routes::ProjectsOut {
             projects: st
                 .graph
@@ -452,7 +628,7 @@ impl WorkService {
         _rc: RequestContext,
         i: ProjectRef,
     ) -> Result<ProjectOut, Error> {
-        let st = self.state.lock().await;
+        let st = self.read_state().await;
         let id = parse_id::<ProjectId>("project_id", &i.project_id)?;
         let p = st
             .graph
@@ -466,7 +642,7 @@ impl WorkService {
         _rc: RequestContext,
         i: ListComments,
     ) -> Result<ThreadsOut, Error> {
-        let st = self.state.lock().await;
+        let st = self.read_state().await;
         let target = st.graph.comment_target(&i.target)?;
         let block = match &target {
             Target::Doc { block, .. } => block.clone(),
@@ -497,7 +673,7 @@ impl WorkService {
         _: NoInput,
     ) -> Result<AssignmentsOut, Error> {
         let me = self.actor(&rc).await?;
-        let st = self.state.lock().await;
+        let st = self.read_state().await;
         Ok(AssignmentsOut {
             assignments: st
                 .comments
@@ -516,7 +692,7 @@ impl WorkService {
         i: CreateIssue,
     ) -> Result<CreatedIssue, Error> {
         let ctx = self.ctx(&rc).await?;
-        let mut st = self.state.lock().await;
+        let mut st = self.write_state().await?;
         let team = Self::team_key(&st.graph, &i.team)?;
         let mut draft = NewIssue::new(IssueId::generate(), team, &i.title);
         draft.body = i.description;
@@ -581,7 +757,7 @@ impl WorkService {
     ) -> Result<IssueOut, Error> {
         let ctx = self.ctx(&rc).await?;
         let me = ctx.actor.clone();
-        let mut st = self.state.lock().await;
+        let mut st = self.write_state().await?;
         let id = Self::issue_id(&st.graph, &i.key)?;
         let current = st
             .graph
@@ -608,7 +784,7 @@ impl WorkService {
         i: MoveIssue,
     ) -> Result<IssueOut, Error> {
         let ctx = self.ctx(&rc).await?;
-        let mut st = self.state.lock().await;
+        let mut st = self.write_state().await?;
         let id = Self::issue_id(&st.graph, &i.key)?;
         let to = Self::team_key(&st.graph, &i.to)?;
         let backup = st.clone();
@@ -631,7 +807,7 @@ impl WorkService {
         i: TriageIssue,
     ) -> Result<IssueOut, Error> {
         let ctx = self.ctx(&rc).await?;
-        let mut st = self.state.lock().await;
+        let mut st = self.write_state().await?;
         let id = Self::issue_id(&st.graph, &i.key)?;
         let action = match i.action.as_str() {
             "accept" => TriageAction::Accept {
@@ -687,7 +863,7 @@ impl WorkService {
         i: CreateTeam,
     ) -> Result<TeamOut, Error> {
         let ctx = self.ctx(&rc).await?;
-        let mut st = self.state.lock().await;
+        let mut st = self.write_state().await?;
         let mut team = Team::new(TeamId::generate(), TeamKey::parse(&i.key)?, &i.name)?;
         team.lead = i.lead.as_deref().map(UserRef::parse).transpose()?;
         team.members = i
@@ -717,7 +893,7 @@ impl WorkService {
 
     pub(crate) async fn put_team(&self, rc: RequestContext, i: PutTeam) -> Result<TeamOut, Error> {
         let ctx = self.ctx(&rc).await?;
-        let mut st = self.state.lock().await;
+        let mut st = self.write_state().await?;
         let key = Self::team_key(&st.graph, &i.team)?;
         let path = format!("teams/{key}/team.yaml");
         let team = Team::from_yaml(&path, &i.yaml)?;
@@ -749,7 +925,7 @@ impl WorkService {
         i: PutProject,
     ) -> Result<ProjectOut, Error> {
         let ctx = self.ctx(&rc).await?;
-        let mut st = self.state.lock().await;
+        let mut st = self.write_state().await?;
         let id = parse_id::<ProjectId>("project_id", &i.project_id)?;
         let path = st.project_paths.get(&id).cloned();
         let project = Project::from_markdown(
@@ -788,7 +964,7 @@ impl WorkService {
         i: AddComment,
     ) -> Result<CommentResult, Error> {
         let ctx = self.ctx(&rc).await?;
-        let mut st = self.state.lock().await;
+        let mut st = self.write_state().await?;
         let reply_to = i
             .reply_to
             .as_deref()
@@ -921,7 +1097,7 @@ impl WorkService {
     where
         F: FnOnce(&mut Comments, &Ctx) -> vellum_work::Result<CommentChanges>,
     {
-        let mut st = self.state.lock().await;
+        let mut st = self.write_state().await?;
         let thread = st.comments.thread_of(id).map(|t| t.id);
         let backup = st.clone();
         let cc = f(&mut st.comments, &ctx)?;
@@ -1100,6 +1276,97 @@ fn store_error(e: StoreError) -> Error {
 }
 
 /// Lists the blob paths under `dir`; a missing directory is empty.
+/// A name for this replica in journal entries: host, process and a
+/// per-start nonce.
+fn writer_name() -> String {
+    let host = std::env::var("HOSTNAME").unwrap_or_default();
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.subsec_nanos());
+    format!("{host}/{}/{nonce:08x}", std::process::id())
+}
+
+/// Builds Work from every file in `store`.
+async fn load_all(store: &dyn BlobStore) -> Result<(State, LoadReport), Error> {
+    let mut state = State::default();
+    let mut report = LoadReport::default();
+    let mut paths = Vec::new();
+    for dir in ["teams", "projects", ".comments"] {
+        paths.extend(list(store, dir).await?);
+    }
+    // Teams first: issues and cycles need their team.
+    paths.sort_by_key(|p| (!p.ends_with("/team.yaml"), p.clone()));
+    for path in paths {
+        match load_one(store, &mut state, &path).await {
+            Ok(true) => report.loaded += 1,
+            Ok(false) => {}
+            Err(e) => {
+                warn!(path, error = %e, "skipped a Work file");
+                report.skipped += 1;
+            }
+        }
+    }
+    Ok((state, report))
+}
+
+/// Brings `state` up to date with files another replica changed. Issues
+/// and comment threads are reloaded one by one; a changed team, cycle or
+/// project (rare) rebuilds everything, since they shape the rest.
+///
+/// # Errors
+///
+/// Whatever stops a file from being read; the caller then rebuilds.
+async fn apply_paths(
+    store: &dyn BlobStore,
+    state: &mut State,
+    paths: &[String],
+) -> Result<(), Error> {
+    for path in paths {
+        match classify(path) {
+            Kind::Issue => {
+                let old = state
+                    .graph
+                    .issues()
+                    .find(|i| i.path() == *path)
+                    .map(|i| i.id);
+                if let Some(id) = old {
+                    let _ = state.graph.unload_issue(&id);
+                }
+                if let Some(text) = read_text(store, path).await? {
+                    let issue = Issue::from_markdown(path, &text)?;
+                    // The same issue may have moved here from another path.
+                    let _ = state.graph.unload_issue(&issue.id);
+                    state.graph.load_issue(issue)?;
+                }
+            }
+            Kind::Thread => {
+                let _ = state.comments.unload_path(path);
+                if let Some(text) = read_text(store, path).await? {
+                    let thread = Thread::from_yaml(path, &text)?;
+                    let _ = state.comments.unload_path(&thread.path());
+                    state.comments.load(thread)?;
+                }
+            }
+            Kind::Team | Kind::Cycle | Kind::Project => {
+                return Err(Error::new(ErrorKind::Conflict, "team settings changed"));
+            }
+            Kind::Other => {}
+        }
+    }
+    Ok(())
+}
+
+/// A file's text, or `None` when it no longer exists.
+async fn read_text(store: &dyn BlobStore, path: &str) -> Result<Option<String>, Error> {
+    match store.get(&blob_path(path)?).await {
+        Ok(blob) => String::from_utf8(blob.bytes.to_vec())
+            .map(Some)
+            .map_err(|_| invalid("not UTF-8")),
+        Err(StoreError::NotFound(_)) => Ok(None),
+        Err(e) => Err(store_error(e)),
+    }
+}
+
 async fn list(store: &dyn BlobStore, dir: &str) -> Result<Vec<String>, Error> {
     let dir = blob_path(dir)?;
     let mut out = Vec::new();

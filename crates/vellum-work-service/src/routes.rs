@@ -65,13 +65,25 @@ fn mutation<I, O, F, Fut>(
 where
     F: Fn(Arc<WorkService>, RequestContext, I) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = Result<O, Error>> + Send + 'static,
-    I: DeserializeOwned + JsonSchema + Send + 'static,
+    I: DeserializeOwned + JsonSchema + Clone + Send + Sync + 'static,
     O: Serialize + JsonSchema + Send + 'static,
 {
     let svc = Arc::clone(svc);
-    Operation::mutation(id, method, path, scope, move |ctx, input| {
-        f(Arc::clone(&svc), ctx, input)
-    })
+    let f = Arc::new(f);
+    Operation::mutation(
+        id,
+        method,
+        path,
+        scope,
+        move |ctx: RequestContext, input: I| {
+            let (svc, f) = (Arc::clone(&svc), Arc::clone(&f));
+            // A command that loses a race to another replica runs again on
+            // the state that replica wrote (ADR 0037).
+            async move {
+                crate::service::retrying(|| f(Arc::clone(&svc), ctx.clone(), input.clone())).await
+            }
+        },
+    )
 }
 
 /// Every Work operation.

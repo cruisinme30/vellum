@@ -7,7 +7,7 @@
 //! bot user. Service crates cannot depend on each other, so the server's
 //! composition root adapts these two calls to the integrations' port.
 //! A command passed to [`WorkService::transact`] runs under the same lock
-//! as every operation, and its changes are written and announced the same
+//! as every operation (and runs again if another replica committed first), and its changes are written and announced the same
 //! way: files first, then events, with memory put back if a write fails.
 
 use vellum_kernel::Error;
@@ -21,7 +21,7 @@ pub type Outcome<R> = (Changes, Option<CommentChanges>, R);
 impl WorkService {
     /// Reads the issue graph and comments under the service lock.
     pub async fn read<R>(&self, f: impl FnOnce(&WorkGraph, &Comments) -> R) -> R {
-        let st = self.state.lock().await;
+        let st = self.read_state().await;
         f(&st.graph, &st.comments)
     }
 
@@ -38,7 +38,21 @@ impl WorkService {
     pub async fn transact<R>(
         &self,
         actor: UserRef,
-        f: impl FnOnce(&mut WorkGraph, &mut Comments, &Ctx) -> Result<Outcome<R>, Error>,
+        mut f: impl FnMut(&mut WorkGraph, &mut Comments, &Ctx) -> Result<Outcome<R>, Error>,
+    ) -> Result<R, Error> {
+        let mut lost = 0;
+        loop {
+            match self.transact_once(actor.clone(), &mut f).await {
+                Err(e) if super::is_race(&e) && lost < super::ATTEMPTS => lost += 1,
+                other => return other,
+            }
+        }
+    }
+
+    async fn transact_once<R>(
+        &self,
+        actor: UserRef,
+        f: &mut impl FnMut(&mut WorkGraph, &mut Comments, &Ctx) -> Result<Outcome<R>, Error>,
     ) -> Result<R, Error> {
         let now = self.clock.now();
         let ctx = Ctx {
@@ -46,7 +60,7 @@ impl WorkService {
             today: now.date(),
             actor: Some(actor),
         };
-        let mut st = self.state.lock().await;
+        let mut st = self.write_state().await?;
         let backup = st.clone();
         let state = &mut *st;
         let (changes, comments, out) = match f(&mut state.graph, &mut state.comments, &ctx) {
