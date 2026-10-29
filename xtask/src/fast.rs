@@ -150,8 +150,8 @@ pub fn run() -> Result<(), String> {
         (Outcome::NotNeeded, Outcome::NotNeeded)
     };
     if areas.rust && !docker_available() {
-        // The missing tool is Docker, which the vellum-db Postgres tests need.
-        results.push(("Postgres tests in vellum-db (Docker)", Outcome::Skipped));
+        // The missing tool is Docker, which the Postgres and Meilisearch tests need.
+        results.push(("Postgres and Meilisearch tests (Docker)", Outcome::Skipped));
     }
     results.push(("Crate boundaries", boundaries));
     results.push(("Help books and their corpus", help));
@@ -210,16 +210,19 @@ fn desktop_steps() -> Vec<Step> {
     .collect()
 }
 
-/// Test binaries that start Postgres in a container through testcontainers.
-const DOCKER_TESTS: &str = "binary_id(vellum-db::postgres) | binary_id(vellum-db::shards)";
+/// Tests that start Postgres or Meilisearch in a container through
+/// testcontainers: two whole `vellum-db` binaries, plus every test named
+/// after the engine it starts.
+const DOCKER_TESTS: &str = "binary_id(vellum-db::postgres) | binary_id(vellum-db::shards) \
+     | test(/postgres/) | test(/meilisearch/)";
 
 /// Whether a Docker daemon looks reachable: `DOCKER_HOST` is set or the
 /// default socket exists. Cloud sandboxes have neither.
 fn docker_available() -> bool {
     env::var_os("DOCKER_HOST").is_some() || Path::new("/var/run/docker.sock").exists()
 }
-
-/// The workspace tests. Without Docker, the container-backed Postgres
+/// The workspace tests. Without Docker, the container-backed database
+/// and search tests are left out (and reported as skipped); CI always runs them.
 /// tests are left out (and reported as skipped); CI always runs them.
 fn rust_tests(docker: bool) -> Step {
     let mut step = Step::new(
@@ -367,6 +370,20 @@ fn steps(base: Option<&str>, branch: Option<&str>) -> Vec<Step> {
     steps
 }
 
+/// Smaller local builds, so a workspace test build fits a cloud sandbox's
+/// disk: no debug info and no incremental cache. A variable the
+/// contributor already set wins.
+const LOCAL_BUILD_ENV: [(&str, &str); 2] =
+    [("CARGO_PROFILE_DEV_DEBUG", "0"), ("CARGO_INCREMENTAL", "0")];
+
+/// The `LOCAL_BUILD_ENV` entries the environment does not already set.
+fn local_build_env(is_set: impl Fn(&str) -> bool) -> Vec<(&'static str, &'static str)> {
+    LOCAL_BUILD_ENV
+        .into_iter()
+        .filter(|(key, _)| !is_set(key))
+        .collect()
+}
+
 fn execute(root: &Path, step: &Step) -> Outcome {
     if !on_path(step.tool) && !root.join(step.program).is_file() {
         return Outcome::Skipped;
@@ -377,7 +394,13 @@ fn execute(root: &Path, step: &Step) -> Outcome {
     } else {
         OsString::from(step.program)
     };
+    let build_env = if step.program == "cargo" {
+        local_build_env(|key| env::var_os(key).is_some())
+    } else {
+        Vec::new()
+    };
     let status = Command::new(program)
+        .envs(build_env)
         .args(&step.args)
         .current_dir(root.join(step.dir))
         .envs(step.env.iter().copied())
@@ -468,6 +491,8 @@ fn changed_areas(root: &Path, base: &str) -> Areas {
         .and_then(|mut child| {
             if let Some(mut stdin) = child.stdin.take() {
                 stdin.write_all(paths.as_bytes())?;
+                // `git` output is trimmed; end the last path with a newline.
+                stdin.write_all(b"\n")?;
             }
             child.wait_with_output()
         });
@@ -597,6 +622,34 @@ mod tests {
         assert_eq!(
             without.args[without.args.len() - 2..],
             ["-E".to_owned(), format!("not ({DOCKER_TESTS})")]
+        );
+    }
+
+    #[test]
+    fn the_last_changed_path_counts() {
+        // `git diff` output is trimmed, so the last path has no newline.
+        let root = repo_root().expect("inside the repository");
+        let output = Command::new(root.join("scripts/ci/changed-areas.sh"))
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+            .and_then(|mut child| {
+                if let Some(mut stdin) = child.stdin.take() {
+                    stdin.write_all(b"README.md\nxtask/src/fast.rs")?;
+                }
+                child.wait_with_output()
+            })
+            .expect("script runs");
+        let areas = Areas::parse(&String::from_utf8_lossy(&output.stdout));
+        assert!(areas.rust, "{areas:?}");
+    }
+
+    #[test]
+    fn local_builds_drop_debug_info_unless_already_set() {
+        assert_eq!(local_build_env(|_| false), LOCAL_BUILD_ENV.to_vec());
+        assert_eq!(
+            local_build_env(|key| key == "CARGO_INCREMENTAL"),
+            [("CARGO_PROFILE_DEV_DEBUG", "0")]
         );
     }
 }

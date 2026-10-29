@@ -19,9 +19,15 @@
 //! `401`, malformed bodies `400`, and a failure in the issue core `503`, so
 //! the provider retries; retries are safe because intake dedupes by source
 //! and Git automation is idempotent.
+//!
+//! A Slack command carries no id to dedupe on, so the receiver remembers
+//! the signatures it accepted in the last five minutes (the window Slack
+//! signatures are valid for) and answers a replayed one as already handled.
+//! Git deliveries run one at a time, so two events for the same pull
+//! request cannot overwrite each other's links.
 
-use std::collections::BTreeMap;
-use std::sync::Arc;
+use std::collections::{BTreeMap, VecDeque};
+use std::sync::{Arc, Mutex};
 
 use axum::Router;
 use axum::body::Bytes;
@@ -78,12 +84,22 @@ impl std::fmt::Debug for ReceiverConfig {
     }
 }
 
+/// How long a Slack signature stays valid, and so how long it is
+/// remembered.
+const SLACK_WINDOW_SECONDS: i64 = 5 * 60;
+/// The most Slack signatures remembered; the oldest go first.
+const SLACK_REMEMBERED: usize = 4096;
+
 /// The receivers' state.
 pub struct Receivers<W, L> {
     work: W,
     links: L,
     config: ReceiverConfig,
     clock: fn() -> Timestamp,
+    /// Slack signatures accepted recently, oldest first.
+    slack_seen: Mutex<VecDeque<(Timestamp, String)>>,
+    /// Serializes Git deliveries, which read and write issue links.
+    git: tokio::sync::Mutex<()>,
 }
 
 impl<W, L> std::fmt::Debug for Receivers<W, L> {
@@ -102,6 +118,8 @@ impl<W: WorkCommands + 'static, L: LinkStore + 'static> Receivers<W, L> {
             links,
             config,
             clock: Timestamp::now,
+            slack_seen: Mutex::new(VecDeque::new()),
+            git: tokio::sync::Mutex::new(()),
         }
     }
 
@@ -121,6 +139,37 @@ impl<W: WorkCommands + 'static, L: LinkStore + 'static> Receivers<W, L> {
             .route("/sentry", post(sentry_hook::<W, L>))
             .route("/email", post(email_hook::<W, L>))
             .with_state(self)
+    }
+}
+
+impl<W, L> Receivers<W, L> {
+    /// Records a Slack signature; false when it was already seen inside
+    /// the window, so the request is a replay.
+    fn first_slack_delivery(&self, signature: &str, now: Timestamp) -> bool {
+        let Ok(mut seen) = self.slack_seen.lock() else {
+            // A poisoned lock fails closed: treat the request as a replay.
+            return false;
+        };
+        while seen.front().is_some_and(|(at, _)| {
+            now.as_second().saturating_sub(at.as_second()) > SLACK_WINDOW_SECONDS
+        }) {
+            let _ = seen.pop_front();
+        }
+        if seen.iter().any(|(_, s)| s == signature) {
+            return false;
+        }
+        if seen.len() >= SLACK_REMEMBERED {
+            let _ = seen.pop_front();
+        }
+        seen.push_back((now, signature.to_owned()));
+        true
+    }
+
+    /// Forgets a Slack signature whose request failed, so a retry runs.
+    fn forget_slack_delivery(&self, signature: &str) {
+        if let Ok(mut seen) = self.slack_seen.lock() {
+            seen.retain(|(_, s)| s != signature);
+        }
     }
 }
 
@@ -201,6 +250,7 @@ async fn github_hook<W: WorkCommands, L: LinkStore>(
     let Some(event) = github::parse(event, &body)? else {
         return Ok(accepted(json!({ "applied": 0 })));
     };
+    let _one_at_a_time = r.git.lock().await;
     let applied = apply(&r.work, &r.links, &r.config.git, &event).await?;
     Ok(accepted(json!({ "applied": applied.len() })))
 }
@@ -219,6 +269,7 @@ async fn gitlab_hook<W: WorkCommands, L: LinkStore>(
     let Some(event) = gitlab::parse(event, &body)? else {
         return Ok(accepted(json!({ "applied": 0 })));
     };
+    let _one_at_a_time = r.git.lock().await;
     let applied = apply(&r.work, &r.links, &r.config.git, &event).await?;
     Ok(accepted(json!({ "applied": applied.len() })))
 }
@@ -234,12 +285,14 @@ async fn slack_hook<W: WorkCommands, L: LinkStore>(
     if r.config.slack_signing_secret.is_empty() {
         return Err(Refusal::NotConfigured);
     }
+    let now = (r.clock)();
+    let signature = header(&headers, "X-Slack-Signature");
     slack::verify(
         &r.config.slack_signing_secret,
         header(&headers, "X-Slack-Request-Timestamp"),
-        header(&headers, "X-Slack-Signature"),
+        signature,
         &body,
-        (r.clock)(),
+        now,
     )?;
     let request = slack::parse(&body)?;
     let reply = |text: String| {
@@ -252,8 +305,18 @@ async fn slack_hook<W: WorkCommands, L: LinkStore>(
     let Some(draft) = slack::to_draft(&request, &r.config.routing, None) else {
         return Ok(reply("Usage: /vellum [TEAM] title of the issue".to_owned()));
     };
-    let key = r.work.create_issue(draft).await?;
-    Ok(reply(format!("Filed {key} in triage.")))
+    // verify() succeeded, so the signature header is present.
+    let signature = signature.unwrap_or_default();
+    if !r.first_slack_delivery(signature, now) {
+        return Ok(reply("Already handled.".to_owned()));
+    }
+    match r.work.create_issue(draft).await {
+        Ok(key) => Ok(reply(format!("Filed {key} in triage."))),
+        Err(e) => {
+            r.forget_slack_delivery(signature);
+            Err(e.into())
+        }
+    }
 }
 
 #[tracing::instrument(name = "integrations.receive.sentry", skip_all)]

@@ -4,6 +4,7 @@
 //! The index handle: one pool, one of two backends.
 
 use std::str::FromStr as _;
+use std::sync::Arc;
 use std::time::Duration;
 
 use sqlx::postgres::{PgPool, PgPoolOptions};
@@ -55,9 +56,62 @@ pub enum IndexPool<'a> {
 }
 
 /// A migrated, ready-to-use index. Cheap to clone.
+///
+/// When the last clone of a SQLite index is dropped, its connections are
+/// closed before the drop returns. Keep an `Index`
+/// alive for as long as you use a pool borrowed from [`Index::pool`].
 #[derive(Debug, Clone)]
 pub struct Index {
     pub(crate) pool: Pool,
+    _closer: Option<Arc<SqliteCloser>>,
+}
+
+/// How long dropping the last SQLite index waits for its connections.
+const CLOSE_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Closes a SQLite pool when the last [`Index`] clone goes away.
+///
+/// sqlx closes a dropped SQLite connection later, on that connection's
+/// own worker thread. SQLCipher frees its shared state in an `atexit`
+/// handler. If a process exits while a worker is still closing, the two
+/// race and the process aborts at exit (`double free`, `malloc_consolidate`,
+/// SIGSEGV), which showed up as random test failures. Closing the pool
+/// here, before the drop returns, means no worker is left behind.
+#[derive(Debug)]
+struct SqliteCloser(SqlitePool);
+
+impl Drop for SqliteCloser {
+    fn drop(&mut self) {
+        if self.0.is_closed() {
+            return;
+        }
+        let pool = self.0.clone();
+        // A helper thread with its own runtime works whether the drop runs
+        // inside an async runtime or outside one.
+        let closer = std::thread::Builder::new()
+            .name("vellum-db-close".into())
+            .spawn(move || {
+                let runtime = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build();
+                match runtime {
+                    Ok(runtime) => {
+                        let closed = runtime.block_on(async {
+                            tokio::time::timeout(CLOSE_TIMEOUT, pool.close()).await
+                        });
+                        if closed.is_err() {
+                            tracing::warn!(
+                                "index connections still busy after {CLOSE_TIMEOUT:?}; not waiting"
+                            );
+                        }
+                    }
+                    Err(error) => tracing::warn!(%error, "could not close the index on drop"),
+                }
+            });
+        if let Ok(closer) = closer {
+            let _ = closer.join();
+        }
+    }
 }
 
 impl Index {
@@ -96,6 +150,7 @@ impl Index {
                         other => Error::Database(other),
                     })?;
                 Self {
+                    _closer: Some(Arc::new(SqliteCloser(pool.clone()))),
                     pool: Pool::Sqlite(pool),
                 }
             }
@@ -110,6 +165,7 @@ impl Index {
                     .await?;
                 Self {
                     pool: Pool::Postgres(pool),
+                    _closer: None,
                 }
             }
         };

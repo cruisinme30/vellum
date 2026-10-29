@@ -10,7 +10,8 @@ import { newRequestId, newTraceparent, telemetry } from "../telemetry";
  *
  * - `GET /api/v1/push/vapid-key` → `{"publicKey": "<base64url>"}`
  * - `POST /api/v1/push/subscriptions` with `PushSubscription.toJSON()`
- * - `DELETE /api/v1/push/subscriptions` with `{"endpoint"}`
+ * - `DELETE /api/v1/push/subscriptions?endpoint=<url-encoded endpoint>`
+ *   (the gateway reads DELETE input from the query string, not the body)
  */
 
 /** Result of {@link enablePush}. */
@@ -97,9 +98,6 @@ export async function disablePush(environment: PushEnvironment): Promise<void> {
   if (subscription === null) return;
   const { endpoint } = subscription;
   await subscription.unsubscribe();
-  await call(environment, "/api/v1/push/subscriptions", {
-    method: "DELETE",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ endpoint }),
-  });
+  const query = new URLSearchParams({ endpoint }).toString();
+  await call(environment, `/api/v1/push/subscriptions?${query}`, { method: "DELETE" });
 }

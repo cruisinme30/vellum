@@ -14,8 +14,9 @@ vellum: 1
 - Decisions: D58, D59, D60
 - Issues: #70 (block schema), #90 (app shell), #92 (block editor),
   #79 (themes), #128 and #129 (collection views); the Yjs binding refs
-  #97 (collab rooms)
-- Pull requests: #262 (shell and editor), collection views to follow
+  #97 (collab rooms); #392 (API clients)
+- Pull requests: #262 (shell and editor), #378 (collection views), #417
+  (sign-in and live collections)
 
 :::
 
@@ -67,6 +68,11 @@ start before the API and the collab server exist.
   server filters, sorts and groups; the six layouts only draw them.
 - Every pointer action in those views has a keyboard path: grid keys and
   inline editors in the table, Alt+arrows and a "Move to" menu on cards.
+- The server adapters share one HTTP client (#392). It sends the session
+  cookie, a CSRF token and an idempotency key on every write, and turns
+  the server's error JSON into one error type that keeps the request ID.
+  When `GET /api/v1/auth/status` gets no answer, the app keeps the mock
+  adapters (demo mode); otherwise every page needs a signed-in user.
 - Why: the shell and editor could ship before the backend, and swapping
   in the server is a transport change only.
 
@@ -84,5 +90,5 @@ start before the API and the collab server exist.
 
 - A new block means editing `blocks.json`, running `cargo xtask schema`,
   then adding its Tiptap extension; a parity test fails until it exists.
-- Replacing the mock adapters with the API (#97 and the gateway) is the
-  next step; the views stay unchanged.
+- Collections run on the API since #417; pages, work, books and search
+  move next (#392), then live editing (#97). The views stay unchanged.

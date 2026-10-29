@@ -24,7 +24,7 @@ pub mod ports;
 pub mod service;
 pub mod sql;
 
-pub use app::{MAX_PUSH, Mutators, PULL_PAGE, Sync};
+pub use app::{MAX_MUTATION_ID, MAX_PUSH, Mutators, PULL_PAGE, Sync};
 pub use domain::{
     Change, ClientId, ClientMutation, Patch, PullRequest, PullResponse, PushRequest, PushResponse,
     Record, Rejected,

@@ -31,6 +31,8 @@ pub struct Services {
     identity: Arc<Identity>,
     /// Collections, books and Work, when an index is configured.
     workspace: Vec<Arc<dyn Service>>,
+    /// The integration receivers, when an integration secret is set.
+    hooks: Option<axum::Router>,
 }
 
 impl std::fmt::Debug for Services {
@@ -40,6 +42,7 @@ impl std::fmt::Debug for Services {
                 "workspace",
                 &self.workspace.iter().map(|s| s.name()).collect::<Vec<_>>(),
             )
+            .field("hooks", &self.hooks.is_some())
             .finish_non_exhaustive()
     }
 }
@@ -69,6 +72,7 @@ impl Services {
         Ok(Self {
             identity: Arc::new(identity),
             workspace: Vec::new(),
+            hooks: None,
         })
     }
 
@@ -80,9 +84,11 @@ impl Services {
     pub async fn with_workspace(
         mut self,
         config: &Config,
-        var: impl Fn(&str) -> Option<String>,
+        var: impl Fn(&str) -> Option<String> + Send + Sync,
     ) -> Result<Self, Error> {
-        self.workspace = workspace::open(config, &self.identity, var).await?;
+        let opened = workspace::open(config, &self.identity, var).await?;
+        self.workspace = opened.services;
+        self.hooks = opened.hooks;
         Ok(self)
     }
 
@@ -101,6 +107,10 @@ impl Services {
             builder = builder.service(service);
         }
         let identity = &self.identity;
+        if let Some(hooks) = &self.hooks {
+            // Providers sign each delivery and send no CSRF token.
+            builder = builder.mount_cross_site("/hooks", hooks.clone());
+        }
         builder
             .authenticator(Arc::new(IdentityAuthenticator::new(Arc::clone(identity))))
             .mount("/auth", identity_http::browser_router(Arc::clone(identity)))

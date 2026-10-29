@@ -1,9 +1,11 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import { BrowserRouter, Route, Routes } from "react-router";
 
+import type { AuthApi, AuthStatus } from "./api/auth";
+import { RequireSession, SessionProvider } from "./api/session";
 import { CollectionView } from "./collections/collection-view";
 import { CollectionsIndexView } from "./collections/collections-index";
 import { CollectionsProvider } from "./collections/context";
@@ -19,6 +21,7 @@ import { FavoritesView, HomeView } from "./views/home";
 import { AdminView, HelpView, NotFoundView } from "./views/info";
 import { NewPageView } from "./views/new-page";
 import { InboxView, SearchView } from "./views/search";
+import { SetupView, SignInView } from "./views/sign-in";
 
 // The editor is most of the bundle, so it loads with the first page opened.
 const PageView = lazy(async () => {
@@ -39,7 +42,15 @@ function PageLoading() {
 export function AppRoutes() {
   return (
     <Routes>
-      <Route element={<AppShell />}>
+      <Route path="sign-in" element={<SignInView />} />
+      <Route path="setup" element={<SetupView />} />
+      <Route
+        element={
+          <RequireSession>
+            <AppShell />
+          </RequireSession>
+        }
+      >
         <Route index element={<HomeView />} />
         <Route
           path="p/:pageId"
@@ -65,11 +76,33 @@ export function AppRoutes() {
   );
 }
 
-/** Services the app runs on: mock adapters today, the API when it lands. */
+/**
+ * Services the app runs on. Areas whose server API exists use it when a
+ * Vellum server answers; the rest, and everything in demo mode, use the
+ * Northstar demo adapters (issue #392).
+ */
 export interface AppServices {
   readonly store: WorkspaceStore;
   readonly collab: CollabConnector;
   readonly collections: CollectionsStore;
+  /** Present when a Vellum server answered; absent in demo mode. */
+  readonly session?: { readonly auth: AuthApi; readonly status: AuthStatus } | undefined;
+}
+
+function MaybeSession({
+  session,
+  children,
+}: {
+  readonly session: AppServices["session"];
+  readonly children: ReactNode;
+}) {
+  return session === undefined ? (
+    children
+  ) : (
+    <SessionProvider auth={session.auth} initial={session.status}>
+      {children}
+    </SessionProvider>
+  );
 }
 
 /** Providers shared by the app and its tests. */
@@ -77,14 +110,17 @@ export function AppProviders({
   store,
   collab,
   collections,
+  session,
   children,
-}: AppServices & { readonly children: React.ReactNode }) {
+}: AppServices & { readonly children: ReactNode }) {
   return (
     <I18nProvider>
       <AppearanceProvider>
-        <WorkspaceProvider store={store} collab={collab}>
-          <CollectionsProvider store={collections}>{children}</CollectionsProvider>
-        </WorkspaceProvider>
+        <MaybeSession session={session}>
+          <WorkspaceProvider store={store} collab={collab}>
+            <CollectionsProvider store={collections}>{children}</CollectionsProvider>
+          </WorkspaceProvider>
+        </MaybeSession>
       </AppearanceProvider>
     </I18nProvider>
   );

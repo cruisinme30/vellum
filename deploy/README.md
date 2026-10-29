@@ -12,7 +12,7 @@ the same signed binary.
 | --- | --- | --- |
 | Single binary | `vellum serve`, SQLite and a folder | a release download |
 | `docker run` | the same binary in a 4 MB distroless image | [`docker/`](docker/Dockerfile) |
-| Team | Vellum, Postgres, MinIO, Kroki | [`compose/`](compose/compose.yaml) |
+| Team | Vellum, Postgres, MinIO, Kroki, ClamAV | [`compose/`](compose/compose.yaml) |
 | Organisation | two of everything, a Patroni replica per shard, canary releases | [`helm/vellum/`](helm/vellum/values.yaml) |
 
 ## Single binary and `docker run`

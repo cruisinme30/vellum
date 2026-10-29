@@ -15,6 +15,7 @@ mod docs;
 mod identity;
 #[cfg(test)]
 mod identity_tests;
+mod integrations;
 mod mcp;
 mod private;
 #[cfg(test)]
@@ -22,6 +23,8 @@ mod private_tests;
 mod reindex;
 mod serve;
 mod services;
+#[cfg(test)]
+mod typescript_tests;
 mod watcher;
 mod workspace;
 
@@ -57,7 +60,11 @@ enum Command {
     #[command(subcommand)]
     Admin(AdminCommand),
     /// Prints the OpenAPI 3.1 document of every service.
-    Openapi,
+    Openapi {
+        /// Print the TypeScript client types instead (`web/src/api/api.gen.ts`).
+        #[arg(long)]
+        typescript: bool,
+    },
     /// Prints the `GraphQL` schema of every service.
     GraphqlSchema,
     /// Rebuild the index from the files in the data folder.
@@ -165,7 +172,10 @@ fn main() -> ExitCode {
             let _entered = span.enter();
             reindex::run(&args)
         }
-        Command::Openapi => match services::contract_gateway() {
+        Command::Openapi { typescript } => match services::contract_gateway() {
+            Ok(gateway) if typescript => {
+                print(vellum_api::typescript::client(gateway.openapi()).trim_end())
+            }
             Ok(gateway) => {
                 print(&serde_json::to_string_pretty(gateway.openapi()).unwrap_or_default())
             }

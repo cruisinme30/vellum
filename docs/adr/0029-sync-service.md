@@ -12,7 +12,7 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D116, D117, D118
-- Issue: #216
+- Issue: #216, #430, #431
 - Pull requests: #219
 - Requirements: R-WK-6 (sub-100 ms perceived latency), R-LT-4 (offline),
   permission changes visible in under 1 s (brief §12)
@@ -56,6 +56,11 @@ another service's tables.
   the client's last processed ID, then runs the rest in order and records
   the new last ID after each one, so a retried push never applies a
   mutation twice.
+- A node runs one push per client at a time: a retry that arrives while
+  the first push still runs gets a retryable `rate_limited`, so both never
+  read the same last ID (#430). Two pushes that reach different HA nodes
+  rely on the mutators' idempotency key. IDs above `i64::MAX` are refused
+  before anything runs.
 - Each mutator belongs to the service that owns the data and is
   registered as `<service>.<verb>`; names are unique. A mutator returns
   the record changes to log. It receives the client ID and mutation ID as
@@ -75,7 +80,9 @@ another service's tables.
   (`reset: true`, full snapshot of readable records) when the cursor is
   empty or unreadable, when the log epoch changed (index rebuilt), when the
   person's permission epoch changed (they gained or lost access to
-  something), or when the cursor is older than the horizon. Revoked
+  something), when the cursor is older than the horizon, or when it is
+  past the log head (a restored backup or a corrupted device store,
+  #431). Revoked
   records thus disappear from devices without the log having to record
   per-person deletes.
 - For "visible in under 1 s", the collaboration WebSocket sends a poke

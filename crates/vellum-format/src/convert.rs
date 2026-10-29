@@ -213,9 +213,18 @@ impl Cx<'_> {
                 // One item with at most one block has no blank line that
                 // could show it is loose, so it is always tight.
                 let single = matches!(items.as_slice(), [item] if item.blocks.len() <= 1);
+                // A quote or table writes its ID after a blank line, which
+                // makes the list loose, so such a list always is.
+                let id_line = items.iter().flat_map(|item| &item.blocks).any(|block| {
+                    matches!(
+                        block,
+                        Block::BlockQuote { id: Some(_), .. }
+                            | Block::Table(Table { id: Some(_), .. })
+                    )
+                });
                 Block::List(List {
                     start: (list.list_type == ListType::Ordered).then_some(list.start as u64),
-                    tight: list.tight || single,
+                    tight: !id_line && (list.tight || single),
                     items,
                 })
             }

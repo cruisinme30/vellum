@@ -547,3 +547,54 @@ kbd {
     width: auto;
   }
 }
+
+/* Sign-in and set-up */
+.vl-auth {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: 24px 16px;
+}
+
+.vl-auth-card {
+  width: min(400px, 100%);
+  padding: 32px clamp(16px, 6vw, 40px);
+  border-radius: var(--vl-radius-l);
+  background: var(--md-surface-container);
+}
+
+.vl-auth-brand {
+  margin: 0;
+  color: var(--md-primary);
+  font-weight: 700;
+}
+
+.vl-auth-card h1 {
+  margin: 8px 0;
+  font-size: 1.75rem;
+  font-weight: 400;
+}
+
+.vl-auth-form {
+  display: grid;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.vl-auth-field {
+  display: grid;
+  gap: 4px;
+}
+
+.vl-auth-field input {
+  min-height: 48px;
+  padding: 0 12px;
+  border: 1px solid var(--md-outline);
+  border-radius: var(--vl-radius-s);
+  background: var(--md-surface);
+}
+
+.vl-auth-form .vl-filled-button {
+  justify-content: center;
+  padding: 0 24px;
+}

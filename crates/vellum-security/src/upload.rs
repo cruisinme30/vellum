@@ -16,7 +16,7 @@ use std::io::Cursor;
 use std::time::Duration;
 
 use image::{ImageFormat, ImageReader, Limits};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::TcpStream;
 
 /// A kind of file Vellum accepts.
@@ -290,16 +290,46 @@ impl Clamd {
 
     async fn instream(&self, bytes: &[u8]) -> std::io::Result<String> {
         let mut stream = TcpStream::connect(&self.address).await?;
+        let (mut reader, mut writer) = stream.split();
+        // clamd answers and hangs up as soon as a stream passes its
+        // StreamMaxLength. Read while writing: once clamd closes with our
+        // bytes unread, its kernel may reset the connection, and on macOS
+        // that reset discards a reply we have not read yet.
+        let (sent, (reply, read)) =
+            tokio::join!(Self::send(&mut writer, bytes), Self::reply(&mut reader));
+        let reply = String::from_utf8_lossy(&reply)
+            .trim_end_matches(['\0', '\n'])
+            .to_owned();
+        match (sent, read) {
+            _ if !reply.is_empty() => Ok(reply),
+            (Err(e), _) | (Ok(()), Err(e)) => Err(e),
+            (Ok(()), Ok(())) => Ok(reply),
+        }
+    }
+
+    /// Reads clamd's NUL-terminated reply, keeping what arrived before any
+    /// error.
+    async fn reply<R: AsyncRead + Unpin>(reader: &mut R) -> (Vec<u8>, std::io::Result<()>) {
+        let mut reply = Vec::new();
+        let mut buf = [0_u8; 512];
+        while reply.len() < 4096 && !reply.contains(&0) {
+            match reader.read(&mut buf).await {
+                Ok(0) => break,
+                Ok(n) => reply.extend(buf.iter().take(n)),
+                Err(e) => return (reply, Err(e)),
+            }
+        }
+        (reply, Ok(()))
+    }
+
+    async fn send<W: AsyncWrite + Unpin>(stream: &mut W, bytes: &[u8]) -> std::io::Result<()> {
         stream.write_all(b"zINSTREAM\0").await?;
         for chunk in bytes.chunks(64 * 1024) {
             let len = u32::try_from(chunk.len()).unwrap_or(u32::MAX);
             stream.write_all(&len.to_be_bytes()).await?;
             stream.write_all(chunk).await?;
         }
-        stream.write_all(&0_u32.to_be_bytes()).await?;
-        let mut reply = String::new();
-        let _read = stream.take(4096).read_to_string(&mut reply).await?;
-        Ok(reply.trim_end_matches(['\0', '\n']).to_owned())
+        stream.write_all(&0_u32.to_be_bytes()).await
     }
 }
 
@@ -318,6 +348,13 @@ impl Scanner for Clamd {
                 found.trim_start_matches("stream: ").to_owned(),
             )),
             None if reply.ends_with("OK") => Ok(()),
+            None if reply.contains("size limit exceeded") => {
+                Err(UploadError::ScannerUnavailable(format!(
+                    "clamd refused a {} byte upload as too large; set StreamMaxLength \
+                     in clamd.conf to at least the upload limit ({reply})",
+                    bytes.len()
+                )))
+            }
             None => Err(UploadError::ScannerUnavailable(reply)),
         }
     }

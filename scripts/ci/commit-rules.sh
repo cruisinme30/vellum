@@ -6,9 +6,19 @@
 
 readonly CONVENTIONAL_RE='^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([a-z0-9._/-]+\))?!?: [^ ].{0,71}$'
 
+# Bots such as Dependabot write titles we cannot shorten ("... in the
+# rust-minor group across 1 directory"), so their subjects keep the type
+# rule but have no length limit.
+readonly CONVENTIONAL_BOT_RE='^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([a-z0-9._/-]+\))?!?: [^ ].*$'
+
 # check_subject <subject>: succeeds for a Conventional Commits subject.
 check_subject() {
   [[ "$1" =~ ${CONVENTIONAL_RE} ]]
+}
+
+# check_bot_subject <subject>: the same rule without the length limit.
+check_bot_subject() {
+  [[ "$1" =~ ${CONVENTIONAL_BOT_RE} ]]
 }
 
 # check_body <message>: succeeds when a blank line follows the subject and

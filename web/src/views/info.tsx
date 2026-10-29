@@ -1,10 +1,14 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import { useState } from "react";
 import { Link } from "react-router";
 
+import { useSession } from "../api/session";
 import { SLASH_ITEMS } from "../editor/slash/items";
 import { useT } from "../i18n/i18n";
+
+import { describeError } from "./sign-in";
 
 const SHORTCUTS: readonly [keys: string, id: string][] = [
   ["/", "help-key-slash"],
@@ -60,7 +64,43 @@ export function PendingView({ title, body }: { readonly title: string; readonly 
 /** Admin. */
 export function AdminView() {
   const t = useT();
-  return <PendingView title={t("nav-admin")} body={t("admin-pending")} />;
+  return (
+    <>
+      <PendingView title={t("nav-admin")} body={t("admin-pending")} />
+      <AccountSection />
+    </>
+  );
+}
+
+/** Who is signed in, and a way out. Shown only against a Vellum server. */
+function AccountSection() {
+  const t = useT();
+  const session = useSession();
+  const [error, setError] = useState<string | undefined>();
+  const user = session?.status.user;
+  if (session === undefined || user === undefined || user === null) return;
+  const signOut = () => {
+    setError(undefined);
+    session.auth
+      .signOut()
+      .then(() => session.refresh())
+      .catch((error_: unknown) => {
+        setError(describeError(error_, t("auth-error")));
+      });
+  };
+  return (
+    <section className="vl-view" aria-labelledby="account-heading">
+      <h2 id="account-heading">{t("auth-signed-in-as", { name: user.name, email: user.email })}</h2>
+      {error === undefined ? undefined : (
+        <p className="vl-field-error" role="alert">
+          {error}
+        </p>
+      )}
+      <button type="button" className="vl-filled-button" onClick={signOut}>
+        {t("auth-sign-out")}
+      </button>
+    </section>
+  );
 }
 
 /** Unknown routes and missing pages. */

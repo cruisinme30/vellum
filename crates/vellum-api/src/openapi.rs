@@ -227,6 +227,7 @@ pub fn document(registry: &Registry, version: &str) -> Value {
             ("parameters", Value::Array(parameters)),
             ("security", security),
             ("x-vellum-operation", json!(op.id())),
+            ("x-vellum-input", input_ref.clone()),
             ("x-vellum-kind", json!(op.kind())),
             ("x-vellum-scope", json!(op.scope().as_str())),
             ("x-vellum-budget-ms", json!(op.time_budget().as_millis())),

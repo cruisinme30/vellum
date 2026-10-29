@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 #
 # The Team rung of the deployment ladder (ADR 0022, D94): Vellum with
-# Postgres, MinIO for blobs and Kroki for diagrams.
+# Postgres, MinIO for blobs, Kroki for diagrams and ClamAV for uploads.
 #
 #   cp deploy/compose/.env.example deploy/compose/.env   # then edit it
 #   docker compose -f deploy/compose/compose.yaml up -d
@@ -42,6 +42,7 @@ services:
       AWS_ACCESS_KEY_ID: vellum
       AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
       VELLUM_KROKI_URL: http://kroki:8000
+      VELLUM_CLAMD_ADDRESS: clamav:3310
       VELLUM_KEK_PASSPHRASE_FILE: /run/secrets/vellum_kek
       VELLUM_LOG: ${VELLUM_LOG:-info}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
@@ -54,6 +55,9 @@ services:
       postgres: { condition: service_healthy }
       minio-init: { condition: service_completed_successfully }
       kroki: { condition: service_healthy }
+      # Not "healthy": the first signature download takes minutes, and
+      # uploads are refused (never stored unscanned) until clamd is up.
+      clamav: { condition: service_started }
 
   postgres:
     <<: *restart
@@ -126,6 +130,33 @@ services:
     <<: *restart
     image: yuzutech/kroki-diagramsnet:0.28.0@sha256:6139cb660c4a2526c2e2e0f7fff64b9b92ac4d8398f85fde53cf25bb6521383b
 
+  # Scans every upload (INSTREAM over TCP). Signatures live in a volume and
+  # freshclam refreshes them; the config is shared with the Helm chart.
+  clamav:
+    <<: [*restart, *hardening]
+    image: clamav/clamav:1.5.4@sha256:bda39705e291105049c3936e2803ac90b955172af8030f94f05dce1252df6c6d
+    user: clamav
+    entrypoint: ["/sbin/tini", "--", "/bin/sh", "-c"]
+    command:
+      # The image ships signatures, so clamd still starts if the first
+      # update fails; freshclam keeps retrying in the background.
+      - >-
+        freshclam --config-file=/etc/vellum/freshclam.conf --stdout
+        || echo "Signature update failed; starting with the signatures on disk.";
+        freshclam --config-file=/etc/vellum/freshclam.conf --stdout --daemon &
+        exec clamd --config-file=/etc/vellum/clamd.conf
+    volumes:
+      - clamav-db:/var/lib/clamav
+      - ../helm/vellum/files/clamd.conf:/etc/vellum/clamd.conf:ro
+      - ../helm/vellum/files/freshclam.conf:/etc/vellum/freshclam.conf:ro
+    tmpfs: [/tmp]
+    healthcheck:
+      test: ["CMD-SHELL", "echo PING | nc 127.0.0.1 3310 | grep -q PONG"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10m
+
 secrets:
   vellum_kek:
     file: ${VELLUM_KEK_FILE:-./secrets/kek-passphrase}
@@ -134,3 +165,4 @@ volumes:
   vellum-data:
   postgres-data:
   minio-data:
+  clamav-db:

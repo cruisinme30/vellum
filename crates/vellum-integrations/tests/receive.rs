@@ -336,6 +336,20 @@ async fn slack_commands_answer_the_user() {
     assert_eq!(status, StatusCode::OK, "{json}");
     assert_eq!(json["text"], "Filed ENG-1 in triage.");
 
+    // The same signed request sent again inside the window files nothing.
+    let (status, json) = send(
+        &router,
+        "/slack",
+        &[
+            ("X-Slack-Request-Timestamp", &fresh),
+            ("X-Slack-Signature", &sign(&fresh)),
+        ],
+        body.clone(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json}");
+    assert_eq!(json["text"], "Already handled.");
+
     // A captured request replayed ten minutes later is refused.
     let stale = (now().as_second() - 600).to_string();
     let (status, _) = send(
@@ -345,10 +359,25 @@ async fn slack_commands_answer_the_user() {
             ("X-Slack-Request-Timestamp", &stale),
             ("X-Slack-Signature", &sign(&stale)),
         ],
-        body,
+        body.clone(),
     )
     .await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
+
+    // A new command (new timestamp, so a new signature) is filed.
+    let later = (now().as_second() + 1).to_string();
+    let (status, json) = send(
+        &router,
+        "/slack",
+        &[
+            ("X-Slack-Request-Timestamp", &later),
+            ("X-Slack-Signature", &sign(&later)),
+        ],
+        body.clone(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json}");
+    assert_eq!(json["text"], "Filed ENG-2 in triage.");
 }
 
 #[tokio::test]

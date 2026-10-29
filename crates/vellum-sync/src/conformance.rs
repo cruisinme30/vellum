@@ -91,6 +91,11 @@ async fn log_keeps_latest_version<S: SyncStore>(store: &S) -> Result<(), String>
             .all(|w| matches!(w, [a, b] if a.seq < b.seq)),
         "positions increase",
     )?;
+    let head = store.info().await.map_err(|e| e.to_string())?.head;
+    ensure(
+        records.last().map(|r| r.seq) == Some(head),
+        "the head is the last position written",
+    )?;
     Ok(())
 }
 

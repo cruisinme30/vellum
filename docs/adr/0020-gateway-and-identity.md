@@ -12,7 +12,7 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D88, D89, D90
-- Issue: #84, #85, #148, #46, #86, #88, #174
+- Issue: #84, #85, #148, #46, #86, #88, #174, #407
 - Pull requests: #39, #234, #347, #352, #363
 
 :::
@@ -123,3 +123,7 @@ live in the gateway crate.
   applies edits made with other tools: an in-place page edit becomes a
   version by an external editor, and a changed `book.yaml` re-applies
   that book's section restrictions.
+- Clients get typed calls for free: `vellum openapi --typescript` turns
+  the same document into `web/src/api/api.gen.ts`, and a contract test
+  fails when the committed file no longer matches the server, so an API
+  change shows up as a type error in the web app, not at run time.

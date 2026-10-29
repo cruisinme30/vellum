@@ -165,6 +165,96 @@ async fn clamd_clean_and_infected() {
     }
 }
 
+/// A clamd whose `StreamMaxLength` is 1024 bytes: like the real one, it answers
+/// and hangs up as soon as a stream is too long.
+async fn small_limit_clamd() -> String {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap().to_string();
+    drop(tokio::spawn(async move {
+        loop {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut command = [0_u8; 10];
+            let _ = socket.read_exact(&mut command).await.unwrap();
+            let len = socket.read_u32().await.unwrap();
+            assert!(len > 1024);
+            socket
+                .write_all(b"INSTREAM size limit exceeded. ERROR\0")
+                .await
+                .unwrap();
+            socket.shutdown().await.unwrap();
+        }
+    }));
+    address
+}
+
+#[tokio::test]
+async fn clamd_size_limit_names_the_setting() {
+    let clamd = Clamd::new(small_limit_clamd().await, Duration::from_secs(5));
+    let err = clamd.scan(&vec![b'a'; 3 * 1024 * 1024]).await.unwrap_err();
+    match err {
+        UploadError::ScannerUnavailable(message) => {
+            assert!(message.contains("StreamMaxLength"), "{message}");
+            assert!(message.contains("3145728 byte"), "{message}");
+        }
+        other => panic!("unexpected {other:?}"),
+    }
+}
+
+/// Like `small_limit_clamd`, but resets the connection after replying, as
+/// macOS does when a peer closes with our upload still unread. The reply must
+/// survive the reset.
+#[tokio::test]
+async fn clamd_size_limit_survives_a_reset() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap().to_string();
+    drop(tokio::spawn(async move {
+        loop {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut command = [0_u8; 10];
+            let _ = socket.read_exact(&mut command).await.unwrap();
+            socket
+                .write_all(b"INSTREAM size limit exceeded. ERROR\0")
+                .await
+                .unwrap();
+            // Give the reply time to reach the client, then reset.
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            socket.set_zero_linger().unwrap();
+            drop(socket);
+        }
+    }));
+    for _ in 0..20 {
+        let err = Clamd::new(address.clone(), Duration::from_secs(5))
+            .scan(&vec![b'a'; 3 * 1024 * 1024])
+            .await
+            .unwrap_err();
+        match err {
+            UploadError::ScannerUnavailable(message) => {
+                assert!(message.contains("StreamMaxLength"), "{message}");
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+}
+
+#[tokio::test]
+async fn clamd_hanging_up_without_a_reply_fails_closed() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap().to_string();
+    drop(tokio::spawn(async move {
+        loop {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut command = [0_u8; 10];
+            let _ = socket.read_exact(&mut command).await.unwrap();
+            drop(socket);
+        }
+    }));
+    let err = Clamd::new(address, Duration::from_secs(5))
+        .scan(&vec![b'a'; 3 * 1024 * 1024])
+        .await
+        .unwrap_err();
+    assert!(matches!(err, UploadError::ScannerUnavailable(_)), "{err:?}");
+}
+
 #[tokio::test]
 async fn clamd_unreachable_fails_closed() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();

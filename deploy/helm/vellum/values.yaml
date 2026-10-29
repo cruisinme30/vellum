@@ -109,6 +109,26 @@ kroki:
     requests: { cpu: 100m, memory: 256Mi, ephemeral-storage: 128Mi }
     limits: { cpu: "1", memory: 768Mi, ephemeral-storage: 512Mi }
 
+# ClamAV scans every upload. Its config is files/clamd.conf, which streams
+# up to 100 MiB, Vellum's upload limit. Each pod loads the full signature
+# set (about 1.5 GiB of memory, twice that while it reloads them).
+clamav:
+  enabled: true
+  # Used when enabled is false: an existing clamd as host:port. Leave it
+  # empty with enabled false to run without virus scanning.
+  externalAddress: ""
+  replicaCount: 2
+  image:
+    repository: clamav/clamav
+    tag: 1.5.4
+    digest: sha256:bda39705e291105049c3936e2803ac90b955172af8030f94f05dce1252df6c6d
+  resources:
+    requests: { cpu: 200m, memory: 1536Mi, ephemeral-storage: 512Mi }
+    limits: { cpu: "2", memory: 3Gi, ephemeral-storage: 2Gi }
+  updaterResources:
+    requests: { cpu: 20m, memory: 64Mi, ephemeral-storage: 64Mi }
+    limits: { cpu: 500m, memory: 512Mi, ephemeral-storage: 512Mi }
+
 service:
   type: ClusterIP
   port: 80

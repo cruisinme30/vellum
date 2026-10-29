@@ -96,8 +96,12 @@ describe("web push", () => {
     const { pushEnvironment, fetchMock } = environment({ existing });
     await disablePush(pushEnvironment);
     expect(existing.unsubscribe).toHaveBeenCalled();
-    const [, init] = fetchMock.mock.calls[0] ?? [];
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
     expect(init?.method).toBe("DELETE");
+    expect(url).toMatch(
+      /\/api\/v1\/push\/subscriptions\?endpoint=https%3A%2F%2Fpush\.example%2F1$/,
+    );
+    expect(init?.body).toBeUndefined();
     const { pushEnvironment: empty, fetchMock: unused } = environment({});
     await disablePush(empty);
     expect(unused).not.toHaveBeenCalled();

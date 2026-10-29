@@ -40,6 +40,7 @@ mod state;
 
 use std::fmt;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use tokio::sync::{RwLock, RwLockReadGuard};
@@ -119,6 +120,69 @@ fn same_name(a: &str, b: &str) -> bool {
     a.trim().to_lowercase() == b.trim().to_lowercase()
 }
 
+/// A CSV import matched against the loaded collections and, unless it is
+/// a dry run, applied to a copy of them.
+struct PreparedImport {
+    import: crate::csv::CsvImport,
+    ws: Option<crate::workspace::Workspace>,
+    changed: crate::workspace::Changeset,
+}
+
+impl PreparedImport {
+    fn report(self, written: bool, collection: CollectionInfo) -> CsvImported {
+        CsvImported {
+            written,
+            rows: self.import.rows.len(),
+            skipped_columns: self.import.skipped_columns,
+            diagnostics: self.import.diagnostics,
+            collection,
+            changed: self.changed,
+        }
+    }
+}
+
+/// Matches `csv` against collection `id` and applies it to a copy of the
+/// workspace, so a bad row leaves nothing half done.
+fn prepare_import(
+    state: &State,
+    csv: &str,
+    id: CollectionId,
+    dry_run: bool,
+) -> Result<PreparedImport, Error> {
+    let import = crate::csv::import_into(csv, &state.ws, id)?;
+    let mut changed = crate::workspace::Changeset::default();
+    if dry_run {
+        return Ok(PreparedImport {
+            import,
+            ws: None,
+            changed,
+        });
+    }
+    let mut ws = state.ws.clone();
+    for edit in import.edits() {
+        let c = ws.apply(edit)?;
+        changed.written.extend(c.written);
+        changed.deleted.extend(c.deleted);
+    }
+    Ok(PreparedImport {
+        import,
+        ws: Some(ws),
+        changed,
+    })
+}
+
+/// A loaded collection's schema, views and load problems.
+fn collection_info(state: &State, id: CollectionId) -> Result<CollectionInfo, Error> {
+    match (state.ws.collection(id), state.folder(id)) {
+        (Some(c), Ok(f)) => Ok(CollectionInfo::new(
+            c.schema(),
+            f.path.as_str().to_owned(),
+            f.diagnostics.clone(),
+        )),
+        _ => Err(Error::new(ErrorKind::Internal, "collection vanished")),
+    }
+}
+
 use crate::compute::Computer;
 use crate::value::DateValue;
 use crate::view::{self, OneOrMany, ViewDef, ViewDefRaw, ViewResult};
@@ -143,6 +207,9 @@ pub struct CollectionsService {
     access: Arc<dyn Access>,
     clock: Clock,
     state: RwLock<Option<State>>,
+    /// Bumped under the write lock by every change to `state`, so work
+    /// prepared under the read lock can tell whether it is still current.
+    writes: AtomicU64,
     index_feed: Option<Arc<dyn IndexFeed>>,
 }
 
@@ -163,6 +230,7 @@ impl CollectionsService {
             access,
             clock: Arc::new(system_now),
             state: RwLock::new(None),
+            writes: AtomicU64::new(0),
             index_feed: None,
         }
     }
@@ -220,7 +288,14 @@ impl CollectionsService {
     /// Drops everything loaded; the next request reads the store again.
     /// The watcher calls this when a collection file changes on disk.
     pub async fn invalidate(&self) {
-        *self.state.write().await = None;
+        let mut guard = self.state.write().await;
+        self.bump();
+        *guard = None;
+    }
+
+    /// Marks the loaded state as changed. Call with the write lock held.
+    fn bump(&self) {
+        let _ = self.writes.fetch_add(1, Ordering::AcqRel);
     }
 
     async fn read(&self) -> Result<RwLockReadGuard<'_, State>, Error> {
@@ -461,6 +536,7 @@ impl CollectionsService {
         let span = tracing::info_span!("collections.edit", op, collection = %id);
         async move {
             let mut guard = self.state.write().await;
+            self.bump();
             if guard.is_none() {
                 *guard = Some(State::load(self.store.as_ref()).await?);
             }
@@ -567,6 +643,7 @@ impl CollectionsService {
         let span = tracing::info_span!("collections.edit_schema", op, collection = %id);
         async move {
             let mut guard = self.state.write().await;
+            self.bump();
             if guard.is_none() {
                 *guard = Some(State::load(self.store.as_ref()).await?);
             }
@@ -884,7 +961,24 @@ impl CollectionsService {
         let id = input.collection_id;
         let span = tracing::info_span!("collections.import_csv", collection = %id);
         async move {
+            // Match and apply the file under the read lock, so a large
+            // import does not stall every other request.
+            let (seen, prepared) = {
+                let state = self.read().await?;
+                let seen = self.writes.load(Ordering::Acquire);
+                self.require_edit(&state, &ctx.principal, id, true).await?;
+                let prepared = prepare_import(&state, &input.csv, id, input.dry_run)?;
+                if input.dry_run {
+                    let collection = collection_info(&state, id)?;
+                    drop(state);
+                    return Ok(prepared.report(false, collection));
+                }
+                drop(state);
+                (seen, prepared)
+            };
             let mut guard = self.state.write().await;
+            let current = self.writes.load(Ordering::Acquire) == seen && guard.is_some();
+            self.bump();
             if guard.is_none() {
                 *guard = Some(State::load(self.store.as_ref()).await?);
             }
@@ -894,44 +988,29 @@ impl CollectionsService {
                     "collections were not loaded",
                 ));
             };
-            self.require_edit(state, &ctx.principal, id, true).await?;
-            let import = crate::csv::import_into(&input.csv, &state.ws, id)?;
-            let rows = import.rows.len();
-            let mut changed = crate::workspace::Changeset::default();
-            if !input.dry_run {
-                // Apply to a copy first, so a bad row leaves nothing half done.
-                let mut ws = state.ws.clone();
-                for edit in import.edits() {
-                    let c = ws.apply(edit)?;
-                    changed.written.extend(c.written);
-                    changed.deleted.extend(c.deleted);
-                }
-                state.ws = ws;
-                let result = state.write(self.store.as_ref(), &changed).await;
-                crate::telemetry::wrote("import_csv", result.is_ok());
-                if let Err(e) = result {
-                    *guard = None;
-                    return Err(e);
-                }
-                self.feed(index::affected_rows(state, &changed));
-            }
-            let collection = match (state.ws.collection(id), state.folder(id)) {
-                (Some(c), Ok(f)) => CollectionInfo::new(
-                    c.schema(),
-                    f.path.as_str().to_owned(),
-                    f.diagnostics.clone(),
-                ),
-                _ => return Err(Error::new(ErrorKind::Internal, "collection vanished")),
+            // Something changed in between: match again against what is
+            // loaded now, rather than overwrite it with a stale copy.
+            let mut prepared = if current {
+                prepared
+            } else {
+                self.require_edit(state, &ctx.principal, id, true).await?;
+                prepare_import(state, &input.csv, id, false)?
             };
+            let changed = std::mem::take(&mut prepared.changed);
+            if let Some(ws) = prepared.ws.take() {
+                state.ws = ws;
+            }
+            let result = state.write(self.store.as_ref(), &changed).await;
+            crate::telemetry::wrote("import_csv", result.is_ok());
+            if let Err(e) = result {
+                *guard = None;
+                return Err(e);
+            }
+            self.feed(index::affected_rows(state, &changed));
+            let collection = collection_info(state, id)?;
             drop(guard);
-            Ok(CsvImported {
-                written: !input.dry_run,
-                rows,
-                skipped_columns: import.skipped_columns,
-                diagnostics: import.diagnostics,
-                collection,
-                changed,
-            })
+            prepared.changed = changed;
+            Ok(prepared.report(true, collection))
         }
         .instrument(span)
         .await
@@ -1001,6 +1080,7 @@ impl CollectionsService {
             let span = tracing::info_span!("collections.create_from_csv", collection = %id);
             async {
                 let mut guard = self.state.write().await;
+                self.bump();
                 if guard.is_none() {
                     *guard = Some(State::load(self.store.as_ref()).await?);
                 }
