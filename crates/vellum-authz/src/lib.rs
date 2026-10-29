@@ -43,6 +43,7 @@ mod engine;
 mod graph;
 mod memory;
 mod model;
+mod sharded;
 mod sql;
 mod store;
 
@@ -53,5 +54,6 @@ pub use graph::{
 };
 pub use memory::MemoryStore;
 pub use model::{Id, Object, Permission, Principal, Relation, Subject, Tuple, TupleRelation};
+pub use sharded::ShardedStore;
 pub use sql::SqlStore;
 pub use store::{AuthzStore, Commit, EffectiveRow, Scope, StoreError, TupleKey};

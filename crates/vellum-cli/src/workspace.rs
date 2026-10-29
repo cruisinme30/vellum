@@ -33,15 +33,14 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use futures::StreamExt as _;
-use vellum_authz::{Authz, AuthzStore, Id, MemoryStore, SqlStore};
+use vellum_authz::{Authz, AuthzStore, Id, MemoryStore, ShardedStore};
 use vellum_books_service::BooksService;
 use vellum_collections::CollectionsService;
 use vellum_collections::service::IndexFeed;
 use vellum_contracts::{BoxFuture, Operation, Readiness, Service};
 use vellum_db::feed::Feed;
-use vellum_db::{Index, IndexConfig, IndexKey};
+use vellum_db::{Index, IndexConfig, IndexKey, ShardRouter, ShardedIndex, ShardsConfig};
 use vellum_drive::authz::{AuthzAccess as DriveAuthzAccess, TreeSync};
-use vellum_drive::sql::SqlIndex;
 use vellum_drive::{Drive, DriveIndex, DriveService};
 use vellum_identity::Identity;
 use vellum_kernel::{Config, Error, ErrorKind, UserId};
@@ -316,7 +315,7 @@ fn keep_fresh(
     cursor: i64,
     workspace: &Workspace,
     spaces: &Arc<Spaces>,
-    drive_index: &Arc<SqlIndex>,
+    drive_index: &Arc<dyn DriveIndex>,
 ) {
     let (reload, from) = (Arc::clone(spaces), Arc::clone(drive_index));
     crate::feed::follow(
@@ -403,7 +402,7 @@ async fn provision_drives(
 /// Makes the missing My Drives now, then keeps checking for new accounts.
 async fn keep_drives(
     drive: &Arc<Drive>,
-    index: &Arc<SqlIndex>,
+    index: &Arc<dyn DriveIndex>,
     identity: &Arc<Identity>,
 ) -> Result<(), Error> {
     let made = provision_drives(drive, index.as_ref(), identity).await?;
@@ -676,6 +675,38 @@ async fn join_cluster(
     ))
 }
 
+/// The drive and permission stores, routing each space to its shard:
+/// one of those `VELLUM_SHARDS` lists, or `index` alone (ADR 0040, D174).
+/// Also returns every shard's database, home first.
+async fn open_shards(
+    index: &Index,
+    var: impl Fn(&str) -> Option<String>,
+) -> Result<(Vec<Index>, Arc<Authz<ShardedStore>>, Arc<dyn DriveIndex>), Error> {
+    let sharded =
+        match ShardsConfig::from_env(var).map_err(|e| unavailable("bad shard settings", e))? {
+            Some(config) => {
+                let sharded = ShardedIndex::open(&config)
+                    .await
+                    .map_err(|e| unavailable("cannot open the shards", e))?;
+                tracing::info!(
+                    shards = sharded.shards().len(),
+                    "spaces are spread over shards"
+                );
+                sharded
+            }
+            None => ShardedIndex::single(index.clone()),
+        };
+    let router = ShardRouter::open(sharded)
+        .await
+        .map_err(|e| unavailable("cannot read the space-to-shard map", e))?;
+    let router = Arc::new(router);
+    Ok((
+        router.indexes().cloned().collect(),
+        Arc::new(Authz::new(ShardedStore::new(Arc::clone(&router)))),
+        Arc::new(vellum_drive::sharded::ShardedIndex::new(router)),
+    ))
+}
+
 /// Rescans the workspace files once per cluster (a replica that starts
 /// while others run finds the index already current), then starts the
 /// cluster's upkeep (D163).
@@ -684,6 +715,7 @@ async fn rescan_and_maintain(
     others_alive: bool,
     drive: &Arc<Drive>,
     index: &Index,
+    shards: &[Index],
 ) {
     let drive = Arc::clone(drive);
     replica
@@ -696,7 +728,7 @@ async fn rescan_and_maintain(
             }
         })
         .await;
-    replica.maintain(index);
+    replica.maintain(index, shards);
 }
 
 /// My Work's cluster jobs: Google Calendar sync every
@@ -757,8 +789,7 @@ pub async fn open(
         .map_err(|e| unavailable("cannot read the change feed", e))?;
     let (replica, others_alive, rate_counts) = join_cluster(&index, &me, &var).await?;
     let store: Arc<dyn BlobStore> = Arc::new(AnnouncingStore::new(files, feed.clone(), &me));
-    let authz = Arc::new(Authz::new(SqlStore::new(index.clone())));
-    let drive_index = Arc::new(SqlIndex::new(index.clone()));
+    let (shards, authz, drive_index) = open_shards(&index, &var).await?;
     let spaces = Arc::new(Spaces::default());
     let (events, queued) = crate::notifications::channel();
     let (rows, row_changes) = crate::search::row_feed();
@@ -766,7 +797,7 @@ pub async fn open(
     let mut workspace = build(
         Arc::clone(&store),
         &authz,
-        Arc::clone(&drive_index) as Arc<dyn DriveIndex>,
+        Arc::clone(&drive_index),
         &spaces,
         identity,
         Feeds {
@@ -788,13 +819,13 @@ pub async fn open(
     if local {
         crate::watcher::start(&config.data_dir, &store, &workspace.drive, &workspace.books).await?;
     }
-    rescan_and_maintain(&replica, others_alive, &workspace.drive, &index).await;
+    rescan_and_maintain(&replica, others_alive, &workspace.drive, &index, &shards).await;
     let hooks = crate::integrations::hooks(&store, &workspace.work, &var).await?;
     let collab = Collab::open(
         Arc::clone(&workspace.drive),
         Arc::new(DriveAuthzAccess::new(
             Arc::clone(&authz),
-            Arc::clone(&drive_index) as Arc<dyn DriveIndex>,
+            Arc::clone(&drive_index),
         )),
         index.clone(),
         &config.data_dir,
@@ -810,6 +841,7 @@ pub async fn open(
         data_dir: config.data_dir.clone(),
         key,
         index,
+        shards,
         store: Arc::clone(&store),
         authz,
         collections: Arc::clone(&workspace.collections),
@@ -830,7 +862,7 @@ pub async fn open(
         replica: Some(replica),
         rate_counts: Some(rate_counts),
         tasks: Some(workspace.tasks),
-        drive_index: Some(drive_index as Arc<dyn DriveIndex>),
+        drive_index: Some(drive_index),
     })
 }
 

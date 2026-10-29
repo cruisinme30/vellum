@@ -48,6 +48,14 @@ impl TreeSync for SqlStore {
     }
 }
 
+/// As for [`SqlStore`]: each shard's `page_ancestors` is kept by the
+/// sharded drive index on the same shard.
+impl TreeSync for vellum_authz::ShardedStore {
+    fn set_parents(&self, _space: Id, _parents: BTreeMap<Id, Option<Id>>) -> DriveResult<()> {
+        Ok(())
+    }
+}
+
 /// [`Access`] backed by [`Authz`].
 pub struct AuthzAccess<S> {
     authz: Arc<Authz<S>>,
