@@ -143,13 +143,13 @@ workflow is renamed.
 | --- | --- | --- |
 | Checks: fast suite | `ci.yml` | pull requests into `develop`, pushes to `develop` |
 | Checks: full suite (release PRs) | `full.yml` | release pull requests into `main` |
-| Checks: labels and tracker | `pr-housekeeping.yml` | every pull request event |
+| Checks: labels and tracker | `pr-housekeeping.yml` | pull requests opened, pushed to or retitled; descriptions edited; closed |
 | PR: auto-merge Dependabot patches | `dependabot-auto-merge.yml` | Dependabot pull requests |
 | Security: CodeQL | `codeql.yml` | release pull requests, pushes to `main`, weekly |
 | Security: weekly Scorecard | `scorecard.yml` | weekly |
 | Scheduled: nightly load, security and fuzz, chaos on Sundays | `nightly.yml` | nightly; skips when `develop` is unchanged |
 | Release: server, desktop and drill | `release.yml` | version tags |
-| Repo: sync labels and project board | `repo-sync.yml` | label file changes, issue changes, every six hours |
+| Repo: sync labels and project board | `repo-sync.yml` | label file changes; the project board every 15 minutes |
 | Repo: develop is red alarm | `develop-health.yml` | after the fast suite runs on `develop` |
 | Website: build and deploy | `site.yml` | website changes, pushes to `main` |
 
@@ -224,6 +224,8 @@ that file lands on `develop`.
 The **Labels** check fails a pull request without at least one `type/*`
 and one `area/*` label. Branch protection requires it next to the suite
 check. When a new crate lands, add its path to `.github/labeler.yml`.
+Adding a label by hand does not re-run the check; push a commit or edit
+the title to run it again, or re-run the failed job from the Actions tab.
 
 ## Definition of done
 
