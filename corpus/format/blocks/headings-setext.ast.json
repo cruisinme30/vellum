@@ -1,0 +1,40 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "heading",
+        "level": 1,
+        "content": [
+          {
+            "type": "text",
+            "text": "Northstar handbook"
+          }
+        ],
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null
+      },
+      {
+        "type": "heading",
+        "level": 2,
+        "content": [
+          {
+            "type": "text",
+            "text": "Getting started"
+          }
+        ],
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null
+      }
+    ]
+  },
+  "diagnostics": []
+}

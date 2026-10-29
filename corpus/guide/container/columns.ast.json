@@ -1,0 +1,68 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "container",
+        "name": "columns",
+        "arg": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "sections": [
+          [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "strong",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Problem"
+                    }
+                  ]
+                },
+                {
+                  "type": "soft_break"
+                },
+                {
+                  "type": "text",
+                  "text": "Policy changes ship blind."
+                }
+              ],
+              "id": null
+            }
+          ],
+          [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "strong",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Outcome"
+                    }
+                  ]
+                },
+                {
+                  "type": "soft_break"
+                },
+                {
+                  "type": "text",
+                  "text": "Every change ships with a report."
+                }
+              ],
+              "id": null
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "diagnostics": []
+}

@@ -1,0 +1,92 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "list",
+        "start": null,
+        "tight": false,
+        "items": [
+          {
+            "task": null,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "First item has two paragraphs."
+                  }
+                ],
+                "id": null
+              },
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "This is the second paragraph of the first item."
+                  }
+                ],
+                "id": null
+              }
+            ]
+          },
+          {
+            "task": null,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Second item."
+                  }
+                ],
+                "id": null
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "start": 7,
+        "tight": true,
+        "items": [
+          {
+            "task": null,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Starts at seven"
+                  }
+                ],
+                "id": null
+              }
+            ]
+          },
+          {
+            "task": null,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Then eight"
+                  }
+                ],
+                "id": null
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "diagnostics": []
+}

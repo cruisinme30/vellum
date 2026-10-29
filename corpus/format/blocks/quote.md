@@ -1,0 +1,3 @@
+> A policy you cannot simulate is a policy you cannot trust.
+>
+> — Northstar design principles

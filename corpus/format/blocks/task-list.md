@@ -1,0 +1,4 @@
+- [x] Design doc approved
+- [x] Replay engine in staging
+- [ ] Diff report reviewed by security
+- [ ] Customer preview scheduled

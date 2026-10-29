@@ -1,0 +1,19 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "fence",
+        "lang": "mermaid",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "timeline\n  title Northstar gateway\n  2025 : Prototype : First customer\n  2026 : Policy engine : SOC 2\n  2027 : Policy simulator : EU region\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}
