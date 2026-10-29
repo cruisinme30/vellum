@@ -656,14 +656,17 @@ async fn rescan_and_maintain(
     replica.maintain(index);
 }
 
-/// My Work's cluster jobs: Google Calendar sync every
-/// [`GOOGLE_SYNC_EVERY`], and reminders and digests, each on one replica.
+/// My Work's and Work's cluster jobs: Google Calendar sync every
+/// [`GOOGLE_SYNC_EVERY`], reminders and digests, and Work's daily and
+/// recurring runs, each on one replica.
 fn task_jobs(
     replica: &Replica,
-    tasks: &Arc<TasksService>,
+    workspace: &Workspace,
     notify: &Arc<NotifyStore>,
     data_dir: &Path,
 ) -> Result<(), Error> {
+    work_jobs(replica, &workspace.work);
+    let tasks = &workspace.tasks;
     crate::reminders::start(replica, tasks, notify, data_dir)?;
     let timer = Arc::clone(tasks);
     replica.every("tasks.google_sync", GOOGLE_SYNC_EVERY, move || {
@@ -676,6 +679,37 @@ fn task_jobs(
     });
     Ok(())
 }
+
+/// Work's cluster jobs, each on one replica: the daily run (cycles,
+/// burn-up, SLA risk) every [`WORK_DAILY_EVERY`], and recurring issues
+/// every [`WORK_RECURRING_EVERY`], so the next one appears just after
+/// 00:01 team time (D224).
+fn work_jobs(replica: &Replica, work: &Arc<WorkService>) {
+    let daily = Arc::clone(work);
+    replica.every("work.daily", WORK_DAILY_EVERY, move || {
+        let daily = Arc::clone(&daily);
+        async move {
+            if let Err(error) = daily.run_daily().await {
+                tracing::warn!(%error, "Work daily run skipped");
+            }
+        }
+    });
+    let recurring = Arc::clone(work);
+    replica.every("work.recurring", WORK_RECURRING_EVERY, move || {
+        let recurring = Arc::clone(&recurring);
+        async move {
+            if let Err(error) = recurring.run_recurring().await {
+                tracing::warn!(%error, "recurring issues skipped");
+            }
+        }
+    });
+}
+
+/// How often the Work daily run repeats; it is idempotent within a day.
+const WORK_DAILY_EVERY: std::time::Duration = std::time::Duration::from_hours(1);
+
+/// How often recurring issues are checked.
+const WORK_RECURRING_EVERY: std::time::Duration = std::time::Duration::from_mins(5);
 
 /// Opens the workspace services for `config`, or returns none (with a
 /// warning) when no index is configured.
@@ -782,7 +816,7 @@ pub async fn open(
     .await?;
     workspace.services.push(Arc::new(search));
     keep_fresh(feed, me, cursor, &workspace, &spaces, drive_index);
-    task_jobs(&replica, &workspace.tasks, notify, &config.data_dir)?;
+    task_jobs(&replica, &workspace, notify, &config.data_dir)?;
     let mut services = workspace.services;
     services.push(Arc::new(Storage(store)));
     Ok(Opened {

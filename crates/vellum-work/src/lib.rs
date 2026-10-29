@@ -37,6 +37,7 @@ pub mod label;
 pub mod mention;
 pub mod my_issues;
 pub mod project;
+pub mod recur;
 pub mod scale;
 pub mod sla;
 pub mod suggest;
@@ -60,6 +61,7 @@ pub use id::{InitiativeId, IssueId, MilestoneId, ProjectId, TeamId, UpdateId, Us
 pub use intake::IntakeForm;
 pub use issue::{Issue, IssueKey, Relation, RelationKind};
 pub use project::{Health, Initiative, Project, ProjectUpdate};
+pub use recur::Repeat;
 pub use scale::{Estimate, EstimateScale, Priority};
 pub use suggest::{TriageBrief, TriageSuggestion};
 pub use team::{Team, TeamKey};

@@ -763,3 +763,59 @@ fn projects_report_progress_and_changes() {
         "a milestone needs its project"
     );
 }
+
+#[test]
+fn a_repeating_issue_files_the_next_one_after_its_due_date() {
+    let mut g = northstar();
+    let at = datetime!(2026-10-01 09:00 UTC);
+    let mut draft = NewIssue::new(id(900), tk("ENG"), "Rotate the signing keys");
+    draft.assignee = Some(user("dev"));
+    draft.labels = vec!["gateway".into()];
+    draft.priority = Some(Priority::High);
+    draft.due = Some(date!(2026 - 10 - 05));
+    let _ = g.create_issue(draft, &ctx(at, Some("dev"))).unwrap();
+    let repeat = "1w".parse().unwrap();
+    let _ = g.set_repeat(&id(900), Some(repeat), at).unwrap();
+
+    // Not yet: the due date has not passed.
+    let early = datetime!(2026-10-05 00:01 UTC);
+    assert!(
+        g.recur(early, |_| early.date(), || id(901))
+            .unwrap()
+            .issues
+            .is_empty()
+    );
+
+    // Two weeks late: one new issue, due on the next date not in the past.
+    let late = datetime!(2026-10-20 00:01 UTC);
+    let changes = g.recur(late, |_| late.date(), || id(901)).unwrap();
+    assert_eq!(changes.issues.len(), 2);
+    let next = g.issue(&id(901)).unwrap();
+    assert_eq!(next.due, Some(date!(2026 - 10 - 26)));
+    assert_eq!(next.repeat, Some(repeat));
+    assert_eq!(next.assignee, Some(user("dev")));
+    assert_eq!(next.labels, vec!["gateway".to_owned()]);
+    assert_eq!(next.priority, Priority::High);
+    assert_ne!(g.category_of(next), Some(Category::Triage));
+    assert_eq!(g.issue(&id(900)).unwrap().repeat, None);
+
+    // The old issue never fires twice.
+    assert!(
+        g.recur(late, |_| late.date(), || id(902))
+            .unwrap()
+            .issues
+            .is_empty()
+    );
+}
+
+#[test]
+fn a_repeat_needs_a_due_date() {
+    let mut g = northstar();
+    let at = datetime!(2026-10-01 09:00 UTC);
+    let draft = NewIssue::new(id(910), tk("ENG"), "Weekly report");
+    let _ = g.create_issue(draft, &ctx(at, Some("dev"))).unwrap();
+    assert!(
+        g.set_repeat(&id(910), Some("1w".parse().unwrap()), at)
+            .is_err()
+    );
+}

@@ -11,6 +11,7 @@ import { useT } from "../i18n/i18n";
 
 import type { CommentOut, IssueOut, TeamOut, WorkApi } from "./api";
 import { stateName } from "./issues-page";
+import { TriageSuggestion } from "./planning/suggestion";
 
 import "./work.css";
 
@@ -156,6 +157,15 @@ function Issue({ api, issueKey }: { readonly api: WorkApi; readonly issueKey: st
           </p>
           <h1>{found.issue.title}</h1>
           <StatePicker loaded={found} onChange={setState} />
+          {found.issue.repeat != undefined && (
+            <p className="vl-muted">{t("plan-repeats", { repeat: found.issue.repeat })}</p>
+          )}
+          <TriageSuggestion
+            issueKey={found.issue.key}
+            onApplied={() => {
+              setVersion((v) => v + 1);
+            }}
+          />
           {error !== undefined && (
             <p className="vl-field-error" role="alert">
               {error}

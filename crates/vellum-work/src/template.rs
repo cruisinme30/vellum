@@ -41,6 +41,9 @@ pub struct Template {
     /// The milestone.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub milestone: Option<MilestoneId>,
+    /// How often issues made from it repeat, such as `1w` (D224).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repeat: Option<crate::recur::Repeat>,
     /// The body, in Vellum Markdown.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub body: String,

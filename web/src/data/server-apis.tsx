@@ -7,6 +7,7 @@ import type { BooksApi } from "../books/api";
 import { useT } from "../i18n/i18n";
 import type { PrivateSpacesApi } from "../platform/private/api";
 import type { WorkApi } from "../work/api";
+import type { PlanningApi } from "../work/planning/api";
 
 import type { Loaded } from "./use-loaded";
 
@@ -15,6 +16,7 @@ export interface ServerApis {
   readonly work?: WorkApi | undefined;
   readonly books?: BooksApi | undefined;
   readonly privateSpaces?: PrivateSpacesApi | undefined;
+  readonly planning?: PlanningApi | undefined;
 }
 
 const ServerApisContext = createContext<ServerApis>({});
@@ -28,6 +30,11 @@ export function ServerApisProvider({
   readonly children: ReactNode;
 }) {
   return <ServerApisContext value={apis}>{children}</ServerApisContext>;
+}
+
+/** One server API, or `undefined` in demo mode; for parts of a screen. */
+export function useServerApi<K extends keyof ServerApis>(api: K): ServerApis[K] {
+  return use(ServerApisContext)[api];
 }
 
 /**

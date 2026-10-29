@@ -42,6 +42,13 @@ import type { WorkApi } from "./work/api";
 import { IssuePage } from "./work/issue-page";
 import { IssuesPage } from "./work/issues-page";
 import { MyWorkPage } from "./work/my-work-page";
+import type { PlanningApi } from "./work/planning/api";
+import { AskPage, AsksPage } from "./work/planning/asks-page";
+import { InitiativesPage } from "./work/planning/initiatives-page";
+import { InsightsPage } from "./work/planning/insights-page";
+import { NewIssuePage } from "./work/planning/new-issue-page";
+import { ProjectPage } from "./work/planning/project-page";
+import { ProjectsPage } from "./work/planning/projects-page";
 
 // The editor is most of the bundle, so it loads with the first page opened.
 const PageView = lazy(async () => {
@@ -88,6 +95,14 @@ export function AppRoutes() {
         <Route path="new" element={<NewPageView />} />
         <Route path="my-work" element={<MyWorkPage />} />
         <Route path="issues" element={<IssuesPage />} />
+        {/* Work planning (D223-D225); /issues/new before /issues/:issueKey. */}
+        <Route path="issues/new" element={<NewIssuePage />} />
+        <Route path="projects" element={<ProjectsPage />} />
+        <Route path="projects/:projectId" element={<ProjectPage />} />
+        <Route path="initiatives" element={<InitiativesPage />} />
+        <Route path="insights" element={<InsightsPage />} />
+        <Route path="asks" element={<AsksPage />} />
+        <Route path="asks/:team/:slug" element={<AskPage />} />
         <Route path="issues/:issueKey" element={<IssuePage />} />
         <Route path="books" element={<BooksPage />} />
         <Route path="books/:bookId" element={<BookPage />} />
@@ -125,6 +140,8 @@ export interface AppServices {
   readonly books?: BooksApi | undefined;
   /** Private spaces' device keys, from a Vellum server; absent in demo mode. */
   readonly privateSpaces?: PrivateSpacesApi | undefined;
+  /** Work planning, from a Vellum server; absent in demo mode. */
+  readonly planning?: PlanningApi | undefined;
   readonly collections: CollectionsStore;
   /** Present when a Vellum server answered; absent in demo mode. */
   readonly session?: { readonly auth: AuthApi; readonly status: AuthStatus } | undefined;
@@ -176,12 +193,16 @@ export function AppProviders({
   work,
   books,
   privateSpaces,
+  planning,
   collections,
   session,
   notifications,
   children,
 }: AppServices & { readonly children: ReactNode }) {
-  const serverApis = useMemo(() => ({ work, books, privateSpaces }), [work, books, privateSpaces]);
+  const serverApis = useMemo(
+    () => ({ work, books, privateSpaces, planning }),
+    [work, books, privateSpaces, planning],
+  );
   const [demoNotifications] = useState<NotificationServices>(() => ({
     store: createMockNotificationPreferencesStore(),
   }));

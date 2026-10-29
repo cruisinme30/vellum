@@ -34,6 +34,7 @@ import { createHttpPrivateSpacesApi } from "./platform/private/api";
 import { DocumentCache } from "./platform/store/document-cache";
 import { openLocalDatabase } from "./platform/store/persistence";
 import { createHttpWorkApi } from "./work/api";
+import { createHttpPlanningApi } from "./work/planning/api";
 
 // Demo pages keep their edits across reloads in the browser's local
 // database. With a server, the page's room on /collab is the store.
@@ -76,6 +77,7 @@ root.render(
       admin={status === undefined ? undefined : createHttpAdminConsoleApi(http)}
       work={status === undefined ? undefined : createHttpWorkApi(http)}
       books={status === undefined ? undefined : createHttpBooksApi(http)}
+      planning={status === undefined ? undefined : createHttpPlanningApi(http)}
       privateSpaces={status === undefined ? undefined : createHttpPrivateSpacesApi(http)}
       collections={
         status === undefined ? createMockCollectionsStore() : createHttpCollectionsStore(http)
