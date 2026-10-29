@@ -5,6 +5,83 @@
 // Do not edit: run `VELLUM_BLESS=1 cargo test -p vellum-cli typescript_client`.
 
 /**
+ * An item's activity.
+ */
+export interface ActivityInput {
+  /**
+   * The item, or a space's ID for the whole space.
+   */
+  id: ObjectId;
+  /**
+   * At most this many, 1 to 200; 50 when absent.
+   */
+  limit?: number | null;
+}
+
+/**
+ * An activity feed, newest first.
+ */
+export interface ActivityList {
+  /**
+   * The changes.
+   */
+  events: ActivityView[];
+}
+
+/**
+ * One change in the activity feed.
+ */
+export interface ActivityView {
+  /**
+   * Who did it.
+   */
+  actor: ActorView;
+  /**
+   * When it happened.
+   */
+  at: Timestamp;
+  /**
+   * The old name or path, for renames and moves.
+   */
+  from?: string | null;
+  /**
+   * The item it happened to.
+   */
+  item_id: ObjectId;
+  /**
+   * What happened: `created`, `edited`, `renamed`, `moved`, `copied`,
+   * `trashed`, `restored`, `purged`, `conflict_copy` or
+   * `version_restored`.
+   */
+  kind: string;
+  /**
+   * The new name or path, for renames and moves.
+   */
+  to?: string | null;
+}
+
+/**
+ * Who made a change.
+ */
+export type ActorView = {
+  type: "user";
+  /**
+   * The person.
+   */
+  user: UserId;
+} | {
+  /**
+   * The person.
+   */
+  on_behalf_of: UserId;
+  type: "model";
+} | {
+  type: "external";
+} | {
+  type: "system";
+};
+
+/**
  * A new comment or reply.
  */
 export interface AddComment {
@@ -50,7 +127,7 @@ export interface AddSection {
   /**
    * Where it goes.
    */
-  place: PlaceInput;
+  place: BooksAddSectionPlaceInput;
   /**
    * The new section's title.
    */
@@ -277,6 +354,26 @@ export interface BookSummary {
 }
 
 /**
+ * A place in the tree: relative to a section, or at either end of a
+ * region.
+ */
+export interface BooksAddSectionPlaceInput {
+  /**
+   * Where.
+   */
+  at: At;
+  /**
+   * The region `start` and `end` refer to; `numbered` by default.
+   */
+  region?: Region | null;
+  /**
+   * The section `before`, `after`, `first_child_of` and
+   * `last_child_of` refer to.
+   */
+  section?: string | null;
+}
+
+/**
  * A snapshot's header.
  */
 export interface BooksCreateSnapshotSnapshotInfo {
@@ -296,6 +393,36 @@ export interface BooksCreateSnapshotSnapshotInfo {
    * The tag, such as `v1.0`.
    */
   tag: string;
+}
+
+/**
+ * A place in the tree: relative to a section, or at either end of a
+ * region.
+ */
+export interface BooksMoveSectionPlaceInput {
+  /**
+   * Where.
+   */
+  at: At;
+  /**
+   * The region `start` and `end` refer to; `numbered` by default.
+   */
+  region?: Region | null;
+  /**
+   * The section `before`, `after`, `first_child_of` and
+   * `last_child_of` refer to.
+   */
+  section?: string | null;
+}
+
+/**
+ * Sections a removal took out.
+ */
+export interface BooksRemoveSectionRemoved {
+  /**
+   * The removed sections, the named one first.
+   */
+  removed: string[];
 }
 
 /**
@@ -952,6 +1079,42 @@ export interface ComputedRow {
 }
 
 /**
+ * A page's content.
+ */
+export interface ContentView {
+  /**
+   * The text; absent for a file that is not UTF-8 text.
+   */
+  content?: string | null;
+  /**
+   * The content's version tag; send it back as `base_etag` to save.
+   */
+  etag: string;
+  /**
+   * The item.
+   */
+  item: NodeView;
+}
+
+/**
+ * A new folder.
+ */
+export interface CreateFolder {
+  /**
+   * Its name.
+   */
+  name: string;
+  /**
+   * The folder to create it in; the top of the space when absent.
+   */
+  parent_id?: ObjectId | null;
+  /**
+   * The space.
+   */
+  space_id: SpaceId;
+}
+
+/**
  * Creates a new collection from a CSV file, inferring property types.
  */
 export interface CreateFromCsvInput {
@@ -1040,6 +1203,28 @@ export interface CreateIssue {
 }
 
 /**
+ * A new page.
+ */
+export interface CreatePage {
+  /**
+   * Its Markdown body.
+   */
+  body?: string;
+  /**
+   * The folder to create it in; the top of the space when absent.
+   */
+  parent_id?: ObjectId | null;
+  /**
+   * The space.
+   */
+  space_id: SpaceId;
+  /**
+   * Its title.
+   */
+  title: string;
+}
+
+/**
  * Creates a row.
  */
 export interface CreateRowInput {
@@ -1058,6 +1243,24 @@ export interface CreateRowInput {
 }
 
 /**
+ * A new shortcut.
+ */
+export interface CreateShortcut {
+  /**
+   * The folder to put it in; the top of the space when absent.
+   */
+  parent_id?: ObjectId | null;
+  /**
+   * The space to put it in.
+   */
+  space_id: SpaceId;
+  /**
+   * The item it points at.
+   */
+  target_id: ObjectId;
+}
+
+/**
  * `books.create_snapshot`.
  */
 export interface CreateSnapshot {
@@ -1073,6 +1276,25 @@ export interface CreateSnapshot {
    * The tag: letters, digits, `.`, `-` and `_`.
    */
   tag: string;
+}
+
+/**
+ * A new space.
+ */
+export interface CreateSpace {
+  /**
+   * Shared drive, or the caller's own My Drive.
+   */
+  kind: SpaceKindView;
+  /**
+   * The display name.
+   */
+  name: string;
+  /**
+   * The short name in its folder path: lowercase letters, digits and
+   * dashes.
+   */
+  slug: string;
 }
 
 /**
@@ -1420,6 +1642,586 @@ export interface Done {
 }
 
 /**
+ * An item in a space.
+ */
+export interface DriveCopyNodeView {
+  /**
+   * Who created it, when known.
+   */
+  created_by?: UserId | null;
+  /**
+   * The item.
+   */
+  id: ObjectId;
+  /**
+   * What it is.
+   */
+  kind: NodeKindView;
+  /**
+   * When it last changed.
+   */
+  modified: Timestamp;
+  /**
+   * The folder it is in; absent at the top of the space.
+   */
+  parent_id?: ObjectId | null;
+  /**
+   * Its path in the workspace folder.
+   */
+  path: string;
+  /**
+   * Bytes on disk.
+   */
+  size: number;
+  /**
+   * The space it is in.
+   */
+  space_id: SpaceId;
+  /**
+   * What a shortcut points at.
+   */
+  target_id?: ObjectId | null;
+  /**
+   * Its title.
+   */
+  title: string;
+  /**
+   * When it was trashed; absent for a live item.
+   */
+  trashed_at?: Timestamp | null;
+}
+
+/**
+ * An item in a space.
+ */
+export interface DriveCreateFolderNodeView {
+  /**
+   * Who created it, when known.
+   */
+  created_by?: UserId | null;
+  /**
+   * The item.
+   */
+  id: ObjectId;
+  /**
+   * What it is.
+   */
+  kind: NodeKindView;
+  /**
+   * When it last changed.
+   */
+  modified: Timestamp;
+  /**
+   * The folder it is in; absent at the top of the space.
+   */
+  parent_id?: ObjectId | null;
+  /**
+   * Its path in the workspace folder.
+   */
+  path: string;
+  /**
+   * Bytes on disk.
+   */
+  size: number;
+  /**
+   * The space it is in.
+   */
+  space_id: SpaceId;
+  /**
+   * What a shortcut points at.
+   */
+  target_id?: ObjectId | null;
+  /**
+   * Its title.
+   */
+  title: string;
+  /**
+   * When it was trashed; absent for a live item.
+   */
+  trashed_at?: Timestamp | null;
+}
+
+/**
+ * An item in a space.
+ */
+export interface DriveCreatePageNodeView {
+  /**
+   * Who created it, when known.
+   */
+  created_by?: UserId | null;
+  /**
+   * The item.
+   */
+  id: ObjectId;
+  /**
+   * What it is.
+   */
+  kind: NodeKindView;
+  /**
+   * When it last changed.
+   */
+  modified: Timestamp;
+  /**
+   * The folder it is in; absent at the top of the space.
+   */
+  parent_id?: ObjectId | null;
+  /**
+   * Its path in the workspace folder.
+   */
+  path: string;
+  /**
+   * Bytes on disk.
+   */
+  size: number;
+  /**
+   * The space it is in.
+   */
+  space_id: SpaceId;
+  /**
+   * What a shortcut points at.
+   */
+  target_id?: ObjectId | null;
+  /**
+   * Its title.
+   */
+  title: string;
+  /**
+   * When it was trashed; absent for a live item.
+   */
+  trashed_at?: Timestamp | null;
+}
+
+/**
+ * An item in a space.
+ */
+export interface DriveCreateShortcutNodeView {
+  /**
+   * Who created it, when known.
+   */
+  created_by?: UserId | null;
+  /**
+   * The item.
+   */
+  id: ObjectId;
+  /**
+   * What it is.
+   */
+  kind: NodeKindView;
+  /**
+   * When it last changed.
+   */
+  modified: Timestamp;
+  /**
+   * The folder it is in; absent at the top of the space.
+   */
+  parent_id?: ObjectId | null;
+  /**
+   * Its path in the workspace folder.
+   */
+  path: string;
+  /**
+   * Bytes on disk.
+   */
+  size: number;
+  /**
+   * The space it is in.
+   */
+  space_id: SpaceId;
+  /**
+   * What a shortcut points at.
+   */
+  target_id?: ObjectId | null;
+  /**
+   * Its title.
+   */
+  title: string;
+  /**
+   * When it was trashed; absent for a live item.
+   */
+  trashed_at?: Timestamp | null;
+}
+
+/**
+ * A space.
+ */
+export interface DriveCreateSpaceSpaceView {
+  /**
+   * The space.
+   */
+  id: SpaceId;
+  /**
+   * Shared drive or My Drive.
+   */
+  kind: SpaceKindView;
+  /**
+   * The display name.
+   */
+  name: string;
+  /**
+   * The owner of a My Drive.
+   */
+  owner?: UserId | null;
+  /**
+   * Quota, trash and version settings.
+   */
+  settings: SettingsView;
+  /**
+   * The short name in its folder path.
+   */
+  slug: string;
+}
+
+/**
+ * An item in a space.
+ */
+export interface DriveGetNodeView {
+  /**
+   * Who created it, when known.
+   */
+  created_by?: UserId | null;
+  /**
+   * The item.
+   */
+  id: ObjectId;
+  /**
+   * What it is.
+   */
+  kind: NodeKindView;
+  /**
+   * When it last changed.
+   */
+  modified: Timestamp;
+  /**
+   * The folder it is in; absent at the top of the space.
+   */
+  parent_id?: ObjectId | null;
+  /**
+   * Its path in the workspace folder.
+   */
+  path: string;
+  /**
+   * Bytes on disk.
+   */
+  size: number;
+  /**
+   * The space it is in.
+   */
+  space_id: SpaceId;
+  /**
+   * What a shortcut points at.
+   */
+  target_id?: ObjectId | null;
+  /**
+   * Its title.
+   */
+  title: string;
+  /**
+   * When it was trashed; absent for a live item.
+   */
+  trashed_at?: Timestamp | null;
+}
+
+/**
+ * An item in a space.
+ */
+export interface DriveMoveNodeView {
+  /**
+   * Who created it, when known.
+   */
+  created_by?: UserId | null;
+  /**
+   * The item.
+   */
+  id: ObjectId;
+  /**
+   * What it is.
+   */
+  kind: NodeKindView;
+  /**
+   * When it last changed.
+   */
+  modified: Timestamp;
+  /**
+   * The folder it is in; absent at the top of the space.
+   */
+  parent_id?: ObjectId | null;
+  /**
+   * Its path in the workspace folder.
+   */
+  path: string;
+  /**
+   * Bytes on disk.
+   */
+  size: number;
+  /**
+   * The space it is in.
+   */
+  space_id: SpaceId;
+  /**
+   * What a shortcut points at.
+   */
+  target_id?: ObjectId | null;
+  /**
+   * Its title.
+   */
+  title: string;
+  /**
+   * When it was trashed; absent for a live item.
+   */
+  trashed_at?: Timestamp | null;
+}
+
+/**
+ * An operation that returns nothing else.
+ */
+export interface DrivePurgeDone {
+  /**
+   * Always true.
+   */
+  ok: boolean;
+}
+
+/**
+ * An item in a space.
+ */
+export interface DriveRenameNodeView {
+  /**
+   * Who created it, when known.
+   */
+  created_by?: UserId | null;
+  /**
+   * The item.
+   */
+  id: ObjectId;
+  /**
+   * What it is.
+   */
+  kind: NodeKindView;
+  /**
+   * When it last changed.
+   */
+  modified: Timestamp;
+  /**
+   * The folder it is in; absent at the top of the space.
+   */
+  parent_id?: ObjectId | null;
+  /**
+   * Its path in the workspace folder.
+   */
+  path: string;
+  /**
+   * Bytes on disk.
+   */
+  size: number;
+  /**
+   * The space it is in.
+   */
+  space_id: SpaceId;
+  /**
+   * What a shortcut points at.
+   */
+  target_id?: ObjectId | null;
+  /**
+   * Its title.
+   */
+  title: string;
+  /**
+   * When it was trashed; absent for a live item.
+   */
+  trashed_at?: Timestamp | null;
+}
+
+/**
+ * An item in a space.
+ */
+export interface DriveResolveShortcutNodeView {
+  /**
+   * Who created it, when known.
+   */
+  created_by?: UserId | null;
+  /**
+   * The item.
+   */
+  id: ObjectId;
+  /**
+   * What it is.
+   */
+  kind: NodeKindView;
+  /**
+   * When it last changed.
+   */
+  modified: Timestamp;
+  /**
+   * The folder it is in; absent at the top of the space.
+   */
+  parent_id?: ObjectId | null;
+  /**
+   * Its path in the workspace folder.
+   */
+  path: string;
+  /**
+   * Bytes on disk.
+   */
+  size: number;
+  /**
+   * The space it is in.
+   */
+  space_id: SpaceId;
+  /**
+   * What a shortcut points at.
+   */
+  target_id?: ObjectId | null;
+  /**
+   * Its title.
+   */
+  title: string;
+  /**
+   * When it was trashed; absent for a live item.
+   */
+  trashed_at?: Timestamp | null;
+}
+
+/**
+ * An item in a space.
+ */
+export interface DriveRestoreNodeView {
+  /**
+   * Who created it, when known.
+   */
+  created_by?: UserId | null;
+  /**
+   * The item.
+   */
+  id: ObjectId;
+  /**
+   * What it is.
+   */
+  kind: NodeKindView;
+  /**
+   * When it last changed.
+   */
+  modified: Timestamp;
+  /**
+   * The folder it is in; absent at the top of the space.
+   */
+  parent_id?: ObjectId | null;
+  /**
+   * Its path in the workspace folder.
+   */
+  path: string;
+  /**
+   * Bytes on disk.
+   */
+  size: number;
+  /**
+   * The space it is in.
+   */
+  space_id: SpaceId;
+  /**
+   * What a shortcut points at.
+   */
+  target_id?: ObjectId | null;
+  /**
+   * Its title.
+   */
+  title: string;
+  /**
+   * When it was trashed; absent for a live item.
+   */
+  trashed_at?: Timestamp | null;
+}
+
+/**
+ * An operation that returns nothing else.
+ */
+export interface DriveStarDone {
+  /**
+   * Always true.
+   */
+  ok: boolean;
+}
+
+/**
+ * An item in a space.
+ */
+export interface DriveTrashNodeView {
+  /**
+   * Who created it, when known.
+   */
+  created_by?: UserId | null;
+  /**
+   * The item.
+   */
+  id: ObjectId;
+  /**
+   * What it is.
+   */
+  kind: NodeKindView;
+  /**
+   * When it last changed.
+   */
+  modified: Timestamp;
+  /**
+   * The folder it is in; absent at the top of the space.
+   */
+  parent_id?: ObjectId | null;
+  /**
+   * Its path in the workspace folder.
+   */
+  path: string;
+  /**
+   * Bytes on disk.
+   */
+  size: number;
+  /**
+   * The space it is in.
+   */
+  space_id: SpaceId;
+  /**
+   * What a shortcut points at.
+   */
+  target_id?: ObjectId | null;
+  /**
+   * Its title.
+   */
+  title: string;
+  /**
+   * When it was trashed; absent for a live item.
+   */
+  trashed_at?: Timestamp | null;
+}
+
+/**
+ * A space.
+ */
+export interface DriveUpdateSpaceSpaceView {
+  /**
+   * The space.
+   */
+  id: SpaceId;
+  /**
+   * Shared drive or My Drive.
+   */
+  kind: SpaceKindView;
+  /**
+   * The display name.
+   */
+  name: string;
+  /**
+   * The owner of a My Drive.
+   */
+  owner?: UserId | null;
+  /**
+   * Quota, trash and version settings.
+   */
+  settings: SettingsView;
+  /**
+   * The short name in its folder path.
+   */
+  slug: string;
+}
+
+/**
  * Edit a comment.
  */
 export interface EditComment {
@@ -1515,6 +2317,44 @@ export interface FieldOut {
    * Whether an answer is needed.
    */
   required: boolean;
+}
+
+/**
+ * Search filters; every filter given must match.
+ */
+export interface FindInput {
+  /**
+   * Who created the item.
+   */
+  created_by?: UserId | null;
+  /**
+   * Kinds to keep; all when empty.
+   */
+  kinds?: NodeKindView[];
+  /**
+   * At most this many, 1 to 200; 50 when absent.
+   */
+  limit?: number | null;
+  /**
+   * A space or folder the item must be in, at any depth.
+   */
+  location?: ObjectId | null;
+  /**
+   * Modified at or after this time.
+   */
+  modified_after?: Timestamp | null;
+  /**
+   * Modified before this time.
+   */
+  modified_before?: Timestamp | null;
+  /**
+   * Only items the caller starred.
+   */
+  starred?: boolean;
+  /**
+   * Case-insensitive text the title must contain.
+   */
+  title?: string | null;
 }
 
 /**
@@ -1955,6 +2795,16 @@ export interface IssueRef {
 }
 
 /**
+ * How many results to return.
+ */
+export interface Limit {
+  /**
+   * At most this many, 1 to 200; 50 when absent.
+   */
+  limit?: number | null;
+}
+
+/**
  * A link on an issue.
  */
 export interface LinkOut {
@@ -1976,6 +2826,20 @@ export interface LinkOut {
  * `books.list` takes no input.
  */
 export type ListBooks = Record<string, unknown>;
+
+/**
+ * The items in a folder, or at the top of a space.
+ */
+export interface ListChildren {
+  /**
+   * The folder; the top of the space when absent.
+   */
+  parent_id?: ObjectId | null;
+  /**
+   * The space.
+   */
+  space_id: SpaceId;
+}
 
 /**
  * `collections.list` takes no input.
@@ -2017,11 +2881,21 @@ export interface MoveSection {
   /**
    * Where it goes.
    */
-  place: PlaceInput;
+  place: BooksMoveSectionPlaceInput;
   /**
    * The section to move, with everything under it.
    */
   section_id: string;
+}
+
+/**
+ * The caller's My Drive, if they have one.
+ */
+export interface MyDrive {
+  /**
+   * The space; absent until it is created.
+   */
+  space?: SpaceView | null;
 }
 
 /**
@@ -2047,7 +2921,82 @@ export interface MyIssuesOut {
 /**
  * No input.
  */
-export type NoInput = Record<string, unknown>;
+export type NoInput = Record<string, never>;
+
+/**
+ * Names an item (a folder, page, book, collection or shortcut).
+ */
+export interface NodeKey {
+  /**
+   * The item.
+   */
+  id: ObjectId;
+}
+
+/**
+ * What an item is.
+ */
+export type NodeKindView = "folder" | "page" | "book" | "collection" | "shortcut";
+
+/**
+ * Items.
+ */
+export interface NodeList {
+  /**
+   * The items.
+   */
+  items: NodeView[];
+}
+
+/**
+ * An item in a space.
+ */
+export interface NodeView {
+  /**
+   * Who created it, when known.
+   */
+  created_by?: UserId | null;
+  /**
+   * The item.
+   */
+  id: ObjectId;
+  /**
+   * What it is.
+   */
+  kind: NodeKindView;
+  /**
+   * When it last changed.
+   */
+  modified: Timestamp;
+  /**
+   * The folder it is in; absent at the top of the space.
+   */
+  parent_id?: ObjectId | null;
+  /**
+   * Its path in the workspace folder.
+   */
+  path: string;
+  /**
+   * Bytes on disk.
+   */
+  size: number;
+  /**
+   * The space it is in.
+   */
+  space_id: SpaceId;
+  /**
+   * What a shortcut points at.
+   */
+  target_id?: ObjectId | null;
+  /**
+   * Its title.
+   */
+  title: string;
+  /**
+   * When it was trashed; absent for a live item.
+   */
+  trashed_at?: Timestamp | null;
+}
 
 /**
  * How a numeric result is displayed.
@@ -2055,23 +3004,26 @@ export type NoInput = Record<string, unknown>;
 export type NumberFormat = "plain" | "percent";
 
 /**
- * A place in the tree: relative to a section, or at either end of a
- * region.
+ * A ObjectId as a 26-character ULID.
+ */
+export type ObjectId = string;
+
+/**
+ * Where to move or copy an item.
  */
 export interface PlaceInput {
   /**
-   * Where.
+   * The item.
    */
-  at: At;
+  id: ObjectId;
   /**
-   * The region `start` and `end` refer to; `numbered` by default.
+   * The folder it goes into; the top of the space when absent.
    */
-  region?: Region | null;
+  parent_id?: ObjectId | null;
   /**
-   * The section `before`, `after`, `first_child_of` and
-   * `last_child_of` refer to.
+   * The space it goes to.
    */
-  section?: string | null;
+  space_id: SpaceId;
 }
 
 /**
@@ -2326,6 +3278,30 @@ export interface ReactionOut {
 }
 
 /**
+ * A recently opened item.
+ */
+export interface RecentItem {
+  /**
+   * The item.
+   */
+  item: NodeView;
+  /**
+   * When the caller last opened it.
+   */
+  opened_at: Timestamp;
+}
+
+/**
+ * The caller's recently opened items, newest first.
+ */
+export interface RecentList {
+  /**
+   * The items.
+   */
+  items: RecentItem[];
+}
+
+/**
  * A region of the summary.
  */
 export type Region = "prefix" | "numbered" | "suffix";
@@ -2373,13 +3349,27 @@ export interface RelationOut {
 }
 
 /**
- * Sections a removal took out.
+ * A count of what an operation removed.
  */
 export interface Removed {
   /**
-   * The removed sections, the named one first.
+   * How many items or versions were removed.
    */
-  removed: string[];
+  removed: number;
+}
+
+/**
+ * A new title.
+ */
+export interface RenameInput {
+  /**
+   * The item.
+   */
+  id: ObjectId;
+  /**
+   * Its new title.
+   */
+  title: string;
 }
 
 /**
@@ -2502,6 +3492,55 @@ export interface RowWritten {
    * The row after the write; absent after a delete.
    */
   row?: CollectionsCreateRowRowDetail | null;
+}
+
+/**
+ * A new version of a page's content.
+ */
+export interface SaveInput {
+  /**
+   * The content the edit started from, as read.
+   */
+  base_content: string;
+  /**
+   * The etag that came with `base_content`.
+   */
+  base_etag: string;
+  /**
+   * The edited content.
+   */
+  content: string;
+  /**
+   * The page.
+   */
+  id: ObjectId;
+}
+
+/**
+ * How a save landed.
+ */
+export type SaveResult = "written" | "merged" | "conflicted";
+
+/**
+ * The outcome of a save.
+ */
+export interface SaveView {
+  /**
+   * The conflict copy holding the new content, after a conflict.
+   */
+  conflict_copy?: NodeView | null;
+  /**
+   * The page after the save.
+   */
+  item: NodeView;
+  /**
+   * How the save landed.
+   */
+  result: SaveResult;
+  /**
+   * The version written; absent after a conflict.
+   */
+  version_id?: VersionId | null;
 }
 
 /**
@@ -2743,6 +3782,33 @@ export interface SetSectionAccess {
 }
 
 /**
+ * A space's settings.
+ */
+export interface SettingsView {
+  /**
+   * Days one version a day is kept after that.
+   */
+  daily_days: number;
+  /**
+   * Days every version of a page is kept.
+   */
+  keep_all_days: number;
+  /**
+   * The most bytes the space may hold, trash and versions included;
+   * no limit when absent.
+   */
+  quota_bytes?: number | null;
+  /**
+   * Days an item stays in the trash before it is purged.
+   */
+  trash_days: number;
+  /**
+   * Weeks one version a week is kept after that; forever when absent.
+   */
+  weekly_weeks?: number | null;
+}
+
+/**
  * The first administrator's details.
  */
 export interface SetupInput {
@@ -2838,6 +3904,66 @@ export interface SnapshotList {
 }
 
 /**
+ * A SpaceId as a 26-character ULID.
+ */
+export type SpaceId = string;
+
+/**
+ * Names a space.
+ */
+export interface SpaceKey {
+  /**
+   * The space.
+   */
+  space_id: SpaceId;
+}
+
+/**
+ * What kind of space.
+ */
+export type SpaceKindView = "shared_drive" | "user_drive";
+
+/**
+ * Spaces.
+ */
+export interface SpaceList {
+  /**
+   * The spaces.
+   */
+  spaces: SpaceView[];
+}
+
+/**
+ * A space.
+ */
+export interface SpaceView {
+  /**
+   * The space.
+   */
+  id: SpaceId;
+  /**
+   * Shared drive or My Drive.
+   */
+  kind: SpaceKindView;
+  /**
+   * The display name.
+   */
+  name: string;
+  /**
+   * The owner of a My Drive.
+   */
+  owner?: UserId | null;
+  /**
+   * Quota, trash and version settings.
+   */
+  settings: SettingsView;
+  /**
+   * The short name in its folder path.
+   */
+  slug: string;
+}
+
+/**
  * A range of characters (Unicode scalar values, not bytes) in the source,
  * so editors can underline the exact spot of an error.
  */
@@ -2850,6 +3976,20 @@ export interface Span {
    * First character, counting from 0.
    */
   start: number;
+}
+
+/**
+ * Starring or unstarring an item.
+ */
+export interface StarInput {
+  /**
+   * The item.
+   */
+  id: ObjectId;
+  /**
+   * Whether it is starred.
+   */
+  starred: boolean;
 }
 
 /**
@@ -3391,6 +4531,24 @@ export interface UpdateSection {
 }
 
 /**
+ * Changes to a space.
+ */
+export interface UpdateSpace {
+  /**
+   * A new display name; unchanged when absent.
+   */
+  name?: string | null;
+  /**
+   * The new settings, replacing the old ones.
+   */
+  settings: SettingsView;
+  /**
+   * The space.
+   */
+  space_id: SpaceId;
+}
+
+/**
  * Changes an administrator makes to a user.
  */
 export interface UpdateUser {
@@ -3410,6 +4568,20 @@ export interface UpdateUser {
    * A new display name.
    */
   name?: string | null;
+}
+
+/**
+ * How much of its quota a space uses.
+ */
+export interface UsageView {
+  /**
+   * The quota; no limit when absent.
+   */
+  quota_bytes?: number | null;
+  /**
+   * Bytes used, trash and versions included.
+   */
+  used_bytes: number;
 }
 
 /**
@@ -3478,6 +4650,67 @@ export type Value = {
   type: "list";
   value: Value[];
 };
+
+/**
+ * One version's content.
+ */
+export interface VersionContent {
+  /**
+   * The text; absent if it is not UTF-8 text.
+   */
+  content?: string | null;
+  /**
+   * The version.
+   */
+  id: VersionId;
+}
+
+/**
+ * A VersionId as a 26-character ULID.
+ */
+export type VersionId = string;
+
+/**
+ * Names one version of a page.
+ */
+export interface VersionKey {
+  /**
+   * The page.
+   */
+  id: ObjectId;
+  /**
+   * The version.
+   */
+  version_id: VersionId;
+}
+
+/**
+ * A page's versions, oldest first.
+ */
+export interface VersionList {
+  /**
+   * The versions.
+   */
+  versions: VersionView[];
+}
+
+/**
+ * One saved version of a page.
+ */
+export interface VersionView {
+  /**
+   * Who wrote it.
+   */
+  author: ActorView;
+  /**
+   * The version.
+   */
+  id: VersionId;
+  /**
+   * Its size in bytes.
+   */
+  size: number;
+}
 
 /**
  * A saved view, in the text form `schema.yaml` uses.
@@ -4071,6 +5304,16 @@ export interface WorkGetTeamTeamOut {
 }
 
 /**
+ * No input.
+ */
+export type WorkListProjectsNoInput = Record<string, unknown>;
+
+/**
+ * No input.
+ */
+export type WorkListTeamsNoInput = Record<string, unknown>;
+
+/**
  * An issue.
  */
 export interface WorkMoveIssueIssueOut {
@@ -4183,6 +5426,11 @@ export interface WorkMoveIssueIssueOut {
    */
   updated_at: string;
 }
+
+/**
+ * No input.
+ */
+export type WorkMyAssignmentsNoInput = Record<string, unknown>;
 
 /**
  * A project with its computed progress.
@@ -4723,7 +5971,7 @@ export interface Operations {
     method: "DELETE";
     path: "/v1/books/{book_id}/sections/{section_id}";
     input: SectionKey;
-    output: Removed;
+    output: BooksRemoveSectionRemoved;
   };
   /** Restrict a section and set its owners and reviewers */
   "books.set_section_access": {
@@ -4836,6 +6084,230 @@ export interface Operations {
     path: "/v1/collections/{collection_id}/rows/{row_id}";
     input: UpdateRowInput;
     output: CollectionsUpdateRowRowWritten;
+  };
+  /** List the changes to an item, or to a whole space by its ID */
+  "drive.activity": {
+    method: "GET";
+    path: "/v1/drive/items/{id}/activity";
+    input: ActivityInput;
+    output: ActivityList;
+  };
+  /** List the pages that link to a page */
+  "drive.backlinks": {
+    method: "GET";
+    path: "/v1/drive/items/{id}/backlinks";
+    input: NodeKey;
+    output: NodeList;
+  };
+  /** Copy an item, with fresh IDs, into a folder or space */
+  "drive.copy": {
+    method: "POST";
+    path: "/v1/drive/items/{id}/copy";
+    input: PlaceInput;
+    output: DriveCopyNodeView;
+  };
+  /** Create a folder */
+  "drive.create_folder": {
+    method: "POST";
+    path: "/v1/drive/spaces/{space_id}/folders";
+    input: CreateFolder;
+    output: DriveCreateFolderNodeView;
+  };
+  /** Create a page */
+  "drive.create_page": {
+    method: "POST";
+    path: "/v1/drive/spaces/{space_id}/pages";
+    input: CreatePage;
+    output: DriveCreatePageNodeView;
+  };
+  /** Create a shortcut to another item */
+  "drive.create_shortcut": {
+    method: "POST";
+    path: "/v1/drive/spaces/{space_id}/shortcuts";
+    input: CreateShortcut;
+    output: DriveCreateShortcutNodeView;
+  };
+  /** Create a shared drive, or your My Drive */
+  "drive.create_space": {
+    method: "POST";
+    path: "/v1/drive/spaces";
+    input: CreateSpace;
+    output: DriveCreateSpaceSpaceView;
+  };
+  /** Delete everything in a space's trash for good */
+  "drive.empty_trash": {
+    method: "DELETE";
+    path: "/v1/drive/spaces/{space_id}/trash";
+    input: SpaceKey;
+    output: Removed;
+  };
+  /** Find items by title, creator, date, kind, place or star */
+  "drive.find": {
+    method: "GET";
+    path: "/v1/drive/search";
+    input: FindInput;
+    output: NodeList;
+  };
+  /** Get an item */
+  "drive.get": {
+    method: "GET";
+    path: "/v1/drive/items/{id}";
+    input: NodeKey;
+    output: DriveGetNodeView;
+  };
+  /** List the items in a folder or at the top of a space */
+  "drive.list": {
+    method: "GET";
+    path: "/v1/drive/spaces/{space_id}/items";
+    input: ListChildren;
+    output: NodeList;
+  };
+  /** Move an item to another folder or space */
+  "drive.move": {
+    method: "POST";
+    path: "/v1/drive/items/{id}/move";
+    input: PlaceInput;
+    output: DriveMoveNodeView;
+  };
+  /** Get your My Drive */
+  "drive.my_drive": {
+    method: "GET";
+    path: "/v1/drive/my-drive";
+    input: NoInput;
+    output: MyDrive;
+  };
+  /** Apply the space's version retention now */
+  "drive.prune_versions": {
+    method: "POST";
+    path: "/v1/drive/spaces/{space_id}/prune-versions";
+    input: SpaceKey;
+    output: Removed;
+  };
+  /** Delete a trashed item for good */
+  "drive.purge": {
+    method: "DELETE";
+    path: "/v1/drive/items/{id}";
+    input: NodeKey;
+    output: DrivePurgeDone;
+  };
+  /** Read a page's content and its etag */
+  "drive.read": {
+    method: "GET";
+    path: "/v1/drive/items/{id}/content";
+    input: NodeKey;
+    output: ContentView;
+  };
+  /** List the items you opened recently */
+  "drive.recent": {
+    method: "GET";
+    path: "/v1/drive/recent";
+    input: Limit;
+    output: RecentList;
+  };
+  /** Rename an item and fix the links to it */
+  "drive.rename": {
+    method: "PATCH";
+    path: "/v1/drive/items/{id}";
+    input: RenameInput;
+    output: DriveRenameNodeView;
+  };
+  /** Get the item a shortcut points at */
+  "drive.resolve_shortcut": {
+    method: "GET";
+    path: "/v1/drive/items/{id}/target";
+    input: NodeKey;
+    output: DriveResolveShortcutNodeView;
+  };
+  /** Bring a trashed item back */
+  "drive.restore": {
+    method: "POST";
+    path: "/v1/drive/items/{id}/restore";
+    input: NodeKey;
+    output: DriveRestoreNodeView;
+  };
+  /** Make an old version the page's content again */
+  "drive.restore_version": {
+    method: "POST";
+    path: "/v1/drive/items/{id}/versions/{version_id}/restore";
+    input: VersionKey;
+    output: SaveView;
+  };
+  /** Save a page, merging changes made meanwhile */
+  "drive.save": {
+    method: "PUT";
+    path: "/v1/drive/items/{id}/content";
+    input: SaveInput;
+    output: SaveView;
+  };
+  /** List the shared drives you can open */
+  "drive.shared_drives": {
+    method: "GET";
+    path: "/v1/drive/shared-drives";
+    input: NoInput;
+    output: SpaceList;
+  };
+  /** List items in other people's My Drives shared with you */
+  "drive.shared_with_me": {
+    method: "GET";
+    path: "/v1/drive/shared-with-me";
+    input: NoInput;
+    output: NodeList;
+  };
+  /** Star or unstar an item */
+  "drive.star": {
+    method: "PUT";
+    path: "/v1/drive/items/{id}/star";
+    input: StarInput;
+    output: DriveStarDone;
+  };
+  /** List the items you starred */
+  "drive.starred": {
+    method: "GET";
+    path: "/v1/drive/starred";
+    input: NoInput;
+    output: NodeList;
+  };
+  /** Move an item, with everything in it, to the trash */
+  "drive.trash": {
+    method: "POST";
+    path: "/v1/drive/items/{id}/trash";
+    input: NodeKey;
+    output: DriveTrashNodeView;
+  };
+  /** List what was trashed in a space */
+  "drive.trash_list": {
+    method: "GET";
+    path: "/v1/drive/spaces/{space_id}/trash";
+    input: SpaceKey;
+    output: NodeList;
+  };
+  /** Rename a space and change its quota, trash and version settings */
+  "drive.update_space": {
+    method: "PATCH";
+    path: "/v1/drive/spaces/{space_id}";
+    input: UpdateSpace;
+    output: DriveUpdateSpaceSpaceView;
+  };
+  /** Get how much of its quota a space uses */
+  "drive.usage": {
+    method: "GET";
+    path: "/v1/drive/spaces/{space_id}/usage";
+    input: SpaceKey;
+    output: UsageView;
+  };
+  /** Read one saved version of a page */
+  "drive.version": {
+    method: "GET";
+    path: "/v1/drive/items/{id}/versions/{version_id}";
+    input: VersionKey;
+    output: VersionContent;
+  };
+  /** List a page's saved versions */
+  "drive.versions": {
+    method: "GET";
+    path: "/v1/drive/items/{id}/versions";
+    input: NodeKey;
+    output: VersionList;
   };
   /** List apps you connected with OAuth */
   "identity.apps": {
@@ -5044,14 +6516,14 @@ export interface Operations {
   "work.list_projects": {
     method: "GET";
     path: "/v1/work/projects";
-    input: NoInput;
+    input: WorkListProjectsNoInput;
     output: ProjectsOut;
   };
   /** Lists teams with their workflows */
   "work.list_teams": {
     method: "GET";
     path: "/v1/work/teams";
-    input: NoInput;
+    input: WorkListTeamsNoInput;
     output: TeamsOut;
   };
   /** Moves an issue to another team; the old key keeps working */
@@ -5065,7 +6537,7 @@ export interface Operations {
   "work.my_assignments": {
     method: "GET";
     path: "/v1/work/me/assignments";
-    input: NoInput;
+    input: WorkMyAssignmentsNoInput;
     output: AssignmentsOut;
   };
   /** Lists my issues in focus order */
@@ -5174,6 +6646,38 @@ export const OPERATIONS = {
   "collections.query": { method: "GET", path: "/v1/collections/{collection_id}/query", mutation: false },
   "collections.save_view": { method: "PUT", path: "/v1/collections/{collection_id}/views/{view}", mutation: true },
   "collections.update_row": { method: "PATCH", path: "/v1/collections/{collection_id}/rows/{row_id}", mutation: true },
+  "drive.activity": { method: "GET", path: "/v1/drive/items/{id}/activity", mutation: false },
+  "drive.backlinks": { method: "GET", path: "/v1/drive/items/{id}/backlinks", mutation: false },
+  "drive.copy": { method: "POST", path: "/v1/drive/items/{id}/copy", mutation: true },
+  "drive.create_folder": { method: "POST", path: "/v1/drive/spaces/{space_id}/folders", mutation: true },
+  "drive.create_page": { method: "POST", path: "/v1/drive/spaces/{space_id}/pages", mutation: true },
+  "drive.create_shortcut": { method: "POST", path: "/v1/drive/spaces/{space_id}/shortcuts", mutation: true },
+  "drive.create_space": { method: "POST", path: "/v1/drive/spaces", mutation: true },
+  "drive.empty_trash": { method: "DELETE", path: "/v1/drive/spaces/{space_id}/trash", mutation: true },
+  "drive.find": { method: "GET", path: "/v1/drive/search", mutation: false },
+  "drive.get": { method: "GET", path: "/v1/drive/items/{id}", mutation: false },
+  "drive.list": { method: "GET", path: "/v1/drive/spaces/{space_id}/items", mutation: false },
+  "drive.move": { method: "POST", path: "/v1/drive/items/{id}/move", mutation: true },
+  "drive.my_drive": { method: "GET", path: "/v1/drive/my-drive", mutation: false },
+  "drive.prune_versions": { method: "POST", path: "/v1/drive/spaces/{space_id}/prune-versions", mutation: true },
+  "drive.purge": { method: "DELETE", path: "/v1/drive/items/{id}", mutation: true },
+  "drive.read": { method: "GET", path: "/v1/drive/items/{id}/content", mutation: false },
+  "drive.recent": { method: "GET", path: "/v1/drive/recent", mutation: false },
+  "drive.rename": { method: "PATCH", path: "/v1/drive/items/{id}", mutation: true },
+  "drive.resolve_shortcut": { method: "GET", path: "/v1/drive/items/{id}/target", mutation: false },
+  "drive.restore": { method: "POST", path: "/v1/drive/items/{id}/restore", mutation: true },
+  "drive.restore_version": { method: "POST", path: "/v1/drive/items/{id}/versions/{version_id}/restore", mutation: true },
+  "drive.save": { method: "PUT", path: "/v1/drive/items/{id}/content", mutation: true },
+  "drive.shared_drives": { method: "GET", path: "/v1/drive/shared-drives", mutation: false },
+  "drive.shared_with_me": { method: "GET", path: "/v1/drive/shared-with-me", mutation: false },
+  "drive.star": { method: "PUT", path: "/v1/drive/items/{id}/star", mutation: true },
+  "drive.starred": { method: "GET", path: "/v1/drive/starred", mutation: false },
+  "drive.trash": { method: "POST", path: "/v1/drive/items/{id}/trash", mutation: true },
+  "drive.trash_list": { method: "GET", path: "/v1/drive/spaces/{space_id}/trash", mutation: false },
+  "drive.update_space": { method: "PATCH", path: "/v1/drive/spaces/{space_id}", mutation: true },
+  "drive.usage": { method: "GET", path: "/v1/drive/spaces/{space_id}/usage", mutation: false },
+  "drive.version": { method: "GET", path: "/v1/drive/items/{id}/versions/{version_id}", mutation: false },
+  "drive.versions": { method: "GET", path: "/v1/drive/items/{id}/versions", mutation: false },
   "identity.apps": { method: "GET", path: "/v1/me/apps", mutation: false },
   "identity.create_token": { method: "POST", path: "/v1/me/tokens", mutation: true },
   "identity.create_user": { method: "POST", path: "/v1/admin/users", mutation: true },

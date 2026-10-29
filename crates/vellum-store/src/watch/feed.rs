@@ -8,12 +8,14 @@ use std::{
     time::{Duration, Instant},
 };
 
-use notify::{RecommendedWatcher, RecursiveMode, Watcher as _};
+use notify::event::{AccessKind, AccessMode};
+use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher as _};
 use tokio::sync::mpsc;
 
 use super::{Change, Reconciler};
 use crate::{
     error::{StoreError, StoreResult},
+    layout::Kind,
     path::{BlobPath, TEMP_PREFIX},
     store::BlobStore,
 };
@@ -21,6 +23,10 @@ use crate::{
 /// Quiet period that ends a batch: editors save in bursts (write temp,
 /// rename, touch), and one reconcile per burst is enough.
 const DEBOUNCE: Duration = Duration::from_millis(300);
+
+/// Longest a batch gathers, so a folder that never goes quiet (a sync
+/// client, a build) still gets reconciled.
+const MAX_BATCH_WAIT: Duration = Duration::from_secs(2);
 
 /// Reports paths touched under a local folder, using inotify, `FSEvents`
 /// or `ReadDirectoryChangesW`. Dropping it stops the watch.
@@ -42,6 +48,10 @@ impl LocalFeed {
         let base = root.clone();
         let mut watcher =
             notify::recommended_watcher(move |res: notify::Result<notify::Event>| match res {
+                // Reads are not changes (closing a written file is).
+                // Reporting them would also loop: the reconciler lists
+                // folders, which the OS reports as reads.
+                Ok(event) if is_read(event.kind) => {}
                 Ok(event) => {
                     for path in event.paths.iter().filter_map(|p| relative(&base, p)) {
                         if tx.blocking_send(path).is_err() {
@@ -60,6 +70,10 @@ impl LocalFeed {
     }
 }
 
+fn is_read(kind: EventKind) -> bool {
+    matches!(kind, EventKind::Access(access) if access != AccessKind::Close(AccessMode::Write))
+}
+
 fn relative(root: &Path, file: &Path) -> Option<BlobPath> {
     let rel = file.strip_prefix(root).ok()?;
     let parts: Option<Vec<&str>> = rel.components().map(|c| c.as_os_str().to_str()).collect();
@@ -72,7 +86,9 @@ fn relative(root: &Path, file: &Path) -> Option<BlobPath> {
     {
         return None;
     }
-    BlobPath::new(joined).ok()
+    let path = BlobPath::new(joined).ok()?;
+    // Vellum's own state (the index, versions) changes on every save.
+    (Kind::of(&path) != Kind::System).then_some(path)
 }
 
 /// Drives `reconciler` from a feed until either channel closes.
@@ -99,13 +115,53 @@ pub async fn run<S: BlobStore>(
             Some(Some(path)) => batch.push(path),
             None => {} // A removal fell due.
         }
-        while let Ok(Some(path)) = tokio::time::timeout(DEBOUNCE, feed.recv()).await {
+        let cutoff = tokio::time::Instant::now() + MAX_BATCH_WAIT;
+        while let Ok(Some(path)) = tokio::time::timeout(
+            DEBOUNCE.min(cutoff - tokio::time::Instant::now()),
+            feed.recv(),
+        )
+        .await
+        {
             batch.push(path);
+            if tokio::time::Instant::now() >= cutoff {
+                break;
+            }
         }
         for change in reconciler.reconcile(batch, Instant::now()).await? {
             if out.send(change).await.is_err() {
                 return Ok(()); // Nobody is listening any more.
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use notify::event::{AccessKind, AccessMode, CreateKind};
+
+    use super::*;
+
+    #[test]
+    fn reads_are_not_changes_but_finished_writes_are() {
+        assert!(is_read(EventKind::Access(AccessKind::Open(
+            AccessMode::Any
+        ))));
+        assert!(is_read(EventKind::Access(AccessKind::Close(
+            AccessMode::Read
+        ))));
+        assert!(!is_read(EventKind::Access(AccessKind::Close(
+            AccessMode::Write
+        ))));
+        assert!(!is_read(EventKind::Create(CreateKind::File)));
+    }
+
+    #[test]
+    fn vellum_state_and_temp_files_are_not_reported() {
+        let root = Path::new("/data");
+        let rel = |p: &str| relative(root, &root.join(p)).map(|b| b.as_str().to_owned());
+        assert_eq!(rel("drives/Plan.md").as_deref(), Some("drives/Plan.md"));
+        assert_eq!(rel(".vellum/index.sqlite-wal"), None);
+        assert_eq!(rel(".vellum/versions/01M63X7PTPE44TNDZ490X8R47P"), None);
+        assert_eq!(rel(&format!("drives/{TEMP_PREFIX}x.md")), None);
     }
 }

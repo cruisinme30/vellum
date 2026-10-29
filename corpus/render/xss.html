@@ -1,0 +1,232 @@
+<article class="vl-doc">
+<h1 id="u-hostile-input">Hostile input</h1>
+<p>Raw HTML is text: &lt;script&gt;alert(1)&lt;/script&gt; and &lt;img src=x onerror=alert(1)&gt;.</p>
+<p>
+<span>javascript link</span> and <span>data link</span> and <span>vbscript</span>.</p>
+<p>![data image](data:image/svg+xml,&lt;svg onload=alert(1)&gt;) js image</p>
+<p>
+<span class="vl-wikilink vl-unresolved" data-target="&lt;b&gt;wiki&lt;/b&gt;" title="No page with this title yet">&lt;b&gt;wiki&lt;/b&gt;</span> and @"&gt;&lt;script&gt; and <span>zero width</span>.</p>
+<p>Text with a bidi override reversed and a control char .</p>
+<h2 id="u-heading-script-alert-1-script-x-onmouseover-y">Heading {#"&gt;&lt;script&gt;alert(1)&lt;/script&gt; .x"onmouseover=y}</h2>
+<div class="vl-container" data-name="callout">
+<p>Attributes do not leak.</p>
+</div>
+<a href="https://evil.example/frame" class="vl-link-card" rel="noopener noreferrer nofollow ugc">
+<span class="vl-link-title">Not an allowed embed.</span>
+<span class="vl-link-host">evil.example</span>
+</a>
+<p>Link card.</p>
+<figure class="vl-figure vl-chart" data-kind="chart">
+<figcaption>&lt;script&gt;alert(1)&lt;/script&gt;</figcaption>
+<svg viewBox="0 0 640 264" width="640" height="264" role="img" aria-labelledby="f0-title" font-family="Roboto, system-ui, sans-serif" id="f0-root" xmlns="http://www.w3.org/2000/svg">
+<title id="f0-title">&lt;script&gt;alert(1)&lt;/script&gt;</title>
+<line x1="52" y1="236" x2="624" y2="236" style="stroke:var(--vl-outline-variant);stroke-width:1;">
+</line>
+<text x="44" y="240" font-size="11" text-anchor="end" style="fill:var(--vl-on-surface-variant);">0</text>
+<line x1="52" y1="181" x2="624" y2="181" style="stroke:var(--vl-outline-variant);stroke-width:1;">
+</line>
+<text x="44" y="185" font-size="11" text-anchor="end" style="fill:var(--vl-on-surface-variant);">0.5</text>
+<line x1="52" y1="126" x2="624" y2="126" style="stroke:var(--vl-outline-variant);stroke-width:1;">
+</line>
+<text x="44" y="130" font-size="11" text-anchor="end" style="fill:var(--vl-on-surface-variant);">1</text>
+<line x1="52" y1="71" x2="624" y2="71" style="stroke:var(--vl-outline-variant);stroke-width:1;">
+</line>
+<text x="44" y="75" font-size="11" text-anchor="end" style="fill:var(--vl-on-surface-variant);">1.5</text>
+<line x1="52" y1="16" x2="624" y2="16" style="stroke:var(--vl-outline-variant);stroke-width:1;">
+</line>
+<text x="44" y="20" font-size="11" text-anchor="end" style="fill:var(--vl-on-surface-variant);">2</text>
+<text x="195" y="254" font-size="11" text-anchor="middle" style="fill:var(--vl-on-surface-variant);">"&lt;img src=x onerror=alert(1)&gt;"</text>
+<text x="481" y="254" font-size="11" text-anchor="middle" style="fill:var(--vl-on-surface-variant);">B</text>
+<rect x="94.9" y="126" width="200.2" height="110" rx="3" style="fill:var(--vl-chart-1);">
+<title>"&lt;img src=x onerror=alert(1)&gt;": 1</title>
+</rect>
+<rect x="380.9" y="16" width="200.2" height="220" rx="3" style="fill:var(--vl-chart-1);">
+<title>B: 2</title>
+</rect>
+<line x1="52" y1="236" x2="624" y2="236" style="stroke:var(--vl-on-surface-variant);stroke-width:1;">
+</line>
+</svg>
+<table class="vl-sr-only">
+<thead>
+<tr>
+<th scope="col">Label</th>
+<th scope="col">Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<th scope="row">"&lt;img src=x onerror=alert(1)&gt;"</th>
+<td>1</td>
+</tr>
+<tr>
+<th scope="row">B</th>
+<td>2</td>
+</tr>
+</tbody>
+</table>
+</figure>
+<figure class="vl-figure vl-diagram" data-kind="mermaid">
+<svg width="100%" class="flowchart" viewBox="0 0 370 64" role="graphics-document document" id="f1-root" xmlns="http://www.w3.org/2000/svg" style="max-width:370px;">
+<style>#f1-root{font-family:Roboto,system-ui,sans-serif;font-size:16px;fill:var(--vl-on-surface);}#f1-root .edge-animation-slow{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 50s linear infinite;stroke-linecap:round;}#f1-root .edge-animation-fast{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 20s linear infinite;stroke-linecap:round;}#f1-root .error-icon{fill:var(--vl-error-container);}#f1-root .error-text{fill:var(--vl-on-error-container);stroke:var(--vl-on-error-container);}#f1-root .edge-thickness-normal{stroke-width:1px;}#f1-root .edge-thickness-thick{stroke-width:3.5px;}#f1-root .edge-pattern-solid{stroke-dasharray:0;}#f1-root .edge-thickness-invisible{stroke-width:0;fill:none;}#f1-root .edge-pattern-dashed{stroke-dasharray:3;}#f1-root .edge-pattern-dotted{stroke-dasharray:2;}#f1-root .marker{fill:var(--vl-on-surface-variant);stroke:var(--vl-on-surface-variant);}#f1-root .marker.cross{stroke:var(--vl-on-surface-variant);}#f1-root svg{font-family:Roboto,system-ui,sans-serif;font-size:16px;}#f1-root p{margin:0;}#f1-root .label{font-family:Roboto,system-ui,sans-serif;color:var(--vl-on-primary-container);}#f1-root .cluster-label text{fill:var(--vl-on-surface);}#f1-root .cluster-label span{color:var(--vl-on-surface);}#f1-root .cluster-label span p{background-color:transparent;}#f1-root .label text,#f1-root span{fill:var(--vl-on-primary-container);color:var(--vl-on-primary-container);}#f1-root .node rect,#f1-root .node circle,#f1-root .node ellipse,#f1-root .node polygon,#f1-root .node path{fill:var(--vl-primary-container);stroke:var(--vl-primary);stroke-width:1px;}#f1-root .rough-node .label text,#f1-root .node .label text,#f1-root .image-shape .label,#f1-root .icon-shape .label{text-anchor:middle;}#f1-root .node .katex path{fill:#000;stroke:#000;stroke-width:1px;}#f1-root .rough-node .label,#f1-root .node .label,#f1-root .image-shape .label,#f1-root .icon-shape .label{text-align:center;}#f1-root .root .anchor path{fill:var(--vl-on-surface-variant)!important;stroke-width:0;stroke:var(--vl-on-surface-variant);}#f1-root .arrowheadPath{fill:#040700;}#f1-root .edgePaths .path{stroke:var(--vl-on-surface-variant);stroke-width:1px;}#f1-root .flowchart-link{stroke:var(--vl-on-surface-variant);fill:none;}#f1-root .edgeLabel{background-color:var(--vl-surface-container);text-align:center;}#f1-root .edgeLabel p{background-color:var(--vl-surface-container);}#f1-root .edgeLabel rect{opacity:0.5;background-color:var(--vl-surface-container);fill:var(--vl-surface-container);}#f1-root .labelBkg{background-color:rgba(239, 237, 244, 0.5);}#f1-root .cluster rect{fill:var(--vl-surface-container-low);stroke:var(--vl-outline-variant);stroke-width:1px;}#f1-root .cluster text{fill:var(--vl-on-surface);}#f1-root .cluster span{color:var(--vl-on-surface);}#f1-root .node .collapsed-indicator{fill:var(--vl-outline-variant);stroke:none;opacity:0.6;}#f1-root .node .collapsed-separator{stroke:var(--vl-outline-variant);stroke-width:0.75px;}#f1-root div.mermaidTooltip{text-align:center;max-width:200px;padding:2px;font-family:Roboto,system-ui,sans-serif;font-size:12px;background:var(--vl-tertiary-container);border:1px solid var(--vl-tertiary);border-radius:2px;pointer-events:none;}#f1-root .flowchartTitleText{text-anchor:middle;font-size:18px;fill:var(--vl-on-surface);}#f1-root rect.text{fill:none;stroke-width:0;}#f1-root .icon-shape,#f1-root .image-shape{background-color:var(--vl-surface-container);text-align:center;}#f1-root .icon-shape p,#f1-root .image-shape p{background-color:var(--vl-surface-container);padding:2px;}#f1-root .icon-shape .label rect,#f1-root .image-shape .label rect{opacity:0.5;background-color:var(--vl-surface-container);fill:var(--vl-surface-container);}#f1-root .label-icon{display:inline-block;height:1em;overflow:visible;vertical-align:-0.125em;}#f1-root .node .label-icon path{fill:currentColor;stroke:revert;stroke-width:revert;}#f1-root .node .neo-node{stroke:var(--vl-primary);}#f1-root :root{--mermaid-font-family:"trebuchet ms",verdana,arial,sans-serif;}</style>
+<defs>
+<filter id="f1-merman-drop-shadow" height="130%" width="130%">
+<feDropShadow dx="4" dy="4" stdDeviation="0" flood-opacity="0.06" flood-color="#000000">
+</feDropShadow>
+</filter>
+</defs>
+<defs>
+<filter id="f1-merman-drop-shadow-small" height="150%" width="150%">
+<feDropShadow dx="2" dy="2" stdDeviation="0" flood-opacity="0.06" flood-color="#000000">
+</feDropShadow>
+</filter>
+</defs>
+<g>
+<marker id="f1-merman_flowchart-v2-pointEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto">
+<path d="M 0 0 L 10 5 L 0 10 z" class="arrowMarkerPath" style="stroke-width:1;stroke-dasharray:1, 0;">
+</path>
+</marker>
+<marker id="f1-merman_flowchart-v2-pointStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="4.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto">
+<path d="M 0 5 L 10 10 L 10 0 z" class="arrowMarkerPath" style="stroke-width:1;stroke-dasharray:1, 0;">
+</path>
+</marker>
+<marker id="f1-merman_flowchart-v2-pointEnd-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="11.5" refY="7" markerUnits="userSpaceOnUse" markerWidth="10.5" markerHeight="14" orient="auto">
+<path d="M 0 0 L 11.5 7 L 0 14 z" class="arrowMarkerPath" style="stroke-width:0;stroke-dasharray:1, 0;">
+</path>
+</marker>
+<marker id="f1-merman_flowchart-v2-pointStart-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="1" refY="7" markerUnits="userSpaceOnUse" markerWidth="11.5" markerHeight="14" orient="auto">
+<polygon points="0,7 11.5,14 11.5,0" class="arrowMarkerPath" style="stroke-width:0;stroke-dasharray:1, 0;">
+</polygon>
+</marker>
+<marker id="f1-merman_flowchart-v2-circleEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+<circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width:1;stroke-dasharray:1, 0;">
+</circle>
+</marker>
+<marker id="f1-merman_flowchart-v2-circleStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-1" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+<circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width:1;stroke-dasharray:1, 0;">
+</circle>
+</marker>
+<marker id="f1-merman_flowchart-v2-circleEnd-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refY="5" refX="12.25" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto">
+<circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width:0;stroke-dasharray:1, 0;">
+</circle>
+</marker>
+<marker id="f1-merman_flowchart-v2-circleStart-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-2" refY="5" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto">
+<circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width:0;stroke-dasharray:1, 0;">
+</circle>
+</marker>
+<marker id="f1-merman_flowchart-v2-crossEnd" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="12" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+<path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width:2;stroke-dasharray:1, 0;">
+</path>
+</marker>
+<marker id="f1-merman_flowchart-v2-crossStart" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="-1" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+<path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width:2;stroke-dasharray:1, 0;">
+</path>
+</marker>
+<marker id="f1-merman_flowchart-v2-crossEnd-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="17.7" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto">
+<path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" style="stroke-width:2.5;">
+</path>
+</marker>
+<marker id="f1-merman_flowchart-v2-crossStart-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="-3.5" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto">
+<path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" style="stroke-width:2.5;stroke-dasharray:1, 0;">
+</path>
+</marker>
+<g class="root">
+<g class="clusters">
+</g>
+<g class="edgePaths">
+<path d="M160,32L164.167,32C168.333,32,176.667,32,184.333,32C192,32,199,32,202.5,32L206,32" id="f1-merman-L_A_B_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" data-edge="true" data-et="edge" data-id="L_A_B_0" data-look="neo" marker-end="url(#f1-merman_flowchart-v2-pointEnd-margin)" style="stroke-dasharray:0 0 42 4;stroke-dashoffset:0;">
+</path>
+</g>
+<g class="edgeLabels">
+<g class="edgeLabel">
+<g class="label" data-id="L_A_B_0" transform="translate(0,0)">
+<foreignObject width="0" height="0">
+<div class="labelBkg" style="display:table-cell;white-space:nowrap;line-height:1.5;max-width:200px;text-align:center;">
+<span class="edgeLabel">
+</span>
+</div>
+</foreignObject>
+</g>
+</g>
+</g>
+<g class="nodes">
+<g class="node default" id="f1-merman-flowchart-A-0" transform="translate(84,32)" data-look="neo">
+<rect class="basic label-container" x="-76" y="-12" width="152" height="24">
+</rect>
+<g class="label" transform="translate(-60,0)">
+<rect>
+</rect>
+<foreignObject width="120" height="0" style="overflow:visible;">
+<div style="display:table;white-space:nowrap;line-height:1.5;max-width:120px;text-align:center;width:120px;">
+<span class="nodeLabel">
+<p>
+</p>
+</span>
+</div>
+</foreignObject>
+</g>
+</g>
+<g class="node default clickable" id="f1-merman-flowchart-B-1">
+<rect class="basic label-container" x="-76" y="-24" width="152" height="48">
+</rect>
+<g class="label" transform="translate(-60,-12)">
+<rect>
+</rect>
+<foreignObject width="120" height="24" style="overflow:visible;">
+<div style="display:table;white-space:nowrap;line-height:1.5;max-width:120px;text-align:center;width:120px;">
+<span class="nodeLabel">
+<p>click</p>
+</span>
+</div>
+</foreignObject>
+</g>
+</g>
+</g>
+</g>
+</g>
+</svg>
+<p class="vl-sr-only">mermaid diagram: flowchart LR</p>
+</figure>
+<pre data-lang="image">
+<code>src: javascript:alert(1)
+alt: bad</code>
+</pre>
+<div class="vl-math">
+<pre class="vl-math-error">
+<code>\href{javascript:alert(1)}{x} + \unknowncommand</code>
+</pre>
+</div>
+<div class="vl-table-wrap">
+<table class="vl-datatable">
+<thead>
+<tr>
+<th scope="col">&lt;script&gt;</th>
+<th scope="col">x</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>=cmd|' /C calc'!A0</td>
+<td class="vl-align-right">2</td>
+</tr>
+</tbody>
+</table>
+</div>
+<figure class="vl-code">
+<pre data-lang="html">
+<code>
+<span class="vl-tok-punctuation">&lt;</span>
+<span class="vl-tok-tag">script</span>
+<span class="vl-tok-punctuation">&gt;</span>
+<span class="vl-tok-function">alert</span>
+<span class="vl-tok-punctuation">(</span>
+<span class="vl-tok-string">"</span>
+<span class="vl-tok-string">code fences are text</span>
+<span class="vl-tok-string">"</span>
+<span class="vl-tok-punctuation">)</span>
+<span class="vl-tok-punctuation">&lt;/</span>
+<span class="vl-tok-tag">script</span>
+<span class="vl-tok-punctuation">&gt;</span>
+</code>
+</pre>
+</figure>
+</article>
