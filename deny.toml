@@ -89,6 +89,8 @@ skip = [
     { crate = "block-buffer@0.10", reason = "pulled by digest 0.10 (WebSocket sha1)" },
     { crate = "crypto-common@0.1", reason = "pulled by digest 0.10 (WebSocket sha1)" },
     { crate = "cpufeatures@0.2", reason = "pulled by sha1 0.10 (WebSocket handshake)" },
+    { crate = "bit-set@0.8", reason = "fancy-regex in syntect (Typst 0.15) is on 0.8" },
+    { crate = "bit-vec@0.8", reason = "pulled by bit-set 0.8 (Typst 0.15)" },
     { crate = "fearless_simd@0.4", reason = "Typst 0.15's raster stack is on 0.4" },
     { crate = "hayro-ccitt@0.3", reason = "Typst 0.15's PDF image stack is on 0.3" },
     { crate = "phf@0.13", reason = "Typst 0.15 dependencies are on phf 0.13" },
