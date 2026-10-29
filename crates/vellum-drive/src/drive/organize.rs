@@ -146,9 +146,9 @@ impl Drive {
             )
             .await?;
             let dir = self.dir_of(&to_space, parent).await?;
-            if dir.starts_with(&node.path) {
+            if self.holds(&node, &dir).await? {
                 return Err(DriveError::Invalid(
-                    "cannot move a folder into itself".into(),
+                    "cannot move an item into itself".into(),
                 ));
             }
             if node.path.parent().as_ref() == Some(&dir) {
@@ -214,9 +214,9 @@ impl Drive {
             )
             .await?;
             let dir = self.dir_of(&to_space, parent).await?;
-            if dir.starts_with(&node.path) {
+            if self.holds(&node, &dir).await? {
                 return Err(DriveError::Invalid(
-                    "cannot copy a folder into itself".into(),
+                    "cannot copy an item into itself".into(),
                 ));
             }
             let files = self.copy_sources(actor, &node).await?;
@@ -241,7 +241,7 @@ impl Drive {
                 }
             }
             for (path, bytes) in files {
-                let target = layout::rebase(&path, &node.path, &dest)?;
+                let target = layout::rebase_member(node.kind, &path, &node.path, &dest)?;
                 let bytes = text_of(&path, &bytes)
                     .map_or(bytes, |text| Bytes::from(links::replace_ids(&text, &ids)));
                 let _ = self
@@ -287,19 +287,30 @@ impl Drive {
         Ok(total)
     }
 
-    /// The node and, for a folder, every live node beneath it.
+    /// The node and, for a folder or a page, every live node beneath it.
     pub(super) async fn subtree(&self, node: &Node) -> DriveResult<Vec<Node>> {
         let mut out = vec![node.clone()];
-        if node.kind.is_container() {
+        if let Some(dir) = self.children_dir(node.kind, &node.path).await? {
             out.extend(
                 self.index
                     .nodes(node.space)
                     .await?
                     .into_iter()
-                    .filter(|n| n.is_live() && n.id != node.id && n.path.starts_with(&node.path)),
+                    .filter(|n| n.is_live() && n.id != node.id && n.path.starts_with(&dir)),
             );
         }
         Ok(out)
+    }
+
+    /// True if `dir` is the node itself or lies beneath it.
+    async fn holds(&self, node: &Node, dir: &BlobPath) -> DriveResult<bool> {
+        if dir.starts_with(&node.path) {
+            return Ok(true);
+        }
+        Ok(self
+            .children_dir(node.kind, &node.path)
+            .await?
+            .is_some_and(|own| dir.starts_with(&own)))
     }
 
     /// The files a copy of `node` by `actor` carries, with their content.
@@ -336,7 +347,16 @@ impl Drive {
                 })
                 .collect()
         } else {
-            vec![(node.path.clone(), node.size)]
+            let mut blobs = vec![(node.path.clone(), node.size)];
+            // A page's nested pages travel with it (D168).
+            if let Some(dir) = self.children_dir(node.kind, &node.path).await? {
+                blobs.extend(self.blobs_under(&dir).await?.into_iter().filter(|(p, _)| {
+                    !p.file_name().contains(".vellum-tmp")
+                        && vellum_store::layout::Kind::of(p).is_content()
+                        && !hidden.iter().any(|h| p.starts_with(h))
+                }));
+            }
+            blobs
         };
         // A book's sections narrow access on their own: the copy gets
         // the book as the copier sees it, and never its snapshots.
@@ -378,7 +398,7 @@ impl Drive {
         let mut moved = Vec::with_capacity(members.len());
         for before in members {
             let mut after = before.clone();
-            after.path = layout::rebase(&before.path, &node.path, &path)?;
+            after.path = layout::rebase_member(node.kind, &before.path, &node.path, &path)?;
             after.space = space.id;
             if before.id == node.id {
                 after.parent = parent;
@@ -433,7 +453,13 @@ impl Drive {
 
         // Links inside moved pages, and inside moved books and collections.
         for (before, after) in moved {
-            if before.path.parent() == after.path.parent() && before.kind != NodeKind::Folder {
+            // A page renamed in place still links into its nested pages,
+            // which moved with it (D168).
+            let carried = before.kind == NodeKind::Page && moved.len() > 1;
+            if before.path.parent() == after.path.parent()
+                && before.kind != NodeKind::Folder
+                && !carried
+            {
                 continue;
             }
             match after.kind {

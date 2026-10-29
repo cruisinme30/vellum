@@ -84,6 +84,76 @@ impl Drive {
         .await
     }
 
+    /// The person's My Drive, created when they have none yet (D171).
+    /// Vellum creates it as itself, owned by `user`, under the slug
+    /// [`layout::slug_of`] makes from `handle`, or under that slug plus
+    /// the end of the user's ID when someone else holds it. Safe to call
+    /// at once from several places: a drive another caller just wrote for
+    /// the same person is found and kept.
+    ///
+    /// # Errors
+    /// Store or index failures.
+    #[tracing::instrument(name = "drive.ensure_my_drive", skip_all, err)]
+    pub async fn ensure_my_drive(&self, user: UserId, handle: Option<&str>) -> DriveResult<Space> {
+        if let Some(space) = self.my_drive(user).await? {
+            return Ok(space);
+        }
+        let base = handle.map_or_else(|| "me".to_owned(), layout::slug_of);
+        let id = user.to_string().to_lowercase();
+        let tail = id.get(id.len().saturating_sub(8)..).unwrap_or(&id);
+        let mut suffixed = base.clone();
+        suffixed.truncate(48);
+        let candidates = [base.clone(), format!("{suffixed}-{tail}"), id.clone()];
+        for slug in &candidates {
+            match self
+                .create_space(
+                    &Actor::System,
+                    SpaceKind::UserDrive,
+                    slug,
+                    MY_DRIVE_NAME,
+                    Some(user),
+                )
+                .await
+            {
+                Ok(space) => return Ok(space),
+                Err(DriveError::AlreadyExists(_)) => {
+                    if let Some(space) = self.claimed_by(user, slug).await? {
+                        return Ok(space);
+                    }
+                }
+                Err(err) => return Err(err),
+            }
+        }
+        Err(DriveError::AlreadyExists(base))
+    }
+
+    /// The My Drive at `slug` if its folder file says it belongs to
+    /// `user`, indexed as it stands.
+    async fn claimed_by(&self, user: UserId, slug: &str) -> DriveResult<Option<Space>> {
+        let root = layout::space_root(SpaceKind::UserDrive, slug)?;
+        let path = root.join(layout::FOLDER_FILE)?;
+        let blob = match self.store.get(&path).await {
+            Ok(blob) => blob,
+            Err(vellum_store::StoreError::NotFound(_)) => return Ok(None),
+            Err(err) => return Err(err.into()),
+        };
+        let file: FolderFile = crate::files::from_yaml(&path, &blob.bytes)?;
+        let Some(meta) = file.space.filter(|m| m.owner == Some(user)) else {
+            return Ok(None);
+        };
+        let space = Space {
+            id: file.id.into(),
+            kind: SpaceKind::UserDrive,
+            slug: slug.to_owned(),
+            name: meta.name,
+            owner: meta.owner,
+            settings: meta.settings,
+            root,
+        };
+        self.index.put_space(&space).await?;
+        Ok(Some(space))
+    }
+
     /// Changes a space's display name and settings (quota, trash days,
     /// version retention). Managers only.
     ///
@@ -300,6 +370,9 @@ impl Drive {
         self.record(actor, node, ActivityKind::Created).await
     }
 }
+
+/// The name a My Drive gets when Vellum creates it.
+pub const MY_DRIVE_NAME: &str = "My Drive";
 
 /// The root `.vellum-folder.yaml` of a space.
 pub(super) fn space_file(space: &Space) -> FolderFile {

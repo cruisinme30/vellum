@@ -5,11 +5,11 @@
 //! live editing, over the files in the data folder, the index database and the
 //! permission engine.
 //!
-//! `vellum serve` opens them when an index is configured: Postgres through
-//! the kernel's `database_url`, or the SQLite index in the data folder,
-//! encrypted with `VELLUM_INDEX_KEY` (or plaintext when
-//! `VELLUM_INDEX_PLAINTEXT=1`). Without one the server still starts, with
-//! sign-in only, and says why.
+//! `vellum serve` opens them over an index: Postgres through the kernel's
+//! `database_url`, or the SQLite index in the data folder, encrypted with
+//! `VELLUM_INDEX_KEY` (or plaintext when `VELLUM_INDEX_PLAINTEXT=1`). With
+//! neither, the key is made on the first start and kept in
+//! `.vellum/keys/index.key`, so `vellum serve` needs no settings.
 //!
 //! Workspace files live in the data folder, or in a shared S3 bucket when
 //! `VELLUM_BLOB_URL` names one (`s3://bucket[/prefix]`, with
@@ -23,6 +23,8 @@
 //! (see [`crate::watcher`]); a bucket is only written through Vellum.
 //! Writes are announced in the index's change feed, and each replica
 //! follows it to keep its caches fresh (see [`crate::feed`]).
+//! Search indexes the drive's pages and the collections' rows (see
+//! [`crate::search`]).
 
 use std::path::Path;
 use std::sync::{Arc, RwLock};
@@ -32,9 +34,10 @@ use futures::StreamExt as _;
 use vellum_authz::{Authz, AuthzStore, Id, MemoryStore, SqlStore};
 use vellum_books_service::BooksService;
 use vellum_collections::CollectionsService;
+use vellum_collections::service::IndexFeed;
 use vellum_contracts::{BoxFuture, Operation, Readiness, Service};
 use vellum_db::feed::Feed;
-use vellum_db::{Index, IndexConfig};
+use vellum_db::{Index, IndexConfig, IndexKey};
 use vellum_drive::authz::{AuthzAccess as DriveAuthzAccess, TreeSync};
 use vellum_drive::sql::SqlIndex;
 use vellum_drive::{Drive, DriveIndex, DriveService};
@@ -53,7 +56,7 @@ use crate::collab::Collab;
 use crate::feed::{AnnouncingStore, Caches};
 use crate::google_http::{self, Endpoints, FileLinks, GoogleHttp};
 use crate::page_render::{Handles, PageRenderService};
-use crate::reindex::{KEY_VAR, index_key};
+use crate::reindex::{KEY_VAR, key_bytes};
 use crate::tasks::{DriveTasks, Parts, TasksSettings};
 
 /// The mail domain that receives My Work capture e-mail.
@@ -85,30 +88,72 @@ fn unavailable(what: &str, e: impl std::fmt::Display) -> Error {
     Error::new(ErrorKind::Unavailable, format!("{what}: {e}"))
 }
 
-/// The index settings for `config`, or `None` with the reason when no
-/// index is configured.
+/// The file under `.vellum/keys` that holds the index key when
+/// `VELLUM_INDEX_KEY` is not set.
+pub const KEY_FILE: &str = "index.key";
+
+/// The SQLite index key: `VELLUM_INDEX_KEY`, then nothing in plaintext
+/// mode, then the key kept beside the data in `.vellum/keys/index.key`,
+/// made on the first start so `vellum serve` needs no settings.
 ///
 /// # Errors
 ///
-/// A key that is set but malformed.
+/// A malformed key, an index file left without its key (made with a key
+/// that is not set now), or a key folder that cannot be written.
+pub fn sqlite_key(
+    config: &Config,
+    var: impl Fn(&str) -> Option<String>,
+) -> Result<Option<[u8; 32]>, Error> {
+    if let Some(hex) = var(KEY_VAR) {
+        return key_bytes(Some(&hex))
+            .map(Some)
+            .map_err(|e| Error::new(ErrorKind::InvalidInput, e));
+    }
+    if var(PLAINTEXT_VAR).is_some_and(|v| matches!(v.as_str(), "1" | "true" | "yes")) {
+        return Ok(None);
+    }
+    let vellum = config.data_dir.join(".vellum");
+    if !vellum.join("keys").join(KEY_FILE).exists() && vellum.join("index.sqlite").exists() {
+        // A new key cannot open the old index; never replace it silently.
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            format!(
+                "the index in {} was made with a key that is not set now: set {KEY_VAR}, \
+                 or restore .vellum/keys/{KEY_FILE}",
+                vellum.display()
+            ),
+        ));
+    }
+    let bytes = crate::keys::key_file(&config.data_dir, KEY_FILE)?;
+    bytes
+        .get(..32)
+        .and_then(|k| <[u8; 32]>::try_from(k).ok())
+        .map(Some)
+        .ok_or_else(|| Error::new(ErrorKind::Internal, "the index key file is too short"))
+}
+
+/// The index settings for `config`: Postgres when a database URL is set,
+/// otherwise SQLite in the data folder, sealed with [`sqlite_key`].
+///
+/// # Errors
+///
+/// As [`sqlite_key`].
 pub fn index_config(
     config: &Config,
     var: impl Fn(&str) -> Option<String>,
-) -> Result<Result<IndexConfig, String>, Error> {
+) -> Result<IndexConfig, Error> {
     if let Some(url) = &config.database_url {
-        return Ok(Ok(IndexConfig::postgres(url.clone())));
+        return Ok(IndexConfig::postgres(url.clone()));
     }
     let path = config.data_dir.join(".vellum").join("index.sqlite");
-    if let Some(hex) = var(KEY_VAR) {
-        let key = index_key(Some(&hex)).map_err(|e| Error::new(ErrorKind::InvalidInput, e))?;
-        return Ok(Ok(IndexConfig::sqlite(path, Some(key))));
+    let key = sqlite_key(config, &var)?;
+    if key.is_some() && var(KEY_VAR).is_none() {
+        tracing::warn!(
+            "the index key is kept in the data folder (.vellum/keys/{KEY_FILE}); \
+             copy it somewhere safe and set {KEY_VAR}"
+        );
     }
-    if var(PLAINTEXT_VAR).is_some_and(|v| matches!(v.as_str(), "1" | "true" | "yes")) {
-        return Ok(Ok(IndexConfig::sqlite(path, None)));
-    }
-    Ok(Err(format!(
-        "no index is configured: set {KEY_VAR}, {PLAINTEXT_VAR}=1 or a database URL"
-    )))
+    Ok(IndexConfig::sqlite(path, key.map(IndexKey::new)))
 }
 
 /// Where the workspace files live.
@@ -276,6 +321,68 @@ async fn load_spaces(drive: &dyn DriveIndex) -> Result<Vec<(BlobPath, Id)>, Erro
         .collect())
 }
 
+/// How often accounts made since startup are checked for a My Drive.
+const DRIVES_EVERY: Duration = Duration::from_secs(30);
+
+/// Looks up handles for naming My Drives.
+fn drive_handles(identity: &Arc<Identity>) -> vellum_drive::service::Handles {
+    let identity = Arc::clone(identity);
+    Arc::new(move |user| identity.user(user).ok().map(|u| u.handle))
+}
+
+/// Makes a My Drive for every active account that has none (D171): at
+/// startup for existing installs, then on each refresh for accounts made
+/// since. The drive API also makes one on a person's first visit.
+async fn provision_drives(
+    drive: &Drive,
+    index: &dyn DriveIndex,
+    identity: &Identity,
+) -> Result<usize, Error> {
+    let owners: std::collections::HashSet<UserId> = index
+        .spaces()
+        .await
+        .map_err(|e| unavailable("cannot list spaces", e))?
+        .into_iter()
+        .filter(|s| s.kind == vellum_drive::SpaceKind::UserDrive)
+        .filter_map(|s| s.owner)
+        .collect();
+    let mut made = 0;
+    for user in identity.users() {
+        if user.disabled || owners.contains(&user.id) {
+            continue;
+        }
+        match drive.ensure_my_drive(user.id, Some(&user.handle)).await {
+            Ok(_) => made += 1,
+            Err(error) => tracing::warn!(%error, user = %user.id, "My Drive not created"),
+        }
+    }
+    Ok(made)
+}
+
+/// Makes the missing My Drives now, then keeps checking for new accounts.
+async fn keep_drives(
+    drive: &Arc<Drive>,
+    index: &Arc<SqlIndex>,
+    identity: &Arc<Identity>,
+) -> Result<(), Error> {
+    let made = provision_drives(drive, index.as_ref(), identity).await?;
+    if made > 0 {
+        tracing::info!(made, "made My Drives for accounts that had none");
+    }
+    let (drive, index, people) = (Arc::clone(drive), Arc::clone(index), Arc::clone(identity));
+    drop(tokio::spawn(async move {
+        let mut tick = tokio::time::interval(DRIVES_EVERY);
+        tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        loop {
+            let _ = tick.tick().await;
+            if let Err(error) = provision_drives(&drive, index.as_ref(), &people).await {
+                tracing::warn!(%error, "My Drives not checked");
+            }
+        }
+    }));
+    Ok(())
+}
+
 /// Work handles come from identity's unique handles.
 #[derive(Debug)]
 struct IdentityDirectory(Arc<Identity>);
@@ -309,8 +416,8 @@ impl EventSink for TracingSink {
 }
 
 /// The opened services, plus the two the file watcher drives, collections
-/// for the change feed, and Work, which the integration receivers act
-/// through.
+/// for the change feed and search, and Work, which the integration
+/// receivers act through.
 struct Workspace {
     services: Vec<Arc<dyn Service>>,
     drive: Arc<Drive>,
@@ -318,6 +425,7 @@ struct Workspace {
     books: Arc<BooksService>,
     work: Arc<WorkService>,
     tasks: Arc<TasksService>,
+    space_of: vellum_collections::service::SpaceOf,
 }
 
 /// What `vellum serve` mounts for the workspace.
@@ -378,46 +486,58 @@ impl TasksSetup {
     }
 }
 
+/// Where the services announce what changed.
+struct Feeds {
+    /// Work's events, for notifications.
+    events: Arc<dyn EventSink>,
+    /// Collection row changes, for search.
+    rows: Option<Arc<dyn IndexFeed>>,
+}
+
 /// Builds the services over `store`, `authz` and the drive's `index`.
 async fn build<S: AuthzStore + TreeSync + 'static>(
     store: Arc<dyn BlobStore>,
-    authz: Arc<Authz<S>>,
+    authz: &Arc<Authz<S>>,
     index: Arc<dyn DriveIndex>,
     spaces: &Arc<Spaces>,
     identity: &Arc<Identity>,
-    events: Arc<dyn EventSink>,
+    feeds: Feeds,
     setup: TasksSetup,
 ) -> Result<Workspace, Error> {
     let drive = Arc::new(Drive::new(
         Arc::clone(&store),
         Arc::clone(&index),
         Arc::new(vellum_drive::authz::AuthzAccess::new(
-            Arc::clone(&authz),
+            Arc::clone(authz),
             Arc::clone(&index),
         )),
     ));
     let lookup = Arc::clone(spaces);
     let space_of: vellum_collections::service::SpaceOf =
         Arc::new(move |path: &BlobPath| lookup.of(path));
-    let collections = Arc::new(CollectionsService::new(
+    let mut collections = CollectionsService::new(
         Arc::clone(&store),
         Arc::new(vellum_collections::service::AuthzAccess::new(
-            Arc::clone(&authz),
+            Arc::clone(authz),
             Arc::clone(&space_of),
         )),
-    ));
+    );
+    if let Some(feed) = feeds.rows {
+        collections = collections.with_index_feed(feed);
+    }
+    let collections = Arc::new(collections);
     let books = Arc::new(BooksService::new(
         Arc::clone(&store),
         Arc::new(vellum_books_service::AuthzAccess::new(
-            Arc::clone(&authz),
-            space_of,
+            Arc::clone(authz),
+            Arc::clone(&space_of),
         )),
     ));
     let directory = Arc::new(IdentityDirectory(Arc::clone(identity)));
     let (work, report) = WorkService::open(
         Arc::clone(&store),
         Arc::clone(&directory) as Arc<dyn Directory>,
-        events,
+        feeds.events,
         Arc::new(SystemClock),
     )
     .await?;
@@ -433,7 +553,7 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
             drive: Arc::clone(&drive),
             store,
             index,
-            authz,
+            authz: Arc::clone(authz),
             identity: Arc::clone(identity),
             work: Arc::clone(&work),
         },
@@ -458,7 +578,7 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
     );
     Ok(Workspace {
         services: vec![
-            Arc::new(DriveService::new(Arc::clone(&drive))),
+            Arc::new(DriveService::new(Arc::clone(&drive)).with_handles(drive_handles(identity))),
             Arc::clone(&collections) as Arc<dyn Service>,
             Arc::clone(&books) as Arc<dyn Service>,
             Arc::clone(&work) as Arc<dyn Service>,
@@ -470,12 +590,31 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
         books,
         work,
         tasks,
+        space_of,
     })
 }
 
-/// Rescans the workspace files once per cluster: a replica that starts
-/// while others run finds the index already current (D163).
-async fn rescan(replica: &Replica, others_alive: bool, drive: &Arc<Drive>) {
+/// The key the search index is derived from; `None` leaves it unsealed
+/// (Postgres and plaintext mode).
+fn search_key(
+    config: &Config,
+    var: impl Fn(&str) -> Option<String>,
+) -> Result<Option<[u8; 32]>, Error> {
+    if config.database_url.is_some() {
+        return Ok(None);
+    }
+    sqlite_key(config, var)
+}
+
+/// Rescans the workspace files once per cluster (a replica that starts
+/// while others run finds the index already current), then starts the
+/// cluster's upkeep (D163).
+async fn rescan_and_maintain(
+    replica: &Replica,
+    others_alive: bool,
+    drive: &Arc<Drive>,
+    index: &Index,
+) {
     let drive = Arc::clone(drive);
     replica
         .rescan_once(others_alive, async move {
@@ -487,6 +626,7 @@ async fn rescan(replica: &Replica, others_alive: bool, drive: &Arc<Drive>) {
             }
         })
         .await;
+    replica.maintain(index);
 }
 
 /// Syncs Google Calendar every [`GOOGLE_SYNC_EVERY`] on one replica.
@@ -518,13 +658,8 @@ pub async fn open(
 ) -> Result<Opened, Error> {
     let setup = TasksSetup::new(identity, Some(&config.data_dir), &var);
     let bucket = bucket(&var)?;
-    let index_config = match index_config(config, &var)? {
-        Ok(c) => c,
-        Err(why) => {
-            tracing::warn!("{why}; serving sign-in only, without the workspace API");
-            return Ok(Opened::default());
-        }
-    };
+    let key = search_key(config, &var)?;
+    let index_config = index_config(config, &var)?;
     let index = Index::open(&index_config)
         .await
         .map_err(|e| unavailable("cannot open the index", e))?;
@@ -555,13 +690,17 @@ pub async fn open(
     let drive_index = Arc::new(SqlIndex::new(index.clone()));
     let spaces = Arc::new(Spaces::default());
     let (events, queued) = crate::notifications::channel();
-    let workspace = build(
+    let (rows, row_changes) = crate::search::row_feed();
+    let mut workspace = build(
         Arc::clone(&store),
-        Arc::clone(&authz),
+        &authz,
         Arc::clone(&drive_index) as Arc<dyn DriveIndex>,
         &spaces,
         identity,
-        events,
+        Feeds {
+            events,
+            rows: Some(rows),
+        },
         setup,
     )
     .await?;
@@ -576,21 +715,37 @@ pub async fn open(
     if local {
         crate::watcher::start(&config.data_dir, &store, &workspace.drive, &workspace.books).await?;
     }
-    rescan(&replica, others_alive, &workspace.drive).await;
-    replica.maintain(&index);
+    rescan_and_maintain(&replica, others_alive, &workspace.drive, &index).await;
     let rate_counts = vellum_db::rate::SharedCounts::new(index.clone());
     let hooks = crate::integrations::hooks(&store, &workspace.work, &var).await?;
     let collab = Collab::open(
         Arc::clone(&workspace.drive),
         Arc::new(DriveAuthzAccess::new(
-            authz,
+            Arc::clone(&authz),
             Arc::clone(&drive_index) as Arc<dyn DriveIndex>,
         )),
-        index,
+        index.clone(),
         &config.data_dir,
         app_origin,
+        Arc::new(crate::identity::IdentityAuthenticator::new(Arc::clone(
+            identity,
+        ))),
     )?;
+    keep_drives(&workspace.drive, &drive_index, identity).await?;
     spaces.replace(load_spaces(drive_index.as_ref()).await?);
+    let search = crate::search::start(crate::search::Parts {
+        data_dir: config.data_dir.clone(),
+        key,
+        index,
+        store: Arc::clone(&store),
+        authz,
+        collections: Arc::clone(&workspace.collections),
+        space_of: Arc::clone(&workspace.space_of),
+        row_changes,
+        holder: me.clone(),
+    })
+    .await?;
+    workspace.services.push(Arc::new(search));
     keep_fresh(feed, me, cursor, &workspace, &spaces, drive_index);
     sync_calendars(&replica, &workspace.tasks);
     let mut services = workspace.services;
@@ -623,16 +778,22 @@ pub async fn describe(
     let authz = Arc::new(Authz::new(MemoryStore::new()));
     let index = Arc::new(vellum_drive::memory::MemoryIndex::new());
     let setup = TasksSetup::new(identity, None, |_| None);
-    let workspace = build(
+    let mut workspace = build(
         store,
-        authz,
+        &authz,
         index,
         &Arc::new(Spaces::default()),
         identity,
-        Arc::new(TracingSink),
+        Feeds {
+            events: Arc::new(TracingSink),
+            rows: None,
+        },
         setup,
     )
     .await?;
+    workspace
+        .services
+        .push(Arc::new(crate::search::describe(authz)?));
     Ok(workspace.services)
 }
 
@@ -719,31 +880,48 @@ mod tests {
     }
 
     #[test]
-    fn index_needs_a_key_plaintext_or_a_database() {
-        let config = Config::default();
+    fn index_uses_a_key_plaintext_a_database_or_a_kept_key() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut config = Config::default();
+        config.data_dir = dir.path().to_path_buf();
         let vars = |pairs: &[(&str, &str)]| -> HashMap<String, String> {
             pairs
                 .iter()
                 .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
                 .collect()
         };
-        let none = vars(&[]);
-        assert!(
-            index_config(&config, |k| none.get(k).cloned())
-                .unwrap()
-                .is_err()
-        );
         let plain = vars(&[(PLAINTEXT_VAR, "1")]);
         assert!(matches!(
             index_config(&config, |k| plain.get(k).cloned()).unwrap(),
-            Ok(IndexConfig::Sqlite { key: None, .. })
+            IndexConfig::Sqlite { key: None, .. }
         ));
         let keyed = vars(&[(KEY_VAR, &"ab".repeat(32))]);
         assert!(matches!(
             index_config(&config, |k| keyed.get(k).cloned()).unwrap(),
-            Ok(IndexConfig::Sqlite { key: Some(_), .. })
+            IndexConfig::Sqlite { key: Some(_), .. }
         ));
         let bad = vars(&[(KEY_VAR, "nope")]);
         assert!(index_config(&config, |k| bad.get(k).cloned()).is_err());
+        assert!(!dir.path().join(".vellum/keys").join(KEY_FILE).exists());
+
+        // With no settings, a key is made once and kept beside the data.
+        let none = vars(&[]);
+        let first = sqlite_key(&config, |k| none.get(k).cloned()).unwrap();
+        assert!(first.is_some());
+        assert_eq!(
+            sqlite_key(&config, |k| none.get(k).cloned()).unwrap(),
+            first
+        );
+        assert!(matches!(
+            index_config(&config, |k| none.get(k).cloned()).unwrap(),
+            IndexConfig::Sqlite { key: Some(_), .. }
+        ));
+
+        // An index whose key is gone is refused, not silently re-keyed.
+        std::fs::remove_file(dir.path().join(".vellum/keys").join(KEY_FILE)).unwrap();
+        std::fs::write(dir.path().join(".vellum/index.sqlite"), b"sealed").unwrap();
+        let error = sqlite_key(&config, |k| none.get(k).cloned()).unwrap_err();
+        assert!(error.to_string().contains(KEY_VAR), "{error}");
+        assert!(!dir.path().join(".vellum/keys").join(KEY_FILE).exists());
     }
 }

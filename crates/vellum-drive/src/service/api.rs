@@ -149,7 +149,8 @@ impl From<&Space> for SpaceView {
 /// The caller's My Drive, if they have one.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct MyDrive {
-    /// The space; absent until it is created.
+    /// The space. It is made on the first visit when the account has
+    /// none yet, so it is always present.
     pub space: Option<SpaceView>,
 }
 
@@ -589,8 +590,35 @@ pub struct PlaceInput {
     pub id: ObjectId,
     /// The space it goes to.
     pub space_id: SpaceId,
-    /// The folder it goes into; the top of the space when absent.
+    /// The folder or page it goes into; the top of the space when absent.
     pub parent_id: Option<ObjectId>,
+    /// Where it goes among its new siblings, counted without it: 0 is
+    /// first. When absent the order is left as it was.
+    pub index: Option<usize>,
+}
+
+/// A space's tree, or the part of it under one item.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct TreeInput {
+    /// The space.
+    pub space_id: SpaceId,
+    /// The folder or page to start under; the whole space when absent.
+    pub root_id: Option<ObjectId>,
+    /// How many levels to return; all when absent.
+    pub depth: Option<usize>,
+    /// At most this many items, 1 to 10000; 2000 when absent.
+    pub limit: Option<usize>,
+}
+
+/// Items in tree order: depth first, siblings in their stored order.
+/// Each item names its parent.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct TreeView {
+    /// The items you can open.
+    pub items: Vec<NodeView>,
+    /// True when the limit cut the tree short.
+    pub truncated: bool,
 }
 
 /// Starring or unstarring an item.

@@ -17,13 +17,15 @@ use url::Url;
 use vellum_api::config::GatewayConfig;
 use vellum_api::gateway::{Gateway, GatewayBuilder};
 use vellum_contracts::Service;
-use vellum_identity::{Identity, IdentityConfig, IdentityService, Store, http as identity_http};
+use vellum_identity::{
+    Identity, IdentityConfig, IdentityService, Sso, SsoConfig, Store, http as identity_http,
+};
 use vellum_kernel::{Config, Error, ErrorKind};
 use vellum_notify::service::{NotifyService, NotifyStore};
 use vellum_tasks::service::TasksService;
 
 use crate::collab::Collab;
-use crate::identity::{GuardedFetcher, IdentityAuthenticator};
+use crate::identity::{GuardedFetcher, GuardedSsoHttp, IdentityAuthenticator};
 use crate::observability::{self, Observability};
 use crate::workspace;
 
@@ -71,17 +73,22 @@ impl std::fmt::Debug for Services {
 
 impl Services {
     /// Opens every service for the workspace at `public_url`, keeping
-    /// state under `data_dir` (or in memory when `None`).
+    /// state under `data_dir` (or in memory when `None`), with single sign-on
+    /// through `sso` when set.
     ///
     /// # Errors
     ///
     /// Invalid settings or unreadable state.
-    pub fn open(public_url: &str, data_dir: Option<&Path>) -> Result<Self, Error> {
+    pub fn open(
+        public_url: &str,
+        data_dir: Option<&Path>,
+        sso: Option<SsoConfig>,
+    ) -> Result<Self, Error> {
         let store = match data_dir {
             Some(dir) => Store::open(dir)?,
             None => Store::memory(),
         };
-        Self::open_with_store(public_url, data_dir, store)
+        Self::open_with_store(public_url, data_dir, store, sso)
     }
 
     /// As [`Services::open`], with the identity records in `store` (the
@@ -94,6 +101,7 @@ impl Services {
         public_url: &str,
         data_dir: Option<&Path>,
         store: Store,
+        sso: Option<SsoConfig>,
     ) -> Result<Self, Error> {
         let url = Url::parse(public_url).map_err(|e| {
             Error::new(
@@ -104,8 +112,13 @@ impl Services {
         let subject = url.to_string();
         let mut config = IdentityConfig::new(url.clone());
         config.data_dir = data_dir.map(Path::to_path_buf);
-        let identity =
+        let mut identity =
             Identity::new(config, store).with_metadata_fetcher(Arc::new(GuardedFetcher::new()?));
+        if let Some(sso) = sso {
+            let http = Arc::new(GuardedSsoHttp::new(&sso.issuer)?);
+            tracing::info!(issuer = %sso.issuer, "single sign-on is on");
+            identity = identity.with_sso(Sso::new(sso, http));
+        }
         let notify = match data_dir {
             Some(dir) => NotifyStore::open(dir, &subject)?,
             None => NotifyStore::memory(&subject)?,
@@ -242,7 +255,7 @@ impl Services {
 /// A gateway built only to describe the API: no listener, in-memory
 /// permissions and an empty scratch folder that is removed afterwards.
 pub fn contract_gateway() -> Result<Gateway, Error> {
-    let mut services = Services::open("http://localhost", None)?;
+    let mut services = Services::open("http://localhost", None, None)?;
     let scratch = std::env::temp_dir().join(format!("vellum-contracts-{}", std::process::id()));
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()

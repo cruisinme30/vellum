@@ -36,7 +36,7 @@ flowchart LR
 
 ## Moving up a rung {#migrate}
 
-1. Take a backup with `vellum backup`.
+1. Take a backup with `vellum admin backup`.
 2. Start the new profile against the same content, or copy the content to its new storage with `vellum migrate-storage`.
 3. Run `vellum reindex` to build the index in the new database.
 4. Point your DNS at the new deployment.

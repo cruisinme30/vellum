@@ -6,7 +6,7 @@
 # Pull requests that touch it get a build and a check of the result;
 # pushes to main publish it on GitHub Pages (Settings -> Pages -> Source
 # must be "GitHub Actions").
-name: Website
+name: "Website: build and deploy"
 
 on:
   pull_request:

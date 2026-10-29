@@ -74,9 +74,10 @@ pub struct UrlPolicy {
     pub allow_http: bool,
     /// Ports a URL may name.
     pub allowed_ports: Vec<u16>,
-    /// Host names exempt from the address and port rules (exact match,
-    /// any case), such as `kroki` in the compose deployment, but only for
-    /// [`SafeClient::get_trusted`]. Empty by default.
+    /// Host names or IP addresses exempt from the address and port rules
+    /// (exact match, any case), such as `kroki` in the compose deployment,
+    /// but only for [`SafeClient::get_trusted`] and
+    /// [`SafeClient::post_form_trusted`]. Empty by default.
     pub trusted_hosts: Vec<String>,
     /// Redirects followed before giving up.
     pub max_redirects: usize,
@@ -137,8 +138,14 @@ impl UrlPolicy {
             return Err(SsrfError::Credentials);
         }
         let port = url.port_or_known_default().unwrap_or(0);
+        // A trusted host may be a name or an address (`10.0.0.5`, `::1`).
+        let bare = url
+            .host_str()
+            .map(|h| h.trim_start_matches('[').trim_end_matches(']'));
+        if trusted_ok && bare.is_some_and(|h| self.is_trusted(h)) {
+            return Ok(());
+        }
         match url.host() {
-            Some(Host::Domain(d)) if trusted_ok && self.is_trusted(d) => return Ok(()),
             Some(Host::Domain(d)) => check_domain(d)?,
             Some(Host::Ipv4(ip)) => check_ip(IpAddr::V4(ip))?,
             Some(Host::Ipv6(ip)) => check_ip(IpAddr::V6(ip))?,
@@ -284,6 +291,8 @@ impl Resolve for GuardedResolver {
 #[derive(Debug, Clone)]
 pub struct SafeClient {
     client: reqwest::Client,
+    /// The same client without redirects, for POSTs.
+    direct: reqwest::Client,
     policy: Arc<UrlPolicy>,
 }
 
@@ -296,12 +305,15 @@ impl SafeClient {
     pub fn new(policy: UrlPolicy) -> Result<Self, SsrfError> {
         let policy = Arc::new(policy);
         let redirect_policy = Arc::clone(&policy);
-        let client = reqwest::Client::builder()
-            .no_proxy()
-            .dns_resolver(GuardedResolver::new(Arc::clone(&policy)))
-            .timeout(policy.timeout)
-            .connect_timeout(policy.timeout)
-            .https_only(!policy.allow_http)
+        let builder = || {
+            reqwest::Client::builder()
+                .no_proxy()
+                .dns_resolver(GuardedResolver::new(Arc::clone(&policy)))
+                .timeout(policy.timeout)
+                .connect_timeout(policy.timeout)
+                .https_only(!policy.allow_http)
+        };
+        let client = builder()
             .redirect(reqwest::redirect::Policy::custom(move |attempt| {
                 if attempt.previous().len() > redirect_policy.max_redirects {
                     let err = SsrfError::Redirects(redirect_policy.max_redirects);
@@ -313,7 +325,14 @@ impl SafeClient {
                 }
             }))
             .build()?;
-        Ok(Self { client, policy })
+        let direct = builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .build()?;
+        Ok(Self {
+            client,
+            direct,
+            policy,
+        })
     }
 
     /// Sends a GET after checking the URL.
@@ -373,6 +392,52 @@ impl SafeClient {
     pub async fn get_trusted_bytes(&self, url: &str) -> Result<Vec<u8>, SsrfError> {
         let response = self.get_trusted(url).await?;
         self.read_limited(response).await
+    }
+
+    /// POSTs a URL-encoded form to a URL Vellum was configured with (an
+    /// identity provider's token endpoint), with optional HTTP basic
+    /// credentials. Hosts in [`UrlPolicy::trusted_hosts`] skip the address
+    /// rules, as in [`SafeClient::get_trusted`]; redirects are never
+    /// followed, since a redirected POST would resend the credentials.
+    /// Returns the status and at most [`UrlPolicy::max_body_bytes`] of
+    /// body, for any status, so callers can read error documents.
+    ///
+    /// # Errors
+    ///
+    /// As [`SafeClient::get_trusted`], plus [`SsrfError::TooLarge`].
+    pub async fn post_form_trusted(
+        &self,
+        url: &str,
+        form: &[(String, String)],
+        basic: Option<(&str, &str)>,
+    ) -> Result<(u16, Vec<u8>), SsrfError> {
+        let url = Url::parse(url)?;
+        self.policy.check_trusted_url(&url)?;
+        let span = tracing::info_span!(
+            "ssrf.post",
+            host = url.host_str().unwrap_or_default(),
+            trusted = true
+        );
+        let body: String = url::form_urlencoded::Serializer::new(String::new())
+            .extend_pairs(form)
+            .finish();
+        let mut request = self
+            .direct
+            .post(url)
+            .header(
+                reqwest::header::CONTENT_TYPE,
+                "application/x-www-form-urlencoded",
+            )
+            .body(body);
+        if let Some((user, password)) = basic {
+            request = request.basic_auth(user, Some(password));
+        }
+        let response = request.send().instrument(span).await?;
+        if response.status().is_redirection() {
+            return Err(SsrfError::Redirects(0));
+        }
+        let status = response.status().as_u16();
+        Ok((status, self.read_limited(response).await?))
     }
 
     async fn read_limited(&self, mut response: reqwest::Response) -> Result<Vec<u8>, SsrfError> {

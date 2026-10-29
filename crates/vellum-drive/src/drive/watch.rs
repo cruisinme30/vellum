@@ -32,6 +32,11 @@ impl Drive {
             let mut rescan: BTreeSet<SpaceId> = BTreeSet::new();
             let mut moving: HashSet<ObjectId> = HashSet::new();
             for change in changes {
+                // Sibling order is read from its file when listing, so a
+                // changed order file needs no rescan (D169).
+                if changed_path(change).file_name() == layout::ORDER_FILE {
+                    continue;
+                }
                 match change {
                     Change::Modified { id, path, .. } => {
                         if !self.external_edit(*id, path).await? {
@@ -136,6 +141,18 @@ impl Drive {
             .map(|n| n.id)
             .collect();
         self.access.tree_changed(space.id, &ids).await
+    }
+}
+
+/// The path a change leaves behind.
+const fn changed_path(change: &Change) -> &BlobPath {
+    match change {
+        Change::Modified { path, .. }
+        | Change::Created { path, .. }
+        | Change::Removed { path, .. }
+        | Change::Untracked { path, .. } => path,
+        Change::Renamed { to, .. } => to,
+        Change::Duplicated { copy, .. } => copy,
     }
 }
 

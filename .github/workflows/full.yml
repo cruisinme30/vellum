@@ -14,7 +14,7 @@
 # Wall time (ADR 0035, D165-D167): the help pages that share one template
 # get the default display mode only, the browser matrix is three browsers
 # times two shards, and the two reproducible builds run side by side.
-name: Full suite
+name: "Checks: full suite (release PRs)"
 
 on:
   pull_request:

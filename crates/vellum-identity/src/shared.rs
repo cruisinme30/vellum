@@ -623,6 +623,7 @@ mod tests {
                 admin: true,
                 disabled: false,
                 created_at: Timestamp::now(),
+                sso: Vec::new(),
             },
         );
         let _ = state.sessions.insert(

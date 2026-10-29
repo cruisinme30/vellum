@@ -8,7 +8,8 @@
 //! each request:
 //!
 //! - [`browser_router`] at `/auth` (CSRF-checked): sign-in, sign-out,
-//!   re-authentication, password change, break-glass and `OAuth` consent.
+//!   re-authentication, password change, break-glass, `OAuth` consent,
+//!   and the single sign-on start and callback (top-level `GET`s).
 //! - [`oauth_router`] at `/oauth` (cross-site): authorize, token, revoke.
 //! - [`well_known_router`] at `/.well-known` (cross-site): server metadata.
 
@@ -263,9 +264,144 @@ async fn consent(
     }
 }
 
+/// Where the provider sends the browser back, under the `/auth` mount.
+pub const SSO_CALLBACK_PATH: &str = "/auth/sso/callback";
+
+fn sso_state_cookie(identity: &Identity, value: &str, max_age: Duration) -> HeaderValue {
+    let config = identity.config();
+    let (name, secure) = if config.https {
+        ("__Host-vellum_sso", "; Secure")
+    } else {
+        ("vellum_sso", "")
+    };
+    let text = format!(
+        "{name}={value}; Path=/; HttpOnly; SameSite=Lax; Max-Age={}{secure}",
+        max_age.as_secs()
+    );
+    HeaderValue::from_str(&text).unwrap_or_else(|_| HeaderValue::from_static(""))
+}
+
+const fn sso_state_name(identity: &Identity) -> &'static str {
+    if identity.config().https {
+        "__Host-vellum_sso"
+    } else {
+        "vellum_sso"
+    }
+}
+
+fn sso_failed(message: &str) -> Response {
+    page(
+        StatusCode::FORBIDDEN,
+        "Single sign-on failed",
+        &format!(
+            "<h1>Single sign-on failed</h1><p>{}</p><p><a href=\"{SIGN_IN_PATH}\">Back to sign-in</a></p>",
+            escape(message)
+        ),
+    )
+}
+
+#[derive(Debug, Deserialize)]
+struct SsoStartQuery {
+    next: Option<String>,
+    #[serde(default)]
+    reauth: Option<String>,
+}
+
+/// Sends the browser to the provider's sign-in page.
+async fn sso_start(State(identity): Shared, Query(query): Query<SsoStartQuery>) -> Response {
+    let Some(sso) = identity.sso() else {
+        return sso_failed("Single sign-on is not set up on this server.");
+    };
+    let redirect_uri = format!("{}{SSO_CALLBACK_PATH}", identity.config().base());
+    let reauth = query
+        .reauth
+        .as_deref()
+        .is_some_and(|v| matches!(v, "1" | "true"));
+    match sso
+        .start(&redirect_uri, query.next.as_deref(), reauth)
+        .await
+    {
+        Ok(started) => {
+            let mut response = Redirect::to(&started.url).into_response();
+            let _ = response.headers_mut().insert(
+                header::SET_COOKIE,
+                sso_state_cookie(&identity, &started.state, crate::sso::PENDING_LIFETIME),
+            );
+            no_store(response)
+        }
+        Err(e) => sso_failed(e.message()),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct SsoCallbackQuery {
+    code: Option<String>,
+    state: Option<String>,
+    error: Option<String>,
+    error_description: Option<String>,
+}
+
+/// Where the provider returns: verifies the sign-in, opens a session and
+/// goes on to the page the user started from.
+async fn sso_callback(
+    State(identity): Shared,
+    headers: HeaderMap,
+    Query(query): Query<SsoCallbackQuery>,
+) -> Response {
+    let Some(sso) = identity.sso().cloned() else {
+        return sso_failed("Single sign-on is not set up on this server.");
+    };
+    let mut response = match (&query.error, &query.code, &query.state) {
+        (Some(error), _, _) => {
+            let detail = query.error_description.as_deref().unwrap_or(error);
+            sso_failed(&format!("The sign-in provider said: {detail}"))
+        }
+        (None, Some(code), Some(state)) => {
+            let redirect_uri = format!("{}{SSO_CALLBACK_PATH}", identity.config().base());
+            let cookie_state = cookie(&headers, sso_state_name(&identity));
+            match sso.finish(&redirect_uri, state, code, cookie_state).await {
+                Ok(done) => match identity.sso_sign_in(&done.identity, user_agent(&headers)) {
+                    Ok(session) => {
+                        // A sign-in in this browser replaces its old session.
+                        if let Some(old) = cookie(&headers, identity.config().cookie_name()) {
+                            let _ = identity.sign_out(old);
+                        }
+                        let max_age = Duration::from_millis(
+                            u64::try_from(
+                                session.session.expires_at.unix_ms()
+                                    - session.session.created_at.unix_ms(),
+                            )
+                            .unwrap_or(0),
+                        );
+                        let mut ok = Redirect::to(&done.next).into_response();
+                        let _ = ok.headers_mut().append(
+                            header::SET_COOKIE,
+                            session_cookie(&identity, &session.secret, max_age),
+                        );
+                        ok
+                    }
+                    Err(e) => sso_failed(e.message()),
+                },
+                Err(e) => {
+                    tracing::info!(event = "identity.sso_failed", error = %e, "single sign-on failed");
+                    sso_failed(e.message())
+                }
+            }
+        }
+        _ => sso_failed("The sign-in provider sent an incomplete answer."),
+    };
+    let _ = response.headers_mut().append(
+        header::SET_COOKIE,
+        sso_state_cookie(&identity, "", Duration::ZERO),
+    );
+    no_store(response)
+}
+
 /// The browser endpoints, to mount at `/auth`.
 pub fn browser_router(identity: Arc<Identity>) -> Router {
     Router::new()
+        .route("/sso/start", get(sso_start))
+        .route("/sso/callback", get(sso_callback))
         .route("/sign-in", post(sign_in))
         .route("/sign-out", post(sign_out))
         .route("/reauthenticate", post(reauthenticate))

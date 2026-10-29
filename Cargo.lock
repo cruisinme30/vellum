@@ -8957,12 +8957,14 @@ name = "vellum-cli"
 version = "0.0.0"
 dependencies = [
  "async-trait",
+ "aws-lc-rs",
  "axum",
  "base64 0.23.1",
  "bytes",
  "clap",
  "futures",
  "getrandom 0.4.3",
+ "hkdf 0.13.0",
  "hmac 0.13.0",
  "http",
  "http-body-util",
@@ -9000,6 +9002,7 @@ dependencies = [
  "vellum-observe",
  "vellum-private",
  "vellum-render",
+ "vellum-search",
  "vellum-security",
  "vellum-store",
  "vellum-tasks",
@@ -9195,6 +9198,7 @@ name = "vellum-identity"
 version = "0.0.0"
 dependencies = [
  "argon2",
+ "aws-lc-rs",
  "axum",
  "base64 0.23.1",
  "getrandom 0.4.3",

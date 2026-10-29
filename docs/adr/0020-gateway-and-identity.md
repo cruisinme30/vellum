@@ -12,7 +12,7 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D88, D89, D90
-- Issue: #84, #85, #148, #46, #86, #88, #174, #407, #393
+- Issue: #84, #85, #148, #46, #86, #87, #88, #174, #407, #393, #429
 - Pull requests: #39, #234, #347, #352, #363
 
 :::
@@ -91,7 +91,17 @@ live in the gateway crate.
 - Break-glass: `vellum admin break-glass` writes a one-time code to the
   data directory; redeeming it opens a 15-minute administrator session.
 - Records live in `.vellum/identity.json` (mode 0600) until the SQL index
-  lands. SSO (OIDC, SAML) follows in its own change.
+  lands.
+
+Single sign-on uses one `OpenID Connect` provider, set by `VELLUM_OIDC_*`
+variables. Vellum is a relying party with the code flow, PKCE, `state`
+(also kept in a short-lived cookie, against login CSRF) and `nonce`. ID
+tokens must be `RS256` or `ES256` from the provider's key set, verified
+with `aws-lc-rs`. An account links by the provider's user ID, else by a
+verified email; new member accounts are created only for listed domains,
+never administrators. A single sign-on session is an ordinary session, so
+it outlives a provider outage, and password and break-glass sign-in stay
+available. Re-authentication asks the provider for a fresh sign-in.
 
 ## Alternatives
 
@@ -103,6 +113,8 @@ live in the gateway crate.
   each resource server would need key distribution; lookups are cheap.
 - **Share pages on the app origin**: user content would run beside the
   signed-in session's cookies.
+- **An `OpenID Connect` client crate**: the flow is small, and the crates
+  pull in a second HTTP stack that would bypass the SSRF guard.
 
 ## Consequences
 
@@ -115,14 +127,9 @@ live in the gateway crate.
   kernel provides them.
 - `vellum-cli` is the composition root: `services.rs` builds every service
   once, and `vellum serve`, `vellum openapi` and `vellum graphql-schema`
-  all see the same set. Without an index (a key, plaintext mode or a
-  database URL) `vellum serve` runs sign-in only and says why, rather
-  than refusing to start.
-- With an index, `vellum serve` also serves the drive. At startup the
-  drive rebuilds its index from the data folder, and a file watcher then
-  applies edits made with other tools: an in-place page edit becomes a
-  version by an external editor, and a changed `book.yaml` re-applies
-  that book's section restrictions.
+  all see the same set. With no index key or database set, `vellum serve`
+  keeps a new key in `.vellum/keys/index.key` and warns, so it starts
+  with no settings (#174). An index whose key is gone is refused.
 - Clients get typed calls for free: `vellum openapi --typescript` turns
   the same document into `web/src/api/api.gen.ts`, and a contract test
   fails when the committed file no longer matches the server, so an API
@@ -134,3 +141,9 @@ the app host (#393). The gateway keeps `/api`, `/healthz`, `/readyz`,
 app's files, or its index for client routes. Those files pass the edge
 middleware but need no sign-in. The `connect-src` of the app's CSP also names
 the host's own `ws`/`wss` origin for live editing.
+
+With an index, `vellum serve` also runs search in the same process. Its
+tantivy index is sealed with a key derived from the index key, so the two
+never share a key. A row hit is checked against its collection, as rows
+have no node of their own. A pending single sign-on lives in one replica's
+memory, so several replicas need sticky sessions for `/auth/sso/*`.

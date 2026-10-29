@@ -10,6 +10,8 @@
 //! drives/users/<slug>/                  a user's My Drive
 //!   .vellum-folder.yaml                 folder (or space) id, icon, settings
 //!   Title.md                            a page
+//!   Title/                              the pages nested under it (D168)
+//!   .vellum-order.yaml                  the order of a container's items (D169)
 //!   Name/                               a folder
 //!   Name.book/book.yaml                 a book
 //!   Name.collection/schema.yaml         a collection
@@ -26,6 +28,8 @@ use crate::model::{NodeKind, SpaceKind};
 pub const STATE_DIR: &str = ".vellum";
 /// Per-folder (and per-space) metadata file.
 pub const FOLDER_FILE: &str = ".vellum-folder.yaml";
+/// Per-container sibling order: the child IDs, in order (D169).
+pub const ORDER_FILE: &str = ".vellum-order.yaml";
 /// The manifest inside a book folder.
 pub const BOOK_FILE: &str = "book.yaml";
 /// The schema inside a collection folder.
@@ -67,6 +71,26 @@ pub fn parse_space_root(dir: &BlobPath) -> Option<(SpaceKind, &str)> {
         _ => return None,
     };
     is_slug(slug).then_some((kind, slug))
+}
+
+/// A My Drive slug from a person's handle: lowercase letters and digits,
+/// other characters turned into single dashes, at most 48 bytes, `me`
+/// when nothing is left. The web app's `slugOf` does the same.
+#[must_use]
+pub fn slug_of(handle: &str) -> String {
+    let lower = handle.to_lowercase();
+    let mut slug = lower
+        .split(|c: char| !(c.is_ascii_lowercase() || c.is_ascii_digit()))
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("-");
+    slug.truncate(48);
+    let slug = slug.trim_end_matches('-').to_owned();
+    if slug.is_empty() {
+        "me".to_owned()
+    } else {
+        slug
+    }
 }
 
 fn is_slug(slug: &str) -> bool {
@@ -232,6 +256,46 @@ pub fn rebase(path: &BlobPath, from: &BlobPath, to: &BlobPath) -> DriveResult<Bl
     Ok(to.join(rest)?)
 }
 
+/// The directory that holds the pages nested under the page at `path`:
+/// `Plan.md` keeps its children in `Plan/` beside it (D168). `None` when
+/// `path` is not a Markdown file.
+#[must_use]
+pub fn page_dir(path: &BlobPath) -> Option<BlobPath> {
+    let name = path.file_name();
+    if !has_ext(name, "md") {
+        return None;
+    }
+    let stem = name.get(..name.len().saturating_sub(3))?;
+    if stem.is_empty() {
+        return None;
+    }
+    child(path.parent().as_ref(), stem).ok()
+}
+
+/// Rebases a member of the node at `from` (the node itself, a file in a
+/// folder, book or collection, or a page nested under a page) to the
+/// same place under `to`.
+///
+/// # Errors
+/// Fails if `path` is not part of the node or the result is invalid.
+pub fn rebase_member(
+    kind: NodeKind,
+    path: &BlobPath,
+    from: &BlobPath,
+    to: &BlobPath,
+) -> DriveResult<BlobPath> {
+    if path.starts_with(from) {
+        return rebase(path, from, to);
+    }
+    if kind == NodeKind::Page
+        && let (Some(old), Some(new)) = (page_dir(from), page_dir(to))
+        && path.starts_with(&old)
+    {
+        return rebase(path, &old, &new);
+    }
+    Err(DriveError::Invalid(format!("{path} is not under {from}")))
+}
+
 /// Joins a directory (or the store root for `None`) and a name.
 ///
 /// # Errors
@@ -300,6 +364,33 @@ mod tests {
         );
         assert!(space_root(SpaceKind::UserDrive, "Bad Slug").is_err());
         assert_eq!(parse_space_root(&p("drives/other/x")), None);
+    }
+
+    #[test]
+    fn my_drive_slugs_come_from_handles() {
+        assert_eq!(slug_of("Ada.Lovelace"), "ada-lovelace");
+        assert_eq!(slug_of("__"), "me");
+        assert_eq!(slug_of("Zoë_42"), "zo-42");
+        assert!(slug_of(&"a".repeat(80)).len() <= 48);
+        assert!(is_slug(&slug_of("-x-")));
+    }
+
+    #[test]
+    fn pages_keep_their_children_beside_them() {
+        assert_eq!(page_dir(&p("d/Plan.md")), Some(p("d/Plan")));
+        assert_eq!(page_dir(&p("Plan.MD")), Some(p("Plan")));
+        assert_eq!(page_dir(&p("d/F")), None);
+        let (from, to) = (p("d/Plan.md"), p("e/Goal.md"));
+        assert_eq!(
+            rebase_member(NodeKind::Page, &p("d/Plan/a/b.md"), &from, &to).ok(),
+            Some(p("e/Goal/a/b.md"))
+        );
+        assert_eq!(
+            rebase_member(NodeKind::Page, &from, &from, &to).ok(),
+            Some(to.clone())
+        );
+        assert!(rebase_member(NodeKind::Page, &p("d/Other/x.md"), &from, &to).is_err());
+        assert!(rebase_member(NodeKind::Folder, &p("d/Plan/x.md"), &from, &to).is_err());
     }
 
     #[test]

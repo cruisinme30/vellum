@@ -27,7 +27,7 @@ use axum::http::{HeaderMap, StatusCode, Uri};
 use axum::response::{IntoResponse as _, Response};
 use axum::routing::get;
 use futures_util::{SinkExt as _, StreamExt as _};
-use tokio::time::{Instant, interval};
+use tokio::time::{Instant, interval, interval_at};
 use tracing::{Instrument as _, info_span, warn};
 use vellum_kernel::{DocId, ErrorKind, Result, SpaceId, UserId};
 
@@ -53,6 +53,18 @@ pub trait Authorizer: Send + Sync + 'static {
     /// [`ErrorKind::Unauthenticated`], [`ErrorKind::PermissionDenied`] or
     /// [`ErrorKind::NotFound`] to refuse; any other kind is a failure.
     async fn authorize(&self, request: &Parts, room: RoomKey) -> Result<(UserId, Access)>;
+
+    /// Checks an open connection again, with the upgrade request it was
+    /// admitted on. The connection is closed as revoked unless this
+    /// returns `Ok` for the same user; a changed [`Access`] applies at
+    /// once. The default runs [`Self::authorize`] again.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::authorize`]; any error ends the connection.
+    async fn recheck(&self, request: &Parts, room: RoomKey) -> Result<(UserId, Access)> {
+        self.authorize(request, room).await
+    }
 }
 
 /// How long a replica waits to reach a room's owner before serving the
@@ -135,6 +147,15 @@ async fn upgrade(
         _ => Route::Local,
     };
     let ws = ws.max_message_size(limit).max_frame_size(limit);
+    let origin = parts.headers.get(axum::http::header::ORIGIN).cloned();
+    // The replica the editor reached keeps checking their access; a
+    // forwarded join was checked by that replica, which relays it.
+    let recheck = (!from_peer).then(|| Recheck {
+        authorizer: Arc::clone(&state.authorizer),
+        request: parts,
+        access,
+        every: hub.config().recheck_access_every,
+    });
     match (route, state.cluster) {
         (Route::Remote(owner), Some(cluster)) => {
             let hop = Hop {
@@ -146,12 +167,12 @@ async fn upgrade(
                     room.doc
                 ),
                 join: cluster.sign(&request),
-                origin: parts.headers.get(axum::http::header::ORIGIN).cloned(),
+                origin,
                 owner,
             };
-            ws.on_upgrade(move |socket| forward(socket, hop, hub, request))
+            ws.on_upgrade(move |socket| forward(socket, hop, hub, request, recheck))
         }
-        _ => ws.on_upgrade(move |socket| serve(socket, hub, request)),
+        _ => ws.on_upgrade(move |socket| serve_checked(socket, hub, request, recheck)),
     }
 }
 
@@ -165,7 +186,13 @@ struct Hop {
 
 /// Relays an editor's socket to the room's owner. If the owner cannot be
 /// reached in time (it may have just died), this replica serves the room.
-async fn forward(socket: WebSocket, hop: Hop, hub: Hub, request: JoinRequest) {
+async fn forward(
+    socket: WebSocket,
+    hop: Hop,
+    hub: Hub,
+    request: JoinRequest,
+    recheck: Option<Recheck>,
+) {
     use tokio_tungstenite::tungstenite::client::IntoClientRequest as _;
     let span = info_span!("collab.forward", room = %request.room, owner = %hop.owner.name);
     if let Some(trace) = request.traceparent {
@@ -199,21 +226,52 @@ async fn forward(socket: WebSocket, hop: Hop, hub: Hub, request: JoinRequest) {
     .instrument(span.clone())
     .await;
     match upstream {
-        Some(stream) => relay(socket, stream).instrument(span).await,
-        None => serve(socket, hub, request).await,
+        Some(stream) => {
+            let (room, user) = (request.room, request.user);
+            relay(
+                socket,
+                stream,
+                Watch {
+                    hub,
+                    room,
+                    user,
+                    recheck,
+                },
+            )
+            .instrument(span)
+            .await;
+        }
+        None => serve_checked(socket, hub, request, recheck).await,
     }
 }
 
 /// Copies frames both ways until either side closes.
-async fn relay<S>(socket: WebSocket, upstream: tokio_tungstenite::WebSocketStream<S>)
-where
+async fn relay<S>(
+    socket: WebSocket,
+    upstream: tokio_tungstenite::WebSocketStream<S>,
+    mut watch: Watch,
+) where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
     use tokio_tungstenite::tungstenite::Message as Up;
     let (mut client_tx, mut client_rx) = socket.split();
     let (mut up_tx, mut up_rx) = upstream.split();
+    let mut check = watch.timer();
     loop {
         tokio::select! {
+            _ = check.tick(), if watch.recheck.is_some() => {
+                // The owner holds the room, so a changed access cannot be
+                // applied from here: any change ends the relay, and the
+                // editor reconnects with what they may do now.
+                let before = watch.recheck.as_ref().map(|r| r.access);
+                let kept = watch.run().await;
+                if kept.is_none() || kept != before {
+                    let _closed = up_tx.send(Up::Close(None)).await;
+                    let reason = CloseReason::Revoked;
+                    let _closed = client_tx.send(close(reason.code(), reason.as_str())).await;
+                    break;
+                }
+            }
             from_client = client_rx.next() => {
                 let out = match from_client {
                     Some(Ok(WsMessage::Binary(b))) => Up::Binary(b),
@@ -288,16 +346,97 @@ pub fn traceparent(headers: &HeaderMap, uri: &Uri) -> Option<TraceParent> {
         })
 }
 
+/// What a connection needs to check its access again while it is open.
+struct Recheck {
+    authorizer: Arc<dyn Authorizer>,
+    request: Parts,
+    access: Access,
+    every: Duration,
+}
+
+/// One connection's access re-checks.
+struct Watch {
+    hub: Hub,
+    room: RoomKey,
+    user: UserId,
+    recheck: Option<Recheck>,
+}
+
+impl Watch {
+    /// The re-check timer; it first fires one period from now.
+    fn timer(&self) -> tokio::time::Interval {
+        let every = self
+            .recheck
+            .as_ref()
+            .map_or(Duration::from_hours(1), |r| r.every);
+        interval_at(Instant::now() + every, every)
+    }
+
+    /// The access to keep, or `None` when the connection must end. A
+    /// changed access is applied to the room when it is served here.
+    async fn run(&mut self) -> Option<Access> {
+        let recheck = self.recheck.as_mut()?;
+        match recheck
+            .authorizer
+            .recheck(&recheck.request, self.room)
+            .await
+        {
+            Ok((again, access)) if again == self.user => {
+                if access != recheck.access {
+                    recheck.access = access;
+                    self.hub.set_access(self.room, self.user, Some(access));
+                }
+                Some(access)
+            }
+            Ok(_) => None,
+            Err(err) if is_refusal(err.kind()) => None,
+            // A failing check (the index is down, say) keeps the
+            // connection as it is; the next tick tries again.
+            Err(err) => {
+                warn!(%err, "cannot check live-editing access again");
+                Some(recheck.access)
+            }
+        }
+    }
+}
+
+const fn is_refusal(kind: ErrorKind) -> bool {
+    matches!(
+        kind,
+        ErrorKind::Unauthenticated | ErrorKind::PermissionDenied | ErrorKind::NotFound
+    )
+}
+
 /// Bridges one upgraded socket to a room until either side ends.
+///
+/// The caller is trusted for the whole connection; the router's own
+/// upgrades also re-check access every
+/// [`CollabConfig::recheck_access_every`](crate::CollabConfig).
 pub async fn serve(socket: WebSocket, hub: Hub, request: JoinRequest) {
+    serve_checked(socket, hub, request, None).await;
+}
+
+async fn serve_checked(
+    socket: WebSocket,
+    hub: Hub,
+    request: JoinRequest,
+    recheck: Option<Recheck>,
+) {
     let span = info_span!("collab.connection", room = %request.room, user = %request.user);
     if let Some(trace) = request.traceparent {
         trace.parent(&span);
     }
-    bridge(socket, hub, request).instrument(span).await;
+    bridge(socket, hub, request, recheck).instrument(span).await;
 }
 
-async fn bridge(socket: WebSocket, hub: Hub, request: JoinRequest) {
+async fn bridge(socket: WebSocket, hub: Hub, request: JoinRequest, recheck: Option<Recheck>) {
+    let mut watch = Watch {
+        hub: hub.clone(),
+        room: request.room,
+        user: request.user,
+        recheck,
+    };
+    let mut check = watch.timer();
     let (mut sink, mut stream) = socket.split();
     let connection = match hub.join(request).await {
         Ok(connection) => connection,
@@ -344,6 +483,13 @@ async fn bridge(socket: WebSocket, hub: Hub, request: JoinRequest) {
                     break;
                 }
             },
+            _ = check.tick(), if watch.recheck.is_some() => {
+                if watch.run().await.is_none() {
+                    let reason = CloseReason::Revoked;
+                    let _closed = sink.send(close(reason.code(), reason.as_str())).await;
+                    break;
+                }
+            }
             _ = ping.tick() => {
                 if last_heard.elapsed() > DEAD_AFTER {
                     break;

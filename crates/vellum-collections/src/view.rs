@@ -35,6 +35,14 @@ use crate::value::{DateValue, Value};
 
 /// Most rows one view query returns.
 pub const MAX_LIMIT: usize = 10_000;
+/// Most filters one view (saved view and query overrides together) runs.
+/// Each filter is checked against every row, so this bounds a query's
+/// work (RT-026).
+pub const MAX_FILTERS: usize = 32;
+/// Most sort keys one view has.
+pub const MAX_SORTS: usize = 8;
+/// Longest filter or sort text, in characters.
+pub const MAX_CLAUSE_CHARS: usize = 1_000;
 
 /// How a view lays out rows.
 #[derive(
@@ -315,6 +323,18 @@ impl ViewDef {
                 .map(|p| p.key.clone())
                 .ok_or_else(|| err(format!("no property {text:?}")))
         };
+        let (filters, sorts) = (raw.filter.items(), raw.sort.items());
+        check_bounds(filters.len(), sorts.len()).map_err(&err)?;
+        if let Some(long) = filters
+            .iter()
+            .chain(&sorts)
+            .find(|t| t.chars().count() > MAX_CLAUSE_CHARS)
+        {
+            let start: String = long.chars().take(40).collect();
+            return Err(err(format!(
+                "{start:?}… is longer than {MAX_CLAUSE_CHARS} characters"
+            )));
+        }
         Ok(Self {
             kind: raw.kind.unwrap_or_default(),
             filters: raw
@@ -365,6 +385,12 @@ impl ViewDef {
     /// Applies fence-style overrides on top of this view.
     pub(crate) fn overlay(&mut self, raw: &ViewDefRaw, schema: &Schema) -> Result<(), SchemaError> {
         let extra = Self::from_raw(raw, schema)?;
+        check_bounds(self.filters.len() + extra.filters.len(), extra.sorts.len()).map_err(
+            |message| SchemaError::View {
+                view: self.name.clone(),
+                message,
+            },
+        )?;
         self.filters.extend(extra.filters);
         if !extra.sorts.is_empty() {
             self.sorts = extra.sorts;
@@ -389,6 +415,17 @@ impl ViewDef {
         }
         Ok(())
     }
+}
+
+/// Refuses more filters or sorts than a view may run.
+fn check_bounds(filters: usize, sorts: usize) -> Result<(), String> {
+    if filters > MAX_FILTERS {
+        return Err(format!("a view may have at most {MAX_FILTERS} filters"));
+    }
+    if sorts > MAX_SORTS {
+        return Err(format!("a view may have at most {MAX_SORTS} sort keys"));
+    }
+    Ok(())
 }
 
 /// A YAML field that may be one string or a list of them.

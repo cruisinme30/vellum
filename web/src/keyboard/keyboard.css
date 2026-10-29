@@ -38,9 +38,19 @@
   cursor: pointer;
 }
 
+/* The selected command uses the theme's selected-item colours: WebKit's
+   system Highlight with white text is only 3.8:1. Forced-colours mode keeps
+   the system pair. */
 .command-menu [role="option"][aria-selected="true"] {
-  background: Highlight;
-  color: HighlightText;
+  background: var(--md-secondary-container, Highlight);
+  color: var(--md-on-secondary-container, HighlightText);
+}
+
+@media (forced-colors: active) {
+  .command-menu [role="option"][aria-selected="true"] {
+    background: Highlight;
+    color: HighlightText;
+  }
 }
 
 .command-menu kbd,

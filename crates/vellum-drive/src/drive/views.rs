@@ -88,8 +88,9 @@ impl Drive {
         .await
     }
 
-    /// The live nodes directly in a folder (`None`: the space root) that
-    /// the caller may view, folders first, then by title.
+    /// The live nodes directly in a folder or page (`None`: the space
+    /// root) that the caller may view, in their stored order (D169), the
+    /// rest folders first, then by title.
     ///
     /// # Errors
     /// `SpaceNotFound`, `NotFound`, `PermissionDenied`.
@@ -102,7 +103,7 @@ impl Drive {
     ) -> DriveResult<Vec<Node>> {
         self.observe("list", async {
             let space = self.space(space).await?;
-            let _ = self.dir_of(&space, parent).await?;
+            let dir = self.dir_of(&space, parent).await?;
             self.authorize(
                 actor,
                 space.id,
@@ -113,11 +114,7 @@ impl Drive {
             let mut out = self
                 .visible(actor, self.index.children(space.id, parent).await?)
                 .await?;
-            out.sort_by(|a, b| {
-                (a.kind != NodeKind::Folder)
-                    .cmp(&(b.kind != NodeKind::Folder))
-                    .then_with(|| a.title.to_lowercase().cmp(&b.title.to_lowercase()))
-            });
+            self.sort_siblings(Some(&dir), &mut out).await?;
             Ok(out)
         })
         .await

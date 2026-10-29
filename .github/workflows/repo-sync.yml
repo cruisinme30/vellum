@@ -1,0 +1,71 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Keeps the repository's labels and the project board in step with the code.
+#   Sync labels: applies .github/labels.yml when it changes on develop.
+#   Sync the Vellum 1.0 project: keeps the public "Vellum 1.0" GitHub
+#     Project in step with the task issues, on every issue change and every
+#     six hours. It needs the PROJECT_TOKEN secret (a token with the
+#     `project` scope), because the default GITHUB_TOKEN cannot write a
+#     user-owned project; without the secret the job is skipped.
+# Both run only the scripts on the default branch.
+name: "Repo: sync labels and project board"
+
+on:
+  push:
+    branches: [develop]
+    paths: [.github/labels.yml, scripts/ci/sync-labels.sh]
+  issues:
+    types: [opened, edited, closed, reopened, labeled, unlabeled, milestoned, demilestoned]
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  labels:
+    name: Sync labels
+    if: contains(fromJSON('["push", "workflow_dispatch"]'), github.event_name)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: scripts/ci/sync-labels.sh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  project:
+    name: Sync the Vellum 1.0 project
+    if: github.event_name != 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    concurrency:
+      group: project-sync
+      cancel-in-progress: false
+    steps:
+      - name: Check for the project token
+        id: token
+        env:
+          PROJECT_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+        run: |
+          if [[ -n "${PROJECT_TOKEN}" ]]; then
+            echo "present=true" >>"${GITHUB_OUTPUT}"
+          else
+            echo "::notice::PROJECT_TOKEN is not set; the project is not synced."
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.token.outputs.present == 'true'
+        with:
+          persist-credentials: false
+      - name: Sync task issues to the project
+        if: steps.token.outputs.present == 'true'
+        run: scripts/ci/project-sync.sh
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}

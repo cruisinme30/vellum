@@ -21,9 +21,14 @@
 //! | `VELLUM_CLAMD_ADDRESS` | `host:port` of `ClamAV`, the default upload virus scanner |
 //! | `VELLUM_INDEX_KEY` | 64 hex characters: the key of the SQLite index |
 //! | `VELLUM_INDEX_PLAINTEXT` | `1` opens the SQLite index without encryption |
+//! | `VELLUM_OIDC_ISSUER`, `VELLUM_OIDC_CLIENT_ID` | Turn on single sign-on with this `OpenID Connect` provider |
+//! | `VELLUM_OIDC_CLIENT_SECRET` | The client secret, for a confidential client |
+//! | `VELLUM_OIDC_NAME` | The provider's name on the sign-in button |
+//! | `VELLUM_OIDC_ALLOWED_DOMAINS` | Comma-separated email domains that get an account on first sign-in |
+//! | `VELLUM_OIDC_AUTO_CREATE` | `false` to sign in existing accounts only |
 //!
-//! Without an index (a key, plaintext or a database URL) the server runs
-//! sign-in only; collections, books and Work need the index.
+//! With none of these, the SQLite index key is made on the first start and
+//! kept in `.vellum/keys/index.key`, so `vellum serve` needs no settings.
 
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
@@ -310,9 +315,10 @@ pub fn run(config_path: Option<&Path>, observability: Observability) -> Result<(
         })?;
     let store = identity_store(&config)?;
     let app_origin = gateway.app_origin.clone();
+    let sso = crate::identity::oidc_config(|k| std::env::var(k).ok())?;
     runtime.block_on(async move {
         let services =
-            services::Services::open_with_store(&app_origin, Some(&config.data_dir), store)?
+            services::Services::open_with_store(&app_origin, Some(&config.data_dir), store, sso)?
             .with_workspace(&config, |k| std::env::var(k).ok())
             .await?
             .with_admin(&config, observability, |k| std::env::var(k).ok())

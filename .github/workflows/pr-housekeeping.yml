@@ -1,15 +1,18 @@
 # SPDX-FileCopyrightText: 2026 The Vellum contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 
-# Labels every pull request (area from paths, type from title, size, and
-# release) and fails unless it has a type/* and an area/* label. Runs as
-# pull_request_target so it may write labels; it never checks out or runs
-# the pull request's code, only the scripts on develop.
-name: Labels
+# Pull request housekeeping. Runs as pull_request_target so it may write
+# labels; it never checks out or runs the pull request's code, only the
+# scripts on develop.
+#   Labels (a required check): area from paths, type from title, size and
+#     release; fails unless the pull request has a type/* and an area/* label.
+#   Tracker: marks the task issues the pull request closes as in progress
+#     while it is open, so the 1.0 tracker stays current.
+name: "Checks: labels and tracker"
 
 on:
   pull_request_target: # zizmor: ignore[dangerous-triggers] -- runs develop's scripts, never the PR's code
-    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled, closed]
   # Labels is a required check, so it must also report in the merge queue.
   # The pull request was already labelled; the merge group passes.
   merge_group:
@@ -20,6 +23,7 @@ permissions:
 jobs:
   labels:
     name: Labels
+    if: github.event.action != 'closed'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -50,3 +54,26 @@ jobs:
           TITLE: ${{ github.event.pull_request.title }}
           BASE: ${{ github.event.pull_request.base.ref }}
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
+
+  tracker:
+    name: Tracker
+    if: >-
+      github.event_name == 'pull_request_target' &&
+      contains(fromJSON('["opened", "reopened", "edited", "closed"]'), github.event.action)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: develop
+          persist-credentials: false
+      - name: Mark linked task issues
+        run: scripts/ci/tracker-status.sh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_STATE: ${{ github.event.pull_request.state }}
