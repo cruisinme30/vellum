@@ -18,16 +18,20 @@ layer = "kernel"
 workspace = true
 
 [dependencies]
+getrandom = "0.3"
 opentelemetry = "0.33.1"
 opentelemetry-appender-tracing = "0.33.1"
 opentelemetry-otlp = { version = "0.33.1", default-features = false, features = ["http-proto", "reqwest-blocking-client", "reqwest-rustls", "trace", "metrics", "logs"] }
 opentelemetry_sdk = "0.33.1"
 serde = { version = "1.0.229", features = ["derive"] }
+sha2 = "0.11.1"
+subtle = "2.6.1"
 thiserror = "2.0.21"
 tracing = "0.1.44"
 tracing-opentelemetry = "0.34.0"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 uuid = { version = "1.29.0", features = ["v4", "v7"] }
+zeroize = "1.9.1"
 
 [dev-dependencies]
 proptest = "1.12.0"
