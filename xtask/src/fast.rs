@@ -4,11 +4,15 @@
 //! `cargo xtask fast`: the "Fast suite" CI workflow, run locally.
 //!
 //! Each step runs the same command as `.github/workflows/ci.yml`. A step
-//! whose tool is not installed is skipped and named in the summary, so a
-//! contributor can still push; CI runs every step regardless.
+//! whose tool is not installed fails the run, because a skipped check is
+//! how failures used to reach CI unnoticed; `scripts/dev/install-tools.sh`
+//! installs them all. `VELLUM_ALLOW_MISSING_TOOLS=1` turns a missing tool
+//! back into a reported skip (ADR 0048, D203).
 //!
 //! Like CI, the Rust and web steps are skipped when the branch does not touch
 //! them; `scripts/ci/changed-areas.sh` decides for both (ADR 0035, D139).
+//! The Rust tests run only for the crates the branch changed; CI runs the
+//! whole workspace. `VELLUM_FAST_ALL_TESTS=1` tests every crate locally too.
 
 use std::env;
 use std::ffi::OsString;
@@ -78,6 +82,8 @@ struct Step {
     /// Directory relative to the repository root.
     dir: &'static str,
     env: Vec<(&'static str, &'static str)>,
+    /// Nothing for this step to check on this branch.
+    not_needed: bool,
 }
 
 impl Step {
@@ -90,6 +96,7 @@ impl Step {
             args: args.iter().map(|&arg| arg.to_owned()).collect(),
             dir: ".",
             env: Vec::new(),
+            not_needed: false,
         }
     }
 
@@ -122,8 +129,28 @@ enum Outcome {
     Passed,
     Failed,
     Skipped,
+    /// The step's tool is not installed, and missing tools are not allowed.
+    Missing,
     /// The branch does not change what the step checks; CI skips it too.
     NotNeeded,
+}
+
+/// Set to `1` to report a missing tool as a skip instead of a failure.
+const ALLOW_MISSING_TOOLS: &str = "VELLUM_ALLOW_MISSING_TOOLS";
+/// Set to `1` to run every crate's tests, as CI does.
+const ALL_TESTS: &str = "VELLUM_FAST_ALL_TESTS";
+
+/// What a skipped step means: allowed only when the contributor opted in.
+const fn missing_tool(allowed: bool) -> Outcome {
+    if allowed {
+        Outcome::Skipped
+    } else {
+        Outcome::Missing
+    }
+}
+
+fn env_flag(key: &str) -> bool {
+    env::var(key).is_ok_and(|value| value == "1")
 }
 
 /// Runs every fast check and fails if any check that ran failed.
@@ -135,12 +162,26 @@ pub fn run() -> Result<(), String> {
         .map_or(Areas::ALL, |base| changed_areas(&root, base));
     let mut results = Vec::new();
     let started = Instant::now();
+    let allow_missing = env_flag(ALLOW_MISSING_TOOLS);
+    let tested = if env_flag(ALL_TESTS) {
+        None
+    } else {
+        base.as_deref()
+            .and_then(|base| changed_packages(&root, base))
+    };
 
-    for step in steps(base.as_deref(), current_branch(&root).as_deref()) {
-        let outcome = if areas.includes(step.area) {
-            execute(&root, &step)
-        } else {
+    for step in steps(
+        base.as_deref(),
+        current_branch(&root).as_deref(),
+        tested.as_deref(),
+    ) {
+        let outcome = if !areas.includes(step.area) || step.not_needed {
             Outcome::NotNeeded
+        } else {
+            match execute(&root, &step) {
+                Outcome::Skipped => missing_tool(allow_missing),
+                outcome => outcome,
+            }
         };
         results.push((step.name, outcome));
     }
@@ -164,6 +205,16 @@ pub fn run() -> Result<(), String> {
     results.push(("Block model", schema));
 
     report(&results, started.elapsed().as_secs());
+    if results
+        .iter()
+        .any(|(_, outcome)| *outcome == Outcome::Missing)
+    {
+        return Err(format!(
+            "Some checks could not run because their tool is not installed, so CI \
+             would be the first to run them. Install the tools with \
+             scripts/dev/install-tools.sh, or set {ALLOW_MISSING_TOOLS}=1 to push anyway."
+        ));
+    }
     if results
         .iter()
         .any(|(_, outcome)| *outcome == Outcome::Failed)
@@ -221,24 +272,27 @@ const DOCKER_TESTS: &str = "binary_id(vellum-db::postgres) | binary_id(vellum-db
 fn docker_available() -> bool {
     env::var_os("DOCKER_HOST").is_some() || Path::new("/var/run/docker.sock").exists()
 }
-/// The workspace tests. Without Docker, the container-backed database
-/// and search tests are left out (and reported as skipped); CI always runs them.
-/// tests are left out (and reported as skipped); CI always runs them.
-fn rust_tests(docker: bool) -> Step {
-    let mut step = Step::new(
-        "Rust tests",
-        "cargo",
-        &[
-            "nextest",
-            "run",
-            "--workspace",
-            "--locked",
-            "--profile",
-            "ci",
-        ],
-    )
-    .needs("cargo-nextest")
-    .area(Area::Rust);
+/// The tests of `packages`, or of the whole workspace when `None`. With no
+/// packages the step is not needed.
+/// Without Docker, the container-backed database and search tests are left
+/// out (and reported as skipped); CI always runs them.
+fn rust_tests(docker: bool, packages: Option<&[String]>) -> Step {
+    let mut step = Step::new("Rust tests", "cargo", &["nextest", "run"])
+        .needs("cargo-nextest")
+        .area(Area::Rust);
+    match packages {
+        None => step.args.push("--workspace".to_owned()),
+        Some([]) => step.not_needed = true,
+        Some(packages) => {
+            for package in packages {
+                step.args.push("-p".to_owned());
+                step.args.push(package.clone());
+            }
+        }
+    }
+    for arg in ["--locked", "--profile", "ci"] {
+        step.args.push(arg.to_owned());
+    }
     if !docker {
         step.args.push("-E".to_owned());
         step.args.push(format!("not ({DOCKER_TESTS})"));
@@ -247,7 +301,7 @@ fn rust_tests(docker: bool) -> Step {
 }
 
 /// The fast suite, in the order CI runs it.
-fn steps(base: Option<&str>, branch: Option<&str>) -> Vec<Step> {
+fn steps(base: Option<&str>, branch: Option<&str>, tested: Option<&[String]>) -> Vec<Step> {
     let mut steps = vec![
         // Rust
         Step::new("Rust format", "cargo", &["fmt", "--all", "--check"]).area(Area::Rust),
@@ -275,7 +329,7 @@ fn steps(base: Option<&str>, branch: Option<&str>) -> Vec<Step> {
         )
         .with_env("RUSTDOCFLAGS", "-D warnings")
         .area(Area::Rust),
-        rust_tests(docker_available()),
+        rust_tests(docker_available(), tested),
         Step::new(
             "Licences, bans, sources and advisories",
             "cargo",
@@ -454,6 +508,7 @@ fn report(results: &[(&str, Outcome)], seconds: u64) {
             Outcome::Passed => format!("  pass  {name}"),
             Outcome::Failed => format!("  FAIL  {name}"),
             Outcome::Skipped => format!("  skip  {name} (tool not installed; CI still runs it)"),
+            Outcome::Missing => format!("  MISS  {name} (tool not installed)"),
             Outcome::NotNeeded => format!("  skip  {name} (no changes here; CI skips it too)"),
         });
     }
@@ -504,6 +559,53 @@ fn changed_areas(root: &Path, base: &str) -> Areas {
     }
 }
 
+/// The workspace crates the commits since `base` touch, by name. `None`
+/// when git or `cargo metadata` fails, so the caller tests everything.
+fn changed_packages(root: &Path, base: &str) -> Option<Vec<String>> {
+    let paths = git(root, &["diff", "--name-only", base, "HEAD"]).unwrap_or_default();
+    let metadata = cargo_metadata::MetadataCommand::new()
+        .current_dir(root)
+        .no_deps()
+        .exec()
+        .ok()?;
+    let crates: Vec<(String, String)> = metadata
+        .workspace_packages()
+        .into_iter()
+        .filter_map(|package| {
+            let dir = package.manifest_path.parent()?.strip_prefix(root).ok()?;
+            Some((package.name.to_string(), dir.as_str().to_owned()))
+        })
+        .collect();
+    Some(packages_for(paths.lines(), &crates))
+}
+
+/// The crates (name, directory relative to the root) that own `paths`. A
+/// path belongs to the crate with the deepest directory that contains it;
+/// paths outside every crate (the root manifest, docs) select none.
+fn packages_for<'a>(
+    paths: impl IntoIterator<Item = &'a str>,
+    crates: &[(String, String)],
+) -> Vec<String> {
+    let mut names: Vec<String> = paths
+        .into_iter()
+        .filter_map(|path| {
+            crates
+                .iter()
+                .filter(|(_, dir)| {
+                    !dir.is_empty()
+                        && path
+                            .strip_prefix(dir.as_str())
+                            .is_some_and(|rest| rest.starts_with('/'))
+                })
+                .max_by_key(|(_, dir)| dir.len())
+                .map(|(name, _)| name.clone())
+        })
+        .collect();
+    names.sort();
+    names.dedup();
+    names
+}
+
 fn current_branch(root: &Path) -> Option<String> {
     git(root, &["symbolic-ref", "--quiet", "--short", "HEAD"])
 }
@@ -536,7 +638,7 @@ mod tests {
 
     #[test]
     fn mirrors_every_fast_suite_job() {
-        let steps = steps(Some("abc123"), Some("feat/thing"));
+        let steps = steps(Some("abc123"), Some("feat/thing"), None);
         let names = names(&steps);
         for expected in [
             "Rust format",
@@ -554,7 +656,7 @@ mod tests {
 
     #[test]
     fn commit_checks_need_a_base() {
-        let names = names(&steps(None, None));
+        let names = names(&steps(None, None, None));
         assert!(!names.contains(&"Commit template and DCO sign-off"));
         assert!(!names.contains(&"Secrets"));
         assert!(!names.contains(&"Branch name"));
@@ -563,13 +665,13 @@ mod tests {
     #[test]
     fn long_lived_branches_skip_the_name_check() {
         for branch in ["develop", "main"] {
-            assert!(!names(&steps(Some("abc"), Some(branch))).contains(&"Branch name"));
+            assert!(!names(&steps(Some("abc"), Some(branch), None)).contains(&"Branch name"));
         }
     }
 
     #[test]
     fn commit_check_spans_base_to_head() {
-        let steps = steps(Some("abc123"), None);
+        let steps = steps(Some("abc123"), None, None);
         let commits = steps
             .iter()
             .find(|step| step.name == "Commit template and DCO sign-off")
@@ -592,7 +694,7 @@ mod tests {
 
     #[test]
     fn rust_and_web_steps_are_tagged() {
-        let steps = steps(Some("abc"), None);
+        let steps = steps(Some("abc"), None, None);
         let area = |name: &str| steps.iter().find(|step| step.name == name).map(|s| s.area);
         assert_eq!(area("Clippy"), Some(Area::Rust));
         assert_eq!(area("Rust tests"), Some(Area::Rust));
@@ -615,10 +717,48 @@ mod tests {
     }
 
     #[test]
+    fn missing_tools_fail_unless_allowed() {
+        assert_eq!(missing_tool(false), Outcome::Missing);
+        assert_eq!(missing_tool(true), Outcome::Skipped);
+    }
+
+    #[test]
+    fn rust_tests_cover_only_the_changed_crates() {
+        let all = rust_tests(true, None);
+        assert!(all.args.contains(&"--workspace".to_owned()));
+        let some = rust_tests(true, Some(&["vellum-db".to_owned()]));
+        assert_eq!(some.args[..4], ["nextest", "run", "-p", "vellum-db"]);
+        assert!(!some.args.contains(&"--workspace".to_owned()));
+        assert!(rust_tests(true, Some(&[])).not_needed);
+    }
+
+    #[test]
+    fn changed_paths_map_to_their_crates() {
+        let crates = [
+            ("vellum-db".to_owned(), "crates/vellum-db".to_owned()),
+            ("vellum-dbx".to_owned(), "crates/vellum-dbx".to_owned()),
+            ("xtask".to_owned(), "xtask".to_owned()),
+            ("inner".to_owned(), "crates/vellum-db/inner".to_owned()),
+        ];
+        let paths = [
+            "crates/vellum-db/src/lib.rs",
+            "crates/vellum-db/tests/jobs.rs",
+            "crates/vellum-db/inner/src/lib.rs",
+            "xtask/src/fast.rs",
+            "Cargo.lock",
+            "docs/adr/0048-x.md",
+        ];
+        assert_eq!(
+            packages_for(paths, &crates),
+            ["inner", "vellum-db", "xtask"]
+        );
+    }
+
+    #[test]
     fn rust_tests_leave_out_container_tests_only_without_docker() {
-        let with = rust_tests(true);
+        let with = rust_tests(true, None);
         assert!(!with.args.iter().any(|arg| arg == "-E"));
-        let without = rust_tests(false);
+        let without = rust_tests(false, None);
         assert_eq!(
             without.args[without.args.len() - 2..],
             ["-E".to_owned(), format!("not ({DOCKER_TESTS})")]
