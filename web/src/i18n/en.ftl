@@ -67,7 +67,6 @@ search-count =
 search-empty = No page matches “{ $query }”.
 inbox-intro = Pages that mention @{ $handle }.
 inbox-empty = Nobody has mentioned you yet.
-data-pending = Collections (tables, boards, galleries, calendars and timelines) open here when the collections engine lands.
 admin-pending = Workspace administration opens here when the identity and admin services land.
 help-shortcuts = Keyboard shortcuts
 help-blocks = Blocks you can insert with /
@@ -78,6 +77,8 @@ help-key-indent = Indent or outdent a list item
 help-key-inline = Typed as text, they become chips
 help-key-tree = Reorder and nest pages in the page tree
 help-key-menu = Open a page’s menu in the page tree
+help-key-grid = Move between table cells, edit one, open its row
+help-key-board = Move a board card to the next column
 not-found-title = This page does not exist
 not-found-home = Go home
 
@@ -137,3 +138,50 @@ fence-rendered = The { $lang } block is drawn by the renderer when the page is s
 fence-kroki = The { $lang } diagram is drawn by the diagram service when it is enabled; otherwise the source is shown.
 chart-summary = { $title }: { $summary }
 editor-loading = Opening the page…
+
+## Collections
+
+collections-intro = Collections are folders of pages with properties, shown as tables, boards, galleries, calendars, timelines and lists.
+collections-empty = There are no collections yet.
+collections-summary =
+    { $rows ->
+        [one] One row
+       *[other] { $rows } rows
+    } · { $views ->
+        [one] one view
+       *[other] { $views } views
+    }
+collection-loading = Loading…
+collection-missing = This collection does not exist
+collection-back = Back to all collections
+collection-views = Views
+collection-new-row = New row
+collection-empty = No rows match this view.
+collection-truncated = Showing { $shown } of { $total } rows.
+collection-table-hint = Arrow keys move between cells. Enter or F2 edits a cell, Enter saves, Escape cancels, Shift+Enter opens the row.
+collection-edit-cell = { $property } of { $row }
+collection-open-row = Open { $title }
+collection-yes = Yes
+collection-no = No
+collection-none = None
+collection-no-choices = Nothing to choose from.
+collection-error-number = Enter a number, such as 3 or 2.5.
+collection-error-date = Enter a date as YYYY-MM-DD.
+collection-error-url = Enter a full address, such as https://example.com.
+collection-board-hint = Drag a card to another column, or press Alt+Left or Alt+Right on it. Each card’s move button lists every column.
+collection-move-label = Move { $title }
+collection-move-to = Move to { $group }
+collection-moved = Moved { $title } to { $group }.
+collection-previous-month = Previous month
+collection-next-month = Next month
+collection-this-month = This month
+collection-undated =
+    { $count ->
+        [one] One row has no date.
+       *[other] { $count } rows have no date.
+    }
+collection-span = from { $start } to { $end }
+collection-no-dates = No dates
+collection-computed = Computed, read-only
+collection-body = Notes
+collection-close-row = Close row

@@ -4,6 +4,10 @@
 import { lazy, Suspense } from "react";
 import { BrowserRouter, Route, Routes } from "react-router";
 
+import { CollectionView } from "./collections/collection-view";
+import { CollectionsIndexView } from "./collections/collections-index";
+import { CollectionsProvider } from "./collections/context";
+import type { CollectionsStore } from "./collections/store";
 import type { WorkspaceStore } from "./data/store";
 import { WorkspaceProvider } from "./data/workspace-context";
 import type { CollabConnector } from "./editor/collab/provider";
@@ -11,7 +15,7 @@ import { I18nProvider, useT } from "./i18n/i18n";
 import { AppShell } from "./shell/app-shell";
 import { AppearanceProvider } from "./theme/appearance-context";
 import { FavoritesView, HomeView } from "./views/home";
-import { AdminView, CollectionsView, HelpView, NotFoundView } from "./views/info";
+import { AdminView, HelpView, NotFoundView } from "./views/info";
 import { NewPageView } from "./views/new-page";
 import { InboxView, SearchView } from "./views/search";
 
@@ -50,7 +54,8 @@ export function AppRoutes() {
         <Route path="new" element={<NewPageView />} />
         {/* My Work lands with the tasks service; until then, mentions are the closest view. */}
         <Route path="my-work" element={<InboxView />} />
-        <Route path="data" element={<CollectionsView />} />
+        <Route path="data" element={<CollectionsIndexView />} />
+        <Route path="data/:collectionId" element={<CollectionView />} />
         <Route path="help" element={<HelpView />} />
         <Route path="admin" element={<AdminView />} />
         <Route path="*" element={<NotFoundView />} />
@@ -63,19 +68,21 @@ export function AppRoutes() {
 export interface AppServices {
   readonly store: WorkspaceStore;
   readonly collab: CollabConnector;
+  readonly collections: CollectionsStore;
 }
 
 /** Providers shared by the app and its tests. */
 export function AppProviders({
   store,
   collab,
+  collections,
   children,
 }: AppServices & { readonly children: React.ReactNode }) {
   return (
     <I18nProvider>
       <AppearanceProvider>
         <WorkspaceProvider store={store} collab={collab}>
-          {children}
+          <CollectionsProvider store={collections}>{children}</CollectionsProvider>
         </WorkspaceProvider>
       </AppearanceProvider>
     </I18nProvider>
