@@ -645,6 +645,7 @@ impl Convert<'_> {
                             let _ = items.next();
                         }
                         out.push(Block::Fence(Fence {
+                            id: None,
                             lang: String::new(),
                             args: String::new(),
                             attrs: Attributes::default(),
@@ -661,7 +662,10 @@ impl Convert<'_> {
                             let _ = items.next();
                             quoted.extend(self.paragraph(&next));
                         }
-                        out.push(Block::BlockQuote { blocks: quoted });
+                        out.push(Block::BlockQuote {
+                            id: None,
+                            blocks: quoted,
+                        });
                     }
                     None if para.num.is_some() => {
                         let mut run = vec![para];
@@ -699,6 +703,7 @@ impl Convert<'_> {
         if let [Piece::Math(math)] = para.pieces.as_slice() {
             self.warn_once("math", "equations were imported as their text, not as TeX");
             return vec![Block::Math {
+                id: None,
                 literal: math.trim().to_owned(),
             }];
         }
@@ -736,7 +741,11 @@ impl Convert<'_> {
             }
             let blocks = self.paragraph(para);
             if let Some((_, list)) = stack.last_mut() {
-                list.items.push(ListItem { task: None, blocks });
+                list.items.push(ListItem {
+                    attrs: vellum_format::Attributes::default(),
+                    task: None,
+                    blocks,
+                });
             }
         }
         while stack.len() > 1 {
@@ -792,6 +801,7 @@ impl Convert<'_> {
             })
             .collect();
         Some(Table {
+            id: None,
             alignments: vec![Alignment::None; width],
             header,
             rows: cells,
@@ -900,6 +910,7 @@ fn close(stack: &mut Vec<(u8, List)>) {
             item.blocks.push(Block::List(inner));
         } else {
             outer.items.push(ListItem {
+                attrs: vellum_format::Attributes::default(),
                 task: None,
                 blocks: vec![Block::List(inner)],
             });

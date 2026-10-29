@@ -111,3 +111,4 @@ Pandoc
 [Cc]ollab
 Docmost
 Gotenberg
+[Rr]ecents

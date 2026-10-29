@@ -9,6 +9,11 @@
         "items": [
           {
             "task": false,
+            "attrs": {
+              "id": null,
+              "classes": [],
+              "pairs": []
+            },
             "blocks": [
               {
                 "type": "paragraph",
@@ -28,6 +33,11 @@
           },
           {
             "task": false,
+            "attrs": {
+              "id": null,
+              "classes": [],
+              "pairs": []
+            },
             "blocks": [
               {
                 "type": "paragraph",
@@ -43,6 +53,11 @@
           },
           {
             "task": false,
+            "attrs": {
+              "id": null,
+              "classes": [],
+              "pairs": []
+            },
             "blocks": [
               {
                 "type": "paragraph",
@@ -58,6 +73,11 @@
           },
           {
             "task": false,
+            "attrs": {
+              "id": null,
+              "classes": [],
+              "pairs": []
+            },
             "blocks": [
               {
                 "type": "paragraph",
@@ -73,6 +93,11 @@
           },
           {
             "task": false,
+            "attrs": {
+              "id": null,
+              "classes": [],
+              "pairs": []
+            },
             "blocks": [
               {
                 "type": "paragraph",
@@ -91,6 +116,11 @@
                 "items": [
                   {
                     "task": false,
+                    "attrs": {
+                      "id": null,
+                      "classes": [],
+                      "pairs": []
+                    },
                     "blocks": [
                       {
                         "type": "paragraph",

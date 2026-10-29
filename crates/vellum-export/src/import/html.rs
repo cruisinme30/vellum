@@ -125,6 +125,7 @@ fn node(element: ElementRef<'_>, out: &mut Out, depth: usize) {
                                 .or_else(|| has_class(li, "unchecked").then_some(false))
                         });
                     ListItem {
+                        attrs: vellum_format::Attributes::default(),
                         task,
                         blocks: blocks_at(li, depth),
                     }
@@ -140,7 +141,7 @@ fn node(element: ElementRef<'_>, out: &mut Out, depth: usize) {
         }
         "blockquote" => {
             let blocks = blocks_at(element, depth);
-            out.block(Block::BlockQuote { blocks });
+            out.block(Block::BlockQuote { id: None, blocks });
         }
         "pre" => {
             let lang = element
@@ -171,6 +172,7 @@ fn node(element: ElementRef<'_>, out: &mut Out, depth: usize) {
                 literal.push('\n');
             }
             out.block(Block::Fence(Fence {
+                id: None,
                 lang,
                 args: String::new(),
                 attrs: Attributes::default(),
@@ -213,6 +215,7 @@ fn node(element: ElementRef<'_>, out: &mut Out, depth: usize) {
                     .next()
                     .map_or_else(Vec::new, |b| blocks_at(b, depth));
                 out.block(Block::Container(Container {
+                    id: None,
                     name: "details".into(),
                     arg: title,
                     attrs: Attributes::default(),
@@ -251,6 +254,7 @@ fn blocks_at(element: ElementRef<'_>, depth: usize) -> Vec<Block> {
 
 fn callout(tone: &str, body: Vec<Block>) -> Block {
     Block::Container(Container {
+        id: None,
         name: tone.into(),
         arg: String::new(),
         attrs: Attributes::default(),
@@ -395,6 +399,7 @@ fn table(element: ElementRef<'_>, depth: usize) -> Option<Table> {
         cells
     };
     Some(Table {
+        id: None,
         alignments: vec![Alignment::None; width],
         header: pad(header),
         rows: rest.into_iter().map(pad).collect(),

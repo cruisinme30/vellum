@@ -128,6 +128,7 @@ mod tests {
 
     fn calc(body: &str) -> Calculator {
         Calculator::parse(&Fence {
+            id: None,
             lang: "calculator".into(),
             args: String::new(),
             attrs: Attributes::default(),

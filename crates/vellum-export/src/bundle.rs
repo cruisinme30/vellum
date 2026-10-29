@@ -79,7 +79,7 @@ async fn freeze(
                         )),
                     }
                 }
-                Block::BlockQuote { blocks } => stack.push(blocks),
+                Block::BlockQuote { blocks, .. } => stack.push(blocks),
                 Block::List(list) => {
                     for item in &mut list.items {
                         stack.push(&mut item.blocks);
@@ -114,6 +114,7 @@ fn snapshot_block(snapshot: &crate::ports::Snapshot, as_of: &str) -> Block {
         return caption;
     }
     let table = Block::Table(Table {
+        id: None,
         alignments: vec![Alignment::None; snapshot.columns.len()],
         header: snapshot.columns.iter().map(text).collect(),
         rows: snapshot
@@ -127,6 +128,7 @@ fn snapshot_block(snapshot: &crate::ports::Snapshot, as_of: &str) -> Block {
             .collect(),
     });
     Block::Container(vellum_format::Container {
+        id: None,
         name: "note".into(),
         arg: String::new(),
         attrs: vellum_format::Attributes::default(),

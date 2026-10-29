@@ -1,4 +1,4 @@
-☐ Call @priya about the EU quota {due=2026-11-02 priority=high}
-☑︎ Ship the replay engine {#replay .done}
+☐ Call @priya about the EU quota
+☑︎ Ship the replay engine
 1 / 1
 
