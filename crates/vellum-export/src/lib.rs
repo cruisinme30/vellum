@@ -23,6 +23,11 @@
 //! | Screen PDF | [`screen::Gotenberg`] (optional) | Chromium renders the page's own HTML |
 //! | Word | [`docx::write`] | heading styles, real lists and tables, SVG with PNG fallback, OMML equations, `PAGEREF` cross-references |
 //! | Google Docs | [`gdocs::Drive`] | the Word file, uploaded with conversion through the Drive API |
+//! | HTML | [`html::write`] | one self-contained file, no script, images embedded |
+//!
+//! Markdown export ([`bundle::markdown`]) writes the page's own Vellum
+//! Markdown with live blocks frozen, and [`bundle::zip`] packs several
+//! files (pages and their attachments, or several exports) into one zip.
 //!
 //! # Import
 //!
@@ -37,11 +42,13 @@
 //! through the global OpenTelemetry meter ([`metrics`]).
 
 pub mod book;
+pub mod bundle;
 mod calc;
 pub mod docx;
 pub mod error;
 pub mod flow;
 pub mod gdocs;
+pub mod html;
 pub mod import;
 pub mod lower;
 pub mod math;
