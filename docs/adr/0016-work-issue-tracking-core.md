@@ -12,8 +12,8 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D76, D77, D78
-- Requirements: R-WK-1, R-WK-2, R-WK-3, R-WK-4, R-WK-5, R-WK-8, R-WK-9, R-WK-11, R-WK-12
-- Issue: #133, #134, #135, #136, #137, #141, #142, #143, #144
+- Requirements: R-WK-1, R-WK-2, R-WK-3, R-WK-4, R-WK-5, R-WK-6, R-WK-8, R-WK-9, R-WK-11, R-WK-12
+- Issue: #133, #134, #135, #136, #137, #138, #141, #142, #143, #144
 - Pull requests: #207
 
 :::
@@ -108,3 +108,7 @@ answers those.
   `Changes` through the store, and publishes the events.
 - Comments with reactions, Git automation, recurring issues, the API,
   imports and insights build on this crate in their own workstreams.
+- The keyboard model lives in the web app (`web/src/keyboard`): one
+  table of commands feeds the shortcuts, the ⌘K menu and the `?` sheet,
+  and key handling is a synchronous lookup to stay inside the 100 ms
+  budget for perceived latency.
