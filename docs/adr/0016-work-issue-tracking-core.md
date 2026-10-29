@@ -92,6 +92,15 @@ answers those.
   `InitiativeId`, `ViewId`) join the kernel's ID list, so no crate
   defines its own.
 
+## Alternatives
+
+- **A separate alias table file**: one more file to lose or conflict;
+  aliases in the issue file rebuild like any other index.
+- **Number from `last_number` alone**: a lost or merged `team.yaml`
+  would hand out a number twice.
+- **A query language for views and rules**: the brief (D15) rules it
+  out; one structured filter serves all three.
+
 ## Consequences
 
 - The service layer owns persistence: it loads every Work file into a
