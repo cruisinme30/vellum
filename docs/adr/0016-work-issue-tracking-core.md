@@ -12,9 +12,9 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D76, D77, D78
-- Requirements: R-WK-1, R-WK-2, R-WK-3, R-WK-4, R-WK-5, R-WK-8, R-WK-9, R-WK-11, R-WK-12
-- Issue: #133, #134, #135, #136, #137, #141, #142, #143, #144
-- Pull requests: #207
+- Requirements: R-WK-1, R-WK-2, R-WK-3, R-WK-4, R-WK-5, R-WK-8, R-WK-9, R-WK-11, R-WK-12, R-WK-16
+- Issue: #133, #134, #135, #136, #137, #141, #142, #143, #144, #146
+- Pull requests: #207, #290
 
 :::
 
@@ -108,3 +108,7 @@ answers those.
   `Changes` through the store, and publishes the events.
 - Comments with reactions, Git automation, recurring issues, the API,
   imports and insights build on this crate in their own workstreams.
+- Intake forms live in `team.yaml` and file their answers as triage
+  issues. An assistant's triage suggestion is stored on the issue
+  (`triage_suggestion` in its front matter) and applies only when a
+  person accepts it, so a model never changes the tracker by itself.
