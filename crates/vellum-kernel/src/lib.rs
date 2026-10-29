@@ -4,8 +4,14 @@
 //! Shared foundations for every Vellum crate.
 //!
 //! The kernel sits at the bottom of the crate graph and depends on no other
-//! Vellum crate. Today it carries the observability baseline
-//! ([`telemetry`]); typed IDs, errors, events and configuration join it in
-//! the foundation workstream.
+//! Vellum crate. It carries the observability baseline ([`telemetry`]) and
+//! typed object IDs ([`id`]).
 
+mod base32;
+pub mod id;
 pub mod telemetry;
+
+pub use id::{
+    BlobId, BookId, CollectionId, CommentId, DocId, DriveId, EventId, FolderId, IdParseError,
+    IssueId, ObjectId, RequestId, ShareId, SpaceId, TaskId, TeamId, UserId, VersionId,
+};
