@@ -169,3 +169,21 @@ proptest! {
         assert_round_trip(&src)?;
     }
 }
+
+/// A paragraph line that only looks like a table's delimiter row once its
+/// escapes are dropped. Saving must keep the escape, or the paragraph comes
+/// back as a table (found by the `format_roundtrip` fuzz target, #300).
+#[test]
+fn escaped_delimiter_rows_stay_paragraphs() -> Result<(), TestCaseError> {
+    for src in [
+        "a\n:\\-",
+        "a\n:\\-:",
+        "a\n:\\-\\-\\-",
+        "a\n\\:--",
+        "a\n\\:-\\-:",
+        ":::  k=\"v\"*** }\n:\\-",
+    ] {
+        assert_round_trip(src)?;
+    }
+    Ok(())
+}
