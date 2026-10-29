@@ -17,6 +17,13 @@ pub const TEMP_PREFIX: &str = ".vellum-tmp-";
 /// are the intersection of what local folders, S3, Google Drive and Git
 /// accept: no empty, `.` or `..` segments, no leading or trailing `/`, no
 /// backslash, NUL or control characters, and at most 1024 bytes.
+///
+/// Windows and Git add their own rules, because a path that is harmless
+/// on one system escapes the folder on another (#272): no `:` (drive
+/// prefixes and NTFS streams), no Windows device names (`CON`, `nul.md`,
+/// `COM1`), no segment ending in `.` or a space (Windows drops them, so
+/// two paths would name one file), and no `.git` segment in any spelling
+/// the file system might fold to it (`.GIT`, `git~1`, `.g\u{200c}it`).
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BlobPath(String);
 
@@ -90,10 +97,52 @@ fn violation(raw: &str) -> Option<&'static str> {
             "" => return Some("empty segment or leading/trailing slash"),
             "." | ".." => return Some("relative segment"),
             s if s.starts_with(TEMP_PREFIX) => return Some("reserved temporary-file prefix"),
+            s if s.contains(':') => return Some("colon (drive prefix or NTFS stream)"),
+            s if s.ends_with(['.', ' ']) => return Some("segment ends in a dot or space"),
+            s if is_windows_device(s) => return Some("Windows device name"),
+            s if is_git_dir(s) => return Some("Git directory"),
             _ => {}
         }
     }
     None
+}
+
+/// Windows device names, which name a device whatever the extension.
+const WINDOWS_DEVICES: [&str; 4] = ["CON", "PRN", "AUX", "NUL"];
+
+fn is_windows_device(segment: &str) -> bool {
+    let stem = segment.split('.').next().unwrap_or(segment).trim_end();
+    let upper = stem.to_ascii_uppercase();
+    if WINDOWS_DEVICES.contains(&upper.as_str()) || upper == "CONIN$" || upper == "CONOUT$" {
+        return true;
+    }
+    // COM0-9 and LPT0-9, including the superscript digits Windows accepts.
+    let mut chars = upper.chars();
+    let prefix: String = chars.by_ref().take(3).collect();
+    let digit = chars.next();
+    (prefix == "COM" || prefix == "LPT")
+        && matches!(digit, Some('0'..='9' | '\u{b9}' | '\u{b2}' | '\u{b3}'))
+        && chars.next().is_none()
+}
+
+/// Whether a file system might fold `segment` to `.git`: any case (macOS,
+/// Windows), the NTFS short name `git~1`, and code points that HFS+
+/// ignores when comparing names.
+pub fn is_git_dir(segment: &str) -> bool {
+    let folded: String = segment
+        .chars()
+        .filter(|c| !is_ignorable(*c))
+        .collect::<String>()
+        .to_ascii_lowercase();
+    folded == ".git" || folded == "git~1"
+}
+
+/// Code points HFS+ skips when comparing names (as in CVE-2014-9390).
+const fn is_ignorable(c: char) -> bool {
+    matches!(
+        c,
+        '\u{200c}'..='\u{200f}' | '\u{202a}'..='\u{202e}' | '\u{206a}'..='\u{206f}' | '\u{feff}'
+    )
 }
 
 impl fmt::Display for BlobPath {
@@ -139,8 +188,47 @@ mod tests {
             "a\\b",
             "a\0b",
             ".vellum-tmp-x",
+            // Windows: drive prefixes, streams, devices, trailing dots and spaces.
+            "C:/Windows/win.ini",
+            "C:",
+            "notes/a.md:secret",
+            "CON",
+            "nul.md",
+            "a/Aux.txt",
+            "com1",
+            "LPT9.log",
+            "COM\u{b9}",
+            "conin$",
+            "a.md.",
+            "a.md ",
+            "dir./a.md",
+            // Git: the repository directory in any spelling.
+            ".git/config",
+            ".GIT/hooks/post-checkout",
+            "x/.git/config",
+            "GIT~1/config",
+            ".g\u{200c}it/config",
+            "\u{feff}.git/config",
         ] {
             assert!(BlobPath::new(bad).is_err(), "{bad:?} should be rejected");
+        }
+    }
+
+    #[test]
+    fn accepts_names_that_only_look_reserved() {
+        for good in [
+            "console.md",
+            "Auxiliary/notes.md",
+            "COM10.md",
+            "nullable.md",
+            ".gitignore",
+            ".github/workflows/ci.yml",
+            "my.git/a.md",
+            "git/a.md",
+            "Family \u{1f468}\u{200d}\u{1f469}\u{200d}\u{1f467}.md",
+            "v1.2.md",
+        ] {
+            assert!(BlobPath::new(good).is_ok(), "{good:?} should be accepted");
         }
     }
 
