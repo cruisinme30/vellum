@@ -173,7 +173,7 @@ fn tag_attributes() -> HashMap<&'static str, HashSet<&'static str>> {
         ("iframe", set(&["src", "allow", "allowfullscreen"])),
         (
             "input",
-            set(&["checked", "disabled", "min", "max", "step", "value", "name"]),
+            set(&["checked", "disabled", "min", "max", "step", "value"]),
         ),
         ("label", set(&["for"])),
         (
@@ -181,7 +181,7 @@ fn tag_attributes() -> HashMap<&'static str, HashSet<&'static str>> {
             set(&["min", "max", "value", "low", "high", "optimum"]),
         ),
         ("progress", set(&["max", "value"])),
-        ("output", set(&["for", "name"])),
+        ("output", set(&["for"])),
         ("ol", set(&["start", "reversed"])),
         ("td", set(&["colspan", "rowspan", "headers"])),
         (

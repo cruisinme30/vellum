@@ -32,6 +32,10 @@ pub(super) fn safe_url(w: &Writer<'_>, url: &str) -> Option<String> {
     if url.starts_with("vellum://") {
         return w.resolver().href(url);
     }
+    // Same-page links follow the prefixed ids.
+    if let Some(fragment) = url.strip_prefix('#') {
+        return html::is_user_id(fragment).then(|| format!("#{}{fragment}", super::ID_PREFIX));
+    }
     let scheme_end = url.find(':');
     let path_start = url.find(['/', '?', '#']);
     match (scheme_end, path_start) {

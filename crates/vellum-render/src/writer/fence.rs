@@ -425,7 +425,6 @@ impl Writer<'_> {
             html::text(&mut self.out, &input.label);
             self.out.push_str("</span><input type=\"range\"");
             push_attr(&mut self.out, "id", &id);
-            push_attr(&mut self.out, "name", &input.key);
             push_attr(&mut self.out, "data-key", &input.key);
             push_attr(&mut self.out, "min", &num(min));
             push_attr(&mut self.out, "max", &num(max));

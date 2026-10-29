@@ -60,6 +60,11 @@ pub struct Writer<'a> {
     depth: usize,
 }
 
+/// The prefix of every id taken from page content. A hyphen keeps the name
+/// out of reach of `window.name`-style property access, and same-page links
+/// (`#plan`) are rewritten to match.
+pub const ID_PREFIX: &str = "u-";
+
 /// Containers nested deeper than this render their body as plain text, so
 /// a hostile document cannot exhaust the stack.
 const MAX_DEPTH: usize = 32;
@@ -114,11 +119,14 @@ impl<'a> Writer<'a> {
         Some(read.data)
     }
 
+    /// A page-unique element id for `wanted`, always starting with
+    /// [`ID_PREFIX`] so that no author-chosen id (`exports`, `module`,
+    /// `location`, ...) can shadow a global through DOM clobbering.
     pub fn unique_id(&mut self, wanted: &str) -> String {
         let base = if wanted.is_empty() {
-            "section".to_owned()
+            format!("{ID_PREFIX}section")
         } else {
-            wanted.to_owned()
+            format!("{ID_PREFIX}{wanted}")
         };
         let mut id = base.clone();
         let mut n = 2;

@@ -54,7 +54,7 @@ use vellum_format::{Block, Document, Fence};
 
 use crate::figure::{Engine, Figures};
 use crate::resolve::Resolver;
-pub use crate::writer::{TocEntry, Warning};
+pub use crate::writer::{ID_PREFIX, TocEntry, Warning};
 
 /// Bumped whenever the HTML for the same input changes, so stored renders
 /// are rebuilt.

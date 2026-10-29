@@ -205,8 +205,8 @@ fn outline_and_title() {
     );
     assert_eq!(page.title.as_deref(), Some("Gateway rollout"));
     let ids: Vec<&str> = page.toc.iter().map(|e| e.id.as_str()).collect();
-    assert_eq!(ids, ["overview", "plan", "risks", "plan-2"]);
-    assert!(page.html.contains("href=\"#plan-2\""), "{}", page.html);
+    assert_eq!(ids, ["u-overview", "u-plan", "u-risks", "u-plan-2"]);
+    assert!(page.html.contains("href=\"#u-plan-2\""), "{}", page.html);
     let untitled = render("# First heading\n\ntext\n");
     assert_eq!(untitled.title.as_deref(), Some("First heading"));
 }
@@ -311,4 +311,25 @@ async fn async_render_without_kroki_matches_offline() {
     let online = r.render(&doc, &NoResolver, &opts).await;
     let offline = r.render_offline(&doc, &NoResolver, &opts);
     assert_eq!(online, offline);
+}
+
+/// Author-chosen ids must not shadow globals (`window.exports`,
+/// `document.location`, ...) through DOM clobbering.
+#[test]
+fn ids_cannot_clobber_globals() {
+    let page = render(
+        "# exports\n\n## location {#module}\n\nSee [the plan](#exports).\n\n```calculator\nname: Name = 1\nout: Out = name * 2\n```\n",
+    );
+    for tag in tags(&page.html) {
+        for attr in ["id=\"", "name=\""] {
+            if let Some(rest) = tag.split(attr).nth(1) {
+                let value = rest.split('"').next().unwrap();
+                assert!(
+                    value.contains('-'),
+                    "{value} can clobber a global in <{tag}>"
+                );
+            }
+        }
+    }
+    assert!(page.html.contains("href=\"#u-exports\""), "{}", page.html);
 }
