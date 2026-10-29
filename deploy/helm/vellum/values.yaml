@@ -62,6 +62,15 @@ csrf:
     name: ""
     key: key
 
+# The key replicas sign forwarded live-editing joins with, shared by every
+# replica. Leave name empty and the chart creates <release>-cluster with a
+# random key, kept across upgrades. To manage it yourself:
+#   kubectl create secret generic vellum-cluster --from-literal=key="$(openssl rand -base64 48)"
+cluster:
+  secret:
+    name: ""
+    key: key
+
 # Blob storage: any S3-compatible bucket with versioning on.
 blob:
   url: s3://vellum
