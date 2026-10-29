@@ -149,6 +149,10 @@ pub fn run() -> Result<(), String> {
     } else {
         (Outcome::NotNeeded, Outcome::NotNeeded)
     };
+    if areas.rust && !docker_available() {
+        // The missing tool is Docker, which the vellum-db Postgres tests need.
+        results.push(("Postgres tests in vellum-db (Docker)", Outcome::Skipped));
+    }
     results.push(("Crate boundaries", boundaries));
     results.push(("Help books and their corpus", help));
 
@@ -199,6 +203,39 @@ fn desktop_steps() -> Vec<Step> {
     .collect()
 }
 
+/// Test binaries that start Postgres in a container through testcontainers.
+const DOCKER_TESTS: &str = "binary_id(vellum-db::postgres) | binary_id(vellum-db::shards)";
+
+/// Whether a Docker daemon looks reachable: `DOCKER_HOST` is set or the
+/// default socket exists. Cloud sandboxes have neither.
+fn docker_available() -> bool {
+    env::var_os("DOCKER_HOST").is_some() || Path::new("/var/run/docker.sock").exists()
+}
+
+/// The workspace tests. Without Docker, the container-backed Postgres
+/// tests are left out (and reported as skipped); CI always runs them.
+fn rust_tests(docker: bool) -> Step {
+    let mut step = Step::new(
+        "Rust tests",
+        "cargo",
+        &[
+            "nextest",
+            "run",
+            "--workspace",
+            "--locked",
+            "--profile",
+            "ci",
+        ],
+    )
+    .needs("cargo-nextest")
+    .area(Area::Rust);
+    if !docker {
+        step.args.push("-E".to_owned());
+        step.args.push(format!("not ({DOCKER_TESTS})"));
+    }
+    step
+}
+
 /// The fast suite, in the order CI runs it.
 fn steps(base: Option<&str>, branch: Option<&str>) -> Vec<Step> {
     let mut steps = vec![
@@ -228,20 +265,7 @@ fn steps(base: Option<&str>, branch: Option<&str>) -> Vec<Step> {
         )
         .with_env("RUSTDOCFLAGS", "-D warnings")
         .area(Area::Rust),
-        Step::new(
-            "Rust tests",
-            "cargo",
-            &[
-                "nextest",
-                "run",
-                "--workspace",
-                "--locked",
-                "--profile",
-                "ci",
-            ],
-        )
-        .needs("cargo-nextest")
-        .area(Area::Rust),
+        rust_tests(docker_available()),
         Step::new(
             "Licences, bans, sources and advisories",
             "cargo",
@@ -545,5 +569,16 @@ mod tests {
     fn missing_tools_are_skipped() {
         let step = Step::new("Nothing", "vellum-no-such-tool", &[]);
         assert_eq!(execute(Path::new("."), &step), Outcome::Skipped);
+    }
+
+    #[test]
+    fn rust_tests_leave_out_container_tests_only_without_docker() {
+        let with = rust_tests(true);
+        assert!(!with.args.iter().any(|arg| arg == "-E"));
+        let without = rust_tests(false);
+        assert_eq!(
+            without.args[without.args.len() - 2..],
+            ["-E".to_owned(), format!("not ({DOCKER_TESTS})")]
+        );
     }
 }

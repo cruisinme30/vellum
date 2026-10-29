@@ -8,7 +8,7 @@
 name: Labels
 
 on:
-  pull_request_target:
+  pull_request_target: # zizmor: ignore[dangerous-triggers] -- runs develop's scripts, never the PR's code
     types: [opened, synchronize, reopened, edited, labeled, unlabeled]
   # Labels is a required check, so it must also report in the merge queue.
   # The pull request was already labelled; the merge group passes.

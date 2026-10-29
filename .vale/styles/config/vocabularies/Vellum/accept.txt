@@ -148,4 +148,5 @@ Flagger
 [Rr]unbooks?
 Kubernetes
 [Hh]elm
+zizmor
 [Rr]ecents

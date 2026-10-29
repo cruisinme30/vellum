@@ -13,7 +13,7 @@ vellum: 1
 - Status: accepted
 - Decisions: D52, D53, D54
 - Issue: #58, #59, #267, #269
-- Pull requests: #32
+- Pull requests: #32, #281, #303
 
 :::
 
@@ -103,7 +103,8 @@ come from ADR 0006. This ADR fixes the rules that turn them into answers.
 - `effective_access` grows as nodes × principals with access. Groups keep
   tuple counts small; the rows are what makes one-lookup checks possible.
 - The engine talks to the index through the `AuthzStore` port. The
-  in-memory adapter is the reference; the SQL adapter on `vellum-db`
-  implements the same port and runs the same tests.
+  in-memory adapter is the reference; `SqlStore` on `vellum-db` (SQLite
+  and Postgres) implements the same port, and a differential property
+  test holds it to the reference, including expiry.
 - Search and the drive call `filter`, `spaces`, `accessible` and
   `tree_changed`; they never read the grant tables themselves.

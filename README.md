@@ -27,7 +27,7 @@ The project website, with the help books, is at
 | `corpus/` | Golden files that pin the Markdown dialect and every export. |
 | `deploy/` | Compose files, the Helm chart and example configuration. |
 | `docs/` | Help books in Vellum Markdown and architecture decision records. |
-| `site/` | The project website's landing page; `scripts/ci/build-site.sh` adds the books. |
+| `site/` | The project website: landing page, docs home, styles, fonts, images and video; `scripts/ci/build-site.sh` builds it with the books and `scripts/ci/check-site.sh` checks it. |
 | `xtask/` | Repository automation, such as the crate-boundary check. |
 
 ## Build and test

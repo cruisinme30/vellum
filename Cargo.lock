@@ -3376,6 +3376,9 @@ dependencies = [
  "rustls",
  "rustls-pki-types",
  "rustls-platform-verifier",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
  "sync_wrapper",
  "tokio",
  "tokio-rustls",
@@ -4863,9 +4866,13 @@ name = "vellum-authz"
 version = "0.0.0"
 dependencies = [
  "proptest",
+ "tempfile",
+ "testcontainers-modules",
  "thiserror",
  "tokio",
  "tracing",
+ "vellum-db",
+ "vellum-kernel",
 ]
 
 [[package]]
@@ -4906,11 +4913,15 @@ dependencies = [
  "futures-util",
  "opentelemetry",
  "proptest",
+ "tempfile",
+ "testcontainers-modules",
  "thiserror",
  "tokio",
  "tokio-tungstenite",
  "tracing",
  "tracing-opentelemetry",
+ "vellum-crypto",
+ "vellum-db",
  "vellum-kernel",
  "yrs",
 ]
@@ -5006,6 +5017,7 @@ dependencies = [
  "tokio",
  "tracing",
  "vellum-authz",
+ "vellum-books",
  "vellum-kernel",
  "vellum-store",
 ]
@@ -5182,6 +5194,7 @@ name = "vellum-store"
 version = "0.0.0"
 dependencies = [
  "async-trait",
+ "axum",
  "bytes",
  "diff-match-patch-rs",
  "diffy",
@@ -5190,6 +5203,9 @@ dependencies = [
  "notify",
  "opentelemetry",
  "proptest",
+ "reqwest",
+ "serde",
+ "serde_json",
  "sha2 0.11.1",
  "tempfile",
  "thiserror",

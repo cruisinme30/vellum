@@ -1,0 +1,166 @@
+<!doctype html>
+<!--
+SPDX-FileCopyrightText: 2026 The Vellum contributors
+SPDX-License-Identifier: AGPL-3.0-only
+
+The docs home, published at docs/. The build fills in the guide cards
+from each book's SUMMARY.md and the page counts (ADR 0027).
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'self'; img-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'"
+    />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Vellum documentation</title>
+    <meta
+      name="description"
+      content="Guides for using Vellum, running a Vellum server and building on it, with a cookbook of recipes, keyboard shortcuts, the command reference and the design decisions."
+    />
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../style.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+
+    <header class="top">
+      <nav class="wrap bar" aria-label="Site">
+        <a class="brand" href="../">
+          <img src="../favicon.svg" alt="" width="30" height="30" />
+          <span>Vellum <small>Docs</small></span>
+        </a>
+        <ul class="nav">
+          <li><a href="../#tour">Product</a></li>
+          <li><a href="user/index.html">User guide</a></li>
+          <li><a href="admin/index.html">Admin guide</a></li>
+          <li><a href="developer/index.html">Developer guide</a></li>
+          <li><a href="decisions/index.html">Decisions</a></li>
+        </ul>
+        <div class="end">
+          <a class="btn out" href="https://github.com/cruisinme30/vellum">GitHub</a>
+        </div>
+      </nav>
+    </header>
+
+    <main id="main" class="dmain">
+      <section class="wrap dhero" aria-labelledby="docs-title">
+        <h1 id="docs-title">Vellum documentation</h1>
+        <p>
+          How to use Vellum, run it for a team and build on it:
+          <!-- COUNT:pages --> pages in three guides. Pick a task below to jump
+          straight in, or open a guide and read it like a book. Every guide has
+          its own search.
+        </p>
+      </section>
+
+      <section class="wrap sec" aria-labelledby="tasks-title">
+        <div class="sec-h">
+          <h2 id="tasks-title">Start here</h2>
+        </div>
+        <ul class="tasks">
+          <li><a href="user/start/index.html"><b>Your first ten minutes</b><span>Make a page, a collection and an issue, and find your way around.</span></a></li>
+          <li><a href="admin/deploy/index.html"><b>Install and run Vellum</b><span>Choose between a single binary, Docker, Compose or Kubernetes.</span></a></li>
+          <li><a href="user/ai/index.html"><b>Connect Claude</b><span>Let Claude Desktop, Claude Code or Cursor work with your permissions.</span></a></li>
+          <li><a href="user/cookbook/index.html"><b>Cookbook</b><span>Step-by-step recipes: meeting notes, status pages, running a cycle and more.</span></a></li>
+          <li><a href="user/start/shortcuts.html"><b>Keyboard shortcuts</b><span>Every shortcut, by screen. In the app, press ? to see them.</span></a></li>
+          <li><a href="admin/reference/cli.html"><b>Command reference</b><span>Every <code>vellum</code> command, the manual pages for the command line.</span></a></li>
+        </ul>
+      </section>
+
+      <section class="wrap sec" aria-labelledby="guides-title">
+        <div class="sec-h">
+          <h2 id="guides-title">The guides</h2>
+          <p>Each guide is a book. Every chapter is listed here; select one to start reading there.</p>
+        </div>
+        <!-- BOOKS -->
+      </section>
+
+      <section class="wrap sec" aria-labelledby="ways-title">
+        <div class="sec-h">
+          <h2 id="ways-title">Read them anywhere</h2>
+          <p>These pages are built from the same files that ship inside Vellum, so all three always match the version you run.</p>
+        </div>
+        <div class="ways">
+          <div>
+            <h3>On this site</h3>
+            <p>Every guide, with search, light and dark themes, and a printable version of each book.</p>
+          </div>
+          <div>
+            <h3>In the app</h3>
+            <p>Press <kbd>?</kbd> on any screen, or select a help link, to open the page about it next to your work.</p>
+          </div>
+          <div>
+            <h3>In your terminal</h3>
+            <p>The guides are built into the <code>vellum</code> program:</p>
+            <pre class="code" tabindex="0" aria-label="Read the guides in a terminal"><code>vellum docs
+vellum docs user writing/text.md</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <section class="wrap sec" aria-labelledby="why-title">
+        <div class="learn">
+          <a class="lc feat" href="decisions/index.html">
+            <span class="n2"><!-- COUNT:decisions --></span>
+            <h3 id="why-title">Why Vellum works this way</h3>
+            <p>Every lasting design decision is written down: the problem, the choice, the alternatives and the trade-offs.</p>
+            <span class="go">Read the decisions →</span>
+          </a>
+          <a class="lc" href="developer/contributing/index.html">
+            <h3>Contribute</h3>
+            <p>How changes are proposed, reviewed and tested.</p>
+            <span class="go">Contributing →</span>
+          </a>
+          <a class="lc" href="developer/contributing/help-books.html">
+            <h3>Improve these docs</h3>
+            <p>Every page here is a Markdown file in the repository.</p>
+            <span class="go">Maintaining the guides →</span>
+          </a>
+          <a class="lc" href="https://github.com/cruisinme30/vellum/issues">
+            <h3>Ask or report</h3>
+            <p>Something unclear or wrong? Open an issue and we'll fix the page.</p>
+            <span class="go">Open an issue →</span>
+          </a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <div class="wrap fcols">
+        <div>
+          <a class="brand" href="../"><img src="../favicon.svg" alt="" width="30" height="30" /><span>Vellum</span></a>
+          <p>An open-source workspace for docs, data and work. This site sets no cookies and loads nothing from other servers.</p>
+        </div>
+        <nav aria-labelledby="f-guides">
+          <h2 id="f-guides">Guides</h2>
+          <ul>
+            <li><a href="user/index.html">User guide</a></li>
+            <li><a href="admin/index.html">Admin guide</a></li>
+            <li><a href="developer/index.html">Developer guide</a></li>
+          </ul>
+        </nav>
+        <nav aria-labelledby="f-ref">
+          <h2 id="f-ref">Reference</h2>
+          <ul>
+            <li><a href="user/start/shortcuts.html">Keyboard shortcuts</a></li>
+            <li><a href="admin/reference/cli.html">Command reference</a></li>
+            <li><a href="user/glossary.html">Glossary</a></li>
+            <li><a href="decisions/index.html">Design decisions</a></li>
+          </ul>
+        </nav>
+        <nav aria-labelledby="f-project">
+          <h2 id="f-project">Project</h2>
+          <ul>
+            <li><a href="../">Home</a></li>
+            <li><a href="https://github.com/cruisinme30/vellum">Source code</a></li>
+            <li><a href="https://github.com/cruisinme30/vellum/blob/develop/SECURITY.md">Security</a></li>
+          </ul>
+        </nav>
+      </div>
+    </footer>
+  </body>
+</html>
