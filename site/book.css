@@ -1,0 +1,37 @@
+/*
+ * SPDX-FileCopyrightText: 2026 The Vellum contributors
+ * SPDX-License-Identifier: AGPL-3.0-only
+ *
+ * Vellum colours for the mdBook help books (Material 3 tokens, brief
+ * section 13). Only the light theme is recoloured; the dark themes stay
+ * mdBook's own.
+ */
+
+html {
+  font-family: Roboto, system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+
+.light {
+  --bg: #f7f8fc;
+  --fg: #1d1b20;
+  --sidebar-bg: #f0f2f9;
+  --sidebar-fg: #46464f;
+  --sidebar-non-existant: #767680;
+  --sidebar-active: #4f5b92;
+  --sidebar-spacer: #c5c6d0;
+  --links: #4f5b92;
+  --inline-code-color: #374378;
+  --theme-popup-bg: #f0f2f9;
+  --theme-popup-border: #c5c6d0;
+  --theme-hover: #e6e8ee;
+  --quote-bg: #f0f2f9;
+  --quote-border: #c5c6d0;
+  --table-border-color: #c5c6d0;
+  --table-header-bg: #e6e8ee;
+  --table-alternate-bg: #f0f2f9;
+  --searchbar-border-color: #c5c6d0;
+  --searchbar-bg: #ffffff;
+  --searchresults-header-fg: #46464f;
+  --searchresults-border-color: #c5c6d0;
+  --search-mark-bg: #dde1ff;
+}

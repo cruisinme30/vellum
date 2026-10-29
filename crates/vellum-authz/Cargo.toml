@@ -16,3 +16,12 @@ layer = "engine"
 
 [lints]
 workspace = true
+
+[dependencies]
+thiserror = "2.0.21"
+tracing = "0.1.44"
+
+[dev-dependencies]
+# proptest 1.12 moves to rand 0.10 while OpenTelemetry is on rand 0.9 (see vellum-crypto).
+proptest = ">=1.11.0, <1.12"
+tokio = { version = "1", features = ["macros", "rt"] }

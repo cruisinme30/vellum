@@ -4,8 +4,29 @@
 //! Shared foundations for every Vellum crate.
 //!
 //! The kernel sits at the bottom of the crate graph and depends on no other
-//! Vellum crate. Today it carries the observability baseline
-//! ([`telemetry`]); typed IDs, errors, events and configuration join it in
-//! the foundation workstream.
+//! Vellum crate. It carries the observability baseline ([`telemetry`]) and
+//! typed object IDs ([`id`])
+//! block IDs ([`block`]), share-link tokens ([`share`]), the shared error
+//! type ([`error`]), timestamps ([`timestamp`]), domain events ([`event`]) and server
+//! configuration ([`config`]).
 
+mod base32;
+pub mod block;
+pub mod config;
+pub mod error;
+pub mod event;
+pub mod id;
+pub mod share;
 pub mod telemetry;
+pub mod timestamp;
+
+pub use block::BlockId;
+pub use config::{Config, ConfigError, Profile};
+pub use error::{Error, ErrorKind, Result};
+pub use event::{Actor, Event, EventKind};
+pub use id::{
+    BlobId, BookId, CollectionId, CommentId, DocId, DriveId, EventId, FolderId, IdParseError,
+    IssueId, ObjectId, RequestId, ShareId, SpaceId, TaskId, TeamId, UserId, VersionId,
+};
+pub use share::{ShareToken, ShareTokenError, ShareTokenHash};
+pub use timestamp::{Timestamp, TimestampError};
