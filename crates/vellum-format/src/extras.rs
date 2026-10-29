@@ -103,6 +103,16 @@ fn flatten_same(inline: Inline) -> Inline {
     }
 }
 
+/// Splits a trailing `^blk-xxxxxxxx` word off a line of directive text
+/// (a fence info string, a container line or an alert title).
+pub fn split_block_id(text: &str) -> (&str, Option<BlockId>) {
+    let text = text.trim_end();
+    let (before, last) = text.rsplit_once(char::is_whitespace).unwrap_or(("", text));
+    last.strip_prefix('^')
+        .and_then(|id| id.parse().ok())
+        .map_or((text, None), |id| (before.trim_end(), Some(id)))
+}
+
 /// Removes a trailing ` ^blk-xxxxxxxx` from merged inline content.
 ///
 /// The marker must follow whitespace (or a line break) and be the last thing
@@ -114,8 +124,9 @@ pub fn take_block_id(content: &mut Vec<Inline>) -> Option<BlockId> {
     let start = text.rfind('^')?;
     let id: BlockId = text.get(start + 1..)?.parse().ok()?;
     let before = text.get(..start)?;
-    let own_line =
-        before.is_empty() && matches!(content.iter().rev().nth(1), Some(Inline::SoftBreak));
+    // On its own line, or the whole paragraph (as in `- [ ] ^blk-…`).
+    let own_line = before.is_empty()
+        && (content.len() == 1 || matches!(content.iter().rev().nth(1), Some(Inline::SoftBreak)));
     if !own_line && !before.ends_with(char::is_whitespace) {
         return None;
     }
@@ -403,6 +414,17 @@ mod tests {
 
         let mut content = vec![text("x^blk-a1b2c3d4")];
         assert!(take_block_id(&mut content).is_none());
+    }
+
+    #[test]
+    fn splits_block_ids_off_directive_lines() {
+        let (rest, id) = split_block_id("rust title ^blk-a1b2c3d4");
+        assert_eq!(rest, "rust title");
+        assert_eq!(id.map(|id| id.to_string()).as_deref(), Some("blk-a1b2c3d4"));
+        assert_eq!(split_block_id("^blk-a1b2c3d4").0, "");
+        for s in ["rust", "x^blk-a1b2c3d4", "^blk-nope", "a ^blk-a1b2c3d4 b"] {
+            assert_eq!(split_block_id(s), (s, None), "{s}");
+        }
     }
 
     #[test]

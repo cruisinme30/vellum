@@ -4,7 +4,8 @@
     "blocks": [
       {
         "type": "math",
-        "literal": "E = mc^2\n"
+        "literal": "E = mc^2\n",
+        "id": null
       }
     ]
   },

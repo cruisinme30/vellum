@@ -1,0 +1,149 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "list",
+        "start": null,
+        "tight": false,
+        "items": [
+          {
+            "task": null,
+            "attrs": {
+              "id": null,
+              "classes": [],
+              "pairs": []
+            },
+            "blocks": [
+              {
+                "type": "list",
+                "start": null,
+                "tight": true,
+                "items": [
+                  {
+                    "task": null,
+                    "attrs": {
+                      "id": null,
+                      "classes": [],
+                      "pairs": []
+                    },
+                    "blocks": [
+                      {
+                        "type": "list",
+                        "start": null,
+                        "tight": true,
+                        "items": [
+                          {
+                            "task": null,
+                            "attrs": {
+                              "id": null,
+                              "classes": [],
+                              "pairs": []
+                            },
+                            "blocks": []
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "task": null,
+            "attrs": {
+              "id": null,
+              "classes": [],
+              "pairs": []
+            },
+            "blocks": [
+              {
+                "type": "list",
+                "start": null,
+                "tight": true,
+                "items": [
+                  {
+                    "task": null,
+                    "attrs": {
+                      "id": null,
+                      "classes": [],
+                      "pairs": []
+                    },
+                    "blocks": [
+                      {
+                        "type": "list",
+                        "start": null,
+                        "tight": true,
+                        "items": [
+                          {
+                            "task": null,
+                            "attrs": {
+                              "id": null,
+                              "classes": [],
+                              "pairs": []
+                            },
+                            "blocks": [
+                              {
+                                "type": "paragraph",
+                                "content": [
+                                  {
+                                    "type": "text",
+                                    "text": "Item"
+                                  }
+                                ],
+                                "id": null
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "A list whose only item is loose:"
+          }
+        ],
+        "id": null
+      },
+      {
+        "type": "list",
+        "start": null,
+        "tight": true,
+        "items": [
+          {
+            "task": false,
+            "attrs": {
+              "id": null,
+              "classes": [],
+              "pairs": []
+            },
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Northstar"
+                  }
+                ],
+                "id": null
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "diagnostics": []
+}

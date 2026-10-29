@@ -12,6 +12,9 @@
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 
+use vellum_kernel::CommentId;
+
+use crate::comment::{Comment, Target};
 use crate::cycle::CycleKey;
 use crate::id::{IssueId, ProjectId, UpdateId, UserRef};
 use crate::issue::{Issue, IssueKey};
@@ -217,6 +220,99 @@ pub enum WorkEvent {
         label: String,
         /// `created`, `updated` or `deleted`.
         change: String,
+    },
+    /// A comment was posted (a new thread or a reply).
+    CommentAdded {
+        /// The thread.
+        thread: CommentId,
+        /// What the thread is on.
+        target: Target,
+        /// The new comment.
+        comment: Box<Comment>,
+        /// People mentioned in it.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        mentions: Vec<UserRef>,
+        /// Who the comment assigned the thread to ("assign to").
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        assignee: Option<UserRef>,
+        /// Who to notify: participants, followers, mentions and the
+        /// assignee, without the author.
+        recipients: Vec<UserRef>,
+    },
+    /// A comment was edited.
+    CommentEdited {
+        /// The thread.
+        thread: CommentId,
+        /// What the thread is on.
+        target: Target,
+        /// The comment after the edit.
+        comment: Box<Comment>,
+        /// People mentioned for the first time by the edit.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        new_mentions: Vec<UserRef>,
+    },
+    /// A comment was deleted.
+    CommentDeleted {
+        /// The thread.
+        thread: CommentId,
+        /// What the thread is on.
+        target: Target,
+        /// The deleted comment.
+        comment: CommentId,
+        /// Who deleted it.
+        by: UserRef,
+    },
+    /// A reaction was added or removed.
+    CommentReaction {
+        /// The thread.
+        thread: CommentId,
+        /// The comment.
+        comment: CommentId,
+        /// The emoji.
+        emoji: String,
+        /// Who reacted.
+        by: UserRef,
+        /// Added (`true`) or removed.
+        added: bool,
+    },
+    /// A thread was resolved; its assignment, if any, is done.
+    CommentThreadResolved {
+        /// The thread.
+        thread: CommentId,
+        /// What the thread is on.
+        target: Target,
+        /// Who resolved it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        by: Option<UserRef>,
+        /// The assignee whose item is now done.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        assignee: Option<UserRef>,
+    },
+    /// A resolved thread was reopened.
+    CommentThreadReopened {
+        /// The thread.
+        thread: CommentId,
+        /// What the thread is on.
+        target: Target,
+        /// Who reopened it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        by: Option<UserRef>,
+    },
+    /// A thread was assigned, reassigned or unassigned.
+    CommentAssigned {
+        /// The thread.
+        thread: CommentId,
+        /// What the thread is on.
+        target: Target,
+        /// The previous assignee.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        from: Option<UserRef>,
+        /// The new assignee.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        to: Option<UserRef>,
+        /// Who did it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        by: Option<UserRef>,
     },
 }
 

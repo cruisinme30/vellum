@@ -32,6 +32,7 @@ pub fn serialize(document: &Document) -> String {
         nested: false,
         columns: false,
         file_start: document.front_matter.is_none(),
+        after_dash: false,
     };
     out.push_str(&blocks(&document.blocks, pos, "\n"));
     out
@@ -39,6 +40,10 @@ pub fn serialize(document: &Document) -> String {
 
 /// Where a run of blocks sits.
 #[derive(Clone, Copy)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "independent facts about one position, read in different places"
+)]
 struct Pos {
     /// Inside a list item or block quote: lines are indented or prefixed,
     /// so the line-start-only `:::` and `$$` syntax is not available.
@@ -47,6 +52,9 @@ struct Pos {
     columns: bool,
     /// At the very start of a file without front matter.
     file_start: bool,
+    /// The first block shares its line with a `-` bullet, so a bullet list
+    /// there must use `*`, or `- - -` would read as a thematic break.
+    after_dash: bool,
 }
 
 /// Writes blocks, each ending in `\n`, joined by `separator`.
@@ -60,14 +68,17 @@ fn blocks(blocks: &[Block], pos: Pos, separator: &str) -> String {
         }
         let pos = Pos {
             file_start: pos.file_start && i == 0,
+            after_dash: pos.after_dash && i == 0,
             ..pos
         };
         // A list right after another list needs a different marker, or the
         // two would be read as one.
-        let alternate = matches!(
+        let adjacent = matches!(
             (previous, block),
             (Some(Block::List(a)), Block::List(b)) if a.start.is_some() == b.start.is_some()
         ) && !previous_alternate;
+        let alternate =
+            adjacent || (pos.after_dash && matches!(block, Block::List(l) if l.start.is_none()));
         out.push_str(&self::block(block, pos, alternate));
         previous = Some(block);
         previous_alternate = alternate;
@@ -106,36 +117,55 @@ fn block(block: &Block, pos: Pos, alternate: bool) -> String {
         }
         Block::ThematicBreak if pos.columns || pos.file_start || pos.nested => "***\n".to_owned(),
         Block::ThematicBreak => "---\n".to_owned(),
-        Block::BlockQuote { blocks: inner } => {
+        Block::BlockQuote { blocks: inner, id } => {
             let body = blocks(
                 inner,
                 Pos {
                     nested: true,
                     columns: false,
                     file_start: false,
+                    after_dash: false,
                 },
                 "\n",
             );
-            if body.is_empty() {
+            let mut out = if body.is_empty() {
                 ">\n".to_owned()
             } else {
                 prefix_lines(&body, "> ", "> ")
-            }
+            };
+            push_id_line(&mut out, id.as_ref());
+            out
         }
         Block::List(list) => self::list(list, alternate),
         Block::Fence(fence) => self::fence(fence),
-        Block::Math { literal } if !pos.nested && !literal.lines().any(|l| l == "$$") => {
-            format!("$$\n{literal}$$\n")
+        Block::Math { literal, id } if !pos.nested && !literal.lines().any(|l| l == "$$") => {
+            let mut open = "$$".to_owned();
+            push_block_id(&mut open, id.as_ref());
+            format!("{open}\n{literal}$$\n")
         }
-        Block::Math { literal } => self::fence(&Fence {
+        Block::Math { literal, id } => self::fence(&Fence {
             lang: "math".to_owned(),
             args: String::new(),
             attrs: crate::ast::Attributes::default(),
+            id: *id,
             literal: literal.clone(),
         }),
-        Block::Table(table) => self::table(table),
+        Block::Table(table) => {
+            let mut out = self::table(table);
+            push_id_line(&mut out, table.id.as_ref());
+            out
+        }
         Block::Container(container) if pos.nested => alert(container),
         Block::Container(container) => self::container(container),
+    }
+}
+
+/// Writes a table's or quote's block ID on its own line after a blank one.
+fn push_id_line(out: &mut String, id: Option<&vellum_kernel::BlockId>) {
+    if let Some(id) = id {
+        out.push_str("\n^");
+        out.push_str(&id.to_string());
+        out.push('\n');
     }
 }
 
@@ -172,8 +202,24 @@ fn list(list: &List, alternate: bool) -> String {
             nested: true,
             columns: false,
             file_start: false,
+            after_dash: marker == "-",
         };
-        let body = blocks(&item.blocks, pos, if list.tight { "" } else { "\n" });
+        let separator = if list.tight { "" } else { "\n" };
+        let body = match (item.task, item.blocks.split_first()) {
+            (Some(_), Some((Block::Paragraph { content, id }, rest))) => {
+                let mut text = task_text(content, id.as_ref(), &item.attrs);
+                if !rest.is_empty() {
+                    text.push_str(separator);
+                    let rest_pos = Pos {
+                        after_dash: false,
+                        ..pos
+                    };
+                    text.push_str(&blocks(rest, rest_pos, separator));
+                }
+                text
+            }
+            _ => blocks(&item.blocks, pos, separator),
+        };
         let paragraph_first = matches!(item.blocks.first(), Some(Block::Paragraph { .. }));
         if body.is_empty() {
             out.push_str(&marker);
@@ -191,6 +237,26 @@ fn list(list: &List, alternate: bool) -> String {
     out
 }
 
+/// A task item's first paragraph: its text, the `{…}` span (D82), then
+/// the block ID.
+fn task_text(
+    content: &[crate::ast::Inline],
+    id: Option<&vellum_kernel::BlockId>,
+    attrs: &crate::ast::Attributes,
+) -> String {
+    let mut text = inline::write(content, Place::Paragraph);
+    let attrs = attrs_after(&text, attrs);
+    if !attrs.is_empty() {
+        if !text.is_empty() {
+            text.push(' ');
+        }
+        text.push_str(&attrs);
+    }
+    push_block_id(&mut text, id);
+    text.push('\n');
+    text
+}
+
 fn fence(fence: &Fence) -> String {
     let c = if fence.lang.contains('`') || fence.args.contains('`') {
         '~'
@@ -204,16 +270,20 @@ fn fence(fence: &Fence) -> String {
         .max();
     let marks = c.to_string().repeat(longest.unwrap_or(0).max(2) + 1);
     let mut info = inline::escape_info(&fence.lang);
-    for part in [
-        inline::escape_info(&fence.args),
-        attrs::to_string(&fence.attrs),
-    ] {
-        if !part.is_empty() {
-            if !info.is_empty() {
-                info.push(' ');
-            }
-            info.push_str(&part);
+    let args = inline::escape_info(&fence.args);
+    if !args.is_empty() {
+        if !info.is_empty() {
+            info.push(' ');
         }
+        info.push_str(&args);
+    }
+    push_block_id(&mut info, fence.id.as_ref());
+    let attrs = attrs_after(&info, &fence.attrs);
+    if !attrs.is_empty() {
+        if !info.is_empty() {
+            info.push(' ');
+        }
+        info.push_str(&attrs);
     }
     // An info string starting with the fence character would lengthen it.
     let gap = if info.starts_with(c) { " " } else { "" };
@@ -262,11 +332,9 @@ fn table(table: &Table) -> String {
 fn container(container: &Container) -> String {
     let colons = ":".repeat(3 + nesting_depth(container));
     let mut out = colons.clone();
-    for part in [
-        &container.name,
-        &container.arg,
-        &attrs::to_string(&container.attrs),
-    ] {
+    let mut arg = container.arg.clone();
+    push_block_id(&mut arg, container.id.as_ref());
+    for part in [&container.name, &arg, &attrs_after(&arg, &container.attrs)] {
         if !part.is_empty() {
             out.push(' ');
             out.push_str(part);
@@ -278,13 +346,19 @@ fn container(container: &Container) -> String {
         nested: false,
         columns,
         file_start: false,
+        after_dash: false,
     };
     let sections: Vec<String> = container
         .sections
         .iter()
         .map(|s| blocks(s, pos, "\n"))
         .collect();
-    let body = sections.join("\n---\n\n");
+    let mut body = sections.join("\n---\n\n");
+    // The parser drops one empty column before the first split, so an
+    // empty first column needs a split of its own.
+    if sections.len() > 1 && sections.first().is_some_and(String::is_empty) {
+        body.insert_str(0, "---\n\n");
+    }
     // Blank lines around the body keep lists and fences apart from the
     // `:::` lines, as markdownlint (MD031, MD032) expects.
     if !body.is_empty() {
@@ -311,6 +385,18 @@ fn nesting_depth(container: &Container) -> usize {
         .unwrap_or(0)
 }
 
+/// The attributes written after `text`. When there are none but `text`
+/// itself ends in something that reads as attributes, an empty `{}` keeps
+/// that text from being taken as them.
+fn attrs_after(text: &str, attrs: &crate::ast::Attributes) -> String {
+    let written = attrs::to_string(attrs);
+    if written.is_empty() && attrs::split_trailing(text).0 != text.trim_end() {
+        "{}".to_owned()
+    } else {
+        written
+    }
+}
+
 /// A callout inside a list item or quote, written as a `GitHub` alert.
 fn alert(container: &Container) -> String {
     let kind = match container.name.as_str() {
@@ -321,15 +407,20 @@ fn alert(container: &Container) -> String {
         _ => "NOTE",
     };
     let mut head = format!("[!{kind}]");
-    if !container.arg.is_empty() {
-        head.push(' ');
-        head.push_str(&container.arg);
+    let mut arg = container.arg.clone();
+    push_block_id(&mut arg, container.id.as_ref());
+    for part in [&arg, &attrs_after(&arg, &container.attrs)] {
+        if !part.is_empty() {
+            head.push(' ');
+            head.push_str(part);
+        }
     }
     head.push('\n');
     let pos = Pos {
         nested: true,
         columns: false,
         file_start: false,
+        after_dash: false,
     };
     let body: Vec<String> = container
         .sections
