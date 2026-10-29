@@ -220,7 +220,16 @@ impl Drive {
                 ));
             }
             let blobs = if node.kind.is_dir() {
-                self.blobs_under(&node.path).await?
+                // Build output and in-flight temp files are not content.
+                self.blobs_under(&node.path)
+                    .await?
+                    .into_iter()
+                    .filter(|(p, _)| {
+                        !p.segments().any(|s| s == ".mdbook")
+                            && !p.file_name().contains(".vellum-tmp")
+                            && vellum_store::layout::Kind::of(p).is_content()
+                    })
+                    .collect()
             } else {
                 vec![(node.path.clone(), node.size)]
             };
@@ -529,7 +538,7 @@ fn relink_text(
 /// The text of a file the drive may rewrite IDs in.
 fn text_of(path: &BlobPath, bytes: &[u8]) -> Option<String> {
     let name = path.file_name();
-    let texty = ["md", "yaml", "yml"]
+    let texty = ["md", "yaml", "yml", "json"]
         .iter()
         .any(|ext| layout::has_ext(name, ext));
     if !texty {

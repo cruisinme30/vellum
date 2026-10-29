@@ -13,6 +13,7 @@
 //! the [`vellum_store::BlobStore`] for files, a [`DriveIndex`] for the
 //! rebuildable index, and [`Access`] for authorization.
 
+pub mod authz;
 mod drive;
 pub mod error;
 pub mod files;
