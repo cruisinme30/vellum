@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 //! Webhook subscriptions an admin manages, and their delivery (#149,
-//! ADR 0041, D218).
+//! ADR 0041, D263).
 //!
 //! | Operation | Route | Does |
 //! |---|---|---|
