@@ -10,6 +10,7 @@
 //! is refused instead of silently overwriting newer content.
 
 mod error;
+pub mod layout;
 mod local;
 mod merge;
 pub mod metered;
