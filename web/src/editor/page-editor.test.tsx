@@ -54,7 +54,7 @@ function serverConnector(initial: LiveState) {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
-    done: () => Promise.resolve(),
+    done: vi.fn(() => Promise.resolve()),
   };
   const connector: CollabConnector = {
     open: (id, space) => ({ ...local.open(id, space), live }),
@@ -67,7 +67,7 @@ function serverConnector(initial: LiveState) {
       }
     });
   };
-  return { connector, set };
+  return { connector, set, live };
 }
 
 const notice = () => screen.getByRole("status");
@@ -245,6 +245,40 @@ describe("PageEditor", () => {
       );
       await settle();
       expect(open).toHaveBeenCalledWith("01JPAGE", "01JSPACE");
+    });
+
+    it("saves a version on Done and on Ctrl+S, and says when it is saved", async () => {
+      const { connector, live } = serverConnector({
+        status: "online",
+        canWrite: true,
+        peers: new Map(),
+      });
+      const onControls = vi.fn();
+      render(<PageEditor {...editorProperties(connector, { onControls })} />);
+      await settle();
+      const done = screen.getByRole("button", { name: "Done" });
+      expect(done.hasAttribute("disabled")).toBe(false);
+      act(() => {
+        editorOf(editors()[0]).commands.insertContent("More");
+      });
+      expect(screen.getByText("Unsaved changes")).toBeDefined();
+
+      act(() => {
+        done.click();
+      });
+      await settle();
+      expect(live.done).toHaveBeenCalledTimes(1);
+      expect(screen.getByText("Saved")).toBeDefined();
+
+      const body = editors()[0];
+      act(() => {
+        body?.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "s", ctrlKey: true, bubbles: true }),
+        );
+      });
+      await settle();
+      expect(live.done).toHaveBeenCalledTimes(2);
+      expect(onControls).toHaveBeenLastCalledWith(expect.objectContaining({ canWrite: true }));
     });
 
     it("is read-only with a notice until the server lets this person write", async () => {

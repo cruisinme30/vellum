@@ -5,7 +5,7 @@ import { getSchema, type JSONContent } from "@tiptap/core";
 import { Collaboration } from "@tiptap/extension-collaboration";
 import { CollaborationCaret } from "@tiptap/extension-collaboration-caret";
 import { EditorContent, useEditor } from "@tiptap/react";
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import * as Y from "yjs";
 
 import { useT } from "../i18n/i18n";
@@ -17,6 +17,7 @@ import type {
   LiveConnection,
   LiveState,
 } from "./collab/provider";
+import { createSaver, type SaveStatus, type Saver } from "./collab/saving";
 import { FIELD, seedUpdate } from "./collab/seed";
 import { vellumExtensions } from "./extensions";
 import type { ResolvePage } from "./nodes/inline";
@@ -33,6 +34,20 @@ export interface PageEditorProperties {
   readonly user: CollabUser;
   readonly resolvePage: ResolvePage;
   readonly onOpenPage: (id: string) => void;
+  /** How long after the last change a version is written; 30 s by default. */
+  readonly idleSaveMs?: number;
+  /** Extra controls in the editor's bar, before Done. */
+  readonly actions?: ReactNode;
+  /** Told how to save the page now and whether it is editable; `undefined` once closed. */
+  readonly onControls?: (controls?: EditorControls) => void;
+}
+
+/** What the page around the editor may do with it. */
+export interface EditorControls {
+  /** Writes a version now; resolves `false` when that failed. */
+  readonly save: () => Promise<boolean>;
+  /** Whether this person may change the page. */
+  readonly canWrite: boolean;
 }
 
 interface BoundProperties extends Omit<PageEditorProperties, "connector" | "pageId" | "spaceId"> {
@@ -89,10 +104,95 @@ function LiveNotice({ state }: { readonly state: LiveState }) {
   );
 }
 
-function BoundEditor({ session, seed, user, resolvePage, onOpenPage }: BoundProperties) {
+const SAVE_LABELS: Record<SaveStatus, string> = {
+  saved: "editor-saved",
+  unsaved: "editor-unsaved",
+  saving: "editor-saving",
+  failed: "editor-save-failed",
+};
+
+/** Whether a key press is the save shortcut (Ctrl+S, or Cmd+S on a Mac). */
+const isSaveKey = (event: KeyboardEvent) =>
+  (event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "s";
+
+/**
+ * Where this editor's changes stand, and Done, which writes a version now.
+ * Versions are also written on their own after a quiet spell (ADR 0010).
+ */
+function SaveControls({
+  saver,
+  canSave,
+  children,
+}: {
+  readonly saver: Saver;
+  readonly canSave: boolean;
+  readonly children?: ReactNode;
+}) {
+  const t = useT();
+  const status = useSyncExternalStore(saver.subscribe, saver.getSnapshot);
+  return (
+    <div className="vl-editor-save">
+      <span className="vl-save-status" aria-live="polite" data-status={status}>
+        {canSave ? t(SAVE_LABELS[status]) : ""}
+      </span>
+      {children}
+      <button
+        type="button"
+        className="vl-filled-button vl-done-button"
+        disabled={!canSave || status === "saving"}
+        title={t("editor-done-hint")}
+        aria-keyshortcuts="Control+S Meta+S"
+        onClick={() => {
+          void saver.save();
+        }}
+      >
+        {t("editor-done")}
+      </button>
+    </div>
+  );
+}
+
+const LOCAL_LIVE = (): LiveConnection => LOCAL;
+
+function BoundEditor({
+  session,
+  seed,
+  user,
+  resolvePage,
+  onOpenPage,
+  idleSaveMs,
+  actions,
+  onControls,
+}: BoundProperties) {
   const t = useT();
   const live = useLive(session.live);
+  const [saver] = useState(() =>
+    createSaver(session.doc, session.live ?? LOCAL_LIVE(), {
+      ...(idleSaveMs === undefined ? {} : { idleMs: idleSaveMs }),
+    }),
+  );
+  useEffect(
+    () => () => {
+      saver.dispose();
+    },
+    [saver],
+  );
   const editable = live.status !== "revoked" && live.canWrite;
+  useEffect(() => {
+    onControls?.({
+      save: async () => {
+        await saver.save();
+        return saver.getSnapshot() !== "failed";
+      },
+      canWrite: editable,
+    });
+  }, [onControls, saver, editable]);
+  useEffect(
+    () => () => {
+      onControls?.();
+    },
+    [onControls],
+  );
   const base = useMemo(
     () => vellumExtensions({ t, resolvePage, history: false }),
     [t, resolvePage],
@@ -128,6 +228,14 @@ function BoundEditor({ session, seed, user, resolvePage, onOpenPage }: BoundProp
           }
           return true;
         },
+        handleKeyDown: (_view, event) => {
+          if (!isSaveKey(event)) {
+            return false;
+          }
+          event.preventDefault();
+          void saver.save();
+          return true;
+        },
         handleDOMEvents: {
           click: (_view, event) => {
             const target = event.target as HTMLElement | null;
@@ -150,7 +258,12 @@ function BoundEditor({ session, seed, user, resolvePage, onOpenPage }: BoundProp
 
   return (
     <div className="vl-editor">
-      <Toolbar editor={editor} />
+      <div className="vl-editor-bar">
+        <Toolbar editor={editor} />
+        <SaveControls saver={saver} canSave={editable && live.status === "online"}>
+          {actions}
+        </SaveControls>
+      </div>
       <LiveNotice state={live} />
       <EditorContent editor={editor} />
     </div>

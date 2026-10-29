@@ -6,6 +6,7 @@ import {
   use,
   useCallback,
   useEffect,
+  useMemo,
   useState,
   useSyncExternalStore,
   type ReactNode,
@@ -13,23 +14,28 @@ import {
 
 import type { CollabConnector } from "../editor/collab/provider";
 
+import type { PageHistory } from "./history";
 import type { WorkspaceSnapshot, WorkspaceStore } from "./store";
 import type { SearchHit } from "./types";
 
 interface Services {
   readonly store: WorkspaceStore;
   readonly collab: CollabConnector;
+  /** Saved versions of pages; only a Vellum server keeps them. */
+  readonly history?: PageHistory | undefined;
 }
 
 const ServicesContext = createContext<Services | undefined>(undefined);
 
-/** Provides the workspace store and the collab connector to the app. */
+/** Provides the workspace store, the collab connector and page history to the app. */
 export function WorkspaceProvider({
   store,
   collab,
+  history,
   children,
 }: Services & { readonly children: ReactNode }) {
-  return <ServicesContext value={{ store, collab }}>{children}</ServicesContext>;
+  const services = useMemo(() => ({ store, collab, history }), [store, collab, history]);
+  return <ServicesContext value={services}>{children}</ServicesContext>;
 }
 
 /** The services; throws outside a provider. */

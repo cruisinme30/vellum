@@ -148,6 +148,33 @@ editor-connecting = Connecting to the server…
 editor-offline = Offline. Your changes are kept and sync when the connection returns.
 editor-read-only = You can view this page but not edit it.
 editor-revoked = Your access to this page was removed. Reload to see what you can open.
+editor-saved = Saved
+editor-unsaved = Unsaved changes
+editor-saving = Saving…
+editor-save-failed = Not saved yet. Your changes are kept and saving will retry.
+editor-done = Done
+editor-done-hint = Save a version now (Ctrl+S)
+history-open = Version history
+history-title = Version history
+history-close = Close version history
+history-loading = Loading…
+history-empty = No saved versions yet. A version is saved after 30 seconds without edits, or when you press Done.
+history-versions = Saved versions, newest first
+history-current = current
+history-preview = Version text
+history-not-text = This version is not text, so it cannot be shown.
+history-by-you = You
+history-by-person = Another member
+history-by-model = An AI assistant
+history-by-external = Edited outside Vellum
+history-by-system = Vellum
+history-restore = Restore this version
+history-restore-explain = The page's text becomes this version again. Your current text is saved as a version first, so you can come back to it.
+history-restore-confirm = Restore
+history-restoring = Restoring…
+history-cancel = Cancel
+history-restored = Restored the version from { $when }.
+history-save-first-failed = Your latest changes could not be saved, so nothing was restored. Try again in a moment.
 
 ## Collections
 

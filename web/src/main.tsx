@@ -18,6 +18,7 @@ import { createHttp } from "./api/http";
 import { App } from "./app";
 import { createHttpCollectionsStore } from "./collections/http";
 import { createMockCollectionsStore } from "./collections/mock";
+import { createHttpPageHistory } from "./data/history";
 import { createHttpWorkspaceStore } from "./data/http";
 import { createNorthstarStore } from "./data/mock/northstar";
 import { lazyCache } from "./editor/collab/lazy-cache";
@@ -67,6 +68,7 @@ root.render(
           : createHttpWorkspaceStore(http, { user: status.user ?? undefined })
       }
       collab={status === undefined ? createLocalConnector({ cache }) : createSocketConnector()}
+      history={status === undefined ? undefined : createHttpPageHistory(http)}
       collections={
         status === undefined ? createMockCollectionsStore() : createHttpCollectionsStore(http)
       }

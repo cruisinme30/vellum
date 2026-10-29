@@ -12,6 +12,7 @@ import { CollectionView } from "./collections/collection-view";
 import { CollectionsIndexView } from "./collections/collections-index";
 import { CollectionsProvider } from "./collections/context";
 import type { CollectionsStore } from "./collections/store";
+import type { PageHistory } from "./data/history";
 import type { WorkspaceStore } from "./data/store";
 import { useServices, WorkspaceProvider } from "./data/workspace-context";
 import type { CollabConnector } from "./editor/collab/provider";
@@ -92,6 +93,8 @@ export function AppRoutes() {
 export interface AppServices {
   readonly store: WorkspaceStore;
   readonly collab: CollabConnector;
+  /** Saved page versions, from a Vellum server; absent in demo mode. */
+  readonly history?: PageHistory | undefined;
   readonly collections: CollectionsStore;
   /** Present when a Vellum server answered; absent in demo mode. */
   readonly session?: { readonly auth: AuthApi; readonly status: AuthStatus } | undefined;
@@ -138,6 +141,7 @@ function SignedInUser({ children }: { readonly children: ReactNode }) {
 export function AppProviders({
   store,
   collab,
+  history,
   collections,
   session,
   notifications,
@@ -150,7 +154,7 @@ export function AppProviders({
     <I18nProvider>
       <AppearanceProvider>
         <MaybeSession session={session}>
-          <WorkspaceProvider store={store} collab={collab}>
+          <WorkspaceProvider store={store} collab={collab} history={history}>
             <SignedInUser>
               <CollectionsProvider store={collections}>
                 <NotificationsProvider services={notifications ?? demoNotifications}>
