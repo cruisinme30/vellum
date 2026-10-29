@@ -76,7 +76,7 @@ root.render(
           ? undefined
           : {
               store: createHttpNotificationPreferencesStore(http),
-              device: createBrowserPushDevice(),
+              device: createBrowserPushDevice("", http),
             }
       }
     />

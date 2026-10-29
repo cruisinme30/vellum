@@ -24,6 +24,13 @@ export interface PushEnvironment {
   readonly fetch: typeof fetch;
   readonly registration: Pick<ServiceWorkerRegistration, "pushManager">;
   readonly requestPermission: () => Promise<NotificationPermission>;
+  /**
+   * Sends a write through the app's API client, which adds the session's
+   * CSRF token and an idempotency key; the gateway refuses a cookie-signed
+   * write without the token. Absent, writes go through `fetch` (tests,
+   * token-authenticated callers).
+   */
+  readonly send?: (method: "POST" | "DELETE", path: string, body?: unknown) => Promise<unknown>;
 }
 
 /**
@@ -83,11 +90,13 @@ export async function enablePush(environment: PushEnvironment): Promise<PushStat
       applicationServerKey: decodeBase64Url(publicKey),
     });
   }
-  await call(environment, "/api/v1/push/subscriptions", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(subscription.toJSON()),
-  });
+  await (environment.send === undefined
+    ? call(environment, "/api/v1/push/subscriptions", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(subscription.toJSON()),
+      })
+    : environment.send("POST", "/api/v1/push/subscriptions", subscription.toJSON()));
   telemetry().count("vellum.client.push.enabled");
   return "enabled";
 }
@@ -99,5 +108,8 @@ export async function disablePush(environment: PushEnvironment): Promise<void> {
   const { endpoint } = subscription;
   await subscription.unsubscribe();
   const query = new URLSearchParams({ endpoint }).toString();
-  await call(environment, `/api/v1/push/subscriptions?${query}`, { method: "DELETE" });
+  const path = `/api/v1/push/subscriptions?${query}`;
+  await (environment.send === undefined
+    ? call(environment, path, { method: "DELETE" })
+    : environment.send("DELETE", path));
 }
