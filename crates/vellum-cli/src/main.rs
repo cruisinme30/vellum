@@ -62,6 +62,9 @@ mod tasks_http;
 mod tasks_tests;
 #[cfg(test)]
 mod typescript_tests;
+mod uploads;
+#[cfg(test)]
+mod uploads_tests;
 mod watcher;
 mod web;
 #[cfg(test)]

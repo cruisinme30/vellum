@@ -59,6 +59,7 @@ use crate::cluster::Replica;
 use crate::collab::{Collab, LivePages};
 use crate::feed::{AnnouncingStore, Caches};
 use crate::google_http::{self, Endpoints, FileLinks, GoogleHttp};
+use crate::identity::IdentityAuthenticator;
 use crate::page_render::{Handles, PageRenderService};
 use crate::reindex::{KEY_VAR, key_bytes};
 use crate::tasks::{DriveTasks, Parts, TasksSettings};
@@ -491,6 +492,8 @@ pub struct Opened {
     pub tasks: Option<Arc<TasksService>>,
     /// The drive index, which Admin → Usage counts pages and storage from.
     pub drive_index: Option<Arc<dyn DriveIndex>>,
+    /// The drive, which also takes file uploads (see [`crate::uploads`]).
+    pub drive: Option<Arc<Drive>>,
 }
 
 /// My Work's settings: where its secrets live and what it links to.
@@ -894,9 +897,7 @@ pub async fn open(
         index.clone(),
         &config.data_dir,
         app_origin,
-        Arc::new(crate::identity::IdentityAuthenticator::new(Arc::clone(
-            identity,
-        ))),
+        Arc::new(IdentityAuthenticator::new(Arc::clone(identity))),
     )?;
     keep_drives(&workspace.drive, &drive_index, identity).await?;
     live_pages.attach(&collab);
@@ -927,6 +928,7 @@ pub async fn open(
         rate_counts: Some(rate_counts),
         tasks: Some(workspace.tasks),
         drive_index: Some(drive_index),
+        drive: Some(workspace.drive),
     })
 }
 
