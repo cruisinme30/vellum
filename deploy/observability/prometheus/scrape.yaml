@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# A Prometheus configuration that scrapes the collector and loads the Vellum
+# rules. Merge it into your own configuration.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - rules.yaml
+
+scrape_configs:
+  - job_name: vellum
+    static_configs:
+      - targets: ["otel-collector:8889"]

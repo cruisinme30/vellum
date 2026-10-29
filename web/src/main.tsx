@@ -21,6 +21,7 @@ import { createHttpWorkspaceStore } from "./data/http";
 import { createNorthstarStore } from "./data/mock/northstar";
 import { lazyCache } from "./editor/collab/lazy-cache";
 import { createLocalConnector } from "./editor/collab/local-connector";
+import { startClientTelemetry } from "./platform/client-telemetry-start";
 import { createPlatform, startPlatform } from "./platform/platform";
 import { DocumentCache } from "./platform/store/document-cache";
 import { openLocalDatabase } from "./platform/store/persistence";
@@ -32,6 +33,12 @@ const container = document.querySelector("#root");
 if (container === null) {
   throw new Error("Vellum: the #root element is missing from index.html");
 }
+startClientTelemetry({
+  performance,
+  location,
+  document,
+  Observer: globalThis.PerformanceObserver,
+});
 const root = createRoot(container);
 
 // When a Vellum server answers, the areas whose API exists use it (issue

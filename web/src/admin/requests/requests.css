@@ -1,0 +1,127 @@
+/*
+ * SPDX-FileCopyrightText: 2026 The Vellum contributors
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+.vl-requests {
+  font-family: Roboto, system-ui, sans-serif;
+  color: #1d1b20;
+  padding: 16px 24px;
+}
+
+.vl-requests__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  align-items: end;
+  margin-block-end: 16px;
+}
+
+.vl-requests__filters button,
+.vl-requests__table button {
+  border-radius: 999px;
+  border: 1px solid #767680;
+  background: #dde1ff;
+  color: #1d1b20;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+
+.vl-requests__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.vl-requests__table th,
+.vl-requests__table td {
+  text-align: start;
+  padding: 6px 8px;
+  border-block-end: 1px solid #c5c6d0;
+}
+
+.vl-requests__table tr[aria-selected="true"] {
+  background: #f0f2f9;
+}
+
+.vl-requests__row--error td {
+  color: #ba1a1a;
+}
+
+.vl-waterfall ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.vl-waterfall__row > button {
+  display: grid;
+  grid-template-columns: minmax(160px, 28%) 1fr 90px;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  background: none;
+  padding: 3px 0;
+  text-align: start;
+  cursor: pointer;
+  color: inherit;
+}
+
+.vl-waterfall__row > button:focus-visible {
+  outline: 2px solid #4f5b92;
+}
+
+.vl-waterfall__track {
+  position: relative;
+  background: #f7f8fc;
+  border-radius: 4px;
+  min-height: 14px;
+}
+
+.vl-waterfall__bar {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  border-radius: 4px;
+  background: #4f5b92;
+}
+
+.vl-waterfall__row--browser .vl-waterfall__bar {
+  background: #7d5260;
+}
+
+.vl-waterfall__row--error .vl-waterfall__bar {
+  background: #ba1a1a;
+}
+
+.vl-waterfall__details {
+  margin: 4px 0 8px 24px;
+  font-size: 0.875rem;
+}
+
+.vl-waterfall__details dl > div {
+  display: flex;
+  gap: 8px;
+}
+
+.vl-waterfall__details dt {
+  font-weight: 500;
+}
+
+.vl-waterfall__details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.vl-waterfall__level {
+  font-weight: 500;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .vl-waterfall__bar {
+    transition: width 120ms ease-out;
+  }
+}
+
+.vl-routes__over {
+  color: #ba1a1a;
+}

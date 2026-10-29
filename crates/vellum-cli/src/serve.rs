@@ -31,6 +31,8 @@ use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
 use vellum_api::config::{GatewayConfig, host_of};
 use vellum_api::gateway::{Gateway, GatewayBuilder};
+
+use crate::observability::Observability;
 use vellum_api::server::{ServeConfig, Tls, serve};
 use vellum_kernel::{Config, Error, ErrorKind};
 use vellum_security::upload::Clamd;
@@ -161,8 +163,18 @@ pub fn edge(config: &Config, var: impl Fn(&str) -> Option<String>) -> Result<Edg
 /// Reads the install's CSRF key, creating it (32 random bytes, owner-only)
 /// on first start.
 fn csrf_key_file(data_dir: &Path) -> Result<Vec<u8>, Error> {
+    key_file(data_dir, "gateway-csrf.key")
+}
+
+/// The 32-byte key in `.vellum/keys/<name>`, created (readable by the owner
+/// only) on first use.
+///
+/// # Errors
+///
+/// The key folder cannot be created or the file cannot be written.
+pub fn key_file(data_dir: &Path, name: &str) -> Result<Vec<u8>, Error> {
     let dir = data_dir.join(".vellum").join("keys");
-    let path = dir.join("gateway-csrf.key");
+    let path = dir.join(name);
     let io = |e: std::io::Error| {
         Error::new(
             ErrorKind::Unavailable,
@@ -231,7 +243,7 @@ async fn shutdown_signal() {
 /// # Errors
 ///
 /// Configuration, key-file, TLS or listener errors.
-pub fn run(config_path: Option<&Path>) -> Result<(), Error> {
+pub fn run(config_path: Option<&Path>, observability: Observability) -> Result<(), Error> {
     let config = Config::load(config_path)
         .map_err(|e| Error::new(ErrorKind::InvalidInput, e.to_string()).with_source(e))?;
     let Edge {
@@ -257,6 +269,8 @@ pub fn run(config_path: Option<&Path>) -> Result<(), Error> {
     runtime.block_on(async move {
         let services = services::Services::open(&app_origin, Some(&config.data_dir))?
             .with_workspace(&config, |k| std::env::var(k).ok())
+            .await?
+            .with_admin(&config, observability, |k| std::env::var(k).ok())
             .await?;
         tracing::info!(services = ?services, "services ready");
         if !web::BUILT {
