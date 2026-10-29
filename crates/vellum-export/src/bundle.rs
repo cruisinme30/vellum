@@ -248,7 +248,7 @@ mod tests {
         let out = markdown(&doc, &ports, "2026-10-29").await;
         assert!(out.warnings.is_empty(), "{:?}", out.warnings);
         assert!(
-            out.text.contains("*Open risks (as of 2026-10-29)*"),
+            out.text.contains(r"*Open risks (as of 2026\-10-29)*"),
             "{}",
             out.text
         );

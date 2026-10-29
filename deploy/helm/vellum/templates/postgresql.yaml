@@ -1,0 +1,50 @@
+{{/*
+SPDX-FileCopyrightText: 2026 The Vellum contributors
+SPDX-License-Identifier: AGPL-3.0-only
+
+One Patroni cluster per shard through the Zalando Postgres Operator: a
+primary and a synchronous replica, so failover never loses an acknowledged
+write (RPO 0) and writes resume in under 30 s.
+*/}}
+{{- if eq .Values.postgres.mode "operator" }}
+{{- $pg := .Values.postgres.operator }}
+{{- if lt (int $pg.instances) 2 }}
+{{- fail "postgres.operator.instances must be at least 2 (primary + synchronous replica)" }}
+{{- end }}
+{{- range .Values.shards }}
+---
+apiVersion: acid.zalan.do/v1
+kind: postgresql
+metadata:
+  name: {{ include "vellum.pgCluster" (dict "root" $ "shard" .) }}
+  labels:
+    {{- include "vellum.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: postgres
+    vellum.dev/shard: {{ .name }}
+spec:
+  teamId: {{ $pg.teamId }}
+  numberOfInstances: {{ $pg.instances }}
+  enableConnectionPooler: true
+  users:
+    vellum: [login]
+  databases:
+    {{ $.Values.postgres.database }}: vellum
+  postgresql:
+    version: {{ $pg.version | quote }}
+    parameters:
+      wal_level: logical
+      max_connections: "200"
+      synchronous_commit: "on"
+  patroni:
+    synchronous_mode: true
+    synchronous_mode_strict: false
+    failsafe_mode: true
+  volume:
+    size: {{ $pg.volumeSize }}
+    {{- with $pg.storageClass }}
+    storageClass: {{ . }}
+    {{- end }}
+  resources:
+    {{- toYaml $pg.resources | nindent 4 }}
+{{- end }}
+{{- end }}

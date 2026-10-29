@@ -188,3 +188,36 @@ async fn a_weaker_lasting_grant_survives_a_stronger_expiring_one() {
             .is_empty()
     );
 }
+
+#[tokio::test]
+async fn groups_of_follows_nesting_and_drops_expired_memberships() {
+    let (authz, now) = setup();
+    authz
+        .store()
+        .write_directory(
+            vec![
+                Tuple::member(OUTER, Subject::Group(GROUP)).expiring(3_000),
+                Tuple::member(GROUP, Subject::User(USER)),
+            ],
+            vec![],
+        )
+        .await
+        .unwrap();
+    let user = Principal::User(USER);
+    assert_eq!(
+        authz.groups_of(user).await.unwrap(),
+        BTreeSet::from([GROUP, OUTER])
+    );
+    now.store(3_000, Ordering::SeqCst);
+    assert_eq!(
+        authz.groups_of(user).await.unwrap(),
+        BTreeSet::from([GROUP])
+    );
+    assert!(
+        authz
+            .groups_of(Principal::ShareLink(LINK))
+            .await
+            .unwrap()
+            .is_empty()
+    );
+}

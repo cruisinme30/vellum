@@ -1,0 +1,6 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# CI renders the chart with each file here; scripts/ci/lint-infra.sh runs
+# helm lint and kube-score on the result. This one keeps the defaults.
+{}
