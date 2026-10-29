@@ -11,6 +11,9 @@ so models can read, search and draft under your own permissions. Every
 object is a Vellum Markdown file in a real folder; the database is an index
 you can rebuild.
 
+The project website, with the help books, is at
+<https://cruisinme30.github.io/vellum/>.
+
 > Status: repository skeleton. The 1.0 release is built foundation first;
 > see [the build order](docs/adr/0001-repository-skeleton.md).
 
@@ -24,6 +27,7 @@ you can rebuild.
 | `corpus/` | Golden files that pin the Markdown dialect and every export. |
 | `deploy/` | Compose files, the Helm chart and example configuration. |
 | `docs/` | Help books in Vellum Markdown and architecture decision records. |
+| `site/` | The project website's landing page; `scripts/ci/build-site.sh` adds the books. |
 | `xtask/` | Repository automation, such as the crate-boundary check. |
 
 ## Build and test
