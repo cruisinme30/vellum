@@ -72,6 +72,8 @@ struct Mount {
     prefix: String,
     router: Router,
     csrf_exempt: bool,
+    /// The largest request body; `None` for the gateway's own limit.
+    max_body: Option<usize>,
 }
 
 /// Builds a [`Gateway`].
@@ -198,6 +200,27 @@ impl GatewayBuilder {
             prefix: prefix.into(),
             router,
             csrf_exempt: false,
+            max_body: None,
+        });
+        self
+    }
+
+    /// Mounts an upload router under `prefix`, like [`Self::mount`] but
+    /// taking request bodies up to `max_body` bytes instead of
+    /// [`GatewayConfig::max_body_bytes`]. The router reads the caller and
+    /// checks their rights before it reads the body.
+    #[must_use]
+    pub fn mount_uploads(
+        mut self,
+        prefix: impl Into<String>,
+        router: Router,
+        max_body: usize,
+    ) -> Self {
+        self.mounts.push(Mount {
+            prefix: prefix.into(),
+            router,
+            csrf_exempt: false,
+            max_body: Some(max_body),
         });
         self
     }
@@ -212,6 +235,7 @@ impl GatewayBuilder {
             prefix: prefix.into(),
             router,
             csrf_exempt: true,
+            max_body: None,
         });
         self
     }
@@ -441,6 +465,7 @@ fn limited(state: &Shared, caller: &str, request: &Request) -> Option<Duration> 
 #[derive(Clone, Copy)]
 struct Protect {
     csrf: bool,
+    max_body: usize,
 }
 
 async fn protect(
@@ -497,12 +522,18 @@ async fn protect(
     if request.headers().contains_key(&IDEMPOTENCY_KEY)
         && crate::security::is_unsafe(request.method())
     {
-        return idempotent(&state, caller, request, next).await;
+        return idempotent(&state, caller, request, next, policy.max_body).await;
     }
     next.run(request).await
 }
 
-async fn idempotent(state: &Shared, caller: String, request: Request, next: Next) -> Response {
+async fn idempotent(
+    state: &Shared,
+    caller: String,
+    request: Request,
+    next: Next,
+    max_body: usize,
+) -> Response {
     let id = request_id(&request);
     let key = request
         .headers()
@@ -519,7 +550,7 @@ async fn idempotent(state: &Shared, caller: String, request: Request, next: Next
         .into_response();
     };
     let (parts, body) = request.into_parts();
-    let Ok(bytes) = to_bytes(body, state.config.max_body_bytes).await else {
+    let Ok(bytes) = to_bytes(body, max_body).await else {
         return ErrorResponse::of(ErrorKind::InvalidInput, "the request body is too large", id)
             .into_response();
     };
@@ -597,13 +628,14 @@ async fn idempotent(state: &Shared, caller: String, request: Request, next: Next
     }
 }
 
-fn layered(router: Router, state: &Arc<Shared>, csrf: bool) -> Router {
+fn layered(router: Router, state: &Arc<Shared>, csrf: bool, max_body: Option<usize>) -> Router {
+    let max_body = max_body.unwrap_or(state.config.max_body_bytes);
     router
         .layer(from_fn_with_state(
-            (Arc::clone(state), Protect { csrf }),
+            (Arc::clone(state), Protect { csrf, max_body }),
             protect,
         ))
-        .layer(RequestBodyLimitLayer::new(state.config.max_body_bytes))
+        .layer(RequestBodyLimitLayer::new(max_body))
 }
 
 /// Whether `path` is `prefix` itself or below it.
@@ -649,6 +681,7 @@ fn gateway_router(state: &Arc<Shared>, mounts: Vec<Mount>) -> Router {
         api.fallback(api_not_found).with_state(Arc::clone(state)),
         state,
         true,
+        None,
     );
     let mut app = Router::new()
         .route("/healthz", get(healthz))
@@ -658,7 +691,7 @@ fn gateway_router(state: &Arc<Shared>, mounts: Vec<Mount>) -> Router {
     for mount in mounts {
         app = app.nest(
             &mount.prefix,
-            layered(mount.router, state, !mount.csrf_exempt),
+            layered(mount.router, state, !mount.csrf_exempt, mount.max_body),
         );
     }
     edge(app, state, Surface::App)
