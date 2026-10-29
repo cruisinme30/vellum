@@ -32,8 +32,8 @@ was ever sent (R-MW-1, R-MW-5).
 
 - `GET` and `PUT /v1/my-work/settings`: an IANA time zone (or `null` to
   follow the server), the start of day and the digest time (`null` is off).
-- Zones are looked up in jiff's tz database; unknown names, odd characters
-  and anything over 64 bytes are refused. Times must be `HH:MM`.
+- Zones are looked up in jiff's time zone database; unknown names, odd
+  characters and anything over 64 bytes are refused. Times must be `HH:MM`.
 - `Profile` carries the stored preferences and the zone in force, so
   "today", relative reminders and the digest all use the person's zone.
 - Serve keeps them in `<data>/.vellum/tasks/people.json`; a saved zone that
