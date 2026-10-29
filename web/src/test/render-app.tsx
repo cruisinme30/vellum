@@ -7,6 +7,7 @@ import { userEvent, type UserEvent } from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { MemoryRouter, useLocation } from "react-router";
 
+import type { AuthApi, AuthStatus } from "../api/auth";
 import { AppProviders, AppRoutes } from "../app";
 import { createMockCollectionsStore } from "../collections/mock";
 import type { CollectionsStore } from "../collections/store";
@@ -55,11 +56,12 @@ export function renderWithProviders(
   path = "/",
   store: WorkspaceStore = createNorthstarStore(),
   collections: CollectionsStore = createMockCollectionsStore(),
+  session?: { readonly auth: AuthApi; readonly status: AuthStatus },
 ): Rendered {
   const collab = createTestCollab();
   const user = userEvent.setup();
   const result = render(
-    <AppProviders store={store} collab={collab} collections={collections}>
+    <AppProviders store={store} collab={collab} collections={collections} session={session}>
       <MemoryRouter initialEntries={[path]}>
         {element}
         <LocationProbe />
@@ -80,8 +82,9 @@ export function renderApp(
   path = "/",
   store?: WorkspaceStore,
   collections?: CollectionsStore,
+  session?: { readonly auth: AuthApi; readonly status: AuthStatus },
 ): Rendered {
-  return renderWithProviders(<AppRoutes />, path, store, collections);
+  return renderWithProviders(<AppRoutes />, path, store, collections, session);
 }
 
 /** Makes `matchMedia` report a match for the given queries only. */
