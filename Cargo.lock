@@ -6027,6 +6027,7 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
+ "vellum-format",
  "vellum-kernel",
  "vellum-work",
 ]
