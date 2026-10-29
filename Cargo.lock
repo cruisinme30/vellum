@@ -8936,6 +8936,8 @@ dependencies = [
  "getrandom 0.4.3",
  "http",
  "http-body-util",
+ "jiff",
+ "serde",
  "serde_json",
  "serde_urlencoded",
  "sha2 0.11.1",
@@ -8960,6 +8962,7 @@ dependencies = [
  "vellum-private",
  "vellum-security",
  "vellum-store",
+ "vellum-tasks",
  "vellum-work",
  "vellum-work-service",
 ]

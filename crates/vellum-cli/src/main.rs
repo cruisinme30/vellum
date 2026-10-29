@@ -22,6 +22,10 @@ mod private_tests;
 mod reindex;
 mod serve;
 mod services;
+mod tasks;
+mod tasks_http;
+#[cfg(test)]
+mod tasks_tests;
 mod watcher;
 mod workspace;
 

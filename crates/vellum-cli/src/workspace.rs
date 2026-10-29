@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-//! The workspace services: the drive, collections, books and Work, over the
-//! files in the data folder, the index database and the permission engine.
+//! The workspace services: the drive, collections, books, Work and My
+//! Work, over the files in the data folder, the index database and the
+//! permission engine.
 //!
 //! `vellum serve` opens them when an index is configured: Postgres through
 //! the kernel's `database_url`, or the SQLite index in the data folder,
@@ -29,10 +30,18 @@ use vellum_drive::{Drive, DriveIndex, DriveService};
 use vellum_identity::Identity;
 use vellum_kernel::{Config, Error, ErrorKind, UserId};
 use vellum_store::{BlobPath, BlobStore, LocalStore};
+use vellum_tasks::service::{Config as TasksConfig, TasksService};
 use vellum_work::{UserRef, WorkEvent};
 use vellum_work_service::{Directory, EventSink, SystemClock, WorkService};
 
 use crate::reindex::{KEY_VAR, index_key};
+use crate::tasks::{DriveTasks, Parts, TasksSettings};
+
+/// The mail domain that receives My Work capture e-mail.
+pub const MAIL_DOMAIN_VAR: &str = "VELLUM_MAIL_DOMAIN";
+
+/// The Slack app's signing secret, for capture from Slack.
+pub const SLACK_SECRET_VAR: &str = "VELLUM_SLACK_SIGNING_SECRET";
 
 /// Variable that opens the SQLite index without encryption.
 pub const PLAINTEXT_VAR: &str = "VELLUM_INDEX_PLAINTEXT";
@@ -137,6 +146,50 @@ struct Workspace {
     services: Vec<Arc<dyn Service>>,
     drive: Arc<Drive>,
     books: Arc<BooksService>,
+    tasks: Arc<TasksService>,
+}
+
+/// The opened workspace services, and My Work for its plain HTTP routes.
+pub struct Opened {
+    /// Every typed service.
+    pub services: Vec<Arc<dyn Service>>,
+    /// My Work, which also serves the feed, CalDAV and capture routes.
+    pub tasks: Option<Arc<TasksService>>,
+}
+
+/// My Work's settings: where its secrets live and what it links to.
+pub struct TasksSetup {
+    /// The adapter's settings.
+    pub settings: TasksSettings,
+    /// The service's settings.
+    pub config: TasksConfig,
+}
+
+impl TasksSetup {
+    /// The settings for a server at `identity`'s public URL.
+    pub fn new(
+        identity: &Identity,
+        data_dir: Option<&Path>,
+        var: impl Fn(&str) -> Option<String>,
+    ) -> Self {
+        let url = identity.config().public_url.clone();
+        let mail_domain = var(MAIL_DOMAIN_VAR)
+            .or_else(|| url.host_str().map(str::to_owned))
+            .unwrap_or_else(|| "localhost".to_owned());
+        Self {
+            settings: TasksSettings {
+                dir: data_dir.map(|d| d.join(".vellum").join("tasks")),
+                time_zone: None,
+            },
+            config: TasksConfig {
+                base_url: url.as_str().trim_end_matches('/').to_owned(),
+                mail_domain,
+                slack_signing_secret: var(SLACK_SECRET_VAR)
+                    .filter(|s| !s.is_empty())
+                    .map(String::into_bytes),
+            },
+        }
+    }
 }
 
 /// Builds the services over `store`, `authz` and the drive's `index`.
@@ -146,13 +199,14 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
     index: Arc<dyn DriveIndex>,
     spaces: &Arc<Spaces>,
     identity: &Arc<Identity>,
+    setup: TasksSetup,
 ) -> Result<Workspace, Error> {
     let drive = Arc::new(Drive::new(
         Arc::clone(&store),
         Arc::clone(&index),
         Arc::new(vellum_drive::authz::AuthzAccess::new(
             Arc::clone(&authz),
-            index,
+            Arc::clone(&index),
         )),
     ));
     let lookup = Arc::clone(spaces);
@@ -167,10 +221,13 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
     );
     let books = Arc::new(BooksService::new(
         Arc::clone(&store),
-        Arc::new(vellum_books_service::AuthzAccess::new(authz, space_of)),
+        Arc::new(vellum_books_service::AuthzAccess::new(
+            Arc::clone(&authz),
+            space_of,
+        )),
     ));
     let (work, report) = WorkService::open(
-        store,
+        Arc::clone(&store),
         Arc::new(IdentityDirectory(Arc::clone(identity))),
         Arc::new(TracingSink),
         Arc::new(SystemClock),
@@ -182,15 +239,30 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
             "some Work files could not be read"
         );
     }
+    let work = Arc::new(work);
+    let adapter = DriveTasks::open(
+        Parts {
+            drive: Arc::clone(&drive),
+            store,
+            index,
+            authz,
+            identity: Arc::clone(identity),
+            work: Arc::clone(&work),
+        },
+        &setup.settings,
+    )?;
+    let tasks = Arc::new(TasksService::new(Arc::new(adapter), setup.config));
     Ok(Workspace {
         services: vec![
             Arc::new(DriveService::new(Arc::clone(&drive))),
             Arc::new(collections),
             Arc::clone(&books) as Arc<dyn Service>,
-            Arc::new(work),
+            work,
+            Arc::clone(&tasks) as Arc<dyn Service>,
         ],
         drive,
         books,
+        tasks,
     })
 }
 
@@ -204,12 +276,16 @@ pub async fn open(
     config: &Config,
     identity: &Arc<Identity>,
     var: impl Fn(&str) -> Option<String>,
-) -> Result<Vec<Arc<dyn Service>>, Error> {
+) -> Result<Opened, Error> {
+    let setup = TasksSetup::new(identity, Some(&config.data_dir), &var);
     let index_config = match index_config(config, var)? {
         Ok(c) => c,
         Err(why) => {
             tracing::warn!("{why}; serving sign-in only, without the workspace API");
-            return Ok(Vec::new());
+            return Ok(Opened {
+                services: Vec::new(),
+                tasks: None,
+            });
         }
     };
     let index = Index::open(&index_config)
@@ -229,6 +305,7 @@ pub async fn open(
         Arc::clone(&drive_index) as Arc<dyn DriveIndex>,
         &spaces,
         identity,
+        setup,
     )
     .await?;
     // The watcher starts before the rescan, so nothing edited in between
@@ -251,7 +328,10 @@ pub async fn open(
             }
         }
     }));
-    Ok(workspace.services)
+    Ok(Opened {
+        services: workspace.services,
+        tasks: Some(workspace.tasks),
+    })
 }
 
 /// The services over an empty scratch folder and in-memory permissions,
@@ -271,7 +351,16 @@ pub async fn describe(
     );
     let authz = Arc::new(Authz::new(MemoryStore::new()));
     let index = Arc::new(vellum_drive::memory::MemoryIndex::new());
-    let workspace = build(store, authz, index, &Arc::new(Spaces::default()), identity).await?;
+    let setup = TasksSetup::new(identity, None, |_| None);
+    let workspace = build(
+        store,
+        authz,
+        index,
+        &Arc::new(Spaces::default()),
+        identity,
+        setup,
+    )
+    .await?;
     Ok(workspace.services)
 }
 

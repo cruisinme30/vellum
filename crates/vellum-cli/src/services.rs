@@ -6,8 +6,8 @@
 //! Each service workstream adds its service to [`Services`] and
 //! [`Services::mount`] (with any raw routers), so `vellum serve`, the
 //! OpenAPI document and the `GraphQL` schema all see the same set.
-//! Identity always runs; the workspace services (collections, books,
-//! Work) join when an index is configured.
+//! Identity always runs; the workspace services (drive, collections,
+//! books, Work and My Work) join when an index is configured.
 
 use std::path::Path;
 use std::sync::Arc;
@@ -18,6 +18,7 @@ use vellum_api::gateway::{Gateway, GatewayBuilder};
 use vellum_contracts::Service;
 use vellum_identity::{Identity, IdentityConfig, IdentityService, Store, http as identity_http};
 use vellum_kernel::{Config, Error, ErrorKind};
+use vellum_tasks::service::TasksService;
 
 use crate::identity::{GuardedFetcher, IdentityAuthenticator};
 use crate::workspace;
@@ -29,8 +30,10 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 #[derive(Clone)]
 pub struct Services {
     identity: Arc<Identity>,
-    /// Collections, books and Work, when an index is configured.
+    /// The workspace services, when an index is configured.
     workspace: Vec<Arc<dyn Service>>,
+    /// My Work, for its feed, CalDAV and capture routes.
+    tasks: Option<Arc<TasksService>>,
 }
 
 impl std::fmt::Debug for Services {
@@ -69,6 +72,7 @@ impl Services {
         Ok(Self {
             identity: Arc::new(identity),
             workspace: Vec::new(),
+            tasks: None,
         })
     }
 
@@ -82,7 +86,9 @@ impl Services {
         config: &Config,
         var: impl Fn(&str) -> Option<String>,
     ) -> Result<Self, Error> {
-        self.workspace = workspace::open(config, &self.identity, var).await?;
+        let opened = workspace::open(config, &self.identity, var).await?;
+        self.workspace = opened.services;
+        self.tasks = opened.tasks;
         Ok(self)
     }
 
@@ -101,6 +107,11 @@ impl Services {
             builder = builder.service(service);
         }
         let identity = &self.identity;
+        if let Some(tasks) = &self.tasks {
+            for (prefix, router) in crate::tasks_http::routers(tasks, identity) {
+                builder = builder.mount_cross_site(prefix, router);
+            }
+        }
         builder
             .authenticator(Arc::new(IdentityAuthenticator::new(Arc::clone(identity))))
             .mount("/auth", identity_http::browser_router(Arc::clone(identity)))
