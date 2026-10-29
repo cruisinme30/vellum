@@ -1,0 +1,74 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "fence",
+        "lang": "timeline",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "2026-10-01 | Beta opens | Invite-only, Northstar design partners\n2026-11-24 | General availability\n"
+      },
+      {
+        "type": "fence",
+        "lang": "roadmap",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "range: 2026-10-01 .. 2027-03-31\nReplay engine | 2026-10-01 | 2026-12-15\nGA | 2026-11-24 | milestone\n"
+      },
+      {
+        "type": "fence",
+        "lang": "risk-matrix",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "Data loss | likelihood 1 | impact 5\nSlow search | likelihood 3 | impact 2\n"
+      },
+      {
+        "type": "fence",
+        "lang": "board",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "## Todo\n- Write runbook [P1]\n## Doing\n- Replay engine\n## Done\n- Diff report\n"
+      },
+      {
+        "type": "fence",
+        "lang": "table",
+        "args": "sortable bar=Revenue sum=Revenue",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "Region,Revenue\nEMEA,120\nAPAC,90\n"
+      },
+      {
+        "type": "fence",
+        "lang": "architecture",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "Edge: Gateway\nCore: Policy engine, Audit log\nGateway -> Policy engine: checks\nPolicy engine -> Audit log\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}

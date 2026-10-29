@@ -1,0 +1,8 @@
+```mermaid
+sankey-beta
+Requests,Allowed,8200
+Requests,Blocked,1800
+Blocked,Injection,1100
+Blocked,Rate limit,500
+Blocked,Policy,200
+```

@@ -35,18 +35,30 @@ gitGraph
    kebab case: `feat/typed-ids`, `fix/watcher-rename`, `docs/adr-0002`.
    CI rejects other names (Dependabot's `dependabot/…` excepted). Open the
    pull request against `develop`.
-2. At regular intervals a maintainer opens a pull request from `develop`
-   into `main`. It merges with a merge commit, never a squash, so history
-   stays shared.
-3. Releases are cut by tagging `main` (`vX.Y.Z`, semver).
-4. An urgent fix branches from `main`, merges into `main` through the full
+2. Merge with auto-merge: `gh pr merge --auto --squash`, or **Enable
+   auto-merge** on GitHub. The pull request squash-merges itself once
+   **Fast suite** is green. Pull requests are not re-tested on top of each
+   other, so the fast suite also runs on every push to `develop`. When
+   it fails there, the **Develop health** workflow opens a
+   "develop is red" issue. Whoever merged the breaking change fixes or
+   reverts it, others hold their merges, and the issue closes itself
+   when `develop` is green again. If `Cargo.lock` or `web/pnpm-lock.yaml`
+   conflicts, merge `develop` into your branch and run
+   `cargo xtask relock`.
+3. At regular intervals a maintainer cuts a release branch,
+   `chore/release-YYYY-MM-DD`, from a green `develop` commit and opens a
+   pull request from it into `main`. A frozen snapshot lets the full
+   suite finish while `develop` keeps moving. It merges with a merge
+   commit, never a squash, so history stays shared.
+4. Releases are cut by tagging `main` (`vX.Y.Z`, semver).
+5. An urgent fix branches from `main`, merges into `main` through the full
    suite, then `main` merges back into `develop`.
 
 ## Checks
 
 | Suite | Runs on | Contents |
 | --- | --- | --- |
-| Fast (`ci.yml`) | every pull request into `develop` or `main`, pushes to `develop` | rustfmt, clippy, rustdoc, unit and property tests (nextest), crate boundaries, cargo-deny, cargo-audit; Prettier, tsc, ESLint, knip, Vitest with 85 % coverage, pnpm audit; REUSE, yamllint, shellcheck, markdownlint, Vale, local links, gitleaks, infrastructure linters; Conventional Commits, DCO, branch name and description template |
+| Fast (`ci.yml`) | every pull request into `develop` or `main`, pushes to `develop` | rustfmt, clippy, rustdoc, unit and property tests (nextest), crate boundaries, cargo-deny, cargo-audit; Prettier, tsc, ESLint, knip, Vitest with 85 % coverage, pnpm audit; REUSE, yamllint, shellcheck, markdownlint, Vale, local links, gitleaks, infrastructure linters; Conventional Commits, DCO, branch name and description template; linked issue and decision record |
 | Full (`full.yml`) | every pull request into `main`, pushes to `main`, nightly | the fast suite, plus Rust line coverage of at least 85 %, the release build, Playwright end-to-end with axe accessibility checks, and external link checks |
 
 Further layers join the full suite as their code lands: golden corpus,
@@ -74,6 +86,28 @@ CI still runs it. Install `markdownlint-cli2`, `vale`, `lychee`,
 `gitleaks`, `reuse`, `yamllint` and `shellcheck` to run every check. In
 an emergency, `git push --no-verify` skips the hook, but CI still gates
 the merge.
+
+## Issues and decision records
+
+Every change is traceable to the discussion that led to it.
+
+- **One issue per feature or fix.** Open a GitHub issue before starting.
+  Keep the discussion there: the problem, the options, the questions and
+  the answers, so the issue is the feature's full history.
+- **The pull request links it.** Put `Closes #N` (or `Refs #N` when the
+  issue stays open) in the **Issue** section of the description.
+- **A feature records its decisions.** Copy `docs/adr/0000-template.md`
+  to `docs/adr/NNNN-<slug>.md`, ask for the next record and decision
+  numbers, and fill it in. Every record has the same four sections,
+  **Context**, **Decisions**, **Alternatives** and **Consequences**, plus
+  the issue and pull requests in its facts block. Keep it short: under
+  150 lines and at most six bullets in a row; the **Decision records**
+  check enforces both. When a feature only extends an existing decision,
+  update that record or name it as `ADR NNNN` in the description.
+
+The **Issue and decision record** check in the fast suite enforces this.
+Release pull requests, Dependabot, and `chore` or `ci` pull requests are
+exempt.
 
 ## Commits and pull requests
 
@@ -123,7 +157,8 @@ check. When a new crate lands, add its path to `.github/labeler.yml`.
 
 Formatted; zero lint warnings; tests at the right layer; tracing spans and
 metrics for any new I/O; public items documented; user guide updated if the
-change is visible; an ADR in `docs/adr/` if a decision was made; reviewed
+change is visible; a linked issue, and for a feature an ADR in
+`docs/adr/` that links it; reviewed
 by someone who did not write it; CI green.
 
 ## Branch protection
@@ -134,8 +169,9 @@ Set these under **Settings → Rules → Rulesets** on GitHub.
 | --- | --- | --- |
 | Require a pull request (0 approvals while there is one maintainer) | yes | yes |
 | Required status checks | `Fast suite` | `Full suite` |
-| Require branches to be up to date | yes | yes |
+| Auto-merge (squash on `develop`) | yes | no |
+| Require branches to be up to date | no (Develop health catches combinations) | yes |
 | Require signed commits | planned | planned |
 | Require linear history | yes (squash merge) | no (merge commits from `develop`) |
 | Block force pushes and deletion | yes | yes |
-| Restrict who can push | — | maintainers only, and only from `develop` or a hotfix |
+| Restrict who can push | — | maintainers only, and only from a release branch or a hotfix |

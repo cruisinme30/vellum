@@ -1,0 +1,3 @@
+Literal characters stay literal: \*not italic\*, \_not italic\_, \[not a link\], \`not code\`, \<not html> and 5 \* 3.
+
+Snake_case words need no escapes, and neither does a = b.

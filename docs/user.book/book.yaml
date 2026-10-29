@@ -1,0 +1,111 @@
+vellum: 1
+id: 01M63C8QH9FN872JSH5DQNY6E9
+title: User guide
+numbering: decimal
+max_depth: 3
+export_profile: default
+nodes:
+  01M63CFE66X4BN1AP8Q95NRMXZ:
+    path: README.md
+  01M63CFE67X46N7KX44C7WV4HP:
+    path: start/README.md
+  01M63CFE67MXWWJF7BTKEPYMFV:
+    path: start/editor.md
+  01M63CFE674A9A6BKGKDT4FDHS:
+    path: start/shortcuts.md
+  01M63CFE67FTFQ8XDH4S7ET305:
+    path: writing/README.md
+  01M63CFE67J4PKTBWV4SEKZVFD:
+    path: writing/text.md
+  01M63CFE67KJ8DNXFCVQYT4F27:
+    path: writing/structure.md
+  01M63CFE68RASNTPVVBTRXBA6Z:
+    path: writing/containers.md
+  01M63CFE6872ZE4R5D3BBVQ222:
+    path: writing/numbers.md
+  01M63CFE68K4DQC96RHGRDB3BH:
+    path: writing/charts.md
+  01M63CFE68RDVE0FK3FPM39SCP:
+    path: writing/plans.md
+  01M63CFE69PHPB6WRBB2DZH556:
+    path: writing/media.md
+  01M63CFE69ZGB3H7PKY85FNHEE:
+    path: writing/interactive.md
+  01M63CFE695JHR5CT1S8HH3WDC:
+    path: writing/rendering.md
+  01M63CFE699P22GB36Z2F8NN82:
+    path: diagrams/README.md
+  01M63CFE69CSEMP7N4AV85N8CD:
+    path: diagrams/mermaid.md
+  01M63CFE69R6H6CDKC8S6V66X1:
+    path: diagrams/kroki.md
+  01M63CFE699A568XC5KR9935JE:
+    path: diagrams/errors.md
+  01M63CFE6AY4JH4VRWJD27AB60:
+    path: data/README.md
+  01M63CFE6AVJJ8BPGV8PSJH467:
+    path: data/properties.md
+  01M63CFE6AKFSSD68KZ1A4J9VB:
+    path: data/formulas.md
+  01M63CFE6A6EN0Y8BD7X9JSH88:
+    path: data/views.md
+  01M63CFE6ANMXKF0XQHKFM57BG:
+    path: books/README.md
+  01M63CFE6ACQRBNH8HC5HE1WAT:
+    path: books/numbering.md
+  01M63CFE6BM482SF9S81PZXTEG:
+    path: books/publishing.md
+  01M63CFE6BJDEMZ5KKM47KCJM5:
+    path: work/README.md
+  01M63CFE6BN3FM8WCNHE97ACE2:
+    path: work/cycles.md
+  01M63CFE6BEQ9KJKRTGPZWXA46:
+    path: work/projects.md
+  01M63CFE6D9C4J2CBEQCMZDGBA:
+    path: work/git.md
+  01M63CFE6D1GYA247XRQD5N8XV:
+    path: work/import.md
+  01M63CFE6DEX5ZZ9B6J932T04N:
+    path: my-work/README.md
+  01M63CFE6DPBF9718KGFFWX7X2:
+    path: my-work/quick-add.md
+  01M63CFE6EACD11MG7NJBAE1YC:
+    path: my-work/calendar.md
+  01M63CFE6EE72DZXNSS697V5HS:
+    path: drive/README.md
+  01M63CFE6EBPZZV9796TFPBFZQ:
+    path: drive/sharing.md
+  01M63CFE6EC3A4987TVBN7YPWC:
+    path: drive/external-edits.md
+  01M63CFE6E892FX5TJPFV635MJ:
+    path: ai/README.md
+  01M63CFE6EAABTXC8GSEY19CFJ:
+    path: ai/drafts.md
+  01M63CFE6E3DRJA4TQNS9CSGRM:
+    path: cookbook/README.md
+  01M63CFE6FA6D69FAA5YXV3RES:
+    path: cookbook/meeting-notes.md
+  01M63CFE6F2CWRYV53K5GJGAHP:
+    path: cookbook/personal-tasks.md
+  01M63CFE6FK1VH1H0A6T3AHZYM:
+    path: cookbook/status-page.md
+  01M63CFE6FECTX40YFDXFNMDJN:
+    path: cookbook/requirements-tracker.md
+  01M63CFE6FVPMCB1RY71ZX8ZCM:
+    path: cookbook/running-a-cycle.md
+  01M63CFE6F5K9DXREV3WGTFV95:
+    path: cookbook/export-chapter.md
+  01M63CFE6FJKC6SYVC2573N2TF:
+    path: cookbook/prd-with-issues.md
+  01M63CFE6GX4QTGS9C8P9SS09N:
+    path: cookbook/on-call-runbook.md
+  01M63CFE6GJS1RY6ECPE79TGSK:
+    path: cookbook/quarterly-review.md
+  01M63CFE6GPKC1SA40WNMM5EYV:
+    path: cookbook/release-notes-mcp.md
+  01M63CFE6GHMBHHQ9VRGTC42YZ:
+    path: cookbook/private-research-wiki.md
+  01M63CFE6GPPNCPQZH35TH584M:
+    path: cookbook/docs-as-code.md
+  01M63CFE6H61T81EAWK2TWMS33:
+    path: glossary.md

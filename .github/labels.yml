@@ -77,6 +77,12 @@
 - name: area/pages
   color: "5319e7"
   description: "vellum-pages: spaces, pages, books"
+- name: area/drive
+  color: "5319e7"
+  description: "vellum-drive: spaces, folders, trash, versions"
+- name: area/books
+  color: "5319e7"
+  description: "vellum-books: books, SUMMARY.md, numbering, publishing"
 - name: area/work
   color: "5319e7"
   description: "Work: issues, cycles, projects"
@@ -110,6 +116,38 @@
 - name: area/deploy
   color: "5319e7"
   description: "Compose, Helm and deployment"
+- name: area/search
+  color: "5319e7"
+  description: "Search index and query"
+- name: area/drive
+  color: "5319e7"
+  description: "Drive layer: folders, trash, sharing"
+- name: area/books
+  color: "5319e7"
+  description: "Books and SUMMARY.md"
+- name: area/identity
+  color: "5319e7"
+  description: "Accounts, sessions, SSO, OAuth"
+- name: area/security
+  color: "5319e7"
+  description: "Security hardening across crates"
+- name: area/observability
+  color: "5319e7"
+  description: "Telemetry, admin and request explorer"
+- name: area/integrations
+  color: "5319e7"
+  description: "Git, webhooks, intake, notifications"
+- name: area/desktop
+  color: "5319e7"
+  description: "Desktop app and PWA"
+- name: area/site
+  color: "5319e7"
+  description: "Project website"
+
+# Tracker
+- name: task
+  color: "c5def5"
+  description: "A 1.0 task in the tracker"
 
 # Phase of the build order
 - name: phase/foundation

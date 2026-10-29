@@ -12,7 +12,8 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D52, D53, D54
-- Issues: [#58](https://github.com/cruisinme30/vellum/issues/58), [#59](https://github.com/cruisinme30/vellum/issues/59)
+- Issue: #58, #59
+- Pull requests: #32
 
 :::
 
@@ -80,6 +81,15 @@ come from ADR 0006. This ADR fixes the rules that turn them into answers.
 - Expiring grants stay correct through a sweep job: `sweep_expired`
   deletes due tuples, re-materialises, and returns when the next sweep is
   due.
+
+## Alternatives
+
+- **Walk the tree on every check**: cost grows with depth and breaks the
+  one-lookup rule.
+- **Compute access in a background job**: changes would show late,
+  missing the 1 s target.
+- **Groups as principals in `effective_access`**: a check would need a
+  membership join.
 
 ## Consequences
 

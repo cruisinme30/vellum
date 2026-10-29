@@ -26,12 +26,36 @@ trap 'rm -rf "${work}"' EXIT
 
 # to_commonmark <file>: rewrites a Vellum Markdown page in place. Drops a
 # leading YAML front matter block and the opening and closing lines of
-# ::: containers (a details title becomes a bold line), and turns the
+# ::: containers (a details title becomes a bold line), rewrites relative
+# links for the published layout (<name>.book/ becomes <name>/, README.md
+# becomes index.md), and turns the
 # front matter title into the page heading when the page has none. It
 # never touches anything inside a code fence, where
 # the help books show Vellum Markdown source on purpose.
 to_commonmark() {
   awk '
+    # Published books live at docs/<name>/ and mdBook writes README.md
+    # chapters as index.html, so relative links follow both renames.
+    function fix_target(t) {
+      if (t ~ /^[A-Za-z][A-Za-z0-9+.-]*:/ || t ~ /^[\/#]/) return t
+      gsub(/\.book\//, "/", t)
+      if (t ~ /(^|\/)README\.md(#|$)/) sub(/README\.md/, "index.md", t)
+      return t
+    }
+    function fix_links(s,   out, link) {
+      out = ""
+      while (match(s, /\]\([^) \t]+/)) {
+        link = substr(s, RSTART + 2, RLENGTH - 2)
+        out = out substr(s, 1, RSTART + 1) fix_target(link)
+        s = substr(s, RSTART + RLENGTH)
+      }
+      out = out s
+      if (match(out, /^ ? ? ?\[[^]]+\]:[ \t]*/) && RLENGTH < length(out)) {
+        link = substr(out, RSTART + RLENGTH); sub(/[ \t].*$/, "", link)
+        out = substr(out, 1, RLENGTH) fix_target(link) substr(out, RLENGTH + 1 + length(link))
+      }
+      return out
+    }
     NR == 1 && $0 == "---" { front = 1; next }
     front {
       if ($0 == "---" || $0 == "...") front = 0
@@ -53,6 +77,7 @@ to_commonmark() {
           if (title != $0 && title != "") print "**" title "**\n"
           next
         }
+        $0 = fix_links($0)
       } else {
         line = $0; sub(/^ +/, "", line); sub(/[ \t]+$/, "", line)
         if (substr(line, 1, 1) == substr(fence, 1, 1) && line ~ /^(`+|~+)$/ && length(line) >= length(fence)) fence = ""
@@ -134,6 +159,8 @@ if [[ -e "${adrs[0]}" ]]; then
     echo "[Architecture decisions](README.md)"
     echo
     for adr in "${adrs[@]}"; do
+      # 0000-template.md is the blank form for new records, not a decision.
+      [[ "$(basename "${adr}")" == 0000-* ]] && continue
       cp "${adr}" "${src}/"
       echo "- [$(yaml_title "${adr}")]($(basename "${adr}"))"
     done

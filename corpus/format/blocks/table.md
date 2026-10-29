@@ -1,0 +1,5 @@
+| # | Requirement | Owner | Status |
+| --- | :-- | :-: | --: |
+| R1 | Replay 7 days of traffic in under 10 minutes | @dev | Done |
+| R2 | Diff report: newly blocked, newly allowed | @priya | In review |
+| R3 | Pipe \| inside a cell | @maya | Blocked |

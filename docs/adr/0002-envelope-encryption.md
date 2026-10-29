@@ -12,6 +12,8 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D34, D35, D36
+- Issue: none (recorded before the issue rule, D119)
+- Pull requests: #22
 
 :::
 
@@ -35,8 +37,6 @@ on-disk format and the provider contract in `vellum-crypto`.
   object: magic `\0VLE`, version, KEK id, wrapped DEK, nonce, ciphertext.
   A Markdown file never starts with a NUL byte, so plaintext and sealed
   objects are told apart without metadata.
-- Consequence: deleting one object's header shreds that object, and a
-  backup restores keys and data together.
 
 ### D35: the payload is bound to neither the path nor the header
 
@@ -46,10 +46,6 @@ on-disk format and the provider contract in `vellum-crypto`.
 - Rotation (`rewrap`) unwraps the DEK with the old KEK, wraps it with the
   current one and rewrites only the header. Retired KEKs stay in the
   keyring until no header names them.
-- Consequence: someone with write access to the store could swap two whole
-  sealed objects. That is an integrity threat to the store itself, covered
-  by authorization, the audit log and the index's content hashes, not by
-  encryption at rest.
 
 ### D36: providers own the KEK and the wrapped form
 
@@ -58,3 +54,23 @@ on-disk format and the provider contract in `vellum-crypto`.
 - `LocalKeyring` serves the OS keychain and passphrase cases. A passphrase
   KEK id carries its Argon2id salt and costs, so the passphrase alone
   re-derives the KEK from any envelope header.
+
+## Alternatives
+
+- **One DEK per document in a lookup table**: an extra table to back up
+  and keep in step, for no gain over one DEK per object.
+- **Bind the payload to its path**: renames would need re-encryption.
+- **Bind the payload to the header**: rotation would rewrite every
+  payload instead of one header.
+
+## Consequences
+
+- Deleting one object's header shreds that object, and a backup
+  restores keys and data together.
+- Someone with write access to the store could swap two sealed objects;
+  authorization, the audit log and content hashes cover that.
+- `vellum-sealed-store` (engine layer) wraps any `BlobStore`: sealed
+  writes by default, reads that accept both forms while a space switches
+  mode, and `reseal` as the one migration and rotation step.
+- `head`, `get`, `put` and `rename` report plaintext sizes; listings
+  report stored sizes because they never read content.

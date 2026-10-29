@@ -20,6 +20,8 @@ workspace = true
 [features]
 # Exposes the storage adapter conformance suite to other crates' tests.
 conformance = []
+# Git work tree with commit per save batch and merge-based sync.
+git = ["tokio/process", "tokio/fs", "tokio/io-util"]
 
 [dependencies]
 async-trait = "0.1.92"
@@ -28,14 +30,16 @@ diff-match-patch-rs = "0.5.1"
 diffy = "0.5.2"
 futures = "0.3.34"
 hex = "0.4.3"
+notify = "8.2.0"
 opentelemetry = "0.33.1"
 sha2 = "0.11.1"
 thiserror = "2.0.21"
-tokio = { version = "1.49.0", features = ["rt", "sync"] }
+tokio = { version = "1.49.0", features = ["rt", "sync", "time"] }
 tracing = "0.1.44"
+vellum-kernel.workspace = true
 
 [dev-dependencies]
 proptest = ">=1.11.0, <1.12"
 tempfile = "3.27.0"
 tokio = { version = "1.49.0", features = ["macros", "rt-multi-thread"] }
-vellum-store = { path = ".", features = ["conformance"] }
+vellum-store = { path = ".", features = ["conformance", "git"] }
