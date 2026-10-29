@@ -25,7 +25,7 @@ vellum: 1
 | `created` | Who created the row and when | Priya Shah, 2026-10-02 |
 
 Select **Properties** on a collection to rename a property, change its
-type, change a select's options or a formula, delete a property, or add
+type, change the options of a select or a formula, delete a property, or add
 a new one at the end. Renaming a property updates the formulas that use
 it. Changing the type keeps every value in the files: values that do not
 fit the new type are listed under **Problems** until you fix them or
