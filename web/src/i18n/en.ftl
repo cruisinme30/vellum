@@ -185,3 +185,20 @@ collection-no-dates = No dates
 collection-computed = Computed, read-only
 collection-body = Notes
 collection-close-row = Close row
+
+## Sign-in and first-run set-up
+
+auth-email = Email
+auth-password = Password
+auth-error = Something went wrong. Try again.
+auth-loading = Connecting to Vellum…
+auth-sign-out = Sign out
+auth-signed-in-as = Signed in as { $name } ({ $email })
+sign-in-title = Sign in
+sign-in-intro = Sign in to your Vellum workspace.
+sign-in-submit = Sign in
+setup-title = Set up your workspace
+setup-intro = This workspace is new. Create the first administrator account; you can invite everyone else afterwards.
+setup-name = Your name
+setup-password-hint = At least 12 characters.
+setup-submit = Create account

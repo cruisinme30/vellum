@@ -12,7 +12,10 @@ import "./styles/collections.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
+import { createAuthApi } from "./api/auth";
+import { createHttp } from "./api/http";
 import { App } from "./app";
+import { createHttpCollectionsStore } from "./collections/http";
 import { createMockCollectionsStore } from "./collections/mock";
 import { createNorthstarStore } from "./data/mock/northstar";
 import { lazyCache } from "./editor/collab/lazy-cache";
@@ -28,12 +31,29 @@ const container = document.querySelector("#root");
 if (container === null) {
   throw new Error("Vellum: the #root element is missing from index.html");
 }
-createRoot(container).render(
+const root = createRoot(container);
+
+// When a Vellum server answers, the areas whose API exists use it (issue
+// #392); without one (the dev server alone, the website's demo) the whole
+// app runs on the Northstar demo data.
+const http = createHttp();
+const auth = createAuthApi(http);
+let status: Awaited<ReturnType<typeof auth.status>>;
+try {
+  status = await auth.status();
+} catch {
+  // A server that answers with an error: show the demo rather than nothing.
+  status = undefined;
+}
+root.render(
   <StrictMode>
     <App
       store={createNorthstarStore()}
       collab={createLocalConnector({ cache })}
-      collections={createMockCollectionsStore()}
+      collections={
+        status === undefined ? createMockCollectionsStore() : createHttpCollectionsStore(http)
+      }
+      session={status === undefined ? undefined : { auth, status }}
     />
   </StrictMode>,
 );

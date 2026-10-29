@@ -6,8 +6,22 @@ import { defineConfig } from "vitest/config";
 
 import { vellumServiceWorker } from "./src/platform/pwa/vite-plugin";
 
+// `VELLUM_SERVER=http://127.0.0.1:8080 pnpm dev` runs the app against a
+// local `vellum serve`; without it the app runs on the Northstar demo data.
+const server = process.env["VELLUM_SERVER"];
+const proxy =
+  server === undefined
+    ? undefined
+    : Object.fromEntries(
+        ["/api", "/auth", "/oauth", "/.well-known", "/collab"].map((path) => [
+          path,
+          { target: server, changeOrigin: false, ws: path === "/collab" },
+        ]),
+      );
+
 export default defineConfig({
   plugins: [react(), vellumServiceWorker()],
+  ...(proxy === undefined ? {} : { server: { proxy } }),
   build: {
     sourcemap: true,
     // The editor chunk (Tiptap, ProseMirror, Yjs) is about 560 kB; it loads lazily.
