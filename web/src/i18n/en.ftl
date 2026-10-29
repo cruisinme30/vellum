@@ -208,3 +208,65 @@ setup-intro = This workspace is new. Create the first administrator account; you
 setup-name = Your name
 setup-password-hint = At least 12 characters.
 setup-submit = Create account
+
+## Notification settings
+
+notify-open = Notification settings
+notify-title = Notifications
+notify-intro = Choose what reaches you and where. These settings follow you to every device.
+notify-loading = Loading your notification settings…
+notify-retry = Try again
+notify-save = Save
+notify-discard = Discard changes
+notify-saved = Saved.
+notify-channels = What reaches you
+notify-channels-caption = Each row is a kind of notification; each column is a place it can reach you.
+notify-kind = Notification
+notify-channel-in_app = Inbox
+notify-channel-email = Email
+notify-channel-push = Push
+notify-toggle = { $channel } for { $kind }
+notify-urgent = Urgent
+notify-kind-issue_assigned = Assigned to you
+notify-kind-mentioned = Mentions
+notify-kind-commented = Comments on things you follow
+notify-kind-state_changed = Status changes
+notify-kind-triage_new = New in your triage inbox
+notify-kind-sla_high_risk = SLA at risk
+notify-kind-sla_breached = SLA breached
+notify-kind-review_requested = Review requests
+notify-kind-project_update = Project updates
+notify-kind-reminder = Reminders
+notify-kind-pull_request = Pull requests
+notify-email = Email timing
+notify-email-delay = Send email after
+notify-email-now = Straight away
+notify-minutes = { $n ->
+        [one] 1 minute
+       *[other] { $n } minutes
+    }
+notify-email-hint = If you read it in Vellum first, the email is not sent. Urgent notifications are emailed straight away.
+notify-snooze = Snooze
+notify-snooze-hint = Hold push and email for a while. Your inbox still fills up, and urgent notifications still come through.
+notify-snooze-1h = 1 hour
+notify-snooze-8h = 8 hours
+notify-snooze-1d = 1 day
+notify-snooze-1w = 1 week
+notify-snoozed-until = Snoozed until { $time }.
+notify-resume = Resume now
+notify-muted = Muted
+notify-muted-empty = Nothing is muted.
+notify-unmute = Unmute
+notify-unmute-label = Unmute { $subject }
+notify-mute-subject = Issue key or page ID
+notify-mute = Mute
+notify-device = This device
+notify-device-checking = Checking this browser…
+notify-device-on = Push notifications are on for this browser.
+notify-device-off = Push notifications are off for this browser.
+notify-device-denied = This browser blocked notifications. Allow them in the site settings, then try again.
+notify-device-unsupported = This browser can't receive push notifications. On iPhone and iPad, add Vellum to your Home Screen first.
+notify-device-demo = Push notifications need a Vellum server; the demo can't send them.
+notify-device-enable = Turn on push
+notify-device-disable = Turn off push
+notify-device-error = Push couldn't be changed. Try again.
