@@ -11,8 +11,8 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D150, D151
-- Issue: #432, #435, #437
+- Decisions: D150, D151, D159
+- Issue: #432, #433, #435, #437
 - Pull requests: none yet (delivered as a bundle)
 
 :::
@@ -61,6 +61,22 @@ safe to run as several replicas. Each fix adds its decision here.
   their editors reconnect to the new owner. An unreachable owner means the
   replica serves the room itself, so re-home costs one reconnect.
 
+### `D159`: the workspace files live in the bucket `VELLUM_BLOB_URL` names
+
+- `vellum serve` opens the S3 adapter when `VELLUM_BLOB_URL` is an `s3://`
+  URL, and the data folder when it is unset. Any other value, or missing
+  S3 keys, stops startup with a message naming the variable.
+- The file watcher runs only for a data folder. A bucket is written only
+  through Vellum, so there are no outside edits to follow.
+- A `storage` readiness check lists an empty folder in the store, so
+  `/readyz` fails while the bucket is unreachable, without logging an
+  error on every healthy probe.
+- A shared bucket with a per-replica SQLite index logs a warning; the team
+  and organisation profiles already require Postgres.
+- Multi-replica Work (D150) relies on this: its journal claim needs the S3
+  adapter's `If-Match` and `If-None-Match` writes, which the storage
+  conformance suite checks are atomic.
+
 ## Alternatives
 
 - **Work state in Postgres**: the most scalable, but it rewrites the
@@ -69,6 +85,9 @@ safe to run as several replicas. Each fix adds its decision here.
   discovery and request forwarding; the collab fix may provide both later.
 - **Ingress affinity by document path**: depends on the ingress
   controller and cannot drain rooms when replicas change.
+- **A shared volume (`ReadWriteMany`) at `/data`**: keeps the local
+  folder code, but few clusters offer one, and file locking over network
+  file systems cannot serve as Work's atomic claim.
 - **Full reload whenever anything changed**: simple, but each change would
   cost every replica a read of every Work file.
 
@@ -82,5 +101,7 @@ safe to run as several replicas. Each fix adds its decision here.
   large workspace needs more than about 20 commands a second.
 - Forwarded collab traffic between replicas is plain WebSocket inside the
   cluster network; the chart's network policy limits who can reach it.
+- A bucket needs static S3 keys today; the chart's workload-identity
+  option refuses to start until the S3 adapter supports it.
 - Edits made to Work files outside Vellum are still not picked up while
   running; that is unchanged.

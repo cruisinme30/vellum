@@ -11,18 +11,25 @@
 //! `VELLUM_INDEX_PLAINTEXT=1`). Without one the server still starts, with
 //! sign-in only, and says why.
 //!
-//! At startup the drive rescans the data folder, and a file watcher then
-//! keeps the index in step with edits made outside Vellum (see
-//! [`crate::watcher`]).
+//! Workspace files live in the data folder, or in a shared S3 bucket when
+//! `VELLUM_BLOB_URL` names one (`s3://bucket[/prefix]`, with
+//! `VELLUM_S3_ENDPOINT`, `VELLUM_S3_REGION` and the `AWS_*` keys). Several
+//! replicas need the bucket and a Postgres index, so they all see one
+//! workspace and a restarted pod loses nothing.
+//!
+//! At startup the drive rescans the files. For a data folder, a file
+//! watcher then keeps the index in step with edits made outside Vellum
+//! (see [`crate::watcher`]); a bucket is only written through Vellum.
 
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
+use futures::StreamExt as _;
 use vellum_authz::{Authz, AuthzStore, Id, MemoryStore, SqlStore};
 use vellum_books_service::BooksService;
 use vellum_collections::CollectionsService;
-use vellum_contracts::{BoxFuture, Service};
+use vellum_contracts::{BoxFuture, Operation, Readiness, Service};
 use vellum_db::{Index, IndexConfig};
 use vellum_drive::authz::{AuthzAccess as DriveAuthzAccess, TreeSync};
 use vellum_drive::sql::SqlIndex;
@@ -30,7 +37,8 @@ use vellum_drive::{Drive, DriveIndex, DriveService};
 use vellum_identity::Identity;
 use vellum_kernel::{Config, Error, ErrorKind, UserId};
 use vellum_notify::service::NotifyStore;
-use vellum_store::{BlobPath, BlobStore, LocalStore};
+use vellum_store::remote::s3::{S3Config, S3Store};
+use vellum_store::{BlobPath, BlobStore, LocalStore, StoreError};
 use vellum_tasks::google::Google;
 use vellum_tasks::service::{Config as TasksConfig, TasksService};
 use vellum_work::{UserRef, WorkEvent};
@@ -53,6 +61,15 @@ const GOOGLE_SYNC_EVERY: Duration = Duration::from_mins(5);
 
 /// Variable that opens the SQLite index without encryption.
 pub const PLAINTEXT_VAR: &str = "VELLUM_INDEX_PLAINTEXT";
+
+/// Variable naming the shared blob store; unset keeps files in the data
+/// folder.
+pub const BLOB_URL_VAR: &str = "VELLUM_BLOB_URL";
+
+/// Folder the readiness probe lists. It is normally empty; any answer but
+/// an error means the store is reachable. Listing, unlike a lookup, does
+/// not log a missing file as an error on every probe.
+const PROBE: &str = ".vellum/ready";
 
 /// How often the space list behind permission checks is reloaded.
 const SPACES_REFRESH: Duration = Duration::from_secs(30);
@@ -85,6 +102,93 @@ pub fn index_config(
     Ok(Err(format!(
         "no index is configured: set {KEY_VAR}, {PLAINTEXT_VAR}=1 or a database URL"
     )))
+}
+
+/// Where the workspace files live.
+struct Files {
+    store: Arc<dyn BlobStore>,
+    /// A folder on this machine, which the file watcher can follow.
+    local: bool,
+}
+
+/// The shared bucket `VELLUM_BLOB_URL` names, or `None` to keep files in
+/// the data folder.
+///
+/// # Errors
+///
+/// A blob URL that is not `s3://`, or missing S3 settings.
+fn bucket(var: impl Fn(&str) -> Option<String>) -> Result<Option<S3Config>, Error> {
+    let Some(url) = var(BLOB_URL_VAR).filter(|v| !v.is_empty()) else {
+        return Ok(None);
+    };
+    if !url.starts_with("s3://") {
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            format!(
+                "{BLOB_URL_VAR} must be an s3:// URL; leave it unset to keep files in the data folder"
+            ),
+        ));
+    }
+    S3Config::from_vars(var).map(Some).map_err(|e| {
+        Error::new(
+            ErrorKind::InvalidInput,
+            format!("cannot use the blob store: {e}"),
+        )
+    })
+}
+
+/// Opens `bucket`, or the data folder when there is none.
+///
+/// # Errors
+///
+/// The S3 client cannot start, or the data folder cannot be opened.
+async fn open_files(config: &Config, bucket: Option<S3Config>) -> Result<Files, Error> {
+    let Some(bucket) = bucket else {
+        let store = LocalStore::open(&config.data_dir)
+            .await
+            .map_err(|e| unavailable("cannot open the data folder", e))?;
+        return Ok(Files {
+            store: Arc::new(store),
+            local: true,
+        });
+    };
+    let store = S3Store::new(bucket).map_err(|e| unavailable("cannot use the blob store", e))?;
+    Ok(Files {
+        store: Arc::new(store),
+        local: false,
+    })
+}
+
+/// Reports whether the blob store answers, for `/readyz`. It has no
+/// operations of its own.
+#[derive(Debug)]
+struct Storage(Arc<dyn BlobStore>);
+
+impl Service for Storage {
+    fn name(&self) -> &'static str {
+        "storage"
+    }
+
+    fn operations(self: Arc<Self>) -> Vec<Operation> {
+        Vec::new()
+    }
+
+    fn readiness(&self) -> BoxFuture<'_, Readiness> {
+        Box::pin(probe(self.0.as_ref()))
+    }
+}
+
+async fn probe(store: &dyn BlobStore) -> Readiness {
+    let Ok(path) = BlobPath::new(PROBE) else {
+        return Readiness::Ready;
+    };
+    match store.list(Some(&path)).next().await {
+        None | Some(Ok(_) | Err(StoreError::NotFound(_))) => Readiness::Ready,
+        Some(Err(e)) => Readiness::NotReady(format!(
+            "the {} blob store is unreachable: {e}",
+            store.backend()
+        )),
+    }
 }
 
 /// The spaces and their folders, newest first by folder depth, for the
@@ -327,6 +431,7 @@ pub async fn open(
     var: impl Fn(&str) -> Option<String> + Send + Sync,
 ) -> Result<Opened, Error> {
     let setup = TasksSetup::new(identity, Some(&config.data_dir), &var);
+    let bucket = bucket(&var)?;
     let index_config = match index_config(config, &var)? {
         Ok(c) => c,
         Err(why) => {
@@ -337,11 +442,14 @@ pub async fn open(
     let index = Index::open(&index_config)
         .await
         .map_err(|e| unavailable("cannot open the index", e))?;
-    let store: Arc<dyn BlobStore> = Arc::new(
-        LocalStore::open(&config.data_dir)
-            .await
-            .map_err(|e| unavailable("cannot open the data folder", e))?,
-    );
+    let Files { store, local } = open_files(config, bucket).await?;
+    if !local && matches!(index_config, IndexConfig::Sqlite { .. }) {
+        tracing::warn!(
+            "files are in a shared bucket but the index is this machine's SQLite file; \
+             run one replica only, or set a database URL"
+        );
+    }
+    tracing::info!(backend = store.backend(), "workspace files opened");
     let authz = Arc::new(Authz::new(SqlStore::new(index.clone())));
     let drive_index = Arc::new(SqlIndex::new(index.clone()));
     let spaces = Arc::new(Spaces::default());
@@ -364,9 +472,11 @@ pub async fn open(
     )?;
     // The watcher starts before the rescan, so nothing edited in between
     // is missed; whatever it sees twice is applied idempotently.
-    crate::watcher::start(&config.data_dir, &store, &workspace.drive, &workspace.books).await?;
+    if local {
+        crate::watcher::start(&config.data_dir, &store, &workspace.drive, &workspace.books).await?;
+    }
     match workspace.drive.scan().await {
-        Ok(report) => tracing::info!(?report, "drive index rebuilt from the data folder"),
+        Ok(report) => tracing::info!(?report, "drive index rebuilt from the workspace files"),
         Err(error) => tracing::warn!(%error, "drive rescan failed; the index may be stale"),
     }
     let hooks = crate::integrations::hooks(&store, &workspace.work, &var).await?;
@@ -404,8 +514,10 @@ pub async fn open(
             }
         }
     }));
+    let mut services = workspace.services;
+    services.push(Arc::new(Storage(store)));
     Ok(Opened {
-        services: workspace.services,
+        services,
         hooks,
         collab: Some(collab),
         tasks: Some(workspace.tasks),
@@ -451,6 +563,66 @@ mod tests {
 
     fn path(p: &str) -> BlobPath {
         BlobPath::new(p).unwrap()
+    }
+
+    fn lookup<'a>(pairs: &'a [(&'a str, &'a str)]) -> impl Fn(&str) -> Option<String> + 'a {
+        move |name| {
+            pairs
+                .iter()
+                .find(|(k, _)| *k == name)
+                .map(|(_, v)| (*v).to_owned())
+        }
+    }
+
+    #[tokio::test]
+    async fn files_stay_local_unless_a_bucket_is_named() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut config = Config::default();
+        config.data_dir = dir.path().to_path_buf();
+        let none = bucket(lookup(&[(BLOB_URL_VAR, "")])).unwrap();
+        let local = open_files(&config, none).await.unwrap();
+        assert!(local.local);
+        assert_eq!(local.store.backend(), "local");
+        assert_eq!(probe(local.store.as_ref()).await, Readiness::Ready);
+
+        let named = bucket(lookup(&[
+            (BLOB_URL_VAR, "s3://vellum/ws"),
+            ("VELLUM_S3_ENDPOINT", "http://127.0.0.1:9"),
+            ("AWS_ACCESS_KEY_ID", "id"),
+            ("AWS_SECRET_ACCESS_KEY", "secret"),
+        ]))
+        .unwrap();
+        let shared = open_files(&config, named).await.unwrap();
+        assert!(!shared.local);
+        assert_eq!(shared.store.backend(), "s3");
+    }
+
+    #[test]
+    fn a_bad_blob_url_or_missing_keys_stop_startup() {
+        for vars in [
+            &[(BLOB_URL_VAR, "file:///data")][..],
+            &[(BLOB_URL_VAR, "s3://vellum")][..],
+        ] {
+            let error = bucket(lookup(vars)).err().unwrap();
+            assert_eq!(error.kind(), ErrorKind::InvalidInput);
+            assert!(!error.to_string().contains("secret"));
+        }
+    }
+
+    #[tokio::test]
+    async fn an_unreachable_bucket_is_not_ready() {
+        // Port 9 (discard) refuses connections on a test machine.
+        let store = S3Config::from_vars(lookup(&[
+            (BLOB_URL_VAR, "s3://vellum"),
+            ("VELLUM_S3_ENDPOINT", "http://127.0.0.1:9"),
+            ("AWS_ACCESS_KEY_ID", "id"),
+            ("AWS_SECRET_ACCESS_KEY", "secret"),
+        ]))
+        .and_then(S3Store::new)
+        .unwrap();
+        assert!(
+            matches!(probe(&store).await, Readiness::NotReady(reason) if reason.contains("s3"))
+        );
     }
 
     #[test]
