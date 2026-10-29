@@ -16,3 +16,23 @@ layer = "service"
 
 [lints]
 workspace = true
+
+[dependencies]
+async-trait = "0.1.89"
+axum = { version = "0.8.9", default-features = false, features = ["ws"] }
+bytes = "1.12.1"
+futures-util = { version = "0.3.31", default-features = false, features = ["sink", "std"] }
+opentelemetry = "0.33.1"
+thiserror = "2.0.21"
+tokio = { version = "1.54.1", features = ["rt", "sync", "time", "macros"] }
+tracing = "0.1.44"
+tracing-opentelemetry = "0.34.0"
+vellum-kernel.workspace = true
+yrs = { version = "0.28.0", features = ["sync"] }
+
+[dev-dependencies]
+axum = { version = "0.8.9", default-features = false, features = ["ws", "tokio", "http1"] }
+# proptest 1.12 moves to rand 0.10 while OpenTelemetry is on rand 0.9.
+proptest = ">=1.11.0, <1.12"
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "net", "test-util"] }
+tokio-tungstenite = "0.29"
