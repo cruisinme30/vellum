@@ -12,6 +12,7 @@
 mod books;
 mod content;
 mod create;
+mod order;
 mod organize;
 mod scan;
 mod trash;
@@ -34,6 +35,8 @@ use crate::model::{Activity, ActivityKind, Node, NodeKind, Space};
 use crate::ports::{Access, Clock, DriveIndex, Permission, SystemClock};
 
 pub use content::{SaveOutcome, Saved};
+pub use create::MY_DRIVE_NAME;
+pub use order::{MAX_TREE_ITEMS, Tree};
 pub use views::Filter;
 
 /// Counter of drive operations, labelled `op` and `outcome`.
@@ -213,18 +216,47 @@ impl Drive {
     }
 
     /// The directory a new child of `parent` goes in, checking that the
-    /// parent is a live folder of `space`.
+    /// parent is a live folder or page of `space`.
     async fn dir_of(&self, space: &Space, parent: Option<ObjectId>) -> DriveResult<BlobPath> {
         let Some(parent) = parent else {
             return Ok(space.root.clone());
         };
-        let folder = self.live_node(parent).await?;
-        if folder.space != space.id || !folder.kind.is_container() {
+        let holder = self.live_node(parent).await?;
+        if holder.space != space.id {
             return Err(DriveError::Invalid(format!(
-                "{parent} is not a folder in this space"
+                "{parent} is not a folder or page in this space"
             )));
         }
-        Ok(folder.path)
+        self.children_dir(holder.kind, &holder.path)
+            .await?
+            .ok_or_else(|| {
+                DriveError::Invalid(format!("{parent} is not a folder or page in this space"))
+            })
+    }
+
+    /// The directory holding what is nested under a node: a folder's own
+    /// directory, or the directory beside a page (D168). A page whose
+    /// directory is a folder in its own right (it has a
+    /// `.vellum-folder.yaml`, made outside Vellum) holds nothing.
+    pub(super) async fn children_dir(
+        &self,
+        kind: NodeKind,
+        path: &BlobPath,
+    ) -> DriveResult<Option<BlobPath>> {
+        match kind {
+            NodeKind::Folder => Ok(Some(path.clone())),
+            NodeKind::Page => {
+                let Some(dir) = layout::page_dir(path) else {
+                    return Ok(None);
+                };
+                match self.store.head(&dir.join(layout::FOLDER_FILE)?).await {
+                    Ok(_) => Ok(None),
+                    Err(StoreError::NotFound(_)) => Ok(Some(dir)),
+                    Err(err) => Err(err.into()),
+                }
+            }
+            NodeKind::Book | NodeKind::Collection | NodeKind::Shortcut => Ok(None),
+        }
     }
 
     /// The node's folders, innermost first, then the space itself.
@@ -295,7 +327,21 @@ impl Drive {
     ) -> DriveResult<BlobPath> {
         for counter in 1..=10_000 {
             let path = dir.join(&layout::file_name(kind, title, counter))?;
-            if keep == Some(&path) || !self.occupied(&path).await? {
+            if keep == Some(&path) {
+                return Ok(path);
+            }
+            // A page and a folder of the same name would claim the same
+            // directory (D168), so each needs the other's name free too.
+            let twin = match kind {
+                NodeKind::Page => layout::page_dir(&path),
+                NodeKind::Folder => Some(dir.join(&format!("{}.md", path.file_name()))?),
+                NodeKind::Book | NodeKind::Collection | NodeKind::Shortcut => None,
+            };
+            let twin_taken = match &twin {
+                Some(twin) => self.occupied(twin).await?,
+                None => false,
+            };
+            if !twin_taken && !self.occupied(&path).await? {
                 return Ok(path);
             }
         }
@@ -310,20 +356,32 @@ impl Drive {
         Ok(out)
     }
 
-    /// Moves every blob of a node (one file, or a whole directory) from
-    /// `from` to `to`, undoing the moves already made if one fails.
+    /// Moves every blob of a node (one file, a whole directory, or a page
+    /// with the pages nested under it) from `from` to `to`, undoing the
+    /// moves already made if one fails.
     async fn move_blobs(&self, kind: NodeKind, from: &BlobPath, to: &BlobPath) -> DriveResult<()> {
         if from == to {
             return Ok(());
         }
-        if !kind.is_dir() {
-            let _ = self.store.rename(from, to).await?;
-            return Ok(());
+        let mut moves: Vec<(BlobPath, BlobPath)> = Vec::new();
+        if kind.is_dir() {
+            for (path, _) in self.blobs_under(from).await? {
+                let target = layout::rebase(&path, from, to)?;
+                moves.push((path, target));
+            }
+        } else {
+            moves.push((from.clone(), to.clone()));
+            if let (Some(old), Some(new)) =
+                (self.children_dir(kind, from).await?, layout::page_dir(to))
+            {
+                for (path, _) in self.blobs_under(&old).await? {
+                    let target = layout::rebase(&path, &old, &new)?;
+                    moves.push((path, target));
+                }
+            }
         }
-        let blobs = self.blobs_under(from).await?;
-        let mut done: Vec<(BlobPath, BlobPath)> = Vec::with_capacity(blobs.len());
-        for (path, _) in blobs {
-            let target = layout::rebase(&path, from, to)?;
+        let mut done: Vec<(BlobPath, BlobPath)> = Vec::with_capacity(moves.len());
+        for (path, target) in moves {
             match self.store.rename(&path, &target).await {
                 Ok(_) => done.push((path, target)),
                 Err(err) => {
