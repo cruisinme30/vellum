@@ -27,6 +27,10 @@ pub struct IndexEntry {
 
 /// One change in a batch.
 #[derive(Debug, Clone, PartialEq)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "batches are short-lived and mostly upserts; boxing would only add allocations"
+)]
 pub enum Change {
     /// Insert or replace a document and all its blocks.
     Upsert(IndexEntry),

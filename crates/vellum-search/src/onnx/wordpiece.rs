@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-//! The BERT WordPiece tokenizer (uncased), which sentence-embedding models
-//! such as MiniLM, BGE and E5 use. Pure Rust, from a `vocab.txt`.
+//! The BERT `WordPiece` tokenizer (uncased), which sentence-embedding models
+//! such as `MiniLM`, BGE and E5 use. Pure Rust, from a `vocab.txt`.
 
 use std::collections::HashMap;
 
@@ -12,7 +12,7 @@ use tantivy::tokenizer::{
 
 use crate::error::{Result, SearchError};
 
-/// The longest word WordPiece splits; longer ones become `[UNK]`.
+/// The longest word `WordPiece` splits; longer ones become `[UNK]`.
 const MAX_WORD_CHARS: usize = 100;
 
 /// Token IDs for one text, with `[CLS]` and `[SEP]` around it.
@@ -22,7 +22,7 @@ pub struct Encoding {
     pub ids: Vec<i64>,
 }
 
-/// A WordPiece vocabulary.
+/// A `WordPiece` vocabulary.
 #[derive(Debug, Clone)]
 pub struct WordPiece {
     vocab: HashMap<String, i64>,

@@ -165,7 +165,7 @@ impl FromStr for BlockKind {
 pub struct UnknownKind(pub String);
 
 /// One block of a document, ready to index.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IndexBlock {
     /// The block's stable ID.
     pub id: BlockId,
@@ -181,7 +181,7 @@ pub struct IndexBlock {
 }
 
 /// A document as the index sees it: metadata plus blocks in reading order.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IndexDocument {
     /// The space the document lives in.
     pub space: SpaceId,
@@ -304,7 +304,7 @@ pub struct SearchPage {
 }
 
 /// A title match for the instant (⌘K) search.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TitleHit {
     /// The space.
     pub space: SpaceId,
@@ -319,7 +319,7 @@ pub struct TitleHit {
 }
 
 /// A block as stored in an index: what a backend returns.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StoredBlock {
     /// The space.
     pub space: SpaceId,

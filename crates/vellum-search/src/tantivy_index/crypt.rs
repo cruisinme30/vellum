@@ -5,7 +5,7 @@
 //!
 //! The index holds document text, so it is encrypted like the files it is
 //! built from. Each file is a 20-byte header (`VSX1` plus a random 16-byte
-//! salt) followed by 4 KiB plaintext chunks, each sealed with
+//! salt) followed by 4 `KiB` plaintext chunks, each sealed with
 //! XChaCha20-Poly1305. The nonce is the salt plus the chunk number; the AAD
 //! binds the file name, the chunk number and whether it is the last chunk,
 //! so chunks cannot be swapped, reordered or truncated undetected. Reads
@@ -406,20 +406,16 @@ impl Write for EncryptingWriter {
     fn flush(&mut self) -> io::Result<()> {
         // Partial chunks stay buffered until terminate; flushing them early
         // would need a re-seal. Tantivy only relies on terminate.
-        match self.inner.as_mut() {
-            Some(inner) => inner.flush(),
-            None => Ok(()),
-        }
+        self.inner.as_mut().map_or(Ok(()), Write::flush)
     }
 }
 
 impl TerminatingWrite for EncryptingWriter {
     fn terminate_ref(&mut self, _: AntiCallToken) -> io::Result<()> {
         self.emit(true)?;
-        match self.inner.take() {
-            Some(inner) => inner.terminate(),
-            None => Ok(()),
-        }
+        self.inner
+            .take()
+            .map_or(Ok(()), TerminatingWrite::terminate)
     }
 }
 
@@ -448,7 +444,7 @@ mod tests {
     fn streamed_files_round_trip_at_every_size_and_range() {
         let (_, enc) = dir();
         for size in [0, 1, CHUNK - 1, CHUNK, CHUNK + 1, 3 * CHUNK, 3 * CHUNK + 17] {
-            let data: Vec<u8> = (0..size).map(|i| (i % 251) as u8).collect();
+            let data: Vec<u8> = (0..size).map(|i| u8::try_from(i % 251).unwrap()).collect();
             let name = format!("f{size}");
             write(&enc, &name, &data);
             let handle = enc.get_file_handle(Path::new(&name)).unwrap();

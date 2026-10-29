@@ -38,6 +38,9 @@ impl RowCount for () {
 }
 
 /// Runs `fut` in a `search.backend` span and records rows and milliseconds.
+///
+/// # Errors
+/// Whatever `fut` returns.
 pub async fn traced<T, E, F>(engine: &'static str, operation: &'static str, fut: F) -> Result<T, E>
 where
     T: RowCount,
@@ -60,11 +63,10 @@ where
         search.engine = engine,
         search.operation = operation
     );
-    match &out {
-        Ok(value) => {
-            let _ = span.record("search.rows", value.row_count());
-        }
-        Err(_) => {
+    if let Ok(value) = &out {
+        let _ = span.record("search.rows", value.row_count());
+    } else {
+        {
             let _ = span.record("otel.status_code", "ERROR");
             tracing::debug!(
                 counter.vellum.search.errors = 1_u64,

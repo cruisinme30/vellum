@@ -113,6 +113,7 @@ fn block(
 impl Corpus {
     /// The documents of the corpus.
     #[must_use]
+    #[expect(clippy::too_many_lines, reason = "fixture data, one document per call")]
     pub fn documents(&self) -> Vec<IndexDocument> {
         let doc = |space,
                    doc,
@@ -355,7 +356,7 @@ pub struct HashEmbedder {
 }
 
 impl HashEmbedder {
-    fn embed(&self, input: &str) -> Vec<f32> {
+    fn embed(self, input: &str) -> Vec<f32> {
         let mut v = vec![0.0; self.dimensions.max(1)];
         let len = v.len();
         for token in text::tokens(input) {

@@ -16,10 +16,11 @@ const KEY: &str = "northstar-test-master-key";
 
 /// A Meilisearch server: in a container, or the one named by
 /// `VELLUM_TEST_MEILI_URL` (with `VELLUM_TEST_MEILI_KEY`).
-async fn start() -> (Option<ContainerAsync<GenericImage>>, String, String) {
+async fn start()
+-> Result<(Option<ContainerAsync<GenericImage>>, String, String), Box<dyn std::error::Error>> {
     if let Ok(url) = std::env::var("VELLUM_TEST_MEILI_URL") {
         let key = std::env::var("VELLUM_TEST_MEILI_KEY").unwrap_or_default();
-        return (None, url, key);
+        return Ok((None, url, key));
     }
     let container = GenericImage::new("getmeili/meilisearch", "v1.24")
         .with_exposed_port(7700.tcp())
@@ -27,19 +28,18 @@ async fn start() -> (Option<ContainerAsync<GenericImage>>, String, String) {
         .with_env_var("MEILI_MASTER_KEY", KEY)
         .with_env_var("MEILI_NO_ANALYTICS", "true")
         .start()
-        .await
-        .unwrap();
-    let port = container.get_host_port_ipv4(7700).await.unwrap();
-    (
+        .await?;
+    let port = container.get_host_port_ipv4(7700).await?;
+    Ok((
         Some(container),
         format!("http://127.0.0.1:{port}"),
         KEY.to_owned(),
-    )
+    ))
 }
 
 #[tokio::test]
 async fn meilisearch_conforms() {
-    let (_container, url, key) = start().await;
+    let (_container, url, key) = start().await.unwrap();
     let backend = MeiliBackend::connect(MeiliConfig {
         url,
         api_key: Some(key),

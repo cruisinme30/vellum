@@ -4,7 +4,7 @@
 //! Local sentence embeddings from an ONNX model (R-AI-7), with no external
 //! service and no native runtime: inference runs on tract, pure Rust.
 //!
-//! Any BERT-style sentence-embedding export works (MiniLM, BGE, E5): the
+//! Any BERT-style sentence-embedding export works (`MiniLM`, BGE, E5): the
 //! model takes `input_ids`, `attention_mask` and optionally
 //! `token_type_ids`, and returns token states (mean-pooled here over the
 //! attention mask) or an already pooled sentence vector. The operator
@@ -20,8 +20,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tokio::sync::OnceCell;
 use tract_onnx::prelude::{
-    Framework as _, InferenceModelExt as _, IntoRunnable as _, TValue, Tensor, TypedRunnableModel,
-    tvec,
+    Framework as _, InferenceModelExt as _, IntoRunnable, TValue, Tensor, TypedRunnableModel, tvec,
 };
 
 pub use self::wordpiece::WordPiece;
@@ -33,7 +32,7 @@ use crate::vector::{self, Embedder};
 pub struct OnnxConfig {
     /// The ONNX file.
     pub model: PathBuf,
-    /// The WordPiece `vocab.txt`.
+    /// The `WordPiece` `vocab.txt`.
     pub vocab: PathBuf,
     /// A stable name of the model, stored with the index.
     pub model_id: String,
@@ -142,7 +141,7 @@ fn load(config: &OnnxConfig) -> Result<Loaded> {
     }
     let model = model
         .into_optimized()
-        .and_then(|m| m.into_runnable())
+        .and_then(IntoRunnable::into_runnable)
         .map_err(model_error)?;
     tracing::info!(model = %config.model_id, "loaded the embedding model");
     Ok(Loaded {

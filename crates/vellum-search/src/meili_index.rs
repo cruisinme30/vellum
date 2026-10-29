@@ -25,7 +25,7 @@ const EMBEDDER: &str = "vellum";
 /// The section value of blocks before the first heading.
 const NO_SECTION: &str = "none";
 /// How long a write may wait for Meilisearch to index it.
-const TASK_TIMEOUT: Duration = Duration::from_secs(60);
+const TASK_TIMEOUT: Duration = Duration::from_mins(1);
 /// The most blocks one section can return.
 const MAX_SECTION: usize = 5_000;
 

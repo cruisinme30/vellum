@@ -199,7 +199,7 @@ async fn run(
                 }
             }
         }
-        for waiter in waiters.drain(..) {
+        for waiter in std::mem::take(&mut waiters) {
             let reply = match &outcome {
                 Ok(()) => Ok(()),
                 Err(error) => Err(SearchError::Source(error.to_string())),
@@ -219,10 +219,8 @@ async fn index_batch(
 ) -> Result<()> {
     let mut updates = Vec::with_capacity(docs.len());
     for doc in docs {
-        updates.push(match source.load(*doc).await? {
-            Some(document) => Update::Upsert(document),
-            None => Update::Remove(*doc),
-        });
+        let loaded = source.load(*doc).await?;
+        updates.push(loaded.map_or(Update::Remove(*doc), Update::Upsert));
     }
     tracing::debug!(
         counter.vellum.search.indexed_documents = u64::try_from(docs.len()).unwrap_or(u64::MAX)

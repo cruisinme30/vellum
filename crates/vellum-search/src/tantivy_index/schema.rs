@@ -108,6 +108,7 @@ pub fn register(index: &Index) {
 
 /// Lower-cased, ASCII-folded, unstemmed words of `input`: the vocabulary of
 /// title prefixes, and the safe word list the Postgres query builder uses.
+#[must_use]
 pub fn plain_tokens(input: &str) -> Vec<String> {
     let mut analyzer = plain_analyzer();
     let mut stream = analyzer.token_stream(input);

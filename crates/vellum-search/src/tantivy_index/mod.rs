@@ -39,7 +39,7 @@ use crate::error::{Result, SearchError};
 use crate::model::{StoredBlock, TitleHit};
 use crate::vector;
 
-/// The indexing arena per batch; tantivy's minimum is 15 MiB.
+/// The indexing arena per batch; tantivy's minimum is 15 `MiB`.
 const WRITER_ARENA: usize = 16 << 20;
 
 /// The most blocks one section can return.
@@ -121,7 +121,7 @@ impl TantivyBackend {
             Location::Folder(path) => {
                 std::fs::create_dir_all(path)?;
                 let directory = wrap(
-                    Box::new(MmapDirectory::open(path).map_err(open_dir)?),
+                    Box::new(MmapDirectory::open(path).map_err(|e| open_dir(&e))?),
                     config.key.as_ref(),
                 );
                 let stamp = directory
@@ -140,7 +140,7 @@ impl TantivyBackend {
                     std::fs::remove_dir_all(path)?;
                     std::fs::create_dir_all(path)?;
                     let directory = wrap(
-                        Box::new(MmapDirectory::open(path).map_err(open_dir)?),
+                        Box::new(MmapDirectory::open(path).map_err(|e| open_dir(&e))?),
                         config.key.as_ref(),
                     );
                     create(directory, &want)?
@@ -174,7 +174,7 @@ impl TantivyBackend {
     }
 }
 
-fn open_dir(error: tantivy::directory::error::OpenDirectoryError) -> SearchError {
+fn open_dir(error: &tantivy::directory::error::OpenDirectoryError) -> SearchError {
     SearchError::Io(std::io::Error::other(error.to_string()))
 }
 
@@ -205,7 +205,7 @@ impl Inner {
         self.reader.searcher()
     }
 
-    fn term(&self, field: tantivy::schema::Field, text: &str) -> Box<dyn Query> {
+    fn term(field: tantivy::schema::Field, text: &str) -> Box<dyn Query> {
         Box::new(TermQuery::new(
             Term::from_field_text(field, text),
             IndexRecordOption::Basic,
@@ -216,7 +216,7 @@ impl Inner {
     fn filter(&self, rec: &str, scope: Scope<'_>) -> Vec<(Occur, Box<dyn Query>)> {
         let f = &self.fields;
         let mut clauses: Vec<Box<dyn Query>> = vec![
-            self.term(f.rec, rec),
+            Self::term(f.rec, rec),
             Box::new(TermSetQuery::new(
                 scope
                     .spaces
@@ -259,7 +259,7 @@ impl Inner {
             )));
         }
         if let Some(location) = scope.filters.location {
-            clauses.push(self.term(f.ancestor, &location.to_string()));
+            clauses.push(Self::term(f.ancestor, &location.to_string()));
         }
         clauses
             .into_iter()
@@ -369,7 +369,7 @@ impl Inner {
         };
         let mut clauses = self.filter(REC_DOC, scope);
         for word in complete {
-            clauses.push((Occur::Must, self.term(f.title_plain, word)));
+            clauses.push((Occur::Must, Self::term(f.title_plain, word)));
         }
         let prefix = format!("{}.*", regex_escape(last));
         clauses.push((
@@ -390,8 +390,8 @@ impl Inner {
     fn block(&self, doc: DocId, block: BlockId) -> Result<Option<StoredBlock>> {
         let f = &self.fields;
         let query = BooleanQuery::new(vec![
-            (Occur::Must, self.term(f.rec, REC_BLOCK)),
-            (Occur::Must, self.term(f.doc, &doc.to_string())),
+            (Occur::Must, Self::term(f.rec, REC_BLOCK)),
+            (Occur::Must, Self::term(f.doc, &doc.to_string())),
             (
                 Occur::Must,
                 Box::new(TermQuery::new(
@@ -411,8 +411,8 @@ impl Inner {
         let f = &self.fields;
         let key = section.map_or(NO_SECTION, BlockId::as_u64);
         let query = BooleanQuery::new(vec![
-            (Occur::Must, self.term(f.rec, REC_BLOCK)),
-            (Occur::Must, self.term(f.doc, &doc.to_string())),
+            (Occur::Must, Self::term(f.rec, REC_BLOCK)),
+            (Occur::Must, Self::term(f.doc, &doc.to_string())),
             (
                 Occur::Must,
                 Box::new(TermQuery::new(

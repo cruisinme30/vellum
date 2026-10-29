@@ -73,7 +73,7 @@ impl Default for Tuning {
 }
 
 /// One write to the index.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Update {
     /// Index or re-index a document.
     Upsert(IndexDocument),
@@ -82,7 +82,7 @@ pub enum Update {
 }
 
 /// A block with its whole section: what "ask this space" and MCP quote.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Context {
     /// The block asked for.
     pub block: StoredBlock,

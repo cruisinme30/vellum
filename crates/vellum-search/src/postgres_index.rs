@@ -81,11 +81,12 @@ fn tsquery(text: &str) -> Option<String> {
 
 fn words(text: &str, positive: &mut Vec<String>, negative: &mut Vec<String>) {
     for word in text.split_whitespace() {
-        let (target, word) = match word.strip_prefix('-') {
-            Some(w) => (&mut *negative, w),
-            None => (&mut *positive, word.trim_start_matches('+')),
-        };
-        target.extend(crate::tantivy_index::plain_words(word));
+        if let Some(w) = word.strip_prefix('-') {
+            negative.extend(crate::tantivy_index::plain_words(w));
+            continue;
+        }
+        let word = word.trim_start_matches('+');
+        positive.extend(crate::tantivy_index::plain_words(word));
     }
 }
 
