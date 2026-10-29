@@ -122,3 +122,43 @@ async fn rotation_rewraps_on_reseal() -> TestResult {
     assert_eq!(store.get(&path).await?.bytes.as_ref(), b"spec");
     Ok(())
 }
+
+#[derive(Debug)]
+struct E2eUnder(BlobPath);
+
+impl vellum_sealed_store::ModePolicy for E2eUnder {
+    fn mode_for(&self, path: &BlobPath) -> vellum_sealed_store::Mode {
+        if path.starts_with(&self.0) {
+            vellum_sealed_store::Mode::EndToEnd
+        } else {
+            vellum_sealed_store::Mode::Encrypted
+        }
+    }
+}
+
+#[tokio::test]
+async fn e2e_spaces_hold_only_member_ciphertext() -> TestResult {
+    use vellum_crypto::recipients::{RecipientSecret, open_as, seal_for};
+    let dir = tempfile::tempdir()?;
+    let keys = Arc::new(keyring("kek-1")?);
+    let store = Sealed::new(
+        LocalStore::open(dir.path()).await?,
+        keys,
+        E2eUnder(BlobPath::new("vault")?),
+    );
+    let path = BlobPath::new("vault/board.md")?;
+    let member = RecipientSecret::generate()?;
+
+    let refused = store
+        .put(&path, Bytes::from_static(b"# plain"), Precondition::None)
+        .await;
+    assert!(refused.is_err(), "plaintext must not land in an E2E space");
+
+    let sealed = Bytes::from(seal_for(&[member.public()], b"# Board")?);
+    let _ = store.put(&path, sealed.clone(), Precondition::None).await?;
+    let got = store.get(&path).await?;
+    assert_eq!(got.bytes, sealed, "server returns ciphertext as is");
+    assert_eq!(open_as(&member, &got.bytes)?, b"# Board");
+    assert!(!store.reseal(&path).await?);
+    Ok(())
+}
