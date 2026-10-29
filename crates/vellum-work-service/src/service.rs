@@ -42,6 +42,7 @@ use crate::api::{
     ResolveThread, TeamOut, TeamRef, ThreadOut, ThreadsOut, TriageIssue, UpdateIssue, invalid,
     parse_name,
 };
+use crate::api::{Done, ListViews, PutView, ViewIn, ViewOut, ViewRef, ViewsOut};
 use crate::journal::{self, CatchUp};
 use crate::ports::{Clock, Directory, EventSink};
 use crate::routes;
@@ -65,6 +66,8 @@ pub struct State {
     pub(crate) comments: Comments,
     /// Where each project page lives; titles can change, paths do not.
     project_paths: BTreeMap<ProjectId, String>,
+    /// Saved views, stored as `views/<id>.yaml`.
+    pub(crate) views: BTreeMap<ViewId, View>,
     /// The journal revision this copy reflects (see [`crate::journal`]).
     pub(crate) seen: u64,
     /// When this copy last compared itself with the journal for a read.
@@ -606,6 +609,136 @@ impl WorkService {
             cycles: st.graph.cycles(&key).iter().map(CycleOut::of).collect(),
             velocity: st.graph.velocity(&key, today),
         })
+    }
+
+    // ----- saved views -----
+
+    pub(crate) async fn list_views(
+        &self,
+        rc: RequestContext,
+        i: ListViews,
+    ) -> Result<ViewsOut, Error> {
+        let me = self.actor(&rc).await?;
+        let st = self.read_state().await;
+        let team = i
+            .team
+            .as_deref()
+            .map(|t| Self::team_key(&st.graph, t))
+            .transpose()?;
+        let member_of = |key: &TeamKey| st.graph.team(key).is_some_and(|t| t.is_member(&me));
+        let mut views: Vec<&View> = st
+            .views
+            .values()
+            .filter(|v| v.visible_to(&me, member_of))
+            .filter(|v| team.is_none() || v.team.is_none() || v.team == team)
+            .collect();
+        views.sort_by_key(|v| v.name.to_lowercase());
+        Ok(ViewsOut {
+            views: views.into_iter().map(ViewOut::of).collect(),
+        })
+    }
+
+    pub(crate) async fn create_view(
+        &self,
+        rc: RequestContext,
+        i: ViewIn,
+    ) -> Result<ViewOut, Error> {
+        self.save_view(rc, ViewId::generate(), i, true).await
+    }
+
+    pub(crate) async fn put_view(&self, rc: RequestContext, i: PutView) -> Result<ViewOut, Error> {
+        let id = parse_id::<ViewId>("view_id", &i.view_id)?;
+        self.save_view(rc, id, i.settings(), false).await
+    }
+
+    async fn save_view(
+        &self,
+        rc: RequestContext,
+        id: ViewId,
+        i: ViewIn,
+        new: bool,
+    ) -> Result<ViewOut, Error> {
+        let me = self.actor(&rc).await?;
+        let mut st = self.write_state().await?;
+        if !new {
+            let _ = Self::own_view(&st, &id, &me)?;
+        }
+        let name = i.name.trim();
+        if name.is_empty() || name.chars().count() > 120 {
+            return Err(invalid("name: 1 to 120 characters"));
+        }
+        let team = i
+            .team
+            .as_deref()
+            .map(|t| Self::team_key(&st.graph, t))
+            .transpose()?;
+        let filter = match i.filter.as_deref() {
+            Some(text) => {
+                serde_json::from_str(text).map_err(|e| invalid(&format!("filter: {e}")))?
+            }
+            None => Filter::default(),
+        };
+        let view = View {
+            id,
+            name: name.to_owned(),
+            owner: me.clone(),
+            team,
+            visibility: pick("visibility", i.visibility.as_deref())?.unwrap_or_default(),
+            layout: pick("layout", i.layout.as_deref())?.unwrap_or_default(),
+            filter,
+            group_by: pick("group_by", i.group_by.as_deref())?.unwrap_or_default(),
+            order_by: pick("order_by", i.order_by.as_deref())?.unwrap_or_default(),
+            show_closed: pick("show_closed", i.show_closed.as_deref())?.unwrap_or_default(),
+            show_sub_issues: i.show_sub_issues.unwrap_or(true),
+        };
+        view.check().map_err(Error::from)?;
+        let text = view.to_yaml().map_err(Error::from)?;
+        let backup = st.clone();
+        let _ = st.views.insert(id, view.clone());
+        self.commit(
+            &mut st,
+            backup,
+            Changes::default(),
+            None,
+            vec![(view.path(), text)],
+            Some(&me),
+        )
+        .await?;
+        Ok(ViewOut::of(&view))
+    }
+
+    pub(crate) async fn delete_view(&self, rc: RequestContext, i: ViewRef) -> Result<Done, Error> {
+        let me = self.actor(&rc).await?;
+        let id = parse_id::<ViewId>("view_id", &i.view_id)?;
+        let mut st = self.write_state().await?;
+        let path = Self::own_view(&st, &id, &me)?.path();
+        let backup = st.clone();
+        let _ = st.views.remove(&id);
+        let changes = Changes {
+            removed_paths: BTreeSet::from([path]),
+            ..Changes::default()
+        };
+        self.commit(&mut st, backup, changes, None, Vec::new(), Some(&me))
+            .await?;
+        Ok(Done { ok: true })
+    }
+
+    /// The view, if `me` owns it. A view the caller cannot see is "not
+    /// found", so IDs of private views do not leak.
+    fn own_view<'s>(st: &'s State, id: &ViewId, me: &UserRef) -> Result<&'s View, Error> {
+        let not_found = || Error::new(ErrorKind::NotFound, format!("view {id}"));
+        let view = st.views.get(id).ok_or_else(not_found)?;
+        let member_of = |key: &TeamKey| st.graph.team(key).is_some_and(|t| t.is_member(me));
+        if !view.visible_to(me, member_of) {
+            return Err(not_found());
+        }
+        if &view.owner != me {
+            return Err(Error::new(
+                ErrorKind::PermissionDenied,
+                "only the view's owner can change it".to_owned(),
+            ));
+        }
+        Ok(view)
     }
 
     pub(crate) async fn list_projects(
@@ -1256,6 +1389,14 @@ fn date(text: &str) -> Result<Date, Error> {
         .map_err(|_| invalid(&format!("date {text:?} must be YYYY-MM-DD")))
 }
 
+/// An optional engine enum from its serde name.
+fn pick<T: serde::de::DeserializeOwned>(
+    field: &str,
+    text: Option<&str>,
+) -> Result<Option<T>, Error> {
+    text.map(|t| parse_name(field, t)).transpose()
+}
+
 fn parse_id<T: std::str::FromStr>(field: &str, text: &str) -> Result<T, Error> {
     text.parse::<T>()
         .map_err(|_| invalid(&format!("{field}: {text:?} is not a valid ID")))
@@ -1291,7 +1432,7 @@ async fn load_all(store: &dyn BlobStore) -> Result<(State, LoadReport), Error> {
     let mut state = State::default();
     let mut report = LoadReport::default();
     let mut paths = Vec::new();
-    for dir in ["teams", "projects", ".comments"] {
+    for dir in ["teams", "projects", ".comments", "views"] {
         paths.extend(list(store, dir).await?);
     }
     // Teams first: issues and cycles need their team.
@@ -1347,6 +1488,13 @@ async fn apply_paths(
                     state.comments.load(thread)?;
                 }
             }
+            Kind::View => {
+                state.views.retain(|_, v| v.path() != *path);
+                if let Some(text) = read_text(store, path).await? {
+                    let view = View::from_yaml(path, &text)?;
+                    let _ = state.views.insert(view.id, view);
+                }
+            }
             Kind::Team | Kind::Cycle | Kind::Project => {
                 return Err(Error::new(ErrorKind::Conflict, "team settings changed"));
             }
@@ -1399,6 +1547,10 @@ async fn load_one(store: &dyn BlobStore, state: &mut State, path: &str) -> Resul
             let _ = state.graph.upsert_project(p)?;
         }
         Kind::Thread => state.comments.load(Thread::from_yaml(path, text)?)?,
+        Kind::View => {
+            let view = View::from_yaml(path, text)?;
+            let _ = state.views.insert(view.id, view);
+        }
         Kind::Other => {}
     }
     Ok(true)
@@ -1411,6 +1563,7 @@ enum Kind {
     Cycle,
     Project,
     Thread,
+    View,
     Other,
 }
 
@@ -1428,6 +1581,7 @@ fn classify(path: &str) -> Kind {
         ["teams", _, "cycles", f] if has_ext(f, "yaml") => Kind::Cycle,
         ["projects", _, "project.md"] => Kind::Project,
         [".comments", _, f] if has_ext(f, "yaml") => Kind::Thread,
+        ["views", f] if has_ext(f, "yaml") => Kind::View,
         _ => Kind::Other,
     }
 }
