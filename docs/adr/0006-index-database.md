@@ -11,9 +11,9 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D46, D47, D48
-- Issue: #56
-- Pull requests: #24
+- Decisions: D46, D47, D48, D142
+- Issue: #56, #230
+- Pull requests: #24, #SHARDPR
 
 :::
 
@@ -62,6 +62,19 @@ between what a reindex rebuilds and what only the database holds.
 - Two files with the same ID: the first by path keeps it, the rest are
   reported as duplicates.
 
+### D142: spaces map to shards in the main database
+
+- With `VELLUM_SHARDS` set, the main database (`VELLUM_DATABASE_URL`)
+  holds `space_shards`: one row per space naming its shard. Each shard
+  (`VELLUM_SHARD_<NAME>_DATABASE_URL`) carries the full schema and only
+  its own spaces' rows.
+- A space with no row is on the home shard, the first in the list. A
+  reindex records new spaces there, so the map is complete afterwards.
+- Moving a space is two steps: update the map, then reindex. Each shard
+  commits on its own; a failed run leaves some shards new and some old,
+  and the next run converges. An entry naming a removed shard stops the
+  reindex before anything is written.
+
 ## Alternatives
 
 - **The `sqlx` `Any` driver over both backends**: one code path, but it loses
@@ -73,8 +86,13 @@ between what a reindex rebuilds and what only the database holds.
   would then change the source of truth. Not chosen; the store and the
   watcher (ADR 0026) assign IDs.
 
+- **Hash the space ID to pick a shard**: no map to keep, but adding a
+  shard moves most spaces. Not chosen; the map moves only what an
+  operator asks for.
+
 ## Consequences
 
 - Each schema change is written twice; the parity test catches drift.
 - Losing the index file loses stars and recents but no content; grants
   come back from the YAML copies.
+- Sharded reads look up the map first; callers should cache it per space.
