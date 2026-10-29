@@ -21,6 +21,8 @@ use vellum_identity::{
     Identity, IdentityConfig, IdentityService, Sso, SsoConfig, Store, http as identity_http,
 };
 use vellum_kernel::{Config, Error, ErrorKind};
+use vellum_notify::endpoint::{self, SafeTransport};
+use vellum_notify::hooks::{HookStore, Webhooks, WebhooksService};
 use vellum_notify::service::{NotifyService, NotifyStore};
 use vellum_tasks::service::TasksService;
 
@@ -38,6 +40,8 @@ pub struct Services {
     identity: Arc<Identity>,
     /// Push subscriptions and notification preferences.
     notify: Arc<NotifyService>,
+    /// Webhook subscriptions and their delivery queue.
+    webhooks: Arc<Webhooks<SafeTransport>>,
     /// The app's origin, which live-editing connections must come from.
     origin: String,
     /// Collections, books and Work, when an index is configured.
@@ -123,9 +127,20 @@ impl Services {
             Some(dir) => NotifyStore::open(dir, &subject)?,
             None => NotifyStore::memory(&subject)?,
         };
+        let hooks = match data_dir {
+            Some(dir) => HookStore::open(dir, endpoint::policy(&[]))?,
+            None => HookStore::memory(endpoint::policy(&[])),
+        };
+        let transport = SafeTransport::new(endpoint::policy(&[])).map_err(|e| {
+            Error::new(
+                ErrorKind::Internal,
+                format!("cannot build the webhook client: {e}"),
+            )
+        })?;
         Ok(Self {
             identity: Arc::new(identity),
             notify: Arc::new(NotifyService::new(Arc::new(notify))),
+            webhooks: Arc::new(Webhooks::new(Arc::new(hooks), transport)),
             origin: url.origin().ascii_serialization(),
             workspace: Vec::new(),
             hooks: None,
@@ -172,6 +187,7 @@ impl Services {
             config,
             &self.identity,
             self.notify.store(),
+            &self.webhooks,
             &self.origin,
             var,
         )
@@ -217,6 +233,7 @@ impl Services {
         let mut all: Vec<Arc<dyn Service>> = vec![
             Arc::new(IdentityService::new(Arc::clone(&self.identity))),
             Arc::clone(&self.notify) as Arc<dyn Service>,
+            Arc::new(WebhooksService::new(Arc::clone(&self.webhooks))),
         ];
         all.extend(self.workspace.iter().cloned());
         all.extend(self.admin.iter().cloned());
@@ -239,6 +256,11 @@ impl Services {
                 builder = builder.mount_cross_site(prefix, router);
             }
         }
+        // Mail apps post one-click unsubscribes with no session (RFC 8058).
+        builder = builder.mount_cross_site(
+            "/unsubscribe",
+            crate::mail::router(Arc::clone(self.notify.store())),
+        );
         builder
             .route_metrics(self.observability.metrics.clone())
             .authenticator(Arc::new(IdentityAuthenticator::new(Arc::clone(identity))))

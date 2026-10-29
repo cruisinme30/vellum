@@ -33,7 +33,7 @@ impl Reply {
     }
 }
 
-fn app(data_dir: Option<&std::path::Path>) -> Router {
+pub fn app(data_dir: Option<&std::path::Path>) -> Router {
     let services = Services::open(ORIGIN, data_dir, None).unwrap();
     let mut config = GatewayConfig::new(ORIGIN, vec![3; 32]);
     config.rate_per_second = 10_000;

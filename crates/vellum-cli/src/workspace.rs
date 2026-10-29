@@ -43,6 +43,9 @@ use vellum_drive::sql::SqlIndex;
 use vellum_drive::{Drive, DriveIndex, DriveService};
 use vellum_identity::Identity;
 use vellum_kernel::{Config, Error, ErrorKind, UserId};
+use vellum_notify::endpoint::SafeTransport;
+use vellum_notify::hooks::Webhooks;
+use vellum_notify::mail::Mailer;
 use vellum_notify::service::NotifyStore;
 use vellum_store::remote::s3::{S3Config, S3Store};
 use vellum_store::{BlobPath, BlobStore, LocalStore, StoreError};
@@ -677,6 +680,30 @@ fn task_jobs(
     Ok(())
 }
 
+/// Webhooks, email, reminders and digests for the notifier.
+fn delivery(
+    identity: &Arc<Identity>,
+    notify: &Arc<NotifyStore>,
+    webhooks: &Arc<Webhooks<SafeTransport>>,
+    tasks: &Arc<TasksService>,
+    var: impl Fn(&str) -> Option<String>,
+) -> Result<crate::notifications::Delivery, Error> {
+    // My Work counts "today" in the server's zone (see `TasksSetup`).
+    let time_zone = jiff::tz::TimeZone::system();
+    let mail = crate::mail::setup(var, identity.config().public_url.as_str())?
+        .map(|(outbound, config)| Arc::new(Mailer::new(Arc::clone(notify), outbound, config)));
+    Ok(crate::notifications::Delivery {
+        webhooks: Arc::clone(webhooks),
+        mail,
+        people: Arc::new(crate::mail::People::new(
+            Arc::clone(identity),
+            time_zone.clone(),
+        )),
+        tasks: Arc::clone(tasks),
+        time_zone,
+    })
+}
+
 /// Opens the workspace services for `config`, or returns none (with a
 /// warning) when no index is configured.
 ///
@@ -688,6 +715,7 @@ pub async fn open(
     config: &Config,
     identity: &Arc<Identity>,
     notify: &Arc<NotifyStore>,
+    webhooks: &Arc<Webhooks<SafeTransport>>,
     app_origin: &str,
     var: impl Fn(&str) -> Option<String> + Send + Sync,
 ) -> Result<Opened, Error> {
@@ -744,6 +772,7 @@ pub async fn open(
         Arc::clone(&workspace.work),
         Arc::clone(identity),
         Arc::clone(notify),
+        delivery(identity, notify, webhooks, &workspace.tasks, &var)?,
     )?;
     // The watcher starts before the rescan, so nothing edited in between
     // is missed; whatever it sees twice is applied idempotently.
