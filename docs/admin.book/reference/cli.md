@@ -15,7 +15,7 @@ Every command accepts `--config <file>` and `--data-dir <folder>`, and
 | `vellum docs` | Lists the help books built into this binary, or prints a page |
 | `vellum mcp` | Runs the MCP server over standard input and output; `--private` serves the end-to-end encrypted spaces sealed to this device, read-only, from the data folder or (with `--server`) from a Vellum server |
 | `vellum private key` | Prints this device's public key and fingerprint, for enrolling it in private spaces |
-| `vellum private enrol`, `vellum private reseal` | Enrols this device in a private space on a server, and reseals the space's pages after a device joins or leaves (token in `VELLUM_TOKEN`) |
+| `vellum private enrol`, `vellum private reseal` | Enrols this device in a private space on a server, and seals the space's pages to its current devices after one joins or leaves, readable pages included; new device keys need `--trust <fingerprint>` (token in `VELLUM_TOKEN`) |
 | `vellum new` | Creates a page, book or collection from the command line |
 | `vellum open` | Opens a page in the browser |
 | `vellum search` | Searches from the command line |

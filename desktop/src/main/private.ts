@@ -26,6 +26,8 @@ export interface PrivateDeps {
   ) => Promise<RunResult>;
   /** The machine's name, for the default device label. */
   readonly hostname: () => string;
+  /** Where the binary keeps the device keys this device trusts. */
+  readonly pinDir: string;
 }
 
 /** This device's public key, as members see it. */
@@ -68,9 +70,14 @@ export class PrivateSpaces {
     return this.remote(["enrol", "--space", space, `--label=${name}`]);
   }
 
-  /** Reseals the pages this device can open to the space's current keys. */
-  async reseal(spaceId: unknown): Promise<PrivateResult> {
-    return this.remote(["reseal", "--space", parseSpaceId(spaceId)]);
+  /**
+   * Reseals the pages this device can open to the space's current keys,
+   * and seals pages left readable. Keys new since the last reseal must be
+   * in `trust`, after the person compared their fingerprints.
+   */
+  async reseal(spaceId: unknown, trust?: unknown): Promise<PrivateResult> {
+    const trusted = parseFingerprints(trust).map((fingerprint) => `--trust=${fingerprint}`);
+    return this.remote(["reseal", "--space", parseSpaceId(spaceId), ...trusted]);
   }
 
   private async remote(commandArguments: readonly string[]): Promise<PrivateResult> {
@@ -79,6 +86,7 @@ export class PrivateSpaces {
     const result = await this.deps.run(["private", ...commandArguments], {
       VELLUM_SERVER: this.server(),
       VELLUM_TOKEN: token,
+      VELLUM_PRIVATE_DIR: this.deps.pinDir,
     });
     return { lines: this.output(result) };
   }
@@ -93,6 +101,20 @@ export class PrivateSpaces {
       .map((line) => line.trimEnd())
       .filter((line) => line !== "");
   }
+}
+
+const FINGERPRINT = /^[0-9a-f]{32}$/u;
+
+/** Validates the fingerprints the person chose to trust. */
+function parseFingerprints(input: unknown): string[] {
+  if (input === undefined) return [];
+  if (!Array.isArray(input) || input.length > 255)
+    throw new TypeError("Trusted keys are a list of fingerprints");
+  return input.map((value: unknown) => {
+    if (typeof value !== "string" || !FINGERPRINT.test(value))
+      throw new TypeError("A fingerprint is 32 lowercase hex digits");
+    return value;
+  });
 }
 
 /** Validates a space ID from the page before it reaches a command line. */

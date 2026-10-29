@@ -466,6 +466,8 @@ struct Workspace {
     work: Arc<WorkService>,
     tasks: Arc<TasksService>,
     space_of: vellum_collections::service::SpaceOf,
+    /// Private spaces, whose guard every replica keeps current.
+    e2e: Arc<vellum_e2e::E2e>,
 }
 
 /// What `vellum serve` mounts for the workspace.
@@ -536,6 +538,9 @@ struct Feeds {
     rows: Option<Arc<dyn IndexFeed>>,
     /// Page text saved through the API, for live editing rooms.
     pages: Option<Arc<dyn vellum_drive::PageWrites>>,
+    /// Which spaces are private: the e2e service changes it, the store's
+    /// guard enforces it.
+    private: vellum_e2e::PrivateRoots,
 }
 
 /// Builds the services over `store`, `authz` and the drive's `index`.
@@ -556,7 +561,7 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
         Arc::clone(&index),
         Arc::clone(&drive_access),
     ));
-    let e2e = crate::e2e::service(&store, &index, drive_access);
+    let e2e = Arc::new(crate::e2e::service(&store, &index, drive_access).with_roots(feeds.private));
     let lookup = Arc::clone(spaces);
     let space_of: vellum_collections::service::SpaceOf =
         Arc::new(move |path: &BlobPath| lookup.of(path));
@@ -634,7 +639,7 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
             Arc::clone(&work) as Arc<dyn Service>,
             Arc::clone(&tasks) as Arc<dyn Service>,
             Arc::new(pages),
-            Arc::new(e2e),
+            Arc::clone(&e2e) as Arc<dyn Service>,
         ],
         drive,
         collections,
@@ -642,6 +647,7 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
         work,
         tasks,
         space_of,
+        e2e,
     })
 }
 
@@ -788,7 +794,8 @@ pub async fn open(
         .await
         .map_err(|e| unavailable("cannot read the change feed", e))?;
     let (replica, others_alive, rate_counts) = join_cluster(&index, &me, &var).await?;
-    let store: Arc<dyn BlobStore> = Arc::new(AnnouncingStore::new(files, feed.clone(), &me));
+    let (store, roots) =
+        crate::e2e::guarded(Arc::new(AnnouncingStore::new(files, feed.clone(), &me)));
     let (shards, authz, drive_index) = open_shards(&index, &var).await?;
     let spaces = Arc::new(Spaces::default());
     let (events, queued) = crate::notifications::channel();
@@ -804,6 +811,7 @@ pub async fn open(
             events,
             rows: Some(rows),
             pages: Some(Arc::clone(&live_pages) as Arc<dyn vellum_drive::PageWrites>),
+            private: roots,
         },
         setup,
     )
@@ -820,6 +828,8 @@ pub async fn open(
         crate::watcher::start(&config.data_dir, &store, &workspace.drive, &workspace.books).await?;
     }
     rescan_and_maintain(&replica, others_alive, &workspace.drive, &index, &shards).await;
+    // After the rescan, so every private space's folder is in the index.
+    crate::e2e::keep_roots_fresh(Arc::clone(&workspace.e2e)).await;
     let hooks = crate::integrations::hooks(&store, &workspace.work, &var).await?;
     let collab = Collab::open(
         Arc::clone(&workspace.drive),
@@ -894,6 +904,7 @@ pub async fn describe(
             events: Arc::new(TracingSink),
             rows: None,
             pages: None,
+            private: vellum_e2e::PrivateRoots::default(),
         },
         setup,
     )

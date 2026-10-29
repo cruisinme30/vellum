@@ -13,7 +13,15 @@ import type { PrivateSpace, PrivateSpacesApi } from "./api";
 
 type DeviceActions = NonNullable<DesktopBridge["privateSpaces"]>;
 
-/** A fingerprint in groups of four, as `vellum private key` prints none of. */
+/** What the binary says before the fingerprints it does not trust yet. */
+const UNTRUSTED = /untrusted device keys: ([0-9a-f,]+)/u;
+
+/** The fingerprints a reseal refused, if that is why it failed. */
+function untrustedKeys(message: string): string[] | undefined {
+  return UNTRUSTED.exec(message)?.[1]?.split(",");
+}
+
+/** A fingerprint in groups of four, easier to read aloud and compare. */
 function grouped(fingerprint: string): string {
   return fingerprint.match(/.{1,4}/gu)?.join(" ") ?? fingerprint;
 }
@@ -39,7 +47,12 @@ export function PrivateSpaces({
   const t = useT();
   const [revision, setRevision] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<{ text: string; failed: boolean }>();
+  const [message, setMessage] = useState<{
+    text: string;
+    failed: boolean;
+    /** Keys a reseal refused, and the space, while the person decides. */
+    untrusted?: { space: string; keys: string[] };
+  }>();
   const key = useLoaded(
     async () => (device === undefined ? undefined : device.deviceKey()),
     [device],
@@ -47,7 +60,7 @@ export function PrivateSpaces({
   const spaces = useLoaded(() => api.spaces(), [api, revision]);
   const mine = key.state === "ready" ? key.value?.fingerprint : undefined;
 
-  const run = (action: () => Promise<readonly string[]>) => {
+  const run = (action: () => Promise<readonly string[]>, space?: string) => {
     setBusy(true);
     setMessage(undefined);
     action().then(
@@ -59,7 +72,12 @@ export function PrivateSpaces({
       (error: unknown) => {
         setBusy(false);
         const fallback = error instanceof Error ? error.message : t("private-error");
-        setMessage({ text: describeError(error, fallback), failed: true });
+        const keys = untrustedKeys(fallback);
+        setMessage(
+          keys === undefined || space === undefined
+            ? { text: describeError(error, fallback), failed: true }
+            : { text: t("private-untrusted"), failed: true, untrusted: { space, keys } },
+        );
       },
     );
   };
@@ -89,6 +107,19 @@ export function PrivateSpaces({
         >
           {message.text}
         </p>
+      )}
+      {message?.untrusted === undefined || device === undefined ? undefined : (
+        <UntrustedKeys
+          keys={message.untrusted.keys}
+          busy={busy}
+          onTrust={() => {
+            const { space, keys } = message.untrusted ?? { space: "", keys: [] };
+            run(async () => {
+              const { lines } = await device.reseal(space, keys);
+              return lines;
+            }, space);
+          }}
+        />
       )}
       <Ready loaded={spaces}>
         {(list) =>
@@ -126,7 +157,7 @@ function SpaceCard({
   readonly busy: boolean;
   readonly device: DeviceActions | undefined;
   readonly api: PrivateSpacesApi;
-  readonly run: (action: () => Promise<readonly string[]>) => void;
+  readonly run: (action: () => Promise<readonly string[]>, space?: string) => void;
 }) {
   const t = useT();
   const heading = `private-space-${space.id}`;
@@ -181,7 +212,7 @@ function SpaceCard({
           {keys.length === 0 ? t("private-make-private") : t("private-enrol")}
         </button>
       ) : undefined}
-      {device !== undefined && enrolled && keys.length > 1 ? (
+      {device !== undefined && enrolled ? (
         <button
           type="button"
           className="vl-text-button"
@@ -190,12 +221,41 @@ function SpaceCard({
             run(async () => {
               const { lines } = await device.reseal(space.id);
               return lines;
-            });
+            }, space.id);
           }}
         >
           {t("private-reseal")}
         </button>
       ) : undefined}
+    </section>
+  );
+}
+
+/** Device keys new since this device last sealed, to compare before trusting. */
+function UntrustedKeys({
+  keys,
+  busy,
+  onTrust,
+}: {
+  readonly keys: readonly string[];
+  readonly busy: boolean;
+  readonly onTrust: () => void;
+}) {
+  const t = useT();
+  return (
+    <section aria-labelledby="private-untrusted-heading">
+      <h2 id="private-untrusted-heading">{t("private-untrusted-heading")}</h2>
+      <p>{t("private-untrusted-help")}</p>
+      <ul>
+        {keys.map((fingerprint) => (
+          <li key={fingerprint}>
+            <code>{grouped(fingerprint)}</code>
+          </li>
+        ))}
+      </ul>
+      <button type="button" className="vl-filled-button" disabled={busy} onClick={onTrust}>
+        {t("private-trust")}
+      </button>
     </section>
   );
 }

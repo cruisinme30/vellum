@@ -35,6 +35,7 @@ mod mcp;
 mod notifications;
 mod observability;
 mod page_render;
+mod pins;
 mod private;
 mod private_remote;
 #[cfg(test)]

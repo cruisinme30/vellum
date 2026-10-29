@@ -512,7 +512,7 @@ notify-device-error = Push couldn't be changed. Try again.
 ## Private spaces (end-to-end encrypted)
 
 private-title = Private spaces
-private-intro = Pages in a private space are sealed on members' devices. The server stores only ciphertext, so it can't read, search or export them.
+private-intro = Pages in a private space are sealed on members' devices. The server stores only ciphertext and refuses readable pages there, so it can't read, search or export them. After making a space private, seal its existing pages from this device.
 private-device = This device
 private-device-desktop-only = Enrolling a device needs the Vellum desktop app, which keeps the device key in this computer's keychain.
 private-device-fingerprint = Device fingerprint:
@@ -525,11 +525,15 @@ private-sealed-to = { $count ->
 private-this-device = (this device)
 private-make-private = Make private and enrol this device
 private-enrol = Enrol this device
-private-reseal = Reseal pages for every device
+private-reseal = Seal pages for every device
 private-remove = Remove
 private-remove-label = Remove { $device }
 private-removed = Removed { $device }. Reseal the pages from another device so it can't open new versions.
 private-error = That didn't work. Try again.
+private-untrusted = Some devices were added since this device last sealed the space. Nothing was sealed.
+private-untrusted-heading = New devices to check
+private-untrusted-help = Ask each device's owner to read out its fingerprint from their Private spaces screen. Trust them only if every group matches; otherwise the server may have added a device of its own.
+private-trust = The fingerprints match: trust and seal
 
 ## Screens that need a server
 

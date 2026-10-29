@@ -13,6 +13,7 @@ function setup(stdout = "", code = 0, stderr = "") {
   const spaces = new PrivateSpaces(() => "https://vellum.northstar.dev", token, {
     run,
     hostname: () => "ana-mbp",
+    pinDir: "/u/private",
   });
   return { run, token, spaces };
 }
@@ -39,12 +40,23 @@ describe("private spaces", () => {
     expect(environment).toEqual({
       VELLUM_SERVER: "https://vellum.northstar.dev",
       VELLUM_TOKEN: "at-123",
+      VELLUM_PRIVATE_DIR: "/u/private",
     });
   });
 
   it("reseals and reports the binary's error", async () => {
     const ok = setup("1 resealed\n");
     expect(await ok.spaces.reseal(SPACE)).toEqual({ lines: ["1 resealed"] });
+    await ok.spaces.reseal(SPACE, ["0123456789abcdef0123456789abcdef"]);
+    expect(ok.run.mock.lastCall?.[0]).toEqual([
+      "private",
+      "reseal",
+      "--space",
+      SPACE,
+      "--trust=0123456789abcdef0123456789abcdef",
+    ]);
+    await expect(ok.spaces.reseal(SPACE, ["--server=evil"])).rejects.toThrow(TypeError);
+    await expect(ok.spaces.reseal(SPACE, "abc")).rejects.toThrow(TypeError);
     const failing = setup("", 1, "warn\nconflict (409): already enrolled\n");
     await expect(failing.spaces.enrol(SPACE, "Laptop")).rejects.toThrow(/already enrolled/);
   });

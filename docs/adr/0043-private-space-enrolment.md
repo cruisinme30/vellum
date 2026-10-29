@@ -11,7 +11,7 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D182, D183, D184, D185
+- Decisions: D182, D183, D184, D185, D208, D209, D210
 - Issue: #475
 - Pull requests: to be linked when merged
 - Builds on: ADR 0002 (recipient envelopes), ADR 0025 (key registry and
@@ -89,6 +89,34 @@ a device joins or leaves.
   gets a Private spaces screen; outside the desktop app it says that
   enrolling needs it.
 
+### D208: a guard keeps readable writes out of private spaces
+
+- The workspace store sits behind a guard. A write into a private space's
+  folder must be a recipient envelope, whichever service makes it (drive,
+  live editing, sync, books, imports); moving a readable page in counts.
+- Folder manifests, sibling order and shortcuts carry no page content and
+  stay writable, so the drive can still organise a private space.
+- Each replica reloads which spaces are private every 15 seconds, and at
+  once when its own e2e service enrols a first key.
+
+### D209: existing pages are sealed on a member's device
+
+- An editor of the space can fetch a page still readable from before the
+  space turned private (`plaintext=true`); viewers get ciphertext only.
+- `vellum private reseal` seals those pages along with resealing the rest,
+  so making a space private is: enrol, then seal from that device.
+
+### D210: devices pin the keys they seal to
+
+- Each device remembers, per server and space, the fingerprints it has
+  sealed to. The first list it sees is trusted as found (on enrolment or
+  first reseal); after that a new key stops the reseal until the person
+  compares its fingerprint with its owner and trusts it.
+- Every key the server sends is checked against its fingerprint, so a
+  pinned fingerprint cannot hide a swapped key.
+- The desktop app shows the new keys and seals only after the person
+  confirms; the CLI takes `--trust <fingerprint>`.
+
 ## Alternatives
 
 - **A database table per space**: needs a migration and a second place to
@@ -98,6 +126,9 @@ a device joins or leaves.
   client. Pages are small; we can add one later if it matters.
 - **The server re-wraps envelopes when a device joins**: impossible
   without a key that opens them, which is the point of E2E.
+- **Pin keys on the server or sign key lists**: a server we do not
+  trust cannot vouch for itself; signed lists need a member key hierarchy
+  that 1.0 does not have. Device-side pins catch the same attack.
 - **Add recipients without re-encrypting** (`add_recipient`): cheaper,
   but cannot drop a revoked device whose fingerprint is all we know, and
   keeps the old file key. A full reseal handles both.
@@ -106,12 +137,10 @@ a device joins or leaves.
 
 - A member can make a shared drive private, enrol devices and search it
   from Claude without the folder reaching the device by other means.
-- Trust in the key list rests on the server, as it does for sign-in. A
-  malicious server could enrol its own key; members can compare
-  fingerprints on the Private spaces screen. Pinning keys on devices is
-  follow-up work.
-- The drive still accepts plaintext writes into a private space's folder,
-  and existing pages are not converted. Refusing server-readable writes
-  in private spaces, and a conversion tool, are follow-ups.
+- A server that slips its own key into a list cannot get pages sealed to
+  it without a member trusting that fingerprint (D210). The first list a
+  device sees is still trusted as found.
+- Another replica may accept readable writes into a newly private space
+  for up to 15 seconds; reseal seals anything that lands in that window.
 - Reseal must run on a device that can open the pages after each enrol or
   revoke; the screen and the command say so.

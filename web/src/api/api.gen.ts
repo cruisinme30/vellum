@@ -3309,6 +3309,11 @@ export interface GetObject {
    */
   path: string;
   /**
+   * Also return a readable page, so a member's device can seal it
+   * (needs edit access). Off by default: only ciphertext is served.
+   */
+  plaintext?: boolean;
+  /**
    * The space.
    */
   space_id: SpaceId;
@@ -5312,7 +5317,8 @@ export type Scope = "read" | "write:draft" | "write:direct" | "work" | "admin";
  */
 export interface SealedObject {
   /**
-   * The recipient envelope (or the space's folder manifest), base64.
+   * The recipient envelope (or, when not `sealed`, the readable
+   * bytes), base64.
    */
   envelope: string;
   /**
@@ -5323,6 +5329,11 @@ export interface SealedObject {
    * Its path inside the space folder.
    */
   path: string;
+  /**
+   * False for a readable object: the folder manifest, or a page still
+   * to convert when `plaintext` was asked for.
+   */
+  sealed: boolean;
 }
 
 /**

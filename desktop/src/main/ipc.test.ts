@@ -22,7 +22,8 @@ function services(): BridgeServices {
     notify,
     privateDeviceKey: () => Promise.resolve({ publicKey: "ab", fingerprint: "cd" }),
     privateEnrol,
-    privateReseal: (spaceId) => Promise.resolve({ lines: [String(spaceId)] }),
+    privateReseal: (spaceId, trust) =>
+      Promise.resolve({ lines: [String(spaceId), JSON.stringify(trust)] }),
   };
 }
 
@@ -48,7 +49,9 @@ describe("ipc", () => {
     expect(privateEnrol).toHaveBeenCalledWith("S", "L");
     await dispatch(handlers, Channel.privateEnrol, page, "junk");
     expect(privateEnrol.mock.lastCall).toEqual([undefined, undefined]);
-    expect(await dispatch(handlers, Channel.privateReseal, page, "S")).toEqual({ lines: ["S"] });
+    expect(
+      await dispatch(handlers, Channel.privateReseal, page, { spaceId: "S", trust: ["f"] }),
+    ).toEqual({ lines: ["S", '["f"]'] });
   });
 
   it("refuses other senders, unknown channels and unsafe input", async () => {
