@@ -59,6 +59,11 @@ export default defineConfig(
     extends: [tseslint.disableTypeChecked],
   },
   {
+    // Generated from schema/blocks.json; its length follows the schema.
+    files: ["src/**/*.gen.ts"],
+    rules: { "max-lines": "off" },
+  },
+  {
     // Tool configuration files must use a default export.
     files: ["*.config.{js,ts}"],
     languageOptions: { globals: { ...globals.node } },
