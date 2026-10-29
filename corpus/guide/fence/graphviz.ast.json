@@ -1,0 +1,20 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "fence",
+        "lang": "graphviz",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null,
+        "literal": "digraph layers {\n  rankdir=LR;\n  node [shape=box, style=rounded];\n  kernel -> contracts -> foundation -> engine -> service -> edge -> app;\n}\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}

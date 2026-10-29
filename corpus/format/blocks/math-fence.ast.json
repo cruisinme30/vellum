@@ -1,0 +1,13 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "math",
+        "literal": "E = mc^2\n",
+        "id": null
+      }
+    ]
+  },
+  "diagnostics": []
+}

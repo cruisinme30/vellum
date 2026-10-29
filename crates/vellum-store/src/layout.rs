@@ -23,13 +23,19 @@ use crate::{error::StoreResult, path::BlobPath};
 pub const SYSTEM_DIR: &str = ".vellum";
 /// Per-folder metadata file (id, icon, ACL copy).
 pub const FOLDER_META: &str = ".vellum-folder.yaml";
+/// A book's generated `mdBook` output; rebuilt on demand, never content.
+pub const BUILD_DIR: &str = ".mdbook";
+/// A book's published snapshots: data the books service owns, not
+/// documents to index.
+pub const SNAPSHOTS_DIR: &str = ".snapshots";
 /// Longest file name, in bytes, that every supported backend accepts.
 pub const MAX_NAME_BYTES: usize = 200;
 
 /// What a path holds, decided from its location and name alone.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Kind {
-    /// Vellum's own state under `.vellum/`, or a VCS directory.
+    /// Vellum's own state under `.vellum/`, a VCS directory, or generated
+    /// build output such as a book's `.mdbook/`.
     System,
     /// Editor scratch files (`.swp`, `~`, `.DS_Store`, ...); never ingested.
     Scratch,
@@ -66,7 +72,7 @@ impl Kind {
     pub fn of(path: &BlobPath) -> Self {
         let name = path.file_name();
         let first = path.segments().next().unwrap_or_default();
-        if first == SYSTEM_DIR || path.segments().any(|s| s == ".git") {
+        if first == SYSTEM_DIR || path.segments().any(|s| s == ".git" || s == BUILD_DIR) {
             return Self::System;
         }
         if is_scratch(name) {
@@ -85,6 +91,9 @@ impl Kind {
                 });
             }
             _ => {}
+        }
+        if in_book_snapshots(path) {
+            return Self::Asset;
         }
         if name.to_ascii_lowercase().ends_with(".shortcut.yaml") {
             return Self::Shortcut;
@@ -109,6 +118,14 @@ impl Kind {
 fn has_ext(name: &str, ext: &str) -> bool {
     name.rsplit_once('.')
         .is_some_and(|(stem, e)| !stem.is_empty() && e.eq_ignore_ascii_case(ext))
+}
+
+/// True for anything under `<name>.book/.snapshots/`.
+fn in_book_snapshots(path: &BlobPath) -> bool {
+    let segments: Vec<&str> = path.segments().collect();
+    segments
+        .windows(2)
+        .any(|w| matches!(w, [book, snaps] if *snaps == SNAPSHOTS_DIR && has_ext(book, "book")))
 }
 
 fn is_scratch(name: &str) -> bool {
@@ -237,7 +254,8 @@ mod tests {
     #[test]
     fn classifies_the_layout() -> StoreResult<()> {
         assert_eq!(kind(".vellum/index.sqlite"), Kind::System);
-        assert_eq!(kind("drives/shared/Ops/.git/HEAD"), Kind::System);
+        // `.git` cannot even be named as a blob path (#272).
+        assert!(BlobPath::new("drives/shared/Ops/.git/HEAD").is_err());
         assert_eq!(kind("drives/users/ana/.Plan.md.swp"), Kind::Scratch);
         assert_eq!(kind("drives/users/ana/Plan.md~"), Kind::Scratch);
         assert_eq!(
@@ -251,6 +269,18 @@ mod tests {
         );
         assert_eq!(
             kind("drives/shared/Ops/Guide.book/intro.md"),
+            Kind::Document
+        );
+        assert_eq!(
+            kind("drives/shared/Ops/Guide.book/.mdbook/index.html"),
+            Kind::System
+        );
+        assert_eq!(
+            kind("drives/shared/Ops/Guide.book/.snapshots/v1/intro.md"),
+            Kind::Asset
+        );
+        assert_eq!(
+            kind("drives/shared/Ops/Notes/.snapshots/intro.md"),
             Kind::Document
         );
         let collection = BlobPath::new("drives/shared/Ops/Vendors.collection")?;

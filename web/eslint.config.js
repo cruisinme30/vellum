@@ -59,6 +59,17 @@ export default defineConfig(
     extends: [tseslint.disableTypeChecked],
   },
   {
+    // Generated from schema/blocks.json or the server's operations; its
+    // length and names follow the source, and named aliases
+    // (`BookId = string`) document the API.
+    files: ["src/**/*.gen.ts"],
+    rules: {
+      "max-lines": "off",
+      "sonarjs/redundant-type-aliases": "off",
+      "unicorn/prevent-abbreviations": "off",
+    },
+  },
+  {
     // Tool configuration files must use a default export.
     files: ["*.config.{js,ts}"],
     languageOptions: { globals: { ...globals.node } },

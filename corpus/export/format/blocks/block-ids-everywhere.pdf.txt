@@ -1,0 +1,23 @@
+Block IDs on every block
+A paragraph.
+A quote keeps its ID on its own line after it.
+Region Revenue
+EMEA 120
+fn main() {}
+Q1 3
+Q2 5
+2
+𝐸 = 𝑚𝑐
+Info
+Callouts carry the ID on their opening line.
+[Image: Gateway diagram]
+94%
+Uptime
+• A list item with a quote:
+Quoted inside a list.
+2 2
+𝑎 + 𝑏
+Warning
+Alerts carry it in the title.
+1 / 1
+

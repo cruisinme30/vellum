@@ -1,0 +1,428 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Everything a version tag ships, in one run.
+#
+# Server: signed, reproducible releases (ADR 0022, D96). A tag vX.Y.Z on main:
+#   1. builds the static binary twice per architecture and requires the
+#      builds to be byte-identical (reproducible builds);
+#   2. writes a CycloneDX SBOM of the source tree;
+#   3. signs every file with Sigstore (keyless cosign) and records SLSA
+#      level 3 provenance for the files and the image;
+#   4. pushes the multi-arch image to GHCR built from those same binaries,
+#      signed and with the SBOM attested;
+#   5. publishes the GitHub release with all of it attached;
+#   6. runs the upgrade and restore drill against the published image:
+#      upgrade a seeded stack from each of the previous two releases, and
+#      restore a backup into a scratch stack, comparing counts each time.
+#
+# Desktop: builds the app for macOS, Windows and Linux and attaches it to a
+# draft GitHub release, for every v* tag. A tag push fails without the Apple
+# secrets. Set these repository secrets (ADR 0023, D99):
+#   macOS:   CSC_LINK, CSC_KEY_PASSWORD (Developer ID Application, .p12 as base64)
+#            APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID (notarisation)
+#   Windows: WIN_CSC_LINK, WIN_CSC_KEY_PASSWORD (code-signing certificate)
+#
+# A manual run does one part only: an unsigned desktop build, or the drill
+# against a given image (or one built from the chosen commit).
+name: "Release: server, desktop and drill"
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      part:
+        description: "What to run"
+        type: choice
+        options: [drill, desktop]
+        default: drill
+      image:
+        description: "Drill only: image to test; empty builds this commit"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  verify:
+    name: Tag is on main and matches the version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    if: github.event_name == 'push'
+    outputs:
+      server: ${{ steps.kind.outputs.server }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Only vX.Y.Z tags release the server; other v* tags build the desktop app
+        id: kind
+        run: |
+          if [[ "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "server=true" >>"${GITHUB_OUTPUT}"
+          else
+            echo "::notice::${GITHUB_REF_NAME} is not vX.Y.Z; only the desktop app is built."
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.kind.outputs.server == 'true'
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Releases come from main only
+        if: steps.kind.outputs.server == 'true'
+        run: |
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "${GITHUB_SHA}" origin/main; then
+            echo "::error::${GITHUB_REF_NAME} (${GITHUB_SHA}) is not on main."
+            exit 1
+          fi
+      - name: The tag matches the workspace version
+        if: steps.kind.outputs.server == 'true'
+        id: version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          declared="$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -1)"
+          if [[ "${declared}" != "${version}" ]]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} but Cargo.toml declares ${declared}."
+            exit 1
+          fi
+          echo "version=${version}" >>"${GITHUB_OUTPUT}"
+
+  binaries:
+    name: Reproducible binary (${{ matrix.arch }})
+    needs: verify
+    if: needs.verify.outputs.server == 'true'
+    strategy:
+      matrix:
+        include:
+          - { arch: amd64, runner: ubuntu-24.04 }
+          - { arch: arm64, runner: ubuntu-24.04-arm }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build twice from scratch
+        run: |
+          for n in 1 2; do
+            docker buildx build --no-cache --target binary \
+              --output "type=local,dest=${RUNNER_TEMP}/build-${n}" -f deploy/docker/Dockerfile .
+          done
+      - name: The builds are byte-identical
+        run: cmp "${RUNNER_TEMP}/build-1/vellum" "${RUNNER_TEMP}/build-2/vellum"
+      - name: Name the binary
+        run: |
+          mkdir -p dist
+          cp "${RUNNER_TEMP}/build-1/vellum" "dist/vellum-linux-${{ matrix.arch }}"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: binary-${{ matrix.arch }}
+          path: dist/
+          if-no-files-found: error
+
+  assemble:
+    name: SBOM, checksums and signatures
+    needs: [verify, binaries]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write # keyless Sigstore signing
+    outputs:
+      subjects: ${{ steps.hashes.outputs.subjects }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          pattern: binary-*
+          path: dist
+          merge-multiple: true
+      - name: CycloneDX SBOM of the source tree (Rust and web)
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: dist/vellum-${{ needs.verify.outputs.version }}.cdx.json
+          upload-artifact: false
+          upload-release-assets: false
+      - name: Checksums
+        id: hashes
+        working-directory: dist
+        run: |
+          sha256sum -- * >SHA256SUMS
+          echo "subjects=$(base64 -w0 SHA256SUMS)" >>"${GITHUB_OUTPUT}"
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - name: Sign every file with Sigstore
+        working-directory: dist
+        run: |
+          for file in vellum-* SHA256SUMS; do
+            cosign sign-blob --yes --bundle "${file}.sigstore.json" "${file}"
+          done
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-files
+          path: dist/
+          if-no-files-found: error
+
+  provenance:
+    name: SLSA provenance (files)
+    needs: assemble
+    permissions:
+      actions: read
+      id-token: write
+      contents: write
+    # SLSA requires the generator to be referenced by tag, not by digest
+    # (see .github/zizmor.yml).
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
+    with:
+      base64-subjects: ${{ needs.assemble.outputs.subjects }}
+      provenance-name: vellum.intoto.jsonl
+      upload-assets: false
+
+  image:
+    name: Signed multi-arch image
+    needs: [verify, assemble]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: release-files
+          path: dist
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build the image from the released binaries and push it
+        id: push
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          docker buildx build --push --platform linux/amd64,linux/arm64 --target runtime \
+            --build-arg DIST=release --build-context release=dist \
+            --build-arg "VERSION=${VERSION}" --build-arg "REVISION=${GITHUB_SHA}" \
+            --provenance=false --sbom=false --metadata-file "${RUNNER_TEMP}/metadata.json" \
+            -t "${IMAGE}:${VERSION}" -t "${IMAGE}:latest" -f deploy/docker/Dockerfile .
+          echo "digest=$(jq -r '."containerimage.digest"' "${RUNNER_TEMP}/metadata.json")" >>"${GITHUB_OUTPUT}"
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - name: Sign the image and attest its SBOM
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          cosign sign --yes "${IMAGE}@${DIGEST}"
+          cosign attest --yes --type cyclonedx --predicate "dist/vellum-${VERSION}.cdx.json" "${IMAGE}@${DIGEST}"
+
+  image-provenance:
+    name: SLSA provenance (image)
+    needs: image
+    permissions:
+      actions: read
+      id-token: write
+      packages: write
+    # Referenced by tag on purpose, like provenance above.
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
+    with:
+      image: ghcr.io/${{ github.repository }}
+      digest: ${{ needs.image.outputs.digest }}
+      registry-username: ${{ github.actor }}
+    secrets:
+      registry-password: ${{ secrets.GITHUB_TOKEN }}
+
+  publish:
+    name: Publish the release
+    needs: [verify, assemble, provenance, image, image-provenance]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: release-files
+          path: dist
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: vellum.intoto.jsonl
+          path: dist
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.verify.outputs.version }}
+          DIGEST: ${{ needs.image.outputs.digest }}
+        run: |
+          cat >notes.md <<NOTES
+          Image: \`${IMAGE}:${VERSION}\` (\`${DIGEST}\`), signed with Sigstore.
+
+          Verify a binary before running it:
+
+          \`\`\`sh
+          cosign verify-blob vellum-linux-amd64 --bundle vellum-linux-amd64.sigstore.json \\
+            --certificate-identity-regexp '^https://github.com/${GITHUB_REPOSITORY}/' \\
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com
+          slsa-verifier verify-artifact vellum-linux-amd64 --provenance-path vellum.intoto.jsonl \\
+            --source-uri github.com/${GITHUB_REPOSITORY} --source-tag ${GITHUB_REF_NAME}
+          \`\`\`
+          NOTES
+          gh release create "${GITHUB_REF_NAME}" dist/* --repo "${GITHUB_REPOSITORY}" \
+            --verify-tag --title "Vellum ${VERSION}" --notes-file notes.md
+
+  desktop:
+    name: Desktop app (${{ matrix.os }})
+    if: github.event_name == 'push' || inputs.part == 'desktop'
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write # electron-builder uploads to the draft release
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            binary: vellum
+          - os: windows-2025
+            binary: vellum.exe
+          - os: ubuntu-24.04
+            binary: vellum
+    env:
+      VELLUM_BINARY: ${{ matrix.binary }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Release builds restore no caches, so a poisoned cache can't reach a
+      # signed release (ADR 0032).
+      - run: rustup toolchain install
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: desktop/package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+      # The server binary embeds web/dist at compile time, so build the web
+      # app first or the binary ships the placeholder page.
+      - name: Web app
+        working-directory: web
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run build
+      - name: Server binary (universal on macOS)
+        if: runner.os == 'macOS'
+        run: |
+          rustup target add aarch64-apple-darwin x86_64-apple-darwin
+          cargo build --release --locked -p vellum-cli --target aarch64-apple-darwin
+          cargo build --release --locked -p vellum-cli --target x86_64-apple-darwin
+          lipo -create -output target/release/vellum \
+            target/aarch64-apple-darwin/release/vellum target/x86_64-apple-darwin/release/vellum
+      - name: Server binary
+        if: runner.os != 'macOS'
+        run: cargo build --release --locked -p vellum-cli
+      - name: Desktop app
+        working-directory: desktop
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ runner.os == 'macOS' && secrets.CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ runner.os == 'macOS' && secrets.CSC_KEY_PASSWORD || '' }}
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run build
+          args=(--config electron-builder.yml --publish always)
+          if [[ "${RUNNER_OS}" == "macOS" && -z "${APPLE_ID}" ]]; then
+            # A tagged release never ships an unsigned macOS build (ADR 0023, D99).
+            if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+              echo "::error::Set APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID, CSC_LINK and CSC_KEY_PASSWORD"
+              exit 1
+            fi
+            args+=(-c.mac.notarize=false)
+          fi
+          if [[ -z "${CSC_LINK}${WIN_CSC_LINK}" ]]; then export CSC_IDENTITY_AUTO_DISCOVERY=false; fi
+          pnpm exec electron-builder "${args[@]}"
+
+  drill:
+    name: Upgrade and restore drill
+    needs: [verify, publish]
+    # After a published release, or on a manual drill run.
+    if: >-
+      !cancelled() &&
+      (needs.publish.result == 'success' ||
+      (github.event_name == 'workflow_dispatch' && inputs.part == 'drill'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: The image under test
+        id: image
+        env:
+          INPUT_IMAGE: ${{ inputs.image }}
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          if [[ -n "${VERSION}" ]]; then
+            image="ghcr.io/${GITHUB_REPOSITORY}:${VERSION}"
+            docker pull "${image}"
+          elif [[ -n "${INPUT_IMAGE}" ]]; then
+            image="${INPUT_IMAGE}"
+            docker pull "${image}"
+          else
+            image="vellum:ci"
+            docker buildx build --load -t "${image}" -f deploy/docker/Dockerfile .
+          fi
+          echo "image=${image}" >>"${GITHUB_OUTPUT}"
+      - name: Does the binary serve yet?
+        id: serve
+        run: |
+          if deploy/compose/stack.sh has-serve "${{ steps.image.outputs.image }}"; then
+            echo "ready=true" >>"${GITHUB_OUTPUT}"
+          else
+            echo "::notice::vellum has no serve command yet; the drill starts once it does."
+          fi
+      - name: Upgrade from each of the previous two releases
+        if: steps.serve.outputs.ready == 'true'
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+          TAG: ${{ github.event_name == 'push' && github.ref_name || '' }}
+        run: |
+          mapfile -t previous < <(gh release list --repo "${GITHUB_REPOSITORY}" --exclude-drafts \
+            --exclude-pre-releases --json tagName --jq '.[].tagName' | grep -vxF "${TAG:-none}" | head -2)
+          if ((${#previous[@]} == 0)); then
+            echo "::notice::No earlier release to upgrade from."
+          fi
+          for tag in "${previous[@]}"; do
+            deploy/drills/upgrade.sh "ghcr.io/${GITHUB_REPOSITORY}:${tag#v}" "${IMAGE}"
+          done
+      - name: Restore a backup into a scratch stack
+        if: steps.serve.outputs.ready == 'true'
+        run: deploy/drills/restore.sh "${{ steps.image.outputs.image }}"

@@ -1,0 +1,6 @@
+[Normal] Before and after the cache
+|  | Before | After |
+| Read | 48 | 21 |
+| Write | 120 | 110 |
+| Search | 95 | 60 |
+

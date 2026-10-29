@@ -1,0 +1,178 @@
+{
+  "document": {
+    "front_matter": {
+      "fields": {
+        "id": "01JB9C2D4E6F8G0H2J4K6M8N0P",
+        "title": "Gateway status, week 45",
+        "owner": "sam",
+        "tags": [
+          "status",
+          "gateway"
+        ],
+        "vellum": 1
+      }
+    },
+    "blocks": [
+      {
+        "type": "container",
+        "name": "stats",
+        "arg": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null,
+        "sections": [
+          [
+            {
+              "type": "list",
+              "start": null,
+              "tight": true,
+              "items": [
+                {
+                  "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "99.97% · Availability · ▲ 0.02 pts"
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                },
+                {
+                  "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "38 ms · p95 latency · ▼ 4 ms"
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                },
+                {
+                  "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "3 · Incidents · ▬ 0"
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        ]
+      },
+      {
+        "type": "fence",
+        "lang": "chart",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null,
+        "literal": "title: p95 latency this week\ntype: line\nunit: ms\nlabels: [Mon, Tue, Wed, Thu, Fri]\nvalues: [44, 41, 40, 39, 38]\n"
+      },
+      {
+        "type": "container",
+        "name": "good",
+        "arg": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null,
+        "sections": [
+          [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The new cache cut read latency by 9%."
+                }
+              ],
+              "id": null
+            }
+          ]
+        ]
+      },
+      {
+        "type": "container",
+        "name": "warn",
+        "arg": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null,
+        "sections": [
+          [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The EU region migration slips a week while we wait for the new database"
+                },
+                {
+                  "type": "soft_break"
+                },
+                {
+                  "type": "text",
+                  "text": "quota ("
+                },
+                {
+                  "type": "issue_key",
+                  "key": "OPS-31"
+                },
+                {
+                  "type": "text",
+                  "text": ")."
+                }
+              ],
+              "id": null
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "diagnostics": []
+}

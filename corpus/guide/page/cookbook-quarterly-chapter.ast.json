@@ -1,0 +1,137 @@
+{
+  "document": {
+    "front_matter": {
+      "fields": {
+        "id": "01JB9F5G7H9J1K3M5N7P9Q1R3S",
+        "title": "Engineering",
+        "vellum": 1
+      }
+    },
+    "blocks": [
+      {
+        "type": "container",
+        "name": "stats",
+        "arg": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null,
+        "sections": [
+          [
+            {
+              "type": "list",
+              "start": null,
+              "tight": true,
+              "items": [
+                {
+                  "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "11 of 14 · Goals met · ▲ 3"
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                },
+                {
+                  "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "34 · Average velocity · ▲ 4 pts"
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                },
+                {
+                  "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "99.97% · Availability · ▬ 0"
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        ]
+      },
+      {
+        "type": "fence",
+        "lang": "chart",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": [
+            [
+              "source",
+              "collection:01JB9G6H8J0K2M4N6P8Q0R2S4T"
+            ],
+            [
+              "x",
+              "Quarter"
+            ],
+            [
+              "y",
+              "Points"
+            ],
+            [
+              "agg",
+              "sum"
+            ]
+          ]
+        },
+        "id": null,
+        "literal": "title: Points shipped by quarter\ntype: bar\n"
+      },
+      {
+        "type": "fence",
+        "lang": "collection",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null,
+        "literal": "id: 01JB9G6H8J0K2M4N6P8Q0R2S4T\nview: By status\nfilter: Quarter == \"2026-Q4\"\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}

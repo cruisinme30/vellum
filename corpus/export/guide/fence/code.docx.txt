@@ -1,0 +1,1 @@
+[Code] helm rollback gateway 1 -n prodkubectl rollout status deploy/gateway

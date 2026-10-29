@@ -1,0 +1,39 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "container",
+        "name": "warn",
+        "arg": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null,
+        "sections": [
+          [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "This container is never closed, so it runs to the end of the file."
+                }
+              ],
+              "id": null
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "diagnostics": [
+    {
+      "line": 1,
+      "code": "unclosed_container",
+      "message": "container has no closing `:::` line; it runs to the end of its parent"
+    }
+  ]
+}

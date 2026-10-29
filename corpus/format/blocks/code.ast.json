@@ -1,0 +1,46 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "fence",
+        "lang": "bash",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null,
+        "literal": "helm rollback gateway 1 -n prod\n"
+      },
+      {
+        "type": "fence",
+        "lang": "rust",
+        "args": "",
+        "attrs": {
+          "id": "evaluate",
+          "classes": [
+            "highlight"
+          ],
+          "pairs": []
+        },
+        "id": null,
+        "literal": "fn evaluate(request: &Request) -> Decision {\n    Decision::Allow\n}\n"
+      },
+      {
+        "type": "fence",
+        "lang": "markdown",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null,
+        "literal": "```chart\ntype: bar\n```\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}

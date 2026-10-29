@@ -1,0 +1,37 @@
+{{/*
+SPDX-FileCopyrightText: 2026 The Vellum contributors
+SPDX-License-Identifier: AGPL-3.0-only
+*/}}
+{{- if not .Values.shards }}
+{{- fail "shards must list at least one shard" }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "vellum.fullname" . }}
+  labels:
+    {{- include "vellum.labels" . | nindent 4 }}
+    {{- include "vellum.selector" . | nindent 4 }}
+data:
+  VELLUM_PROFILE: org
+  VELLUM_BIND: 0.0.0.0:7700
+  VELLUM_DATA_DIR: /data
+  VELLUM_PUBLIC_URL: {{ .Values.publicUrl | quote }}
+  VELLUM_LOG: {{ .Values.log.level | quote }}
+  VELLUM_LOG_FORMAT: {{ .Values.log.format | quote }}
+  OTEL_EXPORTER_OTLP_ENDPOINT: {{ .Values.otlpEndpoint | quote }}
+  VELLUM_BLOB_URL: {{ .Values.blob.url | quote }}
+  VELLUM_S3_ENDPOINT: {{ .Values.blob.endpoint | quote }}
+  VELLUM_S3_REGION: {{ .Values.blob.region | quote }}
+  {{- if .Values.kroki.enabled }}
+  VELLUM_KROKI_URL: {{ printf "http://%s-kroki:8000" (include "vellum.fullname" .) | quote }}
+  {{- else }}
+  VELLUM_KROKI_URL: {{ .Values.kroki.externalUrl | quote }}
+  {{- end }}
+  {{- if .Values.clamav.enabled }}
+  VELLUM_CLAMD_ADDRESS: {{ printf "%s-clamav:3310" (include "vellum.fullname" .) | quote }}
+  {{- else if .Values.clamav.externalAddress }}
+  VELLUM_CLAMD_ADDRESS: {{ .Values.clamav.externalAddress | quote }}
+  {{- end }}
+  # Shards by space: the ordered shard names; the first is the home shard.
+  VELLUM_SHARDS: {{ include "vellum.shardNames" . | quote }}

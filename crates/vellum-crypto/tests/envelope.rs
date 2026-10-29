@@ -5,7 +5,8 @@
 
 use proptest::prelude::*;
 use vellum_crypto::{
-    CryptoError, KekId, LocalKeyring, SecretKey, is_envelope, kek_of, open, rewrap, seal,
+    CryptoError, KekId, LocalKeyring, SecretKey, is_envelope, kek_of, open, plaintext_len, rewrap,
+    seal,
 };
 
 type TestResult = Result<(), CryptoError>;
@@ -31,6 +32,7 @@ async fn round_trip_and_fresh_dek_per_object() -> TestResult {
     assert_ne!(one, two, "each object gets its own DEK and nonce");
     assert_eq!(open(&ring, &one).await?, doc);
     assert_eq!(kek_of(&one)?.as_str(), "kek-a");
+    assert_eq!(plaintext_len(&one)?, doc.len());
     Ok(())
 }
 

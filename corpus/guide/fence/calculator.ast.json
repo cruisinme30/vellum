@@ -1,0 +1,20 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "fence",
+        "lang": "calculator",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null,
+        "literal": "units: Requests per second = 2000 [100..10000 step 100]\ncost: Cost per million requests = 0.40 [0.10..2.00 step 0.05]\nresult: Monthly cost = units * 2.592 * cost ($)\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}

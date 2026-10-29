@@ -1,0 +1,59 @@
+{
+  "name": "@vellum/desktop",
+  "productName": "Vellum",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The Vellum desktop app: the web app in an Electron shell with offline copies, system-browser sign-in and keychain tokens.",
+  "license": "AGPL-3.0-only",
+  "author": "The Vellum contributors",
+  "homepage": "https://github.com/cruisinme30/vellum",
+  "type": "module",
+  "main": "dist/main/index.js",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "start": "pnpm run build && electron .",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "knip": "knip",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "dist": "pnpm run build && electron-builder --config electron-builder.yml"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.10"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@types/node": "^26.6.6",
+    "@vitest/coverage-v8": "^5.0.5",
+    "electron": "44.9.3",
+    "electron-builder": "26.17.0",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-import-x": "^4.17.1",
+    "eslint-plugin-sonarjs": "^4.2.2",
+    "eslint-plugin-unicorn": "^64.0.0",
+    "globals": "^17.13.0",
+    "knip": "^6.43.0",
+    "prettier": "^3.9.10",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.72.1",
+    "vitest": "^5.0.5"
+  },
+  "packageManager": "pnpm@10.28.0",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron"
+    ],
+    "ignoredBuiltDependencies": [
+      "electron-winstaller",
+      "unrs-resolver"
+    ]
+  }
+}

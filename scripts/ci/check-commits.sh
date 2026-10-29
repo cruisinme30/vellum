@@ -27,11 +27,15 @@ while read -r sha; do
   if [[ "${committer_email}" == "noreply@github.com" ]]; then
     subject="${subject% (#[0-9]*)}"
   fi
-  if ! check_subject "${subject}"; then
+  bot=false
+  if [[ "${author_email}" == *"[bot]@users.noreply.github.com" ]]; then
+    bot=true
+  fi
+  if ! { check_subject "${subject}" || { "${bot}" && check_bot_subject "${subject}"; }; }; then
     echo "::error::${sha:0:12} subject is not a Conventional Commit: ${subject}"
     failures=$((failures + 1))
   fi
-  if [[ "${author_email}" == *"[bot]@users.noreply.github.com" || "${committer_email}" == "noreply@github.com" ]]; then
+  if "${bot}" || [[ "${committer_email}" == "noreply@github.com" ]]; then
     continue
   fi
   if ! check_body "${message}"; then

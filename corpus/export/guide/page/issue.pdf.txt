@@ -1,0 +1,6 @@
+Replay 7 days in under 10 minutes
+The replay engine reads seven days of traffic from the audit log.
+☐ Stream from the audit log
+☐ Parallelise by tenant
+1 / 1
+

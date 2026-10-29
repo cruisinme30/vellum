@@ -26,6 +26,8 @@ area/crypto:
   - changed-files:
       - any-glob-to-any-file:
           - "crates/vellum-crypto*/**"
+          - "crates/vellum-sealed-store/**"
+          - "crates/vellum-kms/**"
 area/security:
   - changed-files:
       - any-glob-to-any-file:
@@ -59,10 +61,24 @@ area/pages:
   - changed-files:
       - any-glob-to-any-file:
           - "crates/vellum-pages/**"
+area/drive:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-drive/**"
+area/books:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-books/**"
+          - "crates/vellum-books-service/**"
 area/work:
   - changed-files:
       - any-glob-to-any-file:
           - "crates/vellum-work*/**"
+          - "crates/vellum-integrations/**"
+area/notify:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-notify/**"
 area/my-work:
   - changed-files:
       - any-glob-to-any-file:
@@ -72,10 +88,18 @@ area/api:
   - changed-files:
       - any-glob-to-any-file:
           - "crates/vellum-api/**"
+area/identity:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-identity/**"
 area/jobs:
   - changed-files:
       - any-glob-to-any-file:
           - "crates/vellum-jobs/**"
+area/search:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-search/**"
 area/mcp:
   - changed-files:
       - any-glob-to-any-file:
@@ -84,6 +108,16 @@ area/cli:
   - changed-files:
       - any-glob-to-any-file:
           - "crates/vellum-cli/**"
+area/sync:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-sync/**"
+          - "web/src/platform/store/**"
+area/desktop:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "desktop/**"
+          - "crates/vellum-private/**"
 area/editor:
   - changed-files:
       - any-glob-to-any-file:
@@ -118,7 +152,18 @@ area/docs:
           - "docs/**"
           - "site/**"
           - "*.md"
+          - "crates/vellum-help/**"
+          - "xtask/src/help/**"
+          - "corpus/guide/**"
 area/deploy:
   - changed-files:
       - any-glob-to-any-file:
           - "deploy/**"
+area/observability:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-observe/**"
+          - "crates/vellum-admin/**"
+          - "deploy/observability/**"
+          - "web/src/admin/**"
+          - "web/src/platform/client-telemetry*"

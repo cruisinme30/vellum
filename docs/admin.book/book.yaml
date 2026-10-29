@@ -1,0 +1,49 @@
+vellum: 1
+id: 01M63C8QH91EE346V65JZEQ24X
+title: Admin guide
+numbering: decimal
+max_depth: 3
+export_profile: default
+nodes:
+  01M63CFE5YV1EYVK287J5GHZ07:
+    path: README.md
+  01M63CFE5ZAB00T8DNFJ9PV6M4:
+    path: deploy/README.md
+  01M63CFE5ZPFWFG98RXPQTMKGT:
+    path: deploy/single-binary.md
+  01M63CFE60EG0WHG200X6EFW01:
+    path: deploy/docker.md
+  01M63CFE609BZ1WAAG29DH7PFW:
+    path: deploy/compose.md
+  01M63CFE60KC3WWME4NBEXXS0G:
+    path: deploy/helm.md
+  01M63CFE61Y6QWWCCYRBD6DCTY:
+    path: configure/README.md
+  01M63CFE615720F85XEF8Q8285:
+    path: configure/storage.md
+  01M63CFE61A85MTD76GSEW6GB7:
+    path: configure/identity.md
+  01M63CFE6128Z1BQPN30Q5MK2F:
+    path: configure/ai.md
+  01M63CFE61SYK94HT651XPNK20:
+    path: configure/integrations.md
+  01M63CFE617Z9J85T4D2WYD2JZ:
+    path: security/README.md
+  01M63CFE61MH3QDCDGEYXK3X8P:
+    path: security/encryption.md
+  01M63CFE61Y6897J5GBSD6Q6BS:
+    path: security/access.md
+  01M63CFE62RE8A1SRHR8WKGA4T:
+    path: operate/README.md
+  01M63CFE62665T0RXR3CBXSZQ8:
+    path: operate/backups.md
+  01M63CFE62SKYAP32V5TPN2P58:
+    path: operate/observability.md
+  01M63CFE62GAV995KXV75MBAWW:
+    path: operate/upgrades.md
+  01M63CFE62RWV0Q910TAABPK62:
+    path: operate/capacity.md
+  01M63CFE622VGV774X6YCXDYCP:
+    path: operate/troubleshooting.md
+  01M63CFE62S9ZP4WVEVXEQRN7D:
+    path: reference/cli.md

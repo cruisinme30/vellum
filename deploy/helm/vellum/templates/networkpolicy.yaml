@@ -1,0 +1,74 @@
+{{/*
+SPDX-FileCopyrightText: 2026 The Vellum contributors
+SPDX-License-Identifier: AGPL-3.0-only
+*/}}
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "vellum.fullname" . }}
+  labels:
+    {{- include "vellum.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "vellum.selector" . | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    # The ingress controller and in-cluster clients; only the HTTP port.
+    - ports:
+        - { port: 7700, protocol: TCP }
+  # Postgres, the bucket, the identity provider, OTLP and DNS: open egress.
+  egress:
+    - {}
+{{- if .Values.kroki.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "vellum.fullname" . }}-kroki
+  labels:
+    {{- include "vellum.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "vellum.krokiSelector" . | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "vellum.selector" . | nindent 14 }}
+      ports:
+        - { port: 8000, protocol: TCP }
+  # Secure mode: Kroki never fetches anything.
+  egress: []
+{{- end }}
+{{- if .Values.clamav.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "vellum.fullname" . }}-clamav
+  labels:
+    {{- include "vellum.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "vellum.clamavSelector" . | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "vellum.selector" . | nindent 14 }}
+      ports:
+        - { port: 3310, protocol: TCP }
+  # freshclam fetches signatures over HTTPS; DNS to resolve the mirror.
+  egress:
+    - ports:
+        - { port: 443, protocol: TCP }
+        - { port: 53, protocol: UDP }
+        - { port: 53, protocol: TCP }
+{{- end }}
+{{- end }}

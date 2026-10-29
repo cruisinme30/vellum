@@ -1,0 +1,20 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "fence",
+        "lang": "chart",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null,
+        "literal": "title: Blocked requests per week\ntype: bar\nlabels: [W40, W41, W42, W43]\nvalues: [120, 185, 160, 240]\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}

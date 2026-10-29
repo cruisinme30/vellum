@@ -1,0 +1,20 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "fence",
+        "lang": "image",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null,
+        "literal": "src: assets/request-path.svg\ndark: assets/request-path-dark.svg\nalt: Northstar gateway request path\ncaption: Every request passes the policy engine before the backend.\nwidth: 80%\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}

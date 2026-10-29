@@ -1,0 +1,74 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "list",
+        "start": null,
+        "tight": true,
+        "items": [
+          {
+            "task": false,
+            "attrs": {
+              "id": null,
+              "classes": [],
+              "pairs": [
+                [
+                  "due",
+                  "2026-11-02"
+                ],
+                [
+                  "priority",
+                  "high"
+                ]
+              ]
+            },
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Call "
+                  },
+                  {
+                    "type": "mention",
+                    "handle": "priya"
+                  },
+                  {
+                    "type": "text",
+                    "text": " about the EU quota"
+                  }
+                ],
+                "id": "blk-a1b2c3d4"
+              }
+            ]
+          },
+          {
+            "task": true,
+            "attrs": {
+              "id": "replay",
+              "classes": [
+                "done"
+              ],
+              "pairs": []
+            },
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Ship the replay engine"
+                  }
+                ],
+                "id": "blk-b2c3d4e5"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "diagnostics": []
+}

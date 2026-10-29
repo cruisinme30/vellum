@@ -1,0 +1,20 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "fence",
+        "lang": "chart",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null,
+        "literal": "title: Issues closed per cycle\ntype: stacked\nlabels: [C01, C02, C03, C04]\nBugs: [8, 6, 9, 4]\nFeatures: [5, 7, 6, 9]\nChores: [2, 3, 1, 2]\nlegend: bottom\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}

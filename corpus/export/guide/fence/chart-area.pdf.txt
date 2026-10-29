@@ -1,0 +1,7 @@
+Requests served (millions)
+Jul 3.1
+Aug 3.4
+Sep 4
+Oct 4.6
+1 / 1
+
