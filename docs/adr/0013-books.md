@@ -92,8 +92,8 @@ sections narrow access, and books publish as sites. The code is
   authorization: a `restricted` marker plus an `editor` grant per
   principal, capped by the engine at the principal's role on the book.
   The index registers sections flat under the book, which is exact for a
-  literal intersection. Unindexed sections are skipped and still enforced
-  by the service.
+  literal intersection. Sections not yet indexed are skipped and still
+  enforced by the service.
 - Role grants on section nodes belong to the mirror: the drive never
   shares a chapter on its own.
 
