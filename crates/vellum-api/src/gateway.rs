@@ -453,7 +453,13 @@ async fn protect(
     let meta = RequestMeta {
         headers: request.headers().clone(),
         client_ip: ip,
-        path: request.uri().path().to_owned(),
+        // Inside a mounted router the URI has lost its mount prefix; the
+        // authenticator sees the path the client asked for.
+        path: request
+            .extensions()
+            .get::<axum::extract::OriginalUri>()
+            .map_or_else(|| request.uri().path(), |original| original.0.path())
+            .to_owned(),
     };
     let authenticated = match state.authenticator.authenticate(&meta).await {
         Ok(a) => a,

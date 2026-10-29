@@ -50,7 +50,7 @@ pub struct McpArgs {
 pub fn run(args: &McpArgs) -> ExitCode {
     if !args.demo && !args.private {
         tracing::error!(
-            "the workspace services are not wired into the binary yet; run `vellum mcp --demo` to try the server, or `vellum mcp --private --space slug=path` for private spaces"
+            "`vellum mcp` serves the demo (`--demo`) or this device's private spaces (`--private --space slug=path`); for the workspace, point your MCP client at the server's /mcp endpoint, such as https://vellum.example.com/mcp"
         );
         return ExitCode::FAILURE;
     }

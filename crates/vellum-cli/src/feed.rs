@@ -186,6 +186,8 @@ pub struct Caches {
     pub books: Arc<BooksService>,
     /// Reloads the path-to-space list.
     pub spaces: Box<dyn Fn() -> BoxFuture<'static, ()> + Send + Sync>,
+    /// MCP listeners, told about every change, this replica's included.
+    pub events: Option<crate::mcp_serve::Events>,
 }
 
 impl Caches {
@@ -200,6 +202,9 @@ impl Caches {
     }
 
     async fn reset(&self) {
+        if let Some(events) = &self.events {
+            events.reset();
+        }
         (self.spaces)().await;
         self.books.invalidate().await;
         self.collections.invalidate().await;
@@ -225,6 +230,9 @@ pub fn follow(feed: Feed, me: String, mut cursor: i64, caches: Caches) {
                     }
                     Ok(page) => {
                         let full = page.changes.len() >= PAGE;
+                        if let Some(events) = &caches.events {
+                            events.changed(&page.changes);
+                        }
                         caches.apply(touched(&page.changes, &me)).await;
                         cursor = page.cursor;
                         if !full {
@@ -375,6 +383,7 @@ mod tests {
                     let _ = counter.fetch_add(1, Ordering::SeqCst);
                     Box::pin(async {})
                 }),
+                events: None,
             },
         );
 

@@ -254,6 +254,25 @@ impl Drive {
         title: &str,
         body: &str,
     ) -> DriveResult<Node> {
+        self.create_page_with(actor, space, parent, title, body, &[])
+            .await
+    }
+
+    /// As [`Drive::create_page`], with extra front-matter fields written
+    /// after `id` and `title`, such as `status: draft` and the attribution
+    /// of a page a model wrote (ADR 0019, D218).
+    ///
+    /// # Errors
+    /// `PermissionDenied`, `Invalid`, or `QuotaExceeded`.
+    pub async fn create_page_with(
+        &self,
+        actor: &Actor,
+        space: SpaceId,
+        parent: Option<ObjectId>,
+        title: &str,
+        body: &str,
+        front: &[(&str, &str)],
+    ) -> DriveResult<Node> {
         self.observe("create_page", async {
             let space = self.space(space).await?;
             self.authorize(
@@ -269,6 +288,12 @@ impl Drive {
             let id = ObjectId::generate();
             let mut yaml = frontmatter::set("", "id", &id.to_string());
             yaml = frontmatter::set(&yaml, "title", title);
+            for (key, value) in front {
+                if matches!(*key, "id" | "title" | "vellum") {
+                    return Err(DriveError::Invalid(format!("{key} is set by the drive")));
+                }
+                yaml = frontmatter::set(&yaml, key, value);
+            }
             let text = format!("---\n{yaml}vellum: 1\n---\n\n{body}");
             let bytes = Bytes::from(text);
             let size = bytes.len() as u64;

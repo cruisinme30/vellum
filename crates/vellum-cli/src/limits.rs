@@ -148,6 +148,13 @@ impl SharedLimit for ClusterLimit {
     }
 }
 
+/// MCP's per-token allowance, counted in the same table (ADR 0019, D218).
+impl vellum_mcp::ratelimit::SharedLimit for ClusterLimit {
+    fn hit(&self, key: &str) -> Option<Duration> {
+        self.hit_at(key, now_ms())
+    }
+}
+
 /// Exempts live-editing joins forwarded by another replica, when the
 /// cluster key is set.
 #[must_use]

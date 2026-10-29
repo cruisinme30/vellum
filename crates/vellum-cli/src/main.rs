@@ -31,6 +31,11 @@ mod integrations;
 mod keys;
 mod limits;
 mod mcp;
+mod mcp_edit;
+mod mcp_serve;
+#[cfg(test)]
+mod mcp_tests;
+mod mcp_workspace;
 mod notifications;
 mod observability;
 mod page_render;

@@ -276,6 +276,7 @@ fn keep_fresh(
     workspace: &Workspace,
     spaces: &Arc<Spaces>,
     drive_index: Arc<SqlIndex>,
+    events: crate::mcp_serve::Events,
 ) {
     let (reload, from) = (Arc::clone(spaces), Arc::clone(&drive_index));
     crate::feed::follow(
@@ -294,6 +295,7 @@ fn keep_fresh(
                     }
                 })
             }),
+            events: Some(events),
         },
     );
     let refresh = Arc::clone(spaces);
@@ -444,6 +446,12 @@ pub struct Opened {
     pub rate_counts: Option<vellum_db::rate::SharedCounts>,
     /// My Work, which also serves the feed, CalDAV and capture routes.
     pub tasks: Option<Arc<TasksService>>,
+    /// The workspace as MCP sees it, and the feed's events for its
+    /// listeners.
+    pub mcp: Option<(
+        Arc<crate::mcp_workspace::ServeWorkspace>,
+        crate::mcp_serve::Events,
+    )>,
 }
 
 /// My Work's settings: where its secrets live and what it links to.
@@ -677,6 +685,73 @@ fn task_jobs(
     Ok(())
 }
 
+/// Opens the index and the workspace files.
+async fn open_storage(
+    config: &Config,
+    bucket: Option<S3Config>,
+    var: impl Fn(&str) -> Option<String>,
+) -> Result<(Index, Files), Error> {
+    let index_config = index_config(config, var)?;
+    let index = Index::open(&index_config)
+        .await
+        .map_err(|e| unavailable("cannot open the index", e))?;
+    let files = open_files(config, bucket).await?;
+    if !files.local && matches!(index_config, IndexConfig::Sqlite { .. }) {
+        tracing::warn!(
+            "files are in a shared bucket but the index is this machine's SQLite file; \
+             run one replica only, or set a database URL"
+        );
+    }
+    tracing::info!(backend = files.store.backend(), "workspace files opened");
+    Ok((index, files))
+}
+
+/// The workspace as MCP tools see it, and the feed's events for MCP
+/// listeners (ADR 0019, D217 and D219).
+fn mcp_parts(
+    workspace: &Workspace,
+    drive_index: &Arc<SqlIndex>,
+    app_origin: &str,
+) -> (
+    Arc<crate::mcp_workspace::ServeWorkspace>,
+    crate::mcp_serve::Events,
+) {
+    let index = Arc::clone(drive_index) as Arc<dyn DriveIndex>;
+    let mcp = Arc::new(crate::mcp_workspace::ServeWorkspace::new(
+        Arc::clone(&workspace.drive),
+        Arc::clone(&index),
+        &workspace.services,
+        app_origin,
+    ));
+    let events = crate::mcp_serve::Events::new(index, Arc::clone(&workspace.space_of));
+    (mcp, events)
+}
+
+/// Live editing over the drive, with permissions from `authz`.
+fn open_collab<S: AuthzStore + TreeSync + 'static>(
+    workspace: &Workspace,
+    authz: &Arc<Authz<S>>,
+    drive_index: &Arc<SqlIndex>,
+    index: &Index,
+    config: &Config,
+    app_origin: &str,
+    identity: &Arc<Identity>,
+) -> Result<Collab, Error> {
+    Collab::open(
+        Arc::clone(&workspace.drive),
+        Arc::new(DriveAuthzAccess::new(
+            Arc::clone(authz),
+            Arc::clone(drive_index) as Arc<dyn DriveIndex>,
+        )),
+        index.clone(),
+        &config.data_dir,
+        app_origin,
+        Arc::new(crate::identity::IdentityAuthenticator::new(Arc::clone(
+            identity,
+        ))),
+    )
+}
+
 /// Opens the workspace services for `config`, or returns none (with a
 /// warning) when no index is configured.
 ///
@@ -694,21 +769,13 @@ pub async fn open(
     let setup = TasksSetup::new(identity, Some(&config.data_dir), &var);
     let bucket = bucket(&var)?;
     let key = search_key(config, &var)?;
-    let index_config = index_config(config, &var)?;
-    let index = Index::open(&index_config)
-        .await
-        .map_err(|e| unavailable("cannot open the index", e))?;
-    let Files {
-        store: files,
-        local,
-    } = open_files(config, bucket).await?;
-    if !local && matches!(index_config, IndexConfig::Sqlite { .. }) {
-        tracing::warn!(
-            "files are in a shared bucket but the index is this machine's SQLite file; \
-             run one replica only, or set a database URL"
-        );
-    }
-    tracing::info!(backend = files.backend(), "workspace files opened");
+    let (
+        index,
+        Files {
+            store: files,
+            local,
+        },
+    ) = open_storage(config, bucket, &var).await?;
     // Follow the feed from before anything is loaded, so no change made
     // meanwhile is missed.
     let feed = Feed::new(index.clone());
@@ -752,18 +819,14 @@ pub async fn open(
     }
     rescan_and_maintain(&replica, others_alive, &workspace.drive, &index).await;
     let hooks = crate::integrations::hooks(&store, &workspace.work, &var).await?;
-    let collab = Collab::open(
-        Arc::clone(&workspace.drive),
-        Arc::new(DriveAuthzAccess::new(
-            Arc::clone(&authz),
-            Arc::clone(&drive_index) as Arc<dyn DriveIndex>,
-        )),
-        index.clone(),
-        &config.data_dir,
+    let collab = open_collab(
+        &workspace,
+        &authz,
+        &drive_index,
+        &index,
+        config,
         app_origin,
-        Arc::new(crate::identity::IdentityAuthenticator::new(Arc::clone(
-            identity,
-        ))),
+        identity,
     )?;
     keep_drives(&workspace.drive, &drive_index, identity).await?;
     live_pages.attach(&collab);
@@ -781,7 +844,16 @@ pub async fn open(
     })
     .await?;
     workspace.services.push(Arc::new(search));
-    keep_fresh(feed, me, cursor, &workspace, &spaces, drive_index);
+    let (mcp, events) = mcp_parts(&workspace, &drive_index, app_origin);
+    keep_fresh(
+        feed,
+        me,
+        cursor,
+        &workspace,
+        &spaces,
+        drive_index,
+        events.clone(),
+    );
     task_jobs(&replica, &workspace.tasks, notify, &config.data_dir)?;
     let mut services = workspace.services;
     services.push(Arc::new(Storage(store)));
@@ -792,6 +864,7 @@ pub async fn open(
         replica: Some(replica),
         rate_counts: Some(rate_counts),
         tasks: Some(workspace.tasks),
+        mcp: Some((mcp, events)),
     })
 }
 

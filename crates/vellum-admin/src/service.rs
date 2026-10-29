@@ -193,6 +193,13 @@ impl<K: KeyProvider + 'static> AdminService<K> {
         }
     }
 
+    /// The audit log, for other parts of the server that record actions
+    /// in the same chain (MCP calls, ADR 0019 D217).
+    #[must_use]
+    pub fn audit_log(&self) -> Arc<dyn AuditLog> {
+        Arc::clone(&self.audit)
+    }
+
     // ----- Admin → Requests -------------------------------------------------
 
     /// Recent requests, newest first.

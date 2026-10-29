@@ -215,7 +215,7 @@ impl PrivateWorkspace {
     }
 }
 
-fn blocks_of(doc: &PrivateDoc) -> Vec<Block> {
+pub fn blocks_of(doc: &PrivateDoc) -> Vec<Block> {
     doc.blocks
         .iter()
         .map(|b| Block {
@@ -232,7 +232,7 @@ fn blocks_of(doc: &PrivateDoc) -> Vec<Block> {
 
 /// The blocks a selector names: listed IDs, a heading's section, or a
 /// range (the whole page when the selector is empty).
-fn select(blocks: Vec<Block>, selector: BlockSelector) -> Result<Vec<Block>, WorkspaceError> {
+pub fn select(blocks: Vec<Block>, selector: BlockSelector) -> Result<Vec<Block>, WorkspaceError> {
     if !selector.ids.is_empty() {
         return Ok(blocks
             .into_iter()
