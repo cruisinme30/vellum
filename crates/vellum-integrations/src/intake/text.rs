@@ -154,9 +154,10 @@ fn text_node(text: &str) -> Inline {
     let mut chars = text.chars().peekable();
     while let Some(c) = chars.next() {
         out.push(c);
-        // Inside an email address the serializer escapes `@` itself.
-        let word_start =
-            !prev.is_some_and(|p| p.is_alphanumeric() || matches!(p, '.' | '_' | '+' | '-'));
+        // The same boundary the parser uses for mentions. An extra joiner
+        // is harmless; a missing one lets the text mention someone.
+        let word_start = !prev
+            .is_some_and(|p| p.is_alphanumeric() || matches!(p, '_' | '-' | '.' | '/' | '@' | ':'));
         if c == '@' && word_start && chars.peek().is_some_and(char::is_ascii_alphabetic) {
             out.push(JOINER);
         }
@@ -219,6 +220,7 @@ mod tests {
         "# Heading\nSetext\n===\n---",
         "> quoted\n    indented code",
         "@everyone please look, cc @alice",
+        "+@priya and a+@priya (@priya) *@priya ~@priya \\@priya @@priya",
         "[[Secret page]] and [ref]\n\n[ref]: https://evil.example",
         "==mark== ^sup^ ~sub~ **bold** _em_ `code` \\ trailing \\",
         "line ^blk-00000000\n{#id .class}",
