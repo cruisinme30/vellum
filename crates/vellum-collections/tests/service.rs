@@ -1255,3 +1255,99 @@ async fn feeds_search_rows_with_computed_values() {
     let new_row = imported.changed.written.first().unwrap().row.to_string();
     assert!(take(&feed).contains(&new_row));
 }
+
+/// Access that runs a hook once, on the first edit check, then yields so
+/// a task the hook spawned can queue for the write lock.
+struct Interleave {
+    grants: Arc<Grants>,
+    hook: Mutex<Option<Box<dyn FnOnce() + Send>>>,
+}
+
+#[async_trait]
+impl Access for Interleave {
+    async fn allowed(
+        &self,
+        principal: &Principal,
+        collection: CollectionId,
+        path: &BlobPath,
+        need: Need,
+    ) -> Result<bool, Error> {
+        let hook = if need == Need::Edit {
+            self.hook
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .take()
+        } else {
+            None
+        };
+        if let Some(hook) = hook {
+            hook();
+            tokio::task::yield_now().await;
+        }
+        self.grants.allowed(principal, collection, path, need).await
+    }
+}
+
+#[tokio::test]
+async fn an_import_does_not_overwrite_a_write_that_lands_meanwhile() {
+    let f = fixture().await;
+    let access = Arc::new(Interleave {
+        grants: f.grants.clone(),
+        hook: Mutex::new(None),
+    });
+    let service = Arc::new(CollectionsService::new(f.store.clone(), access.clone()));
+    let ana = UserId::generate();
+    f.grants.grant(ana, REQS, Need::Edit);
+    f.grants.grant(ana, RELS, Need::Edit);
+    let reqs = REQS.parse().unwrap();
+
+    // While the import matches its file under the read lock, another
+    // request edits a row and gets the write lock first.
+    let other = Arc::clone(&service);
+    let edit = Arc::new(Mutex::new(None));
+    let slot = Arc::clone(&edit);
+    *access.hook.lock().unwrap() = Some(Box::new(move || {
+        let handle = tokio::spawn(async move {
+            other
+                .update_row(
+                    &ctx(ana),
+                    UpdateRowInput {
+                        collection_id: reqs,
+                        row_id: R2.parse().unwrap(),
+                        values: BTreeMap::from([("est".to_owned(), Value::Number(21.0))]),
+                        body: None,
+                    },
+                )
+                .await
+                .map(|_| ())
+        });
+        *slot.lock().unwrap() = Some(handle);
+    }));
+    let imported = service
+        .import_csv(
+            &ctx(ana),
+            ImportCsvInput {
+                collection_id: reqs,
+                csv: "Requirement,Estimate\nAudit log,3\n".into(),
+                dry_run: false,
+            },
+        )
+        .await
+        .unwrap();
+    let handle = edit.lock().unwrap().take().unwrap();
+    handle.await.unwrap().unwrap();
+    assert_eq!(imported.rows, 1);
+
+    // Both writes survive, in memory and on disk.
+    let key = |row: &str| RowKey {
+        collection_id: reqs,
+        row_id: row.parse().unwrap(),
+    };
+    let r2 = service.get_row(&ctx(ana), key(R2)).await.unwrap();
+    assert_eq!(r2.row.cells["est"], Ok(Value::Number(21.0)));
+    let new_row = imported.changed.written.first().unwrap().row.to_string();
+    assert!(service.get_row(&ctx(ana), key(&new_row)).await.is_ok());
+    service.invalidate().await;
+    let r2 = service.get_row(&ctx(ana), key(R2)).await.unwrap();
+    assert_eq!(r2.row.cells["est"], Ok(Value::Number(21.0)));
+}
