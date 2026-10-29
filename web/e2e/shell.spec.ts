@@ -9,7 +9,15 @@ import { expect, test, type Page } from "@playwright/test";
 
 // These are feature tests: they run once per browser, at laptop size. The UI
 // suite (e2e/ui) covers every screen size; the phone cases below set their own.
-test.use({ viewport: { width: 1366, height: 768 }, hasTouch: false, isMobile: false });
+// The offline worker is blocked: once it controls the page, WebKit and
+// Firefox send the app's API calls past the routes that fake the server.
+// The PWA has its own tests.
+test.use({
+  viewport: { width: 1366, height: 768 },
+  hasTouch: false,
+  isMobile: false,
+  serviceWorkers: "block",
+});
 // eslint-disable-next-line no-empty-pattern -- Playwright needs the fixtures object
 test.beforeEach(({}, testInfo) => {
   test.skip(!testInfo.project.name.endsWith("-laptop"), "runs at laptop size only");
