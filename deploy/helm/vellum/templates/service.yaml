@@ -1,0 +1,28 @@
+{{/*
+SPDX-FileCopyrightText: 2026 The Vellum contributors
+SPDX-License-Identifier: AGPL-3.0-only
+*/}}
+{{- $fullname := include "vellum.fullname" . }}
+{{- $services := list $fullname }}
+{{- if .Values.canary.enabled }}
+{{- $services = append $services (printf "%s-canary" $fullname) }}
+{{- end }}
+{{- range $services }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ . }}
+  labels:
+    {{- include "vellum.labels" $ | nindent 4 }}
+    {{- include "vellum.selector" $ | nindent 4 }}
+spec:
+  type: {{ $.Values.service.type }}
+  selector:
+    {{- include "vellum.selector" $ | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ $.Values.service.port }}
+      targetPort: http
+      protocol: TCP
+{{- end }}
