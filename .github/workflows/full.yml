@@ -22,11 +22,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: full-${{ github.event.pull_request.number || github.ref }}
-  # Superseded pull request runs are cancelled; every push to a long-lived
-  # branch is checked to completion so its result stays meaningful.
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: always

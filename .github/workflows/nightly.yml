@@ -15,9 +15,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: nightly-${{ github.ref }}
-  cancel-in-progress: false
 
 env:
   K6_VERSION: v2.3.0

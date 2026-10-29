@@ -24,9 +24,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: site-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   MDBOOK_VERSION: 0.5.4

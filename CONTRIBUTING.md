@@ -61,7 +61,9 @@ gitGraph
 | Fast (`ci.yml`) | every pull request into `develop` or `main`, pushes to `develop` | rustfmt, clippy, rustdoc, unit and property tests (nextest), crate boundaries, cargo-deny, cargo-audit; Prettier, tsc, ESLint, knip, Vitest with 85 % coverage, pnpm audit; the UI layout suite in Chromium at phone and laptop size; REUSE, yamllint, shellcheck, markdownlint, Vale, local links, gitleaks, infrastructure linters; Conventional Commits, DCO, branch name and description template; linked issue and decision record |
 | Full (`full.yml`) | every pull request into `main`, nightly | the fast suite, plus Rust line coverage of at least 85 %, the release build, Playwright end-to-end and the full UI suite (Chromium, Firefox and WebKit at four sizes, with visual baselines), and external link checks |
 
-Each test runs once per event. Inside the full suite, the Rust tests run
+No workflow run cancels another: a new push starts its own run and
+older runs finish, so every commit gets a result. Each test runs once
+per event. Inside the full suite, the Rust tests run
 only in the coverage job and the UI tests only in the browser matrix, not
 again in its copy of the fast suite. A release pull request must come
 from a `chore/release-…` branch: one opened straight from `develop` fails

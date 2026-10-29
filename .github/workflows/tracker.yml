@@ -14,9 +14,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: tracker-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
 
 jobs:
   tracker:
