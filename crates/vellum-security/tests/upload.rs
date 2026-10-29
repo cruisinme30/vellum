@@ -201,6 +201,25 @@ async fn clamd_size_limit_names_the_setting() {
 }
 
 #[tokio::test]
+async fn clamd_hanging_up_without_a_reply_fails_closed() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap().to_string();
+    drop(tokio::spawn(async move {
+        loop {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut command = [0_u8; 10];
+            let _ = socket.read_exact(&mut command).await.unwrap();
+            drop(socket);
+        }
+    }));
+    let err = Clamd::new(address, Duration::from_secs(5))
+        .scan(&vec![b'a'; 3 * 1024 * 1024])
+        .await
+        .unwrap_err();
+    assert!(matches!(err, UploadError::ScannerUnavailable(_)), "{err:?}");
+}
+
+#[tokio::test]
 async fn clamd_unreachable_fails_closed() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap().to_string();
