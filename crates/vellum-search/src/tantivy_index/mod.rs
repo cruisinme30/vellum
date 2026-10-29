@@ -32,6 +32,7 @@ use tantivy::{
 use vellum_kernel::{BlockId, DocId};
 
 pub use self::crypt::{EncryptedDirectory, IndexKey};
+pub use self::schema::plain_tokens as plain_words;
 use self::schema::{Fields, NO_SECTION, REC_BLOCK, REC_DOC};
 use crate::backend::{Change, Scope, SearchBackend};
 use crate::error::{Result, SearchError};

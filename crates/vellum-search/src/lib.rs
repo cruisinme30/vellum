@@ -28,6 +28,7 @@ pub mod conformance;
 pub mod error;
 pub mod fusion;
 pub mod model;
+pub mod postgres_index;
 pub mod service;
 pub mod tantivy_index;
 pub mod telemetry;
@@ -41,6 +42,7 @@ pub use model::{
     BlockKind, DocKind, Filters, Fragment, IndexBlock, IndexDocument, SearchHit, SearchPage,
     SearchQuery, StoredBlock, TitleHit,
 };
+pub use postgres_index::PostgresBackend;
 pub use service::{Context, SearchService, Tuning, Update};
 pub use tantivy_index::{IndexKey, Location, Opened, TantivyBackend, TantivyConfig};
 pub use vector::Embedder;
