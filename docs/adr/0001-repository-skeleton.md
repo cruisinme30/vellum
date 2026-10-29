@@ -52,7 +52,7 @@ full suite.
 ### D33: toolchain pins and the crate layering rule
 
 - Rust is pinned in `rust-toolchain.toml` (1.97.0). TypeScript stays on
-  6.0 and ESLint on 9 until typescript-eslint and eslint-plugin-react
+  6.0 and ESLint on 9 until `typescript-eslint` and `eslint-plugin-react`
   support the next major versions; Dependabot proposes the upgrades.
 - Every crate declares a layer in `[package.metadata.vellum]`:
   kernel, contracts, foundation, engine, service, edge, app. A crate may

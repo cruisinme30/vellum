@@ -40,3 +40,5 @@ GPG
 ULID
 pnpm
 tsc
+Affero
+[Ww]orkstreams?
