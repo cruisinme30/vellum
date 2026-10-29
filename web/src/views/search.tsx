@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { useId } from "react";
-import { useSearchParams } from "react-router";
+import { Link, useSearchParams } from "react-router";
 
 import { useServices, useWorkspace } from "../data/workspace-context";
 import { useT } from "../i18n/i18n";
@@ -53,7 +53,10 @@ export function InboxView() {
   return (
     <div className="vl-view">
       <h1>{t("nav-inbox")}</h1>
-      <p className="vl-muted">{t("inbox-intro", { handle: workspace.me.handle })}</p>
+      <p className="vl-muted">
+        {t("inbox-intro", { handle: workspace.me.handle })}{" "}
+        <Link to="/settings/notifications">{t("notify-open")}</Link>
+      </p>
       <PageList items={store.mentions(workspace.me.handle)} empty={t("inbox-empty")} />
     </div>
   );

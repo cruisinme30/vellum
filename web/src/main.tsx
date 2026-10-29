@@ -8,6 +8,7 @@ import "./styles/tokens.css";
 import "./styles/shell.css";
 import "./styles/editor.css";
 import "./styles/collections.css";
+import "./styles/notifications.css";
 
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
@@ -20,6 +21,8 @@ import { createMockCollectionsStore } from "./collections/mock";
 import { createNorthstarStore } from "./data/mock/northstar";
 import { lazyCache } from "./editor/collab/lazy-cache";
 import { createLocalConnector } from "./editor/collab/local-connector";
+import { createBrowserPushDevice } from "./notifications/device";
+import { createHttpNotificationPreferencesStore } from "./notifications/preferences";
 import { createPlatform, startPlatform } from "./platform/platform";
 import { DocumentCache } from "./platform/store/document-cache";
 import { openLocalDatabase } from "./platform/store/persistence";
@@ -54,6 +57,14 @@ root.render(
         status === undefined ? createMockCollectionsStore() : createHttpCollectionsStore(http)
       }
       session={status === undefined ? undefined : { auth, status }}
+      notifications={
+        status === undefined
+          ? undefined
+          : {
+              store: createHttpNotificationPreferencesStore(http),
+              device: createBrowserPushDevice(),
+            }
+      }
     />
   </StrictMode>,
 );

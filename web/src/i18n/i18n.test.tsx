@@ -8,6 +8,7 @@ import { renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
+import { CHANNELS, KINDS } from "../notifications/preferences";
 import { DESTINATIONS } from "../shell/destinations";
 import { THEMES } from "../theme/themes";
 
@@ -41,6 +42,11 @@ function familyIds(): string[] {
     ...Object.values(DESTINATIONS).map((destination) => `nav-${destination.id}`),
     ...THEMES.map((theme) => `theme-${theme}`),
     ...["comfortable", "compact"].map((density) => `density-${density}`),
+    ...KINDS.map((kind) => `notify-kind-${kind}`),
+    ...CHANNELS.map((channel) => `notify-channel-${channel}`),
+    ...["checking", "on", "off", "denied", "unsupported", "demo"].map(
+      (state) => `notify-device-${state}`,
+    ),
     ...["draft", "in-review", "verified", "outdated"].map((status) => `status-${status}`),
     ...literals(toolbar, /\bid: "([\w-]+)"/g).map((id) => `toolbar-${id}`),
     // Parse errors of collection editors, returned by parseInput.
