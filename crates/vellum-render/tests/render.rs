@@ -16,7 +16,10 @@ use std::time::{Duration, Instant};
 
 use vellum_format::parse;
 use vellum_render::figure::{FigureConfig, Figures};
-use vellum_render::resolve::{IssueRef, NoResolver, Resolved, Resolver};
+use vellum_render::resolve::{
+    IssueCard, IssueGroup, IssueLayout, IssueRef, IssueView, IssuesAt, NoResolver, Resolved,
+    Resolver,
+};
 use vellum_render::{RenderOptions, RenderedPage, Renderer};
 
 fn renderer() -> Renderer {
@@ -332,4 +335,88 @@ fn ids_cannot_clobber_globals() {
         }
     }
     assert!(page.html.contains("href=\"#u-exports\""), "{}", page.html);
+}
+
+struct Issues;
+
+impl Resolver for Issues {
+    fn issues(&self, at: IssuesAt<'_>) -> Option<Result<IssueView, String>> {
+        let card = |key: &str, href: &str| IssueCard {
+            key: key.into(),
+            href: href.into(),
+            title: format!("{key} <b>title</b>"),
+            state: "In review".into(),
+            assignee: Some("Maya Chen".into()),
+            priority: Some("Urgent".into()),
+        };
+        match (at.index, at.block_id) {
+            (0, None) => Some(Ok(IssueView {
+                title: Some("Gateway work".into()),
+                layout: IssueLayout::List,
+                groups: vec![
+                    IssueGroup {
+                        title: "In review".into(),
+                        issues: vec![card("ENG-142", "/i/ENG-142")],
+                    },
+                    IssueGroup {
+                        title: "Empty".into(),
+                        issues: Vec::new(),
+                    },
+                ],
+                more: 3,
+            })),
+            (1, Some("blk-a1b2c3d4")) => Some(Ok(IssueView {
+                title: None,
+                layout: IssueLayout::Board,
+                groups: vec![
+                    IssueGroup {
+                        title: "Todo".into(),
+                        issues: vec![card("ENG-7", "javascript:alert(1)")],
+                    },
+                    IssueGroup {
+                        title: String::new(),
+                        issues: Vec::new(),
+                    },
+                ],
+                more: 0,
+            })),
+            (2, _) => Some(Err("needs a view or a filter".into())),
+            _ => None,
+        }
+    }
+}
+
+#[test]
+fn issue_blocks_render_live_views() {
+    let src = "::: issues\nfilter:\n  field: status\n:::\n\n:::: tip\n::: issues ^blk-a1b2c3d4\nlayout: board\n:::\n::::\n\n```md\n::: issues\n:::\n```\n\n::: issues\nbad: 1\n:::\n\n::: issues\nlimit: 5\n:::\n";
+    let page = renderer().render_offline(&parse(src).document, &Issues, &RenderOptions::default());
+    let html = &page.html;
+    assert_safe("issues", html);
+    // The list view, with its heading, groups, cards and the overflow note.
+    assert!(html.contains("vl-issues-list"), "{html}");
+    assert!(html.contains("Gateway work"));
+    assert!(html.contains("href=\"/i/ENG-142\""));
+    assert!(
+        html.contains("ENG-142 &lt;b&gt;title&lt;/b&gt;"),
+        "titles are text"
+    );
+    assert!(html.contains("3 more issues not shown."));
+    assert!(!html.contains(">Empty<"), "empty list groups are hidden");
+    // The board nested in a callout is the second block, matched by its id; a
+    // hostile link loses its href but keeps its key.
+    assert!(html.contains("vl-issues-board"));
+    assert!(html.contains("aria-label=\"No value\""));
+    assert!(!html.contains("javascript:"));
+    assert!(html.contains("data-issue=\"ENG-7\""));
+    // The fenced example is not counted; the invalid block warns; the
+    // unresolved one waits for the client.
+    assert!(
+        page.warnings.iter().any(|w| w
+            .message
+            .contains("issues block 3: needs a view or a filter")),
+        "{:?}",
+        page.warnings
+    );
+    assert!(html.contains("data-index=\"3\""));
+    assert_eq!(html.matches("vl-live-placeholder").count(), 2, "{html}");
 }

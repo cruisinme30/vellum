@@ -40,6 +40,71 @@ pub struct CollectionSnapshot {
     pub rows: Vec<Vec<String>>,
 }
 
+/// Which `::: issues` block of the page a view is for.
+///
+/// The renderer never reads the block's YAML: the Markdown parser drops the
+/// indentation that nested filters need. The resolver reads the raw body of
+/// the `index`th `::: issues` block of the source instead, counting in
+/// document order, skipping code fences and including containers nested in
+/// other containers. (Containers do not open inside quotes or lists.)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct IssuesAt<'a> {
+    /// The block's position among the page's `::: issues` blocks, from 0.
+    pub index: usize,
+    /// The block's `^id`, when it has one.
+    pub block_id: Option<&'a str>,
+}
+
+/// How an issue view is laid out.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum IssueLayout {
+    /// Rows, grouped into sections.
+    #[default]
+    List,
+    /// Columns, one per group.
+    Board,
+}
+
+/// One issue in an embedded view.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct IssueCard {
+    /// The issue key (`ENG-142`).
+    pub key: String,
+    /// Where the issue lives.
+    pub href: String,
+    /// The issue title.
+    pub title: String,
+    /// The state's display name (`In review`).
+    pub state: String,
+    /// The assignee's display name.
+    pub assignee: Option<String>,
+    /// The priority's display name (`Urgent`).
+    pub priority: Option<String>,
+}
+
+/// A group of issues: a list section or a board column.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct IssueGroup {
+    /// The group's display name; empty when the view is not grouped.
+    pub title: String,
+    /// The issues, in order.
+    pub issues: Vec<IssueCard>,
+}
+
+/// The issues an `::: issues` block shows to this reader, already filtered
+/// by their permissions and capped by the block's limit.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct IssueView {
+    /// A heading, such as the saved view's name.
+    pub title: Option<String>,
+    /// List or board.
+    pub layout: IssueLayout,
+    /// The groups, in order.
+    pub groups: Vec<IssueGroup>,
+    /// How many matching issues the limit left out.
+    pub more: usize,
+}
+
 /// Resolves references against the workspace for one reader.
 ///
 /// Every method has a default, so a resolver only implements what it knows.
@@ -92,6 +157,13 @@ pub trait Resolver: Send + Sync {
 
     /// The current rows of a collection view, for a `collection` fence.
     fn collection(&self, _id: &str, _view: &str) -> Option<CollectionSnapshot> {
+        None
+    }
+
+    /// The live issue view of an `::: issues` block. `None` renders a
+    /// placeholder the client fills in; `Err` explains why the block is
+    /// invalid (shown as a warning).
+    fn issues(&self, _at: IssuesAt<'_>) -> Option<Result<IssueView, String>> {
         None
     }
 }

@@ -124,6 +124,7 @@ const DATA: &[&str] = &[
     "data-provider",
     "data-stale",
     "data-cols",
+    "data-index",
     "data-x",
     "data-y",
 ];
