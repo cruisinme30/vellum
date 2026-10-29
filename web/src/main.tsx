@@ -9,6 +9,7 @@ import "./styles/shell.css";
 import "./styles/editor.css";
 import "./styles/collections.css";
 import "./styles/notifications.css";
+import "./styles/appearance.css";
 
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
@@ -34,6 +35,7 @@ import { createPlatform, startPlatform } from "./platform/platform";
 import { createHttpPrivateSpacesApi } from "./platform/private/api";
 import { DocumentCache } from "./platform/store/document-cache";
 import { openLocalDatabase } from "./platform/store/persistence";
+import { createHttpOrganisationAppearance } from "./theme/organisation";
 import { createHttpWorkApi } from "./work/api";
 
 // Demo pages keep their edits across reloads in the browser's local
@@ -83,6 +85,7 @@ root.render(
         status === undefined ? createMockCollectionsStore() : createHttpCollectionsStore(http)
       }
       session={status === undefined ? undefined : { auth, status }}
+      appearance={status === undefined ? undefined : createHttpOrganisationAppearance(http)}
       notifications={
         status === undefined
           ? undefined

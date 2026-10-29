@@ -29,7 +29,7 @@ use crate::audit::{AuditActor, AuditQuery, AuditRecord};
 use crate::backup::BackupFile;
 use crate::counts::{UsageCounts, UsageSampler};
 use crate::service::{AdminService, Caller};
-use crate::settings::AdminSettings;
+use crate::settings::{AdminSettings, AppearanceSettings};
 use crate::usage::UsageFacts;
 
 /// How recent a sign-in admin changes need. It matches the default of
@@ -372,6 +372,7 @@ impl<K: KeyProvider + 'static> Service for AdminApi<K> {
                 },
             ),
             client_report(svc),
+            appearance(svc),
             query(
                 svc,
                 "admin.list_audit",
@@ -486,6 +487,25 @@ fn client_report<K: KeyProvider + 'static>(svc: &Svc<K>) -> Operation {
         },
     )
     .summary("Browser timings for a page view or slow call, joined to its trace")
+}
+
+/// The organisation's look: any signed-in reader may read it, so the app
+/// can theme itself from the organisation's seed (R-TH-1).
+fn appearance<K: KeyProvider + 'static>(svc: &Svc<K>) -> Operation {
+    let s = Arc::clone(svc);
+    Operation::query(
+        "admin.appearance",
+        "/v1/appearance",
+        Scope::Read,
+        move |_ctx: RequestContext, _input: Empty| {
+            let s = Arc::clone(&s);
+            async move {
+                let current = s.settings().await?;
+                Ok::<AppearanceSettings, Error>(current.settings.appearance)
+            }
+        },
+    )
+    .summary("The organisation's seed colour and export and site themes")
 }
 
 fn telemetry_preview<K: KeyProvider + 'static>(

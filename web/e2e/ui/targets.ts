@@ -74,6 +74,9 @@ const APP_TARGETS: Target[] = [
   app("drive trash", "/drive/s/S1/trash", { server: "drive", visual: false }),
   app("drive settings", "/drive/s/S2/settings", { server: "drive", visual: false }),
   app("drive search", "/drive/search?q=plan&kind=page", { server: "drive", visual: false }),
+  // The theme editor's words and its contrast table change as tokens are
+  // added, so the layout audit covers it rather than a pixel baseline.
+  app("appearance", "/settings/appearance", { visual: false }),
 ];
 
 function htmlFiles(directory: string): string[] {

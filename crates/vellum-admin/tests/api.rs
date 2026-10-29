@@ -90,6 +90,10 @@ fn declares_valid_operations() {
         if op.id() == "admin.client_report" {
             assert_eq!(op.scope(), Scope::Read);
             assert_eq!(op.path(), "/v1/telemetry/client");
+        } else if op.id() == "admin.appearance" {
+            assert_eq!(op.scope(), Scope::Read);
+            assert_eq!(op.path(), "/v1/appearance");
+            assert_eq!(op.kind(), OperationKind::Query);
         } else {
             assert_eq!(op.scope(), Scope::Admin, "{}", op.id());
         }
@@ -161,6 +165,17 @@ async fn audits_settings_and_backups() {
         .await
         .unwrap();
     assert_eq!(saved["settings"]["organisation"], "Northstar");
+    // Any reader sees the organisation's look, and only that.
+    let reader = ctx(CredentialKind::Session, &[Scope::Read]);
+    let look = f
+        .op("admin.appearance")
+        .call(reader, json!({}))
+        .await
+        .unwrap();
+    assert_eq!(
+        look,
+        json!({"seed": "#4f5b92", "export_theme": "light", "site_theme": "auto"})
+    );
     let stale = f
         .call(
             "admin.update_settings",

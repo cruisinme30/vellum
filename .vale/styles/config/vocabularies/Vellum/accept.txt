@@ -182,3 +182,4 @@ EICAR
 lettre
 rustls
 unlinks
+Hyperlegible

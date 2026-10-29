@@ -50,10 +50,55 @@
   --vl-row: 30px;
 }
 
+/* Spacious: bigger targets and more air (R-TH-5). */
+:root[data-density="spacious"] {
+  --vl-space: 10px;
+  --vl-row: 44px;
+}
+
+/*
+ * Motion (R-TH-5): "system" follows the OS setting, "reduce" always stills
+ * the interface, and "full" keeps motion even when the OS asks to reduce it.
+ */
 @media (prefers-reduced-motion: reduce) {
-  :root {
+  :root:not([data-motion="full"]) {
     --vl-motion: 0ms linear;
   }
+
+  :root:not([data-motion="full"]) *,
+  :root:not([data-motion="full"]) *::before,
+  :root:not([data-motion="full"]) *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+:root[data-motion="reduce"] {
+  --vl-motion: 0ms linear;
+}
+
+:root[data-motion="reduce"] *,
+:root[data-motion="reduce"] *::before,
+:root[data-motion="reduce"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Reading fonts (R-TH-5); their faces load when chosen. */
+:root[data-font="hyperlegible"] {
+  --vl-font: "Atkinson Hyperlegible", "Roboto", system-ui, sans-serif;
+}
+
+:root[data-font="dyslexic"] {
+  --vl-font: "OpenDyslexic", "Atkinson Hyperlegible", "Roboto", system-ui, sans-serif;
+
+  /* OpenDyslexic reads best with a little more room between lines and words. */
+  line-height: 1.7;
+  word-spacing: 0.08em;
 }
 
 *,

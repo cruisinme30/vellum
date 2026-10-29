@@ -125,19 +125,6 @@
   inset-inline-start: 76px;
 }
 
-.vl-theme-settings fieldset {
-  display: grid;
-  gap: 4px;
-  margin: 0 0 12px;
-  padding: 0;
-  border: 0;
-}
-
-.vl-theme-settings legend {
-  margin-bottom: 4px;
-  font-weight: 500;
-}
-
 .vl-radio {
   display: flex;
   align-items: center;

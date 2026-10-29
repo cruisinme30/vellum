@@ -18,14 +18,23 @@ import { AdminScreen } from "./context";
 
 /** One editable setting: where it lives, and how the form shows it. */
 interface Field {
-  readonly group: "telemetry" | "observability" | "backups" | "security";
+  readonly group: "telemetry" | "observability" | "backups" | "security" | "appearance";
   readonly key: string;
-  readonly kind: "number" | "text" | "toggle";
+  readonly kind: "number" | "text" | "toggle" | "color" | "select";
   /** Smallest allowed number. */
   readonly min?: number;
+  /** A select's values. */
+  readonly options?: readonly string[];
 }
 
+/** The theme ids the server accepts (vellum-admin `EXPORT_THEMES`, `SITE_THEMES`). */
+export const EXPORT_THEMES = ["light", "high-contrast", "sepia"] as const;
+export const SITE_THEMES = ["auto", "light", "dark", "high-contrast", "sepia", "dim"] as const;
+
 const FIELDS: readonly Field[] = [
+  { group: "appearance", key: "seed", kind: "color" },
+  { group: "appearance", key: "export_theme", kind: "select", options: EXPORT_THEMES },
+  { group: "appearance", key: "site_theme", kind: "select", options: SITE_THEMES },
   { group: "backups", key: "enabled", kind: "toggle" },
   { group: "backups", key: "interval_hours", kind: "number", min: 1 },
   { group: "backups", key: "keep", kind: "number", min: 1 },
@@ -41,7 +50,7 @@ const FIELDS: readonly Field[] = [
   { group: "telemetry", key: "interval_hours", kind: "number", min: 1 },
 ];
 
-const GROUPS = ["backups", "security", "observability", "telemetry"] as const;
+const GROUPS = ["appearance", "backups", "security", "observability", "telemetry"] as const;
 
 type Group = Readonly<Record<string, unknown>>;
 
@@ -70,6 +79,10 @@ function fieldValue(field: Field, data: FormData, name: string): unknown {
     }
     case "text": {
       return field.key === "endpoint" && text === "" ? undefined : text;
+    }
+    case "color":
+    case "select": {
+      return text === "" ? KEEP : text;
     }
   }
 }
@@ -114,6 +127,28 @@ function FieldInput({
           defaultChecked={groupOf(settings, field.group)[field.key] === true}
         />
         {label}
+      </label>
+    );
+  }
+  if (field.kind === "select") {
+    return (
+      <label>
+        {label}
+        <select name={name} defaultValue={shownText(settings, field)}>
+          {(field.options ?? []).map((option) => (
+            <option key={option} value={option}>
+              {t(`admin-theme-${option}`)}
+            </option>
+          ))}
+        </select>
+      </label>
+    );
+  }
+  if (field.kind === "color") {
+    return (
+      <label>
+        {label}
+        <input name={name} type="color" defaultValue={shownText(settings, field) || "#4f5b92"} />
       </label>
     );
   }
@@ -238,7 +273,7 @@ function SettingsLoader({ api }: { readonly api: AdminConsoleApi }) {
   );
 }
 
-/** Admin → Settings: backups, sessions, observability and telemetry. */
+/** Admin → Settings: appearance, backups, sessions, observability and telemetry. */
 export function SettingsPage() {
   const t = useT();
   return (

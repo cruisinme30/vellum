@@ -50,6 +50,65 @@ theme-seed-reset = Reset colour
 density-legend = Density
 density-comfortable = Comfortable
 density-compact = Compact
+density-spacious = Spacious
+theme-custom = Custom
+theme-custom-named = Custom: { $name }
+theme-seed-organisation = Use the organisation's colour
+appearance-more = All appearance settings
+appearance-title = Appearance
+appearance-intro = These settings are saved in this browser. They change how Vellum looks for you, not for anyone else.
+reading-title = Reading and motion
+reading-sample = The quick brown fox jumps over the lazy dog. Northstar ships the 1.0 roadmap on Friday.
+text-size-legend = Text size
+text-size-option = { $size } %
+font-legend = Font
+font-default = Roboto (default)
+font-hyperlegible = Atkinson Hyperlegible
+font-dyslexic = OpenDyslexic
+motion-legend = Motion
+motion-system = Match the system
+motion-reduce = Reduce motion
+motion-full = Allow motion
+theme-editor-title = Custom theme
+theme-editor-intro = Start from a built-in theme and an accent colour, change any colour, and check every pair against WCAG 2.2 contrast. You can only use a theme that passes.
+theme-custom-name = Theme name
+theme-custom-default-name = My theme
+theme-custom-base = Start from
+theme-tokens = Colours
+theme-tokens-reset = Reset colours
+theme-preview = Preview
+theme-preview-text = Body text on the page surface.
+theme-preview-muted = Secondary text, such as dates and hints.
+theme-preview-button = Button
+theme-preview-callout = A callout for notes and tips.
+contrast-caption = Each pair of colours the app puts together, with the contrast it needs.
+contrast-pair = Colours
+contrast-ratio = Contrast
+contrast-needs = Needs
+contrast-result = Result
+contrast-ok = Passes
+contrast-low = Too low
+contrast-pass = All { $count } colour pairs pass.
+contrast-fail = { $count ->
+    [one] 1 colour pair has too little contrast.
+   *[other] { $count } colour pairs have too little contrast.
+}
+theme-apply = Use this theme
+theme-applied = Your custom theme is on.
+theme-export = Export JSON
+theme-import = Import JSON
+theme-import-done = Imported "{ $name }". Check it, then choose Use this theme.
+theme-import-too-large = That file is too large to be a theme.
+theme-import-not-json = That file is not JSON.
+theme-import-format = That file is not a Vellum theme.
+theme-import-name = The theme needs a name of 1 to 64 characters.
+theme-import-base = The theme starts from a theme Vellum does not know.
+theme-import-seed = The theme's seed must be a colour like #4f5b92.
+theme-import-token = The theme has an unknown token or a bad colour: { $token }.
+theme-import-contrast = { $count ->
+    [one] The theme was not imported: 1 colour pair has too little contrast.
+   *[other] The theme was not imported: { $count } colour pairs have too little contrast.
+}
 
 ## Views
 
@@ -103,7 +162,7 @@ admin-usage-version-bytes = Saved versions
 admin-audit = Audit log
 admin-audit-summary = Who did what, in a tamper-evident log you can verify and export.
 admin-settings = Settings
-admin-settings-summary = Backups, admin sessions, observability and anonymous telemetry.
+admin-settings-summary = Appearance, backups, admin sessions, observability and anonymous telemetry.
 admin-backups = Backups
 admin-backups-summary = The last backup and restore drill, and both on demand.
 admin-webhooks = Webhooks
@@ -141,11 +200,21 @@ admin-audit-broken = The log was altered at record { $seq }: { $reason }
 admin-settings-intro = Changes apply at once. If another admin saves first, reload and make your change again.
 admin-settings-saved = Settings saved.
 admin-settings-conflict = Another admin saved these settings since you opened them. Nothing was changed.
+admin-settings-appearance = Appearance
 admin-settings-backups = Backups
 admin-settings-security = Admin sessions
 admin-settings-observability = Observability
 admin-settings-telemetry = Anonymous telemetry
 admin-setting-organisation = Organisation name
+admin-setting-appearance-seed = Organisation colour (people can still pick their own)
+admin-setting-appearance-export-theme = Theme for exports (PDF, HTML, Word)
+admin-setting-appearance-site-theme = Theme for published sites
+admin-theme-auto = Follow the reader's system
+admin-theme-light = Light
+admin-theme-dark = Dark
+admin-theme-high-contrast = High contrast
+admin-theme-sepia = Sepia
+admin-theme-dim = Dim
 admin-setting-backups-enabled = Run scheduled backups
 admin-setting-backups-interval-hours = Hours between backups
 admin-setting-backups-keep = Backups to keep
