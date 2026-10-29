@@ -11,6 +11,9 @@ all-features = true
 version = 2
 yanked = "deny"
 ignore = [
+    # smallstr is unmaintained (no vulnerability); yrs 0.28 depends on it.
+    # Drop this once yrs replaces it. Mirrored in .cargo/audit.toml.
+    { id = "RUSTSEC-2026-0215", reason = "unmaintained, pulled by yrs; no safe upgrade yet" },
     # Unmaintained, not vulnerable: the bincode authors call 1.3.3 complete.
     # syntect uses it only to load its bundled syntax definitions.
     { id = "RUSTSEC-2025-0141", reason = "bincode 1.3.3 via syntect; unmaintained, no known vulnerability" },
@@ -57,6 +60,12 @@ skip = [
     { crate = "getrandom@0.3", reason = "older crates still on 0.3 during the 0.4 move" },
     { crate = "r-efi@5", reason = "pulled by getrandom 0.3" },
     { crate = "miniz_oxide@0.8", reason = "png still on 0.8 while flate2 moved to 0.9" },
+    { crate = "hashbrown@0.14", reason = "dashmap 6 (via yrs) has not moved to hashbrown 0.15+" },
+    { crate = "base64@0.22", reason = "axum and tungstenite WebSocket handshakes are on base64 0.22" },
+    { crate = "digest@0.10", reason = "the WebSocket handshake hashes with sha1 0.10; RustCrypto 0.11 elsewhere" },
+    { crate = "block-buffer@0.10", reason = "pulled by digest 0.10 (WebSocket sha1)" },
+    { crate = "crypto-common@0.1", reason = "pulled by digest 0.10 (WebSocket sha1)" },
+    { crate = "cpufeatures@0.2", reason = "pulled by sha1 0.10 (WebSocket handshake)" },
     { crate = "granit-parser@1", reason = "merman-core still on 1 while serde-saphyr moved to 2" },
 ]
 skip-tree = [
