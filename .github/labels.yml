@@ -77,6 +77,9 @@
 - name: area/pages
   color: "5319e7"
   description: "vellum-pages: spaces, pages, books"
+- name: area/books
+  color: "5319e7"
+  description: "vellum-books: books, SUMMARY.md, numbering, publishing"
 - name: area/work
   color: "5319e7"
   description: "Work: issues, cycles, projects"
