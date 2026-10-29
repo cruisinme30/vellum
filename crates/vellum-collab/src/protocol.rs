@@ -65,6 +65,9 @@ pub fn encode(messages: &[Message]) -> Vec<u8> {
 /// When the frame is not a valid sequence of messages, including a frame
 /// that ends mid-message or carries trailing bytes.
 pub fn decode(frame: &[u8]) -> Result<Vec<Message>, ReadError> {
+    if !counts_fit(frame) {
+        return Err(ReadError::UnexpectedValue);
+    }
     let messages = contain(|| {
         let mut decoder = DecoderV1::new(Cursor::new(frame));
         MessageReader::new(&mut decoder).collect::<Result<Vec<_>, _>>()
@@ -86,7 +89,70 @@ pub fn decode(frame: &[u8]) -> Result<Vec<Message>, ReadError> {
 /// When the bytes are not a valid update.
 pub fn decode_update(bytes: &[u8]) -> Result<yrs::Update, ReadError> {
     use yrs::updates::decoder::Decode as _;
+    if !count_fits(bytes) {
+        return Err(ReadError::UnexpectedValue);
+    }
     contain(|| yrs::Update::decode_v1(bytes)).ok_or(ReadError::UnexpectedValue)?
+}
+
+/// Whether the count that opens `payload` could be honest.
+///
+/// yrs sizes a hash table from the first number of an update, a state
+/// vector or an awareness update before it reads a single entry, so five
+/// bytes claiming 2^27 clients once made the server touch 224 MB. Every
+/// entry takes at least one byte, so a count larger than the bytes after
+/// it is a lie and the payload is refused before yrs sees it. A payload
+/// that does not start with a readable number is left for yrs to reject.
+fn count_fits(payload: &[u8]) -> bool {
+    let mut cursor = Cursor::new(payload);
+    cursor.read_var::<u64>().map_or(true, |count| {
+        let rest = payload.len().saturating_sub(cursor.next);
+        u64::try_from(rest).is_ok_and(|rest| count <= rest)
+    })
+}
+
+/// Walks a frame the way [`MessageReader`] does and checks the count of
+/// every state vector and awareness update in it with [`count_fits`].
+///
+/// The walk stops where the frame stops making sense; yrs fails at that
+/// same message and never decodes anything after it.
+fn counts_fit(frame: &[u8]) -> bool {
+    let mut cursor = Cursor::new(frame);
+    while cursor.has_content() {
+        match next_fits(&mut cursor) {
+            Some(true) => {}
+            Some(false) => return false,
+            None => return true,
+        }
+    }
+    true
+}
+
+/// Reads one message for [`counts_fit`]: whether its count fits, or `None`
+/// when the bytes are not a message.
+fn next_fits(cursor: &mut Cursor<'_>) -> Option<bool> {
+    use yrs::sync::protocol::{
+        MSG_AUTH, MSG_AWARENESS, MSG_QUERY_AWARENESS, MSG_SYNC, MSG_SYNC_STEP_1, PERMISSION_DENIED,
+    };
+    Some(match cursor.read_var::<u8>().ok()? {
+        MSG_SYNC => {
+            let step = cursor.read_var::<u8>().ok()?;
+            let payload = cursor.read_buf().ok()?;
+            step != MSG_SYNC_STEP_1 || count_fits(payload)
+        }
+        MSG_AWARENESS => count_fits(cursor.read_buf().ok()?),
+        MSG_AUTH => {
+            if cursor.read_var::<u8>().ok()? == PERMISSION_DENIED {
+                let _reason = cursor.read_buf().ok()?;
+            }
+            true
+        }
+        MSG_QUERY_AWARENESS => true,
+        _ => {
+            let _payload = cursor.read_buf().ok()?;
+            true
+        }
+    })
 }
 
 /// Runs a decoder over untrusted bytes, turning a panic into `None`.
