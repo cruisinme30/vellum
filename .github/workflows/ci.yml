@@ -139,11 +139,14 @@ jobs:
           fetch-depth: 0
       - name: Branch name and title follow the conventions
         env:
+          BASE: ${{ github.event.pull_request.base.ref }}
           BRANCH: ${{ github.event.pull_request.head.ref }}
           TITLE: ${{ github.event.pull_request.title }}
         run: |
           source scripts/ci/commit-rules.sh
-          if ! check_branch "${BRANCH}"; then
+          if [[ "${BASE}" == "main" && "${BRANCH}" == "develop" ]]; then
+            echo "Release pull request from develop."
+          elif ! check_branch "${BRANCH}"; then
             echo "::error::Branch '${BRANCH}' must be named <type>/<topic>, e.g. feat/typed-ids"
             exit 1
           fi
