@@ -63,7 +63,8 @@ const inlineBase = (name: NodeName) => {
     atom: true,
     selectable: true,
     addAttributes: () => tiptapAttributes(spec),
-    parseHTML: () => [{ tag: `[data-type="${spec.name}"]` }],
+    // Above the default 50: a wiki link is an `<a href>`, which the link mark would take.
+    parseHTML: () => [{ tag: `[data-type="${spec.name}"]`, priority: 60 }],
   };
 };
 

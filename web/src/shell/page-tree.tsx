@@ -276,15 +276,19 @@ export function PageTree({ space, pages, currentId, onNavigate }: PageTreeProper
                 onKeyDown={(event) => {
                   event.stopPropagation();
                   if (event.key === "Enter" || event.key === "Escape") {
-                    if (event.key === "Enter") {
-                      store.renamePage(page.id, event.currentTarget.value.trim());
+                    if (event.key === "Escape") {
+                      // Moving focus blurs the field, and blurring saves.
+                      event.currentTarget.value = page.title;
                     }
                     setRenaming(undefined);
                     focus(page.id);
                   }
                 }}
                 onBlur={(event) => {
-                  store.renamePage(page.id, event.currentTarget.value.trim());
+                  const title = event.currentTarget.value.trim();
+                  if (title !== page.title) {
+                    store.renamePage(page.id, title);
+                  }
                   setRenaming(undefined);
                 }}
               />

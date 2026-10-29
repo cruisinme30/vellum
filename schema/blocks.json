@@ -136,12 +136,15 @@
     },
     {
       "name": "taskItem",
-      "doc": "One task; ticking it anywhere edits this block.",
+      "doc": "One task; ticking it anywhere edits this block. `attributes` keeps the item's trailing `{...}` span (D82) verbatim, so the editor round-trips it.",
       "impl": "tiptap",
       "content": "paragraph block*",
       "defining": true,
       "markdown": "list_item:task",
-      "attrs": { "checked": { "type": "boolean", "default": false } }
+      "attrs": {
+        "checked": { "type": "boolean", "default": false },
+        "attributes": { "type": "string", "default": "" }
+      }
     },
     {
       "name": "table",

@@ -162,13 +162,13 @@ export const NODES = [
   },
   {
     name: "taskItem",
-    doc: "One task; ticking it anywhere edits this block.",
+    doc: "One task; ticking it anywhere edits this block. `attributes` keeps the item's trailing `{...}` span (D82) verbatim, so the editor round-trips it.",
     impl: "tiptap",
     group: "",
     content: "paragraph block*",
     defining: true,
     markdown: "list_item:task",
-    attrs: { "checked": { type: "boolean", default: false }, },
+    attrs: { "attributes": { type: "string", default: "" }, "checked": { type: "boolean", default: false }, },
     slash: [
     ],
   },

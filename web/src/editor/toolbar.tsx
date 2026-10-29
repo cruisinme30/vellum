@@ -3,7 +3,7 @@
 
 import type { Editor } from "@tiptap/core";
 import { useEditorState } from "@tiptap/react";
-import { useRef, type KeyboardEvent } from "react";
+import type { KeyboardEvent } from "react";
 
 import { useT } from "../i18n/i18n";
 import { Icon } from "../shell/icon";
@@ -13,7 +13,7 @@ import { safeUrl } from "./urls";
 interface Action {
   readonly id: string;
   readonly icon: string;
-  readonly mark?: string;
+  readonly mark: string;
   readonly keys: string;
   readonly run: (editor: Editor) => void;
 }
@@ -56,29 +56,29 @@ const ACTIONS: readonly Action[] = [
   },
 ];
 
+/** Arrow keys move focus between the toolbar's buttons, wrapping at the ends. */
+const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+  const buttons = [...event.currentTarget.querySelectorAll("button")];
+  const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
+  const step: Record<string, number> = { ArrowRight: 1, ArrowLeft: -1 };
+  const delta = step[event.key];
+  if (delta !== undefined && at !== -1) {
+    event.preventDefault();
+    buttons[(at + delta + buttons.length) % buttons.length]?.focus();
+  }
+};
+
 /** The formatting toolbar: one tab stop, arrow keys between buttons (WAI-ARIA toolbar). */
 export function Toolbar({ editor }: { readonly editor: Editor }) {
   const t = useT();
-  const bar = useRef<HTMLDivElement>(null);
   const active = useEditorState({
     editor,
     selector: ({ editor: current }) =>
       Object.fromEntries([
-        ...ACTIONS.map((a) => [a.id, a.mark ? current.isActive(a.mark) : false]),
+        ...ACTIONS.map((a) => [a.id, current.isActive(a.mark)]),
         ["link", current.isActive("link")],
       ]) as Record<string, boolean>,
   });
-
-  const onKeyDown = (event: KeyboardEvent) => {
-    const buttons = [...(bar.current?.querySelectorAll("button") ?? [])];
-    const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
-    const step: Record<string, number> = { ArrowRight: 1, ArrowLeft: -1 };
-    const delta = step[event.key];
-    if (delta !== undefined && at !== -1) {
-      event.preventDefault();
-      buttons[(at + delta + buttons.length) % buttons.length]?.focus();
-    }
-  };
 
   const setLink = () => {
     const current = String(editor.getAttributes("link")["href"] ?? "");
@@ -99,7 +99,6 @@ export function Toolbar({ editor }: { readonly editor: Editor }) {
       className="vl-toolbar"
       role="toolbar"
       aria-label={t("toolbar-label")}
-      ref={bar}
       onKeyDown={onKeyDown}
     >
       {ACTIONS.map((action, index) => (
@@ -108,7 +107,7 @@ export function Toolbar({ editor }: { readonly editor: Editor }) {
           type="button"
           className="vl-icon-button"
           tabIndex={index === 0 ? 0 : -1}
-          aria-pressed={active[action.id] ?? false}
+          aria-pressed={active[action.id] === true}
           aria-label={t(`toolbar-${action.id}`)}
           aria-keyshortcuts={action.keys.replace("Mod", "Control")}
           title={t(`toolbar-${action.id}`)}
@@ -123,7 +122,7 @@ export function Toolbar({ editor }: { readonly editor: Editor }) {
         type="button"
         className="vl-icon-button"
         tabIndex={-1}
-        aria-pressed={active["link"] ?? false}
+        aria-pressed={active["link"] === true}
         aria-label={t("toolbar-link")}
         title={t("toolbar-link")}
         onClick={setLink}

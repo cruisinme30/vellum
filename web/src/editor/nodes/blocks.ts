@@ -57,7 +57,10 @@ export const CodeBlock = CodeBlockBase.extend({
 /** `$$` display math. */
 export const MathBlock = Node.create({
   ...fromSchema("mathBlock"),
-  parseHTML: () => [{ tag: 'pre[data-type="mathBlock"]', preserveWhitespace: "full" }],
+  // Above the default 50, or the code block's `pre` rule takes it.
+  parseHTML: () => [
+    { tag: 'pre[data-type="mathBlock"]', preserveWhitespace: "full", priority: 60 },
+  ],
   renderHTML: ({ HTMLAttributes }) => [
     "pre",
     mergeAttributes(HTMLAttributes, { "data-type": "mathBlock", class: "vl-math" }),
@@ -126,6 +129,7 @@ export const Tab = Node.create({
 /** `::: toc`. */
 export const Toc = Node.create({
   ...fromSchema("toc"),
+  parseHTML: () => [{ tag: 'nav[data-type="toc"]' }],
   renderHTML: ({ HTMLAttributes }) => [
     "nav",
     mergeAttributes(HTMLAttributes, { "data-type": "toc", class: "vl-block vl-toc" }),

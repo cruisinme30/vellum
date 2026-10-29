@@ -1,0 +1,81 @@
+---
+id: 01M63DBJ68777XDB5CTM10Q43H
+title: "ADR 0010: Web app shell, block editor and the block schema"
+status: verified
+owner: "@cruisinme30"
+tags: [adr, web, editor, schema]
+vellum: 1
+---
+
+::: facts
+
+- Date: 2026-10-29
+- Status: accepted
+- Decisions: D58, D59, D60
+- Issues: #70 (block schema), #90 (app shell), #92 (block editor),
+  #79 (themes); the Yjs binding refs #97 (collab rooms)
+- Pull requests: the web app shell and editor pull request
+
+:::
+
+## Context
+
+Brief section 13 asks for a Material 3 shell (navigation rail, page tree,
+themes, a phone layout) and a block editor that covers every Vellum
+block, with a slash menu, stable block IDs and real-time collaboration.
+The server stores Markdown (ADR 0004); the editor works on ProseMirror
+nodes. Both sides must agree on one block model, and the web app had to
+start before the API and the collab server exist.
+
+## Decisions
+
+### D58: one block schema generates the Rust and editor models
+
+- `schema/blocks.json` lists every node and mark with its attributes,
+  content, Markdown mapping and slash entry. `cargo xtask schema`
+  generates `crates/vellum-contracts/src/blocks.rs` and
+  `web/src/editor/schema/blocks.gen.ts`; `--check` fails CI and the fast
+  suite when either is stale.
+- Why: a block added on one side only would silently drop content on
+  the other.
+
+### D59: the editor speaks ProseMirror JSON and Yjs, never Markdown
+
+- Markdown conversion happens only on the server. The browser edits a
+  Yjs document bound with `@tiptap/y-tiptap`; block IDs (`blk-` plus 8
+  Crockford base32 characters, as `vellum_kernel::BlockId`) are assigned
+  client-side by an extension that skips remote transactions and
+  re-assigns duplicates.
+- Why: one parser and serializer (ADR 0004) keeps the canonical form in
+  one place, and client-side IDs work offline.
+
+### D60: the web app runs on ports with mock adapters
+
+- Views talk to a `WorkspaceStore` port and the editor to a
+  `CollabConnector` port. Today they run on Northstar mock data and a
+  BroadcastChannel connector that speaks the y-sync state-vector exchange
+  between tabs; the connector keeps updates in the clients' local
+  `DocumentCache` (ADR 0023). The real API and collab server replace the
+  adapters, not the views.
+- Themes are Material 3 tonal palettes computed in-house in CIE LCh, with
+  WCAG 2.2 AA contrast checked in tests. Strings use Fluent; routing uses
+  react-router. The editor chunk loads lazily.
+- Why: the shell and editor could ship before the backend, and swapping
+  in the server is a transport change only.
+
+## Alternatives
+
+- **Hand-written types on each side**: rejected; they drift (D58).
+- **Markdown in the browser** (a JS parser): rejected; two parsers would
+  disagree on edge cases (D59).
+- **`y-indexeddb`**: rejected in favour of the shared `DocumentCache`, so
+  one store owns offline data (D60).
+- **`@material/material-color-utilities`**: dropped; its extensionless
+  ESM imports break under Node and the tests (D60).
+
+## Consequences
+
+- A new block means editing `blocks.json`, running `cargo xtask schema`,
+  then adding its Tiptap extension; a parity test fails until it exists.
+- Replacing the mock adapters with the API (#97 and the gateway) is the
+  next step; the views stay unchanged.

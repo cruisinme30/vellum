@@ -72,7 +72,8 @@ export function vellumExtensions({ t, resolvePage, history }: ExtensionOptions):
       link: {
         openOnClick: false,
         autolink: true,
-        protocols: ["http", "https", "mailto"],
+        // http, https and mailto are linkify built-ins: registering them again as
+        // custom protocols only warns ("already initialized") from the second editor on.
         isAllowedUri: (url, context) =>
           /^(?:https?:|mailto:|\/|#)/i.test(url) && context.defaultValidate(url),
         // Tiptap removes an attribute set to null: links never open a new window by default.
@@ -83,10 +84,26 @@ export function vellumExtensions({ t, resolvePage, history }: ExtensionOptions):
     CodeBlock,
     MathBlock,
     TaskList,
-    TaskItem.configure({ nested: true }),
+    // Keeps the item's `{...}` attribute span (D82) through edits.
+    TaskItem.extend({
+      addAttributes() {
+        return {
+          ...this.parent?.(),
+          attributes: {
+            default: "",
+            parseHTML: (element) => element.dataset["attributes"] ?? "",
+            renderHTML: (attributes) => {
+              const span = String(attributes["attributes"] ?? "");
+              return span === "" ? {} : { "data-attributes": span };
+            },
+          },
+        };
+      },
+    }).configure({ nested: true }),
     Highlight,
-    Subscript,
-    Superscript,
+    // `~sub~` and `^super^` cannot nest in Vellum Markdown (schema `excludes`).
+    Subscript.extend({ excludes: "superscript" }),
+    Superscript.extend({ excludes: "subscript" }),
     Table,
     TableRow,
     TableHeader,

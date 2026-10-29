@@ -67,29 +67,26 @@ export function TabsView({ node, editor, getPos }: ReactNodeViewProps) {
 
   return (
     <NodeViewWrapper className="vl-block vl-tabs" ref={wrapper}>
-      <div
-        className="vl-tab-list"
-        role="tablist"
-        aria-label={t("tabs-label")}
-        contentEditable={false}
-      >
-        {titles.map((title, index) => (
-          <button
-            key={`${String(index)}-${title}`}
-            id={tabId(index)}
-            type="button"
-            role="tab"
-            aria-selected={index === active}
-            aria-controls={panelId(index)}
-            tabIndex={index === active ? 0 : -1}
-            onClick={() => {
-              setChosen(index);
-            }}
-            onKeyDown={onKeyDown}
-          >
-            {title === "" ? t("tabs-untitled") : title}
-          </button>
-        ))}
+      <div className="vl-tab-list" contentEditable={false}>
+        <div className="vl-tab-strip" role="tablist" aria-label={t("tabs-label")}>
+          {titles.map((title, index) => (
+            <button
+              key={`${String(index)}-${title}`}
+              id={tabId(index)}
+              type="button"
+              role="tab"
+              aria-selected={index === active}
+              aria-controls={panelId(index)}
+              tabIndex={index === active ? 0 : -1}
+              onClick={() => {
+                setChosen(index);
+              }}
+              onKeyDown={onKeyDown}
+            >
+              {title === "" ? t("tabs-untitled") : title}
+            </button>
+          ))}
+        </div>
         {editor.isEditable && (
           <button
             type="button"

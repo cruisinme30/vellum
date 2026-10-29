@@ -37,7 +37,7 @@ pub enum NodeType {
     ListItem,
     /// A `- [ ]` task list; each task is projected into My Work.
     TaskList,
-    /// One task; ticking it anywhere edits this block.
+    /// One task; ticking it anywhere edits this block. `attributes` keeps the item's trailing `{...}` span (D82) verbatim, so the editor round-trips it.
     TaskItem,
     /// A GFM table. Cells hold one paragraph, as GFM allows.
     Table,

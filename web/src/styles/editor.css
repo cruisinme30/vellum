@@ -327,6 +327,12 @@
   gap: 4px;
   padding: 0 8px;
   border-bottom: 1px solid var(--md-outline-variant);
+}
+
+.vl-tab-strip {
+  display: flex;
+  gap: 4px;
+  min-width: 0;
   overflow-x: auto;
 }
 

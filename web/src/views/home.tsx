@@ -16,7 +16,7 @@ export function HomeView() {
   const starred = workspace.pages.filter((p) => p.starred);
   return (
     <div className="vl-view">
-      <h1>{t("home-greeting", { name: workspace.me.name.split(" ")[0] ?? "" })}</h1>
+      <h1>{t("home-greeting", { name: workspace.me.name.replace(/ .*/s, "") })}</h1>
       <section aria-labelledby="home-recent">
         <h2 id="home-recent">{t("home-recent")}</h2>
         <PageList items={recent.map((page) => ({ page }))} empty={t("home-recent-empty")} />

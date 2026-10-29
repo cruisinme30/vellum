@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { NodeViewWrapper, type ReactNodeViewProps } from "@tiptap/react";
+import { useState, type FocusEvent } from "react";
 
 import { useT } from "../../i18n/i18n";
 import { Icon } from "../../shell/icon";
@@ -31,10 +32,28 @@ function Field({ label, value, onChange, type = "text", readOnly }: FieldPropert
   );
 }
 
-/** Shows the attribute form while the block is selected or still empty. */
-const editing = (properties: ReactNodeViewProps, key: string) =>
-  properties.editor.isEditable &&
-  (properties.selected || String(properties.node.attrs[key]) === "");
+/**
+ * Shows the attribute form while the block is selected, still empty, or
+ * being typed in (typing in the form never selects the block, and the first
+ * character makes it non-empty).
+ */
+function useEditing(properties: ReactNodeViewProps, key: string) {
+  const [focused, setFocused] = useState(false);
+  const open =
+    properties.editor.isEditable &&
+    (focused || properties.selected || String(properties.node.attrs[key]) === "");
+  const formEvents = {
+    onFocus: () => {
+      setFocused(true);
+    },
+    onBlur: (event: FocusEvent<HTMLElement>) => {
+      if (!event.currentTarget.contains(event.relatedTarget)) {
+        setFocused(false);
+      }
+    },
+  };
+  return [open, formEvents] as const;
+}
 
 /** `::: link <url>`: a rich link preview. */
 export function LinkCardView(properties: ReactNodeViewProps) {
@@ -43,6 +62,7 @@ export function LinkCardView(properties: ReactNodeViewProps) {
   const url = String(node.attrs["url"]);
   const title = String(node.attrs["title"]);
   const href = safeUrl(url);
+  const [editing, formEvents] = useEditing(properties, "url");
   return (
     <NodeViewWrapper className="vl-block vl-linkCard" contentEditable={false}>
       {href ? (
@@ -56,8 +76,8 @@ export function LinkCardView(properties: ReactNodeViewProps) {
       ) : (
         <p className="vl-muted">{t("link-empty")}</p>
       )}
-      {editing(properties, "url") && (
-        <div className="vl-form">
+      {editing && (
+        <div className="vl-form" {...formEvents}>
           <Field
             label={t("field-url")}
             type="url"
@@ -88,6 +108,7 @@ export function EmbedView(properties: ReactNodeViewProps) {
   const url = String(node.attrs["url"]);
   const target = embedTarget(url);
   const href = safeUrl(url);
+  const [editing, formEvents] = useEditing(properties, "url");
   return (
     <NodeViewWrapper className="vl-block vl-embed" contentEditable={false}>
       {target ? (
@@ -110,8 +131,8 @@ export function EmbedView(properties: ReactNodeViewProps) {
           )}
         </p>
       )}
-      {editing(properties, "url") && (
-        <div className="vl-form">
+      {editing && (
+        <div className="vl-form" {...formEvents}>
           <Field
             label={t("field-url")}
             type="url"
@@ -135,6 +156,7 @@ export function ImageView(properties: ReactNodeViewProps) {
   const alt = String(node.attrs["alt"]);
   const width = String(node.attrs["width"]);
   const safe = safeUrl(source);
+  const [editing, formEvents] = useEditing(properties, "src");
   return (
     <NodeViewWrapper
       className="vl-block vl-image"
@@ -156,8 +178,8 @@ export function ImageView(properties: ReactNodeViewProps) {
       ) : (
         <p className="vl-muted">{t("image-empty")}</p>
       )}
-      {editing(properties, "src") && (
-        <div className="vl-form">
+      {editing && (
+        <div className="vl-form" {...formEvents}>
           <Field
             label={t("field-image-url")}
             type="url"

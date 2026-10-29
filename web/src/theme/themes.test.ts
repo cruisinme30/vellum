@@ -4,7 +4,15 @@
 import { describe, expect, it } from "vitest";
 
 import { contrast, fromLch, parseHex, toHex, toLch } from "./color";
-import { buildScheme, checkContrast, DEFAULT_SEED, THEMES, type ResolvedTheme } from "./themes";
+import {
+  buildScheme,
+  checkContrast,
+  CONTRAST_RULES,
+  DEFAULT_SEED,
+  isDark,
+  THEMES,
+  type ResolvedTheme,
+} from "./themes";
 
 const resolved = THEMES.filter((t): t is ResolvedTheme => t !== "system");
 
@@ -65,5 +73,15 @@ describe("themes", () => {
   it("reports failing pairs", () => {
     const broken = { ...buildScheme("light"), "on-surface": "#f7f8fc" };
     expect(checkContrast(broken).map((f) => f.fg)).toContain("on-surface");
+  });
+
+  it("reports every rule of a scheme with missing tokens as failing", () => {
+    const failures = checkContrast({});
+    expect(failures).toHaveLength(CONTRAST_RULES.length);
+    expect(failures.every((failure) => failure.ratio === 0)).toBe(true);
+  });
+
+  it("knows which themes are dark", () => {
+    expect(resolved.filter((theme) => isDark(theme))).toEqual(["dark", "dim"]);
   });
 });
