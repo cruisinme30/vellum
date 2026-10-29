@@ -16,6 +16,28 @@ async function expectNoViolations(page: Page) {
 
 const editorOf = (page: Page) => page.getByRole("textbox", { name: "Page body" });
 
+/** Every Yjs update in the page cache, decoded loosely as text. */
+async function storedText(): Promise<string> {
+  const database = await new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open("vellum-northstar");
+    request.addEventListener("success", () => {
+      resolve(request.result);
+    });
+    request.addEventListener("error", () => {
+      reject(new Error("the page cache did not open"));
+    });
+  });
+  const rows = await new Promise<{ update: Uint8Array }[]>((resolve) => {
+    const request = database.transaction("documentUpdates").objectStore("documentUpdates").getAll();
+    request.addEventListener("success", () => {
+      resolve(request.result as { update: Uint8Array }[]);
+    });
+  });
+  database.close();
+  const decoder = new TextDecoder();
+  return rows.map((row) => decoder.decode(row.update)).join("");
+}
+
 /** Puts the caret on a new empty paragraph after the page's first one. */
 async function newLine(page: Page) {
   await editorOf(page).locator("p").first().click();
@@ -75,10 +97,11 @@ test("two tabs edit the same page together", async ({ page, context }) => {
 test("edits survive a reload", async ({ page }) => {
   await page.goto(GATEWAY);
   await newLine(page);
-  await page.keyboard.type("Kept offline");
+  // One insertion is one update, so the text is stored in one piece.
+  await page.keyboard.insertText("Kept offline");
   await expect(editorOf(page)).toContainText("Kept offline");
-  // Updates reach IndexedDB asynchronously; give the last write a moment.
-  await page.waitForTimeout(500);
+  // Updates reach IndexedDB asynchronously; reload once the text is stored.
+  await expect.poll(() => page.evaluate(storedText)).toContain("Kept offline");
   await page.reload();
   await expect(editorOf(page)).toContainText("Kept offline");
 });

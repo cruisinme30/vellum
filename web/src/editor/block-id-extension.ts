@@ -9,7 +9,7 @@ import { isBlockId, newBlockId } from "./block-id";
 import { BLOCK_ID_TYPES } from "./schema/spec";
 
 /** Plugin key of the block-ID plugin. */
-export const blockIdKey = new PluginKey("vellumBlockIds");
+const blockIdKey = new PluginKey("vellumBlockIds");
 
 const isRemote = (tr: Transaction) => {
   const meta = tr.getMeta(ySyncPluginKey) as { isChangeOrigin?: boolean } | undefined;

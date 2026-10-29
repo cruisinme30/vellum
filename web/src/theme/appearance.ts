@@ -11,7 +11,7 @@ import {
 } from "./themes";
 
 /** Interface density (R-TH-5). */
-export type Density = "comfortable" | "compact";
+type Density = "comfortable" | "compact";
 
 /** A user's appearance settings. */
 export interface Appearance {

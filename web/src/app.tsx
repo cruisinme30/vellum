@@ -15,7 +15,10 @@ import { AdminView, CollectionsView, HelpView, NotFoundView } from "./views/info
 import { InboxView, SearchView } from "./views/search";
 
 // The editor is most of the bundle, so it loads with the first page opened.
-const PageView = lazy(async () => ({ default: (await import("./views/page-view")).PageView }));
+const PageView = lazy(async () => {
+  const view = await import("./views/page-view");
+  return { default: view.PageView };
+});
 
 function PageLoading() {
   const t = useT();

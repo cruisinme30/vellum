@@ -14,7 +14,7 @@ export type ResolvedTheme = Exclude<ThemeName, "system">;
 export const DEFAULT_SEED = "#4f5b92";
 
 /** Colour roles, written as `--md-<role>` custom properties. */
-export const ROLES = [
+const ROLES = [
   "primary",
   "on-primary",
   "primary-container",
@@ -38,10 +38,10 @@ export const ROLES = [
   "scrim",
 ] as const;
 /** A colour role. */
-export type Role = (typeof ROLES)[number];
+type Role = (typeof ROLES)[number];
 
 /** Callout kinds and their fixed hues, so meaning never depends on the seed. */
-export const CALLOUTS = { info: 255, warn: 70, good: 145, crit: 25, tip: 305, note: -1 } as const;
+const CALLOUTS = { info: 255, warn: 70, good: 145, crit: 25, tip: 305, note: -1 } as const;
 
 /** Every token of a scheme: roles plus `callout-<kind>` and `callout-<kind>-bg`. */
 export type Scheme = Readonly<Record<string, string>>;

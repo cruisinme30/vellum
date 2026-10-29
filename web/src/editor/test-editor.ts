@@ -62,14 +62,14 @@ export function topLevelTypes(editor: Editor): string[] {
 }
 
 /** Props of {@link EditorHarness}. */
-export interface EditorHarnessProperties {
+interface EditorHarnessProperties {
   readonly content: JSONContent | string;
   readonly editable?: boolean;
   readonly onEditor?: (editor: Editor) => void;
 }
 
 /** A React-mounted Vellum editor, so node views render through portals. */
-export function EditorHarness({ content, editable = true, onEditor }: EditorHarnessProperties) {
+function EditorHarness({ content, editable = true, onEditor }: EditorHarnessProperties) {
   const editor = useEditor({
     extensions: vellumExtensions({ t: english, resolvePage: resolveGateway, history: true }),
     content,

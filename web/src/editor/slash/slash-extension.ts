@@ -17,7 +17,7 @@ import {
 } from "./slash-menu";
 
 /** Plugin key of the slash menu. */
-export const slashKey = new PluginKey("vellumSlash");
+const slashKey = new PluginKey("vellumSlash");
 
 const LIST_ID = "vl-slash-list";
 

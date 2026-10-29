@@ -16,7 +16,7 @@ export interface Space {
 }
 
 /** Page status from front matter. */
-export type PageStatus = "draft" | "in-review" | "verified" | "outdated";
+type PageStatus = "draft" | "in-review" | "verified" | "outdated";
 
 /** A page as the tree and lists see it; the body lives in its collab document. */
 export interface PageMeta {
