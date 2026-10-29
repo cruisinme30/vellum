@@ -168,7 +168,7 @@ const fn tight(max_connections: usize) -> ConnectionLimits {
         max_connections_per_ip: 0,
         body_timeout: Duration::from_secs(1),
         idle_timeout: Duration::from_millis(600),
-        upload_prefix: None,
+        upload_prefixes: &[],
         upload_rate: 0,
     }
 }

@@ -494,6 +494,8 @@ pub struct Opened {
     pub drive_index: Option<Arc<dyn DriveIndex>>,
     /// The drive, which also takes file uploads (see [`crate::uploads`]).
     pub drive: Option<Arc<Drive>>,
+    /// Books, which export reads sections through (see [`crate::exports`]).
+    pub books: Option<Arc<BooksService>>,
 }
 
 /// My Work's settings: where its secrets live and what it links to.
@@ -929,6 +931,7 @@ pub async fn open(
         tasks: Some(workspace.tasks),
         drive_index: Some(drive_index),
         drive: Some(workspace.drive),
+        books: Some(workspace.books),
     })
 }
 

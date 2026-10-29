@@ -30,7 +30,7 @@ use vellum_tasks::service::TasksService;
 use crate::collab::Collab;
 use crate::identity::{GuardedFetcher, GuardedSsoHttp, IdentityAuthenticator};
 use crate::observability::{self, Observability};
-use crate::{uploads, workspace};
+use crate::{exports, uploads, workspace};
 
 /// The binary's version, shown in `/healthz` and the API documents.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -67,6 +67,10 @@ pub struct Services {
     drive: Option<Arc<vellum_drive::Drive>>,
     /// The virus scanner every upload goes through, when one is set.
     scanner: Option<Arc<Clamd>>,
+    /// Books, which book exports read through.
+    books: Option<Arc<vellum_books_service::BooksService>>,
+    /// The public URL, for links out of an export.
+    public_url: String,
 }
 
 impl std::fmt::Debug for Services {
@@ -160,6 +164,8 @@ impl Services {
             drive_index: None,
             drive: None,
             scanner: None,
+            books: None,
+            public_url: public_url.trim_end_matches('/').to_owned(),
         })
     }
 
@@ -219,6 +225,7 @@ impl Services {
         self.tasks = opened.tasks;
         self.drive_index = opened.drive_index;
         self.drive = opened.drive;
+        self.books = opened.books;
         Ok(self)
     }
 
@@ -241,6 +248,28 @@ impl Services {
                     UploadPolicy::default(),
                 )
             })
+    }
+
+    /// The export and import routers, mounted at [`exports::EXPORT_PREFIX`]
+    /// and [`exports::IMPORT_PREFIX`] by [`Self::mount`]. Without a
+    /// workspace index they answer 503.
+    pub fn transfer(&self) -> (axum::Router, axum::Router) {
+        let Some(drive) = &self.drive else {
+            return (exports::unavailable_router(), exports::unavailable_router());
+        };
+        let figures = crate::page_render::PageRenderService::figures_from_env()
+            .inspect_err(|e| tracing::warn!(error = %e, "exports draw no figures"))
+            .ok()
+            .map(Arc::new);
+        let transfer = Arc::new(exports::Transfer::new(
+            Arc::clone(drive),
+            self.books.clone(),
+            figures,
+            self.scanner.clone(),
+            UploadPolicy::default(),
+            Some(self.public_url.clone()),
+        ));
+        (transfer.export_router(), transfer.import_router())
     }
 
     /// Rate-limit counts shared with the other replicas, when an index is
@@ -289,6 +318,7 @@ impl Services {
             builder = builder.service(service);
         }
         let identity = &self.identity;
+        let (export, import) = self.transfer();
         if let Some(hooks) = &self.hooks {
             // Providers sign each delivery and send no CSRF token.
             builder = builder.mount_cross_site("/hooks", hooks.clone());
@@ -314,6 +344,8 @@ impl Services {
             )
             .mount("/collab", self.collab())
             .mount_uploads(uploads::PREFIX, self.uploads(), upload_body_limit())
+            .mount(exports::EXPORT_PREFIX, export)
+            .mount_uploads(exports::IMPORT_PREFIX, import, upload_body_limit())
     }
 }
 
