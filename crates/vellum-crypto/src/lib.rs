@@ -5,12 +5,15 @@
 //!
 //! Every stored object is sealed with its own random 256-bit data-encryption
 //! key (DEK) using XChaCha20-Poly1305. The DEK is wrapped by a key-encryption
-//! key (KEK). This module holds the key types and the AEAD primitive.
+//! key (KEK) held by a [`KeyProvider`]: a [`LocalKeyring`] fed from the OS
+//! keychain or an Argon2id passphrase, or a remote KMS or Vault adapter.
 
 pub mod aead;
 mod error;
 mod key;
+mod provider;
 
 pub use aead::{NONCE_LEN, TAG_LEN};
 pub use error::CryptoError;
 pub use key::{KEY_LEN, KekId, MAX_KEK_ID_LEN, SecretKey};
+pub use provider::{KeyProvider, LocalKeyring, WrappedDek};
