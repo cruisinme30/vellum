@@ -23,8 +23,8 @@ Every Vellum file is untrusted input: a collaborator, a synced folder, an
 import or an MCP client can write any bytes, and the server parses them on
 save, render and index. The brief (section 11 and 12) asks for a hardened,
 self-hosted service that meets its latency and memory budgets under load.
-Gourav asked for continuous red teaming: attack what has merged, prove each
-finding, and make sure the fix lands (#259). The first sweep found a 3 KB
+The project lead asked for continuous red teaming: attack what has
+merged, prove each finding, and make sure the fix lands (#259). The first sweep found a 3 KB
 document that aborts the process with a stack overflow (#260).
 
 ## Decisions
@@ -72,7 +72,7 @@ document that aborts the process with a stack overflow (#260).
   limit without removing it, and costs memory on every worker.
 - **Reject deep documents outright**: loses the user's content; showing
   the deep part as text keeps the file readable and editable.
-- **Fuzzing only, no hand-written cases**: fuzzers find the crash but not
+- **Fuzzing only, no hand-written cases**: fuzz targets find the crash but not
   the quadratic cases quickly, and they do not run on every pull request.
 
 ## Consequences
