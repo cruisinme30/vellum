@@ -15,6 +15,7 @@ use vellum_kernel::telemetry::{self, TelemetryConfig};
 
 mod docs;
 mod mcp;
+mod reindex;
 
 /// Vellum: a self-hosted workspace where every object is a Markdown file.
 #[derive(Debug, Parser)]
@@ -31,6 +32,8 @@ enum Command {
     Docs(docs::DocsArgs),
     /// Serve the MCP server over stdio for a local AI client.
     Mcp(mcp::McpArgs),
+    /// Rebuild the index from the files in the data folder.
+    Reindex(reindex::Args),
 }
 
 fn main() -> ExitCode {
@@ -65,6 +68,7 @@ fn main() -> ExitCode {
     let _entered = span.enter();
     match cli.command {
         Some(Command::Mcp(args)) => mcp::run(&args),
+        Some(Command::Reindex(args)) => reindex::run(&args),
         Some(Command::Docs(_)) | None => {
             tracing::info!("vellum started; no command given");
             ExitCode::SUCCESS

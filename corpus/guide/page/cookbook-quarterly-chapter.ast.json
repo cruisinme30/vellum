@@ -17,6 +17,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "sections": [
           [
             {
@@ -26,6 +27,11 @@
               "items": [
                 {
                   "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
                   "blocks": [
                     {
                       "type": "paragraph",
@@ -41,6 +47,11 @@
                 },
                 {
                   "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
                   "blocks": [
                     {
                       "type": "paragraph",
@@ -56,6 +67,11 @@
                 },
                 {
                   "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
                   "blocks": [
                     {
                       "type": "paragraph",
@@ -100,6 +116,7 @@
             ]
           ]
         },
+        "id": null,
         "literal": "title: Points shipped by quarter\ntype: bar\n"
       },
       {
@@ -111,6 +128,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "id: 01JB9G6H8J0K2M4N6P8Q0R2S4T\nview: By status\nfilter: Quarter == \"2026-Q4\"\n"
       }
     ]
