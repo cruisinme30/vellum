@@ -160,3 +160,42 @@
     gap: 2px;
   }
 }
+
+.vl-usage {
+  display: grid;
+  gap: 24px;
+  margin-top: 16px;
+}
+
+.vl-usage-group h2 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.vl-usage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.vl-usage-tile {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 12px;
+  background: var(--md-surface-container-low, transparent);
+}
+
+.vl-usage-tile dt {
+  overflow-wrap: anywhere;
+  color: var(--md-on-surface-variant);
+  font-size: 0.875rem;
+}
+
+.vl-usage-tile dd {
+  margin: 4px 0 0;
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}

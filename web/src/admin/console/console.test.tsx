@@ -13,12 +13,14 @@ import {
   createHttpAdminConsoleApi,
   type AdminConsoleApi,
   type AuditRecord,
+  type UsageCounts,
   type Versioned,
 } from "./api";
 import { AuditPage } from "./audit-page";
 import { BackupsPage } from "./backups-page";
 import { AdminConsoleProvider } from "./context";
 import { settingsFromForm, SettingsPage } from "./settings-page";
+import { UsagePage } from "./usage-page";
 
 function record(seq: number, overrides: Partial<AuditRecord["event"]> = {}): AuditRecord {
   return {
@@ -47,6 +49,29 @@ const SETTINGS: Versioned = {
     backups: { enabled: true, interval_hours: 24, keep: 7, destination: "backups" },
     security: { fresh_auth_minutes: 15, session_hours: 12 },
   },
+};
+
+const USAGE: UsageCounts = {
+  sampled_at_ms: Date.UTC(2026, 9, 29, 20, 30),
+  users: 12,
+  enabled_users: 11,
+  admins: 2,
+  active_users_1d: 4,
+  active_users_7d: 9,
+  active_users_30d: 11,
+  sessions: 7,
+  api_tokens: 3,
+  spaces: 14,
+  folders: 30,
+  pages: 1250,
+  books: 2,
+  collections: 5,
+  trashed: 6,
+  versions: 400,
+  file_bytes: 3 * 1024 * 1024,
+  version_bytes: 1024 * 1024,
+  events_1d: 57,
+  events_7d: 310,
 };
 
 function fakeApi(overrides: Partial<AdminConsoleApi> = {}) {
@@ -100,6 +125,7 @@ function fakeApi(overrides: Partial<AdminConsoleApi> = {}) {
         within_rto: true,
       }),
     ),
+    usage: vi.fn(() => Promise.resolve(USAGE)),
     ...overrides,
   };
   return { api, audit, settings, saveSettings, state };
@@ -138,6 +164,51 @@ describe("admin console API", () => {
     });
     await api.runDrill();
     expect(send).toHaveBeenLastCalledWith("POST", "/api/v1/admin/backups/drill");
+    await api.usage(false);
+    expect(get).toHaveBeenLastCalledWith("/api/v1/admin/usage", {});
+    await api.usage(true);
+    expect(get).toHaveBeenLastCalledWith("/api/v1/admin/usage", { refresh: "true" });
+  });
+});
+
+describe("usage page", () => {
+  it("shows people, activity, content and storage, and counts again on demand", async () => {
+    const usage = vi.fn<AdminConsoleApi["usage"]>(() => Promise.resolve(USAGE));
+    const { api } = fakeApi({ usage });
+    const user = renderWith(api, <UsagePage />);
+    const people = await screen.findByRole("region", { name: "People" });
+    expect(within(people).getByText("Accounts").nextSibling?.textContent).toBe("12");
+    const content = screen.getByRole("region", { name: "Content" });
+    expect(within(content).getByText("Pages").nextSibling?.textContent).toBe("1,250");
+    const storage = screen.getByRole("region", { name: "Storage" });
+    expect(within(storage).getByText("Total stored").nextSibling?.textContent).toBe("4.0 MB");
+    const activity = screen.getByRole("region", { name: "Activity" });
+    expect(within(activity).getByText("Changes this week").nextSibling?.textContent).toBe("310");
+    expect(screen.getByRole("status").textContent).toMatch(/^Counted /);
+    expect(usage).toHaveBeenLastCalledWith(false);
+    await user.click(screen.getByRole("button", { name: "Count now" }));
+    await waitFor(() => {
+      expect(usage).toHaveBeenLastCalledWith(true);
+    });
+  });
+
+  it("says when nothing was counted yet, and reports failures", async () => {
+    const { api } = fakeApi({
+      usage: vi.fn(() => Promise.resolve({ ...USAGE, sampled_at_ms: 0 })),
+    });
+    renderWith(api, <UsagePage />);
+    expect(await screen.findByText("Nothing counted yet.")).toBeDefined();
+  });
+
+  it("reports a failed count", async () => {
+    const { api } = fakeApi({
+      usage: vi.fn(() =>
+        Promise.reject(new ApiError("unavailable", "index down", { status: 503 })),
+      ),
+    });
+    renderWith(api, <UsagePage />);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toMatch(/index down/);
   });
 });
 
