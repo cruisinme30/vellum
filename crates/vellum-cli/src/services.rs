@@ -63,6 +63,8 @@ pub struct Services {
     mcp_workspace: Option<Arc<dyn vellum_mcp::ports::Workspace>>,
     /// Where MCP calls are audited.
     audit: Arc<crate::mcp_serve::AuditTrail>,
+    /// The same workspace, for wiring the export routes into MCP (D265).
+    mcp_adapter: Option<Arc<crate::mcp_workspace::ServeWorkspace>>,
 }
 
 impl std::fmt::Debug for Services {
@@ -146,6 +148,7 @@ impl Services {
             mcp: None,
             mcp_workspace: None,
             audit: Arc::default(),
+            mcp_adapter: None,
         })
     }
 
@@ -201,6 +204,7 @@ impl Services {
                 limit.spawn_sync(counts.clone());
                 limit as Arc<dyn vellum_mcp::ratelimit::SharedLimit>
             });
+            self.mcp_adapter = Some(Arc::clone(&workspace));
             let workspace = workspace as Arc<dyn vellum_mcp::ports::Workspace>;
             let mcp = crate::mcp_serve::endpoint(
                 Arc::clone(&workspace),
@@ -214,6 +218,12 @@ impl Services {
             self.mcp_workspace = Some(workspace);
         }
         Ok(self)
+    }
+
+    /// The MCP workspace adapter, for tests that plug in its exporter.
+    #[cfg(test)]
+    pub const fn mcp_adapter(&self) -> Option<&Arc<crate::mcp_workspace::ServeWorkspace>> {
+        self.mcp_adapter.as_ref()
     }
 
     /// Rate-limit counts shared with the other replicas, when an index is

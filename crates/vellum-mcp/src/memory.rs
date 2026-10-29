@@ -694,6 +694,7 @@ impl Workspace for MemoryWorkspace {
             name: format!("{}.{}", d.doc.title, request.format),
             mime_type: mime.into(),
             size: u64::try_from(d.doc.markdown.len()).unwrap_or(0),
+            data: None,
         })
     }
 
