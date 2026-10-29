@@ -6,7 +6,10 @@
 # - the sections Context, Decisions, Alternatives and Consequences, in
 #   that order and no others, none of them empty;
 # - Issue and Pull requests lines in the facts block;
-# - at most 150 lines, and at most 6 bullets in a row under any heading.
+# - at most 150 lines, and at most 6 bullets in a row under any heading;
+# - no ADR number or D number used twice. Threads pick their own numbers
+#   with `cargo xtask adr next` (ADR 0049, D216), so this is what catches
+#   two branches that picked the same ones.
 set -euo pipefail
 
 max_lines=150
@@ -50,6 +53,24 @@ for adr in docs/adr/[0-9]*.md; do
   while IFS= read -r problem; do
     [[ -n "${problem}" ]] && fail "${adr}" "${problem}"
   done <<<"${problems}"
+done
+
+# Duplicate ADR numbers (file name prefixes) and D numbers (facts lines).
+declare -A adr_owner=() decision_owner=()
+for adr in docs/adr/[0-9]*.md; do
+  name="$(basename "${adr}")"
+  [[ "${name}" == 0000-* ]] && continue
+  number="${name%%-*}"
+  if [[ -n "${adr_owner[${number}]:-}" ]]; then
+    fail "${adr}" "ADR ${number} is also ${adr_owner[${number}]}; run 'cargo xtask adr next' for a free number."
+  fi
+  adr_owner[${number}]="${name}"
+  for decision in $(grep -m1 '^- Decisions:' "${adr}" | grep -oE '\bD[0-9]+\b' || true); do
+    if [[ -n "${decision_owner[${decision}]:-}" ]]; then
+      fail "${adr}" "${decision} is also in ${decision_owner[${decision}]}; run 'cargo xtask adr next' for a free number."
+    fi
+    decision_owner[${decision}]="${name}"
+  done
 done
 
 if ((failures > 0)); then
