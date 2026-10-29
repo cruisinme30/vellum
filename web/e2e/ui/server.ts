@@ -34,10 +34,14 @@ export async function fakeServer(page: Page, state: ServerState | undefined): Pr
   await context.route("**/api/csrf", (route) =>
     route.fulfill({ json: { token: "t", header: "x-csrf-token" } }),
   );
+  // The organisation's look (ADR 0007): the defaults, as a new server has.
+  await context.route("**/api/v1/appearance", (route) => route.fulfill({ json: {} }));
   if (state !== "drive") return;
   await context.route("**/api/v1/**", (route) => {
     const url = new URL(route.request().url());
-    if (url.pathname === "/api/v1/auth/status") return route.fallback();
+    if (url.pathname === "/api/v1/auth/status" || url.pathname === "/api/v1/appearance") {
+      return route.fallback();
+    }
     const json = driveAnswer(url.pathname);
     return json === undefined ? route.fulfill({ status: 404, json: {} }) : route.fulfill({ json });
   });
