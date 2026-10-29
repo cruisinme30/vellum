@@ -91,6 +91,26 @@ const MY_WORK: MyWorkView = {
   ],
 };
 
+// eslint-disable-next-line unicorn/no-null -- the API's "none"
+const NONE = null;
+
+const MENTIONED: MyWorkView = {
+  open: 1,
+  today: "2026-10-29",
+  sections: [
+    {
+      bucket: "inbox",
+      tasks: [
+        task("mention.c9", "@ana can you check the copy?", {
+          kind: "mention",
+          issue_key: "ENG-7",
+          mentioned_by: "priya",
+        }),
+      ],
+    },
+  ],
+};
+
 function fakeApi(overrides: Partial<WorkApi> = {}) {
   const myWork = vi.fn<WorkApi["myWork"]>(() => Promise.resolve(MY_WORK));
   const addTask = vi.fn<WorkApi["addTask"]>((text) => Promise.resolve(task("new", text)));
@@ -102,10 +122,28 @@ function fakeApi(overrides: Partial<WorkApi> = {}) {
     Promise.resolve(issue(key, "Fix sign-in", { state })),
   );
   const addComment = vi.fn<WorkApi["addComment"]>(() => Promise.resolve());
+  const dismissMention = vi.fn<WorkApi["dismissMention"]>(() => Promise.resolve());
+  const saveSettings = vi.fn<WorkApi["saveSettings"]>((input) =>
+    Promise.resolve({
+      time_zone: input.time_zone ?? NONE,
+      effective_time_zone: input.time_zone ?? "UTC",
+      day_starts_at: input.day_starts_at ?? "09:00",
+      digest_at: input.digest_at ?? NONE,
+    }),
+  );
   const api: WorkApi = {
     myWork,
     addTask,
     setDone,
+    dismissMention,
+    settings: () =>
+      Promise.resolve({
+        time_zone: NONE,
+        effective_time_zone: "UTC",
+        day_starts_at: "09:00",
+        digest_at: "07:30",
+      }),
+    saveSettings,
     teams: () => Promise.resolve([TEAM]),
     issues: () => Promise.resolve([issue("ENG-7", "Fix sign-in")]),
     issue: (key) => Promise.resolve(issue(key, "Fix sign-in")),
@@ -126,7 +164,17 @@ function fakeApi(overrides: Partial<WorkApi> = {}) {
     addComment,
     ...overrides,
   };
-  return { api, myWork, addTask, setDone, createIssue, setState, addComment };
+  return {
+    api,
+    myWork,
+    addTask,
+    setDone,
+    createIssue,
+    setState,
+    addComment,
+    dismissMention,
+    saveSettings,
+  };
 }
 
 function renderAt(path: string, api: WorkApi | undefined, routes: ReactNode) {
@@ -184,6 +232,14 @@ describe("work API", () => {
     expect(send).toHaveBeenLastCalledWith("POST", "/api/v1/tasks/k1/complete", {});
     await api.setDone("k1", false);
     expect(send).toHaveBeenLastCalledWith("POST", "/api/v1/tasks/k1/reopen", {});
+    await api.dismissMention("mention.c9");
+    expect(send).toHaveBeenLastCalledWith("POST", "/api/v1/my-work/mentions/c9/dismiss", {});
+    await api.saveSettings({ time_zone: "Asia/Tokyo", day_starts_at: "09:00", digest_at: NONE });
+    expect(send).toHaveBeenLastCalledWith("PUT", "/api/v1/my-work/settings", {
+      time_zone: "Asia/Tokyo",
+      day_starts_at: "09:00",
+      digest_at: NONE,
+    });
     await api.setState("ENG-1", "done");
     expect(send).toHaveBeenLastCalledWith("PATCH", "/api/v1/work/issues/ENG-1", {
       state: "done",
@@ -209,6 +265,36 @@ describe("My Work", () => {
     await waitFor(() => {
       expect(myWork).toHaveBeenCalledTimes(3);
     });
+  });
+
+  it("shows who mentioned you and dismisses the mention", async () => {
+    const { api, dismissMention } = fakeApi({ myWork: () => Promise.resolve(MENTIONED) });
+    const user = renderAt("/my-work", api, <Route path="my-work" element={<MyWorkPage />} />);
+    expect(await screen.findByText("priya mentioned you:")).toBeDefined();
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(screen.getByRole("link", { name: "ENG-7" }).getAttribute("href")).toBe("/issues/ENG-7");
+    await user.click(
+      screen.getByRole("button", { name: "Dismiss the mention “@ana can you check the copy?”" }),
+    );
+    expect(dismissMention).toHaveBeenCalledWith("mention.c9");
+  });
+
+  it("saves the time zone, start of day and digest time", async () => {
+    const { api, saveSettings } = fakeApi();
+    const user = renderAt("/my-work", api, <Route path="my-work" element={<MyWorkPage />} />);
+    await user.click(await screen.findByText("Time zone and reminders"));
+    expect(await screen.findByText("My Work counts days in UTC.")).toBeDefined();
+    const zone = screen.getByRole("combobox", { name: "Time zone" });
+    await user.clear(zone);
+    await user.type(zone, "Asia/Tokyo");
+    await user.clear(screen.getByLabelText("Morning digest at"));
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+    expect(saveSettings).toHaveBeenCalledWith({
+      time_zone: "Asia/Tokyo",
+      day_starts_at: "09:00",
+      digest_at: NONE,
+    });
+    expect(await screen.findByText("Settings saved.")).toBeDefined();
   });
 
   it("explains itself in demo mode", () => {

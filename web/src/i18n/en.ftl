@@ -399,6 +399,19 @@ my-work-bucket-upcoming = Upcoming
 my-work-bucket-anytime = Anytime
 my-work-bucket-someday = Someday
 my-work-bucket-done = Done
+my-work-mentioned-by = { $person } mentioned you:
+my-work-open-page = Open page
+my-work-dismiss = Dismiss
+my-work-dismiss-label = Dismiss the mention “{ $title }”
+my-work-settings = Time zone and reminders
+my-work-settings-zone-now = My Work counts days in { $zone }.
+my-work-settings-zone = Time zone
+my-work-settings-zone-server = Leave empty to use the server's
+my-work-settings-day = Day starts at
+my-work-settings-digest = Morning digest at
+my-work-settings-digest-hint = Reminders on a date without a time count from the start of your day. Clear the digest time to stop the digest.
+my-work-settings-save = Save settings
+my-work-settings-saved = Settings saved.
 
 ## Issues
 
