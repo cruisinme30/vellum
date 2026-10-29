@@ -2728,8 +2728,10 @@ name = "vellum-cli"
 version = "0.0.0"
 dependencies = [
  "clap",
+ "tokio",
  "tracing",
  "vellum-kernel",
+ "vellum-mcp",
 ]
 
 [[package]]
@@ -2828,6 +2830,7 @@ dependencies = [
  "tracing",
  "tracing-opentelemetry",
  "vellum-kernel",
+ "vellum-security",
 ]
 
 [[package]]

@@ -4,21 +4,32 @@
 //! The `vellum` binary.
 //!
 //! One binary runs every Vellum service. Subcommands (`serve`, `reindex`,
-//! `mcp`, `docs` and the rest) arrive with their workstreams; today it
-//! parses its arguments, starts telemetry and exits.
+//! `docs` and the rest) arrive with their workstreams; `mcp` serves the MCP
+//! server over stdio.
+
+mod mcp;
 
 use std::process::ExitCode;
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use vellum_kernel::telemetry::{self, TelemetryConfig};
 
 /// Vellum: a self-hosted workspace where every object is a Markdown file.
 #[derive(Debug, Parser)]
 #[command(name = "vellum", version, about)]
-struct Cli {}
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Command>,
+}
+
+#[derive(Debug, Subcommand)]
+enum Command {
+    /// Serve the MCP server over stdio for a local AI client.
+    Mcp(mcp::McpArgs),
+}
 
 fn main() -> ExitCode {
-    let Cli {} = Cli::parse();
+    let Cli { command } = Cli::parse();
     let config = TelemetryConfig::from_env("vellum", env!("CARGO_PKG_VERSION"));
     let _guard = match telemetry::init(&config) {
         Ok(guard) => guard,
@@ -34,6 +45,11 @@ fn main() -> ExitCode {
     };
     let span = tracing::info_span!("vellum.cli", version = env!("CARGO_PKG_VERSION"));
     let _entered = span.enter();
-    tracing::info!("vellum started; no command given");
-    ExitCode::SUCCESS
+    match command {
+        Some(Command::Mcp(args)) => mcp::run(&args),
+        None => {
+            tracing::info!("vellum started; no command given");
+            ExitCode::SUCCESS
+        }
+    }
 }
