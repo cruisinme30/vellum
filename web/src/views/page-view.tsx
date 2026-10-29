@@ -12,6 +12,7 @@ import { useServices, useWorkspace } from "../data/workspace-context";
 import type { ChipSources } from "../editor/chips/items";
 import { PageEditor, type EditorControls } from "../editor/page-editor";
 import { useT } from "../i18n/i18n";
+import { useShare } from "../sharing/share-button";
 import { Icon } from "../shell/icon";
 import { issueChipStatus } from "../work/api";
 
@@ -111,6 +112,7 @@ export function PageView() {
   const { store, collab } = useServices();
   const workspace = useWorkspace();
   const pageHistory = usePageHistory(pageId);
+  const share = useShare(pageId);
   const chips = useChipSources();
   const page = workspace.pages.find((p) => p.id === pageId);
   const trail = useMemo(() => ancestors(workspace.pages, pageId), [workspace.pages, pageId]);
@@ -203,7 +205,9 @@ export function PageView() {
         >
           <Icon name={page.starred ? "star-fill" : "star"} />
         </button>
+        {share.button}
       </header>
+      {share.panel}
       {page.folder === true ? (
         <FolderContents pages={pages} folder={page} />
       ) : (
