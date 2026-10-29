@@ -4,15 +4,17 @@
 //! The `vellum` binary.
 //!
 //! One binary runs every Vellum service. Subcommands (`serve`, `reindex`,
-//! `docs` and the rest) arrive with their workstreams; `mcp` serves the MCP
-//! server over stdio.
-
-mod mcp;
+//! and the rest) arrive with their workstreams. `vellum docs` reads the
+//! help books built into the binary; `vellum mcp` serves the MCP server
+//! over stdio.
 
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
 use vellum_kernel::telemetry::{self, TelemetryConfig};
+
+mod docs;
+mod mcp;
 
 /// Vellum: a self-hosted workspace where every object is a Markdown file.
 #[derive(Debug, Parser)]
@@ -22,14 +24,30 @@ struct Cli {
     command: Option<Command>,
 }
 
+/// The subcommands.
 #[derive(Debug, Subcommand)]
 enum Command {
+    /// Read the user, admin and developer guides built into this binary.
+    Docs(docs::DocsArgs),
     /// Serve the MCP server over stdio for a local AI client.
     Mcp(mcp::McpArgs),
 }
 
 fn main() -> ExitCode {
-    let Cli { command } = Cli::parse();
+    let cli = Cli::parse();
+    if let Some(Command::Docs(args)) = &cli.command {
+        // Reading the embedded books needs no telemetry or configuration.
+        return match docs::run(args, &mut std::io::stdout().lock()) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                #[expect(clippy::print_stderr, reason = "the terminal is the interface")]
+                {
+                    eprintln!("vellum docs: {error}");
+                }
+                ExitCode::FAILURE
+            }
+        };
+    }
     let config = TelemetryConfig::from_env("vellum", env!("CARGO_PKG_VERSION"));
     let _guard = match telemetry::init(&config) {
         Ok(guard) => guard,
@@ -45,9 +63,9 @@ fn main() -> ExitCode {
     };
     let span = tracing::info_span!("vellum.cli", version = env!("CARGO_PKG_VERSION"));
     let _entered = span.enter();
-    match command {
+    match cli.command {
         Some(Command::Mcp(args)) => mcp::run(&args),
-        None => {
+        Some(Command::Docs(_)) | None => {
             tracing::info!("vellum started; no command given");
             ExitCode::SUCCESS
         }

@@ -1,0 +1,32 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "container",
+        "name": "note",
+        "arg": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "sections": [
+          [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Callouts written for GitHub work too."
+                }
+              ],
+              "id": null
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "diagnostics": []
+}
