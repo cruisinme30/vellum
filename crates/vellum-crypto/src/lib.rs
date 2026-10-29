@@ -14,6 +14,7 @@ pub mod aead;
 pub mod envelope;
 mod error;
 mod key;
+mod keychain;
 mod passphrase;
 mod provider;
 
@@ -21,5 +22,8 @@ pub use aead::{NONCE_LEN, TAG_LEN};
 pub use envelope::{is_envelope, kek_of, open, rewrap, seal};
 pub use error::CryptoError;
 pub use key::{KEY_LEN, KekId, MAX_KEK_ID_LEN, SecretKey};
+#[cfg(feature = "os-keychain")]
+pub use keychain::OsKeychain;
+pub use keychain::{SecretStore, keyring_from_store, load_or_create_kek, rotate_in_store};
 pub use passphrase::PassphraseKdf;
 pub use provider::{KeyProvider, LocalKeyring, WrappedDek};
