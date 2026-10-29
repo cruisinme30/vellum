@@ -25,5 +25,5 @@ pub use key::{KEY_LEN, KekId, MAX_KEK_ID_LEN, SecretKey};
 #[cfg(feature = "os-keychain")]
 pub use keychain::OsKeychain;
 pub use keychain::{SecretStore, keyring_from_store, load_or_create_kek, rotate_in_store};
-pub use passphrase::PassphraseKdf;
+pub use passphrase::{PASSPHRASE_ENV, PASSPHRASE_FILE_ENV, PassphraseKdf, passphrase_from_env};
 pub use provider::{KeyProvider, LocalKeyring, WrappedDek};
