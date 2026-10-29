@@ -70,7 +70,11 @@ for (const target of TARGETS.filter((candidate) => !candidate.sweep)) {
       expect(await hasText(page), "the page is blank when scripts fail").toBe(true);
     });
 
-    test("still opens offline once installed", async ({ page, context }) => {
+    test("still opens offline once installed", async ({ page, context, browserName }) => {
+      test.skip(
+        browserName === "firefox" && target.server !== undefined,
+        "Firefox sends routed requests past the service worker, so the stand-in server rules out offline",
+      );
       await fakeServer(page, target.server);
       await page.goto(target.url);
       await settle(page);
@@ -85,7 +89,13 @@ for (const target of TARGETS.filter((candidate) => !candidate.sweep)) {
       test.skip(!controlled, "no service worker controls this page yet (PWA, #139)");
       await context.setOffline(true);
       await page.reload();
-      expect(await hasText(page), "the page is blank offline").toBe(true);
+      // Offline the app falls back to the demo, and the sign-in and set-up
+      // screens redirect home: the router renders one empty frame between
+      // the two, so wait for the text instead of sampling once.
+      await expect(page.locator("body"), "the page is blank offline").toHaveText(/\S/, {
+        useInnerText: true,
+        timeout: 5000,
+      });
     });
   });
 }
