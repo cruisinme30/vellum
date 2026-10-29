@@ -13,7 +13,13 @@ import { createRoot } from "react-dom/client";
 
 import { App } from "./app";
 import { createNorthstarStore } from "./data/mock/northstar";
+import { lazyCache } from "./editor/collab/lazy-cache";
 import { createLocalConnector } from "./editor/collab/local-connector";
+import { DocumentCache } from "./platform/store/document-cache";
+import { openLocalDatabase } from "./platform/store/persistence";
+
+// Pages keep their edits across reloads in the browser's local database.
+const cache = lazyCache(async () => new DocumentCache(await openLocalDatabase("vellum-northstar")));
 
 const container = document.querySelector("#root");
 if (container === null) {
@@ -21,6 +27,6 @@ if (container === null) {
 }
 createRoot(container).render(
   <StrictMode>
-    <App store={createNorthstarStore()} collab={createLocalConnector()} />
+    <App store={createNorthstarStore()} collab={createLocalConnector({ cache })} />
   </StrictMode>,
 );
