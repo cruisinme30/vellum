@@ -65,6 +65,8 @@ export interface PullResponse {
   /** When true the client drops its base state before applying `patches`. */
   readonly reset: boolean;
   readonly patches: readonly Patch[];
+  /** When true, more patches are waiting: pull again with the new cursor. */
+  readonly more?: boolean;
 }
 
 /** Read access inside a mutator or a query. */
