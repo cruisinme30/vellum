@@ -12,8 +12,8 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D40, D41, D42
-- Pull requests: #35
-- Issues: #64, #65, #66, #67, #68, #69
+- Pull requests: #35, #220, #228, #255
+- Issues: #64, #65, #66, #67, #68, #69, #285
 
 :::
 
@@ -89,6 +89,22 @@ flowchart LR
   between reading and writing.
 - An issue key is a candidate. Render resolves it against teams and
   falls back to plain text.
+
+Every block the editor gives an ID to keeps it through a save (#285).
+The ID goes where the block's own syntax leaves room for it:
+
+| Block | Where `^blk-…` goes |
+| --- | --- |
+| Paragraph, heading, image | end of the text line |
+| Code, data fence, chart | info string, before `{…}`: ```` ```js ^blk-… ```` |
+| Math | `$$ ^blk-…` opener, or ```` ```math ^blk-… ```` when nested |
+| Container (callout, columns, tabs, stats, embed…) | opener, before `{…}` |
+| GitHub alert | title line: `> [!NOTE] Title ^blk-…` |
+| Quote, table | alone on a line after a blank line |
+
+A task item's trailing `{…}` span is read into `ListItem.attrs` before
+dates and mentions are found, and written back canonically:
+`- [ ] Text {due="2026-11-02"} ^blk-…`.
 
 ## Alternatives
 

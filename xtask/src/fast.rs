@@ -22,6 +22,7 @@ use std::time::Instant;
 enum Area {
     Rust,
     Web,
+    Desktop,
     /// Always runs: files, docs, secrets and commits.
     Any,
 }
@@ -31,12 +32,14 @@ enum Area {
 struct Areas {
     rust: bool,
     web: bool,
+    desktop: bool,
 }
 
 impl Areas {
     const ALL: Self = Self {
         rust: true,
         web: true,
+        desktop: true,
     };
 
     /// Parses the script's `rust=true` / `web=false` lines.
@@ -50,6 +53,7 @@ impl Areas {
         Self {
             rust: flag("rust"),
             web: flag("web"),
+            desktop: flag("desktop"),
         }
     }
 
@@ -57,6 +61,7 @@ impl Areas {
         match area {
             Area::Rust => self.rust,
             Area::Web => self.web,
+            Area::Desktop => self.desktop,
             Area::Any => true,
         }
     }
@@ -173,6 +178,27 @@ fn web_steps() -> Vec<Step> {
     .collect()
 }
 
+/// The Desktop job's steps, run in `desktop/`.
+fn desktop_steps() -> Vec<Step> {
+    [
+        ("Desktop install", &["install", "--frozen-lockfile"][..]),
+        ("Desktop format", &["run", "format:check"]),
+        ("Desktop types", &["run", "typecheck"]),
+        ("Desktop lint", &["run", "lint"]),
+        ("Desktop dead code", &["run", "knip"]),
+        ("Desktop tests with coverage", &["run", "test:coverage"]),
+        ("Desktop build", &["run", "build"]),
+        ("Desktop dependency audit", &["audit"]),
+    ]
+    .into_iter()
+    .map(|(name, args)| {
+        Step::new(name, "pnpm", args)
+            .in_dir("desktop")
+            .area(Area::Desktop)
+    })
+    .collect()
+}
+
 /// The fast suite, in the order CI runs it.
 fn steps(base: Option<&str>, branch: Option<&str>) -> Vec<Step> {
     let mut steps = vec![
@@ -228,6 +254,7 @@ fn steps(base: Option<&str>, branch: Option<&str>) -> Vec<Step> {
             .area(Area::Rust),
     ];
     steps.extend(web_steps());
+    steps.extend(desktop_steps());
     steps.extend([
         // Files, docs and secrets
         Step::new("REUSE headers", "reuse", &["lint"]),
@@ -483,10 +510,11 @@ mod tests {
     #[test]
     fn areas_follow_the_script_output() {
         assert_eq!(
-            Areas::parse("rust=false\nweb=true\n"),
+            Areas::parse("rust=false\nweb=true\ndesktop=false\n"),
             Areas {
                 rust: false,
-                web: true
+                web: true,
+                desktop: false
             }
         );
         assert_eq!(Areas::parse(""), Areas::ALL);
@@ -500,9 +528,11 @@ mod tests {
         assert_eq!(area("Rust tests"), Some(Area::Rust));
         assert_eq!(area("Web lint"), Some(Area::Web));
         assert_eq!(area("Prose (Vale)"), Some(Area::Any));
+        assert_eq!(area("Desktop lint"), Some(Area::Desktop));
         let docs_only = Areas {
             rust: false,
             web: false,
+            desktop: false,
         };
         assert!(!docs_only.includes(Area::Rust));
         assert!(docs_only.includes(Area::Any));

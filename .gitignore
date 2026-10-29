@@ -7,6 +7,9 @@ node_modules/
 /web/coverage/
 /web/playwright-report/
 /web/test-results/
+/desktop/dist/
+/desktop/coverage/
+/desktop/release/
 /lcov.info
 .DS_Store
 *.swp

@@ -9,6 +9,20 @@
         "items": [
           {
             "task": false,
+            "attrs": {
+              "id": null,
+              "classes": [],
+              "pairs": [
+                [
+                  "due",
+                  "2026-11-02"
+                ],
+                [
+                  "priority",
+                  "high"
+                ]
+              ]
+            },
             "blocks": [
               {
                 "type": "paragraph",
@@ -23,15 +37,7 @@
                   },
                   {
                     "type": "text",
-                    "text": " about the EU quota {due="
-                  },
-                  {
-                    "type": "date",
-                    "date": "2026-11-02"
-                  },
-                  {
-                    "type": "text",
-                    "text": " priority=high}"
+                    "text": " about the EU quota"
                   }
                 ],
                 "id": "blk-a1b2c3d4"
@@ -40,13 +46,20 @@
           },
           {
             "task": true,
+            "attrs": {
+              "id": "replay",
+              "classes": [
+                "done"
+              ],
+              "pairs": []
+            },
             "blocks": [
               {
                 "type": "paragraph",
                 "content": [
                   {
                     "type": "text",
-                    "text": "Ship the replay engine {#replay .done}"
+                    "text": "Ship the replay engine"
                   }
                 ],
                 "id": "blk-b2c3d4e5"

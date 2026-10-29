@@ -11,6 +11,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "classDiagram\n  class Page {\n    +PageId id\n    +String title\n    +Status status\n    +render() Html\n  }\n  class Book {\n    +BookId id\n    +Numbering numbering\n    +nodes() List~Page~\n  }\n  class Collection {\n    +Schema schema\n    +rows() List~Page~\n  }\n  Book \"1\" o-- \"*\" Page : contains\n  Collection \"1\" *-- \"*\" Page : rows\n"
       }
     ]

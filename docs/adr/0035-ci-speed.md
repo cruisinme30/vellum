@@ -39,9 +39,10 @@ jobs also queued for runners.
 
 ### `D139`: run only the jobs a change needs
 
-- `scripts/ci/changed-areas.sh` maps changed paths to the Rust and Web
-  jobs. Pull requests into develop skip Web unless `web/` changed, and
-  skip Rust when only ADRs, the site or top-level Markdown changed.
+- `scripts/ci/changed-areas.sh` maps changed paths to the Rust, Web and
+  Desktop jobs. Pull requests into develop skip Web unless `web/` changed,
+  Desktop unless `desktop/` or `web/` changed, and Rust when only ADRs,
+  the site or top-level Markdown changed.
 - Help books are compiled into `vellum-help`, so they count as Rust.
 - A change to workflows or `scripts/ci/` runs everything, as do pushes,
   the merge queue and the full suite.
