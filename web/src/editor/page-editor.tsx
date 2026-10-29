@@ -4,11 +4,13 @@
 import { getSchema, type JSONContent } from "@tiptap/core";
 import { Collaboration } from "@tiptap/extension-collaboration";
 import { CollaborationCaret } from "@tiptap/extension-collaboration-caret";
+import type { EditorState } from "@tiptap/pm/state";
 import { type Editor, EditorContent, useEditor } from "@tiptap/react";
 import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   type ReactNode,
@@ -66,6 +68,11 @@ export interface PageEditorProperties {
    * chips. Read when the page opens: pass one object for the page's life.
    */
   readonly chips?: ChipSources | undefined;
+  /**
+   * `T` with text selected turns the selection into a task (R-MW-3): this
+   * gets the selected text. Without it, `T` types as usual.
+   */
+  readonly onSelectionTask?: ((text: string) => void) | undefined;
 }
 
 /** What the page around the editor may do with it. */
@@ -143,6 +150,20 @@ const SAVE_LABELS: Record<SaveStatus, string> = {
 };
 
 /** Whether a key press is the save shortcut (Ctrl+S, or Cmd+S on a Mac). */
+/**
+ * The selected text when `event` is a bare `T` over a selection outside code,
+ * which turns the selection into a task; `undefined` otherwise.
+ */
+export function selectionTaskText(event: KeyboardEvent, state: EditorState): string | undefined {
+  if (event.key !== "t" && event.key !== "T") return undefined;
+  if (event.metaKey || event.ctrlKey || event.altKey || event.isComposing) return undefined;
+  const { selection } = state;
+  if (selection.empty) return undefined;
+  if (selection.$from.parent.type.spec.code === true) return undefined;
+  const text = state.doc.textBetween(selection.from, selection.to, " ", " ").trim();
+  return text === "" ? undefined : text.replaceAll(/\s+/g, " ");
+}
+
 const isSaveKey = (event: KeyboardEvent) =>
   (event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "s";
 
@@ -260,8 +281,14 @@ function BoundEditor({
   work,
   me,
   chips,
+  onSelectionTask,
 }: BoundProperties) {
   const t = useT();
+  // The editor is built once per session; the ref sees the latest callback.
+  const selectionTask = useRef(onSelectionTask);
+  useEffect(() => {
+    selectionTask.current = onSelectionTask;
+  }, [onSelectionTask]);
   const live = useLive(session.live);
   const [saver] = useState(() =>
     createSaver(session.doc, session.live ?? LOCAL_LIVE(), {
@@ -326,7 +353,14 @@ function BoundEditor({
           }
           return true;
         },
-        handleKeyDown: (_view, event) => {
+        handleKeyDown: (view, event) => {
+          const toTask = selectionTask.current;
+          const selected = toTask === undefined ? undefined : selectionTaskText(event, view.state);
+          if (toTask !== undefined && selected !== undefined) {
+            event.preventDefault();
+            toTask(selected);
+            return true;
+          }
           if (!isSaveKey(event)) {
             return false;
           }

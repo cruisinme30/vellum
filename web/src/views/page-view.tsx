@@ -16,6 +16,7 @@ import { PageEditor, type EditorControls } from "../editor/page-editor";
 import { useT } from "../i18n/i18n";
 import { Icon } from "../shell/icon";
 import { issueChipStatus } from "../work/api";
+import { useQuickAdd } from "../work/quick-add";
 
 import { HistoryPanel } from "./history-panel";
 import { NotFoundView } from "./info";
@@ -146,6 +147,7 @@ export function PageView() {
   const navigate = useNavigate();
   const { store, collab } = useServices();
   const workspace = useWorkspace();
+  const quickAdd = useQuickAdd();
   const pageHistory = usePageHistory(pageId);
   const { work } = useServerApis();
   const chips = useChipSources();
@@ -279,6 +281,13 @@ export function PageView() {
               work={work}
               me={workspace.me.handle}
               chips={chips}
+              onSelectionTask={
+                quickAdd === undefined
+                  ? undefined
+                  : (text) => {
+                      quickAdd({ text, page: { id: page.id, title: page.title } });
+                    }
+              }
               actions={
                 <>
                   {pageFiles.button}

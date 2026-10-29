@@ -74,10 +74,17 @@ function Comments({ api, issueKey }: { readonly api: WorkApi; readonly issueKey:
   const submit: NonNullable<ComponentProps<"form">["onSubmit"]> = (event) => {
     event.preventDefault();
     const form = event.currentTarget;
-    const body = new FormData(form).get("body");
+    const data = new FormData(form);
+    const body = data.get("body");
+    const assign = data.get("assign");
     if (typeof body !== "string" || body.trim() === "") return;
     setError(undefined);
-    api.addComment(issueKey, body.trim()).then(
+    const assignTo = typeof assign === "string" && assign.trim() !== "" ? assign.trim() : undefined;
+    const sent =
+      assignTo === undefined
+        ? api.addComment(issueKey, body.trim())
+        : api.addComment(issueKey, body.trim(), assignTo);
+    sent.then(
       () => {
         form.reset();
         setVersion((v) => v + 1);
@@ -95,6 +102,10 @@ function Comments({ api, issueKey }: { readonly api: WorkApi; readonly issueKey:
         <label>
           {t("issue-comment-add")}
           <textarea name="body" rows={3} required />
+        </label>
+        <label className="vl-comment-assign">
+          {t("issue-comment-assign")}
+          <input name="assign" autoComplete="off" placeholder="@handle" />
         </label>
         <button type="submit" className="vl-filled-button">
           {t("issue-comment-send")}

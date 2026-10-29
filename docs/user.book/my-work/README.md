@@ -24,6 +24,10 @@ email or Slack.
 
 :::
 
+To reschedule a task, drag it onto a section, or onto the bar of days and
+buckets that shows while you drag. From the keyboard, use the task's
+**Move** menu. Moving a task changes its start date; its due date stays.
+
 ## Task lists are files {#lists}
 
 A personal task list is a checklist file in your `tasks` folder. You can
@@ -85,5 +89,9 @@ subtasks; reminders; and a recurrence.
 
 ## Shared lists {#shared}
 
-Share a task list like any page. Everyone with access sees the same
+Open **Lists** under My Work to make a list or share one: type a
+person's handle and press **Share**. Everyone with access sees the same
 list, and tasks can be assigned to any member.
+
+On an issue, fill in **Assign to** when you comment to give that person
+the comment as a task in their My Work.

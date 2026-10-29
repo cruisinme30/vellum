@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { useState, type ComponentProps } from "react";
+import { useCallback, useEffect, useState, type DragEvent } from "react";
 import { Link, useSearchParams } from "react-router";
 
 import { failureText } from "../data/failure";
@@ -9,7 +9,12 @@ import { Ready, ServerScreen } from "../data/server-apis";
 import { useLoaded } from "../data/use-loaded";
 import { useT } from "../i18n/i18n";
 
-import type { MyWorkSettingsView, MyWorkView, TaskView, WorkApi } from "./api";
+import type { MyWorkView, TaskView, WorkApi } from "./api";
+import { BlockForm, BlockLabel, CalendarPanel } from "./my-work-calendar";
+import { ListsPanel } from "./my-work-lists";
+import { Settings } from "./my-work-settings";
+import { QuickAddForm, TASKS_CHANGED } from "./quick-add";
+import { isMovable, moveTargets, sectionTarget } from "./schedule";
 
 import "./work.css";
 
@@ -50,180 +55,233 @@ function MentionRow({
   );
 }
 
-/** One task: its tick box, its title (a link for an issue) and when it is due. */
-function TaskRow({
-  task,
-  onToggle,
-  onDismiss,
-}: {
-  readonly task: TaskView;
+/** The drag payload type for a task, so drops from elsewhere are ignored. */
+const TASK_DRAG = "application/x-vellum-task";
+
+/** What a row can do; each is wired by the page. */
+interface RowActions {
   readonly onToggle: (task: TaskView) => void;
   readonly onDismiss: (task: TaskView) => void;
+  readonly onMove: (task: TaskView, to: string) => void;
+  readonly onDragging: (task?: TaskView) => void;
+}
+
+/** The keyboard and screen-reader way to reschedule: a Move menu. */
+function MoveMenu({
+  task,
+  today,
+  onMove,
+}: {
+  readonly task: TaskView;
+  readonly today: string;
+  readonly onMove: (task: TaskView, to: string) => void;
 }) {
   const t = useT();
-  const key = task.issue_key ?? undefined;
-  if (task.kind === "mention") return <MentionRow task={task} onDismiss={onDismiss} />;
   return (
-    <li className={task.overdue ? "vl-task vl-task-overdue" : "vl-task"}>
+    <select
+      className="vl-task-move"
+      aria-label={t("my-work-move-label", { title: task.title })}
+      value=""
+      onChange={(event) => {
+        if (event.target.value !== "") onMove(task, event.target.value);
+      }}
+    >
+      <option value="">{t("my-work-move")}</option>
+      {moveTargets(today).map((target) => (
+        <option key={target.to} value={target.to}>
+          {"key" in target.label ? t(target.label.key) : target.label.day}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/** One task: its tick box, its title (a link for an issue) and when it is due. */
+function TaskRow({
+  api,
+  task,
+  today,
+  actions,
+  onChanged,
+}: {
+  readonly api: WorkApi;
+  readonly task: TaskView;
+  readonly today: string;
+  readonly actions: RowActions;
+  readonly onChanged: () => void;
+}) {
+  const t = useT();
+  const [blocking, setBlocking] = useState(false);
+  const key = task.issue_key ?? undefined;
+  if (task.kind === "mention") return <MentionRow task={task} onDismiss={actions.onDismiss} />;
+  const movable = isMovable(task) && !task.done;
+  return (
+    // Dragging is the pointer shortcut; the Move menu is the keyboard way (R-MW-1).
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
+    <li
+      className={task.overdue ? "vl-task vl-task-overdue" : "vl-task"}
+      draggable={movable}
+      onDragStart={(event) => {
+        if (!movable) return;
+        event.dataTransfer.setData(TASK_DRAG, task.id);
+        event.dataTransfer.effectAllowed = "move";
+        actions.onDragging(task);
+      }}
+      onDragEnd={() => {
+        actions.onDragging();
+      }}
+    >
       <label>
         <input
           type="checkbox"
           checked={task.done}
           onChange={() => {
-            onToggle(task);
+            actions.onToggle(task);
           }}
         />
         <span className="vl-task-title">{task.title}</span>
       </label>
       {key !== undefined && <Link to={`/issues/${encodeURIComponent(key)}`}>{key}</Link>}
+      {task.list != undefined && <small className="vl-muted">#{task.list}</small>}
       {task.fields.due != undefined && (
         <small className="vl-muted">{t("my-work-due", { date: task.fields.due })}</small>
+      )}
+      <BlockLabel task={task} />
+      {movable && (
+        <>
+          <MoveMenu task={task} today={today} onMove={actions.onMove} />
+          <button
+            type="button"
+            className="vl-text-button"
+            aria-expanded={blocking}
+            aria-label={t("my-work-block-for", { title: task.title })}
+            onClick={() => {
+              setBlocking(!blocking);
+            }}
+          >
+            {t("my-work-block")}
+          </button>
+        </>
+      )}
+      {blocking && (
+        <BlockForm
+          api={api}
+          task={task}
+          today={today}
+          onDone={() => {
+            setBlocking(false);
+            onChanged();
+          }}
+        />
       )}
     </li>
   );
 }
 
-/** The buckets that hold tasks, in the server's order. */
-function Buckets({
-  view,
-  onToggle,
-  onDismiss,
+/** Takes a dropped task, if the drag carries one. */
+function dropProperties(onDrop: (task: string) => void) {
+  return {
+    onDragOver: (event: DragEvent) => {
+      if (event.dataTransfer.types.includes(TASK_DRAG)) {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+      }
+    },
+    onDrop: (event: DragEvent) => {
+      const task = event.dataTransfer.getData(TASK_DRAG);
+      if (task === "") return;
+      event.preventDefault();
+      onDrop(task);
+    },
+  };
+}
+
+/** While a task is dragged: every place it can go, including buckets with nothing in them. */
+function DropBar({
+  today,
+  onDrop,
 }: {
-  readonly view: MyWorkView;
-  readonly onToggle: (task: TaskView) => void;
-  readonly onDismiss: (task: TaskView) => void;
+  readonly today: string;
+  readonly onDrop: (task: string, to: string) => void;
 }) {
   const t = useT();
+  return (
+    <ul className="vl-drop-bar" aria-label={t("my-work-drop-here")}>
+      {moveTargets(today).map((target) => (
+        <li
+          key={target.to}
+          {...dropProperties((task) => {
+            onDrop(task, target.to);
+          })}
+        >
+          {"key" in target.label ? t(target.label.key) : target.label.day}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** The buckets that hold tasks, in the server's order; each takes dropped tasks. */
+function Buckets({
+  api,
+  view,
+  actions,
+  onChanged,
+}: {
+  readonly api: WorkApi;
+  readonly view: MyWorkView;
+  readonly actions: RowActions;
+  readonly onChanged: () => void;
+}) {
+  const t = useT();
+  const [dragging, setDragging] = useState<TaskView>();
+  const rowActions: RowActions = {
+    ...actions,
+    onDragging: (task) => {
+      setDragging(task);
+      actions.onDragging(task);
+    },
+  };
+  const moveById = (id: string, to: string) => {
+    const task = view.sections.flatMap((section) => section.tasks).find((each) => each.id === id);
+    setDragging(undefined);
+    if (task !== undefined) actions.onMove(task, to);
+  };
   const sections = view.sections.filter((section) => section.tasks.length > 0);
   if (sections.length === 0) return <p className="vl-muted">{t("my-work-empty")}</p>;
   return (
     <>
-      {sections.map((section) => (
-        <section key={`${section.bucket}:${section.day ?? section.week_of ?? ""}`}>
-          <h2>{section.day ?? t(`my-work-bucket-${section.bucket}`)}</h2>
-          <ul className="vl-task-list">
-            {section.tasks.map((task) => (
-              <TaskRow key={task.id} task={task} onToggle={onToggle} onDismiss={onDismiss} />
-            ))}
-          </ul>
-        </section>
-      ))}
+      {dragging !== undefined && <DropBar today={view.today} onDrop={moveById} />}
+      {sections.map((section) => {
+        const target = sectionTarget(section);
+        return (
+          <section
+            key={`${section.bucket}:${section.day ?? section.week_of ?? ""}`}
+            className={
+              dragging !== undefined && target !== undefined ? "vl-drop-target" : undefined
+            }
+            {...(target !== undefined &&
+              dropProperties((task) => {
+                moveById(task, target);
+              }))}
+          >
+            <h2>{section.day ?? t(`my-work-bucket-${section.bucket}`)}</h2>
+            <ul className="vl-task-list">
+              {section.tasks.map((task) => (
+                <TaskRow
+                  key={task.id}
+                  api={api}
+                  task={task}
+                  today={view.today}
+                  actions={rowActions}
+                  onChanged={onChanged}
+                />
+              ))}
+            </ul>
+          </section>
+        );
+      })}
     </>
-  );
-}
-
-// eslint-disable-next-line unicorn/no-null -- the API reads null as "none": the server's zone, no digest
-const NONE = null;
-
-/** The browser's IANA time zone, if it reports one. */
-function browserZone(): string | undefined {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone;
-  } catch {
-    return undefined;
-  }
-}
-
-/** Every zone the browser knows, for the picker. */
-function knownZones(): readonly string[] {
-  try {
-    return Intl.supportedValuesOf("timeZone");
-  } catch {
-    return [];
-  }
-}
-
-/** Time zone, start of day and digest time. */
-function SettingsForm({
-  api,
-  settings,
-  onSaved,
-}: {
-  readonly api: WorkApi;
-  readonly settings: MyWorkSettingsView;
-  readonly onSaved: () => void;
-}) {
-  const t = useT();
-  const [error, setError] = useState<string>();
-  const [saved, setSaved] = useState(false);
-  const here = browserZone();
-  const save: NonNullable<ComponentProps<"form">["onSubmit"]> = (event) => {
-    event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    const text = (name: string) => {
-      const value = data.get(name);
-      return typeof value === "string" ? value.trim() : "";
-    };
-    setError(undefined);
-    setSaved(false);
-    api
-      .saveSettings({
-        time_zone: text("time_zone") === "" ? NONE : text("time_zone"),
-        day_starts_at: text("day_starts_at"),
-        digest_at: text("digest_at") === "" ? NONE : text("digest_at"),
-      })
-      .then(
-        () => {
-          setSaved(true);
-          onSaved();
-        },
-        (error_: unknown) => {
-          setError(failureText(error_));
-        },
-      );
-  };
-  return (
-    <form className="vl-work-settings" onSubmit={save}>
-      <p className="vl-muted">
-        {t("my-work-settings-zone-now", { zone: settings.effective_time_zone })}
-      </p>
-      <label>
-        {t("my-work-settings-zone")}
-        <input
-          name="time_zone"
-          list="vl-time-zones"
-          autoComplete="off"
-          defaultValue={settings.time_zone ?? here ?? ""}
-          placeholder={t("my-work-settings-zone-server")}
-        />
-      </label>
-      <datalist id="vl-time-zones">
-        {knownZones().map((zone) => (
-          <option key={zone} value={zone} />
-        ))}
-      </datalist>
-      <label>
-        {t("my-work-settings-day")}
-        <input name="day_starts_at" type="time" required defaultValue={settings.day_starts_at} />
-      </label>
-      <label>
-        {t("my-work-settings-digest")}
-        <input name="digest_at" type="time" defaultValue={settings.digest_at ?? ""} />
-      </label>
-      <p className="vl-muted">{t("my-work-settings-digest-hint")}</p>
-      <button type="submit" className="vl-filled-button">
-        {t("my-work-settings-save")}
-      </button>
-      {saved && <p role="status">{t("my-work-settings-saved")}</p>}
-      {error !== undefined && (
-        <p className="vl-field-error" role="alert">
-          {error}
-        </p>
-      )}
-    </form>
-  );
-}
-
-function Settings({ api, onSaved }: { readonly api: WorkApi; readonly onSaved: () => void }) {
-  const t = useT();
-  const loaded = useLoaded(() => api.settings(), [api], failureText);
-  return (
-    <details className="vl-work-settings-panel">
-      <summary>{t("my-work-settings")}</summary>
-      <Ready loaded={loaded}>
-        {(settings) => <SettingsForm api={api} settings={settings} onSaved={onSaved} />}
-      </Ready>
-    </details>
   );
 }
 
@@ -293,65 +351,59 @@ function SlackLink({ api }: { readonly api: WorkApi }) {
 }
 
 function MyWork({ api }: { readonly api: WorkApi }) {
-  const t = useT();
   const [version, setVersion] = useState(0);
   const [error, setError] = useState<string>();
   const loaded = useLoaded(() => api.myWork(), [api, version], failureText);
+  const reload = useCallback(() => {
+    setVersion((v) => v + 1);
+  }, []);
+  useEffect(() => {
+    globalThis.addEventListener(TASKS_CHANGED, reload);
+    return () => {
+      globalThis.removeEventListener(TASKS_CHANGED, reload);
+    };
+  }, [reload]);
   const run = (write: Promise<unknown>) => {
     setError(undefined);
-    write.then(
-      () => {
-        setVersion((v) => v + 1);
-      },
-      (error_: unknown) => {
-        setError(failureText(error_));
-      },
-    );
+    write.then(reload, (error_: unknown) => {
+      setError(failureText(error_));
+    });
   };
-  const add: NonNullable<ComponentProps<"form">["onSubmit"]> = (event) => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const text = new FormData(form).get("text");
-    if (typeof text !== "string" || text.trim() === "") return;
-    form.reset();
-    run(api.addTask(text.trim()));
+  const actions: RowActions = {
+    onToggle: (task) => {
+      run(api.setDone(task.id, !task.done));
+    },
+    onDismiss: (task) => {
+      run(api.dismissMention(task.id));
+    },
+    onMove: (task, to) => {
+      run(api.move(task.id, to));
+    },
+    onDragging: () => {
+      setError(undefined);
+    },
   };
   return (
     <>
       <SlackLink api={api} />
-      <form className="vl-work-add" onSubmit={add}>
-        <label>
-          {t("my-work-add")}
-          <input name="text" autoComplete="off" placeholder={t("my-work-add-hint")} />
-        </label>
-        <button type="submit" className="vl-filled-button">
-          {t("my-work-add-button")}
-        </button>
-      </form>
+      {/* QuickAddForm tells the page through TASKS_CHANGED, like the Q dialog. */}
+      <QuickAddForm
+        api={api}
+        onAdded={() => {
+          // The reload comes from the TASKS_CHANGED event.
+        }}
+      />
       {error !== undefined && (
         <p className="vl-field-error" role="alert">
           {error}
         </p>
       )}
       <Ready loaded={loaded}>
-        {(view) => (
-          <Buckets
-            view={view}
-            onToggle={(task) => {
-              run(api.setDone(task.id, !task.done));
-            }}
-            onDismiss={(task) => {
-              run(api.dismissMention(task.id));
-            }}
-          />
-        )}
+        {(view) => <Buckets api={api} view={view} actions={actions} onChanged={reload} />}
       </Ready>
-      <Settings
-        api={api}
-        onSaved={() => {
-          setVersion((v) => v + 1);
-        }}
-      />
+      <ListsPanel api={api} onChanged={reload} />
+      <CalendarPanel api={api} onChanged={reload} />
+      <Settings api={api} onSaved={reload} />
     </>
   );
 }

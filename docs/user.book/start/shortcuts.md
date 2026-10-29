@@ -13,7 +13,7 @@ Windows and Linux, read `⌘` as `Ctrl` and `⌥` as `Alt`.
 
 | Keys | Action |
 | --- | --- |
-| `⌘K` | Search and run any command |
+| `⌘K` | Find a page by title, or run any command |
 | `C` | New issue |
 | `Alt C` | New issue from a template |
 | `Q` | Quick-add a task |

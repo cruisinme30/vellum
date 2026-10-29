@@ -46,13 +46,13 @@ import { DriveSettingsPage } from "./drive/settings-page";
 import { TrashPage } from "./drive/trash-page";
 import type { CollabConnector } from "./editor/collab/provider";
 import { I18nProvider, useT } from "./i18n/i18n";
-import { KeyboardRoot } from "./keyboard/keyboard-root";
 import { NotificationsProvider, type NotificationServices } from "./notifications/context";
 import { NotificationSettingsView } from "./notifications/notification-settings";
 import { createMockNotificationPreferencesStore } from "./notifications/preferences";
 import type { DirectoryApi } from "./people/directory";
 import type { PrivateSpacesApi } from "./platform/private/api";
 import { PrivateSpacesView } from "./platform/private/private-spaces-view";
+import { AppKeyboard } from "./shell/app-keyboard";
 import { AppShell } from "./shell/app-shell";
 import { AppearanceProvider, type OrganisationAppearance } from "./theme/appearance-context";
 import { AppearancePage } from "./theme/appearance-page";
@@ -65,6 +65,7 @@ import type { WorkApi } from "./work/api";
 import { IssuePage } from "./work/issue-page";
 import { IssuesPage } from "./work/issues-page";
 import { MyWorkPage } from "./work/my-work-page";
+import { QuickAddProvider } from "./work/quick-add";
 
 // The editor is most of the bundle, so it loads with the first page opened.
 const PageView = lazy(async () => {
@@ -296,11 +297,13 @@ export function AppProviders({
 export function App(services: AppServices) {
   return (
     <AppProviders {...services}>
-      <KeyboardRoot>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-      </KeyboardRoot>
+      <BrowserRouter>
+        <QuickAddProvider>
+          <AppKeyboard>
+            <AppRoutes />
+          </AppKeyboard>
+        </QuickAddProvider>
+      </BrowserRouter>
     </AppProviders>
   );
 }

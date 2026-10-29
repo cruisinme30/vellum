@@ -11,8 +11,8 @@ import { NORTHSTAR_BODIES } from "../data/mock/northstar-pages";
 import { createLocalConnector } from "./collab/local-connector";
 import type { CollabConnector, LiveConnection, LiveState } from "./collab/provider";
 import { body, h, p, wiki } from "./content";
-import { PageEditor, type PageEditorProperties } from "./page-editor";
-import { memoryChannels, resolveGateway, settle } from "./test-editor";
+import { PageEditor, selectionTaskText, type PageEditorProperties } from "./page-editor";
+import { createTestEditor, memoryChannels, resolveGateway, settle } from "./test-editor";
 
 const user = { name: "Priya", color: "#1a73e8" };
 const seed = body(h(1, "Plan"), p("See ", wiki("Gateway"), " and ", wiki("Nowhere")));
@@ -324,5 +324,28 @@ describe("PageEditor", () => {
       expect(editorOf(editors()[0]).isEditable).toBe(false);
       expect(notice().textContent).toContain("access to this page was removed");
     });
+  });
+});
+
+const press = (key: string, extra: Partial<KeyboardEventInit> = {}) =>
+  new KeyboardEvent("keydown", { key, ...extra });
+
+describe("selectionTaskText", () => {
+  it("takes the selected text on a bare T, and nothing else", () => {
+    const editor = createTestEditor({ content: "<p>Call   Sam about the launch</p>" });
+    expect(selectionTaskText(press("t"), editor.state)).toBeUndefined();
+    editor.commands.setTextSelection({ from: 1, to: 15 });
+    expect(selectionTaskText(press("t"), editor.state)).toBe("Call Sam about");
+    expect(selectionTaskText(press("T"), editor.state)).toBe("Call Sam about");
+    expect(selectionTaskText(press("t", { metaKey: true }), editor.state)).toBeUndefined();
+    expect(selectionTaskText(press("x"), editor.state)).toBeUndefined();
+    editor.destroy();
+  });
+
+  it("leaves code alone", () => {
+    const editor = createTestEditor({ content: "<pre><code>let t = 1</code></pre>" });
+    editor.commands.setTextSelection({ from: 1, to: 4 });
+    expect(selectionTaskText(press("t"), editor.state)).toBeUndefined();
+    editor.destroy();
   });
 });

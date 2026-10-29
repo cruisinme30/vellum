@@ -17,14 +17,15 @@ test("the command menu opens from the keyboard and passes WCAG 2.2 AA", async ({
   await page.goto("/");
   await expect(page.getByRole("navigation", { name: "Main" })).toBeVisible();
   await page.keyboard.press("ControlOrMeta+k");
-  const search = page.getByRole("combobox", { name: "Search commands" });
+  const search = page.getByRole("combobox", { name: "Search pages and commands" });
   await expect(search).toBeFocused();
   await search.fill("short");
   await expect(page.getByRole("option", { name: /Show all shortcuts/ })).toBeVisible();
   const results = await new AxeBuilder({ page }).withTags(WCAG).analyze();
   expect(results.violations).toEqual([]);
 
-  await page.keyboard.press("Enter");
+  // Pages whose titles match come first; pick the command itself.
+  await page.getByRole("option", { name: /Show all shortcuts/ }).click();
   const sheet = page.getByRole("dialog", { name: "Keyboard shortcuts" });
   await expect(sheet).toBeVisible();
   const sheetResults = await new AxeBuilder({ page }).withTags(WCAG).analyze();

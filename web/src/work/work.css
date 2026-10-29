@@ -193,3 +193,211 @@
   flex-wrap: wrap;
   gap: 8px;
 }
+
+/* Quick-add: the line, what the parser understood, the list and Add. */
+.vl-quick-add {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 20px;
+}
+
+.vl-quick-add > label,
+.vl-quick-add label {
+  font-size: 0.875rem;
+}
+
+.vl-quick-add input,
+.vl-quick-add select,
+.vl-block-form input,
+.vl-list-share input,
+.vl-work-comment input,
+.vl-task-move {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--md-outline);
+  border-radius: 4px;
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+  font: inherit;
+}
+
+.vl-quick-add label:has(select) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.vl-quick-parse {
+  min-height: 1.5em;
+}
+
+.vl-quick-line {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+/* Each understood phrase is marked; the kind shows as an underline colour
+   as well as the fact list, so colour is never the only cue. */
+.vl-quick-line mark {
+  border-radius: 4px;
+  padding: 0 2px;
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+  text-decoration: underline 2px;
+  text-underline-offset: 3px;
+}
+
+.vl-quick-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8125rem;
+}
+
+.vl-quick-facts li {
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+.vl-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The quick-add dialog floats like the ⌘K menu. */
+.vl-quick-dialog {
+  position: fixed;
+  inset: 12vh auto auto 50%;
+  box-sizing: border-box;
+  width: min(36rem, calc(100vw - 2rem));
+  max-height: 76vh;
+  overflow: auto;
+  padding: 16px 20px;
+  transform: translateX(-50%);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 16px;
+  background: var(--md-surface-container-high, Canvas);
+  color: var(--md-on-surface, CanvasText);
+  box-shadow: 0 1rem 3rem rgb(0 0 0 / 30%);
+  z-index: 1000;
+}
+
+.vl-quick-dialog h2 {
+  margin: 0 0 8px;
+  font-size: 1.25rem;
+}
+
+/* Rescheduling: rows can be dragged onto a section or the drop bar. */
+.vl-task[draggable="true"] {
+  cursor: grab;
+}
+
+.vl-drop-bar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 8px;
+  border-radius: 12px;
+  background: var(--md-surface-container);
+  list-style: none;
+  z-index: 1;
+}
+
+.vl-drop-bar li {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px dashed var(--md-outline);
+  border-radius: 20px;
+  line-height: 40px;
+}
+
+.vl-drop-target {
+  border-radius: 12px;
+  outline: 2px dashed var(--md-outline-variant);
+  outline-offset: 4px;
+}
+
+.vl-task-move {
+  min-height: 32px;
+  padding: 4px 8px;
+  font-size: 0.8125rem;
+}
+
+.vl-block-form,
+.vl-list-share {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 12px;
+}
+
+.vl-block-form label,
+.vl-list-share label {
+  display: grid;
+  gap: 4px;
+  font-size: 0.875rem;
+}
+
+.vl-block-form input[type="number"] {
+  width: 7em;
+}
+
+.vl-work-panel {
+  margin: 24px 0;
+}
+
+.vl-work-panel summary {
+  min-height: 40px;
+  cursor: pointer;
+  line-height: 40px;
+}
+
+.vl-list-list,
+.vl-list-members {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.vl-list-row {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--md-outline-variant);
+}
+
+.vl-list-row p {
+  margin: 0 0 4px;
+}
+
+.vl-list-members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .vl-quick-dialog {
+    animation: vl-quick-pop 80ms ease-out;
+  }
+}
+
+@keyframes vl-quick-pop {
+  from {
+    opacity: 0;
+  }
+}

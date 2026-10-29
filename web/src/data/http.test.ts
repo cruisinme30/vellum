@@ -98,6 +98,12 @@ const searchHit = (pageId: string, text: string) => ({
   ],
 });
 
+/** The snippet `searchHit` makes, as the store keeps it. */
+const marked = (text: string) => [
+  { text: "the ", hit: false },
+  { text, hit: true },
+];
+
 const page = (store: WorkspaceStore, id: string) =>
   store.getSnapshot().pages.find((p) => p.id === id);
 
@@ -376,10 +382,17 @@ describe("the HTTP workspace store", () => {
       { q: "plan", kinds: "page", limit: 50 },
     ]);
     expect(hits).toEqual([
-      { page: page(store, "p2"), snippet: "the plan" },
-      { page: page(store, "p1"), snippet: "the plan" },
+      { page: page(store, "p2"), snippet: "the plan", fragments: marked("plan ") },
+      { page: page(store, "p1"), snippet: "the plan", fragments: marked("plan") },
     ]);
     expect(await store.mentions("priya")).toEqual([]);
+
+    // Filters go to the server and are checked again on the tree's pages.
+    const starred = await store.search("plan", { starred: true, spaceId: "s1", modifiedDays: 7 });
+    const query = http.get.mock.lastCall?.[1];
+    expect(query).toMatchObject({ q: "plan", starred: true, spaces: "s1" });
+    expect(typeof query?.["modified_from"]).toBe("number");
+    expect(starred).toEqual([]);
   });
 
   it("searches titles when the server runs no search service", async () => {
