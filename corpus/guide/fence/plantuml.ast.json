@@ -1,0 +1,19 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "fence",
+        "lang": "plantuml",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "@startuml\nactor Developer\nparticipant Gateway\ndatabase \"Audit log\" as Audit\nDeveloper -> Gateway: POST /orders\nGateway -> Audit: write decision\nGateway --> Developer: 201 Created\n@enduml\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}

@@ -1,0 +1,62 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Pull requests auto-merge into develop without being re-tested on top of
+# each other, so two green pull requests can still combine into a red
+# develop. The Fast suite runs on every push to develop; this workflow
+# raises one "develop is red" issue when that run fails and closes it when
+# develop is green again.
+name: Develop health
+
+on:
+  workflow_run:
+    workflows: [Fast suite]
+    types: [completed]
+    branches: [develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: develop-health
+  cancel-in-progress: false
+
+jobs:
+  report:
+    name: Report develop status
+    if: >-
+      github.event.workflow_run.event == 'push' &&
+      contains(fromJSON('["success", "failure"]'), github.event.workflow_run.conclusion)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: Open, update or close the "develop is red" issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          COMMIT_TITLE: ${{ github.event.workflow_run.display_title }}
+        run: |
+          title="develop is red"
+          open="$(gh issue list --state open --label status/blocked --search "\"${title}\" in:title" \
+            --json number,title --jq "map(select(.title == \"${title}\")) | .[0].number // empty")"
+          commit="${SHA:0:7} ${COMMIT_TITLE}"
+          if [[ "${CONCLUSION}" == "failure" ]]; then
+            note="The Fast suite failed on \`develop\` at ${commit}: ${RUN_URL}"
+            if [[ -n "${open}" ]]; then
+              gh issue comment "${open}" --body "Still red. ${note}"
+            else
+              body="$(printf '%s\n\n%s %s %s' "${note}" \
+                "Whoever merged that change, or the first one after the last green run, fixes" \
+                "\`develop\` or reverts the change. Hold other merges until this issue closes;" \
+                "it closes itself when the Fast suite passes on \`develop\` again.")"
+              gh issue create --title "${title}" --label status/blocked,type/fix,area/ci,priority/p0 \
+                --body "${body}"
+            fi
+          elif [[ -n "${open}" ]]; then
+            gh issue close "${open}" --comment "Green again at ${commit}: ${RUN_URL}"
+          fi

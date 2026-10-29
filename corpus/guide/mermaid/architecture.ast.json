@@ -1,0 +1,19 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "fence",
+        "lang": "mermaid",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "architecture-beta\n  group cloud(cloud)[Northstar cloud]\n  service gw(internet)[Gateway] in cloud\n  service api(server)[API] in cloud\n  service db(database)[Postgres] in cloud\n  service blob(disk)[Blob store] in cloud\n  gw:R --> L:api\n  api:R --> L:db\n  api:B --> T:blob\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}

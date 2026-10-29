@@ -4,21 +4,46 @@
 //! The `vellum` binary.
 //!
 //! One binary runs every Vellum service. Subcommands (`serve`, `reindex`,
-//! `mcp`, `docs` and the rest) arrive with their workstreams; today it
-//! parses its arguments, starts telemetry and exits.
+//! `mcp` and the rest) arrive with their workstreams. `vellum docs` reads
+//! the help books built into the binary.
 
 use std::process::ExitCode;
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use vellum_kernel::telemetry::{self, TelemetryConfig};
+
+mod docs;
 
 /// Vellum: a self-hosted workspace where every object is a Markdown file.
 #[derive(Debug, Parser)]
 #[command(name = "vellum", version, about)]
-struct Cli {}
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Command>,
+}
+
+/// The subcommands.
+#[derive(Debug, Subcommand)]
+enum Command {
+    /// Read the user, admin and developer guides built into this binary.
+    Docs(docs::DocsArgs),
+}
 
 fn main() -> ExitCode {
-    let Cli {} = Cli::parse();
+    let cli = Cli::parse();
+    if let Some(Command::Docs(args)) = &cli.command {
+        // Reading the embedded books needs no telemetry or configuration.
+        return match docs::run(args, &mut std::io::stdout().lock()) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                #[expect(clippy::print_stderr, reason = "the terminal is the interface")]
+                {
+                    eprintln!("vellum docs: {error}");
+                }
+                ExitCode::FAILURE
+            }
+        };
+    }
     let config = TelemetryConfig::from_env("vellum", env!("CARGO_PKG_VERSION"));
     let _guard = match telemetry::init(&config) {
         Ok(guard) => guard,

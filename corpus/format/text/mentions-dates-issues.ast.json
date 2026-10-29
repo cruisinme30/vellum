@@ -1,0 +1,75 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Ask "
+          },
+          {
+            "type": "mention",
+            "handle": "priya.s"
+          },
+          {
+            "type": "text",
+            "text": " to review "
+          },
+          {
+            "type": "issue_key",
+            "key": "ENG-142"
+          },
+          {
+            "type": "text",
+            "text": " by "
+          },
+          {
+            "type": "date",
+            "date": "2026-11-24"
+          },
+          {
+            "type": "text",
+            "text": ", and add it to "
+          },
+          {
+            "type": "date",
+            "date": "today"
+          },
+          {
+            "type": "text",
+            "text": " in My Work."
+          }
+        ],
+        "id": null
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Email addresses like "
+          },
+          {
+            "type": "link",
+            "url": "mailto:dev@northstar.dev",
+            "title": "",
+            "content": [
+              {
+                "type": "text",
+                "text": "dev@northstar.dev"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": " and versions like v2026-11-24 are not mentions or dates."
+          }
+        ],
+        "id": null
+      }
+    ]
+  },
+  "diagnostics": []
+}

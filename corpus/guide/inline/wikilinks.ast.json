@@ -1,0 +1,36 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "See "
+          },
+          {
+            "type": "wiki_link",
+            "target": "Gateway architecture",
+            "label": null
+          },
+          {
+            "type": "text",
+            "text": " or "
+          },
+          {
+            "type": "wiki_link",
+            "target": "Gateway architecture",
+            "label": "the gateway page"
+          },
+          {
+            "type": "text",
+            "text": "."
+          }
+        ],
+        "id": null
+      }
+    ]
+  },
+  "diagnostics": []
+}
