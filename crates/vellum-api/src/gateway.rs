@@ -463,7 +463,9 @@ async fn protect(
         .principal
         .user_id()
         .map(|u| format!("user:{u}"))
-        .or_else(|| ip.map(|ip| format!("ip:{ip}")))
+        // An IPv6 client counts as its /64, so rotating addresses inside
+        // it does not reset the limit.
+        .or_else(|| ip.map(|ip| format!("ip:{}", vellum_security::rate::client_bucket(ip))))
         .unwrap_or_else(|| "anonymous".to_owned());
     if let Some(wait) = limited(&state, &caller, &request) {
         let mut response =
