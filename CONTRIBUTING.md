@@ -108,7 +108,7 @@ Set `VELLUM_ALLOW_MISSING_TOOLS=1` to skip a missing tool instead. The
 local run is focused: clippy, rustdoc and the Rust tests cover only the
 crates your branch changed, and the web and desktop unit tests only the
 files related to your changes, without the coverage gate. The
-integrator's batch runs the entire suite in CI, so don't run it in a
+batch pull request into develop runs the entire suite in CI, so don't run it in a
 feature branch; `VELLUM_FAST_ALL_TESTS=1` does it locally if you need to. Tests that need
 Docker are left out without a Docker daemon, and CI runs them. Local
 builds skip debug info and incremental caches (`CARGO_PROFILE_DEV_DEBUG=0`,
