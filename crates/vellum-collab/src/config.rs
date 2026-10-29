@@ -25,6 +25,9 @@ pub struct CollabConfig {
     pub max_clients_per_peer: usize,
     /// Attempts for one storage write before it is carried into the next.
     pub persist_attempts: u32,
+    /// How often an open connection's access is checked again, so a
+    /// revoked grant, a trashed page or a signed-out session ends it.
+    pub recheck_access_every: Duration,
 }
 
 impl Default for CollabConfig {
@@ -38,6 +41,7 @@ impl Default for CollabConfig {
             max_awareness_bytes: 16 * 1024,
             max_clients_per_peer: 8,
             persist_attempts: 5,
+            recheck_access_every: Duration::from_mins(1),
         }
     }
 }

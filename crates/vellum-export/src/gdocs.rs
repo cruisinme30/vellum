@@ -255,11 +255,17 @@ impl Drive {
         {
             return Err(ImportError::TooLarge("the document is over 100 MB".into()));
         }
-        let bytes = response.bytes().await.map_err(import_remote)?;
-        if bytes.len() > MAX_IMPORT_BYTES {
-            return Err(ImportError::TooLarge("the document is over 100 MB".into()));
+        // A chunked reply has no length up front: stop reading at the
+        // limit instead of buffering whatever is sent (RT-027).
+        let mut response = response;
+        let mut bytes = Vec::new();
+        while let Some(chunk) = response.chunk().await.map_err(import_remote)? {
+            if bytes.len() + chunk.len() > MAX_IMPORT_BYTES {
+                return Err(ImportError::TooLarge("the document is over 100 MB".into()));
+            }
+            bytes.extend_from_slice(&chunk);
         }
-        Ok((name, bytes.to_vec()))
+        Ok((name, bytes))
     }
 
     async fn get(&self, url: Url, token: &AccessToken) -> Result<reqwest::Response, ImportError> {
@@ -453,5 +459,65 @@ mod tests {
             svg_size(r#"<svg class="typst-doc" width="42.5pt" height="20pt">"#),
             (42.5, 20.0)
         );
+    }
+
+    /// RT-027 (#462): a reply with no length used to be buffered whole before
+    /// the size check. The download now stops at the limit.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn a_chunked_download_stops_at_the_limit() {
+        use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let sent = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counter = std::sync::Arc::clone(&sent);
+        drop(tokio::spawn(async move {
+            loop {
+                let Ok((mut socket, _)) = listener.accept().await else {
+                    return;
+                };
+                let counter = std::sync::Arc::clone(&counter);
+                drop(tokio::spawn(async move {
+                    let mut request = vec![0u8; 4096];
+                    let n = socket.read(&mut request).await.unwrap_or(0);
+                    let line = String::from_utf8_lossy(&request[..n]).into_owned();
+                    if line.contains("fields=") {
+                        let body = format!(r#"{{"name":"Plan","mimeType":"{DOCX}"}}"#);
+                        let head = format!(
+                            "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
+                            body.len()
+                        );
+                        let _ = socket.write_all(head.as_bytes()).await;
+                        let _ = socket.write_all(body.as_bytes()).await;
+                        return;
+                    }
+                    let head = "HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\nconnection: close\r\n\r\n";
+                    if socket.write_all(head.as_bytes()).await.is_err() {
+                        return;
+                    }
+                    let chunk = vec![b'a'; 1024 * 1024];
+                    // Up to 1 GiB, far past the limit, unless the client stops.
+                    for _ in 0..1024 {
+                        let size = format!("{:x}\r\n", chunk.len());
+                        if socket.write_all(size.as_bytes()).await.is_err()
+                            || socket.write_all(&chunk).await.is_err()
+                            || socket.write_all(b"\r\n").await.is_err()
+                        {
+                            return;
+                        }
+                        let _ = counter.fetch_add(chunk.len(), std::sync::atomic::Ordering::SeqCst);
+                    }
+                    let _ = socket.write_all(b"0\r\n\r\n").await;
+                }));
+            }
+        }));
+        let api = Url::parse(&format!("http://{addr}/")).unwrap();
+        let drive = Drive::with_endpoints(api.clone(), api, Duration::from_mins(1)).unwrap();
+        let result = drive.download_docx(&AccessToken::new("t"), "file1").await;
+        assert!(
+            matches!(result, Err(ImportError::TooLarge(_))),
+            "{result:?}"
+        );
+        let total = sent.load(std::sync::atomic::Ordering::SeqCst);
+        assert!(total < 512 * 1024 * 1024, "the server sent {total} bytes");
     }
 }

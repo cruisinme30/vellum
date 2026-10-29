@@ -13,7 +13,7 @@ vellum: 1
 - Status: accepted
 - Decisions: D120, D121, D122
 - Issue: #259
-- Pull requests: #265, #283, #284, #315, #356, #372, #376, #397
+- Pull requests: #265, #283, #284, #315, #356, #372, #376, #397, #464
 
 :::
 
@@ -54,7 +54,8 @@ document that aborts the process with a stack overflow (#260).
   toolchain) and run in the nightly full suite with a time budget; a crash
   becomes a `hostile.rs` case before it is fixed.
 - Load and chaos tests stay with the deploy thread (#193, #194); the red
-  team adds scenarios there rather than a second harness.
+  team adds scenarios there rather than a second harness. Attack traffic
+  runs in `deploy/perf/k6/hostile.js` in the nightly, next to readers.
 
 ### D122: one issue per finding, fixed with a regression test
 
@@ -84,3 +85,5 @@ document that aborts the process with a stack overflow (#260).
   come with a `hostile.rs` before they merge; the red team reviews them.
 - The fast suite grows by a few seconds per crate; heavy cases belong in
   the nightly fuzz job instead.
+- Long-lived connections (live editing) check access again while open,
+  so they cannot outlive a revoked grant or session by more than a minute.

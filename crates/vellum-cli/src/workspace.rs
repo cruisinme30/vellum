@@ -552,6 +552,9 @@ pub async fn open(
         index,
         &config.data_dir,
         app_origin,
+        Arc::new(crate::identity::IdentityAuthenticator::new(Arc::clone(
+            identity,
+        ))),
     )?;
     spaces.replace(load_spaces(drive_index.as_ref()).await?);
     keep_fresh(feed, me, cursor, &workspace, &spaces, drive_index);
