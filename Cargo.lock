@@ -4987,6 +4987,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "vellum-work-service"
+version = "0.0.0"
+dependencies = [
+ "bytes",
+ "futures",
+ "schemars 1.2.3",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "time",
+ "tokio",
+ "tracing",
+ "vellum-contracts",
+ "vellum-kernel",
+ "vellum-store",
+ "vellum-work",
+]
+
+[[package]]
 name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
