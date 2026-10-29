@@ -58,8 +58,8 @@ gitGraph
 
 | Suite | Runs on | Contents |
 | --- | --- | --- |
-| Fast (`ci.yml`) | every pull request into `develop` or `main`, pushes to `develop` | rustfmt, clippy, rustdoc, unit and property tests (nextest), crate boundaries, cargo-deny, cargo-audit; Prettier, tsc, ESLint, knip, Vitest with 85 % coverage, pnpm audit; REUSE, yamllint, shellcheck, markdownlint, Vale, local links, gitleaks, infrastructure linters; Conventional Commits, DCO, branch name and description template; linked issue and decision record |
-| Full (`full.yml`) | every pull request into `main`, pushes to `main`, nightly | the fast suite, plus Rust line coverage of at least 85 %, the release build, Playwright end-to-end with axe accessibility checks, and external link checks |
+| Fast (`ci.yml`) | every pull request into `develop` or `main`, pushes to `develop` | rustfmt, clippy, rustdoc, unit and property tests (nextest), crate boundaries, cargo-deny, cargo-audit; Prettier, tsc, ESLint, knip, Vitest with 85 % coverage, pnpm audit; the UI layout suite in Chromium at phone and laptop size; REUSE, yamllint, shellcheck, markdownlint, Vale, local links, gitleaks, infrastructure linters; Conventional Commits, DCO, branch name and description template; linked issue and decision record |
+| Full (`full.yml`) | every pull request into `main`, pushes to `main`, nightly | the fast suite, plus Rust line coverage of at least 85 %, the release build, Playwright end-to-end and the full UI suite (Chromium, Firefox and WebKit at four sizes, with visual baselines), and external link checks |
 
 Further layers join the full suite as their code lands: golden corpus,
 integration with testcontainers, contract, performance, chaos, security
@@ -86,6 +86,24 @@ CI still runs it. Install `markdownlint-cli2`, `vale`, `lychee`,
 `gitleaks`, `reuse`, `yamllint` and `shellcheck` to run every check. In
 an emergency, `git push --no-verify` skips the hook, but CI still gates
 the merge.
+
+### UI quality suite
+
+`web/e2e/ui/` opens every app view and every website and help book page in
+each display mode (themes, zoom, 200 % text, right-to-left, long text) and
+fails on overlapping or clipped elements, sideways scrolling, missing
+images or fonts, console errors, layout shift, invisible keyboard focus,
+blank loading states and axe WCAG 2.2 AA violations
+([ADR 0031](docs/adr/0031-ui-quality-suite.md)). Add a new view's route to
+`web/e2e/ui/targets.ts`. Run it locally with:
+
+```sh
+scripts/ci/build-site.sh _site
+cd web && UI_SITE_DIR=../_site pnpm exec playwright test e2e/ui
+```
+
+`UI_BROWSERS`, `UI_VIEWPORTS` and `UI_SCOPE=full` widen or narrow the
+run. Visual baselines are refreshed with `scripts/ci/ui-baselines.sh`.
 
 ## Issues and decision records
 
@@ -147,7 +165,7 @@ workflow applies changes when that file lands on `develop`.
 | Group | Labels | Set by |
 | --- | --- | --- |
 | `type/*` | `feat fix docs refactor perf test build ci chore style revert` | the pull request title |
-| `area/*` | `kernel contracts format store crypto db render export authz collab collections pages work notify my-work api jobs mcp cli editor web ci docs deploy` | changed paths (`.github/labeler.yml`), or by hand |
+| `area/*` | `kernel contracts format store crypto db render export authz collab collections pages work notify my-work api jobs mcp cli sync desktop editor web ci docs deploy` | changed paths (`.github/labeler.yml`), or by hand |
 | `phase/*` | `foundation format editor drive-books collections work mywork-mcp clients-release` | by hand, following the build order |
 | `status/*` | `in-progress blocked ready-to-merge` | by hand |
 | `priority/p0` | every requirement is P0 | by hand |

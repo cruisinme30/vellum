@@ -1,0 +1,2 @@
+[Normal] Literal characters stay literal: *not italic*, _not italic_, [not a link], `not code`, <not html> and 5 * 3.
+[Normal] Snake_case words need no escapes, and neither does a = b.

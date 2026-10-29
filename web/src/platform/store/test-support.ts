@@ -44,6 +44,8 @@ export class FakeServer implements SyncTransport {
   /** Mutation names the server refuses. */
   readonly forbidden = new Set<string>();
   pushes = 0;
+  /** Most patches per pull, like the server's page size. */
+  pageSize = Number.POSITIVE_INFINITY;
   failNext: Error | undefined;
 
   push(request: PushRequest): Promise<PushResponse> {
@@ -68,11 +70,13 @@ export class FakeServer implements SyncTransport {
     const failure = this.#takeFailure();
     if (failure !== undefined) return Promise.reject(failure);
     const from = cursor === "" ? 0 : Number(cursor);
+    const to = Math.min(this.log.length, from + this.pageSize);
     return Promise.resolve({
-      cursor: String(this.log.length),
+      cursor: String(to),
       lastMutationId: this.applied.get(clientId) ?? 0,
       reset: false,
-      patches: this.log.slice(from),
+      patches: this.log.slice(from, to),
+      more: to < this.log.length,
     });
   }
 

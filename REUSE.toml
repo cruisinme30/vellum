@@ -15,8 +15,10 @@ path = [
   "web/tsconfig.json",
   "web/knip.json",
   "web/.prettierrc.json",
+  "schema/*.json",
   "web/public/manifest.webmanifest",
   "web/public/icons/**",
+  "web/e2e/__screenshots__/**",
   "desktop/pnpm-lock.yaml",
   "desktop/package.json",
   "desktop/tsconfig.json",
@@ -31,6 +33,7 @@ path = [
   "corpus/guide/**",
   "corpus/**/*.md",
   "corpus/**/*.json",
+  "corpus/**/*.txt",
   ".gitmessage",
   "deploy/perf/*.json",
 ]
