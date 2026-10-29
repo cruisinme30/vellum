@@ -95,6 +95,13 @@ describe("currentPlatform", () => {
     expect(currentPlatform({ userAgent: "Mozilla/5.0 (iPad; CPU OS 18_0)" })).toBe("mac");
     expect(currentPlatform({ platform: "Win32" })).toBe("other");
     expect(currentPlatform({})).toBe("other");
+  });
+
+  it("trusts the operating system over a Safari user agent on Linux", () => {
+    const safari = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15";
+    expect(currentPlatform({ platform: "Linux x86_64", userAgent: safari })).toBe("other");
+    expect(currentPlatform({ platform: "", userAgent: safari })).toBe("mac");
+    expect(currentPlatform({ platform: "iPhone", userAgent: safari })).toBe("mac");
     expect(["mac", "other"]).toContain(currentPlatform());
   });
 });
