@@ -54,7 +54,15 @@ impl Drive {
             self.authorize(actor, node.space, node.id, Permission::View)
                 .await?;
             let path = layout::id_file(node.kind, &node.path)?;
-            let blob = self.store.get(&path).await?;
+            let mut blob = self.store.get(&path).await?;
+            if node.kind == NodeKind::Book {
+                // The raw book.yaml names restricted sections and who may
+                // see them; hand back the reader's view of it instead.
+                if let Some(view) = self.book_view(actor, &node).await?.files.remove(&path) {
+                    blob.meta.size = view.len() as u64;
+                    blob.bytes = view;
+                }
+            }
             if let Some(user) = Self::user_of(actor) {
                 self.index.touch(user, node.id, self.clock.now()).await?;
             }

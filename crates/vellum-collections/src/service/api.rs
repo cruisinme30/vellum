@@ -70,6 +70,126 @@ pub struct QueryInput {
     pub limit: Option<usize>,
 }
 
+/// Exports a view as CSV.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ExportCsvInput {
+    /// The collection.
+    pub collection_id: CollectionId,
+    /// A saved view's name; the first view when absent. The export has
+    /// that view's columns, filters and order, and every matching row.
+    #[serde(default)]
+    pub view: Option<String>,
+}
+
+/// A CSV export.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CsvExport {
+    /// A suggested file name (`Requirements - Open.csv`).
+    pub file_name: String,
+    /// The CSV text: a header row, then one line per row.
+    pub csv: String,
+}
+
+/// Adds the rows of a CSV file to an existing collection.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ImportCsvInput {
+    /// The collection.
+    pub collection_id: CollectionId,
+    /// The CSV text. Headers match property names or keys; relation cells
+    /// match related rows by title.
+    pub csv: String,
+    /// Check the file and report what would happen, without writing.
+    #[serde(default)]
+    pub dry_run: bool,
+}
+
+/// Creates a new collection from a CSV file, inferring property types.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct CreateFromCsvInput {
+    /// The drive folder to create the `Title.collection` folder in.
+    pub folder: String,
+    /// The collection's title.
+    pub title: String,
+    /// The CSV text; the first row is the header.
+    pub csv: String,
+    /// Infer the schema and report it, without writing.
+    #[serde(default)]
+    pub dry_run: bool,
+}
+
+/// What a CSV import did, or would do on a dry run.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CsvImported {
+    /// Whether anything was written.
+    pub written: bool,
+    /// Rows created (or that would be).
+    pub rows: usize,
+    /// Headers that matched no writable property and were ignored.
+    pub skipped_columns: Vec<String>,
+    /// Problems with individual cells; their values were kept as text or
+    /// left empty.
+    pub diagnostics: Vec<Diagnostic>,
+    /// The collection after the import: its properties (inferred, for a
+    /// new collection) and views.
+    pub collection: CollectionInfo,
+    /// Row files written, including links mirrored into other collections.
+    pub changed: Changeset,
+}
+
+/// Names one saved view.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ViewKey {
+    /// The collection.
+    pub collection_id: CollectionId,
+    /// The view's name (matched without regard to case).
+    pub view: String,
+}
+
+/// Saves a view: replaces the view with this name, or adds it at the end.
+/// Filters, sorts and property names use the same text as `schema.yaml`
+/// (`Status is Done`, `Due desc`), by property name or key.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SaveViewInput {
+    /// The collection.
+    pub collection_id: CollectionId,
+    /// The view's name.
+    pub view: String,
+    /// A new name, to rename the view.
+    #[serde(default)]
+    pub rename_to: Option<String>,
+    /// The layout; a table when absent.
+    #[serde(default)]
+    pub kind: Option<ViewKind>,
+    /// Filters, all of which must match.
+    #[serde(default)]
+    pub filter: Vec<String>,
+    /// Sort keys, most significant first.
+    #[serde(default)]
+    pub sort: Vec<String>,
+    /// Group-by property (board columns, table sections).
+    #[serde(default)]
+    pub group: Option<String>,
+    /// Hidden properties.
+    #[serde(default)]
+    pub hide: Vec<String>,
+    /// Date property for calendar and timeline.
+    #[serde(default)]
+    pub date: Option<String>,
+    /// End-date property for timeline bars.
+    #[serde(default)]
+    pub end: Option<String>,
+    /// Most rows to show.
+    #[serde(default)]
+    pub limit: Option<usize>,
+}
+
 /// Resolves a `collection` block embedded in a page.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
