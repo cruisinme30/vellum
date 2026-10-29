@@ -19,7 +19,8 @@ rust=false
 web=false
 desktop=false
 seen=false
-while IFS= read -r path; do
+# The `|| [[ -n ... ]]` keeps a last line that has no trailing newline.
+while IFS= read -r path || [[ -n "${path}" ]]; do
   [[ -z "${path}" ]] && continue
   seen=true
   case "${path}" in

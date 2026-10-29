@@ -560,6 +560,7 @@ fn changed_areas(root: &Path, base: &str) -> Areas {
         .and_then(|mut child| {
             if let Some(mut stdin) = child.stdin.take() {
                 stdin.write_all(paths.as_bytes())?;
+                stdin.write_all(b"\n")?;
             }
             child.wait_with_output()
         });
@@ -700,6 +701,25 @@ mod tests {
         );
         // Nothing to leave out: no filter at all.
         assert!(!rust_tests(Some(&[])).args.iter().any(|arg| arg == "-E"));
+    }
+
+    #[test]
+    fn the_last_changed_path_counts() {
+        // `git diff` output is trimmed, so the last path has no newline.
+        let root = repo_root().expect("inside the repository");
+        let output = Command::new(root.join("scripts/ci/changed-areas.sh"))
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+            .and_then(|mut child| {
+                if let Some(mut stdin) = child.stdin.take() {
+                    stdin.write_all(b"README.md\nxtask/src/fast.rs")?;
+                }
+                child.wait_with_output()
+            })
+            .expect("script runs");
+        let areas = Areas::parse(&String::from_utf8_lossy(&output.stdout));
+        assert!(areas.rust, "{areas:?}");
     }
 
     #[test]
