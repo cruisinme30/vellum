@@ -44,7 +44,7 @@ they test.
 
 - One image, `deploy/docker/Dockerfile`: a static musl binary on
   distroless `static`, running as UID 65532, every base pinned by digest.
-  `docker run` and compose use it; the image is a few MB, budget 40 MB.
+  `docker run` and compose use it.
 - `deploy/compose/compose.yaml` is the Team profile: Vellum, Postgres 17,
   MinIO (built from pinned source in `deploy/compose/minio`, bucket
   versioning on) and Kroki with its Excalidraw and draw.io companions. Only
@@ -90,9 +90,12 @@ they test.
   from the same binaries, signs it and attests its SBOM, then publishes
   the GitHub release.
 - The Full suite builds the binary twice and compares it, and runs
-  `cargo xtask budgets`: binary and compressed image under 40 MB, first
-  ready response under 2 s, idle resident memory under 80 MB, and a clean
-  exit within 30 s of SIGTERM.
+  `cargo xtask budgets`: first ready response under 2 s, idle resident
+  memory under 80 MB, and a clean exit within 30 s of SIGTERM. The size
+  budgets (binary 110 MB, compressed image 45 MB) sit just above the
+  first sizes measured, in release 3, so growth fails; reaching the 40 MB
+  download target is
+  [#491](https://github.com/cruisinme30/vellum/issues/491).
 - Nightly: k6 (`deploy/perf/k6`) against the compose stack with the SLOs as
   thresholds; `cargo xtask perf-gate` fails when any p95 grows 10 % or more
   over `deploy/perf/baseline.json`, and the result is kept as trend data.

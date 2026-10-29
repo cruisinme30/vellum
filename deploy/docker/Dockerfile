@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2026 The Vellum contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 #
-# The Vellum image: one static binary on distroless, under 40 MB (D94).
+# The Vellum image: one static binary on distroless (D94; size budget in xtask/src/budgets.rs).
 # Build from the repository root:
 #
 #   docker build -f deploy/docker/Dockerfile -t vellum .
