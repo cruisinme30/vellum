@@ -1,0 +1,19 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "fence",
+        "lang": "mermaid",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "xychart-beta\n  title \"Requests and errors\"\n  x-axis [Mon, Tue, Wed, Thu, Fri]\n  y-axis \"Requests (thousands)\" 0 --> 120\n  bar [80, 95, 102, 88, 110]\n  line [4, 6, 5, 3, 2]\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}

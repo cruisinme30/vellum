@@ -12,6 +12,7 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D40, D41, D42
+- Issues: #64, #65, #66, #67, #68, #69
 
 :::
 
@@ -93,3 +94,6 @@ flowchart LR
   documents, and that parsing arbitrary input never panics.
 - Typed data for data fences and data containers (chart, stats and the
   rest) lives in `vellum_format::blocks` and is read from this AST.
+  `Data::from_block` returns the data plus a `block_data` diagnostic for
+  each line it skipped, so a renderer can show what it read and fall
+  back to the source when nothing could be read.

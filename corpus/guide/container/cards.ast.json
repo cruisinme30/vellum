@@ -1,0 +1,113 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "container",
+        "name": "cards",
+        "arg": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "sections": [
+          [
+            {
+              "type": "list",
+              "start": null,
+              "tight": true,
+              "items": [
+                {
+                  "task": null,
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "🛰 "
+                        },
+                        {
+                          "type": "strong",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Edge listener"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " Terminates TLS."
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                },
+                {
+                  "task": null,
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "⚖️ "
+                        },
+                        {
+                          "type": "strong",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Policy engine"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " Evaluates rules."
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                },
+                {
+                  "task": null,
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "🗄 "
+                        },
+                        {
+                          "type": "strong",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Audit writer"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " Records every decision."
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "diagnostics": []
+}

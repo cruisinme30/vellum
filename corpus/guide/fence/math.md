@@ -1,0 +1,3 @@
+```math
+\sigma = \sqrt{\frac{1}{N}\sum_{i=1}^{N}(x_i - \mu)^2}
+```

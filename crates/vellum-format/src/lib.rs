@@ -13,6 +13,7 @@
 
 pub mod ast;
 pub mod attrs;
+pub mod blocks;
 mod convert;
 pub mod diagnostic;
 mod extras;
