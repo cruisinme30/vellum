@@ -12,7 +12,7 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D97, D98, D99
-- Issue: #185 (PWA); also #91, #182, #184 and #186
+- Issue: #182 (desktop), #185 (PWA); also #91, #184 and #186
 - Pull requests: #34, #139
 - Requirements: R-WK-6, R-MW-5, R-LT-4, R-SE-10
 
@@ -97,6 +97,10 @@ every client must run the same editor build.
   (`basic_text` back end) the app keeps tokens in memory only and asks
   people to sign in again after a restart, rather than store a token
   that any local process could read.
+- Pages load from the privileged `app://vellum/` scheme, which also
+  forwards `/api/*` to the server and adds the access token in the main
+  process. Local mode runs the bundled `vellum serve` on a loopback port
+  with the `single` profile and waits for `/readyz`.
 - Releases are built with electron-builder. macOS builds are signed and
   notarised when the repository secrets `APPLE_ID`,
   `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`, `CSC_LINK` and
