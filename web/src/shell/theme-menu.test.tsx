@@ -56,8 +56,8 @@ describe("ThemeSettings", () => {
 
   it("links to the full appearance settings", () => {
     renderWithProviders(<ThemeSettings />);
-    expect(
-      screen.getByRole("link", { name: "All appearance settings" }).getAttribute("href"),
-    ).toBe("/settings/appearance");
+    expect(screen.getByRole("link", { name: "All appearance settings" }).getAttribute("href")).toBe(
+      "/settings/appearance",
+    );
   });
 });

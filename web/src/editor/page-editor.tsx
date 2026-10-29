@@ -4,7 +4,7 @@
 import { getSchema, type JSONContent } from "@tiptap/core";
 import { Collaboration } from "@tiptap/extension-collaboration";
 import { CollaborationCaret } from "@tiptap/extension-collaboration-caret";
-import { EditorContent, useEditor } from "@tiptap/react";
+import { type Editor, EditorContent, useEditor } from "@tiptap/react";
 import {
   useCallback,
   useEffect,
@@ -185,6 +185,68 @@ function SaveControls({
 
 const LOCAL_LIVE = (): LiveConnection => LOCAL;
 
+/** The Comment and Create issue buttons, with the issue form when open. */
+function WorkActions({
+  work,
+  editable,
+  side,
+  onToggle,
+  onClose,
+  pageId,
+  editor,
+}: {
+  readonly work: WorkApi;
+  readonly editable: boolean;
+  readonly side: Side | undefined;
+  readonly onToggle: (kind: Side["kind"]) => void;
+  readonly onClose: () => void;
+  readonly pageId: string;
+  readonly editor: Editor;
+}) {
+  const t = useT();
+  return (
+    <>
+      <button
+        type="button"
+        className="vl-icon-button"
+        aria-label={t("comments-open")}
+        title={t("comments-open")}
+        aria-expanded={side?.kind === "comments"}
+        onClick={() => {
+          onToggle("comments");
+        }}
+      >
+        <Icon name="comment" />
+      </button>
+      {editable && (
+        <span className="vl-file-issue-anchor">
+          <button
+            type="button"
+            className="vl-icon-button"
+            aria-label={t("file-issue-open")}
+            title={t("file-issue-open")}
+            aria-expanded={side?.kind === "issue"}
+            onClick={() => {
+              onToggle("issue");
+            }}
+          >
+            <Icon name="add_task" />
+          </button>
+          {side?.kind === "issue" && (
+            <FileIssue
+              api={work}
+              documentId={pageId}
+              editor={editor}
+              anchor={side.anchor}
+              onClose={onClose}
+            />
+          )}
+        </span>
+      )}
+    </>
+  );
+}
+
 function BoundEditor({
   pageId,
   session,
@@ -300,45 +362,15 @@ function BoundEditor({
     setSide(side?.kind === kind ? undefined : { kind, anchor: ensureAnchor(editor) });
   };
   const workActions = work && (
-    <>
-      <button
-        type="button"
-        className="vl-icon-button"
-        aria-label={t("comments-open")}
-        title={t("comments-open")}
-        aria-expanded={side?.kind === "comments"}
-        onClick={() => {
-          openSide("comments");
-        }}
-      >
-        <Icon name="comment" />
-      </button>
-      {editable && (
-        <span className="vl-file-issue-anchor">
-          <button
-            type="button"
-            className="vl-icon-button"
-            aria-label={t("file-issue-open")}
-            title={t("file-issue-open")}
-            aria-expanded={side?.kind === "issue"}
-            onClick={() => {
-              openSide("issue");
-            }}
-          >
-            <Icon name="add_task" />
-          </button>
-          {side?.kind === "issue" && (
-            <FileIssue
-              api={work}
-              documentId={pageId}
-              editor={editor}
-              anchor={side.anchor}
-              onClose={closeSide}
-            />
-          )}
-        </span>
-      )}
-    </>
+    <WorkActions
+      work={work}
+      editable={editable}
+      side={side}
+      onToggle={openSide}
+      onClose={closeSide}
+      pageId={pageId}
+      editor={editor}
+    />
   );
 
   return (
