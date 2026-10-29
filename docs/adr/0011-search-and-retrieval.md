@@ -13,7 +13,7 @@ vellum: 1
 - Status: accepted
 - Decisions: `D61`, `D62`, `D63`
 - Issue: `#102`, also `#99`, `#100` and `#172`
-- Pull requests: the `feat/search` pull request
+- Pull requests: `#236`
 
 :::
 
@@ -32,20 +32,6 @@ The `vellum-search` crate is a service-layer crate. The `SearchBackend`
 trait is the one port; `SearchService` adds scoping, fusion, the
 permission check and snippets once for every engine; a conformance suite
 runs the same checks against each engine.
-
-## Options considered
-
-- **ACLs in the index**: store reader lists per block and filter inside
-  the engine. Fast, but every grant change means re-indexing every
-  affected block, which breaks "permission changes visible in under one
-  second". Not chosen.
-- **Post-filter only**: rank everything, then ask authorization. Simple,
-  but a person with access to one small space pays for ranking every space.
-  Not chosen on its own.
-- **External vector database**: ruled out by the brief.
-- **ONNX Runtime**: fast, but a native library to ship per platform.
-  tract runs ONNX in pure Rust, keeps the binary self-contained, and is
-  fast enough for small sentence models.
 
 ## Decisions
 
@@ -86,6 +72,13 @@ runs the same checks against each engine.
   mismatch, or a key that cannot read the stamp, empties the index and
   asks for a rebuild instead of failing.
 
+## Alternatives
+
+- **ACLs in the index**: every grant change re-indexes blocks, missing the one-second target.
+- **Post-filter only**: ranks every space even when the caller reads one.
+- **External vector database**: ruled out by the brief.
+- **ONNX Runtime**: a native library per platform; tract is pure Rust.
+
 ## Consequences
 
 - Grant changes reach search immediately, at the cost of one batch
@@ -97,7 +90,3 @@ runs the same checks against each engine.
   adapter is the path, as D23 says.
 - Postgres search tables live in their own `vellum_search` schema with
   their own migrations.
-
-## History
-
-- `2026-10-29`: accepted with the `feat/search` pull request.

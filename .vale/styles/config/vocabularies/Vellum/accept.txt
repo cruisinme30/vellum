@@ -73,6 +73,11 @@ Roboto
 Meilisearch
 BM25
 ONNX
+[Uu]nstarted
+(?:SLAs?|slas)
+[Ss]lugs?
+[Aa]ssignees?
+[Bb]acklog
 Excalidraw
 [Pp]riya
 Rao
@@ -86,7 +91,6 @@ Sigstore
 ymin
 ymax
 [Uu]nthemed
-[Uu]nstarted
 tokio
 sqlx
 sonarjs
