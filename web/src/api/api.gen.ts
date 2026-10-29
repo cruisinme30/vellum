@@ -5697,7 +5697,7 @@ export interface TasksCreateTaskView {
   /**
    * Subtasks.
    */
-  subtasks: _[];
+  subtasks: TasksCreateTaskView[];
 }
 
 /**
@@ -5782,7 +5782,7 @@ export interface TasksMoveTaskView {
   /**
    * Subtasks.
    */
-  subtasks: _[];
+  subtasks: TasksMoveTaskView[];
 }
 
 /**
@@ -5842,7 +5842,7 @@ export interface TasksReopenTaskView {
   /**
    * Subtasks.
    */
-  subtasks: _[];
+  subtasks: TasksReopenTaskView[];
 }
 
 /**
@@ -5982,7 +5982,7 @@ export interface TasksUpdateTaskView {
   /**
    * Subtasks.
    */
-  subtasks: _[];
+  subtasks: TasksUpdateTaskView[];
 }
 
 /**
