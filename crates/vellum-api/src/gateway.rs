@@ -66,6 +66,7 @@ pub struct GatewayBuilder {
     public_site: Arc<dyn PublicSite>,
     breaker: BreakerPolicy,
     mounts: Vec<Mount>,
+    web_app: Option<Router>,
 }
 
 impl std::fmt::Debug for GatewayBuilder {
@@ -98,6 +99,7 @@ impl GatewayBuilder {
             public_site: Arc::new(NothingPublished),
             breaker: BreakerPolicy::default(),
             mounts: Vec::new(),
+            web_app: None,
         }
     }
 
@@ -164,6 +166,19 @@ impl GatewayBuilder {
         self
     }
 
+    /// Serves the web app on the app host for every path the gateway does
+    /// not own. Paths under `/api`, `/healthz`, `/readyz`, `/collab` and
+    /// every mount prefix never reach it, matched or not, so an unknown `/auth/…` or
+    /// `/api/…` path stays the gateway's not-found, never the app's index.
+    /// It gets the edge middleware and the app's security headers, but no
+    /// authentication or rate limiting: it serves only the app's static
+    /// files.
+    #[must_use]
+    pub fn web_app(mut self, router: Router) -> Self {
+        self.web_app = Some(router);
+        self
+    }
+
     /// Validates every operation and assembles the routes.
     ///
     /// # Errors
@@ -193,7 +208,7 @@ impl GatewayBuilder {
             openapi,
             graphql,
         });
-        let app = app_router(&state, self.mounts);
+        let app = app_router(&state, self.mounts, self.web_app);
         let public = crate::public::router(self.public_site);
         let public = edge(public, &state, Surface::Public);
         Ok(Gateway { state, app, public })
@@ -505,7 +520,36 @@ fn layered(router: Router, state: &Arc<Shared>, csrf: bool) -> Router {
         .layer(RequestBodyLimitLayer::new(state.config.max_body_bytes))
 }
 
-fn app_router(state: &Arc<Shared>, mounts: Vec<Mount>) -> Router {
+/// Whether `path` is `prefix` itself or below it.
+fn under(path: &str, prefix: &str) -> bool {
+    path.strip_prefix(prefix)
+        .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+}
+
+fn app_router(state: &Arc<Shared>, mounts: Vec<Mount>, web_app: Option<Router>) -> Router {
+    // `/collab` is the live-editing socket's, mounted or not.
+    let mut owned: Vec<String> = ["/api", "/healthz", "/readyz", "/collab"]
+        .into_iter()
+        .map(str::to_owned)
+        .collect();
+    owned.extend(mounts.iter().map(|m| m.prefix.clone()));
+    let gateway = gateway_router(state, mounts);
+    let Some(web_app) = web_app else {
+        return gateway;
+    };
+    let web_app = edge(web_app, state, Surface::App);
+    Router::new().fallback_service(tower::service_fn(move |request: Request| {
+        let path = request.uri().path();
+        let router = if owned.iter().any(|prefix| under(path, prefix)) {
+            gateway.clone()
+        } else {
+            web_app.clone()
+        };
+        tower::ServiceExt::oneshot(router, request)
+    }))
+}
+
+fn gateway_router(state: &Arc<Shared>, mounts: Vec<Mount>) -> Router {
     let mut api = Router::new()
         .route("/api/openapi.json", get(openapi_json))
         .route("/api/graphql", post(graphql_post))

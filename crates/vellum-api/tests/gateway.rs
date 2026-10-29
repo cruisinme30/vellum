@@ -770,6 +770,66 @@ async fn public_origin_is_separate() -> TestResult {
 }
 
 #[tokio::test]
+async fn the_web_app_gets_only_paths_the_gateway_does_not_own() -> TestResult {
+    let shell = Router::new().fallback(|| async { "app shell" });
+    let gw = GatewayBuilder::new(config(), "1.0.0-test")
+        .service(Arc::new(Notes {
+            created: AtomicUsize::new(0),
+            ready: Readiness::Ready,
+        }))
+        .authenticator(Arc::new(FakeAuth))
+        .mount(
+            "/raw",
+            Router::new().route("/echo", post(|| async { "echo" })),
+        )
+        .web_app(shell)
+        .build()?;
+    for path in ["/", "/p/abc", "/data/x", "/sign-in", "/rawx", "/apix"] {
+        let reply = send(&gw, get(path, "")?).await?;
+        assert_eq!(reply.text, "app shell", "{path}");
+        assert!(
+            reply
+                .headers
+                .get("content-security-policy")
+                .and_then(|v| v.to_str().ok())
+                .is_some_and(|csp| csp.contains("script-src 'self'")),
+            "{path}"
+        );
+    }
+    let api = send(&gw, get("/api/v1/nope", "")?).await?;
+    assert_eq!(api.status, StatusCode::NOT_FOUND);
+    assert_eq!(
+        api.body.get("code"),
+        Some(&json!("not_found")),
+        "{}",
+        api.text
+    );
+    for path in [
+        "/raw",
+        "/raw/unknown",
+        "/healthz/x",
+        "/api",
+        "/collab",
+        "/collab/s/d",
+    ] {
+        let reply = send(&gw, get(path, "")?).await?;
+        assert_ne!(reply.text, "app shell", "{path}");
+    }
+    assert_eq!(
+        send(&gw, get("/healthz", "")?).await?.status,
+        StatusCode::OK
+    );
+    // Published pages on the public host never get the app.
+    let public = Request::get("/p/abc")
+        .header("host", "pages.northstar.dev")
+        .body(Body::empty())?;
+    let reply = send(&gw, public).await?;
+    assert_ne!(reply.text, "app shell");
+    assert!(reply.text.contains("page not found"));
+    Ok(())
+}
+
+#[tokio::test]
 async fn invalid_registrations_are_refused() {
     struct Twice;
     impl Service for Twice {
