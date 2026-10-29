@@ -229,15 +229,17 @@ impl<'p> Session<'p> {
     /// Finishes the export.
     #[must_use]
     pub fn finish(self, title: String, layout: Layout, as_of: &str, blocks: Vec<Node>) -> Lowered {
+        let mut flow = Flow {
+            title,
+            as_of: as_of.to_owned(),
+            layout,
+            show_title: true,
+            blocks,
+            assets: self.assets,
+        };
+        flow.drop_dangling_xrefs();
         Lowered {
-            flow: Flow {
-                title,
-                as_of: as_of.to_owned(),
-                layout,
-                show_title: true,
-                blocks,
-                assets: self.assets,
-            },
+            flow,
             warnings: self.warnings,
         }
     }
@@ -1554,10 +1556,18 @@ impl Ctx<'_, '_> {
                     .get(fragment)
                     .or_else(|| self.opts.refs.docs.get(doc))
             };
-            if let Some((anchor, text)) = target {
+            if let Some((anchor, label)) = target {
+                // Empty or `§` link text is a cross-reference shown as the
+                // target's label; other text is kept.
+                let written = crate::flow::plain_text(&spans);
+                let text = if matches!(written.trim(), "" | "§") {
+                    label.clone()
+                } else {
+                    written
+                };
                 out.push(Span::Xref {
                     anchor: anchor.clone(),
-                    text: text.clone(),
+                    text,
                 });
                 return;
             }

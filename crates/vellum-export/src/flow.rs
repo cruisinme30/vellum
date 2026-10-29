@@ -518,6 +518,98 @@ const fn is_false(value: &bool) -> bool {
     !*value
 }
 
+impl Flow {
+    /// Turns cross-references whose target is not in the flow into plain
+    /// text, so a stale or filtered reference never breaks a backend.
+    pub(crate) fn drop_dangling_xrefs(&mut self) {
+        let mut anchors = std::collections::HashSet::new();
+        for node in &self.blocks {
+            node.walk(&mut |node| {
+                if let Node::Heading {
+                    anchor: Some(anchor),
+                    ..
+                }
+                | Node::Paragraph {
+                    anchor: Some(anchor),
+                    ..
+                } = node
+                {
+                    let _ = anchors.insert(anchor.clone());
+                }
+            });
+        }
+        for node in &mut self.blocks {
+            node.spans_mut(&mut |spans| {
+                for span in spans.iter_mut() {
+                    if let Span::Xref { anchor, text } = span
+                        && !anchors.contains(anchor.as_str())
+                    {
+                        *span = Span::plain(std::mem::take(text));
+                    }
+                }
+            });
+        }
+    }
+}
+
+impl Node {
+    /// Calls `f` on this node and every node inside it.
+    pub fn walk(&self, f: &mut impl FnMut(&Self)) {
+        f(self);
+        match self {
+            Self::Quote { blocks } | Self::Callout { blocks, .. } | Self::Titled { blocks, .. } => {
+                for b in blocks {
+                    b.walk(f);
+                }
+            }
+            Self::List { items, .. } => {
+                items.iter().flat_map(|i| &i.blocks).for_each(|b| b.walk(f));
+            }
+            Self::Columns { columns } => columns.iter().flatten().for_each(|b| b.walk(f)),
+            _ => {}
+        }
+    }
+
+    /// Calls `f` on every run of spans in this node and the nodes inside
+    /// it, including link text.
+    pub fn spans_mut(&mut self, f: &mut impl FnMut(&mut Vec<Span>)) {
+        fn runs(spans: &mut Vec<Span>, f: &mut impl FnMut(&mut Vec<Span>)) {
+            for span in spans.iter_mut() {
+                if let Span::Link { spans, .. } = span {
+                    runs(spans, f);
+                }
+            }
+            f(spans);
+        }
+        match self {
+            Self::Heading { spans, .. } | Self::Paragraph { spans, .. } => runs(spans, f),
+            Self::Titled { title, blocks } => {
+                runs(title, f);
+                for b in blocks {
+                    b.spans_mut(f);
+                }
+            }
+            Self::Quote { blocks } | Self::Callout { blocks, .. } => {
+                for b in blocks {
+                    b.spans_mut(f);
+                }
+            }
+            Self::List { items, .. } => items
+                .iter_mut()
+                .flat_map(|i| &mut i.blocks)
+                .for_each(|b| b.spans_mut(f)),
+            Self::Columns { columns } => columns.iter_mut().flatten().for_each(|b| b.spans_mut(f)),
+            Self::Table(table) => table
+                .header
+                .iter_mut()
+                .chain(table.rows.iter_mut().flatten())
+                .for_each(|cell| runs(&mut cell.spans, f)),
+            Self::Cards { cards } => cards.iter_mut().for_each(|card| runs(&mut card.spans, f)),
+            _ => {}
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
