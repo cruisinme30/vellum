@@ -3,7 +3,9 @@
 
 import { useEffect, useId, useRef, useState, type RefObject } from "react";
 
+import { formatSize } from "../data/format";
 import type { PageHistory, PageVersion, VersionAuthor } from "../data/history";
+import { useLoaded, type Loaded } from "../data/use-loaded";
 import { useT } from "../i18n/i18n";
 import { Icon } from "../shell/icon";
 
@@ -23,11 +25,6 @@ export interface HistoryPanelProperties {
   readonly onClose: () => void;
 }
 
-type Loaded<T> =
-  | { readonly state: "loading" }
-  | { readonly state: "failed"; readonly message: string }
-  | { readonly state: "ready"; readonly value: T };
-
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 const DATE = new Intl.DateTimeFormat("en", {
@@ -37,15 +34,6 @@ const DATE = new Intl.DateTimeFormat("en", {
   hour: "numeric",
   minute: "2-digit",
 });
-
-/** A size in bytes, in the unit people read. */
-export function formatSize(bytes: number): string {
-  if (bytes < 1024) {
-    return `${String(bytes)} B`;
-  }
-  const kb = bytes / 1024;
-  return kb < 1024 ? `${kb.toFixed(1)} KB` : `${(kb / 1024).toFixed(1)} MB`;
-}
 
 function authorKey(author: VersionAuthor, meId: string | undefined): string {
   switch (author.type) {
@@ -62,31 +50,6 @@ function authorKey(author: VersionAuthor, meId: string | undefined): string {
       return "history-by-system";
     }
   }
-}
-
-/** Loads a promise's answer into state; `reload` asks again. */
-function useLoaded<T>(load: () => Promise<T>, keys: readonly unknown[]): Loaded<T> {
-  const [loaded, setLoaded] = useState<{ keys: readonly unknown[]; value: Loaded<T> }>();
-  useEffect(() => {
-    let current = true;
-    load().then(
-      (value) => {
-        if (current) setLoaded({ keys, value: { state: "ready", value } });
-      },
-      (error: unknown) => {
-        if (current) setLoaded({ keys, value: { state: "failed", message: errorText(error) } });
-      },
-    );
-    return () => {
-      current = false;
-    };
-    // The keys say when to load again; `load` is a fresh closure each render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, keys);
-  const same =
-    loaded?.keys.length === keys.length &&
-    loaded.keys.every((key, index) => Object.is(key, keys[index]));
-  return same ? loaded.value : { state: "loading" };
 }
 
 /** A loading line or an error, for a load that has not succeeded. */

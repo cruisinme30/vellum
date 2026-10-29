@@ -4,6 +4,11 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { BrowserRouter, Route, Routes } from "react-router";
 
+import type { AdminConsoleApi } from "./admin/console/api";
+import { AuditPage } from "./admin/console/audit-page";
+import { BackupsPage } from "./admin/console/backups-page";
+import { AdminConsoleProvider } from "./admin/console/context";
+import { SettingsPage } from "./admin/console/settings-page";
 import { RequestsPage } from "./admin/requests/requests-page";
 import { RoutesPage } from "./admin/routes/routes-page";
 import type { AuthApi, AuthStatus } from "./api/auth";
@@ -79,6 +84,9 @@ export function AppRoutes() {
         <Route path="admin" element={<AdminView />} />
         <Route path="admin/requests" element={<RequestsPage />} />
         <Route path="admin/routes" element={<RoutesPage />} />
+        <Route path="admin/audit" element={<AuditPage />} />
+        <Route path="admin/settings" element={<SettingsPage />} />
+        <Route path="admin/backups" element={<BackupsPage />} />
         <Route path="*" element={<NotFoundView />} />
       </Route>
     </Routes>
@@ -95,6 +103,8 @@ export interface AppServices {
   readonly collab: CollabConnector;
   /** Saved page versions, from a Vellum server; absent in demo mode. */
   readonly history?: PageHistory | undefined;
+  /** The admin console's audit, settings and backups; absent in demo mode. */
+  readonly admin?: AdminConsoleApi | undefined;
   readonly collections: CollectionsStore;
   /** Present when a Vellum server answered; absent in demo mode. */
   readonly session?: { readonly auth: AuthApi; readonly status: AuthStatus } | undefined;
@@ -142,6 +152,7 @@ export function AppProviders({
   store,
   collab,
   history,
+  admin,
   collections,
   session,
   notifications,
@@ -158,7 +169,7 @@ export function AppProviders({
             <SignedInUser>
               <CollectionsProvider store={collections}>
                 <NotificationsProvider services={notifications ?? demoNotifications}>
-                  {children}
+                  <AdminConsoleProvider api={admin}>{children}</AdminConsoleProvider>
                 </NotificationsProvider>
               </CollectionsProvider>
             </SignedInUser>

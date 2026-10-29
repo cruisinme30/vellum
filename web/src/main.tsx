@@ -13,6 +13,7 @@ import "./styles/notifications.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
+import { createHttpAdminConsoleApi } from "./admin/console/api";
 import { createAuthApi } from "./api/auth";
 import { createHttp } from "./api/http";
 import { App } from "./app";
@@ -69,6 +70,7 @@ root.render(
       }
       collab={status === undefined ? createLocalConnector({ cache }) : createSocketConnector()}
       history={status === undefined ? undefined : createHttpPageHistory(http)}
+      admin={status === undefined ? undefined : createHttpAdminConsoleApi(http)}
       collections={
         status === undefined ? createMockCollectionsStore() : createHttpCollectionsStore(http)
       }

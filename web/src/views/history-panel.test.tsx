@@ -5,10 +5,11 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
+import { formatSize } from "../data/format";
 import type { PageHistory, PageVersion } from "../data/history";
 import { I18nProvider } from "../i18n/i18n";
 
-import { formatSize, HistoryPanel, type HistoryPanelProperties } from "./history-panel";
+import { HistoryPanel, type HistoryPanelProperties } from "./history-panel";
 
 const OLD: PageVersion = {
   id: "v1",

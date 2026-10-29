@@ -35,10 +35,19 @@ describe("pending views", () => {
     expect(screen.getByText("Coming soon.")).toBeDefined();
   });
 
-  it("explains administration", () => {
+  it("lists the admin screens", () => {
     renderWithProviders(<AdminView />);
     expect(screen.getByRole("heading", { level: 1, name: "Admin" })).toBeDefined();
-    expect(screen.getByText(/identity and admin services land/)).toBeDefined();
+    const screens: [string, string][] = [
+      ["Audit log", "/admin/audit"],
+      ["Settings", "/admin/settings"],
+      ["Backups", "/admin/backups"],
+      ["Requests", "/admin/requests"],
+      ["Routes", "/admin/routes"],
+    ];
+    for (const [name, path] of screens) {
+      expect(screen.getByRole("link", { name }).getAttribute("href")).toBe(path);
+    }
   });
 });
 
