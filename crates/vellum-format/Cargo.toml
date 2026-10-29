@@ -16,3 +16,14 @@ layer = "foundation"
 
 [lints]
 workspace = true
+
+[dependencies]
+comrak = { version = "0.59.0", default-features = false, features = ["attributes"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_yaml_ng = "0.10.0"
+tracing = "0.1.44"
+vellum-kernel.workspace = true
+
+[dev-dependencies]
+proptest = "1.11.0"
+serde_json = "1.0.154"
