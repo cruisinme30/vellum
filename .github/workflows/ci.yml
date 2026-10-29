@@ -284,7 +284,7 @@ jobs:
       - name: YAML
         run: yamllint --strict .
       - name: Shell
-        run: shellcheck -x scripts/*/*.sh deploy/*/*.sh .githooks/*
+        run: shellcheck -x scripts/*/*.sh deploy/*/*.sh deploy/packages/linux/*.sh site/*.sh .githooks/*
       - name: Workflow security (zizmor)
         # ADR 0032, D126: template injection, excessive token permissions,
         # unpinned or impostor actions, credential persistence, cooldowns.

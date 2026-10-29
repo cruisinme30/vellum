@@ -138,5 +138,7 @@ they test.
   once the binary has them, and copies the database and bucket directly
   until then. The nightly run also calls `vellum budgets --server` for
   per-route latency budgets (#179) once that command exists.
+- Install channels, platforms and desktop signing extend this release in
+  [ADR 0060](0060-install-channels-and-platforms.md) (D250-D252).
 - GitHub-hosted runners are noisy; if the 10 % gate flaps, move the
   nightly job to a dedicated runner rather than widening the gate.

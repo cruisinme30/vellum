@@ -10,7 +10,7 @@ the same signed binary.
 
 | Rung | What runs | Where |
 | --- | --- | --- |
-| Single binary | `vellum serve`, SQLite and a folder | a release download |
+| Single binary | `vellum serve`, SQLite and a folder | Homebrew, winget, `.deb`/`.rpm`, [`install.sh`](../site/install.sh) or a release download ([`packages/`](packages/nfpm.yaml)) |
 | `docker run` | the same binary in a 4 MB distroless image | [`docker/`](docker/Dockerfile) |
 | Team | Vellum, Postgres, MinIO, Kroki, ClamAV | [`compose/`](compose/compose.yaml) |
 | Organisation | two of everything, a Patroni replica per shard, canary releases | [`helm/vellum/`](helm/vellum/values.yaml) |

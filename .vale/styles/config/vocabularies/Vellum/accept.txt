@@ -179,3 +179,5 @@ zizmor
 ClamAV
 EICAR
 [Rr]escan(s|ned|ning)?
+nfpm
+winget
