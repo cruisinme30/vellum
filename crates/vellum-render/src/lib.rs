@@ -58,7 +58,7 @@ pub use crate::writer::{ID_PREFIX, TocEntry, Warning};
 
 /// Bumped whenever the HTML for the same input changes, so stored renders
 /// are rebuilt.
-pub const RENDER_VERSION: u32 = 1;
+pub const RENDER_VERSION: u32 = 2;
 
 /// Per-render settings.
 #[derive(Debug, Clone, Default)]
