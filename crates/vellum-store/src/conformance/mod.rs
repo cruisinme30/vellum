@@ -37,6 +37,8 @@ macro_rules! ensure {
     };
 }
 
+pub mod conditional;
+
 fn p(check: &'static str, rel: &str) -> Result<BlobPath, Failure> {
     BlobPath::new(format!("conformance/{check}/{rel}")).map_err(|e| Failure {
         check,
@@ -59,7 +61,11 @@ pub async fn run_all(store: &dyn BlobStore) -> Outcome {
     put_get_roundtrip(store).await?;
     missing_blobs(store).await?;
     rename_never_clobbers(store).await?;
-    list_is_recursive_and_scoped(store).await
+    list_is_recursive_and_scoped(store).await?;
+    conditional::if_absent(store).await?;
+    conditional::if_match(store).await?;
+    conditional::conditional_delete(store).await?;
+    conditional::racing_writers_one_wins(store).await
 }
 
 /// Content survives a round trip and `head` agrees with `get`.

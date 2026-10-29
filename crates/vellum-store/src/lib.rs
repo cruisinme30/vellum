@@ -11,6 +11,7 @@
 
 mod error;
 mod local;
+pub mod metered;
 mod path;
 mod store;
 
@@ -19,5 +20,6 @@ pub mod conformance;
 
 pub use error::{StoreError, StoreResult};
 pub use local::LocalStore;
+pub use metered::Metered;
 pub use path::{BlobPath, MAX_PATH_BYTES, TEMP_PREFIX};
 pub use store::{Blob, BlobEntry, BlobMeta, BlobStore, Etag, Precondition};
