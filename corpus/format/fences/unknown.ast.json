@@ -1,0 +1,19 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "fence",
+        "lang": "sparkle",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "Unknown fences fall back to a code block.\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}

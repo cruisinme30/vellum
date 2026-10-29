@@ -1,0 +1,120 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "See "
+          },
+          {
+            "type": "link",
+            "url": "https://northstar.dev/runbooks/deploy",
+            "title": "Deploy runbook",
+            "content": [
+              {
+                "type": "text",
+                "text": "the deploy runbook"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": ", "
+          },
+          {
+            "type": "link",
+            "url": "https://northstar.dev/status",
+            "title": "",
+            "content": [
+              {
+                "type": "text",
+                "text": "https://northstar.dev/status"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": " or "
+          },
+          {
+            "type": "link",
+            "url": "https://northstar.dev/changelog",
+            "title": "",
+            "content": [
+              {
+                "type": "text",
+                "text": "https://northstar.dev/changelog"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": "."
+          }
+        ],
+        "id": null
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Write to "
+          },
+          {
+            "type": "link",
+            "url": "mailto:dev@northstar.dev",
+            "title": "",
+            "content": [
+              {
+                "type": "text",
+                "text": "dev@northstar.dev"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": ", or open "
+          },
+          {
+            "type": "link",
+            "url": "docs/getting started.md",
+            "title": "",
+            "content": [
+              {
+                "type": "text",
+                "text": "the docs"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": "."
+          }
+        ],
+        "id": null
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "image",
+            "url": "images/architecture.png",
+            "title": "Request path",
+            "alt": [
+              {
+                "type": "text",
+                "text": "Architecture overview"
+              }
+            ]
+          }
+        ],
+        "id": null
+      }
+    ]
+  },
+  "diagnostics": []
+}
