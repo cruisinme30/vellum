@@ -53,6 +53,14 @@ pub enum IdParseError {
         /// The ID type being parsed.
         kind: &'static str,
     },
+    /// The text does not start with the required prefix.
+    #[error("{kind} must start with {prefix:?}")]
+    Prefix {
+        /// The ID type being parsed.
+        kind: &'static str,
+        /// The required prefix.
+        prefix: &'static str,
+    },
 }
 
 /// Parses ULID text into its 128-bit value.
