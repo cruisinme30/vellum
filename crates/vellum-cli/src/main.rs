@@ -38,6 +38,8 @@ mod mcp;
 mod notifications;
 mod observability;
 mod page_render;
+#[cfg(test)]
+mod perf_routes_tests;
 mod pins;
 mod private;
 mod private_remote;
