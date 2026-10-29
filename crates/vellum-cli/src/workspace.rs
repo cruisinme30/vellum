@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-//! The workspace services: the drive, collections, books and Work, over the
-//! files in the data folder, the index database and the permission engine.
+//! The workspace services: the drive, collections, books, Work and live
+//! editing, over the files in the data folder, the index database and the
+//! permission engine.
 //!
 //! `vellum serve` opens them when an index is configured: Postgres through
 //! the kernel's `database_url`, or the SQLite index in the data folder,
@@ -23,7 +24,7 @@ use vellum_books_service::BooksService;
 use vellum_collections::CollectionsService;
 use vellum_contracts::{BoxFuture, Service};
 use vellum_db::{Index, IndexConfig};
-use vellum_drive::authz::TreeSync;
+use vellum_drive::authz::{AuthzAccess as DriveAuthzAccess, TreeSync};
 use vellum_drive::sql::SqlIndex;
 use vellum_drive::{Drive, DriveIndex, DriveService};
 use vellum_identity::Identity;
@@ -32,6 +33,7 @@ use vellum_store::{BlobPath, BlobStore, LocalStore};
 use vellum_work::{UserRef, WorkEvent};
 use vellum_work_service::{Directory, EventSink, SystemClock, WorkService};
 
+use crate::collab::Collab;
 use crate::reindex::{KEY_VAR, index_key};
 
 /// Variable that opens the SQLite index without encryption.
@@ -149,6 +151,8 @@ pub struct Opened {
     /// The integration receivers, to mount cross-site at `/hooks`, when an
     /// integration secret is set (see [`crate::integrations`]).
     pub hooks: Option<axum::Router>,
+    /// Live editing, when an index is configured.
+    pub collab: Option<Collab>,
 }
 
 /// Builds the services over `store`, `authz` and the drive's `index`.
@@ -218,6 +222,7 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
 pub async fn open(
     config: &Config,
     identity: &Arc<Identity>,
+    app_origin: &str,
     var: impl Fn(&str) -> Option<String> + Send + Sync,
 ) -> Result<Opened, Error> {
     let index_config = match index_config(config, &var)? {
@@ -236,11 +241,11 @@ pub async fn open(
             .map_err(|e| unavailable("cannot open the data folder", e))?,
     );
     let authz = Arc::new(Authz::new(SqlStore::new(index.clone())));
-    let drive_index = Arc::new(SqlIndex::new(index));
+    let drive_index = Arc::new(SqlIndex::new(index.clone()));
     let spaces = Arc::new(Spaces::default());
     let workspace = build(
         Arc::clone(&store),
-        authz,
+        Arc::clone(&authz),
         Arc::clone(&drive_index) as Arc<dyn DriveIndex>,
         &spaces,
         identity,
@@ -254,6 +259,16 @@ pub async fn open(
         Err(error) => tracing::warn!(%error, "drive rescan failed; the index may be stale"),
     }
     let hooks = crate::integrations::hooks(&store, &workspace.work, &var).await?;
+    let collab = Collab::open(
+        Arc::clone(&workspace.drive),
+        Arc::new(DriveAuthzAccess::new(
+            authz,
+            Arc::clone(&drive_index) as Arc<dyn DriveIndex>,
+        )),
+        index,
+        &config.data_dir,
+        app_origin,
+    )?;
     spaces.replace(load_spaces(drive_index.as_ref()).await?);
     let refresh = Arc::clone(&spaces);
     drop(tokio::spawn(async move {
@@ -270,6 +285,7 @@ pub async fn open(
     Ok(Opened {
         services: workspace.services,
         hooks,
+        collab: Some(collab),
     })
 }
 
