@@ -3046,10 +3046,12 @@ dependencies = [
  "image",
  "proptest",
  "reqwest",
+ "sha2",
  "thiserror",
  "tokio",
  "tracing",
  "url",
+ "vellum-kernel",
 ]
 
 [[package]]
