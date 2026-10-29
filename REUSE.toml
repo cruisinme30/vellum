@@ -37,6 +37,7 @@ path = [
   "corpus/**/*.html",
   "corpus/**/*.txt",
   ".gitmessage",
+  "deploy/observability/grafana/dashboards/*.json",
   "deploy/perf/*.json",
 ]
 precedence = "aggregate"

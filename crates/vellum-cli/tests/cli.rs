@@ -43,6 +43,64 @@ fn rejects_an_invalid_log_filter() {
 }
 
 #[test]
+fn profile_renders_a_folded_file() {
+    let dir = std::env::temp_dir().join(format!("vellum-cli-profile-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let input = dir.join("in.folded");
+    let out = dir.join("out.svg");
+    std::fs::write(&input, "http.request;db.query 900\n").unwrap();
+    let output = vellum()
+        .args(["profile", "--input"])
+        .arg(&input)
+        .arg("--out")
+        .arg(&out)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(std::fs::read_to_string(&out).unwrap().starts_with("<svg"));
+    let failed = vellum()
+        .args(["profile", "--input"])
+        .arg(dir.join("missing"))
+        .output()
+        .unwrap();
+    assert!(!failed.status.success());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn budgets_checks_a_routes_file() {
+    let dir = std::env::temp_dir().join(format!("vellum-cli-budgets-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let input = dir.join("routes.json");
+    std::fs::write(
+        &input,
+        r#"{"minutes":15,"routes":[],"in_flight":0,"process":{},"buffer":{}}"#,
+    )
+    .unwrap();
+    let passed = vellum()
+        .args(["budgets", "--input"])
+        .arg(&input)
+        .output()
+        .unwrap();
+    assert!(
+        passed.status.success(),
+        "{}",
+        String::from_utf8_lossy(&passed.stderr)
+    );
+    let failed = vellum()
+        .args(["budgets", "--input"])
+        .arg(dir.join("missing.json"))
+        .output()
+        .unwrap();
+    assert!(!failed.status.success());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn prints_the_api_contracts() {
     let output = vellum().arg("openapi").output().unwrap();
     assert!(output.status.success());

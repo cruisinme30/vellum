@@ -8869,6 +8869,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "vellum-admin"
+version = "0.0.0"
+dependencies = [
+ "async-trait",
+ "base64 0.22.1",
+ "clap",
+ "getrandom 0.4.3",
+ "hex",
+ "opentelemetry",
+ "proptest",
+ "reqwest",
+ "schemars 1.2.3",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "vellum-contracts",
+ "vellum-crypto",
+ "vellum-kernel",
+ "vellum-observe",
+]
+
+[[package]]
 name = "vellum-api"
 version = "0.0.0"
 dependencies = [
@@ -8977,6 +9004,7 @@ dependencies = [
  "tower",
  "tracing",
  "url",
+ "vellum-admin",
  "vellum-api",
  "vellum-authz",
  "vellum-books-service",
@@ -9320,6 +9348,25 @@ dependencies = [
  "tracing",
  "url",
  "vellum-security",
+]
+
+[[package]]
+name = "vellum-observe"
+version = "0.0.0"
+dependencies = [
+ "getrandom 0.4.3",
+ "hex",
+ "opentelemetry",
+ "proptest",
+ "schemars 1.2.3",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-opentelemetry",
+ "tracing-subscriber",
+ "vellum-kernel",
 ]
 
 [[package]]

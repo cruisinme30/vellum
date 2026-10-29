@@ -187,6 +187,30 @@ pub fn subscriber(
     ),
     TelemetryError,
 > {
+    subscriber_with(config, None)
+}
+
+/// A layer added beneath the kernel's own, such as the Admin → Requests
+/// recorder from `vellum-observe`.
+pub type ExtraLayer = Box<dyn tracing_subscriber::Layer<Registry> + Send + Sync>;
+
+/// Like [`subscriber`], with one extra layer that sees every span and
+/// event the filter lets through.
+///
+/// # Errors
+///
+/// Returns [`TelemetryError`] when the filter is invalid or an exporter
+/// cannot be built.
+pub fn subscriber_with(
+    config: &TelemetryConfig,
+    extra: Option<ExtraLayer>,
+) -> Result<
+    (
+        impl tracing::Subscriber + Send + Sync + use<>,
+        TelemetryGuard,
+    ),
+    TelemetryError,
+> {
     let filter = EnvFilter::try_new(&config.filter)?;
     let stderr = match config.log_format {
         LogFormat::Json => tracing_subscriber::fmt::layer()
@@ -214,7 +238,11 @@ pub fn subscriber(
                 filter_fn(|meta| !is_exporter_target(meta.target())),
             ))
     });
-    let subscriber = Registry::default().with(filter).with(stderr).with(otel);
+    let subscriber = Registry::default()
+        .with(extra)
+        .with(filter)
+        .with(stderr)
+        .with(otel);
     if let Some(p) = &providers {
         opentelemetry::global::set_meter_provider(p.meter.clone());
         opentelemetry::global::set_tracer_provider(p.tracer.clone());
@@ -237,7 +265,20 @@ fn is_exporter_target(target: &str) -> bool {
 /// Returns [`TelemetryError`] when the configuration is invalid or
 /// telemetry was already initialised.
 pub fn init(config: &TelemetryConfig) -> Result<TelemetryGuard, TelemetryError> {
-    let (subscriber, guard) = subscriber(config)?;
+    init_with(config, None)
+}
+
+/// Like [`init`], with one extra layer; see [`subscriber_with`].
+///
+/// # Errors
+///
+/// Returns [`TelemetryError`] when the configuration is invalid or
+/// telemetry was already initialised.
+pub fn init_with(
+    config: &TelemetryConfig,
+    extra: Option<ExtraLayer>,
+) -> Result<TelemetryGuard, TelemetryError> {
+    let (subscriber, guard) = subscriber_with(config, extra)?;
     tracing::subscriber::set_global_default(subscriber)?;
     Ok(guard)
 }
@@ -322,6 +363,32 @@ mod tests {
             tracing::info!(monotonic_counter.kernel_test_events = 1_u64, "exported");
         });
         drop(guard);
+    }
+
+    #[test]
+    fn extra_layer_sees_spans() {
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        struct Count(Arc<AtomicUsize>);
+        impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for Count {
+            fn on_new_span(
+                &self,
+                _: &tracing::span::Attributes<'_>,
+                _: &tracing::span::Id,
+                _: tracing_subscriber::layer::Context<'_, S>,
+            ) {
+                let _ = self.0.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+        let seen = Arc::new(AtomicUsize::new(0));
+        let (sub, _guard) =
+            subscriber_with(&config(&[]), Some(Box::new(Count(Arc::clone(&seen))))).unwrap();
+        tracing::subscriber::with_default(sub, || {
+            let span = tracing::info_span!("kernel.extra");
+            drop(span.enter());
+        });
+        assert_eq!(seen.load(Ordering::Relaxed), 1);
     }
 
     #[test]

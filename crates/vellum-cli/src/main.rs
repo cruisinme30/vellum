@@ -9,8 +9,11 @@
 //! generated from. `vellum docs` reads the help books built into the
 //! binary; `vellum mcp` serves the MCP server over stdio; `vellum reindex`
 //! rebuilds the index from the data folder; `vellum private` manages this
-//! device's key for end-to-end encrypted private spaces.
+//! device's key for end-to-end encrypted private spaces. `vellum profile`
+//! and `vellum budgets` ask a running server for a flame graph and for
+//! routes over their latency budget.
 
+mod admin;
 mod docs;
 mod identity;
 #[cfg(test)]
@@ -72,6 +75,11 @@ enum Command {
     /// End-to-end encrypted private spaces on this device.
     #[command(subcommand)]
     Private(private::PrivateCommand),
+    /// Draw a flame graph of where a running server spends its time.
+    Profile(vellum_admin::profile::ProfileArgs),
+    /// Fail when a route's p95 latency is over its budget (a CI gate after
+    /// a load test).
+    Budgets(vellum_admin::budgets::BudgetsArgs),
 }
 
 /// Administration subcommands.
@@ -136,6 +144,18 @@ fn no_command() -> ExitCode {
     ExitCode::SUCCESS
 }
 
+/// Runs `f` with telemetry on, inside the `vellum.cli` span.
+fn with_telemetry(f: impl FnOnce() -> ExitCode) -> ExitCode {
+    let config = TelemetryConfig::from_env("vellum", env!("CARGO_PKG_VERSION"));
+    let _guard = match telemetry::init(&config) {
+        Ok(guard) => guard,
+        Err(error) => return fail(&error),
+    };
+    let span = tracing::info_span!("vellum.cli", version = env!("CARGO_PKG_VERSION"));
+    let _entered = span.enter();
+    f()
+}
+
 fn main() -> ExitCode {
     let cli = Cli::parse();
     let Some(command) = cli.command else {
@@ -172,6 +192,8 @@ fn main() -> ExitCode {
             let _entered = span.enter();
             reindex::run(&args)
         }
+        Command::Profile(args) => with_telemetry(|| admin::profile(&args)),
+        Command::Budgets(args) => with_telemetry(|| admin::budgets(&args)),
         Command::Openapi { typescript } => match services::contract_gateway() {
             Ok(gateway) if typescript => {
                 print(vellum_api::typescript::client(gateway.openapi()).trim_end())
