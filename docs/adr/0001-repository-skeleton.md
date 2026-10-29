@@ -37,6 +37,10 @@ full suite.
   and external link checks. Golden corpus, integration, contract,
   performance, chaos, security scans and the upgrade drill join it as
   their code lands.
+- Pull requests enter `develop` through a merge queue, which runs the
+  fast suite on each pull request on top of the ones ahead of it. With
+  many contributors merging automatically, this stops them racing and
+  stops two green pull requests combining into a red `develop`.
 - Consequence: the brief's "e2e and axe on every PR" becomes "on every PR
   into `main` and nightly". A regression can sit on `develop` for at most
   one night before the nightly run reports it.

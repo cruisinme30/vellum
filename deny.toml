@@ -31,6 +31,11 @@ allow = [
     "Unicode-3.0",
     "Zlib",
 ]
+# CC0-1.0 is a public-domain dedication, so it is compatible too. It is
+# allowed per crate rather than globally because it has no patent grant.
+exceptions = [
+    { crate = "notify", allow = ["CC0-1.0"] },
+]
 
 [licenses.private]
 ignore = true
