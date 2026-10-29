@@ -4,7 +4,8 @@
 #
 # The Fast suite's "UI layout (quick)" job, run locally by `cargo xtask fast`:
 # builds the website, then runs the layout, focus and loading checks
-# (ADR 0031) in Chromium at phone and laptop size, both CI shards at once.
+# (ADR 0031) in Chromium at phone and laptop size, both CI shards at once,
+# in cargo xtask fast only when VELLUM_FAST_ALL_TESTS=1 (the integrator's run).
 # The integrator runs it on every merged batch, so a UI regression is found
 # before the batch's CI run. Needs mdbook (scripts/dev/install-tools.sh) and
 # web/node_modules (pnpm install). Extra arguments go to Playwright, such as

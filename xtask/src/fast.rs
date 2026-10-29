@@ -12,7 +12,8 @@
 //! Like CI, the Rust and web steps are skipped when the branch does not touch
 //! them; `scripts/ci/changed-areas.sh` decides for both (ADR 0035, D139).
 //! The Rust tests run only for the crates the branch changed; CI runs the
-//! whole workspace. `VELLUM_FAST_ALL_TESTS=1` tests every crate locally too.
+//! whole workspace. `VELLUM_FAST_ALL_TESTS=1` tests every crate locally too,
+//! and adds the UI layout checks: the integrator's full run (issue #532).
 
 use std::env;
 use std::ffi::OsString;
@@ -354,12 +355,14 @@ fn steps(base: Option<&str>, branch: Option<&str>, tested: Option<&[String]>) ->
     steps.extend(web_steps());
     steps.extend(desktop_steps());
     // The "UI layout (quick)" job: what a merged batch most often breaks
-    // without any single branch failing on its own (issue #532).
-    steps.push(
-        Step::new("UI layout (quick)", "scripts/ci/ui-quick.sh", &[])
-            .needs("mdbook")
-            .area(Area::Ui),
-    );
+    // without any single branch failing on its own (issue #532). It takes
+    // minutes, so only the integrator's full run (VELLUM_FAST_ALL_TESTS=1)
+    // includes it; threads run focused tests.
+    let mut ui = Step::new("UI layout (quick)", "scripts/ci/ui-quick.sh", &[])
+        .needs("mdbook")
+        .area(Area::Ui);
+    ui.not_needed = !env_flag(ALL_TESTS);
+    steps.push(ui);
     steps.extend([
         // Files, docs and secrets
         Step::new("REUSE headers", "reuse", &["lint"]),
