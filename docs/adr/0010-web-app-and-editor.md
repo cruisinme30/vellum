@@ -14,7 +14,7 @@ vellum: 1
 - Decisions: D58, D59, D60
 - Issues: #70 (block schema), #90 (app shell), #92 (block editor),
   #79 (themes); the Yjs binding refs #97 (collab rooms)
-- Pull requests: the web app shell and editor pull request
+- Pull requests: #262
 
 :::
 
