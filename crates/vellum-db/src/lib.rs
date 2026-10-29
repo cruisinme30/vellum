@@ -6,7 +6,8 @@
 //! Files on disk are the source of truth; this crate holds the rebuildable
 //! index over them (spaces, folders, documents, the `page_ancestors` closure)
 //! plus the database-owned tables `grants`, `user_doc_state` and
-//! `collab_updates` (the live-editing change log, written by `vellum-collab`).
+//! `collab_updates` (the live-editing change log, written by `vellum-collab`),
+//! and the replica tables in [`cluster`].
 //!
 //! Two backends share one schema shape:
 //! - **SQLite** for the single binary, encrypted with SQLCipher when a key is given.
@@ -15,6 +16,7 @@
 //! Conventions: IDs are ULID text, timestamps are UTC epoch milliseconds,
 //! and `space_id` is the shard key on every table. Migrations are forward-only.
 
+pub mod cluster;
 mod config;
 mod error;
 mod index;
