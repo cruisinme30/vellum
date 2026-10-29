@@ -11,6 +11,8 @@
 #[cfg(feature = "dropbox")]
 pub mod dropbox;
 mod oauth;
+#[cfg(feature = "onedrive")]
+pub mod onedrive;
 
 use std::{fmt, time::Duration};
 
