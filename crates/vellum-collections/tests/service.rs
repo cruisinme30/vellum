@@ -13,7 +13,8 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use serde_json::json;
 use vellum_collections::service::{
-    Access, CollectionsService, CreateRowInput, Need, QueryInput, RowKey, UpdateRowInput,
+    Access, CollectionsService, CreateRowInput, Need, QueryInput, RowKey, SaveViewInput,
+    UpdateRowInput, ViewKey,
 };
 use vellum_collections::{DateValue, Value, ViewKind};
 use vellum_contracts::{
@@ -626,7 +627,9 @@ async fn operations_are_valid_and_callable() {
             "collections.get_row",
             "collections.create_row",
             "collections.update_row",
-            "collections.delete_row"
+            "collections.delete_row",
+            "collections.save_view",
+            "collections.delete_view"
         ]
     );
     for op in &ops {
@@ -677,4 +680,127 @@ async fn operations_are_valid_and_callable() {
         .await
         .unwrap_err();
     assert_eq!(err.kind(), ErrorKind::InvalidInput);
+}
+
+#[cfg(test)]
+fn board(name: &str) -> SaveViewInput {
+    SaveViewInput {
+        collection_id: REQS.parse().unwrap(),
+        view: name.into(),
+        rename_to: None,
+        kind: Some(ViewKind::Board),
+        filter: vec!["Estimate > 1".into()],
+        sort: vec!["Requirement asc".into()],
+        group: Some("Done".into()),
+        hide: vec!["Remaining".into()],
+        date: None,
+        end: None,
+        limit: Some(20),
+    }
+}
+
+#[tokio::test]
+async fn saves_renames_and_deletes_views() {
+    let f = fixture().await;
+    let ana = UserId::generate();
+    f.grants.grant(ana, REQS, Need::Edit);
+    f.grants.grant(ana, RELS, Need::Read);
+    let c = ctx(ana);
+    let schema_path = format!("{REQS_DIR}/schema.yaml");
+
+    // A new view is added at the end and written to schema.yaml by key.
+    let info = f.service.save_view(&c, board("By status")).await.unwrap();
+    let names: Vec<&str> = info.views.iter().map(|v| v.name.as_str()).collect();
+    assert_eq!(names, ["All", "Open", "By status"]);
+    let saved = &info.views[2];
+    assert_eq!(saved.kind, ViewKind::Board);
+    assert_eq!(saved.group.as_deref(), Some("dn"));
+    assert_eq!(saved.hidden, ["left"]);
+    let yaml = read(&f.root, &schema_path);
+    assert!(yaml.contains("By status"), "{yaml}");
+    assert!(yaml.contains("group: dn"), "{yaml}");
+
+    // Saving the same name (any case) replaces it; renaming keeps its place.
+    let mut again = board("by STATUS");
+    again.kind = Some(ViewKind::Gallery);
+    again.rename_to = Some("Cards".into());
+    let info = f.service.save_view(&c, again).await.unwrap();
+    let names: Vec<&str> = info.views.iter().map(|v| v.name.as_str()).collect();
+    assert_eq!(names, ["All", "Open", "Cards"]);
+    assert_eq!(info.views[2].kind, ViewKind::Gallery);
+
+    // Queries use the saved view.
+    let q = QueryInput {
+        collection_id: REQS.parse().unwrap(),
+        view: Some("cards".into()),
+        kind: None,
+        filter: Vec::new(),
+        sort: Vec::new(),
+        group: None,
+        hide: Vec::new(),
+        limit: None,
+    };
+    assert_eq!(
+        f.service.query(&c, q).await.unwrap().kind,
+        ViewKind::Gallery
+    );
+
+    // Bad input and name clashes are rejected.
+    let mut clash = board("Cards");
+    clash.rename_to = Some("open".into());
+    assert_eq!(
+        kind(f.service.save_view(&c, clash).await),
+        ErrorKind::Conflict
+    );
+    let mut bad = board("Broken");
+    bad.filter = vec!["Nope = 1".into()];
+    assert_eq!(
+        kind(f.service.save_view(&c, bad).await),
+        ErrorKind::InvalidInput
+    );
+    assert_eq!(
+        kind(f.service.save_view(&c, board("  ")).await),
+        ErrorKind::InvalidInput
+    );
+
+    let key = |view: &str| ViewKey {
+        collection_id: REQS.parse().unwrap(),
+        view: view.into(),
+    };
+    let info = f.service.delete_view(&c, key("CARDS")).await.unwrap();
+    assert_eq!(info.views.len(), 2);
+    assert!(!read(&f.root, &schema_path).contains("Cards"));
+    assert_eq!(
+        kind(f.service.delete_view(&c, key("Cards")).await),
+        ErrorKind::NotFound
+    );
+
+    // Saving views needs edit access to this collection only.
+    let bo = UserId::generate();
+    f.grants.grant(bo, REQS, Need::Read);
+    f.grants.grant(bo, RELS, Need::Read);
+    assert_eq!(
+        kind(f.service.save_view(&ctx(bo), board("Mine")).await),
+        ErrorKind::PermissionDenied
+    );
+}
+
+#[tokio::test]
+async fn a_schema_changed_on_disk_is_not_overwritten() {
+    let f = fixture().await;
+    let ana = UserId::generate();
+    f.grants.grant(ana, REQS, Need::Edit);
+    f.grants.grant(ana, RELS, Need::Edit);
+    let c = ctx(ana);
+    let _ = f.service.list(&c).await.unwrap();
+    let schema_path = format!("{REQS_DIR}/schema.yaml");
+    let edited = read(&f.root, &schema_path).replace("title: Requirements", "title: Reqs");
+    write(&f.root, &schema_path, &edited);
+    assert_eq!(
+        kind(f.service.save_view(&c, board("Board")).await),
+        ErrorKind::Conflict
+    );
+    assert_eq!(read(&f.root, &schema_path), edited);
+    let info = f.service.save_view(&c, board("Board")).await.unwrap();
+    assert_eq!(info.title, "Reqs");
 }

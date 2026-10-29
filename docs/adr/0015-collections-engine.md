@@ -95,9 +95,10 @@ each request through an access port backed by authorization.
 - On first use the service reads every `*.collection/schema.yaml` and its
   `rows/*.md` into one workspace; the watcher calls `invalidate` when a
   file changes on disk, and the next request reloads.
-- Each row keeps the path and etag it was read at. A save rewrites that
-  file only if the etag still matches, so an outside edit is never lost;
-  a mismatch is a `conflict` and drops the cache.
+- Each row and `schema.yaml` keep the etag they were read at. A save
+  (a row, or a saved view in the schema) rewrites the file only if the
+  etag still matches, so an outside edit is never lost; a mismatch is a
+  `conflict` and drops the cache.
 - New rows get `rows/<slug>.md`, then `-2`, `-3`… Deleted rows move to
   `.vellum/trash/collections/<collection>/<row>.md`.
 - When two folders share a collection ID, the older `schema.yaml` keeps
@@ -111,7 +112,9 @@ each request through an access port backed by authorization.
   `not_found`.
 - Editing also needs edit access to the other side of each two-way
   relation, because the engine mirrors links into those row files.
-- Row writes need the `write:direct` scope; reads need `read`.
+- Saving or deleting a view changes only `schema.yaml`, so it needs edit
+  access to that collection alone.
+- Writes need the `write:direct` scope; reads need `read`.
 
 ### D134: `vellum-collections` is a service-layer crate
 
