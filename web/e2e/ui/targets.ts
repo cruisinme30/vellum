@@ -62,12 +62,11 @@ const app = (
   ...(options.server === undefined ? {} : { server: options.server }),
 });
 
-// Sign-in and set-up have no visual baselines yet; they are made in the
-// Playwright container (scripts/ci/ui-baselines.sh), then `visual` turns on.
+// Baselines are made in the Playwright container (scripts/ci/ui-baselines.sh).
 const APP_TARGETS: Target[] = [
   app("shell", "/"),
-  app("sign-in", "/sign-in", { server: "signed-out", visual: false }),
-  app("setup", "/setup", { server: "new", visual: false }),
+  app("sign-in", "/sign-in", { server: "signed-out" }),
+  app("setup", "/setup", { server: "new" }),
 ];
 
 function htmlFiles(directory: string): string[] {
