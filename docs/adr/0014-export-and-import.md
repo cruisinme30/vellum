@@ -13,7 +13,7 @@ vellum: 1
 - Status: accepted
 - Decisions: D70, D71, D72, D229, D230, D231
 - Requirements: R-EX, R-IM, R-BK-5, NFR
-- Issue: #119, #120, #121, #122, #123, #124, #506, #78
+- Issue: #119, #120, #121, #122, #123, #124, #506, #78, #151
 - Pull requests: #286
 
 :::
@@ -104,6 +104,9 @@ cross-references.
   parses it; then the importer's own archive limits apply.
 - `Drive::import` writes the files into a new folder, refusing paths that
   leave it or name Vellum's own files, and indexes them like a copy.
+- Issues from Linear, Jira and GitHub (#151) come in at
+  `/api/v1/issue-import`, admins only, with a dry run first. They are
+  created in one Work transaction as the caller; re-imports skip them.
 
 ### D231: export and import run on blocking threads behind two slots
 

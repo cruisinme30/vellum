@@ -46,6 +46,20 @@ export interface ImportResult {
   readonly warnings: readonly ExportWarning[];
 }
 
+/** Trackers whose issue exports Vellum reads. */
+export type IssueTracker = "linear" | "jira" | "github";
+
+/** What an issue import did, or would do on a dry run. */
+export interface IssueImportReport {
+  readonly created: number;
+  readonly skipped: number;
+  readonly links: number;
+  readonly read: number;
+  readonly keys: readonly (readonly [string, string])[];
+  readonly warnings: readonly { readonly external_id?: string | null; readonly message: string }[];
+  readonly dry_run: boolean;
+}
+
 /** The export and import operations the web app uses. */
 export interface TransferApi {
   preview(target: ExportTarget, paper: Paper): Promise<ExportPreview>;
@@ -58,6 +72,15 @@ export interface TransferApi {
       readonly source: ImportSource;
     },
   ): Promise<ImportResult>;
+  importIssues(
+    file: File,
+    into: {
+      readonly tracker: IssueTracker;
+      readonly team: string;
+      readonly repo?: string | undefined;
+      readonly dryRun: boolean;
+    },
+  ): Promise<IssueImportReport>;
 }
 
 const EXPORT = "/api/v1/export";
@@ -86,6 +109,19 @@ export function createHttpTransferApi(http: Http): TransferApi {
       http.upload<ImportResult>(
         "/api/v1/import",
         { space: into.space, parent: into.parent, source: into.source, name: file.name },
+        file,
+        file.type === "" ? "application/octet-stream" : file.type,
+      ),
+    importIssues: (file, into) =>
+      http.upload<IssueImportReport>(
+        "/api/v1/issue-import",
+        {
+          tracker: into.tracker,
+          team: into.team,
+          repo: into.repo,
+          name: file.name,
+          dry_run: into.dryRun ? "true" : undefined,
+        },
         file,
         file.type === "" ? "application/octet-stream" : file.type,
       ),

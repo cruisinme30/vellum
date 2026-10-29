@@ -116,3 +116,24 @@
 .vl-import-done p {
   margin: 8px 0 0;
 }
+
+.vl-import-form + .vl-import-form {
+  margin-top: 32px;
+}
+
+.vl-import-form h2 {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 400;
+}
+
+.vl-import-form input:not([type="file"]) {
+  min-height: 40px;
+  font: inherit;
+}
+
+.vl-import-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

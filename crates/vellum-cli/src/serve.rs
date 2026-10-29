@@ -203,7 +203,11 @@ fn connection_limits(
             .transpose()?
             .unwrap_or(per_ip_default),
         // Large files on slow links get time for their size (D213).
-        upload_prefixes: &[crate::uploads::PREFIX, crate::exports::IMPORT_PREFIX],
+        upload_prefixes: &[
+            crate::uploads::PREFIX,
+            crate::exports::IMPORT_PREFIX,
+            crate::issue_import::PREFIX,
+        ],
         ..vellum_api::server::ConnectionLimits::default()
     })
 }

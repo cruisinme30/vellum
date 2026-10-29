@@ -522,6 +522,8 @@ pub struct Opened {
     pub drive: Option<Arc<Drive>>,
     /// Share links on the public origin (#95).
     pub public: Option<Arc<dyn vellum_api::public::PublicSite>>,
+    /// Work, which issue imports create through (see [`crate::issue_import`]).
+    pub work: Option<Arc<WorkService>>,
 }
 
 /// My Work's settings: where its secrets live and what it links to.
@@ -1142,6 +1144,7 @@ pub async fn open(
         books: Some(workspace.books),
         drive: Some(workspace.drive),
         public: Some(public_site(&workspace.sharing)?),
+        work: Some(workspace.work),
     })
 }
 

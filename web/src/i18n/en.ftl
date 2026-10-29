@@ -1718,3 +1718,19 @@ import-start = Import
 import-working = Importing…
 import-done = Imported { $pages } items into “{ $title }”.
 import-open = Open the folder
+import-issues-title = Issues from Linear, Jira or GitHub
+import-issues-intro = Only workspace admins can import issues. Preview first to see what will be created. Issues imported before are skipped, so you can run an import again.
+import-issues-tracker = Exported from
+import-issues-tracker-linear = Linear (CSV export)
+import-issues-tracker-jira = Jira (search results as JSON)
+import-issues-tracker-github = GitHub Issues (JSON)
+import-issues-repo = Repository
+import-issues-team = Team key
+import-issues-file = Export file
+import-issues-preview = Preview
+import-issues-planned = { $created } issues will be created; { $skipped } were imported before.
+import-issues-done = Created { $created } issues; { $skipped } were imported before.
+import-issues-warnings = { $count ->
+    [one] One note
+   *[other] { $count } notes
+}
