@@ -13,7 +13,7 @@ use std::collections::BTreeMap;
 use proptest::prelude::*;
 use support::{TestCodec, sync_docs};
 use vellum_collab::tree::{self, CONTENT_FIELD};
-use vellum_collab::{DocTree, Element, MarkdownCodec as _, Node, TextRun};
+use vellum_collab::{DocTree, Element, FormatCodec, MarkdownCodec, Node, TextRun};
 use yrs::types::xml::{XmlElementPrelim, XmlFragment as _, XmlOut, XmlTextPrelim};
 use yrs::{Any, Doc, Text as _, Transact as _, Xml as _};
 
@@ -185,7 +185,23 @@ fn block_text(doc: &Doc, block: usize) -> Option<(yrs::XmlTextRef, u32)> {
     Some((text, text_len))
 }
 
-fn apply(replicas: &[Doc], peer: usize, op: &Op) {
+/// The codec under test and the name of its bold mark.
+#[derive(Clone, Copy)]
+struct Codec<'a> {
+    codec: &'a dyn MarkdownCodec,
+    bold: &'a str,
+}
+
+const TEST: Codec<'static> = Codec {
+    codec: &TestCodec,
+    bold: "bold",
+};
+const FORMAT: Codec<'static> = Codec {
+    codec: &FormatCodec,
+    bold: "strong",
+};
+
+fn apply(replicas: &[Doc], peer: usize, op: &Op, codec: Codec<'_>) {
     let Some(doc) = replicas.get(peer) else {
         return;
     };
@@ -202,7 +218,7 @@ fn apply(replicas: &[Doc], peer: usize, op: &Op) {
                 let mut attrs = yrs::types::Attrs::new();
                 if *bold {
                     let _previous =
-                        attrs.insert("bold".into(), Any::Map(std::sync::Arc::default()));
+                        attrs.insert(codec.bold.into(), Any::Map(std::sync::Arc::default()));
                 }
                 target.insert_with_attributes(&mut txn, index, text, attrs);
             }
@@ -245,7 +261,7 @@ fn apply(replicas: &[Doc], peer: usize, op: &Op) {
         }
         Op::External { markdown } => {
             let base = tree::read(doc);
-            let theirs = TestCodec.parse_markdown(markdown).unwrap();
+            let theirs = codec.codec.parse_markdown(markdown).unwrap();
             let _update = tree::merge(doc, &base, &theirs);
         }
         Op::Sync { with } => {
@@ -257,6 +273,60 @@ fn apply(replicas: &[Doc], peer: usize, op: &Op) {
             }
         }
     }
+}
+
+/// Three editors start from the same Markdown, edit concurrently with
+/// partial syncs in between, then sync fully: every replica holds the
+/// same tree and the same Markdown, and that Markdown is canonical.
+fn converge(
+    start: &[String],
+    script: &[(usize, Op)],
+    codec: Codec<'_>,
+) -> Result<(), TestCaseError> {
+    let initial = if start.is_empty() {
+        "\n".to_owned()
+    } else {
+        format!("{}\n", start.join("\n\n"))
+    };
+    let seed = tree::new_doc();
+    tree::write(&seed, &codec.codec.parse_markdown(&initial).unwrap());
+    let replicas: Vec<Doc> = (0..3).map(|_| tree::new_doc()).collect();
+    for replica in &replicas {
+        sync_docs(&seed, replica);
+    }
+
+    for (peer, op) in script {
+        apply(&replicas, *peer, op, codec);
+    }
+    for _ in 0..2 {
+        for a in 0..replicas.len() {
+            for b in (a + 1)..replicas.len() {
+                sync_docs(&replicas[a], &replicas[b]);
+            }
+        }
+    }
+
+    let trees: Vec<DocTree> = replicas.iter().map(tree::read).collect();
+    let markdown: Vec<String> = trees
+        .iter()
+        .map(|t| codec.codec.to_markdown(t).unwrap())
+        .collect();
+    prop_assert_eq!(&trees[0], &trees[1]);
+    prop_assert_eq!(&trees[1], &trees[2]);
+    prop_assert_eq!(&markdown[0], &markdown[1]);
+    prop_assert_eq!(&markdown[1], &markdown[2]);
+
+    // CRDT → Markdown → CRDT → Markdown is a fixed point.
+    let reloaded = tree::new_doc();
+    tree::write(
+        &reloaded,
+        &codec.codec.parse_markdown(&markdown[0]).unwrap(),
+    );
+    prop_assert_eq!(
+        codec.codec.to_markdown(&tree::read(&reloaded)).unwrap(),
+        markdown[0].clone()
+    );
+    Ok(())
 }
 
 proptest! {
@@ -271,36 +341,16 @@ proptest! {
         start in prop::collection::vec("(# )?[a-z]{1,5}", 0..4),
         script in prop::collection::vec((0..3_usize, op()), 1..40),
     ) {
-        let initial = if start.is_empty() { "\n".to_owned() } else { format!("{}\n", start.join("\n\n")) };
-        let seed = tree::new_doc();
-        tree::write(&seed, &TestCodec.parse_markdown(&initial).unwrap());
-        let replicas: Vec<Doc> = (0..3).map(|_| tree::new_doc()).collect();
-        for replica in &replicas {
-            sync_docs(&seed, replica);
-        }
+        converge(&start, &script, TEST)?;
+    }
 
-        for (peer, op) in &script {
-            apply(&replicas, *peer, op);
-        }
-        for _ in 0..2 {
-            for a in 0..replicas.len() {
-                for b in (a + 1)..replicas.len() {
-                    sync_docs(&replicas[a], &replicas[b]);
-                }
-            }
-        }
-
-        let trees: Vec<DocTree> = replicas.iter().map(tree::read).collect();
-        let markdown: Vec<String> = trees.iter().map(|t| TestCodec.to_markdown(t).unwrap()).collect();
-        prop_assert_eq!(&trees[0], &trees[1]);
-        prop_assert_eq!(&trees[1], &trees[2]);
-        prop_assert_eq!(&markdown[0], &markdown[1]);
-        prop_assert_eq!(&markdown[1], &markdown[2]);
-
-        // CRDT → Markdown → CRDT → Markdown is a fixed point.
-        let reloaded = tree::new_doc();
-        tree::write(&reloaded, &TestCodec.parse_markdown(&markdown[0]).unwrap());
-        prop_assert_eq!(TestCodec.to_markdown(&tree::read(&reloaded)).unwrap(), markdown[0].clone());
+    /// The same with the production codec over `vellum-format`.
+    #[test]
+    fn concurrent_edits_converge_with_the_format_codec(
+        start in prop::collection::vec("(# )?[a-z]{1,5}", 0..4),
+        script in prop::collection::vec((0..3_usize, op()), 1..40),
+    ) {
+        converge(&start, &script, FORMAT)?;
     }
 
     /// An external edit merged into a live document keeps every block the

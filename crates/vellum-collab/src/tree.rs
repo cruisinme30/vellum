@@ -116,7 +116,9 @@ impl DocTree {
 }
 
 impl Node {
-    fn normalized(&self) -> Self {
+    /// This node in the form [`read`] returns (see [`DocTree::normalized`]).
+    #[must_use]
+    pub fn normalized(&self) -> Self {
         match self {
             Self::Element(element) => Self::Element(Element {
                 name: element.name.clone(),
