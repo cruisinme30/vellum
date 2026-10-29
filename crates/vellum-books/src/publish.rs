@@ -264,6 +264,15 @@ impl Book {
                     ..LinkEdit::default()
                 });
             }
+            if is_book_data(&resolved) {
+                // Snapshots, history and the manifest hold every section,
+                // restricted and draft ones too: never copy them into a
+                // publication, whatever a chapter links to (RT-041).
+                return Some(LinkEdit {
+                    unlink: Some(current.unwrap_or(&link.dest).to_owned()),
+                    ..LinkEdit::default()
+                });
+            }
             let _ = assets.insert(resolved);
             None
         }))
@@ -559,6 +568,14 @@ a { color: var(--primary); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 "#;
 
+/// Whether a book-relative path is the book's own data rather than an
+/// asset: anything under a dot folder or named with a leading dot
+/// (`.snapshots/`, `.history/`, `.published/`) and the manifest.
+#[must_use]
+pub fn is_book_data(path: &str) -> bool {
+    path == crate::manifest::FILE_NAME || path.split('/').any(|segment| segment.starts_with('.'))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -627,6 +644,33 @@ mod tests {
             "<span class=\"draft\"><span class=\"num\">1.2</span> Security training</span>"
         ));
         assert!(!services.contains("<script"));
+    }
+
+    /// RT-041: a section editor linking `.snapshots/v1.0.json` (every
+    /// chapter, restricted ones too) or `book.yaml` as an image got the
+    /// file copied into a public site. Book data is never an asset.
+    #[test]
+    fn book_data_is_never_published_as_an_asset() {
+        let mut book = restricted();
+        let body =
+            "![](../.snapshots/v1.0.json) ![](../book.yaml) ![](../.history/x.json) ![](team.png)";
+        book.set_text(
+            &id(3),
+            crate::markdown::new_chapter(&id(3), "Your first week", None, body),
+        )
+        .unwrap();
+        for site in [
+            book.to_mdbook(&Audience::Public).unwrap(),
+            book.to_static_site(&Audience::Public, &PlainRenderer)
+                .unwrap(),
+        ] {
+            assert_eq!(
+                site.assets.iter().map(String::as_str).collect::<Vec<_>>(),
+                ["onboarding/team.png"]
+            );
+        }
+        assert!(is_book_data(".published/site/index.html"));
+        assert!(!is_book_data("img/chart.png"));
     }
 
     #[test]
