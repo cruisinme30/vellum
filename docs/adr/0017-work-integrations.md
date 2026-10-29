@@ -100,6 +100,14 @@ and reach the issue core only through the `WorkCommands` port.
 - Receivers keep the raw request body, so they mount on the gateway as
   raw routes (`vellum_integrations::receive`) rather than typed
   operations. A provider with no secret configured gets `404`.
+- `vellum_notify::service` keeps each person's push subscriptions and
+  preferences in `.vellum/notify.json` (mode 0600), with the VAPID key
+  made on first start, and serves them at `/api/v1/push/...` and
+  `/api/v1/notifications/preferences`. Push endpoints must be `https`.
+  Work events (mentions, comments, assignments, state changes, SLA risk)
+  become inbox lines (`/api/v1/notifications`) and pushes in the
+  background; email waits for a mail transport. Issue events carry no
+  actor yet, so a person who assigns themselves is notified too.
 - Webhook receivers written for other trackers must read
   `Vellum-Signature`; the timestamp-plus-HMAC shape is common.
 - The port's commands are plain steps on the engine
