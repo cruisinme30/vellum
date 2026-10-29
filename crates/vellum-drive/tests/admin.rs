@@ -4,7 +4,10 @@
 //! What workspace administrators do to spaces (ADR 0021, D242), on the
 //! real permission engine.
 
-#![allow(clippy::too_many_lines, reason = "one test walks an admin's whole visit")]
+#![allow(
+    clippy::too_many_lines,
+    reason = "one test walks an admin's whole visit"
+)]
 
 use std::sync::Arc;
 
