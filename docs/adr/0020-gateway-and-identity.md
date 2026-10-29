@@ -11,8 +11,8 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D88, D89
-- Issue: #84, #85, #148, #46
+- Decisions: D88, D89, D90
+- Issue: #84, #85, #148, #46, #86, #88
 - Pull requests: #39, #234
 
 :::
@@ -72,12 +72,35 @@ live in the gateway crate.
   only on a separate public origin with a sandboxing CSP and no scripts,
   through a `PublicSite` port.
 
+### D90: identity issues opaque, hashed credentials and is the `OAuth` server
+
+- Every credential (session cookie, `vlm_` API token, `OAuth` code,
+  access and refresh token, break-glass code) is 32 random bytes behind a
+  type prefix, stored only as its SHA-256. Passwords use Argon2id.
+- Sessions are an `HttpOnly`, `SameSite=Lax` cookie
+  (`__Host-vellum_session` over HTTPS) with 14-day idle and 30-day
+  absolute expiry; the session hash is the CSRF binding.
+- Sign-in locks out an address after 5 failures and an IP after 20, with
+  doubling waits up to 15 minutes. Admin operations need a sign-in within
+  15 minutes; tokens never satisfy that for long.
+- The `OAuth` 2.1 server takes public clients only: PKCE `S256`, Client ID
+  Metadata Documents fetched through the SSRF guard, the built-in
+  `vellum-desktop` client with any-port loopback redirects, RFC 8707
+  audiences (`<base>/mcp` for MCP) and rotating refresh tokens whose
+  reuse revokes the grant.
+- Break-glass: `vellum admin break-glass` writes a one-time code to the
+  data directory; redeeming it opens a 15-minute administrator session.
+- Records live in `.vellum/identity.json` (mode 0600) until the SQL index
+  lands. SSO (OIDC, SAML) follows in its own change.
+
 ## Alternatives
 
 - **Each service ships an `axum` router and a `GraphQL` object**: REST
   and `GraphQL` drift apart, and services pull in HTTP crates.
 - **Hand-written gateway handlers per service**: the gateway changes for
   every endpoint and coverage depends on discipline.
+- **Signed JWT access tokens**: cannot be revoked before expiry, and
+  each resource server would need key distribution; lookups are cheap.
 - **Share pages on the app origin**: user content would run beside the
   signed-in session's cookies.
 

@@ -22,15 +22,26 @@ path = "src/main.rs"
 base64 = "0.23.1"
 clap = { version = "4.6.7", features = ["derive"] }
 getrandom = "0.4"
+http = "1.5.0"
 serde_json = "1.0.154"
 thiserror = "2.0.21"
 tokio = { version = "1.54.1", features = ["io-std", "macros", "rt-multi-thread", "signal"] }
 tracing = "0.1.44"
+url = "2.5.8"
 vellum-api = { path = "../vellum-api" }
 vellum-contracts.workspace = true
 vellum-help.workspace = true
+vellum-identity = { path = "../vellum-identity" }
 vellum-kernel.workspace = true
 vellum-mcp = { path = "../vellum-mcp" }
+vellum-security = { path = "../vellum-security" }
+
+[dev-dependencies]
+axum = { version = "0.8.9", default-features = false }
+http-body-util = "0.1.3"
+serde_urlencoded = "0.7.1"
+sha2 = "0.11.1"
+tower = { version = "0.5.3", features = ["util"] }
 
 [lints]
 workspace = true

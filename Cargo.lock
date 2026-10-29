@@ -4193,18 +4193,27 @@ dependencies = [
 name = "vellum-cli"
 version = "0.0.0"
 dependencies = [
+ "axum",
  "base64 0.23.1",
  "clap",
  "getrandom 0.4.3",
+ "http",
+ "http-body-util",
  "serde_json",
+ "serde_urlencoded",
+ "sha2",
  "thiserror",
  "tokio",
+ "tower",
  "tracing",
+ "url",
  "vellum-api",
  "vellum-contracts",
  "vellum-help",
+ "vellum-identity",
  "vellum-kernel",
  "vellum-mcp",
+ "vellum-security",
 ]
 
 [[package]]
@@ -4300,6 +4309,31 @@ dependencies = [
 [[package]]
 name = "vellum-help"
 version = "0.0.0"
+
+[[package]]
+name = "vellum-identity"
+version = "0.0.0"
+dependencies = [
+ "argon2",
+ "axum",
+ "base64 0.23.1",
+ "getrandom 0.4.3",
+ "http",
+ "http-body-util",
+ "schemars",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "sha2",
+ "subtle",
+ "tokio",
+ "tower",
+ "tracing",
+ "url",
+ "vellum-contracts",
+ "vellum-kernel",
+ "vellum-security",
+]
 
 [[package]]
 name = "vellum-jobs"
