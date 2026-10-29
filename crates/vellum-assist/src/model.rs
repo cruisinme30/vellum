@@ -131,9 +131,21 @@ impl ModelSettings {
                 ));
             }
         }
-        Url::parse(&self.base())
-            .map_err(|_| invalid("base_url: not an absolute URL"))
-            .map(drop)
+        let url = Url::parse(&self.base()).map_err(|_| invalid("base_url: not an absolute URL"))?;
+        // The request URL is built by appending the API path, so a query,
+        // fragment or sign-in part would change where it goes (RT-038).
+        if !matches!(url.scheme(), "http" | "https")
+            || url.host_str().is_none()
+            || !url.username().is_empty()
+            || url.password().is_some()
+            || url.query().is_some()
+            || url.fragment().is_some()
+        {
+            return Err(invalid(
+                "base_url: give the endpoint as http(s)://host[:port]/path, without a query",
+            ));
+        }
+        Ok(())
     }
 }
 
@@ -390,8 +402,11 @@ impl HttpModel {
         Ok(Self { client, endpoints })
     }
 
-    /// Whether `base` is one of the admin-listed endpoints (same scheme,
-    /// host and port, and under its path).
+    /// Whether `base` is one of the admin-listed endpoints: same scheme,
+    /// host, port and path. Only the exact base an admin listed is
+    /// trusted, never other paths on that host (RT-038), so a user cannot
+    /// reach a self-hosted server's other APIs, such as Ollama's model
+    /// pulls.
     #[must_use]
     pub fn is_listed(&self, base: &str) -> bool {
         let Ok(url) = Url::parse(base) else {
@@ -401,7 +416,11 @@ impl HttpModel {
             e.scheme() == url.scheme()
                 && e.host_str() == url.host_str()
                 && e.port_or_known_default() == url.port_or_known_default()
-                && url.path().starts_with(e.path().trim_end_matches('/'))
+                && url.path().trim_end_matches('/') == e.path().trim_end_matches('/')
+                && url.query().is_none()
+                && url.fragment().is_none()
+                && url.username().is_empty()
+                && url.password().is_none()
         })
     }
 }
@@ -413,6 +432,9 @@ impl ModelClient for HttpModel {
         settings: &ModelSettings,
         prompt: &Prompt,
     ) -> Result<Completion, ModelError> {
+        settings
+            .validate()
+            .map_err(|e| ModelError::Blocked(e.message().to_owned()))?;
         let base = settings.base();
         let listed = self.is_listed(&base);
         if !listed && !base.starts_with("https://") {
@@ -569,6 +591,51 @@ mod tests {
             model.complete(&s, &prompt()).await,
             Err(ModelError::Blocked(_))
         ));
+        Ok(())
+    }
+
+    /// RT-038: a listed endpoint trusts its exact base only. Other paths on
+    /// the host (Ollama's `/api/pull`, `/api/push`) stay unreachable, and a
+    /// query or fragment cannot cut off the API path that is appended.
+    #[tokio::test]
+    async fn a_listing_trusts_its_exact_base_only() -> Result<(), Error> {
+        let model = HttpModel::new(
+            &["http://ollama:11434".into(), "http://vllm:8000/v1/".into()],
+            Duration::from_secs(5),
+        )?;
+        assert!(model.is_listed("http://ollama:11434"));
+        assert!(model.is_listed("http://vllm:8000/v1"));
+        for base in [
+            "http://ollama:11434/api",
+            "http://ollama:11434/api/pull?",
+            "http://vllm:8000/v1x",
+            "http://vllm:8000/v1/../api",
+            "http://vllm:8000/v1/admin",
+            "http://vllm:8000/v1?a=b",
+            "http://vllm:8000/v1#x",
+            "http://u:p@vllm:8000/v1",
+        ] {
+            assert!(!model.is_listed(base), "{base}");
+            let mut s = settings(Provider::OpenaiCompatible);
+            s.base_url = Some(base.into());
+            assert!(
+                matches!(
+                    model.complete(&s, &prompt()).await,
+                    Err(ModelError::Blocked(_))
+                ),
+                "{base}"
+            );
+        }
+        for base in [
+            "https://api.openai.com/v1?x=",
+            "https://api.openai.com/v1#frag",
+            "https://user@api.openai.com/v1",
+            "ftp://api.openai.com/v1",
+        ] {
+            let mut s = settings(Provider::OpenaiCompatible);
+            s.base_url = Some(base.into());
+            assert!(s.validate().is_err(), "{base}");
+        }
         Ok(())
     }
 }
