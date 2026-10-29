@@ -12,6 +12,9 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D97, D98, D99
+- Issues: #91 (local-first store), #185 (PWA), #182 and #184 (desktop),
+  #186 (private spaces)
+- Pull requests: #34 (local-first store), #139 (PWA)
 - Requirements: brief §3 (desktop, mobile), §8 (sub-100 ms perceived
   latency), §11 (E2E private spaces), R-WK-6, R-MW-5, R-LT-4, R-SE-10
 
@@ -140,3 +143,7 @@ every client must run the same editor build.
   example after an index rebuild) answers pulls with `reset: true`.
 - Notarisation waits only for the owner's Apple credentials; nothing else
   in the release path depends on them.
+
+## History
+
+- 2026-10-29: accepted in #34 (D98); PWA rules added to D97 in #139.
