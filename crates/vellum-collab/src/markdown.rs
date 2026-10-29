@@ -18,11 +18,11 @@
 //! - Containers become their typed node when the body fits it (`callout`,
 //!   `details`, `columns` > `column`, `tabs` > `tab` split at `##`, `toc`,
 //!   `stats`, `facts`, `progress`, `cards`, `pages`, `steps`, `linkCard`,
-//!   `embed`); anything else is a generic [`CONTAINER`] node.
+//!   `embed`); anything else is a generic `container` node.
 //! - Inline: text with the marks `bold`, `italic`, `strike`, `code`,
 //!   `highlight`, `subscript`, `superscript` and `link`; a soft break is a
 //!   `\n` in the text; `hardBreak`, `mention`, `wikiLink`, `issueKey`,
-//!   `date`, and [`INLINE_IMAGE`] for an image inside text. Marks around an
+//!   `date`, and `inlineImage` for an image inside text. Marks around an
 //!   inline node are its `marks` attribute, as `y-prosemirror` stores them.
 //!
 //! Dialect facts the schema has no attribute for yet are kept in extra
@@ -55,12 +55,6 @@ pub const RAW_FRONT_MATTER: &str = "$raw";
 
 /// The `meta` key that lists front matter keys in file order.
 pub const FRONT_MATTER_ORDER: &str = "$order";
-
-/// A `:::` container with no typed node, or whose body does not fit one.
-pub const CONTAINER: &str = "container";
-
-/// An image inside text (the schema's `image` is a block).
-pub const INLINE_IMAGE: &str = "inlineImage";
 
 /// The verbatim `{#id .class key="value"}` span of a heading, fence or
 /// container, as `vellum_format::attrs` writes it.
@@ -185,7 +179,7 @@ fn block_to_element(block: &Block) -> Element {
                     .first()
                     .map(Vec::as_slice)
                     .unwrap_or_default();
-                Element::new(CONTAINER, blocks_to_nodes(section))
+                node(NodeType::Container, blocks_to_nodes(section))
                     .with_attr("name", container.name.clone())
                     .with_attr("arg", container.arg.clone())
             });
@@ -241,8 +235,19 @@ fn typed_container(container: &Container) -> Option<Element> {
         ContainerKind::Steps if no_arg => node(NodeType::Steps, only_list(true)?),
         ContainerKind::Pages if no_arg && body.is_empty() => node(NodeType::Pages, Vec::new()),
         ContainerKind::Pages if no_arg => node(NodeType::Pages, only_list(false)?),
-        ContainerKind::Link if body.is_empty() => {
-            node(NodeType::LinkCard, Vec::new()).with_attr("url", container.arg.clone())
+        ContainerKind::Link => {
+            // The body is one line holding the card's title.
+            let title = match body {
+                [] => String::new(),
+                [Block::Paragraph { content, id: None }] => match content.as_slice() {
+                    [Inline::Text { text }] => text.clone(),
+                    _ => return None,
+                },
+                _ => return None,
+            };
+            node(NodeType::LinkCard, Vec::new())
+                .with_attr("url", container.arg.clone())
+                .with_attr("title", title)
         }
         ContainerKind::Embed if body.is_empty() => {
             node(NodeType::Embed, Vec::new()).with_attr("url", container.arg.clone())
@@ -456,7 +461,7 @@ fn flatten(inlines: &[Inline], marks: &Marks, out: &mut Vec<Piece>) {
                 flatten(content, &with(MarkType::Link, Any::Map(link.into())), out);
             }
             Inline::Image { url, title, alt } => out.push(atom(
-                Element::new(INLINE_IMAGE, Vec::new())
+                node(NodeType::InlineImage, Vec::new())
                     .with_attr("src", url.clone())
                     .with_attr("alt", vellum_format::plain_text(alt))
                     .with_attr("title", title.clone()),
@@ -559,8 +564,7 @@ fn fields(meta: &BTreeMap<String, Any>) -> Map<String, Value> {
 }
 
 fn is_inline(name: &str) -> bool {
-    name == INLINE_IMAGE
-        || NodeType::from_name(name).is_some_and(|kind| kind.is_inline() && kind != NodeType::Text)
+    NodeType::from_name(name).is_some_and(|kind| kind.is_inline() && kind != NodeType::Text)
 }
 
 fn nodes_to_blocks(nodes: &[Node]) -> Vec<Block> {
@@ -662,10 +666,8 @@ fn element_to_container(element: &Element) -> Option<Container> {
     };
     let named =
         |name: &str, arg: String| container(name.to_owned(), arg, vec![nodes_to_blocks(children)]);
-    if element.name == CONTAINER {
-        return Some(named(&text("name"), text("arg")));
-    }
     match NodeType::from_name(&element.name)? {
+        NodeType::Container => Some(named(&text("name"), text("arg"))),
         NodeType::Callout => {
             let name = attr_str(attrs, "kind").unwrap_or("info");
             Some(named(name, text("title")))
@@ -706,7 +708,18 @@ fn element_to_container(element: &Element) -> Option<Container> {
         NodeType::Cards => Some(named("cards", String::new())),
         NodeType::Steps => Some(named("steps", String::new())),
         NodeType::Pages => Some(named("pages", String::new())),
-        NodeType::LinkCard => Some(named("link", text("url"))),
+        NodeType::LinkCard => {
+            let title = text("title");
+            let body = if title.is_empty() {
+                Vec::new()
+            } else {
+                vec![Block::Paragraph {
+                    content: vec![Inline::Text { text: title }],
+                    id: None,
+                }]
+            };
+            Some(container("link".to_owned(), text("url"), vec![body]))
+        }
         NodeType::Embed => Some(named("embed", text("url"))),
         _ => None,
     }
@@ -926,11 +939,9 @@ fn image(attrs: &BTreeMap<String, Any>) -> Inline {
 fn atom(element: &Element) -> Option<Inline> {
     let attrs = &element.attrs;
     let text = |key: &str| attr_str(attrs, key).unwrap_or_default().to_owned();
-    if element.name == INLINE_IMAGE {
-        return Some(image(attrs));
-    }
     Some(match NodeType::from_name(&element.name)? {
         NodeType::HardBreak => Inline::HardBreak,
+        NodeType::InlineImage => image(attrs),
         NodeType::WikiLink => Inline::WikiLink {
             target: text("target"),
             label: attr_str(attrs, "label")

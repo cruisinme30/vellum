@@ -5,28 +5,60 @@
 //! Markdown → tree → Yjs → tree → Markdown, and comes back as its
 //! canonical form with the same AST.
 
-#![allow(missing_docs, clippy::unwrap_used)]
+#![allow(missing_docs, clippy::unwrap_used, clippy::indexing_slicing)]
 
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use proptest::prelude::*;
-use vellum_collab::markdown::{CONTAINER, INLINE_IMAGE, from_document, to_document};
+use vellum_collab::markdown::{from_document, to_document};
 use vellum_collab::{FormatCodec, MarkdownCodec as _, Node, tree};
 use vellum_contracts::blocks::{MarkType, NodeType};
 
-/// Every node and mark name the codec writes is in the editor's schema.
-fn check_names(nodes: &[Node], out: &mut Vec<String>) {
+/// Attribute names each node may carry, read from `schema/blocks.json`.
+fn schema_attrs() -> HashMap<String, HashSet<String>> {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../schema/blocks.json");
+    let schema: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap();
+    schema["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|node| {
+            let mut attrs: HashSet<String> = node["attrs"]
+                .as_object()
+                .map(|attrs| attrs.keys().cloned().collect())
+                .unwrap_or_default();
+            if node["blockId"].as_bool() == Some(true) {
+                let _new = attrs.insert("blockId".to_owned());
+            }
+            if node["inline"].as_bool() == Some(true) {
+                let _new = attrs.insert("marks".to_owned());
+            }
+            (node["name"].as_str().unwrap().to_owned(), attrs)
+        })
+        .collect()
+}
+
+/// Every node, attribute and mark the codec writes is in the editor's
+/// schema.
+fn check_schema(nodes: &[Node], schema: &HashMap<String, HashSet<String>>, out: &mut Vec<String>) {
     for node in nodes {
         match node {
             Node::Element(element) => {
-                let known = NodeType::from_name(&element.name).is_some()
-                    || element.name == CONTAINER
-                    || element.name == INLINE_IMAGE;
-                if !known {
+                if NodeType::from_name(&element.name).is_none() {
                     out.push(format!("node {}", element.name));
                 }
-                check_names(&element.children, out);
+                let allowed = schema.get(&element.name);
+                out.extend(
+                    element
+                        .attrs
+                        .keys()
+                        .filter(|key| !allowed.is_some_and(|allowed| allowed.contains(*key)))
+                        .map(|key| format!("{}.{key}", element.name)),
+                );
+                check_schema(&element.children, schema, out);
             }
             Node::Text(runs) => out.extend(
                 runs.iter()
@@ -78,6 +110,7 @@ fn corpus_survives_the_editor_tree() {
     inputs(&corpus_root().join("../docs"), &mut files);
     assert!(files.len() > 50, "corpus looks empty: {}", files.len());
 
+    let schema = schema_attrs();
     let mut failures = Vec::new();
     for input in &files {
         let name = input
@@ -92,7 +125,7 @@ fn corpus_survives_the_editor_tree() {
         // The tree conversion alone is lossless on the AST.
         let tree = from_document(&parsed);
         let mut unknown = Vec::new();
-        check_names(&tree.content, &mut unknown);
+        check_schema(&tree.content, &schema, &mut unknown);
         if !unknown.is_empty() {
             failures.push(format!("{name}: names outside the schema: {unknown:?}"));
         }
