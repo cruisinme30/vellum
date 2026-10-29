@@ -134,6 +134,8 @@ if [[ -e "${adrs[0]}" ]]; then
     echo "[Architecture decisions](README.md)"
     echo
     for adr in "${adrs[@]}"; do
+      # 0000-template.md is the blank form for new records, not a decision.
+      [[ "$(basename "${adr}")" == 0000-* ]] && continue
       cp "${adr}" "${src}/"
       echo "- [$(yaml_title "${adr}")]($(basename "${adr}"))"
     done
