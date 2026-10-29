@@ -187,8 +187,9 @@ Every change is traceable to the discussion that led to it.
   `cargo xtask adr new <slug> --decisions N --issue N`. It writes
   `docs/adr/NNNN-<slug>.md` from `docs/adr/0000-template.md` with the next
   free record and decision numbers across all branches
-  (`cargo xtask adr next` only prints them). Push the branch right away to
-  claim the numbers, then fill it in. Every record has the same four sections,
+  (`cargo xtask adr next` only prints them), skipping those reserved in
+  `docs/adr/reserved.toml`. Push the branch right away to claim the
+  numbers, then fill it in. Every record has the same four sections,
   **Context**, **Decisions**, **Alternatives** and **Consequences**, plus
   the issue and pull requests in its facts block. Keep it short: under
   150 lines and at most six bullets in a row; the **Decision records**

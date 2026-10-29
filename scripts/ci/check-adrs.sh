@@ -7,7 +7,8 @@
 #   that order and no others, none of them empty;
 # - Issue and Pull requests lines in the facts block;
 # - at most 150 lines, and at most 6 bullets in a row under any heading;
-# - no ADR number or D number used twice. Threads pick their own numbers
+# - no ADR number or D number used twice, and no overlapping reservations
+#   in docs/adr/reserved.toml. Threads pick their own numbers
 #   with `cargo xtask adr next` (ADR 0049, D216), so this is what catches
 #   two branches that picked the same ones.
 set -euo pipefail
@@ -72,6 +73,29 @@ for adr in docs/adr/[0-9]*.md; do
     decision_owner[${decision}]="${name}"
   done
 done
+
+# Reservations (docs/adr/reserved.toml) may not overlap one another.
+reserved=docs/adr/reserved.toml
+declare -A reserved_owner=()
+if [[ -f "${reserved}" ]]; then
+  while IFS= read -r range; do
+    first="${range%%-*}"
+    last="${range##*-}"
+    first="${first#D}"
+    last="${last#D}"
+    if ! [[ "${first}" =~ ^[0-9]+$ && "${last}" =~ ^[0-9]+$ ]] || ((10#${first} > 10#${last})); then
+      fail "${reserved}" "Cannot read the range '${range}'; write \"D217\" or \"D217-D261\"."
+      continue
+    fi
+    for ((d = 10#${first}; d <= 10#${last}; d++)); do
+      if [[ -n "${reserved_owner[${d}]:-}" ]]; then
+        fail "${reserved}" "D${d} is in both '${reserved_owner[${d}]}' and '${range}'."
+        break
+      fi
+      reserved_owner[${d}]="${range}"
+    done
+  done < <(sed -nE 's/^decisions *= *"([^"]+)".*/\1/p' "${reserved}")
+fi
 
 if ((failures > 0)); then
   echo "See docs/adr/0000-template.md for the shape of a decision record."
