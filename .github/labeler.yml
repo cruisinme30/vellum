@@ -59,6 +59,10 @@ area/pages:
   - changed-files:
       - any-glob-to-any-file:
           - "crates/vellum-pages/**"
+area/drive:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-drive/**"
 area/work:
   - changed-files:
       - any-glob-to-any-file:
