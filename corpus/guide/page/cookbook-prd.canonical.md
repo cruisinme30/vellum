@@ -12,10 +12,12 @@ vellum: 1
 ---
 
 ::: facts
+
 - Owner: @priya
 - Status: In review
 - Target: 2027-01-10
 - Project: Policy simulator
+
 :::
 
 ## Problem
@@ -49,5 +51,7 @@ PDF layout slips | likelihood 2 | impact 2
 ```
 
 ::: details Out of scope
+
 Simulating policies against synthetic traffic; live A/B of policies.
+
 :::

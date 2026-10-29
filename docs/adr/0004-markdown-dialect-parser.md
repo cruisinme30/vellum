@@ -12,6 +12,7 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D40, D41, D42
+- Pull requests: #35
 - Issues: #64, #65, #66, #67, #68, #69
 
 :::
@@ -57,7 +58,9 @@ flowchart LR
 - `serialize(&Document)` writes one canonical text: `-` bullets and `.`
   markers (alternating `*` and `)` for adjacent lists), backtick fences
   sized to their content, `***` for rules where `---` would be
-  ambiguous, front matter keys in page order, and minimal escapes.
+  ambiguous, front matter keys in page order, blank lines inside
+  `:::` containers (so the output passes markdownlint), and minimal
+  escapes (a backslash is doubled only before punctuation).
   `parse(serialize(d)) == d` for every parsed `d`.
 
 ### D41: the directive pre-pass works on lines outside code
@@ -83,6 +86,14 @@ flowchart LR
   between reading and writing.
 - An issue key is a candidate. Render resolves it against teams and
   falls back to plain text.
+
+## Alternatives
+
+- **`pulldown-cmark`**: no GFM alerts or footnote parity with comrak,
+  and the brief names comrak.
+- **`serde_yaml`**: depends on the unmaintained `unsafe-libyaml`.
+- **Keep the source text instead of a canonical form**: equal documents
+  would diff differently, and merges would see noise.
 
 ## Consequences
 
