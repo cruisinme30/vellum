@@ -92,6 +92,28 @@ export function layoutAudit(): Finding[] {
     }
     return false;
   };
+  /** The part of a box its scrolling or clipping ancestors leave visible. */
+  const visiblePart = (element: Element, box: DOMRect): DOMRect => {
+    let { left, top, right, bottom } = box;
+    for (
+      let node = element.parentElement;
+      node !== null && node !== document.body;
+      node = node.parentElement
+    ) {
+      const style = getComputedStyle(node);
+      if (style.overflowX === "visible" && style.overflowY === "visible") continue;
+      const frame = node.getBoundingClientRect();
+      if (style.overflowX !== "visible") {
+        left = Math.max(left, frame.left);
+        right = Math.min(right, frame.right);
+      }
+      if (style.overflowY !== "visible") {
+        top = Math.max(top, frame.top);
+        bottom = Math.min(bottom, frame.bottom);
+      }
+    }
+    return new DOMRect(left, top, Math.max(0, right - left), Math.max(0, bottom - top));
+  };
   const ownText = (element: Element): boolean =>
     [...element.childNodes].some(
       (child) => child.nodeType === Node.TEXT_NODE && (child.textContent ?? "").trim() !== "",
@@ -214,13 +236,19 @@ export function layoutAudit(): Finding[] {
                 Number.parseFloat(style.paddingBottom) + Number.parseFloat(style.borderBottomWidth),
             }
           : { top: 0, bottom: 0 };
+      // Only the part a scrolling or clipping ancestor leaves visible counts:
+      // a long command inside a scrolling code block does not cover its
+      // neighbour.
       return [...element.getClientRects()].map((box) => ({
         element,
-        rect: new DOMRect(
-          box.x,
-          box.y + inset.top,
-          box.width,
-          Math.max(0, box.height - inset.top - inset.bottom),
+        rect: visiblePart(
+          element,
+          new DOMRect(
+            box.x,
+            box.y + inset.top,
+            box.width,
+            Math.max(0, box.height - inset.top - inset.bottom),
+          ),
         ),
       }));
     })

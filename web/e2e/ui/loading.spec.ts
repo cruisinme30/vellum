@@ -41,7 +41,11 @@ for (const target of TARGETS) {
       await page.goto(target.url, { waitUntil: "commit" });
       await expect.poll(() => hasText(page), { timeout: 30_000, intervals: [50] }).toBe(true);
       const firstText = Date.now() - started;
-      await page.waitForLoadState("load");
+      // On a throttled link the whole of a long page can take minutes; the
+      // check is about what readers see first, so stop waiting after 30 s.
+      await page.waitForLoadState("load", { timeout: 30_000 }).catch((error: unknown) => {
+        if (!(error instanceof Error && error.name === "TimeoutError")) throw error;
+      });
       await settle(page);
       expect(firstText, `first text after ${String(firstText)} ms`).toBeLessThan(FIRST_TEXT_MS);
       expect(await layoutShift(page)).toBeLessThanOrEqual(CLS_LIMIT);
