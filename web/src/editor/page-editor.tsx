@@ -5,12 +5,18 @@ import { getSchema, type JSONContent } from "@tiptap/core";
 import { Collaboration } from "@tiptap/extension-collaboration";
 import { CollaborationCaret } from "@tiptap/extension-collaboration-caret";
 import { EditorContent, useEditor } from "@tiptap/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import * as Y from "yjs";
 
 import { useT } from "../i18n/i18n";
 
-import type { CollabConnector, CollabSession, CollabUser } from "./collab/provider";
+import type {
+  CollabConnector,
+  CollabSession,
+  CollabUser,
+  LiveConnection,
+  LiveState,
+} from "./collab/provider";
 import { FIELD, seedUpdate } from "./collab/seed";
 import { vellumExtensions } from "./extensions";
 import type { ResolvePage } from "./nodes/inline";
@@ -19,6 +25,8 @@ import { Toolbar } from "./toolbar";
 /** Props of {@link PageEditor}. */
 export interface PageEditorProperties {
   readonly pageId: string;
+  /** The drive space that holds the page; names its live-editing room. */
+  readonly spaceId: string;
   /** Content for a page whose collab document has never been written. */
   readonly seed: JSONContent | undefined;
   readonly connector: CollabConnector;
@@ -27,12 +35,64 @@ export interface PageEditorProperties {
   readonly onOpenPage: (id: string) => void;
 }
 
-interface BoundProperties extends Omit<PageEditorProperties, "connector" | "pageId"> {
+interface BoundProperties extends Omit<PageEditorProperties, "connector" | "pageId" | "spaceId"> {
   readonly session: CollabSession;
+}
+
+/** A local session: always online and editable, and never changes. */
+const unsubscribeNothing = () => {
+  // A local session never changes, so there is nothing to unsubscribe.
+};
+const LOCAL: LiveConnection = {
+  getSnapshot: () => LOCAL_STATE,
+  subscribe: () => unsubscribeNothing,
+  done: () => Promise.resolve(),
+};
+const LOCAL_STATE: LiveState = { status: "online", canWrite: true, peers: new Map() };
+
+/** The session's server state. */
+function useLive(live: LiveConnection = LOCAL): LiveState {
+  return useSyncExternalStore(live.subscribe, live.getSnapshot);
+}
+
+/** One line under the toolbar when the page is not plainly editable and synced. */
+function LiveNotice({ state }: { readonly state: LiveState }) {
+  const t = useT();
+  let key: string | undefined;
+  switch (state.status) {
+    case "revoked": {
+      key = "editor-revoked";
+
+      break;
+    }
+    case "offline": {
+      key = "editor-offline";
+
+      break;
+    }
+    case "connecting": {
+      key = "editor-connecting";
+
+      break;
+    }
+    default: {
+      if (!state.canWrite) {
+        key = "editor-read-only";
+      }
+    }
+  }
+  // The live region stays mounted so screen readers announce each change.
+  return (
+    <div role="status">
+      {key === undefined ? undefined : <p className="vl-editor-notice">{t(key)}</p>}
+    </div>
+  );
 }
 
 function BoundEditor({ session, seed, user, resolvePage, onOpenPage }: BoundProperties) {
   const t = useT();
+  const live = useLive(session.live);
+  const editable = live.status !== "revoked" && live.canWrite;
   const base = useMemo(
     () => vellumExtensions({ t, resolvePage, history: false }),
     [t, resolvePage],
@@ -81,10 +141,17 @@ function BoundEditor({ session, seed, user, resolvePage, onOpenPage }: BoundProp
     },
     [session, seeded],
   );
+  useEffect(() => {
+    // Tiptap would emit an update for the change; leave the document alone.
+    if (editor.isEditable !== editable) {
+      editor.setEditable(editable, false);
+    }
+  }, [editor, editable]);
 
   return (
     <div className="vl-editor">
       <Toolbar editor={editor} />
+      <LiveNotice state={live} />
       <EditorContent editor={editor} />
     </div>
   );
@@ -95,11 +162,11 @@ function BoundEditor({ session, seed, user, resolvePage, onOpenPage }: BoundProp
  * document is an effect so React's development double-mount never leaks
  * a session.
  */
-export function PageEditor({ connector, pageId, ...rest }: PageEditorProperties) {
+export function PageEditor({ connector, pageId, spaceId, ...rest }: PageEditorProperties) {
   const t = useT();
   const [open, setOpen] = useState<{ pageId: string; session: CollabSession }>();
   useEffect(() => {
-    const session = connector.open(pageId);
+    const session = connector.open(pageId, spaceId);
     let live = true;
     void session.ready.then(() => {
       if (live) {
@@ -110,7 +177,7 @@ export function PageEditor({ connector, pageId, ...rest }: PageEditorProperties)
       live = false;
       session.destroy();
     };
-  }, [connector, pageId]);
+  }, [connector, pageId, spaceId]);
   if (open?.pageId !== pageId) {
     return (
       <p className="vl-muted" role="status">

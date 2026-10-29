@@ -85,8 +85,8 @@ describe("createLocalConnector", () => {
   it("syncs edits between two sessions of the same document", async () => {
     const bus = createBus();
     const connector = createLocalConnector({ channel: bus.factory });
-    const first = track(connector.open("page-1"));
-    const second = track(connector.open("page-1"));
+    const first = track(connector.open("page-1", "space-1"));
+    const second = track(connector.open("page-1", "space-1"));
     await Promise.all([first.ready, second.ready]);
     first.doc.getText("t").insert(0, "hello");
     await settle();
@@ -99,10 +99,10 @@ describe("createLocalConnector", () => {
   it("catches a late joiner up through the hello exchange", async () => {
     const bus = createBus();
     const connector = createLocalConnector({ channel: bus.factory });
-    const early = track(connector.open("page-1"));
+    const early = track(connector.open("page-1", "space-1"));
     await early.ready;
     early.doc.getText("t").insert(0, "before you came");
-    const late = track(connector.open("page-1"));
+    const late = track(connector.open("page-1", "space-1"));
     await late.ready;
     await settle();
     expect(text(late)).toBe("before you came");
@@ -111,8 +111,8 @@ describe("createLocalConnector", () => {
   it("keeps different documents apart", async () => {
     const bus = createBus();
     const connector = createLocalConnector({ channel: bus.factory });
-    const first = track(connector.open("page-1"));
-    const other = track(connector.open("page-2"));
+    const first = track(connector.open("page-1", "space-1"));
+    const other = track(connector.open("page-2", "space-1"));
     await Promise.all([first.ready, other.ready]);
     first.doc.getText("t").insert(0, "private");
     await settle();
@@ -122,8 +122,8 @@ describe("createLocalConnector", () => {
   it("shares awareness state and removes it on destroy", async () => {
     const bus = createBus();
     const connector = createLocalConnector({ channel: bus.factory });
-    const first = track(connector.open("page-1"));
-    const second = connector.open("page-1");
+    const first = track(connector.open("page-1", "space-1"));
+    const second = connector.open("page-1", "space-1");
     await Promise.all([first.ready, second.ready]);
     second.awareness.setLocalStateField("user", { name: "Sam", color: "#123456" });
     await settle();
@@ -140,7 +140,9 @@ describe("createLocalConnector", () => {
     source.getText("t").insert(0, "cached");
     const { cache, stored, append } = memoryCache({ "page-1": [Y.encodeStateAsUpdate(source)] });
     const bus = createBus();
-    const session = track(createLocalConnector({ cache, channel: bus.factory }).open("page-1"));
+    const session = track(
+      createLocalConnector({ cache, channel: bus.factory }).open("page-1", "space-1"),
+    );
     await session.ready;
     expect(text(session)).toBe("cached");
     expect(append).not.toHaveBeenCalled();
@@ -153,8 +155,10 @@ describe("createLocalConnector", () => {
   it("caches remote updates without echoing them back", async () => {
     const { cache, append } = memoryCache();
     const bus = createBus();
-    const writer = track(createLocalConnector({ channel: bus.factory }).open("page-1"));
-    const reader = track(createLocalConnector({ cache, channel: bus.factory }).open("page-1"));
+    const writer = track(createLocalConnector({ channel: bus.factory }).open("page-1", "space-1"));
+    const reader = track(
+      createLocalConnector({ cache, channel: bus.factory }).open("page-1", "space-1"),
+    );
     await Promise.all([writer.ready, reader.ready]);
     await settle();
     const before = bus.posted.length;
@@ -167,7 +171,7 @@ describe("createLocalConnector", () => {
 
   it("ignores foreign messages and its own echoes", async () => {
     const bus = createBus();
-    const session = track(createLocalConnector({ channel: bus.factory }).open("page-1"));
+    const session = track(createLocalConnector({ channel: bus.factory }).open("page-1", "space-1"));
     await session.ready;
     const [channel] = bus.channels;
     for (const data of ["text", undefined, { kind: "update" }, 42]) {
@@ -185,7 +189,7 @@ describe("createLocalConnector", () => {
 
   it("closes its channel and stops listening on destroy", async () => {
     const bus = createBus();
-    const session = createLocalConnector({ channel: bus.factory }).open("page-1");
+    const session = createLocalConnector({ channel: bus.factory }).open("page-1", "space-1");
     await session.ready;
     const [channel] = bus.channels;
     if (!channel) {
@@ -199,7 +203,7 @@ describe("createLocalConnector", () => {
 
   it("uses a real BroadcastChannel by default", async () => {
     const connector = createLocalConnector();
-    const first = track(connector.open(`real-${String(Date.now())}`));
+    const first = track(connector.open(`real-${String(Date.now())}`, "space-1"));
     await first.ready;
     first.doc.getText("t").insert(0, "over the wire");
     expect(text(first)).toBe("over the wire");
