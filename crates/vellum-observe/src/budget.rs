@@ -19,6 +19,10 @@ pub const DEFAULT_READ_MS: u64 = 150;
 pub const DEFAULT_WRITE_MS: u64 = 300;
 /// Fewer requests than this in the window are too few to judge a p95.
 pub const DEFAULT_MIN_REQUESTS: u64 = 20;
+/// The rendered-page route, served from the render cache (#74).
+pub const PAGE_RENDER_ROUTE: &str = "/api/v1/pages/{id}/render";
+/// Its p95 budget: the cached-read target, in milliseconds.
+pub const PAGE_RENDER_MS: u64 = 50;
 
 /// A budget for one route, or every route under a prefix.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -78,7 +82,11 @@ impl Default for Budgets {
             read_ms: DEFAULT_READ_MS,
             write_ms: DEFAULT_WRITE_MS,
             min_requests: DEFAULT_MIN_REQUESTS,
-            routes: Vec::new(),
+            routes: vec![RouteBudget {
+                method: Some("GET".to_owned()),
+                route: PAGE_RENDER_ROUTE.to_owned(),
+                p95_ms: PAGE_RENDER_MS,
+            }],
         }
     }
 }
@@ -201,6 +209,17 @@ mod tests {
             route: route.to_owned(),
             p95_ms,
         }
+    }
+
+    #[test]
+    fn rendered_pages_have_the_cached_read_budget_by_default() {
+        let budgets = Budgets::default();
+        assert_eq!(budgets.budget_for("GET", PAGE_RENDER_ROUTE), 50);
+        assert_eq!(
+            budgets.budget_for("GET", "/api/v1/pages/{id}"),
+            DEFAULT_READ_MS
+        );
+        assert!(budgets.problems().is_empty());
     }
 
     #[test]

@@ -8993,6 +8993,7 @@ dependencies = [
  "http-body-util",
  "jiff",
  "lettre",
+ "lru",
  "reqwest",
  "schemars 1.2.3",
  "serde",
