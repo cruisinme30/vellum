@@ -2827,6 +2827,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "hashify"
+version = "0.2.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd1246c0e5493286aeb2dde35b1f4eb9c4ce00e628641210a5e553fc001a1f26"
+dependencies = [
+ "indexmap 2.14.2",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "hashlink"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4060,6 +4072,15 @@ name = "lz4_flex"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ecbdfe44b1bd960b68170b417450a628c43f7cf56bb3c5317e61cb230ee7f226"
+
+[[package]]
+name = "mail-parser"
+version = "0.11.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ec00bda90c6e645a54506c630c2820cd6b1890cfd2b0a169b50f74b2b8c7c86"
+dependencies = [
+ "hashify",
+]
 
 [[package]]
 name = "manatee"
@@ -9423,6 +9444,30 @@ dependencies = [
  "tracing",
  "vellum-contracts",
  "vellum-db",
+ "vellum-kernel",
+]
+
+[[package]]
+name = "vellum-tasks"
+version = "0.0.0"
+dependencies = [
+ "csv",
+ "hmac 0.13.0",
+ "jiff",
+ "mail-parser",
+ "opentelemetry",
+ "proptest",
+ "quick-xml 0.42.0",
+ "schemars 1.2.3",
+ "serde",
+ "serde-saphyr 2.0.0",
+ "serde_json",
+ "sha2 0.11.1",
+ "subtle",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "vellum-contracts",
  "vellum-kernel",
 ]
 
