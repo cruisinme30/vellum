@@ -11,6 +11,15 @@ check_subject() {
   [[ "$1" =~ ${CONVENTIONAL_RE} ]]
 }
 
+# check_body <message>: succeeds when a blank line follows the subject and
+# a body explains the change (trailers such as Signed-off-by do not count).
+check_body() {
+  local second body
+  second="$(sed -n '2p' <<<"$1")"
+  body="$(sed -n '3,$p' <<<"$1" | grep -vE '^[A-Za-z-]+: ' | grep -v '^[[:space:]]*$' || true)"
+  [[ -z "${second}" && -n "${body}" ]]
+}
+
 # check_signoff <message> <name> <email>: succeeds when the message has a
 # Signed-off-by trailer for that author.
 check_signoff() {

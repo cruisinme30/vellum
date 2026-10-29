@@ -68,11 +68,22 @@ pnpm --dir web run test
 
 Enable the repository hooks once: `git config core.hooksPath .githooks`.
 
-## Commits
+## Commits and pull requests
 
-- **Conventional Commits**: `type(scope): summary`, where type is one of
-  `build chore ci docs feat fix perf refactor revert style test`. The pull
-  request title follows the same rule.
+CI enforces every rule in this section on each pull request.
+
+- **Commit template**: run `git config commit.template .gitmessage` once.
+  Each commit has a Conventional Commits subject, `type(scope): summary`
+  of at most 72 characters, where type is one of
+  `build chore ci docs feat fix perf refactor revert style test`; then a
+  blank line; then a body saying why. The `.githooks/commit-msg` hook
+  checks the same rules locally.
+- **Pull request title**: a Conventional Commits subject, because it
+  becomes the squash commit on `develop`.
+- **Pull request description**: the template in
+  `.github/pull_request_template.md`. Summary, Requirements, Changes,
+  Tests, Observability and Security must each be filled in; write "None"
+  with a reason when one does not apply.
 - **Developer Certificate of Origin**: sign off every commit with
   `git commit -s`. The sign-off must match the commit author.
 - **Signed commits**: sign with GPG, SSH or S/MIME so GitHub marks them

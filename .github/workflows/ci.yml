@@ -148,7 +148,12 @@ jobs:
             echo "::error::Title is not a Conventional Commit: ${TITLE}"
             exit 1
           fi
-      - name: Conventional Commits and DCO sign-off
+      - name: Description follows the template
+        if: github.event.pull_request.user.type != 'Bot'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: scripts/ci/check-pr-body.sh
+      - name: Commit template and DCO sign-off
         run: >-
           scripts/ci/check-commits.sh
           ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }}

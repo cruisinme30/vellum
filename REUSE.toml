@@ -17,6 +17,7 @@ path = [
   ".lycheeignore",
   ".vale/styles/config/vocabularies/**",
   "docs/**/*.md",
+  ".gitmessage",
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 The Vellum contributors"

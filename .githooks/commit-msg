@@ -2,8 +2,8 @@
 # SPDX-FileCopyrightText: 2026 The Vellum contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 #
-# Rejects a commit message without a Conventional Commits subject or a DCO
-# sign-off. Enable with: git config core.hooksPath .githooks
+# Rejects a commit message without a Conventional Commits subject, a body
+# or a DCO sign-off. Enable with: git config core.hooksPath .githooks
 set -euo pipefail
 
 root="$(git rev-parse --show-toplevel)"
@@ -16,6 +16,10 @@ subject="$(head -n1 <<<"${message}")"
 
 if ! check_subject "${subject}"; then
   echo "commit-msg: subject must be a Conventional Commit, e.g. 'feat(format): parse callouts'." >&2
+  exit 1
+fi
+if ! check_body "${message}"; then
+  echo "commit-msg: add a blank line after the subject and a body saying why (see .gitmessage)." >&2
   exit 1
 fi
 name="$(git config user.name)"
