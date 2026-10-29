@@ -3112,6 +3112,26 @@ name = "vellum-db"
 version = "0.0.0"
 
 [[package]]
+name = "vellum-drive"
+version = "0.0.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "futures",
+ "opentelemetry",
+ "proptest",
+ "serde",
+ "serde-saphyr",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "vellum-authz",
+ "vellum-kernel",
+ "vellum-store",
+]
+
+[[package]]
 name = "vellum-export"
 version = "0.0.0"
 
