@@ -78,8 +78,8 @@ start before the API and the collab server exist.
   the person's My Drive, made on first use, and their shared drives, with
   folders as tree nodes. Changes show at once and are undone, with the
   request ID shown, when refused; creating a page and search answer with
-  promises. Bodies come only over the collab socket, never REST.
-- Against a server the editor joins the page's room at
+  promises. Bodies come only over the collab socket, never REST. The
+  editor joins the page's room at
   `/collab/{space_id}/{doc_id}` (ADR 0009, #415) over WebSocket, with the
   session cookie; the server admits only the app's own origin. The
   client speaks the room's y-sync protocol with a small codec of its own
