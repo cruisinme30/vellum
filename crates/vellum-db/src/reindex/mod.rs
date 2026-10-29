@@ -130,7 +130,7 @@ impl DocKind {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct SpaceRow {
     space_id: ObjectId,
     kind: SpaceKind,
@@ -140,7 +140,7 @@ struct SpaceRow {
     plaintext: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct FolderRow {
     space_id: ObjectId,
     folder_id: ObjectId,
@@ -150,7 +150,7 @@ struct FolderRow {
     icon: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct DocumentRow {
     space_id: ObjectId,
     doc_id: ObjectId,
@@ -166,7 +166,7 @@ struct DocumentRow {
 
 /// Everything one scan found, ready to write.
 #[derive(Debug, Default)]
-struct Snapshot {
+pub struct Snapshot {
     spaces: Vec<SpaceRow>,
     folders: Vec<FolderRow>,
     documents: Vec<DocumentRow>,
@@ -179,7 +179,7 @@ const fn uuid(id: ObjectId) -> Uuid {
     Uuid::from_u128(id.as_u128())
 }
 
-fn now_ms() -> i64 {
+pub fn now_ms() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |d| i64::try_from(d.as_millis()).unwrap_or(i64::MAX))
@@ -262,6 +262,74 @@ macro_rules! write_snapshot {
     }};
 }
 
+impl Snapshot {
+    /// Keeps only the rows of the spaces `keep` accepts. Problems stay with
+    /// the first part, so a split snapshot reports each one once.
+    pub fn split_off(&self, keep: impl Fn(ObjectId) -> bool, problems: bool) -> Self {
+        Self {
+            spaces: self
+                .spaces
+                .iter()
+                .filter(|s| keep(s.space_id))
+                .cloned()
+                .collect(),
+            folders: self
+                .folders
+                .iter()
+                .filter(|f| keep(f.space_id))
+                .cloned()
+                .collect(),
+            documents: self
+                .documents
+                .iter()
+                .filter(|d| keep(d.space_id))
+                .cloned()
+                .collect(),
+            ancestors: self
+                .ancestors
+                .iter()
+                .filter(|a| keep(a.0))
+                .copied()
+                .collect(),
+            problems: if problems {
+                self.problems.clone()
+            } else {
+                Vec::new()
+            },
+        }
+    }
+
+    /// The IDs of the spaces found, in scan order.
+    pub fn space_ids(&self) -> impl Iterator<Item = ObjectId> + '_ {
+        self.spaces.iter().map(|s| s.space_id)
+    }
+
+    pub fn report(self) -> ReindexReport {
+        ReindexReport {
+            spaces: self.spaces.len(),
+            folders: self.folders.len(),
+            documents: self.documents.len(),
+            problems: self.problems,
+        }
+    }
+}
+
+/// Reads the workspace at `root` into memory, off the async runtime.
+pub async fn scan<R>(root: &Path, reader: R, now: i64) -> Result<Snapshot>
+where
+    R: FileReader + 'static,
+{
+    let root_owned: PathBuf = root.to_path_buf();
+    let snap =
+        tokio::task::spawn_blocking(move || scan::Scanner::new(&root_owned, &reader, now).run())
+            .await
+            .map_err(|err| Error::Io(io::Error::other(err)))?;
+    for problem in &snap.problems {
+        tracing::warn!(%problem, "reindex skipped a path");
+    }
+    Ok(snap)
+}
+
 impl Index {
     /// Rebuilds spaces, folders, documents and `page_ancestors` from the
     /// workspace at `root`, in one transaction. Grants and per-user state
@@ -277,26 +345,19 @@ impl Index {
         R: FileReader + 'static,
     {
         let now = now_ms();
-        let root_owned: PathBuf = root.to_path_buf();
-        let snap = tokio::task::spawn_blocking(move || {
-            scan::Scanner::new(&root_owned, &reader, now).run()
-        })
-        .await
-        .map_err(|err| Error::Io(io::Error::other(err)))?;
+        let snap = scan(root, reader, now).await?;
+        self.write_snapshot(&snap, now).await?;
+        let _ = tracing::Span::current().record("documents", snap.documents.len());
+        Ok(snap.report())
+    }
+
+    /// Replaces the derived tables with `snap` in one transaction.
+    pub(crate) async fn write_snapshot(&self, snap: &Snapshot, now: i64) -> Result<()> {
         let system = self.backend().otel_system();
         match &self.pool {
-            Pool::Sqlite(pool) => write_snapshot!(pool, system, &snap, now),
-            Pool::Postgres(pool) => write_snapshot!(pool, system, &snap, now),
+            Pool::Sqlite(pool) => write_snapshot!(pool, system, snap, now),
+            Pool::Postgres(pool) => write_snapshot!(pool, system, snap, now),
         }
-        let _ = tracing::Span::current().record("documents", snap.documents.len());
-        for problem in &snap.problems {
-            tracing::warn!(%problem, "reindex skipped a path");
-        }
-        Ok(ReindexReport {
-            spaces: snap.spaces.len(),
-            folders: snap.folders.len(),
-            documents: snap.documents.len(),
-            problems: snap.problems,
-        })
+        Ok(())
     }
 }

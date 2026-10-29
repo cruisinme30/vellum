@@ -25,4 +25,10 @@ pub enum Error {
         /// Path of the SQLite file.
         path: String,
     },
+    /// The shard settings are missing or inconsistent.
+    #[error("invalid shard configuration: {0}")]
+    Config(String),
+    /// A space is assigned to a shard this deployment does not have.
+    #[error("no shard named {0:?} is configured")]
+    UnknownShard(String),
 }
