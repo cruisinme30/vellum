@@ -21,7 +21,13 @@ release binary, on x86-64 or ARM64 (a Raspberry Pi 3 or later on a
 | Windows | `winget install Vellum.Vellum` |
 | Debian, Ubuntu | `sudo apt install ./vellum_<version>_amd64.deb` (or `_arm64`) |
 | Fedora, RHEL, openSUSE | `sudo dnf install ./vellum-<version>-1.x86_64.rpm` (or `.aarch64`) |
-| Any Linux or macOS | `curl -fsSL https://cruisinme30.github.io/vellum/install.sh \| sh` |
+| Any Linux or macOS | The install script below |
+
+The install script picks the right binary for your platform:
+
+```bash
+curl -fsSL https://cruisinme30.github.io/vellum/install.sh | sh
+```
 
 The `.deb` and `.rpm` files are on the release page. To install by hand,
 download the binary for your platform, check its signature, and put it
