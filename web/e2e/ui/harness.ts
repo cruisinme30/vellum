@@ -8,6 +8,7 @@ import type { Page, TestInfo } from "@playwright/test";
 
 import { layoutAudit, type Finding } from "./audit";
 import type { Mode } from "./modes";
+import { fakeServer } from "./server";
 import type { Target } from "./targets";
 
 /** WCAG 2.2 AA, the brief's accessibility bar. */
@@ -122,6 +123,7 @@ export async function auditTarget(
   const errors = watchErrors(page);
   await watchLayoutShift(page);
   await mode.apply(page);
+  await fakeServer(page, target.server);
   await page.goto(target.url, { waitUntil: "load" });
   await settle(page);
 
