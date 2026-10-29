@@ -10,6 +10,10 @@
 # job and the UI tests only in the end-to-end matrix, not again inside the
 # fast suite. Pushes to main are not checked again: main requires an
 # up-to-date branch, so the merge commit has the tree this suite passed.
+#
+# Wall time (ADR 0035, D165-D167): the help pages that share one template
+# get the default display mode only, the browser matrix is three browsers
+# times two shards, and the two reproducible builds run side by side.
 name: Full suite
 
 on:
@@ -17,6 +21,12 @@ on:
     branches: [main]
     types: [opened, synchronize, reopened, edited]
   workflow_dispatch:
+    inputs:
+      ui-scope:
+        description: "UI suite scope: full, or exhaustive (every help page in every display mode)"
+        type: choice
+        options: [full, exhaustive]
+        default: full
 
 permissions:
   contents: read
@@ -111,35 +121,59 @@ jobs:
           name: rust-coverage
           path: lcov.info
 
-  # Also the release build check: it builds the release binary (twice,
-  # to prove the build is reproducible) and runs it for the budgets.
-  image:
-    name: Image, budgets and reproducibility
+  # Also the release build check: two from-scratch builds of the release
+  # binary, side by side (D166). The image job compares them.
+  binary:
+    name: Reproducible build ${{ matrix.build }}
     needs: gate
     if: needs.gate.outputs.run == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 45
+    strategy:
+      matrix:
+        build: [1, 2]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build the binary from scratch
+        run: |
+          docker buildx build --no-cache --target binary \
+            --output "type=local,dest=${RUNNER_TEMP}/build" -f deploy/docker/Dockerfile .
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-binary-${{ matrix.build }}
+          path: ${{ runner.temp }}/build/vellum
+          if-no-files-found: error
+          retention-days: 3
+
+  image:
+    name: Image, budgets and reproducibility
+    needs: [gate, binary]
+    if: needs.gate.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: release-binary-*
+          path: ${{ runner.temp }}
+      - name: The two builds are byte-identical
+        run: |
+          sha256sum "${RUNNER_TEMP}"/release-binary-*/vellum
+          cmp "${RUNNER_TEMP}/release-binary-1/vellum" "${RUNNER_TEMP}/release-binary-2/vellum"
+          chmod +x "${RUNNER_TEMP}/release-binary-1/vellum"
       - run: rustup toolchain install
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      - name: Build the binary twice from scratch
-        run: |
-          for n in 1 2; do
-            docker buildx build --no-cache --target binary \
-              --output "type=local,dest=${RUNNER_TEMP}/build-${n}" -f deploy/docker/Dockerfile .
-          done
-      - name: The two builds are byte-identical
-        run: |
-          sha256sum "${RUNNER_TEMP}"/build-*/vellum
-          cmp "${RUNNER_TEMP}/build-1/vellum" "${RUNNER_TEMP}/build-2/vellum"
       - name: Build the image from that binary
         run: |
           mkdir -p "${RUNNER_TEMP}/dist"
-          cp "${RUNNER_TEMP}/build-1/vellum" "${RUNNER_TEMP}/dist/vellum-linux-amd64"
+          cp "${RUNNER_TEMP}/release-binary-1/vellum" "${RUNNER_TEMP}/dist/vellum-linux-amd64"
           docker buildx build --load --target runtime \
             --build-arg DIST=release --build-context "release=${RUNNER_TEMP}/dist" \
             -t vellum:ci -f deploy/docker/Dockerfile .
@@ -147,7 +181,7 @@ jobs:
         run: |
           image_bytes="$(docker save vellum:ci | gzip -9 | wc -c)"
           cargo run --locked --package xtask -- budgets \
-            --binary "${RUNNER_TEMP}/build-1/vellum" --image-bytes "${image_bytes}"
+            --binary "${RUNNER_TEMP}/release-binary-1/vellum" --image-bytes "${image_bytes}"
 
   website:
     name: Website build for the UI suite
@@ -178,7 +212,7 @@ jobs:
           path: _site
 
   e2e:
-    name: End-to-end, UI and accessibility (${{ matrix.browser }} ${{ matrix.shard }}/4)
+    name: End-to-end, UI and accessibility (${{ matrix.browser }} ${{ matrix.shard }}/2)
     needs: [gate, website]
     if: needs.gate.outputs.run == 'true'
     runs-on: ubuntu-24.04
@@ -193,13 +227,15 @@ jobs:
       fail-fast: false
       matrix:
         browser: [chromium, firefox, webkit]
-        shard: [1, 2, 3, 4]
+        # Two shards: about 10 minutes each, and six jobs instead of twelve
+        # leave room under the account's 20 concurrent jobs (D167).
+        shard: [1, 2]
     defaults:
       run:
         working-directory: web
     env:
       HOME: /tmp
-      UI_SCOPE: full
+      UI_SCOPE: ${{ inputs.ui-scope || 'full' }}
       UI_BROWSERS: ${{ matrix.browser }}
       UI_SITE_DIR: ../_site
       # Baselines exist for Chromium only.
@@ -216,7 +252,7 @@ jobs:
         with:
           package_json_file: web/package.json
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright test --shard=${{ matrix.shard }}/4
+      - run: pnpm exec playwright test --shard=${{ matrix.shard }}/2
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -271,7 +307,7 @@ jobs:
   full-suite:
     name: Full suite
     if: always()
-    needs: [gate, fast, coverage, image, clamav, e2e, links]
+    needs: [gate, fast, coverage, binary, image, clamav, e2e, links]
     runs-on: ubuntu-24.04
     steps:
       - name: Every check passed
