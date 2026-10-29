@@ -314,3 +314,27 @@ fn corpus_data_fences_read_cleanly() {
         assert!(read.diagnostics.is_empty(), "{read:?}");
     }
 }
+
+#[test]
+fn calculator_parentheses_in_formulas_are_not_units() {
+    let read = read(
+        "```calculator\na: 1\nb: 2\nc: 3\nx: X = a * (b + c)\ny: Y = round(a)\n\
+         z: Z = (a + b) * c (%)\n```\n",
+    );
+    let Data::Calculator(calc) = read.data else {
+        panic!()
+    };
+    let outputs: Vec<(&str, Option<&str>)> = calc
+        .outputs
+        .iter()
+        .map(|o| (o.formula.as_str(), o.unit.as_deref()))
+        .collect();
+    assert_eq!(
+        outputs,
+        [
+            ("a * (b + c)", None),
+            ("round(a)", None),
+            ("(a + b) * c", Some("%")),
+        ]
+    );
+}

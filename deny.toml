@@ -10,7 +10,11 @@ all-features = true
 [advisories]
 version = 2
 yanked = "deny"
-ignore = []
+ignore = [
+    # smallstr is unmaintained (no vulnerability); yrs 0.28 depends on it.
+    # Drop this once yrs replaces it. Mirrored in .cargo/audit.toml.
+    { id = "RUSTSEC-2026-0215", reason = "unmaintained, pulled by yrs; no safe upgrade yet" },
+]
 
 [licenses]
 version = 2
@@ -53,13 +57,14 @@ skip = [
     { crate = "getrandom@0.3", reason = "older crates still on 0.3 during the 0.4 move" },
     { crate = "r-efi@5", reason = "pulled by getrandom 0.3" },
     { crate = "miniz_oxide@0.8", reason = "png still on 0.8 while flate2 moved to 0.9" },
-    { crate = "base64@0.22", reason = "sqlx 0.9 and bollard are still on base64 0.22" },
+    { crate = "hashbrown@0.14", reason = "dashmap 6 (via yrs) has not moved to hashbrown 0.15+" },
+    { crate = "base64@0.22", reason = "axum and tungstenite WebSocket handshakes are on base64 0.22" },
+    { crate = "digest@0.10", reason = "the WebSocket handshake hashes with sha1 0.10; RustCrypto 0.11 elsewhere" },
+    { crate = "block-buffer@0.10", reason = "pulled by digest 0.10 (WebSocket sha1)" },
+    { crate = "crypto-common@0.1", reason = "pulled by digest 0.10 (WebSocket sha1)" },
+    { crate = "cpufeatures@0.2", reason = "pulled by sha1 0.10 (WebSocket handshake)" },
     { crate = "hashbrown@0.16", reason = "sqlx-core 0.9 pins hashbrown 0.16; indexmap moved to 0.17" },
     { crate = "sha2@0.10", reason = "sqlx-core 0.9 is still on the RustCrypto 0.10 line" },
-    { crate = "digest@0.10", reason = "RustCrypto 0.10 line, see sha2@0.10" },
-    { crate = "block-buffer@0.10", reason = "RustCrypto 0.10 line, see sha2@0.10" },
-    { crate = "crypto-common@0.1", reason = "RustCrypto 0.10 line, see sha2@0.10" },
-    { crate = "cpufeatures@0.2", reason = "RustCrypto 0.10 line, see sha2@0.10" },
     { crate = "rand@0.9", reason = "bollard (testcontainers, tests only) and opentelemetry_sdk are still on rand 0.9" },
     { crate = "rand_core@0.9", reason = "pulled by rand 0.9" },
     { crate = "getrandom@0.2", reason = "ring (rustls) is still on getrandom 0.2" },
