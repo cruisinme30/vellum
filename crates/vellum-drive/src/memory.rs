@@ -14,7 +14,7 @@
     reason = "locks are held for single await-free blocks"
 )]
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use async_trait::async_trait;
@@ -313,6 +313,7 @@ impl Role {
 pub struct MemoryAccess {
     index: Arc<dyn DriveIndex>,
     grants: Mutex<HashMap<(ObjectId, UserId), Role>>,
+    groups: Mutex<BTreeMap<UserId, BTreeSet<ObjectId>>>,
 }
 
 impl MemoryAccess {
@@ -322,12 +323,24 @@ impl MemoryAccess {
         Self {
             index,
             grants: Mutex::new(HashMap::new()),
+            groups: Mutex::new(BTreeMap::new()),
         }
     }
 
     /// Grants `role` on a node, or on a whole space via its ID.
     pub fn grant(&self, user: UserId, node: impl Into<ObjectId>, role: Role) {
         let _ = self.lock().insert((node.into(), user), role);
+    }
+
+    /// Makes `user` a member of `group`.
+    pub fn join(&self, user: UserId, group: ObjectId) {
+        let _ = self
+            .groups
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .entry(user)
+            .or_default()
+            .insert(group);
     }
 
     /// Removes a grant made on `node` itself.
@@ -421,5 +434,15 @@ impl Access for MemoryAccess {
     async fn grant_owner(&self, user: UserId, _space: SpaceId, node: ObjectId) -> DriveResult<()> {
         self.grant(user, node, Role::Manager);
         Ok(())
+    }
+
+    async fn groups_of(&self, user: UserId) -> DriveResult<BTreeSet<ObjectId>> {
+        Ok(self
+            .groups
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(&user)
+            .cloned()
+            .unwrap_or_default())
     }
 }

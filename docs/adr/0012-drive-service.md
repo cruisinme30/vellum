@@ -78,6 +78,11 @@ writes, the three-way merge and an identity-based watcher.
   metadata, `book.yaml`, schemas, snapshots) to a fresh ULID and
   substitutes it across the copy, so links inside the copy point inside
   the copy. The copier owns the copy and no grants are copied.
+- A book is copied, and its `book.yaml` read, as the copier sees it:
+  sections they may not see, files beside or beneath those sections and
+  all snapshots stay behind. Their principals are their user and every
+  group the permission engine puts them in; a manager of the book sees
+  all of it (#327, #329).
 - A shortcut is `Name.shortcut.yaml` holding its own ID and the
   target's. Creating one needs view rights on the target; following one
   checks the target again, so a shortcut never grants access.
