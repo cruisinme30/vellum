@@ -93,6 +93,25 @@ CI enforces every rule in this section on each pull request.
   docs, not one per commit or step. There is no line limit; keep commits
   inside the pull request small and logical so the history reads well.
 
+## Labels
+
+Labels are code: `.github/labels.yml` defines them and the Sync labels
+workflow applies changes when that file lands on `develop`.
+
+| Group | Labels | Set by |
+| --- | --- | --- |
+| `type/*` | `feat fix docs refactor perf test build ci chore style revert` | the pull request title |
+| `area/*` | `kernel contracts format store crypto db render export authz collab collections pages work my-work api jobs mcp cli editor web ci docs deploy` | changed paths (`.github/labeler.yml`), or by hand |
+| `phase/*` | `foundation format editor drive-books collections work mywork-mcp clients-release` | by hand, following the build order |
+| `status/*` | `in-progress blocked ready-to-merge` | by hand |
+| `priority/p0` | every requirement is P0 | by hand |
+| `size/*` | `xs s m l xl` (under 50, 200, 500, 1,000 lines, or more) | changed lines, generated files excluded |
+| `release` | a `develop` → `main` pull request | automatically |
+
+The **Labels** check fails a pull request without at least one `type/*`
+and one `area/*` label. Branch protection requires it next to the suite
+check. When a new crate lands, add its path to `.github/labeler.yml`.
+
 ## Definition of done
 
 Formatted; zero lint warnings; tests at the right layer; tracing spans and

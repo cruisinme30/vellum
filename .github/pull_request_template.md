@@ -43,3 +43,4 @@ integration, contract, e2e, performance. -->
 - [ ] Public items documented; user guide updated if visible
 - [ ] ADR added if a decision was made
 - [ ] One feature per pull request, complete with its tests and docs
+- [ ] Labels: `type/*` and `area/*` (set automatically), plus `phase/*`
