@@ -12,7 +12,8 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D73, D74, D75, D132, D133, D134
-- Issue: #125, #126, #127; views, CSV and embeds in #128 to #132
+- Issue: #125, #126, #127; CSV and embeds #130 to #132; the web views
+  (#128, #129) are in ADR 0010
 - Pull requests: #208 (engine), #266 (service)
 
 :::

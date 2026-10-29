@@ -13,8 +13,9 @@ vellum: 1
 - Status: accepted
 - Decisions: D58, D59, D60
 - Issues: #70 (block schema), #90 (app shell), #92 (block editor),
-  #79 (themes); the Yjs binding refs #97 (collab rooms)
-- Pull requests: #262
+  #79 (themes), #128 and #129 (collection views); the Yjs binding refs
+  #97 (collab rooms)
+- Pull requests: #262 (shell and editor), collection views to follow
 
 :::
 
@@ -58,8 +59,14 @@ start before the API and the collab server exist.
   `DocumentCache` (ADR 0023). The real API and collab server replace the
   adapters, not the views.
 - Themes are Material 3 tonal palettes computed in-house in a perceptual
-  (CIE) colour space, with WCAG 2.2 AA contrast checked in tests. Strings use Fluent; routing uses
-  react-router. The editor chunk loads lazily.
+  (CIE) colour space, with WCAG 2.2 AA contrast checked in tests. Strings
+  use Fluent; routing uses react-router. The editor chunk loads lazily.
+- Collection views (#128, #129) follow the same pattern: a
+  `CollectionsStore` port mirrors the collections service's JSON (ADR
+  0015), and a Northstar mock serves it until the client lands. The
+  server filters, sorts and groups; the six layouts only draw them.
+- Every pointer action in those views has a keyboard path: grid keys and
+  inline editors in the table, Alt+arrows and a "Move to" menu on cards.
 - Why: the shell and editor could ship before the backend, and swapping
   in the server is a transport change only.
 
