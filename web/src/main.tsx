@@ -30,6 +30,7 @@ import { createBrowserPushDevice } from "./notifications/device";
 import { createHttpNotificationPreferencesStore } from "./notifications/preferences";
 import { startClientTelemetry } from "./platform/client-telemetry-start";
 import { createPlatform, startPlatform } from "./platform/platform";
+import { createHttpPrivateSpacesApi } from "./platform/private/api";
 import { DocumentCache } from "./platform/store/document-cache";
 import { openLocalDatabase } from "./platform/store/persistence";
 import { createHttpWorkApi } from "./work/api";
@@ -75,6 +76,7 @@ root.render(
       admin={status === undefined ? undefined : createHttpAdminConsoleApi(http)}
       work={status === undefined ? undefined : createHttpWorkApi(http)}
       books={status === undefined ? undefined : createHttpBooksApi(http)}
+      privateSpaces={status === undefined ? undefined : createHttpPrivateSpacesApi(http)}
       collections={
         status === undefined ? createMockCollectionsStore() : createHttpCollectionsStore(http)
       }

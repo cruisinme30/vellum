@@ -39,6 +39,22 @@ export interface DesktopBridge {
   notify(notice: Notice): Promise<void>;
   /** Registers a handler for `vellum://` links opened from other apps. */
   onOpenUrl(listener: (path: string) => void): () => void;
+  /**
+   * End-to-end encrypted private spaces (ADR 0043). Absent on desktop
+   * builds older than the feature. The device key stays in the OS keychain;
+   * these calls only return its public half and command output.
+   */
+  readonly privateSpaces?: PrivateSpacesBridge;
+}
+
+/** Private-space actions the desktop app runs with the bundled `vellum` binary. */
+interface PrivateSpacesBridge {
+  /** This device's public key and fingerprint, created on first use. */
+  deviceKey(): Promise<{ readonly publicKey: string; readonly fingerprint: string }>;
+  /** Enrols this device in a space for the signed-in account. */
+  enrol(spaceId: string, label?: string): Promise<{ readonly lines: readonly string[] }>;
+  /** Reseals the pages this device can open to the space's current keys. */
+  reseal(spaceId: string): Promise<{ readonly lines: readonly string[] }>;
 }
 
 /** What screens may ask of the shell. */

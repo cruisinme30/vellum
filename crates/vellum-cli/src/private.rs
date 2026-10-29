@@ -32,25 +32,117 @@ const READ_ONLY: &str = "private spaces are read-only for AI tools: the device c
 pub enum PrivateCommand {
     /// Print this device's public key and fingerprint, creating the key in
     /// the OS keychain on first use. Give the key to a space owner to be
-    /// enrolled.
-    Key,
+    /// enrolled, or run `vellum private enrol`.
+    Key {
+        /// Print JSON (`public_key`, `fingerprint`) for the desktop app.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Enrol this device in a private space on a server, so pages are
+    /// sealed to it too. The token comes from `VELLUM_TOKEN`.
+    Enrol {
+        #[command(flatten)]
+        remote: RemoteArgs,
+        /// A name the other members recognise, such as "Dana's laptop".
+        #[arg(long)]
+        label: String,
+    },
+    /// Reseal every page this device can open to the space's current
+    /// keys, after a device was enrolled or revoked. The token comes from
+    /// `VELLUM_TOKEN`.
+    Reseal {
+        #[command(flatten)]
+        remote: RemoteArgs,
+    },
+}
+
+/// Which server and space a remote command works on.
+#[derive(Debug, Clone, clap::Args)]
+pub struct RemoteArgs {
+    /// The server, such as `https://vellum.northstar.dev`.
+    #[arg(long, env = crate::private_remote::SERVER_VAR)]
+    pub server: String,
+    /// The private space's ID.
+    #[arg(long)]
+    pub space: vellum_kernel::SpaceId,
+}
+
+impl RemoteArgs {
+    fn client(&self) -> Result<crate::private_remote::E2eClient, String> {
+        let token = std::env::var(crate::private_remote::TOKEN_VAR).unwrap_or_default();
+        crate::private_remote::E2eClient::new(&self.server, &token)
+    }
 }
 
 /// Runs `vellum private …` and returns the lines to print.
 ///
 /// # Errors
 ///
-/// The keychain cannot be opened or holds a damaged key.
+/// The keychain cannot be opened or holds a damaged key, or the server
+/// refused.
 pub fn run(command: &PrivateCommand) -> Result<Vec<String>, String> {
     match command {
-        PrivateCommand::Key => {
+        PrivateCommand::Key { json } => {
             let identity = device_identity()?;
+            if *json {
+                return Ok(vec![
+                    serde_json::json!({
+                        "public_key": identity.public_hex(),
+                        "fingerprint": identity.fingerprint_hex(),
+                    })
+                    .to_string(),
+                ]);
+            }
             Ok(vec![
                 format!("public key:  {}", identity.public_hex()),
                 format!("fingerprint: {}", identity.fingerprint_hex()),
             ])
         }
+        PrivateCommand::Enrol { remote, label } => {
+            let client = remote.client()?;
+            let identity = device_identity()?;
+            let enrolled = block_on(crate::private_remote::enrol(
+                &client,
+                &identity,
+                remote.space,
+                label,
+            ))?
+            .map_err(|e| e.to_string())?;
+            Ok(vec![
+                format!("enrolled \"{}\" in {}", enrolled.label, remote.space),
+                format!("fingerprint: {}", enrolled.fingerprint),
+                "Another member's device must now run `vellum private reseal` so existing pages open here.".to_owned(),
+            ])
+        }
+        PrivateCommand::Reseal { remote } => {
+            let client = remote.client()?;
+            let identity = device_identity()?;
+            let report = block_on(crate::private_remote::reseal(
+                &client,
+                &identity,
+                remote.space,
+            ))??;
+            let mut lines = vec![format!(
+                "{} resealed, {} already current, {} sealed for other devices only",
+                report.resealed, report.current, report.not_for_this_device
+            )];
+            if report.changed > 0 {
+                lines.push(format!(
+                    "{} changed during the pass; run it again",
+                    report.changed
+                ));
+            }
+            Ok(lines)
+        }
     }
+}
+
+fn block_on<F: std::future::Future>(future: F) -> Result<F::Output, String> {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| format!("cannot start the async runtime: {e}"))?;
+    Ok(runtime.block_on(future))
 }
 
 /// This device's identity, from the OS keychain.

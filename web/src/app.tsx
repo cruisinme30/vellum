@@ -29,6 +29,8 @@ import { KeyboardRoot } from "./keyboard/keyboard-root";
 import { NotificationsProvider, type NotificationServices } from "./notifications/context";
 import { NotificationSettingsView } from "./notifications/notification-settings";
 import { createMockNotificationPreferencesStore } from "./notifications/preferences";
+import type { PrivateSpacesApi } from "./platform/private/api";
+import { PrivateSpacesView } from "./platform/private/private-spaces-view";
 import { AppShell } from "./shell/app-shell";
 import { AppearanceProvider } from "./theme/appearance-context";
 import { FavoritesView, HomeView } from "./views/home";
@@ -82,6 +84,7 @@ export function AppRoutes() {
         <Route path="favorites" element={<FavoritesView />} />
         <Route path="inbox" element={<InboxView />} />
         <Route path="settings/notifications" element={<NotificationSettingsView />} />
+        <Route path="settings/private-spaces" element={<PrivateSpacesView />} />
         <Route path="new" element={<NewPageView />} />
         <Route path="my-work" element={<MyWorkPage />} />
         <Route path="issues" element={<IssuesPage />} />
@@ -120,6 +123,8 @@ export interface AppServices {
   readonly work?: WorkApi | undefined;
   /** Books, from a Vellum server; absent in demo mode. */
   readonly books?: BooksApi | undefined;
+  /** Private spaces' device keys, from a Vellum server; absent in demo mode. */
+  readonly privateSpaces?: PrivateSpacesApi | undefined;
   readonly collections: CollectionsStore;
   /** Present when a Vellum server answered; absent in demo mode. */
   readonly session?: { readonly auth: AuthApi; readonly status: AuthStatus } | undefined;
@@ -170,12 +175,13 @@ export function AppProviders({
   admin,
   work,
   books,
+  privateSpaces,
   collections,
   session,
   notifications,
   children,
 }: AppServices & { readonly children: ReactNode }) {
-  const serverApis = useMemo(() => ({ work, books }), [work, books]);
+  const serverApis = useMemo(() => ({ work, books, privateSpaces }), [work, books, privateSpaces]);
   const [demoNotifications] = useState<NotificationServices>(() => ({
     store: createMockNotificationPreferencesStore(),
   }));

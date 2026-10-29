@@ -19,6 +19,7 @@ mod backup_cli;
 mod cluster;
 mod collab;
 mod docs;
+mod e2e;
 mod feed;
 mod google_http;
 #[cfg(test)]
@@ -34,6 +35,9 @@ mod notifications;
 mod observability;
 mod page_render;
 mod private;
+mod private_remote;
+#[cfg(test)]
+mod private_remote_tests;
 #[cfg(test)]
 mod private_tests;
 mod reindex;

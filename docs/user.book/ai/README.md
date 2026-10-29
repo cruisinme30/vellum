@@ -70,14 +70,23 @@ so the server cannot search it or pass it to a model. Your own computer
 can: `vellum mcp --private` opens the pages sealed to this device, in
 memory only, and serves them to your AI client read-only.
 
-1. Run `vellum private key` and send the public key it prints to the
-   space's owner, who adds this device to the space.
-2. Add Vellum to your client with the space's folder:
+1. In the desktop app, open **Settings → Private spaces** and choose
+   **Enrol this device** on the space. (From a terminal:
+   `vellum private enrol --server <url> --space <id> --label "My laptop"`
+   with an API token in `VELLUM_TOKEN`.)
+2. On a device that can already open the space, choose **Reseal pages
+   for every device**, so existing pages open on the new one too.
+3. Add Vellum to your client with the space's ID and your server:
 
 ```json
 { "mcpServers": { "vellum-private": { "command": "vellum",
-  "args": ["mcp", "--private", "--space", "board=drives/shared/board"] } } }
+  "args": ["mcp", "--private", "--server", "https://vellum.northstar.dev",
+           "--space", "board=01JDB0ARD00000000000000000"],
+  "env": { "VELLUM_TOKEN": "<an API token>" } } } }
 ```
+
+Without `--server`, give the space's folder in the data folder instead,
+such as `board=drives/shared/board`.
 
 The model can search, read pages and blocks, and cite them. It cannot
 write, comment or export, and nothing it reads leaves your computer

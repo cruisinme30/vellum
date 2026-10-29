@@ -13,6 +13,12 @@ export const Channel = {
   accessToken: "vellum:access-token",
   openExternal: "vellum:open-external",
   notify: "vellum:notify",
+  /** This device's public key for private spaces. */
+  privateDeviceKey: "vellum:private-device-key",
+  /** Enrol this device in a private space. */
+  privateEnrol: "vellum:private-enrol",
+  /** Reseal a private space's pages to its current keys. */
+  privateReseal: "vellum:private-reseal",
   /** Main to renderer: a `vellum://` link was opened. */
   openUrl: "vellum:open-url",
 } as const;

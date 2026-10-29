@@ -8964,6 +8964,7 @@ dependencies = [
  "clap",
  "futures",
  "getrandom 0.4.3",
+ "hex",
  "hkdf 0.13.0",
  "hmac 0.13.0",
  "http",
@@ -8992,6 +8993,7 @@ dependencies = [
  "vellum-crypto",
  "vellum-db",
  "vellum-drive",
+ "vellum-e2e",
  "vellum-format",
  "vellum-help",
  "vellum-identity",
@@ -9142,6 +9144,28 @@ dependencies = [
  "vellum-contracts",
  "vellum-db",
  "vellum-kernel",
+ "vellum-store",
+]
+
+[[package]]
+name = "vellum-e2e"
+version = "0.0.0"
+dependencies = [
+ "async-trait",
+ "base64 0.23.1",
+ "bytes",
+ "futures",
+ "hex",
+ "schemars 1.2.3",
+ "serde",
+ "serde-saphyr 2.0.0",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "vellum-contracts",
+ "vellum-crypto",
+ "vellum-kernel",
+ "vellum-security",
  "vellum-store",
 ]
 

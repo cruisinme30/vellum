@@ -3,6 +3,7 @@
 
 // The Electron main process: wires Electron to the tested modules.
 
+import { hostname } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -28,11 +29,13 @@ import {
   fileDisk,
   freePort,
   readOptionalFile,
+  runBinary,
   safeStorageVault,
   spawnChild,
 } from "./electron-adapters.js";
 import type { Fetch } from "./fetch.js";
 import { bridgeHandlers, dispatch } from "./ipc.js";
+import { PrivateSpaces } from "./private.js";
 import {
   APP_HOST,
   APP_SCHEME,
@@ -185,12 +188,20 @@ async function start(): Promise<void> {
     allowPermission(permission, origin === `${APP_SCHEME}://${APP_HOST}` ? APP_URL : origin),
   );
 
+  const privateSpaces = new PrivateSpaces(
+    () => server,
+    () => auth.accessToken(),
+    { run: runBinary(binary), hostname },
+  );
   const handlers = bridgeHandlers({
     serverUrl: () => server,
     signIn: () => auth.signIn(),
     signOut: () => auth.signOut(),
     accessToken: () => auth.accessToken(),
     openExternal: (url) => shell.openExternal(url),
+    privateDeviceKey: () => privateSpaces.deviceKey(),
+    privateEnrol: (spaceId, label) => privateSpaces.enrol(spaceId, label),
+    privateReseal: (spaceId) => privateSpaces.reseal(spaceId),
     notify(notice) {
       const shown = new Notification({ title: notice.title, body: notice.body });
       shown.on("click", () => {

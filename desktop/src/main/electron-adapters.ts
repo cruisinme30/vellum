@@ -3,13 +3,14 @@
 
 // Thin adapters from Node and Electron to the interfaces the tested modules use.
 
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, type AddressInfo } from "node:net";
 import path from "node:path";
 
 import type { SafeStorage } from "electron";
 
+import type { RunResult } from "./private.js";
 import type { Disk } from "./settings.js";
 import type { Child } from "./sidecar.js";
 import type { Vault } from "./token-store.js";
@@ -79,4 +80,34 @@ export async function freePort(): Promise<number> {
     }),
   );
   return port;
+}
+
+/** How long one `vellum private` command may run; a reseal of a large space takes longest. */
+const PRIVATE_TIMEOUT_MS = 10 * 60_000;
+
+/** Runs `binary` to completion, capturing its output. */
+export function runBinary(
+  binary: string,
+): (
+  commandArguments: readonly string[],
+  environment: Readonly<Record<string, string>>,
+) => Promise<RunResult> {
+  return (commandArguments, environment) =>
+    new Promise((resolve) => {
+      execFile(
+        binary,
+        [...commandArguments],
+        {
+          env: { ...process.env, ...environment },
+          timeout: PRIVATE_TIMEOUT_MS,
+          maxBuffer: 1024 * 1024,
+          windowsHide: true,
+        },
+        (error, stdout, stderr) => {
+          let code = 0;
+          if (error !== null) code = typeof error.code === "number" ? error.code : 1;
+          resolve({ code, stdout, stderr });
+        },
+      );
+    });
 }
