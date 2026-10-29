@@ -1,0 +1,10 @@
+```mermaid
+treemap-beta
+"Storage"
+  "Pages": 420
+  "Assets": 310
+  "Index": 90
+"Compute"
+  "Render": 160
+  "Search": 120
+```

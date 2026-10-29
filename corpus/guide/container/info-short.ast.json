@@ -1,0 +1,32 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "container",
+        "name": "info",
+        "arg": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "sections": [
+          [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The gateway is the single entry point."
+                }
+              ],
+              "id": null
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "diagnostics": []
+}

@@ -12,6 +12,8 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D34, D35, D36
+- Issue: none (recorded before the issue rule, D119)
+- Pull requests: #22
 
 :::
 
@@ -35,8 +37,6 @@ on-disk format and the provider contract in `vellum-crypto`.
   object: magic `\0VLE`, version, KEK id, wrapped DEK, nonce, ciphertext.
   A Markdown file never starts with a NUL byte, so plaintext and sealed
   objects are told apart without metadata.
-- Consequence: deleting one object's header shreds that object, and a
-  backup restores keys and data together.
 
 ### D35: the payload is bound to neither the path nor the header
 
@@ -46,10 +46,6 @@ on-disk format and the provider contract in `vellum-crypto`.
 - Rotation (`rewrap`) unwraps the DEK with the old KEK, wraps it with the
   current one and rewrites only the header. Retired KEKs stay in the
   keyring until no header names them.
-- Consequence: someone with write access to the store could swap two whole
-  sealed objects. That is an integrity threat to the store itself, covered
-  by authorization, the audit log and the index's content hashes, not by
-  encryption at rest.
 
 ### D36: providers own the KEK and the wrapped form
 
@@ -59,19 +55,22 @@ on-disk format and the provider contract in `vellum-crypto`.
   KEK id carries its Argon2id salt and costs, so the passphrase alone
   re-derives the KEK from any envelope header.
 
-## Applying it to the blob store
+## Alternatives
 
-`vellum-sealed-store` wraps any `BlobStore` in `Sealed`, an engine-layer
-crate because `vellum-crypto` and `vellum-store` are both foundation.
+- **One DEK per document in a lookup table**: an extra table to back up
+  and keep in step, for no gain over one DEK per object.
+- **Bind the payload to its path**: renames would need re-encryption.
+- **Bind the payload to the header**: rotation would rewrite every
+  payload instead of one header.
 
-- Writes follow the space's mode: sealed by default, as is in a plaintext
-  space. Reads open an envelope wherever one is found and pass plaintext
-  through, so a space stays readable while it switches mode. A plaintext
-  object in an encrypted space is counted and logged until `reseal`
-  rewrites it.
-- `reseal` is the one migration and rotation step: it seals, re-wraps or
-  opens an object as the policy now wants, guarded by `IfMatch`.
-- Etags are the stored bytes' etags, so preconditions pass through. `get`,
-  `head`, `put` and `rename` report plaintext sizes (`head` reads the
-  object to find it); listings report stored sizes because they never
-  read content.
+## Consequences
+
+- Deleting one object's header shreds that object, and a backup
+  restores keys and data together.
+- Someone with write access to the store could swap two sealed objects;
+  authorization, the audit log and content hashes cover that.
+- `vellum-sealed-store` (engine layer) wraps any `BlobStore`: sealed
+  writes by default, reads that accept both forms while a space switches
+  mode, and `reseal` as the one migration and rotation step.
+- `head`, `get`, `put` and `rename` report plaintext sizes; listings
+  report stored sizes because they never read content.

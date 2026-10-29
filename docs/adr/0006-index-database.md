@@ -25,18 +25,7 @@ Postgres in the HA profiles, with `space_id` as the shard key. The crate
 `vellum-db` needs one schema that both backends carry and a clear line
 between what a reindex rebuilds and what only the database holds.
 
-## Alternatives
-
-- **The `sqlx` `Any` driver over both backends**: one code path, but it loses
-  `uuid` and typed binds and hides dialect differences. Not chosen; the
-  index keeps one pool per backend behind the same `Index` handle.
-- **IDs as ULID text**: readable in SQL, but 26 bytes per key against 16
-  and no native `uuid` in Postgres. Not chosen.
-- **Reindex writes missing IDs into files**: self-healing, but a rebuild
-  would then change the source of truth. Not chosen; the store and the
-  watcher (ADR 0026) assign IDs.
-
-## Decision
+## Decisions
 
 ### D46: one schema, two dialects, forward-only
 
@@ -72,6 +61,17 @@ between what a reindex rebuilds and what only the database holds.
   an ID is reported, not given one; assigning IDs is the store's job.
 - Two files with the same ID: the first by path keeps it, the rest are
   reported as duplicates.
+
+## Alternatives
+
+- **The `sqlx` `Any` driver over both backends**: one code path, but it loses
+  `uuid` and typed binds and hides dialect differences. Not chosen; the
+  index keeps one pool per backend behind the same `Index` handle.
+- **IDs as ULID text**: readable in SQL, but 26 bytes per key against 16
+  and no native `uuid` in Postgres. Not chosen.
+- **Reindex writes missing IDs into files**: self-healing, but a rebuild
+  would then change the source of truth. Not chosen; the store and the
+  watcher (ADR 0026) assign IDs.
 
 ## Consequences
 

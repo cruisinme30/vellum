@@ -1,0 +1,19 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "fence",
+        "lang": "chart",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "title: Before and after the cache\ntype: grouped\nlabels: [Read, Write, Search]\nBefore: [48, 120, 95]\nAfter: [21, 110, 60]\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}

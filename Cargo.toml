@@ -15,6 +15,7 @@ publish = false
 
 [workspace.dependencies]
 vellum-db = { path = "crates/vellum-db" }
+vellum-help = { path = "crates/vellum-help" }
 vellum-kernel = { path = "crates/vellum-kernel" }
 
 # The lint baseline from the engineering standards. CI runs with

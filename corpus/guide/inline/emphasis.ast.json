@@ -1,0 +1,57 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "strong",
+            "content": [
+              {
+                "type": "text",
+                "text": "bold"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": " "
+          },
+          {
+            "type": "emphasis",
+            "content": [
+              {
+                "type": "text",
+                "text": "italic"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": " "
+          },
+          {
+            "type": "strikethrough",
+            "content": [
+              {
+                "type": "text",
+                "text": "strike"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": " "
+          },
+          {
+            "type": "code",
+            "code": "code"
+          }
+        ],
+        "id": null
+      }
+    ]
+  },
+  "diagnostics": []
+}

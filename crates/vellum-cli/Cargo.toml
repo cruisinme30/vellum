@@ -20,10 +20,13 @@ path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4.6.7", features = ["derive"] }
-tokio = { version = "1", features = ["rt"] }
+thiserror = "2.0.21"
+tokio = { version = "1.54.1", features = ["io-std", "rt-multi-thread"] }
 tracing = "0.1.44"
 vellum-db.workspace = true
+vellum-help.workspace = true
 vellum-kernel.workspace = true
+vellum-mcp = { path = "../vellum-mcp" }
 
 [lints]
 workspace = true

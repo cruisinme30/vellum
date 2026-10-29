@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+blank_issues_enabled: true
+contact_links:
+  - name: Security report
+    url: https://github.com/cruisinme30/vellum/security/policy
+    about: Report a vulnerability privately, never in a public issue.
