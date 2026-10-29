@@ -22,6 +22,8 @@
 //! (see [`crate::watcher`]); a bucket is only written through Vellum.
 //! Writes are announced in the index's change feed, and each replica
 //! follows it to keep its caches fresh (see [`crate::feed`]).
+//! Search indexes the drive's pages and the collections' rows (see
+//! [`crate::search`]).
 
 use std::path::Path;
 use std::sync::{Arc, RwLock};
@@ -31,6 +33,7 @@ use futures::StreamExt as _;
 use vellum_authz::{Authz, AuthzStore, Id, MemoryStore, SqlStore};
 use vellum_books_service::BooksService;
 use vellum_collections::CollectionsService;
+use vellum_collections::service::IndexFeed;
 use vellum_contracts::{BoxFuture, Operation, Readiness, Service};
 use vellum_db::feed::Feed;
 use vellum_db::{Index, IndexConfig};
@@ -51,7 +54,7 @@ use crate::collab::Collab;
 use crate::feed::{AnnouncingStore, Caches};
 use crate::google_http::{self, Endpoints, FileLinks, GoogleHttp};
 use crate::page_render::{Handles, PageRenderService};
-use crate::reindex::{KEY_VAR, index_key};
+use crate::reindex::{KEY_VAR, index_key, key_bytes};
 use crate::tasks::{DriveTasks, Parts, TasksSettings};
 
 /// The mail domain that receives My Work capture e-mail.
@@ -307,8 +310,8 @@ impl EventSink for TracingSink {
 }
 
 /// The opened services, plus the two the file watcher drives, collections
-/// for the change feed, and Work, which the integration receivers act
-/// through.
+/// for the change feed and search, and Work, which the integration
+/// receivers act through.
 struct Workspace {
     services: Vec<Arc<dyn Service>>,
     drive: Arc<Drive>,
@@ -316,6 +319,7 @@ struct Workspace {
     books: Arc<BooksService>,
     work: Arc<WorkService>,
     tasks: Arc<TasksService>,
+    space_of: vellum_collections::service::SpaceOf,
 }
 
 /// What `vellum serve` mounts for the workspace.
@@ -372,46 +376,58 @@ impl TasksSetup {
     }
 }
 
+/// Where the services announce what changed.
+struct Feeds {
+    /// Work's events, for notifications.
+    events: Arc<dyn EventSink>,
+    /// Collection row changes, for search.
+    rows: Option<Arc<dyn IndexFeed>>,
+}
+
 /// Builds the services over `store`, `authz` and the drive's `index`.
 async fn build<S: AuthzStore + TreeSync + 'static>(
     store: Arc<dyn BlobStore>,
-    authz: Arc<Authz<S>>,
+    authz: &Arc<Authz<S>>,
     index: Arc<dyn DriveIndex>,
     spaces: &Arc<Spaces>,
     identity: &Arc<Identity>,
-    events: Arc<dyn EventSink>,
+    feeds: Feeds,
     setup: TasksSetup,
 ) -> Result<Workspace, Error> {
     let drive = Arc::new(Drive::new(
         Arc::clone(&store),
         Arc::clone(&index),
         Arc::new(vellum_drive::authz::AuthzAccess::new(
-            Arc::clone(&authz),
+            Arc::clone(authz),
             Arc::clone(&index),
         )),
     ));
     let lookup = Arc::clone(spaces);
     let space_of: vellum_collections::service::SpaceOf =
         Arc::new(move |path: &BlobPath| lookup.of(path));
-    let collections = Arc::new(CollectionsService::new(
+    let mut collections = CollectionsService::new(
         Arc::clone(&store),
         Arc::new(vellum_collections::service::AuthzAccess::new(
-            Arc::clone(&authz),
+            Arc::clone(authz),
             Arc::clone(&space_of),
         )),
-    ));
+    );
+    if let Some(feed) = feeds.rows {
+        collections = collections.with_index_feed(feed);
+    }
+    let collections = Arc::new(collections);
     let books = Arc::new(BooksService::new(
         Arc::clone(&store),
         Arc::new(vellum_books_service::AuthzAccess::new(
-            Arc::clone(&authz),
-            space_of,
+            Arc::clone(authz),
+            Arc::clone(&space_of),
         )),
     ));
     let directory = Arc::new(IdentityDirectory(Arc::clone(identity)));
     let (work, report) = WorkService::open(
         Arc::clone(&store),
         Arc::clone(&directory) as Arc<dyn Directory>,
-        events,
+        feeds.events,
         Arc::new(SystemClock),
     )
     .await?;
@@ -427,7 +443,7 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
             drive: Arc::clone(&drive),
             store,
             index,
-            authz,
+            authz: Arc::clone(authz),
             identity: Arc::clone(identity),
             work: Arc::clone(&work),
         },
@@ -464,7 +480,37 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
         books,
         work,
         tasks,
+        space_of,
     })
+}
+
+/// The search index key, derived from the index key; `None` leaves the
+/// index unsealed (Postgres and plaintext mode).
+fn search_key(
+    config: &Config,
+    var: impl Fn(&str) -> Option<String>,
+) -> Result<Option<[u8; 32]>, Error> {
+    if config.database_url.is_some() {
+        return Ok(None);
+    }
+    var(KEY_VAR)
+        .map(|hex| key_bytes(Some(&hex)))
+        .transpose()
+        .map_err(|e| Error::new(ErrorKind::InvalidInput, e))
+}
+
+/// Syncs every user's time blocks with Google Calendar, every few minutes.
+fn sync_calendars(tasks: Arc<TasksService>) {
+    drop(tokio::spawn(async move {
+        let mut tick = tokio::time::interval(GOOGLE_SYNC_EVERY);
+        tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        loop {
+            let _ = tick.tick().await;
+            if let Err(error) = tasks.google_sync_all().await {
+                tracing::warn!(%error, "Google Calendar sync skipped");
+            }
+        }
+    }));
 }
 
 /// Opens the workspace services for `config`, or returns none (with a
@@ -483,6 +529,7 @@ pub async fn open(
 ) -> Result<Opened, Error> {
     let setup = TasksSetup::new(identity, Some(&config.data_dir), &var);
     let bucket = bucket(&var)?;
+    let key = search_key(config, &var)?;
     let index_config = match index_config(config, &var)? {
         Ok(c) => c,
         Err(why) => {
@@ -517,13 +564,17 @@ pub async fn open(
     let drive_index = Arc::new(SqlIndex::new(index.clone()));
     let spaces = Arc::new(Spaces::default());
     let (events, queued) = crate::notifications::channel();
-    let workspace = build(
+    let (rows, row_changes) = crate::search::row_feed();
+    let mut workspace = build(
         Arc::clone(&store),
-        Arc::clone(&authz),
+        &authz,
         Arc::clone(&drive_index) as Arc<dyn DriveIndex>,
         &spaces,
         identity,
-        events,
+        Feeds {
+            events,
+            rows: Some(rows),
+        },
         setup,
     )
     .await?;
@@ -546,26 +597,28 @@ pub async fn open(
     let collab = Collab::open(
         Arc::clone(&workspace.drive),
         Arc::new(DriveAuthzAccess::new(
-            authz,
+            Arc::clone(&authz),
             Arc::clone(&drive_index) as Arc<dyn DriveIndex>,
         )),
-        index,
+        index.clone(),
         &config.data_dir,
         app_origin,
     )?;
     spaces.replace(load_spaces(drive_index.as_ref()).await?);
+    let search = crate::search::start(crate::search::Parts {
+        data_dir: config.data_dir.clone(),
+        key,
+        index,
+        store: Arc::clone(&store),
+        authz,
+        collections: Arc::clone(&workspace.collections),
+        space_of: Arc::clone(&workspace.space_of),
+        row_changes,
+    })
+    .await?;
+    workspace.services.push(Arc::new(search));
     keep_fresh(feed, me, cursor, &workspace, &spaces, drive_index);
-    let timer = Arc::clone(&workspace.tasks);
-    drop(tokio::spawn(async move {
-        let mut tick = tokio::time::interval(GOOGLE_SYNC_EVERY);
-        tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-        loop {
-            let _ = tick.tick().await;
-            if let Err(error) = timer.google_sync_all().await {
-                tracing::warn!(%error, "Google Calendar sync skipped");
-            }
-        }
-    }));
+    sync_calendars(Arc::clone(&workspace.tasks));
     let mut services = workspace.services;
     services.push(Arc::new(Storage(store)));
     Ok(Opened {
@@ -594,16 +647,22 @@ pub async fn describe(
     let authz = Arc::new(Authz::new(MemoryStore::new()));
     let index = Arc::new(vellum_drive::memory::MemoryIndex::new());
     let setup = TasksSetup::new(identity, None, |_| None);
-    let workspace = build(
+    let mut workspace = build(
         store,
-        authz,
+        &authz,
         index,
         &Arc::new(Spaces::default()),
         identity,
-        Arc::new(TracingSink),
+        Feeds {
+            events: Arc::new(TracingSink),
+            rows: None,
+        },
         setup,
     )
     .await?;
+    workspace
+        .services
+        .push(Arc::new(crate::search::describe(authz)?));
     Ok(workspace.services)
 }
 

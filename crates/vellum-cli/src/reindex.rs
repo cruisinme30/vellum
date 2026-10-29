@@ -85,8 +85,13 @@ fn execute(args: &Args) -> Result<Vec<String>, String> {
 
 /// Parses a 32-byte key written as 64 hex characters.
 pub fn index_key(hex: Option<&str>) -> Result<IndexKey, String> {
+    key_bytes(hex).map(IndexKey::new)
+}
+
+/// The raw bytes of a key written as 64 hex characters.
+pub fn key_bytes(hex: Option<&str>) -> Result<[u8; 32], String> {
     let hex = hex.ok_or_else(|| format!("set {KEY_VAR} to the index key, or pass --plaintext"))?;
-    parse_hex_key(KEY_VAR, hex).map(IndexKey::new)
+    parse_hex_key(KEY_VAR, hex)
 }
 
 /// Parses the 32-byte key in variable `var`, written as 64 hex characters.

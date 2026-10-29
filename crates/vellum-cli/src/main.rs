@@ -33,6 +33,7 @@ mod private;
 #[cfg(test)]
 mod private_tests;
 mod reindex;
+mod search;
 mod serve;
 mod services;
 #[cfg(test)]

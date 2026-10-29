@@ -599,7 +599,7 @@ async fn workspace_services_answer_signed_in_users() {
         .unwrap();
     let names: Vec<_> = services.all().iter().map(|s| s.name()).collect();
     assert!(
-        ["drive", "collections", "books", "work"]
+        ["drive", "collections", "books", "work", "search"]
             .iter()
             .all(|n| names.contains(n)),
         "{names:?}"
@@ -685,6 +685,10 @@ async fn workspace_services_answer_signed_in_users() {
         }
     }
     assert!(seen.contains("external"), "no external version: {seen}");
+
+    // Search finds the edit made outside Vellum.
+    let found = search_until(&app, &cookie, "another%20editor", &page_id).await;
+    assert!(found.contains(&page_id), "page not found: {found}");
     services.shutdown().await;
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -875,4 +879,23 @@ async fn a_mention_reaches_the_mentioned_persons_inbox() {
     .await;
     assert_eq!(read.status, StatusCode::OK, "{}", read.text);
     assert_eq!(read.json()["unread"], 0);
+}
+
+/// Searches as the cookie's owner until a hit mentions `want`, for up to
+/// ten seconds; returns the last reply.
+async fn search_until(app: &Router, cookie: &str, q: &str, want: &str) -> String {
+    let mut last = String::new();
+    for _ in 0..100 {
+        let reply = send(
+            app,
+            finish(request("GET", &format!("/api/v1/search?q={q}")).header(header::COOKIE, cookie)),
+        )
+        .await;
+        last = reply.text;
+        if last.contains(want) {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+    last
 }

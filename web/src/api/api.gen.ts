@@ -638,6 +638,10 @@ export interface AuthStatus {
    * The caller's scopes.
    */
   scopes: Scope[];
+  /**
+   * The single sign-on button, when a provider is configured.
+   */
+  sso?: SsoButton | null;
 }
 
 /**
@@ -724,6 +728,16 @@ export interface BackupSettings {
    */
   drill_interval_days?: number;
 }
+
+/**
+ * A block ID: blk- and 8 Crockford base32 characters.
+ */
+export type BlockId = string;
+
+/**
+ * The kind of a block, which shapes how its hit is shown.
+ */
+export type BlockKind = "heading" | "paragraph" | "list_item" | "task" | "quote" | "code" | "table" | "callout" | "caption" | "property" | "other";
 
 /**
  * A BookId as a 26-character ULID.
@@ -1629,6 +1643,38 @@ export interface ContentView {
 }
 
 /**
+ * A block with its whole section: what "ask this space" and MCP quote.
+ */
+export interface Context {
+  /**
+   * The block asked for.
+   */
+  block: StoredBlock;
+  /**
+   * Every block of its section, in reading order.
+   */
+  section: StoredBlock[];
+  /**
+   * The citation of the block.
+   */
+  citation: string;
+}
+
+/**
+ * `search.context` input.
+ */
+export interface ContextInput {
+  /**
+   * The document.
+   */
+  doc_id: DocId;
+  /**
+   * The block, `blk-xxxxxxxx`.
+   */
+  block_id: BlockId;
+}
+
+/**
  * A new folder.
  */
 export interface CreateFolder {
@@ -2211,6 +2257,11 @@ export interface DigestView {
  * A DocId as a 26-character ULID.
  */
 export type DocId = string;
+
+/**
+ * The kind of object a document is, for the drive's "type" filter.
+ */
+export type DocKind = "page" | "book" | "collection" | "row" | "issue" | "task_list" | "folder";
 
 /**
  * An acknowledgement.
@@ -3070,6 +3121,20 @@ export interface FormsOut {
    * The forms, in the order the team lists them.
    */
   forms: FormOut[];
+}
+
+/**
+ * A run of snippet text, highlighted when it matched the query.
+ */
+export interface Fragment {
+  /**
+   * The text.
+   */
+  text: string;
+  /**
+   * Whether it matched a query term.
+   */
+  hit: boolean;
 }
 
 /**
@@ -4892,6 +4957,129 @@ export interface SaveViewInput {
 export type Scope = "read" | "write:draft" | "write:direct" | "work" | "admin";
 
 /**
+ * One block that matched, with what the UI and MCP need to show and cite it.
+ */
+export interface SearchHit {
+  /**
+   * The space.
+   */
+  space: SpaceId;
+  /**
+   * The document.
+   */
+  doc: DocId;
+  /**
+   * The block.
+   */
+  block: BlockId;
+  /**
+   * The heading that opens the block's section.
+   */
+  section?: BlockId | null;
+  /**
+   * The document's kind.
+   */
+  doc_kind: DocKind;
+  /**
+   * The block's kind.
+   */
+  block_kind: BlockKind;
+  /**
+   * The document's title.
+   */
+  title: string;
+  /**
+   * The document's path.
+   */
+  path: string;
+  /**
+   * Headings above the block.
+   */
+  heading_path: string[];
+  /**
+   * A short excerpt of the block with the matches marked.
+   */
+  snippet: Fragment[];
+  /**
+   * The fused relevance score; higher is better. Only comparable within one response.
+   */
+  score: number;
+  /**
+   * A stable citation: `vellum://doc/{doc}#{block}`.
+   */
+  citation: string;
+}
+
+/**
+ * One page of search results.
+ */
+export interface SearchPage {
+  /**
+   * The hits, best first.
+   */
+  hits: SearchHit[];
+  /**
+   * Whether more hits follow this page.
+   */
+  has_more: boolean;
+  /**
+   * Whether semantic ranking took part.
+   */
+  hybrid: boolean;
+}
+
+/**
+ * `search.query` input.
+ */
+export interface SearchQueryQueryInput {
+  /**
+   * What to search for.
+   */
+  q: string;
+  /**
+   * Comma-separated space IDs to search in.
+   */
+  spaces?: string | null;
+  /**
+   * Comma-separated owner (user) IDs.
+   */
+  owners?: string | null;
+  /**
+   * Comma-separated kinds: `page`, `book`, `collection`, `row`, `issue`,
+   * `task_list`, `folder`.
+   */
+  kinds?: string | null;
+  /**
+   * A folder, drive, book or space ID: only documents under it.
+   */
+  location?: ObjectId | null;
+  /**
+   * Only documents modified at or after this time (Unix milliseconds).
+   */
+  modified_from?: number | null;
+  /**
+   * Only documents modified at or before this time (Unix milliseconds).
+   */
+  modified_to?: number | null;
+  /**
+   * Only starred documents.
+   */
+  starred?: boolean;
+  /**
+   * Search the trash.
+   */
+  trashed?: boolean;
+  /**
+   * Hits to skip.
+   */
+  offset?: number;
+  /**
+   * Hits to return (default 20, at most 100).
+   */
+  limit?: number | null;
+}
+
+/**
  * A newly issued secret URL or address. It is shown once.
  */
 export interface SecretView {
@@ -5337,6 +5525,20 @@ export interface Span {
 }
 
 /**
+ * How the sign-in page offers single sign-on.
+ */
+export interface SsoButton {
+  /**
+   * The provider's name, for "Sign in with {name}".
+   */
+  name: string;
+  /**
+   * Where the button goes; append `?next=<path>` to return there.
+   */
+  startUrl: string;
+}
+
+/**
  * Starring or unstarring an item.
  */
 export interface StarInput {
@@ -5393,6 +5595,56 @@ export interface StatusOut {
    * duplicate.
    */
   category: string;
+}
+
+/**
+ * A block as stored in an index: what a backend returns.
+ */
+export interface StoredBlock {
+  /**
+   * The space.
+   */
+  space: SpaceId;
+  /**
+   * The document.
+   */
+  doc: DocId;
+  /**
+   * The block.
+   */
+  block: BlockId;
+  /**
+   * Position of the block in the document.
+   */
+  position: number;
+  /**
+   * The section heading.
+   */
+  section?: BlockId | null;
+  /**
+   * The document's kind.
+   */
+  doc_kind: DocKind;
+  /**
+   * The block's kind.
+   */
+  block_kind: BlockKind;
+  /**
+   * The document's title.
+   */
+  title: string;
+  /**
+   * The document's path.
+   */
+  path: string;
+  /**
+   * Headings above the block.
+   */
+  heading_path: string[];
+  /**
+   * The block's text.
+   */
+  text: string;
 }
 
 /**
@@ -6148,6 +6400,60 @@ export interface ThreadsOut {
 }
 
 export type Timestamp = string;
+
+/**
+ * A title match for the instant (⌘K) search.
+ */
+export interface TitleHit {
+  /**
+   * The space.
+   */
+  space: SpaceId;
+  /**
+   * The document.
+   */
+  doc: DocId;
+  /**
+   * Its kind.
+   */
+  kind: DocKind;
+  /**
+   * Its title.
+   */
+  title: string;
+  /**
+   * Its path.
+   */
+  path: string;
+}
+
+/**
+ * `search.titles` input.
+ */
+export interface TitlesInput {
+  /**
+   * What the person has typed so far.
+   */
+  q: string;
+  /**
+   * Comma-separated space IDs to search in.
+   */
+  spaces?: string | null;
+  /**
+   * Matches to return (default 10, at most 100).
+   */
+  limit?: number | null;
+}
+
+/**
+ * `search.titles` output.
+ */
+export interface TitlesPage {
+  /**
+   * The matching titles, best first.
+   */
+  hits: TitleHit[];
+}
 
 /**
  * A line of the table of contents.
@@ -8582,6 +8888,27 @@ export interface Operations {
     input: PageKey;
     output: RenderedPageView;
   };
+  /** A block with the heading section around it, for quoting and citations */
+  "search.context": {
+    method: "GET";
+    path: "/v1/search/context/{doc_id}/{block_id}";
+    input: ContextInput;
+    output: Context;
+  };
+  /** Searches blocks across everything the caller can read */
+  "search.query": {
+    method: "GET";
+    path: "/v1/search";
+    input: SearchQueryQueryInput;
+    output: SearchPage;
+  };
+  /** Instant title search for the command menu */
+  "search.titles": {
+    method: "GET";
+    path: "/v1/search/titles";
+    input: TitlesInput;
+    output: TitlesPage;
+  };
   /** Completes a task; a repeating task moves to its next date */
   "tasks.complete": {
     method: "POST";
@@ -9051,6 +9378,9 @@ export const OPERATIONS = {
   "notify.read": { method: "POST", path: "/v1/notifications/read", mutation: true },
   "notify.set_preferences": { method: "PUT", path: "/v1/notifications/preferences", mutation: true },
   "render.page": { method: "GET", path: "/v1/pages/{id}/render", mutation: false },
+  "search.context": { method: "GET", path: "/v1/search/context/{doc_id}/{block_id}", mutation: false },
+  "search.query": { method: "GET", path: "/v1/search", mutation: false },
+  "search.titles": { method: "GET", path: "/v1/search/titles", mutation: false },
   "tasks.complete": { method: "POST", path: "/v1/tasks/{task}/complete", mutation: true },
   "tasks.create": { method: "POST", path: "/v1/tasks", mutation: true },
   "tasks.create_list": { method: "POST", path: "/v1/task-lists", mutation: true },

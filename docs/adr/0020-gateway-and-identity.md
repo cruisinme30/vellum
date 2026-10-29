@@ -12,7 +12,7 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D88, D89, D90
-- Issue: #84, #85, #148, #46, #86, #87, #88, #174, #407, #393
+- Issue: #84, #85, #148, #46, #86, #87, #88, #174, #407, #393, #429
 - Pull requests: #39, #234, #347, #352, #363
 
 :::
@@ -130,11 +130,6 @@ available. Re-authentication asks the provider for a fresh sign-in.
   all see the same set. Without an index (a key, plaintext mode or a
   database URL) `vellum serve` runs sign-in only and says why, rather
   than refusing to start.
-- With an index, `vellum serve` also serves the drive. At startup the
-  drive rebuilds its index from the data folder, and a file watcher then
-  applies edits made with other tools: an in-place page edit becomes a
-  version by an external editor, and a changed `book.yaml` re-applies
-  that book's section restrictions.
 - Clients get typed calls for free: `vellum openapi --typescript` turns
   the same document into `web/src/api/api.gen.ts`, and a contract test
   fails when the committed file no longer matches the server, so an API
@@ -146,3 +141,9 @@ the app host (#393). The gateway keeps `/api`, `/healthz`, `/readyz`,
 app's files, or its index for client routes. Those files pass the edge
 middleware but need no sign-in. The `connect-src` of the app's CSP also names
 the host's own `ws`/`wss` origin for live editing.
+
+With an index, `vellum serve` also runs search in the same process. Its
+tantivy index is sealed with a key derived from the index key, so the two
+never share a key. A row hit is checked against its collection, as rows
+have no node of their own. A pending single sign-on lives in one replica's
+memory, so several replicas need sticky sessions for `/auth/sso/*`.
