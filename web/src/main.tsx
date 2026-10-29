@@ -17,6 +17,7 @@ import { createHttpAdminConsoleApi } from "./admin/console/api";
 import { createAuthApi } from "./api/auth";
 import { createHttp } from "./api/http";
 import { App } from "./app";
+import { createHttpAssistApi, createHttpMcpSetupApi } from "./assist/api";
 import { createHttpBooksApi } from "./books/api";
 import { createHttpCollectionsStore } from "./collections/http";
 import { createMockCollectionsStore } from "./collections/mock";
@@ -77,6 +78,8 @@ root.render(
       work={status === undefined ? undefined : createHttpWorkApi(http)}
       books={status === undefined ? undefined : createHttpBooksApi(http)}
       privateSpaces={status === undefined ? undefined : createHttpPrivateSpacesApi(http)}
+      assist={status === undefined ? undefined : createHttpAssistApi(http)}
+      mcpSetup={status === undefined ? undefined : createHttpMcpSetupApi()}
       collections={
         status === undefined ? createMockCollectionsStore() : createHttpCollectionsStore(http)
       }

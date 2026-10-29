@@ -3,6 +3,7 @@
 
 import { createContext, use, type ReactNode } from "react";
 
+import type { AssistApi, McpSetupApi } from "../assist/api";
 import type { BooksApi } from "../books/api";
 import { useT } from "../i18n/i18n";
 import type { PrivateSpacesApi } from "../platform/private/api";
@@ -15,6 +16,10 @@ export interface ServerApis {
   readonly work?: WorkApi | undefined;
   readonly books?: BooksApi | undefined;
   readonly privateSpaces?: PrivateSpacesApi | undefined;
+  /** The person's own model: summarise, ask, draft (ADR 0056). */
+  readonly assist?: AssistApi | undefined;
+  /** The admin page's MCP client setup. */
+  readonly mcpSetup?: McpSetupApi | undefined;
 }
 
 const ServerApisContext = createContext<ServerApis>({});
@@ -80,4 +85,9 @@ export function Ready<T>({
     );
   }
   return <>{children(loaded.value)}</>;
+}
+
+/** One server-only API, or `undefined` in demo mode. */
+export function useServerApi<K extends keyof ServerApis>(api: K): ServerApis[K] {
+  return use(ServerApisContext)[api];
 }

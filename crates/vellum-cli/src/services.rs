@@ -56,6 +56,10 @@ pub struct Services {
     admin: Option<Arc<dyn Service>>,
     /// Where the gateway records per-route metrics.
     observability: Observability,
+    /// The workspace as MCP clients see it; the assistant reads through it.
+    mcp_workspace: Option<Arc<dyn vellum_mcp::ports::Workspace>>,
+    /// Bring-your-own-model features, when the MCP workspace is wired.
+    assist: Option<Arc<dyn Service>>,
 }
 
 impl std::fmt::Debug for Services {
@@ -67,6 +71,7 @@ impl std::fmt::Debug for Services {
             )
             .field("hooks", &self.hooks.is_some())
             .field("admin", &self.admin.is_some())
+            .field("assist", &self.assist.is_some())
             .finish_non_exhaustive()
     }
 }
@@ -135,6 +140,8 @@ impl Services {
             tasks: None,
             admin: None,
             observability: Observability::new(),
+            mcp_workspace: None,
+            assist: None,
         })
     }
 
@@ -155,6 +162,19 @@ impl Services {
         observability::spawn_ticks(Arc::clone(&service), Arc::clone(&facts));
         self.admin = Some(observability::api(service, facts));
         self.observability = observability;
+        Ok(self)
+    }
+
+    /// Adds the bring-your-own-model API over the MCP workspace adapter
+    /// (see [`crate::assist`]). Without that adapter it stays off.
+    ///
+    /// # Errors
+    ///
+    /// A malformed `VELLUM_AI_ENDPOINTS`.
+    pub fn with_assist(mut self, var: impl Fn(&str) -> Option<String>) -> Result<Self, Error> {
+        if let Some(workspace) = &self.mcp_workspace {
+            self.assist = crate::assist::service(Arc::clone(workspace), var)?;
+        }
         Ok(self)
     }
 
@@ -220,6 +240,7 @@ impl Services {
         ];
         all.extend(self.workspace.iter().cloned());
         all.extend(self.admin.iter().cloned());
+        all.extend(self.assist.iter().cloned());
         all
     }
 
@@ -268,6 +289,10 @@ pub fn contract_gateway() -> Result<Gateway, Error> {
     let _ = std::fs::remove_dir_all(&scratch);
     services.workspace = described?;
     services.admin = Some(admin?);
+    services.assist = crate::assist::service(
+        Arc::new(vellum_mcp::memory::MemoryWorkspace::new("http://localhost")),
+        |_| None,
+    )?;
     services
         .mount(GatewayBuilder::new(
             GatewayConfig::new("http://localhost", vec![0; 32]),

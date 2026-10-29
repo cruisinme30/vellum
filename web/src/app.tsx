@@ -13,6 +13,10 @@ import { RequestsPage } from "./admin/requests/requests-page";
 import { RoutesPage } from "./admin/routes/routes-page";
 import type { AuthApi, AuthStatus } from "./api/auth";
 import { RequireSession, SessionProvider, useSession } from "./api/session";
+import type { AssistApi, McpSetupApi } from "./assist/api";
+import { AskView } from "./assist/ask-view";
+import { McpSetupPage } from "./assist/mcp-setup-page";
+import { AssistantSettingsView } from "./assist/settings-view";
 import type { BooksApi } from "./books/api";
 import { BookPage, BooksPage } from "./books/books-page";
 import { CollectionView } from "./collections/collection-view";
@@ -85,6 +89,8 @@ export function AppRoutes() {
         <Route path="inbox" element={<InboxView />} />
         <Route path="settings/notifications" element={<NotificationSettingsView />} />
         <Route path="settings/private-spaces" element={<PrivateSpacesView />} />
+        <Route path="settings/ai" element={<AssistantSettingsView />} />
+        <Route path="ask" element={<AskView />} />
         <Route path="new" element={<NewPageView />} />
         <Route path="my-work" element={<MyWorkPage />} />
         <Route path="issues" element={<IssuesPage />} />
@@ -101,6 +107,7 @@ export function AppRoutes() {
         <Route path="admin/audit" element={<AuditPage />} />
         <Route path="admin/settings" element={<SettingsPage />} />
         <Route path="admin/backups" element={<BackupsPage />} />
+        <Route path="admin/mcp" element={<McpSetupPage />} />
         <Route path="*" element={<NotFoundView />} />
       </Route>
     </Routes>
@@ -125,6 +132,10 @@ export interface AppServices {
   readonly books?: BooksApi | undefined;
   /** Private spaces' device keys, from a Vellum server; absent in demo mode. */
   readonly privateSpaces?: PrivateSpacesApi | undefined;
+  /** The person's own model (summarise, ask, draft); absent in demo mode. */
+  readonly assist?: AssistApi | undefined;
+  /** The admin page's MCP client setup; absent in demo mode. */
+  readonly mcpSetup?: McpSetupApi | undefined;
   readonly collections: CollectionsStore;
   /** Present when a Vellum server answered; absent in demo mode. */
   readonly session?: { readonly auth: AuthApi; readonly status: AuthStatus } | undefined;
@@ -176,12 +187,17 @@ export function AppProviders({
   work,
   books,
   privateSpaces,
+  assist,
+  mcpSetup,
   collections,
   session,
   notifications,
   children,
 }: AppServices & { readonly children: ReactNode }) {
-  const serverApis = useMemo(() => ({ work, books, privateSpaces }), [work, books, privateSpaces]);
+  const serverApis = useMemo(
+    () => ({ work, books, privateSpaces, assist, mcpSetup }),
+    [work, books, privateSpaces, assist, mcpSetup],
+  );
   const [demoNotifications] = useState<NotificationServices>(() => ({
     store: createMockNotificationPreferencesStore(),
   }));

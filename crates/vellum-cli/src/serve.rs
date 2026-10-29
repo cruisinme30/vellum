@@ -322,7 +322,8 @@ pub fn run(config_path: Option<&Path>, observability: Observability) -> Result<(
             .with_workspace(&config, |k| std::env::var(k).ok())
             .await?
             .with_admin(&config, observability, |k| std::env::var(k).ok())
-            .await?;
+            .await?
+            .with_assist(|k| std::env::var(k).ok())?;
         tracing::info!(services = ?services, "services ready");
         if !web::BUILT {
             tracing::warn!("this binary was built without the web app; `/` shows a placeholder");

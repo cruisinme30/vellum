@@ -8905,6 +8905,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "vellum-assist"
+version = "0.0.0"
+dependencies = [
+ "async-trait",
+ "schemars 1.2.3",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "url",
+ "vellum-contracts",
+ "vellum-kernel",
+ "vellum-security",
+]
+
+[[package]]
 name = "vellum-authz"
 version = "0.0.0"
 dependencies = [
@@ -8985,6 +9002,7 @@ dependencies = [
  "url",
  "vellum-admin",
  "vellum-api",
+ "vellum-assist",
  "vellum-authz",
  "vellum-books-service",
  "vellum-collab",

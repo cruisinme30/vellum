@@ -5,6 +5,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
 import { useSession } from "../api/session";
+import { usePageAssistant } from "../assist/page-assistant";
 import { ancestors, siblings } from "../data/tree";
 import type { PageMeta } from "../data/types";
 import { useServices, useWorkspace } from "../data/workspace-context";
@@ -75,6 +76,7 @@ export function PageView() {
   const { store, collab } = useServices();
   const workspace = useWorkspace();
   const pageHistory = usePageHistory(pageId);
+  const assistant = usePageAssistant(pageId);
   const page = workspace.pages.find((p) => p.id === pageId);
   const trail = useMemo(() => ancestors(workspace.pages, pageId), [workspace.pages, pageId]);
   const space = workspace.spaces.find((s) => s.id === page?.spaceId);
@@ -200,8 +202,14 @@ export function PageView() {
             resolvePage={resolvePage}
             onOpenPage={onOpenPage}
             onControls={pageHistory.setControls}
-            actions={pageHistory.button}
+            actions={
+              <>
+                {assistant.button}
+                {pageHistory.button}
+              </>
+            }
           />
+          {assistant.panel}
           {pageHistory.panel}
         </>
       )}

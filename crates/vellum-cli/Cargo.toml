@@ -42,6 +42,7 @@ tracing = "0.1.44"
 url = "2.5.8"
 vellum-admin = { path = "../vellum-admin" }
 vellum-api = { path = "../vellum-api" }
+vellum-assist = { path = "../vellum-assist" }
 vellum-authz = { path = "../vellum-authz" }
 vellum-books-service = { path = "../vellum-books-service" }
 vellum-collab = { path = "../vellum-collab" }

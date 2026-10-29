@@ -4,6 +4,7 @@
 import { useId } from "react";
 import { Link, useSearchParams } from "react-router";
 
+import { useServerApi } from "../data/server-apis";
 import { useSearch, useWorkspace } from "../data/workspace-context";
 import { useT } from "../i18n/i18n";
 
@@ -26,6 +27,7 @@ export function SearchView() {
   const [parameters, setParameters] = useSearchParams();
   const query = parameters.get("q") ?? "";
   const hits = useSearch("search", query);
+  const assist = useServerApi("assist");
   return (
     <div className="vl-view">
       <h1>{t("nav-search")}</h1>
@@ -48,6 +50,13 @@ export function SearchView() {
       <p className="vl-muted" role="status">
         {searchStatus(t, query, hits)}
       </p>
+      {assist !== undefined && (
+        <p>
+          <Link to={query === "" ? "/ask" : `/ask?q=${encodeURIComponent(query)}`}>
+            {t("assist-ask-link")}
+          </Link>
+        </p>
+      )}
       {query !== "" && hits !== undefined && (
         <PageList items={hits} empty={t("search-empty", { query })} />
       )}
