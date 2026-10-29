@@ -74,18 +74,19 @@ pub fn body(text: &str) -> &str {
 pub fn front_matter(text: &str, key: &str) -> Option<String> {
     let range = split(text).yaml?;
     let yaml = text.get(range)?;
-    let value: serde_yaml_ng::Value = serde_yaml_ng::from_str(yaml).ok()?;
-    match value.get(key)? {
-        serde_yaml_ng::Value::String(s) => Some(s.clone()),
-        serde_yaml_ng::Value::Number(n) => Some(n.to_string()),
-        serde_yaml_ng::Value::Bool(b) => Some(b.to_string()),
+    let fields: std::collections::BTreeMap<String, serde_json::Value> =
+        serde_saphyr::from_str(yaml).ok()?;
+    match fields.get(key)? {
+        serde_json::Value::String(s) => Some(s.clone()),
+        serde_json::Value::Number(n) => Some(n.to_string()),
+        serde_json::Value::Bool(b) => Some(b.to_string()),
         _ => None,
     }
 }
 
 fn yaml_scalar(value: &str) -> String {
     let flat = value.split_whitespace().collect::<Vec<_>>().join(" ");
-    serde_yaml_ng::to_string(&flat)
+    serde_saphyr::to_string(&flat)
         .map_or_else(|_| format!("{flat:?}"), |s| s.trim_end().to_owned())
 }
 

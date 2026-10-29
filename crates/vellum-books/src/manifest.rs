@@ -221,7 +221,7 @@ impl Manifest {
     /// sections sharing a path.
     pub fn parse(text: &str) -> Result<Self> {
         let manifest: Self =
-            serde_yaml_ng::from_str(text).map_err(|e| BookError::Manifest(e.to_string()))?;
+            serde_saphyr::from_str(text).map_err(|e| BookError::Manifest(e.to_string()))?;
         manifest.validate()?;
         Ok(manifest)
     }
@@ -265,7 +265,7 @@ impl Manifest {
     ///
     /// Returns [`BookError::Manifest`] if serialisation fails.
     pub fn to_yaml(&self) -> Result<String> {
-        serde_yaml_ng::to_string(self).map_err(|e| BookError::Manifest(e.to_string()))
+        serde_saphyr::to_string(self).map_err(|e| BookError::Manifest(e.to_string()))
     }
 
     /// The id of the section stored at `path`.
