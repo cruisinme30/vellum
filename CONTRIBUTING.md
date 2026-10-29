@@ -53,28 +53,35 @@ Further layers join the full suite as their code lands: golden corpus,
 integration with testcontainers, contract, performance, chaos, security
 scans and the upgrade and restore drill.
 
-Run the same checks locally before pushing:
+Run the fast suite locally before pushing. Install the hooks once, after
+cloning:
 
 ```sh
-cargo fmt --all --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo nextest run --workspace
-cargo xtask boundaries
-cargo deny check
-pnpm --dir web run format:check
-pnpm --dir web run lint
-pnpm --dir web run test
+cargo xtask install-hooks
 ```
 
-Enable the repository hooks once: `git config core.hooksPath .githooks`.
+This turns on the commit template and three git hooks: `commit-msg`
+checks the commit message, `pre-commit` checks formatting, and `pre-push`
+runs `cargo xtask fast`, which mirrors every **Fast suite** check in CI
+and refuses the push if one fails. Run it by hand at any time:
+
+```sh
+cargo xtask fast
+```
+
+A check whose tool is not installed is skipped and named in the summary;
+CI still runs it. Install `markdownlint-cli2`, `vale`, `lychee`,
+`gitleaks`, `reuse`, `yamllint` and `shellcheck` to run every check. In
+an emergency, `git push --no-verify` skips the hook, but CI still gates
+the merge.
 
 ## Commits and pull requests
 
 CI enforces every rule in this section on each pull request.
 
-- **Commit template**: run `git config commit.template .gitmessage` once.
-  Each commit has a Conventional Commits subject, `type(scope): summary`
-  of at most 72 characters, where type is one of
+- **Commit template**: `cargo xtask install-hooks` sets it up. Each
+  commit has a Conventional Commits subject, `type(scope): summary` of at
+  most 72 characters, where type is one of
   `build chore ci docs feat fix perf refactor revert style test`; then a
   blank line; then a body saying why. The `.githooks/commit-msg` hook
   checks the same rules locally.
