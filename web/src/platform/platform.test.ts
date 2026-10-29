@@ -92,4 +92,14 @@ describe("platform", () => {
     await startPlatform(platform, { production: true });
     expect(register).toHaveBeenCalledTimes(2);
   });
+
+  it("registers the worker while the browser still asks to keep storage", async () => {
+    const register = vi.fn(() => Promise.reject(new Error("no")));
+    // Firefox shows a prompt for persist(); this one is never answered.
+    const persist = vi.fn(() => new Promise<boolean>(noop));
+    vi.stubGlobal("navigator", { serviceWorker: { register }, storage: { persist } });
+    await startPlatform(createPlatform({}), { production: true });
+    expect(persist).toHaveBeenCalled();
+    expect(register).toHaveBeenCalled();
+  });
 });
