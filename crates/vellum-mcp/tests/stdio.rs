@@ -154,3 +154,32 @@ async fn exits_when_input_closes() {
     let finished = tokio::time::timeout(Duration::from_secs(2), c.done).await;
     assert!(matches!(finished, Ok(Ok(Ok(())))));
 }
+
+#[tokio::test]
+async fn answers_a_request_sent_just_before_input_closes() {
+    let mut c = start();
+    c.send(&request_body(1, "tools/list", json!({}))).await;
+    assert!(c.input.shutdown().await.is_ok());
+    assert_eq!(c.recv().await["id"], 1);
+    let finished = tokio::time::timeout(Duration::from_secs(2), c.done).await;
+    assert!(matches!(finished, Ok(Ok(Ok(())))));
+}
+
+#[tokio::test]
+async fn open_subscriptions_end_when_input_closes() {
+    let mut c = start();
+    c.send(&request_body(
+        5,
+        "subscriptions/listen",
+        json!({ "notifications": { "resourcesListChanged": true } }),
+    ))
+    .await;
+    assert_eq!(
+        c.recv().await["method"],
+        "notifications/subscriptions/acknowledged"
+    );
+    assert!(c.input.shutdown().await.is_ok());
+    assert_eq!(c.recv().await["id"], 5, "the stream closes with its result");
+    let finished = tokio::time::timeout(Duration::from_secs(2), c.done).await;
+    assert!(matches!(finished, Ok(Ok(Ok(())))));
+}

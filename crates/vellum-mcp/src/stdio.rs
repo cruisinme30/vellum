@@ -5,8 +5,9 @@
 //!
 //! One JSON-RPC message per line in each direction. Requests run
 //! concurrently; `notifications/cancelled` stops one (including a
-//! `subscriptions/listen` stream). The server exits when standard input
-//! closes. Credentials come from the environment (an API token), as the
+//! `subscriptions/listen` stream). When standard input closes, requests
+//! already read still get their replies, open listen streams end, and the
+//! server exits. Credentials come from the environment (an API token), as the
 //! specification asks for stdio, so no `OAuth` flow runs here.
 
 use std::collections::HashMap;
@@ -16,7 +17,7 @@ use serde_json::Value;
 use tokio::io::{
     AsyncBufReadExt as _, AsyncRead, AsyncReadExt as _, AsyncWrite, AsyncWriteExt as _, BufReader,
 };
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 use tokio::task::{AbortHandle, JoinSet};
 
 use crate::auth::Principal;
@@ -60,6 +61,8 @@ where
     let in_flight: InFlight = Arc::default();
     let legacy_version: Arc<Mutex<Option<String>>> = Arc::default();
     let mut tasks = JoinSet::new();
+    // Flips to true when standard input closes, ending open listen streams.
+    let (closing_tx, closing_rx) = watch::channel(false);
     let mut reader = BufReader::new(input);
     let mut line = String::new();
     loop {
@@ -120,6 +123,7 @@ where
         let flight = Arc::clone(&in_flight);
         let legacy = Arc::clone(&legacy_version);
         let task_id = id.clone();
+        let mut closing = closing_rx.clone();
         let handle = tasks.spawn(async move {
             let is_initialize = msg.method == "initialize";
             let reply = server.handle(msg, &ctx).await;
@@ -132,13 +136,21 @@ where
                 Reply::Listen(mut listener) => {
                     let _ = tx.send(listener.acknowledgement().to_line()).await;
                     loop {
-                        if let Some(n) = listener.next().await {
-                            if tx.send(n.to_line()).await.is_err() {
+                        tokio::select! {
+                            next = listener.next() => {
+                                if let Some(n) = next {
+                                    if tx.send(n.to_line()).await.is_err() {
+                                        break;
+                                    }
+                                } else {
+                                    let _ = tx.send(listener.closing().to_line()).await;
+                                    break;
+                                }
+                            }
+                            () = async { drop(closing.wait_for(|closed| *closed).await); } => {
+                                let _ = tx.send(listener.closing().to_line()).await;
                                 break;
                             }
-                        } else {
-                            let _ = tx.send(listener.closing().to_line()).await;
-                            break;
                         }
                     }
                 }
@@ -165,8 +177,10 @@ where
         // Reap finished tasks so the set does not grow without bound.
         while tasks.try_join_next().is_some() {}
     }
-    // Standard input closed: stop promptly, as the transport asks.
-    tasks.abort_all();
+    // Standard input closed. Requests already read still answer (aborting
+    // them dropped replies when a client wrote and closed at once); listen
+    // streams end, so every task finishes promptly.
+    let _ = closing_tx.send(true);
     while tasks.join_next().await.is_some() {}
     drop(tx);
     writer.await.map_err(std::io::Error::other)?
