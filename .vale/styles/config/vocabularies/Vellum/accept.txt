@@ -150,3 +150,5 @@ Kubernetes
 [Hh]elm
 zizmor
 [Rr]ecents
+ClamAV
+EICAR

@@ -53,6 +53,23 @@ breaker; if Kroki is down, pages show the last drawing and the source.
 Mermaid and architecture diagrams are drawn inside Vellum and never need
 Kroki. Leave Kroki out if your users do not need those types.
 
+## Virus scanning {#clamav}
+
+The compose stack runs ClamAV next to Vellum, and the Helm chart runs two
+copies of it. Every upload, up to the 100 MiB limit, is streamed to it
+before it is stored. If ClamAV is down, uploads are refused rather than
+stored unscanned. ClamAV needs about 1.5 GiB of memory and fetches new
+signatures every two hours.
+
+Point the upload scanner at it in **Admin → Security → Uploads**: the
+address is `clamav:3310` in compose and `<release>-vellum-clamav:3310` in
+Kubernetes. Both also pass it to Vellum as `VELLUM_CLAMD_ADDRESS`.
+
+If you run your own ClamAV, set `StreamMaxLength 100M` in `clamd.conf`.
+Many packages ship `25M`, which refuses every upload between 25 and
+100 MiB. To check a scanner, run `deploy/clamav/smoke.sh <host> 3310`. It
+streams a 30 MB file and the EICAR test file through it.
+
 ## Redis {#redis}
 
 Redis is optional in every profile. When `VELLUM_REDIS_URL` is set,

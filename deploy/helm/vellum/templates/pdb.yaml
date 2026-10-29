@@ -27,3 +27,17 @@ spec:
     matchLabels:
       {{- include "vellum.krokiSelector" . | nindent 6 }}
 {{- end }}
+{{- if .Values.clamav.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "vellum.fullname" . }}-clamav
+  labels:
+    {{- include "vellum.labels" . | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      {{- include "vellum.clamavSelector" . | nindent 6 }}
+{{- end }}

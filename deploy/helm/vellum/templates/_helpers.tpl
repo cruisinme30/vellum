@@ -36,6 +36,12 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/component: kroki
 {{- end }}
 
+{{- define "vellum.clamavSelector" -}}
+app.kubernetes.io/name: {{ include "vellum.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/component: clamav
+{{- end }}
+
 {{- define "vellum.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
 {{- default (include "vellum.fullname" .) .Values.serviceAccount.name }}
