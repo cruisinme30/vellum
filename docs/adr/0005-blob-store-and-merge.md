@@ -12,6 +12,8 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D43, D44, D45
+- Issue: none (recorded before the issue rule, D119)
+- Pull requests: #25
 
 :::
 
@@ -70,6 +72,14 @@ of that trait and the merge rules in `vellum-store`.
   deleted meanwhile recreates it. Trash and history make that safe.
 - A save that keeps meeting newer versions gives up after eight merges
   with an error rather than looping.
+
+## Alternatives
+
+- **Last write wins**: the brief rules it out; it loses edits silently.
+- **Fuzzy patching**: can place an edit in the wrong spot without
+  reporting it.
+- **Character-level merge for manifests**: can produce a well-formed but
+  wrong manifest.
 
 ## Consequences
 

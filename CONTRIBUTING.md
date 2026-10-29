@@ -92,8 +92,11 @@ Every change is traceable to the discussion that led to it.
   issue stays open) in the **Issue** section of the description.
 - **A feature records its decisions.** Copy `docs/adr/0000-template.md`
   to `docs/adr/NNNN-<slug>.md`, ask for the next record and decision
-  numbers, and fill it in: context, options, decisions, consequences, and
-  a link to the issue. When a feature only extends an existing decision,
+  numbers, and fill it in. Every record has the same four sections,
+  **Context**, **Decisions**, **Alternatives** and **Consequences**, plus
+  the issue and pull requests in its facts block. Keep it short: under
+  150 lines and at most six bullets in a row; the **Decision records**
+  check enforces both. When a feature only extends an existing decision,
   update that record or name it as `ADR NNNN` in the description.
 
 The **Issue and decision record** check in the fast suite enforces this.

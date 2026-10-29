@@ -111,6 +111,8 @@ jobs:
         run: yamllint --strict .
       - name: Shell
         run: shellcheck -x scripts/*/*.sh .githooks/*
+      - name: Decision records
+        run: scripts/ci/check-adrs.sh
       - name: Markdown
         uses: DavidAnson/markdownlint-cli2-action@696eb3f2509270d7b882d2aa68347bc676e7af34 # v25.0.0
       - name: Prose (Vale)

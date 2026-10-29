@@ -12,6 +12,7 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D40, D41, D42
+- Pull requests: #35
 - Issues: #64, #65, #66, #67, #68, #69
 
 :::
@@ -83,6 +84,14 @@ flowchart LR
   between reading and writing.
 - An issue key is a candidate. Render resolves it against teams and
   falls back to plain text.
+
+## Alternatives
+
+- **`pulldown-cmark`**: no GFM alerts or footnote parity with comrak,
+  and the brief names comrak.
+- **`serde_yaml`**: depends on the unmaintained `unsafe-libyaml`.
+- **Keep the source text instead of a canonical form**: equal documents
+  would diff differently, and merges would see noise.
 
 ## Consequences
 
