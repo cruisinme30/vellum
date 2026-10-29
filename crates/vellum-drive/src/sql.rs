@@ -19,7 +19,7 @@
 //!
 //! The SQL is written once: `$n` placeholders and `ON CONFLICT` read the
 //! same on SQLite and Postgres, and each method body is expanded for both
-//! pools by [`on_pool`].
+//! pools by the `on_pool` macro.
 
 use std::collections::HashSet;
 use std::fmt;
