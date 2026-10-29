@@ -25,11 +25,14 @@ proptest! {
 
     #[test]
     fn quantiles_are_monotonic(latencies in proptest::collection::vec(0_u64..40_000, 1..200)) {
+        // A fixed minute: with the wall clock, recording could cross into
+        // the next minute and a one-minute snapshot would miss requests.
+        const MINUTE: u64 = 29_000_000;
         let m = RouteMetrics::new();
         for ms in &latencies {
-            m.record("GET", "/p", 200, Duration::from_millis(*ms));
+            m.record_at(MINUTE, "GET", "/p", 200, Duration::from_millis(*ms));
         }
-        let stat = m.snapshot(1).pop().unwrap();
+        let stat = m.snapshot_at(MINUTE, 1).pop().unwrap();
         let p50 = stat.p50_ms.unwrap();
         let p95 = stat.p95_ms.unwrap();
         let p99 = stat.p99_ms.unwrap();

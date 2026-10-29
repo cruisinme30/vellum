@@ -323,7 +323,16 @@ impl RouteMetrics {
         self.record_at(now_minute(), method, route, status, duration);
     }
 
-    fn record_at(&self, minute: u64, method: &str, route: &str, status: u16, duration: Duration) {
+    /// Like [`Self::record`], filed under `minute` (minutes since the Unix
+    /// epoch) instead of the current one, so tests need no clock.
+    pub fn record_at(
+        &self,
+        minute: u64,
+        method: &str,
+        route: &str,
+        status: u16,
+        duration: Duration,
+    ) {
         let error = status >= 500;
         self.instruments.duration.record(
             duration.as_secs_f64(),
@@ -360,8 +369,11 @@ impl RouteMetrics {
         total
     }
 
+    /// Like [`Self::snapshot`], as if `now` (minutes since the Unix epoch)
+    /// were the current minute.
+    #[must_use]
     #[expect(clippy::cast_precision_loss, reason = "counts are far below 2^52")]
-    fn snapshot_at(&self, now: u64, minutes: u64) -> Vec<RouteStat> {
+    pub fn snapshot_at(&self, now: u64, minutes: u64) -> Vec<RouteStat> {
         let minutes = minutes.clamp(1, WINDOW_MINUTES);
         let mut stats: Vec<RouteStat> = self
             .lock()
