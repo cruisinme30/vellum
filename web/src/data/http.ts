@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import type { SearchPage } from "../api/api.gen";
 import { ApiError, type Http } from "../api/http";
 
 import type { SignedInUser, StoreProblem, WorkspaceSnapshot, WorkspaceStore } from "./store";
@@ -31,6 +32,9 @@ interface NodeList {
 }
 
 const DRIVE = "/api/v1/drive";
+const SEARCH = "/api/v1/search";
+/** Hits asked of the search service; several can fall in one page. */
+const SEARCH_LIMIT = 50;
 const segment = encodeURIComponent;
 const item = (id: string) => `${DRIVE}/items/${segment(id)}`;
 
@@ -324,16 +328,20 @@ export function createHttpWorkspaceStore(
       return;
     },
     async search(raw) {
-      const title = raw.trim();
-      if (title === "") return [];
+      const q = raw.trim();
+      if (q === "") return [];
+      // Only what the tree holds opens here: shared-with-me items have no space in it yet.
+      const known = new Map(snapshot.pages.map((p) => [p.id, p]));
       try {
-        const found = await http.get<NodeList>(`${DRIVE}/search`, { title, limit: 50 });
-        // Only what the tree holds opens here: shared-with-me items have no space in it yet.
-        const known = new Map(snapshot.pages.map((p) => [p.id, p]));
-        return found.items.flatMap((node): SearchHit[] => {
-          const page = known.get(node.id);
-          return page === undefined ? [] : [{ page, snippet: "" }];
-        });
+        return await searchText(http, q, known);
+      } catch (error) {
+        if (!searchMissing(error)) {
+          report(error);
+          return [];
+        }
+      }
+      try {
+        return await searchTitles(http, q, known);
       } catch (error) {
         report(error);
         return [];
@@ -359,3 +367,43 @@ export function createHttpWorkspaceStore(
   store.setUser?.(options.user);
   return store;
 }
+
+/**
+ * Full-text search: the best block of each page, best page first, with the
+ * block's excerpt as the snippet.
+ */
+async function searchText(
+  http: Http,
+  q: string,
+  known: ReadonlyMap<string, PageMeta>,
+): Promise<SearchHit[]> {
+  const found = await http.get<SearchPage>(SEARCH, { q, kinds: "page", limit: SEARCH_LIMIT });
+  const hits = new Map<string, SearchHit>();
+  for (const hit of found.hits) {
+    const page = known.get(hit.doc);
+    if (page === undefined || hits.has(page.id)) continue;
+    const snippet = hit.snippet
+      .map((fragment) => fragment.text)
+      .join("")
+      .trim();
+    hits.set(page.id, { page, snippet });
+  }
+  return [...hits.values()];
+}
+
+/** Title search on the drive, for a server that runs no search service. */
+async function searchTitles(
+  http: Http,
+  title: string,
+  known: ReadonlyMap<string, PageMeta>,
+): Promise<SearchHit[]> {
+  const found = await http.get<NodeList>(`${DRIVE}/search`, { title, limit: SEARCH_LIMIT });
+  return found.items.flatMap((node): SearchHit[] => {
+    const page = known.get(node.id);
+    return page === undefined ? [] : [{ page, snippet: "" }];
+  });
+}
+
+/** Whether a search failed because the server has no search service. */
+const searchMissing = (error: unknown) =>
+  error instanceof ApiError && (error.status === 404 || error.status === 501);

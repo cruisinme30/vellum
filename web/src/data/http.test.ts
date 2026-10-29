@@ -84,6 +84,15 @@ async function settled(store: WorkspaceStore) {
   await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
+/** A search hit on `pageId` whose excerpt is "the " plus `text`. */
+const searchHit = (pageId: string, text: string) => ({
+  doc: pageId,
+  snippet: [
+    { text: "the ", hit: false },
+    { text, hit: true },
+  ],
+});
+
 const page = (store: WorkspaceStore, id: string) =>
   store.getSnapshot().pages.find((p) => p.id === id);
 
@@ -345,19 +354,45 @@ describe("the HTTP workspace store", () => {
     expect(second.store.getSnapshot().problem?.message).toBe("read only");
   });
 
-  it("searches titles on the server, keeping what the tree holds", async () => {
+  it("searches page text on the server, one hit per page the tree holds", async () => {
     const { http, store } = await loaded({
-      "GET /api/v1/drive/search": { items: [node("p2", "page"), node("elsewhere", "page")] },
+      "GET /api/v1/search": {
+        hits: [
+          searchHit("p2", "plan "),
+          searchHit("elsewhere", "plan"),
+          searchHit("p2", "again"),
+          searchHit("p1", "plan"),
+        ],
+        has_more: false,
+        hybrid: false,
+      },
     });
     expect(await store.search("  ")).toEqual([]);
-    const hits = await store.search(" p ");
-    expect(http.get.mock.lastCall).toEqual(["/api/v1/drive/search", { title: "p", limit: 50 }]);
-    expect(hits).toEqual([{ page: page(store, "p2"), snippet: "" }]);
+    const hits = await store.search(" plan ");
+    expect(http.get.mock.lastCall).toEqual([
+      "/api/v1/search",
+      { q: "plan", kinds: "page", limit: 50 },
+    ]);
+    expect(hits).toEqual([
+      { page: page(store, "p2"), snippet: "the plan" },
+      { page: page(store, "p1"), snippet: "the plan" },
+    ]);
     expect(await store.mentions("priya")).toEqual([]);
   });
 
+  it("searches titles when the server runs no search service", async () => {
+    const { http, store } = await loaded({
+      "GET /api/v1/search": new ApiError("not_found", "no route", { status: 404 }),
+      "GET /api/v1/drive/search": { items: [node("p2", "page"), node("elsewhere", "page")] },
+    });
+    const hits = await store.search(" p ");
+    expect(http.get.mock.lastCall).toEqual(["/api/v1/drive/search", { title: "p", limit: 50 }]);
+    expect(hits).toEqual([{ page: page(store, "p2"), snippet: "" }]);
+    expect(store.getSnapshot().problem).toBeUndefined();
+  });
+
   it("reports a search that fails", async () => {
-    const { store } = await loaded({ "GET /api/v1/drive/search": new Error("down") });
+    const { store } = await loaded({ "GET /api/v1/search": new Error("down") });
     expect(await store.search("x")).toEqual([]);
     expect(store.getSnapshot().problem?.message).toBe("down");
   });
