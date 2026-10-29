@@ -350,6 +350,7 @@ async fn tools_list_is_deterministic_and_public() {
             "get_doc",
             "get_blocks",
             "get_outline",
+            "get_template",
             "create_draft",
             "propose_edit",
             "create_issue",
@@ -689,7 +690,7 @@ async fn legacy_clients_can_initialize_and_call_without_meta() {
         .unwrap_or_default();
     let (status, _, body) = send(&h.app, req).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(body["result"]["tools"].as_array().map(Vec::len), Some(14));
+    assert_eq!(body["result"]["tools"].as_array().map(Vec::len), Some(15));
     let note = json!({ "jsonrpc": "2.0", "method": "notifications/initialized" });
     let req = Request::post("/mcp")
         .header(header::AUTHORIZATION, "Bearer read")
@@ -869,4 +870,22 @@ async fn llms_txt_sitemap_and_format_md() {
     .into_owned();
     assert_eq!(html, "<html>page</html>");
     let _ = Actor::Anonymous;
+}
+
+#[tokio::test]
+async fn templates_are_listed_and_read() {
+    let h = harness();
+    let (status, _, list) = call_tool(&h, "read", "get_template", json!({})).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        list["result"]["structuredContent"]["templates"][0]["name"],
+        "prd"
+    );
+    let (_, _, prd) = call_tool(&h, "read", "get_template", json!({ "name": "prd" })).await;
+    let md = prd["result"]["structuredContent"]["markdown"]
+        .as_str()
+        .unwrap_or_default();
+    assert!(md.contains("## Requirements"), "{prd}");
+    let (_, _, missing) = call_tool(&h, "read", "get_template", json!({ "name": "nope" })).await;
+    assert_eq!(missing["result"]["isError"], true, "{missing}");
 }

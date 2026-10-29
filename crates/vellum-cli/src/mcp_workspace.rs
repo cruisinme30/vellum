@@ -25,7 +25,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use serde_json::{Map, Value, json};
 use vellum_contracts::{CredentialKind, Operation, RequestContext, ScopeSet, Service};
-use vellum_drive::{Drive, DriveIndex, NodeKind, Saved, Space};
+use vellum_drive::{Drive, DriveIndex, Filter, NodeKind, Saved, Space};
 use vellum_kernel::{
     Actor as Who, Error, ErrorKind, ObjectId, RequestId, SpaceId, Timestamp, UserId,
 };
@@ -34,7 +34,7 @@ use vellum_mcp::ports::{
     Actor, Attribution, Block, BlockSelector, Change, ChangePage, CollectionQuery, Document,
     EditProposal, ExportArtifact, ExportRequest, Issue, IssueUpdate, Listing, ListingPage,
     NewComment, NewIssue, NewPage, NewTask, OutlineNode, RowPage, RowUpsert, SearchHit,
-    SearchQuery, SiteInfo, Workspace, WorkspaceError, WriteMode, WriteReceipt,
+    SearchQuery, SiteInfo, Template, Workspace, WorkspaceError, WriteMode, WriteReceipt,
 };
 use vellum_private::PrivateDoc;
 use vellum_store::Base;
@@ -58,6 +58,22 @@ const OPS: [&str; 14] = [
     "books.get",
     "collections.get",
 ];
+
+/// The folder name that holds page templates.
+const TEMPLATES: &str = "Templates";
+
+/// Most template folders, and templates per folder, looked at.
+const MAX_TEMPLATES: usize = 200;
+
+/// A template's name: its title in lowercase, words joined by hyphens.
+fn template_name(title: &str) -> String {
+    title
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| !w.is_empty())
+        .map(str::to_lowercase)
+        .collect::<Vec<_>>()
+        .join("-")
+}
 
 /// How long one service call may take.
 const BUDGET: Duration = Duration::from_secs(30);
@@ -504,6 +520,51 @@ impl ServeWorkspace {
         self.call(caller, "books.get", json!({ "book_id": id }))
             .await
             .map_err(read_err(id))
+    }
+
+    /// Page templates (D264): pages in a folder named `Templates` in any
+    /// space the caller can open, by name, first title wins.
+    async fn templates(
+        &self,
+        caller: &Caller,
+    ) -> Result<Vec<(String, vellum_drive::Node)>, WorkspaceError> {
+        let who = caller.model();
+        let folders = self
+            .drive
+            .find(
+                &who,
+                &Filter {
+                    title: Some(TEMPLATES.to_owned()),
+                    kinds: vec![NodeKind::Folder],
+                    ..Filter::default()
+                },
+                MAX_TEMPLATES,
+            )
+            .await
+            .map_err(write_err)?;
+        let mut out: Vec<(String, vellum_drive::Node)> = Vec::new();
+        for folder in folders
+            .iter()
+            .filter(|f| f.title.eq_ignore_ascii_case(TEMPLATES))
+        {
+            let pages = self
+                .drive
+                .find(
+                    &who,
+                    &Filter {
+                        kinds: vec![NodeKind::Page],
+                        location: Some(folder.id),
+                        ..Filter::default()
+                    },
+                    MAX_TEMPLATES,
+                )
+                .await
+                .map_err(write_err)?;
+            out.extend(pages.into_iter().map(|p| (template_name(&p.title), p)));
+        }
+        out.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.title.cmp(&b.1.title)));
+        out.dedup_by(|a, b| a.0 == b.0);
+        Ok(out)
     }
 
     /// The caller's activity since `from`, oldest first.
@@ -1372,9 +1433,33 @@ impl Workspace for ServeWorkspace {
         Ok(ListingPage { items, next_cursor })
     }
 
-    async fn get_template(&self, _actor: &Actor, name: &str) -> Result<String, WorkspaceError> {
-        // No template store yet; prompts fall back to their own outline.
-        Err(WorkspaceError::NotFound(name.to_owned()))
+    async fn list_templates(&self, actor: &Actor) -> Result<Vec<Template>, WorkspaceError> {
+        let Ok(caller) = Caller::of(actor) else {
+            return Ok(Vec::new());
+        };
+        Ok(self
+            .templates(&caller)
+            .await?
+            .into_iter()
+            .map(|(name, node)| Template {
+                uri: format!("vellum://template/{name}"),
+                name,
+                title: node.title,
+            })
+            .collect())
+    }
+
+    async fn get_template(&self, actor: &Actor, name: &str) -> Result<String, WorkspaceError> {
+        let caller = Caller::of(actor)?;
+        let wanted = template_name(name);
+        let (_, node) = self
+            .templates(&caller)
+            .await?
+            .into_iter()
+            .find(|(n, _)| *n == wanted)
+            .ok_or_else(|| WorkspaceError::NotFound(name.to_owned()))?;
+        let (doc, _) = self.read_page(&caller, &node.id.to_string()).await?;
+        Ok(body_of(&doc.markdown))
     }
 
     async fn site_info(&self) -> Result<SiteInfo, WorkspaceError> {
@@ -1427,6 +1512,13 @@ mod tests {
             sort_text(&json!({ "property": "Due", "direction": "DESC" })),
             "\"Due\" desc"
         );
+    }
+
+    #[test]
+    fn templates_are_named_from_their_titles() {
+        assert_eq!(template_name("PRD"), "prd");
+        assert_eq!(template_name("Weekly status: team"), "weekly-status-team");
+        assert_eq!(template_name("  Post-mortem  "), "post-mortem");
     }
 
     #[test]

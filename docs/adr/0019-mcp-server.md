@@ -146,5 +146,4 @@ decisions say which way we went. D217–D219 put the server inside
   resources, prompts, `llms.txt` and `?format=md` can only show what the
   caller may read.
 - MCP clients connect to `<server>/mcp`; `vellum mcp` stays for the demo
-  and private spaces. Export and page templates over MCP are not served
-  yet; those tools say so.
+  and private spaces. Templates and export over MCP follow in ADR 0065.

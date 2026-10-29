@@ -476,6 +476,17 @@ pub struct ListingPage {
     pub next_cursor: Option<String>,
 }
 
+/// A page template a model can start a draft from.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Template {
+    /// The name to pass to `get_template` (lowercase, hyphenated).
+    pub name: String,
+    /// The template page's title.
+    pub title: String,
+    /// `vellum://template/<name>`.
+    pub uri: String,
+}
+
 /// Facts about the deployment, for `llms.txt`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SiteInfo {
@@ -605,8 +616,13 @@ pub trait Workspace: Send + Sync {
         cursor: Option<String>,
         limit: u32,
     ) -> Result<ListingPage, WorkspaceError>;
-    /// A named page template's Markdown (for the `write-prd` prompt).
+    /// A named page template's Markdown (for the `write-prd` prompt and the
+    /// `get_template` tool).
     async fn get_template(&self, actor: &Actor, name: &str) -> Result<String, WorkspaceError>;
+    /// The page templates the actor can use, by name and title.
+    async fn list_templates(&self, _actor: &Actor) -> Result<Vec<Template>, WorkspaceError> {
+        Ok(Vec::new())
+    }
     /// Deployment facts for `llms.txt`.
     async fn site_info(&self) -> Result<SiteInfo, WorkspaceError>;
 }

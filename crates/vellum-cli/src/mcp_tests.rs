@@ -85,6 +85,7 @@ pub async fn server(dir: &std::path::Path) -> (Services, Router) {
 /// personal token for MCP: the session cookie, its CSRF token, the page's
 /// ID and the bearer token.
 pub struct World {
+    pub space_id: String,
     pub cookie: String,
     pub csrf: String,
     pub page_id: String,
@@ -106,6 +107,7 @@ pub async fn world(app: &Router) -> World {
     let mut w = World {
         csrf: csrf(app, &cookie).await,
         cookie,
+        space_id: String::new(),
         page_id: String::new(),
         bearer: String::new(),
     };
@@ -118,7 +120,8 @@ pub async fn world(app: &Router) -> World {
     )
     .await;
     assert_eq!(space.status, StatusCode::OK, "{}", space.text);
-    let space_id = space.json()["id"].as_str().unwrap().to_owned();
+    w.space_id = space.json()["id"].as_str().unwrap().to_owned();
+    let space_id = w.space_id.clone();
     let page = send(
         app,
         w.post(
@@ -342,5 +345,52 @@ async fn listeners_hear_about_changes_from_the_feed() {
     }
     assert!(seen.contains("notifications/resources/updated"), "{seen}");
     assert!(seen.contains(&uri), "{seen}");
+    services.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn page_templates_come_from_templates_folders() {
+    let dir = tempfile::tempdir().unwrap();
+    let (services, app) = server(dir.path()).await;
+    let w = world(&app).await;
+    let folder = send(
+        &app,
+        w.post(
+            &format!("/api/v1/drive/spaces/{}/folders", w.space_id),
+            &json!({ "name": "Templates" }),
+        ),
+    )
+    .await;
+    assert_eq!(folder.status, StatusCode::OK, "{}", folder.text);
+    let page = send(
+        &app,
+        w.post(
+            &format!("/api/v1/drive/spaces/{}/pages", w.space_id),
+            &json!({
+                "parent_id": folder.json()["id"],
+                "title": "PRD",
+                "body": "## Problem\n\n## Requirements\n",
+            }),
+        ),
+    )
+    .await;
+    assert_eq!(page.status, StatusCode::OK, "{}", page.text);
+
+    let list = structured(&tool(&app, &w.bearer, "get_template", json!({})).await);
+    assert_eq!(list["templates"][0]["name"], "prd", "{list}");
+    assert_eq!(list["templates"].as_array().unwrap().len(), 1, "{list}");
+    let prd = structured(&tool(&app, &w.bearer, "get_template", json!({ "name": "PRD" })).await);
+    let md = prd["markdown"].as_str().unwrap();
+    assert!(
+        md.contains("## Requirements") && !md.contains("id:"),
+        "{md}"
+    );
+    let missing = tool(&app, &w.bearer, "get_template", json!({ "name": "nope" })).await;
+    assert_eq!(
+        missing.json()["result"]["isError"],
+        true,
+        "{}",
+        missing.text
+    );
     services.shutdown().await;
 }
