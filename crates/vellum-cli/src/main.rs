@@ -18,6 +18,9 @@ mod mcp;
 mod reindex;
 mod serve;
 mod services;
+mod web;
+#[cfg(test)]
+mod web_tests;
 mod workspace;
 
 use std::io::Write as _;

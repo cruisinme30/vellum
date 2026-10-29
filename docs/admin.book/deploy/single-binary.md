@@ -31,7 +31,8 @@ vellum serve --data-dir ~/vellum
 
 Vellum listens on `127.0.0.1:7700` and creates the data folder on first
 start. Open `http://127.0.0.1:7700` and create the first account; it
-becomes the workspace owner.
+becomes the workspace owner. The same address serves the web app and
+the API under `/api`, so there is nothing else to host.
 
 To serve other people, give Vellum a public address and let it get a
 certificate:
