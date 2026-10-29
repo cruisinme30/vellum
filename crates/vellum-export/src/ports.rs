@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use vellum_format::Fence;
+use vellum_format::blocks::Calculator;
 
 /// A chart or diagram drawn as a standalone, sanitised SVG.
 #[derive(Debug, Clone, PartialEq)]
@@ -168,6 +169,90 @@ impl AssetSource for NoAssets {
     }
 }
 
+/// One calculator output, computed.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CalcValue {
+    /// The unit written after the formula, such as `$` or `days`.
+    pub unit: Option<String>,
+    /// The value, or why it could not be computed.
+    pub value: Result<f64, String>,
+}
+
+/// A table read from an import source, to become a collection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NewCollection {
+    /// The collection title.
+    pub title: String,
+    /// The table as CSV, header row first.
+    pub csv: String,
+    /// Pages that hold row bodies, matched to rows by title.
+    pub rows: Vec<RowPage>,
+}
+
+/// A page that holds the body of one row.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RowPage {
+    /// The row title, as in the table's title column.
+    pub title: String,
+    /// The document ID the row takes.
+    pub id: String,
+    /// The row body as Vellum Markdown, without front matter.
+    pub body: String,
+}
+
+/// A collection's files as `(path inside the collection folder, text)`,
+/// and the problems found while building it.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CollectionFiles {
+    /// The files: schema, rows and views.
+    pub files: Vec<(String, String)>,
+    /// Rows or cells that could not be imported, one line each.
+    pub problems: Vec<String>,
+}
+
+/// The collections engine, as export and import need it.
+///
+/// Calculators are computed with the collections formula language, and
+/// imported databases become collections. Collections is a service on the
+/// same layer as export, so it comes in through this port.
+pub trait Collections: Send + Sync {
+    /// Computes each output of `calc` from its stored inputs, in order;
+    /// later outputs may use earlier ones. `as_of` (`YYYY-MM-DD`) answers
+    /// `now()`.
+    fn calculate(&self, calc: &Calculator, as_of: &str) -> Vec<CalcValue>;
+
+    /// Builds the files of a new collection from an imported table.
+    ///
+    /// # Errors
+    ///
+    /// Returns why the table cannot become a collection; the import then
+    /// keeps it as a CSV file and its row pages as ordinary pages.
+    fn create(&self, table: &NewCollection) -> Result<CollectionFiles, String>;
+}
+
+/// No collections engine: calculator outputs show an error, and imported
+/// databases stay CSV files with their row pages as ordinary pages.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NoCollections;
+
+const NO_COLLECTIONS: &str = "no collections engine is connected";
+
+impl Collections for NoCollections {
+    fn calculate(&self, calc: &Calculator, _as_of: &str) -> Vec<CalcValue> {
+        calc.outputs
+            .iter()
+            .map(|output| CalcValue {
+                unit: output.unit.clone(),
+                value: Err(NO_COLLECTIONS.into()),
+            })
+            .collect()
+    }
+
+    fn create(&self, _table: &NewCollection) -> Result<CollectionFiles, String> {
+        Err(NO_COLLECTIONS.into())
+    }
+}
+
 /// The ports one export uses.
 #[derive(Clone)]
 pub struct Ports {
@@ -177,6 +262,8 @@ pub struct Ports {
     pub live: Arc<dyn LiveData>,
     /// Loads images.
     pub assets: Arc<dyn AssetSource>,
+    /// Computes calculators.
+    pub collections: Arc<dyn Collections>,
 }
 
 impl Default for Ports {
@@ -185,6 +272,7 @@ impl Default for Ports {
             figures: Arc::new(NoFigures),
             live: Arc::new(NoLiveData),
             assets: Arc::new(NoAssets),
+            collections: Arc::new(NoCollections),
         }
     }
 }

@@ -29,14 +29,14 @@ use vellum_format::blocks::{
     Read, RiskMatrix, Roadmap, Stats, Steps, Tabs, Timeline, Trend,
 };
 
-use crate::calc::{self, display_number};
+use crate::calc::display_number;
 use crate::error::ExportWarning;
 use crate::flow::{
     Align, Asset, Bar, Card, Cell, Flow, Item, Layout, Media, Node, Span, Stat, Style, Table,
     TableStyle, Tone,
 };
 use crate::math;
-use crate::ports::{FigureError, FigureSvg, IssueChip, PageRef, Ports, Snapshot};
+use crate::ports::{CalcValue, FigureError, FigureSvg, IssueChip, PageRef, Ports, Snapshot};
 
 /// Most images and figures one export may carry. The print backend gives
 /// each a file slot, so the limit also bounds the typesetter's file table.
@@ -1096,7 +1096,11 @@ impl Ctx<'_, '_> {
 
     fn calculator(&mut self, fence: &Fence) -> Node {
         let calc = self.read(&fence.lang, Calculator::parse(fence));
-        let values = calc::outputs(&calc, &self.opts.as_of);
+        let values = self
+            .session
+            .ports
+            .collections
+            .calculate(&calc, &self.opts.as_of);
         let mut rows: Vec<Vec<Cell>> = calc
             .inputs
             .iter()
@@ -1107,7 +1111,7 @@ impl Ctx<'_, '_> {
                 ]
             })
             .collect();
-        for (output, (unit, value)) in calc.outputs.into_iter().zip(values) {
+        for (output, CalcValue { unit, value }) in calc.outputs.into_iter().zip(values) {
             let unit = unit.unwrap_or_default();
             let value = match &value {
                 Ok(value) if unit == "$" || unit == "€" || unit == "£" => {

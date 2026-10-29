@@ -8,6 +8,12 @@ use zip::write::SimpleFileOptions;
 use super::*;
 use crate::flow::{Asset, Flow, Item, Layout, Media, Node, Span, Table as FlowTable, TableStyle};
 
+/// Imports without a collections engine; `tests/import.rs` covers the
+/// collections it builds.
+fn import(source: Source, name: &str, bytes: &[u8]) -> Result<ImportSet, ImportError> {
+    super::import(source, name, bytes, &NoCollections)
+}
+
 fn zip_of(files: &[(&str, &[u8])]) -> Vec<u8> {
     let mut out = Cursor::new(Vec::new());
     let mut zip = zip::ZipWriter::new(&mut out);
@@ -123,7 +129,7 @@ fn outline_and_docmost_notices_become_callouts() {
 }
 
 #[test]
-fn notion_databases_become_collections() {
+fn notion_databases_without_an_engine_stay_csv_and_pages() {
     let home = "Home 0123456789abcdef0123456789abcdef";
     let tasks = "Tasks 11111111111111111111111111111111";
     let row = "Rotate keys 22222222222222222222222222222222";
@@ -140,40 +146,37 @@ fn notion_databases_become_collections() {
         "notion.zip",
         &zip_of(&[
             (&format!("{home}.md"), home_md.as_bytes()),
-            (&format!("{home}/{tasks}.csv"), csv.as_bytes()),
             (&format!("{home}/{tasks}_all.csv"), csv.as_bytes()),
             (&format!("{home}/{tasks}/{row}.md"), row_text.as_bytes()),
-            (&format!("{home}/diagram {}.png", "3".repeat(32)), PNG),
         ]),
     )
     .unwrap();
     let all = paths(&set);
+    assert!(all.contains(&"Home/Tasks.csv"), "{all:?}");
     assert!(
-        all.contains(&"Home/Tasks.collection/schema.yaml"),
-        "{all:?}"
+        set.file("Home/Tasks.csv")
+            .unwrap()
+            .text()
+            .contains("Audit logs")
     );
-    assert!(all.contains(&"Home/diagram.png"), "{all:?}");
-    let rows: Vec<&ImportedFile> = set
-        .files
-        .iter()
-        .filter(|f| f.path.starts_with("Home/Tasks.collection/rows/"))
-        .collect();
-    assert_eq!(rows.len(), 2, "{all:?}");
-    let rotate = rows
-        .iter()
+    let rotate = set
+        .pages()
         .find(|f| f.text().contains("Rotate the signing keys."))
         .unwrap()
         .text();
-    assert!(!rotate.contains("Status: Done\n\nRotate"), "{rotate}");
     let row_id = rotate
         .lines()
         .find_map(|l| l.strip_prefix("id: "))
         .unwrap()
         .to_owned();
     let (_, home) = page(&set, "Home.md");
+    assert!(home.contains(&format!("vellum://doc/{row_id}")), "{home}");
     assert!(
-        home.contains(&format!("vellum://doc/{row_id}")),
-        "{home}\n{rotate}"
+        set.warnings
+            .iter()
+            .any(|w| w.message.contains("not a collection")),
+        "{:?}",
+        set.warnings
     );
 }
 

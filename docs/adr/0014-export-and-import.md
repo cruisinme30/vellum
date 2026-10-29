@@ -71,6 +71,11 @@ cross-references.
   rows; Notion's ID suffixes are stripped from names.
 - Archives are read with limits (entry count, entry size, total size)
   and unsafe paths are rejected, since an import is untrusted input.
+- Collections is a service on the same layer as export, so calculators
+  and imported databases reach it through a `Collections` port, which
+  `vellum-jobs` answers with the collections engine. Without it,
+  calculators show an error and databases stay CSV files beside their
+  row pages.
 - Book export maps a section's depth to its heading level, rebuilds the
   contents and prints references as "§2.1 Services, p. 5".
 

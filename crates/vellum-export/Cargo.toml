@@ -37,13 +37,12 @@ typst-assets = { version = "0.15.1", features = ["fonts"] }
 typst-layout = "0.15.1"
 typst-pdf = "0.15.1"
 typst-svg = "0.15.1"
-time = "0.3.55"
 url = "2.5.8"
-vellum-collections = { path = "../vellum-collections" }
 vellum-format = { path = "../vellum-format" }
 vellum-kernel.workspace = true
 zip = { version = "9.1.3", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
 proptest = ">=1.11.0, <1.12"
+vellum-jobs = { path = "../vellum-jobs" }
 tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread", "net", "io-util"] }

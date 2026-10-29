@@ -21,6 +21,7 @@ use quick_xml::events::Event;
 use vellum_export::docx::{DocxOptions, write};
 use vellum_export::pdf::{PdfEngine, PrintTheme};
 use vellum_export::{LowerOptions, Ports, Target, lower};
+use vellum_jobs::export::CollectionsEngine;
 
 const ROOTS: [&str; 2] = ["format", "guide"];
 
@@ -142,6 +143,14 @@ fn docx_structure(bytes: &[u8]) -> String {
     out
 }
 
+/// Ports with the collections engine, so calculators show their values.
+fn ports() -> Ports {
+    Ports {
+        collections: std::sync::Arc::new(CollectionsEngine),
+        ..Ports::default()
+    }
+}
+
 #[tokio::test]
 async fn corpus_exports_match_their_goldens() {
     let bless = std::env::var_os("VELLUM_BLESS").is_some();
@@ -152,7 +161,7 @@ async fn corpus_exports_match_their_goldens() {
     assert!(files.len() >= 20, "the corpus looks empty: {}", files.len());
     let engine = PdfEngine::new();
     let theme = PrintTheme::default();
-    let ports = Ports::default();
+    let ports = ports();
     let mut failures = Vec::new();
     for input in &files {
         let source = fs::read_to_string(input).unwrap();

@@ -13,6 +13,7 @@ use std::time::{Duration, Instant};
 
 use vellum_export::pdf::{PdfEngine, PrintTheme};
 use vellum_export::{LowerOptions, Ports, Target, lower};
+use vellum_jobs::export::CollectionsEngine;
 
 const RUNS: usize = 7;
 
@@ -45,12 +46,20 @@ fn thirty_pages() -> String {
     out
 }
 
+/// Ports with the collections engine, so calculators show their values.
+fn ports() -> Ports {
+    Ports {
+        collections: std::sync::Arc::new(CollectionsEngine),
+        ..Ports::default()
+    }
+}
+
 #[tokio::test]
 async fn thirty_pages_render_within_budget() {
     let doc = vellum_format::parse(&thirty_pages()).document;
     let lowered = lower(
         &doc,
-        &Ports::default(),
+        &ports(),
         &LowerOptions::new(Target::Print, "2026-10-29"),
     )
     .await;

@@ -34,17 +34,16 @@ mod word;
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
-use vellum_collections::csv::import_new;
-use vellum_collections::{Collection, Edit, PropertyType, Workspace};
 use vellum_format::front_matter::{Map, Value};
 use vellum_format::{Document, FrontMatter, Inline};
-use vellum_kernel::{CollectionId, DocId};
+use vellum_kernel::DocId;
 
 pub use archive::{MAX_ENTRIES, MAX_ENTRY_BYTES, MAX_TOTAL_BYTES};
 
 use crate::error::{ExportWarning, ImportError};
 use crate::gdocs::{AccessToken, Drive};
 use crate::metrics;
+use crate::ports::{Collections, NewCollection, NoCollections, RowPage};
 
 /// Longest file or folder name written, in bytes (the store's limit).
 const MAX_NAME_BYTES: usize = 200;
@@ -153,8 +152,13 @@ pub enum FileKind {
 ///
 /// [`ImportError::Format`] when the bytes are not that kind of export,
 /// [`ImportError::TooLarge`] past the archive limits.
-#[tracing::instrument(name = "import", skip(bytes), fields(source = source.name(), bytes = bytes.len()))]
-pub fn import(source: Source, name: &str, bytes: &[u8]) -> Result<ImportSet, ImportError> {
+#[tracing::instrument(name = "import", skip(bytes, collections), fields(source = source.name(), bytes = bytes.len()))]
+pub fn import(
+    source: Source,
+    name: &str,
+    bytes: &[u8],
+    collections: &dyn Collections,
+) -> Result<ImportSet, ImportError> {
     let started = Instant::now();
     let result = match source {
         Source::Markdown | Source::Obsidian | Source::Outline | Source::Docmost => {
@@ -164,7 +168,7 @@ pub fn import(source: Source, name: &str, bytes: &[u8]) -> Result<ImportSet, Imp
         Source::Confluence => confluence::import(bytes),
         Source::Word => word::import(name, bytes),
     };
-    let result = result.map(Builder::finish);
+    let result = result.map(|builder| builder.finish(collections));
     metrics::import_done(
         source.name(),
         started,
@@ -195,7 +199,7 @@ pub async fn google_doc(
     file_id: &str,
 ) -> Result<ImportSet, ImportError> {
     let (name, bytes) = drive.download_docx(token, file_id).await?;
-    import(Source::Word, &name, &bytes)
+    import(Source::Word, &name, &bytes, &NoCollections)
 }
 
 /// A page read from the source, before IDs and links are settled.
@@ -328,7 +332,7 @@ impl Builder {
 
     /// Settles IDs, rewrites links and writes the files.
     #[allow(clippy::too_many_lines)] // one pass per stage, in order
-    pub(crate) fn finish(mut self) -> ImportSet {
+    pub(crate) fn finish(mut self, collections: &dyn Collections) -> ImportSet {
         let ids: Vec<String> = self
             .pages
             .iter()
@@ -364,46 +368,60 @@ impl Builder {
         }
 
         let mut set = ImportSet::default();
-        let mut rows: Vec<Vec<(usize, String)>> = vec![Vec::new(); self.tables.len()];
-        for (i, (page, mut doc)) in self.pages.iter().zip(docs).enumerate() {
-            let id = ids.get(i).cloned().unwrap_or_default();
-            if let Some(table) = page.row_of {
-                doc.front_matter = None;
-                if let Some(rows) = rows.get_mut(table) {
-                    rows.push((i, vellum_format::serialize(&doc)));
-                }
+        let mut rows: Vec<Vec<(&Page, &str, Document)>> = vec![Vec::new(); self.tables.len()];
+        for ((page, doc), id) in self.pages.iter().zip(docs).zip(&ids) {
+            if let Some(rows) = page.row_of.and_then(|table| rows.get_mut(table)) {
+                rows.push((page, id, doc));
                 continue;
             }
-            doc.front_matter = Some(front_matter(doc.front_matter.take(), &id, &page.title));
-            set.files.push(ImportedFile {
-                path: page.out.clone(),
-                bytes: vellum_format::serialize(&doc).into_bytes(),
-                kind: FileKind::Page {
-                    id,
-                    title: page.title.clone(),
-                },
-            });
+            set.files.push(page_file(page, doc, id));
         }
 
         for (table, rows) in self.tables.iter().zip(rows) {
-            match collection(table, &rows, &self.pages, &ids) {
-                Ok((files, problems)) => {
-                    for problem in problems {
+            let new = NewCollection {
+                title: table.title.clone(),
+                csv: table.csv.clone(),
+                rows: rows
+                    .iter()
+                    .map(|(page, id, doc)| {
+                        let mut body = doc.clone();
+                        body.front_matter = None;
+                        RowPage {
+                            title: page.title.clone(),
+                            id: (*id).to_owned(),
+                            body: vellum_format::serialize(&body),
+                        }
+                    })
+                    .collect(),
+            };
+            match collections.create(&new) {
+                Ok(built) => {
+                    for problem in built.problems {
                         self.warnings
                             .push(ExportWarning::new(table.out.clone(), problem));
                     }
                     set.files
-                        .extend(files.into_iter().map(|(path, text)| ImportedFile {
+                        .extend(built.files.into_iter().map(|(path, text)| ImportedFile {
                             path: format!("{}/{path}", table.out),
                             bytes: text.into_bytes(),
                             kind: FileKind::Collection,
                         }));
                 }
                 Err(message) => {
+                    // Keep the data: the table as CSV beside its row pages.
+                    let csv = format!("{}.csv", stem(&table.out));
                     self.warnings.push(ExportWarning::new(
                         table.out.clone(),
-                        format!("not imported as a collection: {message}"),
+                        format!("kept as {csv}, not a collection: {message}"),
                     ));
+                    set.files.push(ImportedFile {
+                        path: csv,
+                        bytes: table.csv.clone().into_bytes(),
+                        kind: FileKind::Asset,
+                    });
+                    for (page, id, doc) in rows {
+                        set.files.push(page_file(page, doc, id));
+                    }
                 }
             }
         }
@@ -586,72 +604,17 @@ fn front_matter(existing: Option<FrontMatter>, id: &str, title: &str) -> FrontMa
     FrontMatter::Fields(map)
 }
 
-/// Builds a collection from a table and its row pages.
-/// A collection's files as `(path, text)` and the problems found.
-type CollectionFiles = (Vec<(String, String)>, Vec<String>);
-
-fn collection(
-    table: &Table,
-    rows: &[(usize, String)],
-    pages: &[Page],
-    ids: &[String],
-) -> Result<CollectionFiles, String> {
-    let id = CollectionId::generate();
-    let read = import_new(&table.csv, id, &table.title).map_err(|e| e.to_string())?;
-    let mut problems: Vec<String> = read
-        .diagnostics
-        .iter()
-        .map(|d| format!("{}: {}", d.location, d.message))
-        .collect();
-    let title_key = read
-        .schema
-        .properties
-        .iter()
-        .find(|p| matches!(p.kind, PropertyType::Title))
-        .map(|p| p.key.clone())
-        .unwrap_or_default();
-    let mut bodies: HashMap<String, (usize, &str)> = rows
-        .iter()
-        .filter_map(|(page, body)| {
-            let title = pages.get(*page)?.title.to_lowercase();
-            Some((title, (*page, body.as_str())))
-        })
-        .collect();
-    let mut workspace = Workspace::new();
-    workspace
-        .insert(Collection::new(read.schema.clone()))
-        .map_err(|e| e.to_string())?;
-    for values in &read.rows {
-        let title = values
-            .get(&title_key)
-            .map(|v| format!("{v}").to_lowercase())
-            .unwrap_or_default();
-        let (doc, body) = bodies
-            .remove(&title)
-            .map_or((None, String::new()), |(page, body)| {
-                (
-                    ids.get(page).and_then(|id| id.parse::<DocId>().ok()),
-                    body.to_owned(),
-                )
-            });
-        if let Err(error) = workspace.apply(Edit::CreateRow {
-            collection: id,
-            id: doc,
-            values: values.clone(),
-            body,
-        }) {
-            problems.push(format!("row `{title}` skipped: {error}"));
-        }
+/// A page's file, with its front matter settled.
+fn page_file(page: &Page, mut doc: Document, id: &str) -> ImportedFile {
+    doc.front_matter = Some(front_matter(doc.front_matter.take(), id, &page.title));
+    ImportedFile {
+        path: page.out.clone(),
+        bytes: vellum_format::serialize(&doc).into_bytes(),
+        kind: FileKind::Page {
+            id: id.to_owned(),
+            title: page.title.clone(),
+        },
     }
-    for (title, _) in bodies {
-        problems.push(format!("row page `{title}` has no row in the table"));
-    }
-    let files = workspace
-        .collection(id)
-        .ok_or("the collection was not created")?
-        .files()
-        .map_err(|e| e.to_string())?;
-    Ok((files, problems))
 }
 
 /// Whether `path` ends in one of `exts` (without dots), ignoring case.
