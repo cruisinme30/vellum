@@ -29,6 +29,8 @@ import type {
 } from "../api/api.gen";
 import type { Http } from "../api/http";
 
+import type { TeamFile } from "./settings/team-file";
+
 /** A new issue. */
 interface NewIssue {
   readonly team: string;
@@ -99,6 +101,20 @@ export interface WorkApi {
   createView(view: ViewIn): Promise<ViewOut>;
   updateView(id: string, view: ViewIn): Promise<ViewOut>;
   deleteView(id: string): Promise<void>;
+  /** A team's whole settings file, as JSON. */
+  teamSettings(team: string): Promise<TeamFile>;
+  /** Replaces a team's settings file (admins; needs a recent sign-in). */
+  saveTeamSettings(team: string, settings: TeamFile): Promise<TeamOut>;
+  /** Creates a team (admins). */
+  createTeam(team: NewTeam): Promise<TeamOut>;
+}
+
+/** A new team. */
+export interface NewTeam {
+  readonly key: string;
+  readonly name: string;
+  readonly lead?: string;
+  readonly members?: readonly string[];
 }
 
 const WORK = "/api/v1/work";
@@ -179,6 +195,18 @@ export function createHttpWorkApi(http: Http): WorkApi {
     async deleteView(id) {
       await http.send("DELETE", `${WORK}/views/${segment(id)}`);
     },
+    async teamSettings(team) {
+      const found = await http.get<{ settings: TeamFile }>(
+        `${WORK}/teams/${segment(team)}/settings`,
+      );
+      return found.settings;
+    },
+    // JSON is YAML, so the edited file goes back as the team's YAML text.
+    saveTeamSettings: (team, settings) =>
+      http.send<TeamOut>("PUT", `${WORK}/teams/${segment(team)}`, {
+        yaml: JSON.stringify(settings),
+      }),
+    createTeam: (team) => http.send<TeamOut>("POST", `${WORK}/teams`, team),
   };
 }
 

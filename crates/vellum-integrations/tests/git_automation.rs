@@ -40,6 +40,8 @@ struct Core {
     issues: Mutex<BTreeMap<IssueKey, IssueSnapshot>>,
     links: Mutex<BTreeMap<IssueKey, IssueLinks>>,
     history: Mutex<Vec<String>>,
+    /// The mapping the team set in its own settings, if any.
+    own: Option<Mapping>,
 }
 
 fn key(text: &str) -> IssueKey {
@@ -105,6 +107,10 @@ impl WorkCommands for Core {
         _body: &str,
     ) -> Result<(), WorkError> {
         Ok(())
+    }
+
+    async fn git_mapping(&self, _team: &str) -> Result<Option<Mapping>, WorkError> {
+        Ok(self.own.clone())
     }
 }
 
@@ -316,4 +322,26 @@ fn hmac_hex(key: &[u8], body: &[u8]) -> String {
             let _ = write!(hex, "{b:02x}");
             hex
         })
+}
+
+#[tokio::test]
+async fn the_team_settings_mapping_wins_over_the_integration_file() {
+    let mut core = Core::with_issues(&["ENG-9"]);
+    // The team sends opened pull requests straight to Ready to merge, and
+    // leaves merges alone.
+    core.own = Some(Mapping {
+        pr_opened: Some("rdy".to_owned()),
+        ..Mapping::default()
+    });
+    let settings = settings();
+    let opened = pr(9, PullRequestAction::Opened, "Fix", "Closes ENG-9");
+    let applied = apply(&core, &core, &settings, &opened).await.unwrap();
+    assert_eq!(applied[0].moved_to.as_deref(), Some("rdy"));
+    let merged = pr(9, PullRequestAction::Merged, "Fix", "Closes ENG-9");
+    let _ = apply(&core, &core, &settings, &merged).await.unwrap();
+    assert_eq!(
+        core.state("ENG-9"),
+        "rdy",
+        "an unmapped moment does not move the issue"
+    );
 }

@@ -7039,6 +7039,22 @@ export interface TeamRef {
 }
 
 /**
+ * A team's whole settings file, for the settings screen.
+ */
+export interface TeamSettingsOut {
+  /**
+   * `team.yaml` as JSON: statuses, estimates, cycles, triage rules, SLAs,
+   * labels, templates, forms and the Git mapping. Send it back, edited,
+   * as the `yaml` of `PUT /v1/work/teams/{team}` (JSON is valid YAML).
+   */
+  settings: unknown;
+  /**
+   * The same file as YAML text.
+   */
+  yaml: string;
+}
+
+/**
  * Every team.
  */
 export interface TeamsOut {
@@ -10563,6 +10579,13 @@ export interface Operations {
     input: TeamRef;
     output: WorkGetTeamTeamOut;
   };
+  /** Reads a team's whole settings file (team.yaml) as JSON and YAML */
+  "work.get_team_settings": {
+    method: "GET";
+    path: "/v1/work/teams/{team}/settings";
+    input: TeamRef;
+    output: TeamSettingsOut;
+  };
   /** Lists a team's triage inbox */
   "work.inbox": {
     method: "GET";
@@ -10878,6 +10901,7 @@ export const OPERATIONS = {
   "work.get_issue": { method: "GET", path: "/v1/work/issues/{key}", mutation: false },
   "work.get_project": { method: "GET", path: "/v1/work/projects/{project_id}", mutation: false },
   "work.get_team": { method: "GET", path: "/v1/work/teams/{team}", mutation: false },
+  "work.get_team_settings": { method: "GET", path: "/v1/work/teams/{team}/settings", mutation: false },
   "work.inbox": { method: "GET", path: "/v1/work/teams/{team}/inbox", mutation: false },
   "work.insights": { method: "GET", path: "/v1/work/insights", mutation: false },
   "work.list_comments": { method: "GET", path: "/v1/work/comments", mutation: false },

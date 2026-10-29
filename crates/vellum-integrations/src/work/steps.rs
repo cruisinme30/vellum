@@ -60,6 +60,29 @@ pub fn states(graph: &WorkGraph, team: &str) -> Result<Vec<WorkflowState>, WorkE
     Ok(team.workflow.statuses.iter().map(state).collect())
 }
 
+/// The Git mapping the team set in its settings, if any (R-WK-10).
+///
+/// # Errors
+///
+/// [`WorkError::NotFound`] for an unknown team.
+pub fn git_mapping(
+    graph: &WorkGraph,
+    team: &str,
+) -> Result<Option<crate::git::Mapping>, WorkError> {
+    let key = team_key(team)?;
+    let team = graph
+        .team(&key)
+        .ok_or_else(|| WorkError::NotFound(key.to_string()))?;
+    let name = |s: &Option<StatusKey>| s.as_ref().map(ToString::to_string);
+    Ok(team.git.as_ref().map(|g| crate::git::Mapping {
+        branch_pushed: name(&g.branch_pushed),
+        pr_opened: name(&g.pr_opened),
+        pr_approved: name(&g.pr_approved),
+        pr_merged: name(&g.pr_merged),
+        pr_closed_unmerged: name(&g.pr_closed_unmerged),
+    }))
+}
+
 /// The team an issue belongs to, for picking its time zone.
 ///
 /// # Errors

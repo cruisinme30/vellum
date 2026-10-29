@@ -108,6 +108,10 @@ pub(crate) fn all(s: &Arc<WorkService>) -> Vec<Operation> {
         .summary("Replaces a team's configuration (team.yaml)")
         .description("Statuses, estimates, cycles, triage rules, SLAs, labels and templates. The file is validated before anything changes.")
         .fresh_auth(FRESH),
+        query(s, "work.get_team_settings", "/v1/work/teams/{team}/settings", |s, c, i| async move {
+            s.get_team_settings(c, i).await
+        })
+        .summary("Reads a team's whole settings file (team.yaml) as JSON and YAML"),
         query(s, "work.inbox", "/v1/work/teams/{team}/inbox", |s, c, i| async move { s.inbox(c, i).await })
             .summary("Lists a team's triage inbox"),
         query(s, "work.list_cycles", "/v1/work/teams/{team}/cycles", |s, c, i| async move {

@@ -235,12 +235,21 @@ impl WorkGraph {
     /// # Errors
     ///
     /// Returns [`WorkError::UnknownTeam`] or the [`Team::check`] error.
-    pub fn update_team(&mut self, team: Team) -> Result<Changes> {
+    pub fn update_team(&mut self, mut team: Team) -> Result<Changes> {
         team.check()?;
         let old = self
             .teams
             .get(&team.key)
             .ok_or_else(|| WorkError::UnknownTeam(team.key.clone()))?;
+        if team.id != old.id {
+            return Err(WorkError::TeamConfig {
+                team: team.key.clone(),
+                reason: "the team ID cannot change".to_owned(),
+            });
+        }
+        // A settings file read before an issue was filed must not hand its
+        // number out again: numbers only grow.
+        team.last_number = team.last_number.max(old.last_number);
         let mut changes = Changes::default();
         diff_labels(
             Some(&team.key),

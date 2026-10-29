@@ -779,3 +779,94 @@ async fn saved_views_are_shared_by_visibility_and_survive_a_restart() {
             .exists()
     );
 }
+
+#[tokio::test]
+async fn team_settings_round_trip_as_json_and_numbers_never_go_back() {
+    let w = world().await;
+    with_eng(&w).await;
+    let read = w
+        .call("dev", "work.get_team_settings", json!({"team": "ENG"}))
+        .await;
+    let mut settings = read["settings"].clone();
+    assert!(read["yaml"].as_str().unwrap().contains("key: ENG"));
+    // Rename a status, add one, turn on one-week cycles, add an SLA rule
+    // and map Git moments, as the settings screen does.
+    let statuses = settings["workflow"]["statuses"].as_array_mut().unwrap();
+    let todo = statuses.iter_mut().find(|s| s["key"] == "todo").unwrap();
+    todo["name"] = json!("Up next");
+    statuses.push(json!({"key": "qa", "name": "QA", "category": "started"}));
+    settings["cycles"] = json!({"duration_weeks": 1, "start_day": "tuesday", "upcoming": 2});
+    settings["sla"]["rules"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"name": "Low", "when": {"field": "priority", "op": "is", "values": ["low"]}, "within_hours": 240}));
+    settings["git"] = json!({"pr_opened": "qa", "pr_merged": "done"});
+    // A stale copy: an issue is filed between the read and the save.
+    let _ = w
+        .call(
+            "dev",
+            "work.create_issue",
+            json!({"team": "ENG", "title": "Filed meanwhile"}),
+        )
+        .await;
+    let saved = w
+        .call(
+            "mara",
+            "work.put_team",
+            json!({"team": "ENG", "yaml": settings.to_string()}),
+        )
+        .await;
+    assert!(
+        saved["statuses"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|s| s["name"] == "Up next")
+    );
+    assert_eq!(saved["cycles"], true);
+
+    let (w, skipped) = w.reopen().await;
+    assert_eq!(skipped, 0);
+    let back = w
+        .call("dev", "work.get_team_settings", json!({"team": "ENG"}))
+        .await;
+    assert_eq!(back["settings"]["git"]["pr_opened"], "qa");
+    assert_eq!(back["settings"]["cycles"]["duration_weeks"], 1);
+    assert_eq!(
+        back["settings"]["last_number"], 1,
+        "the stale copy did not reset numbering"
+    );
+    let next = w
+        .call(
+            "dev",
+            "work.create_issue",
+            json!({"team": "ENG", "title": "Next"}),
+        )
+        .await;
+    assert_eq!(next["issue"]["key"], "ENG-2");
+
+    // A Git moment naming a missing status, or a changed team ID, is refused.
+    let mara = w.principal("mara", ScopeSet::FULL);
+    let mut bad = back["settings"].clone();
+    bad["git"] = json!({"pr_merged": "shipped"});
+    assert_eq!(
+        w.call_as(
+            mara.clone(),
+            "work.put_team",
+            json!({"team": "ENG", "yaml": bad.to_string()})
+        )
+        .await,
+        Err(ErrorKind::InvalidInput)
+    );
+    let mut moved = back["settings"].clone();
+    moved["id"] = json!("01JBV0000000000000000000ZZ");
+    assert!(
+        w.call_as(
+            mara,
+            "work.put_team",
+            json!({"team": "ENG", "yaml": moved.to_string()})
+        )
+        .await
+        .is_err()
+    );
+}

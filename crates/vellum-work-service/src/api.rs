@@ -1011,3 +1011,16 @@ pub struct ViewRef {
     /// The view ID.
     pub view_id: String,
 }
+
+// ----- team settings -----
+
+/// A team's whole settings file, for the settings screen.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct TeamSettingsOut {
+    /// `team.yaml` as JSON: statuses, estimates, cycles, triage rules, SLAs,
+    /// labels, templates, forms and the Git mapping. Send it back, edited,
+    /// as the `yaml` of `PUT /v1/work/teams/{team}` (JSON is valid YAML).
+    pub settings: serde_json::Value,
+    /// The same file as YAML text.
+    pub yaml: String,
+}

@@ -46,6 +46,7 @@ import { IssuePage } from "./work/issue-page";
 import { IssuesPage } from "./work/issues-page";
 import { MyIssuesPage } from "./work/my-issues-page";
 import { MyWorkPage } from "./work/my-work-page";
+import { TeamSettingsPage } from "./work/settings/team-settings-page";
 import { TriagePage } from "./work/triage-page";
 
 // The editor is most of the bundle, so it loads with the first page opened.
@@ -96,6 +97,7 @@ export function AppRoutes() {
         <Route path="issues/mine" element={<MyIssuesPage />} />
         <Route path="issues/triage" element={<TriagePage />} />
         <Route path="issues/cycles" element={<CyclesPage />} />
+        <Route path="issues/settings" element={<TeamSettingsPage />} />
         <Route path="issues/:issueKey" element={<IssuePage />} />
         <Route path="books" element={<BooksPage />} />
         <Route path="books/:bookId" element={<BookPage />} />

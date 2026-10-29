@@ -72,6 +72,7 @@ const APP_TARGETS: Target[] = [
   app("my issues", "/issues/mine", { server: "work", visual: false }),
   app("triage", "/issues/triage", { server: "work", visual: false }),
   app("cycles", "/issues/cycles", { server: "work", visual: false }),
+  app("team settings", "/issues/settings", { server: "work", visual: false }),
 ];
 
 function htmlFiles(directory: string): string[] {
