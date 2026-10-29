@@ -131,6 +131,10 @@ fn object_type(schema: &Map<String, Value>, depth: usize) -> String {
             |t| format!("Record<string, {t}>"),
         );
     };
+    // Sorted, so the output never depends on whether `serde_json` keeps
+    // insertion order (its `preserve_order` feature can be switched on by
+    // any crate in the build).
+    let properties: BTreeMap<&String, &Value> = properties.iter().collect();
     let indent = "  ".repeat(depth + 1);
     let mut out = String::from("{\n");
     for (name, property) in properties {
@@ -398,6 +402,24 @@ mod tests {
         for (schema, want) in cases {
             assert_eq!(ts_type(&schema, 0), want, "{schema}");
         }
+    }
+
+    #[test]
+    fn fields_come_out_in_name_order() {
+        // Built by hand in reverse order, so the map keeps that order when
+        // `preserve_order` is on.
+        let mut properties = Map::new();
+        for name in ["zeta", "mid", "alpha"] {
+            let _ = properties.insert(name.to_owned(), json!({"type": "string"}));
+        }
+        let schema = json!({
+            "type": "object",
+            "properties": properties,
+            "required": ["alpha", "mid", "zeta"],
+        });
+        let ts = ts_type(&schema, 0);
+        let at = |name: &str| ts.find(name).unwrap_or(usize::MAX);
+        assert!(at("alpha") < at("mid") && at("mid") < at("zeta"), "{ts}");
     }
 
     #[test]
