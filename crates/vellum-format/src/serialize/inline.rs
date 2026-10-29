@@ -230,13 +230,16 @@ impl Writer {
 }
 
 /// Which character of a line-leading text must be escaped so it is not
-/// read as a block marker (heading, quote, list, setext line, container or
-/// math fence).
+/// read as a block marker (heading, quote, list, setext line, table
+/// delimiter row, container or math fence).
 fn line_start_escape(chars: &[char]) -> Option<usize> {
     let first = *chars.first()?;
     match first {
         '#' | '>' | '-' | '+' | '=' => Some(0),
         ':' if chars.get(1..3) == Some(&[':', ':']) => Some(0),
+        // `:-` would make the line a table delimiter row under the line
+        // above; an escaped colon keeps it a paragraph line.
+        ':' if chars.get(1) == Some(&'-') => Some(0),
         '$' if chars.get(1) == Some(&'$') => Some(0),
         '0'..='9' => {
             let digits = chars.iter().take_while(|c| c.is_ascii_digit()).count();

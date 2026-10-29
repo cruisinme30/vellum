@@ -6,7 +6,7 @@
 use std::io::Write as _;
 use std::process::ExitCode;
 
-use vellum_db::{Index, IndexConfig, IndexKey, PlainFiles};
+use vellum_db::{Index, IndexConfig, IndexKey, PlainFiles, ShardedIndex, ShardsConfig};
 use vellum_kernel::config::Config;
 
 /// Environment variable holding the 64-hex-character index key, until the
@@ -41,26 +41,37 @@ pub fn run(args: &Args) -> ExitCode {
 
 fn execute(args: &Args) -> Result<Vec<String>, String> {
     let config = Config::load(None).map_err(|e| e.to_string())?;
-    let index_config = if let Some(url) = &config.database_url {
-        IndexConfig::postgres(url.clone())
-    } else if args.plaintext {
-        IndexConfig::sqlite(config.data_dir.join(".vellum/index.sqlite"), None)
-    } else {
-        let key = index_key(std::env::var(KEY_VAR).ok().as_deref())?;
-        IndexConfig::sqlite(config.data_dir.join(".vellum/index.sqlite"), Some(key))
-    };
+    let shards =
+        ShardsConfig::from_env(|key| std::env::var(key).ok()).map_err(|e| e.to_string())?;
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .map_err(|e| e.to_string())?;
-    let report = runtime
-        .block_on(async {
+    let report = if let Some(shards) = shards {
+        // Sharded deployment: each space goes to the shard the map names.
+        runtime.block_on(async {
+            let index = ShardedIndex::open(&shards).await?;
+            let report = index.reindex(&config.data_dir, PlainFiles).await;
+            index.close().await;
+            report
+        })
+    } else {
+        let index_config = if let Some(url) = &config.database_url {
+            IndexConfig::postgres(url.clone())
+        } else if args.plaintext {
+            IndexConfig::sqlite(config.data_dir.join(".vellum/index.sqlite"), None)
+        } else {
+            let key = index_key(std::env::var(KEY_VAR).ok().as_deref())?;
+            IndexConfig::sqlite(config.data_dir.join(".vellum/index.sqlite"), Some(key))
+        };
+        runtime.block_on(async {
             let index = Index::open(&index_config).await?;
             let report = index.reindex(&config.data_dir, PlainFiles).await;
             index.close().await;
             report
         })
-        .map_err(|e| e.to_string())?;
+    }
+    .map_err(|e| e.to_string())?;
     let mut lines = vec![format!(
         "Indexed {} spaces, {} folders and {} documents; skipped {} paths.",
         report.spaces,
