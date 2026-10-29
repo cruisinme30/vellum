@@ -13,7 +13,7 @@ vellum: 1
 - Status: accepted
 - Decisions: D76, D77, D78
 - Requirements: R-WK-1, R-WK-2, R-WK-3, R-WK-4, R-WK-5, R-WK-8, R-WK-9, R-WK-11, R-WK-12
-- Issue: #133, #134, #135, #136, #137, #141, #142, #143, #144
+- Issue: #133, #134, #135, #136, #137, #141, #142, #143, #144, #145
 - Pull requests: #207
 
 :::
@@ -108,3 +108,7 @@ answers those.
   `Changes` through the store, and publishes the events.
 - Comments with reactions, Git automation, recurring issues, the API,
   imports and insights build on this crate in their own workstreams.
+- Insights (#145) read only the lifecycle timestamps: lead, cycle and
+  triage time as nearest-rank p50, p85 and p95, plus throughput and
+  created counts, by one pivot and per week or month, over at most two
+  years. Pivots use current values, such as today's assignee.
