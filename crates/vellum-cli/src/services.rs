@@ -135,8 +135,14 @@ impl Services {
         config: &Config,
         var: impl Fn(&str) -> Option<String> + Send + Sync,
     ) -> Result<Self, Error> {
-        let opened =
-            workspace::open(config, &self.identity, self.notify.store(), &self.origin, var).await?;
+        let opened = workspace::open(
+            config,
+            &self.identity,
+            self.notify.store(),
+            &self.origin,
+            var,
+        )
+        .await?;
         self.workspace = opened.services;
         self.hooks = opened.hooks;
         self.collab = opened.collab;
