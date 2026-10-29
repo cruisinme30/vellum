@@ -592,6 +592,31 @@ async fn workspace_services_answer_signed_in_users() {
         anonymous.text
     );
 
+    // Live editing is mounted. A test request carries no connection to
+    // upgrade, so the socket handler answers 426 instead of a missing route.
+    let collab = format!(
+        "/collab/{}/{}",
+        vellum_kernel::SpaceId::generate(),
+        vellum_kernel::DocId::generate()
+    );
+    let anonymous = send(
+        &app,
+        finish(
+            request("GET", &collab)
+                .header(header::CONNECTION, "upgrade")
+                .header(header::UPGRADE, "websocket")
+                .header(header::SEC_WEBSOCKET_VERSION, "13")
+                .header(header::SEC_WEBSOCKET_KEY, "dGhlIHNhbXBsZSBub25jZQ=="),
+        ),
+    )
+    .await;
+    assert_eq!(
+        anonymous.status,
+        StatusCode::UPGRADE_REQUIRED,
+        "{}",
+        anonymous.text
+    );
+
     let cookie = signed_in_admin(&app).await;
     for path in ["/api/v1/books", "/api/v1/collections", "/api/v1/work/teams"] {
         let reply = send(
@@ -601,5 +626,6 @@ async fn workspace_services_answer_signed_in_users() {
         .await;
         assert_eq!(reply.status, StatusCode::OK, "{path}: {}", reply.text);
     }
+    services.shutdown().await;
     let _ = std::fs::remove_dir_all(&dir);
 }

@@ -10,10 +10,12 @@
 //! binary; `vellum mcp` serves the MCP server over stdio; `vellum reindex`
 //! rebuilds the index from the data folder.
 
+mod collab;
 mod docs;
 mod identity;
 #[cfg(test)]
 mod identity_tests;
+mod keys;
 mod mcp;
 mod reindex;
 mod serve;

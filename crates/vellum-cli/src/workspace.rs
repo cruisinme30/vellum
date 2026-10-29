@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-//! The workspace services: collections, books and Work, over the files in
-//! the data folder, the index database and the permission engine.
+//! The workspace services: collections, books, Work and live editing, over
+//! the files in the data folder, the index database and the permission
+//! engine.
 //!
 //! `vellum serve` opens them when an index is configured: Postgres through
 //! the kernel's `database_url`, or the SQLite index in the data folder,
@@ -19,14 +20,16 @@ use vellum_books_service::BooksService;
 use vellum_collections::CollectionsService;
 use vellum_contracts::{BoxFuture, Service};
 use vellum_db::{Index, IndexConfig};
-use vellum_drive::DriveIndex as _;
+use vellum_drive::authz::AuthzAccess as DriveAuthzAccess;
 use vellum_drive::sql::SqlIndex;
+use vellum_drive::{Drive, DriveIndex};
 use vellum_identity::Identity;
 use vellum_kernel::{Config, Error, ErrorKind, UserId};
 use vellum_store::{BlobPath, BlobStore, LocalStore};
 use vellum_work::{UserRef, WorkEvent};
 use vellum_work_service::{Directory, EventSink, SystemClock, WorkService};
 
+use crate::collab::Collab;
 use crate::reindex::{KEY_VAR, index_key};
 
 /// Variable that opens the SQLite index without encryption.
@@ -173,13 +176,14 @@ async fn build<S: AuthzStore + 'static>(
 pub async fn open(
     config: &Config,
     identity: &Arc<Identity>,
+    app_origin: &str,
     var: impl Fn(&str) -> Option<String>,
-) -> Result<Vec<Arc<dyn Service>>, Error> {
+) -> Result<Workspace, Error> {
     let index_config = match index_config(config, var)? {
         Ok(c) => c,
         Err(why) => {
             tracing::warn!("{why}; serving sign-in only, without the workspace API");
-            return Ok(Vec::new());
+            return Ok(Workspace::default());
         }
     };
     let index = Index::open(&index_config)
@@ -191,6 +195,22 @@ pub async fn open(
             .map_err(|e| unavailable("cannot open the data folder", e))?,
     );
     let authz = Arc::new(Authz::new(SqlStore::new(index.clone())));
+    let drive_index: Arc<dyn DriveIndex> = Arc::new(SqlIndex::new(index.clone()));
+    let drive_access = Arc::new(DriveAuthzAccess::new(
+        Arc::clone(&authz),
+        Arc::clone(&drive_index),
+    ));
+    let collab = Collab::open(
+        Arc::new(Drive::new(
+            Arc::clone(&store),
+            drive_index,
+            Arc::clone(&drive_access) as _,
+        )),
+        drive_access,
+        index.clone(),
+        &config.data_dir,
+        app_origin,
+    )?;
     let drive = SqlIndex::new(index);
     let spaces = Arc::new(Spaces::default());
     spaces.replace(load_spaces(&drive).await?);
@@ -206,7 +226,19 @@ pub async fn open(
             }
         }
     }));
-    build(store, authz, &spaces, identity).await
+    Ok(Workspace {
+        services: build(store, authz, &spaces, identity).await?,
+        collab: Some(collab),
+    })
+}
+
+/// What [`open`] starts.
+#[derive(Default)]
+pub struct Workspace {
+    /// Collections, books and Work.
+    pub services: Vec<Arc<dyn Service>>,
+    /// Live editing, when an index is configured.
+    pub collab: Option<Collab>,
 }
 
 /// The services over an empty scratch folder and in-memory permissions,

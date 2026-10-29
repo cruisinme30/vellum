@@ -19,6 +19,7 @@ use vellum_contracts::Service;
 use vellum_identity::{Identity, IdentityConfig, IdentityService, Store, http as identity_http};
 use vellum_kernel::{Config, Error, ErrorKind};
 
+use crate::collab::Collab;
 use crate::identity::{GuardedFetcher, IdentityAuthenticator};
 use crate::workspace;
 
@@ -29,8 +30,12 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 #[derive(Clone)]
 pub struct Services {
     identity: Arc<Identity>,
+    /// The app's origin, which live-editing connections must come from.
+    origin: String,
     /// Collections, books and Work, when an index is configured.
     workspace: Vec<Arc<dyn Service>>,
+    /// Live editing, when an index is configured.
+    collab: Option<Collab>,
 }
 
 impl std::fmt::Debug for Services {
@@ -58,7 +63,7 @@ impl Services {
                 format!("VELLUM_PUBLIC_URL is not a URL: {e}"),
             )
         })?;
-        let mut config = IdentityConfig::new(url);
+        let mut config = IdentityConfig::new(url.clone());
         config.data_dir = data_dir.map(Path::to_path_buf);
         let store = match data_dir {
             Some(dir) => Store::open(dir)?,
@@ -68,7 +73,9 @@ impl Services {
             Identity::new(config, store).with_metadata_fetcher(Arc::new(GuardedFetcher::new()?));
         Ok(Self {
             identity: Arc::new(identity),
+            origin: url.origin().ascii_serialization(),
             workspace: Vec::new(),
+            collab: None,
         })
     }
 
@@ -82,8 +89,27 @@ impl Services {
         config: &Config,
         var: impl Fn(&str) -> Option<String>,
     ) -> Result<Self, Error> {
-        self.workspace = workspace::open(config, &self.identity, var).await?;
+        let opened = workspace::open(config, &self.identity, &self.origin, var).await?;
+        self.workspace = opened.services;
+        self.collab = opened.collab;
         Ok(self)
+    }
+
+    /// The live-editing endpoint, mounted at `/collab` by [`Self::mount`]:
+    /// one WebSocket per page at `/collab/{space_id}/{doc_id}`. Without a
+    /// workspace index it answers 503.
+    pub fn collab(&self) -> axum::Router {
+        self.collab
+            .as_ref()
+            .map_or_else(crate::collab::unavailable_router, Collab::router)
+    }
+
+    /// Saves every page open for live editing and closes its connections.
+    /// Call it after the server stops accepting requests.
+    pub async fn shutdown(&self) {
+        if let Some(collab) = &self.collab {
+            collab.shutdown().await;
+        }
     }
 
     /// Every typed service, in registration order.
@@ -109,6 +135,7 @@ impl Services {
                 "/.well-known",
                 identity_http::well_known_router(Arc::clone(identity)),
             )
+            .mount("/collab", self.collab())
     }
 }
 
