@@ -1,7 +1,25 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-//! The blob store port and its adapters (local folder, S3, Git and cloud drives).
+//! Vellum's storage layer.
 //!
-//! This crate is a placeholder in the repository skeleton. Its first real
-//! code lands with its workstream in the build order.
+//! [`BlobStore`] is the port every storage backend implements (local
+//! folder, S3, Google Drive, Dropbox, `OneDrive`, Git) and every decorator
+//! wraps. Blobs are addressed by validated [`BlobPath`]s, versioned by
+//! opaque [`Etag`]s, and written under a [`Precondition`] so a stale writer
+//! is refused instead of silently overwriting newer content.
+
+mod error;
+mod local;
+pub mod metered;
+mod path;
+mod store;
+
+#[cfg(any(test, feature = "conformance"))]
+pub mod conformance;
+
+pub use error::{StoreError, StoreResult};
+pub use local::LocalStore;
+pub use metered::Metered;
+pub use path::{BlobPath, MAX_PATH_BYTES, TEMP_PREFIX};
+pub use store::{Blob, BlobEntry, BlobMeta, BlobStore, Etag, Precondition};

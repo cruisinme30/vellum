@@ -16,3 +16,24 @@ layer = "foundation"
 
 [lints]
 workspace = true
+
+[features]
+# Exposes the storage adapter conformance suite to other crates' tests.
+conformance = []
+
+[dependencies]
+async-trait = "0.1.92"
+bytes = "1.12.1"
+futures = "0.3.34"
+hex = "0.4.3"
+opentelemetry = "0.33.1"
+sha2 = "0.11.1"
+thiserror = "2.0.21"
+tokio = { version = "1.49.0", features = ["rt", "sync"] }
+tracing = "0.1.44"
+
+[dev-dependencies]
+proptest = ">=1.11.0, <1.12"
+tempfile = "3.27.0"
+tokio = { version = "1.49.0", features = ["macros", "rt-multi-thread"] }
+vellum-store = { path = ".", features = ["conformance"] }
