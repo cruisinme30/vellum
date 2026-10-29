@@ -52,6 +52,7 @@ pub mod telemetry;
 pub mod value;
 pub mod view;
 pub mod workspace;
+pub mod yaml;
 
 pub use compute::{Cell, CellError, ComputedRow, Computer};
 pub use error::{Diagnostic, EditError, SchemaError, Severity};

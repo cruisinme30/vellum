@@ -82,7 +82,7 @@ impl CollectionEmbed {
     ///
     /// Returns an [`EmbedError`] for invalid YAML, unknown keys or a bad id.
     pub fn parse(body: &str) -> Result<Self, EmbedError> {
-        let raw: EmbedRaw = serde_yaml_ng::from_str(body)
+        let raw: EmbedRaw = crate::yaml::from_str(body)
             .map_err(|e| EmbedError(format!("collection block: {e}")))?;
         Ok(Self {
             id: parse_collection_id(&raw.id)?,

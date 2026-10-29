@@ -12,6 +12,8 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D73, D74, D75
+- Issue: #125, #126, #127; views, CSV and embeds in #128 to #132
+- Pull requests: #208
 
 :::
 

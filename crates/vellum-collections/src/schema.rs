@@ -233,8 +233,7 @@ impl Schema {
     ///
     /// Returns a [`SchemaError`] naming the first problem found.
     pub fn from_yaml(text: &str) -> Result<Self, SchemaError> {
-        let raw: SchemaRaw =
-            serde_yaml_ng::from_str(text).map_err(|e| SchemaError::Yaml(e.to_string()))?;
+        let raw: SchemaRaw = crate::yaml::from_str(text).map_err(SchemaError::Yaml)?;
         Self::from_raw(raw)
     }
 
@@ -244,7 +243,7 @@ impl Schema {
     ///
     /// Returns [`SchemaError::Yaml`] if serialisation fails.
     pub fn to_yaml(&self) -> Result<String, SchemaError> {
-        serde_yaml_ng::to_string(&self.to_raw()).map_err(|e| SchemaError::Yaml(e.to_string()))
+        crate::yaml::to_string(&self.to_raw()).map_err(SchemaError::Yaml)
     }
 
     /// A new schema with only a title property, for a fresh collection.

@@ -22,7 +22,7 @@
 
 use std::collections::BTreeMap;
 
-use serde_yaml_ng::{Mapping, Value as Yaml};
+use crate::yaml::{Mapping, Yaml};
 use vellum_kernel::DocId;
 
 use crate::error::Diagnostic;
@@ -46,7 +46,7 @@ pub struct Row {
 impl Row {
     /// An empty row.
     #[must_use]
-    pub fn new(id: DocId) -> Self {
+    pub const fn new(id: DocId) -> Self {
         Self {
             id,
             values: BTreeMap::new(),
@@ -118,8 +118,8 @@ impl Row {
     pub fn parse(text: &str, schema: &Schema, location: &str) -> (Self, Vec<Diagnostic>) {
         let mut diags = Vec::new();
         let (front, body) = split_front_matter(text);
-        let mapping = match front.map(serde_yaml_ng::from_str::<Yaml>) {
-            Some(Ok(Yaml::Mapping(m))) => m,
+        let mapping = match front.map(crate::yaml::from_str::<Yaml>) {
+            Some(Ok(Yaml::Map(m))) => m,
             None | Some(Ok(Yaml::Null)) => Mapping::new(),
             Some(Ok(_)) => {
                 diags.push(Diagnostic::error(location, "front matter is not a mapping"));
@@ -148,11 +148,7 @@ impl Row {
             extra: Mapping::new(),
             body: body.to_owned(),
         };
-        for (k, v) in mapping {
-            let Some(key) = k.as_str().map(str::to_owned) else {
-                let _ = row.extra.insert(k, v);
-                continue;
-            };
+        for (key, v) in mapping {
             if key == "id" {
                 continue;
             }
@@ -168,11 +164,11 @@ impl Row {
                             location,
                             format!("{} ({key}): {why}; kept as written", p.name),
                         ));
-                        let _ = row.extra.insert(Yaml::String(key), v);
+                        row.extra.insert(key, v);
                     }
                 },
                 _ => {
-                    let _ = row.extra.insert(Yaml::String(key), v);
+                    row.extra.insert(key, v);
                 }
             }
         }
@@ -184,18 +180,18 @@ impl Row {
     #[must_use]
     pub fn to_markdown(&self, schema: &Schema) -> String {
         let mut m = Mapping::new();
-        let _ = m.insert("id".into(), Yaml::String(self.id.to_string()));
+        m.insert("id", Yaml::String(self.id.to_string()));
         for p in &schema.properties {
             if let Some(v) = self.values.get(&p.key) {
-                let _ = m.insert(Yaml::String(p.key.clone()), to_yaml(&p.kind, v));
+                m.insert(p.key.clone(), to_yaml(&p.kind, v));
             }
         }
-        for (k, v) in &self.extra {
+        for (k, v) in self.extra.iter() {
             if !m.contains_key(k) {
-                let _ = m.insert(k.clone(), v.clone());
+                m.insert(k.clone(), v.clone());
             }
         }
-        let yaml = serde_yaml_ng::to_string(&m).unwrap_or_default();
+        let yaml = crate::yaml::to_string(&Yaml::Map(m)).unwrap_or_default();
         format!("---\n{yaml}---\n{}", self.body)
     }
 }
@@ -235,14 +231,15 @@ pub(crate) fn from_yaml(kind: &PropertyType, v: &Yaml) -> Result<Value, String> 
     let scalar_text = |v: &Yaml| -> Option<String> {
         match v {
             Yaml::String(s) => Some(s.clone()),
-            Yaml::Number(n) => Some(n.to_string()),
+            Yaml::Int(n) => Some(n.to_string()),
+            Yaml::Float(n) => Some(crate::value::format_number(*n)),
             Yaml::Bool(b) => Some(b.to_string()),
             _ => None,
         }
     };
     let list = |v: &Yaml| -> Option<Vec<String>> {
         match v {
-            Yaml::Sequence(items) => items.iter().map(scalar_text).collect(),
+            Yaml::Seq(items) => items.iter().map(scalar_text).collect(),
             other => scalar_text(other).map(|s| vec![s]),
         }
     };
@@ -254,7 +251,9 @@ pub(crate) fn from_yaml(kind: &PropertyType, v: &Yaml) -> Result<Value, String> 
             .map(Value::Text)
             .ok_or_else(|| "expected text".into()),
         PropertyType::Number { .. } => match v {
-            Yaml::Number(n) => n.as_f64().filter(|f| f.is_finite()).map(Value::Number),
+            #[allow(clippy::cast_precision_loss)]
+            Yaml::Int(n) => Some(Value::Number(*n as f64)),
+            Yaml::Float(n) => Some(*n).filter(|f| f.is_finite()).map(Value::Number),
             Yaml::String(s) => parse_number(s).map(Value::Number),
             _ => None,
         }
@@ -319,8 +318,8 @@ fn to_yaml(kind: &PropertyType, v: &Value) -> Yaml {
         PropertyType::Multi { .. } | PropertyType::Relation { .. }
     );
     match v {
-        Value::List(items) => Yaml::Sequence(items.iter().map(scalar_yaml).collect()),
-        other if always_list => Yaml::Sequence(vec![scalar_yaml(other)]),
+        Value::List(items) => Yaml::Seq(items.iter().map(scalar_yaml).collect()),
+        other if always_list => Yaml::Seq(vec![scalar_yaml(other)]),
         other => scalar_yaml(other),
     }
 }
@@ -333,12 +332,12 @@ fn scalar_yaml(v: &Value) -> Yaml {
             // Integral and inside the exact range of f64, so the cast is exact.
             #[allow(clippy::cast_possible_truncation)]
             let i = *n as i64;
-            Yaml::Number(i.into())
+            Yaml::Int(i)
         }
-        Value::Number(n) => Yaml::Number((*n).into()),
+        Value::Number(n) => Yaml::Float(*n),
         Value::Bool(b) => Yaml::Bool(*b),
         Value::Date(d) => Yaml::String(d.to_string()),
-        Value::List(items) => Yaml::Sequence(items.iter().map(scalar_yaml).collect()),
+        Value::List(items) => Yaml::Seq(items.iter().map(scalar_yaml).collect()),
     }
 }
 
