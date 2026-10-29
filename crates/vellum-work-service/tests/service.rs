@@ -583,3 +583,58 @@ async fn forms_file_triage_issues_and_suggestions_wait_for_a_person() {
         .await;
     assert!(brief["suggestion"].is_null());
 }
+
+#[tokio::test]
+async fn insights_count_finished_work_by_team_and_refuse_bad_ranges() {
+    let w = world().await;
+    with_eng(&w).await;
+    for (title, state) in [
+        ("Ship login", "done"),
+        ("Fix upload", "done"),
+        ("Plan Q1", "todo"),
+    ] {
+        let _ = w
+            .call(
+                "dev",
+                "work.create_issue",
+                json!({"team": "ENG", "title": title, "state": state, "assignee": "dev"}),
+            )
+            .await;
+    }
+    let answer = w
+        .call(
+            "mara",
+            "work.insights",
+            json!({"team": "ENG", "measure": "throughput", "pivot": "assignee", "from": "2026-10-26", "to": "2026-11-09", "interval": "week"}),
+        )
+        .await;
+    assert_eq!(answer["overall"]["count"], 2);
+    assert_eq!(answer["buckets"][0]["key"], "dev");
+    assert_eq!(answer["buckets"][0]["series"].as_array().unwrap().len(), 2);
+
+    let created = w
+        .call(
+            "mara",
+            "work.insights",
+            json!({"measure": "created", "from": "2026-11-01", "to": "2026-11-03"}),
+        )
+        .await;
+    assert_eq!(created["overall"]["count"], 3);
+
+    for bad in [
+        json!({"from": "2026-11-03", "to": "2026-11-01"}),
+        json!({"from": "2020-01-01", "to": "2026-11-01"}),
+        json!({"measure": "speed", "from": "2026-11-01", "to": "2026-11-03"}),
+        json!({"filter": "{", "from": "2026-11-01", "to": "2026-11-03"}),
+        json!({"from": "Nov 1", "to": "2026-11-03"}),
+    ] {
+        let refused = w
+            .call_as(
+                w.principal("mara", ScopeSet::FULL),
+                "work.insights",
+                bad.clone(),
+            )
+            .await;
+        assert_eq!(refused, Err(ErrorKind::InvalidInput), "{bad}");
+    }
+}

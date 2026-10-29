@@ -12,7 +12,7 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D135, D136, D137
-- Requirements: R-WK-13, R-WK-16
+- Requirements: R-WK-13, R-WK-15, R-WK-16
 - Issue: #258, #319
 - Pull requests: #275, #324
 
@@ -87,3 +87,5 @@ the seam.
   through a public form's share link waits on share links and rate
   limits in the gateway. A suggestion is stored, and only a person's
   accept applies it.
+- Insights is one read-only query. The team key narrows the caller's
+  filter, so a dashboard asks per team without writing filter JSON.

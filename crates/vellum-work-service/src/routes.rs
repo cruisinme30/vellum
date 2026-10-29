@@ -102,6 +102,9 @@ pub(crate) fn all(s: &Arc<WorkService>) -> Vec<Operation> {
             s.list_cycles(c, i).await
         })
         .summary("Lists a team's cycles with burn-up and velocity"),
+        query(s, "work.insights", "/v1/work/insights", |s, c, i| async move { s.insights(c, i).await })
+            .summary("Measures lead, cycle and triage time, throughput and intake")
+            .description("Percentiles (p50, p85, p95) and means in hours over a date range, for all issues or a filter, optionally broken down by team, assignee, priority, label, project, cycle or estimate and split into weeks or months."),
         // Issues.
         query(s, "work.query_issues", "/v1/work/issues", |s, c, i| async move { s.query_issues(c, i).await })
             .summary("Lists issues by filter, grouped and ordered"),
