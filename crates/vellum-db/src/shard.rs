@@ -25,7 +25,7 @@ use vellum_kernel::ObjectId;
 use crate::config::IndexConfig;
 use crate::error::{Error, Result};
 use crate::index::{Index, Pool};
-use crate::reindex::{self, FileReader, ReindexReport, Snapshot};
+use crate::reindex::{self, FileReader, Listing, ReindexReport, Snapshot};
 use crate::telemetry::traced;
 
 /// Environment variable naming the main database.
@@ -244,6 +244,22 @@ impl ShardedIndex {
     {
         let now = reindex::now_ms();
         let snap = reindex::scan(root, reader, now).await?;
+        self.write_split(snap, now).await
+    }
+
+    /// Like [`ShardedIndex::reindex`], from a [`Listing`] of a bucket.
+    ///
+    /// # Errors
+    /// As [`ShardedIndex::reindex`].
+    #[tracing::instrument(name = "db.reindex_shards", skip_all, fields(files = listing.len(), documents))]
+    pub async fn reindex_listing(&self, listing: Listing) -> Result<ReindexReport> {
+        let now = reindex::now_ms();
+        let snap = reindex::scan_listing(listing, now).await?;
+        self.write_split(snap, now).await
+    }
+
+    /// Writes each shard's part of `snap`.
+    async fn write_split(&self, snap: Snapshot, now: i64) -> Result<ReindexReport> {
         let placement = self.place(&snap).await?;
         for (i, shard) in self.shards.iter().enumerate() {
             let part = snap.split_off(|space| placement.get(&space) == Some(&i), false);
