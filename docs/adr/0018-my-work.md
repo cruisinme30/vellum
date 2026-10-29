@@ -12,7 +12,7 @@ vellum: 1
 - Date: `2026-10-29`
 - Status: accepted
 - Decisions: `D82`, `D83`, `D84`
-- Issue: `#152` (with `#153`–`#156`, `#158`, `#159`, `#161`, `#163`)
+- Issue: `#152` (with `#153`–`#156`, `#158`, `#159`, `#161`, `#163`, `#442`)
 - Pull requests: `#243`
 
 :::
@@ -74,5 +74,12 @@ port.
 ## Consequences
 
 - Editors, scripts, CalDAV clients and imports all make the same edits.
-- The server binary implements `Workspace` and mounts the raw routes.
+- The server binary implements `Workspace` (`#442`). Lists are pages in a
+  `Tasks` folder in the owner's My Drive. Sharing grants editor access to
+  that one page through the permission engine.
+- Checklists in documents count when they mention the person, among the
+  200 most recently changed pages they can open.
+- The feed, CalDAV and capture routes are mounted cross-site, so a browser
+  cookie never counts there. CalDAV signs in with an API token, sent as a
+  bearer token or as the HTTP Basic password.
 - Time-blocking (`#162`) and non-English quick-add are follow-ups.

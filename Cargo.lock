@@ -8996,6 +8996,7 @@ dependencies = [
  "vellum-private",
  "vellum-security",
  "vellum-store",
+ "vellum-tasks",
  "vellum-work",
  "vellum-work-service",
 ]
@@ -9019,6 +9020,7 @@ dependencies = [
  "testcontainers-modules",
  "thiserror",
  "tokio",
+ "tokio-tungstenite 0.29.0",
  "tokio-tungstenite 0.30.0",
  "tracing",
  "tracing-opentelemetry",

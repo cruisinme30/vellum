@@ -20,7 +20,7 @@ path = "src/main.rs"
 
 [dependencies]
 async-trait = "0.1"
-axum = { version = "0.8.9", default-features = false }
+axum = { version = "0.8.9", default-features = false, features = ["original-uri"] }
 base64 = "0.23.1"
 bytes = "1.12.1"
 clap = { version = "4.6.7", features = ["derive"] }
@@ -53,6 +53,7 @@ vellum-notify = { path = "../vellum-notify" }
 vellum-private = { path = "../vellum-private", features = ["os-keychain"] }
 vellum-security = { path = "../vellum-security" }
 vellum-store = { path = "../vellum-store" }
+vellum-tasks = { path = "../vellum-tasks" }
 vellum-work = { path = "../vellum-work" }
 vellum-work-service = { path = "../vellum-work-service" }
 

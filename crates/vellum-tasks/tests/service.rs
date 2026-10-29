@@ -139,7 +139,7 @@ impl Workspace for Mem {
         _user: UserId,
         path: String,
         text: String,
-    ) -> BoxFuture<'_, Result<(), Error>> {
+    ) -> BoxFuture<'_, Result<DocId, Error>> {
         let id = lists::read_meta(&text).id.unwrap();
         let mut state = self.state.lock().unwrap();
         let _ = state.files.insert(
@@ -150,7 +150,7 @@ impl Workspace for Mem {
                 version: 1,
             },
         );
-        ready(Ok(()))
+        ready(Ok(id))
     }
 
     fn set_member(

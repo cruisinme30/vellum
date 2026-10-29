@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-//! The workspace services: the drive, collections, books, Work and live
-//! editing, over the files in the data folder, the index database and the
+//! The workspace services: the drive, collections, books, Work, My Work and
+//! live editing, over the files in the data folder, the index database and the
 //! permission engine.
 //!
 //! `vellum serve` opens them when an index is configured: Postgres through
@@ -31,11 +31,19 @@ use vellum_identity::Identity;
 use vellum_kernel::{Config, Error, ErrorKind, UserId};
 use vellum_notify::service::NotifyStore;
 use vellum_store::{BlobPath, BlobStore, LocalStore};
+use vellum_tasks::service::{Config as TasksConfig, TasksService};
 use vellum_work::{UserRef, WorkEvent};
 use vellum_work_service::{Directory, EventSink, SystemClock, WorkService};
 
 use crate::collab::Collab;
 use crate::reindex::{KEY_VAR, index_key};
+use crate::tasks::{DriveTasks, Parts, TasksSettings};
+
+/// The mail domain that receives My Work capture e-mail.
+pub const MAIL_DOMAIN_VAR: &str = "VELLUM_MAIL_DOMAIN";
+
+/// The Slack app's signing secret, for capture from Slack.
+pub const SLACK_SECRET_VAR: &str = "VELLUM_SLACK_SIGNING_SECRET";
 
 /// Variable that opens the SQLite index without encryption.
 pub const PLAINTEXT_VAR: &str = "VELLUM_INDEX_PLAINTEXT";
@@ -147,6 +155,7 @@ struct Workspace {
     drive: Arc<Drive>,
     books: Arc<BooksService>,
     work: Arc<WorkService>,
+    tasks: Arc<TasksService>,
 }
 
 /// What `vellum serve` mounts for the workspace.
@@ -159,6 +168,43 @@ pub struct Opened {
     pub hooks: Option<axum::Router>,
     /// Live editing, when an index is configured.
     pub collab: Option<Collab>,
+    /// My Work, which also serves the feed, CalDAV and capture routes.
+    pub tasks: Option<Arc<TasksService>>,
+}
+
+/// My Work's settings: where its secrets live and what it links to.
+pub struct TasksSetup {
+    /// The adapter's settings.
+    pub settings: TasksSettings,
+    /// The service's settings.
+    pub config: TasksConfig,
+}
+
+impl TasksSetup {
+    /// The settings for a server at `identity`'s public URL.
+    pub fn new(
+        identity: &Identity,
+        data_dir: Option<&Path>,
+        var: impl Fn(&str) -> Option<String>,
+    ) -> Self {
+        let url = identity.config().public_url.clone();
+        let mail_domain = var(MAIL_DOMAIN_VAR)
+            .or_else(|| url.host_str().map(str::to_owned))
+            .unwrap_or_else(|| "localhost".to_owned());
+        Self {
+            settings: TasksSettings {
+                dir: data_dir.map(|d| d.join(".vellum").join("tasks")),
+                time_zone: None,
+            },
+            config: TasksConfig {
+                base_url: url.as_str().trim_end_matches('/').to_owned(),
+                mail_domain,
+                slack_signing_secret: var(SLACK_SECRET_VAR)
+                    .filter(|s| !s.is_empty())
+                    .map(String::into_bytes),
+            },
+        }
+    }
 }
 
 /// Builds the services over `store`, `authz` and the drive's `index`.
@@ -169,13 +215,14 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
     spaces: &Arc<Spaces>,
     identity: &Arc<Identity>,
     events: Arc<dyn EventSink>,
+    setup: TasksSetup,
 ) -> Result<Workspace, Error> {
     let drive = Arc::new(Drive::new(
         Arc::clone(&store),
         Arc::clone(&index),
         Arc::new(vellum_drive::authz::AuthzAccess::new(
             Arc::clone(&authz),
-            index,
+            Arc::clone(&index),
         )),
     ));
     let lookup = Arc::clone(spaces);
@@ -190,7 +237,10 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
     );
     let books = Arc::new(BooksService::new(
         Arc::clone(&store),
-        Arc::new(vellum_books_service::AuthzAccess::new(authz, space_of)),
+        Arc::new(vellum_books_service::AuthzAccess::new(
+            Arc::clone(&authz),
+            space_of,
+        )),
     ));
     let (work, report) = WorkService::open(
         Arc::clone(&store),
@@ -206,16 +256,31 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
             "some Work files could not be read"
         );
     }
+    let work = Arc::new(work);
+    let adapter = DriveTasks::open(
+        Parts {
+            drive: Arc::clone(&drive),
+            store,
+            index,
+            authz,
+            identity: Arc::clone(identity),
+            work: Arc::clone(&work),
+        },
+        &setup.settings,
+    )?;
+    let tasks = Arc::new(TasksService::new(Arc::new(adapter), setup.config));
     Ok(Workspace {
         services: vec![
             Arc::new(DriveService::new(Arc::clone(&drive))),
             Arc::new(collections),
             Arc::clone(&books) as Arc<dyn Service>,
             Arc::clone(&work) as Arc<dyn Service>,
+            Arc::clone(&tasks) as Arc<dyn Service>,
         ],
         drive,
         books,
         work,
+        tasks,
     })
 }
 
@@ -233,6 +298,7 @@ pub async fn open(
     app_origin: &str,
     var: impl Fn(&str) -> Option<String> + Send + Sync,
 ) -> Result<Opened, Error> {
+    let setup = TasksSetup::new(identity, Some(&config.data_dir), &var);
     let index_config = match index_config(config, &var)? {
         Ok(c) => c,
         Err(why) => {
@@ -259,6 +325,7 @@ pub async fn open(
         &spaces,
         identity,
         events,
+        setup,
     )
     .await?;
     crate::notifications::start(
@@ -302,6 +369,7 @@ pub async fn open(
         services: workspace.services,
         hooks,
         collab: Some(collab),
+        tasks: Some(workspace.tasks),
     })
 }
 
@@ -322,6 +390,7 @@ pub async fn describe(
     );
     let authz = Arc::new(Authz::new(MemoryStore::new()));
     let index = Arc::new(vellum_drive::memory::MemoryIndex::new());
+    let setup = TasksSetup::new(identity, None, |_| None);
     let workspace = build(
         store,
         authz,
@@ -329,6 +398,7 @@ pub async fn describe(
         &Arc::new(Spaces::default()),
         identity,
         Arc::new(TracingSink),
+        setup,
     )
     .await?;
     Ok(workspace.services)
