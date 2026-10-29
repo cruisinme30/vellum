@@ -1,0 +1,52 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Keeps the public "Vellum 1.0" project board in sync with the task issues:
+# on every issue change, every six hours, and on demand. GITHUB_TOKEN cannot
+# write user-owned projects, so the sync uses the PROJECT_TOKEN secret (a
+# token with only the "project" scope). Without it the job skips with a
+# notice. It never checks out or runs code from a pull request.
+name: Project
+
+on:
+  issues:
+    types: [opened, edited, closed, reopened, labeled, unlabeled, milestoned, demilestoned, transferred]
+  schedule:
+    - cron: "23 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One sync at a time; a burst of issue edits collapses into one pending run.
+concurrency:
+  group: project-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync project board
+    # Only task issues change the board; the schedule and manual runs catch the rest.
+    if: >-
+      github.event_name != 'issues' ||
+      contains(github.event.issue.labels.*.name, 'task') ||
+      github.event.label.name == 'task'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: develop
+          persist-credentials: false
+      - name: Sync
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PROJECT_OWNER: ${{ github.repository_owner }}
+          PROJECT_NUMBER: "2"
+        run: |
+          if [[ -z "${GH_TOKEN}" ]]; then
+            echo "::notice::PROJECT_TOKEN is not set; skipping the project sync."
+            exit 0
+          fi
+          scripts/ci/project-sync.sh
