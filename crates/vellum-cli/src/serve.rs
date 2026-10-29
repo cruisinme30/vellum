@@ -19,6 +19,7 @@
 //! | `VELLUM_CSRF_KEY_FILE` | A file holding that base64 key (a Docker or Kubernetes secret) |
 //! | `VELLUM_EMBED_ORIGINS` | Comma-separated origins allowed in sandboxed embeds |
 //! | `VELLUM_CLAMD_ADDRESS` | `host:port` of `ClamAV`, the default upload virus scanner |
+//! | `VELLUM_MAX_CONNECTIONS_PER_IP` | Connections one client address may hold; default 256 with TLS on, no cap with it off |
 //! | `VELLUM_INDEX_KEY` | 64 hex characters: the key of the SQLite index |
 //! | `VELLUM_INDEX_PLAINTEXT` | `1` opens the SQLite index without encryption |
 //! | `VELLUM_OIDC_ISSUER`, `VELLUM_OIDC_CLIENT_ID` | Turn on single sign-on with this `OpenID Connect` provider |
@@ -45,6 +46,9 @@ use vellum_db::IndexConfig;
 use vellum_identity::Store;
 use vellum_kernel::{Config, Error, ErrorKind};
 use vellum_security::upload::Clamd;
+
+/// Connections one client address may hold when Vellum terminates TLS.
+const PER_IP_CONNECTIONS: usize = 256;
 
 /// How long one virus scan may take.
 const CLAMD_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
@@ -158,6 +162,7 @@ pub fn edge(config: &Config, var: impl Fn(&str) -> Option<String>) -> Result<Edg
     if csrf_key.as_ref().is_some_and(|k| k.len() < 32) {
         return Err(invalid(csrf_var, "must decode to at least 32 bytes"));
     }
+    let limits = connection_limits(&tls, &var)?;
     let scanner = var("VELLUM_CLAMD_ADDRESS")
         .map(|a| a.trim().to_owned())
         .filter(|a| !a.is_empty())
@@ -168,10 +173,36 @@ pub fn edge(config: &Config, var: impl Fn(&str) -> Option<String>) -> Result<Edg
             bind: config.bind,
             tls,
             redirect_http,
-            limits: vellum_api::server::ConnectionLimits::default(),
+            limits,
         },
         csrf_key,
         scanner,
+    })
+}
+
+/// The connection limits. With TLS on, clients connect directly, so one
+/// address may hold at most [`PER_IP_CONNECTIONS`]; behind a
+/// TLS-terminating proxy every connection shares the proxy's address, so
+/// there is no cap unless `VELLUM_MAX_CONNECTIONS_PER_IP` sets one.
+fn connection_limits(
+    tls: &Tls,
+    var: impl Fn(&str) -> Option<String>,
+) -> Result<vellum_api::server::ConnectionLimits, Error> {
+    let per_ip_default = if *tls == Tls::Off {
+        0
+    } else {
+        PER_IP_CONNECTIONS
+    };
+    Ok(vellum_api::server::ConnectionLimits {
+        max_connections_per_ip: var("VELLUM_MAX_CONNECTIONS_PER_IP")
+            .map(|v| {
+                v.trim()
+                    .parse::<usize>()
+                    .map_err(|e| invalid("VELLUM_MAX_CONNECTIONS_PER_IP", e))
+            })
+            .transpose()?
+            .unwrap_or(per_ip_default),
+        ..vellum_api::server::ConnectionLimits::default()
     })
 }
 
@@ -362,6 +393,21 @@ mod tests {
         assert_eq!(e.gateway.app_origin, "https://vellum.northstar.dev");
         assert!(e.gateway.public_origin.is_none());
         assert!(e.scanner.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn per_ip_connection_cap_follows_tls() -> Result<(), Error> {
+        assert_eq!(edge_with(&[])?.serve.limits.max_connections_per_ip, 0);
+        let tls = edge_with(&[
+            ("VELLUM_TLS", "files"),
+            ("VELLUM_TLS_CERT", "/c.pem"),
+            ("VELLUM_TLS_KEY", "/k.pem"),
+        ])?;
+        assert_eq!(tls.serve.limits.max_connections_per_ip, PER_IP_CONNECTIONS);
+        let set = edge_with(&[("VELLUM_MAX_CONNECTIONS_PER_IP", "32")])?;
+        assert_eq!(set.serve.limits.max_connections_per_ip, 32);
+        assert!(edge_with(&[("VELLUM_MAX_CONNECTIONS_PER_IP", "many")]).is_err());
         Ok(())
     }
 

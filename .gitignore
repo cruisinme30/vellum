@@ -17,3 +17,7 @@ node_modules/
 .env.*
 !.env.example
 /_site/
+
+# Python bytecode
+__pycache__/
+*.pyc

@@ -4,8 +4,10 @@
 # Nightly load test and security scan on the Team profile (docker compose)
 # (ADR 0022, D96). The k6 suite must hold the SLO thresholds, and a p95
 # that grows 10 % or more over deploy/perf/baseline.json fails the run.
-# ZAP runs its baseline scan against the same stack, and each fuzz target
-# runs for five minutes. A night is skipped when develop has not changed
+# Hostile k6 traffic and slow, idle clients (ADR 0047) run against the
+# same stack, and ClamAV gets a flood of hostile uploads. ZAP runs its
+# baseline scan against the same stack, and each fuzz target runs for
+# five minutes. A night is skipped when develop has not changed
 # since the last green night.
 #
 # On Sunday nights it also runs the chaos test on the Organisation profile:
@@ -110,6 +112,9 @@ jobs:
         run: >-
           k6 run -e BASE_URL=http://127.0.0.1:7700 -e DURATION=1m
           deploy/perf/k6/hostile.js
+      - name: Hold up against slow and idle clients (slowloris, slow bodies, idle HTTP/2)
+        if: always() && steps.serve.outputs.ready == 'true'
+        run: python3 deploy/perf/hostile/slow_clients.py http://127.0.0.1:7700
       - name: Every route within its latency budget
         if: always() && steps.serve.outputs.ready == 'true'
         run: |
@@ -136,6 +141,37 @@ jobs:
       - name: Server logs
         if: failure() && steps.serve.outputs.ready == 'true'
         run: deploy/compose/stack.sh compose nightly logs --tail 300
+
+  scanner:
+    name: Virus scanner under hostile uploads (ClamAV)
+    # Nested, encrypted and bomb archives, EICAR and clean files, 56 at
+    # once, through the upload check against a real clamd with the shipped
+    # clamd.conf (ADR 0047). No upload may pass infected, none may hang.
+    needs: changed
+    if: needs.changed.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Start ClamAV from the compose stack
+        working-directory: deploy/compose
+        run: |
+          cp .env.example .env
+          docker compose up -d --wait --wait-timeout 900 clamav
+      - name: Install Rust
+        run: rustup toolchain install
+      - name: Hostile uploads against the real clamd
+        run: |
+          ip="$(cd deploy/compose && docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' \
+            "$(docker compose ps -q clamav)")"
+          VELLUM_TEST_CLAMD="${ip}:3310" cargo test --locked -p vellum-security \
+            --test clamd_stress -- --ignored --test-threads 1 --nocapture
+      - name: ClamAV logs
+        if: failure()
+        working-directory: deploy/compose
+        run: docker compose logs clamav
 
   zap:
     name: Security scan (ZAP baseline)
