@@ -58,6 +58,8 @@ pub struct Services {
     tasks: Option<Arc<TasksService>>,
     /// The admin console (requests, routes, audit, settings, backups).
     admin: Option<Arc<dyn Service>>,
+    /// Books, for their public sites at `/published`.
+    books: Option<Arc<vellum_books_service::BooksService>>,
     /// Where the gateway records per-route metrics.
     observability: Observability,
     /// The drive index, which Admin → Usage counts pages and storage from.
@@ -159,6 +161,7 @@ impl Services {
             rate_counts: None,
             tasks: None,
             admin: None,
+            books: None,
             observability: Observability::new(),
             drive_index: None,
             mcp: None,
@@ -242,6 +245,7 @@ impl Services {
             self.mcp = Some(mcp);
             self.mcp_workspace = Some(workspace);
         }
+        self.books = opened.books;
         Ok(self)
     }
 
@@ -294,6 +298,9 @@ impl Services {
         if let Some(hooks) = &self.hooks {
             // Providers sign each delivery and send no CSRF token.
             builder = builder.mount_cross_site("/hooks", hooks.clone());
+        }
+        if let Some(books) = &self.books {
+            builder = builder.mount("/published", crate::published::router(Arc::clone(books)));
         }
         if let Some(tasks) = &self.tasks {
             for (prefix, router) in crate::tasks_http::routers(tasks, identity) {

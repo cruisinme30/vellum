@@ -25,17 +25,19 @@ styles, so Word's navigation pane works.
 
 ## Publish as a site {#publish}
 
-**⋯ → Publish** turns a book into a static website with search, a
-table of contents and previous and next links, built with mdBook. Choose
-where it goes:
+A book manager opens **Publish** and picks a format:
 
-- **The public docs site** of your Vellum, at a path you pick.
-- **A custom domain** with its own theme, such as `docs.northstar.dev`.
-- **A folder or Git repository**, to host anywhere.
+- **Static website**: pages with a table of contents and previous and
+  next links, and no scripts. Published for everyone, Vellum serves it at
+  `/published/books/<book id>/`.
+- **mdBook source**: a tree that `mdbook build` or the public docs site
+  builds.
 
-Each publish is a snapshot. Readers see the published version until you
-publish again, so work in progress never leaks. The site includes an
-`llms.txt` file so AI tools can read it.
+Both land in the book folder under `.published/`, so a Git-backed space
+pushes them with the book. Publish for **Only some people** to keep
+their restricted sections; a public site never shows a restricted
+section. Readers see the published version until you publish again, so
+work in progress never leaks.
 
 ## Git Sync {#git-sync}
 

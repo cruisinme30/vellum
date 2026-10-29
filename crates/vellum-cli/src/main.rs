@@ -52,6 +52,7 @@ mod private_remote;
 mod private_remote_tests;
 #[cfg(test)]
 mod private_tests;
+mod published;
 mod reindex;
 mod reminders;
 mod search;

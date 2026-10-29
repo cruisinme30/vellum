@@ -460,6 +460,21 @@ impl EventSink for TracingSink {
     }
 }
 
+/// Books over `store`. Published sites render like the app; without
+/// diagram settings they fall back to the source text.
+fn books_service<S: AuthzStore + TreeSync + 'static>(
+    store: Arc<dyn BlobStore>,
+    authz: &Arc<Authz<S>>,
+    space_of: vellum_collections::service::SpaceOf,
+) -> Arc<BooksService> {
+    let access = vellum_books_service::AuthzAccess::new(Arc::clone(authz), space_of);
+    let mut books = BooksService::new(store, Arc::new(access));
+    if let Ok(figures) = crate::page_render::PageRenderService::figures_from_env() {
+        books = books.with_renderer(Arc::new(crate::published::SiteRenderer::new(figures)));
+    }
+    Arc::new(books)
+}
+
 /// The opened services, plus the two the file watcher drives, collections
 /// for the change feed and search, and Work, which the integration
 /// receivers act through.
@@ -499,6 +514,8 @@ pub struct Opened {
         Arc<crate::mcp_workspace::ServeWorkspace>,
         crate::mcp_serve::Events,
     )>,
+    /// Books, which also serve published sites at `/published`.
+    pub books: Option<Arc<BooksService>>,
 }
 
 /// My Work's settings: where its secrets live and what it links to.
@@ -587,13 +604,7 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
         collections = collections.with_index_feed(feed);
     }
     let collections = Arc::new(collections);
-    let books = Arc::new(BooksService::new(
-        Arc::clone(&store),
-        Arc::new(vellum_books_service::AuthzAccess::new(
-            Arc::clone(authz),
-            Arc::clone(&space_of),
-        )),
-    ));
+    let books = books_service(Arc::clone(&store), authz, Arc::clone(&space_of));
     let directory = Arc::new(IdentityDirectory(Arc::clone(identity)));
     let (work, report) = WorkService::open(
         Arc::clone(&store),
@@ -1029,10 +1040,9 @@ pub async fn open(
         events.clone(),
     );
     task_jobs(&replica, &workspace.tasks, notify, &config.data_dir)?;
-    let mut services = workspace.services;
-    services.push(Arc::new(Storage::new(store, !local)));
+    workspace.services.push(Arc::new(Storage::new(store, !local)));
     Ok(Opened {
-        services,
+        services: workspace.services,
         hooks,
         collab: Some(collab),
         replica: Some(replica),
@@ -1040,6 +1050,7 @@ pub async fn open(
         tasks: Some(workspace.tasks),
         drive_index: Some(drive_index),
         mcp: Some((mcp, events)),
+        books: Some(workspace.books),
     })
 }
 

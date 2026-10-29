@@ -9010,6 +9010,7 @@ dependencies = [
  "vellum-admin",
  "vellum-api",
  "vellum-authz",
+ "vellum-books",
  "vellum-books-service",
  "vellum-collab",
  "vellum-collections",
