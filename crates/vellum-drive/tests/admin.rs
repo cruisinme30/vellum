@@ -4,6 +4,8 @@
 //! What workspace administrators do to spaces (ADR 0021, D242), on the
 //! real permission engine.
 
+#![allow(clippy::too_many_lines, reason = "one test walks an admin's whole visit")]
+
 use std::sync::Arc;
 
 use vellum_authz::{Authz, AuthzStore, MemoryStore, SqlStore};
@@ -146,6 +148,9 @@ async fn admins_manage_spaces<S: AuthzStore + TreeSync + 'static>(
     let all = drive.admin_spaces().await?;
     let kinds: Vec<SpaceKind> = all.iter().map(|a| a.space.kind).collect();
     assert_eq!(kinds, vec![SpaceKind::SharedDrive, SpaceKind::UserDrive]);
-    assert!(all[0].used > 0, "the page counts towards the drive's size");
+    assert!(
+        all.first().is_some_and(|a| a.used > 0),
+        "the page counts towards the drive's size"
+    );
     Ok(())
 }
