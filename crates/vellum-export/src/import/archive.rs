@@ -5,8 +5,10 @@
 //!
 //! Entry names are resolved with the zip crate's `enclosed_name`, so an
 //! absolute path or `..` never escapes the import, and every read is
-//! capped: the number of entries, each entry's size and the total size,
-//! whatever the archive's headers claim.
+//! capped: the number of entries, each entry's size, how far one entry
+//! may expand and the total size, whatever the archive's headers claim.
+//! Everything read is held in memory, so the caps bound the memory one
+//! import can take (RT-025).
 
 use std::io::{Cursor, Read};
 
@@ -17,7 +19,12 @@ pub const MAX_ENTRIES: usize = 20_000;
 /// Largest single entry, uncompressed.
 pub const MAX_ENTRY_BYTES: u64 = 100 * 1024 * 1024;
 /// Largest total of all entries, uncompressed.
-pub const MAX_TOTAL_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+pub const MAX_TOTAL_BYTES: u64 = 512 * 1024 * 1024;
+/// Most an entry may expand over its compressed size. Text and Office
+/// XML expand about 5 to 20 times; a zip bomb expands about 1000 times.
+pub const MAX_RATIO: u64 = 200;
+/// Entries up to this size may expand any amount.
+const RATIO_FREE_BYTES: u64 = 8 * 1024 * 1024;
 
 /// One file from an archive.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -87,11 +94,14 @@ fn read_into(
                 "more than {MAX_ENTRIES} files"
             )));
         }
+        // Read no further than this entry's own limits allow, so a bomb
+        // is refused before it is held in memory.
+        let packed = file.compressed_size();
+        let expands = packed.saturating_mul(MAX_RATIO).max(RATIO_FREE_BYTES);
+        let room = MAX_TOTAL_BYTES.saturating_sub(*total);
+        let cap = MAX_ENTRY_BYTES.min(expands).min(room);
         let mut data = Vec::new();
-        let _ = file
-            .by_ref()
-            .take(MAX_ENTRY_BYTES + 1)
-            .read_to_end(&mut data)?;
+        let _ = file.by_ref().take(cap + 1).read_to_end(&mut data)?;
         let size = data.len() as u64;
         if size > MAX_ENTRY_BYTES {
             return Err(ImportError::TooLarge(format!(
@@ -99,11 +109,17 @@ fn read_into(
                 MAX_ENTRY_BYTES / 1024 / 1024
             )));
         }
+        if size > expands {
+            return Err(ImportError::TooLarge(format!(
+                "{path} expands more than {MAX_RATIO} times its packed size"
+            )));
+        }
         *total += size;
         if *total > MAX_TOTAL_BYTES {
-            return Err(ImportError::TooLarge(
-                "the archive expands past 2 GB".into(),
-            ));
+            return Err(ImportError::TooLarge(format!(
+                "the archive expands past {} MB",
+                MAX_TOTAL_BYTES / 1024 / 1024
+            )));
         }
         drop(file);
         if nested && path.to_ascii_lowercase().ends_with(".zip") {
@@ -178,6 +194,65 @@ mod tests {
         strip_common_root(&mut entries);
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].path, "Page abc.md");
+    }
+
+    fn deflated(files: &[(&str, usize)]) -> Vec<u8> {
+        let mut out = Cursor::new(Vec::new());
+        let mut zip = zip::ZipWriter::new(&mut out);
+        let options = SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated)
+            .large_file(true);
+        let chunk = vec![0u8; 1024 * 1024];
+        for (name, mib) in files {
+            zip.start_file(*name, options).unwrap();
+            for _ in 0..*mib {
+                zip.write_all(&chunk).unwrap();
+            }
+        }
+        let _ = zip.finish().unwrap();
+        out.into_inner()
+    }
+
+    /// RT-025 (#460): a small archive of zeros used to expand to 2 GB in memory.
+    /// It is now refused after reading at most one entry's allowance.
+    #[test]
+    fn a_zip_bomb_is_refused_before_it_fills_memory() {
+        let bomb = deflated(&[("a.md", 64), ("b.md", 64)]);
+        assert!(bomb.len() < 1024 * 1024, "{} bytes", bomb.len());
+        let refused = read("markdown", &bomb, false);
+        assert!(
+            matches!(&refused, Err(ImportError::TooLarge(m)) if m.contains("expands")),
+            "{refused:?}"
+        );
+        // Nested archives are held to the same rule.
+        let outer = zip_of(&[("Part-1.zip", &bomb)]);
+        assert!(matches!(
+            read("notion", &outer, true),
+            Err(ImportError::TooLarge(_))
+        ));
+    }
+
+    #[test]
+    fn small_and_ordinary_entries_still_read() {
+        let mut seed = 7u64;
+        let text: String = (0..200_000)
+            .map(|_| {
+                seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+                [
+                    "ship ",
+                    "plan ",
+                    "Northstar ",
+                    "launch ",
+                    "review ",
+                    "notes ",
+                ][usize::try_from(seed >> 61).unwrap_or(0) % 6]
+            })
+            .collect();
+        let bytes = zip_of(&[("notes.md", text.as_bytes())]);
+        let entries = read("markdown", &bytes, false).unwrap();
+        assert_eq!(entries[0].bytes.len(), text.len());
+        let small = deflated(&[("zeros.md", 8)]);
+        assert_eq!(read("markdown", &small, false).unwrap().len(), 1);
     }
 
     #[test]
