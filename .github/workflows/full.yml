@@ -69,6 +69,38 @@ jobs:
       - name: Binary runs
         run: target/release/vellum --version
 
+  image:
+    name: Image, budgets and reproducibility
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build the binary twice from scratch
+        run: |
+          for n in 1 2; do
+            docker buildx build --no-cache --target binary \
+              --output "type=local,dest=${RUNNER_TEMP}/build-${n}" -f deploy/docker/Dockerfile .
+          done
+      - name: The two builds are byte-identical
+        run: |
+          sha256sum "${RUNNER_TEMP}"/build-*/vellum
+          cmp "${RUNNER_TEMP}/build-1/vellum" "${RUNNER_TEMP}/build-2/vellum"
+      - name: Build the image from that binary
+        run: |
+          mkdir -p "${RUNNER_TEMP}/dist"
+          cp "${RUNNER_TEMP}/build-1/vellum" "${RUNNER_TEMP}/dist/vellum-linux-amd64"
+          docker buildx build --load --target runtime \
+            --build-arg DIST=release --build-context "release=${RUNNER_TEMP}/dist" \
+            -t vellum:ci -f deploy/docker/Dockerfile .
+      - name: Size, cold start, idle memory and drain within budget
+        run: |
+          image_bytes="$(docker save vellum:ci | gzip -9 | wc -c)"
+          cargo run --locked --package xtask -- budgets \
+            --binary "${RUNNER_TEMP}/build-1/vellum" --image-bytes "${image_bytes}"
+
   e2e:
     name: End-to-end and accessibility
     runs-on: ubuntu-24.04
@@ -111,7 +143,7 @@ jobs:
   full-suite:
     name: Full suite
     if: always()
-    needs: [fast, coverage, release-build, e2e, links]
+    needs: [fast, coverage, release-build, image, e2e, links]
     runs-on: ubuntu-24.04
     steps:
       - name: Every check passed
