@@ -165,7 +165,7 @@ pub struct Changes {
 }
 
 impl Changes {
-    fn merge(&mut self, other: Self) {
+    pub(crate) fn merge(&mut self, other: Self) {
         self.issues.extend(other.issues);
         self.removed_paths.extend(other.removed_paths);
         self.teams.extend(other.teams);
@@ -488,21 +488,26 @@ impl WorkGraph {
         IssueSnapshot::of(issue, self.category_of(issue).unwrap_or(Category::Backlog))
     }
 
-    fn team_ref(&self, key: &TeamKey) -> Result<&Team> {
+    pub(crate) fn team_ref(&self, key: &TeamKey) -> Result<&Team> {
         self.teams
             .get(key)
             .ok_or_else(|| WorkError::UnknownTeam(key.clone()))
     }
 
-    fn issue_ref(&self, id: &IssueId) -> Result<&Issue> {
+    pub(crate) fn issue_ref(&self, id: &IssueId) -> Result<&Issue> {
         self.issues
             .get(id)
             .ok_or_else(|| WorkError::UnknownIssue(id.to_string()))
     }
 
+    /// Replaces an issue whose key is unchanged.
+    pub(crate) fn store_issue(&mut self, issue: Issue) {
+        let _ = self.issues.insert(issue.id, issue);
+    }
+
     // ----- validation helpers -----
 
-    fn check_label(&self, team: &Team, label: &str) -> Result<()> {
+    pub(crate) fn check_label(&self, team: &Team, label: &str) -> Result<()> {
         let known = team
             .labels
             .iter()
