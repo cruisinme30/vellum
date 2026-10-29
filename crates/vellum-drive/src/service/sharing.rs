@@ -12,7 +12,7 @@ use vellum_contracts::{HttpMethod, Operation, RequestContext, Scope};
 use vellum_kernel::{Error, ErrorKind, ObjectId, ShareId, Timestamp, UserId};
 
 use super::api::{Done, NodeKey, NodeView};
-use super::{DriveService, actor};
+use super::{DriveService, Handles, actor};
 use crate::model::NodeKind;
 use crate::sharing::{Grant, Grantee, LinkInfo, Role, Sharing, SharingState};
 
@@ -61,6 +61,8 @@ impl From<RoleView> for Role {
 pub struct GrantView {
     /// `user:<id>` or `group:<id>`.
     pub principal: String,
+    /// The person's handle, when known.
+    pub handle: Option<String>,
     /// The role.
     pub role: RoleView,
     /// When it stops counting; unset for no end.
@@ -170,7 +172,7 @@ pub struct LinkKey {
     pub link_id: ShareId,
 }
 
-fn view(state: &SharingState, links_allowed: bool) -> SharingView {
+fn view(state: &SharingState, links_allowed: bool, handles: Option<&Handles>) -> SharingView {
     SharingView {
         item: NodeView::from(&state.node),
         grants: state
@@ -178,6 +180,10 @@ fn view(state: &SharingState, links_allowed: bool) -> SharingView {
             .iter()
             .map(|g| GrantView {
                 principal: g.grantee.to_string(),
+                handle: match (g.grantee, handles) {
+                    (Grantee::User(user), Some(handles)) => handles(user),
+                    _ => None,
+                },
                 role: g.role.into(),
                 expires_at: g.expires_at,
             })
@@ -202,7 +208,11 @@ impl DriveService {
     async fn sharing_view(&self, ctx: &RequestContext, id: ObjectId) -> Result<SharingView, Error> {
         let sharing = self.sharing()?;
         let state = sharing.state(&actor(ctx)?, id).await?;
-        Ok(view(&state, sharing.public_origin().is_some()))
+        Ok(view(
+            &state,
+            sharing.public_origin().is_some(),
+            self.handles.as_ref(),
+        ))
     }
 
     async fn sharing_state(
