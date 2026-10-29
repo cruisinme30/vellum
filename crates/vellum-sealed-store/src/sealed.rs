@@ -61,6 +61,11 @@ impl<S: BlobStore, K: KeyProvider + std::fmt::Debug, P: ModePolicy> Sealed<S, K,
         &self.inner
     }
 
+    /// The key provider objects are sealed with.
+    pub fn keys(&self) -> &K {
+        &self.keys
+    }
+
     /// Rewrites one object into the form the policy wants now: seals
     /// plaintext in an encrypted space, re-wraps envelopes whose KEK is not
     /// current (rotation), and opens envelopes in a plaintext space. Uses
@@ -159,13 +164,19 @@ where
     ) -> StoreResult<BlobMeta> {
         let size = len(&bytes);
         let stored = match self.policy.mode_for(path) {
+            // E2E ciphertext stays as the clients sealed it, so members'
+            // devices can read it straight from the folder or bucket.
+            Mode::Encrypted | Mode::EndToEnd
+                if vellum_crypto::recipients::is_recipient_envelope(&bytes) =>
+            {
+                bytes
+            }
             Mode::Encrypted => Bytes::from(
                 vellum_crypto::seal(self.keys.as_ref(), &bytes)
                     .await
                     .map_err(crypto_error)?,
             ),
             Mode::Plaintext => bytes,
-            Mode::EndToEnd if vellum_crypto::recipients::is_recipient_envelope(&bytes) => bytes,
             Mode::EndToEnd => {
                 return Err(StoreError::Backend(
                     "E2E private space accepts only recipient envelopes".into(),

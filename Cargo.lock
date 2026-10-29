@@ -8999,17 +8999,20 @@ dependencies = [
  "vellum-identity",
  "vellum-integrations",
  "vellum-kernel",
+ "vellum-kms",
  "vellum-mcp",
  "vellum-notify",
  "vellum-observe",
  "vellum-private",
  "vellum-render",
+ "vellum-sealed-store",
  "vellum-search",
  "vellum-security",
  "vellum-store",
  "vellum-tasks",
  "vellum-work",
  "vellum-work-service",
+ "zeroize",
 ]
 
 [[package]]

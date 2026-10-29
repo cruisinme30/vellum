@@ -21,14 +21,18 @@
 //! | `VELLUM_CLAMD_ADDRESS` | `host:port` of `ClamAV`, the default upload virus scanner |
 //! | `VELLUM_INDEX_KEY` | 64 hex characters: the key of the SQLite index |
 //! | `VELLUM_INDEX_PLAINTEXT` | `1` opens the SQLite index without encryption |
+//! | `VELLUM_KMS_KEY` | The files' KEK in a key service: `aws-kms:…`, `gcp-kms:…` or `vault:…` |
+//! | `VELLUM_KEK_PASSPHRASE`, `VELLUM_KEK_PASSPHRASE_FILE` | Derive the files' KEK from a passphrase |
+//! | `VELLUM_FILES_PLAINTEXT` | `1` stores the workspace files without encryption |
 //! | `VELLUM_OIDC_ISSUER`, `VELLUM_OIDC_CLIENT_ID` | Turn on single sign-on with this `OpenID Connect` provider |
 //! | `VELLUM_OIDC_CLIENT_SECRET` | The client secret, for a confidential client |
 //! | `VELLUM_OIDC_NAME` | The provider's name on the sign-in button |
 //! | `VELLUM_OIDC_ALLOWED_DOMAINS` | Comma-separated email domains that get an account on first sign-in |
 //! | `VELLUM_OIDC_AUTO_CREATE` | `false` to sign in existing accounts only |
 //!
-//! With none of these, the SQLite index key is made on the first start and
-//! kept in `.vellum/keys/index.key`, so `vellum serve` needs no settings.
+//! With none of these, the SQLite index key and the files' key are made on
+//! the first start and kept in `.vellum/keys`, so `vellum serve` needs no
+//! settings (see [`crate::at_rest`]).
 
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};

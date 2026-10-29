@@ -6,7 +6,7 @@
 use std::io::Write as _;
 use std::process::ExitCode;
 
-use vellum_db::{Index, IndexConfig, IndexKey, PlainFiles, ShardedIndex, ShardsConfig};
+use vellum_db::{Index, IndexConfig, IndexKey, ShardedIndex, ShardsConfig};
 use vellum_kernel::config::Config;
 
 /// Environment variable holding the 64-hex-character index key, until the
@@ -43,15 +43,22 @@ fn execute(args: &Args) -> Result<Vec<String>, String> {
     let config = Config::load(None).map_err(|e| e.to_string())?;
     let shards =
         ShardsConfig::from_env(|key| std::env::var(key).ok()).map_err(|e| e.to_string())?;
-    let runtime = tokio::runtime::Builder::new_current_thread()
+    // Two workers: the scan runs on a blocking thread and opens sealed
+    // files through the runtime, which a key service call needs.
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
         .enable_all()
         .build()
+        .map_err(|e| e.to_string())?;
+    // Read the files as the server stores them: sealed unless plaintext.
+    let files = runtime
+        .block_on(crate::at_rest::reader(&config, |k| std::env::var(k).ok()))
         .map_err(|e| e.to_string())?;
     let report = if let Some(shards) = shards {
         // Sharded deployment: each space goes to the shard the map names.
         runtime.block_on(async {
             let index = ShardedIndex::open(&shards).await?;
-            let report = index.reindex(&config.data_dir, PlainFiles).await;
+            let report = index.reindex(&config.data_dir, files.clone()).await;
             index.close().await;
             report
         })
@@ -71,7 +78,7 @@ fn execute(args: &Args) -> Result<Vec<String>, String> {
         };
         runtime.block_on(async {
             let index = Index::open(&index_config).await?;
-            let report = index.reindex(&config.data_dir, PlainFiles).await;
+            let report = index.reindex(&config.data_dir, files.clone()).await;
             index.close().await;
             report
         })

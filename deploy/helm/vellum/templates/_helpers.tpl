@@ -169,11 +169,19 @@ spec:
             name: {{ . }}
         {{- end }}
       env:
+        {{- if .Values.encryption.kms }}
+        # Files are sealed under a key in a key service (ADR 0025, D260);
+        # credentials come from the pod's role (IRSA, Pod Identity,
+        # workload identity), never from static keys.
+        - name: VELLUM_KMS_KEY
+          value: {{ .Values.encryption.kms | quote }}
+        {{- else }}
         - name: VELLUM_KEK_PASSPHRASE
           valueFrom:
             secretKeyRef:
               name: {{ .Values.encryption.kekSecret.name }}
               key: {{ .Values.encryption.kekSecret.key }}
+        {{- end }}
         - name: VELLUM_CSRF_KEY
           valueFrom:
             secretKeyRef:

@@ -15,6 +15,7 @@
 //! codes and takes, lists and restores encrypted backups.
 
 mod admin;
+mod at_rest;
 mod backup_cli;
 mod cluster;
 mod collab;

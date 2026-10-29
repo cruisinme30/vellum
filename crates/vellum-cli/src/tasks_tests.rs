@@ -40,7 +40,9 @@ impl Fixture {
         let services = Services::open(ORIGIN, Some(&dir), None)
             .unwrap()
             .with_workspace(&config, |k| {
-                (k == crate::workspace::PLAINTEXT_VAR).then(|| "1".to_owned())
+                // These tests read the task files on disk.
+                (k == crate::workspace::PLAINTEXT_VAR || k == crate::at_rest::PLAINTEXT_VAR)
+                    .then(|| "1".to_owned())
             })
             .await
             .unwrap();
