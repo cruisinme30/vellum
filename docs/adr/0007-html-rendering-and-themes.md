@@ -103,4 +103,3 @@ flowchart LR
 - Live parts (collection views, `@today`, the roadmap's today line,
   sortable tables, calculators) render a correct static version and leave
   `data-*` hooks for the web client to hydrate.
-
