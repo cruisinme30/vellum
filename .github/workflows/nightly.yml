@@ -6,13 +6,24 @@
 # that grows 10 % or more over deploy/perf/baseline.json fails the run.
 # ZAP runs its baseline scan against the same stack, and each fuzz target
 # runs for five minutes. A night is skipped when develop has not changed
-# since the last green run.
-name: Nightly load and security
+# since the last green night.
+#
+# On Sunday nights it also runs the chaos test on the Organisation profile:
+# the Helm chart on kind with a Patroni Postgres, under k6 load, while Chaos
+# Mesh kills a Vellum node, a Kroki pod and the Postgres primary. It fails
+# when an SLO threshold breaks or an acknowledged write is lost.
+name: "Scheduled: nightly load, security and fuzz, chaos on Sundays"
 
 on:
   schedule:
     - cron: "41 3 * * *"
   workflow_dispatch:
+    inputs:
+      suite:
+        description: "What to run"
+        type: choice
+        options: [nightly, chaos, both]
+        default: nightly
 
 permissions:
   contents: read
@@ -31,25 +42,35 @@ jobs:
       actions: read # reads the last successful run of this workflow
     outputs:
       run: ${{ steps.check.outputs.run }}
+      chaos: ${{ steps.check.outputs.chaos }}
     steps:
       - id: check
         env:
           EVENT: ${{ github.event_name }}
+          SUITE: ${{ inputs.suite }}
           GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          last=""
-          if [[ "${EVENT}" == "schedule" ]]; then
-            runs="repos/${GH_REPO}/actions/workflows/nightly.yml/runs"
-            last="$(gh api "${runs}?branch=develop&status=success&per_page=1" \
-              --jq '.workflow_runs[0].head_sha // ""' || true)"
-          fi
-          if [[ -n "${last}" && "${last}" == "${GITHUB_SHA}" ]]; then
-            echo "develop is still at ${GITHUB_SHA}, which passed last time; skipping tonight."
-            echo "run=false" >> "${GITHUB_OUTPUT}"
+          if [[ "${EVENT}" != "schedule" ]]; then
+            [[ "${SUITE}" != "chaos" ]] && run=true || run=false
+            [[ "${SUITE}" != "nightly" ]] && chaos=true || chaos=false
           else
-            echo "run=true" >> "${GITHUB_OUTPUT}"
+            # Only scheduled runs count as a green night: a manual chaos-only
+            # run must not make the next night skip its load test.
+            runs="repos/${GH_REPO}/actions/workflows/nightly.yml/runs"
+            last="$(gh api "${runs}?branch=develop&event=schedule&status=success&per_page=1" \
+              --jq '.workflow_runs[0].head_sha // ""' || true)"
+            if [[ -n "${last}" && "${last}" == "${GITHUB_SHA}" ]]; then
+              echo "develop is still at ${GITHUB_SHA}, which passed last time; skipping tonight."
+              run=false
+            else
+              run=true
+            fi
+            # The chaos test runs weekly, on Sunday nights (UTC).
+            [[ "$(date -u +%u)" == 7 ]] && chaos=true || chaos=false
           fi
+          echo "run=${run}" >> "${GITHUB_OUTPUT}"
+          echo "chaos=${chaos}" >> "${GITHUB_OUTPUT}"
 
   load:
     name: Load test (k6)
@@ -214,3 +235,55 @@ jobs:
         with:
           name: fuzz-crash-${{ matrix.target }}
           path: fuzz/artifacts/${{ matrix.target }}
+
+  chaos:
+    name: Chaos under load
+    needs: changed
+    if: needs.changed.outputs.chaos == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build the images
+        run: |
+          docker buildx build --load -t vellum:ci -f deploy/docker/Dockerfile .
+          docker buildx build --load -t vellum-minio:ci deploy/compose/minio
+      - name: Does the binary serve yet?
+        id: serve
+        run: |
+          if deploy/compose/stack.sh has-serve vellum:ci; then
+            echo "ready=true" >>"${GITHUB_OUTPUT}"
+          else
+            echo "::notice::vellum has no serve command yet; the chaos test starts once it does."
+          fi
+      - uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
+        if: steps.serve.outputs.ready == 'true'
+        with:
+          cluster_name: chaos
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        if: steps.serve.outputs.ready == 'true'
+        with:
+          version: v3.19.0
+      - name: Install the Postgres Operator and Chaos Mesh
+        if: steps.serve.outputs.ready == 'true'
+        run: |
+          kind load docker-image vellum:ci vellum-minio:ci --name chaos
+          helm install postgres-operator postgres-operator \
+            --repo https://opensource.zalando.com/postgres-operator/charts/postgres-operator \
+            --version 2.0.3 --wait
+          helm install chaos-mesh chaos-mesh --repo https://charts.chaos-mesh.org --version 2.8.7 \
+            --namespace chaos-mesh --create-namespace --wait \
+            --set chaosDaemon.runtime=containerd \
+            --set chaosDaemon.socketPath=/run/containerd/containerd.sock
+      - name: Run the faults under load
+        if: steps.serve.outputs.ready == 'true'
+        run: deploy/chaos/run.sh
+      - name: Cluster state
+        if: failure() && steps.serve.outputs.ready == 'true'
+        run: |
+          kubectl get pods -A -o wide
+          kubectl get events --sort-by=.lastTimestamp | tail -80
+          kubectl logs -l app.kubernetes.io/component=server --tail=200 --prefix
