@@ -45,9 +45,9 @@ pub enum TransportError {
     Connect(String),
 }
 
-/// Sends HTTP requests. Implemented in the edge layer over the shared HTTP
-/// client, which re-checks resolved addresses with
-/// [`crate::endpoint::check_resolved`] and applies a 10 s timeout.
+/// Sends HTTP requests. [`crate::endpoint::SafeTransport`] is the real
+/// implementation: it re-checks resolved addresses at connect time and
+/// applies a 10 s timeout.
 pub trait HttpTransport: Send + Sync {
     /// Posts the request and returns the response status.
     fn post(
@@ -83,6 +83,16 @@ impl Outcome {
             },
             Err(TransportError::Refused(_)) => Self::Rejected,
             Err(TransportError::Timeout | TransportError::Connect(_)) => Self::Retry(None),
+        }
+    }
+
+    /// Classifies a push service's answer. Push services also answer 404
+    /// for a subscription that expired, so 404 removes it too.
+    #[must_use]
+    pub const fn classify_push(result: &Result<HttpResponse, TransportError>) -> Self {
+        match result {
+            Ok(HttpResponse { status: 404, .. }) => Self::Gone,
+            _ => Self::classify(result),
         }
     }
 
@@ -197,6 +207,12 @@ impl EndpointHealth {
     }
 }
 
+/// The channel label for web push deliveries.
+pub const PUSH_CHANNEL: &str = "push";
+
+/// The channel label for webhook deliveries.
+pub const WEBHOOK_CHANNEL: &str = "webhook";
+
 /// Sends one attempt inside a span and records the delivery metrics.
 pub async fn attempt<T: HttpTransport>(
     transport: &T,
@@ -217,7 +233,11 @@ pub async fn attempt<T: HttpTransport>(
     async {
         let started = Instant::now();
         let result = transport.post(request).await;
-        let outcome = Outcome::classify(&result);
+        let outcome = if channel == PUSH_CHANNEL {
+            Outcome::classify_push(&result)
+        } else {
+            Outcome::classify(&result)
+        };
         let elapsed_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
         let span = tracing::Span::current();
         if let Ok(response) = &result {
@@ -262,6 +282,9 @@ mod tests {
     fn classification() {
         assert_eq!(Outcome::classify(&response(204)), Outcome::Delivered);
         assert_eq!(Outcome::classify(&response(410)), Outcome::Gone);
+        assert_eq!(Outcome::classify(&response(404)), Outcome::Rejected);
+        assert_eq!(Outcome::classify_push(&response(404)), Outcome::Gone);
+        assert_eq!(Outcome::classify_push(&response(410)), Outcome::Gone);
         assert_eq!(Outcome::classify(&response(404)), Outcome::Rejected);
         assert_eq!(Outcome::classify(&response(503)), Outcome::Retry(None));
         assert_eq!(Outcome::classify(&response(429)), Outcome::Retry(None));
