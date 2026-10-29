@@ -113,7 +113,8 @@ impl Service for Notes {
                     })
                 },
             )
-            .summary("Gets a note"),
+            .summary("Gets a note")
+            .revalidate(),
             Operation::mutation(
                 "notes.create",
                 HttpMethod::Post,
@@ -349,6 +350,77 @@ async fn rest_round_trip_matches_the_openapi_schema() -> TestResult {
     let validator = jsonschema::validator_for(&schema)?;
     assert!(validator.is_valid(&reply.body));
     assert!(!validator.is_valid(&json!({"id": "x"})));
+    Ok(())
+}
+
+#[tokio::test]
+async fn revalidated_queries_answer_304_for_their_etag() -> TestResult {
+    let (gw, _) = gateway()?;
+    let first = send(&gw, get("/api/v1/spaces/eng/notes/7", "Bearer read")?).await?;
+    assert_eq!(first.status, StatusCode::OK, "{}", first.text);
+    let tag = first
+        .headers
+        .get("etag")
+        .and_then(|v| v.to_str().ok())
+        .ok_or("no etag")?
+        .to_owned();
+    assert!(tag.starts_with("W/\""), "{tag}");
+    assert_eq!(
+        first
+            .headers
+            .get("cache-control")
+            .and_then(|v| v.to_str().ok()),
+        Some("private, no-cache")
+    );
+    assert_eq!(first.body["id"], 7);
+
+    let conditional = |tag: &str| -> Result<Request<Body>, http::Error> {
+        Request::get("/api/v1/spaces/eng/notes/7")
+            .header("host", "vellum.northstar.dev")
+            .header("authorization", "Bearer read")
+            .header("if-none-match", tag)
+            .body(Body::empty())
+    };
+    // The same tag, strong or weak, or among others: nothing to send.
+    for candidate in [
+        tag.clone(),
+        tag.trim_start_matches("W/").to_owned(),
+        format!("\"x\", {tag}"),
+    ] {
+        let again = send(&gw, conditional(&candidate)?).await?;
+        assert_eq!(again.status, StatusCode::NOT_MODIFIED, "{candidate}");
+        assert!(again.text.is_empty());
+        assert_eq!(
+            again.headers.get("etag").and_then(|v| v.to_str().ok()),
+            Some(tag.as_str())
+        );
+    }
+    // Another answer has another tag, so a stale one gets the full body.
+    let other = send(&gw, conditional("W/\"stale\"")?).await?;
+    assert_eq!(other.status, StatusCode::OK);
+    let shouted = send(
+        &gw,
+        get("/api/v1/spaces/eng/notes/7?shout=true", "Bearer read")?,
+    )
+    .await?;
+    assert_ne!(shouted.headers.get("etag"), first.headers.get("etag"));
+    // Permission is checked before the tag: no credential, no 304.
+    let anonymous = Request::get("/api/v1/spaces/eng/notes/7")
+        .header("host", "vellum.northstar.dev")
+        .header("if-none-match", tag.as_str())
+        .body(Body::empty())?;
+    assert_eq!(send(&gw, anonymous).await?.status, StatusCode::UNAUTHORIZED);
+    // Writes never carry one.
+    let created = send(
+        &gw,
+        post_json(
+            "/api/v1/spaces/eng/notes",
+            "Bearer write",
+            &json!({"text": "x"}),
+        )?,
+    )
+    .await?;
+    assert!(created.headers.get("etag").is_none());
     Ok(())
 }
 
