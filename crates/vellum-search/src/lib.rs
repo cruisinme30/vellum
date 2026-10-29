@@ -17,7 +17,8 @@
 //! - **Drive filters** (R-DR-9): owner, modified range, type, location,
 //!   starred, trash.
 //! - **Incremental indexing** on every save, and full rebuilds, through the
-//!   [`Indexer`].
+//!   [`Indexer`]; [`DriveFeed`] and [`DriveSource`] feed it the drive's
+//!   saved pages.
 //! - **Encryption at rest** (D63): the tantivy index is sealed with
 //!   XChaCha20-Poly1305 chunk by chunk.
 
@@ -27,9 +28,11 @@ mod authz;
 pub mod backend;
 #[doc(hidden)]
 pub mod conformance;
+pub mod drive_feed;
 pub mod error;
 pub mod fusion;
 pub mod indexer;
+pub mod markdown;
 pub mod meili_index;
 pub mod model;
 pub mod onnx;
@@ -44,6 +47,7 @@ pub mod vector;
 pub use access::{Principal, ReadAccess, Stars};
 pub use api::{SearchApi, TitlesPage};
 pub use backend::{Change, IndexEntry, Scope, SearchBackend};
+pub use drive_feed::{DriveFeed, DriveSource, FeedConfig, Start};
 pub use error::{Result, SearchError};
 pub use indexer::{DocumentSource, Indexer, IndexerConfig, rebuild};
 pub use meili_index::{MeiliBackend, MeiliConfig};

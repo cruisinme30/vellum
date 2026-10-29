@@ -8970,7 +8970,9 @@ dependencies = [
  "vellum-authz",
  "vellum-contracts",
  "vellum-db",
+ "vellum-format",
  "vellum-kernel",
+ "vellum-store",
  "zeroize",
 ]
 
