@@ -58,3 +58,16 @@ Yjs
 Replicache
 mdBook
 Roboto
+GitLab
+GitHub
+Sentry
+Jira
+Atlassian
+VAPID
+HMAC
+SSRF
+RFC
+[Uu]nmerged
+[Tt]rigrams?
+[Ww]ebhooks?
+[Rr]ebinding

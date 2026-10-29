@@ -80,6 +80,9 @@
 - name: area/work
   color: "5319e7"
   description: "Work: issues, cycles, projects"
+- name: area/notify
+  color: "5319e7"
+  description: "vellum-notify: webhooks, inbox, email and web push"
 - name: area/my-work
   color: "5319e7"
   description: "My Work: tasks"

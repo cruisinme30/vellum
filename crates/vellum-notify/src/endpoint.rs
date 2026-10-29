@@ -1,161 +1,141 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-//! Outbound endpoint checks: the SSRF guard for webhooks and push services.
+//! Outbound endpoints: the SSRF policy for webhooks and push services, and
+//! the HTTP transport that enforces it.
 //!
-//! An admin-supplied URL must never let Vellum reach its own network. The
-//! check runs twice: [`check_url`] when the hook is saved, and
-//! [`check_resolved`] on the addresses the transport resolved, right before
-//! it connects, so DNS rebinding cannot slip a private address in between.
+//! The address rules are the shared ones in [`vellum_security::ssrf`]. A
+//! URL is checked when an admin saves the hook, and the transport resolves
+//! names through [`GuardedResolver`], which refuses any non-public address
+//! at connect time, so DNS rebinding cannot reach the internal network.
+//! Webhook requests never follow redirects: a 3xx is a failed delivery.
 
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::sync::Arc;
+use std::time::Duration;
 
-use url::{Host, Url};
+use url::Url;
+use vellum_security::ssrf::{GuardedResolver, SsrfError, UrlPolicy};
 
-/// Whether plain `http://` and private addresses are allowed.
+use crate::delivery::{HttpResponse, HttpTransport, TransportError};
+use crate::webhook::OutboundRequest;
+
+/// The per-attempt budget for a delivery.
+pub const TIMEOUT: Duration = Duration::from_secs(10);
+
+/// The policy for webhook and push endpoints: HTTPS only on 443 or 8443.
 ///
-/// `Strict` is the default and the only mode for the Team and Org
-/// profiles. `AllowPrivate` exists for the single-binary laptop profile,
-/// where the receiver often runs on the same machine; an admin must turn it
-/// on explicitly.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum Policy {
-    /// HTTPS only, public addresses only.
-    #[default]
-    Strict,
-    /// HTTP and private or loopback addresses are allowed.
-    AllowPrivate,
+/// `trusted_hosts` exempts named hosts from the address rules. It is empty
+/// in the Team and Org profiles; on a laptop an admin may name a local
+/// receiver (`localhost`) explicitly, and only then may `http` be used.
+#[must_use]
+pub fn policy(trusted_hosts: &[String]) -> UrlPolicy {
+    let mut policy = UrlPolicy::default();
+    policy.allow_http = !trusted_hosts.is_empty();
+    policy.allowed_ports = vec![443, 8443];
+    policy.trusted_hosts = trusted_hosts
+        .iter()
+        .map(|h| h.to_ascii_lowercase())
+        .collect();
+    policy.max_redirects = 0;
+    policy.timeout = TIMEOUT;
+    policy
 }
 
-/// Why an endpoint was refused.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-pub enum EndpointError {
-    /// Not a valid absolute URL.
-    #[error("not a valid URL")]
-    Invalid,
-    /// Only `https` (or `http` when allowed) is accepted.
-    #[error("scheme `{0}` is not allowed")]
-    Scheme(String),
-    /// Credentials in the URL would leak into logs.
-    #[error("URLs must not carry a user name or password")]
-    Credentials,
-    /// The URL has no host.
-    #[error("URL has no host")]
-    NoHost,
-    /// The host is or resolved to a non-public address.
-    #[error("address {0} is not public")]
-    PrivateAddress(IpAddr),
-    /// The host name is reserved for local use.
-    #[error("host `{0}` is reserved for local use")]
-    LocalName(String),
-    /// Resolution returned no addresses.
-    #[error("host did not resolve")]
-    Unresolved,
-}
-
-/// Checks a URL when it is saved.
+/// Checks a URL when a hook is saved.
 ///
 /// # Errors
 ///
-/// [`EndpointError`] names the first rule the URL breaks.
-pub fn check_url(raw: &str, policy: Policy) -> Result<Url, EndpointError> {
-    let url = Url::parse(raw).map_err(|_| EndpointError::Invalid)?;
-    match (url.scheme(), policy) {
-        ("https", _) | ("http", Policy::AllowPrivate) => {}
-        (other, _) => return Err(EndpointError::Scheme(other.to_owned())),
+/// [`SsrfError`] names the first rule the URL breaks.
+pub fn check_url(raw: &str, policy: &UrlPolicy) -> Result<Url, SsrfError> {
+    let url = Url::parse(raw)?;
+    let trusted = url.host_str().is_some_and(|h| {
+        policy
+            .trusted_hosts
+            .iter()
+            .any(|t| t.eq_ignore_ascii_case(h))
+    });
+    if trusted {
+        // Trusted local receivers may use any port.
+        let mut relaxed = policy.clone();
+        relaxed.allowed_ports.extend(url.port());
+        relaxed.check_url(&url)?;
+    } else {
+        policy.check_url(&url)?;
     }
-    if !url.username().is_empty() || url.password().is_some() {
-        return Err(EndpointError::Credentials);
+    Ok(url)
+}
+
+/// An [`HttpTransport`] over `reqwest` with the guarded resolver.
+#[derive(Debug, Clone)]
+pub struct SafeTransport {
+    client: reqwest::Client,
+    policy: Arc<UrlPolicy>,
+}
+
+impl SafeTransport {
+    /// Builds the transport.
+    ///
+    /// # Errors
+    ///
+    /// [`SsrfError::Http`] if the TLS backend cannot initialise.
+    pub fn new(policy: UrlPolicy) -> Result<Self, SsrfError> {
+        let policy = Arc::new(policy);
+        let client = reqwest::Client::builder()
+            .no_proxy()
+            .dns_resolver(GuardedResolver::new(Arc::clone(&policy)))
+            .timeout(policy.timeout)
+            .connect_timeout(policy.timeout)
+            .https_only(!policy.allow_http)
+            .redirect(reqwest::redirect::Policy::none())
+            .user_agent(crate::webhook::USER_AGENT)
+            .build()?;
+        Ok(Self { client, policy })
     }
-    if policy == Policy::AllowPrivate {
-        return url.host().map(|_| url.clone()).ok_or(EndpointError::NoHost);
+}
+
+fn refused(error: &reqwest::Error) -> Option<String> {
+    let mut source: Option<&(dyn std::error::Error + 'static)> = Some(error);
+    while let Some(current) = source {
+        if let Some(ssrf) = current.downcast_ref::<SsrfError>() {
+            return Some(ssrf.to_string());
+        }
+        source = current.source();
     }
-    match url.host() {
-        None => Err(EndpointError::NoHost),
-        Some(Host::Ipv4(ip)) => check_ip(IpAddr::V4(ip)).map(|()| url.clone()),
-        Some(Host::Ipv6(ip)) => check_ip(IpAddr::V6(ip)).map(|()| url.clone()),
-        Some(Host::Domain(name)) => {
-            let lower = name.to_ascii_lowercase();
-            let local = ["localhost", "local", "internal", "localdomain", "home.arpa"]
-                .iter()
-                .any(|suffix| lower == *suffix || lower.ends_with(&format!(".{suffix}")));
-            if local || !lower.contains('.') {
-                Err(EndpointError::LocalName(lower))
-            } else {
-                Ok(url.clone())
-            }
+    None
+}
+
+impl HttpTransport for SafeTransport {
+    async fn post(&self, request: &OutboundRequest) -> Result<HttpResponse, TransportError> {
+        let _ = check_url(request.url.as_str(), &self.policy)
+            .map_err(|e| TransportError::Refused(e.to_string()))?;
+        let mut builder = self
+            .client
+            .post(request.url.clone())
+            .body(request.body.clone());
+        for (name, value) in &request.headers {
+            builder = builder.header(name, value);
+        }
+        match builder.send().await {
+            Ok(response) => Ok(HttpResponse {
+                status: response.status().as_u16(),
+                retry_after: response
+                    .headers()
+                    .get(reqwest::header::RETRY_AFTER)
+                    .and_then(|v| v.to_str().ok())
+                    .and_then(|v| v.trim().parse().ok()),
+            }),
+            Err(error) => Err(refused(&error).map_or_else(
+                || {
+                    if error.is_timeout() {
+                        TransportError::Timeout
+                    } else {
+                        TransportError::Connect(error.to_string())
+                    }
+                },
+                TransportError::Refused,
+            )),
         }
     }
-}
-
-/// Checks every resolved address right before connecting.
-///
-/// # Errors
-///
-/// [`EndpointError::PrivateAddress`] if any address is not public, and
-/// [`EndpointError::Unresolved`] if there are none.
-pub fn check_resolved(addrs: &[IpAddr], policy: Policy) -> Result<(), EndpointError> {
-    if addrs.is_empty() {
-        return Err(EndpointError::Unresolved);
-    }
-    if policy == Policy::AllowPrivate {
-        return Ok(());
-    }
-    addrs.iter().try_for_each(|ip| check_ip(*ip))
-}
-
-fn check_ip(ip: IpAddr) -> Result<(), EndpointError> {
-    if is_public(ip) {
-        Ok(())
-    } else {
-        Err(EndpointError::PrivateAddress(ip))
-    }
-}
-
-/// Whether an address is globally routable.
-#[must_use]
-pub fn is_public(ip: IpAddr) -> bool {
-    match ip {
-        IpAddr::V4(v4) => is_public_v4(v4),
-        IpAddr::V6(v6) => v6
-            .to_ipv4_mapped()
-            .map_or_else(|| is_public_v6(v6), is_public_v4),
-    }
-}
-
-fn is_public_v4(ip: Ipv4Addr) -> bool {
-    let [a, b, c, _] = ip.octets();
-    !(ip.is_unspecified()
-        || ip.is_loopback()
-        || ip.is_private()
-        || ip.is_link_local()
-        || ip.is_broadcast()
-        || ip.is_documentation()
-        || ip.is_multicast()
-        || a == 0
-        // 100.64.0.0/10 carrier-grade NAT
-        || (a == 100 && (64..128).contains(&b))
-        // 192.0.0.0/24 IETF protocol assignments
-        || (a == 192 && b == 0 && c == 0)
-        // 198.18.0.0/15 benchmarking
-        || (a == 198 && (b == 18 || b == 19))
-        // 240.0.0.0/4 reserved
-        || a >= 240)
-}
-
-fn is_public_v6(ip: Ipv6Addr) -> bool {
-    let first = ip.segments().first().copied().unwrap_or(0);
-    !(ip.is_unspecified()
-        || ip.is_loopback()
-        || ip.is_multicast()
-        // fc00::/7 unique local
-        || (first & 0xfe00) == 0xfc00
-        // fe80::/10 link local
-        || (first & 0xffc0) == 0xfe80
-        // 2001:db8::/32 documentation
-        || (first == 0x2001 && ip.segments().get(1) == Some(&0x0db8))
-        // 64:ff9b::/96 NAT64 can reach IPv4 private ranges
-        || first == 0x0064)
 }
 
 #[cfg(test)]
@@ -163,77 +143,28 @@ mod tests {
     use super::*;
 
     #[test]
-    fn strict_accepts_public_https() {
-        assert!(check_url("https://hooks.northstar.dev/vellum", Policy::Strict).is_ok());
-        assert!(check_url("https://8.8.8.8/x", Policy::Strict).is_ok());
-    }
-
-    #[test]
-    fn strict_refuses_local_targets() {
-        let cases = [
-            (
-                "http://hooks.northstar.dev",
-                EndpointError::Scheme("http".to_owned()),
-            ),
-            ("https://user:pw@northstar.dev", EndpointError::Credentials),
-            (
-                "https://localhost/x",
-                EndpointError::LocalName("localhost".to_owned()),
-            ),
-            (
-                "https://db.internal/x",
-                EndpointError::LocalName("db.internal".to_owned()),
-            ),
-            (
-                "https://intranet/x",
-                EndpointError::LocalName("intranet".to_owned()),
-            ),
-            (
-                "ftp://northstar.dev",
-                EndpointError::Scheme("ftp".to_owned()),
-            ),
-        ];
-        for (url, expected) in cases {
-            assert_eq!(check_url(url, Policy::Strict), Err(expected), "{url}");
-        }
-        for url in [
-            "https://127.0.0.1/",
-            "https://10.1.2.3/",
+    fn strict_policy() {
+        let strict = policy(&[]);
+        assert!(check_url("https://hooks.northstar.dev/vellum", &strict).is_ok());
+        assert!(check_url("https://hooks.northstar.dev:8443/v", &strict).is_ok());
+        for bad in [
+            "http://hooks.northstar.dev",
+            "https://hooks.northstar.dev:22/",
+            "https://user:pw@northstar.dev",
+            "https://localhost/x",
+            "https://10.0.0.1/",
             "https://169.254.169.254/latest/meta-data",
             "https://[::1]/",
-            "https://[fd00::1]/",
-            "https://[::ffff:10.0.0.1]/",
-            "https://100.64.0.1/",
+            "ftp://northstar.dev",
         ] {
-            assert!(
-                matches!(
-                    check_url(url, Policy::Strict),
-                    Err(EndpointError::PrivateAddress(_))
-                ),
-                "{url}"
-            );
+            assert!(check_url(bad, &strict).is_err(), "{bad}");
         }
     }
 
     #[test]
-    fn allow_private_is_for_laptops() {
-        assert!(check_url("http://localhost:8080/hook", Policy::AllowPrivate).is_ok());
-        assert!(check_url("ftp://localhost", Policy::AllowPrivate).is_err());
-    }
-
-    #[test]
-    fn resolved_addresses_are_rechecked() {
-        let public: IpAddr = Ipv4Addr::new(93, 184, 216, 34).into();
-        let private: IpAddr = Ipv4Addr::new(192, 168, 1, 1).into();
-        assert_eq!(check_resolved(&[public], Policy::Strict), Ok(()));
-        assert_eq!(
-            check_resolved(&[public, private], Policy::Strict),
-            Err(EndpointError::PrivateAddress(private))
-        );
-        assert_eq!(
-            check_resolved(&[], Policy::Strict),
-            Err(EndpointError::Unresolved)
-        );
-        assert_eq!(check_resolved(&[private], Policy::AllowPrivate), Ok(()));
+    fn trusted_local_receivers() {
+        let laptop = policy(&["localhost".to_owned()]);
+        assert!(check_url("http://localhost:8080/hook", &laptop).is_ok());
+        assert!(check_url("http://127.0.0.1:8080/hook", &laptop).is_err());
     }
 }

@@ -3136,6 +3136,7 @@ dependencies = [
  "hmac",
  "jiff",
  "p256",
+ "reqwest",
  "serde",
  "serde_json",
  "sha2",
@@ -3144,6 +3145,7 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
+ "vellum-security",
 ]
 
 [[package]]

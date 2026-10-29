@@ -11,7 +11,7 @@
 //! - **web push** goes out at once to every registered browser;
 //! - **email** waits [`Preferences::email_delay`] and is skipped if the
 //!   person has read the inbox entry by then, so an active user is not
-//!   emailed about what they already saw (D81).
+//!   emailed about what they already saw (D80).
 //!
 //! The caller passes only recipients who can read the subject; this
 //! module never widens access.
