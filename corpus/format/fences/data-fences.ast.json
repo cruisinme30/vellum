@@ -11,7 +11,7 @@
           "classes": [],
           "pairs": []
         },
-        "literal": "2026-10-01: Beta opens\n2026-11-24: General availability\n"
+        "literal": "2026-10-01 | Beta opens | Invite-only, Northstar design partners\n2026-11-24 | General availability\n"
       },
       {
         "type": "fence",
@@ -22,7 +22,7 @@
           "classes": [],
           "pairs": []
         },
-        "literal": "range: 2026-10 .. 2027-03\nReplay engine: 2026-10 .. 2026-12\nmilestone GA: 2026-11-24\n"
+        "literal": "range: 2026-10-01 .. 2027-03-31\nReplay engine | 2026-10-01 | 2026-12-15\nGA | 2026-11-24 | milestone\n"
       },
       {
         "type": "fence",
@@ -33,7 +33,7 @@
           "classes": [],
           "pairs": []
         },
-        "literal": "Data loss: likelihood 1, impact 5\nSlow search: likelihood 3, impact 2\n"
+        "literal": "Data loss | likelihood 1 | impact 5\nSlow search | likelihood 3 | impact 2\n"
       },
       {
         "type": "fence",
@@ -44,7 +44,7 @@
           "classes": [],
           "pairs": []
         },
-        "literal": "Todo: Write runbook\nDoing: Replay engine\nDone: Diff report\n"
+        "literal": "## Todo\n- Write runbook [P1]\n## Doing\n- Replay engine\n## Done\n- Diff report\n"
       },
       {
         "type": "fence",
@@ -66,7 +66,7 @@
           "classes": [],
           "pairs": []
         },
-        "literal": "lane Edge: Gateway\nlane Core: Policy engine, Audit log\nGateway -> Policy engine\nPolicy engine -> Audit log\n"
+        "literal": "Edge: Gateway\nCore: Policy engine, Audit log\nGateway -> Policy engine: checks\nPolicy engine -> Audit log\n"
       }
     ]
   },
