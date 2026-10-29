@@ -11,7 +11,7 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D31, D32, D33
+- Decisions: D31, D32, D33, D112, D119
 
 :::
 
@@ -37,6 +37,10 @@ full suite.
   and external link checks. Golden corpus, integration, contract,
   performance, chaos, security scans and the upgrade drill join it as
   their code lands.
+- Pull requests enter `develop` through a merge queue, which runs the
+  fast suite on each pull request on top of the ones ahead of it. With
+  many contributors merging automatically, this stops them racing and
+  stops two green pull requests combining into a red `develop`.
 - Consequence: the brief's "e2e and axe on every PR" becomes "on every PR
   into `main` and nightly". A regression can sit on `develop` for at most
   one night before the nightly run reports it.
@@ -49,11 +53,9 @@ full suite.
   covered by `REUSE.toml`. Copyright is held by "The Vellum contributors",
   each of whom signs the DCO.
 
-### D33: toolchain pins and the crate layering rule
+### D33: the Rust pin, crate layering and merging
 
-- Rust is pinned in `rust-toolchain.toml` (1.97.0). TypeScript stays on
-  6.0 and ESLint on 9 until `typescript-eslint` and `eslint-plugin-react`
-  support the next major versions; Dependabot proposes the upgrades.
+- Rust is pinned in `rust-toolchain.toml` (1.97.0).
 - Every crate declares a layer in `[package.metadata.vellum]`:
   kernel, contracts, foundation, engine, service, edge, app. A crate may
   depend only on strictly lower layers, so services can never reach into
@@ -67,6 +69,25 @@ full suite.
 - One pull request per feature. This supersedes the brief's "PRs under 400
   lines" rule: there is no size gate, and commits inside a pull request
   stay small and logical instead.
+
+### D112: web toolchain pins
+
+- TypeScript stays on 6.0 and ESLint on 9 until `typescript-eslint` and
+  `eslint-plugin-react` support the next major versions; Dependabot
+  proposes the upgrades.
+- This was first recorded under D33 and renumbered so that each decision
+  has one number.
+
+### D119: every change is traceable
+
+- Every pull request, except releases, Dependabot, `chore` and `ci`,
+  links a GitHub issue that holds the discussion behind it.
+- Every feature also adds or updates a decision record in `docs/adr/`
+  that links the issue, from `docs/adr/0000-template.md`, or names the
+  existing record it follows.
+- The fast suite enforces both, so the rule needs no extra required check.
+  The product owner asked for it on 2026-10-29 (#157), so that a feature's history
+  and the reasoning behind it can be found from the code.
 
 ## Gate inventory
 
@@ -84,6 +105,7 @@ full suite.
 | Secrets | fast | gitleaks |
 | Infrastructure | fast | sqlfluff, hadolint, helm lint, kube-score (when files exist) |
 | Commits and descriptions | fast | Conventional Commits, DCO, branch names, description template |
+| Traceability | fast | linked issue; decision record for features |
 
 ## Observability baseline
 

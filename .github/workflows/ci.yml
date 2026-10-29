@@ -1,8 +1,8 @@
 # SPDX-FileCopyrightText: 2026 The Vellum contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 
-# The fast suite: gates every pull request into develop (and is part of the
-# full suite for main). Branch protection requires the "Fast suite" check.
+# The fast suite: gates every pull request into develop, again in the merge
+# queue, and is part of the full suite for main. Branch protection requires the "Fast suite" check.
 name: Fast suite
 
 on:
@@ -11,6 +11,8 @@ on:
     types: [opened, synchronize, reopened, edited]
   push:
     branches: [develop]
+  # The merge queue tests each pull request on top of the ones ahead of it.
+  merge_group:
   workflow_call:
 
 permissions:
@@ -106,7 +108,7 @@ jobs:
       - name: YAML
         run: yamllint --strict .
       - name: Shell
-        run: shellcheck -x scripts/ci/*.sh .githooks/*
+        run: shellcheck -x scripts/*/*.sh .githooks/*
       - name: Markdown
         uses: DavidAnson/markdownlint-cli2-action@696eb3f2509270d7b882d2aa68347bc676e7af34 # v25.0.0
       - name: Prose (Vale)
@@ -124,6 +126,9 @@ jobs:
             --exclude-path LICENSES --exclude-path web/node_modules '**/*.md'
           fail: true
       - name: Secrets
+        # The pull request already scanned these commits; the action does
+        # not support merge queue events.
+        if: github.event_name != 'merge_group'
         uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -166,10 +171,35 @@ jobs:
           scripts/ci/check-commits.sh
           ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }}
 
+  traceability:
+    name: Issue and decision record
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Linked issue, and a decision record for features
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          TITLE: ${{ github.event.pull_request.title }}
+          BASE: ${{ github.event.pull_request.base.ref }}
+          AUTHOR_TYPE: ${{ github.event.pull_request.user.type }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: scripts/ci/check-traceability.sh
+
   fast-suite:
     name: Fast suite
     if: always()
-    needs: [rust, web, hygiene, commits]
+    needs: [rust, web, hygiene, commits, traceability]
     runs-on: ubuntu-24.04
     steps:
       - name: Every fast check passed or was not applicable
