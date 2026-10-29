@@ -11,7 +11,8 @@ on:
     types: [opened, synchronize, reopened, edited]
   push:
     branches: [develop]
-  # The merge queue tests each pull request on top of the ones ahead of it.
+  # Used if the repository moves to an organisation and enables the merge
+  # queue (scripts/admin/enable-merge-queue.sh).
   merge_group:
   workflow_call:
 
@@ -40,7 +41,7 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
         with:
-          tool: cargo-nextest,cargo-deny,cargo-audit
+          tool: cargo-nextest,cargo-deny,cargo-audit,mdbook
       - name: Format
         run: cargo fmt --all --check
       - name: Clippy
@@ -51,6 +52,8 @@ jobs:
         run: cargo nextest run --workspace --locked
       - name: Crate boundaries
         run: cargo xtask boundaries
+      - name: Help books and their corpus
+        run: cargo xtask help
       - name: Licences, bans, sources and advisories
         run: cargo deny --locked check
       - name: RustSec audit
@@ -109,6 +112,8 @@ jobs:
         run: yamllint --strict .
       - name: Shell
         run: shellcheck -x scripts/*/*.sh .githooks/*
+      - name: Decision records
+        run: scripts/ci/check-adrs.sh
       - name: Markdown
         uses: DavidAnson/markdownlint-cli2-action@696eb3f2509270d7b882d2aa68347bc676e7af34 # v25.0.0
       - name: Prose (Vale)
@@ -117,13 +122,14 @@ jobs:
         run: |
           base="https://github.com/errata-ai/vale/releases/download/v${VALE_VERSION}"
           curl -sSfL "${base}/vale_${VALE_VERSION}_Linux_64-bit.tar.gz" | tar -xz -C "${RUNNER_TEMP}" vale
-          "${RUNNER_TEMP}/vale" --glob='!{**/node_modules/**,target/**,LICENSES/**,LICENSE}' .
+          "${RUNNER_TEMP}/vale" --glob='!{**/node_modules/**,target/**,LICENSES/**,LICENSE,corpus/**}' .
       - name: Local links
         uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
           args: >-
             --offline --no-progress --include-fragments
-            --exclude-path LICENSES --exclude-path web/node_modules '**/*.md'
+            --exclude-path LICENSES --exclude-path web/node_modules
+            --exclude-path corpus '**/*.md'
           fail: true
       - name: Secrets
         # The pull request already scanned these commits; the action does

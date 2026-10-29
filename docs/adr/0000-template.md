@@ -10,36 +10,30 @@ vellum: 1
 ::: facts
 
 - Date: `YYYY-MM-DD`
-- Status: proposed, accepted, superseded by `ADR NNNN`, or rejected
+- Status: proposed, accepted, or superseded by `ADR NNNN`
 - Decisions: `DNN`, `DNN`
-- Issue: `#N`, the GitHub issue that holds the feature's discussion
+- Issue: `#N`
 - Pull requests: `#N`
 
 :::
 
 ## Context
 
-What problem the feature solves, which brief requirements it implements,
-and the constraints that shaped the choice. Summarise the discussion in
-the issue: the options people raised and the questions they asked.
-
-## Options considered
-
-- **Option A**: what it is, what it costs and why it was or was not chosen.
-- **Option B**: the same.
+Two to five sentences: the problem, the requirement it serves, and the
+constraint that shapes the answer.
 
 ## Decisions
 
 ### `DNN`: the decision in a few words
 
-- What was decided, stated so a reader can check the code against it.
-- Why, in one or two sentences.
+- What is decided, stated so the code can be checked against it.
+- Why, in one line.
+- Three to six bullets for each decision.
+
+## Alternatives
+
+- **Option**: why it was not chosen, in one line.
 
 ## Consequences
 
-What becomes easier, what becomes harder, and what to revisit later and
-when.
-
-## History
-
-- `YYYY-MM-DD`: accepted in `#N`.
+- What becomes easier or harder, and what to revisit later.

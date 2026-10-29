@@ -138,7 +138,7 @@ fn record(outcome: &str) {
 
 /// Merges the three versions; `None` is a conflict. Binary content only
 /// merges when one side left it unchanged.
-fn three_way(kind: MergeKind, base: &[u8], ours: &Bytes, theirs: &Bytes) -> Option<Bytes> {
+pub fn three_way(kind: MergeKind, base: &[u8], ours: &Bytes, theirs: &Bytes) -> Option<Bytes> {
     if ours == theirs || base == theirs.as_ref() {
         return Some(ours.clone());
     }

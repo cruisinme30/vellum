@@ -1,0 +1,81 @@
+{
+  "document": {
+    "front_matter": {
+      "fields": {
+        "id": "01JB9B1C3D5E7F9G1H3J5K7M9N",
+        "title": "Ops",
+        "vellum": 1
+      }
+    },
+    "blocks": [
+      {
+        "type": "list",
+        "start": null,
+        "tight": true,
+        "items": [
+          {
+            "task": false,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Renew TLS certificates due:2026-11-03 15:00 p2"
+                  }
+                ],
+                "id": null
+              }
+            ]
+          },
+          {
+            "task": false,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Check backup restore every!:2w"
+                  }
+                ],
+                "id": null
+              }
+            ]
+          },
+          {
+            "task": false,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Standup notes every:weekday 09:00"
+                  }
+                ],
+                "id": null
+              }
+            ]
+          },
+          {
+            "task": true,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Rotate the on-call schedule"
+                  }
+                ],
+                "id": null
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "diagnostics": []
+}

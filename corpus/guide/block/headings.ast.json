@@ -1,0 +1,72 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "heading",
+        "level": 1,
+        "content": [
+          {
+            "type": "text",
+            "text": "Page title"
+          }
+        ],
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null
+      },
+      {
+        "type": "heading",
+        "level": 2,
+        "content": [
+          {
+            "type": "text",
+            "text": "Section"
+          }
+        ],
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null
+      },
+      {
+        "type": "heading",
+        "level": 3,
+        "content": [
+          {
+            "type": "text",
+            "text": "Subsection"
+          }
+        ],
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null
+      },
+      {
+        "type": "heading",
+        "level": 4,
+        "content": [
+          {
+            "type": "text",
+            "text": "Minor heading"
+          }
+        ],
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null
+      }
+    ]
+  },
+  "diagnostics": []
+}

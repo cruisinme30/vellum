@@ -60,6 +60,14 @@ area/pages:
   - changed-files:
       - any-glob-to-any-file:
           - "crates/vellum-pages/**"
+area/drive:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-drive/**"
+area/books:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-books/**"
 area/work:
   - changed-files:
       - any-glob-to-any-file:
@@ -128,6 +136,9 @@ area/docs:
           - "docs/**"
           - "site/**"
           - "*.md"
+          - "crates/vellum-help/**"
+          - "xtask/src/help/**"
+          - "corpus/guide/**"
 area/deploy:
   - changed-files:
       - any-glob-to-any-file:
