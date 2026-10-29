@@ -98,5 +98,6 @@ and reach the issue core only through the `WorkCommands` port.
   raw routes rather than typed operations.
 - Webhook receivers written for other trackers must read
   `Vellum-Signature`; the timestamp-plus-HMAC shape is common.
-- HTTP routes and the `vellum-work` adapter follow once the gateway and
-  #207 merge.
+- `vellum_integrations::work::GraphWork` implements the port over the
+  engine; it dedupes intake by source link. HTTP routes follow the
+  gateway.
