@@ -3278,6 +3278,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "vellum-work-service"
+version = "0.0.0"
+dependencies = [
+ "bytes",
+ "futures",
+ "schemars",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "time",
+ "tokio",
+ "tracing",
+ "vellum-contracts",
+ "vellum-kernel",
+ "vellum-store",
+ "vellum-work",
+]
+
+[[package]]
 name = "wait-timeout"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
