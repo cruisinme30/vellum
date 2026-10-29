@@ -1,0 +1,38 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "container",
+        "name": "sidebar",
+        "arg": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "sections": [
+          [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Contents of a container this version does not know."
+                }
+              ],
+              "id": null
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "diagnostics": [
+    {
+      "line": 1,
+      "code": "unknown_container",
+      "message": "`::: sidebar` is not a Vellum container; its content is shown as is"
+    }
+  ]
+}

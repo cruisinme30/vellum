@@ -76,6 +76,7 @@ pub fn run() -> Result<(), String> {
         results.push((step.name, outcome));
     }
     results.push(("Crate boundaries", boundaries_outcome()));
+    results.push(("Help books and their corpus", help_outcome()));
 
     report(&results, started.elapsed().as_secs());
     if results
@@ -149,7 +150,7 @@ fn steps(base: Option<&str>, branch: Option<&str>) -> Vec<Step> {
             "Prose (Vale)",
             "vale",
             &[
-                "--glob=!{**/node_modules/**,target/**,LICENSES/**,LICENSE}",
+                "--glob=!{**/node_modules/**,target/**,LICENSES/**,LICENSE,corpus/**}",
                 ".",
             ],
         ),
@@ -164,6 +165,8 @@ fn steps(base: Option<&str>, branch: Option<&str>) -> Vec<Step> {
                 "LICENSES",
                 "--exclude-path",
                 "web/node_modules",
+                "--exclude-path",
+                "corpus",
                 "**/*.md",
             ],
         ),
@@ -233,6 +236,17 @@ fn execute(root: &Path, step: &Step) -> Outcome {
 fn boundaries_outcome() -> Outcome {
     progress("==> Crate boundaries");
     match crate::boundaries::run() {
+        Ok(()) => Outcome::Passed,
+        Err(message) => {
+            progress(&message);
+            Outcome::Failed
+        }
+    }
+}
+
+fn help_outcome() -> Outcome {
+    progress("==> Help books and their corpus");
+    match crate::help::run(None) {
         Ok(()) => Outcome::Passed,
         Err(message) => {
             progress(&message);

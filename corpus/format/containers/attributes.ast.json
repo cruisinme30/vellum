@@ -61,7 +61,7 @@
   },
   "diagnostics": [
     {
-      "line": 5,
+      "line": 7,
       "code": "unknown_container",
       "message": "`::: ` is not a Vellum container; its content is shown as is"
     }
