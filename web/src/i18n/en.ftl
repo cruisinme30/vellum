@@ -298,6 +298,83 @@ collection-no-dates = No dates
 collection-computed = Computed, read-only
 collection-body = Notes
 collection-close-row = Close row
+collection-close-panel = Close panel
+collection-delete-row = Delete row
+collection-confirm-delete-row = Delete “{ $title }”? Press again to confirm
+collection-properties = Properties
+collection-import = Import CSV
+collection-export = Export CSV
+collection-save = Save
+collection-new-view = New view
+collection-edit-view-button = Edit view
+collection-edit-view = Edit “{ $view }”
+collection-view-name = Name
+collection-view-layout = Layout
+collection-view-filters = Filters, one per line
+collection-view-filters-hint = Write a property, a test and a value, such as “Status is Done”, “Estimate > 3” or “Owner is empty”. Rows must match every line.
+collection-view-sorts = Sort by, one per line (add “desc” for largest or latest first)
+collection-view-group = Group by
+collection-view-date = Date
+collection-view-end = End date
+collection-view-hidden = Hidden properties
+collection-view-limit = Most rows to show
+collection-delete-view = Delete view
+collection-confirm-delete-view = Delete “{ $view }”? Press again to confirm
+collection-kind-table = Table
+collection-kind-board = Board
+collection-kind-gallery = Gallery
+collection-kind-calendar = Calendar
+collection-kind-timeline = Timeline
+collection-kind-list = List
+collection-property-name = Name ({ $type })
+collection-property-options = Options, separated by commas
+collection-property-formula = Formula
+collection-property-type = Type
+collection-new-property-name = Name
+collection-add-property = Add property
+collection-delete-property = Delete { $property }
+collection-confirm-delete-property = Delete { $property }? Press again to confirm
+collection-type-title = Title
+collection-type-text = Text
+collection-type-number = Number
+collection-type-select = Select
+collection-type-multi = Multi-select
+collection-type-person = Person
+collection-type-date = Date
+collection-type-checkbox = Checkbox
+collection-type-url = Link
+collection-type-relation = Relation
+collection-type-rollup = Rollup
+collection-type-formula = Formula
+collection-type-created = Created time
+collection-import-title = Import into { $collection }
+collection-import-intro = Columns are matched to properties by name. Check the file first to see what would be added; the import adds every row or none.
+collection-csv-file = CSV file
+collection-csv-paste = Or paste CSV text
+collection-csv-check = Check
+collection-csv-import = Import
+collection-csv-would-add =
+    { $rows ->
+        [one] One row would be added.
+       *[other] { $rows } rows would be added.
+    }
+collection-csv-added =
+    { $rows ->
+        [one] Added one row.
+       *[other] Added { $rows } rows.
+    }
+collection-csv-skipped = Ignored columns: { $columns }
+collection-new = New collection
+collection-new-title = Title
+collection-new-folder = Drive folder
+collection-new-csv-hint = Leave the CSV empty for a blank collection, or start from a file: its first column becomes the title and the other column types are guessed.
+collection-create = Create
+fence-collection-needs-id = Add an “id:” line with the collection’s ID to show its rows.
+fence-collection-caption =
+    { $total ->
+        [one] { $title }, { $view }: one row
+       *[other] { $title }, { $view }: { $total } rows
+    }
 
 ## Sign-in and first-run set-up
 

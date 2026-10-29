@@ -9,10 +9,21 @@ import {
   type MockRow,
   type MockSeed,
 } from "./mock-data";
+import {
+  addProperty,
+  collectionFromCsv,
+  csvOf,
+  csvRows,
+  deleteProperty,
+  deleteView,
+  embedQuery,
+  saveView,
+  updateProperty,
+} from "./mock-edits";
 import { computeRow, resolve, type MockWorld } from "./mock-engine";
 import { runQuery } from "./mock-query";
 import type { CollectionsStore } from "./store";
-import type { CollectionInfo, PropertyInfo, RowDetail, Value } from "./types";
+import type { CollectionInfo, CsvImported, PropertyInfo, RowDetail, Value } from "./types";
 import { EMPTY, isEmpty, list, plain, text, texts } from "./value";
 
 /** Checks that a value fits a property, as the server does on a write. */
@@ -69,11 +80,17 @@ export function createMockCollectionsStore(
   const rows = new Map<string, MockRow[]>(
     seed.collections.map((c) => [c.id, [...(seed.rows[c.id] ?? [])]]),
   );
-  const world: MockWorld = { collections: seed.collections, rows };
+  let collections: readonly MockCollection[] = seed.collections;
+  const world: MockWorld = {
+    get collections() {
+      return collections;
+    },
+    rows,
+  };
   const listeners = new Set<() => void>();
 
   const collectionOf = (id: string) => {
-    const collection = seed.collections.find((c) => c.id === id);
+    const collection = collections.find((c) => c.id === id);
     if (!collection) {
       throw new Error(`collection ${id} not found`);
     }
@@ -153,11 +170,43 @@ export function createMockCollectionsStore(
       listener();
     }
   };
+  /** Replaces a collection's schema, as a `schema.yaml` rewrite would. */
+  const edit = (id: string, change: (c: MockCollection) => MockCollection) =>
+    later(() => {
+      const next = change(collectionOf(id));
+      collections = collections.map((c) => (c.id === id ? next : c));
+      changed();
+      return strip(next);
+    });
+  /** Adds parsed CSV rows to a collection. */
+  const addRows = (collection: MockCollection, csv: string, write: boolean): CsvImported => {
+    const parsed = csvRows(collection, csv);
+    const added = parsed.rows.map((values): MockRow => ({
+      id: newPageId(),
+      values: { name: text(""), ...values },
+      body: "",
+    }));
+    if (write) {
+      rows.set(collection.id, [...(rows.get(collection.id) ?? []), ...added]);
+      changed();
+    }
+    return {
+      written: write,
+      rows: added.length,
+      skippedColumns: parsed.skipped,
+      diagnostics: [],
+      collection: strip(collection),
+      changed: {
+        written: write ? added.map((r) => ({ collection: collection.id, row: r.id })) : [],
+        deleted: [],
+      },
+    };
+  };
 
   return {
     list: () =>
       later(() => ({
-        collections: seed.collections
+        collections: collections
           .map((c) => ({
             id: c.id,
             title: c.title,
@@ -196,6 +245,68 @@ export function createMockCollectionsStore(
         return {
           row: detail(collection, rowOf(collection.id, row.id)),
           changed: { written: [{ collection: collection.id, row: row.id }], deleted: [] },
+        };
+      }),
+    deleteRow: (key) =>
+      later(() => {
+        const collection = collectionOf(key.collection_id);
+        const row = rowOf(collection.id, key.row_id);
+        for (const property of collection.properties) {
+          mirror(property, row.id, row.values[property.key], EMPTY);
+        }
+        rows.set(
+          collection.id,
+          (rows.get(collection.id) ?? []).filter((r) => r.id !== row.id),
+        );
+        changed();
+        return {
+          changed: { written: [], deleted: [{ collection: collection.id, row: row.id }] },
+        };
+      }),
+    saveView: (input) => edit(input.collection_id, (c) => saveView(c, input)),
+    deleteView: (key) => edit(key.collection_id, (c) => deleteView(c, key.view)),
+    addProperty: (input) => edit(input.collection_id, (c) => addProperty(c, input)),
+    updateProperty: (input) => edit(input.collection_id, (c) => updateProperty(c, input)),
+    deleteProperty: (key) => edit(key.collection_id, (c) => deleteProperty(c, key.key)),
+    exportCsv: (input) =>
+      later(() => {
+        const collection = collectionOf(input.collection_id);
+        const result = runQuery(world, collection, {
+          ...input,
+          limit: Number.MAX_SAFE_INTEGER,
+        });
+        const stem =
+          input.view === undefined ? collection.title : `${collection.title} - ${result.view}`;
+        return { fileName: `${stem}.csv`, csv: csvOf(result) };
+      }),
+    importCsv: (input) =>
+      later(() => addRows(collectionOf(input.collection_id), input.csv, input.dry_run !== true)),
+    createFromCsv: (input) =>
+      later(() => {
+        const title = input.title.trim();
+        if (title === "") {
+          throw new Error("a collection needs a title");
+        }
+        if (collections.some((c) => c.title.toLowerCase() === title.toLowerCase())) {
+          throw new Error(`a collection named ${JSON.stringify(title)} is already there`);
+        }
+        const collection = collectionFromCsv(newPageId(), title, input.folder, input.csv);
+        const write = input.dry_run !== true;
+        if (write) {
+          collections = [...collections, collection];
+          rows.set(collection.id, []);
+        }
+        return addRows(collection, input.csv, write);
+      }),
+    embed: (fence) =>
+      later(() => {
+        const query = embedQuery(fence);
+        const collection = collectionOf(query.collection_id);
+        return {
+          collectionId: collection.id,
+          title: collection.title,
+          path: collection.path,
+          result: runQuery(world, collection, query),
         };
       }),
     subscribe(listener) {

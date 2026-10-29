@@ -47,6 +47,39 @@ test("the row panel has no WCAG 2.2 AA violations", async ({ page }) => {
   await expectNoViolations(page);
 });
 
+for (const [name, path, button, dialog] of [
+  ["view editor", `${ISSUES}?view=Board`, "Edit view", "Edit “Board”"],
+  ["new view panel", ISSUES, "New view", "New view"],
+  ["properties panel", ISSUES, "Properties", "Properties"],
+  ["CSV import panel", ISSUES, "Import CSV", "Import into Issues"],
+  ["new collection panel", "/data", "New collection", "New collection"],
+] as const) {
+  test(`the ${name} has no WCAG 2.2 AA violations and fits the screen`, async ({ page }) => {
+    await page.goto(path);
+    await page.getByRole("button", { name: button, exact: true }).click();
+    const panel = page.getByRole("dialog", { name: dialog });
+    await expect(panel).toBeVisible();
+    const box = await panel.boundingBox();
+    expect(box && box.x + box.width).toBeLessThanOrEqual(1366);
+    await expectNoViolations(page);
+  });
+}
+
+test("a view made in the editor becomes a tab", async ({ page }) => {
+  await page.goto(ISSUES);
+  await page.getByRole("button", { name: "New view", exact: true }).click();
+  const panel = page.getByRole("dialog", { name: "New view" });
+  await panel.getByLabel("Name").fill("Blocked work");
+  await panel.getByLabel("Layout").selectOption("board");
+  await panel.getByLabel("Group by").selectOption("status");
+  await panel.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("tab", { name: "Blocked work" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(page.getByRole("region").first()).toBeVisible();
+});
+
 test("a table cell is edited from the keyboard", async ({ page }) => {
   await page.goto(ISSUES);
   const grid = page.getByRole("grid", { name: "All issues" });

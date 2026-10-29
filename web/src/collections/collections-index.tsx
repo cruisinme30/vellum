@@ -1,21 +1,37 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { Link } from "react-router";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router";
 
 import { useT } from "../i18n/i18n";
 import { Icon } from "../shell/icon";
 
 import { useLoad } from "./context";
+import { defaultFolder, NewCollectionPanel } from "./csv-panels";
 
 /** Data: every collection the user can read. */
 export function CollectionsIndexView() {
   const t = useT();
   const list = useLoad("collections", (store) => store.list());
   const collections = list.data?.collections;
+  const [creating, setCreating] = useState(false);
+  const navigate = useNavigate();
   return (
     <div className="vl-view">
-      <h1>{t("nav-data")}</h1>
+      <div className="vl-collection-head">
+        <h1>{t("nav-data")}</h1>
+        <button
+          type="button"
+          className="vl-filled-button"
+          onClick={() => {
+            setCreating(true);
+          }}
+        >
+          <Icon name="add" size={20} />
+          {t("collection-new")}
+        </button>
+      </div>
       <p className="vl-muted">{t("collections-intro")}</p>
       {list.error !== undefined && (
         <p className="vl-field-error" role="alert">
@@ -49,6 +65,18 @@ export function CollectionsIndexView() {
             </li>
           ))}
         </ul>
+      )}
+      {creating && (
+        <NewCollectionPanel
+          folder={defaultFolder(collections?.map((c) => c.path) ?? [])}
+          onCreated={(id) => {
+            setCreating(false);
+            void navigate(`/data/${id}`);
+          }}
+          onClose={() => {
+            setCreating(false);
+          }}
+        />
       )}
     </div>
   );
