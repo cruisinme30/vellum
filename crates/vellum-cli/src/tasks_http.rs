@@ -40,7 +40,7 @@ pub fn routers(tasks: &Arc<TasksService>, identity: &Arc<Identity>) -> Vec<(&'st
         tasks: Arc::clone(tasks),
         identity: Arc::clone(identity),
     };
-    ["/feeds", "/dav", "/capture"]
+    ["/feeds", "/dav", "/capture", "/connect"]
         .into_iter()
         .map(|prefix| {
             let router = Router::new()
@@ -114,6 +114,7 @@ async fn handle(
     let raw = RawRequest {
         method,
         path,
+        query: uri.query().unwrap_or_default().to_owned(),
         headers,
         body: body.to_vec(),
         principal,

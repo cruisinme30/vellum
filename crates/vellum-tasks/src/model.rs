@@ -17,6 +17,7 @@ use vellum_kernel::{BlockId, CommentId, DocId, IssueId};
 
 use crate::attrs::Attrs;
 use crate::recur::{RRule, RRuleError};
+use crate::timeblock::TimeBlock;
 
 /// A deadline: a whole day, or a day and a time of day.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -263,6 +264,8 @@ pub struct TaskFields {
     pub start: Option<Date>,
     /// The deadline, with an optional time (R-MW-2).
     pub due: Option<Due>,
+    /// A stretch of time set aside for it (R-MW-9).
+    pub block: Option<TimeBlock>,
     /// The repeat schedule (R-MW-4).
     pub recurrence: Option<Recurrence>,
     /// Reminders (R-MW-5).
@@ -276,6 +279,8 @@ pub struct TaskFields {
     /// Where an imported or captured task came from, such as
     /// `todoist:6Xr8`, so a re-import skips it.
     pub src: Option<String>,
+    /// The Google Calendar event that shows its time block.
+    pub event: Option<String>,
 }
 
 fn split_list(value: &str) -> impl Iterator<Item = &str> {
@@ -300,6 +305,8 @@ impl TaskFields {
                 })
                 .transpose()?,
             due: attrs.get("due").map(str::parse).transpose()?,
+            block: attrs.get("block").map(str::parse).transpose()?,
+            event: attrs.get("gcal").map(str::to_owned),
             ..Self::default()
         };
         if let Some(rule) = attrs.get("rrule") {
@@ -345,6 +352,7 @@ impl TaskFields {
         attrs.set_opt("when", self.when.map(When::as_str));
         attrs.set_opt("start", self.start.map(|d| d.to_string()));
         attrs.set_opt("due", self.due.map(|d| d.to_string()));
+        attrs.set_opt("block", self.block.map(|b| b.to_string()));
         attrs.set_opt(
             "rrule",
             self.recurrence.as_ref().map(|r| r.rule.to_string()),
@@ -366,6 +374,7 @@ impl TaskFields {
                 .map(|t| t.strftime("%Y-%m-%dT%H:%M:%SZ").to_string()),
         );
         attrs.set_opt("src", self.src.clone());
+        attrs.set_opt("gcal", self.event.clone());
         attrs.canonicalise();
     }
 }

@@ -30,10 +30,12 @@ use vellum_drive::{Drive, DriveIndex, DriveService};
 use vellum_identity::Identity;
 use vellum_kernel::{Config, Error, ErrorKind, UserId};
 use vellum_store::{BlobPath, BlobStore, LocalStore};
+use vellum_tasks::google::Google;
 use vellum_tasks::service::{Config as TasksConfig, TasksService};
 use vellum_work::{UserRef, WorkEvent};
 use vellum_work_service::{Directory, EventSink, SystemClock, WorkService};
 
+use crate::google_http::{self, Endpoints, FileLinks, GoogleHttp};
 use crate::reindex::{KEY_VAR, index_key};
 use crate::tasks::{DriveTasks, Parts, TasksSettings};
 
@@ -42,6 +44,9 @@ pub const MAIL_DOMAIN_VAR: &str = "VELLUM_MAIL_DOMAIN";
 
 /// The Slack app's signing secret, for capture from Slack.
 pub const SLACK_SECRET_VAR: &str = "VELLUM_SLACK_SIGNING_SECRET";
+
+/// How often time blocks sync with Google Calendar.
+const GOOGLE_SYNC_EVERY: Duration = Duration::from_mins(5);
 
 /// Variable that opens the SQLite index without encryption.
 pub const PLAINTEXT_VAR: &str = "VELLUM_INDEX_PLAINTEXT";
@@ -163,6 +168,8 @@ pub struct TasksSetup {
     pub settings: TasksSettings,
     /// The service's settings.
     pub config: TasksConfig,
+    /// The Google `OAuth` client (ID and secret), for time-blocking.
+    pub google: Option<(String, String)>,
 }
 
 impl TasksSetup {
@@ -188,6 +195,9 @@ impl TasksSetup {
                     .filter(|s| !s.is_empty())
                     .map(String::into_bytes),
             },
+            google: var(google_http::CLIENT_ID_VAR)
+                .filter(|s| !s.is_empty())
+                .zip(var(google_http::CLIENT_SECRET_VAR).filter(|s| !s.is_empty())),
         }
     }
 }
@@ -251,7 +261,13 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
         },
         &setup.settings,
     )?;
-    let tasks = Arc::new(TasksService::new(Arc::new(adapter), setup.config));
+    let mut tasks = TasksService::new(Arc::new(adapter), setup.config);
+    if let Some((id, secret)) = setup.google {
+        let api = GoogleHttp::new(Endpoints::google()?, id.clone(), secret)?;
+        let links = FileLinks::new(setup.settings.dir.map(|d| d.join("google")));
+        tasks = tasks.with_google(Google::new(Arc::new(api), Arc::new(links), id));
+    }
+    let tasks = Arc::new(tasks);
     Ok(Workspace {
         services: vec![
             Arc::new(DriveService::new(Arc::clone(&drive))),
@@ -325,6 +341,17 @@ pub async fn open(
             match load_spaces(drive_index.as_ref()).await {
                 Ok(list) => refresh.replace(list),
                 Err(error) => tracing::warn!(%error, "space list not refreshed"),
+            }
+        }
+    }));
+    let timer = Arc::clone(&workspace.tasks);
+    drop(tokio::spawn(async move {
+        let mut tick = tokio::time::interval(GOOGLE_SYNC_EVERY);
+        tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        loop {
+            let _ = tick.tick().await;
+            if let Err(error) = timer.google_sync_all().await {
+                tracing::warn!(%error, "Google Calendar sync skipped");
             }
         }
     }));

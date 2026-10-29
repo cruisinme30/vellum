@@ -12,6 +12,9 @@
 //! device's key for end-to-end encrypted private spaces.
 
 mod docs;
+mod google_http;
+#[cfg(test)]
+mod google_http_tests;
 mod identity;
 #[cfg(test)]
 mod identity_tests;

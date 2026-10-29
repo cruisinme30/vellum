@@ -8937,6 +8937,7 @@ dependencies = [
  "http",
  "http-body-util",
  "jiff",
+ "reqwest",
  "serde",
  "serde_json",
  "serde_urlencoded",
