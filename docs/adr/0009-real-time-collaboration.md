@@ -12,7 +12,7 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D55, D56, D57
-- Issue: [#97](https://github.com/cruisinme30/vellum/issues/97), [#294](https://github.com/cruisinme30/vellum/issues/294)
+- Issue: [#97](https://github.com/cruisinme30/vellum/issues/97), [#235](https://github.com/cruisinme30/vellum/issues/235), [#294](https://github.com/cruisinme30/vellum/issues/294)
 - Pull requests: [#217](https://github.com/cruisinme30/vellum/pull/217), [#302](https://github.com/cruisinme30/vellum/pull/302)
 
 :::
@@ -51,6 +51,10 @@ flowchart LR
 - The server converts the tree to and from Markdown only through the
   `MarkdownCodec` port, whose adapter is the `vellum-format` parser and
   canonical serializer. The room never writes Markdown of its own.
+- The node schema is fixed in `vellum_collab::markdown`: `ProseMirror`
+  names (`paragraph`, `heading`, `bullet_list`, `code_block`, marks `em`,
+  `strong`, `link`) plus one node per dialect construct. Every corpus file
+  keeps its exact AST through the tree.
 - The wire is the stock `Yjs` sync and awareness protocol, so the editor
   uses the unmodified `y-prosemirror` binding.
 - Three messages use the custom tag range: `100` sets the `traceparent`
