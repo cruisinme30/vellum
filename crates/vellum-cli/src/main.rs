@@ -7,10 +7,11 @@
 //! with every service registered in [`services`]; `vellum openapi` and
 //! `vellum graphql-schema` print the API contracts the clients are
 //! generated from. `vellum docs` reads the help books built into the
-//! binary. Further subcommands (`reindex`, `mcp`) arrive with their
-//! workstreams.
+//! binary; `vellum mcp` serves the MCP server over stdio. Further
+//! subcommands (`reindex` and the rest) arrive with their workstreams.
 
 mod docs;
+mod mcp;
 mod serve;
 mod services;
 
@@ -33,6 +34,8 @@ struct Cli {
 enum Command {
     /// Read the user, admin and developer guides built into this binary.
     Docs(docs::DocsArgs),
+    /// Serve the MCP server over stdio for a local AI client.
+    Mcp(mcp::McpArgs),
     /// Runs the server: every service behind the gateway.
     Serve {
         /// The configuration file (default: `VELLUM_CONFIG`, then built-in
@@ -90,6 +93,16 @@ fn main() -> ExitCode {
             Ok(()) => ExitCode::SUCCESS,
             Err(error) => fail(&format_args!("docs: {error}")),
         },
+        Command::Mcp(args) => {
+            let telemetry_config = TelemetryConfig::from_env("vellum", env!("CARGO_PKG_VERSION"));
+            let _guard = match telemetry::init(&telemetry_config) {
+                Ok(guard) => guard,
+                Err(error) => return fail(&error),
+            };
+            let span = tracing::info_span!("vellum.cli", version = env!("CARGO_PKG_VERSION"));
+            let _entered = span.enter();
+            mcp::run(&args)
+        }
         Command::Openapi => match services::contract_gateway() {
             Ok(gateway) => {
                 print(&serde_json::to_string_pretty(gateway.openapi()).unwrap_or_default())

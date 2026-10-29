@@ -90,3 +90,33 @@ fn serves_health_checks() {
     let _ = std::fs::remove_dir_all(&data);
     assert!(reply.starts_with("HTTP/1.1 200"), "{reply}");
 }
+
+#[test]
+fn mcp_demo_answers_discover_over_stdio() {
+    use std::io::Write as _;
+    use std::process::Stdio;
+
+    let mut child = vellum()
+        .args(["mcp", "--demo"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
+    let request = r#"{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}"#;
+    let mut stdin = child.stdin.take().unwrap();
+    writeln!(stdin, "{request}").unwrap();
+    drop(stdin);
+    let output = child.wait_with_output().unwrap();
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        stdout.contains(r#""supportedVersions":["2026-07-28","2025-11-25"]"#),
+        "{stdout}"
+    );
+    assert_eq!(
+        stdout.lines().count(),
+        1,
+        "stdout carries only MCP messages"
+    );
+}

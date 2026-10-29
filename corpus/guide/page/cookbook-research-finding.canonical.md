@@ -10,9 +10,11 @@ vellum: 1
 ---
 
 ::: facts
+
 - Interviews: 7 of 9
 - Confidence: high
 - Segment: regulated enterprises
+
 :::
 
 > We only shortlisted gateways that could show us every blocked

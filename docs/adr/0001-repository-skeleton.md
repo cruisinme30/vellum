@@ -37,10 +37,14 @@ full suite.
   and external link checks. Golden corpus, integration, contract,
   performance, chaos, security scans and the upgrade drill join it as
   their code lands.
-- Pull requests enter `develop` through a merge queue, which runs the
-  fast suite on each pull request on top of the ones ahead of it. With
-  many contributors merging automatically, this stops them racing and
-  stops two green pull requests combining into a red `develop`.
+- Pull requests auto-merge into `develop` once their fast suite is
+  green. GitHub merge queues need a repository owned by an organisation,
+  so pull requests are not re-tested on top of each other. Instead, the
+  fast suite runs on every push to `develop`, and a failure there opens a
+  "develop is red" issue that holds other merges until it is fixed.
+  Moving the repository to an organisation would allow the merge queue.
+- Releases are cut from a frozen branch, `chore/release-YYYY-MM-DD`,
+  because `develop` moves faster than the full suite runs.
 - Consequence: the brief's "e2e and axe on every PR" becomes "on every PR
   into `main` and nightly". A regression can sit on `develop` for at most
   one night before the nightly run reports it.
