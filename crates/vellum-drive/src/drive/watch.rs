@@ -33,8 +33,12 @@ impl Drive {
             let mut moving: HashSet<ObjectId> = HashSet::new();
             for change in changes {
                 // Sibling order is read from its file when listing, so a
-                // changed order file needs no rescan (D169).
-                if changed_path(change).file_name() == layout::ORDER_FILE {
+                // changed order file needs no rescan (D169). Uploaded files
+                // are not in the index at all (D211).
+                let path = changed_path(change);
+                if path.file_name() == layout::ORDER_FILE
+                    || vellum_store::layout::in_attachments(path)
+                {
                     continue;
                 }
                 match change {
