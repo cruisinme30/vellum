@@ -8,6 +8,8 @@
 //! Each adapter is a module behind its own cargo feature, so a deployment
 //! compiles only the backends it uses.
 
+#[cfg(feature = "dropbox")]
+pub mod dropbox;
 mod oauth;
 
 use std::{fmt, time::Duration};
@@ -15,6 +17,8 @@ use std::{fmt, time::Duration};
 use bytes::Bytes;
 use reqwest::{RequestBuilder, Response, StatusCode, header::RETRY_AFTER};
 
+#[cfg(feature = "dropbox")]
+pub use dropbox::{DropboxConfig, DropboxStore};
 pub use oauth::{RefreshToken, StaticToken, TokenSource};
 
 use crate::{

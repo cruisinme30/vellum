@@ -24,6 +24,8 @@ conformance = []
 git = ["tokio/process", "tokio/fs", "tokio/io-util"]
 # Remote adapters, one feature each. `remote` is their shared HTTP layer.
 remote = ["dep:reqwest", "dep:serde", "dep:serde_json"]
+# Dropbox, on the Dropbox API v2.
+dropbox = ["remote"]
 
 [dependencies]
 async-trait = "0.1.92"
@@ -48,4 +50,4 @@ axum = { version = "0.8.9", default-features = false, features = ["http1", "toki
 proptest = ">=1.11.0, <1.12"
 tempfile = "3.27.0"
 tokio = { version = "1.49.0", features = ["macros", "rt-multi-thread"] }
-vellum-store = { path = ".", features = ["conformance", "git"] }
+vellum-store = { path = ".", features = ["conformance", "git", "dropbox"] }
