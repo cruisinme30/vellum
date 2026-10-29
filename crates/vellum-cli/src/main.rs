@@ -4,8 +4,9 @@
 //! The `vellum` binary.
 //!
 //! One binary runs every Vellum service. Subcommands (`serve`, `reindex`,
-//! `mcp` and the rest) arrive with their workstreams. `vellum docs` reads
-//! the help books built into the binary.
+//! and the rest) arrive with their workstreams. `vellum docs` reads the
+//! help books built into the binary; `vellum mcp` serves the MCP server
+//! over stdio.
 
 use std::process::ExitCode;
 
@@ -13,6 +14,7 @@ use clap::{Parser, Subcommand};
 use vellum_kernel::telemetry::{self, TelemetryConfig};
 
 mod docs;
+mod mcp;
 
 /// Vellum: a self-hosted workspace where every object is a Markdown file.
 #[derive(Debug, Parser)]
@@ -27,6 +29,8 @@ struct Cli {
 enum Command {
     /// Read the user, admin and developer guides built into this binary.
     Docs(docs::DocsArgs),
+    /// Serve the MCP server over stdio for a local AI client.
+    Mcp(mcp::McpArgs),
 }
 
 fn main() -> ExitCode {
@@ -59,6 +63,11 @@ fn main() -> ExitCode {
     };
     let span = tracing::info_span!("vellum.cli", version = env!("CARGO_PKG_VERSION"));
     let _entered = span.enter();
-    tracing::info!("vellum started; no command given");
-    ExitCode::SUCCESS
+    match cli.command {
+        Some(Command::Mcp(args)) => mcp::run(&args),
+        Some(Command::Docs(_)) | None => {
+            tracing::info!("vellum started; no command given");
+            ExitCode::SUCCESS
+        }
+    }
 }

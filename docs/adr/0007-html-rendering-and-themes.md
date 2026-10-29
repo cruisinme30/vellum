@@ -12,7 +12,8 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D49, D50, D51
-- Issues: #73, #75, #76, #77, #81 (and the server side of #79)
+- Issue: #73, #75, #76, #77, #81 (and the server side of #79)
+- Pull request: #241
 
 :::
 
@@ -103,6 +104,3 @@ flowchart LR
   sortable tables, calculators) render a correct static version and leave
   `data-*` hooks for the web client to hydrate.
 
-## History
-
-- 2026-10-29: accepted with the first render pull request.

@@ -247,6 +247,16 @@ define_ids! {
     TeamId typed;
     /// An issue. Its human key (`ENG-142`) is separate and can change.
     IssueId typed;
+    /// A Work project, which groups issues across teams.
+    ProjectId typed;
+    /// A milestone inside a Work project.
+    MilestoneId typed;
+    /// A project update (a health report with notes).
+    ProjectUpdateId typed;
+    /// A Work initiative, which groups projects.
+    InitiativeId typed;
+    /// A saved view of issues.
+    ViewId typed;
     /// A comment on a document or issue.
     CommentId typed;
     /// A stored version of a document.
