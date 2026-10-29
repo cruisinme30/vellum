@@ -217,9 +217,11 @@ async fn redirects_never_lead_to_a_trusted_host() {
     let result = client
         .get_trusted_bytes(&format!("http://localhost:{port}/"))
         .await;
+    // Report only the size of what came back, never the body itself.
     assert!(
         result.is_err(),
-        "followed a redirect to a trusted host: {result:?}"
+        "followed a redirect to a trusted host ({:?} bytes)",
+        result.map(|body| body.len())
     );
 }
 
