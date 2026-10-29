@@ -5,8 +5,9 @@
 # The weekly chaos test (ADR 0022, D96) on a kind cluster that already runs
 # the Zalando Postgres Operator and Chaos Mesh, with the images vellum:ci
 # and vellum-minio:ci loaded. Under load, it kills a Vellum node, a Kroki
-# pod and the Postgres primary, then asserts that the SLO thresholds held
-# and that every acknowledged write can be read back.
+# pod and the Postgres primary, restarts the blob store and slows the
+# database (D255), then asserts that the SLO thresholds held and that every
+# acknowledged write can be read back.
 #
 #   deploy/chaos/run.sh
 set -euo pipefail
@@ -14,8 +15,8 @@ set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo="$(cd "${here}/../.." && pwd)"
 K6_IMAGE="${K6_IMAGE:-grafana/k6:2.3.0@sha256:2dd4756ec6e14e62778916e1eb850108e4b499304c02df56760fa0bdb0fba0b8}"
-DURATION="${DURATION:-12m}"
-GAP="${GAP:-150}"
+DURATION="${DURATION:-15m}"
+GAP="${GAP:-140}"
 base_url="http://vellum.default.svc"
 work="$(mktemp -d)"
 
@@ -73,7 +74,8 @@ echo "Starting load (${DURATION}) and the acknowledged-write log."
 k6_job chaos-load suite.js "SCALE=0.05" "DURATION=${DURATION}" "PAGES=100"
 k6_job chaos-writes writes.js "DURATION=${DURATION}"
 
-for experiment in kill-vellum-node kill-kroki kill-postgres-primary; do
+experiments=(kill-vellum-node kill-kroki kill-postgres-primary restart-blob-store slow-postgres)
+for experiment in "${experiments[@]}"; do
   sleep "${GAP}"
   echo "Fault: ${experiment}"
   yq "select(.metadata.name == \"${experiment}\")" "${here}/experiments.yaml" | kubectl apply -f -

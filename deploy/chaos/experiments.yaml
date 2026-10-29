@@ -2,8 +2,11 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 #
 # The weekly faults, applied one at a time by run.sh while k6 runs: a
-# Vellum node (and the collab rooms on it), a Kroki pod, and the Postgres
-# primary, which forces a Patroni failover to the synchronous replica.
+# Vellum node (and the collab rooms on it), a Kroki pod, the Postgres
+# primary, which forces a Patroni failover to the synchronous replica, a
+# blob store restart, and a slow database (ADR 0022, D255). Vellum keeps
+# shared counters and leases in Postgres, not Redis (ADR 0040), so the
+# database faults cover what a Redis fault would elsewhere.
 apiVersion: chaos-mesh.org/v1alpha1
 kind: PodChaos
 metadata:
@@ -37,3 +40,37 @@ spec:
     labelSelectors:
       application: spilo
       spilo-role: master
+---
+# The blob store goes away for the few seconds its container takes to
+# restart. Killing the container, not the pod, keeps MinIO's emptyDir, so
+# an acknowledged blob is still there afterwards.
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: restart-blob-store
+spec:
+  action: container-kill
+  mode: one
+  containerNames: [minio]
+  selector:
+    labelSelectors:
+      app: minio
+---
+# Every packet to and from the Postgres primary waits 40 ms (give or take
+# 10) for 90 seconds: a congested network or a busy disk.
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: slow-postgres
+spec:
+  action: delay
+  mode: all
+  selector:
+    labelSelectors:
+      application: spilo
+      spilo-role: master
+  delay:
+    latency: 40ms
+    jitter: 10ms
+    correlation: "25"
+  duration: 90s
