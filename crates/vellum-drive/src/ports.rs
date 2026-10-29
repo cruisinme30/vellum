@@ -10,6 +10,7 @@
 //! tests and the zero-config binary; SQL and `vellum-authz` adapters are
 //! wired in by the server.
 
+use std::collections::BTreeSet;
 use std::fmt;
 
 use async_trait::async_trait;
@@ -117,6 +118,9 @@ pub trait Access: Send + Sync + fmt::Debug {
     async fn tree_changed(&self, space: SpaceId, nodes: &[ObjectId]) -> DriveResult<()>;
     /// Gives the creator of a node ownership of it.
     async fn grant_owner(&self, user: UserId, space: SpaceId, node: ObjectId) -> DriveResult<()>;
+    /// Every group `user` belongs to right now, nested groups included,
+    /// by group ID. Book sections restricted to `group:<ID>` use it.
+    async fn groups_of(&self, user: UserId) -> DriveResult<BTreeSet<ObjectId>>;
 }
 
 /// The source of the current time, replaceable in tests.

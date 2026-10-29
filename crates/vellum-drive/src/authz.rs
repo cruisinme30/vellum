@@ -10,7 +10,7 @@
 //! Owners are `owner` tuples written as Vellum itself, since a creator has
 //! no access yet to grant from.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fmt;
 use std::sync::Arc;
 
@@ -161,6 +161,18 @@ impl<S: AuthzStore + TreeSync + 'static> Access for AuthzAccess<S> {
             .await
             .map_err(access_error)?;
         Ok(())
+    }
+
+    async fn groups_of(&self, user: UserId) -> DriveResult<BTreeSet<ObjectId>> {
+        let groups = self
+            .authz
+            .groups_of(principal(user))
+            .await
+            .map_err(access_error)?;
+        Ok(groups
+            .into_iter()
+            .map(|g| ObjectId::from_u128(g.0))
+            .collect())
     }
 }
 
