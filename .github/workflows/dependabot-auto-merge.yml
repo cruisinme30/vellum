@@ -4,7 +4,7 @@
 # Turns on auto-merge (squash) for Dependabot's patch updates (ADR 0032,
 # D127). The pull request still merges only once every required check is
 # green; minor and major updates wait for a person.
-name: Dependabot auto-merge
+name: "PR: auto-merge Dependabot patches"
 
 on:
   pull_request:

@@ -39,7 +39,7 @@ gitGraph
    auto-merge** on GitHub. The pull request squash-merges itself once
    **Fast suite** is green. Pull requests are not re-tested on top of each
    other, so the fast suite also runs on every push to `develop`. When
-   it fails there, the **Develop health** workflow opens a
+   it fails there, the **Repo: develop is red alarm** workflow opens a
    "develop is red" issue. Whoever merged the breaking change fixes or
    reverts it, others hold their merges, and the issue closes itself
    when `develop` is green again. If `Cargo.lock` or `web/pnpm-lock.yaml`
@@ -132,6 +132,27 @@ cd web && UI_SITE_DIR=../_site pnpm exec playwright test e2e/ui
 `UI_SCOPE=full` (the release check) adds every help page in the default
 mode; `UI_SCOPE=exhaustive` checks every help page in every mode. Visual baselines are refreshed with `scripts/ci/ui-baselines.sh`.
 
+## Workflows
+
+Each workflow name starts with a word that says when it runs, so related
+ones sit together in the Actions tab. The required checks are job names
+(`Fast suite`, `Labels`, `Full suite`, CodeQL) and do not change when a
+workflow is renamed.
+
+| Workflow | File | Runs on |
+| --- | --- | --- |
+| Checks: fast suite | `ci.yml` | pull requests into `develop`, pushes to `develop` |
+| Checks: full suite (release PRs) | `full.yml` | release pull requests into `main` |
+| Checks: labels and tracker | `pr-housekeeping.yml` | every pull request event |
+| PR: auto-merge Dependabot patches | `dependabot-auto-merge.yml` | Dependabot pull requests |
+| Security: CodeQL | `codeql.yml` | release pull requests, pushes to `main`, weekly |
+| Security: weekly Scorecard | `scorecard.yml` | weekly |
+| Scheduled: nightly load, security and fuzz, chaos on Sundays | `nightly.yml` | nightly; skips when `develop` is unchanged |
+| Release: server, desktop and drill | `release.yml` | version tags |
+| Repo: sync labels and project board | `repo-sync.yml` | label file changes, issue changes, every six hours |
+| Repo: develop is red alarm | `develop-health.yml` | after the fast suite runs on `develop` |
+| Website: build and deploy | `site.yml` | website changes, pushes to `main` |
+
 ## Issues and decision records
 
 Every change is traceable to the discussion that led to it.
@@ -187,7 +208,8 @@ CI enforces every rule in this section on each pull request.
 ## Labels
 
 Labels are code: `.github/labels.yml` defines them and the Sync labels
-workflow applies changes when that file lands on `develop`.
+workflow (**Repo: sync labels and project board**) applies changes when
+that file lands on `develop`.
 
 | Group | Labels | Set by |
 | --- | --- | --- |

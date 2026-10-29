@@ -3,7 +3,7 @@
 
 # Packaging for macOS (notarised, universal), Windows (NSIS) and Linux
 # (AppImage and deb). Signing material comes only from the environment; see
-# .github/workflows/desktop-release.yml and ADR 0023 (D99).
+# .github/workflows/release.yml and ADR 0023 (D99).
 appId: dev.vellum.desktop
 productName: Vellum
 copyright: Copyright © 2026 The Vellum contributors
