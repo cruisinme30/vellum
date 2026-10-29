@@ -98,15 +98,18 @@
 - name: area/jobs
   color: "5319e7"
   description: "vellum-jobs: background jobs"
+- name: area/search
+  color: "5319e7"
+  description: "vellum-search: indexing, ranking and retrieval"
 - name: area/mcp
   color: "5319e7"
   description: "vellum-mcp: the MCP server"
 - name: area/cli
   color: "5319e7"
   description: "vellum-cli: the vellum binary"
-- name: area/desktop
+- name: area/sync
   color: "5319e7"
-  description: "The Electron desktop app"
+  description: "vellum-sync: push/pull sync for the local-first clients"
 - name: area/editor
   color: "5319e7"
   description: "The web editor"
@@ -149,6 +152,14 @@
 - name: area/site
   color: "5319e7"
   description: "Project website"
+
+# Findings (red team, ADR 0030)
+- name: security
+  color: "b60205"
+  description: "A security finding or hardening"
+- name: bug
+  color: "d73a4a"
+  description: "Something does not work as intended"
 
 # Tracker
 - name: task

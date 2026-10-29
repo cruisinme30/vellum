@@ -103,6 +103,46 @@ fn flatten_same(inline: Inline) -> Inline {
     }
 }
 
+/// Marks a backslash-escaped character that could start or join an extra
+/// (`\@`, `\-`, `\^`), so [`recognize`] and [`take_block_id`] pass over it.
+/// [`recognize`] removes the marks. A Unicode noncharacter is used because
+/// it never appears in interchanged text.
+pub const ESCAPED: char = '\u{FDD0}';
+
+/// The text for an escaped character, marked when it matters to extras.
+pub fn mark_escape(text: &str) -> String {
+    if matches!(text, "@" | "-" | "^") {
+        format!("{ESCAPED}{text}")
+    } else {
+        text.to_owned()
+    }
+}
+
+/// Char offsets in `text` to backslash-escape so that no part of it is read
+/// back as an extra: the `@` of a mention, the first `-` of a date or issue
+/// key.
+pub fn extra_escapes(text: &str) -> Vec<usize> {
+    let mut out = Vec::new();
+    let mut offset = 0;
+    for piece in recognize(vec![Inline::Text {
+        text: text.to_owned(),
+    }]) {
+        let (len, escape) = match &piece {
+            Inline::Text { text } => (text.chars().count(), None),
+            Inline::Mention { handle } => (1 + handle.chars().count(), Some(0)),
+            Inline::Date { date } if date == "today" => (6, Some(0)),
+            Inline::Date { date } => (date.chars().count(), Some(4)),
+            Inline::IssueKey { key } => (key.chars().count(), key.find('-')),
+            _ => (0, None),
+        };
+        if let Some(escape) = escape {
+            out.push(offset + escape);
+        }
+        offset += len;
+    }
+    out
+}
+
 /// Splits a trailing `^blk-xxxxxxxx` word off a line of directive text
 /// (a fence info string, a container line or an alert title).
 pub fn split_block_id(text: &str) -> (&str, Option<BlockId>) {
@@ -147,11 +187,24 @@ pub fn recognize(inlines: Vec<Inline>) -> Vec<Inline> {
     for inline in inlines {
         match inline {
             Inline::Text { text } => split_text(&text, &mut out),
-            Inline::Link { .. } | Inline::Image { .. } => out.push(inline),
+            Inline::Link { .. } | Inline::Image { .. } => out.push(map_children(inline, unmark)),
             other => out.push(map_children(other, recognize)),
         }
     }
     out
+}
+
+/// Removes escape marks without recognising extras (link text, image alt).
+fn unmark(inlines: Vec<Inline>) -> Vec<Inline> {
+    inlines
+        .into_iter()
+        .map(|inline| match inline {
+            Inline::Text { text } => Inline::Text {
+                text: text.replace(ESCAPED, ""),
+            },
+            other => map_children(other, unmark),
+        })
+        .collect()
 }
 
 /// Applies `f` to the children of a mark, link or image.
@@ -208,7 +261,7 @@ fn split_text(text: &str, out: &mut Vec<Inline>) {
             if plain_start < index {
                 let plain = text.get(plain_start..index).unwrap_or_default();
                 out.push(Inline::Text {
-                    text: plain.to_owned(),
+                    text: plain.replace(ESCAPED, ""),
                 });
             }
             out.push(node);
@@ -223,7 +276,7 @@ fn split_text(text: &str, out: &mut Vec<Inline>) {
     if plain_start < text.len() {
         let plain = text.get(plain_start..).unwrap_or_default();
         out.push(Inline::Text {
-            text: plain.to_owned(),
+            text: plain.replace(ESCAPED, ""),
         });
     }
 }
@@ -231,7 +284,9 @@ fn split_text(text: &str, out: &mut Vec<Inline>) {
 /// An extra may start at the beginning of a run or after a character that
 /// cannot be part of a word, e-mail address or longer identifier.
 fn at_boundary(prev: Option<char>) -> bool {
-    prev.is_none_or(|c| !(c.is_alphanumeric() || matches!(c, '_' | '-' | '.' | '/' | '@' | ':')))
+    prev.is_none_or(|c| {
+        !(c.is_alphanumeric() || matches!(c, '_' | '-' | '.' | '/' | '@' | ':' | ESCAPED))
+    })
 }
 
 /// Matches an extra at the start of `rest`, returning its byte length.

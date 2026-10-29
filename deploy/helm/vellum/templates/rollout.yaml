@@ -1,0 +1,87 @@
+{{/*
+SPDX-FileCopyrightText: 2026 The Vellum contributors
+SPDX-License-Identifier: AGPL-3.0-only
+
+Canary 10 % -> 50 % -> 100 % through Argo Rollouts (D95). Background
+analysis runs from the first step; a breach aborts the rollout and traffic
+returns to the stable version automatically.
+*/}}
+{{- if .Values.canary.enabled }}
+{{- $fullname := include "vellum.fullname" . }}
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "vellum.labels" . | nindent 4 }}
+    {{- include "vellum.selector" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      {{- include "vellum.selector" . | nindent 6 }}
+  template:
+    {{- include "vellum.podTemplate" . | nindent 4 }}
+  strategy:
+    canary:
+      stableService: {{ $fullname }}
+      canaryService: {{ $fullname }}-canary
+      maxUnavailable: 0
+      {{- if .Values.ingress.enabled }}
+      trafficRouting:
+        nginx:
+          stableIngress: {{ $fullname }}
+      {{- end }}
+      analysis:
+        startingStep: 1
+        templates:
+          - templateName: {{ $fullname }}-slo
+        args:
+          - name: canary-hash
+            valueFrom:
+              podTemplateHashValue: Latest
+      steps:
+        {{- range .Values.canary.steps }}
+        - setWeight: {{ . }}
+        - pause: { duration: {{ $.Values.canary.pause }} }
+        {{- end }}
+        - setWeight: 100
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: {{ $fullname }}-slo
+  labels:
+    {{- include "vellum.labels" . | nindent 4 }}
+spec:
+  args:
+    - name: canary-hash
+  metrics:
+    # Server errors as a share of all requests served by the canary pods.
+    - name: error-ratio
+      interval: {{ .Values.canary.interval }}
+      failureLimit: 1
+      consecutiveErrorLimit: 3
+      successCondition: len(result) == 0 || isNaN(result[0]) || result[0] <= {{ .Values.canary.maxErrorRatio }}
+      provider:
+        prometheus:
+          address: {{ .Values.canary.prometheus.address }}
+          query: |
+            sum(rate(http_server_request_duration_seconds_count{rollouts_pod_template_hash="{{ "{{" }}args.canary-hash{{ "}}" }}",http_response_status_code=~"5.."}[2m]))
+            /
+            sum(rate(http_server_request_duration_seconds_count{rollouts_pod_template_hash="{{ "{{" }}args.canary-hash{{ "}}" }}"}[2m]))
+    # p95 latency of the canary pods against the uncached-read target.
+    - name: latency-p95
+      interval: {{ .Values.canary.interval }}
+      failureLimit: 1
+      consecutiveErrorLimit: 3
+      successCondition: len(result) == 0 || isNaN(result[0]) || result[0] <= {{ .Values.canary.maxP95Seconds }}
+      provider:
+        prometheus:
+          address: {{ .Values.canary.prometheus.address }}
+          query: |
+            histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{rollouts_pod_template_hash="{{ "{{" }}args.canary-hash{{ "}}" }}"}[2m])))
+{{- end }}
