@@ -11,6 +11,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "{\n  \"type\": \"excalidraw\",\n  \"version\": 2,\n  \"elements\": [\n    {\"id\": \"a\", \"type\": \"rectangle\", \"x\": 0, \"y\": 0, \"width\": 160, \"height\": 60},\n    {\"id\": \"b\", \"type\": \"text\", \"x\": 40, \"y\": 20, \"text\": \"Gateway\"}\n  ],\n  \"appState\": {\"viewBackgroundColor\": \"#ffffff\"}\n}\n"
       }
     ]

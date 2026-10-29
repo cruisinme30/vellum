@@ -136,6 +136,20 @@ fn steps(base: Option<&str>, branch: Option<&str>) -> Vec<Step> {
         Step::new("Web dead code", "pnpm", &["run", "knip"]).in_dir("web"),
         Step::new("Web tests with coverage", "pnpm", &["run", "test:coverage"]).in_dir("web"),
         Step::new("Web dependency audit", "pnpm", &["audit"]).in_dir("web"),
+        // Desktop
+        Step::new("Desktop install", "pnpm", &["install", "--frozen-lockfile"]).in_dir("desktop"),
+        Step::new("Desktop format", "pnpm", &["run", "format:check"]).in_dir("desktop"),
+        Step::new("Desktop types", "pnpm", &["run", "typecheck"]).in_dir("desktop"),
+        Step::new("Desktop lint", "pnpm", &["run", "lint"]).in_dir("desktop"),
+        Step::new("Desktop dead code", "pnpm", &["run", "knip"]).in_dir("desktop"),
+        Step::new(
+            "Desktop tests with coverage",
+            "pnpm",
+            &["run", "test:coverage"],
+        )
+        .in_dir("desktop"),
+        Step::new("Desktop build", "pnpm", &["run", "build"]).in_dir("desktop"),
+        Step::new("Desktop dependency audit", "pnpm", &["audit"]).in_dir("desktop"),
         // Files, docs and secrets
         Step::new("REUSE headers", "reuse", &["lint"]),
         Step::new("YAML", "yamllint", &["--strict", "."]),

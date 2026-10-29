@@ -18,9 +18,12 @@
 //! - **Categories, not schemes.** Statuses are free; the seven
 //!   [`Category`] values drive every view, automation and metric (D15).
 //!
-//! See ADR 0016 for the decisions this crate records (D76 to D78).
+//! See ADR 0016 (D76 to D78) and ADR 0033 (D129 to D131) for the
+//! decisions this crate records.
 
+pub mod comment;
 pub mod cycle;
+pub mod doclink;
 pub mod error;
 pub mod event;
 pub mod filter;
@@ -29,6 +32,7 @@ pub mod id;
 pub mod intake;
 pub mod issue;
 pub mod label;
+pub mod mention;
 pub mod my_issues;
 pub mod project;
 pub mod scale;
@@ -41,7 +45,9 @@ pub mod triage;
 pub mod view;
 pub mod workflow;
 
+pub use comment::{BlockRef, Comment, CommentChanges, Comments, NewComment, Target, Thread};
 pub use cycle::{Cycle, CycleKey, CycleSettings};
+pub use doclink::{BackLink, IssueEmbed};
 pub use error::{Result, WorkError};
 pub use event::{IssueSnapshot, WorkEvent};
 pub use filter::{Condition, Field, Filter, Op};

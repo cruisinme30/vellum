@@ -22,6 +22,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "sections": [
           [
             {
@@ -31,6 +32,11 @@
               "items": [
                 {
                   "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
                   "blocks": [
                     {
                       "type": "paragraph",
@@ -46,6 +52,11 @@
                 },
                 {
                   "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
                   "blocks": [
                     {
                       "type": "paragraph",
@@ -61,6 +72,11 @@
                 },
                 {
                   "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
                   "blocks": [
                     {
                       "type": "paragraph",
@@ -88,6 +104,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "title: p95 latency this week\ntype: line\nunit: ms\nlabels: [Mon, Tue, Wed, Thu, Fri]\nvalues: [44, 41, 40, 39, 38]\n"
       },
       {
@@ -99,6 +116,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "sections": [
           [
             {
@@ -123,6 +141,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "sections": [
           [
             {
