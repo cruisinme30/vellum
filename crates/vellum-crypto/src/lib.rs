@@ -19,7 +19,7 @@ mod passphrase;
 mod provider;
 
 pub use aead::{NONCE_LEN, TAG_LEN};
-pub use envelope::{is_envelope, kek_of, open, rewrap, seal};
+pub use envelope::{is_envelope, kek_of, open, plaintext_len, rewrap, seal};
 pub use error::CryptoError;
 pub use key::{KEY_LEN, KekId, MAX_KEK_ID_LEN, SecretKey};
 #[cfg(feature = "os-keychain")]
