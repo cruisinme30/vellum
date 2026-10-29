@@ -82,6 +82,7 @@ RFC
 [Tt]rigrams?
 [Ww]ebhooks?
 [Rr]ebinding
+[Pp]recach(e|es|ed|ing)
 [Uu]nstarted
 (?:SLAs?|slas)
 [Ss]lugs?
