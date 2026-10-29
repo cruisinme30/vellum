@@ -34,8 +34,8 @@ pub enum Profile {
     Org,
 }
 
-/// Validated server configuration.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Validated server configuration. `Debug` hides the database URL.
+#[derive(Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Config {
     /// Root folder holding `.vellum/`, drives, teams and tasks.
@@ -48,6 +48,21 @@ pub struct Config {
     pub profile: Profile,
     /// Postgres URL; `None` means the bundled SQLite index.
     pub database_url: Option<String>,
+}
+
+impl std::fmt::Debug for Config {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Config")
+            .field("data_dir", &self.data_dir)
+            .field("bind", &self.bind)
+            .field("public_url", &self.public_url)
+            .field("profile", &self.profile)
+            .field(
+                "database_url",
+                &self.database_url.as_ref().map(|_| "<redacted>"),
+            )
+            .finish()
+    }
 }
 
 impl Default for Config {
@@ -222,6 +237,7 @@ mod tests {
         assert_eq!(c.data_dir, PathBuf::from("/srv/northstar"));
         assert_eq!(c.bind, "127.0.0.1:9000".parse().unwrap());
         assert_eq!(c.profile, Profile::Team);
+        assert!(!format!("{c:?}").contains("postgres://"));
     }
 
     #[test]
