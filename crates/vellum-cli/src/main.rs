@@ -11,11 +11,13 @@
 //! rebuilds the index from the data folder; `vellum private` manages this
 //! device's key for end-to-end encrypted private spaces.
 
+mod collab;
 mod docs;
 mod identity;
 #[cfg(test)]
 mod identity_tests;
 mod integrations;
+mod keys;
 mod mcp;
 mod notifications;
 mod private;

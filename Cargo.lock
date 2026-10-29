@@ -8981,6 +8981,7 @@ dependencies = [
  "vellum-api",
  "vellum-authz",
  "vellum-books-service",
+ "vellum-collab",
  "vellum-collections",
  "vellum-contracts",
  "vellum-crypto",

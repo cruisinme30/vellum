@@ -12,7 +12,7 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D55, D56, D57
-- Issue: [#97](https://github.com/cruisinme30/vellum/issues/97), [#235](https://github.com/cruisinme30/vellum/issues/235), [#294](https://github.com/cruisinme30/vellum/issues/294)
+- Issue: [#97](https://github.com/cruisinme30/vellum/issues/97), [#235](https://github.com/cruisinme30/vellum/issues/235), [#294](https://github.com/cruisinme30/vellum/issues/294), [#414](https://github.com/cruisinme30/vellum/issues/414)
 - Pull requests: [#217](https://github.com/cruisinme30/vellum/pull/217), [#302](https://github.com/cruisinme30/vellum/pull/302), [#380](https://github.com/cruisinme30/vellum/pull/380)
 
 :::
@@ -123,9 +123,11 @@ flowchart LR
 
 - The editor binds `y-prosemirror` to the `default` field; a node or mark
   added to the dialect is added to `schema/blocks.json` first.
-- The update log (`vellum-db`) and the codec (`vellum-format`) are real
-  adapters; the document files adapter over `vellum-store` is next, and
-  the in-memory adapters still run the tests.
+- Rooms read and save pages through `vellum-drive`, whose three-way merge
+  keeps an outside edit instead of overwriting it. Collab and drive share
+  a layer, so these adapters live in `vellum-cli`. A browser session joins
+  only from the app's origin, because a WebSocket handshake carries no
+  CSRF token. The log's sealing key is kept in the data folder.
 - Every new message type takes a tag in the custom range and is ignored
   by servers that do not know it.
 - CI fuzzes the protocol with arbitrary frames and checks with property
