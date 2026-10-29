@@ -16,3 +16,14 @@ layer = "foundation"
 
 [lints]
 workspace = true
+
+[dependencies]
+# SQLCipher is compiled in (vendored OpenSSL) so the single binary needs no system crypto library.
+libsqlite3-sys = { version = "0.37", features = ["bundled-sqlcipher-vendored-openssl"] }
+sqlx = { version = "0.9", default-features = false, features = ["macros", "migrate", "runtime-tokio", "sqlite"] }
+thiserror = "2.0.21"
+tracing = "0.1.44"
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

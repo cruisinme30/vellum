@@ -46,6 +46,8 @@ skip = [
     { crate = "syn@2", reason = "proc-macro ecosystem is moving from syn 2 to 3" },
     { crate = "getrandom@0.3", reason = "older crates still on 0.3 during the 0.4 move" },
     { crate = "r-efi@5", reason = "pulled by getrandom 0.3" },
+    { crate = "base64@0.22", reason = "sqlx 0.9 is still on base64 0.22" },
+    { crate = "hashbrown@0.16", reason = "sqlx-core 0.9 pins hashbrown 0.16; indexmap moved to 0.17" },
 ]
 skip-tree = []
 
