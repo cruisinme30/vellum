@@ -1,0 +1,28 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Literal characters stay literal: *not italic*, _not italic_, [not a link], `not code`, <not html> and 5 * 3."
+          }
+        ],
+        "id": null
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Snake_case words need no escapes, and neither does a = b."
+          }
+        ],
+        "id": null
+      }
+    ]
+  },
+  "diagnostics": []
+}

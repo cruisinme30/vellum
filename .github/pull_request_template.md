@@ -6,6 +6,13 @@ Fill in every section. CI fails when a required section is missing or
 empty; write "None" with a reason when one truly does not apply.
 -->
 
+## Issue
+
+<!-- Required: the issue that holds this change's discussion, as
+"Closes #N" (or "Refs #N" when the issue stays open). A feature also
+names its decision record, e.g. "ADR 0012", or adds one to docs/adr/.
+Release, chore and ci pull requests are exempt. -->
+
 ## Summary
 
 <!-- What changes and why, in two or three sentences. -->
@@ -41,6 +48,6 @@ integration, contract, e2e, performance. -->
 - [ ] Branch is `<type>/<topic>`; title and commits are Conventional Commits
 - [ ] Every commit is signed off (`git commit -s`)
 - [ ] Public items documented; user guide updated if visible
-- [ ] ADR added if a decision was made
+- [ ] Linked issue holds the discussion; a feature's ADR in `docs/adr/` links it
 - [ ] One feature per pull request, complete with its tests and docs
 - [ ] Labels: `type/*` and `area/*` (set automatically), plus `phase/*`

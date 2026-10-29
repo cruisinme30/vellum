@@ -17,6 +17,8 @@ path = [
   ".lycheeignore",
   ".vale/styles/config/vocabularies/**",
   "docs/**/*.md",
+  "corpus/**/*.md",
+  "corpus/**/*.json",
   ".gitmessage",
 ]
 precedence = "aggregate"

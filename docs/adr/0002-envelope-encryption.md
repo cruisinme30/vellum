@@ -58,3 +58,20 @@ on-disk format and the provider contract in `vellum-crypto`.
 - `LocalKeyring` serves the OS keychain and passphrase cases. A passphrase
   KEK id carries its Argon2id salt and costs, so the passphrase alone
   re-derives the KEK from any envelope header.
+
+## Applying it to the blob store
+
+`vellum-sealed-store` wraps any `BlobStore` in `Sealed`, an engine-layer
+crate because `vellum-crypto` and `vellum-store` are both foundation.
+
+- Writes follow the space's mode: sealed by default, as is in a plaintext
+  space. Reads open an envelope wherever one is found and pass plaintext
+  through, so a space stays readable while it switches mode. A plaintext
+  object in an encrypted space is counted and logged until `reseal`
+  rewrites it.
+- `reseal` is the one migration and rotation step: it seals, re-wraps or
+  opens an object as the policy now wants, guarded by `IfMatch`.
+- Etags are the stored bytes' etags, so preconditions pass through. `get`,
+  `head`, `put` and `rename` report plaintext sizes (`head` reads the
+  object to find it); listings report stored sizes because they never
+  read content.

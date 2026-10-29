@@ -1,0 +1,53 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "container",
+        "name": "toc",
+        "arg": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "sections": [
+          []
+        ]
+      },
+      {
+        "type": "heading",
+        "level": 2,
+        "content": [
+          {
+            "type": "text",
+            "text": "Purpose"
+          }
+        ],
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null
+      },
+      {
+        "type": "heading",
+        "level": 2,
+        "content": [
+          {
+            "type": "text",
+            "text": "Request path"
+          }
+        ],
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null
+      }
+    ]
+  },
+  "diagnostics": []
+}

@@ -1,0 +1,36 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Read "
+          },
+          {
+            "type": "wiki_link",
+            "target": "Runbook: deploy",
+            "label": null
+          },
+          {
+            "type": "text",
+            "text": " before you ship, and "
+          },
+          {
+            "type": "wiki_link",
+            "target": "Onboarding checklist",
+            "label": "the onboarding list"
+          },
+          {
+            "type": "text",
+            "text": " on day one."
+          }
+        ],
+        "id": null
+      }
+    ]
+  },
+  "diagnostics": []
+}
