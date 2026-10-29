@@ -89,6 +89,8 @@ skip = [
     { crate = "block-buffer@0.10", reason = "pulled by digest 0.10 (WebSocket sha1)" },
     { crate = "crypto-common@0.1", reason = "pulled by digest 0.10 (WebSocket sha1)" },
     { crate = "cpufeatures@0.2", reason = "pulled by sha1 0.10 (WebSocket handshake)" },
+    { crate = "granit-parser@1", reason = "merman-core still on 1 while serde-saphyr moved to 2" },
+    { crate = "pastey@0.1", reason = "htmlize (merman-core) while tantivy moved to 0.2" },
     { crate = "bit-set@0.8", reason = "fancy-regex in syntect (Typst 0.15) is on 0.8" },
     { crate = "bit-vec@0.8", reason = "pulled by bit-set 0.8 (Typst 0.15)" },
     { crate = "fearless_simd@0.4", reason = "Typst 0.15's raster stack is on 0.4" },
@@ -116,6 +118,9 @@ skip = [
     { crate = "darling_macro@0.23", reason = "async-graphql-derive is on darling 0.23; bon (tantivy) moved to 0.24" },
 ]
 skip-tree = [
+    # merman's HTML label rewriting uses lol_html 3, which is on cssparser
+    # 0.36 and phf 0.13; ammonia is on cssparser 0.38 and phf 0.14.
+    { crate = "lol_html@3", reason = "merman-core pins lol_html 3 (older cssparser and phf)" },
     # Linux Secret Service (os-keychain feature only) still uses the previous
     # RustCrypto generation (sha2 0.10, cipher 0.4) for its session encryption.
     { crate = "dbus-secret-service@4", depth = 20, reason = "Linux keychain; waiting for its RustCrypto 0.11 release" },
