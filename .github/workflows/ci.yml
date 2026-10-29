@@ -134,11 +134,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - name: Pull request title is a Conventional Commit
+      - name: Branch name and title follow the conventions
         env:
+          BRANCH: ${{ github.event.pull_request.head.ref }}
           TITLE: ${{ github.event.pull_request.title }}
         run: |
           source scripts/ci/commit-rules.sh
+          if ! check_branch "${BRANCH}"; then
+            echo "::error::Branch '${BRANCH}' must be named <type>/<topic>, e.g. feat/typed-ids"
+            exit 1
+          fi
           if ! check_subject "${TITLE}"; then
             echo "::error::Title is not a Conventional Commit: ${TITLE}"
             exit 1

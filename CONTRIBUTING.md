@@ -28,9 +28,13 @@ gitGraph
 | --- | --- | --- | --- |
 | `develop` | Integration branch; all work starts here | short-lived feature branches | **Fast suite** |
 | `main` | Always releasable; releases are tagged here | `develop` only, at regular intervals | **Full suite** |
-| `feat/…`, `fix/…`, `docs/…` | One change each | branched from `develop` | — |
+| `<type>/<topic>` | One change each | branched from `develop` | — |
 
-1. Branch from `develop`, open the pull request against `develop`.
+1. Branch from `develop` with a name of the form `<type>/<topic>`, where
+   type is a Conventional Commits type and topic says what changes, in
+   kebab case: `feat/typed-ids`, `fix/watcher-rename`, `docs/adr-0002`.
+   CI rejects other names (Dependabot's `dependabot/…` excepted). Open the
+   pull request against `develop`.
 2. At regular intervals a maintainer opens a pull request from `develop`
    into `main`. It merges with a merge commit, never a squash, so history
    stays shared.

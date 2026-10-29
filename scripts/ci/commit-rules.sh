@@ -16,3 +16,10 @@ check_subject() {
 check_signoff() {
   grep -qxF "Signed-off-by: $2 <$3>" <<<"$1"
 }
+
+readonly BRANCH_RE='^((build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)/[a-z0-9][a-z0-9._-]*|dependabot/.+)$'
+
+# check_branch <name>: succeeds for a <type>/<topic> branch name.
+check_branch() {
+  [[ "$1" =~ ${BRANCH_RE} ]]
+}
