@@ -1,0 +1,293 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "heading",
+        "level": 1,
+        "content": [
+          {
+            "type": "text",
+            "text": "Block IDs on every block"
+          }
+        ],
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": "blk-a0000001"
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "A paragraph."
+          }
+        ],
+        "id": "blk-a0000002"
+      },
+      {
+        "type": "block_quote",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "A quote keeps its ID on its own line after it."
+              }
+            ],
+            "id": null
+          }
+        ],
+        "id": "blk-a0000003"
+      },
+      {
+        "type": "table",
+        "alignments": [
+          "none",
+          "right"
+        ],
+        "header": [
+          [
+            {
+              "type": "text",
+              "text": "Region"
+            }
+          ],
+          [
+            {
+              "type": "text",
+              "text": "Revenue"
+            }
+          ]
+        ],
+        "rows": [
+          [
+            [
+              {
+                "type": "text",
+                "text": "EMEA"
+              }
+            ],
+            [
+              {
+                "type": "text",
+                "text": "120"
+              }
+            ]
+          ]
+        ],
+        "id": "blk-a0000004"
+      },
+      {
+        "type": "fence",
+        "lang": "rust",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": "blk-a0000005",
+        "literal": "fn main() {}\n"
+      },
+      {
+        "type": "fence",
+        "lang": "chart",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [
+            "wide"
+          ],
+          "pairs": []
+        },
+        "id": "blk-a0000006",
+        "literal": "type: bar\nlabels: [Q1, Q2]\nvalues: [3, 5]\n"
+      },
+      {
+        "type": "math",
+        "literal": "E = mc^2\n",
+        "id": "blk-a0000007"
+      },
+      {
+        "type": "container",
+        "name": "info",
+        "arg": "Heads up",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": "blk-a0000008",
+        "sections": [
+          [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Callouts carry the ID on their opening line."
+                }
+              ],
+              "id": null
+            }
+          ]
+        ]
+      },
+      {
+        "type": "container",
+        "name": "columns",
+        "arg": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": "blk-a0000009",
+        "sections": [
+          [
+            {
+              "type": "container",
+              "name": "stats",
+              "arg": "",
+              "attrs": {
+                "id": null,
+                "classes": [],
+                "pairs": []
+              },
+              "id": "blk-a0000010",
+              "sections": [
+                [
+                  {
+                    "type": "list",
+                    "start": null,
+                    "tight": true,
+                    "items": [
+                      {
+                        "task": null,
+                        "attrs": {
+                          "id": null,
+                          "classes": [],
+                          "pairs": []
+                        },
+                        "blocks": [
+                          {
+                            "type": "paragraph",
+                            "content": [
+                              {
+                                "type": "text",
+                                "text": "94% · Uptime"
+                              }
+                            ],
+                            "id": null
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              ]
+            }
+          ],
+          [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "image",
+                  "url": "assets/gateway.svg",
+                  "title": "",
+                  "alt": [
+                    {
+                      "type": "text",
+                      "text": "Gateway diagram"
+                    }
+                  ]
+                }
+              ],
+              "id": "blk-a0000011"
+            }
+          ]
+        ]
+      },
+      {
+        "type": "list",
+        "start": null,
+        "tight": false,
+        "items": [
+          {
+            "task": null,
+            "attrs": {
+              "id": null,
+              "classes": [],
+              "pairs": []
+            },
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "A list item with a quote:"
+                  }
+                ],
+                "id": null
+              },
+              {
+                "type": "block_quote",
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Quoted inside a list."
+                      }
+                    ],
+                    "id": null
+                  }
+                ],
+                "id": "blk-a0000012"
+              },
+              {
+                "type": "math",
+                "literal": "a^2 + b^2\n",
+                "id": "blk-a0000013"
+              },
+              {
+                "type": "container",
+                "name": "warn",
+                "arg": "Nested callout",
+                "attrs": {
+                  "id": null,
+                  "classes": [],
+                  "pairs": []
+                },
+                "id": "blk-a0000014",
+                "sections": [
+                  [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Alerts carry it in the title."
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "diagnostics": []
+}

@@ -11,6 +11,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "erDiagram\n  TEAM ||--o{ ISSUE : owns\n  ISSUE }o--o| CYCLE : \"planned in\"\n  ISSUE }o--o{ LABEL : tagged\n  USER ||--o{ ISSUE : assigned\n  ISSUE {\n    string key PK\n    string title\n    int priority\n    date due\n  }\n"
       }
     ]

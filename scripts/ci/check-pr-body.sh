@@ -2,11 +2,15 @@
 # SPDX-FileCopyrightText: 2026 The Vellum contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 #
-# Checks that a pull request description fills in every required section
-# of .github/pull_request_template.md. Reads the body from $PR_BODY.
+# Checks that a pull request description explains itself
+# (.github/pull_request_template.md). Reads the body from $PR_BODY.
+# - Every required section is present and filled in.
+# - A decision (D12) or record (ADR 0012) is never named bare: its line
+#   also carries a link and a few words saying what it is. Text in
+#   `code` is exempt, so an ID can be quoted as an example.
 set -euo pipefail
 
-required=(Summary Requirements Changes Tests Observability Security)
+required=(Why "What changed" "How to verify" "Security and operations")
 
 # Drop HTML comments (the template's hints), then normalise line endings.
 body="$(printf '%s\n' "${PR_BODY:-}" | tr -d '\r' | perl -0pe 's/<!--.*?-->//gs')"
@@ -26,7 +30,18 @@ for section in "${required[@]}"; do
   fi
 done
 
+# A line naming D<n> or ADR <n> needs a link and at least four other words.
+while IFS= read -r line; do
+  [[ -z "${line}" ]] && continue
+  words="$(perl -pe 's/\]\([^)]*\)/]/g; s/\bADR ?\d{4}\b//g; s/\bD\d{1,3}\b//g; s/[^A-Za-z ]/ /g' <<<"${line}" | wc -w)"
+  if [[ "${line}" != *"]("* || "${words}" -lt 4 ]]; then
+    echo "::error::Explain this reference in plain words and link it: ${line}"
+    failures=$((failures + 1))
+  fi
+done < <(perl -pe 's/`[^`]*`//g' <<<"${body}" | grep -E '\b(D[0-9]{1,3}|ADR ?[0-9]{4})\b' || true)
+
 if ((failures > 0)); then
+  echo "See .github/pull_request_template.md: a reader should follow the description without knowing project IDs."
   exit 1
 fi
-echo "Every required section of the description is filled in."
+echo "The description explains itself."

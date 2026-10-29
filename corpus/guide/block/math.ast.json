@@ -4,7 +4,8 @@
     "blocks": [
       {
         "type": "math",
-        "literal": "F_1 = \\frac{2PR}{P+R}\n"
+        "literal": "F_1 = \\frac{2PR}{P+R}\n",
+        "id": null
       }
     ]
   },

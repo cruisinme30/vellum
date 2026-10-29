@@ -11,6 +11,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "title: Catch rate by attack class\ntype: donut\nDirect: 60\nIndirect: 30\nMulti-turn: 10\n"
       }
     ]
