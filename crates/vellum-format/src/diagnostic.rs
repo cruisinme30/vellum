@@ -27,6 +27,9 @@ pub enum DiagnosticCode {
     /// A line of a data fence or data container could not be read; it is
     /// skipped and the rest of the block is kept.
     BlockData,
+    /// Blocks or inline markup nest deeper than [`crate::MAX_NESTING`]
+    /// levels; the deeper content is kept as plain text.
+    NestingTooDeep,
 }
 
 /// A problem found while parsing, with the 1-based source line when known.
