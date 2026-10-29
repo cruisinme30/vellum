@@ -44,6 +44,9 @@ use crate::api::{
 use crate::ports::{Clock, Directory, EventSink};
 use crate::routes;
 
+pub mod insights;
+pub mod triage;
+
 /// The most issues one list returns.
 pub const MAX_LIST: usize = 1000;
 
