@@ -392,6 +392,20 @@ export type AdminStateEmpty = Record<string, unknown>;
 export type AdminTelemetryPreviewEmpty = Record<string, unknown>;
 
 /**
+ * An API token as administrators list it (never the secret).
+ */
+export interface AdminTokenView {
+  /**
+   * Its owner; absent if the account is gone.
+   */
+  owner?: TokenOwner | null;
+  /**
+   * The token's details.
+   */
+  token: TokenView;
+}
+
+/**
  * Every admin setting.
  */
 export interface AdminUpdateSettingsAdminSettings {
@@ -568,6 +582,8 @@ export interface AppView {
    */
   scopes: Scope[];
 }
+
+export type Array_of_AdminTokenView = AdminTokenView[];
 
 export type Array_of_AppView = AppView[];
 
@@ -6256,6 +6272,16 @@ export interface SetSectionAccess {
 }
 
 /**
+ * The cap on new tokens' expiry.
+ */
+export interface SetTokenPolicy {
+  /**
+   * The longest expiry in days, 1 to 3650; `null` lifts the cap.
+   */
+  maxDays?: number | null;
+}
+
+/**
  * New settings and the version they replace.
  */
 export interface SettingsUpdate {
@@ -7498,6 +7524,38 @@ export interface TocNode {
    * The navigation title.
    */
   title: string;
+}
+
+/**
+ * Who owns a token, as administrators see it.
+ */
+export interface TokenOwner {
+  /**
+   * The sign-in address.
+   */
+  email: string;
+  /**
+   * The user's ID.
+   */
+  id: UserId;
+  /**
+   * The display name.
+   */
+  name: string;
+}
+
+/**
+ * What a new personal API token may have.
+ */
+export interface TokenPolicy {
+  /**
+   * The longest expiry in days; `None` allows tokens that never expire.
+   */
+  maxDays?: number | null;
+  /**
+   * The scopes you may grant.
+   */
+  scopes: Scope[];
 }
 
 /**
@@ -10207,6 +10265,27 @@ export interface Operations {
     input: UpdateGroup;
     output: GroupsUpdateGroupView;
   };
+  /** Revoke anyone's API token */
+  "identity.admin_revoke_token": {
+    method: "DELETE";
+    path: "/v1/admin/tokens/{id}";
+    input: ById;
+    output: Done;
+  };
+  /** Cap how long new API tokens may last */
+  "identity.admin_token_policy": {
+    method: "PUT";
+    path: "/v1/admin/token-policy";
+    input: SetTokenPolicy;
+    output: TokenPolicy;
+  };
+  /** List everyone's API tokens */
+  "identity.admin_tokens": {
+    method: "GET";
+    path: "/v1/admin/tokens";
+    input: Empty;
+    output: Array_of_AdminTokenView;
+  };
   /** List apps you connected with OAuth */
   "identity.apps": {
     method: "GET";
@@ -10269,6 +10348,13 @@ export interface Operations {
     path: "/v1/auth/status";
     input: Empty;
     output: AuthStatus;
+  };
+  /** The scopes and longest expiry a new API token may have */
+  "identity.token_policy": {
+    method: "GET";
+    path: "/v1/me/token-policy";
+    input: Empty;
+    output: TokenPolicy;
   };
   /** List your API tokens */
   "identity.tokens": {
@@ -10937,6 +11023,9 @@ export const OPERATIONS = {
   "groups.members": { method: "GET", path: "/v1/admin/groups/{id}/members", mutation: false },
   "groups.search": { method: "GET", path: "/v1/directory/groups", mutation: false },
   "groups.update": { method: "PATCH", path: "/v1/admin/groups/{id}", mutation: true },
+  "identity.admin_revoke_token": { method: "DELETE", path: "/v1/admin/tokens/{id}", mutation: true },
+  "identity.admin_token_policy": { method: "PUT", path: "/v1/admin/token-policy", mutation: true },
+  "identity.admin_tokens": { method: "GET", path: "/v1/admin/tokens", mutation: false },
   "identity.apps": { method: "GET", path: "/v1/me/apps", mutation: false },
   "identity.create_token": { method: "POST", path: "/v1/me/tokens", mutation: true },
   "identity.create_user": { method: "POST", path: "/v1/admin/users", mutation: true },
@@ -10946,6 +11035,7 @@ export const OPERATIONS = {
   "identity.sessions": { method: "GET", path: "/v1/me/sessions", mutation: false },
   "identity.setup": { method: "POST", path: "/v1/setup", mutation: true },
   "identity.status": { method: "GET", path: "/v1/auth/status", mutation: false },
+  "identity.token_policy": { method: "GET", path: "/v1/me/token-policy", mutation: false },
   "identity.tokens": { method: "GET", path: "/v1/me/tokens", mutation: false },
   "identity.update_me": { method: "PATCH", path: "/v1/me", mutation: true },
   "identity.update_user": { method: "PATCH", path: "/v1/admin/users/{id}", mutation: true },

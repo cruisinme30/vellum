@@ -155,6 +155,46 @@ pub struct CreatedToken {
     pub details: TokenView,
 }
 
+/// What a new personal API token may have.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TokenPolicy {
+    /// The longest expiry in days; `None` allows tokens that never expire.
+    pub max_days: Option<u32>,
+    /// The scopes you may grant.
+    pub scopes: Vec<Scope>,
+}
+
+/// Who owns a token, as administrators see it.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TokenOwner {
+    /// The user's ID.
+    pub id: UserId,
+    /// The display name.
+    pub name: String,
+    /// The sign-in address.
+    pub email: String,
+}
+
+/// An API token as administrators list it (never the secret).
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminTokenView {
+    /// The token's details.
+    pub token: TokenView,
+    /// Its owner; absent if the account is gone.
+    pub owner: Option<TokenOwner>,
+}
+
+/// The cap on new tokens' expiry.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct SetTokenPolicy {
+    /// The longest expiry in days, 1 to 3650; `null` lifts the cap.
+    pub max_days: Option<u32>,
+}
+
 /// A connected `OAuth` app.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -370,6 +410,62 @@ impl Service for IdentityService {
                 }
             }
         };
+        let token_policy = {
+            let id = Arc::clone(id);
+            move |ctx: RequestContext, _: Empty| {
+                let id = Arc::clone(&id);
+                async move {
+                    let user = ctx.principal.require_user()?;
+                    Ok(TokenPolicy {
+                        max_days: id.max_token_days(),
+                        scopes: id.token_scopes(user)?,
+                    })
+                }
+            }
+        };
+        let admin_tokens = {
+            let id = Arc::clone(id);
+            move |_: RequestContext, _: Empty| {
+                let id = Arc::clone(&id);
+                async move {
+                    Ok(id
+                        .all_api_tokens()
+                        .into_iter()
+                        .map(|(token, owner)| AdminTokenView {
+                            token: token_view(token),
+                            owner: owner.map(|u| TokenOwner {
+                                id: u.id,
+                                name: u.name,
+                                email: u.email,
+                            }),
+                        })
+                        .collect::<Vec<_>>())
+                }
+            }
+        };
+        let admin_revoke_token = {
+            let id = Arc::clone(id);
+            move |_: RequestContext, input: ById| {
+                let id = Arc::clone(&id);
+                async move {
+                    let _ = id.admin_revoke_api_token(&input.id)?;
+                    Ok(done())
+                }
+            }
+        };
+        let admin_token_policy = {
+            let id = Arc::clone(id);
+            move |ctx: RequestContext, input: SetTokenPolicy| {
+                let id = Arc::clone(&id);
+                async move {
+                    let user = ctx.principal.require_user()?;
+                    Ok(TokenPolicy {
+                        max_days: id.set_max_token_days(input.max_days)?,
+                        scopes: id.token_scopes(user)?,
+                    })
+                }
+            }
+        };
         let apps = {
             let id = Arc::clone(id);
             move |ctx: RequestContext, _: Empty| {
@@ -486,6 +582,39 @@ impl Service for IdentityService {
                 revoke_token,
             )
             .summary("Revoke one of your API tokens"),
+            Operation::query(
+                "identity.token_policy",
+                "/v1/me/token-policy",
+                Scope::Read,
+                token_policy,
+            )
+            .summary("The scopes and longest expiry a new API token may have"),
+            Operation::query(
+                "identity.admin_tokens",
+                "/v1/admin/tokens",
+                Scope::Admin,
+                admin_tokens,
+            )
+            .fresh_auth(FRESH_AUTH)
+            .summary("List everyone's API tokens"),
+            Operation::mutation(
+                "identity.admin_revoke_token",
+                HttpMethod::Delete,
+                "/v1/admin/tokens/{id}",
+                Scope::Admin,
+                admin_revoke_token,
+            )
+            .fresh_auth(FRESH_AUTH)
+            .summary("Revoke anyone's API token"),
+            Operation::mutation(
+                "identity.admin_token_policy",
+                HttpMethod::Put,
+                "/v1/admin/token-policy",
+                Scope::Admin,
+                admin_token_policy,
+            )
+            .fresh_auth(FRESH_AUTH)
+            .summary("Cap how long new API tokens may last"),
             Operation::query("identity.apps", "/v1/me/apps", Scope::Read, apps)
                 .summary("List apps you connected with OAuth"),
             Operation::mutation(

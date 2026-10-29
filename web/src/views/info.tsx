@@ -9,6 +9,7 @@ import { SLASH_ITEMS } from "../editor/slash/items";
 import { useT } from "../i18n/i18n";
 
 import "../admin/console/console.css";
+import "../account/account.css";
 
 import { describeError } from "./sign-in";
 
@@ -67,6 +68,7 @@ const ADMIN_SCREENS = [
   "users",
   "spaces",
   "groups",
+  "tokens",
   "usage",
   "audit",
   "settings",
@@ -117,6 +119,16 @@ function AccountSection() {
   return (
     <section className="vl-view" aria-labelledby="account-heading">
       <h2 id="account-heading">{t("auth-signed-in-as", { name: user.name, email: user.email })}</h2>
+      <nav aria-label={t("account-links")}>
+        <ul className="vl-account-links">
+          <li>
+            <Link to="/settings/api-tokens">{t("account-tokens-link")}</Link>
+          </li>
+          <li>
+            <Link to="/settings/notifications">{t("account-notifications-link")}</Link>
+          </li>
+        </ul>
+      </nav>
       {error === undefined ? undefined : (
         <p className="vl-field-error" role="alert">
           {error}

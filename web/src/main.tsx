@@ -13,6 +13,7 @@ import "./styles/notifications.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
+import { createHttpAccountApi } from "./account/api";
 import { createHttpAdminConsoleApi } from "./admin/console/api";
 import { createAuthApi } from "./api/auth";
 import { createHttp } from "./api/http";
@@ -82,6 +83,7 @@ root.render(
       work={status === undefined ? undefined : createHttpWorkApi(http)}
       books={status === undefined ? undefined : createHttpBooksApi(http)}
       privateSpaces={status === undefined ? undefined : createHttpPrivateSpacesApi(http)}
+      account={status === undefined ? undefined : createHttpAccountApi(http)}
       collections={
         status === undefined ? createMockCollectionsStore() : createHttpCollectionsStore(http)
       }

@@ -3,6 +3,7 @@
 
 import { createContext, use, type ReactNode } from "react";
 
+import type { AccountApi } from "../account/api";
 import type { BooksApi } from "../books/api";
 import { useT } from "../i18n/i18n";
 import type { PrivateSpacesApi } from "../platform/private/api";
@@ -15,6 +16,8 @@ export interface ServerApis {
   readonly work?: WorkApi | undefined;
   readonly books?: BooksApi | undefined;
   readonly privateSpaces?: PrivateSpacesApi | undefined;
+  /** The signed-in person's API tokens and sign-in factors. */
+  readonly account?: AccountApi | undefined;
 }
 
 const ServerApisContext = createContext<ServerApis>({});

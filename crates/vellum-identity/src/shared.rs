@@ -551,6 +551,13 @@ pub fn diff(old: &State, new: &State) -> Result<Vec<Row>, Error> {
         &mut rows,
     )?;
     diff_map("group", &old.groups, &new.groups, Clone::clone, &mut rows)?;
+    if old.sign_in != new.sign_in {
+        rows.push(Row {
+            kind: "sign_in".to_owned(),
+            id: "settings".to_owned(),
+            record: Some(encode(&new.sign_in)?),
+        });
+    }
     Ok(rows)
 }
 
@@ -598,6 +605,12 @@ fn apply(state: &mut State, delta: &Delta) -> Result<(), Error> {
             "oauth_consent" => put(&mut state.oauth_consents, row)?,
             "oauth_code" => put(&mut state.oauth_codes, row)?,
             "group" => put(&mut state.groups, row)?,
+            "sign_in" => {
+                state.sign_in = match &row.record {
+                    Some(json) => decode(&row.kind, &row.id, json)?,
+                    None => crate::store::SignInSettings::default(),
+                };
+            }
             other => tracing::debug!(kind = other, "skipping an unknown identity record"),
         }
     }
@@ -691,6 +704,7 @@ mod tests {
             "oauth_consents",
             "oauth_codes",
             "groups",
+            "sign_in",
         ];
         maps.sort_unstable();
         assert_eq!(fields, maps);

@@ -37,5 +37,5 @@ sessions at once.
 
 People create personal API tokens in **Settings → API tokens**, each
 with scopes (`read`, `write:draft`, `write:direct`, `work`, `admin`) and
-an expiry. Admins can list and revoke any token and cap the longest
-expiry allowed.
+an expiry; the token is shown once. In **Admin → API tokens**, admins
+can list and revoke any token and cap the longest expiry allowed.

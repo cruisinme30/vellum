@@ -4,6 +4,8 @@
 import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
 import { BrowserRouter, Route, Routes } from "react-router";
 
+import type { AccountApi } from "./account/api";
+import { ApiTokensPage } from "./account/api-tokens-page";
 import type { AdminConsoleApi } from "./admin/console/api";
 import { AuditPage } from "./admin/console/audit-page";
 import { BackupsPage } from "./admin/console/backups-page";
@@ -11,6 +13,7 @@ import { AdminConsoleProvider } from "./admin/console/context";
 import { GroupsPage } from "./admin/console/groups-page";
 import { SettingsPage } from "./admin/console/settings-page";
 import { SpacesPage } from "./admin/console/spaces-page";
+import { AdminTokensPage } from "./admin/console/tokens-page";
 import { UsagePage } from "./admin/console/usage-page";
 import { UsersPage } from "./admin/console/users-page";
 import { WebhooksPage } from "./admin/console/webhooks-page";
@@ -93,6 +96,7 @@ export function AppRoutes() {
         <Route path="inbox" element={<InboxView />} />
         <Route path="settings/notifications" element={<NotificationSettingsView />} />
         <Route path="settings/private-spaces" element={<PrivateSpacesView />} />
+        <Route path="settings/api-tokens" element={<ApiTokensPage />} />
         <Route path="new" element={<NewPageView />} />
         <Route path="my-work" element={<MyWorkPage />} />
         <Route path="issues" element={<IssuesPage />} />
@@ -114,6 +118,7 @@ export function AppRoutes() {
         <Route path="admin/users" element={<UsersPage />} />
         <Route path="admin/spaces" element={<SpacesPage />} />
         <Route path="admin/groups" element={<GroupsPage />} />
+        <Route path="admin/tokens" element={<AdminTokensPage />} />
         <Route path="*" element={<NotFoundView />} />
       </Route>
     </Routes>
@@ -138,6 +143,8 @@ export interface AppServices {
   readonly books?: BooksApi | undefined;
   /** Private spaces' device keys, from a Vellum server; absent in demo mode. */
   readonly privateSpaces?: PrivateSpacesApi | undefined;
+  /** The person's API tokens and sign-in factors; absent in demo mode. */
+  readonly account?: AccountApi | undefined;
   readonly collections: CollectionsStore;
   /** Present when a Vellum server answered; absent in demo mode. */
   readonly session?: { readonly auth: AuthApi; readonly status: AuthStatus } | undefined;
@@ -194,13 +201,17 @@ export function AppProviders({
   work,
   books,
   privateSpaces,
+  account,
   collections,
   session,
   notifications,
   reauth,
   children,
 }: AppServices & { readonly children: ReactNode }) {
-  const serverApis = useMemo(() => ({ work, books, privateSpaces }), [work, books, privateSpaces]);
+  const serverApis = useMemo(
+    () => ({ work, books, privateSpaces, account }),
+    [work, books, privateSpaces, account],
+  );
   const [demoNotifications] = useState<NotificationServices>(() => ({
     store: createMockNotificationPreferencesStore(),
   }));

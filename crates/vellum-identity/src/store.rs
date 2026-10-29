@@ -264,6 +264,19 @@ pub struct State {
     /// Named groups by ID.
     #[serde(default)]
     pub groups: BTreeMap<String, Group>,
+    /// How people may sign in, set in Admin → Sign-in (ADR 0069).
+    #[serde(default)]
+    pub sign_in: SignInSettings,
+}
+
+/// The workspace's sign-in rules, one record set by administrators
+/// (ADR 0069).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SignInSettings {
+    /// The longest expiry, in days, a personal API token may have; `None`
+    /// allows tokens that never expire (D291).
+    pub max_token_days: Option<u32>,
 }
 
 impl State {
