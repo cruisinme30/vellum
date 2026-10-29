@@ -291,7 +291,11 @@ export function layoutAudit(): Finding[] {
     }
   }
   for (const face of document.fonts) {
-    if (face.status === "error") {
+    // WebKit marks a font-display: optional face as "error" when it misses
+    // the short block period, and the page keeps its fallback font, which is
+    // what optional asks for. A missing or blocked font file is still caught
+    // by the harness as a failed request or an HTTP error.
+    if (face.status === "error" && face.display !== "optional") {
       findings.push({
         rule: "font-failed",
         target: "document.fonts",

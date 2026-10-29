@@ -6,7 +6,14 @@ import { expect, test } from "@playwright/test";
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
+// WebKit sometimes navigated during the axe scan while the offline worker
+// installed; blocking it removed that. The PWA has its own tests.
+test.use({ serviceWorkers: "block" });
+
 test("the command menu opens from the keyboard and passes WCAG 2.2 AA", async ({ page }) => {
+  // Reduced motion turns off the 80 ms pop-in, so axe never measures
+  // half-faded text and no animation is left to wait on.
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   await expect(page.getByRole("navigation", { name: "Main" })).toBeVisible();
   await page.keyboard.press("ControlOrMeta+k");

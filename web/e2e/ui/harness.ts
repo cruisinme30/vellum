@@ -85,8 +85,9 @@ export async function layoutShift(page: Page): Promise<number> {
 
 /** Waits until the page is quiet: network idle, fonts loaded, two frames painted. */
 export async function settle(page: Page): Promise<void> {
-  // Pages that poll never go idle; the fonts and frames below still settle them.
-  await page.waitForLoadState("networkidle").catch((error: unknown) => {
+  // Pages that poll never go idle, nor does WebKit while a looping video
+  // streams, so the wait is capped; the fonts and frames below still settle them.
+  await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch((error: unknown) => {
     if (!(error instanceof Error && error.name === "TimeoutError")) throw error;
   });
   await page.evaluate(async () => {
