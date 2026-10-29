@@ -12,8 +12,8 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D34, D35, D36
-- Issue: none (recorded before the issue rule, D119)
-- Pull requests: #22
+- Issue: #47, #48, #49, #50
+- Pull requests: #22, #29, #238
 
 :::
 
@@ -74,3 +74,7 @@ on-disk format and the provider contract in `vellum-crypto`.
   mode, and `reseal` as the one migration and rotation step.
 - `head`, `get`, `put` and `rename` report plaintext sizes; listings
   report stored sizes because they never read content.
+- KEK backends: the OS keychain (macOS, Windows, Linux Secret Service), a
+  passphrase from `VELLUM_KEK_PASSPHRASE` or `VELLUM_KEK_PASSPHRASE_FILE`,
+  and in `vellum-kms` AWS KMS, Cloud KMS and Vault transit over HTTPS. Their
+  KEK ids name the remote key and go along as associated data.

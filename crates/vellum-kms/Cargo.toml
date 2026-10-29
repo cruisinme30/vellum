@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+[package]
+name = "vellum-kms"
+description = "Remote key-encryption-key providers: AWS KMS, GCP Cloud KMS and HashiCorp Vault transit."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[package.metadata.vellum]
+layer = "engine"
+
+[lints]
+workspace = true
+
+[dependencies]
+base64 = "0.23.1"
+hmac = "0.13"
+reqwest = { version = "0.13", default-features = false, features = ["rustls"] }
+serde_json = "1.0.154"
+sha2 = "0.11.1"
+tracing = "0.1.44"
+vellum-crypto = { path = "../vellum-crypto" }
+zeroize = "1.9.1"
+
+[dev-dependencies]
+tokio = { version = "1.54.1", features = ["io-util", "macros", "net", "rt-multi-thread"] }
