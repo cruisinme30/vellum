@@ -509,6 +509,7 @@ mod tests {
             args: String::new(),
             attrs: Attributes::default(),
             literal: literal.into(),
+            id: None,
         }
     }
 

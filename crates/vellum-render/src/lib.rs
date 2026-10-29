@@ -255,7 +255,7 @@ fn kroki_fences(blocks: &[Block]) -> Vec<&Fence> {
                 Block::Fence(f) if matches!(figure::engine(f), Some(Engine::Kroki(_))) => {
                     out.push(f);
                 }
-                Block::BlockQuote { blocks } => walk(blocks, out, depth + 1),
+                Block::BlockQuote { blocks, .. } => walk(blocks, out, depth + 1),
                 Block::List(l) => l.items.iter().for_each(|i| walk(&i.blocks, out, depth + 1)),
                 Block::Container(c) => c.sections.iter().for_each(|s| walk(s, out, depth + 1)),
                 _ => {}

@@ -203,14 +203,21 @@ impl<'a> Writer<'a> {
                 id,
             } => self.heading(*level, content, attrs, id.map(|b| b.to_string())),
             Block::ThematicBreak => self.out.push_str("<hr>"),
-            Block::BlockQuote { blocks } => {
-                self.out.push_str("<blockquote>");
+            Block::BlockQuote { blocks, id } => {
+                self.out.push_str("<blockquote");
+                self.block_id(id.as_ref());
+                self.out.push('>');
                 self.blocks(blocks);
                 self.out.push_str("</blockquote>");
             }
             Block::List(list) => self.list(list, ""),
             Block::Fence(f) => self.fence(f),
-            Block::Math { literal } => self.math(literal),
+            Block::Math { literal, id } => {
+                self.out.push_str("<div class=\"vl-math\"");
+                self.block_id(id.as_ref());
+                self.out.push('>');
+                self.math(literal);
+            }
             Block::Table(t) => self.table(t),
             Block::Container(c) => self.container(c),
         }
@@ -305,8 +312,17 @@ impl<'a> Writer<'a> {
         }
     }
 
+    /// Writes ` id="u-blk-…"` for a block id (the anchor for deep links and
+    /// comments).
+    fn block_id(&mut self, id: Option<&impl std::fmt::Display>) {
+        if let Some(id) = id {
+            let id = self.unique_id(&id.to_string());
+            push_attr(&mut self.out, "id", &id);
+        }
+    }
+
+    /// The body of a `vl-math` div, which the caller opens.
     fn math(&mut self, literal: &str) {
-        self.out.push_str("<div class=\"vl-math\">");
         let rendered = crate::math::to_mathml(literal).and_then(|m| self.island(&m));
         if let Err(e) = rendered {
             self.warn(format!("math: {e}"));
@@ -471,8 +487,8 @@ fn plain_block_text(b: &Block) -> String {
             vellum_format::plain_text(content)
         }
         Block::Fence(f) => f.literal.clone(),
-        Block::Math { literal } => literal.clone(),
-        Block::BlockQuote { blocks } => blocks
+        Block::Math { literal, .. } => literal.clone(),
+        Block::BlockQuote { blocks, .. } => blocks
             .iter()
             .map(plain_block_text)
             .collect::<Vec<_>>()
