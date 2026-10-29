@@ -3,9 +3,16 @@
 
 # cargo-audit settings. Keep in step with [advisories] in deny.toml.
 [advisories]
+# smallstr is unmaintained (no vulnerability); yrs 0.28 depends on it.
 ignore = [
-    # smallstr is unmaintained (no vulnerability); yrs 0.28 depends on it.
     "RUSTSEC-2026-0215",
-    # bincode 1.3.3 via syntect: unmaintained, no known vulnerability.
+    # Typst 0.15 (print PDF export); see deny.toml for the reasons.
     "RUSTSEC-2025-0141",
+    "RUSTSEC-2024-0436",
+    "RUSTSEC-2026-0194",
+    "RUSTSEC-2026-0195",
+    "RUSTSEC-2026-0206",
+    "RUSTSEC-2026-0192",
+    "RUSTSEC-2024-0449",
+    "RUSTSEC-2024-0320",
 ]

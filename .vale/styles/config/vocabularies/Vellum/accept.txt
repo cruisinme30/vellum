@@ -12,6 +12,8 @@ Northstar
 [Ss]ign(s|ed)?
 [Ss]erialize
 Kroki
+Docmost
+Gotenberg
 MinIO
 Postgres
 ProseMirror

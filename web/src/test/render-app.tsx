@@ -8,6 +8,8 @@ import type { ReactNode } from "react";
 import { MemoryRouter, useLocation } from "react-router";
 
 import { AppProviders, AppRoutes } from "../app";
+import { createMockCollectionsStore } from "../collections/mock";
+import type { CollectionsStore } from "../collections/store";
 import { createNorthstarStore } from "../data/mock/northstar";
 import type { WorkspaceStore } from "../data/store";
 import { createLocalConnector, type ChannelFactory } from "../editor/collab/local-connector";
@@ -41,6 +43,7 @@ function LocationProbe() {
 
 interface Rendered extends RenderResult {
   readonly store: WorkspaceStore;
+  readonly collections: CollectionsStore;
   readonly user: UserEvent;
   /** The router's current path and query. */
   readonly location: () => string;
@@ -51,11 +54,12 @@ export function renderWithProviders(
   element: ReactNode,
   path = "/",
   store: WorkspaceStore = createNorthstarStore(),
+  collections: CollectionsStore = createMockCollectionsStore(),
 ): Rendered {
   const collab = createTestCollab();
   const user = userEvent.setup();
   const result = render(
-    <AppProviders store={store} collab={collab}>
+    <AppProviders store={store} collab={collab} collections={collections}>
       <MemoryRouter initialEntries={[path]}>
         {element}
         <LocationProbe />
@@ -65,14 +69,19 @@ export function renderWithProviders(
   return {
     ...result,
     store,
+    collections,
     user,
     location: () => result.getByTestId("location").textContent,
   };
 }
 
 /** Renders every route of the app at a path, by default on the Northstar demo. */
-export function renderApp(path = "/", store?: WorkspaceStore): Rendered {
-  return renderWithProviders(<AppRoutes />, path, store);
+export function renderApp(
+  path = "/",
+  store?: WorkspaceStore,
+  collections?: CollectionsStore,
+): Rendered {
+  return renderWithProviders(<AppRoutes />, path, store, collections);
 }
 
 /** Makes `matchMedia` report a match for the given queries only. */

@@ -1,0 +1,1 @@
+[Normal] Each bad field is reported, and the page still renders.

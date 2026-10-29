@@ -43,6 +43,11 @@ function familyIds(): string[] {
     ...["comfortable", "compact"].map((density) => `density-${density}`),
     ...["draft", "in-review", "verified", "outdated"].map((status) => `status-${status}`),
     ...literals(toolbar, /\bid: "([\w-]+)"/g).map((id) => `toolbar-${id}`),
+    // Parse errors of collection editors, returned by parseInput.
+    ...literals(
+      readFileSync(path.join(SOURCE_ROOT, "collections/value.ts"), "utf8"),
+      /"(collection-error-[\w-]+)"/g,
+    ),
   ];
 }
 

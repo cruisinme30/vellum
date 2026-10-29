@@ -1,0 +1,4 @@
+[ListParagraph/2] 
+[ListParagraph/2] Item
+[Normal] A list whose only item is loose:
+[ListParagraph/0] ☐ Northstar

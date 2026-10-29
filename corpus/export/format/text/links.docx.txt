@@ -1,0 +1,3 @@
+[Normal] See the deploy runbook, https://northstar.dev/status or https://northstar.dev/changelog.
+[Normal] Write to dev@northstar.dev, or open the docs.
+[Normal] [Image: Architecture overview]
