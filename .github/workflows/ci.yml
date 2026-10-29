@@ -76,6 +76,15 @@ jobs:
             passed="$(gh api "repos/${GH_REPO}/actions/workflows/${WORKFLOW}/runs?head_sha=${SHA}&status=success" \
               --jq '.total_count' || echo 0)"
           fi
+          # A merge commit on develop whose tree is exactly its pull
+          # request's head was already tested on that pull request (the
+          # integrator's batches), so its push run checks nothing again.
+          if [[ "${EVENT}" == "push" ]] && git rev-parse --verify --quiet HEAD^2 >/dev/null &&
+            [[ "$(git rev-parse 'HEAD^{tree}')" == "$(git rev-parse 'HEAD^2^{tree}')" ]]; then
+            pr_head="$(git rev-parse HEAD^2)"
+            passed="$(gh api "repos/${GH_REPO}/actions/workflows/${WORKFLOW}/runs?head_sha=${pr_head}&status=success" \
+              --jq '.total_count' || echo 0)"
+          fi
           if ((passed > 0)); then
             echo "This commit already passed; checking the description only."
             printf 'rust=false\nweb=false\ndesktop=false\nui=false\nfiles=false\n' | tee -a "${GITHUB_OUTPUT}"
