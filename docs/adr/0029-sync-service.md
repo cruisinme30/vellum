@@ -12,6 +12,7 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D116, D117, D118
+- Issue: #216
 - Builds on: ADR 0023 (D98, the client side of the contract)
 - Requirements: R-WK-6 (sub-100 ms perceived latency), R-LT-4 (offline),
   permission changes visible in under 1 s (brief §12)
@@ -27,6 +28,17 @@ records it may read, and stay correct when permissions change, the index
 is rebuilt, or a device stays offline for weeks. It must run on SQLite in
 the single binary and on Postgres in HA, and a service may never read
 another service's tables.
+
+## Options considered
+
+- **Append-only event log**: simple writes, but it grows without bound and
+  a long-offline client replays every intermediate version. Rejected.
+- **Per-record latest version with a global sequence**: bounded by the
+  number of records, cheap snapshots, same SQL on SQLite and Postgres.
+  Chosen.
+- **Postgres logical replication (ElectricSQL-style)**: no SQLite story
+  for the single binary, and row-level permissions are hard to apply.
+  Rejected.
 
 ## Decisions
 
@@ -93,3 +105,8 @@ another service's tables.
   downloads a fresh snapshot once.
 - Permission changes cost one snapshot per affected person, which is rare
   and bounded by what they can read.
+
+## History
+
+- 2026-10-29: accepted; engine and in-memory store in the pull request
+  that closes #216.
