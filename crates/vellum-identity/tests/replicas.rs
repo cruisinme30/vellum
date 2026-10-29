@@ -96,7 +96,7 @@ async fn oauth_codes_cross_replicas_once(config: &IndexConfig) {
     let Authorize::Consent(view) = a.authorize(user, &request).await else {
         panic!("expected a consent screen");
     };
-    let back = Url::parse(&b.decide(user, &view.consent_id, true).unwrap()).unwrap();
+    let back = Url::parse(&b.decide(user, None, &view.consent_id, true).unwrap()).unwrap();
     let code = back
         .query_pairs()
         .find(|(k, _)| k == "code")

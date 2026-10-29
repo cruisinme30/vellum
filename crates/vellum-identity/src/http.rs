@@ -255,9 +255,14 @@ async fn consent(
     Extension(principal): Extension<Principal>,
     Json(input): Json<Decision>,
 ) -> Response {
-    let result = principal
-        .require_user()
-        .and_then(|user| identity.decide(user, &input.consent_id, input.approve));
+    let result = principal.require_user().and_then(|user| {
+        identity.decide(
+            user,
+            principal.authenticated_at(),
+            &input.consent_id,
+            input.approve,
+        )
+    });
     match result {
         Ok(url) => no_store(Json(json!({ "redirectTo": url })).into_response()),
         Err(e) => error_response(&e, id),
