@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+[package]
+name = "xtask"
+description = "Repository automation: architecture checks run by CI."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+cargo_metadata = "0.23.1"
+
+[lints]
+workspace = true

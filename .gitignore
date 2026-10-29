@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+/target/
+node_modules/
+/web/dist/
+/web/coverage/
+/web/playwright-report/
+/web/test-results/
+/lcov.info
+.DS_Store
+*.swp
+.env
+.env.*
+!.env.example

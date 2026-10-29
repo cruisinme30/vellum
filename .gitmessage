@@ -1,0 +1,9 @@
+# <type>(<scope>): <summary in the imperative, at most 72 characters>
+#
+# Why this change is needed, and what it changes. Wrap at 72 columns.
+# Reference requirement or decision IDs, e.g. "Implements R-FMT-3."
+#
+# Signed-off-by: Your Name <you@example.com>   (added by git commit -s)
+#
+# Types: build chore ci docs feat fix perf refactor revert style test
+# Enable this template once: git config commit.template .gitmessage
