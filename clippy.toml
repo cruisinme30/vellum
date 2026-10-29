@@ -10,4 +10,4 @@ allow-indexing-slicing-in-tests = true
 allow-print-in-tests = true
 
 # Product and protocol names that are not code identifiers.
-doc-valid-idents = ["SQLite", "SQLCipher", "PostgreSQL", "OpenTelemetry", "GraphQL", "OpenAPI", "WebSocket", "..."]
+doc-valid-idents = ["SQLite", "SQLCipher", "PostgreSQL", "OpenTelemetry", "GraphQL", "OpenAPI", "WebSocket", "GitHub", "GitLab", "..."]
