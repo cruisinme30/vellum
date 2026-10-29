@@ -101,6 +101,7 @@ sharing.check: user/drive/sharing.md#check
 ai.connect: user/ai/README.md#connect
 ai.tools: user/ai/README.md#tools
 ai.scopes: user/ai/README.md#scopes
+ai.private: user/ai/README.md#private
 ai.drafts: user/ai/drafts.md#review
 
 # Admin

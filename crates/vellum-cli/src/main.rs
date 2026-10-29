@@ -8,13 +8,17 @@
 //! `vellum graphql-schema` print the API contracts the clients are
 //! generated from. `vellum docs` reads the help books built into the
 //! binary; `vellum mcp` serves the MCP server over stdio; `vellum reindex`
-//! rebuilds the index from the data folder.
+//! rebuilds the index from the data folder; `vellum private` manages this
+//! device's key for end-to-end encrypted private spaces.
 
 mod docs;
 mod identity;
 #[cfg(test)]
 mod identity_tests;
 mod mcp;
+mod private;
+#[cfg(test)]
+mod private_tests;
 mod reindex;
 mod serve;
 mod services;
@@ -58,6 +62,9 @@ enum Command {
     GraphqlSchema,
     /// Rebuild the index from the files in the data folder.
     Reindex(reindex::Args),
+    /// End-to-end encrypted private spaces on this device.
+    #[command(subcommand)]
+    Private(private::PrivateCommand),
 }
 
 /// Administration subcommands.
@@ -144,6 +151,10 @@ fn main() -> ExitCode {
             mcp::run(&args)
         }
         Command::Admin(AdminCommand::BreakGlass { config }) => break_glass(config.as_deref()),
+        Command::Private(command) => match private::run(&command) {
+            Ok(lines) => print(&lines.join("\n")),
+            Err(error) => fail(&error),
+        },
         Command::Reindex(args) => {
             let telemetry_config = TelemetryConfig::from_env("vellum", env!("CARGO_PKG_VERSION"));
             let _guard = match telemetry::init(&telemetry_config) {
