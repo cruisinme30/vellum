@@ -42,3 +42,13 @@ pnpm
 tsc
 Affero
 [Ww]orkstreams?
+comrak
+[Ss]erializ(e|er|ers|able|ed|es|ing)
+[Ss]etext
+CommonMark
+GFM
+YAML
+ATX
+[Ww]ikilinks?
+[Ss]ubscript
+[Ss]uperscript
