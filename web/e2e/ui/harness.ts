@@ -32,6 +32,12 @@ function watchErrors(page: Page): Problem[] {
     problems.push({ rule: "uncaught-exception", target: "window", message: error.message });
   });
   page.on("requestfailed", (request) => {
+    // Browsers cancel a video source they won't play (WebKit and WebM) or
+    // no longer need; that is not a failed load.
+    const error = request.failure()?.errorText ?? "";
+    const media =
+      request.resourceType() === "media" || /\.(?:webm|mp4|ogg|mp3)$/.test(request.url());
+    if (media && /abort|cancel/i.test(error)) return;
     problems.push({
       rule: "request-failed",
       target: request.url(),
