@@ -1,0 +1,45 @@
+// SPDX-FileCopyrightText: 2026 The Vellum contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+
+import { useWorkspace } from "../data/workspace-context";
+import { useT } from "../i18n/i18n";
+
+import { PageList } from "./page-list";
+
+/** Home: recently changed pages and favourites. */
+export function HomeView() {
+  const t = useT();
+  const workspace = useWorkspace();
+  const recent = workspace.pages
+    .toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .slice(0, 6);
+  const starred = workspace.pages.filter((p) => p.starred);
+  return (
+    <div className="vl-view">
+      <h1>{t("home-greeting", { name: workspace.me.name.split(" ")[0] ?? "" })}</h1>
+      <section aria-labelledby="home-recent">
+        <h2 id="home-recent">{t("home-recent")}</h2>
+        <PageList items={recent.map((page) => ({ page }))} empty={t("home-recent-empty")} />
+      </section>
+      <section aria-labelledby="home-starred">
+        <h2 id="home-starred">{t("nav-favorites")}</h2>
+        <PageList items={starred.map((page) => ({ page }))} empty={t("favorites-empty")} />
+      </section>
+    </div>
+  );
+}
+
+/** Favorites: starred pages. */
+export function FavoritesView() {
+  const t = useT();
+  const workspace = useWorkspace();
+  return (
+    <div className="vl-view">
+      <h1>{t("nav-favorites")}</h1>
+      <PageList
+        items={workspace.pages.filter((p) => p.starred).map((page) => ({ page }))}
+        empty={t("favorites-empty")}
+      />
+    </div>
+  );
+}

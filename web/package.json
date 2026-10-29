@@ -21,9 +21,30 @@
     "e2e": "playwright test"
   },
   "dependencies": {
+    "@fluent/bundle": "^0.19.1",
+    "@fontsource/roboto": "^5.3.0",
+    "@material-symbols/svg-400": "^0.48.2",
+    "@tiptap/core": "3.32.1",
+    "@tiptap/extension-code-block": "3.32.1",
+    "@tiptap/extension-collaboration": "3.32.1",
+    "@tiptap/extension-collaboration-caret": "3.32.1",
+    "@tiptap/extension-highlight": "3.32.1",
+    "@tiptap/extension-list": "3.32.1",
+    "@tiptap/extension-subscript": "3.32.1",
+    "@tiptap/extension-superscript": "3.32.1",
+    "@tiptap/extension-table": "3.32.1",
+    "@tiptap/extensions": "3.32.1",
+    "@tiptap/pm": "3.32.1",
+    "@tiptap/react": "3.32.1",
+    "@tiptap/starter-kit": "3.32.1",
+    "@tiptap/suggestion": "3.32.1",
+    "@tiptap/y-tiptap": "^3.0.11",
     "idb": "8.0.4",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "react-router": "^8.5.1",
+    "y-protocols": "^1.0.7",
+    "yjs": "^13.6.33"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",

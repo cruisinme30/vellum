@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 /** An attribute declared in `schema/blocks.json`. */
-export interface AttrData {
+export interface AttributeData {
   readonly type: "string" | "integer" | "boolean" | "enum";
   readonly default: string | number | boolean;
   readonly values?: readonly string[];
@@ -43,7 +43,7 @@ export interface NodeData {
   readonly blockId?: boolean;
   /** The Vellum Markdown construct the node maps to. */
   readonly markdown: string;
-  readonly attrs: Readonly<Record<string, AttrData>>;
+  readonly attrs: Readonly<Record<string, AttributeData>>;
   readonly slash: readonly SlashData[];
 }
 
@@ -53,6 +53,6 @@ export interface MarkData {
   readonly doc: string;
   readonly impl: "tiptap" | "generic" | "custom";
   readonly markdown: string;
-  readonly attrs: Readonly<Record<string, AttrData>>;
+  readonly attrs: Readonly<Record<string, AttributeData>>;
   readonly excludes?: string;
 }

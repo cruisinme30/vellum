@@ -215,10 +215,7 @@
       "defining": true,
       "blockId": true,
       "markdown": "container:details",
-      "attrs": {
-        "summary": { "type": "string", "default": "Details" },
-        "open": { "type": "boolean", "default": false, "transient": true }
-      },
+      "attrs": { "summary": { "type": "string", "default": "Details" } },
       "slash": [
         { "title": "Toggle", "description": "Collapsible section", "keywords": ["details", "collapse", "expand", "accordion"], "section": "Layout", "icon": "expand_circle_down" }
       ]

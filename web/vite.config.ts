@@ -8,6 +8,8 @@ export default defineConfig({
   plugins: [react()],
   build: {
     sourcemap: true,
+    // The editor chunk (Tiptap, ProseMirror, Yjs) is about 560 kB; it loads lazily.
+    chunkSizeWarningLimit: 600,
   },
   test: {
     environment: "jsdom",

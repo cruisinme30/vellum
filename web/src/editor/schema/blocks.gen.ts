@@ -249,7 +249,7 @@ export const NODES = [
     defining: true,
     blockId: true,
     markdown: "container:details",
-    attrs: { "open": { type: "boolean", default: false, transient: true }, "summary": { type: "string", default: "Details" }, },
+    attrs: { "summary": { type: "string", default: "Details" }, },
     slash: [
       { title: "Toggle", description: "Collapsible section", keywords: ["details","collapse","expand","accordion"], section: "Layout", icon: "expand_circle_down", attrs: {} },
     ],
