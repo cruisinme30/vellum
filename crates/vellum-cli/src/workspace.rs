@@ -59,6 +59,7 @@ use crate::cluster::Replica;
 use crate::collab::{Collab, LivePages};
 use crate::feed::{AnnouncingStore, Caches};
 use crate::google_http::{self, Endpoints, FileLinks, GoogleHttp};
+use crate::identity::IdentityAuthenticator;
 use crate::page_render::{Handles, PageRenderService};
 use crate::reindex::{KEY_VAR, key_bytes};
 use crate::tasks::{DriveTasks, Parts, TasksSettings};
@@ -894,9 +895,8 @@ pub async fn open(
         index.clone(),
         &config.data_dir,
         app_origin,
-        Arc::new(crate::identity::IdentityAuthenticator::new(Arc::clone(
-            identity,
-        ))),
+        Arc::new(IdentityAuthenticator::new(Arc::clone(identity))),
+        crate::collab::cluster(&index, &me, &var)?,
     )?;
     keep_drives(&workspace.drive, &drive_index, identity).await?;
     live_pages.attach(&collab);

@@ -229,15 +229,21 @@ impl Services {
             .map_or_else(crate::collab::unavailable_router, Collab::router)
     }
 
-    /// Saves every page open for live editing and closes its connections,
-    /// then leaves the cluster's heartbeat table.
+    /// Leaves the cluster's heartbeat table, so the other replicas take
+    /// over this one's live-editing rooms at once, then saves every page
+    /// open for live editing and closes its connections.
     /// Call it after the server stops accepting requests.
     pub async fn shutdown(&self) {
+        // Stop both heartbeats before saving the rooms, so neither puts
+        // this replica back in the list while its editors move away.
         if let Some(collab) = &self.collab {
-            collab.shutdown().await;
+            collab.leave_cluster().await;
         }
         if let Some(replica) = &self.replica {
             replica.leave().await;
+        }
+        if let Some(collab) = &self.collab {
+            collab.shutdown().await;
         }
     }
 
