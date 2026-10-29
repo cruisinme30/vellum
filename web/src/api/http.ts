@@ -21,7 +21,7 @@
 import { type HealthMonitor, retryAfterSeconds, serviceHealth } from "./health";
 
 /** The longest `Retry-After` the client waits out before giving up. */
-export const MAX_RETRY_WAIT_MS = 5000;
+const MAX_RETRY_WAIT_MS = 5000;
 
 /** The server's stable error codes, plus `network` when no answer came. */
 export type ErrorCode =

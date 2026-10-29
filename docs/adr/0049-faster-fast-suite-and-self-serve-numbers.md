@@ -47,6 +47,9 @@ Threads also stopped work to ask the coordinator for ADR and D numbers.
 - "Rust tests" is its own job, started as soon as "Changed areas"
   finishes. "Rust" keeps format, clippy, docs and the policy checks.
 - Each job keeps its own Rust cache, saved only on develop (D138).
+  When a develop push skips its checks because the batch already passed,
+  both Rust jobs still build (clippy, docs, test binaries) to save the
+  caches; otherwise every batch would build from cold.
 - `[profile.dev]` uses `debug = "line-tables-only"`, and dependencies
   build with no debug info. Panic traces keep file and line numbers, while
   linking, cache restores and sandbox target directories all get smaller.
