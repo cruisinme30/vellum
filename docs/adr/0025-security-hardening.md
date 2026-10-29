@@ -53,12 +53,12 @@ one place, and services call it.
 - The type comes from magic bytes, never from the client's
   `Content-Type`. The extension must agree with it, and unknown types are
   refused.
-- Raster images are decoded under limits of 16384 px per side and a
+- Raster images are decoded under limits of 16384 pixels per side and a
   512 MiB allocation cap, then re-encoded. This strips `EXIF`, comments and
   polyglot payloads.
 - SVG, ZIP, Office files and text are always served with
   `Content-Disposition: attachment`. SVG is inlined only after the
-  renderer's sanitizer.
+  sanitizer in the render service.
 - The `ClamAV` hook (`clamd` `INSTREAM`) is optional. When it is configured
   it fails closed: if the scanner is unreachable, the upload is refused.
 - Secret scanning on save warns by default, and an admin policy can block
