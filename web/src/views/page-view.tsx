@@ -7,7 +7,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import { useSession } from "../api/session";
 import { PageFilesProvider } from "../attachments/context";
 import { FilesPanel } from "../attachments/files-panel";
-import { useServerApis, useServerApi  } from "../data/server-apis";
+import { useServerApis, useServerApi } from "../data/server-apis";
 import { ancestors, siblings } from "../data/tree";
 import type { PageMeta } from "../data/types";
 import { useServices, useWorkspace } from "../data/workspace-context";
