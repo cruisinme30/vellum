@@ -23,7 +23,8 @@
 //! Writes are announced in the index's change feed, and each replica
 //! follows it to keep its caches fresh (see [`crate::feed`]).
 //! Search indexes the drive's pages and the collections' rows (see
-//! [`crate::search`]).
+//! [`crate::search`]). Every blob store call is metered
+//! (`vellum_store_*`, see [`vellum_store::Metered`]).
 
 use std::path::Path;
 use std::sync::{Arc, RwLock};
@@ -44,7 +45,7 @@ use vellum_identity::Identity;
 use vellum_kernel::{Config, Error, ErrorKind, UserId};
 use vellum_notify::service::NotifyStore;
 use vellum_store::remote::s3::{S3Config, S3Store};
-use vellum_store::{BlobPath, BlobStore, LocalStore, StoreError};
+use vellum_store::{BlobPath, BlobStore, LocalStore, Metered, StoreError};
 use vellum_tasks::google::Google;
 use vellum_tasks::service::{Config as TasksConfig, TasksService};
 use vellum_work::{UserRef, WorkEvent};
@@ -198,15 +199,26 @@ async fn open_files(config: &Config, bucket: Option<S3Config>) -> Result<Files, 
             .await
             .map_err(|e| unavailable("cannot open the data folder", e))?;
         return Ok(Files {
-            store: Arc::new(store),
+            store: Arc::new(Metered::new(store)),
             local: true,
         });
     };
     let store = S3Store::new(bucket).map_err(|e| unavailable("cannot use the blob store", e))?;
     Ok(Files {
-        store: Arc::new(store),
+        store: Arc::new(Metered::new(store)),
         local: false,
     })
+}
+
+/// Warns when files are shared but the index is not, which only works
+/// for one replica.
+fn warn_if_unshared(local: bool, index: &IndexConfig) {
+    if !local && matches!(index, IndexConfig::Sqlite { .. }) {
+        tracing::warn!(
+            "files are in a shared bucket but the index is this machine's SQLite file; \
+             run one replica only, or set a database URL"
+        );
+    }
 }
 
 /// Reports whether the blob store answers, for `/readyz`. It has no
@@ -273,9 +285,9 @@ fn keep_fresh(
     cursor: i64,
     workspace: &Workspace,
     spaces: &Arc<Spaces>,
-    drive_index: Arc<SqlIndex>,
+    drive_index: &Arc<SqlIndex>,
 ) {
-    let (reload, from) = (Arc::clone(spaces), Arc::clone(&drive_index));
+    let (reload, from) = (Arc::clone(spaces), Arc::clone(drive_index));
     crate::feed::follow(
         feed,
         me,
@@ -294,7 +306,7 @@ fn keep_fresh(
             }),
         },
     );
-    let refresh = Arc::clone(spaces);
+    let (refresh, drive_index) = (Arc::clone(spaces), Arc::clone(drive_index));
     drop(tokio::spawn(async move {
         let mut tick = tokio::time::interval(SPACES_REFRESH);
         tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
@@ -438,6 +450,8 @@ pub struct Opened {
     pub collab: Option<Collab>,
     /// My Work, which also serves the feed, CalDAV and capture routes.
     pub tasks: Option<Arc<TasksService>>,
+    /// The drive index, which Admin → Usage counts pages and storage from.
+    pub drive_index: Option<Arc<dyn DriveIndex>>,
 }
 
 /// My Work's settings: where its secrets live and what it links to.
@@ -646,12 +660,7 @@ pub async fn open(
         store: files,
         local,
     } = open_files(config, bucket).await?;
-    if !local && matches!(index_config, IndexConfig::Sqlite { .. }) {
-        tracing::warn!(
-            "files are in a shared bucket but the index is this machine's SQLite file; \
-             run one replica only, or set a database URL"
-        );
-    }
+    warn_if_unshared(local, &index_config);
     tracing::info!(backend = files.backend(), "workspace files opened");
     // Follow the feed from before anything is loaded, so no change made
     // meanwhile is missed.
@@ -726,7 +735,7 @@ pub async fn open(
     })
     .await?;
     workspace.services.push(Arc::new(search));
-    keep_fresh(feed, me, cursor, &workspace, &spaces, drive_index);
+    keep_fresh(feed, me, cursor, &workspace, &spaces, &drive_index);
     sync_calendars(Arc::clone(&workspace.tasks));
     let mut services = workspace.services;
     services.push(Arc::new(Storage(store)));
@@ -735,6 +744,7 @@ pub async fn open(
         hooks,
         collab: Some(collab),
         tasks: Some(workspace.tasks),
+        drive_index: Some(drive_index as Arc<dyn DriveIndex>),
     })
 }
 

@@ -279,6 +279,8 @@ fn main() -> ExitCode {
                 Ok(guard) => guard,
                 Err(error) => return fail(&error),
             };
+            // Resident memory and threads, for the saturation panels.
+            vellum_observe::process::register_metrics();
             match serve::run(config.as_deref(), observability) {
                 Ok(()) => ExitCode::SUCCESS,
                 Err(error) => {

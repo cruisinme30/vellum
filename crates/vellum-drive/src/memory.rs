@@ -22,7 +22,7 @@ use vellum_kernel::{ObjectId, SpaceId, Timestamp, UserId, VersionId};
 use vellum_store::BlobPath;
 
 use crate::error::DriveResult;
-use crate::model::{Activity, Node, Space, VersionRecord};
+use crate::model::{Activity, DriveTotals, Node, Space, VersionRecord};
 use crate::ports::{Access, DriveIndex, Permission};
 
 #[derive(Debug, Default)]
@@ -284,6 +284,31 @@ impl DriveIndex for MemoryIndex {
             .sum();
         Ok(nodes.saturating_add(versions))
     }
+
+    async fn totals(&self, now: Timestamp) -> DriveResult<DriveTotals> {
+        let state = self.lock();
+        let mut totals = DriveTotals {
+            spaces: count(state.spaces.len()),
+            versions: count(state.versions.len()),
+            version_bytes: state.versions.values().map(|v| v.size).sum(),
+            ..DriveTotals::default()
+        };
+        for node in state.nodes.values() {
+            totals.add_node(node.kind, node.is_live(), node.size);
+        }
+        let day = DAY_MS;
+        let ago = |a: &Activity| now.unix_ms().saturating_sub(a.at.unix_ms());
+        totals.events_1d = count(state.activity.iter().filter(|a| ago(a) <= day).count());
+        totals.events_7d = count(state.activity.iter().filter(|a| ago(a) <= 7 * day).count());
+        Ok(totals)
+    }
+}
+
+/// A day in milliseconds.
+const DAY_MS: i64 = 86_400_000;
+
+fn count(n: usize) -> u64 {
+    u64::try_from(n).unwrap_or(u64::MAX)
 }
 
 /// A role a person holds on a space or node.

@@ -293,6 +293,60 @@ pub struct Usage {
     pub quota: Option<u64>,
 }
 
+/// Counts across every space, from [`crate::DriveIndex::totals`]. Live
+/// counts leave out trashed nodes; bytes count everything kept.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct DriveTotals {
+    /// Spaces (shared and personal drives).
+    pub spaces: u64,
+    /// Live folders.
+    pub folders: u64,
+    /// Live pages.
+    pub pages: u64,
+    /// Live books.
+    pub books: u64,
+    /// Live collections.
+    pub collections: u64,
+    /// Live shortcuts.
+    pub shortcuts: u64,
+    /// Nodes in the trash.
+    pub trashed: u64,
+    /// Bytes of current files, live and trashed.
+    pub file_bytes: u64,
+    /// Saved versions.
+    pub versions: u64,
+    /// Bytes of saved versions.
+    pub version_bytes: u64,
+    /// Activity entries in the last 24 hours.
+    pub events_1d: u64,
+    /// Activity entries in the last 7 days.
+    pub events_7d: u64,
+}
+
+impl DriveTotals {
+    /// Adds one node.
+    pub const fn add_node(&mut self, kind: NodeKind, live: bool, bytes: u64) {
+        self.file_bytes = self.file_bytes.saturating_add(bytes);
+        self.add_nodes(kind, live, 1);
+    }
+
+    /// Adds `n` nodes of one kind, without their bytes.
+    pub const fn add_nodes(&mut self, kind: NodeKind, live: bool, n: u64) {
+        let slot = if live {
+            match kind {
+                NodeKind::Folder => &mut self.folders,
+                NodeKind::Page => &mut self.pages,
+                NodeKind::Book => &mut self.books,
+                NodeKind::Collection => &mut self.collections,
+                NodeKind::Shortcut => &mut self.shortcuts,
+            }
+        } else {
+            &mut self.trashed
+        };
+        *slot = slot.saturating_add(n);
+    }
+}
+
 /// What a scan of the store changed in the index.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ScanReport {

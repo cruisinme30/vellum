@@ -239,3 +239,72 @@ async fn shared_tables_follow_the_drive_on_postgres() -> TestResult {
     let url = format!("postgres://postgres:postgres@127.0.0.1:{port}/postgres");
     shared_tables_follow_the_drive(Index::open(&IndexConfig::postgres(url)).await?).await
 }
+
+/// Admin → Usage reads these totals: live items by kind, the trash, bytes
+/// and recent activity, the same on both backends and the memory index.
+async fn totals_count_the_drive(index: Arc<dyn DriveIndex>) -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let store = Arc::new(LocalStore::open(dir.path()).await?);
+    let access = Arc::new(MemoryAccess::new(index.clone()));
+    let drive = Drive::new(store, index.clone(), access);
+    let alice = Actor::User {
+        user: UserId::generate(),
+    };
+    let empty = index.totals(vellum_kernel::Timestamp::now()).await?;
+    assert_eq!(empty, vellum_drive::DriveTotals::default());
+
+    let eng = drive
+        .create_space(&alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .await?;
+    let folder = drive.create_folder(&alice, eng.id, None, "Specs").await?;
+    let _ = drive
+        .create_page(&alice, eng.id, Some(folder.id), "Plan", "Ship it.")
+        .await?;
+    let gone = drive
+        .create_page(&alice, eng.id, None, "Old", "bye")
+        .await?;
+    let _ = drive.trash(&alice, gone.id).await?;
+
+    let now = vellum_kernel::Timestamp::now();
+    let totals = index.totals(now).await?;
+    assert_eq!(totals.spaces, 1);
+    assert_eq!((totals.folders, totals.pages, totals.trashed), (1, 1, 1));
+    assert_eq!(
+        (totals.books, totals.collections, totals.shortcuts),
+        (0, 0, 0)
+    );
+    let bytes: u64 = index.nodes(eng.id).await?.iter().map(|n| n.size).sum();
+    assert!(bytes > 0);
+    assert_eq!(totals.file_bytes, bytes);
+    assert!(totals.events_1d >= 4, "{totals:?}");
+    assert_eq!(totals.events_1d, totals.events_7d);
+
+    // A week and a day later, nothing is recent any more.
+    let later = vellum_kernel::Timestamp::from_unix_ms(now.unix_ms() + 8 * 86_400_000)?;
+    let later = index.totals(later).await?;
+    assert_eq!((later.events_1d, later.events_7d), (0, 0));
+    assert_eq!(later.pages, 1);
+    Ok(())
+}
+
+#[tokio::test]
+async fn totals_count_the_drive_on_sqlite() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let db = Index::open(&IndexConfig::sqlite(dir.path().join("index.sqlite"), None)).await?;
+    totals_count_the_drive(Arc::new(SqlIndex::new(db))).await
+}
+
+#[tokio::test]
+async fn totals_count_the_drive_in_memory() -> TestResult {
+    totals_count_the_drive(Arc::new(vellum_drive::memory::MemoryIndex::new())).await
+}
+
+#[tokio::test]
+async fn totals_count_the_drive_on_postgres() -> TestResult {
+    let container: ContainerAsync<Postgres> =
+        Postgres::default().with_tag("17-alpine").start().await?;
+    let port = container.get_host_port_ipv4(5432).await?;
+    let url = format!("postgres://postgres:postgres@127.0.0.1:{port}/postgres");
+    let db = Index::open(&IndexConfig::postgres(url)).await?;
+    totals_count_the_drive(Arc::new(SqlIndex::new(db))).await
+}

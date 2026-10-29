@@ -32,8 +32,8 @@ pub use drive::{
 };
 pub use error::{DriveError, DriveResult};
 pub use model::{
-    Activity, ActivityKind, Node, NodeKind, RetentionPolicy, ScanReport, Space, SpaceKind,
-    SpaceSettings, TrashState, Usage, VersionRecord,
+    Activity, ActivityKind, DriveTotals, Node, NodeKind, RetentionPolicy, ScanReport, Space,
+    SpaceKind, SpaceSettings, TrashState, Usage, VersionRecord,
 };
 pub use ports::{Access, Clock, DriveIndex, Permission, SystemClock};
 pub use service::{DriveService, PageWrites};

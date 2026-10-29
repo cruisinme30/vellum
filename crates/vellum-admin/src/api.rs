@@ -27,6 +27,7 @@ use vellum_observe::{TraceId, TraceParent, TraceQuery};
 
 use crate::audit::{AuditActor, AuditQuery, AuditRecord};
 use crate::backup::BackupFile;
+use crate::counts::{UsageCounts, UsageSampler};
 use crate::service::{AdminService, Caller};
 use crate::settings::AdminSettings;
 use crate::usage::UsageFacts;
@@ -41,6 +42,11 @@ pub const FRESH_AUTH: Duration = Duration::from_mins(5);
 pub trait UsageFactsSource: Send + Sync {
     /// The counts now.
     async fn facts(&self) -> UsageFacts;
+
+    /// The exact counts behind Admin → Usage, when the server keeps them.
+    fn sampler(&self) -> Option<Arc<UsageSampler>> {
+        None
+    }
 }
 
 /// A source that reports nothing, until the services that own the counts
@@ -151,6 +157,18 @@ pub struct WindowInput {
     /// Minutes, 1 to 60 (default 15).
     pub minutes: Option<u64>,
 }
+
+/// How fresh the usage counts must be.
+#[derive(Debug, Clone, Copy, Default, Deserialize, JsonSchema)]
+#[serde(default)]
+pub struct UsageInput {
+    /// Count again now instead of answering from the last sample (at most
+    /// five minutes old).
+    pub refresh: bool,
+}
+
+/// How long cached usage counts are served without counting again.
+pub const USAGE_MAX_AGE_MS: i64 = 5 * 60 * 1000;
 
 /// The SLOs.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
@@ -404,6 +422,7 @@ impl<K: KeyProvider + 'static> Service for AdminApi<K> {
                 },
             ),
             telemetry_preview(svc, &self.facts),
+            usage(svc, &self.facts),
             query(
                 svc,
                 "admin.state",
@@ -484,6 +503,26 @@ fn telemetry_preview<K: KeyProvider + 'static>(
             async move {
                 let f = facts.facts().await;
                 s.telemetry_preview(&f).await
+            }
+        },
+    )
+}
+
+fn usage<K: KeyProvider + 'static>(svc: &Svc<K>, facts: &Arc<dyn UsageFactsSource>) -> Operation {
+    let sampler = facts.sampler();
+    query(
+        svc,
+        "admin.usage",
+        "/v1/admin/usage",
+        "People, pages, storage and activity on this server, counted at most five minutes ago",
+        move |_s, _ctx, input: UsageInput| {
+            let sampler = sampler.clone();
+            async move {
+                let Some(sampler) = sampler else {
+                    return Ok(UsageCounts::default());
+                };
+                let max_age = if input.refresh { -1 } else { USAGE_MAX_AGE_MS };
+                sampler.current(max_age).await
             }
         },
     )
