@@ -159,7 +159,7 @@ EOF
 
 rm -rf "${out}"
 mkdir -p "${out}/docs"
-cp "${root}/site/style.css" "${root}/site/favicon.svg" "${out}/"
+cp "${root}/site/style.css" "${root}/site/favicon.svg" "${root}/site/install.sh" "${out}/"
 cp -R "${root}/site/fonts" "${root}/site/img" "${root}/site/media" "${out}/"
 
 books=()

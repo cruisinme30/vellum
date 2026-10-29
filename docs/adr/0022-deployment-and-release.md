@@ -135,10 +135,8 @@ MinIO stopped publishing community images in October 2025.
 - **Patroni**: the Zalando Postgres Operator (Patroni inside) was chosen
   over a Bitnami chart (no synchronous failover) and CloudNativePG (not
   Patroni, which the brief names).
-- **Canary**: Argo Rollouts was chosen over Flagger (needs a mesh or a
-  specific ingress) and a hand-written script (no automatic rollback).
-- **Provenance**: the SLSA GitHub generator (level 3, isolated builder)
-  was chosen over `actions/attest-build-provenance` (level 2).
+- **Canary**: Argo Rollouts over Flagger (needs a mesh) and a script (no
+  rollback); **provenance**: the SLSA generator (level 3) over level 2.
 - **Gates**: a fixed baseline drifts and one night is noisy (median of five
   chosen); re-running load and chaos per hourly release costs hours.
 
@@ -148,3 +146,5 @@ MinIO stopped publishing community images in October 2025.
   `deploy/perf/k6/routes.js`, for the API and collab threads to keep true.
 - If the 10 % gate flaps on noisy runners, move the nightly to a
   dedicated runner rather than widening the gate.
+- Install channels, platforms and desktop signing extend this release in
+  [ADR 0060](0060-install-channels-and-platforms.md) (D250-D252).

@@ -352,7 +352,7 @@ fn steps(base: Option<&str>, branch: Option<&str>, tested: Option<&[String]>) ->
             "bash",
             &[
                 "-c",
-                "shellcheck -x scripts/*/*.sh deploy/*/*.sh .githooks/*",
+                "shellcheck -x scripts/*/*.sh deploy/*/*.sh deploy/packages/linux/*.sh site/*.sh .githooks/*",
             ],
         )
         .needs("shellcheck"),
@@ -377,6 +377,8 @@ fn steps(base: Option<&str>, branch: Option<&str>, tested: Option<&[String]>) ->
                 "LICENSES",
                 "--exclude-path",
                 "web/node_modules",
+                "--exclude-path",
+                "desktop/node_modules",
                 "--exclude-path",
                 "corpus",
                 "**/*.md",

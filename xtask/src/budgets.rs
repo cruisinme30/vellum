@@ -1,17 +1,18 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-//! Resource budgets for the single binary: under 2 s from start to ready
-//! and under 80 MB resident when idle, from the brief's targets. The size
-//! budgets sit just above the first measured sizes (release 3: binary
-//! 100 MB, image 40.7 MB), so growth fails the check while shrinking
-//! toward the brief's 40 MB download is tracked separately.
-//! A shutdown signal must also drain and exit cleanly.
+//! Resource budgets for the single binary: under 2 s from start to ready,
+//! under 80 MB resident and under 1 % of one CPU when idle (R-LT-1), from
+//! the brief's targets. The size budgets sit just above the first measured
+//! sizes (release 3: binary 100 MB, image 40.7 MB), so growth fails the
+//! check while shrinking toward the brief's 40 MB download is tracked
+//! separately. A shutdown signal must also drain and exit cleanly.
 //!
 //! `cargo xtask budgets --binary <path> [--image-bytes <n>] [--settle <secs>]`
 //! starts `<path> serve` on a free port with an empty data folder, times
 //! the first successful `GET /readyz`, waits for it to settle, reads its
-//! resident set from `/proc`, then sends SIGTERM. Until the binary has a
+//! resident set from `/proc`, samples its CPU time over a quiet window, then
+//! sends SIGTERM. Until the binary has a
 //! `serve` command only the size budgets apply, and the check says so.
 
 use std::io::{Read as _, Write as _};
@@ -29,6 +30,8 @@ pub struct Limits {
     pub image_bytes: u64,
     /// Resident memory once idle.
     pub idle_rss_bytes: u64,
+    /// CPU used once idle, in thousandths of one core.
+    pub idle_cpu_permille: u64,
     /// From process start to the first ready response.
     pub cold_start: Duration,
     /// From SIGTERM to a clean exit.
@@ -40,6 +43,7 @@ pub const LIMITS: Limits = Limits {
     binary_bytes: 110_000_000,
     image_bytes: 45_000_000,
     idle_rss_bytes: 80_000_000,
+    idle_cpu_permille: 10,
     cold_start: Duration::from_secs(2),
     drain: Duration::from_secs(30),
 };
@@ -55,6 +59,8 @@ pub struct Measurements {
     pub cold_start: Option<Duration>,
     /// Resident memory after settling.
     pub idle_rss_bytes: Option<u64>,
+    /// CPU used over the quiet window, in thousandths of one core.
+    pub idle_cpu_permille: Option<u64>,
     /// Time from SIGTERM to exit, and whether the exit was clean.
     pub drain: Option<(Duration, bool)>,
 }
@@ -146,6 +152,15 @@ pub fn evaluate(measured: &Measurements, limits: &Limits) -> Vec<String> {
     if let Some(bytes) = measured.idle_rss_bytes {
         over("idle resident memory", bytes, limits.idle_rss_bytes);
     }
+    if let Some(permille) = measured.idle_cpu_permille
+        && permille >= limits.idle_cpu_permille
+    {
+        failures.push(format!(
+            "idle CPU: {} over the {} budget",
+            percent(permille),
+            percent(limits.idle_cpu_permille)
+        ));
+    }
     if let Some(time) = measured.cold_start
         && time >= limits.cold_start
     {
@@ -194,6 +209,11 @@ fn report(measured: &Measurements, limits: &Limits) -> String {
         mb(limits.idle_rss_bytes),
     ));
     text.push_str(&row(
+        "idle CPU",
+        measured.idle_cpu_permille.map(percent),
+        percent(limits.idle_cpu_permille),
+    ));
+    text.push_str(&row(
         "SIGTERM to exit",
         measured.drain.map(|(t, clean)| {
             format!(
@@ -211,6 +231,11 @@ fn report(measured: &Measurements, limits: &Limits) -> String {
 fn mb(bytes: u64) -> String {
     let tenths = bytes / 100_000;
     format!("{}.{} MB", tenths / 10, tenths % 10)
+}
+
+/// Formats thousandths of a core as a percentage with one decimal place.
+fn percent(permille: u64) -> String {
+    format!("{}.{} %", permille / 10, permille % 10)
 }
 
 fn has_serve(binary: &Path) -> bool {
@@ -281,6 +306,7 @@ fn observe(
     let status = std::fs::read_to_string(format!("/proc/{}/status", child.id()))
         .map_err(|e| format!("cannot read the server's memory: {e}"))?;
     measured.idle_rss_bytes = Some(vm_rss_bytes(&status).ok_or("no VmRSS line in /proc status")?);
+    measured.idle_cpu_permille = Some(idle_cpu(child.id())?);
 
     let signalled = Instant::now();
     let sent = Command::new("kill")
@@ -299,6 +325,49 @@ fn observe(
     }
     measured.drain = Some((signalled.elapsed(), false));
     Ok(())
+}
+
+/// How long the idle CPU sample runs. Long enough that one clock tick
+/// (10 ms) is 0.2 % of it, so the 1 % budget is five ticks.
+const CPU_WINDOW: Duration = Duration::from_secs(5);
+
+/// Clock ticks per second in `/proc/<pid>/stat`. Linux fixes `USER_HZ` at
+/// 100 on every architecture it exposes to user space.
+const TICKS_PER_SECOND: u64 = 100;
+
+/// Samples the process's CPU time over [`CPU_WINDOW`], in thousandths of
+/// one core.
+fn idle_cpu(pid: u32) -> Result<u64, String> {
+    let read = || {
+        std::fs::read_to_string(format!("/proc/{pid}/stat"))
+            .map_err(|e| format!("cannot read the server's CPU time: {e}"))
+            .and_then(|stat| cpu_ticks(&stat).ok_or_else(|| "unreadable /proc stat".to_owned()))
+    };
+    let before = read()?;
+    let started = Instant::now();
+    std::thread::sleep(CPU_WINDOW);
+    let after = read()?;
+    Ok(cpu_permille(
+        after.saturating_sub(before),
+        started.elapsed(),
+    ))
+}
+
+/// User plus system clock ticks from `/proc/<pid>/stat` text. The command
+/// name in brackets may hold spaces, so fields are counted after the last
+/// closing bracket: `utime` and `stime` are the 12th and 13th there.
+fn cpu_ticks(stat: &str) -> Option<u64> {
+    let rest = stat.get(stat.rfind(')')? + 1..)?;
+    let mut fields = rest.split_whitespace().skip(11);
+    let user: u64 = fields.next()?.parse().ok()?;
+    let system: u64 = fields.next()?.parse().ok()?;
+    user.checked_add(system)
+}
+
+/// Converts clock ticks used over `window` to thousandths of one core.
+fn cpu_permille(ticks: u64, window: Duration) -> u64 {
+    let millis = u64::try_from(window.as_millis()).unwrap_or(u64::MAX).max(1);
+    ticks.saturating_mul(1_000 * 1_000 / TICKS_PER_SECOND) / millis
 }
 
 /// Sends a minimal HTTP/1.1 GET and returns the status code.
@@ -345,6 +414,7 @@ mod tests {
             image_bytes: Some(5_000_000),
             cold_start: Some(Duration::from_millis(300)),
             idle_rss_bytes: Some(30_000_000),
+            idle_cpu_permille: Some(2),
             drain: Some((Duration::from_millis(50), true)),
         };
         assert!(evaluate(&measured, &LIMITS).is_empty());
@@ -357,15 +427,17 @@ mod tests {
             image_bytes: Some(46_000_000),
             cold_start: Some(Duration::from_millis(2_500)),
             idle_rss_bytes: Some(90_000_000),
+            idle_cpu_permille: Some(15),
             drain: Some((Duration::from_millis(10), false)),
         };
         let failures = evaluate(&measured, &LIMITS);
-        assert_eq!(failures.len(), 5, "{failures:?}");
+        assert_eq!(failures.len(), 6, "{failures:?}");
         assert!(
             failures[0].contains("111.0 MB over the 110.0 MB"),
             "{failures:?}"
         );
-        assert!(failures[3].contains("2500 ms"), "{failures:?}");
+        assert!(failures[3].contains("1.5 % over the 1.0 %"), "{failures:?}");
+        assert!(failures[4].contains("2500 ms"), "{failures:?}");
     }
 
     #[test]
@@ -379,6 +451,25 @@ mod tests {
         let status = "Name:\tvellum\nVmHWM:\t  50000 kB\nVmRSS:\t   41236 kB\nThreads:\t4\n";
         assert_eq!(vm_rss_bytes(status), Some(41_236 * 1024));
         assert_eq!(vm_rss_bytes("Name:\tvellum\n"), None);
+    }
+
+    #[test]
+    fn reads_cpu_ticks() {
+        // A command name with spaces and brackets must not shift the fields.
+        let stat = "4242 (vellum (x) y) S 1 4242 4242 0 -1 4194560 900 0 0 0 37 12 0 0 20 0 9 0";
+        assert_eq!(cpu_ticks(stat), Some(49));
+        assert_eq!(cpu_ticks("4242 (vellum) S 1"), None);
+        assert_eq!(cpu_ticks("no brackets"), None);
+    }
+
+    #[test]
+    fn cpu_ticks_become_permille() {
+        // Five ticks (50 ms) over five seconds is 1 % of a core.
+        assert_eq!(cpu_permille(5, Duration::from_secs(5)), 10);
+        assert_eq!(cpu_permille(0, Duration::from_secs(5)), 0);
+        assert_eq!(cpu_permille(500, Duration::from_secs(5)), 1_000);
+        assert_eq!(cpu_permille(1, Duration::ZERO), 10_000);
+        assert_eq!(percent(10), "1.0 %");
     }
 
     #[test]

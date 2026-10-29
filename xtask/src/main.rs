@@ -22,9 +22,11 @@
 //! - `cargo xtask help` checks the help books in `docs/`, and
 //!   `cargo xtask help write` regenerates the files derived from them.
 //! - `cargo xtask budgets` checks the binary's size, cold start, idle
-//!   memory and shutdown against the brief's targets.
+//!   memory, idle CPU and shutdown against the brief's targets.
 //! - `cargo xtask adr next` prints the next free decision record and D
 //!   numbers, and `cargo xtask adr new <slug>` starts a record with them.
+//! - `cargo xtask installers` writes a release's Homebrew formula and
+//!   winget manifests from its checksums.
 //! - `cargo xtask perf-gate` fails the nightly run when a k6 p95 regresses
 //!   by 10 % or more against `deploy/perf/baseline.json`.
 
@@ -35,13 +37,14 @@ mod boundaries;
 mod budgets;
 mod fast;
 mod help;
+mod installers;
 mod perf_gate;
 mod pr_check;
 mod relock;
 mod schema;
 
 const USAGE: &str = "usage: cargo xtask <fast | pr-check | install-hooks | relock | boundaries | adr | \
-                     help [check|write] | budgets | perf-gate | \
+                     help [check|write] | budgets | installers | perf-gate | \
                      schema [--check]>";
 
 fn main() -> ExitCode {
@@ -59,6 +62,7 @@ fn main() -> ExitCode {
         Some("adr") => adr::run(rest),
         Some("help") => help::run(mode),
         Some("budgets") => budgets::run(rest),
+        Some("installers") => installers::run(rest),
         Some("perf-gate") => perf_gate::run(rest),
         Some("schema") => schema::run(rest),
         _ => Err(USAGE.to_owned()),
