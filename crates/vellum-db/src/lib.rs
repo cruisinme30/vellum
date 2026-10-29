@@ -5,8 +5,10 @@
 //!
 //! Files on disk are the source of truth; this crate holds the rebuildable
 //! index over them (spaces, folders, documents, the `page_ancestors` closure)
-//! plus the database-owned tables `grants`, `user_doc_state` and
-//! `collab_updates` (the live-editing change log, written by `vellum-collab`).
+//! plus the database-owned tables `grants`, `user_doc_state`,
+//! `collab_updates` (the live-editing change log, written by `vellum-collab`)
+//! and `identity_records` (accounts and sessions shared by replicas, written
+//! by `vellum-identity`).
 //!
 //! Two backends share one schema shape:
 //! - **SQLite** for the single binary, encrypted with SQLCipher when a key is given.

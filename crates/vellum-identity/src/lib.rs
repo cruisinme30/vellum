@@ -23,10 +23,12 @@
 
 pub mod http;
 pub mod identity;
+mod lockout;
 pub mod oauth;
 pub mod password;
 pub mod secret;
 pub mod service;
+mod shared;
 pub mod store;
 
 pub use identity::{

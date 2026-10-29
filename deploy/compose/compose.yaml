@@ -44,9 +44,10 @@ services:
       VELLUM_KROKI_URL: http://kroki:8000
       VELLUM_CLAMD_ADDRESS: clamav:3310
       VELLUM_KEK_PASSPHRASE_FILE: /run/secrets/vellum_kek
+      VELLUM_CSRF_KEY_FILE: /run/secrets/vellum_csrf
       VELLUM_LOG: ${VELLUM_LOG:-info}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
-    secrets: [vellum_kek]
+    secrets: [vellum_kek, vellum_csrf]
     volumes:
       - vellum-data:/data
     tmpfs: [/tmp]
@@ -160,6 +161,8 @@ services:
 secrets:
   vellum_kek:
     file: ${VELLUM_KEK_FILE:-./secrets/kek-passphrase}
+  vellum_csrf:
+    file: ${VELLUM_CSRF_FILE:-./secrets/csrf-key}
 
 volumes:
   vellum-data:
