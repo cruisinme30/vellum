@@ -3,15 +3,15 @@
 
 //! The sync use cases: push, pull and publish.
 
-use std::collections::{BTreeMap, HashSet};
-use std::sync::Arc;
+use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::sync::{Arc, Mutex, PoisonError};
 
 use tracing::{Instrument, info, info_span, warn};
 use vellum_kernel::{Error, ErrorKind, RequestId, UserId};
 
 use crate::cursor::Cursor;
 use crate::domain::{
-    Change, PullRequest, PullResponse, PushRequest, PushResponse, Record, Rejected,
+    Change, ClientId, PullRequest, PullResponse, PushRequest, PushResponse, Record, Rejected,
 };
 use crate::ports::{AccessKey, MutationContext, ReadAccess, ServerMutator, SyncStore};
 
@@ -19,6 +19,8 @@ use crate::ports::{AccessKey, MutationContext, ReadAccess, ServerMutator, SyncSt
 pub const MAX_PUSH: usize = 500;
 /// Most patches returned by one pull.
 pub const PULL_PAGE: usize = 1000;
+/// Highest mutation ID: stores keep it as a signed 64-bit number.
+pub const MAX_MUTATION_ID: u64 = i64::MAX.unsigned_abs();
 
 /// Mutators by name. Services register theirs at start-up.
 #[derive(Default, Clone)]
@@ -72,6 +74,48 @@ pub struct Sync<S, A> {
     store: S,
     access: A,
     mutators: Mutators,
+    /// Clients with a push in progress on this node.
+    pushing: Mutex<BTreeSet<ClientId>>,
+}
+
+/// Marks a client's push as running until dropped, even when the push
+/// future is cancelled because the device hung up.
+struct Pushing<'a> {
+    pushing: &'a Mutex<BTreeSet<ClientId>>,
+    client: ClientId,
+}
+
+impl<'a> Pushing<'a> {
+    /// Claims the client, or refuses with a retryable error while another
+    /// push for it runs. Running both would apply its mutations twice:
+    /// each would read the same last processed ID before either advanced it.
+    fn claim(pushing: &'a Mutex<BTreeSet<ClientId>>, client: &ClientId) -> Result<Self, Error> {
+        let claimed = pushing
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(client.clone());
+        if claimed {
+            Ok(Self {
+                pushing,
+                client: client.clone(),
+            })
+        } else {
+            Err(Error::new(
+                ErrorKind::RateLimited,
+                "this device's previous push is still running; retry shortly",
+            ))
+        }
+    }
+}
+
+impl Drop for Pushing<'_> {
+    fn drop(&mut self) {
+        let _ = self
+            .pushing
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .remove(&self.client);
+    }
 }
 
 /// How one mutation ended.
@@ -88,6 +132,7 @@ impl<S: SyncStore, A: ReadAccess> Sync<S, A> {
             store,
             access,
             mutators,
+            pushing: Mutex::new(BTreeSet::new()),
         }
     }
 
@@ -117,6 +162,7 @@ impl<S: SyncStore, A: ReadAccess> Sync<S, A> {
     /// # Errors
     ///
     /// `InvalidInput` for an oversized or out-of-order batch,
+    /// `RateLimited` while another push for the same client runs,
     /// `PermissionDenied` when the client belongs to another user, and
     /// store failures. A retryable mutator failure is not an error: the
     /// response simply stops before that mutation.
@@ -144,6 +190,17 @@ impl<S: SyncStore, A: ReadAccess> Sync<S, A> {
                     "mutation ids must increase",
                 ));
             }
+            if request
+                .mutations
+                .last()
+                .is_some_and(|m| m.id > MAX_MUTATION_ID)
+            {
+                return Err(Error::new(
+                    ErrorKind::InvalidInput,
+                    format!("mutation ids must be at most {MAX_MUTATION_ID}"),
+                ));
+            }
+            let _running = Pushing::claim(&self.pushing, &request.client_id)?;
             let already = self.bound_client(user, &request).await?;
             let mut last = already;
             let mut rejected = Vec::new();
@@ -257,6 +314,7 @@ impl<S: SyncStore, A: ReadAccess> Sync<S, A> {
                 cursor.log_epoch == info.epoch
                     && cursor.access_epoch == access_epoch
                     && cursor.seq >= info.horizon
+                    && cursor.seq <= info.head
             });
             let reset = resume.is_none();
             let _ = tracing::Span::current().record("reset", reset);

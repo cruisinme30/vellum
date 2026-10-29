@@ -32,6 +32,9 @@ pub struct LogInfo {
     /// Tombstones at or below this position may have been pruned; a cursor
     /// older than it must reset.
     pub horizon: u64,
+    /// The last log position written. A cursor past it did not come from
+    /// this log (a restored backup, a corrupted device store) and resets.
+    pub head: u64,
 }
 
 /// Persistence for clients and the change log.

@@ -383,3 +383,109 @@ async fn mutator_names_are_unique() {
 async fn memory_store_conforms() {
     check_store(MemoryStore::new).await.unwrap();
 }
+
+/// `slow.set` takes a while, like a mutator waiting on a busy database.
+struct Slow {
+    space: SpaceId,
+    calls: AtomicUsize,
+}
+
+impl ServerMutator for Slow {
+    fn apply<'a>(
+        &'a self,
+        _context: &'a MutationContext,
+        _args: Value,
+    ) -> BoxFuture<'a, Result<Vec<Change>, Error>> {
+        Box::pin(async move {
+            let calls = self.calls.fetch_add(1, Ordering::SeqCst) + 1;
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            Ok(vec![Change::put(self.space, "counters", "c", json!(calls))])
+        })
+    }
+}
+
+/// A device whose push times out retries it while the server is still
+/// working on the first one. The retry must not run the mutations again.
+#[tokio::test]
+async fn a_push_retried_while_the_first_still_runs_applies_nothing_twice() {
+    let slow = Arc::new(Slow {
+        space: SpaceId::generate(),
+        calls: AtomicUsize::new(0),
+    });
+    let mut mutators = Mutators::new();
+    mutators.register("slow.set", slow.clone()).unwrap();
+    let sync = Sync::new(
+        MemoryStore::new(),
+        Shared(Arc::new(Access::default())),
+        mutators,
+    );
+    let user = UserId::generate();
+    let batch = PushRequest {
+        client_id: client(),
+        mutations: vec![ClientMutation {
+            id: 1,
+            name: "slow.set".to_owned(),
+            args: json!({}),
+            created_at: 0,
+        }],
+    };
+    let both: [_; 2] = tokio::join!(
+        sync.push(user, RequestId::generate(), batch.clone()),
+        sync.push(user, RequestId::generate(), batch.clone()),
+    )
+    .into();
+    assert_eq!(slow.calls.load(Ordering::SeqCst), 1, "applied twice");
+    for result in both {
+        match result {
+            Ok(response) => assert_eq!(response.last_mutation_id, 1),
+            Err(err) => assert!(err.kind().is_retryable(), "{err}"),
+        }
+    }
+    // Once the first push is done, the retry goes through and skips it.
+    let later = sync.push(user, RequestId::generate(), batch).await.unwrap();
+    assert_eq!(later.last_mutation_id, 1);
+    assert_eq!(slow.calls.load(Ordering::SeqCst), 1);
+}
+
+/// The log stores mutation IDs as signed 64-bit numbers, so a larger ID
+/// is refused before anything runs, not after the mutator has applied it.
+#[tokio::test]
+async fn mutation_ids_beyond_the_store_range_are_refused_up_front() {
+    let w = world();
+    let too_big = u64::try_from(i64::MAX).unwrap() + 1;
+    let err = w
+        .sync
+        .push(
+            w.user,
+            RequestId::generate(),
+            push(vec![mutation(too_big, json!({"key": "a"}))]),
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::InvalidInput);
+    assert_eq!(w.mutator.calls.load(Ordering::SeqCst), 0);
+}
+
+/// A cursor past the end of the log comes from a restored backup or a
+/// corrupted device store. Resuming from it would skip every change up
+/// to that position, so the device resets instead.
+#[tokio::test]
+async fn a_cursor_ahead_of_the_log_resets() {
+    let w = world();
+    w.sync
+        .publish(vec![Change::put(w.space, "t", "a", json!(1))])
+        .await
+        .unwrap();
+    let pulled = w.sync.pull(w.user, pull("")).await.unwrap();
+    let epochs = pulled.cursor.rsplit_once('.').unwrap().0.to_owned();
+    for seq in ["2", "500", &u64::MAX.to_string()] {
+        let ahead = w
+            .sync
+            .pull(w.user, pull(&format!("{epochs}.{seq}")))
+            .await
+            .unwrap();
+        assert!(ahead.reset, "cursor at {seq}");
+        assert_eq!(keys(&ahead.patches), ["put a"]);
+        assert_eq!(ahead.cursor, pulled.cursor);
+    }
+}
