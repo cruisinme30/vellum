@@ -65,8 +65,11 @@ CodeQL (`codeql.yml`) scans release pull requests, pushes to `main` and
 `develop` weekly. The nightly load test, security scan and fuzz runs skip a night when
 `develop` has not changed since the last green night.
 
-No workflow run cancels another: a new push starts its own run and
-older runs finish, so every commit gets a result. Each test runs once
+On a pull request into `develop`, a new push cancels that pull request's
+older **Fast suite** and **Labels** runs, so a batch has one live run;
+a title or description edit waits for the running one instead. Nothing
+else cancels: pushes to `develop` and `main`, release pull requests into
+`main`, the nightly and releases always finish. Each test runs once
 per event. Inside the full suite, the Rust tests run
 only in the coverage job and the UI tests only in the browser matrix, not
 again in its copy of the fast suite. A release pull request must come
