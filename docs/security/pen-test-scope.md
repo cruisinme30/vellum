@@ -5,8 +5,10 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 # Penetration test scope for Vellum 1.0
 
-The brief (§11) requires an independent penetration test before 1.0, and
-issue #195 tracks it. This page is the scope to send to the testing firm.
+The brief (§11) asks for an independent penetration test. On 2026-10-29
+the maintainer deferred it past 1.0; internal red teaming (ADR 0030 and
+0047) covers 1.0. This page is the scope to send a testing firm when the
+test happens.
 The OWASP ASVS level 2 self-assessment
 ([asvs-l2.html](asvs-l2.html)) lists the controls the test should verify.
 

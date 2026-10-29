@@ -115,5 +115,6 @@ adapters. Three gaps were left for 1.0:
   is needed and the pod's role reaches the key.
 - Vault still uses a static token (`VAULT_TOKEN`); Kubernetes auth for
   Vault is a follow-up.
-- The ASVS page marks these controls met, and the pen test scope is in
-  `docs/security/pen-test-scope.md`.
+- The ASVS page marks these controls met. The maintainer deferred the
+  external pen test past 1.0 on 2026-10-29; its scope stays ready in
+  `docs/security/pen-test-scope.md`, and internal red teaming covers 1.0.

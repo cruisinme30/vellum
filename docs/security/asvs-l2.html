@@ -80,7 +80,7 @@ footer { margin-top: 48px; color: var(--muted); font-size: 0.9rem; max-width: 70
     Where Vellum stands against the OWASP Application Security Verification Standard 5.0 at level 2,
     the target set in the brief (§11, §12; R-SE-11). Each row summarizes a group of requirements in our
     own words, with the evidence in the repository and the owning workstream. It is updated as
-    controls land, and an independent penetration test before 1.0 checks it.
+    controls land. An independent penetration test is deferred past 1.0.
   </p>
   <div class="facts">
     <span>As of 2026-10-29, 3:30 PM PT</span>
@@ -196,7 +196,7 @@ const CHAPTERS = [
     ["No unsafe code; no unwrap, panic or unchecked indexing", "met", "Workspace lints, <code>-D warnings</code> in CI", "skeleton"],
     ["Crate layering is enforced", "met", "<code>cargo xtask boundaries</code>", "skeleton"],
     ["Security controls live in one reviewed crate", "met", "<code>vellum-security</code>, ADR 0025", "security"],
-    ["Independent penetration test before 1.0", "plan", "Scope in <code>docs/security/pen-test-scope.md</code>; needs an outside tester", "security"],
+    ["Independent penetration test", "plan", "Deferred past 1.0 by the maintainer (2026-10-29); internal red teaming (ADR 0030, 0047) covers 1.0. Scope ready in <code>docs/security/pen-test-scope.md</code>", "security"],
   ]],
   ["V16 Security logging and error handling", "", [
     ["Security events are logged with request IDs and traced", "met", "OpenTelemetry via <code>vellum_kernel::telemetry</code>", "kernel, observability"],
