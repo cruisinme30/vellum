@@ -55,8 +55,10 @@ jobs also queued for runners.
 ### `D140`: CodeQL gates main, not develop
 
 - The develop ruleset drops its `code_scanning` rule; main keeps it.
-- CodeQL still scans every pull request and push and reports alerts, and a
-  high or critical alert blocks the release into main.
+- CodeQL scans release pull requests, pushes to main and develop weekly
+  (`.github/workflows/codeql.yml`), replacing the CodeQL default setup of
+  [ADR 0032](0032-repository-security-controls.md). A high or critical
+  alert blocks the release into main.
 - Merges into develop wait only for the Fast suite and Labels.
 
 ## Alternatives
@@ -77,3 +79,12 @@ jobs also queued for runners.
   release, since main stays gated.
 - A new top-level folder counts as Rust until `changed-areas.sh` lists it.
 - Revisit if the repository moves to an organisation with a merge queue.
+- The full suite runs each test once: Rust tests only with coverage, UI
+  tests only in the browser matrix, and nothing again on the push to main.
+- A release pull request opened from develop itself fails fast; releases
+  come from a frozen `chore/release-…` branch.
+
+From 2026-10-29, develop is pushed about every two hours after the full
+suite passes locally. A push to develop runs the Fast suite once for the
+areas it changed, the Full suite runs only on release pull requests, the
+nightly jobs skip unchanged nights, and no run cancels another.

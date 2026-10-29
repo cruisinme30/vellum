@@ -15,10 +15,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: chaos
-  cancel-in-progress: false
-
 jobs:
   chaos:
     name: Chaos under load

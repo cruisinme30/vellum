@@ -15,15 +15,16 @@ on:
   # queue (scripts/admin/enable-merge-queue.sh).
   merge_group:
   workflow_call:
+    inputs:
+      full-suite:
+        description: >-
+          Called from the full suite, which runs the Rust tests (with
+          coverage) and the whole UI suite itself, so they are not run twice.
+        type: boolean
+        default: false
 
 permissions:
   contents: read
-
-concurrency:
-  group: fast-${{ github.workflow_ref }}-${{ github.event.pull_request.number || github.ref }}
-  # Superseded pull request runs are cancelled; every push to a long-lived
-  # branch is checked to completion so its result stays meaningful.
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: always
@@ -32,9 +33,9 @@ env:
 
 jobs:
   # Which jobs this change needs (ADR 0035, D139). Pull requests into
-  # develop skip the Rust job for docs-only changes and the Web job when
-  # web/ is untouched. Pushes, the merge queue and the full suite (release
-  # pull requests into main) run everything.
+  # develop and pushes to develop skip the Rust job for docs-only changes
+  # and the Web job when web/ is untouched. The merge queue and the full
+  # suite (release pull requests into main) run everything.
   changes:
     name: Changed areas
     runs-on: ubuntu-24.04
@@ -55,30 +56,40 @@ jobs:
           fetch-depth: 2
           persist-credentials: false
       # Editing a pull request's title or description starts a new run on
-      # the same commit. When an earlier run on that commit already passed,
-      # only the description checks run again.
+      # the same commit. When an earlier run of the same workflow on that
+      # commit already passed, only the description checks run again.
       - id: areas
         env:
           EVENT: ${{ github.event_name }}
           ACTION: ${{ github.event.action }}
           BASE: ${{ github.base_ref }}
           SHA: ${{ github.event.pull_request.head.sha }}
+          BEFORE: ${{ github.event.before }}
+          # Runs started by the full suite are listed under full.yml.
+          WORKFLOW: ${{ inputs.full-suite && 'full.yml' || 'ci.yml' }}
+          FULL: ${{ inputs.full-suite && 'true' || 'false' }}
           GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          if [[ "${EVENT}" == "pull_request" && "${BASE}" == "develop" ]]; then
-            passed=0
-            if [[ "${ACTION}" == "edited" ]]; then
-              passed="$(gh api "repos/${GH_REPO}/actions/workflows/ci.yml/runs?head_sha=${SHA}&status=success" \
-                --jq '.total_count' || echo 0)"
-            fi
-            if ((passed > 0)); then
-              echo "This commit already passed the Fast suite; checking the description only."
-              printf 'rust=false\nweb=false\ndesktop=false\nui=false\nfiles=false\n' | tee -a "${GITHUB_OUTPUT}"
-            else
-              git diff --name-only HEAD^1 HEAD | scripts/ci/changed-areas.sh | tee -a "${GITHUB_OUTPUT}"
-              echo "files=true" | tee -a "${GITHUB_OUTPUT}"
-            fi
+          passed=0
+          if [[ "${EVENT}" == "pull_request" && "${ACTION}" == "edited" ]]; then
+            passed="$(gh api "repos/${GH_REPO}/actions/workflows/${WORKFLOW}/runs?head_sha=${SHA}&status=success" \
+              --jq '.total_count' || echo 0)"
+          fi
+          if ((passed > 0)); then
+            echo "This commit already passed; checking the description only."
+            printf 'rust=false\nweb=false\ndesktop=false\nui=false\nfiles=false\n' | tee -a "${GITHUB_OUTPUT}"
+          elif [[ "${EVENT}" == "pull_request" && "${BASE}" == "develop" ]]; then
+            git diff --name-only HEAD^1 HEAD | scripts/ci/changed-areas.sh | tee -a "${GITHUB_OUTPUT}"
+            echo "files=true" | tee -a "${GITHUB_OUTPUT}"
+          elif [[ "${EVENT}" == "push" && -n "${BEFORE}" && "${BEFORE}" != 0000000* ]] &&
+            git fetch --quiet --depth=1 origin "${BEFORE}"; then
+            # A push to develop checks only the areas its commits touch.
+            git diff --name-only "${BEFORE}" HEAD | scripts/ci/changed-areas.sh | tee -a "${GITHUB_OUTPUT}"
+            echo "files=true" | tee -a "${GITHUB_OUTPUT}"
+          elif [[ "${FULL}" == "true" ]]; then
+            # The full suite runs every UI test in every browser itself.
+            printf 'rust=true\nweb=true\ndesktop=true\nui=false\nfiles=true\n' | tee -a "${GITHUB_OUTPUT}"
           else
             printf 'rust=true\nweb=true\ndesktop=true\nui=true\nfiles=true\n' | tee -a "${GITHUB_OUTPUT}"
           fi
@@ -110,6 +121,8 @@ jobs:
       - name: Docs
         run: cargo doc --workspace --no-deps --locked
       - name: Tests
+        # The full suite runs these same tests in its coverage job.
+        if: ${{ !inputs.full-suite }}
         run: cargo nextest run --workspace --locked --profile ci
       - name: Crate boundaries
         run: cargo xtask boundaries
