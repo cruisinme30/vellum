@@ -108,7 +108,7 @@ export function AppShell() {
  * is down, so pages still read but saving may fail (issue #191). It goes
  * away by itself on the next good answer.
  */
-export function ServiceBanner() {
+function ServiceBanner() {
   const t = useT();
   return (
     <div className="vl-problem" role="status" data-testid="service-banner">

@@ -84,7 +84,7 @@ impl Fixture {
 #[test]
 fn declares_valid_operations() {
     let f = fixture();
-    assert_eq!(f.operations.len(), 17);
+    assert_eq!(f.operations.len(), 18);
     for op in &f.operations {
         op.validate("admin").unwrap();
         if op.id() == "admin.client_report" {

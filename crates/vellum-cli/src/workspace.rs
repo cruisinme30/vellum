@@ -1040,7 +1040,9 @@ pub async fn open(
         events.clone(),
     );
     task_jobs(&replica, &workspace.tasks, notify, &config.data_dir)?;
-    workspace.services.push(Arc::new(Storage::new(store, !local)));
+    workspace
+        .services
+        .push(Arc::new(Storage::new(store, !local)));
     Ok(Opened {
         services: workspace.services,
         hooks,
