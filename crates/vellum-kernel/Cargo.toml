@@ -23,6 +23,7 @@ opentelemetry = "0.33.1"
 opentelemetry-appender-tracing = "0.33.1"
 opentelemetry-otlp = { version = "0.33.1", default-features = false, features = ["http-proto", "reqwest-blocking-client", "reqwest-rustls", "trace", "metrics", "logs"] }
 opentelemetry_sdk = "0.33.1"
+schemars = { version = "1", default-features = false, features = ["std"] }
 serde = { version = "1.0.229", features = ["derive"] }
 sha2 = "0.11.1"
 subtle = "2.6.1"

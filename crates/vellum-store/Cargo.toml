@@ -24,6 +24,8 @@ conformance = []
 [dependencies]
 async-trait = "0.1.92"
 bytes = "1.12.1"
+diff-match-patch-rs = "0.5.1"
+diffy = "0.5.2"
 futures = "0.3.34"
 hex = "0.4.3"
 opentelemetry = "0.33.1"

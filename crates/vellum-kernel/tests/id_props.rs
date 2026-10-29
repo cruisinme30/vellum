@@ -63,3 +63,22 @@ fn generated_ids_are_unique_and_ordered() {
     let ids: Vec<DocId> = (0..1000).map(|_| DocId::generate()).collect();
     assert!(ids.windows(2).all(|w| matches!(w, [a, b] if a < b)));
 }
+
+#[test]
+fn json_schemas_describe_the_text_forms() {
+    let doc = serde_json::to_value(schemars::schema_for!(DocId)).unwrap_or_default();
+    assert_eq!(
+        doc.pointer("/format").and_then(|v| v.as_str()),
+        Some("ulid")
+    );
+    let pattern = doc
+        .pointer("/pattern")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default();
+    assert!(pattern.starts_with("^[0-7]"));
+    let block = serde_json::to_value(schemars::schema_for!(BlockId)).unwrap_or_default();
+    assert_eq!(
+        block.pointer("/type").and_then(|v| v.as_str()),
+        Some("string")
+    );
+}

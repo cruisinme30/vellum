@@ -20,6 +20,9 @@ use uuid::Uuid;
 
 use crate::base32;
 
+/// JSON Schema pattern for ULID text (case-insensitive Crockford base32).
+const ULID_PATTERN: &str = "^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$";
+
 /// Length of an object ID in its ULID text form.
 pub const ULID_LEN: usize = 26;
 
@@ -168,6 +171,21 @@ macro_rules! define_id {
 
             fn from_str(text: &str) -> Result<Self, Self::Err> {
                 parse_ulid(stringify!($name), text).map(Self)
+            }
+        }
+
+        impl schemars::JsonSchema for $name {
+            fn schema_name() -> std::borrow::Cow<'static, str> {
+                stringify!($name).into()
+            }
+
+            fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+                schemars::json_schema!({
+                    "type": "string",
+                    "format": "ulid",
+                    "pattern": ULID_PATTERN,
+                    "description": concat!("A ", stringify!($name), " as a 26-character ULID."),
+                })
             }
         }
 

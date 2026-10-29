@@ -102,6 +102,20 @@ impl FromStr for BlockId {
     }
 }
 
+impl schemars::JsonSchema for BlockId {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "BlockId".into()
+    }
+
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({
+            "type": "string",
+            "pattern": "^blk-[0-9a-hjkmnp-tv-zA-HJKMNP-TV-Z]{8}$",
+            "description": "A block ID: blk- and 8 Crockford base32 characters.",
+        })
+    }
+}
+
 impl Serialize for BlockId {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.collect_str(self)

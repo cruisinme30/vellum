@@ -75,6 +75,16 @@ impl FromStr for Timestamp {
     }
 }
 
+impl schemars::JsonSchema for Timestamp {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "Timestamp".into()
+    }
+
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({ "type": "string", "format": "date-time" })
+    }
+}
+
 impl Serialize for Timestamp {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.collect_str(self)
