@@ -537,12 +537,20 @@ impl Identity {
     }
 
     /// Answers a consent screen. Returns the URL to send the browser to.
+    /// `authenticated_at` is when the answering session last proved the
+    /// user's identity; the grant's tokens carry it (RT-039).
     ///
     /// # Errors
     ///
     /// [`ErrorKind::NotFound`] for an unknown, expired or someone else's
     /// consent.
-    pub fn decide(&self, user: UserId, consent_id: &str, approve: bool) -> Result<String, Error> {
+    pub fn decide(
+        &self,
+        user: UserId,
+        authenticated_at: Option<Timestamp>,
+        consent_id: &str,
+        approve: bool,
+    ) -> Result<String, Error> {
         let key = hash_key(&secret::hash(consent_id));
         let consent = self
             .store()
@@ -570,6 +578,7 @@ impl Identity {
             scopes: consent.scopes,
             audience: consent.audience,
             challenge: consent.challenge,
+            auth_time: authenticated_at,
             expires: after(now, self.config().code_lifetime),
         };
         let stored = self.store().write(|s| {
@@ -659,6 +668,7 @@ impl Identity {
             scopes: pending.scopes,
             audience,
             created_at: now,
+            auth_time: pending.auth_time,
             refresh_hash,
             spent_refresh: Vec::new(),
             refresh_expires_at: after(now, self.config().refresh_token_lifetime),

@@ -1041,7 +1041,7 @@ impl Identity {
                                 .intersect(user_scopes(user)),
                             audience: access.audience.clone(),
                             expires_at: Some(access.expires_at),
-                            issued_at: grant.created_at,
+                            issued_at: grant.auth_time.unwrap_or(grant.created_at),
                         })
                     })
                     .ok_or_else(invalid)
@@ -1050,8 +1050,10 @@ impl Identity {
         }
     }
 
-    /// Resolves a bearer token for the gateway. Tokens carry the time they
-    /// were issued as their authentication time, so they never satisfy a
+    /// Resolves a bearer token for the gateway. A personal token carries
+    /// the time it was created (which took a recent sign-in) as its
+    /// authentication time, and an `OAuth` token the sign-in time of the
+    /// session that approved its grant (RT-039), so neither satisfies a
     /// recent-sign-in check for long.
     ///
     /// # Errors
