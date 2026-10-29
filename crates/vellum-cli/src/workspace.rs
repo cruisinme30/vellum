@@ -52,7 +52,7 @@ use vellum_work::{UserRef, WorkEvent};
 use vellum_work_service::{Directory, EventSink, SystemClock, WorkService};
 
 use crate::cluster::Replica;
-use crate::collab::Collab;
+use crate::collab::{Collab, LivePages};
 use crate::feed::{AnnouncingStore, Caches};
 use crate::google_http::{self, Endpoints, FileLinks, GoogleHttp};
 use crate::page_render::{Handles, PageRenderService};
@@ -492,6 +492,8 @@ struct Feeds {
     events: Arc<dyn EventSink>,
     /// Collection row changes, for search.
     rows: Option<Arc<dyn IndexFeed>>,
+    /// Page text saved through the API, for live editing rooms.
+    pages: Option<Arc<dyn vellum_drive::PageWrites>>,
 }
 
 /// Builds the services over `store`, `authz` and the drive's `index`.
@@ -576,9 +578,14 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
         handles,
         PageRenderService::figures_from_env()?,
     );
+    let mut drive_service =
+        DriveService::new(Arc::clone(&drive)).with_handles(drive_handles(identity));
+    if let Some(writes) = feeds.pages {
+        drive_service = drive_service.with_page_writes(writes);
+    }
     Ok(Workspace {
         services: vec![
-            Arc::new(DriveService::new(Arc::clone(&drive)).with_handles(drive_handles(identity))),
+            Arc::new(drive_service),
             Arc::clone(&collections) as Arc<dyn Service>,
             Arc::clone(&books) as Arc<dyn Service>,
             Arc::clone(&work) as Arc<dyn Service>,
@@ -604,6 +611,24 @@ fn search_key(
         return Ok(None);
     }
     sqlite_key(config, var)
+}
+
+/// Joins the cluster's heartbeat table, and opens the rate-limit counts
+/// shared with the other replicas. Also says whether another replica was
+/// already alive.
+async fn join_cluster(
+    index: &Index,
+    me: &str,
+    var: impl Fn(&str) -> Option<String>,
+) -> Result<(Replica, bool, vellum_db::rate::SharedCounts), Error> {
+    let (replica, others_alive) = Replica::join(index, me, var)
+        .await
+        .map_err(|e| unavailable("cannot join the cluster", e))?;
+    Ok((
+        replica,
+        others_alive,
+        vellum_db::rate::SharedCounts::new(index.clone()),
+    ))
 }
 
 /// Rescans the workspace files once per cluster (a replica that starts
@@ -682,15 +707,14 @@ pub async fn open(
         .head()
         .await
         .map_err(|e| unavailable("cannot read the change feed", e))?;
-    let (replica, others_alive) = Replica::join(&index, &me, &var)
-        .await
-        .map_err(|e| unavailable("cannot join the cluster", e))?;
+    let (replica, others_alive, rate_counts) = join_cluster(&index, &me, &var).await?;
     let store: Arc<dyn BlobStore> = Arc::new(AnnouncingStore::new(files, feed.clone(), &me));
     let authz = Arc::new(Authz::new(SqlStore::new(index.clone())));
     let drive_index = Arc::new(SqlIndex::new(index.clone()));
     let spaces = Arc::new(Spaces::default());
     let (events, queued) = crate::notifications::channel();
     let (rows, row_changes) = crate::search::row_feed();
+    let live_pages = Arc::new(LivePages::default());
     let mut workspace = build(
         Arc::clone(&store),
         &authz,
@@ -700,6 +724,7 @@ pub async fn open(
         Feeds {
             events,
             rows: Some(rows),
+            pages: Some(Arc::clone(&live_pages) as Arc<dyn vellum_drive::PageWrites>),
         },
         setup,
     )
@@ -716,7 +741,6 @@ pub async fn open(
         crate::watcher::start(&config.data_dir, &store, &workspace.drive, &workspace.books).await?;
     }
     rescan_and_maintain(&replica, others_alive, &workspace.drive, &index).await;
-    let rate_counts = vellum_db::rate::SharedCounts::new(index.clone());
     let hooks = crate::integrations::hooks(&store, &workspace.work, &var).await?;
     let collab = Collab::open(
         Arc::clone(&workspace.drive),
@@ -732,6 +756,7 @@ pub async fn open(
         ))),
     )?;
     keep_drives(&workspace.drive, &drive_index, identity).await?;
+    live_pages.attach(&collab);
     spaces.replace(load_spaces(drive_index.as_ref()).await?);
     let search = crate::search::start(crate::search::Parts {
         data_dir: config.data_dir.clone(),
@@ -787,6 +812,7 @@ pub async fn describe(
         Feeds {
             events: Arc::new(TracingSink),
             rows: None,
+            pages: None,
         },
         setup,
     )

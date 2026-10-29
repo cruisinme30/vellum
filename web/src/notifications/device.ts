@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import type { Http } from "../api/http";
 import { disablePush, enablePush, pushSupported, type PushState } from "../platform/pwa/push";
 
 /** Push on this browser, as the settings screen sees it. */
@@ -14,14 +15,24 @@ export interface PushDevice {
   disable(): Promise<void>;
 }
 
-/** The real browser, talking to the server at `baseUrl` (no trailing slash). */
-export function createBrowserPushDevice(baseUrl = ""): PushDevice {
+/**
+ * The real browser, talking to the server at `baseUrl` (no trailing
+ * slash). Writes go through `http` when given, so they carry the
+ * session's CSRF token.
+ */
+export function createBrowserPushDevice(baseUrl = "", http?: Http): PushDevice {
   const supported = pushSupported();
   const environment = async () => ({
     baseUrl,
     fetch: globalThis.fetch.bind(globalThis),
     registration: await navigator.serviceWorker.ready,
     requestPermission: () => Notification.requestPermission(),
+    ...(http === undefined
+      ? {}
+      : {
+          send: (method: "POST" | "DELETE", path: string, body?: unknown) =>
+            http.send(method, path, body),
+        }),
   });
   return {
     supported,

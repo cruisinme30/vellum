@@ -356,6 +356,45 @@ impl Hub {
         }
     }
 
+    /// Merges new text of the page's file into its room, opening the room
+    /// from storage when it is closed. Used when the file was written
+    /// outside the room (a version restored through the API): the change
+    /// log is the room's source of truth, so without this a room would
+    /// later write its old text back over the new.
+    ///
+    /// Edits in the log that the file never held are lost where the new
+    /// text differs: the new text wins, as a restore means it to.
+    ///
+    /// # Errors
+    ///
+    /// When the room cannot be loaded or the Markdown cannot be converted.
+    #[tracing::instrument(name = "collab.merge_markdown", skip_all, fields(room = %room), err)]
+    pub async fn merge_markdown(&self, room: RoomKey, markdown: String) -> Result<()> {
+        // A page never edited live has no log; its first room reads the file.
+        let open = self.registry.lock().contains_key(&room);
+        if !open && self.deps.store.load(room).await?.is_empty() {
+            return Ok(());
+        }
+        for _ in 0..JOIN_ATTEMPTS {
+            let entry = self.room(room);
+            let (reply, result) = oneshot::channel();
+            let command = Command::ApplyMarkdown {
+                markdown: markdown.clone(),
+                reply,
+            };
+            if entry.cmd.send(command).await.is_err() {
+                self.registry.remove(room, entry.generation);
+                continue;
+            }
+            match result.await {
+                Ok(outcome) => return outcome,
+                // The room closed between lookup and reply: open it again.
+                Err(_) => self.registry.remove(room, entry.generation),
+            }
+        }
+        Err(room_gone())
+    }
+
     /// Changes a user's access to an open room at once: `None` disconnects
     /// their connections, `Read` stops applying their edits.
     pub fn set_access(&self, room: RoomKey, user: UserId, access: Option<Access>) {

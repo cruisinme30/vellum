@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import { Link } from "react-router";
+
 import { useSession } from "../api/session";
 import { useWorkspace } from "../data/workspace-context";
 import { useT } from "../i18n/i18n";
@@ -20,6 +22,11 @@ export function HomeView() {
   return (
     <div className="vl-view">
       <h1>{t("home-greeting", { name: (user?.name ?? workspace.me.name).replace(/ .*/s, "") })}</h1>
+      <nav className="vl-home-shortcuts" aria-label={t("home-shortcuts")}>
+        <Link to="/my-work">{t("my-work")}</Link>
+        <Link to="/issues">{t("issues")}</Link>
+        <Link to="/books">{t("books")}</Link>
+      </nav>
       <section aria-labelledby="home-recent">
         <h2 id="home-recent">{t("home-recent")}</h2>
         <PageList items={recent.map((page) => ({ page }))} empty={t("home-recent-empty")} />

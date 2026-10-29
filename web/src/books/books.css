@@ -1,0 +1,91 @@
+/*
+ * SPDX-FileCopyrightText: 2026 The Vellum contributors
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+/* The book list and reader. */
+
+.vl-book-list {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.vl-book-list li {
+  display: grid;
+  gap: 2px;
+}
+
+.vl-book-list a {
+  color: var(--md-primary);
+  font-weight: 500;
+}
+
+.vl-book {
+  display: grid;
+  grid-template-columns: minmax(180px, 260px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+@media (width <= 720px) {
+  .vl-book {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.vl-book-toc ol {
+  margin: 0;
+  padding-left: 14px;
+  list-style: none;
+}
+
+.vl-book-toc > ol {
+  padding-left: 0;
+}
+
+.vl-book-toc li {
+  margin: 4px 0;
+}
+
+.vl-book-toc a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.vl-book-toc a[aria-current="page"] {
+  color: var(--md-primary);
+  font-weight: 500;
+}
+
+.vl-toc-part {
+  margin-top: 12px;
+  color: var(--md-on-surface-variant);
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.vl-toc-separator {
+  border-top: 1px solid var(--md-outline-variant);
+}
+
+.vl-book-section {
+  min-width: 0;
+  max-width: 72ch;
+}
+
+.vl-markdown pre {
+  overflow-x: auto;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--md-surface-container);
+}
+
+.vl-markdown blockquote {
+  margin: 12px 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--md-outline-variant);
+  color: var(--md-on-surface-variant);
+}

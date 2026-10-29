@@ -1,16 +1,18 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
+import { useSession } from "../api/session";
 import { ancestors, siblings } from "../data/tree";
 import type { PageMeta } from "../data/types";
 import { useServices, useWorkspace } from "../data/workspace-context";
-import { PageEditor } from "../editor/page-editor";
+import { PageEditor, type EditorControls } from "../editor/page-editor";
 import { useT } from "../i18n/i18n";
 import { Icon } from "../shell/icon";
 
+import { HistoryPanel } from "./history-panel";
 import { NotFoundView } from "./info";
 import { PageList } from "./page-list";
 
@@ -25,6 +27,46 @@ export function caretColor(handle: string): string {
   return CARET_COLORS[sum % CARET_COLORS.length] ?? "#4f5b92";
 }
 
+/**
+ * The History button for the editor's bar and the panel it opens. Both
+ * are absent in demo mode, which keeps no versions.
+ */
+function usePageHistory(pageId: string) {
+  const t = useT();
+  const { history } = useServices();
+  const session = useSession();
+  const [openFor, setOpenFor] = useState<string>();
+  const [controls, setControls] = useState<EditorControls>();
+  const open = openFor === pageId;
+  const button = history && (
+    <button
+      type="button"
+      className="vl-icon-button"
+      aria-label={t("history-open")}
+      title={t("history-open")}
+      aria-expanded={open}
+      onClick={() => {
+        setOpenFor(open ? undefined : pageId);
+      }}
+    >
+      <Icon name="history" />
+    </button>
+  );
+  const panel = history && open && (
+    <HistoryPanel
+      pageId={pageId}
+      history={history}
+      meId={session?.status.user?.id}
+      canRestore={controls?.canWrite ?? false}
+      saveFirst={controls?.save}
+      onClose={() => {
+        setOpenFor(undefined);
+      }}
+    />
+  );
+  return { button, panel, setControls };
+}
+
 /** A page: breadcrumbs, title, properties and the editor. */
 export function PageView() {
   const t = useT();
@@ -32,6 +74,7 @@ export function PageView() {
   const navigate = useNavigate();
   const { store, collab } = useServices();
   const workspace = useWorkspace();
+  const pageHistory = usePageHistory(pageId);
   const page = workspace.pages.find((p) => p.id === pageId);
   const trail = useMemo(() => ancestors(workspace.pages, pageId), [workspace.pages, pageId]);
   const space = workspace.spaces.find((s) => s.id === page?.spaceId);
@@ -156,7 +199,10 @@ export function PageView() {
             user={user}
             resolvePage={resolvePage}
             onOpenPage={onOpenPage}
+            onControls={pageHistory.setControls}
+            actions={pageHistory.button}
           />
+          {pageHistory.panel}
         </>
       )}
     </article>

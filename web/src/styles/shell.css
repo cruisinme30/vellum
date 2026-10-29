@@ -618,3 +618,24 @@ kbd {
   justify-content: center;
   padding: 0 24px;
 }
+
+.vl-home-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+
+.vl-home-shortcuts a {
+  padding: 6px 16px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 999px;
+  color: var(--md-primary);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.vl-home-shortcuts a:hover,
+.vl-home-shortcuts a:focus-visible {
+  background: var(--md-surface-container);
+}

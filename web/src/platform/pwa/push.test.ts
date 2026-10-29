@@ -107,6 +107,21 @@ describe("web push", () => {
     expect(unused).not.toHaveBeenCalled();
   });
 
+  it("sends writes through the app's API client when given one", async () => {
+    const existing = subscription();
+    const { pushEnvironment, fetchMock } = environment({ existing });
+    const send = vi.fn(() => Promise.resolve());
+    const withClient = { ...pushEnvironment, send };
+    await enablePush(withClient);
+    expect(send).toHaveBeenCalledWith("POST", "/api/v1/push/subscriptions", existing.toJSON());
+    await disablePush(withClient);
+    expect(send).toHaveBeenLastCalledWith(
+      "DELETE",
+      "/api/v1/push/subscriptions?endpoint=https%3A%2F%2Fpush.example%2F1",
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("detects support", () => {
     expect(pushSupported({})).toBe(false);
     vi.stubGlobal("navigator", { serviceWorker: {} });

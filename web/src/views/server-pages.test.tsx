@@ -41,8 +41,10 @@ function fakeDrive(options: { hold?: boolean; trash?: unknown } = {}) {
     },
     "/api/v1/drive/shared-drives": { spaces: [] },
     "/api/v1/drive/starred": { items: [] },
-    "/api/v1/drive/spaces/S1/items": { items: [node("F1", "folder")] },
-    "/api/v1/drive/spaces/S1/items?F1": { items: [node("P1", "page", "F1")] },
+    "/api/v1/drive/spaces/S1/tree": {
+      items: [node("F1", "folder"), node("P1", "page", "F1")],
+      truncated: false,
+    },
   };
   const http = {
     get: vi.fn((path: string, query?: { parent_id?: string }) => {

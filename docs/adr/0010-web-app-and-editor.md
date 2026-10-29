@@ -11,7 +11,7 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D58, D59, D60
+- Decisions: D58, D59, D60, D172
 - Issues: #70 (block schema), #90 (app shell), #92 (block editor),
   #79 (themes), #128 and #129 (collection views); the Yjs binding refs
   #97 (collab rooms); #392 (API clients); #89 (pages on the server's
@@ -95,6 +95,22 @@ start before the API and the collab server exist.
 - Why: the shell and editor could ship before the backend, and swapping
   in the server is a transport change only.
 
+### D172: versions on idle and Done, history restores through the room
+
+- The editor writes a version 30 s after its own last change, and on
+  Done (button, Ctrl/Cmd+S). Done with nothing new is only acknowledged,
+  so this timer and the room's own never make two copies. The bar says
+  Saved, Unsaved changes, Saving or failed (retried on the next quiet
+  spell); offline edits save once the socket is back.
+- History lists the drive's versions (time read from the ULID), shows a
+  version's Markdown as text, and restores it as a new version. The
+  editor saves first, so the text it replaces stays in the history.
+- A page text written through the API (a save, a restore) is merged into
+  the page's room, opening it from its log if needed: the log is the
+  room's source of truth, so otherwise the room would write its old text
+  back. The file's text wins over log edits it never held. A page never
+  edited live has no log and is left alone.
+
 ## Alternatives
 
 - **Hand-written types on each side**: rejected; they drift (D58).
@@ -102,6 +118,9 @@ start before the API and the collab server exist.
   disagree on edge cases (D59).
 - **`y-indexeddb`**: rejected in favour of the shared `DocumentCache`, so
   one store owns offline data (D60).
+- **Restore by rewriting the document in the browser**: rejected; the
+  browser has no Markdown parser (D59), and other editors would not get
+  it from the file (D172).
 - **`@material/material-color-utilities`**: dropped; its ESM imports
   lack file extensions, which break under Node and the tests (D60).
 
