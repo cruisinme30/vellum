@@ -62,3 +62,9 @@ ATX
 [Ww]ikilinks?
 [Ss]ubscript
 [Ss]uperscript
+[Mm]utators?
+Yjs
+[Jj]ittered
+Replicache
+mdBook
+Roboto

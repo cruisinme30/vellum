@@ -35,46 +35,59 @@ gitGraph
    kebab case: `feat/typed-ids`, `fix/watcher-rename`, `docs/adr-0002`.
    CI rejects other names (Dependabot's `dependabot/…` excepted). Open the
    pull request against `develop`.
-2. At regular intervals a maintainer opens a pull request from `develop`
+2. Merge through the merge queue: `gh pr merge --auto --squash`, or
+   **Merge when ready** on GitHub. The queue tests each pull request on
+   top of the ones ahead of it and merges it once **Fast suite** passes
+   there, so parallel pull requests never race each other into `develop`.
+   If `Cargo.lock` or `web/pnpm-lock.yaml` conflicts, merge `develop` into
+   your branch and run `cargo xtask relock`.
+3. At regular intervals a maintainer opens a pull request from `develop`
    into `main`. It merges with a merge commit, never a squash, so history
    stays shared.
-3. Releases are cut by tagging `main` (`vX.Y.Z`, semver).
-4. An urgent fix branches from `main`, merges into `main` through the full
+4. Releases are cut by tagging `main` (`vX.Y.Z`, semver).
+5. An urgent fix branches from `main`, merges into `main` through the full
    suite, then `main` merges back into `develop`.
 
 ## Checks
 
 | Suite | Runs on | Contents |
 | --- | --- | --- |
-| Fast (`ci.yml`) | every pull request into `develop` or `main`, pushes to `develop` | rustfmt, clippy, rustdoc, unit and property tests (nextest), crate boundaries, cargo-deny, cargo-audit; Prettier, tsc, ESLint, knip, Vitest with 85 % coverage, pnpm audit; REUSE, yamllint, shellcheck, markdownlint, Vale, local links, gitleaks, infrastructure linters; Conventional Commits, DCO, branch name and description template |
+| Fast (`ci.yml`) | every pull request into `develop` or `main`, each merge queue entry, pushes to `develop` | rustfmt, clippy, rustdoc, unit and property tests (nextest), crate boundaries, cargo-deny, cargo-audit; Prettier, tsc, ESLint, knip, Vitest with 85 % coverage, pnpm audit; REUSE, yamllint, shellcheck, markdownlint, Vale, local links, gitleaks, infrastructure linters; Conventional Commits, DCO, branch name and description template |
 | Full (`full.yml`) | every pull request into `main`, pushes to `main`, nightly | the fast suite, plus Rust line coverage of at least 85 %, the release build, Playwright end-to-end with axe accessibility checks, and external link checks |
 
 Further layers join the full suite as their code lands: golden corpus,
 integration with testcontainers, contract, performance, chaos, security
 scans and the upgrade and restore drill.
 
-Run the same checks locally before pushing:
+Run the fast suite locally before pushing. Install the hooks once, after
+cloning:
 
 ```sh
-cargo fmt --all --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo nextest run --workspace
-cargo xtask boundaries
-cargo deny check
-pnpm --dir web run format:check
-pnpm --dir web run lint
-pnpm --dir web run test
+cargo xtask install-hooks
 ```
 
-Enable the repository hooks once: `git config core.hooksPath .githooks`.
+This turns on the commit template and three git hooks: `commit-msg`
+checks the commit message, `pre-commit` checks formatting, and `pre-push`
+runs `cargo xtask fast`, which mirrors every **Fast suite** check in CI
+and refuses the push if one fails. Run it by hand at any time:
+
+```sh
+cargo xtask fast
+```
+
+A check whose tool is not installed is skipped and named in the summary;
+CI still runs it. Install `markdownlint-cli2`, `vale`, `lychee`,
+`gitleaks`, `reuse`, `yamllint` and `shellcheck` to run every check. In
+an emergency, `git push --no-verify` skips the hook, but CI still gates
+the merge.
 
 ## Commits and pull requests
 
 CI enforces every rule in this section on each pull request.
 
-- **Commit template**: run `git config commit.template .gitmessage` once.
-  Each commit has a Conventional Commits subject, `type(scope): summary`
-  of at most 72 characters, where type is one of
+- **Commit template**: `cargo xtask install-hooks` sets it up. Each
+  commit has a Conventional Commits subject, `type(scope): summary` of at
+  most 72 characters, where type is one of
   `build chore ci docs feat fix perf refactor revert style test`; then a
   blank line; then a body saying why. The `.githooks/commit-msg` hook
   checks the same rules locally.
@@ -127,7 +140,8 @@ Set these under **Settings → Rules → Rulesets** on GitHub.
 | --- | --- | --- |
 | Require a pull request (0 approvals while there is one maintainer) | yes | yes |
 | Required status checks | `Fast suite` | `Full suite` |
-| Require branches to be up to date | yes | yes |
+| Merge queue (squash, groups of up to 5) | yes | no |
+| Require branches to be up to date | no (the merge queue does it) | yes |
 | Require signed commits | planned | planned |
 | Require linear history | yes (squash merge) | no (merge commits from `develop`) |
 | Block force pushes and deletion | yes | yes |
