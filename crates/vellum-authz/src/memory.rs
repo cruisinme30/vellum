@@ -19,9 +19,9 @@ struct Space {
     epoch: u64,
     parents: BTreeMap<Id, Option<Id>>,
     tuples: BTreeMap<TupleKey, Tuple>,
-    /// `(principal id, object) → (relation, epoch)`, the shape of the
-    /// `effective_access` primary key.
-    effective: BTreeMap<(Id, Id), (Relation, u64)>,
+    /// `(principal id, object, relation) → (epoch, valid_until)`, the
+    /// shape of the `effective_access` primary key.
+    effective: BTreeMap<(Id, Id, Relation), (u64, Option<i64>)>,
 }
 
 #[derive(Debug, Default)]
@@ -35,6 +35,18 @@ struct State {
 #[derive(Debug, Default)]
 pub struct MemoryStore {
     state: Mutex<State>,
+}
+
+fn live(valid_until: Option<i64>, now_ms: i64) -> bool {
+    valid_until.is_none_or(|at| at > now_ms)
+}
+
+fn live_rows(space: &Space, p: Id, now_ms: i64) -> impl Iterator<Item = (Id, Relation)> + '_ {
+    space
+        .effective
+        .range((p, Id(0), Relation::Viewer)..=(p, Id(u128::MAX), Relation::Owner))
+        .filter(move |(_, (_, until))| live(*until, now_ms))
+        .map(|((_, o, r), _)| (*o, *r))
 }
 
 fn poisoned<T>(_: PoisonError<T>) -> StoreError {
@@ -145,12 +157,13 @@ impl AuthzStore for MemoryStore {
         }
         match commit.scope {
             Scope::All => s.effective.clear(),
-            Scope::Objects(objects) => s.effective.retain(|(_, o), _| !objects.contains(o)),
+            Scope::Objects(objects) => s.effective.retain(|(_, o, _), _| !objects.contains(o)),
         }
         for row in commit.rows {
-            let _ = s
-                .effective
-                .insert((row.principal.id(), row.object), (row.relation, epoch));
+            let _ = s.effective.insert(
+                (row.principal.id(), row.object, row.relation),
+                (epoch, row.valid_until),
+            );
         }
         s.epoch = epoch;
         Ok(epoch)
@@ -161,19 +174,8 @@ impl AuthzStore for MemoryStore {
         space: Id,
         principal: Principal,
         object: Id,
-    ) -> Result<Option<(Relation, u64)>, StoreError> {
-        let state = self.lock()?;
-        Ok(state
-            .spaces
-            .get(&space)
-            .and_then(|s| s.effective.get(&(principal.id(), object)).copied()))
-    }
-
-    async fn list(
-        &self,
-        space: Id,
-        principal: Principal,
-    ) -> Result<Vec<(Id, Relation)>, StoreError> {
+        now_ms: i64,
+    ) -> Result<Vec<(Relation, u64)>, StoreError> {
         let state = self.lock()?;
         let p = principal.id();
         Ok(state
@@ -181,10 +183,25 @@ impl AuthzStore for MemoryStore {
             .get(&space)
             .map(|s| {
                 s.effective
-                    .range((p, Id(0))..=(p, Id(u128::MAX)))
-                    .map(|((_, object), (relation, _))| (*object, *relation))
+                    .range((p, object, Relation::Viewer)..=(p, object, Relation::Owner))
+                    .filter(|(_, (_, until))| live(*until, now_ms))
+                    .map(|((_, _, r), (epoch, _))| (*r, *epoch))
                     .collect()
             })
+            .unwrap_or_default())
+    }
+
+    async fn list(
+        &self,
+        space: Id,
+        principal: Principal,
+        now_ms: i64,
+    ) -> Result<Vec<(Id, Relation)>, StoreError> {
+        let state = self.lock()?;
+        Ok(state
+            .spaces
+            .get(&space)
+            .map(|s| live_rows(s, principal.id(), now_ms).collect())
             .unwrap_or_default())
     }
 
@@ -192,33 +209,26 @@ impl AuthzStore for MemoryStore {
         &self,
         principal: Principal,
         objects: &[Id],
+        now_ms: i64,
     ) -> Result<Vec<(Id, Relation)>, StoreError> {
         let state = self.lock()?;
         let p = principal.id();
-        Ok(objects
-            .iter()
-            .filter_map(|o| {
-                state
-                    .spaces
-                    .values()
-                    .find_map(|s| s.effective.get(&(p, *o)))
-                    .map(|(r, _)| (*o, *r))
-            })
+        let wanted: BTreeSet<Id> = objects.iter().copied().collect();
+        Ok(state
+            .spaces
+            .values()
+            .flat_map(|s| live_rows(s, p, now_ms))
+            .filter(|(o, _)| wanted.contains(o))
             .collect())
     }
 
-    async fn spaces_of(&self, principal: Principal) -> Result<Vec<Id>, StoreError> {
+    async fn spaces_of(&self, principal: Principal, now_ms: i64) -> Result<Vec<Id>, StoreError> {
         let state = self.lock()?;
         let p = principal.id();
         Ok(state
             .spaces
             .iter()
-            .filter(|(_, s)| {
-                s.effective
-                    .range((p, Id(0))..=(p, Id(u128::MAX)))
-                    .next()
-                    .is_some()
-            })
+            .filter(|(_, s)| live_rows(s, p, now_ms).next().is_some())
             .map(|(id, _)| *id)
             .collect())
     }
