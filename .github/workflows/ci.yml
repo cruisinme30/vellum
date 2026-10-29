@@ -117,13 +117,13 @@ jobs:
         run: |
           base="https://github.com/errata-ai/vale/releases/download/v${VALE_VERSION}"
           curl -sSfL "${base}/vale_${VALE_VERSION}_Linux_64-bit.tar.gz" | tar -xz -C "${RUNNER_TEMP}" vale
-          "${RUNNER_TEMP}/vale" --glob='!{**/node_modules/**,target/**,LICENSES/**,LICENSE}' .
+          "${RUNNER_TEMP}/vale" --glob='!{**/node_modules/**,target/**,LICENSES/**,LICENSE,corpus/format/**}' .
       - name: Local links
         uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
           args: >-
             --offline --no-progress --include-fragments
-            --exclude-path LICENSES --exclude-path web/node_modules '**/*.md'
+            --exclude-path LICENSES --exclude-path web/node_modules --exclude-path corpus/format '**/*.md'
           fail: true
       - name: Secrets
         # The pull request already scanned these commits; the action does
@@ -171,10 +171,35 @@ jobs:
           scripts/ci/check-commits.sh
           ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }}
 
+  traceability:
+    name: Issue and decision record
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Linked issue, and a decision record for features
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          TITLE: ${{ github.event.pull_request.title }}
+          BASE: ${{ github.event.pull_request.base.ref }}
+          AUTHOR_TYPE: ${{ github.event.pull_request.user.type }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: scripts/ci/check-traceability.sh
+
   fast-suite:
     name: Fast suite
     if: always()
-    needs: [rust, web, hygiene, commits]
+    needs: [rust, web, hygiene, commits, traceability]
     runs-on: ubuntu-24.04
     steps:
       - name: Every fast check passed or was not applicable

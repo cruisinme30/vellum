@@ -1,0 +1,35 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Northstar is a self-hosted workspace for documents, issues and tasks."
+          },
+          {
+            "type": "soft_break"
+          },
+          {
+            "type": "text",
+            "text": "A line break inside a paragraph is kept as written."
+          }
+        ],
+        "id": null
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "A second paragraph follows a blank line."
+          }
+        ],
+        "id": null
+      }
+    ]
+  },
+  "diagnostics": []
+}

@@ -1,0 +1,74 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "fence",
+        "lang": "timeline",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "2026-10-01: Beta opens\n2026-11-24: General availability\n"
+      },
+      {
+        "type": "fence",
+        "lang": "roadmap",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "range: 2026-10 .. 2027-03\nReplay engine: 2026-10 .. 2026-12\nmilestone GA: 2026-11-24\n"
+      },
+      {
+        "type": "fence",
+        "lang": "risk-matrix",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "Data loss: likelihood 1, impact 5\nSlow search: likelihood 3, impact 2\n"
+      },
+      {
+        "type": "fence",
+        "lang": "board",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "Todo: Write runbook\nDoing: Replay engine\nDone: Diff report\n"
+      },
+      {
+        "type": "fence",
+        "lang": "table",
+        "args": "sortable bar=Revenue sum=Revenue",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "Region,Revenue\nEMEA,120\nAPAC,90\n"
+      },
+      {
+        "type": "fence",
+        "lang": "architecture",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "lane Edge: Gateway\nlane Core: Policy engine, Audit log\nGateway -> Policy engine\nPolicy engine -> Audit log\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}

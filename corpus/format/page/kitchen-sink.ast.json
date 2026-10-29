@@ -1,0 +1,299 @@
+{
+  "document": {
+    "front_matter": {
+      "fields": {
+        "id": "01JB7Z3K8Q4W5N6P7R8S9T0V21",
+        "title": "Policy simulator design",
+        "status": "draft",
+        "owner": "priya",
+        "vellum": 1
+      }
+    },
+    "blocks": [
+      {
+        "type": "heading",
+        "level": 1,
+        "content": [
+          {
+            "type": "text",
+            "text": "Policy simulator design"
+          }
+        ],
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null
+      },
+      {
+        "type": "container",
+        "name": "toc",
+        "arg": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "sections": [
+          []
+        ]
+      },
+      {
+        "type": "heading",
+        "level": 2,
+        "content": [
+          {
+            "type": "text",
+            "text": "Purpose"
+          }
+        ],
+        "attrs": {
+          "id": "purpose",
+          "classes": [],
+          "pairs": []
+        },
+        "id": null
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Replay "
+          },
+          {
+            "type": "strong",
+            "content": [
+              {
+                "type": "text",
+                "text": "7 days"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": " of traffic against a draft policy before it ships. Tracked in "
+          },
+          {
+            "type": "issue_key",
+            "key": "ENG-142"
+          },
+          {
+            "type": "text",
+            "text": ", due "
+          },
+          {
+            "type": "date",
+            "date": "2026-11-24"
+          },
+          {
+            "type": "text",
+            "text": "."
+          }
+        ],
+        "id": "blk-p0s1t2v3"
+      },
+      {
+        "type": "container",
+        "name": "stats",
+        "arg": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "sections": [
+          [
+            {
+              "type": "list",
+              "start": null,
+              "tight": true,
+              "items": [
+                {
+                  "task": null,
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "7 days · Replayed traffic"
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                },
+                {
+                  "task": null,
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "10 min · Target replay time · ▼ 5 min"
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        ]
+      },
+      {
+        "type": "heading",
+        "level": 2,
+        "content": [
+          {
+            "type": "text",
+            "text": "Request path"
+          }
+        ],
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null
+      },
+      {
+        "type": "fence",
+        "lang": "mermaid",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "sequenceDiagram\n  Client->>Gateway: request\n  Gateway->>Engine: evaluate\n"
+      },
+      {
+        "type": "container",
+        "name": "columns",
+        "arg": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "sections": [
+          [
+            {
+              "type": "container",
+              "name": "good",
+              "arg": "",
+              "attrs": {
+                "id": null,
+                "classes": [],
+                "pairs": []
+              },
+              "sections": [
+                [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Ship the simulator first."
+                      }
+                    ],
+                    "id": null
+                  }
+                ]
+              ]
+            }
+          ],
+          [
+            {
+              "type": "container",
+              "name": "warn",
+              "arg": "",
+              "attrs": {
+                "id": null,
+                "classes": [],
+                "pairs": []
+              },
+              "sections": [
+                [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "The diff report needs security review."
+                      }
+                    ],
+                    "id": null
+                  }
+                ]
+              ]
+            }
+          ]
+        ]
+      },
+      {
+        "type": "heading",
+        "level": 2,
+        "content": [
+          {
+            "type": "text",
+            "text": "Open decisions"
+          }
+        ],
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null
+      },
+      {
+        "type": "list",
+        "start": null,
+        "tight": true,
+        "items": [
+          {
+            "task": false,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Decide the retention for replay data "
+                  },
+                  {
+                    "type": "mention",
+                    "handle": "priya"
+                  }
+                ],
+                "id": null
+              }
+            ]
+          },
+          {
+            "task": true,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Pick the storage backend"
+                  }
+                ],
+                "id": null
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "diagnostics": []
+}
