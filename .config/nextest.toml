@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# cargo-nextest settings. CI and `cargo xtask fast` use the "ci" profile.
+
+[profile.ci]
+# A test that hangs is killed after 2 minutes instead of holding the Rust
+# job until its 30-minute timeout (ADR 0035, D138). Slow tests are named
+# every 30 s.
+slow-timeout = { period = "30s", terminate-after = 4 }
+# Print a failure as it happens and again in the summary.
+failure-output = "immediate-final"
