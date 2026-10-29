@@ -137,8 +137,7 @@ impl Drive {
                 } else {
                     Permission::Edit
                 };
-            self.authorize(actor, node.space, node.id, permission)
-                .await?;
+            let _ = self.authorize_subtree(actor, &node, permission).await?;
             self.authorize(
                 actor,
                 to_space.id,

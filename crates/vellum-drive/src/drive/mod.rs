@@ -153,6 +153,25 @@ impl Drive {
         }
     }
 
+    /// Fails unless `actor` holds `permission` on `node` and on every live
+    /// node beneath it, which it returns. Moving or trashing a folder
+    /// carries everything in it, so a part the actor may not change (a
+    /// restricted page, say) blocks the whole operation. The answer stays
+    /// `PermissionDenied` so it does not reveal what is hidden.
+    async fn authorize_subtree(
+        &self,
+        actor: &Actor,
+        node: &Node,
+        permission: Permission,
+    ) -> DriveResult<Vec<Node>> {
+        let members = self.subtree(node).await?;
+        for member in &members {
+            self.authorize(actor, member.space, member.id, permission)
+                .await?;
+        }
+        Ok(members)
+    }
+
     /// Like [`Self::authorize`] but answers instead of failing.
     async fn may(&self, actor: &Actor, node: &Node, permission: Permission) -> DriveResult<bool> {
         match self.authorize(actor, node.space, node.id, permission).await {
