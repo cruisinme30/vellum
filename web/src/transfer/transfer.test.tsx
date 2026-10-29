@@ -16,6 +16,7 @@ import {
   type TransferApi,
 } from "./api";
 import { ExportPanel } from "./export-panel";
+import { IssueImportForm } from "./import-screen";
 
 const PAGE: ExportTarget = { kind: "page", id: "p 1", title: "Launch plan" };
 const SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>';
@@ -32,6 +33,7 @@ function fakeApi(overrides: Partial<TransferApi> = {}): TransferApi {
     ),
     download: vi.fn(() => Promise.resolve(new Blob(["%PDF-"]))),
     importFile: vi.fn(),
+    importIssues: vi.fn(),
     ...overrides,
   };
 }
@@ -128,5 +130,47 @@ describe("export panel", () => {
     expect(await screen.findByText("the server is busy")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Download" }));
     expect(await screen.findByText("too large to export")).toBeTruthy();
+  });
+});
+
+describe("issue import", () => {
+  it("previews, then imports, a GitHub export", async () => {
+    const user = userEvent.setup();
+    const importIssues = vi.fn<TransferApi["importIssues"]>((_file, into) =>
+      Promise.resolve({
+        created: 2,
+        skipped: 1,
+        links: 0,
+        read: 3,
+        keys: [],
+        warnings: [{ external_id: "northstar/app#7", message: "assignee left unassigned" }],
+        dry_run: into.dryRun,
+      }),
+    );
+    render(
+      <I18nProvider>
+        <IssueImportForm api={fakeApi({ importIssues })} />
+      </I18nProvider>,
+    );
+    const preview = screen.getByRole("button", { name: "Preview" });
+    expect(preview).toHaveProperty("disabled", true);
+    await user.selectOptions(screen.getByLabelText("Exported from"), "github");
+    await user.type(screen.getByLabelText("Repository"), "northstar/app");
+    await user.type(screen.getByLabelText("Team key"), "eng");
+    const file = new File(["[]"], "issues.json", { type: "application/json" });
+    await user.upload(screen.getByLabelText("Export file"), file);
+
+    await user.click(preview);
+    expect(importIssues).toHaveBeenLastCalledWith(file, {
+      tracker: "github",
+      team: "ENG",
+      repo: "northstar/app",
+      dryRun: true,
+    });
+    expect(await screen.findByText(/2 issues will be created/)).toBeTruthy();
+    expect(screen.getByText("One note")).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "Import" }));
+    expect(await screen.findByText(/Created 2 issues/)).toBeTruthy();
   });
 });

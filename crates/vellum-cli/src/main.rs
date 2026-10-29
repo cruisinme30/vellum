@@ -34,6 +34,9 @@ mod identity;
 #[cfg(test)]
 mod identity_tests;
 mod integrations;
+mod issue_import;
+#[cfg(test)]
+mod issue_import_tests;
 mod keys;
 mod limits;
 mod mail;

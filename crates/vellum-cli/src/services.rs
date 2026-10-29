@@ -30,7 +30,7 @@ use vellum_tasks::service::TasksService;
 use crate::collab::Collab;
 use crate::identity::{GuardedFetcher, GuardedSsoHttp, IdentityAuthenticator};
 use crate::observability::{self, Observability};
-use crate::{exports, uploads, workspace};
+use crate::{exports, issue_import, uploads, workspace};
 
 /// The binary's version, shown in `/healthz` and the API documents.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -71,6 +71,8 @@ pub struct Services {
     books: Option<Arc<vellum_books_service::BooksService>>,
     /// The public URL, for links out of an export.
     public_url: String,
+    /// Work, which issue imports create through.
+    work: Option<Arc<vellum_work_service::WorkService>>,
 }
 
 impl std::fmt::Debug for Services {
@@ -166,6 +168,7 @@ impl Services {
             scanner: None,
             books: None,
             public_url: public_url.trim_end_matches('/').to_owned(),
+            work: None,
         })
     }
 
@@ -226,6 +229,7 @@ impl Services {
         self.drive_index = opened.drive_index;
         self.drive = opened.drive;
         self.books = opened.books;
+        self.work = opened.work;
         Ok(self)
     }
 
@@ -270,6 +274,21 @@ impl Services {
             Some(self.public_url.clone()),
         ));
         (transfer.export_router(), transfer.import_router())
+    }
+
+    /// The issue import route, mounted at [`issue_import::PREFIX`] by
+    /// [`Self::mount`]. Without a workspace index it answers 503.
+    pub fn issue_import(&self) -> axum::Router {
+        self.work
+            .as_ref()
+            .map_or_else(issue_import::unavailable_router, |work| {
+                issue_import::router(
+                    Arc::clone(work),
+                    Arc::clone(&self.identity),
+                    self.scanner.clone(),
+                    UploadPolicy::default(),
+                )
+            })
     }
 
     /// Rate-limit counts shared with the other replicas, when an index is
@@ -346,6 +365,11 @@ impl Services {
             .mount_uploads(uploads::PREFIX, self.uploads(), upload_body_limit())
             .mount(exports::EXPORT_PREFIX, export)
             .mount_uploads(exports::IMPORT_PREFIX, import, upload_body_limit())
+            .mount_uploads(
+                issue_import::PREFIX,
+                self.issue_import(),
+                upload_body_limit(),
+            )
     }
 }
 

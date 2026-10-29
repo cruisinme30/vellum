@@ -496,6 +496,8 @@ pub struct Opened {
     pub drive: Option<Arc<Drive>>,
     /// Books, which export reads sections through (see [`crate::exports`]).
     pub books: Option<Arc<BooksService>>,
+    /// Work, which issue imports create through (see [`crate::issue_import`]).
+    pub work: Option<Arc<WorkService>>,
 }
 
 /// My Work's settings: where its secrets live and what it links to.
@@ -933,6 +935,7 @@ pub async fn open(
         drive_index: Some(drive_index),
         drive: Some(workspace.drive),
         books: Some(workspace.books),
+        work: Some(workspace.work),
     })
 }
 
