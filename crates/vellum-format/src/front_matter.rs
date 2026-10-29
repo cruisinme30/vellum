@@ -162,7 +162,7 @@ pub fn parse(yaml: &str, diagnostics: &mut Vec<Diagnostic>) -> FrontMatter {
 fn canonical_order(mut map: Mapping) -> Mapping {
     let mut ordered = Mapping::with_capacity(map.len());
     for key in KNOWN_KEYS {
-        if let Some(value) = map.remove(key) {
+        if let Some(value) = map.shift_remove(key) {
             let _ = ordered.insert(Value::from(key), value);
         }
     }

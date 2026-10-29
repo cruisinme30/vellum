@@ -102,7 +102,7 @@ impl Cx<'_> {
             }
             NodeValue::Heading(heading) => {
                 // A setext heading may span lines; an ATX heading cannot.
-                let mut content = extras::merge_text(unbreak(self.inlines(node)));
+                let mut content = trim_ends(extras::merge_text(unbreak(self.inlines(node))));
                 let id = extras::take_block_id(&mut content);
                 Block::Heading {
                     level: heading.level,
@@ -115,12 +115,17 @@ impl Cx<'_> {
             NodeValue::BlockQuote | NodeValue::MultilineBlockQuote(_) => Block::BlockQuote {
                 blocks: self.blocks(node),
             },
-            NodeValue::Alert(alert) => Block::Container(Container {
-                name: callout_name(alert.alert_type).to_owned(),
-                arg: alert.title.unwrap_or_default().trim().to_owned(),
-                attrs: Attributes::default(),
-                sections: vec![self.blocks(node)],
-            }),
+            NodeValue::Alert(alert) => {
+                // Read the title as a container line would be read.
+                let title = alert.title.unwrap_or_default();
+                let (arg, attrs) = crate::attrs::split_trailing(title.trim());
+                Block::Container(Container {
+                    name: callout_name(alert.alert_type).to_owned(),
+                    arg: arg.to_owned(),
+                    attrs,
+                    sections: vec![self.blocks(node)],
+                })
+            }
             NodeValue::List(list) => Block::List(List {
                 start: (list.list_type == ListType::Ordered).then_some(list.start as u64),
                 tight: list.tight,
@@ -134,9 +139,7 @@ impl Cx<'_> {
                 let info = code.info.trim();
                 let (lang, args) = info.split_once(char::is_whitespace).unwrap_or((info, ""));
                 if lang == "math" && args.trim().is_empty() && attrs.is_empty() {
-                    Block::Math {
-                        literal,
-                    }
+                    Block::Math { literal }
                 } else {
                     Block::Fence(Fence {
                         lang: lang.to_owned(),
@@ -250,12 +253,26 @@ impl Cx<'_> {
     }
 }
 
+/// Trims whitespace from the start of the first and end of the last text
+/// run, as an ATX heading line is read.
+fn trim_ends(mut content: Vec<Inline>) -> Vec<Inline> {
+    if let Some(Inline::Text { text }) = content.first_mut() {
+        *text = text.trim_start().to_owned();
+    }
+    if let Some(Inline::Text { text }) = content.last_mut() {
+        *text = text.trim_end().to_owned();
+    }
+    extras::merge_text(content)
+}
+
 /// Replaces line breaks with spaces, recursively.
 fn unbreak(inlines: Vec<Inline>) -> Vec<Inline> {
     inlines
         .into_iter()
         .map(|inline| match inline {
-            Inline::SoftBreak | Inline::HardBreak => Inline::Text { text: " ".to_owned() },
+            Inline::SoftBreak | Inline::HardBreak => Inline::Text {
+                text: " ".to_owned(),
+            },
             other => extras::map_children(other, unbreak),
         })
         .collect()

@@ -104,7 +104,7 @@ fn block(block: &Block, pos: Pos, alternate: bool) -> String {
             text.push('\n');
             text
         }
-        Block::ThematicBreak if pos.columns || pos.file_start => "***\n".to_owned(),
+        Block::ThematicBreak if pos.columns || pos.file_start || pos.nested => "***\n".to_owned(),
         Block::ThematicBreak => "---\n".to_owned(),
         Block::BlockQuote { blocks: inner } => {
             let body = blocks(
@@ -116,7 +116,11 @@ fn block(block: &Block, pos: Pos, alternate: bool) -> String {
                 },
                 "\n",
             );
-            if body.is_empty() { ">\n".to_owned() } else { prefix_lines(&body, "> ", "> ") }
+            if body.is_empty() {
+                ">\n".to_owned()
+            } else {
+                prefix_lines(&body, "> ", "> ")
+            }
         }
         Block::List(list) => self::list(list, alternate),
         Block::Fence(fence) => self::fence(fence),
@@ -170,9 +174,16 @@ fn list(list: &List, alternate: bool) -> String {
             file_start: false,
         };
         let body = blocks(&item.blocks, pos, if list.tight { "" } else { "\n" });
+        let paragraph_first = matches!(item.blocks.first(), Some(Block::Paragraph { .. }));
         if body.is_empty() {
             out.push_str(&marker);
             out.push('\n');
+        } else if item.task.is_some() && !paragraph_first {
+            // A task box must be followed by text on its line; other blocks
+            // start on the next line.
+            out.push_str(&marker);
+            out.push_str(if list.tight { " \n" } else { " \n\n" });
+            out.push_str(&prefix_lines(&body, &indent, &indent));
         } else {
             out.push_str(&prefix_lines(&body, &format!("{marker} "), &indent));
         }
@@ -192,8 +203,11 @@ fn fence(fence: &Fence) -> String {
         .map(|l| l.trim_start().chars().take_while(|x| *x == c).count())
         .max();
     let marks = c.to_string().repeat(longest.unwrap_or(0).max(2) + 1);
-    let mut info = fence.lang.clone();
-    for part in [fence.args.clone(), attrs::to_string(&fence.attrs)] {
+    let mut info = inline::escape_info(&fence.lang);
+    for part in [
+        inline::escape_info(&fence.args),
+        attrs::to_string(&fence.attrs),
+    ] {
         if !part.is_empty() {
             if !info.is_empty() {
                 info.push(' ');

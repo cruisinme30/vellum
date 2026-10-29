@@ -30,7 +30,7 @@ pub use front_matter::{FrontMatter, Status};
 pub use serialize::serialize;
 
 /// A parsed document and the problems found while reading it.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Parsed {
     /// The document, in canonical form.
     pub document: Document,

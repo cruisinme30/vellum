@@ -11,18 +11,96 @@ use vellum_kernel::BlockId;
 
 use crate::ast::Inline;
 
-/// Merges adjacent text runs and drops empty ones, recursively.
+/// Merges adjacent text runs, drops empty ones and flattens a mark nested
+/// directly in the same mark (`<em><em>x</em></em>` reads as `<em>x</em>`),
+/// recursively.
 pub fn merge_text(inlines: Vec<Inline>) -> Vec<Inline> {
     let mut out: Vec<Inline> = Vec::with_capacity(inlines.len());
     for inline in inlines {
-        let inline = map_children(inline, merge_text);
+        let inline = flatten_same(map_children(inline, merge_text));
         match (out.last_mut(), inline) {
             (_, Inline::Text { text }) if text.is_empty() => {}
             (Some(Inline::Text { text: last }), Inline::Text { text }) => last.push_str(&text),
+            // `<em>a</em><em>b</em>` reads as `<em>ab</em>`.
+            (Some(Inline::Emphasis { content: last }), Inline::Emphasis { content })
+            | (Some(Inline::Strong { content: last }), Inline::Strong { content }) => {
+                last.extend(content);
+                *last = merge_text(std::mem::take(last));
+            }
             (_, inline) => out.push(inline),
         }
     }
     out
+}
+
+fn flatten_same(inline: Inline) -> Inline {
+    fn splice(content: Vec<Inline>, same: fn(&Inline) -> Option<&Vec<Inline>>) -> Vec<Inline> {
+        let mut out = Vec::with_capacity(content.len());
+        for child in content {
+            match same(&child) {
+                Some(inner) => out.extend(inner.iter().cloned()),
+                None => out.push(child),
+            }
+        }
+        merge_text(out)
+    }
+    match inline {
+        Inline::Emphasis { content } => Inline::Emphasis {
+            content: splice(content, |i| {
+                if let Inline::Emphasis { content } = i {
+                    Some(content)
+                } else {
+                    None
+                }
+            }),
+        },
+        Inline::Strong { content } => Inline::Strong {
+            content: splice(content, |i| {
+                if let Inline::Strong { content } = i {
+                    Some(content)
+                } else {
+                    None
+                }
+            }),
+        },
+        Inline::Strikethrough { content } => Inline::Strikethrough {
+            content: splice(content, |i| {
+                if let Inline::Strikethrough { content } = i {
+                    Some(content)
+                } else {
+                    None
+                }
+            }),
+        },
+        Inline::Highlight { content } => Inline::Highlight {
+            content: splice(content, |i| {
+                if let Inline::Highlight { content } = i {
+                    Some(content)
+                } else {
+                    None
+                }
+            }),
+        },
+        Inline::Subscript { content } => Inline::Subscript {
+            content: splice(content, |i| {
+                if let Inline::Subscript { content } = i {
+                    Some(content)
+                } else {
+                    None
+                }
+            }),
+        },
+        Inline::Superscript { content } => Inline::Superscript {
+            content: splice(content, |i| {
+                if let Inline::Superscript { content } = i {
+                    Some(content)
+                } else {
+                    None
+                }
+            }),
+        },
+        other => other,
+    }
 }
 
 /// Removes a trailing ` ^blk-xxxxxxxx` from merged inline content.
