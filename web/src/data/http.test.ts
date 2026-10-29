@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { ApiError, type Http } from "../api/http";
 
-import { createHttpWorkspaceStore, slugOf } from "./http";
+import { createHttpWorkspaceStore } from "./http";
 import type { WorkspaceStore } from "./store";
 
 const PRIYA = { id: "01M6409GN2EYWS8Z7NFQQ3JNWZ", handle: "priya", name: "Priya Raman" };
@@ -57,14 +57,19 @@ const BASE = {
   "GET /api/v1/drive/my-drive": { space: MINE },
   "GET /api/v1/drive/shared-drives": { spaces: [TEAM] },
   "GET /api/v1/drive/starred": { items: [node("p2", "page")] },
-  "GET /api/v1/drive/spaces/S-MINE/items": {
-    items: [node("f1", "folder"), node("p1", "page"), node("b1", "book")],
+  "GET /api/v1/drive/spaces/S-MINE/tree": {
+    items: [
+      node("f1", "folder"),
+      node("p2", "page", "f1", { created_by: SAM.id }),
+      node("p1", "page"),
+      node("b1", "book"),
+      node("in-book", "page", "b1"),
+    ],
+    truncated: false,
   },
-  "GET /api/v1/drive/spaces/S-MINE/items?parent_id=f1": {
-    items: [node("p2", "page", "f1", { created_by: SAM.id })],
-  },
-  "GET /api/v1/drive/spaces/S-TEAM/items": {
+  "GET /api/v1/drive/spaces/S-TEAM/tree": {
     items: [node("t1", "page", undefined, { space_id: "S-TEAM" })],
+    truncated: false,
   },
 };
 
@@ -96,15 +101,6 @@ const searchHit = (pageId: string, text: string) => ({
 const page = (store: WorkspaceStore, id: string) =>
   store.getSnapshot().pages.find((p) => p.id === id);
 
-describe("slugOf", () => {
-  it("makes a valid space slug from any handle", () => {
-    expect(slugOf("Priya.Raman")).toBe("priya-raman");
-    expect(slugOf("--x__y--")).toBe("x-y");
-    expect(slugOf("åäö")).toBe("me");
-    expect(slugOf(`${"a".repeat(47)}-b`)).toBe("a".repeat(47));
-  });
-});
-
 describe("the HTTP workspace store", () => {
   it("is empty and idle until someone signs in", () => {
     const http = fakeHttp({});
@@ -130,7 +126,11 @@ describe("the HTTP workspace store", () => {
       { id: "S-MINE", slug: "priya", name: "My Drive", icon: "🏠" },
       { id: "S-TEAM", slug: "eng", name: "Engineering", icon: "👥" },
     ]);
-    expect(snapshot.pages.map((p) => p.id)).toEqual(["f1", "p1", "p2", "t1"]);
+    expect(snapshot.pages.map((p) => p.id)).toEqual(["f1", "p2", "p1", "t1"]);
+    expect(http.get.mock.calls).toContainEqual([
+      "/api/v1/drive/spaces/S-MINE/tree",
+      { limit: 10_000 },
+    ]);
     expect(page(store, "f1")).toMatchObject({ folder: true, icon: "📁", position: 1 });
     expect(page(store, "p1")).toEqual({
       id: "p1",
@@ -147,35 +147,36 @@ describe("the HTTP workspace store", () => {
     expect(page(store, "p2")).toMatchObject({ parentId: "f1", starred: true, owner: "" });
   });
 
-  it("creates the person's My Drive on first use", async () => {
-    const create = vi.fn(() => MINE);
-    await loaded({
-      "GET /api/v1/drive/my-drive": JSON.parse('{ "space": null }') as unknown,
-      "POST /api/v1/drive/spaces": create,
+  it("loads level by level when the tree is cut short, nesting pages under pages", async () => {
+    const { store } = await loaded({
+      "GET /api/v1/drive/spaces/S-MINE/tree": { items: [node("f1", "folder")], truncated: true },
+      "GET /api/v1/drive/spaces/S-MINE/items": {
+        items: [node("f1", "folder"), node("p1", "page"), node("b1", "book")],
+      },
+      "GET /api/v1/drive/spaces/S-MINE/items?parent_id=f1": { items: [node("p2", "page", "f1")] },
+      "GET /api/v1/drive/spaces/S-MINE/items?parent_id=p1": { items: [node("sub", "page", "p1")] },
+      "GET /api/v1/drive/spaces/S-MINE/items?parent_id=p2": { items: [] },
+      "GET /api/v1/drive/spaces/S-MINE/items?parent_id=sub": { items: [] },
     });
-    expect(create).toHaveBeenCalledWith(
-      { kind: "user_drive", slug: "priya", name: "My Drive" },
-      undefined,
-    );
+    expect(store.getSnapshot().pages.map((p) => p.id)).toEqual(["f1", "p1", "p2", "sub", "t1"]);
+    expect(page(store, "sub")).toMatchObject({ parentId: "p1", position: 1 });
   });
 
-  it("picks another slug when the handle's is taken", async () => {
-    const slugs: unknown[] = [];
-    const { store } = await loaded({
-      "GET /api/v1/drive/my-drive": {},
-      "POST /api/v1/drive/spaces": (body: unknown) => {
-        slugs.push((body as { slug: string }).slug);
-        return slugs.length === 1 ? new ApiError("conflict", "taken") : MINE;
-      },
+  it("never makes a My Drive itself, and reports one missing", async () => {
+    const { http, store } = await loaded({
+      "GET /api/v1/drive/my-drive": JSON.parse('{ "space": null }') as unknown,
     });
-    expect(slugs).toEqual(["priya", `priya-${PRIYA.id.slice(-8).toLowerCase()}`]);
-    expect(store.getSnapshot().spaces).toHaveLength(2);
+    expect(http.send.mock.calls).toHaveLength(0);
+    expect(store.getSnapshot()).toMatchObject({
+      loading: false,
+      spaces: [],
+      problem: { message: "The server returned no My Drive." },
+    });
   });
 
   it("reports a load that fails, with the request ID", async () => {
     const { store } = await loaded({
-      "GET /api/v1/drive/my-drive": JSON.parse('{ "space": null }') as unknown,
-      "POST /api/v1/drive/spaces": new ApiError("permission_denied", "not allowed", {
+      "GET /api/v1/drive/shared-drives": new ApiError("permission_denied", "not allowed", {
         requestId: "R1",
       }),
     });
@@ -297,27 +298,28 @@ describe("the HTTP workspace store", () => {
     expect(calls).toHaveLength(2);
   });
 
-  it("moves into a folder on the server, and reorders only here", async () => {
+  it("moves and reorders on the server, sending the place among the new siblings", async () => {
     const { http, store } = await loaded({
       "POST /api/v1/drive/items/p1/move": node("p1", "page", "f1"),
     });
     store.movePage("p1", { spaceId: "S-MINE", parentId: undefined, index: 0 });
     await settled(store);
-    expect(http.send.mock.calls).toHaveLength(0);
+    expect(http.send.mock.lastCall).toEqual([
+      "POST",
+      "/api/v1/drive/items/p1/move",
+      { space_id: "S-MINE", parent_id: undefined, index: 0 },
+    ]);
     expect(page(store, "p1")?.position).toBe(1);
-    store.movePage("p1", { spaceId: "S-MINE", parentId: "f1", index: 0 });
+    store.movePage("p1", { spaceId: "S-MINE", parentId: "f1", index: 1 });
     await settled(store);
     expect(http.send.mock.lastCall).toEqual([
       "POST",
       "/api/v1/drive/items/p1/move",
-      {
-        space_id: "S-MINE",
-        parent_id: "f1",
-      },
+      { space_id: "S-MINE", parent_id: "f1", index: 1 },
     ]);
     expect(page(store, "p1")?.parentId).toBe("f1");
     store.movePage("missing", { spaceId: "S-MINE", parentId: undefined, index: 0 });
-    expect(http.send.mock.calls).toHaveLength(1);
+    expect(http.send.mock.calls).toHaveLength(2);
   });
 
   it("undoes a move the server refuses", async () => {

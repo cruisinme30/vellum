@@ -31,6 +31,12 @@ interface NodeList {
   readonly items: readonly NodeView[];
 }
 
+/** `TreeView` from `vellum-drive`: a space's items, depth first in order. */
+interface TreeList extends NodeList {
+  /** True when the limit cut the tree short. */
+  readonly truncated: boolean;
+}
+
 const DRIVE = "/api/v1/drive";
 const SEARCH = "/api/v1/search";
 /** Hits asked of the search service; several can fall in one page. */
@@ -38,20 +44,11 @@ const SEARCH_LIMIT = 50;
 const segment = encodeURIComponent;
 const item = (id: string) => `${DRIVE}/items/${segment(id)}`;
 
+/** The most items one tree request asks for; the server's own cap. */
+const TREE_LIMIT = 10_000;
+
 /** Folders and pages make the tree; books, collections and shortcuts open elsewhere. */
 const inTree = (node: NodeView) => node.kind === "page" || node.kind === "folder";
-
-/** A My Drive's slug from a handle: lowercase letters, digits and dashes. */
-export function slugOf(handle: string): string {
-  const slug = handle
-    .toLowerCase()
-    .split(/[^a-z\d]/)
-    .filter(Boolean)
-    .join("-")
-    .slice(0, 48)
-    .replace(/-$/, "");
-  return slug === "" ? "me" : slug;
-}
 
 function problemOf(error: unknown): StoreProblem {
   if (error instanceof ApiError) {
@@ -98,17 +95,15 @@ function spaceOf(space: SpaceView): Space {
 export interface HttpWorkspaceOptions {
   /** The workspace's name in the sidebar. */
   readonly name?: string;
-  /** The name a new My Drive gets. */
-  readonly myDriveName?: string;
   /** Who is signed in when the app starts; loading starts at once. */
   readonly user?: SignedInUser | undefined;
 }
 
 /**
  * The workspace port over the drive's REST operations (`/api/v1/drive`,
- * issue #392). The snapshot holds the signed-in person's My Drive, created
- * on first use, and the shared drives they can open, each with its whole
- * folder and page tree. Changes show at once and settle with the server;
+ * issue #392). The snapshot holds the signed-in person's My Drive, which
+ * the server makes with the account, and the shared drives they can open,
+ * each with its whole folder and page tree. Changes show at once and settle with the server;
  * one the server refuses is undone and shows as the snapshot's `problem`.
  *
  * Page bodies travel over the live-editing socket, never through here
@@ -167,30 +162,35 @@ export function createHttpWorkspaceStore(
     };
   };
 
-  const myDrive = async (who: SignedInUser): Promise<SpaceView> => {
+  const myDrive = async (): Promise<SpaceView> => {
     const mine = await http.get<{ space?: SpaceView | null }>(`${DRIVE}/my-drive`);
-    if (mine.space !== undefined && mine.space !== null) return mine.space;
-    const create = (slug: string) =>
-      http.send<SpaceView>("POST", `${DRIVE}/spaces`, {
-        kind: "user_drive",
-        slug,
-        name: options.myDriveName ?? "My Drive",
-      });
-    const slug = slugOf(who.handle);
-    try {
-      return await create(slug);
-    } catch (error) {
-      // Someone else's drive has the slug: make it unique with the user ID.
-      if (error instanceof ApiError && error.code === "conflict") {
-        return create(`${slug}-${who.id.slice(-8).toLowerCase()}`);
-      }
-      throw error;
+    if (mine.space === undefined || mine.space === null) {
+      // The server makes a My Drive with every account, so this is a fault.
+      throw new Error("The server returned no My Drive.");
     }
+    return mine.space;
   };
 
-  /** A space's folders and pages, level by level, each list in the server's order. */
-  const tree = async (spaceId: string, starred: ReadonlySet<string>): Promise<PageMeta[]> => {
+  /** Turns depth-first items into pages, numbering each list of siblings from 1. */
+  const pagesOf = (items: readonly NodeView[], starred: ReadonlySet<string>): PageMeta[] => {
+    const kept = new Set<string>();
+    const counts = new Map<string | undefined, number>();
     const out: PageMeta[] = [];
+    for (const node of items) {
+      const parent = node.parent_id ?? undefined;
+      // Only folders and pages make the tree, and nothing under what it leaves out.
+      if (!inTree(node) || (parent !== undefined && !kept.has(parent))) continue;
+      kept.add(node.id);
+      const position = (counts.get(parent) ?? 0) + 1;
+      counts.set(parent, position);
+      out.push(metaOf(node, position, starred.has(node.id)));
+    }
+    return out;
+  };
+
+  /** A space's tree, level by level: slower, but never cut short. */
+  const treeByLevel = async (spaceId: string): Promise<NodeView[]> => {
+    const out: NodeView[] = [];
     let level: (string | undefined)[] = [undefined];
     while (level.length > 0) {
       const lists = await Promise.all(
@@ -198,16 +198,20 @@ export function createHttpWorkspaceStore(
           http.get<NodeList>(`${DRIVE}/spaces/${segment(spaceId)}/items`, { parent_id: parent }),
         ),
       );
-      const next: string[] = [];
-      for (const list of lists) {
-        for (const [index, node] of list.items.filter((n) => inTree(n)).entries()) {
-          out.push(metaOf(node, index + 1, starred.has(node.id)));
-          if (node.kind === "folder") next.push(node.id);
-        }
-      }
-      level = next;
+      const found = lists.flatMap((list) => list.items.filter((n) => inTree(n)));
+      out.push(...found);
+      level = found.map((node) => node.id);
     }
     return out;
+  };
+
+  /** A space's folders and pages in one request, or level by level when it is too big. */
+  const tree = async (spaceId: string, starred: ReadonlySet<string>): Promise<PageMeta[]> => {
+    const whole = await http.get<TreeList>(`${DRIVE}/spaces/${segment(spaceId)}/tree`, {
+      limit: TREE_LIMIT,
+    });
+    const items = whole.truncated ? await treeByLevel(spaceId) : whole.items;
+    return pagesOf(items, starred);
   };
 
   const load = async (who: SignedInUser) => {
@@ -216,7 +220,7 @@ export function createHttpWorkspaceStore(
     set(emptyFor(who));
     try {
       const [own, shared, starredList] = await Promise.all([
-        myDrive(who),
+        myDrive(),
         http.get<{ spaces: readonly SpaceView[] }>(`${DRIVE}/shared-drives`),
         http.get<NodeList>(`${DRIVE}/starred`),
       ]);
@@ -304,18 +308,16 @@ export function createHttpWorkspaceStore(
       change(patch(id, { starred }), () => http.send("PUT", `${item(id)}/star`, { starred }));
     },
     movePage(id, target) {
-      const page = snapshot.pages.find((p) => p.id === id);
-      if (page === undefined) return;
-      const reparents = page.spaceId !== target.spaceId || page.parentId !== target.parentId;
-      // The drive keeps no order among siblings: a reorder stays in this tab.
-      const request: () => Promise<unknown> = reparents
-        ? () =>
-            http.send("POST", `${item(id)}/move`, {
-              space_id: target.spaceId,
-              parent_id: target.parentId,
-            })
-        : () => Promise.resolve();
-      change((pages) => movePage(pages, id, target), request);
+      if (!snapshot.pages.some((p) => p.id === id)) return;
+      change(
+        (pages) => movePage(pages, id, target),
+        () =>
+          http.send("POST", `${item(id)}/move`, {
+            space_id: target.spaceId,
+            parent_id: target.parentId,
+            index: target.index,
+          }),
+      );
     },
     trashPage(id) {
       const gone = descendants(snapshot.pages, id);
