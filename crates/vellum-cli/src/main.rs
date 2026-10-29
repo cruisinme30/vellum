@@ -14,6 +14,7 @@
 //! routes over their latency budget.
 
 mod admin;
+mod cluster;
 mod collab;
 mod docs;
 mod feed;

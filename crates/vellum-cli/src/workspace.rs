@@ -17,7 +17,8 @@
 //! replicas need the bucket and a Postgres index, so they all see one
 //! workspace and a restarted pod loses nothing.
 //!
-//! At startup the drive rescans the files. For a data folder, a file
+//! At startup the first replica of the cluster rescans the files (see
+//! [`crate::cluster`]). For a data folder, a file
 //! watcher then keeps the index in step with edits made outside Vellum
 //! (see [`crate::watcher`]); a bucket is only written through Vellum.
 //! Writes are announced in the index's change feed, and each replica
@@ -47,6 +48,7 @@ use vellum_tasks::service::{Config as TasksConfig, TasksService};
 use vellum_work::{UserRef, WorkEvent};
 use vellum_work_service::{Directory, EventSink, SystemClock, WorkService};
 
+use crate::cluster::Replica;
 use crate::collab::Collab;
 use crate::feed::{AnnouncingStore, Caches};
 use crate::google_http::{self, Endpoints, FileLinks, GoogleHttp};
@@ -328,6 +330,8 @@ pub struct Opened {
     pub hooks: Option<axum::Router>,
     /// Live editing, when an index is configured.
     pub collab: Option<Collab>,
+    /// This replica in the cluster's heartbeat table.
+    pub replica: Option<Replica>,
     /// My Work, which also serves the feed, CalDAV and capture routes.
     pub tasks: Option<Arc<TasksService>>,
 }
@@ -467,6 +471,35 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
     })
 }
 
+/// Rescans the workspace files once per cluster: a replica that starts
+/// while others run finds the index already current (D163).
+async fn rescan(replica: &Replica, others_alive: bool, drive: &Arc<Drive>) {
+    let drive = Arc::clone(drive);
+    replica
+        .rescan_once(others_alive, async move {
+            match drive.scan().await {
+                Ok(report) => {
+                    tracing::info!(?report, "drive index rebuilt from the workspace files");
+                }
+                Err(error) => tracing::warn!(%error, "drive rescan failed; the index may be stale"),
+            }
+        })
+        .await;
+}
+
+/// Syncs Google Calendar every [`GOOGLE_SYNC_EVERY`] on one replica.
+fn sync_calendars(replica: &Replica, tasks: &Arc<TasksService>) {
+    let timer = Arc::clone(tasks);
+    replica.every("tasks.google_sync", GOOGLE_SYNC_EVERY, move || {
+        let timer = Arc::clone(&timer);
+        async move {
+            if let Err(error) = timer.google_sync_all().await {
+                tracing::warn!(%error, "Google Calendar sync skipped");
+            }
+        }
+    });
+}
+
 /// Opens the workspace services for `config`, or returns none (with a
 /// warning) when no index is configured.
 ///
@@ -512,6 +545,9 @@ pub async fn open(
         .head()
         .await
         .map_err(|e| unavailable("cannot read the change feed", e))?;
+    let (replica, others_alive) = Replica::join(&index, &me, &var)
+        .await
+        .map_err(|e| unavailable("cannot join the cluster", e))?;
     let store: Arc<dyn BlobStore> = Arc::new(AnnouncingStore::new(files, feed.clone(), &me));
     let authz = Arc::new(Authz::new(SqlStore::new(index.clone())));
     let drive_index = Arc::new(SqlIndex::new(index.clone()));
@@ -538,10 +574,8 @@ pub async fn open(
     if local {
         crate::watcher::start(&config.data_dir, &store, &workspace.drive, &workspace.books).await?;
     }
-    match workspace.drive.scan().await {
-        Ok(report) => tracing::info!(?report, "drive index rebuilt from the workspace files"),
-        Err(error) => tracing::warn!(%error, "drive rescan failed; the index may be stale"),
-    }
+    rescan(&replica, others_alive, &workspace.drive).await;
+    replica.maintain(&index);
     let hooks = crate::integrations::hooks(&store, &workspace.work, &var).await?;
     let collab = Collab::open(
         Arc::clone(&workspace.drive),
@@ -555,23 +589,14 @@ pub async fn open(
     )?;
     spaces.replace(load_spaces(drive_index.as_ref()).await?);
     keep_fresh(feed, me, cursor, &workspace, &spaces, drive_index);
-    let timer = Arc::clone(&workspace.tasks);
-    drop(tokio::spawn(async move {
-        let mut tick = tokio::time::interval(GOOGLE_SYNC_EVERY);
-        tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-        loop {
-            let _ = tick.tick().await;
-            if let Err(error) = timer.google_sync_all().await {
-                tracing::warn!(%error, "Google Calendar sync skipped");
-            }
-        }
-    }));
+    sync_calendars(&replica, &workspace.tasks);
     let mut services = workspace.services;
     services.push(Arc::new(Storage(store)));
     Ok(Opened {
         services,
         hooks,
         collab: Some(collab),
+        replica: Some(replica),
         tasks: Some(workspace.tasks),
     })
 }

@@ -44,6 +44,8 @@ pub struct Services {
     hooks: Option<axum::Router>,
     /// Live editing, when an index is configured.
     collab: Option<Collab>,
+    /// This replica's place in the cluster, when an index is configured.
+    replica: Option<crate::cluster::Replica>,
     /// My Work, for its feed, CalDAV and capture routes.
     tasks: Option<Arc<TasksService>>,
     /// The admin console (requests, routes, audit, settings, backups).
@@ -113,6 +115,7 @@ impl Services {
             workspace: Vec::new(),
             hooks: None,
             collab: None,
+            replica: None,
             tasks: None,
             admin: None,
             observability: Observability::new(),
@@ -160,6 +163,7 @@ impl Services {
         self.workspace = opened.services;
         self.hooks = opened.hooks;
         self.collab = opened.collab;
+        self.replica = opened.replica;
         self.tasks = opened.tasks;
         Ok(self)
     }
@@ -173,11 +177,15 @@ impl Services {
             .map_or_else(crate::collab::unavailable_router, Collab::router)
     }
 
-    /// Saves every page open for live editing and closes its connections.
+    /// Saves every page open for live editing and closes its connections,
+    /// then leaves the cluster's heartbeat table.
     /// Call it after the server stops accepting requests.
     pub async fn shutdown(&self) {
         if let Some(collab) = &self.collab {
             collab.shutdown().await;
+        }
+        if let Some(replica) = &self.replica {
+            replica.leave().await;
         }
     }
 

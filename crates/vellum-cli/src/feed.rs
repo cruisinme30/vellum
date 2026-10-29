@@ -39,11 +39,10 @@ pub const POLL: Duration = Duration::from_millis(250);
 /// Most changes read per poll; a longer backlog is read over several.
 const PAGE: usize = 2048;
 
-/// How often old positions are pruned, and how many are kept. At 1,000
-/// writes a second that is about two minutes of history, far more than a
-/// replica falls behind between polls.
-const PRUNE_EVERY: Duration = Duration::from_mins(5);
-const KEEP: u64 = 100_000;
+/// How many positions are kept when the feed is pruned (by one replica,
+/// see [`crate::cluster`]). At 1,000 writes a second that is about two
+/// minutes of history, far more than a replica falls behind between polls.
+pub const KEEP: u64 = 100_000;
 
 /// A name for this process that no other replica shares: the host (the
 /// pod name in Kubernetes), the process ID and the start time.
@@ -213,7 +212,6 @@ pub fn follow(feed: Feed, me: String, mut cursor: i64, caches: Caches) {
     drop(tokio::spawn(async move {
         let mut tick = tokio::time::interval(POLL);
         tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-        let mut pruned = tokio::time::Instant::now();
         loop {
             let _ = tick.tick().await;
             // Drain a backlog without waiting a tick between pages.
@@ -237,13 +235,6 @@ pub fn follow(feed: Feed, me: String, mut cursor: i64, caches: Caches) {
                         tracing::warn!(%error, "cannot read the change feed");
                         break;
                     }
-                }
-            }
-            if pruned.elapsed() >= PRUNE_EVERY {
-                pruned = tokio::time::Instant::now();
-                match feed.prune(KEEP).await {
-                    Ok(gone) => tracing::debug!(gone, "pruned the change feed"),
-                    Err(error) => tracing::warn!(%error, "cannot prune the change feed"),
                 }
             }
         }
