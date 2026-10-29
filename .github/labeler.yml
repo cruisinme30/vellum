@@ -1,0 +1,124 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# actions/labeler: area labels from changed paths. A pull request may get
+# several. New crates add a line here.
+
+area/kernel:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-kernel/**"
+area/contracts:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-contracts/**"
+area/format:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-format/**"
+          - "corpus/**"
+          - "schema/**"
+area/store:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-store/**"
+area/crypto:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-crypto*/**"
+area/security:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-security/**"
+area/db:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-db/**"
+          - "**/*.sql"
+area/render:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-render/**"
+area/export:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-export/**"
+area/authz:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-authz/**"
+area/collab:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-collab/**"
+area/collections:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-collections/**"
+area/pages:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-pages/**"
+area/work:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-work*/**"
+area/my-work:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-tasks*/**"
+          - "crates/vellum-mywork*/**"
+area/api:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-api/**"
+area/jobs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-jobs/**"
+area/mcp:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-mcp/**"
+area/cli:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/vellum-cli/**"
+area/editor:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "web/src/editor/**"
+area/web:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "web/**"
+area/ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/**"
+          - "scripts/**"
+          - ".githooks/**"
+          - "xtask/**"
+          - ".cargo/**"
+          - "Cargo.toml"
+          - "Cargo.lock"
+          - "deny.toml"
+          - "clippy.toml"
+          - "rustfmt.toml"
+          - "rust-toolchain.toml"
+          - ".vale/**"
+          - ".vale.ini"
+          - ".yamllint.yaml"
+          - ".markdownlint-cli2.jsonc"
+          - ".lycheeignore"
+          - "REUSE.toml"
+area/docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "docs/**"
+          - "site/**"
+          - "*.md"
+area/deploy:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "deploy/**"

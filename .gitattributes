@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+* text=auto eol=lf
+
+# Generated files: collapsed in GitHub diffs.
+Cargo.lock linguist-generated=true
+web/pnpm-lock.yaml linguist-generated=true
+LICENSE linguist-generated=true
+LICENSES/** linguist-generated=true

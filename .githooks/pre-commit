@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Fast formatting checks before each commit. CI runs the full set.
+set -euo pipefail
+
+root="$(git rev-parse --show-toplevel)"
+cargo fmt --all --check --manifest-path "${root}/Cargo.toml"
+if [[ -d "${root}/web/node_modules" ]]; then
+  pnpm --dir "${root}/web" exec prettier --check .
+fi

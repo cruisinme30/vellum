@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+[package]
+name = "vellum-authz"
+description = "Deny-by-default relationship-based authorization over the index."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[package.metadata.vellum]
+layer = "engine"
+
+[lints]
+workspace = true
+
+[dependencies]
+thiserror = "2.0.21"
+tracing = "0.1.44"
+
+[dev-dependencies]
+# proptest 1.12 moves to rand 0.10 while OpenTelemetry is on rand 0.9 (see vellum-crypto).
+proptest = ">=1.11.0, <1.12"
+tokio = { version = "1", features = ["macros", "rt"] }

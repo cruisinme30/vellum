@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+extends: default
+
+ignore: |
+  web/node_modules/
+  web/pnpm-lock.yaml
+  target/
+
+rules:
+  line-length:
+    max: 120
+  document-start: disable
+  truthy:
+    allowed-values: ["true", "false", "on"]
+  braces:
+    max-spaces-inside: 1
+  comments:
+    min-spaces-from-content: 1

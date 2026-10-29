@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+version = 1
+
+# Files whose format cannot carry a comment header. Vellum Markdown has no
+# raw HTML, so documents in docs/ cannot hold an HTML comment header.
+[[annotations]]
+path = [
+  "Cargo.lock",
+  "web/pnpm-lock.yaml",
+  "web/package.json",
+  "web/tsconfig.json",
+  "web/knip.json",
+  "web/.prettierrc.json",
+  ".markdownlint-cli2.jsonc",
+  ".lycheeignore",
+  ".vale/styles/config/vocabularies/**",
+  "docs/**/*.md",
+  ".gitmessage",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 The Vellum contributors"
+SPDX-License-Identifier = "AGPL-3.0-only"
