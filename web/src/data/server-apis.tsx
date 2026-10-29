@@ -3,6 +3,7 @@
 
 import { createContext, use, type ReactNode } from "react";
 
+import type { AttachmentsApi } from "../attachments/api";
 import type { BooksApi } from "../books/api";
 import type { DriveApi } from "../drive/api";
 import { useT } from "../i18n/i18n";
@@ -16,6 +17,7 @@ export interface ServerApis {
   readonly work?: WorkApi | undefined;
   readonly books?: BooksApi | undefined;
   readonly drive?: DriveApi | undefined;
+  readonly attachments?: AttachmentsApi | undefined;
   readonly privateSpaces?: PrivateSpacesApi | undefined;
 }
 
@@ -30,6 +32,11 @@ export function ServerApisProvider({
   readonly children: ReactNode;
 }) {
   return <ServerApisContext value={apis}>{children}</ServerApisContext>;
+}
+
+/** One server API, or `undefined` in demo mode. */
+export function useServerApi<K extends keyof ServerApis>(name: K): ServerApis[K] {
+  return use(ServerApisContext)[name];
 }
 
 /**

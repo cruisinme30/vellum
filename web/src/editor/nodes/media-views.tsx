@@ -4,9 +4,10 @@
 import { NodeViewWrapper, type ReactNodeViewProps } from "@tiptap/react";
 import { useState, type FocusEvent } from "react";
 
+import { UploadButton } from "../../attachments/upload-button";
 import { useT } from "../../i18n/i18n";
 import { Icon } from "../../shell/icon";
-import { embedTarget, safeUrl } from "../urls";
+import { embedTarget, mediaUrl, safeUrl } from "../urls";
 
 interface FieldProperties {
   readonly label: string;
@@ -155,7 +156,7 @@ export function ImageView(properties: ReactNodeViewProps) {
   const source = String(node.attrs["src"]);
   const alt = String(node.attrs["alt"]);
   const width = String(node.attrs["width"]);
-  const safe = safeUrl(source);
+  const safe = mediaUrl(source);
   const [editing, formEvents] = useEditing(properties, "src");
   return (
     <NodeViewWrapper
@@ -180,6 +181,18 @@ export function ImageView(properties: ReactNodeViewProps) {
       )}
       {editing && (
         <div className="vl-form" {...formEvents}>
+          {editor.isEditable && (
+            <UploadButton
+              label={t("image-upload")}
+              accept="image/*"
+              onUploaded={(file) => {
+                updateAttributes({
+                  src: file.ref,
+                  alt: alt === "" ? file.name.replace(/\.[^.]*$/, "") : alt,
+                });
+              }}
+            />
+          )}
           <Field
             label={t("field-image-url")}
             type="url"

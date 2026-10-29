@@ -23,6 +23,26 @@ export function safeUrl(raw: string): string | undefined {
   }
 }
 
+/** `vellum://attachment/{page}/{name}`: a file attached to a page (ADR 0039 D211). */
+const ATTACHMENT_REF =
+  /^vellum:\/\/attachment\/([0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26})\/([^\s/?#]+)$/;
+
+/**
+ * Where to load an attachment `ref` from: the server's download path for
+ * it, or `undefined` for anything that is not an attachment ref.
+ */
+export function attachmentUrl(raw: string): string | undefined {
+  const match = ATTACHMENT_REF.exec(raw.trim());
+  if (match === null) return undefined;
+  const [, page = "", name = ""] = match;
+  return `/api/v1/attachments/${page}/${name}`;
+}
+
+/** An image's source to put in the DOM: an attachment's download path, or a safe URL. */
+export function mediaUrl(raw: string): string | undefined {
+  return attachmentUrl(raw) ?? safeUrl(raw);
+}
+
 /** An embed the sandboxed frame can show. */
 export interface EmbedTarget {
   readonly provider: string;

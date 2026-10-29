@@ -13,6 +13,7 @@ import { RequestsPage } from "./admin/requests/requests-page";
 import { RoutesPage } from "./admin/routes/routes-page";
 import type { AuthApi, AuthStatus } from "./api/auth";
 import { RequireSession, SessionProvider, useSession } from "./api/session";
+import type { AttachmentsApi } from "./attachments/api";
 import type { BooksApi } from "./books/api";
 import { BookPage, BooksPage } from "./books/books-page";
 import { CollectionView } from "./collections/collection-view";
@@ -147,6 +148,8 @@ export interface AppServices {
   readonly books?: BooksApi | undefined;
   /** The drive's spaces, trash, activity and settings; absent in demo mode. */
   readonly drive?: DriveApi | undefined;
+  /** Files attached to pages; absent in demo mode. */
+  readonly attachments?: AttachmentsApi | undefined;
   /** Private spaces' device keys, from a Vellum server; absent in demo mode. */
   readonly privateSpaces?: PrivateSpacesApi | undefined;
   readonly collections: CollectionsStore;
@@ -200,6 +203,7 @@ export function AppProviders({
   work,
   books,
   drive,
+  attachments,
   privateSpaces,
   collections,
   session,
@@ -207,8 +211,8 @@ export function AppProviders({
   children,
 }: AppServices & { readonly children: ReactNode }) {
   const serverApis = useMemo(
-    () => ({ work, books, drive, privateSpaces }),
-    [work, books, drive, privateSpaces],
+    () => ({ work, books, drive, attachments, privateSpaces }),
+    [work, books, drive, attachments, privateSpaces],
   );
   const [demoNotifications] = useState<NotificationServices>(() => ({
     store: createMockNotificationPreferencesStore(),

@@ -5,6 +5,9 @@ import { useCallback, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
 import { useSession } from "../api/session";
+import { PageFilesProvider } from "../attachments/context";
+import { FilesPanel } from "../attachments/files-panel";
+import { useServerApi } from "../data/server-apis";
 import { ancestors, siblings } from "../data/tree";
 import type { PageMeta } from "../data/types";
 import { useServices, useWorkspace } from "../data/workspace-context";
@@ -64,7 +67,41 @@ function usePageHistory(pageId: string) {
       }}
     />
   );
-  return { button, panel, setControls };
+  return { button, panel, controls, setControls };
+}
+
+/**
+ * The Files button for the editor's bar and the page's files panel (D277).
+ * Both are absent in demo mode, which has nowhere to keep files.
+ */
+function usePageFilesPanel(pageId: string, canWrite: boolean) {
+  const t = useT();
+  const available = useServerApi("attachments") !== undefined;
+  const [openFor, setOpenFor] = useState<string>();
+  const open = openFor === pageId;
+  const button = available && (
+    <button
+      type="button"
+      className="vl-icon-button"
+      aria-label={t("files-open")}
+      title={t("files-open")}
+      aria-expanded={open}
+      onClick={() => {
+        setOpenFor(open ? undefined : pageId);
+      }}
+    >
+      <Icon name="attach_file" />
+    </button>
+  );
+  const panel = available && open && (
+    <FilesPanel
+      canWrite={canWrite}
+      onClose={() => {
+        setOpenFor(undefined);
+      }}
+    />
+  );
+  return { button, panel };
 }
 
 /** A page: breadcrumbs, title, properties and the editor. */
@@ -75,6 +112,7 @@ export function PageView() {
   const { store, collab } = useServices();
   const workspace = useWorkspace();
   const pageHistory = usePageHistory(pageId);
+  const pageFiles = usePageFilesPanel(pageId, pageHistory.controls?.canWrite ?? false);
   const page = workspace.pages.find((p) => p.id === pageId);
   const trail = useMemo(() => ancestors(workspace.pages, pageId), [workspace.pages, pageId]);
   const space = workspace.spaces.find((s) => s.id === page?.spaceId);
@@ -191,18 +229,26 @@ export function PageView() {
               </dd>
             </div>
           </dl>
-          <PageEditor
-            pageId={page.id}
-            spaceId={page.spaceId}
-            seed={store.seedFor(page.id)}
-            connector={collab}
-            user={user}
-            resolvePage={resolvePage}
-            onOpenPage={onOpenPage}
-            onControls={pageHistory.setControls}
-            actions={pageHistory.button}
-          />
-          {pageHistory.panel}
+          <PageFilesProvider pageId={page.id}>
+            <PageEditor
+              pageId={page.id}
+              spaceId={page.spaceId}
+              seed={store.seedFor(page.id)}
+              connector={collab}
+              user={user}
+              resolvePage={resolvePage}
+              onOpenPage={onOpenPage}
+              onControls={pageHistory.setControls}
+              actions={
+                <>
+                  {pageFiles.button}
+                  {pageHistory.button}
+                </>
+              }
+            />
+            {pageFiles.panel}
+            {pageHistory.panel}
+          </PageFilesProvider>
         </>
       )}
     </article>

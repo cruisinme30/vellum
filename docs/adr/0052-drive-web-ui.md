@@ -11,8 +11,8 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D226, D227, D228, D266
-- Issue: #503, #509
+- Decisions: D226, D227, D228, D266, D277
+- Issue: #503, #509, #518
 - Pull requests: to be linked when merged
 
 :::
@@ -84,6 +84,19 @@ own record.
   keeps its own trash days and retention policy.
 - A replica that takes a lease runs the job at once, so a restart
   catches up. "Apply retention now" stays as a manual trigger.
+
+### D277: pages upload through the editor and keep a Files panel
+
+- The image block's form offers "Upload an image". The page's Markdown
+  keeps the file's `ref` (`vellum://attachment/{page}/{name}`), and the
+  editor shows it through the server's download path (ADR 0039 D212).
+  Only that exact ref shape maps to a path; every other source still
+  passes the safe URL check.
+- A Files button beside History opens the page's files: download, upload
+  and, for editors, delete after a second click.
+- The HTTP client gains a raw-body upload with the same CSRF token and
+  idempotency key as other writes. The server's refusals (413, 415, 422,
+  503) show in plain words with its message.
 
 ## Alternatives
 

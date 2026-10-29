@@ -591,3 +591,23 @@ drive-pruned = { $count ->
     [one] Removed 1 old version.
    *[other] Removed { $count } old versions.
   }
+
+## Page files (ADR 0052 D277)
+
+image-upload = Upload an image
+upload-busy = Uploading { $name }…
+upload-failed = The upload failed.
+upload-too-large = The file is too big.
+upload-wrong-type = Vellum does not accept this kind of file, or its contents do not match its name.
+upload-refused = The file did not pass the checks.
+upload-scanner-down = The virus scanner is down, so uploads are paused. Try again in a few minutes.
+files-open = Files
+files-title = Files on this page
+files-close = Close files
+files-upload = Upload a file
+files-uploaded = Uploaded { $name }.
+files-empty = No files are attached to this page.
+files-delete = Delete { $name }
+files-delete-confirm = Delete { $name } for good
+files-cancel = Cancel
+files-deleted = Deleted { $name }.
