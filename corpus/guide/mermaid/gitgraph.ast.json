@@ -11,6 +11,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "gitGraph\n  commit id: \"skeleton\"\n  branch develop\n  checkout develop\n  commit id: \"kernel\"\n  branch feat/format\n  checkout feat/format\n  commit id: \"parser\"\n  commit id: \"corpus\"\n  checkout develop\n  merge feat/format\n  checkout main\n  merge develop tag: \"v1.0.0\"\n"
       }
     ]

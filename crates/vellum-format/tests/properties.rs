@@ -127,6 +127,13 @@ fn line() -> impl Strategy<Value = String> {
         "::: details Why",
         "::: {#x}",
         "===",
+        "$$ ^blk-b0000001",
+        "```js ^blk-b0000002 {title=\"x\"}",
+        "::: info ^blk-b0000003",
+        "::: details Why ^blk-b0000004 {open}",
+        "> [!TIP] Hint ^blk-b0000005",
+        "- [ ] Ship {due=\"2026-11-02\"} ^blk-b0000006",
+        "^blk-b0000007",
     ]);
     (prefix, prop::collection::vec(token(), 0..8)).prop_map(|(prefix, tokens)| {
         let gap = if prefix.is_empty() || prefix.ends_with(' ') {

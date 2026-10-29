@@ -1,9 +1,9 @@
 ---
 id: 01M63CJSGXEV1VK8E5593H182C
-title: "ADR 0015: Collections engine"
+title: "ADR 0015: Collections engine and service"
 status: verified
 owner: "@cruisinme30"
-tags: [adr, collections, engine]
+tags: [adr, collections, engine, service]
 vellum: 1
 ---
 
@@ -11,9 +11,9 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D73, D74, D75
+- Decisions: D73, D74, D75, D132, D133, D134
 - Issue: #125, #126, #127; views, CSV and embeds in #128 to #132
-- Pull requests: #208
+- Pull requests: #208 (engine), #266 (service)
 
 :::
 
@@ -29,10 +29,10 @@ in step when files change, and the exact formula and filter semantics.
 The web, render, search and MCP threads build against this crate in
 parallel, so these have to be settled now.
 
-The crate `vellum-collections` is pure: it parses and writes text and
-computes values, with no I/O. The collections service reads and writes
-files through the blob store, checks permissions through authorization,
-and pushes computed rows to the index and search.
+Most of `vellum-collections` is pure: it parses and writes text and
+computes values, with no I/O. Its `service` module serves that over the
+gateway, reading and writing files through the blob store and checking
+each request through an access port backed by authorization.
 
 ## Decisions
 
@@ -90,19 +90,51 @@ and pushes computed rows to the index and search.
   last and order select options as the schema lists them.
 - CSV export prefixes text a spreadsheet would run as a formula with `'`.
 
+### D132: the service loads from the store and rewrites rows in place
+
+- On first use the service reads every `*.collection/schema.yaml` and its
+  `rows/*.md` into one workspace; the watcher calls `invalidate` when a
+  file changes on disk, and the next request reloads.
+- Each row keeps the path and etag it was read at. A save rewrites that
+  file only if the etag still matches, so an outside edit is never lost;
+  a mismatch is a `conflict` and drops the cache.
+- New rows get `rows/<slug>.md`, then `-2`, `-3`… Deleted rows move to
+  `.vellum/trash/collections/<collection>/<row>.md`.
+- When two folders share a collection ID, the older `schema.yaml` keeps
+  it and the copy is reported, not loaded.
+
+### D133: reading or editing a collection covers what it links to
+
+- Reading needs read access to the collection and to every collection
+  its relations point at, since relation cells show linked titles and
+  rollups show linked values. A collection the caller cannot read is
+  `not_found`.
+- Editing also needs edit access to the other side of each two-way
+  relation, because the engine mirrors links into those row files.
+- Row writes need the `write:direct` scope; reads need `read`.
+
+### D134: `vellum-collections` is a service-layer crate
+
+- The crate map already lists it as a service. The engine modules are
+  its domain; `service` holds the ports (`BlobStore`, `Access`) and the
+  operations, so the domain still has no I/O.
+
 ## Alternatives
 
 - **Write computed values to front matter**: files grow, and merges and
   outside edits can leave them disagreeing with their inputs.
 - **Store only one side of a relation**: a row file would not read on
   its own, and the index could not be rebuilt from either side.
+- **Redact linked titles a caller cannot read**: safer for sharing, but
+  every view and rollup would need per-cell checks; revisit with sharing.
+- **A separate `vellum-collections-service` crate**: one more crate for
+  no boundary gain, and the crate map names this one.
 
 ## Consequences
 
-- The web thread gets typed results (`ViewResult`, `ComputedRow`,
-  `ChartData`) with JSON Schema, ready for the service layer's API.
-- The render thread calls `CollectionEmbed` and `ChartSource` to resolve
-  `collection` fences and `source=collection:` charts, and shows an
-  `EmbedError` as a readable fallback.
-- The collections service is the next step: it loads folders through the
-  blob store, applies edits, and exposes them as service operations.
+- The web app calls `collections.list`, `get`, `query`, `get_row` and
+  the row writes, with JSON Schema for every input and output.
+- Render, an engine crate, cannot depend on this one; it resolves
+  `collection` fences and charts through a port this service implements.
+- Still to come: pushing computed rows to the index and search (D73),
+  saving views, CSV and embed operations (#128 to #132).

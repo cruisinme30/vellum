@@ -14,6 +14,7 @@ repository = "https://github.com/cruisinme30/vellum"
 publish = false
 
 [workspace.dependencies]
+vellum-db = { path = "crates/vellum-db" }
 vellum-help = { path = "crates/vellum-help" }
 vellum-kernel = { path = "crates/vellum-kernel" }
 
