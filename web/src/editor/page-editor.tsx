@@ -20,6 +20,7 @@ import { Icon } from "../shell/icon";
 import type { WorkApi } from "../work/api";
 
 import type { ChipSources } from "./chips/items";
+import { PresenceBar } from "./collab/presence";
 import type {
   CollabConnector,
   CollabSession,
@@ -346,6 +347,7 @@ function BoundEditor({
         <Toolbar editor={editor} />
         <SaveControls saver={saver} canSave={editable && live.status === "online"}>
           {workActions}
+          <PresenceBar awareness={session.awareness} live={session.live ? live : undefined} />
           {actions}
         </SaveControls>
       </div>

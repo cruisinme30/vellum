@@ -13,11 +13,23 @@ const USER = {
   admin: true,
 };
 
+/** Who is signed in; Priya unless a test says otherwise. */
+type User = typeof USER;
+
+/** A second person, for two-browser tests. */
+export const SAM: User = {
+  id: "01M6409GN2EYWS8Z7NFQQ3SAM0",
+  email: "sam@northstar.dev",
+  name: "Sam Okafor",
+  handle: "sam",
+  admin: false,
+};
+
 /** A signed-in session on a server whose drive is faked. */
-export async function signedIn(page: Page) {
+export async function signedIn(page: Page, user: User = USER) {
   await page.route("**/api/v1/auth/status", (route) =>
     route.fulfill({
-      json: { needsSetup: false, credential: "session", scopes: ["read"], user: USER },
+      json: { needsSetup: false, credential: "session", scopes: ["read"], user },
     }),
   );
   await page.route("**/api/csrf", (route) =>

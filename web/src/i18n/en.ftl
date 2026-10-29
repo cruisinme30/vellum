@@ -435,6 +435,13 @@ file-issue-team = Team
 file-issue-name = Title
 file-issue-create = Create issue
 file-issue-no-teams = Create a team in Work first.
+presence-label = { $count ->
+    [one] One other person on this page
+   *[other] { $count } other people on this page
+}
+presence-editing = { $name } is editing
+presence-viewing = { $name } is viewing
+presence-more = { $count } more
 history-open = Version history
 history-title = Version history
 history-close = Close version history

@@ -11,8 +11,8 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D233
-- Issue: #93
+- Decisions: D233, D234
+- Issues: #93 (chips), #98 (presence and the two-browser test)
 - Pull requests: none yet
 
 :::
@@ -46,6 +46,19 @@ record holds the other collaboration surfaces of the editor.
 - The Markdown never changes: chips still serialise as the plain token.
 - Demo mode has no Work, so it offers people, dates and pages only.
 
+### `D234`: presence shows only the peers the server vouches for
+
+- The editor bar shows an avatar per other client in the room's awareness
+  (initials on the person's caret colour, black or white ink by
+  contrast), up to four and then "+N", each named "X is editing" or "X is
+  viewing".
+- Against a server a client appears only when the room's peer list names
+  it, because the name in awareness is whatever that browser sends; the
+  peer list carries the server's user and access (ADR 0009). Leaving the
+  page drops the avatar with the next peer list.
+- The Playwright test joins two browser contexts to one faked room that
+  relays edits and presence, and checks text, avatars and carets.
+
 ## Alternatives
 
 - **A server search for people and pages on each keystroke**: rejected;
@@ -53,6 +66,8 @@ record holds the other collaboration surfaces of the editor.
 - **Writing the issue's state into the document**: rejected; it would go
   stale and churn the Markdown on every state change.
 - **`#` as the issue trigger**: rejected; it collides with heading input.
+- **Trusting awareness names alone**: rejected; any browser could claim
+  to be anyone in the avatar row.
 
 ## Consequences
 
