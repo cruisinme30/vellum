@@ -6723,13 +6723,20 @@ dependencies = [
  "tracing",
  "url",
  "vellum-api",
+ "vellum-authz",
+ "vellum-books-service",
+ "vellum-collections",
  "vellum-contracts",
  "vellum-db",
+ "vellum-drive",
  "vellum-help",
  "vellum-identity",
  "vellum-kernel",
  "vellum-mcp",
  "vellum-security",
+ "vellum-store",
+ "vellum-work",
+ "vellum-work-service",
 ]
 
 [[package]]
