@@ -8,7 +8,9 @@
 # chore or ci pull requests.
 #
 # Environment: PR_BODY, TITLE, BASE, AUTHOR_TYPE, BASE_SHA, HEAD_SHA,
-# GH_REPO and GH_TOKEN (to look the issues up).
+# GH_REPO and GH_TOKEN (to look the issues up). `cargo xtask pr-check` sets
+# ISSUE_LOOKUP=off when GitHub is unreachable; the numbers are then not
+# looked up.
 set -euo pipefail
 
 type="${TITLE%%[(:!]*}"
@@ -30,7 +32,9 @@ fi
 
 failures=0
 for number in "${issues[@]}"; do
-  if ! kind="$(gh api "repos/${GH_REPO}/issues/${number}" --jq 'if .pull_request then "pull request" else "issue" end' 2>/dev/null)"; then
+  if [[ "${ISSUE_LOOKUP:-on}" == "off" ]]; then
+    echo "Linked #${number}; not looked up here, CI checks it is an issue."
+  elif ! kind="$(gh api "repos/${GH_REPO}/issues/${number}" --jq 'if .pull_request then "pull request" else "issue" end' 2>/dev/null)"; then
     echo "::error::#${number} does not exist in ${GH_REPO}."
     failures=$((failures + 1))
   elif [[ "${kind}" != "issue" ]]; then

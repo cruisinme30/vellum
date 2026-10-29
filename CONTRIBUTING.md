@@ -94,15 +94,36 @@ and refuses the push if one fails. Run it by hand at any time:
 cargo xtask fast
 ```
 
-A check whose tool is not installed is skipped and named in the summary;
-CI still runs it. The same goes for tests that need Docker: without a
-Docker daemon, `cargo xtask fast` leaves out the container tests and says
-so, and CI runs them. Local builds skip debug info and incremental
-caches (`CARGO_PROFILE_DEV_DEBUG=0`, `CARGO_INCREMENTAL=0`) so a workspace
-test build fits a small disk; set either variable yourself to override.
-Install `markdownlint-cli2`, `vale`, `lychee`, `gitleaks`, `reuse`,
-`yamllint` and `shellcheck` to run every check. In an emergency,
-`git push --no-verify` skips the hook, but CI still gates the merge.
+A check whose tool is not installed fails the run, because a skipped check
+used to let failures reach CI unnoticed. Install every tool, at the
+versions CI uses, with:
+
+```sh
+scripts/dev/install-tools.sh
+```
+
+Cloud sessions get them from the environment's setup script, which runs
+`curl -sSfL https://raw.githubusercontent.com/cruisinme30/vellum/develop/scripts/dev/install-tools.sh | bash`.
+Set `VELLUM_ALLOW_MISSING_TOOLS=1` to skip a missing tool instead. The
+Rust tests run only for the crates your branch changed; CI runs them all,
+and `VELLUM_FAST_ALL_TESTS=1` does the same locally. Tests that need
+Docker are left out without a Docker daemon, and CI runs them. Local
+builds skip debug info and incremental caches (`CARGO_PROFILE_DEV_DEBUG=0`,
+`CARGO_INCREMENTAL=0`) so a test build fits a small disk; set either
+variable yourself to override. In an emergency, `git push --no-verify`
+skips the hook, but CI still gates the merge.
+
+Before opening a pull request, or after editing its title or description,
+check them the way CI will:
+
+```sh
+cargo xtask pr-check --title "feat(db): keep jobs once per cluster" --body-file pr.md
+```
+
+It checks the branch name, the title (a Conventional Commit, at most 72
+characters after the type), every section of the description template, and
+that "Closes #N" names an issue, with a decision record for features
+([ADR 0048](docs/adr/0048-catch-ci-failures-before-pushing.md)).
 
 ### Tests that need containers
 
