@@ -5046,6 +5046,7 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
+ "vellum-format",
 ]
 
 [[package]]
