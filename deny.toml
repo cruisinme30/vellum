@@ -53,6 +53,8 @@ skip = [
     { crate = "getrandom@0.3", reason = "older crates still on 0.3 during the 0.4 move" },
     { crate = "r-efi@5", reason = "pulled by getrandom 0.3" },
     { crate = "miniz_oxide@0.8", reason = "png still on 0.8 while flate2 moved to 0.9" },
+    { crate = "base64@0.22", reason = "async-graphql 7 still on base64 0.22" },
+    { crate = "synstructure@0.13", reason = "asn1-rs-derive (x509-parser via rustls-acme) still on synstructure 0.13" },
 ]
 skip-tree = []
 
