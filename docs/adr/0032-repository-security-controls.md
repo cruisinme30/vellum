@@ -21,8 +21,8 @@ vellum: 1
 
 The repository is public and merges changes from many parallel threads
 into `develop` with auto-merge and no human review (ADR 0001), so the
-checks around the merge must catch what a reviewer would. The audit in
-#239 found secret scanning, push protection, Dependabot security updates
+checks around the merge must catch what a reviewer would. The audit
+in #239 found secret scanning, push protection, Dependabot security updates
 and private vulnerability reporting on, but CodeQL on its default suite,
 no generic-secret or validity checks, workflow tokens left on disk, no
 workflow linting, no Dependabot cooldown, and rulesets that required
