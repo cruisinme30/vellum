@@ -932,6 +932,11 @@ export interface BriefOut {
 }
 
 /**
+ * A bucket of the view.
+ */
+export type BucketName = "inbox" | "today" | "evening" | "upcoming" | "anytime" | "someday" | "done";
+
+/**
  * One breakdown value.
  */
 export interface BucketOut {
@@ -1564,6 +1569,34 @@ export interface CommentResult {
 }
 
 /**
+ * Completing a task.
+ */
+export interface CompleteInput {
+  /**
+   * The task ID.
+   */
+  task: string;
+  /**
+   * Also complete its open subtasks.
+   */
+  cascade?: boolean;
+}
+
+/**
+ * The result of completing a task.
+ */
+export interface CompleteView {
+  /**
+   * The task after the change.
+   */
+  task: TaskView;
+  /**
+   * For a repeating task: the date it moved to. It stays open.
+   */
+  next?: string | null;
+}
+
+/**
  * Every property of one row, stored and computed, by key.
  */
 export interface ComputedRow {
@@ -1636,6 +1669,25 @@ export interface CreateFromCsvInput {
 }
 
 /**
+ * A new task.
+ */
+export interface CreateInput {
+  /**
+   * The quick-add line: title plus phrases such as `tomorrow 3pm`,
+   * `every weekday`, `#list`, `@label`, `+person`, `p1`.
+   */
+  text: string;
+  /**
+   * The list to add to when the line names none; the Inbox otherwise.
+   */
+  list?: string | null;
+  /**
+   * A task ID to add a subtask under.
+   */
+  parent?: string | null;
+}
+
+/**
  * A new issue.
  */
 export interface CreateIssue {
@@ -1699,6 +1751,16 @@ export interface CreateIssue {
    * Intake (form, email, Slack): goes to triage when the team uses it.
    */
   intake?: boolean;
+}
+
+/**
+ * A new list.
+ */
+export interface CreateListInput {
+  /**
+   * Its title.
+   */
+  title: string;
 }
 
 /**
@@ -1997,6 +2059,16 @@ export interface DateSpan {
 export type DateValue = string;
 
 /**
+ * A removed task.
+ */
+export interface DeletedView {
+  /**
+   * Its ID.
+   */
+  id: string;
+}
+
+/**
  * A problem found while loading files or importing CSV.
  *
  * Loading never fails on a bad row: the row still loads, the offending
@@ -2123,6 +2195,16 @@ export interface DiffSection {
    * Its label on that side.
    */
   label: string;
+}
+
+/**
+ * The daily digest.
+ */
+export interface DigestView {
+  /**
+   * Vellum Markdown, or nothing when the day is clear.
+   */
+  markdown?: string | null;
 }
 
 /**
@@ -2857,6 +2939,52 @@ export interface FieldOut {
 }
 
 /**
+ * A task's fields as strings, in the attribute-span syntax (D82).
+ */
+export interface FieldsView {
+  /**
+   * `evening`, `anytime` or `someday`.
+   */
+  when?: string | null;
+  /**
+   * Start date, `YYYY-MM-DD`.
+   */
+  start?: string | null;
+  /**
+   * Deadline, `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM`.
+   */
+  due?: string | null;
+  /**
+   * RFC 5545 repeat rule, without `RRULE:`.
+   */
+  rrule?: string | null;
+  /**
+   * `completion` when the next date counts from completion.
+   */
+  recur_from?: string | null;
+  /**
+   * Reminders: ISO durations relative to the deadline, or local times.
+   */
+  remind: string[];
+  /**
+   * Priority 1 (highest) to 4.
+   */
+  priority?: number | null;
+  /**
+   * Labels.
+   */
+  labels: string[];
+  /**
+   * When it was completed (UTC).
+   */
+  done_at?: string | null;
+  /**
+   * A time block: local start and minutes, `2026-11-03T15:00/90`.
+   */
+  block?: string | null;
+}
+
+/**
  * Search filters; every filter given must match.
  */
 export interface FindInput {
@@ -2945,6 +3073,20 @@ export interface FormsOut {
 }
 
 /**
+ * Whether Google Calendar is set up and connected.
+ */
+export interface GoogleView {
+  /**
+   * Whether the server has a Google `OAuth` client.
+   */
+  configured: boolean;
+  /**
+   * Whether the person has connected their calendar.
+   */
+  connected: boolean;
+}
+
+/**
  * A group of rows (one board column or table section).
  */
 export interface Group {
@@ -2974,6 +3116,24 @@ export interface GroupOut {
    * The issues, in order.
    */
   issues: IssueOut[];
+}
+
+/**
+ * A phrase to highlight in the quick-add box.
+ */
+export interface HighlightView {
+  /**
+   * Start, in UTF-16 code units (`JavaScript` string indices).
+   */
+  start: number;
+  /**
+   * End, exclusive, in UTF-16 code units.
+   */
+  end: number;
+  /**
+   * What it set.
+   */
+  kind: TasksParseTokenView;
 }
 
 /**
@@ -3145,6 +3305,123 @@ export interface ImportCsvInput {
    * Check the file and report what would happen, without writing.
    */
   dry_run?: boolean;
+}
+
+/**
+ * Which app an export comes from.
+ */
+export type ImportFrom = "google_tasks" | "todoist" | "things";
+
+/**
+ * An export to import.
+ */
+export interface ImportInput {
+  /**
+   * The app.
+   */
+  from: ImportFrom;
+  /**
+   * The export's text.
+   */
+  content: string;
+  /**
+   * The list title for a Todoist CSV, which does not name its project.
+   */
+  project?: string | null;
+}
+
+/**
+ * The result of an import.
+ */
+export interface ImportView {
+  /**
+   * The lists written.
+   */
+  lists: ImportedList[];
+}
+
+/**
+ * One list written by an import.
+ */
+export interface ImportedList {
+  /**
+   * The list's document.
+   */
+  doc: DocId;
+  /**
+   * Its title.
+   */
+  title: string;
+  /**
+   * How many items were added; items already imported are skipped.
+   */
+  added: number;
+}
+
+/**
+ * An inbox line, as the API shows it.
+ */
+export interface InboxItem {
+  /**
+   * Pass it to `notify.read` to mark the line read.
+   */
+  id: string;
+  /**
+   * The kind, such as `mentioned`.
+   */
+  kind: string;
+  /**
+   * What it is about, such as `ENG-142`.
+   */
+  subject: string;
+  /**
+   * One line.
+   */
+  title: string;
+  /**
+   * Short body text.
+   */
+  body: string;
+  /**
+   * Link into the app.
+   */
+  url: string;
+  /**
+   * Who caused it.
+   */
+  actor?: string | null;
+  /**
+   * When it happened (RFC 3339).
+   */
+  at: string;
+  /**
+   * Whether it was read.
+   */
+  read: boolean;
+}
+
+/**
+ * Your inbox.
+ */
+export interface InboxPage {
+  /**
+   * Lines, newest first.
+   */
+  items: InboxItem[];
+  /**
+   * How many are unread.
+   */
+  unread: number;
+}
+
+/**
+ * Which inbox lines to list.
+ */
+export interface InboxQuery {
+  /**
+   * Only unread lines.
+   */
+  unread_only?: boolean;
 }
 
 /**
@@ -3408,6 +3685,89 @@ export interface ListComments {
 }
 
 /**
+ * A task list.
+ */
+export interface ListView {
+  /**
+   * The list's document.
+   */
+  doc: DocId;
+  /**
+   * The title.
+   */
+  title: string;
+  /**
+   * Whether it is the person's Inbox.
+   */
+  inbox: boolean;
+  /**
+   * The owner's handle.
+   */
+  owner?: string | null;
+  /**
+   * Members' handles.
+   */
+  members: string[];
+  /**
+   * How many open items it holds.
+   */
+  open: number;
+}
+
+/**
+ * The person's task lists.
+ */
+export interface ListsView {
+  /**
+   * Inbox first, then by title.
+   */
+  lists: ListView[];
+}
+
+/**
+ * Which lines to mark read.
+ */
+export interface MarkRead {
+  /**
+   * Line IDs.
+   */
+  ids?: string[];
+  /**
+   * Every line instead.
+   */
+  all?: boolean;
+}
+
+/**
+ * Sharing a list.
+ */
+export interface MemberInput {
+  /**
+   * The list's document.
+   */
+  list_id: DocId;
+  /**
+   * The person's handle, with or without `@`.
+   */
+  member: string;
+}
+
+/**
+ * Dragging a task to another bucket.
+ */
+export interface MoveInput {
+  /**
+   * The task ID.
+   */
+  task: string;
+  /**
+   * `inbox`, `today`, `evening`, `anytime`, `someday` or a date
+   * (`YYYY-MM-DD`). Moves the start date; the deadline stays.
+   */
+  to: string;
+}
+
+/**
  * Move an issue to another team.
  */
 export interface MoveIssue {
@@ -3467,6 +3827,24 @@ export interface MyIssuesOut {
    * Issues in focus order.
    */
   issues: FocusedIssue[];
+}
+
+/**
+ * My Work for the signed-in person.
+ */
+export interface MyWorkView {
+  /**
+   * The person's local date.
+   */
+  today: string;
+  /**
+   * How many open tasks the view shows.
+   */
+  open: number;
+  /**
+   * The sections in order; empty ones are left out.
+   */
+  sections: SectionView[];
 }
 
 /**
@@ -3584,6 +3962,16 @@ export interface NodeView {
 }
 
 /**
+ * No input.
+ */
+export type NotifyPreferencesEmpty = Record<string, unknown>;
+
+/**
+ * No input.
+ */
+export type NotifyPushKeyEmpty = Record<string, unknown>;
+
+/**
  * How a numeric result is displayed.
  */
 export type NumberFormat = "plain" | "percent";
@@ -3621,6 +4009,70 @@ export interface ObservabilitySettings {
 export type Outcome = "success" | "denied" | "failure";
 
 /**
+ * One heading of the page outline.
+ */
+export interface OutlineEntry {
+  /**
+   * 1 to 6.
+   */
+  level: number;
+  /**
+   * The element id, for `#fragment` links.
+   */
+  id: string;
+  /**
+   * The heading text.
+   */
+  text: string;
+}
+
+/**
+ * Names a page.
+ */
+export interface PageKey {
+  /**
+   * The page.
+   */
+  id: ObjectId;
+}
+
+/**
+ * A quick-add line to parse.
+ */
+export interface ParseInput {
+  /**
+   * The line as typed.
+   */
+  text: string;
+}
+
+/**
+ * A parsed quick-add line.
+ */
+export interface ParseView {
+  /**
+   * The title without the recognised phrases.
+   */
+  title: string;
+  /**
+   * The fields the phrases set.
+   */
+  fields: FieldsView;
+  /**
+   * The list named with `#list`.
+   */
+  list?: string | null;
+  /**
+   * People named with `+person`.
+   */
+  assignees: string[];
+  /**
+   * Phrases to highlight.
+   */
+  highlights: HighlightView[];
+}
+
+/**
  * Where to move or copy an item.
  */
 export interface PlaceInput {
@@ -3650,6 +4102,29 @@ export interface PointOut {
    * The numbers for that interval.
    */
   stats: StatsOut;
+}
+
+/**
+ * Notification settings, as the API shows them.
+ */
+export interface PreferencesView {
+  /**
+   * Channels (`in_app`, `email`, `push`) per kind. Every kind is
+   * listed; on input, a kind left out keeps its defaults.
+   */
+  channels: Record<string, string[]>;
+  /**
+   * Minutes email waits for the inbox entry to be read (0 to 1440).
+   */
+  email_delay_minutes: number;
+  /**
+   * Issue keys and document IDs you muted.
+   */
+  muted: string[];
+  /**
+   * Non-urgent push and email are held until this time (RFC 3339).
+   */
+  snoozed_until?: string | null;
 }
 
 /**
@@ -3782,6 +4257,40 @@ export interface PropertyInfo {
    * Number display format, where it applies.
    */
   format?: NumberFormat | null;
+}
+
+/**
+ * The result of a push registration change.
+ */
+export interface PushDevices {
+  /**
+   * How many browsers you have registered now.
+   */
+  devices: number;
+}
+
+/**
+ * The VAPID public key.
+ */
+export interface PushKey {
+  /**
+   * Base64url, uncompressed P-256; pass it as `applicationServerKey`.
+   */
+  publicKey: string;
+}
+
+/**
+ * The browser's keys.
+ */
+export interface PushKeys {
+  /**
+   * The browser's P-256 public key, base64url.
+   */
+  p256dh: string;
+  /**
+   * The 16-byte auth secret, base64url.
+   */
+  auth: string;
 }
 
 /**
@@ -4010,6 +4519,60 @@ export interface RenameInput {
    * Its new title.
    */
   title: string;
+}
+
+/**
+ * Something on the page that rendered with a fallback.
+ */
+export interface RenderWarning {
+  /**
+   * The top-level block it came from, from 0.
+   */
+  block: number;
+  /**
+   * What happened, for the author.
+   */
+  message: string;
+}
+
+/**
+ * A page rendered for the reader.
+ */
+export interface RenderedPageView {
+  /**
+   * The page.
+   */
+  id: ObjectId;
+  /**
+   * The front matter title, or the first level-1 heading.
+   */
+  title?: string | null;
+  /**
+   * Sanitised HTML: one `<article class="vl-doc">`, styled by the theme
+   * stylesheet's `--vl-*` variables.
+   */
+  html: string;
+  /**
+   * The page outline.
+   */
+  outline: OutlineEntry[];
+  /**
+   * Blocks that rendered with a fallback.
+   */
+  warnings: RenderWarning[];
+  /**
+   * Diagrams shown from their last good picture because the diagram
+   * server was unavailable.
+   */
+  stale_figures: number;
+  /**
+   * A strong `ETag` of the HTML (`sha256-…`).
+   */
+  etag: string;
+  /**
+   * The renderer version that produced it.
+   */
+  render_version: number;
 }
 
 /**
@@ -4329,6 +4892,16 @@ export interface SaveViewInput {
 export type Scope = "read" | "write:draft" | "write:direct" | "work" | "admin";
 
 /**
+ * A newly issued secret URL or address. It is shown once.
+ */
+export interface SecretView {
+  /**
+   * The feed URL or capture address.
+   */
+  value: string;
+}
+
+/**
  * Who may see, own and review a section.
  */
 export interface SectionAccessInfo {
@@ -4413,6 +4986,28 @@ export interface SectionKey {
    * The section (its front-matter ID).
    */
   section_id: string;
+}
+
+/**
+ * One section of My Work.
+ */
+export interface SectionView {
+  /**
+   * The bucket.
+   */
+  bucket: BucketName;
+  /**
+   * For Upcoming: the day (`YYYY-MM-DD`) within the next seven.
+   */
+  day?: string | null;
+  /**
+   * For Upcoming: the Monday of a later week.
+   */
+  week_of?: string | null;
+  /**
+   * The tasks, in display order.
+   */
+  tasks: TaskView[];
 }
 
 /**
@@ -4819,6 +5414,24 @@ export interface SubmitForm {
 }
 
 /**
+ * `PushSubscription.toJSON()`.
+ */
+export interface Subscribe {
+  /**
+   * The push service URL (`https` only).
+   */
+  endpoint: string;
+  /**
+   * When the browser will drop the subscription; not used.
+   */
+  expirationTime?: number | null;
+  /**
+   * The keys messages are encrypted to.
+   */
+  keys: PushKeys;
+}
+
+/**
  * A proposed triage decision for an issue.
  */
 export interface SuggestTriage {
@@ -4895,6 +5508,36 @@ export interface SuggestionOut {
 }
 
 /**
+ * What a sync did.
+ */
+export interface SyncView {
+  /**
+   * Events created for tasks.
+   */
+  created: number;
+  /**
+   * Events updated from tasks.
+   */
+  updated: number;
+  /**
+   * Events deleted.
+   */
+  deleted: number;
+  /**
+   * Tasks moved because their event moved.
+   */
+  moved: number;
+  /**
+   * Tasks whose event was deleted, so they lost their block.
+   */
+  unblocked: number;
+  /**
+   * Tasks added from new events.
+   */
+  adopted: number;
+}
+
+/**
  * What a thread is on.
  */
 export interface TargetOut {
@@ -4910,6 +5553,436 @@ export interface TargetOut {
    * The block ID, for a block.
    */
   block?: string | null;
+}
+
+/**
+ * Where a task comes from.
+ */
+export type TaskKind = "checklist" | "issue" | "comment" | "review";
+
+/**
+ * A task by ID.
+ */
+export interface TaskRef {
+  /**
+   * The task ID.
+   */
+  task: string;
+}
+
+/**
+ * One task in a view.
+ */
+export interface TaskView {
+  /**
+   * The task ID: `<doc>.<block>` for checklist items.
+   */
+  id: string;
+  /**
+   * Where it comes from.
+   */
+  kind: TaskKind;
+  /**
+   * The title, as Vellum Markdown inline text.
+   */
+  title: string;
+  /**
+   * Whether it is completed.
+   */
+  done: boolean;
+  /**
+   * Whether its deadline has passed.
+   */
+  overdue: boolean;
+  /**
+   * The document it lives in, for checklist items and comments.
+   */
+  doc?: DocId | null;
+  /**
+   * The list's title, for items in task lists.
+   */
+  list?: string | null;
+  /**
+   * The issue key, for issues.
+   */
+  issue_key?: string | null;
+  /**
+   * The fields.
+   */
+  fields: FieldsView;
+  /**
+   * People mentioned in the item, without `@`.
+   */
+  assignees: string[];
+  /**
+   * Subtasks.
+   */
+  subtasks: TaskView[];
+}
+
+/**
+ * A task list.
+ */
+export interface TasksCreateListListView {
+  /**
+   * The list's document.
+   */
+  doc: DocId;
+  /**
+   * The title.
+   */
+  title: string;
+  /**
+   * Whether it is the person's Inbox.
+   */
+  inbox: boolean;
+  /**
+   * The owner's handle.
+   */
+  owner?: string | null;
+  /**
+   * Members' handles.
+   */
+  members: string[];
+  /**
+   * How many open items it holds.
+   */
+  open: number;
+}
+
+/**
+ * One task in a view.
+ */
+export interface TasksCreateTaskView {
+  /**
+   * The task ID: `<doc>.<block>` for checklist items.
+   */
+  id: string;
+  /**
+   * Where it comes from.
+   */
+  kind: TaskKind;
+  /**
+   * The title, as Vellum Markdown inline text.
+   */
+  title: string;
+  /**
+   * Whether it is completed.
+   */
+  done: boolean;
+  /**
+   * Whether its deadline has passed.
+   */
+  overdue: boolean;
+  /**
+   * The document it lives in, for checklist items and comments.
+   */
+  doc?: DocId | null;
+  /**
+   * The list's title, for items in task lists.
+   */
+  list?: string | null;
+  /**
+   * The issue key, for issues.
+   */
+  issue_key?: string | null;
+  /**
+   * The fields.
+   */
+  fields: FieldsView;
+  /**
+   * People mentioned in the item, without `@`.
+   */
+  assignees: string[];
+  /**
+   * Subtasks.
+   */
+  subtasks: _[];
+}
+
+/**
+ * No input.
+ */
+export type TasksDigestNoInput = Record<string, unknown>;
+
+/**
+ * No input.
+ */
+export type TasksGoogleConnectNoInput = Record<string, unknown>;
+
+/**
+ * An acknowledgement with nothing to return.
+ */
+export type TasksGoogleDisconnectDone = Record<string, unknown>;
+
+/**
+ * No input.
+ */
+export type TasksGoogleDisconnectNoInput = Record<string, unknown>;
+
+/**
+ * No input.
+ */
+export type TasksGoogleStatusNoInput = Record<string, unknown>;
+
+/**
+ * No input.
+ */
+export type TasksGoogleSyncNoInput = Record<string, unknown>;
+
+/**
+ * No input.
+ */
+export type TasksListsNoInput = Record<string, unknown>;
+
+/**
+ * One task in a view.
+ */
+export interface TasksMoveTaskView {
+  /**
+   * The task ID: `<doc>.<block>` for checklist items.
+   */
+  id: string;
+  /**
+   * Where it comes from.
+   */
+  kind: TaskKind;
+  /**
+   * The title, as Vellum Markdown inline text.
+   */
+  title: string;
+  /**
+   * Whether it is completed.
+   */
+  done: boolean;
+  /**
+   * Whether its deadline has passed.
+   */
+  overdue: boolean;
+  /**
+   * The document it lives in, for checklist items and comments.
+   */
+  doc?: DocId | null;
+  /**
+   * The list's title, for items in task lists.
+   */
+  list?: string | null;
+  /**
+   * The issue key, for issues.
+   */
+  issue_key?: string | null;
+  /**
+   * The fields.
+   */
+  fields: FieldsView;
+  /**
+   * People mentioned in the item, without `@`.
+   */
+  assignees: string[];
+  /**
+   * Subtasks.
+   */
+  subtasks: _[];
+}
+
+/**
+ * No input.
+ */
+export type TasksMyWorkNoInput = Record<string, unknown>;
+
+/**
+ * What a recognised quick-add phrase set.
+ */
+export type TasksParseTokenView = "due" | "start" | "recurrence" | "when" | "list" | "label" | "person" | "priority" | "reminder";
+
+/**
+ * One task in a view.
+ */
+export interface TasksReopenTaskView {
+  /**
+   * The task ID: `<doc>.<block>` for checklist items.
+   */
+  id: string;
+  /**
+   * Where it comes from.
+   */
+  kind: TaskKind;
+  /**
+   * The title, as Vellum Markdown inline text.
+   */
+  title: string;
+  /**
+   * Whether it is completed.
+   */
+  done: boolean;
+  /**
+   * Whether its deadline has passed.
+   */
+  overdue: boolean;
+  /**
+   * The document it lives in, for checklist items and comments.
+   */
+  doc?: DocId | null;
+  /**
+   * The list's title, for items in task lists.
+   */
+  list?: string | null;
+  /**
+   * The issue key, for issues.
+   */
+  issue_key?: string | null;
+  /**
+   * The fields.
+   */
+  fields: FieldsView;
+  /**
+   * People mentioned in the item, without `@`.
+   */
+  assignees: string[];
+  /**
+   * Subtasks.
+   */
+  subtasks: _[];
+}
+
+/**
+ * An acknowledgement with nothing to return.
+ */
+export type TasksRevokeCaptureDone = Record<string, unknown>;
+
+/**
+ * No input.
+ */
+export type TasksRevokeCaptureNoInput = Record<string, unknown>;
+
+/**
+ * An acknowledgement with nothing to return.
+ */
+export type TasksRevokeFeedDone = Record<string, unknown>;
+
+/**
+ * No input.
+ */
+export type TasksRevokeFeedNoInput = Record<string, unknown>;
+
+/**
+ * No input.
+ */
+export type TasksRotateCaptureNoInput = Record<string, unknown>;
+
+/**
+ * No input.
+ */
+export type TasksRotateFeedNoInput = Record<string, unknown>;
+
+/**
+ * A task list.
+ */
+export interface TasksShareListListView {
+  /**
+   * The list's document.
+   */
+  doc: DocId;
+  /**
+   * The title.
+   */
+  title: string;
+  /**
+   * Whether it is the person's Inbox.
+   */
+  inbox: boolean;
+  /**
+   * The owner's handle.
+   */
+  owner?: string | null;
+  /**
+   * Members' handles.
+   */
+  members: string[];
+  /**
+   * How many open items it holds.
+   */
+  open: number;
+}
+
+/**
+ * A task list.
+ */
+export interface TasksUnshareListListView {
+  /**
+   * The list's document.
+   */
+  doc: DocId;
+  /**
+   * The title.
+   */
+  title: string;
+  /**
+   * Whether it is the person's Inbox.
+   */
+  inbox: boolean;
+  /**
+   * The owner's handle.
+   */
+  owner?: string | null;
+  /**
+   * Members' handles.
+   */
+  members: string[];
+  /**
+   * How many open items it holds.
+   */
+  open: number;
+}
+
+/**
+ * One task in a view.
+ */
+export interface TasksUpdateTaskView {
+  /**
+   * The task ID: `<doc>.<block>` for checklist items.
+   */
+  id: string;
+  /**
+   * Where it comes from.
+   */
+  kind: TaskKind;
+  /**
+   * The title, as Vellum Markdown inline text.
+   */
+  title: string;
+  /**
+   * Whether it is completed.
+   */
+  done: boolean;
+  /**
+   * Whether its deadline has passed.
+   */
+  overdue: boolean;
+  /**
+   * The document it lives in, for checklist items and comments.
+   */
+  doc?: DocId | null;
+  /**
+   * The list's title, for items in task lists.
+   */
+  list?: string | null;
+  /**
+   * The issue key, for issues.
+   */
+  issue_key?: string | null;
+  /**
+   * The fields.
+   */
+  fields: FieldsView;
+  /**
+   * People mentioned in the item, without `@`.
+   */
+  assignees: string[];
+  /**
+   * Subtasks.
+   */
+  subtasks: _[];
 }
 
 /**
@@ -5199,6 +6272,78 @@ export interface TriageIssue {
    * For snooze: until when (RFC 3339).
    */
   until?: string | null;
+}
+
+/**
+ * The unread count after a change.
+ */
+export interface Unread {
+  /**
+   * How many lines are unread.
+   */
+  unread: number;
+}
+
+/**
+ * Which browser to forget.
+ */
+export interface Unsubscribe {
+  /**
+   * The push service URL the browser registered.
+   */
+  endpoint: string;
+}
+
+/**
+ * Changes to a task. Each field present replaces the old value; an
+ * empty string clears it.
+ */
+export interface UpdateInput {
+  /**
+   * The task ID.
+   */
+  task: string;
+  /**
+   * The new title.
+   */
+  title?: string | null;
+  /**
+   * `evening`, `anytime` or `someday`.
+   */
+  when?: string | null;
+  /**
+   * `YYYY-MM-DD`.
+   */
+  start?: string | null;
+  /**
+   * `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM`.
+   */
+  due?: string | null;
+  /**
+   * An RFC 5545 rule such as `FREQ=WEEKLY;BYDAY=MO`.
+   */
+  rrule?: string | null;
+  /**
+   * `schedule` or `completion`.
+   */
+  recur_from?: string | null;
+  /**
+   * Comma-separated reminders, such as `-PT15M,2026-11-03T09:00`.
+   */
+  remind?: string | null;
+  /**
+   * `1` to `4`.
+   */
+  priority?: string | null;
+  /**
+   * Comma-separated labels.
+   */
+  labels?: string | null;
+  /**
+   * A time block, `YYYY-MM-DDTHH:MM/<minutes>`, shown in Google
+   * Calendar when it is connected.
+   */
+  block?: string | null;
 }
 
 /**
@@ -7381,6 +8526,216 @@ export interface Operations {
     input: Empty;
     output: Array_of_UserView;
   };
+  /** Your notifications, newest first */
+  "notify.inbox": {
+    method: "GET";
+    path: "/v1/notifications";
+    input: InboxQuery;
+    output: InboxPage;
+  };
+  /** Your notification channels, mutes and snooze */
+  "notify.preferences": {
+    method: "GET";
+    path: "/v1/notifications/preferences";
+    input: NotifyPreferencesEmpty;
+    output: PreferencesView;
+  };
+  /** The server's web push key, for subscribing a browser */
+  "notify.push_key": {
+    method: "GET";
+    path: "/v1/push/vapid-key";
+    input: NotifyPushKeyEmpty;
+    output: PushKey;
+  };
+  /** Register this browser for push notifications */
+  "notify.push_subscribe": {
+    method: "POST";
+    path: "/v1/push/subscriptions";
+    input: Subscribe;
+    output: PushDevices;
+  };
+  /** Stop push notifications to one browser */
+  "notify.push_unsubscribe": {
+    method: "DELETE";
+    path: "/v1/push/subscriptions";
+    input: Unsubscribe;
+    output: PushDevices;
+  };
+  /** Mark notifications read */
+  "notify.read": {
+    method: "POST";
+    path: "/v1/notifications/read";
+    input: MarkRead;
+    output: Unread;
+  };
+  /** Change your notification channels, mutes and snooze */
+  "notify.set_preferences": {
+    method: "PUT";
+    path: "/v1/notifications/preferences";
+    input: PreferencesView;
+    output: PreferencesView;
+  };
+  /** Renders a page as sanitised HTML for the reader */
+  "render.page": {
+    method: "GET";
+    path: "/v1/pages/{id}/render";
+    input: PageKey;
+    output: RenderedPageView;
+  };
+  /** Completes a task; a repeating task moves to its next date */
+  "tasks.complete": {
+    method: "POST";
+    path: "/v1/tasks/{task}/complete";
+    input: CompleteInput;
+    output: CompleteView;
+  };
+  /** Adds a task from a quick-add line */
+  "tasks.create": {
+    method: "POST";
+    path: "/v1/tasks";
+    input: CreateInput;
+    output: TasksCreateTaskView;
+  };
+  /** Creates a task list */
+  "tasks.create_list": {
+    method: "POST";
+    path: "/v1/task-lists";
+    input: CreateListInput;
+    output: TasksCreateListListView;
+  };
+  /** Removes a task and its subtasks */
+  "tasks.delete": {
+    method: "DELETE";
+    path: "/v1/tasks/{task}";
+    input: TaskRef;
+    output: DeletedView;
+  };
+  /** Today's digest as Vellum Markdown */
+  "tasks.digest": {
+    method: "GET";
+    path: "/v1/my-work/digest";
+    input: TasksDigestNoInput;
+    output: DigestView;
+  };
+  /** Starts connecting Google Calendar; returns Google's consent page */
+  "tasks.google_connect": {
+    method: "POST";
+    path: "/v1/my-work/google/connect";
+    input: TasksGoogleConnectNoInput;
+    output: SecretView;
+  };
+  /** Disconnects Google Calendar */
+  "tasks.google_disconnect": {
+    method: "DELETE";
+    path: "/v1/my-work/google";
+    input: TasksGoogleDisconnectNoInput;
+    output: TasksGoogleDisconnectDone;
+  };
+  /** Whether Google Calendar time-blocking is set up and connected */
+  "tasks.google_status": {
+    method: "GET";
+    path: "/v1/my-work/google";
+    input: TasksGoogleStatusNoInput;
+    output: GoogleView;
+  };
+  /** Syncs time blocks with Google Calendar now */
+  "tasks.google_sync": {
+    method: "POST";
+    path: "/v1/my-work/google/sync";
+    input: TasksGoogleSyncNoInput;
+    output: SyncView;
+  };
+  /** Imports tasks from Google Tasks, Todoist or Things */
+  "tasks.import": {
+    method: "POST";
+    path: "/v1/tasks/import";
+    input: ImportInput;
+    output: ImportView;
+  };
+  /** Lists the person's task lists and lists shared with them */
+  "tasks.lists": {
+    method: "GET";
+    path: "/v1/task-lists";
+    input: TasksListsNoInput;
+    output: ListsView;
+  };
+  /** Moves a task to another bucket or day */
+  "tasks.move": {
+    method: "POST";
+    path: "/v1/tasks/{task}/move";
+    input: MoveInput;
+    output: TasksMoveTaskView;
+  };
+  /** Lists My Work: Inbox, Today, Evening, Upcoming, Anytime, Someday, Done */
+  "tasks.my_work": {
+    method: "GET";
+    path: "/v1/my-work";
+    input: TasksMyWorkNoInput;
+    output: MyWorkView;
+  };
+  /** Parses a quick-add line for highlighting */
+  "tasks.parse": {
+    method: "GET";
+    path: "/v1/tasks/parse";
+    input: ParseInput;
+    output: ParseView;
+  };
+  /** Reopens a completed task */
+  "tasks.reopen": {
+    method: "POST";
+    path: "/v1/tasks/{task}/reopen";
+    input: TaskRef;
+    output: TasksReopenTaskView;
+  };
+  /** Turns capture by e-mail off */
+  "tasks.revoke_capture": {
+    method: "DELETE";
+    path: "/v1/my-work/capture-address";
+    input: TasksRevokeCaptureNoInput;
+    output: TasksRevokeCaptureDone;
+  };
+  /** Turns the calendar feed off */
+  "tasks.revoke_feed": {
+    method: "DELETE";
+    path: "/v1/my-work/feed";
+    input: TasksRevokeFeedNoInput;
+    output: TasksRevokeFeedDone;
+  };
+  /** Issues a new capture e-mail address and revokes the old one */
+  "tasks.rotate_capture": {
+    method: "POST";
+    path: "/v1/my-work/capture-address";
+    input: TasksRotateCaptureNoInput;
+    output: SecretView;
+  };
+  /** Issues a new calendar feed URL and revokes the old one */
+  "tasks.rotate_feed": {
+    method: "POST";
+    path: "/v1/my-work/feed";
+    input: TasksRotateFeedNoInput;
+    output: SecretView;
+  };
+  /** Shares a list with someone */
+  "tasks.share_list": {
+    method: "POST";
+    path: "/v1/task-lists/{list_id}/members";
+    input: MemberInput;
+    output: TasksShareListListView;
+  };
+  /** Stops sharing a list with someone */
+  "tasks.unshare_list": {
+    method: "DELETE";
+    path: "/v1/task-lists/{list_id}/members/{member}";
+    input: MemberInput;
+    output: TasksUnshareListListView;
+  };
+  /** Edits a task's title or fields */
+  "tasks.update": {
+    method: "PATCH";
+    path: "/v1/tasks/{task}";
+    input: UpdateInput;
+    output: TasksUpdateTaskView;
+  };
   /** Applies the waiting triage suggestion as the caller */
   "work.accept_suggestion": {
     method: "POST";
@@ -7688,6 +9043,36 @@ export const OPERATIONS = {
   "identity.update_me": { method: "PATCH", path: "/v1/me", mutation: true },
   "identity.update_user": { method: "PATCH", path: "/v1/admin/users/{id}", mutation: true },
   "identity.users": { method: "GET", path: "/v1/admin/users", mutation: false },
+  "notify.inbox": { method: "GET", path: "/v1/notifications", mutation: false },
+  "notify.preferences": { method: "GET", path: "/v1/notifications/preferences", mutation: false },
+  "notify.push_key": { method: "GET", path: "/v1/push/vapid-key", mutation: false },
+  "notify.push_subscribe": { method: "POST", path: "/v1/push/subscriptions", mutation: true },
+  "notify.push_unsubscribe": { method: "DELETE", path: "/v1/push/subscriptions", mutation: true },
+  "notify.read": { method: "POST", path: "/v1/notifications/read", mutation: true },
+  "notify.set_preferences": { method: "PUT", path: "/v1/notifications/preferences", mutation: true },
+  "render.page": { method: "GET", path: "/v1/pages/{id}/render", mutation: false },
+  "tasks.complete": { method: "POST", path: "/v1/tasks/{task}/complete", mutation: true },
+  "tasks.create": { method: "POST", path: "/v1/tasks", mutation: true },
+  "tasks.create_list": { method: "POST", path: "/v1/task-lists", mutation: true },
+  "tasks.delete": { method: "DELETE", path: "/v1/tasks/{task}", mutation: true },
+  "tasks.digest": { method: "GET", path: "/v1/my-work/digest", mutation: false },
+  "tasks.google_connect": { method: "POST", path: "/v1/my-work/google/connect", mutation: true },
+  "tasks.google_disconnect": { method: "DELETE", path: "/v1/my-work/google", mutation: true },
+  "tasks.google_status": { method: "GET", path: "/v1/my-work/google", mutation: false },
+  "tasks.google_sync": { method: "POST", path: "/v1/my-work/google/sync", mutation: true },
+  "tasks.import": { method: "POST", path: "/v1/tasks/import", mutation: true },
+  "tasks.lists": { method: "GET", path: "/v1/task-lists", mutation: false },
+  "tasks.move": { method: "POST", path: "/v1/tasks/{task}/move", mutation: true },
+  "tasks.my_work": { method: "GET", path: "/v1/my-work", mutation: false },
+  "tasks.parse": { method: "GET", path: "/v1/tasks/parse", mutation: false },
+  "tasks.reopen": { method: "POST", path: "/v1/tasks/{task}/reopen", mutation: true },
+  "tasks.revoke_capture": { method: "DELETE", path: "/v1/my-work/capture-address", mutation: true },
+  "tasks.revoke_feed": { method: "DELETE", path: "/v1/my-work/feed", mutation: true },
+  "tasks.rotate_capture": { method: "POST", path: "/v1/my-work/capture-address", mutation: true },
+  "tasks.rotate_feed": { method: "POST", path: "/v1/my-work/feed", mutation: true },
+  "tasks.share_list": { method: "POST", path: "/v1/task-lists/{list_id}/members", mutation: true },
+  "tasks.unshare_list": { method: "DELETE", path: "/v1/task-lists/{list_id}/members/{member}", mutation: true },
+  "tasks.update": { method: "PATCH", path: "/v1/tasks/{task}", mutation: true },
   "work.accept_suggestion": { method: "POST", path: "/v1/work/issues/{key}/triage/suggestion/accept", mutation: true },
   "work.add_comment": { method: "POST", path: "/v1/work/comments", mutation: true },
   "work.assign_thread": { method: "POST", path: "/v1/work/threads/{thread_id}/assign", mutation: true },
