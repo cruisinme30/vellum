@@ -9,13 +9,14 @@ use sqlx::Connection as _;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteConnection};
 use vellum_db::{Backend, Error, Index, IndexConfig, IndexKey};
 
-const TABLES: [&str; 11] = [
+const TABLES: [&str; 12] = [
     "documents",
     "effective_access",
     "folders",
     "grants",
     "index_meta",
     "page_ancestors",
+    "space_shards",
     "spaces",
     "sync_clients",
     "sync_log",
