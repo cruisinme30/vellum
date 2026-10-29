@@ -16,6 +16,7 @@
 //! Only ciphertext and public keys cross the network. Pages are opened and
 //! sealed here, in memory.
 
+use std::collections::BTreeSet;
 use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
@@ -31,6 +32,8 @@ use vellum_private::DeviceIdentity;
 use vellum_store::{
     Blob, BlobEntry, BlobMeta, BlobPath, BlobStore, Etag, Precondition, StoreError, StoreResult,
 };
+
+use crate::pins::Pins;
 
 /// How long one API call may take.
 const TIMEOUT: Duration = Duration::from_secs(30);
@@ -71,6 +74,17 @@ fn unreachable(error: reqwest::Error) -> ApiFailure {
         code: "unavailable".into(),
         message: error.without_url().to_string(),
     }
+}
+
+/// An object as fetched.
+#[derive(Debug, Clone)]
+pub struct Fetched {
+    /// Its bytes: an envelope when `sealed`.
+    pub bytes: Vec<u8>,
+    /// Its version.
+    pub etag: String,
+    /// False for a readable object.
+    pub sealed: bool,
 }
 
 /// The server's `e2e` API, as one signed-in device.
@@ -121,6 +135,12 @@ impl E2eClient {
             base,
             token: token.trim().to_owned(),
         })
+    }
+
+    /// The server's origin, as pins are keyed.
+    #[must_use]
+    pub fn server(&self) -> String {
+        self.base.origin().ascii_serialization()
     }
 
     fn url(&self, space: SpaceId, tail: &str) -> Result<url::Url, ApiFailure> {
@@ -215,15 +235,39 @@ impl E2eClient {
     ///
     /// The server refused, could not be reached, or sent bad base64.
     pub async fn get(&self, space: SpaceId, path: &str) -> Result<(Vec<u8>, String), ApiFailure> {
+        let object = self.fetch(space, path, false).await?;
+        Ok((object.bytes, object.etag))
+    }
+
+    /// One object, readable ones included (needs edit access), so this
+    /// device can seal pages left readable before the space turned
+    /// private.
+    ///
+    /// # Errors
+    ///
+    /// The server refused, could not be reached, or sent bad base64.
+    pub async fn fetch(
+        &self,
+        space: SpaceId,
+        path: &str,
+        plaintext: bool,
+    ) -> Result<Fetched, ApiFailure> {
         let mut url = self.url(space, "object")?;
         let _ = url.query_pairs_mut().append_pair("path", path);
+        if plaintext {
+            let _ = url.query_pairs_mut().append_pair("plaintext", "true");
+        }
         let object: SealedObject = self.send(self.http.get(url)).await?;
         let bytes = STANDARD.decode(object.envelope).map_err(|_| ApiFailure {
             status: 0,
             code: "internal".into(),
             message: "the server sent bad base64".into(),
         })?;
-        Ok((bytes, object.etag))
+        Ok(Fetched {
+            bytes,
+            etag: object.etag,
+            sealed: object.sealed,
+        })
     }
 
     /// Stores sealed bytes at `path`, replacing version `if_match`.
@@ -260,11 +304,29 @@ pub async fn enrol(
     identity: &DeviceIdentity,
     space: SpaceId,
     label: &str,
-) -> Result<DeviceKeyInfo, ApiFailure> {
-    let enrolled = client.enrol(space, &identity.public_hex(), label).await?;
+    pins: &Pins,
+) -> Result<DeviceKeyInfo, String> {
+    let enrolled = client
+        .enrol(space, &identity.public_hex(), label)
+        .await
+        .map_err(|e| e.to_string())?;
     tracing::info!(space = %space, fingerprint = %enrolled.fingerprint, "device enrolled");
+    // A device joining a space trusts the keys it finds there, its own
+    // included; any key that appears later needs trusting by hand.
+    let server = client.server();
+    let mut trusted = pins.load(&server, space)?.unwrap_or_default();
+    if trusted.is_empty() {
+        let keys = client.keys(space).await.map_err(|e| e.to_string())?;
+        trusted.extend(keys.keys.into_iter().map(|k| k.fingerprint));
+    }
+    let _ = trusted.insert(enrolled.fingerprint.clone());
+    pins.save(&server, space, &trusted)?;
     Ok(enrolled)
 }
+
+/// The start of the error naming device keys this device does not trust
+/// yet; the desktop app reads the fingerprints after it.
+pub const UNTRUSTED: &str = "untrusted device keys: ";
 
 /// What a reseal pass did.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -273,6 +335,12 @@ pub struct ResealReport {
     pub current: usize,
     /// Pages resealed and uploaded.
     pub resealed: usize,
+    /// Readable pages, left from before the space turned private, now
+    /// sealed and uploaded.
+    pub converted: usize,
+    /// True when this was the first reseal of the space on this device,
+    /// so its key list was trusted as found.
+    pub first_use: bool,
     /// Pages this device cannot open; another member's device reseals them.
     pub not_for_this_device: usize,
     /// Pages that changed on the server during the pass; run it again.
@@ -282,78 +350,139 @@ pub struct ResealReport {
 /// Reseals every page of `space` that this device can open to exactly
 /// the space's current keys: new devices are added and revoked ones
 /// dropped. Each page gets a fresh file key, so a revoked device cannot
-/// read later versions even if it kept the old one.
+/// read later versions even if it kept the old one. Pages still readable
+/// from before the space turned private are sealed too (D209).
+///
+/// Nothing is sealed to a key this device has not trusted before (D210):
+/// the pass stops with an [`UNTRUSTED`] error naming the new keys unless
+/// their fingerprints are in `trust`.
 ///
 /// # Errors
 ///
-/// The space has no keys, a key is malformed, or the server refused.
+/// The space has no keys, a key is untrusted or malformed, or the server
+/// refused.
 pub async fn reseal(
     client: &E2eClient,
     identity: &DeviceIdentity,
     space: SpaceId,
+    pins: &Pins,
+    trust: &[String],
 ) -> Result<ResealReport, String> {
     let keys = client.keys(space).await.map_err(|e| e.to_string())?;
     if keys.keys.is_empty() {
         return Err("this space has no device keys; enrol a device first".into());
     }
-    let recipients = keys
-        .keys
-        .iter()
-        .map(|k| {
-            let bytes: [u8; 32] = hex::decode(&k.public_key)
-                .ok()
-                .and_then(|b| b.try_into().ok())
-                .ok_or_else(|| format!("the server sent a malformed key for {}", k.label))?;
-            Ok(RecipientPublic::from_bytes(bytes))
-        })
-        .collect::<Result<Vec<_>, String>>()?;
+    let server = client.server();
+    let pinned = pins.load(&server, space)?;
+    let mut report = ResealReport {
+        first_use: pinned.is_none(),
+        ..ResealReport::default()
+    };
+    if let Some(pinned) = &pinned {
+        check_trust(&keys.keys, pinned, trust)?;
+    }
+    let recipients = recipients_from(&keys.keys)?;
     let mut wanted: Vec<[u8; 16]> = recipients
         .iter()
         .map(|r| r.fingerprint().to_bytes())
         .collect();
     wanted.sort_unstable();
-    let mut report = ResealReport::default();
     for object in client.objects(space).await.map_err(|e| e.to_string())? {
-        let (bytes, etag) = match client.get(space, &object.path).await {
+        if vellum_e2e::structural(&object.path) {
+            continue;
+        }
+        let fetched = match client.fetch(space, &object.path, true).await {
             Ok(found) => found,
-            // Plaintext or a page deleted since the listing.
-            Err(e) if e.status == 409 || e.status == 404 => continue,
+            // Deleted since the listing.
+            Err(e) if e.status == 404 => continue,
             Err(e) => return Err(e.to_string()),
         };
-        if !is_recipient_envelope(&bytes) {
-            continue;
-        }
-        let mut have: Vec<[u8; 16]> = recipients_of(&bytes)
-            .map_err(|e| format!("{}: {e}", object.path))?
-            .iter()
-            .map(vellum_crypto::recipients::Fingerprint::to_bytes)
-            .collect();
-        have.sort_unstable();
-        have.dedup();
-        if have == wanted {
-            report.current += 1;
-            continue;
-        }
-        let Ok(plain) = identity.open(&bytes) else {
-            report.not_for_this_device += 1;
-            continue;
+        let plain = if fetched.sealed && is_recipient_envelope(&fetched.bytes) {
+            let mut have: Vec<[u8; 16]> = recipients_of(&fetched.bytes)
+                .map_err(|e| format!("{}: {e}", object.path))?
+                .iter()
+                .map(vellum_crypto::recipients::Fingerprint::to_bytes)
+                .collect();
+            have.sort_unstable();
+            have.dedup();
+            if have == wanted {
+                report.current += 1;
+                continue;
+            }
+            let Ok(plain) = identity.open(&fetched.bytes) else {
+                report.not_for_this_device += 1;
+                continue;
+            };
+            plain
+        } else {
+            fetched.bytes
         };
+        let was_sealed = fetched.sealed;
         let sealed = seal_for(&recipients, &plain).map_err(|e| format!("{}: {e}", object.path))?;
-        match client.put(space, &object.path, &sealed, Some(&etag)).await {
-            Ok(_) => report.resealed += 1,
+        match client
+            .put(space, &object.path, &sealed, Some(&fetched.etag))
+            .await
+        {
+            Ok(_) if was_sealed => report.resealed += 1,
+            Ok(_) => report.converted += 1,
             Err(e) if e.status == 409 => report.changed += 1,
             Err(e) => return Err(e.to_string()),
         }
     }
+    let trusted: BTreeSet<String> = keys.keys.into_iter().map(|k| k.fingerprint).collect();
+    pins.save(&server, space, &trusted)?;
     tracing::info!(
         space = %space,
         current = report.current,
         resealed = report.resealed,
+        converted = report.converted,
         not_for_this_device = report.not_for_this_device,
         changed = report.changed,
         "private space resealed"
     );
     Ok(report)
+}
+
+/// Refuses keys that are neither pinned nor in `trust` (D210).
+fn check_trust(
+    keys: &[DeviceKeyInfo],
+    pinned: &BTreeSet<String>,
+    trust: &[String],
+) -> Result<(), String> {
+    let untrusted: Vec<&DeviceKeyInfo> = keys
+        .iter()
+        .filter(|k| !pinned.contains(&k.fingerprint) && !trust.contains(&k.fingerprint))
+        .collect();
+    if !untrusted.is_empty() {
+        let fingerprints: Vec<&str> = untrusted.iter().map(|k| k.fingerprint.as_str()).collect();
+        let labels: Vec<&str> = untrusted.iter().map(|k| k.label.as_str()).collect();
+        return Err(format!(
+            "{UNTRUSTED}{} ({}); compare each fingerprint with its owner, then run again with --trust <fingerprint>",
+            fingerprints.join(","),
+            labels.join(", ")
+        ));
+    }
+    Ok(())
+}
+
+/// The space's keys as recipients, each checked against its fingerprint.
+fn recipients_from(keys: &[DeviceKeyInfo]) -> Result<Vec<RecipientPublic>, String> {
+    keys.iter()
+        .map(|k| {
+            let bytes: [u8; 32] = hex::decode(&k.public_key)
+                .ok()
+                .and_then(|b| b.try_into().ok())
+                .ok_or_else(|| format!("the server sent a malformed key for {}", k.label))?;
+            let public = RecipientPublic::from_bytes(bytes);
+            if hex::encode(public.fingerprint().to_bytes()) != k.fingerprint {
+                return Err(format!(
+                    "the server sent a mismatched fingerprint for {}",
+                    k.label
+                ));
+            }
+            Ok(public)
+        })
+        .collect::<Result<Vec<_>, String>>()
 }
 
 /// Private spaces on a server as a read-only [`BlobStore`]: the space

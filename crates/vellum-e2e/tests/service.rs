@@ -245,6 +245,7 @@ async fn uploads_must_be_sealed_to_exactly_the_current_keys() {
             GetObject {
                 space_id: space(),
                 path: "notes/a.md".into(),
+                plaintext: false,
             },
         )
         .await
@@ -305,6 +306,7 @@ async fn plaintext_and_system_files_are_never_served() {
     let get = |path: &str| GetObject {
         space_id: space(),
         path: path.into(),
+        plaintext: false,
     };
     let manifest = f.e2e.get(READER, get(".vellum-folder.yaml")).await.unwrap();
     assert_eq!(STANDARD.decode(manifest.envelope).unwrap(), b"id: x\n");
@@ -433,4 +435,95 @@ async fn concurrent_enrolments_all_land() {
     let keys = f.e2e.keys(OWNER, space()).await.unwrap();
     assert_eq!(keys.keys.len(), ok + 1, "no enrolment is lost");
     assert!(ok >= 1);
+}
+
+#[tokio::test]
+async fn the_guard_keeps_readable_writes_out_of_private_spaces() {
+    let dir = tempfile::tempdir().unwrap();
+    let local: Arc<dyn BlobStore> = Arc::new(LocalStore::open(dir.path()).await.unwrap());
+    let roots = vellum_e2e::PrivateRoots::default();
+    let guarded: Arc<dyn BlobStore> =
+        Arc::new(vellum_e2e::Guard::new(Arc::clone(&local), roots.clone()));
+    let access = || {
+        Arc::new(Access(BTreeMap::from([
+            (OWNER, Need::Manage),
+            (READER, Need::View),
+        ])))
+    };
+    let e2e = E2e::new(Arc::clone(&guarded), access()).with_roots(roots.clone());
+    let path = |p: &str| BlobPath::new(p).unwrap();
+    let put = |p: &'static str, bytes: Vec<u8>| {
+        let guarded = Arc::clone(&guarded);
+        async move {
+            guarded
+                .put(
+                    &BlobPath::new(p).unwrap(),
+                    Bytes::from(bytes),
+                    Precondition::None,
+                )
+                .await
+                .map(|_| ())
+        }
+    };
+
+    // Before the space is private, anything goes.
+    put("drives/board/draft.md", b"# draft".to_vec())
+        .await
+        .unwrap();
+    let laptop = device();
+    let _ = e2e.enrol(OWNER, enrol(&laptop, "laptop")).await.unwrap();
+    assert_eq!(roots.len(), 1);
+
+    let refused = put("drives/board/notes/plan.md", b"# readable".to_vec())
+        .await
+        .unwrap_err();
+    assert!(
+        refused.to_string().contains("end-to-end encrypted"),
+        "{refused}"
+    );
+    let sealed = seal_for(&[laptop.public()], b"# plan").unwrap();
+    put("drives/board/notes/plan.md", sealed).await.unwrap();
+    put(
+        "drives/board/notes/.vellum-folder.yaml",
+        b"id: x\n".to_vec(),
+    )
+    .await
+    .unwrap();
+    put("drives/board/.vellum-order.yaml", b"[]\n".to_vec())
+        .await
+        .unwrap();
+    put("drives/boardroom/a.md", b"# another space".to_vec())
+        .await
+        .unwrap();
+    assert!(
+        guarded
+            .rename(&path("drives/boardroom/a.md"), &path("drives/board/a.md"))
+            .await
+            .is_err(),
+        "moving a readable page in is a write"
+    );
+
+    // Another replica learns the space is private from the key list.
+    let other_roots = vellum_e2e::PrivateRoots::default();
+    let other = E2e::new(Arc::clone(&local), access()).with_roots(other_roots.clone());
+    assert_eq!(other.refresh_roots().await.unwrap(), 1);
+    assert_eq!(
+        other_roots.relative(&path("drives/board/x.md")).as_deref(),
+        Some("x.md")
+    );
+
+    // Readable pages left from before go to editors only, flagged unsealed.
+    let get = |plaintext| GetObject {
+        space_id: space(),
+        path: "draft.md".into(),
+        plaintext,
+    };
+    assert_eq!(
+        kind(e2e.get(READER, get(true)).await),
+        ErrorKind::PermissionDenied
+    );
+    assert_eq!(kind(e2e.get(OWNER, get(false)).await), ErrorKind::Conflict);
+    let draft = e2e.get(OWNER, get(true)).await.unwrap();
+    assert!(!draft.sealed);
+    assert_eq!(STANDARD.decode(draft.envelope).unwrap(), b"# draft");
 }

@@ -122,6 +122,10 @@ pub struct GetObject {
     pub space_id: SpaceId,
     /// Its path inside the space folder.
     pub path: String,
+    /// Also return a readable page, so a member's device can seal it
+    /// (needs edit access). Off by default: only ciphertext is served.
+    #[serde(default)]
+    pub plaintext: bool,
 }
 
 /// An object's ciphertext.
@@ -131,8 +135,12 @@ pub struct SealedObject {
     pub path: String,
     /// Its version, for `if_match` on the next write.
     pub etag: String,
-    /// The recipient envelope (or the space's folder manifest), base64.
+    /// The recipient envelope (or, when not `sealed`, the readable
+    /// bytes), base64.
     pub envelope: String,
+    /// False for a readable object: the folder manifest, or a page still
+    /// to convert when `plaintext` was asked for.
+    pub sealed: bool,
 }
 
 /// Uploads a page sealed on the device.
