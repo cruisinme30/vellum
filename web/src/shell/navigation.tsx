@@ -98,7 +98,10 @@ export function BottomBar({
 }: NavProperties & { readonly onMore: () => void; readonly moreOpen: boolean }) {
   const t = useT();
   return (
-    <nav className="vl-bottom-bar" aria-label={t("nav-label")}>
+    // The bar floats over the page by design (Material 3); the page's bottom
+    // padding lets the last content scroll clear of it. The UI suite's
+    // overlap check is told so.
+    <nav className="vl-bottom-bar" aria-label={t("nav-label")} data-allow-overlap="">
       <button type="button" className="vl-rail-item" onClick={onNew}>
         <span className="vl-rail-indicator">
           <Icon name="edit" />

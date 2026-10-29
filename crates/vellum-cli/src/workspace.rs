@@ -1,15 +1,19 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-//! The workspace services: collections, books, Work and live editing, over
-//! the files in the data folder, the index database and the permission
-//! engine.
+//! The workspace services: the drive, collections, books, Work and live
+//! editing, over the files in the data folder, the index database and the
+//! permission engine.
 //!
 //! `vellum serve` opens them when an index is configured: Postgres through
 //! the kernel's `database_url`, or the SQLite index in the data folder,
 //! encrypted with `VELLUM_INDEX_KEY` (or plaintext when
 //! `VELLUM_INDEX_PLAINTEXT=1`). Without one the server still starts, with
 //! sign-in only, and says why.
+//!
+//! At startup the drive rescans the data folder, and a file watcher then
+//! keeps the index in step with edits made outside Vellum (see
+//! [`crate::watcher`]).
 
 use std::path::Path;
 use std::sync::{Arc, RwLock};
@@ -20,9 +24,9 @@ use vellum_books_service::BooksService;
 use vellum_collections::CollectionsService;
 use vellum_contracts::{BoxFuture, Service};
 use vellum_db::{Index, IndexConfig};
-use vellum_drive::authz::AuthzAccess as DriveAuthzAccess;
+use vellum_drive::authz::{AuthzAccess as DriveAuthzAccess, TreeSync};
 use vellum_drive::sql::SqlIndex;
-use vellum_drive::{Drive, DriveIndex};
+use vellum_drive::{Drive, DriveIndex, DriveService};
 use vellum_identity::Identity;
 use vellum_kernel::{Config, Error, ErrorKind, UserId};
 use vellum_store::{BlobPath, BlobStore, LocalStore};
@@ -92,7 +96,7 @@ impl Spaces {
     }
 }
 
-async fn load_spaces(drive: &SqlIndex) -> Result<Vec<(BlobPath, Id)>, Error> {
+async fn load_spaces(drive: &dyn DriveIndex) -> Result<Vec<(BlobPath, Id)>, Error> {
     let spaces = drive
         .spaces()
         .await
@@ -130,13 +134,29 @@ impl EventSink for TracingSink {
     }
 }
 
-/// Builds the services over `store` and `authz`.
-async fn build<S: AuthzStore + 'static>(
+/// The opened services, plus the two the file watcher drives.
+struct Built {
+    services: Vec<Arc<dyn Service>>,
+    drive: Arc<Drive>,
+    books: Arc<BooksService>,
+}
+
+/// Builds the services over `store`, `authz` and the drive's `index`.
+async fn build<S: AuthzStore + TreeSync + 'static>(
     store: Arc<dyn BlobStore>,
     authz: Arc<Authz<S>>,
+    index: Arc<dyn DriveIndex>,
     spaces: &Arc<Spaces>,
     identity: &Arc<Identity>,
-) -> Result<Vec<Arc<dyn Service>>, Error> {
+) -> Result<Built, Error> {
+    let drive = Arc::new(Drive::new(
+        Arc::clone(&store),
+        Arc::clone(&index),
+        Arc::new(vellum_drive::authz::AuthzAccess::new(
+            Arc::clone(&authz),
+            index,
+        )),
+    ));
     let lookup = Arc::clone(spaces);
     let space_of: vellum_collections::service::SpaceOf =
         Arc::new(move |path: &BlobPath| lookup.of(path));
@@ -147,10 +167,10 @@ async fn build<S: AuthzStore + 'static>(
             Arc::clone(&space_of),
         )),
     );
-    let books = BooksService::new(
+    let books = Arc::new(BooksService::new(
         Arc::clone(&store),
         Arc::new(vellum_books_service::AuthzAccess::new(authz, space_of)),
-    );
+    ));
     let (work, report) = WorkService::open(
         store,
         Arc::new(IdentityDirectory(Arc::clone(identity))),
@@ -164,7 +184,16 @@ async fn build<S: AuthzStore + 'static>(
             "some Work files could not be read"
         );
     }
-    Ok(vec![Arc::new(collections), Arc::new(books), Arc::new(work)])
+    Ok(Built {
+        services: vec![
+            Arc::new(DriveService::new(Arc::clone(&drive))),
+            Arc::new(collections),
+            Arc::clone(&books) as Arc<dyn Service>,
+            Arc::new(work),
+        ],
+        drive,
+        books,
+    })
 }
 
 /// Opens the workspace services for `config`, or returns none (with a
@@ -195,39 +224,48 @@ pub async fn open(
             .map_err(|e| unavailable("cannot open the data folder", e))?,
     );
     let authz = Arc::new(Authz::new(SqlStore::new(index.clone())));
-    let drive_index: Arc<dyn DriveIndex> = Arc::new(SqlIndex::new(index.clone()));
-    let drive_access = Arc::new(DriveAuthzAccess::new(
+    let drive_index = Arc::new(SqlIndex::new(index.clone()));
+    let spaces = Arc::new(Spaces::default());
+    let workspace = build(
+        Arc::clone(&store),
         Arc::clone(&authz),
-        Arc::clone(&drive_index),
-    ));
+        Arc::clone(&drive_index) as Arc<dyn DriveIndex>,
+        &spaces,
+        identity,
+    )
+    .await?;
+    // The watcher starts before the rescan, so nothing edited in between
+    // is missed; whatever it sees twice is applied idempotently.
+    crate::watcher::start(&config.data_dir, &store, &workspace.drive, &workspace.books).await?;
+    match workspace.drive.scan().await {
+        Ok(report) => tracing::info!(?report, "drive index rebuilt from the data folder"),
+        Err(error) => tracing::warn!(%error, "drive rescan failed; the index may be stale"),
+    }
     let collab = Collab::open(
-        Arc::new(Drive::new(
-            Arc::clone(&store),
-            drive_index,
-            Arc::clone(&drive_access) as _,
+        Arc::clone(&workspace.drive),
+        Arc::new(DriveAuthzAccess::new(
+            authz,
+            Arc::clone(&drive_index) as Arc<dyn DriveIndex>,
         )),
-        drive_access,
-        index.clone(),
+        index,
         &config.data_dir,
         app_origin,
     )?;
-    let drive = SqlIndex::new(index);
-    let spaces = Arc::new(Spaces::default());
-    spaces.replace(load_spaces(&drive).await?);
+    spaces.replace(load_spaces(drive_index.as_ref()).await?);
     let refresh = Arc::clone(&spaces);
     drop(tokio::spawn(async move {
         let mut tick = tokio::time::interval(SPACES_REFRESH);
         tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         loop {
             let _ = tick.tick().await;
-            match load_spaces(&drive).await {
+            match load_spaces(drive_index.as_ref()).await {
                 Ok(list) => refresh.replace(list),
                 Err(error) => tracing::warn!(%error, "space list not refreshed"),
             }
         }
     }));
     Ok(Workspace {
-        services: build(store, authz, &spaces, identity).await?,
+        services: workspace.services,
         collab: Some(collab),
     })
 }
@@ -235,7 +273,7 @@ pub async fn open(
 /// What [`open`] starts.
 #[derive(Default)]
 pub struct Workspace {
-    /// Collections, books and Work.
+    /// The drive, collections, books and Work.
     pub services: Vec<Arc<dyn Service>>,
     /// Live editing, when an index is configured.
     pub collab: Option<Collab>,
@@ -257,7 +295,9 @@ pub async fn describe(
             .map_err(|e| unavailable("cannot open a scratch folder", e))?,
     );
     let authz = Arc::new(Authz::new(MemoryStore::new()));
-    build(store, authz, &Arc::new(Spaces::default()), identity).await
+    let index = Arc::new(vellum_drive::memory::MemoryIndex::new());
+    let workspace = build(store, authz, index, &Arc::new(Spaces::default()), identity).await?;
+    Ok(workspace.services)
 }
 
 #[cfg(test)]

@@ -550,9 +550,36 @@ async fn break_glass_opens_a_short_admin_session_once() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// Live editing is mounted. A test request carries no connection to
+/// upgrade, so the socket handler answers 426 instead of a missing route.
+async fn live_editing_is_mounted(app: &axum::Router) {
+    let collab = format!(
+        "/collab/{}/{}",
+        vellum_kernel::SpaceId::generate(),
+        vellum_kernel::DocId::generate()
+    );
+    let anonymous = send(
+        app,
+        finish(
+            request("GET", &collab)
+                .header(header::CONNECTION, "upgrade")
+                .header(header::UPGRADE, "websocket")
+                .header(header::SEC_WEBSOCKET_VERSION, "13")
+                .header(header::SEC_WEBSOCKET_KEY, "dGhlIHNhbXBsZSBub25jZQ=="),
+        ),
+    )
+    .await;
+    assert_eq!(
+        anonymous.status,
+        StatusCode::UPGRADE_REQUIRED,
+        "{}",
+        anonymous.text
+    );
+}
+
 /// `vellum serve` with a plaintext index: the workspace services answer a
 /// signed-in user and turn away anonymous callers.
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn workspace_services_answer_signed_in_users() {
     let dir = std::env::temp_dir().join(format!(
         "vellum-workspace-test-{}-{}",
@@ -572,7 +599,9 @@ async fn workspace_services_answer_signed_in_users() {
         .unwrap();
     let names: Vec<_> = services.all().iter().map(|s| s.name()).collect();
     assert!(
-        names.contains(&"collections") && names.contains(&"books") && names.contains(&"work"),
+        ["drive", "collections", "books", "work"]
+            .iter()
+            .all(|n| names.contains(n)),
         "{names:?}"
     );
     let mut gateway = GatewayConfig::new(ORIGIN, vec![3; 32]);
@@ -592,30 +621,7 @@ async fn workspace_services_answer_signed_in_users() {
         anonymous.text
     );
 
-    // Live editing is mounted. A test request carries no connection to
-    // upgrade, so the socket handler answers 426 instead of a missing route.
-    let collab = format!(
-        "/collab/{}/{}",
-        vellum_kernel::SpaceId::generate(),
-        vellum_kernel::DocId::generate()
-    );
-    let anonymous = send(
-        &app,
-        finish(
-            request("GET", &collab)
-                .header(header::CONNECTION, "upgrade")
-                .header(header::UPGRADE, "websocket")
-                .header(header::SEC_WEBSOCKET_VERSION, "13")
-                .header(header::SEC_WEBSOCKET_KEY, "dGhlIHNhbXBsZSBub25jZQ=="),
-        ),
-    )
-    .await;
-    assert_eq!(
-        anonymous.status,
-        StatusCode::UPGRADE_REQUIRED,
-        "{}",
-        anonymous.text
-    );
+    live_editing_is_mounted(&app).await;
 
     let cookie = signed_in_admin(&app).await;
     for path in ["/api/v1/books", "/api/v1/collections", "/api/v1/work/teams"] {
@@ -626,6 +632,59 @@ async fn workspace_services_answer_signed_in_users() {
         .await;
         assert_eq!(reply.status, StatusCode::OK, "{path}: {}", reply.text);
     }
+
+    // A page saved through the API, then edited on disk by another
+    // editor, gains a version by that editor once the watcher sees it.
+    let token = csrf(&app, &cookie).await;
+    let post = |path: &str, body: Value| {
+        finish(
+            json_request("POST", path, &body)
+                .header(header::COOKIE, &cookie)
+                .header("x-csrf-token", &token),
+        )
+    };
+    let space = send(
+        &app,
+        post(
+            "/api/v1/drive/spaces",
+            json!({"kind": "shared_drive", "slug": "eng", "name": "Engineering"}),
+        ),
+    )
+    .await;
+    assert_eq!(space.status, StatusCode::OK, "{}", space.text);
+    let space_id = space.json()["id"].as_str().unwrap().to_owned();
+    let page = send(
+        &app,
+        post(
+            &format!("/api/v1/drive/spaces/{space_id}/pages"),
+            json!({"title": "Runbook", "body": "First draft.\n"}),
+        ),
+    )
+    .await;
+    assert_eq!(page.status, StatusCode::OK, "{}", page.text);
+    let page_id = page.json()["id"].as_str().unwrap().to_owned();
+    let file = dir.join(page.json()["path"].as_str().unwrap());
+    let versions = format!("/api/v1/drive/items/{page_id}/versions");
+    let mut seen = String::new();
+    // An edit landing in the same burst as Vellum's own write is folded
+    // into it, so edit again until the watcher has seen the page.
+    'edits: for attempt in 0..10 {
+        let text = std::fs::read_to_string(&file).unwrap();
+        std::fs::write(&file, format!("{text}Edit {attempt} in another editor.\n")).unwrap();
+        for _ in 0..20 {
+            let reply = send(
+                &app,
+                finish(request("GET", &versions).header(header::COOKIE, &cookie)),
+            )
+            .await;
+            seen = reply.text;
+            if seen.contains("external") {
+                break 'edits;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+    }
+    assert!(seen.contains("external"), "no external version: {seen}");
     services.shutdown().await;
     let _ = std::fs::remove_dir_all(&dir);
 }
