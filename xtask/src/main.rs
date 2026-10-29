@@ -5,6 +5,9 @@
 //!
 //! - `cargo xtask fast` runs the "Fast suite" CI checks locally. The
 //!   pre-push hook runs it before every push.
+//! - `cargo xtask pr-check --title <title> --body-file <file>` runs CI's
+//!   title, branch, description and linked-issue checks before a pull
+//!   request is opened.
 //! - `cargo xtask install-hooks` turns on the repository's git hooks and
 //!   commit template.
 //! - `cargo xtask relock` resolves `Cargo.lock` and `web/pnpm-lock.yaml`
@@ -30,10 +33,11 @@ mod budgets;
 mod fast;
 mod help;
 mod perf_gate;
+mod pr_check;
 mod relock;
 mod schema;
 
-const USAGE: &str = "usage: cargo xtask <fast | install-hooks | relock | boundaries | \
+const USAGE: &str = "usage: cargo xtask <fast | pr-check | install-hooks | relock | boundaries | \
                      help [check|write] | budgets | perf-gate | \
                      schema [--check]>";
 
@@ -45,6 +49,7 @@ fn main() -> ExitCode {
     let mode = rest.first().map(String::as_str);
     let result = match command {
         Some("fast") => fast::run(),
+        Some("pr-check") => pr_check::run(rest),
         Some("install-hooks") => install_hooks(),
         Some("relock") => relock::run(),
         Some("boundaries") => boundaries::run(),
