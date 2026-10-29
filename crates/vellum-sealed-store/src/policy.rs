@@ -16,6 +16,9 @@ pub enum Mode {
     Encrypted,
     /// Stored as is, for spaces whose files must stay readable on disk.
     Plaintext,
+    /// E2E private space: clients seal to members' keys before upload, and
+    /// the store only accepts and returns recipient envelopes.
+    EndToEnd,
 }
 
 /// Decides the at-rest [`Mode`] for a path. The pages service implements it
