@@ -2646,6 +2646,53 @@ export interface DigestView {
 }
 
 /**
+ * People (and, once groups have names, groups) matching a query.
+ */
+export interface Directory {
+  /**
+   * The matches, best first.
+   */
+  entries: DirectoryEntry[];
+}
+
+/**
+ * Someone or a group that can be granted access.
+ */
+export interface DirectoryEntry {
+  /**
+   * A second line to tell namesakes apart (the email for a person).
+   */
+  detail: string;
+  /**
+   * `user` or `group`.
+   */
+  kind: string;
+  /**
+   * The display name.
+   */
+  name: string;
+  /**
+   * The principal as access settings store it: `user:<id>` or
+   * `group:<id>`.
+   */
+  principal: string;
+}
+
+/**
+ * `identity.directory`: find people to share with or restrict to.
+ */
+export interface DirectoryQuery {
+  /**
+   * The most results, 1 to 20; 8 when absent.
+   */
+  limit?: number | null;
+  /**
+   * Part of a name, handle or email; at least two characters.
+   */
+  q: string;
+}
+
+/**
  * A DocId as a 26-character ULID.
  */
 export type DocId = string;
@@ -10314,6 +10361,13 @@ export interface Operations {
     input: CreateUser;
     output: IdentityCreateUserUserView;
   };
+  /** Find people to share with */
+  "identity.directory": {
+    method: "GET";
+    path: "/v1/directory";
+    input: DirectoryQuery;
+    output: Directory;
+  };
   /** Disconnect an app */
   "identity.revoke_app": {
     method: "DELETE";
@@ -11024,6 +11078,7 @@ export const OPERATIONS = {
   "identity.apps": { method: "GET", path: "/v1/me/apps", mutation: false },
   "identity.create_token": { method: "POST", path: "/v1/me/tokens", mutation: true },
   "identity.create_user": { method: "POST", path: "/v1/admin/users", mutation: true },
+  "identity.directory": { method: "GET", path: "/v1/directory", mutation: false },
   "identity.revoke_app": { method: "DELETE", path: "/v1/me/apps/{id}", mutation: true },
   "identity.revoke_session": { method: "DELETE", path: "/v1/me/sessions/{id}", mutation: true },
   "identity.revoke_token": { method: "DELETE", path: "/v1/me/tokens/{id}", mutation: true },

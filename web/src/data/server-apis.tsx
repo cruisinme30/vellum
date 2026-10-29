@@ -8,6 +8,7 @@ import type { DriveApi } from "../drive/api";
 import { ViewTitle } from "../help/help-link";
 import type { HelpTopic } from "../help/topics.gen";
 import { useT } from "../i18n/i18n";
+import type { DirectoryApi } from "../people/directory";
 import type { PrivateSpacesApi } from "../platform/private/api";
 import type { WorkApi } from "../work/api";
 
@@ -19,6 +20,8 @@ export interface ServerApis {
   readonly books?: BooksApi | undefined;
   readonly drive?: DriveApi | undefined;
   readonly privateSpaces?: PrivateSpacesApi | undefined;
+  /** People (and groups) to pick for access and sharing. */
+  readonly directory?: DirectoryApi | undefined;
 }
 
 const ServerApisContext = createContext<ServerApis>({});
@@ -37,6 +40,11 @@ export function ServerApisProvider({
 /** The server-only APIs; each is `undefined` in demo mode. */
 export function useServerApis(): ServerApis {
   return use(ServerApisContext);
+}
+
+/** One server API, or `undefined` in demo mode. */
+export function useServerApi<K extends keyof ServerApis>(name: K): ServerApis[K] {
+  return use(ServerApisContext)[name];
 }
 
 /**
