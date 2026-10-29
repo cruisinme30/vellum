@@ -135,10 +135,13 @@ fn blocks_to_nodes(blocks: &[Block]) -> Vec<Node> {
 fn block_to_element(block: &Block) -> Element {
     match block {
         Block::Paragraph { content, id } => match (content.as_slice(), id) {
-            ([Inline::Image { url, title, alt }], None) => node(NodeType::Image, Vec::new())
-                .with_attr("src", url.clone())
-                .with_attr("alt", vellum_format::plain_text(alt))
-                .with_attr("title", title.clone()),
+            ([Inline::Image { url, title, alt }], _) => with_block_id(
+                node(NodeType::Image, Vec::new())
+                    .with_attr("src", url.clone())
+                    .with_attr("alt", vellum_format::plain_text(alt))
+                    .with_attr("title", title.clone()),
+                *id,
+            ),
             _ => with_block_id(node(NodeType::Paragraph, inlines_to_nodes(content)), *id),
         },
         Block::Heading {
@@ -152,7 +155,9 @@ fn block_to_element(block: &Block) -> Element {
             with_attributes(with_block_id(element, *id), attrs)
         }
         Block::ThematicBreak => node(NodeType::HorizontalRule, Vec::new()),
-        Block::BlockQuote { blocks } => node(NodeType::Blockquote, blocks_to_nodes(blocks)),
+        Block::BlockQuote { blocks, id } => {
+            with_block_id(node(NodeType::Blockquote, blocks_to_nodes(blocks)), *id)
+        }
         Block::List(list) => list_to_element(list),
         Block::Fence(fence) => {
             let element = if fence.kind() == FenceKind::Code {
@@ -168,9 +173,11 @@ fn block_to_element(block: &Block) -> Element {
                     .with_attr("lang", fence.lang.clone())
                     .with_attr("args", fence.args.clone())
             };
-            with_attributes(element, &fence.attrs)
+            with_attributes(with_block_id(element, fence.id), &fence.attrs)
         }
-        Block::Math { literal } => node(NodeType::MathBlock, literal_to_nodes(literal)),
+        Block::Math { literal, id } => {
+            with_block_id(node(NodeType::MathBlock, literal_to_nodes(literal)), *id)
+        }
         Block::Table(table) => table_to_element(table),
         Block::Container(container) => {
             let element = typed_container(container).unwrap_or_else(|| {
@@ -183,7 +190,7 @@ fn block_to_element(block: &Block) -> Element {
                     .with_attr("name", container.name.clone())
                     .with_attr("arg", container.arg.clone())
             });
-            with_attributes(element, &container.attrs)
+            with_attributes(with_block_id(element, container.id), &container.attrs)
         }
     }
 }
@@ -301,7 +308,10 @@ fn list_to_element(list: &List) -> Element {
             let blocks = blocks_to_nodes(&item.blocks);
             Node::Element(item.task.map_or_else(
                 || node(NodeType::ListItem, blocks.clone()),
-                |done| node(NodeType::TaskItem, blocks.clone()).with_attr("checked", done),
+                |done| {
+                    let task = node(NodeType::TaskItem, blocks.clone()).with_attr("checked", done);
+                    with_attributes(task, &item.attrs)
+                },
             ))
         })
         .collect();
@@ -344,7 +354,7 @@ fn table_to_element(table: &Table) -> Element {
             .iter()
             .map(|cells| row(cells, NodeType::TableCell)),
     );
-    node(NodeType::Table, rows)
+    with_block_id(node(NodeType::Table, rows), table.id)
 }
 
 /// Block text without its final newline. An empty literal has no text
@@ -623,6 +633,7 @@ fn element_to_blocks(element: &Element, out: &mut Vec<Block>) {
         NodeType::HorizontalRule => out.push(Block::ThematicBreak),
         NodeType::Blockquote => out.push(Block::BlockQuote {
             blocks: nodes_to_blocks(children),
+            id: block_id(attrs),
         }),
         NodeType::BulletList | NodeType::OrderedList | NodeType::TaskList => {
             out.push(Block::List(element_to_list(element, kind)));
@@ -631,21 +642,24 @@ fn element_to_blocks(element: &Element, out: &mut Vec<Block>) {
             lang: text("language"),
             args: text("args"),
             attrs: attributes(attrs),
+            id: block_id(attrs),
             literal: nodes_to_literal(children),
         })),
         NodeType::DataFence => out.push(Block::Fence(Fence {
             lang: text("lang"),
             args: text("args"),
             attrs: attributes(attrs),
+            id: block_id(attrs),
             literal: nodes_to_literal(children),
         })),
         NodeType::MathBlock => out.push(Block::Math {
             literal: nodes_to_literal(children),
+            id: block_id(attrs),
         }),
         NodeType::Table => out.extend(element_to_table(element).map(Block::Table)),
         NodeType::Image => out.push(Block::Paragraph {
             content: vec![image(attrs)],
-            id: None,
+            id: block_id(attrs),
         }),
         // Misplaced nodes (list items, rows, cells, columns, tabs, inline
         // nodes reached here) keep their content.
@@ -662,6 +676,7 @@ fn element_to_container(element: &Element) -> Option<Container> {
         name,
         arg,
         attrs: attributes(attrs),
+        id: block_id(attrs),
         sections,
     };
     let named =
@@ -738,11 +753,17 @@ fn element_to_list(element: &Element, kind: NodeType) -> List {
                     .then(|| attr_bool(&item.attrs, "checked").unwrap_or(false));
                 ListItem {
                     task,
+                    attrs: if task.is_some() {
+                        attributes(&item.attrs)
+                    } else {
+                        Attributes::default()
+                    },
                     blocks: nodes_to_blocks(&item.children),
                 }
             }
             Node::Text(_) => ListItem {
                 task: None,
+                attrs: Attributes::default(),
                 blocks: nodes_to_blocks(std::slice::from_ref(child)),
             },
         })
@@ -795,6 +816,7 @@ fn element_to_table(element: &Element) -> Option<Table> {
         alignments,
         header,
         rows,
+        id: block_id(&element.attrs),
     })
 }
 
