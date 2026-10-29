@@ -57,8 +57,9 @@ scope.addEventListener("activate", (event) => {
   event.waitUntil(activateShell(caches, manifest).then(() => scope.clients.claim()));
 });
 
+// Only pages of this origin can message their worker, but check anyway.
 scope.addEventListener("message", (event) => {
-  if (event.data === "skip-waiting") void scope.skipWaiting();
+  if (event.origin === origin && event.data === "skip-waiting") void scope.skipWaiting();
 });
 
 scope.addEventListener("fetch", (event) => {
