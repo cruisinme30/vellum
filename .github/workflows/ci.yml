@@ -37,6 +37,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - run: rustup toolchain install
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
@@ -68,6 +70,8 @@ jobs:
         working-directory: web
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
           package_json_file: web/package.json
@@ -100,6 +104,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
       - name: REUSE headers
         uses: fsfe/reuse-action@676e2d560c9a403aa252096d99fcab3e1132b0f5 # v6.0.0
@@ -107,11 +112,17 @@ jobs:
         with:
           python-version: "3.13"
       - name: Install linters
-        run: pip install yamllint==1.37.1 sqlfluff==3.4.2
+        run: pip install yamllint==1.37.1 sqlfluff==3.4.2 zizmor==1.31.1
       - name: YAML
         run: yamllint --strict .
       - name: Shell
         run: shellcheck -x scripts/*/*.sh .githooks/*
+      - name: Workflow security (zizmor)
+        # ADR 0032, D126: template injection, excessive token permissions,
+        # unpinned or impostor actions, credential persistence, cooldowns.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: zizmor --persona=regular --min-severity=low --format=github .github
       - name: Markdown
         uses: DavidAnson/markdownlint-cli2-action@696eb3f2509270d7b882d2aa68347bc676e7af34 # v25.0.0
       - name: Prose (Vale)
@@ -147,6 +158,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
       - name: Branch name and title follow the conventions
         env:
@@ -187,6 +199,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
       - name: Linked issue, and a decision record for features
         env:
@@ -200,10 +213,23 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: scripts/ci/check-traceability.sh
 
+  dependencies:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: No new dependency with a known vulnerability
+        # ADR 0032, D126. Licences and bans stay with cargo deny.
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: low
+          comment-summary-in-pr: never
+
   fast-suite:
     name: Fast suite
     if: always()
-    needs: [rust, web, hygiene, commits, traceability]
+    needs: [rust, web, hygiene, commits, traceability, dependencies]
     runs-on: ubuntu-24.04
     steps:
       - name: Every fast check passed or was not applicable
