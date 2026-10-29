@@ -22,7 +22,7 @@ workspace = true
 libsqlite3-sys = { version = "0.37", features = ["bundled-sqlcipher-vendored-openssl"] }
 sqlx = { version = "0.9", default-features = false, features = ["macros", "migrate", "postgres", "runtime-tokio", "sqlite", "tls-rustls", "uuid"] }
 serde = { version = "1.0.229", features = ["derive"] }
-serde-saphyr = "2.0.0"
+serde-saphyr = { version = "2.0.0", default-features = false, features = ["deserialize", "serialize"] }
 sha2 = "0.11.1"
 thiserror = "2.0.21"
 tokio = { version = "1", features = ["rt"] }

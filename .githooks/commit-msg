@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 #
 # Rejects a commit message without a Conventional Commits subject, a body
-# or a DCO sign-off. Enable with: git config core.hooksPath .githooks
+# or a DCO sign-off. Enable with: cargo xtask install-hooks
 set -euo pipefail
 
 root="$(git rev-parse --show-toplevel)"

@@ -31,6 +31,11 @@ allow = [
     "Unicode-3.0",
     "Zlib",
 ]
+# CC0-1.0 is a public-domain dedication, so it is compatible too. It is
+# allowed per crate rather than globally because it has no patent grant.
+exceptions = [
+    { crate = "notify", allow = ["CC0-1.0"] },
+]
 
 [licenses.private]
 ignore = true
@@ -57,6 +62,7 @@ skip = [
     { crate = "rand_core@0.9", reason = "pulled by rand 0.9" },
     { crate = "getrandom@0.2", reason = "ring (rustls, testcontainers only) is still on getrandom 0.2" },
     { crate = "windows-sys@0.52", reason = "ring is still on windows-sys 0.52" },
+    { crate = "miniz_oxide@0.8", reason = "png still on 0.8 while flate2 moved to 0.9" },
 ]
 skip-tree = []
 
