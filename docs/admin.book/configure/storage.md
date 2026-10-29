@@ -20,6 +20,37 @@ S3.
 | OneDrive | `onedrive:///Vellum` | Eventually consistent; always merged |
 | Git | `git+ssh://git@github.com/northstar/docs.git` | A commit per save batch; pull and rebase through the merge |
 
+## Signing in to S3 {#s3-credentials}
+
+The server reads the bucket from `VELLUM_BLOB_URL=s3://bucket[/prefix]`,
+with `VELLUM_S3_REGION` and, for MinIO or R2, `VELLUM_S3_ENDPOINT`. It
+signs in with the first of these that is set up, so on Kubernetes and AWS
+no key has to be stored anywhere:
+
+| Source | Set up with | Where |
+| --- | --- | --- |
+| Static keys | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Anywhere |
+| Web identity (IRSA) | `AWS_ROLE_ARN`, `AWS_WEB_IDENTITY_TOKEN_FILE` | EKS; any Kubernetes with MinIO STS (`AWS_ENDPOINT_URL_STS`) |
+| Pod Identity or ECS | `AWS_CONTAINER_CREDENTIALS_FULL_URI` or `_RELATIVE_URI` | EKS Pod Identity, ECS tasks |
+| Instance profile | Nothing (IMDSv2) | EC2, when no `VELLUM_S3_ENDPOINT` is set |
+
+EKS sets the variables itself. With the Helm chart, leave
+`blob.credentialsSecret` empty and annotate the service account:
+
+```yaml
+# northstar-values.yaml
+blob:
+  url: s3://northstar-vellum-content
+  region: eu-west-1
+serviceAccount:
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::000000000000:role/northstar-vellum
+```
+
+Temporary keys are refreshed five minutes before they expire. The role
+needs `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject` and
+`s3:ListBucket` on the bucket.
+
 ## Quotas and retention {#quotas}
 
 In **Admin → Drives**, set per drive:

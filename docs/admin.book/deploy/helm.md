@@ -50,6 +50,23 @@ collaboration rooms to another replica in under five seconds.
 | Collaboration rooms | Recreated from Postgres on another replica |
 | Postgres | Primary plus synchronous replica, Patroni failover |
 | Object storage | The provider's own redundancy |
-| Redis (optional) | Cache only; Vellum falls back to memory |
+| Redis | Not used: rate limits, jobs and the change feed live in Postgres |
 | Kroki (optional) | Two replicas; pages fall back to the last drawing |
 | ClamAV (optional) | Two replicas; uploads are refused while none is up ([virus scanning](compose.md#virus-scanning)) |
+
+## When a dependency fails {#degraded}
+
+`/readyz` reports each part as `ready`, `degraded` or `not_ready`. Only
+`not_ready` takes a pod out of the load balancer.
+
+| Failure | What people see | Readiness |
+| --- | --- | --- |
+| Object storage down | Search, lists, Work and My Work keep working; opening or saving a page fails with "storage is unavailable" and the editor retries | `degraded`: every replica shares the bucket, so none is taken out |
+| Postgres primary lost | A few seconds of failed requests while Patroni promotes the replica | `not_ready` until the pool reconnects |
+| Kroki down | Diagrams show their last drawing; after five failures Vellum stops asking for ten seconds | `ready` |
+| ClamAV down | Uploads are refused; everything else works | `ready` |
+| A pod stops | Readiness fails at once, the pod finishes its requests, saves and closes its live rooms; editors reconnect to another replica | `draining` |
+
+The weekly chaos test cuts the servers off the bucket for twenty seconds,
+along with killing a pod, a Kroki pod and the Postgres primary, and
+checks that every acknowledged save survived.

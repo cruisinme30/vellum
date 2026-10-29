@@ -5,8 +5,9 @@
 # The weekly chaos test (ADR 0022, D96) on a kind cluster that already runs
 # the Zalando Postgres Operator and Chaos Mesh, with the images vellum:ci
 # and vellum-minio:ci loaded. Under load, it kills a Vellum node, a Kroki
-# pod and the Postgres primary, then asserts that the SLO thresholds held
-# and that every acknowledged write can be read back.
+# pod and the Postgres primary, and cuts the servers off the bucket, then
+# asserts that the SLO thresholds held and that every acknowledged write
+# can be read back.
 #
 #   deploy/chaos/run.sh
 set -euo pipefail
@@ -73,7 +74,7 @@ echo "Starting load (${DURATION}) and the acknowledged-write log."
 k6_job chaos-load suite.js "SCALE=0.05" "DURATION=${DURATION}" "PAGES=100"
 k6_job chaos-writes writes.js "DURATION=${DURATION}"
 
-for experiment in kill-vellum-node kill-kroki kill-postgres-primary; do
+for experiment in kill-vellum-node kill-kroki kill-postgres-primary blob-outage; do
   sleep "${GAP}"
   echo "Fault: ${experiment}"
   yq "select(.metadata.name == \"${experiment}\")" "${here}/experiments.yaml" | kubectl apply -f -

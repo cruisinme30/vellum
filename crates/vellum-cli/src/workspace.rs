@@ -13,7 +13,8 @@
 //!
 //! Workspace files live in the data folder, or in a shared S3 bucket when
 //! `VELLUM_BLOB_URL` names one (`s3://bucket[/prefix]`, with
-//! `VELLUM_S3_ENDPOINT`, `VELLUM_S3_REGION` and the `AWS_*` keys). Several
+//! `VELLUM_S3_ENDPOINT`, `VELLUM_S3_REGION`, and the `AWS_*` keys or the
+//! pod's workload identity). Several
 //! replicas need the bucket and a Postgres index, so they all see one
 //! workspace and a restarted pod loses nothing.
 //!
@@ -169,7 +170,7 @@ struct Files {
 /// # Errors
 ///
 /// A blob URL that is not `s3://`, or missing S3 settings.
-fn bucket(var: impl Fn(&str) -> Option<String>) -> Result<Option<S3Config>, Error> {
+pub fn bucket(var: impl Fn(&str) -> Option<String>) -> Result<Option<S3Config>, Error> {
     let Some(url) = var(BLOB_URL_VAR).filter(|v| !v.is_empty()) else {
         return Ok(None);
     };
@@ -213,8 +214,25 @@ async fn open_files(config: &Config, bucket: Option<S3Config>) -> Result<Files, 
 
 /// Reports whether the blob store answers, for `/readyz`. It has no
 /// operations of its own.
+///
+/// A shared bucket that stops answering makes the replica degraded, not
+/// unready (ADR 0044, D188): every replica shares the bucket, so failing
+/// readiness would take them all out of the load balancer at once, and
+/// the index-backed reads (search, lists, Work, My Work) would go down
+/// with it. Calls that need the files fail on their own with
+/// `unavailable` and a `Retry-After`. A data folder on this machine is
+/// different: if it is gone, this replica cannot serve and another may.
 #[derive(Debug)]
-struct Storage(Arc<dyn BlobStore>);
+struct Storage {
+    store: Arc<dyn BlobStore>,
+    shared: bool,
+}
+
+impl Storage {
+    fn new(store: Arc<dyn BlobStore>, shared: bool) -> Self {
+        Self { store, shared }
+    }
+}
 
 impl Service for Storage {
     fn name(&self) -> &'static str {
@@ -226,7 +244,18 @@ impl Service for Storage {
     }
 
     fn readiness(&self) -> BoxFuture<'_, Readiness> {
-        Box::pin(probe(self.0.as_ref()))
+        Box::pin(async move { soften(probe(self.store.as_ref()).await, self.shared) })
+    }
+}
+
+/// Turns an outage of a shared bucket into [`Readiness::Degraded`].
+fn soften(readiness: Readiness, shared: bool) -> Readiness {
+    match readiness {
+        Readiness::NotReady(reason) if shared => {
+            tracing::warn!(%reason, "the shared blob store is down: serving degraded");
+            Readiness::Degraded(reason)
+        }
+        other => other,
     }
 }
 
@@ -774,7 +803,7 @@ pub async fn open(
     keep_fresh(feed, me, cursor, &workspace, &spaces, drive_index);
     sync_calendars(&replica, &workspace.tasks);
     let mut services = workspace.services;
-    services.push(Arc::new(Storage(store)));
+    services.push(Arc::new(Storage::new(store, !local)));
     Ok(Opened {
         services,
         hooks,
@@ -869,7 +898,11 @@ mod tests {
     fn a_bad_blob_url_or_missing_keys_stop_startup() {
         for vars in [
             &[(BLOB_URL_VAR, "file:///data")][..],
-            &[(BLOB_URL_VAR, "s3://vellum")][..],
+            // A custom endpoint with no keys and no workload identity.
+            &[
+                (BLOB_URL_VAR, "s3://vellum"),
+                ("VELLUM_S3_ENDPOINT", "http://127.0.0.1:9000"),
+            ][..],
         ] {
             let error = bucket(lookup(vars)).err().unwrap();
             assert_eq!(error.kind(), ErrorKind::InvalidInput);
@@ -878,7 +911,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn an_unreachable_bucket_is_not_ready() {
+    async fn an_unreachable_bucket_is_degraded() {
         // Port 9 (discard) refuses connections on a test machine.
         let store = S3Config::from_vars(lookup(&[
             (BLOB_URL_VAR, "s3://vellum"),
@@ -888,9 +921,15 @@ mod tests {
         ]))
         .and_then(S3Store::new)
         .unwrap();
+        let down = probe(&store).await;
+        assert!(matches!(&down, Readiness::NotReady(reason) if reason.contains("s3")));
+        // Shared by every replica: degraded, so the pods stay in rotation.
         assert!(
-            matches!(probe(&store).await, Readiness::NotReady(reason) if reason.contains("s3"))
+            matches!(soften(down.clone(), true), Readiness::Degraded(reason) if reason.contains("s3"))
         );
+        // A data folder on this machine: unready, so traffic goes elsewhere.
+        assert!(matches!(soften(down, false), Readiness::NotReady(_)));
+        assert_eq!(soften(Readiness::Ready, true), Readiness::Ready);
     }
 
     #[test]
