@@ -18,7 +18,7 @@ CREATE TABLE sync_meta (
 );
 
 INSERT INTO sync_meta (id, epoch)
-VALUES (1, (extract(epoch FROM clock_timestamp()) * 1000)::BIGINT);
+VALUES (1, (EXTRACT(EPOCH FROM CLOCK_TIMESTAMP()) * 1000)::BIGINT);
 
 -- The latest version of each record at the position of its last write;
 -- value is JSON text (not jsonb, so key order survives), NULL for a tombstone.

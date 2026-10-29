@@ -18,14 +18,14 @@ CREATE TABLE sync_meta (
 );
 
 INSERT INTO sync_meta (id, epoch)
-VALUES (1, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER));
+VALUES (1, CAST((JULIANDAY('now') - 2440587.5) * 86400000 AS INTEGER));
 
 -- The latest version of each record at the position of its last write;
 -- value is JSON text, NULL for a tombstone.
 CREATE TABLE sync_log (
     seq INTEGER NOT NULL PRIMARY KEY CHECK (seq > 0),
-    space_id BLOB NOT NULL CHECK (length(space_id) = 16),
-    object_id BLOB NULL CHECK (object_id IS NULL OR length(object_id) = 16),
+    space_id BLOB NOT NULL CHECK (LENGTH(space_id) = 16),
+    object_id BLOB NULL CHECK (object_id IS NULL OR LENGTH(object_id) = 16),
     collection TEXT NOT NULL CHECK (collection <> ''),
     record_key TEXT NOT NULL,
     value TEXT NULL,
@@ -36,7 +36,7 @@ CREATE TABLE sync_log (
 -- processed for it.
 CREATE TABLE sync_clients (
     client_id TEXT NOT NULL PRIMARY KEY CHECK (client_id <> ''),
-    user_id BLOB NOT NULL CHECK (length(user_id) = 16),
+    user_id BLOB NOT NULL CHECK (LENGTH(user_id) = 16),
     last_mutation_id INTEGER NOT NULL CHECK (last_mutation_id >= 0),
     updated_at INTEGER NOT NULL
 );
