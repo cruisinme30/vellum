@@ -46,7 +46,7 @@ gitGraph
 
 | Suite | Runs on | Contents |
 | --- | --- | --- |
-| Fast (`ci.yml`) | every pull request into `develop` or `main`, pushes to `develop` | rustfmt, clippy, rustdoc, unit and property tests (nextest), crate boundaries, cargo-deny, cargo-audit; Prettier, tsc, ESLint, knip, Vitest with 85 % coverage, pnpm audit; REUSE, yamllint, shellcheck, markdownlint, Vale, local links, gitleaks, infrastructure linters; Conventional Commits, DCO and PR size |
+| Fast (`ci.yml`) | every pull request into `develop` or `main`, pushes to `develop` | rustfmt, clippy, rustdoc, unit and property tests (nextest), crate boundaries, cargo-deny, cargo-audit; Prettier, tsc, ESLint, knip, Vitest with 85 % coverage, pnpm audit; REUSE, yamllint, shellcheck, markdownlint, Vale, local links, gitleaks, infrastructure linters; Conventional Commits, DCO, branch name and description template |
 | Full (`full.yml`) | every pull request into `main`, pushes to `main`, nightly | the fast suite, plus Rust line coverage of at least 85 %, the release build, Playwright end-to-end with axe accessibility checks, and external link checks |
 
 Further layers join the full suite as their code lands: golden corpus,
@@ -89,9 +89,28 @@ CI enforces every rule in this section on each pull request.
 - **Signed commits** (planned): sign with GPG, SSH or S/MIME so GitHub
   marks them verified. Branch protection will require this once every
   contributor, including automated ones, has a signing key set up.
-- **Size**: a pull request changes fewer than 400 lines, not counting
-  generated files marked in `.gitattributes`. A maintainer can apply the
-  `size/exempt` label when a larger change cannot be split.
+- **Scope**: one pull request per feature, complete with its tests and
+  docs, not one per commit or step. There is no line limit; keep commits
+  inside the pull request small and logical so the history reads well.
+
+## Labels
+
+Labels are code: `.github/labels.yml` defines them and the Sync labels
+workflow applies changes when that file lands on `develop`.
+
+| Group | Labels | Set by |
+| --- | --- | --- |
+| `type/*` | `feat fix docs refactor perf test build ci chore style revert` | the pull request title |
+| `area/*` | `kernel contracts format store crypto db render export authz collab collections pages work my-work api jobs mcp cli editor web ci docs deploy` | changed paths (`.github/labeler.yml`), or by hand |
+| `phase/*` | `foundation format editor drive-books collections work mywork-mcp clients-release` | by hand, following the build order |
+| `status/*` | `in-progress blocked ready-to-merge` | by hand |
+| `priority/p0` | every requirement is P0 | by hand |
+| `size/*` | `xs s m l xl` (under 50, 200, 500, 1,000 lines, or more) | changed lines, generated files excluded |
+| `release` | a `develop` → `main` pull request | automatically |
+
+The **Labels** check fails a pull request without at least one `type/*`
+and one `area/*` label. Branch protection requires it next to the suite
+check. When a new crate lands, add its path to `.github/labeler.yml`.
 
 ## Definition of done
 
