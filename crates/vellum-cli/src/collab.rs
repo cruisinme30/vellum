@@ -28,6 +28,7 @@ use axum::http::header;
 use axum::http::request::Parts;
 use axum::response::IntoResponse as _;
 use bytes::Bytes;
+use vellum_api::auth::{Authenticator, RequestMeta};
 use vellum_api::error::ErrorResponse;
 use vellum_collab::sql::{Envelope, SqlUpdateStore};
 use vellum_collab::ws::Authorizer;
@@ -71,6 +72,7 @@ impl Collab {
         index: Index,
         data_dir: &Path,
         app_origin: &str,
+        authenticator: Arc<dyn Authenticator>,
     ) -> Result<Self> {
         let keyring = log_keyring(data_dir)?;
         let hub = Hub::new(
@@ -83,6 +85,7 @@ impl Collab {
             drive,
             access,
             origin: app_origin.trim_end_matches('/').to_owned(),
+            authenticator: Some(authenticator),
         });
         Ok(Self { hub, authorizer })
     }
@@ -256,11 +259,22 @@ impl DocumentFiles for DriveFiles {
 }
 
 /// Who may join a page's room, and whether they may edit.
-#[derive(Debug)]
 pub struct DriveAuthorizer {
     drive: Arc<Drive>,
     access: Arc<dyn DriveAccess>,
     origin: String,
+    /// Checks the upgrade's credential again on every re-check, so a
+    /// signed-out or revoked session ends its connections.
+    authenticator: Option<Arc<dyn Authenticator>>,
+}
+
+impl std::fmt::Debug for DriveAuthorizer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DriveAuthorizer")
+            .field("origin", &self.origin)
+            .field("authenticator", &self.authenticator.is_some())
+            .finish_non_exhaustive()
+    }
 }
 
 impl DriveAuthorizer {
@@ -297,6 +311,37 @@ impl Authorizer for DriveAuthorizer {
             .get::<Principal>()
             .cloned()
             .unwrap_or_else(Principal::anonymous);
+        self.admit(request, &principal, room).await
+    }
+
+    async fn recheck(&self, request: &Parts, room: RoomKey) -> Result<(UserId, Access)> {
+        let principal = match &self.authenticator {
+            Some(authenticator) => {
+                let meta = RequestMeta {
+                    headers: request.headers.clone(),
+                    client_ip: None,
+                    path: request.uri.path().to_owned(),
+                };
+                authenticator.authenticate(&meta).await?.principal
+            }
+            None => request
+                .extensions
+                .get::<Principal>()
+                .cloned()
+                .unwrap_or_else(Principal::anonymous),
+        };
+        self.admit(request, &principal, room).await
+    }
+}
+
+impl DriveAuthorizer {
+    /// Who `principal` is in `room` and what they may do there.
+    async fn admit(
+        &self,
+        request: &Parts,
+        principal: &Principal,
+        room: RoomKey,
+    ) -> Result<(UserId, Access)> {
         if principal.kind() == CredentialKind::ShareLink {
             return Err(Error::new(
                 ErrorKind::PermissionDenied,
@@ -305,14 +350,15 @@ impl Authorizer for DriveAuthorizer {
         }
         let user = principal.require_user()?;
         principal.require_scope(Scope::Read)?;
-        self.check_origin(request, &principal)?;
+        self.check_origin(request, principal)?;
         let id = ObjectId::from(room.doc);
         let node = self
             .drive
             .get(&Actor::User { user }, id)
             .await
             .map_err(Error::from)?;
-        if node.space != room.space || node.kind != NodeKind::Page {
+        // A trashed page is not edited live; it comes back with restore.
+        if node.space != room.space || node.kind != NodeKind::Page || !node.is_live() {
             return Err(Error::new(ErrorKind::NotFound, "page not found"));
         }
         let may_edit = principal.scopes().allows(Scope::WriteDirect)
@@ -394,6 +440,7 @@ mod tests {
                 drive: Arc::clone(&self.drive),
                 access: self.access.clone(),
                 origin: ORIGIN.to_owned(),
+                authenticator: None,
             }
         }
 
@@ -582,6 +629,34 @@ mod tests {
             .authorize(&upgrade(Some(token), None), world.room())
             .await?;
         assert_eq!(access, Access::Read);
+        Ok(())
+    }
+
+    /// RT-028 (#459): an open connection is checked again, so a revoked
+    /// grant or a trashed page ends it and a downgrade stops its edits.
+    #[tokio::test]
+    async fn a_recheck_follows_revoked_grants_and_trashed_pages() -> TestResult {
+        let world = World::new().await?;
+        let auth = world.authorizer();
+        let room = world.room();
+        let editor = UserId::generate();
+        world.access.grant(editor, world.page.space, Role::Editor);
+        let request = upgrade(Some(session(editor)), Some(ORIGIN));
+        assert_eq!(auth.recheck(&request, room).await?, (editor, Access::Write));
+
+        world.access.revoke(editor, world.page.space);
+        world.access.grant(editor, world.page.space, Role::Viewer);
+        assert_eq!(auth.recheck(&request, room).await?, (editor, Access::Read));
+
+        world.access.revoke(editor, world.page.space);
+        assert!(auth.recheck(&request, room).await.is_err());
+
+        let owner = upgrade(Some(session(world.owner)), Some(ORIGIN));
+        let _ = world
+            .drive
+            .trash(&Actor::User { user: world.owner }, world.page.id)
+            .await?;
+        assert!(auth.recheck(&owner, room).await.is_err());
         Ok(())
     }
 

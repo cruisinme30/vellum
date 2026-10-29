@@ -203,3 +203,69 @@ async fn two_browsers_edit_over_websockets() {
     println!("keystroke to peer over WebSocket: p95 {p95:?}");
     assert!(p95 < Duration::from_millis(50), "p95 {p95:?}");
 }
+
+/// One user whose access a test can change while they are connected.
+struct Switch {
+    user: UserId,
+    state: std::sync::atomic::AtomicU8,
+}
+
+const WRITE: u8 = 0;
+const READ: u8 = 1;
+
+#[async_trait]
+impl Authorizer for Switch {
+    async fn authorize(&self, _request: &Parts, _room: RoomKey) -> Result<(UserId, Access)> {
+        match self.state.load(std::sync::atomic::Ordering::SeqCst) {
+            WRITE => Ok((self.user, Access::Write)),
+            READ => Ok((self.user, Access::Read)),
+            _ => Err(Error::new(ErrorKind::PermissionDenied, "access revoked")),
+        }
+    }
+}
+
+/// RT-028 (#459): access is checked again while a socket is open. Before, a
+/// user who lost access kept reading and editing for as long as the
+/// socket lived.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_revoked_editor_is_disconnected() {
+    let f = fixture(CollabConfig {
+        batch_window: Duration::from_millis(10),
+        recheck_access_every: Duration::from_millis(100),
+        ..CollabConfig::default()
+    });
+    let switch = Arc::new(Switch {
+        user: UserId::generate(),
+        state: std::sync::atomic::AtomicU8::new(WRITE),
+    });
+    let app = axum::Router::new().nest(
+        "/collab",
+        ws::router(f.hub.clone(), Arc::clone(&switch) as Arc<dyn Authorizer>),
+    );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap().to_string();
+    drop(tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    }));
+    let key = room();
+    f.files.put(key, "# Northstar\n");
+    let mut editor = WsEditor::connect(&addr, key, "any").await.unwrap();
+    assert!(editor.read_until(|e| e.markdown() == "# Northstar\n").await);
+
+    // Revoked: the server closes the socket with 4403.
+    switch.state.store(2, std::sync::atomic::Ordering::SeqCst);
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    let mut code = None;
+    loop {
+        let next = tokio::time::timeout_at(deadline, editor.socket.next()).await;
+        match next {
+            Ok(Some(Ok(WsMessage::Close(frame)))) => {
+                code = frame.map(|f| u16::from(f.code));
+                break;
+            }
+            Ok(Some(Ok(_))) => {}
+            _ => break,
+        }
+    }
+    assert_eq!(code, Some(4403));
+}
