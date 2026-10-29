@@ -12,6 +12,7 @@
 
 use std::env;
 use std::ffi::OsString;
+use std::fs;
 use std::io::{self, Write as _};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -136,7 +137,12 @@ pub fn run() -> Result<(), String> {
     let mut results = Vec::new();
     let started = Instant::now();
 
-    for step in steps(base.as_deref(), current_branch(&root).as_deref()) {
+    let container_tests = (!docker_available()).then(|| container_test_binaries(&root));
+    for step in steps(
+        base.as_deref(),
+        current_branch(&root).as_deref(),
+        container_tests.as_deref(),
+    ) {
         let outcome = if areas.includes(step.area) {
             execute(&root, &step)
         } else {
@@ -150,8 +156,8 @@ pub fn run() -> Result<(), String> {
         (Outcome::NotNeeded, Outcome::NotNeeded)
     };
     if areas.rust && !docker_available() {
-        // The missing tool is Docker, which the vellum-db Postgres tests need.
-        results.push(("Postgres tests in vellum-db (Docker)", Outcome::Skipped));
+        // The missing tool is Docker, which the container tests need.
+        results.push(("Container tests (need Docker)", Outcome::Skipped));
     }
     results.push(("Crate boundaries", boundaries));
     results.push(("Help books and their corpus", help));
@@ -210,8 +216,68 @@ fn desktop_steps() -> Vec<Step> {
     .collect()
 }
 
-/// Test binaries that start Postgres in a container through testcontainers.
-const DOCKER_TESTS: &str = "binary_id(vellum-db::postgres) | binary_id(vellum-db::shards)";
+/// The test binaries that start containers: every integration test file
+/// (`crates/<crate>/tests/<name>.rs` or `tests/<name>/main.rs`) that
+/// mentions `testcontainers`. Found by scanning, so a new crate's
+/// container tests are left out without Docker with no list to update.
+fn container_test_binaries(root: &Path) -> Vec<String> {
+    let mut ids = Vec::new();
+    let Ok(crates) = fs::read_dir(root.join("crates")) else {
+        return ids;
+    };
+    for krate in crates.filter_map(Result::ok).map(|entry| entry.path()) {
+        let Some(package) = package_name(&krate) else {
+            continue;
+        };
+        let Ok(tests) = fs::read_dir(krate.join("tests")) else {
+            continue;
+        };
+        for path in tests.filter_map(Result::ok).map(|entry| entry.path()) {
+            let (source, binary) = if path.is_dir() {
+                (path.join("main.rs"), path.file_name())
+            } else if path.extension().is_some_and(|ext| ext == "rs") {
+                (path.clone(), path.file_stem())
+            } else {
+                continue;
+            };
+            let uses_containers =
+                fs::read_to_string(&source).is_ok_and(|text| text.contains("testcontainers"));
+            if let (true, Some(binary)) = (uses_containers, binary) {
+                ids.push(format!("{package}::{}", binary.to_string_lossy()));
+            }
+        }
+    }
+    ids.sort();
+    ids
+}
+
+/// The `[package] name` in a crate's Cargo.toml.
+fn package_name(krate: &Path) -> Option<String> {
+    let manifest = fs::read_to_string(krate.join("Cargo.toml")).ok()?;
+    let mut in_package = false;
+    for line in manifest.lines().map(str::trim) {
+        if line.starts_with('[') {
+            in_package = line == "[package]";
+        } else if let Some(value) = line
+            .strip_prefix("name")
+            .and_then(|rest| rest.trim_start().strip_prefix('='))
+            .filter(|_| in_package)
+        {
+            return Some(value.trim().trim_matches('"').to_owned());
+        }
+    }
+    None
+}
+
+/// A nextest filter matching none of the given test binaries.
+fn without_binaries(ids: &[String]) -> String {
+    let any = ids
+        .iter()
+        .map(|id| format!("binary_id({id})"))
+        .collect::<Vec<_>>()
+        .join(" | ");
+    format!("not ({any})")
+}
 
 /// Whether a Docker daemon looks reachable: `DOCKER_HOST` is set or the
 /// default socket exists. Cloud sandboxes have neither.
@@ -219,9 +285,9 @@ fn docker_available() -> bool {
     env::var_os("DOCKER_HOST").is_some() || Path::new("/var/run/docker.sock").exists()
 }
 
-/// The workspace tests. Without Docker, the container-backed Postgres
-/// tests are left out (and reported as skipped); CI always runs them.
-fn rust_tests(docker: bool) -> Step {
+/// The workspace tests. Without Docker, the container tests are left out
+/// (and reported as skipped); CI always runs them.
+fn rust_tests(container_tests: Option<&[String]>) -> Step {
     let mut step = Step::new(
         "Rust tests",
         "cargo",
@@ -236,15 +302,21 @@ fn rust_tests(docker: bool) -> Step {
     )
     .needs("cargo-nextest")
     .area(Area::Rust);
-    if !docker {
+    if let Some(ids) = container_tests.filter(|ids| !ids.is_empty()) {
         step.args.push("-E".to_owned());
-        step.args.push(format!("not ({DOCKER_TESTS})"));
+        step.args.push(without_binaries(ids));
     }
     step
 }
 
 /// The fast suite, in the order CI runs it.
-fn steps(base: Option<&str>, branch: Option<&str>) -> Vec<Step> {
+/// `skip_container_tests` lists the test binaries to leave out when Docker
+/// is missing.
+fn steps(
+    base: Option<&str>,
+    branch: Option<&str>,
+    skip_container_tests: Option<&[String]>,
+) -> Vec<Step> {
     let mut steps = vec![
         // Rust
         Step::new("Rust format", "cargo", &["fmt", "--all", "--check"]).area(Area::Rust),
@@ -272,7 +344,7 @@ fn steps(base: Option<&str>, branch: Option<&str>) -> Vec<Step> {
         )
         .with_env("RUSTDOCFLAGS", "-D warnings")
         .area(Area::Rust),
-        rust_tests(docker_available()),
+        rust_tests(skip_container_tests),
         Step::new(
             "Licences, bans, sources and advisories",
             "cargo",
@@ -367,6 +439,20 @@ fn steps(base: Option<&str>, branch: Option<&str>) -> Vec<Step> {
     steps
 }
 
+/// Smaller local builds, so a workspace test build fits a cloud sandbox's
+/// disk: no debug info and no incremental cache. A variable the
+/// contributor already set wins.
+const LOCAL_BUILD_ENV: [(&str, &str); 2] =
+    [("CARGO_PROFILE_DEV_DEBUG", "0"), ("CARGO_INCREMENTAL", "0")];
+
+/// The `LOCAL_BUILD_ENV` entries the environment does not already set.
+fn local_build_env(is_set: impl Fn(&str) -> bool) -> Vec<(&'static str, &'static str)> {
+    LOCAL_BUILD_ENV
+        .into_iter()
+        .filter(|(key, _)| !is_set(key))
+        .collect()
+}
+
 fn execute(root: &Path, step: &Step) -> Outcome {
     if !on_path(step.tool) && !root.join(step.program).is_file() {
         return Outcome::Skipped;
@@ -377,7 +463,13 @@ fn execute(root: &Path, step: &Step) -> Outcome {
     } else {
         OsString::from(step.program)
     };
+    let build_env = if step.program == "cargo" {
+        local_build_env(|key| env::var_os(key).is_some())
+    } else {
+        Vec::new()
+    };
     let status = Command::new(program)
+        .envs(build_env)
         .args(&step.args)
         .current_dir(root.join(step.dir))
         .envs(step.env.iter().copied())
@@ -511,7 +603,7 @@ mod tests {
 
     #[test]
     fn mirrors_every_fast_suite_job() {
-        let steps = steps(Some("abc123"), Some("feat/thing"));
+        let steps = steps(Some("abc123"), Some("feat/thing"), None);
         let names = names(&steps);
         for expected in [
             "Rust format",
@@ -529,7 +621,7 @@ mod tests {
 
     #[test]
     fn commit_checks_need_a_base() {
-        let names = names(&steps(None, None));
+        let names = names(&steps(None, None, None));
         assert!(!names.contains(&"Commit template and DCO sign-off"));
         assert!(!names.contains(&"Secrets"));
         assert!(!names.contains(&"Branch name"));
@@ -538,13 +630,13 @@ mod tests {
     #[test]
     fn long_lived_branches_skip_the_name_check() {
         for branch in ["develop", "main"] {
-            assert!(!names(&steps(Some("abc"), Some(branch))).contains(&"Branch name"));
+            assert!(!names(&steps(Some("abc"), Some(branch), None)).contains(&"Branch name"));
         }
     }
 
     #[test]
     fn commit_check_spans_base_to_head() {
-        let steps = steps(Some("abc123"), None);
+        let steps = steps(Some("abc123"), None, None);
         let commits = steps
             .iter()
             .find(|step| step.name == "Commit template and DCO sign-off")
@@ -567,7 +659,7 @@ mod tests {
 
     #[test]
     fn rust_and_web_steps_are_tagged() {
-        let steps = steps(Some("abc"), None);
+        let steps = steps(Some("abc"), None, None);
         let area = |name: &str| steps.iter().find(|step| step.name == name).map(|s| s.area);
         assert_eq!(area("Clippy"), Some(Area::Rust));
         assert_eq!(area("Rust tests"), Some(Area::Rust));
@@ -591,12 +683,40 @@ mod tests {
 
     #[test]
     fn rust_tests_leave_out_container_tests_only_without_docker() {
-        let with = rust_tests(true);
+        let with = rust_tests(None);
         assert!(!with.args.iter().any(|arg| arg == "-E"));
-        let without = rust_tests(false);
+        let ids = [
+            "vellum-db::postgres".to_owned(),
+            "vellum-search::meilisearch".to_owned(),
+        ];
+        let without = rust_tests(Some(&ids));
         assert_eq!(
             without.args[without.args.len() - 2..],
-            ["-E".to_owned(), format!("not ({DOCKER_TESTS})")]
+            [
+                "-E".to_owned(),
+                "not (binary_id(vellum-db::postgres) | binary_id(vellum-search::meilisearch))"
+                    .to_owned()
+            ]
         );
+        // Nothing to leave out: no filter at all.
+        assert!(!rust_tests(Some(&[])).args.iter().any(|arg| arg == "-E"));
+    }
+
+    #[test]
+    fn local_builds_drop_debug_info_unless_already_set() {
+        assert_eq!(local_build_env(|_| false), LOCAL_BUILD_ENV.to_vec());
+        assert_eq!(
+            local_build_env(|key| key == "CARGO_INCREMENTAL"),
+            [("CARGO_PROFILE_DEV_DEBUG", "0")]
+        );
+    }
+
+    #[test]
+    fn finds_the_container_tests_in_the_workspace() {
+        let root = repo_root().expect("inside the repository");
+        let ids = container_test_binaries(&root);
+        assert!(ids.contains(&"vellum-db::postgres".to_owned()), "{ids:?}");
+        assert!(ids.iter().all(|id| id.starts_with("vellum-")), "{ids:?}");
+        assert!(!ids.iter().any(|id| id.starts_with("xtask")), "{ids:?}");
     }
 }

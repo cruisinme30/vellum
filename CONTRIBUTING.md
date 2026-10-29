@@ -82,10 +82,23 @@ cargo xtask fast
 ```
 
 A check whose tool is not installed is skipped and named in the summary;
-CI still runs it. Install `markdownlint-cli2`, `vale`, `lychee`,
-`gitleaks`, `reuse`, `yamllint` and `shellcheck` to run every check. In
-an emergency, `git push --no-verify` skips the hook, but CI still gates
-the merge.
+CI still runs it. The same goes for tests that need Docker: without a
+Docker daemon, `cargo xtask fast` leaves out the container tests and says
+so, and CI runs them. Local builds skip debug info and incremental
+caches (`CARGO_PROFILE_DEV_DEBUG=0`, `CARGO_INCREMENTAL=0`) so a workspace
+test build fits a small disk; set either variable yourself to override.
+Install `markdownlint-cli2`, `vale`, `lychee`, `gitleaks`, `reuse`,
+`yamllint` and `shellcheck` to run every check. In an emergency,
+`git push --no-verify` skips the hook, but CI still gates the merge.
+
+### Tests that need containers
+
+A test that starts a container (Postgres, Meilisearch and so on) through
+testcontainers goes in its own integration test file,
+`crates/<crate>/tests/<name>.rs` (or `tests/<name>/main.rs`). Keep tests
+that need no container out of that file. `cargo xtask fast` finds these
+files by their `testcontainers` import, so a new crate needs no list or
+naming change.
 
 ## Issues and decision records
 
