@@ -84,7 +84,7 @@ an AI client. A new edge crate, `vellum-private`, does that, and the
   leaks access patterns and term frequencies, and no scheme we found
   supports ranked hybrid search.
 - **Persist the index on disk, sealed with the device key**: faster
-  start, but a second copy of the plaintext's structure on disk. Opening
+  start, but a second copy of the page structure on disk. Opening
   a space of a few thousand pages takes seconds, so we keep RAM only.
 - **Let the model write drafts**: needs the device to seal each change to
   every other member's current key, which depends on enrolment. Deferred.
