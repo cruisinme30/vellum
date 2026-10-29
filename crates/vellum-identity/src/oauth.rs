@@ -33,7 +33,7 @@ use vellum_kernel::{Error, ErrorKind, Timestamp, UserId};
 
 use crate::identity::{Identity, after, user_scopes};
 use crate::secret::{self, Kind};
-use crate::store::{AccessToken, Grant, hash_key};
+use crate::store::{AccessToken, Grant, PendingCode, PendingConsent, hash_key};
 
 /// The built-in desktop client.
 pub const DESKTOP_CLIENT_ID: &str = "vellum-desktop";
@@ -68,7 +68,7 @@ impl ClientMetadataFetcher for NoMetadataFetch {
 }
 
 /// A client the server knows how to redirect to.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Client {
     /// The client ID.
     pub client_id: String,
@@ -154,35 +154,11 @@ struct ClientDocument {
     token_endpoint_auth_method: Option<String>,
 }
 
-#[derive(Debug, Clone)]
-struct PendingConsent {
-    user: UserId,
-    client: Client,
-    redirect_uri: String,
-    state: Option<String>,
-    scopes: Vec<Scope>,
-    audience: Vec<String>,
-    challenge: String,
-    expires: Instant,
-}
-
-#[derive(Debug, Clone)]
-struct PendingCode {
-    user: UserId,
-    client: Client,
-    redirect_uri: String,
-    scopes: Vec<Scope>,
-    audience: Vec<String>,
-    challenge: String,
-    expires: Instant,
-}
-
-/// The server's in-memory tables: consents, codes and the client cache.
-/// They are short-lived, so a restart only makes users click again.
+/// The server's in-memory client cache. Pending consents and codes live in
+/// the store ([`crate::store::State`]), so a code issued by one replica can
+/// be redeemed at another.
 #[derive(Debug, Default)]
 pub(crate) struct OAuthState {
-    consents: Mutex<HashMap<String, PendingConsent>>,
-    codes: Mutex<HashMap<String, PendingCode>>,
     clients: Mutex<HashMap<String, (Client, Instant)>>,
 }
 
@@ -520,27 +496,44 @@ impl Identity {
             redirect_host,
             scopes: scopes.clone(),
         };
-        let mut consents = lock(&self.oauth.consents);
-        let now = Instant::now();
-        consents.retain(|_, c| c.expires > now);
-        if consents.len() >= MAX_PENDING {
-            return Authorize::Fail("Too many sign-ins are pending; try again soon.".to_owned());
+        let now = Timestamp::now();
+        let pending = PendingConsent {
+            user,
+            client,
+            redirect_uri,
+            state: request.state.clone(),
+            scopes,
+            audience,
+            challenge,
+            expires: after(now, CONSENT_LIFETIME),
+        };
+        match self.hold_consent(&consent_id, pending, now) {
+            Ok(true) => Authorize::Consent(view),
+            Ok(false) => {
+                Authorize::Fail("Too many sign-ins are pending; try again soon.".to_owned())
+            }
+            Err(e) => Authorize::Fail(e.message().to_owned()),
         }
-        let _previous = consents.insert(
-            hash_key(&secret::hash(&consent_id)),
-            PendingConsent {
-                user,
-                client,
-                redirect_uri,
-                state: request.state.clone(),
-                scopes,
-                audience,
-                challenge,
-                expires: now + CONSENT_LIFETIME,
-            },
-        );
-        drop(consents);
-        Authorize::Consent(view)
+    }
+
+    /// Keeps a consent screen until answered; `false` when too many are
+    /// pending.
+    fn hold_consent(
+        &self,
+        consent_id: &str,
+        pending: PendingConsent,
+        now: Timestamp,
+    ) -> Result<bool, Error> {
+        self.store().write(|s| {
+            s.oauth_consents.retain(|_, c| c.expires > now);
+            if s.oauth_consents.len() >= MAX_PENDING {
+                return false;
+            }
+            let _previous = s
+                .oauth_consents
+                .insert(hash_key(&secret::hash(consent_id)), pending);
+            true
+        })
     }
 
     /// Answers a consent screen. Returns the URL to send the browser to.
@@ -551,9 +544,10 @@ impl Identity {
     /// consent.
     pub fn decide(&self, user: UserId, consent_id: &str, approve: bool) -> Result<String, Error> {
         let key = hash_key(&secret::hash(consent_id));
-        let consent = lock(&self.oauth.consents)
-            .remove(&key)
-            .filter(|c| c.user == user && c.expires > Instant::now())
+        let consent = self
+            .store()
+            .write(|s| s.oauth_consents.remove(&key))?
+            .filter(|c| c.user == user && c.expires > Timestamp::now())
             .ok_or_else(|| {
                 Error::new(ErrorKind::NotFound, "this request has expired; start again")
             })?;
@@ -568,28 +562,32 @@ impl Identity {
             return Ok(with_params(&consent.redirect_uri, &params));
         }
         let code = secret::generate(Kind::AuthCode)?;
-        let mut codes = lock(&self.oauth.codes);
-        let now = Instant::now();
-        codes.retain(|_, c| c.expires > now);
-        if codes.len() >= MAX_PENDING {
+        let now = Timestamp::now();
+        let pending = PendingCode {
+            user,
+            client: consent.client,
+            redirect_uri: consent.redirect_uri.clone(),
+            scopes: consent.scopes,
+            audience: consent.audience,
+            challenge: consent.challenge,
+            expires: after(now, self.config().code_lifetime),
+        };
+        let stored = self.store().write(|s| {
+            s.oauth_codes.retain(|_, c| c.expires > now);
+            if s.oauth_codes.len() >= MAX_PENDING {
+                return false;
+            }
+            let _ = s
+                .oauth_codes
+                .insert(hash_key(&secret::hash(&code)), pending);
+            true
+        })?;
+        if !stored {
             return Err(Error::new(
                 ErrorKind::Unavailable,
                 "too many pending sign-ins",
             ));
         }
-        let _ = codes.insert(
-            hash_key(&secret::hash(&code)),
-            PendingCode {
-                user,
-                client: consent.client,
-                redirect_uri: consent.redirect_uri.clone(),
-                scopes: consent.scopes,
-                audience: consent.audience,
-                challenge: consent.challenge,
-                expires: now + self.config().code_lifetime,
-            },
-        );
-        drop(codes);
         tracing::info!(event = "identity.oauth_consented", user = %user, "OAuth access approved");
         params.push(("code", &code));
         Ok(with_params(&consent.redirect_uri, &params))
@@ -617,9 +615,12 @@ impl Identity {
             .code
             .as_deref()
             .ok_or_else(|| OAuthError::new("invalid_request", "code is required"))?;
-        let pending = lock(&self.oauth.codes)
-            .remove(&hash_key(&secret::hash(code)))
-            .filter(|c| c.expires > Instant::now())
+        let key = hash_key(&secret::hash(code));
+        let pending = self
+            .store()
+            .write(|s| s.oauth_codes.remove(&key))
+            .map_err(|e| OAuthError::internal(&e))?
+            .filter(|c| c.expires > Timestamp::now())
             .ok_or_else(|| invalid("the code is invalid, used or expired"))?;
         if request.client_id.as_deref() != Some(pending.client.client_id.as_str()) {
             return Err(invalid("the code was issued to another client"));

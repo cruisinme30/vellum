@@ -9,7 +9,7 @@ use sqlx::Connection as _;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteConnection};
 use vellum_db::{Backend, Error, Index, IndexConfig, IndexKey};
 
-const TABLES: [&str; 23] = [
+const TABLES: [&str; 25] = [
     "cluster_changes",
     "cluster_feed",
     "cluster_leases",
@@ -25,6 +25,8 @@ const TABLES: [&str; 23] = [
     "effective_access",
     "folders",
     "grants",
+    "identity_meta",
+    "identity_records",
     "index_meta",
     "page_ancestors",
     "space_shards",
