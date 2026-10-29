@@ -15,7 +15,6 @@ on:
 permissions:
   contents: read
 
-
 jobs:
   chaos:
     name: Chaos under load

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 # OpenSSF Scorecard (ADR 0032, D128): scores the repository's supply-chain
-# practices weekly and on every push to develop, publishes the result to
+# practices weekly, publishes the result to
 # the OpenSSF API for the README badge, and uploads findings to code
 # scanning (Security -> Code scanning, tool "Scorecard").
 name: Scorecard
@@ -16,7 +16,6 @@ on:
   workflow_dispatch:
 
 permissions: {}
-
 
 jobs:
   analysis:

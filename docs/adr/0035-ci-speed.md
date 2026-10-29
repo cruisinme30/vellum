@@ -55,8 +55,9 @@ jobs also queued for runners.
 ### `D140`: CodeQL gates main, not develop
 
 - The develop ruleset drops its `code_scanning` rule; main keeps it.
-- CodeQL still scans every pull request and push and reports alerts, and a
-  high or critical alert blocks the release into main.
+- CodeQL scans release pull requests, pushes to main and develop weekly
+  (`.github/workflows/codeql.yml`), and a high or critical alert blocks
+  the release into main.
 - Merges into develop wait only for the Fast suite and Labels.
 
 ## Alternatives
