@@ -24,6 +24,7 @@
 pub mod comment;
 pub mod cycle;
 pub mod doclink;
+pub mod embed;
 pub mod error;
 pub mod event;
 pub mod filter;

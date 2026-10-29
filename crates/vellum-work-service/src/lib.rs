@@ -23,6 +23,7 @@ use vellum_contracts::{Operation, Service};
 
 pub use ports::{Clock, Directory, EventLog, EventSink, FixedClock, StaticDirectory, SystemClock};
 pub use service::embed::Outcome;
+pub use service::embeds::{EmbedGroup, EmbedIssue, EmbedResult, EmbedView};
 pub use service::{DEFAULT_LIST, LoadReport, MAX_LIST, WorkService};
 
 impl Service for WorkService {

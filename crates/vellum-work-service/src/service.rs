@@ -45,6 +45,7 @@ use crate::ports::{Clock, Directory, EventSink};
 use crate::routes;
 
 pub mod embed;
+pub mod embeds;
 pub mod insights;
 pub mod triage;
 

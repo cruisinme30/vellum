@@ -13,7 +13,7 @@ vellum: 1
 - Status: accepted
 - Decisions: D129, D130, D131
 - Requirements: R-WK-2, R-WK-7, R-MW-7
-- Issue: #134, #140
+- Issue: #134, #140, #409
 - Pull requests: #257
 
 :::
@@ -92,3 +92,7 @@ source. `vellum-work` adds a `comment` module and a `doclink` module.
   the comment events.
 - Render and the editor show `::: issues` blocks and chips; the service
   enforces permissions on what an embed shows.
+- Render cannot call Work, so Work reads a page's raw `::: issues`
+  bodies itself and the server hands render one result per block,
+  matched by block ID or, failing that, position. The two scanners must
+  agree on container and code-fence rules.
