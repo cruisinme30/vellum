@@ -62,7 +62,11 @@ full suite.
   CI cannot verify a signature against GitHub's key registry. The rule
   stays off until every contributor, automated ones included, can sign.
 - Pull requests need no approval while there is a single maintainer, who
-  cannot approve pull requests opened under their own account.
+  cannot approve pull requests opened under their own account. Pull
+  requests merge automatically once their gate is green.
+- One pull request per feature. This supersedes the brief's "PRs under 400
+  lines" rule: there is no size gate, and commits inside a pull request
+  stay small and logical instead.
 
 ## Gate inventory
 
@@ -79,7 +83,7 @@ full suite.
 | Files and docs | fast | REUSE, yamllint, shellcheck, markdownlint, Vale, lychee |
 | Secrets | fast | gitleaks |
 | Infrastructure | fast | sqlfluff, hadolint, helm lint, kube-score (when files exist) |
-| Commits | fast | Conventional Commits, DCO, PR size |
+| Commits and descriptions | fast | Conventional Commits, DCO, branch names, description template |
 
 ## Observability baseline
 
