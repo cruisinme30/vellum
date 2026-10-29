@@ -11,6 +11,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "kanban\n  todo[To do]\n    t1[Write the migration guide]\n  doing[Doing]\n    t2[Replay engine]@{ assigned: \"Dev\", priority: \"High\" }\n  done[Done]\n    t3[Diff report]\n"
       }
     ]

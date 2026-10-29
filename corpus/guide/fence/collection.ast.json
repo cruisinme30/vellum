@@ -11,6 +11,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "id: 01JB4Q8ZK2W6T9R3M5N7P1X0YC\nview: By status\nfilter: Status != Done\nsort: Target asc\n"
       }
     ]

@@ -11,6 +11,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "title: Requests served (millions)\ntype: area\nlabels: [Jul, Aug, Sep, Oct]\nvalues: [3.1, 3.4, 4.0, 4.6]\nymin: 0\n"
       }
     ]
