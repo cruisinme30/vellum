@@ -11,6 +11,9 @@
 //! rebuilds the index from the data folder.
 
 mod docs;
+mod identity;
+#[cfg(test)]
+mod identity_tests;
 mod mcp;
 mod reindex;
 mod serve;
@@ -44,12 +47,44 @@ enum Command {
         #[arg(long)]
         config: Option<std::path::PathBuf>,
     },
+    /// Administration that needs access to the server's files.
+    #[command(subcommand)]
+    Admin(AdminCommand),
     /// Prints the OpenAPI 3.1 document of every service.
     Openapi,
     /// Prints the `GraphQL` schema of every service.
     GraphqlSchema,
     /// Rebuild the index from the files in the data folder.
     Reindex(reindex::Args),
+}
+
+/// Administration subcommands.
+#[derive(Debug, Subcommand)]
+enum AdminCommand {
+    /// Issues a one-time code for a 15-minute administrator session, for
+    /// when no administrator can sign in (SSO down, accounts lost).
+    /// Redeem it in the browser with `POST /auth/break-glass`.
+    BreakGlass {
+        /// The configuration file, to find the data directory.
+        #[arg(long)]
+        config: Option<std::path::PathBuf>,
+    },
+}
+
+fn break_glass(config: Option<&std::path::Path>) -> ExitCode {
+    let config = match vellum_kernel::Config::load(config) {
+        Ok(c) => c,
+        Err(error) => return fail(&error),
+    };
+    let lifetime = std::time::Duration::from_mins(15);
+    match vellum_identity::Identity::issue_break_glass(&config.data_dir, lifetime) {
+        Ok(code) => print(&format!(
+            "Break-glass code (valid once, for 15 minutes):\n{code}\n\n\
+             Redeem it on the sign-in page, or with\n\
+             curl -X POST -H 'content-type: application/json' -d '{{\"code\":\"<code>\"}}' <url>/auth/break-glass"
+        )),
+        Err(error) => fail(&error),
+    }
 }
 
 fn fail(message: &dyn std::fmt::Display) -> ExitCode {
@@ -106,6 +141,7 @@ fn main() -> ExitCode {
             let _entered = span.enter();
             mcp::run(&args)
         }
+        Command::Admin(AdminCommand::BreakGlass { config }) => break_glass(config.as_deref()),
         Command::Reindex(args) => {
             let telemetry_config = TelemetryConfig::from_env("vellum", env!("CARGO_PKG_VERSION"));
             let _guard = match telemetry::init(&telemetry_config) {
