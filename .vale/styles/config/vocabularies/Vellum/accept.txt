@@ -122,3 +122,4 @@ Patroni
 Pandoc
 [Kk]anban
 [Cc]ollab
+[Rr]ecents

@@ -78,7 +78,10 @@ full suite.
   that links the issue, or names the existing record it follows.
 - Decision records follow `docs/adr/0000-template.md`: Context,
   Decisions, Alternatives and Consequences, at most 150 lines.
-- The fast suite checks all three, so the rule needs no extra required
+- Pull request descriptions explain themselves: Why, What changed and
+  How to verify, with every decision or record named in plain words and
+  linked, never as a bare ID.
+- The fast suite checks all four, so the rule needs no extra required
   check.
 
 ## Alternatives

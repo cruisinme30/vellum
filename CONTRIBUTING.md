@@ -122,9 +122,14 @@ CI enforces every rule in this section on each pull request.
 - **Pull request title**: a Conventional Commits subject, because it
   becomes the squash commit on `develop`.
 - **Pull request description**: the template in
-  `.github/pull_request_template.md`. Summary, Requirements, Changes,
-  Tests, Observability and Security must each be filled in; write "None"
-  with a reason when one does not apply.
+  `.github/pull_request_template.md`, written so a reader with no project
+  context can follow it. **Why** (the problem and who it affects, in
+  plain words), **What changed**, **How to verify**, and **Security and
+  operations** must each be filled in; write "None" with a reason when
+  one does not apply. Never name a decision or record bare: "D67" or
+  "ADR 0013" goes with a few words saying what it decided and a link,
+  for example "chapters use lowercase file names
+  ([D67 in ADR 0013](docs/adr/0013-books.md))". CI checks both.
 - **Developer Certificate of Origin**: sign off every commit with
   `git commit -s`. The sign-off must match the commit author.
 - **Signed commits** (planned): sign with GPG, SSH or S/MIME so GitHub
