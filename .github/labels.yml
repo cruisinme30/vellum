@@ -107,9 +107,9 @@
 - name: area/cli
   color: "5319e7"
   description: "vellum-cli: the vellum binary"
-- name: area/desktop
+- name: area/sync
   color: "5319e7"
-  description: "The Electron desktop app"
+  description: "vellum-sync: push/pull sync for the local-first clients"
 - name: area/editor
   color: "5319e7"
   description: "The web editor"

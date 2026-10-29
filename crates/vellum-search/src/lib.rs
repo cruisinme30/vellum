@@ -23,6 +23,7 @@
 
 pub mod access;
 pub mod api;
+mod authz;
 pub mod backend;
 #[doc(hidden)]
 pub mod conformance;
@@ -34,13 +35,14 @@ pub mod model;
 pub mod onnx;
 pub mod postgres_index;
 pub mod service;
+mod stars;
 pub mod tantivy_index;
 pub mod telemetry;
 pub mod text;
 pub mod vector;
 
 pub use access::{Principal, ReadAccess, Stars};
-pub use api::SearchApi;
+pub use api::{SearchApi, TitlesPage};
 pub use backend::{Change, IndexEntry, Scope, SearchBackend};
 pub use error::{Result, SearchError};
 pub use indexer::{DocumentSource, Indexer, IndexerConfig, rebuild};

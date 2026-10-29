@@ -1,0 +1,2 @@
+[Subheading] Why the audit log is written first
+[Normal] So a blocked request still leaves a trace.

@@ -1,0 +1,10 @@
+flowchart LR
+  A[Request] --> B{Allowed?}
+  B -->|yes| C[Serve]
+  B -->|no| D[Block]
+gateway -> engine: evaluate
+@startuml
+Alice -> Bob: hello
+@enduml
+1 / 1
+

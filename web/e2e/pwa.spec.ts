@@ -10,7 +10,7 @@ test("the installed shell starts offline", async ({ page, context }) => {
   });
   await context.setOffline(true);
   await page.goto("/docs/anything");
-  await expect(page.getByRole("heading", { level: 1, name: "Vellum" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Main" })).toBeVisible();
   await context.setOffline(false);
 });
 

@@ -1,0 +1,4 @@
+[Title] Replay 7 days in under 10 minutes
+[Normal] The replay engine reads seven days of traffic from the audit log.
+[ListParagraph/0] ☐ Stream from the audit log
+[ListParagraph/0] ☐ Parallelise by tenant

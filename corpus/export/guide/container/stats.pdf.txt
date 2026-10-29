@@ -1,0 +1,5 @@
+94% 38 ms 12
+Injections caught p95 latency Open incidents
+▲ 6 pts ▼ 12 ms ▬ 0
+1 / 1
+
