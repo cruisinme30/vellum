@@ -114,8 +114,9 @@ pub fn take_block_id(content: &mut Vec<Inline>) -> Option<BlockId> {
     let start = text.rfind('^')?;
     let id: BlockId = text.get(start + 1..)?.parse().ok()?;
     let before = text.get(..start)?;
-    let own_line =
-        before.is_empty() && matches!(content.iter().rev().nth(1), Some(Inline::SoftBreak));
+    // On its own line, or the whole paragraph (as in `- [ ] ^blk-…`).
+    let own_line = before.is_empty()
+        && (content.len() == 1 || matches!(content.iter().rev().nth(1), Some(Inline::SoftBreak)));
     if !own_line && !before.ends_with(char::is_whitespace) {
         return None;
     }
