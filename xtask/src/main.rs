@@ -18,28 +18,40 @@
 //!   views of the block model from `schema/blocks.json`.
 //! - `cargo xtask help` checks the help books in `docs/`, and
 //!   `cargo xtask help write` regenerates the files derived from them.
+//! - `cargo xtask budgets` checks the binary's size, cold start, idle
+//!   memory and shutdown against the brief's targets.
+//! - `cargo xtask perf-gate` fails the nightly run when a k6 p95 regresses
+//!   by 10 % or more against `deploy/perf/baseline.json`.
 
 use std::process::{Command, ExitCode};
 
 mod boundaries;
+mod budgets;
 mod fast;
 mod help;
+mod perf_gate;
 mod relock;
 mod schema;
 
-const USAGE: &str = "usage: cargo xtask <fast | install-hooks | relock | boundaries | help [check|write] | schema [--check]>";
+const USAGE: &str = "usage: cargo xtask <fast | install-hooks | relock | boundaries | \
+                     help [check|write] | budgets | perf-gate | \
+                     schema [--check]>";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let result = match args.split_first() {
-        Some((command, [])) if command == "fast" => fast::run(),
-        Some((command, [])) if command == "install-hooks" => install_hooks(),
-        Some((command, [])) if command == "relock" => relock::run(),
-        Some((command, [])) if command == "boundaries" => boundaries::run(),
-        Some((command, rest)) if command == "help" && rest.len() <= 1 => {
-            help::run(rest.first().map(String::as_str))
-        }
-        Some((command, rest)) if command == "schema" => schema::run(rest),
+    let (command, rest) = args
+        .split_first()
+        .map_or((None, &[][..]), |(c, r)| (Some(c.as_str()), r));
+    let mode = rest.first().map(String::as_str);
+    let result = match command {
+        Some("fast") => fast::run(),
+        Some("install-hooks") => install_hooks(),
+        Some("relock") => relock::run(),
+        Some("boundaries") => boundaries::run(),
+        Some("help") => help::run(mode),
+        Some("budgets") => budgets::run(rest),
+        Some("perf-gate") => perf_gate::run(rest),
+        Some("schema") => schema::run(rest),
         _ => Err(USAGE.to_owned()),
     };
     match result {

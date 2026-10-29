@@ -13,8 +13,8 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use serde_json::json;
 use vellum_collections::service::{
-    Access, ChartInput, CollectionsService, CreateRowInput, Need, QueryInput, RowKey,
-    SaveViewInput, UpdateRowInput, ViewKey,
+    Access, ChartInput, CollectionsService, CreateFromCsvInput, CreateRowInput, ExportCsvInput,
+    ImportCsvInput, Need, QueryInput, RowKey, SaveViewInput, UpdateRowInput, ViewKey,
 };
 use vellum_collections::{DateValue, Value, ViewKind};
 use vellum_contracts::{
@@ -36,10 +36,17 @@ const SECRET_DIR: &str = "drives/shared/Board/Salaries.collection";
 
 /// Grants by (user, collection).
 #[derive(Default)]
-struct Grants(Mutex<BTreeMap<(UserId, CollectionId), Need>>);
+struct Grants(
+    Mutex<BTreeMap<(UserId, CollectionId), Need>>,
+    Mutex<BTreeSet<(UserId, String)>>,
+);
 
 #[cfg(test)]
 impl Grants {
+    fn grant_folder(&self, user: UserId, folder: &str) {
+        let _ = self.1.lock().unwrap().insert((user, folder.to_owned()));
+    }
+
     fn grant(&self, user: UserId, collection: &str, need: Need) {
         let _ = self
             .0
@@ -71,6 +78,23 @@ impl Access for Grants {
             (held, need),
             (Some(Need::Edit), _) | (Some(Need::Read), Need::Read)
         ))
+    }
+
+    async fn allowed_in(
+        &self,
+        principal: &Principal,
+        folder: &BlobPath,
+        need: Need,
+    ) -> Result<bool, Error> {
+        let Some(user) = principal.user_id() else {
+            return Ok(false);
+        };
+        Ok(need == Need::Edit
+            && self
+                .1
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .contains(&(user, folder.as_str().to_owned())))
     }
 }
 
@@ -631,7 +655,10 @@ async fn operations_are_valid_and_callable() {
             "collections.save_view",
             "collections.delete_view",
             "collections.embed",
-            "collections.chart"
+            "collections.chart",
+            "collections.export_csv",
+            "collections.import_csv",
+            "collections.create_from_csv"
         ]
     );
     for op in &ops {
@@ -920,4 +947,185 @@ async fn a_schema_changed_on_disk_is_not_overwritten() {
     assert_eq!(read(&f.root, &schema_path), edited);
     let info = f.service.save_view(&c, board("Board")).await.unwrap();
     assert_eq!(info.title, "Reqs");
+}
+
+#[tokio::test]
+async fn exports_views_as_csv() {
+    let f = fixture().await;
+    let ana = UserId::generate();
+    f.grants.grant(ana, REQS, Need::Read);
+    f.grants.grant(ana, RELS, Need::Read);
+    let c = ctx(ana);
+    let reqs: CollectionId = REQS.parse().unwrap();
+    let all = f
+        .service
+        .export_csv(
+            &c,
+            ExportCsvInput {
+                collection_id: reqs,
+                view: None,
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(all.file_name, "Requirements.csv");
+    let mut lines = all.csv.lines();
+    assert_eq!(
+        lines.next(),
+        Some("Requirement,Estimate,Done,Release,Remaining")
+    );
+    assert_eq!(lines.next(), Some("Replay 7 days,8,Yes,v1.0,0"));
+    assert_eq!(lines.next(), Some("Webhooks,5,No,,5"));
+
+    let open = f
+        .service
+        .export_csv(
+            &c,
+            ExportCsvInput {
+                collection_id: reqs,
+                view: Some("Open".into()),
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(open.file_name, "Requirements - Open.csv");
+    assert_eq!(open.csv.lines().count(), 2);
+
+    let missing = f
+        .service
+        .export_csv(
+            &c,
+            ExportCsvInput {
+                collection_id: reqs,
+                view: Some("Nope".into()),
+            },
+        )
+        .await;
+    assert_eq!(kind(missing), ErrorKind::NotFound);
+    let hidden = f
+        .service
+        .export_csv(
+            &ctx(UserId::generate()),
+            ExportCsvInput {
+                collection_id: reqs,
+                view: None,
+            },
+        )
+        .await;
+    assert_eq!(kind(hidden), ErrorKind::NotFound);
+}
+
+#[tokio::test]
+async fn imports_csv_rows_into_a_collection() {
+    let f = fixture().await;
+    let ana = UserId::generate();
+    f.grants.grant(ana, REQS, Need::Edit);
+    f.grants.grant(ana, RELS, Need::Edit);
+    let c = ctx(ana);
+    let reqs: CollectionId = REQS.parse().unwrap();
+    let text = "Requirement,Estimate,Release,Colour\nSSO,13,v1.0,red\nAudit log,abc,,blue\n";
+    let input = |dry_run| ImportCsvInput {
+        collection_id: reqs,
+        csv: text.into(),
+        dry_run,
+    };
+
+    let preview = f.service.import_csv(&c, input(true)).await.unwrap();
+    assert!(!preview.written);
+    assert_eq!(preview.rows, 2);
+    assert_eq!(preview.skipped_columns, ["Colour"]);
+    assert!(!preview.diagnostics.is_empty(), "abc is not a number");
+    assert!(preview.changed.written.is_empty());
+    assert!(!f.root.join(format!("{REQS_DIR}/rows/sso.md")).exists());
+
+    let done = f.service.import_csv(&c, input(false)).await.unwrap();
+    assert!(done.written);
+    // Two new rows, plus the release that gained a link.
+    assert_eq!(done.changed.written.len(), 3);
+    let sso = read(&f.root, &format!("{REQS_DIR}/rows/sso.md"));
+    assert!(sso.contains("est: 13"), "{sso}");
+    let release = read(&f.root, &format!("{RELS_DIR}/rows/v1-0.md"));
+    let sso_id = sso.lines().find_map(|l| l.strip_prefix("id: ")).unwrap();
+    assert!(release.contains(sso_id), "{release}");
+    assert_eq!(f.service.list(&c).await.unwrap().collections[1].rows, 4);
+
+    let bo = UserId::generate();
+    f.grants.grant(bo, REQS, Need::Read);
+    f.grants.grant(bo, RELS, Need::Read);
+    assert_eq!(
+        kind(f.service.import_csv(&ctx(bo), input(false)).await),
+        ErrorKind::PermissionDenied
+    );
+    let huge = ImportCsvInput {
+        collection_id: reqs,
+        csv: "a".repeat(vellum_collections::service::MAX_CSV_BYTES + 1),
+        dry_run: true,
+    };
+    assert_eq!(
+        kind(f.service.import_csv(&c, huge).await),
+        ErrorKind::InvalidInput
+    );
+}
+
+#[tokio::test]
+async fn creates_a_collection_from_csv() {
+    let f = fixture().await;
+    let ana = UserId::generate();
+    let c = ctx(ana);
+    let folder = "drives/shared/Northstar";
+    let input = |dry_run| {
+        CreateFromCsvInput {
+        folder: folder.into(),
+        title: "Vendors".into(),
+        csv: "Name,Annual cost,Renewal,Active\nAcme,1200,2026-12-01,true\nGlobex,800,2027-03-15,false\n"
+            .into(),
+        dry_run,
+    }
+    };
+    assert_eq!(
+        kind(f.service.create_from_csv(&c, input(false)).await),
+        ErrorKind::PermissionDenied
+    );
+    f.grants.grant_folder(ana, folder);
+
+    let preview = f.service.create_from_csv(&c, input(true)).await.unwrap();
+    assert!(!preview.written);
+    let types: Vec<&str> = preview
+        .collection
+        .properties
+        .iter()
+        .map(|p| p.kind.as_str())
+        .collect();
+    assert_eq!(types, ["title", "number", "date", "checkbox"]);
+    let dir = format!("{folder}/Vendors.collection");
+    assert_eq!(preview.collection.path, dir);
+    assert!(!f.root.join(&dir).exists());
+
+    let made = f.service.create_from_csv(&c, input(false)).await.unwrap();
+    assert!(made.written);
+    assert_eq!(made.rows, 2);
+    assert!(read(&f.root, &format!("{dir}/schema.yaml")).contains("title: Vendors"));
+    assert!(read(&f.root, &format!("{dir}/rows/acme.md")).contains("Acme"));
+    let id = made.collection.id;
+    f.grants.grant(ana, &id.to_string(), Need::Edit);
+    let info = f.service.get(&c, id).await.unwrap();
+    assert_eq!(info.title, "Vendors");
+
+    assert_eq!(
+        kind(f.service.create_from_csv(&c, input(false)).await),
+        ErrorKind::Conflict
+    );
+    let mut system = input(false);
+    system.folder = ".vellum".into();
+    f.grants.grant_folder(ana, ".vellum");
+    assert_eq!(
+        kind(f.service.create_from_csv(&c, system).await),
+        ErrorKind::InvalidInput
+    );
+    let mut blank = input(false);
+    blank.title = "  ".into();
+    assert_eq!(
+        kind(f.service.create_from_csv(&c, blank).await),
+        ErrorKind::InvalidInput
+    );
 }

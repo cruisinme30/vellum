@@ -293,7 +293,10 @@ fn steps(base: Option<&str>, branch: Option<&str>) -> Vec<Step> {
         Step::new(
             "Shell",
             "bash",
-            &["-c", "shellcheck -x scripts/*/*.sh .githooks/*"],
+            &[
+                "-c",
+                "shellcheck -x scripts/*/*.sh deploy/*/*.sh .githooks/*",
+            ],
         )
         .needs("shellcheck"),
         Step::new("Decision records", "scripts/ci/check-adrs.sh", &[]).needs("bash"),
@@ -323,7 +326,7 @@ fn steps(base: Option<&str>, branch: Option<&str>) -> Vec<Step> {
             ],
         ),
         Step::new(
-            "SQL, Docker, Helm and Kubernetes",
+            "SQL, Docker, Compose, Helm and Kubernetes",
             "scripts/ci/lint-infra.sh",
             &[],
         )
