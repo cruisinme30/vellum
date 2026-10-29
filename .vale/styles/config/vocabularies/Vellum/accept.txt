@@ -70,7 +70,7 @@ Replicache
 mdBook
 Roboto
 [Uu]nstarted
-SLAs?
+(?:SLAs?|slas)
 [Ss]lugs?
 [Aa]ssignees?
 [Bb]acklog
