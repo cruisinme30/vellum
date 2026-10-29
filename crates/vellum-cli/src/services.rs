@@ -6,7 +6,7 @@
 //! Each service workstream adds its service to [`Services`] and
 //! [`Services::mount`] (with any raw routers), so `vellum serve`, the
 //! OpenAPI document and the `GraphQL` schema all see the same set.
-//! Identity always runs; the workspace services (collections, books,
+//! Identity and notifications always run; the workspace services (collections, books,
 //! Work) join when an index is configured.
 
 use std::path::Path;
@@ -18,6 +18,7 @@ use vellum_api::gateway::{Gateway, GatewayBuilder};
 use vellum_contracts::Service;
 use vellum_identity::{Identity, IdentityConfig, IdentityService, Store, http as identity_http};
 use vellum_kernel::{Config, Error, ErrorKind};
+use vellum_notify::service::{NotifyService, NotifyStore};
 
 use crate::identity::{GuardedFetcher, IdentityAuthenticator};
 use crate::workspace;
@@ -29,6 +30,8 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 #[derive(Clone)]
 pub struct Services {
     identity: Arc<Identity>,
+    /// Push subscriptions and notification preferences.
+    notify: Arc<NotifyService>,
     /// Collections, books and Work, when an index is configured.
     workspace: Vec<Arc<dyn Service>>,
     /// The integration receivers, when an integration secret is set.
@@ -61,6 +64,7 @@ impl Services {
                 format!("VELLUM_PUBLIC_URL is not a URL: {e}"),
             )
         })?;
+        let subject = url.to_string();
         let mut config = IdentityConfig::new(url);
         config.data_dir = data_dir.map(Path::to_path_buf);
         let store = match data_dir {
@@ -69,8 +73,13 @@ impl Services {
         };
         let identity =
             Identity::new(config, store).with_metadata_fetcher(Arc::new(GuardedFetcher::new()?));
+        let notify = match data_dir {
+            Some(dir) => NotifyStore::open(dir, &subject)?,
+            None => NotifyStore::memory(&subject)?,
+        };
         Ok(Self {
             identity: Arc::new(identity),
+            notify: Arc::new(NotifyService::new(Arc::new(notify))),
             workspace: Vec::new(),
             hooks: None,
         })
@@ -94,8 +103,10 @@ impl Services {
 
     /// Every typed service, in registration order.
     pub fn all(&self) -> Vec<Arc<dyn Service>> {
-        let mut all: Vec<Arc<dyn Service>> =
-            vec![Arc::new(IdentityService::new(Arc::clone(&self.identity)))];
+        let mut all: Vec<Arc<dyn Service>> = vec![
+            Arc::new(IdentityService::new(Arc::clone(&self.identity))),
+            Arc::clone(&self.notify) as Arc<dyn Service>,
+        ];
         all.extend(self.workspace.iter().cloned());
         all
     }

@@ -658,3 +658,84 @@ async fn workspace_services_answer_signed_in_users() {
     assert!(seen.contains("external"), "no external version: {seen}");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[tokio::test]
+async fn the_pwa_registers_and_removes_a_browser_for_push() {
+    let app = app(None);
+    // Signed out, the key is not handed out.
+    let anonymous = send(&app, finish(request("GET", "/api/v1/push/vapid-key"))).await;
+    assert_eq!(anonymous.status, StatusCode::UNAUTHORIZED);
+
+    let cookie = signed_in_admin(&app).await;
+    let key = send(
+        &app,
+        finish(request("GET", "/api/v1/push/vapid-key").header(header::COOKIE, &cookie)),
+    )
+    .await;
+    assert_eq!(key.status, StatusCode::OK, "{}", key.text);
+    let public_key = key.json()["publicKey"].as_str().unwrap().to_owned();
+    assert_eq!(public_key.len(), 87, "base64url of 65 bytes: {public_key}");
+
+    // What `PushSubscription.toJSON()` sends; any P-256 point will do.
+    let token = csrf(&app, &cookie).await;
+    let endpoint = "https://fcm.googleapis.com/fcm/send/abc123";
+    let subscription = json!({
+        "endpoint": endpoint,
+        "expirationTime": null,
+        "keys": {"p256dh": public_key, "auth": "BwcHBwcHBwcHBwcHBwcHBw"},
+    });
+    let call = |method: &str, path: &str, body: &Value| {
+        finish(
+            json_request(method, path, body)
+                .header(header::COOKIE, &cookie)
+                .header("x-csrf-token", &token),
+        )
+    };
+    let added = send(
+        &app,
+        call("POST", "/api/v1/push/subscriptions", &subscription),
+    )
+    .await;
+    assert_eq!(added.status, StatusCode::OK, "{}", added.text);
+    assert_eq!(added.json()["devices"], 1);
+    // Registering the same browser again does not add a device.
+    let again = send(
+        &app,
+        call("POST", "/api/v1/push/subscriptions", &subscription),
+    )
+    .await;
+    assert_eq!(again.json()["devices"], 1);
+
+    let plain = json!({"endpoint": "http://10.0.0.1/hook", "keys": subscription["keys"]});
+    let refused = send(&app, call("POST", "/api/v1/push/subscriptions", &plain)).await;
+    assert_eq!(refused.status, StatusCode::BAD_REQUEST, "{}", refused.text);
+
+    let query = serde_urlencoded::to_string([("endpoint", endpoint)]).unwrap();
+    let removed = send(
+        &app,
+        call(
+            "DELETE",
+            &format!("/api/v1/push/subscriptions?{query}"),
+            &json!({}),
+        ),
+    )
+    .await;
+    assert_eq!(removed.status, StatusCode::OK, "{}", removed.text);
+    assert_eq!(removed.json()["devices"], 0);
+
+    let prefs = send(
+        &app,
+        finish(request("GET", "/api/v1/notifications/preferences").header(header::COOKIE, &cookie)),
+    )
+    .await;
+    assert_eq!(prefs.status, StatusCode::OK, "{}", prefs.text);
+    let mut view = prefs.json();
+    view["channels"]["commented"] = json!(["push"]);
+    let saved = send(
+        &app,
+        call("PUT", "/api/v1/notifications/preferences", &view),
+    )
+    .await;
+    assert_eq!(saved.status, StatusCode::OK, "{}", saved.text);
+    assert_eq!(saved.json()["channels"]["commented"], json!(["push"]));
+}

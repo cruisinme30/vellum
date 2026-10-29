@@ -47,6 +47,7 @@ vellum-identity = { path = "../vellum-identity" }
 vellum-integrations = { path = "../vellum-integrations" }
 vellum-kernel.workspace = true
 vellum-mcp = { path = "../vellum-mcp" }
+vellum-notify = { path = "../vellum-notify" }
 vellum-private = { path = "../vellum-private", features = ["os-keychain"] }
 vellum-security = { path = "../vellum-security" }
 vellum-store = { path = "../vellum-store" }
