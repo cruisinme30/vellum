@@ -58,7 +58,7 @@ vellum-observe = { path = "../vellum-observe" }
 vellum-private = { path = "../vellum-private", features = ["os-keychain"] }
 vellum-render = { path = "../vellum-render" }
 vellum-security = { path = "../vellum-security" }
-vellum-store = { path = "../vellum-store" }
+vellum-store = { path = "../vellum-store", features = ["s3"] }
 vellum-tasks = { path = "../vellum-tasks" }
 vellum-work = { path = "../vellum-work" }
 vellum-work-service = { path = "../vellum-work-service" }
