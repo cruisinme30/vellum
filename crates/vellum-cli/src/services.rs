@@ -283,6 +283,19 @@ impl Services {
         figures.map_or_else(axum::Router::new, crate::help_http::router)
     }
 
+    /// The web app, answering `?format=md` on page URLs with Markdown
+    /// once the workspace is open (R-AI-6, D295).
+    pub fn web_app(&self, web_app: axum::Router) -> axum::Router {
+        match &self.mcp_workspace {
+            Some(workspace) => crate::site_http::markdown_pages(
+                web_app,
+                Arc::clone(workspace),
+                Arc::new(IdentityAuthenticator::new(Arc::clone(&self.identity))),
+            ),
+            None => web_app,
+        }
+    }
+
     /// Saves every page open for live editing and closes its connections,
     /// then leaves the cluster's heartbeat table.
     /// Call it after the server stops accepting requests.
@@ -337,6 +350,12 @@ impl Services {
             builder = builder
                 .mount_cross_site("/mcp", vellum_mcp::http::endpoint_router(Arc::clone(mcp)));
             well_known = well_known.merge(vellum_mcp::http::metadata_router(Arc::clone(mcp)));
+        }
+        if let Some(workspace) = &self.mcp_workspace {
+            // `llms.txt` and the Markdown sitemap (R-AI-6, D295).
+            for (path, router) in crate::site_http::mounts(workspace) {
+                builder = builder.mount(path, router);
+            }
         }
         builder
             .route_metrics(self.observability.metrics.clone())

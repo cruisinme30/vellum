@@ -191,6 +191,20 @@ pub fn router(ws: Arc<dyn Workspace>) -> Router {
         .with_state(ws)
 }
 
+/// `llms.txt` at the root of its router, for a gateway that nests it at
+/// `/llms.txt`.
+pub fn llms_router(ws: Arc<dyn Workspace>) -> Router {
+    Router::new().route("/", get(llms_handler)).with_state(ws)
+}
+
+/// The Markdown sitemap at the root of its router, for a gateway that
+/// nests it at `/sitemap.md`.
+pub fn sitemap_router(ws: Arc<dyn Workspace>) -> Router {
+    Router::new()
+        .route("/", get(sitemap_handler))
+        .with_state(ws)
+}
+
 fn wants_markdown(req: &Request) -> bool {
     req.method() == Method::GET
         && req

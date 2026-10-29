@@ -1026,6 +1026,7 @@ pub async fn open(
         space_of: Arc::clone(&workspace.space_of),
         row_changes,
         holder: me.clone(),
+        embeddings: crate::search::embeddings(&var)?,
     })
     .await?;
     workspace.services.push(Arc::new(search));
@@ -1040,7 +1041,9 @@ pub async fn open(
         events.clone(),
     );
     task_jobs(&replica, &workspace.tasks, notify, &config.data_dir)?;
-    workspace.services.push(Arc::new(Storage::new(store, !local)));
+    workspace
+        .services
+        .push(Arc::new(Storage::new(store, !local)));
     Ok(Opened {
         services: workspace.services,
         hooks,

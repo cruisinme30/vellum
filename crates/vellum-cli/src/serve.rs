@@ -269,7 +269,7 @@ pub fn app_gateway(services: &services::Services, config: GatewayConfig) -> Resu
         .mount(builder)
         // Live editing is mounted at `/collab` with the services (#415);
         // the web app's fallback never answers there.
-        .web_app(web::router(web::embedded()))
+        .web_app(services.web_app(web::router(web::embedded())))
         .build()
 }
 

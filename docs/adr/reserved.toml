@@ -57,3 +57,7 @@ holder = "editor thread: sharing, ADR 0054"
 [[reservation]]
 decisions = "D277"
 holder = "drive thread: uploads UI, ADR 0052"
+
+[[reservation]]
+decisions = "D295-D296"
+holder = "serve wiring: llms.txt and hybrid search (#526, ADR 0011), secret scanning (#527, ADR 0025)"
