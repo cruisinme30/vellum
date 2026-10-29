@@ -41,9 +41,13 @@ import work.
 
 ### D265: MCP export uses the server's export routes
 
-- The `export` tool calls the export service's own operation as the
-  user, like the other services (D218), and returns its short-lived
-  download link, file name, MIME type and size.
+- The `export` tool calls the export service in process as the user,
+  like the other services (D218), through a hook the server sets on
+  the MCP adapter (`ServeWorkspace::set_exporter`).
+- The result names the file, MIME type and size, links the REST export
+  route (`/api/v1/export/...`) that the client can fetch with its own
+  bearer token, and embeds the file (base64) when it is 4 MiB or less.
+- No signed-URL store is needed, so any replica can answer.
 - No second export pipeline lives in the MCP crate or the adapter.
 
 ## Alternatives

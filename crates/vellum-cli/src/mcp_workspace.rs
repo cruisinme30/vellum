@@ -290,7 +290,49 @@ pub struct ServeWorkspace {
     index: Arc<dyn DriveIndex>,
     ops: HashMap<&'static str, Operation>,
     base_url: String,
+    exporter: std::sync::OnceLock<Exporter>,
 }
+
+/// What an MCP export asks for (D265).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ExportWhat {
+    /// One page.
+    Page(ObjectId),
+    /// A book, or the subtree under one of its sections.
+    Book {
+        /// The book.
+        id: String,
+        /// The section whose subtree to export; the whole book when `None`.
+        section: Option<String>,
+    },
+}
+
+/// One exported file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExportFile {
+    /// `<title>.<ext>`.
+    pub file_name: String,
+    /// The media type.
+    pub mime: String,
+    /// The file.
+    pub bytes: Vec<u8>,
+}
+
+/// The server's exporter: runs one export (`pdf`, `docx` or `md`) as the
+/// principal, through the same code as the export routes.
+pub type Exporter = Arc<
+    dyn Fn(
+            vellum_contracts::Principal,
+            ExportWhat,
+            String,
+        ) -> vellum_contracts::BoxFuture<'static, Result<ExportFile, Error>>
+        + Send
+        + Sync,
+>;
+
+/// Largest export handed to the client inline; bigger files are fetched
+/// from the export route with the same token.
+const INLINE_EXPORT: usize = 4 * 1024 * 1024;
 
 impl std::fmt::Debug for ServeWorkspace {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -322,6 +364,35 @@ impl ServeWorkspace {
             index,
             ops,
             base_url: base_url.trim_end_matches('/').to_owned(),
+            exporter: std::sync::OnceLock::new(),
+        }
+    }
+
+    /// Serves `export` through `exporter` (the server's export routes).
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "wired to the export routes when they land (#513)")
+    )]
+    pub fn set_exporter(&self, exporter: Exporter) {
+        let _ = self.exporter.set(exporter);
+    }
+
+    /// The route the same file downloads from, with the caller's token.
+    fn export_url(&self, what: &ExportWhat, format: &str) -> String {
+        match what {
+            ExportWhat::Page(id) => {
+                format!("{}/api/v1/export/pages/{id}?format={format}", self.base_url)
+            }
+            ExportWhat::Book { id, section: None } => {
+                format!("{}/api/v1/export/books/{id}?format={format}", self.base_url)
+            }
+            ExportWhat::Book {
+                id,
+                section: Some(section),
+            } => format!(
+                "{}/api/v1/export/books/{id}?format={format}&scope=subtree&section={section}",
+                self.base_url
+            ),
         }
     }
 
@@ -1329,11 +1400,53 @@ impl Workspace for ServeWorkspace {
         actor: &Actor,
         request: ExportRequest,
     ) -> Result<ExportArtifact, WorkspaceError> {
-        let _ = Caller::of(actor)?;
-        Err(WorkspaceError::Unavailable(format!(
-            "exporting {} as {} is not offered over MCP on this server yet; read it with get_doc instead",
-            request.target, request.format
-        )))
+        let caller = Caller::of(actor)?;
+        let Some(exporter) = self.exporter.get() else {
+            return Err(WorkspaceError::Unavailable(
+                "export is not offered over MCP on this server yet; read the page with get_doc instead".into(),
+            ));
+        };
+        if !matches!(request.format.as_str(), "pdf" | "docx" | "md") {
+            return Err(WorkspaceError::Invalid(
+                "format must be pdf, docx or md".into(),
+            ));
+        }
+        let page = match request.target.parse::<ObjectId>() {
+            Ok(id) => self
+                .drive
+                .get(&caller.model(), id)
+                .await
+                .ok()
+                .filter(|n| n.kind == NodeKind::Page)
+                .map(|n| n.id),
+            Err(_) => None,
+        };
+        let what = page.map_or_else(
+            || ExportWhat::Book {
+                id: request.target.clone(),
+                section: request.section.clone(),
+            },
+            ExportWhat::Page,
+        );
+        let file = exporter(
+            caller.principal.clone(),
+            what.clone(),
+            request.format.clone(),
+        )
+        .await
+        .map_err(read_err(&request.target))?;
+        let size = u64::try_from(file.bytes.len()).unwrap_or(u64::MAX);
+        let data = (file.bytes.len() <= INLINE_EXPORT).then(|| {
+            use base64::Engine as _;
+            base64::engine::general_purpose::STANDARD.encode(&file.bytes)
+        });
+        Ok(ExportArtifact {
+            url: self.export_url(&what, &request.format),
+            name: file.file_name,
+            mime_type: file.mime,
+            size,
+            data,
+        })
     }
 
     async fn list_changes(

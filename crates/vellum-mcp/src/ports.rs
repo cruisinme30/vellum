@@ -423,6 +423,9 @@ pub struct ExportArtifact {
     pub mime_type: String,
     /// Size in bytes.
     pub size: u64,
+    /// The file itself, base64, when small enough to hand over inline.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub data: Option<String>,
 }
 
 /// One change since a point in time.

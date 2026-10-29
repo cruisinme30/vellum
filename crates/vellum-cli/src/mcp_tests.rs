@@ -394,3 +394,80 @@ async fn page_templates_come_from_templates_folders() {
     );
     services.shutdown().await;
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn export_hands_over_the_file_and_its_route() {
+    use std::sync::Arc;
+
+    use crate::mcp_workspace::{ExportFile, ExportWhat};
+
+    let dir = tempfile::tempdir().unwrap();
+    let (services, app) = server(dir.path()).await;
+    let w = world(&app).await;
+    let off = tool(
+        &app,
+        &w.bearer,
+        "export",
+        json!({ "target": w.page_id, "format": "pdf" }),
+    )
+    .await;
+    assert_eq!(off.json()["result"]["isError"], true, "{}", off.text);
+
+    // The export routes' code, as the server wires it; here a stand-in
+    // that echoes what it was asked for.
+    services
+        .mcp_adapter()
+        .unwrap()
+        .set_exporter(Arc::new(|principal, what, format| {
+            Box::pin(async move {
+                assert!(principal.user_id().is_some());
+                let name = match what {
+                    ExportWhat::Page(id) => format!("page-{id}"),
+                    ExportWhat::Book { id, section } => format!("book-{id}-{section:?}"),
+                };
+                Ok(ExportFile {
+                    file_name: format!("{name}.{format}"),
+                    mime: "application/pdf".to_owned(),
+                    bytes: b"%PDF-1.7".to_vec(),
+                })
+            })
+        }));
+    let made = tool(
+        &app,
+        &w.bearer,
+        "export",
+        json!({ "target": w.page_id, "format": "pdf" }),
+    )
+    .await;
+    let body = made.json();
+    let a = &body["result"]["structuredContent"];
+    assert_eq!(
+        a["name"],
+        format!("page-{}.pdf", w.page_id),
+        "{}",
+        made.text
+    );
+    assert_eq!(a["size"], 8);
+    assert_eq!(
+        a["url"],
+        format!("{ORIGIN}/api/v1/export/pages/{}?format=pdf", w.page_id)
+    );
+    assert!(a.get("data").is_none(), "the file is not repeated: {a}");
+    let blob = &body["result"]["content"][2]["resource"]["blob"];
+    assert_eq!(blob, "JVBERi0xLjc=", "{}", made.text);
+    let book = tool(
+        &app,
+        &w.bearer,
+        "export",
+        json!({ "target": "01JBQ8Y4ZK6V3W2N5R7T9X1C41", "format": "docx", "section": "s1" }),
+    )
+    .await;
+    let url = book.json()["result"]["structuredContent"]["url"].clone();
+    assert!(
+        url.as_str()
+            .unwrap()
+            .ends_with("format=docx&scope=subtree&section=s1"),
+        "{url}"
+    );
+    services.shutdown().await;
+}

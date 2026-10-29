@@ -633,12 +633,19 @@ pub async fn call(
             Ok(req) => {
                 let target = req.target.clone();
                 match ws.export(&actor, req).await {
-                    Ok(a) => {
+                    Ok(mut a) => {
+                        let mut content = vec![
+                            json!({ "type": "text", "text": format!("Exported {} ({} bytes).", a.name, a.size) }),
+                            json!({ "type": "resource_link", "uri": a.url, "name": a.name, "mimeType": a.mime_type, "size": a.size }),
+                        ];
+                        // The file itself, when the workspace handed it over.
+                        if let Some(blob) = a.data.take() {
+                            content.push(json!({ "type": "resource", "resource": {
+                                "uri": a.url, "mimeType": a.mime_type, "blob": blob
+                            } }));
+                        }
                         let mut result = Map::new();
-                        let _ = result.insert("content".into(), json!([
-                            { "type": "text", "text": format!("Exported {} ({} bytes). The link expires soon.", a.name, a.size) },
-                            { "type": "resource_link", "uri": a.url, "name": a.name, "mimeType": a.mime_type, "size": a.size }
-                        ]));
+                        let _ = result.insert("content".into(), Value::Array(content));
                         let _ = result.insert("structuredContent".into(), json!(a));
                         ToolOutcome {
                             result,
