@@ -31,12 +31,12 @@ const READ_MS = 2500;
 const pad = (value: number, width = 2) => String(Math.floor(value)).padStart(width, "0");
 
 /** `12345` ms → `00:00:12.345`. */
-export function timestamp(ms: number): string {
+function timestamp(ms: number): string {
   return `${pad(ms / 3_600_000)}:${pad((ms / 60_000) % 60)}:${pad((ms / 1000) % 60)}.${pad(ms % 1000, 3)}`;
 }
 
 /** The captions file for a tour's cues. */
-export function webVtt(cues: readonly Cue[]): string {
+function webVtt(cues: readonly Cue[]): string {
   const body = cues.map(
     (cue, index) =>
       `${String(index + 1)}\n${timestamp(cue.from)} --> ${timestamp(cue.to)}\n${cue.caption}\n`,

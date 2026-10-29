@@ -27,7 +27,7 @@ voice, and keep each tour under two minutes.
 ## The ten videos {#ten}
 
 | # | Task | Chapter or recipe | Tour |
-|---|------|-------------------|------|
+| --- | --- | --- | --- |
 | 1 | Create and share a page | Your first ten minutes | `01-create-and-share-a-page` |
 | 2 | Use the slash menu | Your first ten minutes | `02-use-the-slash-menu` |
 | 3 | Add a chart and a diagram | Charts and data tables | To write |
@@ -41,32 +41,32 @@ voice, and keep each tour under two minutes.
 
 ## Scenes for the tours still to write {#scenes}
 
-3. **A chart and a diagram.** Open "Gateway architecture". Insert
-   `/chart`: "Paste numbers and pick a chart type." Insert `/mermaid`:
-   "Describe the request path in text; Vellum draws it." Switch to dark
-   theme: "Both follow the theme."
-5. **A book.** Open **Books → Northstar handbook**. "A book is a folder
-   of pages with a table of contents." Drag "On-call" above
-   "Onboarding": "Reorder by dragging; numbering follows." Open
-   **History**: "Every change to the contents is kept."
-6. **Export.** On "PRD: Policy simulator" choose **⋯ → Export → PDF**:
-   "Charts and diagrams stay sharp." Repeat with Word: "Headings,
-   tables and comments carry over."
-7. **Issues.** **Issues → ENG → New issue** "Gateway times out under
-   load": "Issues live in teams." Open **Triage**: "Accept, decline or
-   mark a duplicate." Assign Priya and set the cycle: "It shows in her
-   My Work."
-8. **Tasks.** Press `Q` and type "Send launch checklist to legal
-   tomorrow 3pm p1": "Dates and priorities are typed, not picked." Open
-   **My Work → ⋯ → Calendar feed**: "Subscribe once; dated tasks show
-   in your calendar."
-9. **Claude.** In **Admin → AI**, copy the Claude Desktop snippet:
-   "One snippet connects Claude." Ask Claude for release notes from the
-   ENG cycle: "Claude writes a draft, never the page." Open the draft
-   and accept it: "You review every change."
-10. **History.** Open "Platform roadmap 2027", choose **History**, pick
-    yesterday's version: "Every version is kept." Choose **Restore**:
-    "Restoring makes a new version; nothing is lost."
+- **3. A chart and a diagram.** Open "Gateway architecture". Insert
+  `/chart`: "Paste numbers and pick a chart type." Insert `/mermaid`:
+  "Describe the request path in text; Vellum draws it." Switch to dark
+  theme: "Both follow the theme."
+- **5. A book.** Open **Books → Northstar handbook**. "A book is a folder
+  of pages with a table of contents." Drag "On-call" above
+  "Onboarding": "Reorder by dragging; numbering follows." Open
+  **History**: "Every change to the contents is kept."
+- **6. Export.** On "PRD: Policy simulator" choose **⋯ → Export → PDF**:
+  "Charts and diagrams stay sharp." Repeat with Word: "Headings,
+  tables and comments carry over."
+- **7. Issues.** **Issues → ENG → New issue** "Gateway times out under
+  load": "Issues live in teams." Open **Triage**: "Accept, decline or
+  mark a duplicate." Assign Priya and set the cycle: "It shows in her
+  My Work."
+- **8. Tasks.** Press `Q` and type "Send launch checklist to legal
+  tomorrow 3pm p1": "Dates and priorities are typed, not picked." Open
+  **My Work → ⋯ → Calendar feed**: "Subscribe once; dated tasks show
+  in your calendar."
+- **9. Claude.** In **Admin → AI**, copy the Claude Desktop snippet:
+  "One snippet connects Claude." Ask Claude for release notes from the
+  ENG cycle: "Claude writes a draft, never the page." Open the draft
+  and accept it: "You review every change."
+- **10. History.** Open "Platform roadmap 2027", choose **History**, pick
+  yesterday's version: "Every version is kept." Choose **Restore**:
+  "Restoring makes a new version; nothing is lost."
 
 Write each tour once its screens are in the web app. A tour whose
 screens need a server records against `vellum serve` loaded with the

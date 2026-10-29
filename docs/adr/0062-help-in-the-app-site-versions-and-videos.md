@@ -15,13 +15,12 @@ vellum: 1
 - Requirements: R-HG-1, R-HG-4, R-HG-5
 - Issue: #202, #203
 - Pull requests: to be linked when merged
-- Builds on: [ADR 0024](0024-help-books.md) (D100 to D102)
 
 :::
 
 ## Context
 
-ADR 0024 put the help books in the binary and mapped help IDs to
+[ADR 0024](0024-help-books.md) put the help books in the binary and mapped help IDs to
 headings, but nothing in the app opened them, the website had no
 versions, feedback or edit links, the ten videos had no way to be made,
 and translations had no check. The website also published every part's
@@ -79,8 +78,8 @@ introduction (each `README.md`) as an empty page with only its title.
 
 - A new screen gets its `?` by adding a help ID and passing `help`.
 - Old releases' guides cost one mdBook build each; five is the cap.
-- Tours 3 and 5 to 10 are storyboarded; each is written once its
-  screens exist. Sandboxes without Playwright's ffmpeg can run the tours
-  but not record them.
+- Tours 3 and 5 to 10 have scenes and captions; each is written once its
+  screens exist. Sandboxes without Playwright's video encoder can run the
+  tours but not record them.
 - `vellum-render`'s stylesheet no longer lets a facts list, a chart's
   data or a calculator widen a page on a phone.

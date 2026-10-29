@@ -115,6 +115,7 @@ export const HELP_TOPICS = {
   "admin.access-report": "admin/security/access.md#reports",
   "admin.requests": "admin/operate/observability.md#built-in",
   "admin.telemetry": "admin/operate/observability.md#usage",
+  "admin.usage": "admin/operate/observability.md#usage-counts",
   "admin.import": "user/work/import.md",
 } as const;
 

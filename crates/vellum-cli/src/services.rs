@@ -232,7 +232,7 @@ impl Services {
     /// The help books, mounted at `/guide` by [`Self::mount`]. Diagrams
     /// draw with the same settings as pages; a malformed diagram setting
     /// (already refused for pages) falls back to the built-in defaults.
-    pub fn help(&self) -> axum::Router {
+    pub fn help() -> axum::Router {
         let figures = crate::page_render::PageRenderService::figures_from_env()
             .map_err(|e| e.to_string())
             .or_else(|_| {
@@ -304,7 +304,7 @@ impl Services {
             )
             .mount("/collab", self.collab())
             // The help books, for the app's `?` buttons (ADR 0024, D256).
-            .mount(crate::help_http::PREFIX, self.help())
+            .mount(crate::help_http::PREFIX, Self::help())
     }
 }
 

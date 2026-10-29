@@ -1,11 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": [
-    "e2e/**/*.spec.ts",
-    "e2e/tours/*.tour.ts",
-    "playwright.tours.config.ts",
-    "src/platform/pwa/sw.ts"
-  ],
+  "entry": ["e2e/**/*.spec.ts", "e2e/tours/*.tour.ts", "src/platform/pwa/sw.ts"],
   "project": ["src/**/*.{ts,tsx}", "e2e/**/*.ts"],
   "ignore": ["src/**/*.gen.ts"],
   "ignoreDependencies": ["@material-symbols/svg-400"]

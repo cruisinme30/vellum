@@ -20,6 +20,7 @@
 //! carry no script, and rendered HTML is the renderer's sanitised output.
 
 use std::collections::HashMap;
+use std::fmt::Write as _;
 use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 
 use axum::Router;
@@ -97,12 +98,13 @@ fn html_name(path: &str) -> String {
 async fn index() -> Response {
     let mut body = String::from("<h1>Vellum help</h1>\n<ul class=\"vl-help-books\">\n");
     for book in Book::ALL {
-        body.push_str(&format!(
-            "<li><a href=\"{PREFIX}/{}/\">{}</a> <span>{} pages</span></li>\n",
+        let _ = writeln!(
+            body,
+            "<li><a href=\"{PREFIX}/{}/\">{}</a> <span>{} pages</span></li>",
             book.slug(),
             escape(book.title()),
             book.pages().count()
-        ));
+        );
     }
     body.push_str("</ul>\n");
     html(StatusCode::OK, &document("Vellum help", None, &body, ""))
@@ -120,17 +122,13 @@ async fn stylesheet() -> Response {
 }
 
 async fn topic(Path(id): Path<String>) -> Response {
-    match topic_url(&id) {
-        Some(url) => Redirect::to(&url).into_response(),
-        None => not_found(),
-    }
+    topic_url(&id).map_or_else(not_found, |url| Redirect::to(&url).into_response())
 }
 
 async fn book_root(Path(book): Path<String>) -> Response {
-    match Book::from_slug(&book) {
-        Some(book) => Redirect::permanent(&format!("{PREFIX}/{}/", book.slug())).into_response(),
-        None => not_found(),
-    }
+    Book::from_slug(&book).map_or_else(not_found, |book| {
+        Redirect::permanent(&format!("{PREFIX}/{}/", book.slug())).into_response()
+    })
 }
 
 async fn book_home(State(reader): State<Arc<Reader>>, Path(book): Path<String>) -> Response {
@@ -221,7 +219,8 @@ fn document(title: &str, page: Option<&Page>, main: &str, contents: &str) -> Str
     let mut nav = format!("<a class=\"vl-help-home\" href=\"{PREFIX}/\">Vellum help</a>");
     for book in Book::ALL {
         let current = page.is_some_and(|p| p.book() == book);
-        nav.push_str(&format!(
+        let _ = write!(
+            nav,
             "<a href=\"{PREFIX}/{}/\"{}>{}</a>",
             book.slug(),
             if current {
@@ -230,7 +229,7 @@ fn document(title: &str, page: Option<&Page>, main: &str, contents: &str) -> Str
                 ""
             },
             escape(book.title())
-        ));
+        );
     }
     let footer = page.map_or_else(String::new, |p| {
         format!(
@@ -262,7 +261,7 @@ fn contents(book: Book, current: &str) -> String {
         let trimmed = line.trim_start();
         if let Some(part) = trimmed.strip_prefix("# ") {
             if part != "Summary" {
-                out.push_str(&format!("<li class=\"vl-help-part\">{}</li>", escape(part)));
+                let _ = write!(out, "<li class=\"vl-help-part\">{}</li>", escape(part));
             }
             continue;
         }
@@ -276,7 +275,8 @@ fn contents(book: Book, current: &str) -> String {
         } else {
             ""
         };
-        out.push_str(&format!(
+        let _ = write!(
+            out,
             "<li{}><a href=\"{PREFIX}/{}/{}\"{marker}>{}</a></li>",
             if nested {
                 " class=\"vl-help-nested\""
@@ -286,7 +286,7 @@ fn contents(book: Book, current: &str) -> String {
             book.slug(),
             escape(&html_name(target)),
             escape(title)
-        ));
+        );
     }
     out.push_str("</ul>");
     out
@@ -458,7 +458,8 @@ mod tests {
                     .split('#')
                     .next()
                     .unwrap_or_default()
-                    .ends_with(".md")
+                    .rsplit_once('.')
+                    .is_some_and(|(_, ext)| ext.eq_ignore_ascii_case("md"))
         });
         assert_eq!(md_link, None, "every chapter link is .html");
         assert!(!body.to_ascii_lowercase().contains("<script"));
