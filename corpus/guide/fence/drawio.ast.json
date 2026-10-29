@@ -1,0 +1,19 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "fence",
+        "lang": "drawio",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "<mxfile>\n  <diagram name=\"Gateway\">\n    <mxGraphModel>\n      <root>\n        <mxCell id=\"0\"/>\n        <mxCell id=\"1\" parent=\"0\"/>\n        <mxCell id=\"2\" value=\"Gateway\" style=\"rounded=1;\" vertex=\"1\" parent=\"1\">\n          <mxGeometry x=\"40\" y=\"40\" width=\"120\" height=\"60\" as=\"geometry\"/>\n        </mxCell>\n      </root>\n    </mxGraphModel>\n  </diagram>\n</mxfile>\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}

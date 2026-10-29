@@ -1,0 +1,73 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "table",
+        "alignments": [
+          "none",
+          "none",
+          "none"
+        ],
+        "header": [
+          [],
+          [
+            {
+              "type": "text",
+              "text": "Option A"
+            }
+          ],
+          [
+            {
+              "type": "text",
+              "text": "Option B"
+            }
+          ]
+        ],
+        "rows": [
+          [
+            [
+              {
+                "type": "text",
+                "text": "Self-hosted"
+              }
+            ],
+            [
+              {
+                "type": "text",
+                "text": "✓"
+              }
+            ],
+            [
+              {
+                "type": "text",
+                "text": "✗"
+              }
+            ]
+          ],
+          [
+            [
+              {
+                "type": "text",
+                "text": "Free SSO"
+              }
+            ],
+            [
+              {
+                "type": "text",
+                "text": "✓"
+              }
+            ],
+            [
+              {
+                "type": "text",
+                "text": "◐"
+              }
+            ]
+          ]
+        ]
+      }
+    ]
+  },
+  "diagnostics": []
+}

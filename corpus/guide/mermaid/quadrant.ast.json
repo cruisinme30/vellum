@@ -1,0 +1,19 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "fence",
+        "lang": "mermaid",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "quadrantChart\n  title Backlog by value and effort\n  x-axis Low effort --> High effort\n  y-axis Low value --> High value\n  quadrant-1 Plan\n  quadrant-2 Do now\n  quadrant-3 Drop\n  quadrant-4 Maybe\n  Replay engine: [0.7, 0.9]\n  Dark mode: [0.2, 0.6]\n  CSV export: [0.15, 0.3]\n  Rewrite proxy: [0.9, 0.35]\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}

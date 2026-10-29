@@ -284,7 +284,14 @@ fn container(container: &Container) -> String {
         .iter()
         .map(|s| blocks(s, pos, "\n"))
         .collect();
-    out.push_str(&sections.join("\n---\n\n"));
+    let body = sections.join("\n---\n\n");
+    // Blank lines around the body keep lists and fences apart from the
+    // `:::` lines, as markdownlint (MD031, MD032) expects.
+    if !body.is_empty() {
+        out.push('\n');
+        out.push_str(&body);
+        out.push('\n');
+    }
     out.push_str(&colons);
     out.push('\n');
     out

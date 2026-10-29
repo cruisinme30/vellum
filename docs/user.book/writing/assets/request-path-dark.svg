@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Vellum contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 140" role="img" aria-labelledby="t">
+  <title id="t">Northstar gateway request path: client, gateway, policy engine, backend</title>
+  <rect width="640" height="140" fill="#1D1B20"/>
+  <g font-family="Roboto, sans-serif" font-size="15" fill="#E6E8EE" text-anchor="middle">
+    <rect x="20" y="45" width="120" height="50" rx="16" fill="#36407A"/>
+    <text x="80" y="75">Client</text>
+    <rect x="180" y="45" width="120" height="50" rx="16" fill="#36407A"/>
+    <text x="240" y="75">Gateway</text>
+    <rect x="340" y="45" width="120" height="50" rx="16" fill="#36407A"/>
+    <text x="400" y="75">Policy engine</text>
+    <rect x="500" y="45" width="120" height="50" rx="16" fill="#36407A"/>
+    <text x="560" y="75">Backend</text>
+  </g>
+  <g stroke="#B9C3FF" stroke-width="2">
+    <line x1="140" y1="70" x2="180" y2="70"/>
+    <line x1="300" y1="70" x2="340" y2="70"/>
+    <line x1="460" y1="70" x2="500" y2="70"/>
+  </g>
+</svg>

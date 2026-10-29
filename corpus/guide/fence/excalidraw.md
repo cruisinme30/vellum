@@ -1,0 +1,11 @@
+```excalidraw
+{
+  "type": "excalidraw",
+  "version": 2,
+  "elements": [
+    {"id": "a", "type": "rectangle", "x": 0, "y": 0, "width": 160, "height": 60},
+    {"id": "b", "type": "text", "x": 40, "y": 20, "text": "Gateway"}
+  ],
+  "appState": {"viewBackgroundColor": "#ffffff"}
+}
+```
