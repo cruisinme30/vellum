@@ -52,8 +52,10 @@ pub fn routers(tasks: &Arc<TasksService>, identity: &Arc<Identity>) -> Vec<(&'st
         .collect()
 }
 
-/// The password of an HTTP Basic `Authorization` header.
-fn basic_password(request: &Request) -> Option<String> {
+/// The API token a CalDAV app sends in the password slot of an HTTP Basic
+/// `Authorization` header. It is looked up as a bearer token, never treated
+/// as an account password.
+fn basic_auth_token(request: &Request) -> Option<String> {
     let value = request
         .headers()
         .get(axum::http::header::AUTHORIZATION)?
@@ -66,8 +68,8 @@ fn basic_password(request: &Request) -> Option<String> {
         .decode(encoded.trim())
         .ok()?;
     let text = String::from_utf8(decoded).ok()?;
-    let (_, password) = text.split_once(':')?;
-    Some(password.to_owned())
+    let (_, token) = text.split_once(':')?;
+    Some(token.to_owned())
 }
 
 /// Who is calling, under the rules in the module docs.
@@ -85,8 +87,8 @@ fn caller(routes: &Routes, request: &Request, path: &str) -> Principal {
     if principal.user_id().is_some() || !path.starts_with("/dav") {
         return principal;
     }
-    basic_password(request)
-        .and_then(|password| routes.identity.bearer(&password).ok())
+    basic_auth_token(request)
+        .and_then(|token| routes.identity.bearer(&token).ok())
         .map_or(principal, |resolved| resolved.principal)
 }
 
