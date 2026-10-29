@@ -1,0 +1,3 @@
+The page still renders when its front matter is broken.
+1 / 1
+

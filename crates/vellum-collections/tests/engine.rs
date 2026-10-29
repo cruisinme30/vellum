@@ -649,3 +649,58 @@ fn the_save_path_recomputes_affected_rows() {
     let err: vellum_kernel::Error = SchemaError::MissingId.into();
     assert_eq!(err.kind(), vellum_kernel::ErrorKind::InvalidInput);
 }
+
+// A hostile CSV must not turn a few megabytes into millions of warnings or
+// minutes of work while the collections lock is held (#367).
+
+#[test]
+fn csv_import_caps_its_diagnostics() {
+    let ws = northstar();
+    // Two bytes per unknown release title, and one bad number per row.
+    let cell = "a,".repeat(200_000);
+    let rows = "r,,lots\n".repeat(5_000);
+    let text = format!("Requirement,Release,Estimate\nx,\"{cell}\",lots\n{rows}");
+    let import = csv::import_into(&text, &ws, cid(REQS)).unwrap();
+    assert!(
+        import.diagnostics.len() <= csv::MAX_DIAGNOSTICS + 1,
+        "{} diagnostics",
+        import.diagnostics.len()
+    );
+    let last = import.diagnostics.last().unwrap();
+    assert!(last.message.contains("more problems"), "{last:?}");
+}
+
+#[test]
+fn csv_import_matches_relation_titles_in_linear_time() {
+    let mut ws = northstar();
+    for i in 0..2_000 {
+        let mut values = BTreeMap::new();
+        let _ = values.insert("t".to_owned(), Value::Text(format!("Release {i}")));
+        let _ = ws
+            .apply(Edit::CreateRow {
+                collection: cid(RELS),
+                id: None,
+                values,
+                body: String::new(),
+            })
+            .unwrap();
+    }
+    // 50,000 titles against 2,000 rows: about 100 million comparisons when
+    // each title scans the collection, and a few milliseconds with an index.
+    let titles: Vec<String> = (0..50_000)
+        .map(|i| format!("release {}", i % 2_500))
+        .collect();
+    let text = format!("Requirement,Release\nx,\"{}\"\n", titles.join(","));
+    let started = std::time::Instant::now();
+    let import = csv::import_into(&text, &ws, cid(REQS)).unwrap();
+    let elapsed = started.elapsed();
+    assert!(
+        elapsed < std::time::Duration::from_secs(3),
+        "took {elapsed:?}"
+    );
+    let Some(Value::List(ids)) = import.rows[0].get("rel") else {
+        panic!("no relation: {:?}", import.rows[0]);
+    };
+    // Matches are case-insensitive and each row appears once.
+    assert_eq!(ids.len(), 2_000);
+}

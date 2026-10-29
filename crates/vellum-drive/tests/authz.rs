@@ -7,11 +7,11 @@
 use std::sync::Arc;
 
 use vellum_authz::{
-    Actor as AuthzActor, Authz, Change, Id, MemoryStore, Object, Relation, Subject, Tuple,
-    TupleRelation,
+    Actor as AuthzActor, Authz, AuthzStore, Change, Id, MemoryStore, Object, Relation, SqlStore,
+    Subject, Tuple, TupleRelation,
 };
 use vellum_db::{Index, IndexConfig};
-use vellum_drive::authz::AuthzAccess;
+use vellum_drive::authz::{AuthzAccess, TreeSync};
 use vellum_drive::memory::MemoryIndex;
 use vellum_drive::sql::SqlIndex;
 use vellum_drive::{Drive, DriveError, DriveIndex, SpaceKind};
@@ -39,20 +39,34 @@ const fn space_id(id: SpaceId) -> Id {
 
 #[tokio::test]
 async fn the_drive_runs_on_rebac() -> TestResult {
-    the_drive_runs_on_rebac_with(Arc::new(MemoryIndex::new())).await
+    let authz = Arc::new(Authz::new(MemoryStore::new()));
+    the_drive_runs_on_rebac_with(Arc::new(MemoryIndex::new()), authz).await
 }
 
 #[tokio::test]
 async fn the_drive_runs_on_rebac_with_the_sqlite_index() -> TestResult {
     let dir = tempfile::tempdir()?;
     let db = Index::open(&IndexConfig::sqlite(dir.path().join("index.sqlite"), None)).await?;
-    the_drive_runs_on_rebac_with(Arc::new(SqlIndex::new(db))).await
+    let authz = Arc::new(Authz::new(MemoryStore::new()));
+    the_drive_runs_on_rebac_with(Arc::new(SqlIndex::new(db)), authz).await
 }
 
-async fn the_drive_runs_on_rebac_with(index: Arc<dyn DriveIndex>) -> TestResult {
+/// As `vellum serve` runs it: the index and the permission engine share
+/// one database, and the engine reads the tree the drive's index writes.
+#[tokio::test]
+async fn the_drive_runs_on_rebac_all_in_sqlite() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let db = Index::open(&IndexConfig::sqlite(dir.path().join("index.sqlite"), None)).await?;
+    let authz = Arc::new(Authz::new(SqlStore::new(db.clone())));
+    the_drive_runs_on_rebac_with(Arc::new(SqlIndex::new(db)), authz).await
+}
+
+async fn the_drive_runs_on_rebac_with<S: AuthzStore + TreeSync + 'static>(
+    index: Arc<dyn DriveIndex>,
+    authz: Arc<Authz<S>>,
+) -> TestResult {
     let dir = tempfile::tempdir()?;
     let store = Arc::new(LocalStore::open(dir.path()).await?);
-    let authz = Arc::new(Authz::new(MemoryStore::new()));
     let access = Arc::new(AuthzAccess::new(authz.clone(), index.clone()));
     let drive = Drive::new(store, index, access);
     let (alice_id, bob_id) = (UserId::generate(), UserId::generate());

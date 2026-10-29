@@ -1,0 +1,5 @@
+[Title] Ops
+[ListParagraph/0] ☐ Renew TLS certificates due:2026-11-03 15:00 p2
+[ListParagraph/0] ☐ Check backup restore every!:2w
+[ListParagraph/0] ☐ Standup notes every:weekday 09:00
+[ListParagraph/0] ☑ Rotate the on-call schedule

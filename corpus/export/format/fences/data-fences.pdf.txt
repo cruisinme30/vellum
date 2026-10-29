@@ -1,0 +1,20 @@
+2026-10-01 Beta opens
+Invite-only, Northstar design partners
+2026-11-24 General availability
+Roadmap as of 2026-10-29
+• Replay engine: 2026-10-01 → 2026-12-15
+• GA: 2026-11-24 (milestone)
+• Slow search — likelihood 3, impact 2
+• Data loss — likelihood 1, impact 5
+Todo Doing Done
+• Write runbook [P1] • Replay engine • Diff report
+Region Revenue
+EMEA 120
+APAC 90
+Total 210
+• Edge: Gateway
+• Core: Policy engine, Audit log
+• Gateway → Policy engine (checks)
+• Policy engine → Audit log
+1 / 1
+

@@ -1,0 +1,12 @@
+[ListParagraph/0] Clients: Web app, Mobile app, MCP client
+[ListParagraph/0] Edge: Gateway
+[ListParagraph/0] Services: API, Render, Worker
+[ListParagraph/0] Data: Postgres, Object store
+[ListParagraph/0] Web app → Gateway
+[ListParagraph/0] Mobile app → Gateway
+[ListParagraph/0] MCP client → Gateway
+[ListParagraph/0] Gateway → API
+[ListParagraph/0] API → Render
+[ListParagraph/0] API → Postgres
+[ListParagraph/0] Worker → Object store
+[ListParagraph/0] Render → Object store

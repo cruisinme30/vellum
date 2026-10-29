@@ -1,0 +1,3 @@
+[Code] flowchart LR  A[Request] --> B{Allowed?}  B -->|yes| C[Serve]  B -->|no| D[Block]
+[Code] gateway -> engine: evaluate
+[Code] @startumlAlice -> Bob: hello@enduml

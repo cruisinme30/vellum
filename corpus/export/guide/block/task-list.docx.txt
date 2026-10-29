@@ -1,0 +1,2 @@
+[ListParagraph/0] ☐ Announce in the deploys channel
+[ListParagraph/0] ☑ Tag the release

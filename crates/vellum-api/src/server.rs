@@ -13,12 +13,13 @@ use std::future::Future;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 use axum::Router;
 use axum::extract::{ConnectInfo, Request};
 use axum::response::{IntoResponse, Redirect, Response};
 use hyper::body::Incoming;
-use hyper_util::rt::{TokioExecutor, TokioIo};
+use hyper_util::rt::{TokioExecutor, TokioIo, TokioTimer};
 use hyper_util::server::conn::auto::Builder;
 use hyper_util::server::graceful::GracefulShutdown;
 use hyper_util::service::TowerToHyperService;
@@ -27,6 +28,7 @@ use rustls::crypto::CryptoProvider;
 use rustls_pki_types::pem::PemObject as _;
 use rustls_pki_types::{CertificateDer, PrivateKeyDer};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::Semaphore;
 use tokio_rustls::{LazyConfigAcceptor, TlsAcceptor};
 use tokio_stream::StreamExt as _;
 use vellum_kernel::{Error, ErrorKind};
@@ -67,6 +69,33 @@ pub struct ServeConfig {
     pub tls: Tls,
     /// An optional plain-HTTP address that redirects to HTTPS.
     pub redirect_http: Option<SocketAddr>,
+    /// How long and how many connections a client may hold.
+    pub limits: ConnectionLimits,
+}
+
+/// Bounds on what one connection may hold, so a client that never
+/// finishes a request cannot use up the server's file descriptors (#354).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ConnectionLimits {
+    /// Time from accepting a connection to its first byte (plain HTTP) or
+    /// to a finished TLS handshake.
+    pub handshake_timeout: Duration,
+    /// Time to receive a request's headers, and the longest an HTTP/1.1
+    /// connection may sit idle between requests.
+    pub header_read_timeout: Duration,
+    /// Connections served at once. Further connections wait in the
+    /// kernel's accept queue until one closes.
+    pub max_connections: usize,
+}
+
+impl Default for ConnectionLimits {
+    fn default() -> Self {
+        Self {
+            handshake_timeout: Duration::from_secs(10),
+            header_read_timeout: Duration::from_secs(15),
+            max_connections: 4096,
+        }
+    }
 }
 
 fn io_error(what: &str, err: impl std::error::Error + Send + Sync + 'static) -> Error {
@@ -201,18 +230,41 @@ pub async fn serve_listener(
     tracing::info!(address = %local, tls = !matches!(acceptor, Acceptor::Plain), "listening");
     let (stop_tx, stop_rx) = tokio::sync::watch::channel(false);
     if let Some(redirect) = config.redirect_http {
-        drop(tokio::spawn(redirect_to_https(redirect, stop_rx.clone())));
+        drop(tokio::spawn(redirect_to_https(
+            redirect,
+            config.limits,
+            stop_rx.clone(),
+        )));
     }
     let router = gateway.router();
     let graceful = GracefulShutdown::new();
     let acceptor = Arc::new(acceptor);
+    let limits = config.limits;
+    let cap = fit_to_open_file_limit(limits.max_connections);
+    let slots = Arc::new(Semaphore::new(cap));
+    let mut accept_errors = AcceptErrors::default();
     tokio::pin!(shutdown);
     loop {
+        // Wait for a free slot before accepting, so extra connections queue
+        // in the kernel instead of using up file descriptors.
+        let slot = tokio::select! {
+            slot = Arc::clone(&slots).acquire_owned() => match slot {
+                Ok(slot) => slot,
+                Err(_) => break,
+            },
+            () = &mut shutdown => break,
+        };
         let (tcp, peer) = tokio::select! {
             accepted = listener.accept() => match accepted {
-                Ok(pair) => pair,
+                Ok(pair) => {
+                    accept_errors.recovered();
+                    pair
+                }
                 Err(err) => {
-                    tracing::warn!(error = %err, "accept failed");
+                    // Out of file descriptors, or a similar resource error:
+                    // retrying at once spins a core and floods the log.
+                    accept_errors.failed(&err);
+                    tokio::time::sleep(ACCEPT_BACKOFF).await;
                     continue;
                 }
             },
@@ -228,9 +280,10 @@ pub async fn serve_listener(
         let acceptor = Arc::clone(&acceptor);
         let watcher = graceful.watcher();
         drop(tokio::spawn(async move {
-            if let Err(err) = connection(&acceptor, tcp, service, watcher).await {
+            if let Err(err) = connection(&acceptor, tcp, service, watcher, limits).await {
                 tracing::debug!(error = %err, peer = %peer, "connection ended with an error");
             }
+            drop(slot);
         }));
     }
     let _ = stop_tx.send(true);
@@ -248,6 +301,7 @@ async fn connection<S>(
     tcp: TcpStream,
     service: S,
     watcher: hyper_util::server::graceful::Watcher,
+    limits: ConnectionLimits,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
 where
     S: tower::Service<
@@ -261,28 +315,50 @@ where
 {
     let _ = tcp.set_nodelay(true);
     let service = TowerToHyperService::new(service);
-    let builder = Builder::new(TokioExecutor::new());
+    let builder = builder(limits);
+    let handshake = limits.handshake_timeout;
     match acceptor {
         Acceptor::Plain => {
+            // A client that connects and sends nothing never reaches hyper's
+            // header timer, so wait for its first byte here.
+            let mut first = [0_u8; 1];
+            match tokio::time::timeout(handshake, tcp.peek(&mut first)).await {
+                Ok(Ok(n)) if n > 0 => {}
+                Ok(Ok(_)) => return Ok(()),
+                Ok(Err(err)) => return Err(err.into()),
+                Err(_) => return Err("no request before the handshake timeout".into()),
+            }
             watcher
                 .watch(builder.serve_connection_with_upgrades(TokioIo::new(tcp), service))
                 .await
         }
         Acceptor::Tls(tls) => {
-            let stream = tls.accept(tcp).await?;
+            let stream = tokio::time::timeout(handshake, tls.accept(tcp))
+                .await
+                .map_err(|_| "TLS handshake timed out")??;
             watcher
                 .watch(builder.serve_connection_with_upgrades(TokioIo::new(stream), service))
                 .await
         }
         Acceptor::Acme { default, challenge } => {
-            let start = LazyConfigAcceptor::new(rustls::server::Acceptor::default(), tcp).await?;
+            let start = tokio::time::timeout(
+                handshake,
+                LazyConfigAcceptor::new(rustls::server::Acceptor::default(), tcp),
+            )
+            .await
+            .map_err(|_| "TLS handshake timed out")??;
             if rustls_acme::is_tls_alpn_challenge(&start.client_hello()) {
                 tracing::info!("answering an ACME TLS-ALPN-01 challenge");
-                let mut tls = start.into_stream(Arc::clone(challenge)).await?;
+                let mut tls =
+                    tokio::time::timeout(handshake, start.into_stream(Arc::clone(challenge)))
+                        .await
+                        .map_err(|_| "TLS handshake timed out")??;
                 tokio::io::AsyncWriteExt::shutdown(&mut tls).await?;
                 return Ok(());
             }
-            let stream = start.into_stream(Arc::clone(default)).await?;
+            let stream = tokio::time::timeout(handshake, start.into_stream(Arc::clone(default)))
+                .await
+                .map_err(|_| "TLS handshake timed out")??;
             watcher
                 .watch(builder.serve_connection_with_upgrades(TokioIo::new(stream), service))
                 .await
@@ -290,7 +366,87 @@ where
     }
 }
 
-async fn redirect_to_https(bind: SocketAddr, mut stop: tokio::sync::watch::Receiver<bool>) {
+/// File descriptors kept free for the database, the store and logs.
+const RESERVED_FILES: u64 = 256;
+
+/// Raises the soft open-file limit to the hard one, then returns the
+/// connection cap that fits under it, so the cap is reached before the
+/// process runs out of descriptors (#354).
+#[cfg(unix)]
+fn fit_to_open_file_limit(wanted: usize) -> usize {
+    use rustix::process::{Resource, getrlimit, setrlimit};
+    let mut limit = getrlimit(Resource::Nofile);
+    if limit.current.is_some() && limit.current != limit.maximum {
+        let raised = rustix::process::Rlimit {
+            current: limit.maximum,
+            maximum: limit.maximum,
+        };
+        // Refused on some systems (macOS will not take "unlimited"); the
+        // cap then fits the current limit.
+        if setrlimit(Resource::Nofile, raised).is_ok() {
+            limit = getrlimit(Resource::Nofile);
+        }
+    }
+    let cap = limit.current.map_or(wanted, |soft| {
+        let room = soft.saturating_sub(RESERVED_FILES).max(1);
+        wanted.min(usize::try_from(room).unwrap_or(usize::MAX))
+    });
+    if cap < wanted {
+        tracing::warn!(cap, wanted, open_files = ?limit.current, "the open-file limit lowers the connection cap");
+    }
+    cap.max(1)
+}
+
+#[cfg(not(unix))]
+const fn fit_to_open_file_limit(wanted: usize) -> usize {
+    if wanted == 0 { 1 } else { wanted }
+}
+
+/// How long the accept loop pauses after a failed accept.
+const ACCEPT_BACKOFF: Duration = Duration::from_millis(100);
+
+/// Logs accept failures once per burst instead of once per retry.
+#[derive(Default)]
+struct AcceptErrors {
+    failing: u64,
+}
+
+impl AcceptErrors {
+    fn failed(&mut self, err: &std::io::Error) {
+        if self.failing == 0 {
+            tracing::warn!(error = %err, "accept failed; pausing new connections");
+        }
+        self.failing = self.failing.saturating_add(1);
+    }
+
+    fn recovered(&mut self) {
+        if self.failing > 0 {
+            tracing::warn!(failed = self.failing, "accepting connections again");
+            self.failing = 0;
+        }
+    }
+}
+
+/// An HTTP/1.1 and HTTP/2 connection builder with the timeouts in `limits`.
+fn builder(limits: ConnectionLimits) -> Builder<TokioExecutor> {
+    let mut builder = Builder::new(TokioExecutor::new());
+    let _ = builder
+        .http1()
+        .timer(TokioTimer::new())
+        .header_read_timeout(limits.header_read_timeout);
+    let _ = builder
+        .http2()
+        .timer(TokioTimer::new())
+        .keep_alive_interval(limits.header_read_timeout)
+        .keep_alive_timeout(limits.handshake_timeout);
+    builder
+}
+
+async fn redirect_to_https(
+    bind: SocketAddr,
+    limits: ConnectionLimits,
+    mut stop: tokio::sync::watch::Receiver<bool>,
+) {
     let listener = match TcpListener::bind(bind).await {
         Ok(l) => l,
         Err(err) => {
@@ -299,19 +455,40 @@ async fn redirect_to_https(bind: SocketAddr, mut stop: tokio::sync::watch::Recei
         }
     };
     let router = Router::new().fallback(redirect);
+    let slots = Arc::new(Semaphore::new(limits.max_connections.max(1)));
+    let mut accept_errors = AcceptErrors::default();
     loop {
+        let slot = tokio::select! {
+            slot = Arc::clone(&slots).acquire_owned() => match slot {
+                Ok(slot) => slot,
+                Err(_) => return,
+            },
+            _ = stop.changed() => return,
+        };
         let tcp = tokio::select! {
             accepted = listener.accept() => match accepted {
-                Ok((tcp, _)) => tcp,
-                Err(_) => continue,
+                Ok((tcp, _)) => {
+                    accept_errors.recovered();
+                    tcp
+                }
+                Err(err) => {
+                    accept_errors.failed(&err);
+                    tokio::time::sleep(ACCEPT_BACKOFF).await;
+                    continue;
+                }
             },
             _ = stop.changed() => return,
         };
         let service = TowerToHyperService::new(router.clone());
         drop(tokio::spawn(async move {
-            let _ = Builder::new(TokioExecutor::new())
-                .serve_connection(TokioIo::new(tcp), service)
-                .await;
+            // The redirect answers one short request; the header timer
+            // also closes connections that send nothing.
+            let _ = tokio::time::timeout(
+                limits.handshake_timeout + limits.header_read_timeout,
+                builder(limits).serve_connection(TokioIo::new(tcp), service),
+            )
+            .await;
+            drop(slot);
         }));
     }
 }

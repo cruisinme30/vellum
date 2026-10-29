@@ -1,0 +1,7 @@
+Ops
+☐ Renew TLS certificates due:2026-11-03 15:00 p2
+☐ Check backup restore every!:2w
+☐ Standup notes every:weekday 09:00
+☑︎ Rotate the on-call schedule
+1 / 1
+

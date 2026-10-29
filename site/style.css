@@ -1588,7 +1588,11 @@ footer.foot {
     color: CanvasText;
   }
   .ai,
-  .ai * {
+  .ai *,
+  .ai .kicker,
+  .ai p,
+  .flow li,
+  .clients li {
     border-color: CanvasText;
     background: Canvas;
     color: CanvasText;
