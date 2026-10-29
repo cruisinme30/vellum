@@ -44,6 +44,7 @@ const CANONICAL_ORDER: &[&str] = &[
     "when",
     "start",
     "due",
+    "block",
     "rrule",
     "recur_from",
     "remind",
@@ -52,6 +53,7 @@ const CANONICAL_ORDER: &[&str] = &[
     "list",
     "done",
     "src",
+    "gcal",
 ];
 
 const fn is_key_char(c: char) -> bool {
