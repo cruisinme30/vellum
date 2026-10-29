@@ -495,7 +495,10 @@ Hi,\r\n- line item {x=1}\r\nThanks\r\n";
 
     #[test]
     fn slack_signature() {
-        let secret = b"8f742231b10e8888abcd99yyyzzz85a5";
+        // Random secrets, so no key is written into the source.
+        let token = ShareToken::generate().unwrap();
+        let secret = token.expose().as_bytes();
+        let other = ShareToken::generate().unwrap();
         let body = b"payload=%7B%7D";
         let now: Timestamp = "2026-11-02T09:00:00Z".parse().unwrap();
         let ts = now.as_second().to_string();
@@ -514,7 +517,7 @@ Hi,\r\n- line item {x=1}\r\nThanks\r\n";
         );
         assert_eq!(verify_slack(secret, &ts, &sig, body, now), Ok(()));
         assert_eq!(
-            verify_slack(b"other", &ts, &sig, body, now),
+            verify_slack(other.expose().as_bytes(), &ts, &sig, body, now),
             Err(CaptureError::Signature)
         );
         assert_eq!(
