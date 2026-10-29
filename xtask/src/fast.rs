@@ -141,7 +141,7 @@ fn steps(base: Option<&str>, branch: Option<&str>) -> Vec<Step> {
         Step::new(
             "Shell",
             "bash",
-            &["-c", "shellcheck -x scripts/ci/*.sh .githooks/*"],
+            &["-c", "shellcheck -x scripts/*/*.sh .githooks/*"],
         )
         .needs("shellcheck"),
         Step::new("Markdown", "markdownlint-cli2", &[]),

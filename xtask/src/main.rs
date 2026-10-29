@@ -7,6 +7,8 @@
 //!   pre-push hook runs it before every push.
 //! - `cargo xtask install-hooks` turns on the repository's git hooks and
 //!   commit template.
+//! - `cargo xtask relock` resolves `Cargo.lock` and `web/pnpm-lock.yaml`
+//!   conflicts after merging `develop`.
 //! - `cargo xtask boundaries` enforces the crate layering: every workspace
 //!   crate declares a layer in `[package.metadata.vellum]`, and may depend
 //!   only on Vellum crates in strictly lower layers. Crates in the same
@@ -17,14 +19,16 @@ use std::process::{Command, ExitCode};
 
 mod boundaries;
 mod fast;
+mod relock;
 
-const USAGE: &str = "usage: cargo xtask <fast | install-hooks | boundaries>";
+const USAGE: &str = "usage: cargo xtask <fast | install-hooks | relock | boundaries>";
 
 fn main() -> ExitCode {
     let command = std::env::args().nth(1);
     let result = match command.as_deref() {
         Some("fast") => fast::run(),
         Some("install-hooks") => install_hooks(),
+        Some("relock") => relock::run(),
         Some("boundaries") => boundaries::run(),
         _ => Err(USAGE.to_owned()),
     };
