@@ -13,8 +13,9 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use serde_json::json;
 use vellum_collections::service::{
-    Access, ChartInput, CollectionsService, CreateFromCsvInput, CreateRowInput, ExportCsvInput,
-    ImportCsvInput, IndexFeed, Need, QueryInput, RowKey, SaveViewInput, UpdateRowInput, ViewKey,
+    Access, AddPropertyInput, ChartInput, CollectionsService, CreateFromCsvInput, CreateRowInput,
+    ExportCsvInput, ImportCsvInput, IndexFeed, Need, PropertyKey, QueryInput, RowKey,
+    SaveViewInput, UpdatePropertyInput, UpdateRowInput, ViewKey,
 };
 use vellum_collections::{DateValue, Value, ViewKind, view};
 use vellum_contracts::{
@@ -682,6 +683,9 @@ async fn operations_are_valid_and_callable() {
             "collections.delete_row",
             "collections.save_view",
             "collections.delete_view",
+            "collections.add_property",
+            "collections.update_property",
+            "collections.delete_property",
             "collections.embed",
             "collections.chart",
             "collections.export_csv",
@@ -955,6 +959,178 @@ async fn saves_renames_and_deletes_views() {
         kind(f.service.save_view(&ctx(bo), board("Mine")).await),
         ErrorKind::PermissionDenied
     );
+}
+
+#[cfg(test)]
+fn add(name: &str, kind: &str) -> AddPropertyInput {
+    AddPropertyInput {
+        collection_id: REQS.parse().unwrap(),
+        name: name.into(),
+        kind: kind.into(),
+        options: Vec::new(),
+        formula: None,
+        via: None,
+        prop: None,
+        agg: None,
+        format: None,
+    }
+}
+
+#[cfg(test)]
+fn change(key: &str) -> UpdatePropertyInput {
+    UpdatePropertyInput {
+        collection_id: REQS.parse().unwrap(),
+        key: key.into(),
+        name: None,
+        options: None,
+        formula: None,
+        format: None,
+    }
+}
+
+#[tokio::test]
+async fn adds_changes_and_removes_properties() {
+    let f = fixture().await;
+    let ana = UserId::generate();
+    f.grants.grant(ana, REQS, Need::Edit);
+    f.grants.grant(ana, RELS, Need::Read);
+    let c = ctx(ana);
+    let schema_path = format!("{REQS_DIR}/schema.yaml");
+
+    // A select gets a key from its name and lands at the end.
+    let mut status = add("Status", "select");
+    status.options =
+        serde_json::from_value(json!([{"name": "Draft"}, {"name": "Live", "color": "green"}]))
+            .unwrap();
+    let info = f.service.add_property(&c, status).await.unwrap();
+    let last = info.properties.last().unwrap();
+    assert_eq!(
+        (last.key.as_str(), last.kind.as_str()),
+        ("status", "select")
+    );
+    assert_eq!(last.options.len(), 2);
+    assert!(read(&f.root, &schema_path).contains("key: status"));
+
+    // Names clash without regard to case; relations and titles are refused.
+    assert_eq!(
+        kind(f.service.add_property(&c, add("STATUS", "text")).await),
+        ErrorKind::Conflict
+    );
+    assert_eq!(
+        kind(f.service.add_property(&c, add("Owner", "relation")).await),
+        ErrorKind::InvalidInput
+    );
+    assert_eq!(
+        kind(f.service.add_property(&c, add("Other", "title")).await),
+        ErrorKind::InvalidInput
+    );
+    assert_eq!(
+        kind(f.service.add_property(&c, add("Odd", "nope")).await),
+        ErrorKind::InvalidInput
+    );
+    let mut broken = add("Twice", "formula");
+    broken.formula = Some("Nope * 2".into());
+    assert_eq!(
+        kind(f.service.add_property(&c, broken).await),
+        ErrorKind::InvalidInput
+    );
+
+    // A formula and a rollup (its relation named, not keyed) are checked as on load.
+    let mut twice = add("Twice", "formula");
+    twice.formula = Some("Estimate * 2".into());
+    let info = f.service.add_property(&c, twice).await.unwrap();
+    assert_eq!(
+        info.properties.last().unwrap().formula.as_deref(),
+        Some("Estimate * 2")
+    );
+
+    // A rename is refused while a formula names the property.
+    let mut rename = change("est");
+    rename.name = Some("Points".into());
+    assert_eq!(
+        kind(f.service.update_property(&c, rename).await),
+        ErrorKind::Conflict
+    );
+    let mut rename = change("status");
+    rename.name = Some("Stage".into());
+    rename.options = Some(
+        serde_json::from_value(
+            json!([{"name": "Draft"}, {"name": "Live"}, {"name": "Live"}, {"name": " "}]),
+        )
+        .unwrap(),
+    );
+    let info = f.service.update_property(&c, rename).await.unwrap();
+    let stage = info.properties.iter().find(|p| p.key == "status").unwrap();
+    assert_eq!(stage.name, "Stage");
+    assert_eq!(stage.options.len(), 2);
+    let mut wrong = change("dn");
+    wrong.formula = Some("1".into());
+    assert_eq!(
+        kind(f.service.update_property(&c, wrong).await),
+        ErrorKind::InvalidInput
+    );
+    assert_eq!(
+        kind(f.service.update_property(&c, change("gone")).await),
+        ErrorKind::NotFound
+    );
+
+    // Only editors change properties.
+    let bo = UserId::generate();
+    f.grants.grant(bo, REQS, Need::Read);
+    f.grants.grant(bo, RELS, Need::Read);
+    assert_eq!(
+        kind(f.service.add_property(&ctx(bo), add("Mine", "text")).await),
+        ErrorKind::PermissionDenied
+    );
+}
+
+#[tokio::test]
+async fn removing_a_property_cleans_up_views() {
+    let f = fixture().await;
+    let ana = UserId::generate();
+    f.grants.grant(ana, REQS, Need::Edit);
+    f.grants.grant(ana, RELS, Need::Read);
+    let c = ctx(ana);
+    let schema_path = format!("{REQS_DIR}/schema.yaml");
+    let mut stage = add("Stage", "select");
+    stage.options = serde_json::from_value(json!([{"name": "Live"}])).unwrap();
+    let _ = f.service.add_property(&c, stage).await.unwrap();
+    let mut twice = add("Twice", "formula");
+    twice.formula = Some("Estimate * 2".into());
+    let _ = f.service.add_property(&c, twice).await.unwrap();
+
+    // Removing a property also drops the view settings that used it.
+    let mut by_stage = board("By stage");
+    by_stage.group = Some("Stage".into());
+    by_stage.filter = vec!["Estimate > 1".into(), "Stage is Live".into()];
+    by_stage.hide = Vec::new();
+    let _ = f.service.save_view(&c, by_stage).await.unwrap();
+    let key = |key: &str| PropertyKey {
+        collection_id: REQS.parse().unwrap(),
+        key: key.into(),
+    };
+    let info = f.service.delete_property(&c, key("stage")).await.unwrap();
+    assert!(info.properties.iter().all(|p| p.key != "stage"));
+    let view = info.views.iter().find(|v| v.name == "By stage").unwrap();
+    assert_eq!(view.group, None);
+    assert_eq!(view.filters, ["est > 1"]);
+    assert!(!read(&f.root, &schema_path).contains("key: stage"));
+
+    // The title, a two-way relation and a property a formula reads stay.
+    assert_eq!(
+        kind(f.service.delete_property(&c, key("t")).await),
+        ErrorKind::InvalidInput
+    );
+    assert_eq!(
+        kind(f.service.delete_property(&c, key("rel")).await),
+        ErrorKind::InvalidInput
+    );
+    assert_eq!(
+        kind(f.service.delete_property(&c, key("est")).await),
+        ErrorKind::Conflict
+    );
+    let info = f.service.delete_property(&c, key("twice")).await.unwrap();
+    assert!(info.properties.iter().all(|p| p.key != "twice"));
 }
 
 #[tokio::test]

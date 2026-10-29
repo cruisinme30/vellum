@@ -113,6 +113,51 @@ export interface AddComment {
 }
 
 /**
+ * Adds a property (a column) to a collection. The server picks its key
+ * from the name.
+ */
+export interface AddPropertyInput {
+  /**
+   * A rollup's aggregation.
+   */
+  agg?: Aggregation | null;
+  /**
+   * The collection.
+   */
+  collection_id: CollectionId;
+  /**
+   * How numbers show.
+   */
+  format?: NumberFormat | null;
+  /**
+   * A formula's expression (`round(Estimate * 0.5, 1)`).
+   */
+  formula?: string | null;
+  /**
+   * The display name, unique in the collection.
+   */
+  name: string;
+  /**
+   * Options of a select or multi-select, in order.
+   */
+  options?: SelectOption[];
+  /**
+   * A rollup's property on the related rows, by key or name.
+   */
+  prop?: string | null;
+  /**
+   * The type: `text`, `number`, `select`, `multi`, `person`, `date`,
+   * `checkbox`, `url`, `rollup`, `formula` or `created`. Relations are
+   * two-way, so they are added in `schema.yaml`.
+   */
+  type: string;
+  /**
+   * A rollup's relation property, by key or name.
+   */
+  via?: string | null;
+}
+
+/**
  * `books.add_section`.
  */
 export interface AddSection {
@@ -4331,6 +4376,20 @@ export interface PropertyInfo {
 }
 
 /**
+ * Names one property.
+ */
+export interface PropertyKey {
+  /**
+   * The collection.
+   */
+  collection_id: CollectionId;
+  /**
+   * The property's key.
+   */
+  key: string;
+}
+
+/**
  * The result of a push registration change.
  */
 export interface PushDevices {
@@ -6776,6 +6835,37 @@ export interface UpdateMe {
 }
 
 /**
+ * Changes a property. Fields left out stay as they are; the type and key
+ * never change.
+ */
+export interface UpdatePropertyInput {
+  /**
+   * The collection.
+   */
+  collection_id: CollectionId;
+  /**
+   * How numbers show.
+   */
+  format?: NumberFormat | null;
+  /**
+   * A formula's new expression.
+   */
+  formula?: string | null;
+  /**
+   * The property's key.
+   */
+  key: string;
+  /**
+   * A new display name.
+   */
+  name?: string | null;
+  /**
+   * The full new option list of a select or multi-select.
+   */
+  options?: SelectOption[] | null;
+}
+
+/**
  * Changes some values of a row, and optionally its body.
  */
 export interface UpdateRowInput {
@@ -8462,6 +8552,13 @@ export interface Operations {
     input: UpdateSection;
     output: SectionDoc;
   };
+  /** Add a property (a column) to a collection */
+  "collections.add_property": {
+    method: "POST";
+    path: "/v1/collections/{collection_id}/properties";
+    input: AddPropertyInput;
+    output: CollectionInfo;
+  };
   /** Compute a chart's data from a collection */
   "collections.chart": {
     method: "GET";
@@ -8482,6 +8579,13 @@ export interface Operations {
     path: "/v1/collections/{collection_id}/rows";
     input: CreateRowInput;
     output: RowWritten;
+  };
+  /** Remove a property and the view settings that use it */
+  "collections.delete_property": {
+    method: "DELETE";
+    path: "/v1/collections/{collection_id}/properties/{key}";
+    input: PropertyKey;
+    output: CollectionInfo;
   };
   /** Delete a row and unlink it */
   "collections.delete_row": {
@@ -8551,6 +8655,13 @@ export interface Operations {
     method: "PUT";
     path: "/v1/collections/{collection_id}/views/{view}";
     input: SaveViewInput;
+    output: CollectionInfo;
+  };
+  /** Rename a property or change its options, formula or format */
+  "collections.update_property": {
+    method: "PATCH";
+    path: "/v1/collections/{collection_id}/properties/{key}";
+    input: UpdatePropertyInput;
     output: CollectionInfo;
   };
   /** Change a row's values or body */
@@ -9361,9 +9472,11 @@ export const OPERATIONS = {
   "books.remove_section": { method: "DELETE", path: "/v1/books/{book_id}/sections/{section_id}", mutation: true },
   "books.set_section_access": { method: "PUT", path: "/v1/books/{book_id}/sections/{section_id}/access", mutation: true },
   "books.update_section": { method: "PATCH", path: "/v1/books/{book_id}/sections/{section_id}", mutation: true },
+  "collections.add_property": { method: "POST", path: "/v1/collections/{collection_id}/properties", mutation: true },
   "collections.chart": { method: "GET", path: "/v1/collections/chart", mutation: false },
   "collections.create_from_csv": { method: "POST", path: "/v1/collections", mutation: true },
   "collections.create_row": { method: "POST", path: "/v1/collections/{collection_id}/rows", mutation: true },
+  "collections.delete_property": { method: "DELETE", path: "/v1/collections/{collection_id}/properties/{key}", mutation: true },
   "collections.delete_row": { method: "DELETE", path: "/v1/collections/{collection_id}/rows/{row_id}", mutation: true },
   "collections.delete_view": { method: "DELETE", path: "/v1/collections/{collection_id}/views/{view}", mutation: true },
   "collections.embed": { method: "GET", path: "/v1/collections/embed", mutation: false },
@@ -9374,6 +9487,7 @@ export const OPERATIONS = {
   "collections.list": { method: "GET", path: "/v1/collections", mutation: false },
   "collections.query": { method: "GET", path: "/v1/collections/{collection_id}/query", mutation: false },
   "collections.save_view": { method: "PUT", path: "/v1/collections/{collection_id}/views/{view}", mutation: true },
+  "collections.update_property": { method: "PATCH", path: "/v1/collections/{collection_id}/properties/{key}", mutation: true },
   "collections.update_row": { method: "PATCH", path: "/v1/collections/{collection_id}/rows/{row_id}", mutation: true },
   "drive.activity": { method: "GET", path: "/v1/drive/items/{id}/activity", mutation: false },
   "drive.backlinks": { method: "GET", path: "/v1/drive/items/{id}/backlinks", mutation: false },
