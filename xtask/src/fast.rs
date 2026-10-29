@@ -150,8 +150,8 @@ pub fn run() -> Result<(), String> {
         (Outcome::NotNeeded, Outcome::NotNeeded)
     };
     if areas.rust && !docker_available() {
-        // The missing tool is Docker, which the vellum-db Postgres tests need.
-        results.push(("Postgres tests in vellum-db (Docker)", Outcome::Skipped));
+        // The missing tool is Docker, which the Postgres and Meilisearch tests need.
+        results.push(("Postgres and Meilisearch tests (Docker)", Outcome::Skipped));
     }
     results.push(("Crate boundaries", boundaries));
     results.push(("Help books and their corpus", help));
@@ -210,16 +210,19 @@ fn desktop_steps() -> Vec<Step> {
     .collect()
 }
 
-/// Test binaries that start Postgres in a container through testcontainers.
-const DOCKER_TESTS: &str = "binary_id(vellum-db::postgres) | binary_id(vellum-db::shards)";
+/// Tests that start Postgres or Meilisearch in a container through
+/// testcontainers: two whole `vellum-db` binaries, plus every test named
+/// after the engine it starts.
+const DOCKER_TESTS: &str = "binary_id(vellum-db::postgres) | binary_id(vellum-db::shards) \
+     | test(/postgres/) | test(/meilisearch/)";
 
 /// Whether a Docker daemon looks reachable: `DOCKER_HOST` is set or the
 /// default socket exists. Cloud sandboxes have neither.
 fn docker_available() -> bool {
     env::var_os("DOCKER_HOST").is_some() || Path::new("/var/run/docker.sock").exists()
 }
-
-/// The workspace tests. Without Docker, the container-backed Postgres
+/// The workspace tests. Without Docker, the container-backed database
+/// and search tests are left out (and reported as skipped); CI always runs them.
 /// tests are left out (and reported as skipped); CI always runs them.
 fn rust_tests(docker: bool) -> Step {
     let mut step = Step::new(
