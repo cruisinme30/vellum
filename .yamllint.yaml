@@ -9,6 +9,8 @@ ignore: |
   desktop/node_modules/
   desktop/pnpm-lock.yaml
   target/
+  # Helm templates are Go templates; helm lint checks them.
+  deploy/helm/*/templates/
 
 rules:
   line-length:

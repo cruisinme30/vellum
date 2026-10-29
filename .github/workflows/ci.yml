@@ -218,7 +218,7 @@ jobs:
       - name: YAML
         run: yamllint --strict .
       - name: Shell
-        run: shellcheck -x scripts/*/*.sh .githooks/*
+        run: shellcheck -x scripts/*/*.sh deploy/*/*.sh .githooks/*
       - name: Workflow security (zizmor)
         # ADR 0032, D126: template injection, excessive token permissions,
         # unpinned or impostor actions, credential persistence, cooldowns.
@@ -251,7 +251,12 @@ jobs:
         uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: SQL, Docker, Helm and Kubernetes
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v3.19.0
+      - name: Install hadolint and kube-score
+        run: scripts/ci/install-infra-tools.sh
+      - name: SQL, Docker, Compose, Helm and Kubernetes
         run: scripts/ci/lint-infra.sh
 
   commits:

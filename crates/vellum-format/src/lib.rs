@@ -30,6 +30,15 @@ pub use diagnostic::{Diagnostic, DiagnosticCode};
 pub use front_matter::{FrontMatter, Status};
 pub use serialize::serialize;
 
+/// The deepest nesting the parser builds.
+///
+/// It is counted separately for blocks (`:::` containers, block quotes
+/// and lists together) and for inline markup (emphasis, links and the
+/// like). Deeper content is kept as plain
+/// text with a [`DiagnosticCode::NestingTooDeep`] diagnostic, so a hostile
+/// file cannot exhaust the stack of the code that walks the tree (D120).
+pub const MAX_NESTING: usize = 32;
+
 /// A parsed document and the problems found while reading it.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Parsed {

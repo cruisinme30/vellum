@@ -15,6 +15,7 @@
 //! | [`create_url`] | The prefilled create-issue URL |
 //! | [`insights`] | Cycle time, lead time and triage time |
 //! | [`triage`] | AI-suggested triage through the user's own model |
+//! | [`work`] | The [`model::WorkCommands`] port over the issue tracker engine |
 //!
 //! The issue core owns issues, states and numbering. This crate reads it
 //! through [`model::IssueSnapshot`] and changes it only through the
@@ -30,5 +31,6 @@ pub mod intake;
 pub mod model;
 pub mod recurring;
 pub mod triage;
+pub mod work;
 
 mod mac;

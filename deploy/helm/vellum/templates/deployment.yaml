@@ -1,0 +1,28 @@
+{{/*
+SPDX-FileCopyrightText: 2026 The Vellum contributors
+SPDX-License-Identifier: AGPL-3.0-only
+*/}}
+{{- if not .Values.canary.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "vellum.fullname" . }}
+  labels:
+    {{- include "vellum.labels" . | nindent 4 }}
+    {{- include "vellum.selector" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      {{- include "vellum.selector" . | nindent 6 }}
+  template:
+    {{- include "vellum.podTemplate" . | nindent 4 }}
+{{- end }}

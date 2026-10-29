@@ -1,0 +1,104 @@
+{{/*
+SPDX-FileCopyrightText: 2026 The Vellum contributors
+SPDX-License-Identifier: AGPL-3.0-only
+
+Kroki renders D2, PlantUML, Graphviz, Excalidraw and draw.io diagrams. It
+runs in secure mode with no egress; the companions share its pod.
+*/}}
+{{- if .Values.kroki.enabled }}
+{{- $fullname := include "vellum.fullname" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}-kroki
+  labels:
+    {{- include "vellum.labels" . | nindent 4 }}
+    {{- include "vellum.krokiSelector" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.kroki.replicaCount }}
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      {{- include "vellum.krokiSelector" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "vellum.labels" . | nindent 8 }}
+        {{- include "vellum.krokiSelector" . | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  {{- include "vellum.krokiSelector" . | nindent 18 }}
+      containers:
+        - name: kroki
+          image: {{ include "vellum.image" (dict "image" .Values.kroki.image "default" "") }}
+          imagePullPolicy: Always
+          env:
+            - { name: KROKI_SAFE_MODE, value: secure }
+            - { name: KROKI_EXCALIDRAW_HOST, value: localhost }
+            - { name: KROKI_DIAGRAMSNET_HOST, value: localhost }
+            - { name: JAVA_TOOL_OPTIONS, value: "-Djava.io.tmpdir=/tmp" }
+          ports:
+            - { name: http, containerPort: 8000, protocol: TCP }
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 3
+          readinessProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.kroki.resources | nindent 12 }}
+          securityContext:
+            {{- include "vellum.containerSecurity" . | nindent 12 }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+        {{- range $name, $port := dict "excalidraw" 8004 "diagramsnet" 8005 }}
+        - name: {{ $name }}
+          image: {{ include "vellum.image" (dict "image" (index $.Values.kroki $name) "default" "") }}
+          imagePullPolicy: Always
+          env:
+            - { name: HOME, value: /tmp }
+          ports:
+            - { name: {{ $name | trunc 10 }}, containerPort: {{ $port }}, protocol: TCP }
+          # Readiness only: a crashed companion restarts on its own, and a
+          # TCP liveness check would duplicate this probe.
+          readinessProbe:
+            tcpSocket: { port: {{ $port }} }
+            periodSeconds: 5
+          resources:
+            {{- toYaml $.Values.kroki.companionResources | nindent 12 }}
+          securityContext:
+            {{- include "vellum.containerSecurity" $ | nindent 12 }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp, subPath: {{ $name }} }
+        {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: { sizeLimit: 1Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}-kroki
+  labels:
+    {{- include "vellum.labels" . | nindent 4 }}
+    {{- include "vellum.krokiSelector" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "vellum.krokiSelector" . | nindent 4 }}
+  ports:
+    - { name: http, port: 8000, targetPort: http, protocol: TCP }
+{{- end }}
