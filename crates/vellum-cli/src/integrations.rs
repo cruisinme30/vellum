@@ -310,7 +310,7 @@ impl ServiceWork {
     async fn run<R: Send>(
         &self,
         actor: UserRef,
-        step: impl FnOnce(
+        mut step: impl FnMut(
             &mut vellum_work::WorkGraph,
             &mut vellum_work::Comments,
             &vellum_work::Ctx,
@@ -364,7 +364,7 @@ impl WorkCommands for ServiceWork {
         let span = tracing::info_span!("work.create_issue", team = %draft.team);
         tracing::Instrument::instrument(
             self.run(self.bot.clone(), |graph, _, ctx| {
-                let (key, changes) = steps::create_issue(graph, draft, ctx)?;
+                let (key, changes) = steps::create_issue(graph, draft.clone(), ctx)?;
                 Ok((changes.unwrap_or_default(), None, key))
             }),
             span,
@@ -559,7 +559,7 @@ mod tests {
         )
         .unwrap();
         work.transact(UserRef::parse("admin").unwrap(), |graph, _, _| {
-            graph.insert_team(team)?;
+            graph.insert_team(team.clone())?;
             let mut changes = Changes::default();
             let _ = changes.teams.insert(TeamKey::parse("ENG")?);
             Ok((changes, None, ()))
