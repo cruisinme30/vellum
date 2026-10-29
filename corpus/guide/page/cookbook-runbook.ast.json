@@ -1,0 +1,245 @@
+{
+  "document": {
+    "front_matter": {
+      "fields": {
+        "id": "01JB9E4F6G8H0J2K4M6N8P0Q2R",
+        "title": "Runbook: gateway latency",
+        "icon": "🚨",
+        "status": "verified",
+        "owner": "sam",
+        "tags": [
+          "runbook",
+          "on-call"
+        ],
+        "verify_every": "90d",
+        "vellum": 1
+      }
+    },
+    "blocks": [
+      {
+        "type": "container",
+        "name": "crit",
+        "arg": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "sections": [
+          [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Never roll back the audit writer separately from the gateway."
+                }
+              ],
+              "id": null
+            }
+          ]
+        ]
+      },
+      {
+        "type": "heading",
+        "level": 2,
+        "content": [
+          {
+            "type": "text",
+            "text": "Decide"
+          }
+        ],
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null
+      },
+      {
+        "type": "fence",
+        "lang": "mermaid",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "flowchart TD\n  A[p95 over 150 ms for 10 min] --> B{Deploy in the last hour?}\n  B -->|yes| C[Roll back the deploy]\n  B -->|no| D{CPU over 80%?}\n  D -->|yes| E[Scale out]\n  D -->|no| F[Page the gateway team]\n"
+      },
+      {
+        "type": "heading",
+        "level": 2,
+        "content": [
+          {
+            "type": "text",
+            "text": "Size the scale-out"
+          }
+        ],
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null
+      },
+      {
+        "type": "fence",
+        "lang": "calculator",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "rps: Current requests per second = 4000 [500..20000 step 500]\nper: Requests per replica = 900 [200..2000 step 50]\nresult: Replicas needed = round(rps / per + 1) (replicas)\n"
+      },
+      {
+        "type": "heading",
+        "level": 2,
+        "content": [
+          {
+            "type": "text",
+            "text": "Roll back"
+          }
+        ],
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "id": null
+      },
+      {
+        "type": "container",
+        "name": "steps",
+        "arg": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "sections": [
+          [
+            {
+              "type": "list",
+              "start": 1,
+              "tight": true,
+              "items": [
+                {
+                  "task": null,
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "strong",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Find the last good release"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " with "
+                        },
+                        {
+                          "type": "code",
+                          "code": "helm history gateway -n prod"
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                },
+                {
+                  "task": null,
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "strong",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Roll back"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " with "
+                        },
+                        {
+                          "type": "code",
+                          "code": "helm rollback gateway <revision> -n prod"
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                },
+                {
+                  "task": null,
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "strong",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Watch"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " "
+                        },
+                        {
+                          "type": "code",
+                          "code": "kubectl rollout status deploy/gateway -n prod"
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                },
+                {
+                  "task": null,
+                  "blocks": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "strong",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Announce"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " in the incidents channel and open an OPS issue"
+                        }
+                      ],
+                      "id": null
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "diagnostics": []
+}

@@ -1,0 +1,184 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Text can be "
+          },
+          {
+            "type": "strong",
+            "content": [
+              {
+                "type": "text",
+                "text": "bold"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": ", "
+          },
+          {
+            "type": "emphasis",
+            "content": [
+              {
+                "type": "text",
+                "text": "italic"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": ", "
+          },
+          {
+            "type": "strikethrough",
+            "content": [
+              {
+                "type": "text",
+                "text": "struck"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": ", "
+          },
+          {
+            "type": "highlight",
+            "content": [
+              {
+                "type": "text",
+                "text": "highlighted"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": ", "
+          },
+          {
+            "type": "code",
+            "code": "code"
+          },
+          {
+            "type": "text",
+            "text": ", H"
+          },
+          {
+            "type": "subscript",
+            "content": [
+              {
+                "type": "text",
+                "text": "2"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": "O and x"
+          },
+          {
+            "type": "superscript",
+            "content": [
+              {
+                "type": "text",
+                "text": "2"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": "."
+          }
+        ],
+        "id": null
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Marks nest: "
+          },
+          {
+            "type": "emphasis",
+            "content": [
+              {
+                "type": "strong",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "bold italic"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": ", "
+          },
+          {
+            "type": "strong",
+            "content": [
+              {
+                "type": "text",
+                "text": "bold with "
+              },
+              {
+                "type": "emphasis",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "italic"
+                  }
+                ]
+              },
+              {
+                "type": "text",
+                "text": " inside"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": " and "
+          },
+          {
+            "type": "emphasis",
+            "content": [
+              {
+                "type": "text",
+                "text": "italic with "
+              },
+              {
+                "type": "strong",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "bold"
+                  }
+                ]
+              },
+              {
+                "type": "text",
+                "text": " inside"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": "."
+          }
+        ],
+        "id": null
+      }
+    ]
+  },
+  "diagnostics": []
+}

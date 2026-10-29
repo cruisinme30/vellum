@@ -14,22 +14,28 @@
 //!   only on Vellum crates in strictly lower layers. Crates in the same
 //!   layer (for example two services) can never depend on each other, so a
 //!   service cannot reach into another service's storage.
+//! - `cargo xtask help` checks the help books in `docs/`, and
+//!   `cargo xtask help write` regenerates the files derived from them.
 
 use std::process::{Command, ExitCode};
 
 mod boundaries;
 mod fast;
+mod help;
 mod relock;
 
-const USAGE: &str = "usage: cargo xtask <fast | install-hooks | relock | boundaries>";
+const USAGE: &str =
+    "usage: cargo xtask <fast | install-hooks | relock | boundaries | help [check|write]>";
 
 fn main() -> ExitCode {
     let command = std::env::args().nth(1);
+    let mode = std::env::args().nth(2);
     let result = match command.as_deref() {
         Some("fast") => fast::run(),
         Some("install-hooks") => install_hooks(),
         Some("relock") => relock::run(),
         Some("boundaries") => boundaries::run(),
+        Some("help") => help::run(mode.as_deref()),
         _ => Err(USAGE.to_owned()),
     };
     match result {

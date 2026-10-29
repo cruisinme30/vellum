@@ -1,0 +1,19 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "fence",
+        "lang": "chart",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "title: Catch rate by attack class\ntype: donut\nDirect: 60\nIndirect: 30\nMulti-turn: 10\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}

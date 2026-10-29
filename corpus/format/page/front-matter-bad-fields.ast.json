@@ -1,0 +1,40 @@
+{
+  "document": {
+    "front_matter": {
+      "fields": {
+        "id": "not-a-ulid",
+        "status": "done",
+        "vellum": 2
+      }
+    },
+    "blocks": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Each bad field is reported, and the page still renders."
+          }
+        ],
+        "id": null
+      }
+    ]
+  },
+  "diagnostics": [
+    {
+      "line": 0,
+      "code": "front_matter_field",
+      "message": "`id` must be a 26-character ULID, found not-a-ulid"
+    },
+    {
+      "line": 0,
+      "code": "front_matter_field",
+      "message": "`status` must be draft, in-review, verified or outdated, found done"
+    },
+    {
+      "line": 0,
+      "code": "front_matter_field",
+      "message": "`vellum` must be 1, found 2"
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+---
+id: 01M63CFE61A85MTD76GSEW6GB7
+title: Sign-in, SSO and SCIM
+vellum: 1
+---
+
+# Sign-in, SSO and SCIM
+
+## Sign-in methods {#methods}
+
+**Admin → Sign-in** turns on any mix of:
+
+- email and password, with optional TOTP or passkeys
+- OpenID Connect (Google Workspace, Microsoft Entra ID, Okta, Keycloak and any other OIDC provider)
+- SAML 2.0
+
+With SSO on, you can require it for everyone except **break-glass
+admins**, who can still sign in with a password and passkey if the
+identity provider is down. Existing sessions keep working while the
+provider is down.
+
+## SCIM provisioning {#scim}
+
+Turn on SCIM in **Admin → Sign-in → Provisioning** and paste the URL and
+token into your identity provider. Users and groups created there
+appear in Vellum; users removed there are deactivated, their sessions
+end and their content stays with its folders.
+
+## Sessions {#sessions}
+
+Browser sessions use HttpOnly, Secure, SameSite cookies and expire after
+the idle time you set. Repeated failed sign-ins lock the account for a
+period. **Admin → Users → Sign out everywhere** ends all of one person's
+sessions at once.
+
+## API tokens {#tokens}
+
+People create personal API tokens in **Settings → API tokens**, each
+with scopes (`read`, `write:draft`, `write:direct`, `work`, `admin`) and
+an expiry. Admins can list and revoke any token and cap the longest
+expiry allowed.

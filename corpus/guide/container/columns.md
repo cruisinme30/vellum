@@ -1,0 +1,9 @@
+::: columns
+**Problem**
+Policy changes ship blind.
+
+---
+
+**Outcome**
+Every change ships with a report.
+:::

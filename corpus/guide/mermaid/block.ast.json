@@ -1,0 +1,19 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "fence",
+        "lang": "mermaid",
+        "args": "",
+        "attrs": {
+          "id": null,
+          "classes": [],
+          "pairs": []
+        },
+        "literal": "block-beta\n  columns 3\n  client[\"Client\"] space gateway[\"Gateway\"]\n  space space space\n  db[(\"Audit log\")] space backend[\"Backend\"]\n  client --> gateway\n  gateway --> backend\n  gateway --> db\n"
+      }
+    ]
+  },
+  "diagnostics": []
+}
