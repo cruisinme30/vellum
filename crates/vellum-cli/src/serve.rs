@@ -264,7 +264,13 @@ pub fn run(config_path: Option<&Path>) -> Result<(), Error> {
         }
         let gateway = app_gateway(&services, gateway)?;
         tracing::info!(bind = %serve_config.bind, app = %host_of(&config.public_url.clone().unwrap_or_default()), "starting vellum");
-        serve(gateway, serve_config, shutdown_signal()).await
+        // Live-editing sockets stay open until their rooms close, so save
+        // and close the rooms before the server waits for connections.
+        let stop = async move {
+            shutdown_signal().await;
+            services.shutdown().await;
+        };
+        serve(gateway, serve_config, stop).await
     })
 }
 

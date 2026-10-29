@@ -38,6 +38,7 @@ url = "2.5.8"
 vellum-api = { path = "../vellum-api" }
 vellum-authz = { path = "../vellum-authz" }
 vellum-books-service = { path = "../vellum-books-service" }
+vellum-collab = { path = "../vellum-collab" }
 vellum-collections = { path = "../vellum-collections" }
 vellum-contracts.workspace = true
 vellum-crypto = { path = "../vellum-crypto", features = ["os-keychain"] }

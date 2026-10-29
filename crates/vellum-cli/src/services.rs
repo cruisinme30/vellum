@@ -20,6 +20,7 @@ use vellum_identity::{Identity, IdentityConfig, IdentityService, Store, http as 
 use vellum_kernel::{Config, Error, ErrorKind};
 use vellum_notify::service::{NotifyService, NotifyStore};
 
+use crate::collab::Collab;
 use crate::identity::{GuardedFetcher, IdentityAuthenticator};
 use crate::workspace;
 
@@ -32,10 +33,14 @@ pub struct Services {
     identity: Arc<Identity>,
     /// Push subscriptions and notification preferences.
     notify: Arc<NotifyService>,
+    /// The app's origin, which live-editing connections must come from.
+    origin: String,
     /// Collections, books and Work, when an index is configured.
     workspace: Vec<Arc<dyn Service>>,
     /// The integration receivers, when an integration secret is set.
     hooks: Option<axum::Router>,
+    /// Live editing, when an index is configured.
+    collab: Option<Collab>,
 }
 
 impl std::fmt::Debug for Services {
@@ -65,7 +70,7 @@ impl Services {
             )
         })?;
         let subject = url.to_string();
-        let mut config = IdentityConfig::new(url);
+        let mut config = IdentityConfig::new(url.clone());
         config.data_dir = data_dir.map(Path::to_path_buf);
         let store = match data_dir {
             Some(dir) => Store::open(dir)?,
@@ -80,8 +85,10 @@ impl Services {
         Ok(Self {
             identity: Arc::new(identity),
             notify: Arc::new(NotifyService::new(Arc::new(notify))),
+            origin: url.origin().ascii_serialization(),
             workspace: Vec::new(),
             hooks: None,
+            collab: None,
         })
     }
 
@@ -95,10 +102,29 @@ impl Services {
         config: &Config,
         var: impl Fn(&str) -> Option<String> + Send + Sync,
     ) -> Result<Self, Error> {
-        let opened = workspace::open(config, &self.identity, self.notify.store(), var).await?;
+        let opened =
+            workspace::open(config, &self.identity, self.notify.store(), &self.origin, var).await?;
         self.workspace = opened.services;
         self.hooks = opened.hooks;
+        self.collab = opened.collab;
         Ok(self)
+    }
+
+    /// The live-editing endpoint, mounted at `/collab` by [`Self::mount`]:
+    /// one WebSocket per page at `/collab/{space_id}/{doc_id}`. Without a
+    /// workspace index it answers 503.
+    pub fn collab(&self) -> axum::Router {
+        self.collab
+            .as_ref()
+            .map_or_else(crate::collab::unavailable_router, Collab::router)
+    }
+
+    /// Saves every page open for live editing and closes its connections.
+    /// Call it after the server stops accepting requests.
+    pub async fn shutdown(&self) {
+        if let Some(collab) = &self.collab {
+            collab.shutdown().await;
+        }
     }
 
     /// Every typed service, in registration order.
@@ -130,6 +156,7 @@ impl Services {
                 "/.well-known",
                 identity_http::well_known_router(Arc::clone(identity)),
             )
+            .mount("/collab", self.collab())
     }
 }
 
