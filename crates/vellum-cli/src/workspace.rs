@@ -685,7 +685,7 @@ async fn join_cluster(
 }
 
 /// The drive and permission stores, routing each space to its shard:
-/// one of those `VELLUM_SHARDS` lists, or `index` alone (ADR 0040, D174).
+/// one of those `VELLUM_SHARDS` lists, or `index` alone (ADR 0040, D217).
 /// Also returns every shard's database, home first.
 async fn open_shards(
     index: &Index,

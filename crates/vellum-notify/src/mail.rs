@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 //! Email delivery: the per-person queue, sending what fell due and signed
-//! one-click unsubscribe links (ADR 0041, D174).
+//! one-click unsubscribe links (ADR 0041, D217).
 //!
 //! The dispatcher queues an email for each planned email delivery
 //! ([`queue`]). A timer calls [`Mailer::send_due`], which sends each

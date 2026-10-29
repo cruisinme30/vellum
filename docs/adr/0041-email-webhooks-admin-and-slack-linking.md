@@ -11,7 +11,7 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D174, D175, D176, D177
+- Decisions: D176, D177, D217, D218
 - Issue: #164, #149, #163
 - Pull requests: to be linked when merged
 
@@ -30,7 +30,7 @@ links.
 
 ## Decisions
 
-### D174: email is a queue in the notify state, sent by one timer
+### D217: email is a queue in the notify state, sent by one timer
 
 - The dispatcher queues each planned email delivery per person in
   `.vellum/notify.json`. A burst about one subject collapses into one
@@ -48,7 +48,7 @@ links.
   /unsubscribe` shows a button and `POST` mutes the subject. The HMAC
   key lives in the notify state.
 
-### D175: admins manage webhooks under /v1/admin/webhooks
+### D218: admins manage webhooks under /v1/admin/webhooks
 
 - `webhooks.*` operations need the admin scope. Operations: list,
   create, update, delete, rotate the secret, test (a signed `ping`),

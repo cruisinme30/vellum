@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 //! Outgoing email: the SMTP transport, the people directory and the
-//! one-click unsubscribe route (ADR 0041, D174).
+//! one-click unsubscribe route (ADR 0041, D217).
 //!
 //! | Variable | Meaning |
 //! |---|---|
