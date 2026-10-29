@@ -35,7 +35,9 @@ uuid = "1"
 vellum-authz = { path = "../vellum-authz" }
 vellum-contracts = { path = "../vellum-contracts" }
 vellum-db.workspace = true
+vellum-format = { path = "../vellum-format" }
 vellum-kernel.workspace = true
+vellum-store = { path = "../vellum-store" }
 zeroize = "1.9"
 
 [dev-dependencies]

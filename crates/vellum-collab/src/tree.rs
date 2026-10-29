@@ -26,7 +26,7 @@ use yrs::{
 
 /// Name of the `XmlFragment` root holding the body. The editor binds
 /// `y-prosemirror` to this field.
-pub const CONTENT_FIELD: &str = "content";
+pub const CONTENT_FIELD: &str = "default";
 
 /// Name of the `Map` root holding front matter.
 pub const META_FIELD: &str = "meta";
@@ -116,7 +116,9 @@ impl DocTree {
 }
 
 impl Node {
-    fn normalized(&self) -> Self {
+    /// This node in the form [`read`] returns (see [`DocTree::normalized`]).
+    #[must_use]
+    pub fn normalized(&self) -> Self {
         match self {
             Self::Element(element) => Self::Element(Element {
                 name: element.name.clone(),

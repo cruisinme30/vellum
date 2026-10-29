@@ -15,10 +15,10 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use tracing::Instrument as _;
-use vellum_authz::{Actor, Authz, AuthzStore, Directory, Id, Object, Permission, Relation};
+use vellum_authz::{Actor, Authz, AuthzStore, Id, Permission, Relation};
 use vellum_books::manifest::Principal as BookPrincipal;
 use vellum_contracts::Principal;
-use vellum_kernel::{BookId, Error, ErrorKind, ObjectId, Timestamp};
+use vellum_kernel::{BookId, Error, ErrorKind, ObjectId};
 use vellum_store::BlobPath;
 
 use crate::mirror::{self, Restrictions};
@@ -136,33 +136,14 @@ impl<S: AuthzStore + 'static> Access for AuthzAccess<S> {
         };
         let invalid = |e| Error::new(ErrorKind::Internal, "bad principal").with_source(e);
         let mut out = BTreeSet::from([BookPrincipal::user(user).map_err(invalid)?]);
-        let tuples = self
+        let groups = self
             .authz
-            .store()
-            .load_directory()
+            .groups_of(vellum_authz::Principal::User(Id(user.as_u128())))
             .await
             .map_err(unavailable)?;
-        let now = Timestamp::now().unix_ms();
-        let directory = Directory::new(&tuples, now);
-        let me = vellum_authz::Principal::User(Id(user.as_u128()));
-        let groups: BTreeSet<Id> = tuples
-            .iter()
-            .filter_map(|t| match t.object {
-                Object::Group(g) => Some(g),
-                _ => None,
-            })
-            .collect();
         for group in groups {
-            // `expand` gives each member the time their best path through
-            // nested groups stops counting.
-            if directory
-                .expand(group)
-                .get(&me)
-                .is_some_and(|&until| until > now)
-            {
-                let _ = out
-                    .insert(BookPrincipal::group(ObjectId::from_u128(group.0)).map_err(invalid)?);
-            }
+            let _ =
+                out.insert(BookPrincipal::group(ObjectId::from_u128(group.0)).map_err(invalid)?);
         }
         Ok(out)
     }

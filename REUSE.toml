@@ -34,6 +34,7 @@ path = [
   "corpus/guide/**",
   "corpus/**/*.md",
   "corpus/**/*.json",
+  "corpus/**/*.html",
   "corpus/**/*.txt",
   ".gitmessage",
   "deploy/perf/*.json",

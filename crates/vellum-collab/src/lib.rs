@@ -29,6 +29,7 @@
 
 mod config;
 mod hub;
+pub mod markdown;
 pub mod memory;
 mod metrics;
 mod persist;
@@ -43,6 +44,7 @@ pub mod ws;
 
 pub use config::CollabConfig;
 pub use hub::{Access, CloseReason, Connection, Hub, JoinRequest, Outbound, PeerSender, RoomKey};
+pub use markdown::FormatCodec;
 
 pub use ports::{
     DocumentFiles, MarkdownCodec, MarkdownVersion, Seq, StoredUpdate, UpdateStore, VersionReason,

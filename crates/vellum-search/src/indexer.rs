@@ -113,6 +113,15 @@ impl Indexer {
         Ok(())
     }
 
+    /// Queues one document, for feeds that know IDs rather than events.
+    /// Waits when the queue is full.
+    ///
+    /// # Errors
+    /// When the indexing task has stopped.
+    pub async fn touch(&self, doc: DocId) -> Result<()> {
+        self.jobs.send(Job::Doc(doc)).await.map_err(|_| closed())
+    }
+
     /// Waits until everything queued before this call is indexed.
     ///
     /// # Errors

