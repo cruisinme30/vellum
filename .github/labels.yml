@@ -104,9 +104,6 @@
 - name: area/sync
   color: "5319e7"
   description: "vellum-sync: push/pull sync for the local-first clients"
-- name: area/desktop
-  color: "5319e7"
-  description: "The Electron desktop app"
 - name: area/editor
   color: "5319e7"
   description: "The web editor"
