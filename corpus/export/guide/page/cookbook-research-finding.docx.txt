@@ -1,0 +1,9 @@
+[Title] Buyers compare on audit, not price
+| Interviews | 7 of 9 |
+| Confidence | high |
+| Segment | regulated enterprises |
+
+[Quote] We only shortlisted gateways that could show us every blocked request for a year.
+[Heading2] Evidence
+[ListParagraph/0] Interview 03: bank, platform team
+[ListParagraph/0] Interview 07: insurer, security team

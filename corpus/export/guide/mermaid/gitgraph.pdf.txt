@@ -1,0 +1,15 @@
+gitGraph
+  commit id: "skeleton"
+  branch develop
+  checkout develop
+  commit id: "kernel"
+  branch feat/format
+  checkout feat/format
+  commit id: "parser"
+  commit id: "corpus"
+  checkout develop
+  merge feat/format
+  checkout main
+  merge develop tag: "v1.0.0"
+1 / 1
+

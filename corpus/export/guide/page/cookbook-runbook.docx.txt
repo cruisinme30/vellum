@@ -1,0 +1,15 @@
+[Title] Runbook: gateway latency
+| Critical Never roll back the audit writer separately from the gateway. |
+
+[Heading2] Decide
+[Code] flowchart TD  A[p95 over 150 ms for 10 min] --> B{Deploy in the last hour?}  B -->|yes| C[Roll back the deploy]  B -->|no| D{CPU over 80%?}  D -->|yes| E[Scale out]  D -->|no| F[Page the gateway team]
+[Heading2] Size the scale-out
+| Current requests per second | 4,000 |
+| Requests per replica | 900 |
+| Replicas needed | 5 replicas |
+
+[Heading2] Roll back
+[ListParagraph/0] Find the last good releasewith helm history gateway -n prod
+[ListParagraph/0] Roll backwith helm rollback gateway <revision> -n prod
+[ListParagraph/0] Watchkubectl rollout status deploy/gateway -n prod
+[ListParagraph/0] Announcein the incidents channel and open an OPS issue

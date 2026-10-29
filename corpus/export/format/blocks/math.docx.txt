@@ -1,0 +1,2 @@
+[Normal] The F1 score:
+[Normal] [equation]F1=2⋅P⋅RP+R

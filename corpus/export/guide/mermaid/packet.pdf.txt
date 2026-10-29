@@ -1,0 +1,8 @@
+packet-beta
+  title Share token record
+  0-15: "Version"
+  16-31: "Flags"
+  32-95: "Expiry (Unix ms)"
+  96-127: "Space ID prefix"
+1 / 1
+

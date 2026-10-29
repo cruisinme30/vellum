@@ -1,0 +1,12 @@
+journey
+  title Writing a status update
+  section Draft
+    Open last week's page: 4: Priya
+    Copy the template: 3: Priya
+  section Review
+    Ask for comments: 4: Priya, Dev
+    Resolve comments: 2: Priya
+  section Share
+    Post the link: 5: Priya
+1 / 1
+

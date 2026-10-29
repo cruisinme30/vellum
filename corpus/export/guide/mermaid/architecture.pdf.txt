@@ -1,0 +1,11 @@
+architecture-beta
+  group cloud(cloud)[Northstar cloud]
+  service gw(internet)[Gateway] in cloud
+  service api(server)[API] in cloud
+  service db(database)[Postgres] in cloud
+  service blob(disk)[Blob store] in cloud
+  gw:R --> L:api
+  api:R --> L:db
+  api:B --> T:blob
+1 / 1
+

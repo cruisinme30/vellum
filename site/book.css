@@ -215,6 +215,15 @@ body {
   min-height: 24px;
 }
 
+/* Site bar and sidebar links are at least 24 px tall, so stacked links
+   keep the minimum target size (SC 2.5.8). */
+.vellum-site a,
+.chapter li a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+}
+
 /* Long titles and code wrap instead of spilling over the page or the next cell. */
 .chapter li a,
 td,

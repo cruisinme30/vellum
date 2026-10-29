@@ -549,3 +549,57 @@ async fn break_glass_opens_a_short_admin_session_once() {
     assert_eq!(second.status, StatusCode::UNAUTHORIZED);
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// `vellum serve` with a plaintext index: the workspace services answer a
+/// signed-in user and turn away anonymous callers.
+#[tokio::test]
+async fn workspace_services_answer_signed_in_users() {
+    let dir = std::env::temp_dir().join(format!(
+        "vellum-workspace-test-{}-{}",
+        std::process::id(),
+        line!()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let mut config = vellum_kernel::Config::default();
+    config.data_dir = dir.clone();
+    let services = Services::open(ORIGIN, Some(&dir))
+        .unwrap()
+        .with_workspace(&config, |k| {
+            (k == crate::workspace::PLAINTEXT_VAR).then(|| "1".to_owned())
+        })
+        .await
+        .unwrap();
+    let names: Vec<_> = services.all().iter().map(|s| s.name()).collect();
+    assert!(
+        names.contains(&"collections") && names.contains(&"books") && names.contains(&"work"),
+        "{names:?}"
+    );
+    let mut gateway = GatewayConfig::new(ORIGIN, vec![3; 32]);
+    gateway.rate_per_second = 10_000;
+    gateway.rate_burst = 10_000;
+    let app = services
+        .mount(GatewayBuilder::new(gateway, VERSION))
+        .build()
+        .unwrap()
+        .router();
+
+    let anonymous = send(&app, finish(request("GET", "/api/v1/books"))).await;
+    assert_eq!(
+        anonymous.status,
+        StatusCode::UNAUTHORIZED,
+        "{}",
+        anonymous.text
+    );
+
+    let cookie = signed_in_admin(&app).await;
+    for path in ["/api/v1/books", "/api/v1/collections", "/api/v1/work/teams"] {
+        let reply = send(
+            &app,
+            finish(request("GET", path).header(header::COOKIE, &cookie)),
+        )
+        .await;
+        assert_eq!(reply.status, StatusCode::OK, "{path}: {}", reply.text);
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}

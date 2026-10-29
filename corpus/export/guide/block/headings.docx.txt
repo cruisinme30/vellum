@@ -1,0 +1,4 @@
+[Heading1] Page title
+[Heading2] Section
+[Heading3] Subsection
+[Heading4] Minor heading
