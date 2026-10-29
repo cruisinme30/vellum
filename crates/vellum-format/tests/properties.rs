@@ -170,6 +170,21 @@ proptest! {
     }
 }
 
+/// A quote or table in a list item writes its block ID after a blank line,
+/// so the list it sits in is loose (found on a pull request's CI run).
+#[test]
+fn quote_ids_in_list_items_round_trip() -> Result<(), TestCaseError> {
+    for src in [
+        "- Northstar\n  >\n  ^blk-a1b2c3d4",
+        "- >\n  ^blk-a1b2c3d4",
+        "- Northstar\n  > quoted\n\n  ^blk-a1b2c3d4\n- next",
+        "1. | a |\n   | - |\n\n   ^blk-a1b2c3d4",
+    ] {
+        assert_round_trip(src)?;
+    }
+    Ok(())
+}
+
 /// A paragraph line that only looks like a table's delimiter row once its
 /// escapes are dropped. Saving must keep the escape, or the paragraph comes
 /// back as a table (found by the `format_roundtrip` fuzz target, #300).
