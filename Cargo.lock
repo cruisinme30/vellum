@@ -4515,10 +4515,12 @@ dependencies = [
  "serde",
  "serde-saphyr",
  "tempfile",
+ "testcontainers-modules",
  "thiserror",
  "tokio",
  "tracing",
  "vellum-authz",
+ "vellum-db",
  "vellum-kernel",
  "vellum-store",
 ]

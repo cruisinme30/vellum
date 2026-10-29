@@ -27,11 +27,13 @@ serde-saphyr = { version = "2.0.0", default-features = false, features = ["seria
 thiserror = "2.0.21"
 tracing = "0.1.44"
 vellum-authz = { path = "../vellum-authz" }
+vellum-db.workspace = true
 vellum-kernel.workspace = true
 vellum-store = { path = "../vellum-store" }
 
 [dev-dependencies]
 proptest = ">=1.11.0, <1.12"
 tempfile = "3.27.0"
+testcontainers-modules = { version = "0.15", features = ["postgres"] }
 tokio = { version = "1.49.0", features = ["macros", "rt-multi-thread"] }
 vellum-store = { path = "../vellum-store", features = ["conformance"] }

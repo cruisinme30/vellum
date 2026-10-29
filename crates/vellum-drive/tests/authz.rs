@@ -10,9 +10,11 @@ use vellum_authz::{
     Actor as AuthzActor, Authz, Change, Id, MemoryStore, Object, Relation, Subject, Tuple,
     TupleRelation,
 };
+use vellum_db::{Index, IndexConfig};
 use vellum_drive::authz::AuthzAccess;
 use vellum_drive::memory::MemoryIndex;
-use vellum_drive::{Drive, DriveError, SpaceKind};
+use vellum_drive::sql::SqlIndex;
+use vellum_drive::{Drive, DriveError, DriveIndex, SpaceKind};
 use vellum_kernel::{Actor, ObjectId, SpaceId, UserId};
 use vellum_store::LocalStore;
 
@@ -37,9 +39,19 @@ const fn space_id(id: SpaceId) -> Id {
 
 #[tokio::test]
 async fn the_drive_runs_on_rebac() -> TestResult {
+    the_drive_runs_on_rebac_with(Arc::new(MemoryIndex::new())).await
+}
+
+#[tokio::test]
+async fn the_drive_runs_on_rebac_with_the_sqlite_index() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let db = Index::open(&IndexConfig::sqlite(dir.path().join("index.sqlite"), None)).await?;
+    the_drive_runs_on_rebac_with(Arc::new(SqlIndex::new(db))).await
+}
+
+async fn the_drive_runs_on_rebac_with(index: Arc<dyn DriveIndex>) -> TestResult {
     let dir = tempfile::tempdir()?;
     let store = Arc::new(LocalStore::open(dir.path()).await?);
-    let index = Arc::new(MemoryIndex::new());
     let authz = Arc::new(Authz::new(MemoryStore::new()));
     let access = Arc::new(AuthzAccess::new(authz.clone(), index.clone()));
     let drive = Drive::new(store, index, access);
