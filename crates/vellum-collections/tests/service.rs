@@ -1351,3 +1351,59 @@ async fn an_import_does_not_overwrite_a_write_that_lands_meanwhile() {
     let r2 = service.get_row(&ctx(ana), key(R2)).await.unwrap();
     assert_eq!(r2.row.cells["est"], Ok(Value::Number(21.0)));
 }
+
+/// Another replica's writes (ADR 0038): a second service over the same
+/// files sees them once the changed folders are refreshed, and always ends
+/// up where a fresh full load would.
+#[tokio::test]
+async fn refresh_reloads_the_folders_another_replica_changed() {
+    let f = fixture().await;
+    let other = Arc::new(CollectionsService::new(f.store.clone(), f.grants.clone()));
+    let ana = UserId::generate();
+    for id in [REQS, RELS, SECRET] {
+        f.grants.grant(ana, id, Need::Read);
+    }
+    let c = ctx(ana);
+    let summary = |list: vellum_collections::service::api::CollectionList| -> Vec<(String, usize)> {
+        list.collections
+            .into_iter()
+            .map(|s| (s.title, s.rows))
+            .collect()
+    };
+    let fresh = || async {
+        let s = CollectionsService::new(f.store.clone(), f.grants.clone());
+        summary(s.list(&c).await.unwrap())
+    };
+    let dir = |d: &str| BTreeSet::from([BlobPath::new(d).unwrap()]);
+    assert_eq!(
+        summary(other.list(&c).await.unwrap()),
+        [
+            ("Releases".to_owned(), 1),
+            ("Requirements".to_owned(), 2),
+            ("Salaries".to_owned(), 0)
+        ]
+    );
+
+    // A row written elsewhere shows after its folder is refreshed.
+    write(
+        &f.root,
+        &format!("{REQS_DIR}/rows/sso.md"),
+        "---\nid: 01JBQ8Y4ZK6V3W2N5R7T9X1C43\nt: SSO\nest: 3\n---\n",
+    );
+    assert_eq!(summary(other.list(&c).await.unwrap())[1].1, 2);
+    other.refresh(&dir(REQS_DIR)).await;
+    assert_eq!(summary(other.list(&c).await.unwrap())[1].1, 3);
+    assert_eq!(summary(other.list(&c).await.unwrap()), fresh().await);
+
+    // A folder that went is dropped.
+    std::fs::remove_dir_all(f.root.join(SECRET_DIR)).unwrap();
+    other.refresh(&dir(SECRET_DIR)).await;
+    assert_eq!(summary(other.list(&c).await.unwrap()), fresh().await);
+    assert_eq!(summary(other.list(&c).await.unwrap()).len(), 2);
+
+    // Releases went but Requirements still relates to it: a targeted
+    // reload cannot match a full one, so everything is read again.
+    std::fs::remove_dir_all(f.root.join(RELS_DIR)).unwrap();
+    other.refresh(&dir(RELS_DIR)).await;
+    assert_eq!(summary(other.list(&c).await.unwrap()), fresh().await);
+}

@@ -59,7 +59,7 @@ pub use api::{
     RollupInfo, RowDetail, RowKey, RowWritten, SaveViewInput, UpdateRowInput, ViewInfo, ViewKey,
 };
 pub use index::{IndexFeed, IndexField, RowDocument};
-pub use state::{MAX_FILE_BYTES, MAX_ROWS_PER_COLLECTION};
+pub use state::{MAX_FILE_BYTES, MAX_ROWS_PER_COLLECTION, collection_dir};
 
 /// Largest CSV file accepted for import, in bytes.
 pub const MAX_CSV_BYTES: usize = 16 * 1024 * 1024;
@@ -291,6 +291,26 @@ impl CollectionsService {
         let mut guard = self.state.write().await;
         self.bump();
         *guard = None;
+    }
+
+    /// Re-reads the collection folders in `dirs` after another replica
+    /// wrote to them (ADR 0038), keeping every other collection loaded.
+    /// Falls back to [`Self::invalidate`] when a targeted reload cannot
+    /// give the same result as a full one.
+    pub async fn refresh(&self, dirs: &std::collections::BTreeSet<vellum_store::BlobPath>) {
+        if dirs.is_empty() {
+            return;
+        }
+        let mut guard = self.state.write().await;
+        self.bump();
+        let Some(state) = guard.as_mut() else {
+            // Nothing loaded yet: the next request reads everything fresh.
+            return;
+        };
+        if let Err(error) = state.reload(self.store.as_ref(), dirs).await {
+            tracing::info!(%error, "reloading every collection after a change elsewhere");
+            *guard = None;
+        }
     }
 
     /// Marks the loaded state as changed. Call with the write lock held.

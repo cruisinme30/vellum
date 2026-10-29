@@ -7,7 +7,7 @@
 //! index over them (spaces, folders, documents, the `page_ancestors` closure)
 //! plus the database-owned tables `grants`, `user_doc_state` and
 //! `collab_updates` (the live-editing change log, written by `vellum-collab`),
-//! and the replica tables in [`cluster`].
+//! and the replica tables in [`cluster`] and [`feed`].
 //!
 //! Two backends share one schema shape:
 //! - **SQLite** for the single binary, encrypted with SQLCipher when a key is given.
@@ -19,6 +19,7 @@
 pub mod cluster;
 mod config;
 mod error;
+pub mod feed;
 mod index;
 mod reindex;
 mod shard;
