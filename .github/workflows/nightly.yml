@@ -4,7 +4,9 @@
 # Nightly load test and security scan on the Team profile (docker compose)
 # (ADR 0022, D96). The k6 suite must hold the SLO thresholds, and a p95
 # that grows 10 % or more over deploy/perf/baseline.json fails the run.
-# ZAP runs its baseline scan against the same stack.
+# ZAP runs its baseline scan against the same stack, and each fuzz target
+# runs for five minutes. A night is skipped when develop has not changed
+# since the last green run.
 name: Nightly load and security
 
 on:
@@ -15,13 +17,44 @@ on:
 permissions:
   contents: read
 
-
 env:
   K6_VERSION: v2.3.0
 
 jobs:
+  # Nights when develop has not changed since the last green run are
+  # skipped: the same commit would get the same result.
+  changed:
+    name: Develop changed since the last green night
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: read # reads the last successful run of this workflow
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+    steps:
+      - id: check
+        env:
+          EVENT: ${{ github.event_name }}
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          last=""
+          if [[ "${EVENT}" == "schedule" ]]; then
+            runs="repos/${GH_REPO}/actions/workflows/nightly.yml/runs"
+            last="$(gh api "${runs}?branch=develop&status=success&per_page=1" \
+              --jq '.workflow_runs[0].head_sha // ""' || true)"
+          fi
+          if [[ -n "${last}" && "${last}" == "${GITHUB_SHA}" ]]; then
+            echo "develop is still at ${GITHUB_SHA}, which passed last time; skipping tonight."
+            echo "run=false" >> "${GITHUB_OUTPUT}"
+          else
+            echo "run=true" >> "${GITHUB_OUTPUT}"
+          fi
+
   load:
     name: Load test (k6)
+    needs: changed
+    if: needs.changed.outputs.run == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
@@ -80,6 +113,8 @@ jobs:
 
   zap:
     name: Security scan (ZAP baseline)
+    needs: changed
+    if: needs.changed.outputs.run == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -110,3 +145,67 @@ jobs:
           fail_action: true
           allow_issue_writing: false
           artifact_name: zap-report
+
+  fuzz:
+    name: Fuzz ${{ matrix.target }}
+    # Nightly only: a five-minute run per target is too slow for a pull
+    # request and its result is not deterministic. Crashes upload as
+    # artifacts; each one becomes an issue with a regression test.
+    needs: changed
+    if: needs.changed.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - format_roundtrip
+          - formula
+          - merge3
+          - blob_path
+          - collab_frames
+          - mcp_messages
+          - envelope
+    defaults:
+      run:
+        working-directory: fuzz
+    env:
+      # cargo-fuzz sets its own sanitizer flags; nightly-only lints must
+      # not fail the build.
+      RUSTFLAGS: ""
+      # yrs reserves with try_reserve; let a failed reservation return an
+      # error instead of being reported as out of memory.
+      ASAN_OPTIONS: allocator_may_return_null=1
+      TOOLCHAIN: nightly-2026-10-28
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install "${TOOLCHAIN}" --profile minimal
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: fuzz
+          key: ${{ matrix.target }}
+      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+        with:
+          tool: cargo-fuzz
+      - name: Keep the corpus between nights
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: fuzz/corpus/${{ matrix.target }}
+          key: fuzz-corpus-${{ matrix.target }}-${{ github.run_id }}
+          restore-keys: fuzz-corpus-${{ matrix.target }}-
+      - name: Seed the format corpus from the golden examples
+        if: matrix.target == 'format_roundtrip'
+        run: |
+          mkdir -p corpus/format_roundtrip
+          find ../corpus/format -name '*.md' -exec cp {} corpus/format_roundtrip/ \;
+      - name: Fuzz for five minutes
+        run: >-
+          cargo "+${TOOLCHAIN}" fuzz run -O "${{ matrix.target }}" --
+          -max_total_time=300 -rss_limit_mb=4096 -malloc_limit_mb=4096
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fuzz-crash-${{ matrix.target }}
+          path: fuzz/artifacts/${{ matrix.target }}

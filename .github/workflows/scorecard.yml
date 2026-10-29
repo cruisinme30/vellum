@@ -8,8 +8,8 @@
 name: Scorecard
 
 on:
-  push:
-    branches: [develop]
+  # Weekly, not on every push to develop: the score changes slowly and
+  # each run costs runner time.
   schedule:
     - cron: "41 3 * * 1"
   branch_protection_rule:

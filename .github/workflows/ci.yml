@@ -34,9 +34,9 @@ env:
 
 jobs:
   # Which jobs this change needs (ADR 0035, D139). Pull requests into
-  # develop skip the Rust job for docs-only changes and the Web job when
-  # web/ is untouched. Pushes, the merge queue and the full suite (release
-  # pull requests into main) run everything.
+  # develop and pushes to develop skip the Rust job for docs-only changes
+  # and the Web job when web/ is untouched. The merge queue and the full
+  # suite (release pull requests into main) run everything.
   changes:
     name: Changed areas
     runs-on: ubuntu-24.04
@@ -65,6 +65,7 @@ jobs:
           ACTION: ${{ github.event.action }}
           BASE: ${{ github.base_ref }}
           SHA: ${{ github.event.pull_request.head.sha }}
+          BEFORE: ${{ github.event.before }}
           # Runs started by the full suite are listed under full.yml.
           WORKFLOW: ${{ inputs.full-suite && 'full.yml' || 'ci.yml' }}
           FULL: ${{ inputs.full-suite && 'true' || 'false' }}
@@ -81,6 +82,11 @@ jobs:
             printf 'rust=false\nweb=false\ndesktop=false\nui=false\nfiles=false\n' | tee -a "${GITHUB_OUTPUT}"
           elif [[ "${EVENT}" == "pull_request" && "${BASE}" == "develop" ]]; then
             git diff --name-only HEAD^1 HEAD | scripts/ci/changed-areas.sh | tee -a "${GITHUB_OUTPUT}"
+            echo "files=true" | tee -a "${GITHUB_OUTPUT}"
+          elif [[ "${EVENT}" == "push" && -n "${BEFORE}" && "${BEFORE}" != 0000000* ]] &&
+            git fetch --quiet --depth=1 origin "${BEFORE}"; then
+            # A push to develop checks only the areas its commits touch.
+            git diff --name-only "${BEFORE}" HEAD | scripts/ci/changed-areas.sh | tee -a "${GITHUB_OUTPUT}"
             echo "files=true" | tee -a "${GITHUB_OUTPUT}"
           elif [[ "${FULL}" == "true" ]]; then
             # The full suite runs every UI test in every browser itself.

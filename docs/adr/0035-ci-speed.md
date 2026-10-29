@@ -81,3 +81,8 @@ jobs also queued for runners.
   tests only in the browser matrix, and nothing again on the push to main.
 - A release pull request opened from develop itself fails fast; releases
   come from a frozen `chore/release-…` branch.
+
+From 2026-10-29, develop is pushed about every two hours after the full
+suite passes locally. A push to develop runs the Fast suite once for the
+areas it changed, the Full suite runs only on release pull requests, the
+nightly jobs skip unchanged nights, and no run cancels another.
