@@ -13,7 +13,7 @@ vellum: 1
 - Status: accepted
 - Decisions: D88, D89
 - Issue: #84, #85, #148, #46
-- Pull requests: #39
+- Pull requests: #39, #234
 
 :::
 
@@ -93,4 +93,4 @@ live in the gateway crate.
 ## History
 
 - 2026-10-29: D88 accepted in #39.
-- 2026-10-29: D89 added with the gateway.
+- 2026-10-29: D89 accepted in #234.
