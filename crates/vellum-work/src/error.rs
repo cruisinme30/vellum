@@ -78,6 +78,15 @@ pub enum WorkError {
         /// Why the relation was refused.
         reason: &'static str,
     },
+    /// A saved view breaks a rule. The reason is owned: it can quote the
+    /// filter's values, which come from the caller.
+    #[error("invalid view {name:?}: {reason}")]
+    InvalidView {
+        /// The view's name.
+        name: String,
+        /// What is wrong with it.
+        reason: String,
+    },
     /// A Work file could not be parsed.
     #[error("{path}: {reason}")]
     File {
@@ -104,6 +113,7 @@ impl WorkError {
             | Self::InvalidState { .. } => K::Conflict,
             Self::File { .. } => K::Internal,
             Self::Invalid { .. }
+            | Self::InvalidView { .. }
             | Self::TeamConfig { .. }
             | Self::UnknownStatus { .. }
             | Self::InvalidEstimate { .. }
