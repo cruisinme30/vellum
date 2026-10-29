@@ -8803,6 +8803,7 @@ dependencies = [
 name = "vellum-integrations"
 version = "0.0.0"
 dependencies = [
+ "axum",
  "base64 0.23.1",
  "hmac 0.13.0",
  "jiff",
@@ -8813,6 +8814,7 @@ dependencies = [
  "thiserror",
  "time",
  "tokio",
+ "tower",
  "tracing",
  "url",
  "vellum-format",
