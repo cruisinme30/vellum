@@ -1,0 +1,123 @@
+{
+  "document": {
+    "front_matter": null,
+    "blocks": [
+      {
+        "type": "table",
+        "alignments": [
+          "none",
+          "left",
+          "center",
+          "right"
+        ],
+        "header": [
+          [
+            {
+              "type": "text",
+              "text": "#"
+            }
+          ],
+          [
+            {
+              "type": "text",
+              "text": "Requirement"
+            }
+          ],
+          [
+            {
+              "type": "text",
+              "text": "Owner"
+            }
+          ],
+          [
+            {
+              "type": "text",
+              "text": "Status"
+            }
+          ]
+        ],
+        "rows": [
+          [
+            [
+              {
+                "type": "text",
+                "text": "R1"
+              }
+            ],
+            [
+              {
+                "type": "text",
+                "text": "Replay 7 days of traffic in under 10 minutes"
+              }
+            ],
+            [
+              {
+                "type": "mention",
+                "handle": "dev"
+              }
+            ],
+            [
+              {
+                "type": "text",
+                "text": "Done"
+              }
+            ]
+          ],
+          [
+            [
+              {
+                "type": "text",
+                "text": "R2"
+              }
+            ],
+            [
+              {
+                "type": "text",
+                "text": "Diff report: newly blocked, newly allowed"
+              }
+            ],
+            [
+              {
+                "type": "mention",
+                "handle": "priya"
+              }
+            ],
+            [
+              {
+                "type": "text",
+                "text": "In review"
+              }
+            ]
+          ],
+          [
+            [
+              {
+                "type": "text",
+                "text": "R3"
+              }
+            ],
+            [
+              {
+                "type": "text",
+                "text": "Pipe | inside a cell"
+              }
+            ],
+            [
+              {
+                "type": "mention",
+                "handle": "maya"
+              }
+            ],
+            [
+              {
+                "type": "text",
+                "text": "Blocked"
+              }
+            ]
+          ]
+        ]
+      }
+    ]
+  },
+  "diagnostics": []
+}

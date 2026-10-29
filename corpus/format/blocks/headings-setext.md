@@ -1,0 +1,5 @@
+Northstar handbook
+==================
+
+Getting started
+---------------

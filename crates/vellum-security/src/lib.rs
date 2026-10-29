@@ -6,9 +6,11 @@
 //! - [`ssrf`]: outbound HTTP that can only reach the public internet, for
 //!   link previews, embeds, webhooks and imports.
 //! - [`rate`]: keyed rate limits and sign-in lockout.
+//! - [`secrets`]: secret scanning on save.
 //! - [`upload`]: upload sniffing, size limits, image re-encoding and the
 //!   virus-scanner hook.
 
 pub mod rate;
+pub mod secrets;
 pub mod ssrf;
 pub mod upload;
