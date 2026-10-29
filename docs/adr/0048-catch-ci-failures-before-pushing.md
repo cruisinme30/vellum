@@ -13,7 +13,7 @@ vellum: 1
 - Status: accepted
 - Decisions: D202, D203, D204
 - Issue: #490
-- Pull requests: #491
+- Pull requests: #494
 
 :::
 
