@@ -11,6 +11,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "packet-beta\n  title Share token record\n  0-15: \"Version\"\n  16-31: \"Flags\"\n  32-95: \"Expiry (Unix ms)\"\n  96-127: \"Space ID prefix\"\n"
       }
     ]
