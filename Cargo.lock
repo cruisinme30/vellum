@@ -9454,7 +9454,9 @@ dependencies = [
  "tokio",
  "tracing",
  "vellum-contracts",
+ "vellum-format",
  "vellum-kernel",
+ "vellum-render",
  "vellum-store",
  "vellum-work",
 ]

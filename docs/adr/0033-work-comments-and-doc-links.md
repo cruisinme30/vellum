@@ -13,7 +13,7 @@ vellum: 1
 - Status: accepted
 - Decisions: D129, D130, D131
 - Requirements: R-WK-2, R-WK-7, R-MW-7
-- Issue: #134, #140, #409
+- Issue: #134, #140, #409, #427
 - Pull requests: #257
 
 :::
