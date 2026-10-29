@@ -126,8 +126,12 @@ struct TracingSink;
 
 impl EventSink for TracingSink {
     fn publish(&self, events: Vec<WorkEvent>) {
+        self.publish_by(None, events);
+    }
+
+    fn publish_by(&self, actor: Option<&UserRef>, events: Vec<WorkEvent>) {
         for event in events {
-            tracing::debug!(?event, "work event");
+            tracing::debug!(?event, actor = ?actor.map(ToString::to_string), "work event");
         }
     }
 }

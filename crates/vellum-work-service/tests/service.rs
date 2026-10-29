@@ -638,3 +638,37 @@ async fn insights_count_finished_work_by_team_and_refuse_bad_ranges() {
         assert_eq!(refused, Err(ErrorKind::InvalidInput), "{bad}");
     }
 }
+
+#[tokio::test]
+async fn events_name_who_made_the_change() {
+    let w = world().await;
+    with_eng(&w).await;
+    let _ = w.events.take_batches();
+    let issue = w
+        .call(
+            "dev",
+            "work.create_issue",
+            json!({"team": "ENG", "title": "Self-assigned", "assignee": "dev"}),
+        )
+        .await;
+    let batches = w.events.take_batches();
+    assert_eq!(batches.len(), 1);
+    assert_eq!(batches[0].0, Some(UserRef::parse("dev").unwrap()));
+    assert!(
+        batches[0]
+            .1
+            .iter()
+            .any(|e| matches!(e, WorkEvent::IssueCreated { .. }))
+    );
+
+    let key = issue["issue"]["key"].as_str().unwrap();
+    let _ = w
+        .call(
+            "priya",
+            "work.update_issue",
+            json!({"key": key, "state": "in-progress"}),
+        )
+        .await;
+    let batches = w.events.take_batches();
+    assert_eq!(batches[0].0, Some(UserRef::parse("priya").unwrap()));
+}
