@@ -51,13 +51,18 @@ impl Body {
             .iter()
             .filter(|f| !f.value.trim().is_empty())
             .map(|f| {
+                let label = one_line(&f.label);
                 let value = one_line(&f.value);
-                let mut content = vec![text_node(&format!("{}: ", one_line(&f.label)))];
-                content.push(if f.code {
-                    Inline::Code { code: value }
+                // One text node for label and value: escaping works per
+                // node, so two adjacent nodes could join into `@name`.
+                let content = if f.code {
+                    vec![
+                        text_node(&format!("{label}: ")),
+                        Inline::Code { code: value },
+                    ]
                 } else {
-                    text_node(&value)
-                });
+                    vec![text_node(&format!("{label}: {value}"))]
+                };
                 ListItem {
                     task: None,
                     attrs: Attributes::default(),
@@ -145,17 +150,18 @@ impl Fact {
 /// Word joiner: invisible, and stops `@name` being read as a mention.
 const JOINER: char = '\u{2060}';
 
-/// A text node. The dialect reads `@name` in text as a mention and has no
-/// escape for it yet, so a word joiner after `@` keeps an outsider's text
-/// from notifying people.
+/// A text node. The serializer escapes `@name` as `\@name`, but the issue
+/// core's mention scanner (`vellum_work::mention::mentions`) reads raw
+/// Markdown and still notifies on it, so a word joiner after `@` keeps an
+/// outsider's text from notifying people.
 fn text_node(text: &str) -> Inline {
     let mut out = String::with_capacity(text.len());
     let mut prev: Option<char> = None;
     let mut chars = text.chars().peekable();
     while let Some(c) = chars.next() {
         out.push(c);
-        // The same boundary the parser uses for mentions. An extra joiner
-        // is harmless; a missing one lets the text mention someone.
+        // The parser's mention boundary. An extra joiner is harmless; a
+        // missing one lets the text mention someone.
         let word_start = !prev
             .is_some_and(|p| p.is_alphanumeric() || matches!(p, '_' | '-' | '.' | '/' | '@' | ':'));
         if c == '@' && word_start && chars.peek().is_some_and(char::is_ascii_alphabetic) {
@@ -256,6 +262,12 @@ mod tests {
             let mut body = Body::new();
             let _ = body.text(input).quote(input);
             let markdown = body.finish();
+            // Nobody is notified by what an outsider wrote.
+            assert_eq!(
+                vellum_work::mention::mentions(&markdown),
+                Vec::new(),
+                "{markdown}"
+            );
             let blocks = reparsed(&markdown);
             for block in &blocks {
                 match block {
