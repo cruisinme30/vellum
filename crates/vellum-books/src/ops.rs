@@ -503,7 +503,7 @@ fn rewrite_summary(summary: &mut crate::summary::Summary, moves: &BTreeMap<Chapt
 
 /// Edits that keep relative links in one file pointing at the same
 /// targets after files moved.
-fn rewrite_relative(
+pub(crate) fn rewrite_relative(
     text: &str,
     old_dir: &str,
     new_dir: &str,

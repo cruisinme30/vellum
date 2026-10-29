@@ -406,6 +406,44 @@ pub fn apply(text: &str, mut edits: Vec<(Range<usize>, String)>) -> String {
     out
 }
 
+/// A change to one link, returned by the callback of [`map_links`].
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct LinkEdit {
+    /// A new destination.
+    pub dest: Option<String>,
+    /// New link text (plain text; it is escaped). Inline links only.
+    pub text: Option<String>,
+    /// Replace the whole link with this plain text (it is escaped).
+    /// Inline links and autolinks only.
+    pub unlink: Option<String>,
+}
+
+/// Rewrites links in a file. `edit` sees each link and its current text
+/// (for inline links) and returns what to change, if anything.
+#[must_use]
+pub fn map_links(text: &str, mut edit: impl FnMut(&LinkRef, Option<&str>) -> Option<LinkEdit>) -> String {
+    let mut edits = Vec::new();
+    for link in links(text) {
+        let current = link.text_range.clone().and_then(|r| text.get(r));
+        let Some(change) = edit(&link, current) else {
+            continue;
+        };
+        if let Some(plain) = change.unlink {
+            if matches!(link.kind, LinkKind::Inline | LinkKind::Autolink) {
+                edits.push((link.link_range.clone(), escape_link_text(&plain)));
+            }
+            continue;
+        }
+        if let (Some(new_text), Some(range)) = (change.text, link.text_range.clone()) {
+            edits.push((range, escape_link_text(&new_text)));
+        }
+        if let Some(dest) = change.dest {
+            edits.push((link.dest_range.clone(), dest));
+        }
+    }
+    apply(text, edits)
+}
+
 /// Escapes text for use inside a Markdown link's brackets.
 #[must_use]
 pub fn escape_link_text(text: &str) -> String {
