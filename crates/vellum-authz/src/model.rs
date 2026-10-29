@@ -9,8 +9,15 @@
 
 use std::fmt;
 
+use vellum_kernel::id::{
+    BookId, CollectionId, DocId, DriveId, FolderId, ObjectId, ShareId, SpaceId, UserId,
+};
+
 /// A 128-bit object identity, stored as a 16-byte blob in SQLite and a
-/// `uuid` in Postgres. It carries the same bits as the `vellum-kernel` IDs.
+/// `uuid` in Postgres.
+///
+/// It carries the same bits as the `vellum-kernel` IDs and converts to and from each of them, because tuples mix kinds (a
+/// space, a folder, a document, a user, a share link, a group).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct Id(pub u128);
 
@@ -33,10 +40,39 @@ impl Id {
 }
 
 impl fmt::Display for Id {
+    /// The ULID text form, as kernel IDs print.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:032x}", self.0)
+        fmt::Display::fmt(&ObjectId::from_u128(self.0), f)
     }
 }
+
+macro_rules! kernel_ids {
+    ($($kind:ident),*) => {$(
+        impl From<$kind> for Id {
+            fn from(id: $kind) -> Self {
+                Self(id.as_u128())
+            }
+        }
+
+        impl From<Id> for $kind {
+            fn from(id: Id) -> Self {
+                Self::from_u128(id.0)
+            }
+        }
+    )*};
+}
+
+kernel_ids!(
+    ObjectId,
+    SpaceId,
+    DocId,
+    BookId,
+    CollectionId,
+    DriveId,
+    FolderId,
+    UserId,
+    ShareId
+);
 
 /// A role on an object. Each role implies every role below it, so the
 /// derived ordering is the implication order.
@@ -203,6 +239,18 @@ impl Principal {
         match self {
             Self::User(id) | Self::ShareLink(id) => id,
         }
+    }
+}
+
+impl From<UserId> for Principal {
+    fn from(id: UserId) -> Self {
+        Self::User(id.into())
+    }
+}
+
+impl From<ShareId> for Principal {
+    fn from(id: ShareId) -> Self {
+        Self::ShareLink(id.into())
     }
 }
 
@@ -407,7 +455,17 @@ mod tests {
         }
         assert_eq!(Object::from_columns("doc", id), None);
         assert_eq!(Id::from_bytes(Id(7).to_bytes()), Id(7));
-        assert_eq!(Id(255).to_string(), format!("{:0>32}", "ff"));
+        assert_eq!(Id(255).to_string(), "0000000000000000000000007Z");
+        let doc = DocId::generate();
+        assert_eq!(DocId::from(Id::from(doc)), doc);
+        assert_eq!(
+            Principal::from(UserId::from_u128(9)),
+            Principal::User(Id(9))
+        );
+        assert_eq!(
+            Principal::from(ShareId::from_u128(9)),
+            Principal::ShareLink(Id(9))
+        );
     }
 
     #[test]

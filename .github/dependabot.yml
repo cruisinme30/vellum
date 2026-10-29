@@ -1,24 +1,47 @@
 # SPDX-FileCopyrightText: 2026 The Vellum contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 
+# Version updates (ADR 0032, D127). Each ecosystem gets one pull request for
+# patch updates and one for minor updates; majors arrive one per package.
+# The cooldown holds back releases younger than a few days, so a hijacked
+# release is usually yanked before it reaches us. Security updates ignore
+# the cooldown. Patch updates auto-merge (dependabot-auto-merge.yml).
 version: 2
 updates:
   - package-ecosystem: cargo
     directory: /
     target-branch: develop
-    schedule: { interval: weekly }
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 10
     commit-message: { prefix: "build(deps)" }
+    labels: [type/build]
+    cooldown:
+      default-days: 7
+      semver-patch-days: 3
     groups:
-      rust: { patterns: ["*"] }
+      rust-patch: { patterns: ["*"], update-types: [patch] }
+      rust-minor: { patterns: ["*"], update-types: [minor] }
   - package-ecosystem: npm
     directory: /web
     target-branch: develop
-    schedule: { interval: weekly }
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 10
     commit-message: { prefix: "build(deps)" }
+    labels: [type/build]
+    cooldown:
+      default-days: 7
+      semver-patch-days: 3
     groups:
-      web: { patterns: ["*"] }
+      web-patch: { patterns: ["*"], update-types: [patch] }
+      web-minor: { patterns: ["*"], update-types: [minor] }
   - package-ecosystem: github-actions
     directory: /
     target-branch: develop
-    schedule: { interval: weekly }
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 10
     commit-message: { prefix: "ci(deps)" }
+    labels: [type/ci]
+    cooldown:
+      default-days: 7
+    groups:
+      actions: { patterns: ["*"], update-types: [patch, minor] }

@@ -12,9 +12,9 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D76, D77, D78
-- Requirements: R-WK-1, R-WK-2, R-WK-3, R-WK-4, R-WK-5, R-WK-8, R-WK-9, R-WK-11, R-WK-12, R-WK-15, R-WK-16
-- Issue: #133, #134, #135, #136, #137, #141, #142, #143, #144, #145, #146
-- Pull requests: #207, #282, #290
+- Requirements: R-WK-1, R-WK-2, R-WK-3, R-WK-4, R-WK-5, R-WK-6, R-WK-8, R-WK-9, R-WK-11, R-WK-12, R-WK-15, R-WK-16
+- Issue: #133, #134, #135, #136, #137, #138, #141, #142, #143, #144, #145, #146
+- Pull requests: #207, #282, #290, #295
 
 :::
 
@@ -116,3 +116,7 @@ answers those.
   issues. An assistant's triage suggestion is stored on the issue
   (`triage_suggestion` in its front matter) and applies only when a
   person accepts it, so a model never changes the tracker by itself.
+- The keyboard model lives in the web app (`web/src/keyboard`): one
+  table of commands feeds the shortcuts, the ⌘K menu and the `?` sheet,
+  and key handling is a synchronous lookup to stay inside the 100 ms
+  budget for perceived latency.

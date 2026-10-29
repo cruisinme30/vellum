@@ -70,6 +70,55 @@ pub struct QueryInput {
     pub limit: Option<usize>,
 }
 
+/// Names one saved view.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ViewKey {
+    /// The collection.
+    pub collection_id: CollectionId,
+    /// The view's name (matched without regard to case).
+    pub view: String,
+}
+
+/// Saves a view: replaces the view with this name, or adds it at the end.
+/// Filters, sorts and property names use the same text as `schema.yaml`
+/// (`Status is Done`, `Due desc`), by property name or key.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SaveViewInput {
+    /// The collection.
+    pub collection_id: CollectionId,
+    /// The view's name.
+    pub view: String,
+    /// A new name, to rename the view.
+    #[serde(default)]
+    pub rename_to: Option<String>,
+    /// The layout; a table when absent.
+    #[serde(default)]
+    pub kind: Option<ViewKind>,
+    /// Filters, all of which must match.
+    #[serde(default)]
+    pub filter: Vec<String>,
+    /// Sort keys, most significant first.
+    #[serde(default)]
+    pub sort: Vec<String>,
+    /// Group-by property (board columns, table sections).
+    #[serde(default)]
+    pub group: Option<String>,
+    /// Hidden properties.
+    #[serde(default)]
+    pub hide: Vec<String>,
+    /// Date property for calendar and timeline.
+    #[serde(default)]
+    pub date: Option<String>,
+    /// End-date property for timeline bars.
+    #[serde(default)]
+    pub end: Option<String>,
+    /// Most rows to show.
+    #[serde(default)]
+    pub limit: Option<usize>,
+}
+
 /// Resolves a `collection` block embedded in a page.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
