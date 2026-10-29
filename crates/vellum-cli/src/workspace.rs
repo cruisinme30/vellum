@@ -50,7 +50,7 @@ use vellum_tasks::service::{Config as TasksConfig, TasksService};
 use vellum_work::{UserRef, WorkEvent};
 use vellum_work_service::{Directory, EventSink, SystemClock, WorkService};
 
-use crate::collab::Collab;
+use crate::collab::{Collab, LivePages};
 use crate::feed::{AnnouncingStore, Caches};
 use crate::google_http::{self, Endpoints, FileLinks, GoogleHttp};
 use crate::page_render::{Handles, PageRenderService};
@@ -486,6 +486,8 @@ struct Feeds {
     events: Arc<dyn EventSink>,
     /// Collection row changes, for search.
     rows: Option<Arc<dyn IndexFeed>>,
+    /// Page text saved through the API, for live editing rooms.
+    pages: Option<Arc<dyn vellum_drive::PageWrites>>,
 }
 
 /// Builds the services over `store`, `authz` and the drive's `index`.
@@ -570,9 +572,14 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
         handles,
         PageRenderService::figures_from_env()?,
     );
+    let mut drive_service =
+        DriveService::new(Arc::clone(&drive)).with_handles(drive_handles(identity));
+    if let Some(writes) = feeds.pages {
+        drive_service = drive_service.with_page_writes(writes);
+    }
     Ok(Workspace {
         services: vec![
-            Arc::new(DriveService::new(Arc::clone(&drive)).with_handles(drive_handles(identity))),
+            Arc::new(drive_service),
             Arc::clone(&collections) as Arc<dyn Service>,
             Arc::clone(&books) as Arc<dyn Service>,
             Arc::clone(&work) as Arc<dyn Service>,
@@ -660,6 +667,7 @@ pub async fn open(
     let spaces = Arc::new(Spaces::default());
     let (events, queued) = crate::notifications::channel();
     let (rows, row_changes) = crate::search::row_feed();
+    let live_pages = Arc::new(LivePages::default());
     let mut workspace = build(
         Arc::clone(&store),
         &authz,
@@ -669,6 +677,7 @@ pub async fn open(
         Feeds {
             events,
             rows: Some(rows),
+            pages: Some(Arc::clone(&live_pages) as Arc<dyn vellum_drive::PageWrites>),
         },
         setup,
     )
@@ -703,6 +712,7 @@ pub async fn open(
         ))),
     )?;
     keep_drives(&workspace.drive, &drive_index, identity).await?;
+    live_pages.attach(&collab);
     spaces.replace(load_spaces(drive_index.as_ref()).await?);
     let search = crate::search::start(crate::search::Parts {
         data_dir: config.data_dir.clone(),
@@ -755,6 +765,7 @@ pub async fn describe(
         Feeds {
             events: Arc::new(TracingSink),
             rows: None,
+            pages: None,
         },
         setup,
     )

@@ -313,6 +313,55 @@ async fn external_markdown_edits_merge_with_live_typing() {
     );
 }
 
+#[tokio::test]
+async fn text_written_while_a_room_is_closed_wins_when_merged() {
+    let config = CollabConfig {
+        close_after_empty: Duration::from_millis(50),
+        ..quick()
+    };
+    let f = fixture(config);
+    let key = room();
+    f.files.put(key, "Old\n");
+    let mut alice = Editor::join(&f.hub, key, Access::Write).await;
+    assert!(alice.pump_until(|e| e.markdown() == "Old\n").await);
+    alice.edit(|doc| add_paragraph(doc, "New")).await;
+    alice.send(&[Message::Custom(MSG_DONE, Vec::new())]).await;
+    assert!(alice.pump_until(|e| e.dones == 1).await);
+    drop(alice);
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    assert_eq!(f.hub.open_rooms(), 0);
+
+    // An old version is restored through the API while nobody edits.
+    f.files.put(key, "Old\n");
+    f.hub.merge_markdown(key, "Old\n".to_owned()).await.unwrap();
+
+    // The room's log no longer brings the replaced text back.
+    let mut bob = Editor::join(&f.hub, key, Access::Write).await;
+    assert!(
+        bob.pump_until(|e| e.markdown() == "Old\n").await,
+        "{}",
+        bob.markdown()
+    );
+    drop(bob);
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    // The file already held the restored text: no second copy is written.
+    assert_eq!(f.files.versions(key).len(), 1);
+}
+
+#[tokio::test]
+async fn merging_into_a_page_never_edited_live_opens_no_room() {
+    let f = fixture(quick());
+    let key = room();
+    f.files.put(key, "Hello\n");
+    f.hub
+        .merge_markdown(key, "Hello again\n".to_owned())
+        .await
+        .unwrap();
+    assert_eq!(f.hub.open_rooms(), 0);
+    let mut alice = Editor::join(&f.hub, key, Access::Write).await;
+    assert!(alice.pump_until(|e| e.markdown() == "Hello\n").await);
+}
+
 #[tokio::test(start_paused = true)]
 async fn a_storage_outage_delays_writes_but_loses_nothing() {
     let f = fixture(CollabConfig::default());

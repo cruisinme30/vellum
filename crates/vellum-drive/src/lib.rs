@@ -36,4 +36,4 @@ pub use model::{
     SpaceSettings, TrashState, Usage, VersionRecord,
 };
 pub use ports::{Access, Clock, DriveIndex, Permission, SystemClock};
-pub use service::DriveService;
+pub use service::{DriveService, PageWrites};
