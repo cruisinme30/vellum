@@ -8,6 +8,7 @@ import type { Page } from "@playwright/test";
 
 import { expect, test } from "./fixtures";
 import { CLS_LIMIT, layoutShift, settle, watchLayoutShift } from "./harness";
+import { fakeServer } from "./server";
 import { TARGETS } from "./targets";
 
 /**
@@ -37,6 +38,7 @@ for (const target of TARGETS) {
       await cdp.send("Network.enable");
       await cdp.send("Network.emulateNetworkConditions", { offline: false, ...SLOW });
       await watchLayoutShift(page);
+      await fakeServer(page, target.server);
       const started = Date.now();
       await page.goto(target.url, { waitUntil: "commit" });
       await expect.poll(() => hasText(page), { timeout: 30_000, intervals: [50] }).toBe(true);
@@ -54,6 +56,7 @@ for (const target of TARGETS) {
     test("says something without JavaScript", async ({ browser }) => {
       const context = await browser.newContext({ javaScriptEnabled: false });
       const page = await context.newPage();
+      await fakeServer(page, target.server);
       await page.goto(target.url);
       expect(await hasText(page), "the page is blank without JavaScript").toBe(true);
       await context.close();
@@ -61,11 +64,13 @@ for (const target of TARGETS) {
 
     test("is not blank when its scripts fail to load", async ({ page }) => {
       await page.route(/\.m?js(\?.*)?$/, (route) => route.abort());
+      await fakeServer(page, target.server);
       await page.goto(target.url);
       expect(await hasText(page), "the page is blank when scripts fail").toBe(true);
     });
 
     test("still opens offline once installed", async ({ page, context }) => {
+      await fakeServer(page, target.server);
       await page.goto(target.url);
       await settle(page);
       const controlled = await page.evaluate(async () => {
