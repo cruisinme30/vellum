@@ -453,6 +453,19 @@ issue-comment-by = { $author }, { $when }
 issue-comment-add = Add a comment
 issue-comment-send = Comment
 
+## People picker
+
+people-search = Search people by name or email
+people-chosen = Chosen for { $label }
+people-remove = Remove { $name }
+people-group = { $name } (group)
+people-found = { $count ->
+    [one] 1 match. Use the arrow keys to choose.
+   *[other] { $count } matches. Use the arrow keys to choose.
+}
+people-none = No one found.
+people-failed = People could not be searched. You can still type a full user: or group: ID.
+
 ## Books
 
 books = Books
@@ -493,7 +506,7 @@ books-access-effective = Visible to: { $who }
 books-access-restrict = Only these can see it (empty means everyone who can read the book)
 books-access-owners = Owners
 books-access-reviewers = Reviewers
-books-access-help = One per line or separated by commas, as user:ID or group:ID. Book managers always see every section.
+books-access-help = Search by name or email. Book managers always see every section.
 books-history = Outline history
 books-history-empty = No outline changes yet. Reorders, nests, new and removed sections show up here.
 books-history-entry = { $op }, { $when }
@@ -535,6 +548,7 @@ books-publish-audience = For
 books-publish-everyone = Everyone (public)
 books-publish-some = Only some people
 books-publish-who = People and groups
+books-publish-who-needed = Choose who the publication is for, or publish for everyone.
 books-publish-help = Restricted sections are left out unless the audience may see them. A public website is served by this server; an mdBook source builds with mdbook or the public docs site.
 books-publish-now = Publish
 books-publish-none = Not published yet.

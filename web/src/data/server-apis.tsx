@@ -5,6 +5,7 @@ import { createContext, use, type ReactNode } from "react";
 
 import type { BooksApi } from "../books/api";
 import { useT } from "../i18n/i18n";
+import type { DirectoryApi } from "../people/directory";
 import type { PrivateSpacesApi } from "../platform/private/api";
 import type { WorkApi } from "../work/api";
 
@@ -15,6 +16,8 @@ export interface ServerApis {
   readonly work?: WorkApi | undefined;
   readonly books?: BooksApi | undefined;
   readonly privateSpaces?: PrivateSpacesApi | undefined;
+  /** People (and groups) to pick for access and sharing. */
+  readonly directory?: DirectoryApi | undefined;
 }
 
 const ServerApisContext = createContext<ServerApis>({});
@@ -28,6 +31,11 @@ export function ServerApisProvider({
   readonly children: ReactNode;
 }) {
   return <ServerApisContext value={apis}>{children}</ServerApisContext>;
+}
+
+/** One server API, or `undefined` in demo mode. */
+export function useServerApi<K extends keyof ServerApis>(name: K): ServerApis[K] {
+  return use(ServerApisContext)[name];
 }
 
 /**

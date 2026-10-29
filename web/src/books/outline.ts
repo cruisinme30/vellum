@@ -120,11 +120,3 @@ export function isWithin(rows: readonly OutlineRow[], id: string, ancestor: stri
   }
   return false;
 }
-
-/** Splits `user:…, group:…` text into principals, dropping blanks. */
-export function principalList(text: string): string[] {
-  return text
-    .split(/[\s,]+/u)
-    .map((p) => p.trim())
-    .filter((p) => p !== "");
-}

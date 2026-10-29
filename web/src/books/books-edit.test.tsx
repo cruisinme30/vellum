@@ -9,10 +9,11 @@ import { describe, expect, it, vi, type Mock } from "vitest";
 import type { Http } from "../api/http";
 import { ServerApisProvider } from "../data/server-apis";
 import { I18nProvider } from "../i18n/i18n";
+import { createListDirectory } from "../people/directory";
 
 import { createHttpBooksApi, type BookInfo, type BooksApi, type SectionDocument } from "./api";
 import { BookPage } from "./books-page";
-import { dropPlace, isWithin, outlineRows, placeFor, principalList } from "./outline";
+import { dropPlace, isWithin, outlineRows, placeFor } from "./outline";
 
 const node = (id: string, title: string, extra: object = {}) => ({
   id,
@@ -133,11 +134,15 @@ function fakeApi(role: string): FakeApi {
   };
 }
 
+const PEOPLE = createListDirectory([
+  { kind: "user", principal: "user:01PRIYA", name: "Priya Raman", detail: "priya@northstar.dev" },
+]);
+
 function renderBook(api: FakeApi, path = "/books/b1/s1") {
   const user = userEvent.setup();
   render(
     <I18nProvider>
-      <ServerApisProvider apis={{ books: api }}>
+      <ServerApisProvider apis={{ books: api, directory: PEOPLE }}>
         <MemoryRouter initialEntries={[path]}>
           <Routes>
             <Route path="books/:bookId" element={<BookPage />} />
@@ -179,10 +184,6 @@ describe("outline", () => {
     expect(dropPlace(s2, s1, 20, 40, 2)).toBeUndefined();
     expect(isWithin(rows, "s2", "s1")).toBe(true);
     expect(isWithin(rows, "s3", "s1")).toBe(false);
-  });
-
-  it("reads principal lists", () => {
-    expect(principalList("user:A, group:B\n\n user:C ")).toEqual(["user:A", "group:B", "user:C"]);
   });
 });
 
@@ -316,10 +317,11 @@ describe("editing a book", () => {
     const api = fakeApi("manager");
     const user = renderBook(api);
     await user.click(await screen.findByRole("button", { name: "Section access" }));
-    await user.type(await screen.findByLabelText(/Only these can see it/), "group:1");
+    await user.type(await screen.findByLabelText(/Only these can see it/), "pri");
+    await user.click(await screen.findByRole("option", { name: /Priya Raman/ }));
     await user.click(screen.getByRole("button", { name: "Save" }));
     expect(api.setAccess).toHaveBeenCalledWith("b1", "s1", {
-      restrictTo: ["group:1"],
+      restrictTo: ["user:01PRIYA"],
       owners: [],
       reviewers: [],
     });

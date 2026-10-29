@@ -4,13 +4,13 @@
 import { useState } from "react";
 
 import { failureText } from "../data/failure";
-import { Ready } from "../data/server-apis";
+import { Ready, useServerApi } from "../data/server-apis";
 import { useLoaded } from "../data/use-loaded";
 import { useT } from "../i18n/i18n";
+import { PeoplePicker } from "../people/people-picker";
 
 import { Failure, formText, useAction, when, type Submit } from "./actions";
 import type { BooksApi, Publication, PublishFormat } from "./api";
-import { principalList } from "./outline";
 
 function PublicationLine({ publication }: { readonly publication: Publication }) {
   const t = useT();
@@ -38,14 +38,19 @@ export function PublishPanel({ api, book }: { readonly api: BooksApi; readonly b
   const t = useT();
   const [version, setVersion] = useState(0);
   const [members, setMembers] = useState(false);
+  const [audience, setAudience] = useState<string[]>([]);
+  const [missing, setMissing] = useState(false);
+  const directory = useServerApi("directory");
   const loaded = useLoaded(() => api.publications(book), [api, book, version], failureText);
   const { busy, error, run } = useAction();
   const submit: Submit = (event) => {
     event.preventDefault();
     const format = formText(event.currentTarget, "format") as PublishFormat;
-    const audience = members ? principalList(formText(event.currentTarget, "audience")) : [];
+    // An empty audience would publish for everyone, so say so instead.
+    setMissing(members && audience.length === 0);
+    if (members && audience.length === 0) return;
     run(async () => {
-      await api.publish(book, format, audience);
+      await api.publish(book, format, members ? audience : []);
       setVersion((v) => v + 1);
     });
   };
@@ -90,10 +95,12 @@ export function PublishPanel({ api, book }: { readonly api: BooksApi; readonly b
           </label>
         </fieldset>
         {members && (
-          <label>
-            {t("books-publish-who")}
-            <textarea name="audience" rows={2} required aria-describedby="vl-book-publish-help" />
-          </label>
+          <PeoplePicker
+            label={t("books-publish-who")}
+            value={audience}
+            onChange={setAudience}
+            directory={directory}
+          />
         )}
         <p id="vl-book-publish-help" className="vl-muted">
           {t("books-publish-help")}
@@ -102,7 +109,7 @@ export function PublishPanel({ api, book }: { readonly api: BooksApi; readonly b
           {t("books-publish-now")}
         </button>
       </form>
-      <Failure error={error} />
+      <Failure error={missing ? t("books-publish-who-needed") : error} />
       <Ready loaded={loaded}>
         {(publications) =>
           publications.length === 0 ? (

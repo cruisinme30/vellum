@@ -51,6 +51,37 @@ pub struct ById {
     pub id: String,
 }
 
+/// `identity.directory`: find people to share with or restrict to.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DirectoryQuery {
+    /// Part of a name, handle or email; at least two characters.
+    pub q: String,
+    /// The most results, 1 to 20; 8 when absent.
+    pub limit: Option<u8>,
+}
+
+/// Someone or a group that can be granted access.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct DirectoryEntry {
+    /// `user` or `group`.
+    pub kind: String,
+    /// The principal as access settings store it: `user:<id>` or
+    /// `group:<id>`.
+    pub principal: String,
+    /// The display name.
+    pub name: String,
+    /// A second line to tell namesakes apart (the email for a person).
+    pub detail: String,
+}
+
+/// People (and, once groups have names, groups) matching a query.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct Directory {
+    /// The matches, best first.
+    pub entries: Vec<DirectoryEntry>,
+}
+
 /// Who is calling and what the workspace needs.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -401,6 +432,27 @@ impl Service for IdentityService {
                 }
             }
         };
+        let directory = {
+            let id = Arc::clone(id);
+            move |ctx: RequestContext, input: DirectoryQuery| {
+                let id = Arc::clone(&id);
+                async move {
+                    let _ = ctx.principal.require_user()?;
+                    let limit = usize::from(input.limit.unwrap_or(8).clamp(1, 20));
+                    let entries = id
+                        .search_people(&input.q, limit)
+                        .into_iter()
+                        .map(|u| DirectoryEntry {
+                            kind: "user".to_owned(),
+                            principal: format!("user:{}", u.id),
+                            name: u.name,
+                            detail: u.email,
+                        })
+                        .collect();
+                    Ok(Directory { entries })
+                }
+            }
+        };
         let users = {
             let id = Arc::clone(id);
             move |_: RequestContext, _: Empty| {
@@ -496,6 +548,13 @@ impl Service for IdentityService {
                 revoke_app,
             )
             .summary("Disconnect an app"),
+            Operation::query(
+                "identity.directory",
+                "/v1/directory",
+                Scope::Read,
+                directory,
+            )
+            .summary("Find people to share with"),
             Operation::query("identity.users", "/v1/admin/users", Scope::Admin, users)
                 .fresh_auth(FRESH_AUTH)
                 .summary("List every user"),
