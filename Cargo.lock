@@ -2453,6 +2453,18 @@ name = "vellum-render"
 version = "0.0.0"
 
 [[package]]
+name = "vellum-security"
+version = "0.0.0"
+dependencies = [
+ "proptest",
+ "reqwest",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "url",
+]
+
+[[package]]
 name = "vellum-store"
 version = "0.0.0"
 dependencies = [
