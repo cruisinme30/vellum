@@ -97,6 +97,24 @@ impl ShardsConfig {
     }
 }
 
+/// The tables holding a space's rows on its shard, each with the order
+/// that puts parents before children (folders reference their parent).
+const SPACE_TABLES: [(&str, &str); 13] = [
+    ("spaces", ""),
+    ("folders", " ORDER BY length(path)"),
+    ("documents", ""),
+    ("page_ancestors", ""),
+    ("grants", ""),
+    ("effective_access", ""),
+    ("user_doc_state", ""),
+    ("drive_spaces", ""),
+    ("drive_nodes", ""),
+    ("drive_activity", ""),
+    ("drive_activity_scope", ""),
+    ("drive_links", ""),
+    ("drive_versions", ""),
+];
+
 /// One shard: its name and its index.
 #[derive(Debug, Clone)]
 pub struct Shard {
@@ -394,6 +412,68 @@ impl ShardedIndex {
             Pool::Postgres(pool) => write!(pool),
         }
         Ok(())
+    }
+
+    /// Moves every row of `space` to shard `to`, then records the move in
+    /// the map. Run it with every replica stopped: running replicas keep
+    /// the old placement in memory (ADR 0040, D175).
+    ///
+    /// The rows are copied into `to` in one transaction, which first clears
+    /// anything an interrupted move left there, and only then deleted from
+    /// the old shard; running it again after a failure converges. Returns
+    /// how many rows were copied.
+    ///
+    /// # Errors
+    /// [`Error::UnknownShard`] for a name that is not configured,
+    /// [`Error::Config`] unless both shards are on Postgres, and database
+    /// errors.
+    #[tracing::instrument(name = "db.move_space", skip_all, fields(db.shard = to, rows))]
+    pub async fn move_space(&self, space: ObjectId, to: &str) -> Result<u64> {
+        use futures_util::StreamExt as _;
+        use sqlx::postgres::PgPoolCopyExt as _;
+
+        let target = self
+            .shard(to)
+            .ok_or_else(|| Error::UnknownShard(to.to_owned()))?;
+        let source = self.shard_for(space).await?;
+        if source.name == target.name {
+            return Ok(0);
+        }
+        let (Pool::Postgres(from), Pool::Postgres(into)) = (&source.index.pool, &target.index.pool)
+        else {
+            return Err(Error::Config("moving a space needs Postgres shards".into()));
+        };
+        let id = space.as_uuid();
+        let mut rows = 0;
+        let mut tx = into.begin().await?;
+        for (table, _) in SPACE_TABLES.iter().rev() {
+            let sql = format!("DELETE FROM {table} WHERE space_id = $1");
+            let q = sqlx::query(sqlx::AssertSqlSafe(sql)).bind(id);
+            let _ = traced("postgresql", "space.move.clear", q.execute(&mut *tx)).await?;
+        }
+        for (table, order) in SPACE_TABLES {
+            let mut out = from
+                .copy_out_raw(&format!(
+                    "COPY (SELECT * FROM {table} WHERE space_id = '{id}'{order}) TO STDOUT"
+                ))
+                .await?;
+            let mut copy = tx.copy_in_raw(&format!("COPY {table} FROM STDIN")).await?;
+            while let Some(chunk) = out.next().await {
+                let _ = copy.send(chunk?).await?;
+            }
+            rows += copy.finish().await?;
+        }
+        tx.commit().await?;
+        self.record(&[(space, target.name.clone())], true).await?;
+        let mut tx = from.begin().await?;
+        for (table, _) in SPACE_TABLES.iter().rev() {
+            let sql = format!("DELETE FROM {table} WHERE space_id = $1");
+            let q = sqlx::query(sqlx::AssertSqlSafe(sql)).bind(id);
+            let _ = traced("postgresql", "space.move.drop", q.execute(&mut *tx)).await?;
+        }
+        tx.commit().await?;
+        let _ = tracing::Span::current().record("rows", rows);
+        Ok(rows)
     }
 
     /// Closes the main database and every shard.

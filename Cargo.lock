@@ -9101,6 +9101,7 @@ dependencies = [
 name = "vellum-db"
 version = "0.0.0"
 dependencies = [
+ "futures-util",
  "libsqlite3-sys",
  "serde",
  "serde-saphyr 2.0.0",
