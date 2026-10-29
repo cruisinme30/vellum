@@ -32,6 +32,7 @@ pub fn serialize(document: &Document) -> String {
         nested: false,
         columns: false,
         file_start: document.front_matter.is_none(),
+        after_dash: false,
     };
     out.push_str(&blocks(&document.blocks, pos, "\n"));
     out
@@ -39,6 +40,10 @@ pub fn serialize(document: &Document) -> String {
 
 /// Where a run of blocks sits.
 #[derive(Clone, Copy)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "independent facts about one position, read in different places"
+)]
 struct Pos {
     /// Inside a list item or block quote: lines are indented or prefixed,
     /// so the line-start-only `:::` and `$$` syntax is not available.
@@ -47,6 +52,9 @@ struct Pos {
     columns: bool,
     /// At the very start of a file without front matter.
     file_start: bool,
+    /// The first block shares its line with a `-` bullet, so a bullet list
+    /// there must use `*`, or `- - -` would read as a thematic break.
+    after_dash: bool,
 }
 
 /// Writes blocks, each ending in `\n`, joined by `separator`.
@@ -60,14 +68,17 @@ fn blocks(blocks: &[Block], pos: Pos, separator: &str) -> String {
         }
         let pos = Pos {
             file_start: pos.file_start && i == 0,
+            after_dash: pos.after_dash && i == 0,
             ..pos
         };
         // A list right after another list needs a different marker, or the
         // two would be read as one.
-        let alternate = matches!(
+        let adjacent = matches!(
             (previous, block),
             (Some(Block::List(a)), Block::List(b)) if a.start.is_some() == b.start.is_some()
         ) && !previous_alternate;
+        let alternate =
+            adjacent || (pos.after_dash && matches!(block, Block::List(l) if l.start.is_none()));
         out.push_str(&self::block(block, pos, alternate));
         previous = Some(block);
         previous_alternate = alternate;
@@ -113,6 +124,7 @@ fn block(block: &Block, pos: Pos, alternate: bool) -> String {
                     nested: true,
                     columns: false,
                     file_start: false,
+                    after_dash: false,
                 },
                 "\n",
             );
@@ -172,6 +184,7 @@ fn list(list: &List, alternate: bool) -> String {
             nested: true,
             columns: false,
             file_start: false,
+            after_dash: marker == "-",
         };
         let body = blocks(&item.blocks, pos, if list.tight { "" } else { "\n" });
         let paragraph_first = matches!(item.blocks.first(), Some(Block::Paragraph { .. }));
@@ -204,16 +217,19 @@ fn fence(fence: &Fence) -> String {
         .max();
     let marks = c.to_string().repeat(longest.unwrap_or(0).max(2) + 1);
     let mut info = inline::escape_info(&fence.lang);
-    for part in [
-        inline::escape_info(&fence.args),
-        attrs::to_string(&fence.attrs),
-    ] {
-        if !part.is_empty() {
-            if !info.is_empty() {
-                info.push(' ');
-            }
-            info.push_str(&part);
+    let args = inline::escape_info(&fence.args);
+    if !args.is_empty() {
+        if !info.is_empty() {
+            info.push(' ');
         }
+        info.push_str(&args);
+    }
+    let attrs = attrs_after(&info, &fence.attrs);
+    if !attrs.is_empty() {
+        if !info.is_empty() {
+            info.push(' ');
+        }
+        info.push_str(&attrs);
     }
     // An info string starting with the fence character would lengthen it.
     let gap = if info.starts_with(c) { " " } else { "" };
@@ -265,7 +281,7 @@ fn container(container: &Container) -> String {
     for part in [
         &container.name,
         &container.arg,
-        &attrs::to_string(&container.attrs),
+        &attrs_after(&container.arg, &container.attrs),
     ] {
         if !part.is_empty() {
             out.push(' ');
@@ -278,6 +294,7 @@ fn container(container: &Container) -> String {
         nested: false,
         columns,
         file_start: false,
+        after_dash: false,
     };
     let sections: Vec<String> = container
         .sections
@@ -311,6 +328,18 @@ fn nesting_depth(container: &Container) -> usize {
         .unwrap_or(0)
 }
 
+/// The attributes written after `text`. When there are none but `text`
+/// itself ends in something that reads as attributes, an empty `{}` keeps
+/// that text from being taken as them.
+fn attrs_after(text: &str, attrs: &crate::ast::Attributes) -> String {
+    let written = attrs::to_string(attrs);
+    if written.is_empty() && attrs::split_trailing(text).0 != text.trim_end() {
+        "{}".to_owned()
+    } else {
+        written
+    }
+}
+
 /// A callout inside a list item or quote, written as a `GitHub` alert.
 fn alert(container: &Container) -> String {
     let kind = match container.name.as_str() {
@@ -321,15 +350,21 @@ fn alert(container: &Container) -> String {
         _ => "NOTE",
     };
     let mut head = format!("[!{kind}]");
-    if !container.arg.is_empty() {
-        head.push(' ');
-        head.push_str(&container.arg);
+    for part in [
+        &container.arg,
+        &attrs_after(&container.arg, &container.attrs),
+    ] {
+        if !part.is_empty() {
+            head.push(' ');
+            head.push_str(part);
+        }
     }
     head.push('\n');
     let pos = Pos {
         nested: true,
         columns: false,
         file_start: false,
+        after_dash: false,
     };
     let body: Vec<String> = container
         .sections
