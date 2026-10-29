@@ -17,8 +17,8 @@
 #
 # On Sunday nights it also runs the chaos test on the Organisation profile:
 # the Helm chart on kind with a Patroni Postgres, under k6 load, while Chaos
-# Mesh kills a Vellum node, a Kroki pod and the Postgres primary, restarts
-# the blob store and slows the database (D255). It fails when an SLO
+# Mesh kills a Vellum node, a Kroki pod and the Postgres primary, cuts
+# the servers off the bucket and slows the database (D255). It fails when an SLO
 # threshold breaks or an acknowledged write is lost. Release pull requests
 # check the latest results of both (full.yml, D254).
 name: "Scheduled: nightly load, security and fuzz, chaos on Sundays"

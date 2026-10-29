@@ -99,9 +99,7 @@ MinIO stopped publishing community images in October 2025.
 - Weekly: `deploy/chaos/run.sh` on kind injects faults under load (D255);
   it fails when a threshold breaks or an acknowledged write is lost.
 - Every release: `deploy/drills/upgrade.sh` upgrades a seeded stack from
-  each of the previous two releases, and `deploy/drills/restore.sh`
-  restores a backup into a scratch stack; both compare row and object
-  counts.
+  the last two releases; `deploy/drills/restore.sh` restores a backup.
 
 ### D253: upgrades from every earlier schema, with data
 
@@ -118,13 +116,12 @@ MinIO stopped publishing community images in October 2025.
 - `vellum budgets` gets a one-day admin token (`deploy/perf/admin-token.sh`),
   so a route over budget (R-OB-4) fails the night.
 - A release PR fails while the latest load, ZAP, fuzz or chaos run on
-  develop failed (`scripts/ci/reliability-gate.sh`); a green manual run
-  clears it.
+  develop failed (`scripts/ci/reliability-gate.sh`).
 
 ### D255: chaos covers the blob store and a slow database
 
 - Five faults, 140 s apart, in 15 minutes of load: a Vellum node, Kroki,
-  the Postgres primary, a blob store restart, 40 ms extra DB latency.
+  the Postgres primary, a 20 s bucket outage, 40 ms extra DB latency.
 - No Redis: shared state is in Postgres (ADR 0040), so DB faults cover it.
 
 ## Alternatives
