@@ -15,3 +15,7 @@ holder = "collections (D205-D207), desktop (D208-D210), upload route (D211-D213)
 [[reservation]]
 decisions = "D217-D261"
 holder = "16 threads, allocated by the coordinator on 2026-10-29; see the project memory registry"
+
+[[reservation]]
+adrs = "0050-0064"
+holder = "15 gap workstreams: workstream n gets ADR 0049+n (drive UI, workstream 3, gets 0052)"
