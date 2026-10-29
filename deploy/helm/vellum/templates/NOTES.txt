@@ -1,0 +1,20 @@
+{{- /*
+SPDX-FileCopyrightText: 2026 The Vellum contributors
+SPDX-License-Identifier: AGPL-3.0-only
+*/ -}}
+Vellum {{ .Chart.AppVersion }} is installed as {{ include "vellum.fullname" . }}.
+
+Before the pods turn ready:
+  - the secret {{ .Values.encryption.kekSecret.name }} must hold the key-encryption passphrase
+    under "{{ .Values.encryption.kekSecret.key }}";
+{{- if eq .Values.postgres.mode "operator" }}
+  - the Zalando Postgres Operator must be running, to create {{ len .Values.shards }} Patroni cluster(s);
+{{- else }}
+  - the secret {{ .Values.postgres.externalSecret }} must hold one Postgres URL per shard name;
+{{- end }}
+{{- if .Values.canary.enabled }}
+  - the Argo Rollouts controller must be installed; watch a release with
+    kubectl argo rollouts get rollout {{ include "vellum.fullname" . }} --watch
+{{- end }}
+
+Open {{ .Values.publicUrl }} once `kubectl get pods -l app.kubernetes.io/instance={{ .Release.Name }}` shows them ready.

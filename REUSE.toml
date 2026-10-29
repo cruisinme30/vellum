@@ -32,6 +32,7 @@ path = [
   "corpus/**/*.md",
   "corpus/**/*.json",
   ".gitmessage",
+  "deploy/perf/*.json",
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 The Vellum contributors"

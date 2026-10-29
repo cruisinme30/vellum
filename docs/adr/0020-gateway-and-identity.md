@@ -11,9 +11,9 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D88
-- Issue: none (recorded before the issue rule, D119)
-- Pull requests: #39
+- Decisions: D88, D89
+- Issue: #84, #85, #148, #46
+- Pull requests: #39, #234, #347
 
 :::
 
@@ -54,12 +54,32 @@ live in the gateway crate.
 - Start-up refuses a malformed operation: a bad ID, a path outside
   `/v1/`, a `GET` mutation, or a path parameter missing from the input.
 
+### D89: the gateway owns the edge, including the public-pages origin
+
+- TLS 1.3 only (`rustls` with `aws-lc-rs`), from PEM files or ACME
+  (TLS-ALPN-01); HTTP/1.1 and HTTP/2 share one listener, and shutdown
+  turns `/readyz` to 503 before draining.
+- Every response carries a strict CSP, `nosniff`, frame denial,
+  COOP/CORP and, over HTTPS, HSTS.
+- CSRF: cross-site `Sec-Fetch-Site` and foreign `Origin` are refused;
+  cookie sessions also send `X-CSRF-Token`, an HMAC of the session
+  binding. Bearer tokens are exempt.
+- `Idempotency-Key` stores the first response per caller for 24 hours
+  and replays it; a different request under the key is a 422, a
+  concurrent one a 409.
+- Rate limits reuse the `vellum-security` GCRA limiter per caller.
+- Share links (`/s/{token}`) and published pages (`/p/{path}`) are served
+  only on a separate public origin with a sandboxing CSP and no scripts,
+  through a `PublicSite` port.
+
 ## Alternatives
 
 - **Each service ships an `axum` router and a `GraphQL` object**: REST
   and `GraphQL` drift apart, and services pull in HTTP crates.
 - **Hand-written gateway handlers per service**: the gateway changes for
   every endpoint and coverage depends on discipline.
+- **Share pages on the app origin**: user content would run beside the
+  signed-in session's cookies.
 
 ## Consequences
 

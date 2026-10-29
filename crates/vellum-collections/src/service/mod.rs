@@ -23,6 +23,9 @@
 //! | `collections.delete_view` | `DELETE /v1/collections/{collection_id}/views/{view}` | `write:direct` |
 //! | `collections.embed` | `GET /v1/collections/embed` | `read` |
 //! | `collections.chart` | `GET /v1/collections/chart` | `read` |
+//! | `collections.export_csv` | `GET /v1/collections/{collection_id}/csv` | `read` |
+//! | `collections.import_csv` | `POST /v1/collections/{collection_id}/csv` | `write:direct` |
+//! | `collections.create_from_csv` | `POST /v1/collections` | `write:direct` |
 //!
 //! Reading a collection needs read access to it and to every collection
 //! its relations point at, because relation cells show related titles
@@ -48,11 +51,40 @@ use vellum_store::BlobStore;
 
 pub use access::{Access, AuthzAccess, Need, SpaceOf};
 pub use api::{
-    ChartInput, CollectionInfo, CollectionKey, CollectionList, CollectionSummary, CreateRowInput,
-    EmbedInput, EmbedResult, ListCollections, PropertyInfo, QueryInput, RelationInfo, RollupInfo,
-    RowDetail, RowKey, RowWritten, SaveViewInput, UpdateRowInput, ViewInfo, ViewKey,
+    ChartInput, CollectionInfo, CollectionKey, CollectionList, CollectionSummary,
+    CreateFromCsvInput, CreateRowInput, CsvExport, CsvImported, EmbedInput, EmbedResult,
+    ExportCsvInput, ImportCsvInput, ListCollections, PropertyInfo, QueryInput, RelationInfo,
+    RollupInfo, RowDetail, RowKey, RowWritten, SaveViewInput, UpdateRowInput, ViewInfo, ViewKey,
 };
 pub use state::{MAX_FILE_BYTES, MAX_ROWS_PER_COLLECTION};
+
+/// Largest CSV file accepted for import, in bytes.
+pub const MAX_CSV_BYTES: usize = 16 * 1024 * 1024;
+
+/// The saved view `name`, the first view, or a plain table.
+fn view_def(schema: &crate::schema::Schema, name: Option<&str>) -> Result<ViewDef, Error> {
+    match (name, schema.view(name)) {
+        (_, Some(v)) => Ok(v.clone()),
+        (None, None) => Ok(ViewDef::default_table()),
+        (Some(name), None) => Err(Error::new(
+            ErrorKind::NotFound,
+            format!("no view named {name:?}"),
+        )),
+    }
+}
+
+fn csv_size(text: &str) -> Result<(), Error> {
+    if text.len() > MAX_CSV_BYTES {
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            format!(
+                "CSV files over {} MiB cannot be imported",
+                MAX_CSV_BYTES / 1024 / 1024
+            ),
+        ));
+    }
+    Ok(())
+}
 
 /// Most saved views one collection may have.
 pub const MAX_VIEWS: usize = 64;
@@ -314,16 +346,7 @@ impl CollectionsService {
             .collection(id)
             .map(crate::workspace::Collection::schema)
             .ok_or_else(|| Error::new(ErrorKind::NotFound, format!("collection {id} not found")))?;
-        let mut def = match (&input.view, schema.view(input.view.as_deref())) {
-            (_, Some(v)) => v.clone(),
-            (None, None) => ViewDef::default_table(),
-            (Some(name), None) => {
-                return Err(Error::new(
-                    ErrorKind::NotFound,
-                    format!("no view named {name:?}"),
-                ));
-            }
-        };
+        let mut def = view_def(schema, input.view.as_deref())?;
         let list = one_or_many;
         let overlay = ViewDefRaw {
             name: Some(def.name.clone()),
@@ -762,6 +785,243 @@ impl CollectionsService {
     }
 }
 
+impl CollectionsService {
+    /// Exports a view as CSV: its columns, filters and order, every row.
+    ///
+    /// # Errors
+    ///
+    /// `not_found` for an unknown collection or view.
+    pub async fn export_csv(
+        &self,
+        ctx: &RequestContext,
+        input: ExportCsvInput,
+    ) -> Result<CsvExport, Error> {
+        let state = self.read().await?;
+        let id = input.collection_id;
+        self.require_read(&state, &ctx.principal, id).await?;
+        let schema = state
+            .ws
+            .collection(id)
+            .map(crate::workspace::Collection::schema)
+            .ok_or_else(|| Error::new(ErrorKind::NotFound, format!("collection {id} not found")))?;
+        let def = view_def(schema, input.view.as_deref())?;
+        let stem = if input.view.is_some() {
+            format!("{} - {}", schema.title, def.name)
+        } else {
+            schema.title.clone()
+        };
+        let file_name = vellum_store::layout::file_name(&stem, "csv");
+        let mut computer = Computer::new(&state.ws, (self.clock)());
+        let csv = crate::csv::export(&mut computer, id, &def);
+        drop(computer);
+        drop(state);
+        Ok(CsvExport {
+            file_name,
+            csv: csv?,
+        })
+    }
+
+    /// Adds the rows of a CSV file to a collection, all or nothing.
+    ///
+    /// # Errors
+    ///
+    /// `invalid_input` for an unreadable or oversized file;
+    /// `permission_denied` without edit access.
+    pub async fn import_csv(
+        &self,
+        ctx: &RequestContext,
+        input: ImportCsvInput,
+    ) -> Result<CsvImported, Error> {
+        csv_size(&input.csv)?;
+        let id = input.collection_id;
+        let span = tracing::info_span!("collections.import_csv", collection = %id);
+        async move {
+            let mut guard = self.state.write().await;
+            if guard.is_none() {
+                *guard = Some(State::load(self.store.as_ref()).await?);
+            }
+            let Some(state) = guard.as_mut() else {
+                return Err(Error::new(
+                    ErrorKind::Internal,
+                    "collections were not loaded",
+                ));
+            };
+            self.require_edit(state, &ctx.principal, id, true).await?;
+            let import = crate::csv::import_into(&input.csv, &state.ws, id)?;
+            let rows = import.rows.len();
+            let mut changed = crate::workspace::Changeset::default();
+            if !input.dry_run {
+                // Apply to a copy first, so a bad row leaves nothing half done.
+                let mut ws = state.ws.clone();
+                for edit in import.edits() {
+                    let c = ws.apply(edit)?;
+                    changed.written.extend(c.written);
+                    changed.deleted.extend(c.deleted);
+                }
+                state.ws = ws;
+                let result = state.write(self.store.as_ref(), &changed).await;
+                crate::telemetry::wrote("import_csv", result.is_ok());
+                if let Err(e) = result {
+                    *guard = None;
+                    return Err(e);
+                }
+            }
+            let collection = match (state.ws.collection(id), state.folder(id)) {
+                (Some(c), Ok(f)) => CollectionInfo::new(
+                    c.schema(),
+                    f.path.as_str().to_owned(),
+                    f.diagnostics.clone(),
+                ),
+                _ => return Err(Error::new(ErrorKind::Internal, "collection vanished")),
+            };
+            drop(guard);
+            Ok(CsvImported {
+                written: !input.dry_run,
+                rows,
+                skipped_columns: import.skipped_columns,
+                diagnostics: import.diagnostics,
+                collection,
+                changed,
+            })
+        }
+        .instrument(span)
+        .await
+    }
+
+    /// Creates a collection from a CSV file, inferring each column's type.
+    ///
+    /// # Errors
+    ///
+    /// `permission_denied` without edit access to the folder; `conflict`
+    /// when a collection with that name is already there.
+    pub async fn create_from_csv(
+        &self,
+        ctx: &RequestContext,
+        input: CreateFromCsvInput,
+    ) -> Result<CsvImported, Error> {
+        csv_size(&input.csv)?;
+        let title = input.title.trim();
+        if title.is_empty() {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "a collection needs a title",
+            ));
+        }
+        let folder = vellum_store::BlobPath::new(input.folder.trim_end_matches('/'))
+            .map_err(state::store_error)?;
+        if !matches!(
+            vellum_store::layout::Kind::of(&folder.join("x.md").map_err(state::store_error)?),
+            vellum_store::layout::Kind::Document
+        ) {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "collections can only be created in a drive folder",
+            ));
+        }
+        if !self
+            .access
+            .allowed_in(&ctx.principal, &folder, Need::Edit)
+            .await?
+        {
+            return Err(Error::new(
+                ErrorKind::PermissionDenied,
+                "you cannot create collections in this folder",
+            ));
+        }
+        let dir = folder
+            .join(&vellum_store::layout::file_name(title, "collection"))
+            .map_err(state::store_error)?;
+        let id = CollectionId::generate();
+        let import = crate::csv::import_new(&input.csv, id, title)?;
+        let rows = import.rows.len();
+        let (skipped_columns, diagnostics) =
+            (import.skipped_columns.clone(), import.diagnostics.clone());
+        let collection = import.into_collection();
+        let info = CollectionInfo::new(collection.schema(), dir.as_str().to_owned(), Vec::new());
+        let changed = crate::workspace::Changeset {
+            written: collection
+                .rows()
+                .map(|r| crate::workspace::RowRef {
+                    collection: id,
+                    row: r.id,
+                })
+                .collect(),
+            deleted: std::collections::BTreeSet::new(),
+        };
+        if !input.dry_run {
+            let span = tracing::info_span!("collections.create_from_csv", collection = %id);
+            async {
+                let mut guard = self.state.write().await;
+                if guard.is_none() {
+                    *guard = Some(State::load(self.store.as_ref()).await?);
+                }
+                let Some(state) = guard.as_mut() else {
+                    return Err(Error::new(
+                        ErrorKind::Internal,
+                        "collections were not loaded",
+                    ));
+                };
+                let result = state.create(self.store.as_ref(), dir, collection).await;
+                crate::telemetry::wrote("create_from_csv", result.is_ok());
+                if result.is_err() {
+                    *guard = None;
+                }
+                drop(guard);
+                result
+            }
+            .instrument(span)
+            .await?;
+        }
+        Ok(CsvImported {
+            written: !input.dry_run,
+            rows,
+            skipped_columns,
+            diagnostics,
+            collection: info,
+            changed,
+        })
+    }
+
+    fn csv_operations(this: &Arc<Self>) -> Vec<Operation> {
+        let s = Arc::clone(this);
+        let export = Operation::query(
+            "collections.export_csv",
+            "/v1/collections/{collection_id}/csv",
+            Scope::Read,
+            move |ctx, input: ExportCsvInput| {
+                let s = Arc::clone(&s);
+                async move { s.export_csv(&ctx, input).await }
+            },
+        )
+        .summary("Export a view as CSV");
+        let s = Arc::clone(this);
+        let import = Operation::mutation(
+            "collections.import_csv",
+            HttpMethod::Post,
+            "/v1/collections/{collection_id}/csv",
+            Scope::WriteDirect,
+            move |ctx, input: ImportCsvInput| {
+                let s = Arc::clone(&s);
+                async move { s.import_csv(&ctx, input).await }
+            },
+        )
+        .summary("Add the rows of a CSV file to a collection");
+        let s = Arc::clone(this);
+        let create = Operation::mutation(
+            "collections.create_from_csv",
+            HttpMethod::Post,
+            "/v1/collections",
+            Scope::WriteDirect,
+            move |ctx, input: CreateFromCsvInput| {
+                let s = Arc::clone(&s);
+                async move { s.create_from_csv(&ctx, input).await }
+            },
+        )
+        .summary("Create a collection from a CSV file, inferring column types");
+        vec![export, import, create]
+    }
+}
+
 impl Service for CollectionsService {
     fn name(&self) -> &'static str {
         "collections"
@@ -838,6 +1098,7 @@ impl Service for CollectionsService {
         .summary("Change a row's values or body");
         let views = Self::view_operations(&self);
         let embeds = Self::embed_operations(&self);
+        let csv = Self::csv_operations(&self);
         let s = self;
         let delete_row = Operation::mutation(
             "collections.delete_row",
@@ -855,6 +1116,7 @@ impl Service for CollectionsService {
         ];
         ops.extend(views);
         ops.extend(embeds);
+        ops.extend(csv);
         ops
     }
 

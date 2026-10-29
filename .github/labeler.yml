@@ -69,6 +69,7 @@ area/books:
   - changed-files:
       - any-glob-to-any-file:
           - "crates/vellum-books/**"
+          - "crates/vellum-books-service/**"
 area/work:
   - changed-files:
       - any-glob-to-any-file:
