@@ -7,7 +7,9 @@
 # generated secrets under $STACK_STATE (default: a temp folder).
 #
 #   stack.sh has-serve IMAGE                 exit 0 if IMAGE has `vellum serve`
-#   stack.sh up IMAGE PROJECT PORT [KEK]     start and wait for /readyz
+#   stack.sh up IMAGE PROJECT PORT [KEK]     start and wait for /readyz;
+#                                            REPLICAS=2 adds a second
+#                                            Vellum on PORT+1
 #   stack.sh up-deps PROJECT PORT [KEK]      start everything but Vellum
 #   stack.sh down PROJECT                    stop and delete volumes
 set -euo pipefail
@@ -42,6 +44,8 @@ VELLUM_PORT=${port}
 VELLUM_PUBLIC_URL=http://localhost:${port}
 POSTGRES_PASSWORD=$(random)
 MINIO_ROOT_PASSWORD=$(random)
+VELLUM_CLUSTER_KEY=$(random)
+VELLUM_PORT_B=$((port + 1))
 VELLUM_KEK_FILE=${kek}
 VELLUM_CSRF_FILE=${csrf}
 VELLUM_LOG=info
@@ -77,6 +81,14 @@ case "${command}" in
       compose "${project}" logs vellum | tail -100
       exit 1
     fi
+    if [[ "${REPLICAS:-1}" -ge 2 ]]; then
+      # Started after the first, which runs the migrations and the rescan.
+      compose "${project}" --profile replicas up -d --no-build vellum-b
+      if ! wait_ready "$((port + 1))"; then
+        compose "${project}" --profile replicas logs vellum-b | tail -100
+        exit 1
+      fi
+    fi
     ;;
   up-deps)
     project="$1" port="$2"
@@ -94,7 +106,7 @@ case "${command}" in
     compose "$@"
     ;;
   down)
-    compose "$1" down --volumes --remove-orphans
+    compose "$1" --profile replicas down --volumes --remove-orphans
     ;;
   *)
     echo "usage: stack.sh has-serve IMAGE | up IMAGE PROJECT PORT [KEK] | up-deps PROJECT PORT [KEK]" >&2
