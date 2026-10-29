@@ -8,12 +8,18 @@ import type { AdminConsoleApi } from "./admin/console/api";
 import { AuditPage } from "./admin/console/audit-page";
 import { BackupsPage } from "./admin/console/backups-page";
 import { AdminConsoleProvider } from "./admin/console/context";
+import { GroupsPage } from "./admin/console/groups-page";
 import { SettingsPage } from "./admin/console/settings-page";
+import { SpacesPage } from "./admin/console/spaces-page";
 import { UsagePage } from "./admin/console/usage-page";
+import { UsersPage } from "./admin/console/users-page";
 import { WebhooksPage } from "./admin/console/webhooks-page";
 import { RequestsPage } from "./admin/requests/requests-page";
 import { RoutesPage } from "./admin/routes/routes-page";
 import type { AuthApi, AuthStatus } from "./api/auth";
+import type { Http } from "./api/http";
+import type { ReauthGate } from "./api/reauth";
+import { ReauthPrompt } from "./api/reauth-prompt";
 import { RequireSession, SessionProvider, useSession } from "./api/session";
 import type { AttachmentsApi } from "./attachments/api";
 import type { BooksApi } from "./books/api";
@@ -131,6 +137,9 @@ export function AppRoutes() {
         <Route path="admin/settings" element={<SettingsPage />} />
         <Route path="admin/backups" element={<BackupsPage />} />
         <Route path="admin/webhooks" element={<WebhooksPage />} />
+        <Route path="admin/users" element={<UsersPage />} />
+        <Route path="admin/spaces" element={<SpacesPage />} />
+        <Route path="admin/groups" element={<GroupsPage />} />
         <Route path="*" element={<NotFoundView />} />
       </Route>
     </Routes>
@@ -168,6 +177,11 @@ export interface AppServices {
   readonly notifications?: NotificationServices | undefined;
   /** Loads the organisation's seed colour and themes; absent in demo mode. */
   readonly appearance?: (() => Promise<OrganisationAppearance>) | undefined;
+  /**
+   * Asks the person to confirm who they are when an action needs a recent
+   * sign-in (D241); `http` is the client without the retry. Server only.
+   */
+  readonly reauth?: { readonly gate: ReauthGate; readonly http: Http } | undefined;
 }
 
 /**
@@ -242,6 +256,7 @@ export function AppProviders({
   session,
   notifications,
   appearance,
+  reauth,
   children,
 }: AppServices & { readonly children: ReactNode }) {
   const serverApis = useMemo(
@@ -260,7 +275,12 @@ export function AppProviders({
               <CollectionsProvider store={collections}>
                 <NotificationsProvider services={notifications ?? demoNotifications}>
                   <AdminConsoleProvider api={admin}>
-                    <ServerApisProvider apis={serverApis}>{children}</ServerApisProvider>
+                    <ServerApisProvider apis={serverApis}>
+                      {children}
+                      {reauth !== undefined && (
+                        <ReauthPrompt gate={reauth.gate} http={reauth.http} />
+                      )}
+                    </ServerApisProvider>
                   </AdminConsoleProvider>
                 </NotificationsProvider>
               </CollectionsProvider>

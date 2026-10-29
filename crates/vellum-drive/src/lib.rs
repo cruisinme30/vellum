@@ -29,13 +29,13 @@ pub mod sharded;
 pub mod sql;
 
 pub use drive::{
-    Attachment, Drive, Filter, MAX_ATTACHMENTS, MAX_TREE_ITEMS, MY_DRIVE_NAME, OP_SECONDS,
-    OPS_TOTAL, SaveOutcome, Saved, Tree,
+    AdminSpace, Attachment, Drive, Filter, MAX_ATTACHMENTS, MAX_TREE_ITEMS, MY_DRIVE_NAME,
+    OP_SECONDS, OPS_TOTAL, SaveOutcome, Saved, Tree,
 };
 pub use error::{DriveError, DriveResult};
 pub use model::{
     Activity, ActivityKind, DriveTotals, Node, NodeKind, RetentionPolicy, ScanReport, Space,
     SpaceKind, SpaceSettings, TrashState, Usage, VersionRecord,
 };
-pub use ports::{Access, Clock, DriveIndex, Permission, SystemClock};
+pub use ports::{Access, Clock, DriveIndex, Member, Permission, SpaceRole, SystemClock};
 pub use service::{DriveService, PageWrites};

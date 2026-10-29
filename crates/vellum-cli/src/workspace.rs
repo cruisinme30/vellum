@@ -664,6 +664,7 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
             Arc::clone(&tasks) as Arc<dyn Service>,
             Arc::new(pages),
             Arc::clone(&e2e) as Arc<dyn Service>,
+            crate::groups::service(identity, authz),
         ],
         drive,
         collections,

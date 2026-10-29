@@ -24,7 +24,7 @@ use std::sync::{Mutex, PoisonError};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use vellum_contracts::Scope;
-use vellum_kernel::{Error, ErrorKind, Timestamp, UserId};
+use vellum_kernel::{Error, ErrorKind, ObjectId, Timestamp, UserId};
 
 use crate::oauth::Client;
 use crate::secret::SecretHash;
@@ -61,6 +61,21 @@ pub struct User {
     /// Single sign-on identities that sign in as this user.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub sso: Vec<SsoLink>,
+}
+
+/// A named group of people (ADR 0057, D273). Who is in it lives in the
+/// permission engine; this is its name.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Group {
+    /// The group's ID; grants name it as `group:<ID>`.
+    pub id: ObjectId,
+    /// The display name, unique ignoring case.
+    pub name: String,
+    /// What the group is for.
+    #[serde(default)]
+    pub description: String,
+    /// When it was created.
+    pub created_at: Timestamp,
 }
 
 /// A provider's user, linked to a Vellum account on first sign-in.
@@ -256,6 +271,9 @@ pub struct State {
     /// `OAuth` authorization codes by the base64 of their hash.
     #[serde(default)]
     pub oauth_codes: BTreeMap<String, PendingCode>,
+    /// Named groups by ID.
+    #[serde(default)]
+    pub groups: BTreeMap<String, Group>,
 }
 
 impl State {

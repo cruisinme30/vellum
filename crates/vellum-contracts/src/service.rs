@@ -470,6 +470,16 @@ impl Operation {
         path_params(self.path)
     }
 
+    /// Replaces the handler with one built around it, keeping everything
+    /// else the declaration says (schemas, scope, re-authentication
+    /// window). The composition root uses it to audit admin actions
+    /// (ADR 0021, D243).
+    #[must_use]
+    pub fn wrap(mut self, wrap: impl FnOnce(Arc<dyn Handler>) -> Arc<dyn Handler>) -> Self {
+        self.handler = wrap(self.handler);
+        self
+    }
+
     /// Runs the handler.
     #[must_use = "the future does nothing until awaited"]
     pub fn call(
