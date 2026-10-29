@@ -149,7 +149,7 @@ fn steps(base: Option<&str>, branch: Option<&str>) -> Vec<Step> {
             "Prose (Vale)",
             "vale",
             &[
-                "--glob=!{**/node_modules/**,target/**,LICENSES/**,LICENSE}",
+                "--glob=!{**/node_modules/**,target/**,LICENSES/**,LICENSE,corpus/format/**}",
                 ".",
             ],
         ),
