@@ -11,7 +11,8 @@ on:
     types: [opened, synchronize, reopened, edited]
   push:
     branches: [develop]
-  # The merge queue tests each pull request on top of the ones ahead of it.
+  # Used if the repository moves to an organisation and enables the merge
+  # queue (scripts/admin/enable-merge-queue.sh).
   merge_group:
   workflow_call:
 
