@@ -1,0 +1,27 @@
+// SPDX-FileCopyrightText: 2026 The Vellum contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+
+import { AxeBuilder } from "@axe-core/playwright";
+import { expect, test } from "@playwright/test";
+
+const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
+
+test("the command menu opens from the keyboard and passes WCAG 2.2 AA", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1, name: "Vellum" })).toBeVisible();
+  await page.keyboard.press("ControlOrMeta+k");
+  const search = page.getByRole("combobox", { name: "Search commands" });
+  await expect(search).toBeFocused();
+  await search.fill("short");
+  await expect(page.getByRole("option", { name: /Show all shortcuts/ })).toBeVisible();
+  const results = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+  expect(results.violations).toEqual([]);
+
+  await page.keyboard.press("Enter");
+  const sheet = page.getByRole("dialog", { name: "Keyboard shortcuts" });
+  await expect(sheet).toBeVisible();
+  const sheetResults = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+  expect(sheetResults.violations).toEqual([]);
+  await page.keyboard.press("Escape");
+  await expect(sheet).toBeHidden();
+});

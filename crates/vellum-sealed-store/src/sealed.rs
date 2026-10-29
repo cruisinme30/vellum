@@ -28,6 +28,9 @@ pub const PLAINTEXT_READS: &str = "vellum_sealed_plaintext_reads_total";
 ///   pass straight through.
 /// - `get`, `head`, `put` and `rename` report plaintext sizes; `list`
 ///   reports stored sizes, because listings never read content.
+/// - E2E private spaces ([`Mode::EndToEnd`]) hold recipient envelopes the
+///   server cannot open; they pass through untouched and their sizes are
+///   ciphertext sizes.
 /// - Envelopes are not bound to their path (ADR 0002, D35), so renames and
 ///   moves between spaces keep working.
 #[derive(Debug)]
@@ -70,6 +73,9 @@ impl<S: BlobStore, K: KeyProvider + std::fmt::Debug, P: ModePolicy> Sealed<S, K,
     #[tracing::instrument(name = "sealed.reseal", skip(self), fields(path = %path))]
     pub async fn reseal(&self, path: &BlobPath) -> StoreResult<bool> {
         let blob = self.inner.get(path).await?;
+        if vellum_crypto::recipients::is_recipient_envelope(&blob.bytes) {
+            return Ok(false);
+        }
         let sealed = vellum_crypto::is_envelope(&blob.bytes);
         let next = match (self.policy.mode_for(path), sealed) {
             (Mode::Encrypted, true) => vellum_crypto::rewrap(self.keys.as_ref(), &blob.bytes)
@@ -85,7 +91,8 @@ impl<S: BlobStore, K: KeyProvider + std::fmt::Debug, P: ModePolicy> Sealed<S, K,
                     .await
                     .map_err(crypto_error)?,
             ),
-            (Mode::Plaintext, false) => None,
+            // Only members' devices can convert content into an E2E space.
+            (Mode::Plaintext, false) | (Mode::EndToEnd, _) => None,
         };
         let Some(next) = next else {
             return Ok(false);
@@ -96,6 +103,10 @@ impl<S: BlobStore, K: KeyProvider + std::fmt::Debug, P: ModePolicy> Sealed<S, K,
     }
 
     async fn decode(&self, path: &BlobPath, stored: Bytes) -> StoreResult<Bytes> {
+        // E2E ciphertext is returned as is: only members' devices open it.
+        if vellum_crypto::recipients::is_recipient_envelope(&stored) {
+            return Ok(stored);
+        }
         if vellum_crypto::is_envelope(&stored) {
             let plain = vellum_crypto::open(self.keys.as_ref(), &stored)
                 .await
@@ -154,6 +165,12 @@ where
                     .map_err(crypto_error)?,
             ),
             Mode::Plaintext => bytes,
+            Mode::EndToEnd if vellum_crypto::recipients::is_recipient_envelope(&bytes) => bytes,
+            Mode::EndToEnd => {
+                return Err(StoreError::Backend(
+                    "E2E private space accepts only recipient envelopes".into(),
+                ));
+            }
         };
         let meta = self.inner.put(path, stored, condition).await?;
         Ok(BlobMeta { size, ..meta })
@@ -174,6 +191,9 @@ where
 }
 
 fn plain_size(stored: &[u8]) -> StoreResult<u64> {
+    if vellum_crypto::recipients::is_recipient_envelope(stored) {
+        return Ok(len(stored));
+    }
     if vellum_crypto::is_envelope(stored) {
         let n = vellum_crypto::plaintext_len(stored).map_err(crypto_error)?;
         return Ok(u64::try_from(n).unwrap_or(u64::MAX));
