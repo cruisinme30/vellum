@@ -8,6 +8,7 @@ export const routes = {
   ready: '/readyz',
   createPage: (space) => `/api/v1/spaces/${space}/pages`,
   page: (id) => `/api/v1/pages/${id}`,
+  collectionQuery: (id) => `/api/v1/collections/${id}/query`,
   // y-protocols sync and awareness; extra tags 100-102 can be ignored.
   collab: (space, id) => `/collab/${space}/${id}`,
 };
