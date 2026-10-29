@@ -2,54 +2,194 @@
  * SPDX-FileCopyrightText: 2026 The Vellum contributors
  * SPDX-License-Identifier: AGPL-3.0-only
  *
- * Vellum colours for the mdBook help books (Material 3 tokens, brief
- * section 13). Only the light theme is recoloured; the dark themes stay
- * mdBook's own apart from the fixes below.
+ * The look of the help books on the website (ADR 0027): Google Sans and
+ * Google's Material 3 colours, matching the landing page. "light" is the
+ * default theme and "navy" the dark one; both are recoloured. The fonts
+ * are the site's own copies, three folders up from each book's theme/.
  */
 
-html {
-  font-family: Roboto, system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+@font-face {
+  font-family: "Google Sans Flex";
+  font-weight: 400 700;
+  font-display: optional;
+  src: url("../../../fonts/google-sans-flex-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Google Sans Flex";
+  font-weight: 400 700;
+  font-display: optional;
+  src: url("../../../fonts/google-sans-flex-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "Google Sans Code";
+  font-weight: 400 600;
+  font-display: optional;
+  src: url("../../../fonts/google-sans-code-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
-/* System fonts only: build-site.sh drops mdBook's web fonts, whose late
-   swap shifted the page as it loaded (#249). */
 :root {
-  --mono-font: "Roboto Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --mono-font: "Google Sans Code", "Roboto Mono", ui-monospace, Menlo, Consolas, monospace;
+  --content-max-width: 780px;
+}
+
+html {
+  font-family: "Google Sans Flex", "Google Sans", Roboto, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+}
+
+body {
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.content h1,
+.content h2,
+.content h3,
+.content h4 {
+  font-weight: 500;
+  letter-spacing: -0.015em;
+}
+
+.content h1 {
+  font-size: 2.4rem;
+  line-height: 1.15;
+}
+
+.content pre,
+.content table {
+  overflow-wrap: normal;
+}
+
+.content table {
+  border-radius: 12px;
+}
+
+.content blockquote {
+  border-radius: 12px;
 }
 
 .light {
-  --bg: #f7f8fc;
-  --fg: #1d1b20;
-  --sidebar-bg: #f0f2f9;
-  --sidebar-fg: #46464f;
-  --sidebar-non-existant: #767680;
-  --sidebar-active: #4f5b92;
-  --sidebar-spacer: #c5c6d0;
-  --links: #4f5b92;
-  --inline-code-color: #374378;
-  --theme-popup-bg: #f0f2f9;
-  --theme-popup-border: #c5c6d0;
-  --theme-hover: #e6e8ee;
-  --quote-bg: #f0f2f9;
-  --quote-border: #c5c6d0;
-  --table-border-color: #c5c6d0;
-  --table-header-bg: #e6e8ee;
-  --table-alternate-bg: #f0f2f9;
-  --searchbar-border-color: #c5c6d0;
+  --bg: #ffffff;
+  --fg: #1f1f1f;
+  --sidebar-bg: #f0f4f9;
+  --sidebar-fg: #444746;
+  --sidebar-non-existant: #747775;
+  --sidebar-active: #0b57d0;
+  --sidebar-spacer: #dde3ea;
+  --sidebar-header-border-color: #0b57d0;
+  --icons: #5f6368;
+  --icons-hover: #1f1f1f;
+  --links: #0b57d0;
+  --inline-code-color: #1f1f1f;
+  --theme-popup-bg: #f0f4f9;
+  --theme-popup-border: #c4c7c5;
+  --theme-hover: #e1e5ea;
+  --quote-bg: #f0f4f9;
+  --quote-border: #dde3ea;
+  --table-border-color: #dde3ea;
+  --table-header-bg: #e9eef6;
+  --table-alternate-bg: #f8fafd;
+  --searchbar-border-color: #c4c7c5;
   --searchbar-bg: #ffffff;
-  --searchresults-header-fg: #46464f;
-  --searchresults-border-color: #c5c6d0;
-  --search-mark-bg: #dde1ff;
+  --searchbar-fg: #1f1f1f;
+  --searchresults-header-fg: #444746;
+  --searchresults-border-color: #dde3ea;
+  --searchresults-li-bg: #f0f4f9;
+  --search-mark-bg: #fdd663;
+  --footnote-highlight: #0b57d0;
+}
+
+.navy {
+  --bg: #131314;
+  --fg: #e3e3e3;
+  --sidebar-bg: #1e1f20;
+  --sidebar-fg: #c4c7c5;
+  --sidebar-non-existant: #8e918f;
+  --sidebar-active: #a8c7fa;
+  --sidebar-spacer: #333537;
+  --sidebar-header-border-color: #a8c7fa;
+  --icons: #a8abaf;
+  --icons-hover: #e3e3e3;
+  --links: #a8c7fa;
+  --inline-code-color: #e3e3e3;
+  --theme-popup-bg: #1e1f20;
+  --theme-popup-border: #444746;
+  --theme-hover: #282a2c;
+  --quote-bg: #1e1f20;
+  --quote-border: #333537;
+  --table-border-color: #333537;
+  --table-header-bg: #282a2c;
+  --table-alternate-bg: #1b1c1d;
+  --searchbar-border-color: #444746;
+  --searchbar-bg: #1e1f20;
+  --searchbar-fg: #e3e3e3;
+  --searchbar-shadow-color: #444746;
+  --searchresults-header-fg: #c4c7c5;
+  --searchresults-border-color: #333537;
+  --searchresults-li-bg: #1e1f20;
+  --search-mark-bg: #7c5800;
+  --footnote-highlight: #a8c7fa;
+}
+
+/* Inline code is padded from the start, not only once highlight.js adds
+   its class after load, which reflowed the text and shifted the page. */
+:not(pre) > code {
+  padding: 0.1em 0.35em;
+  border-radius: 6px;
+  background: var(--quote-bg);
+}
+
+/* The site bar from theme/header.hbs. It wraps on small screens. mdBook
+   pulls .page up by the menu bar's height to hide an invisible hover strip
+   that sits above the menu bar; the site bar takes that strip's place, so
+   it pushes back down and the strip is turned off. The menu bar still
+   comes back when the reader scrolls up. */
+.vellum-site + #mdbook-menu-bar-hover-placeholder {
+  display: none;
+}
+.vellum-site {
+  margin-block-start: var(--menu-bar-height);
+  margin-inline: calc(0px - var(--page-padding));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 20px;
+  padding: 10px var(--page-padding);
+  border-bottom: 1px solid var(--sidebar-spacer);
+  background: var(--sidebar-bg);
+  font-size: 0.875rem;
+}
+.vellum-site a {
+  color: var(--sidebar-fg);
+  text-decoration: none;
+}
+.vellum-site a:hover {
+  color: var(--links);
+  text-decoration: underline;
+}
+.vellum-site .vellum-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-inline-end: 8px;
+  color: var(--fg);
+  font-size: 1rem;
+  font-weight: 500;
+}
+.vellum-site img {
+  display: block;
 }
 
 /* WCAG 2.2 AA fixes for mdBook's default theme (#249). */
 
-/* The active chapter in the dark themes: mdBook's #2b79a2 is 2.8:1 on the navy sidebar. */
-/* Links: mdBook's #2b79a2 is 3.6:1 on the navy page. */
-.navy,
+/* The coal theme's active chapter and links: mdBook's #2b79a2 is below
+   4.5:1 there. (The navy theme has its own colours above.) */
 .coal {
-  --sidebar-active: #b8c3ff;
-  --links: #b8c3ff;
+  --sidebar-active: #a8c7fa;
+  --links: #a8c7fa;
 }
 
 /* Syntax colours below 4.5:1 in the dark code theme. */
@@ -92,11 +232,4 @@ pre > code:focus-visible,
 .table-wrapper:focus-visible {
   outline: 3px solid var(--links);
   outline-offset: 2px;
-}
-
-/* Inline code is padded from the start, not only once highlight.js adds
-   its class after load, which reflowed the text and shifted the page. */
-:not(pre) > code {
-  padding: 0.1em 0.3em;
-  border-radius: 3px;
 }

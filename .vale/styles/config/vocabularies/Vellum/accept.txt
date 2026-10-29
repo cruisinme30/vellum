@@ -127,4 +127,5 @@ Pandoc
 [Cc]ollab
 Docmost
 Gotenberg
+zizmor
 [Rr]ecents
