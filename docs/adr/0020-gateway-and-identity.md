@@ -12,7 +12,7 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D88, D89, D90
-- Issue: #84, #85, #148, #46, #86, #88, #174, #407, #393
+- Issue: #84, #85, #148, #46, #86, #87, #88, #174, #407, #393
 - Pull requests: #39, #234, #347, #352, #363
 
 :::
@@ -91,7 +91,17 @@ live in the gateway crate.
 - Break-glass: `vellum admin break-glass` writes a one-time code to the
   data directory; redeeming it opens a 15-minute administrator session.
 - Records live in `.vellum/identity.json` (mode 0600) until the SQL index
-  lands. SSO (OIDC, SAML) follows in its own change.
+  lands.
+
+Single sign-on uses one `OpenID Connect` provider, set by `VELLUM_OIDC_*`
+variables. Vellum is a relying party with the code flow, PKCE, `state`
+(also kept in a short-lived cookie, against login CSRF) and `nonce`. ID
+tokens must be `RS256` or `ES256` from the provider's key set, verified
+with `aws-lc-rs`. An account links by the provider's user ID, else by a
+verified email; new member accounts are created only for listed domains,
+never administrators. A single sign-on session is an ordinary session, so
+it outlives a provider outage, and password and break-glass sign-in stay
+available. Re-authentication asks the provider for a fresh sign-in.
 
 ## Alternatives
 
@@ -103,6 +113,8 @@ live in the gateway crate.
   each resource server would need key distribution; lookups are cheap.
 - **Share pages on the app origin**: user content would run beside the
   signed-in session's cookies.
+- **An `OpenID Connect` client crate**: the flow is small, and the crates
+  pull in a second HTTP stack that would bypass the SSRF guard.
 
 ## Consequences
 

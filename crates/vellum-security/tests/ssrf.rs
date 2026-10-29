@@ -251,3 +251,39 @@ async fn oversized_bodies_are_cut_off() {
         .unwrap_err();
     assert!(matches!(err, SsrfError::TooLarge(16)));
 }
+
+#[tokio::test]
+async fn a_trusted_address_and_a_form_post_reach_a_configured_provider() {
+    let port = serve(
+        "HTTP/1.1 400 Bad Request\r\ncontent-length: 25\r\n\r\n{\"error\":\"invalid_grant\"}"
+            .to_owned(),
+    )
+    .await;
+    let mut policy = UrlPolicy::default();
+    policy.trusted_hosts = vec!["127.0.0.1".to_owned()];
+    let client = SafeClient::new(policy).unwrap();
+    let url = format!("http://127.0.0.1:{port}/token");
+    // Only the trusted call is exempt; error documents come back as data.
+    assert!(client.get(&url).await.is_err());
+    let form = vec![("grant_type".to_owned(), "authorization_code".to_owned())];
+    let (status, body) = client
+        .post_form_trusted(&url, &form, Some(("vellum", "secret")))
+        .await
+        .unwrap();
+    assert_eq!(status, 400);
+    assert_eq!(body, br#"{"error":"invalid_grant"}"#);
+}
+
+#[tokio::test]
+async fn a_form_post_never_follows_a_redirect() {
+    let port = serve(
+        "HTTP/1.1 307 Temporary Redirect\r\nlocation: http://169.254.169.254/\r\ncontent-length: 0\r\n\r\n"
+            .to_owned(),
+    )
+    .await;
+    let client = SafeClient::new(trusting_localhost(port)).unwrap();
+    let result = client
+        .post_form_trusted(&format!("http://localhost:{port}/token"), &[], None)
+        .await;
+    assert!(matches!(result, Err(SsrfError::Redirects(0))), "{result:?}");
+}

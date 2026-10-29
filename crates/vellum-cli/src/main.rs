@@ -35,6 +35,8 @@ mod private_tests;
 mod reindex;
 mod serve;
 mod services;
+#[cfg(test)]
+mod sso_tests;
 mod tasks;
 mod tasks_http;
 #[cfg(test)]

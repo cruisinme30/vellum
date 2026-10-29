@@ -34,7 +34,7 @@ impl Reply {
 }
 
 fn app(data_dir: Option<&std::path::Path>) -> Router {
-    let services = Services::open(ORIGIN, data_dir).unwrap();
+    let services = Services::open(ORIGIN, data_dir, None).unwrap();
     let mut config = GatewayConfig::new(ORIGIN, vec![3; 32]);
     config.rate_per_second = 10_000;
     config.rate_burst = 10_000;
@@ -81,7 +81,7 @@ pub fn finish(builder: http::request::Builder) -> Request<Body> {
     request
 }
 
-fn cookie_of(reply: &Reply) -> String {
+pub fn cookie_of(reply: &Reply) -> String {
     let set = reply.headers[header::SET_COOKIE].to_str().unwrap();
     set.split(';').next().unwrap().to_owned()
 }
@@ -590,7 +590,7 @@ async fn workspace_services_answer_signed_in_users() {
     std::fs::create_dir_all(&dir).unwrap();
     let mut config = vellum_kernel::Config::default();
     config.data_dir = dir.clone();
-    let services = Services::open(ORIGIN, Some(&dir))
+    let services = Services::open(ORIGIN, Some(&dir), None)
         .unwrap()
         .with_workspace(&config, |k| {
             (k == crate::workspace::PLAINTEXT_VAR).then(|| "1".to_owned())
@@ -775,7 +775,7 @@ async fn a_mention_reaches_the_mentioned_persons_inbox() {
     let dir = tempfile::tempdir().unwrap();
     let mut config = vellum_kernel::Config::default();
     config.data_dir = dir.path().to_path_buf();
-    let services = Services::open(ORIGIN, Some(dir.path()))
+    let services = Services::open(ORIGIN, Some(dir.path()), None)
         .unwrap()
         .with_workspace(&config, |k| {
             (k == crate::workspace::PLAINTEXT_VAR).then(|| "1".to_owned())
