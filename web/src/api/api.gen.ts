@@ -2611,72 +2611,6 @@ export interface ImportCsvInput {
 }
 
 /**
- * An inbox line, as the API shows it.
- */
-export interface InboxItem {
-  /**
-   * Pass it to `notify.read` to mark the line read.
-   */
-  id: string;
-  /**
-   * The kind, such as `mentioned`.
-   */
-  kind: string;
-  /**
-   * What it is about, such as `ENG-142`.
-   */
-  subject: string;
-  /**
-   * One line.
-   */
-  title: string;
-  /**
-   * Short body text.
-   */
-  body: string;
-  /**
-   * Link into the app.
-   */
-  url: string;
-  /**
-   * Who caused it.
-   */
-  actor?: string | null;
-  /**
-   * When it happened (RFC 3339).
-   */
-  at: string;
-  /**
-   * Whether it was read.
-   */
-  read: boolean;
-}
-
-/**
- * Your inbox.
- */
-export interface InboxPage {
-  /**
-   * Lines, newest first.
-   */
-  items: InboxItem[];
-  /**
-   * How many are unread.
-   */
-  unread: number;
-}
-
-/**
- * Which inbox lines to list.
- */
-export interface InboxQuery {
-  /**
-   * Only unread lines.
-   */
-  unread_only?: boolean;
-}
-
-/**
  * The answer to an insights question.
  */
 export interface InsightsOut {
@@ -2923,20 +2857,6 @@ export interface ListComments {
 }
 
 /**
- * Which lines to mark read.
- */
-export interface MarkRead {
-  /**
-   * Line IDs.
-   */
-  ids?: string[];
-  /**
-   * Every line instead.
-   */
-  all?: boolean;
-}
-
-/**
  * Move an issue to another team.
  */
 export interface MoveIssue {
@@ -3079,16 +2999,6 @@ export interface NodeView {
 }
 
 /**
- * No input.
- */
-export type NotifyPreferencesEmpty = Record<string, unknown>;
-
-/**
- * No input.
- */
-export type NotifyPushKeyEmpty = Record<string, unknown>;
-
-/**
  * How a numeric result is displayed.
  */
 export type NumberFormat = "plain" | "percent";
@@ -3097,6 +3007,34 @@ export type NumberFormat = "plain" | "percent";
  * A ObjectId as a 26-character ULID.
  */
 export type ObjectId = string;
+
+/**
+ * One heading of the page outline.
+ */
+export interface OutlineEntry {
+  /**
+   * 1 to 6.
+   */
+  level: number;
+  /**
+   * The element id, for `#fragment` links.
+   */
+  id: string;
+  /**
+   * The heading text.
+   */
+  text: string;
+}
+
+/**
+ * Names a page.
+ */
+export interface PageKey {
+  /**
+   * The page.
+   */
+  id: ObjectId;
+}
 
 /**
  * Where to move or copy an item.
@@ -3128,29 +3066,6 @@ export interface PointOut {
    * The numbers for that interval.
    */
   stats: StatsOut;
-}
-
-/**
- * Notification settings, as the API shows them.
- */
-export interface PreferencesView {
-  /**
-   * Channels (`in_app`, `email`, `push`) per kind. Every kind is
-   * listed; on input, a kind left out keeps its defaults.
-   */
-  channels: Record<string, string[]>;
-  /**
-   * Minutes email waits for the inbox entry to be read (0 to 1440).
-   */
-  email_delay_minutes: number;
-  /**
-   * Issue keys and document IDs you muted.
-   */
-  muted: string[];
-  /**
-   * Non-urgent push and email are held until this time (RFC 3339).
-   */
-  snoozed_until?: string | null;
 }
 
 /**
@@ -3255,40 +3170,6 @@ export interface PropertyInfo {
    * Number display format, where it applies.
    */
   format?: NumberFormat | null;
-}
-
-/**
- * The result of a push registration change.
- */
-export interface PushDevices {
-  /**
-   * How many browsers you have registered now.
-   */
-  devices: number;
-}
-
-/**
- * The VAPID public key.
- */
-export interface PushKey {
-  /**
-   * Base64url, uncompressed P-256; pass it as `applicationServerKey`.
-   */
-  publicKey: string;
-}
-
-/**
- * The browser's keys.
- */
-export interface PushKeys {
-  /**
-   * The browser's P-256 public key, base64url.
-   */
-  p256dh: string;
-  /**
-   * The 16-byte auth secret, base64url.
-   */
-  auth: string;
 }
 
 /**
@@ -3517,6 +3398,60 @@ export interface RenameInput {
    * Its new title.
    */
   title: string;
+}
+
+/**
+ * Something on the page that rendered with a fallback.
+ */
+export interface RenderWarning {
+  /**
+   * The top-level block it came from, from 0.
+   */
+  block: number;
+  /**
+   * What happened, for the author.
+   */
+  message: string;
+}
+
+/**
+ * A page rendered for the reader.
+ */
+export interface RenderedPageView {
+  /**
+   * The page.
+   */
+  id: ObjectId;
+  /**
+   * The front matter title, or the first level-1 heading.
+   */
+  title?: string | null;
+  /**
+   * Sanitised HTML: one `<article class="vl-doc">`, styled by the theme
+   * stylesheet's `--vl-*` variables.
+   */
+  html: string;
+  /**
+   * The page outline.
+   */
+  outline: OutlineEntry[];
+  /**
+   * Blocks that rendered with a fallback.
+   */
+  warnings: RenderWarning[];
+  /**
+   * Diagrams shown from their last good picture because the diagram
+   * server was unavailable.
+   */
+  stale_figures: number;
+  /**
+   * A strong `ETag` of the HTML (`sha256-…`).
+   */
+  etag: string;
+  /**
+   * The renderer version that produced it.
+   */
+  render_version: number;
 }
 
 /**
@@ -4203,24 +4138,6 @@ export interface SubmitForm {
 }
 
 /**
- * `PushSubscription.toJSON()`.
- */
-export interface Subscribe {
-  /**
-   * The push service URL (`https` only).
-   */
-  endpoint: string;
-  /**
-   * When the browser will drop the subscription; not used.
-   */
-  expirationTime?: number | null;
-  /**
-   * The keys messages are encrypted to.
-   */
-  keys: PushKeys;
-}
-
-/**
  * A proposed triage decision for an issue.
  */
 export interface SuggestTriage {
@@ -4569,26 +4486,6 @@ export interface TriageIssue {
    * For snooze: until when (RFC 3339).
    */
   until?: string | null;
-}
-
-/**
- * The unread count after a change.
- */
-export interface Unread {
-  /**
-   * How many lines are unread.
-   */
-  unread: number;
-}
-
-/**
- * Which browser to forget.
- */
-export interface Unsubscribe {
-  /**
-   * The push service URL the browser registered.
-   */
-  endpoint: string;
 }
 
 /**
@@ -6585,54 +6482,12 @@ export interface Operations {
     input: Empty;
     output: Array_of_UserView;
   };
-  /** Your notifications, newest first */
-  "notify.inbox": {
+  /** Renders a page as sanitised HTML for the reader */
+  "render.page": {
     method: "GET";
-    path: "/v1/notifications";
-    input: InboxQuery;
-    output: InboxPage;
-  };
-  /** Your notification channels, mutes and snooze */
-  "notify.preferences": {
-    method: "GET";
-    path: "/v1/notifications/preferences";
-    input: NotifyPreferencesEmpty;
-    output: PreferencesView;
-  };
-  /** The server's web push key, for subscribing a browser */
-  "notify.push_key": {
-    method: "GET";
-    path: "/v1/push/vapid-key";
-    input: NotifyPushKeyEmpty;
-    output: PushKey;
-  };
-  /** Register this browser for push notifications */
-  "notify.push_subscribe": {
-    method: "POST";
-    path: "/v1/push/subscriptions";
-    input: Subscribe;
-    output: PushDevices;
-  };
-  /** Stop push notifications to one browser */
-  "notify.push_unsubscribe": {
-    method: "DELETE";
-    path: "/v1/push/subscriptions";
-    input: Unsubscribe;
-    output: PushDevices;
-  };
-  /** Mark notifications read */
-  "notify.read": {
-    method: "POST";
-    path: "/v1/notifications/read";
-    input: MarkRead;
-    output: Unread;
-  };
-  /** Change your notification channels, mutes and snooze */
-  "notify.set_preferences": {
-    method: "PUT";
-    path: "/v1/notifications/preferences";
-    input: PreferencesView;
-    output: PreferencesView;
+    path: "/v1/pages/{id}/render";
+    input: PageKey;
+    output: RenderedPageView;
   };
   /** Applies the waiting triage suggestion as the caller */
   "work.accept_suggestion": {
@@ -6925,13 +6780,7 @@ export const OPERATIONS = {
   "identity.update_me": { method: "PATCH", path: "/v1/me", mutation: true },
   "identity.update_user": { method: "PATCH", path: "/v1/admin/users/{id}", mutation: true },
   "identity.users": { method: "GET", path: "/v1/admin/users", mutation: false },
-  "notify.inbox": { method: "GET", path: "/v1/notifications", mutation: false },
-  "notify.preferences": { method: "GET", path: "/v1/notifications/preferences", mutation: false },
-  "notify.push_key": { method: "GET", path: "/v1/push/vapid-key", mutation: false },
-  "notify.push_subscribe": { method: "POST", path: "/v1/push/subscriptions", mutation: true },
-  "notify.push_unsubscribe": { method: "DELETE", path: "/v1/push/subscriptions", mutation: true },
-  "notify.read": { method: "POST", path: "/v1/notifications/read", mutation: true },
-  "notify.set_preferences": { method: "PUT", path: "/v1/notifications/preferences", mutation: true },
+  "render.page": { method: "GET", path: "/v1/pages/{id}/render", mutation: false },
   "work.accept_suggestion": { method: "POST", path: "/v1/work/issues/{key}/triage/suggestion/accept", mutation: true },
   "work.add_comment": { method: "POST", path: "/v1/work/comments", mutation: true },
   "work.assign_thread": { method: "POST", path: "/v1/work/threads/{thread_id}/assign", mutation: true },
