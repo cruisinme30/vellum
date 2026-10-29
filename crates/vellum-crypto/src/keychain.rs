@@ -5,9 +5,10 @@
 //!
 //! The KEK's raw bytes live in the store under its [`KekId`]; the server
 //! config records which id is current and which are retired. The OS backend
-//! (macOS Keychain, Windows Credential Manager) is behind the `os-keychain`
-//! feature. Linux has no daemon-free persistent keychain, so Linux servers
-//! use a passphrase or a KMS/Vault provider instead.
+//! (macOS Keychain, Windows Credential Manager, the Linux Secret Service) is
+//! behind the `os-keychain` feature. The Secret Service needs a running
+//! keyring daemon (GNOME Keyring or KDE Wallet), which desktops have and headless
+//! Linux servers usually lack; those use a passphrase or a KMS/Vault provider.
 
 use zeroize::Zeroizing;
 
@@ -83,8 +84,8 @@ pub fn rotate_in_store(
     Ok(())
 }
 
-/// The operating system keychain: macOS Keychain or Windows Credential
-/// Manager. Entries use `service` and the KEK id as the account name.
+/// The operating system keychain: macOS Keychain, Windows Credential
+/// Manager or the Linux Secret Service. Entries use `service` and the KEK id as the account name.
 #[cfg(feature = "os-keychain")]
 pub struct OsKeychain {
     service: String,
@@ -106,7 +107,8 @@ impl OsKeychain {
     ///
     /// # Errors
     /// [`CryptoError::Provider`] if the keychain cannot be opened, or on a
-    /// platform without one (Linux servers use a passphrase or KMS/Vault).
+    /// platform without one, or on Linux without a Secret Service daemon
+    /// (headless servers use a passphrase or KMS/Vault).
     pub fn open(service: impl Into<String>) -> Result<Self, CryptoError> {
         Ok(Self {
             service: service.into(),
@@ -156,7 +158,16 @@ fn platform_store() -> Result<std::sync::Arc<keyring_core::CredentialStore>, Cry
     Ok(store)
 }
 
-#[cfg(all(feature = "os-keychain", not(any(target_os = "macos", windows))))]
+#[cfg(all(feature = "os-keychain", target_os = "linux"))]
+fn platform_store() -> Result<std::sync::Arc<keyring_core::CredentialStore>, CryptoError> {
+    let store = dbus_secret_service_keyring_store::Store::new().map_err(|e| provider_error(&e))?;
+    Ok(store)
+}
+
+#[cfg(all(
+    feature = "os-keychain",
+    not(any(target_os = "macos", target_os = "linux", windows))
+))]
 fn platform_store() -> Result<std::sync::Arc<keyring_core::CredentialStore>, CryptoError> {
     Err(CryptoError::Provider(
         "no OS keychain on this platform; use a passphrase or KMS/Vault KEK".into(),
