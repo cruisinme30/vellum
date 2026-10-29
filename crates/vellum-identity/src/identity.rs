@@ -175,6 +175,7 @@ pub struct Identity {
     config: IdentityConfig,
     store: Store,
     lockouts: Lockouts,
+    hashing: password::Gate,
     pub(crate) oauth: OAuthState,
     pub(crate) fetcher: Arc<dyn ClientMetadataFetcher>,
     sso: Option<Arc<Sso>>,
@@ -258,6 +259,7 @@ impl Identity {
             config,
             store,
             lockouts: Lockouts::new(),
+            hashing: password::Gate::default(),
             oauth: OAuthState::default(),
             fetcher: Arc::new(NoMetadataFetch),
             sso: None,
@@ -449,6 +451,7 @@ impl Identity {
         let password_hash = match password {
             Some(p) => {
                 password::check_policy(p)?;
+                let _slot = self.hashing.permit()?;
                 Some(password::hash(p)?)
             }
             None => None,
@@ -578,6 +581,8 @@ impl Identity {
         self.lockouts
             .check(&self.store, Key::Email(&email), now)
             .map_err(locked)?;
+        // Refused while too many checks run, before any failure counts.
+        let slot = self.hashing.permit()?;
         let user = self.store.read(|s| s.user_by_email(&email).cloned());
         let stored = user.as_ref().and_then(|u| u.password_hash.as_deref());
         let verified = stored.map_or_else(
@@ -613,6 +618,7 @@ impl Identity {
             .is_some_and(password::needs_rehash)
         {
             let upgraded = password::hash(password)?;
+            drop(slot);
             self.store.write(|s| {
                 if let Some(u) = s.users.get_mut(&user.id) {
                     u.password_hash = Some(upgraded);
@@ -768,6 +774,7 @@ impl Identity {
             .store
             .read(|s| s.users.get(&user).map(|u| u.password_hash.clone()))
             .ok_or_else(|| Error::new(ErrorKind::NotFound, "user not found"))?;
+        let _slot = self.hashing.permit()?;
         if let Some(hash) = stored {
             let ok = current.is_some_and(|c| password::verify(c, &hash));
             if !ok {
