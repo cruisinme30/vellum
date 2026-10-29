@@ -12,7 +12,7 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D85, D86, D87
-- Issue: #165, #166, #167, #168, #169, #170
+- Issue: #165, #166, #167, #168, #169, #170, #171
 - Pull requests: #210
 - Crate: `vellum-mcp` (layer `edge`)
 
