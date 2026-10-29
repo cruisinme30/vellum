@@ -12,9 +12,9 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D73, D74, D75, D132, D133, D134
-- Issue: #125, #126, #127; CSV and embeds #130 to #132; the web views
+- Issue: #125, #126, #127, #130, #131, #132, #362; the web views
   (#128, #129) are in ADR 0010
-- Pull requests: #208 (engine), #266 (service)
+- Pull requests: #208 (engine), #266 (service), #301, #305, #307
 
 :::
 
@@ -145,5 +145,6 @@ each request through an access port backed by authorization.
   through `collections.embed` and `collections.chart`, checked as the
   reader. A bad block is a readable `invalid_input` the page shows in
   place; an unreadable collection is `not_found`, never shown.
-- Still to come: pushing computed rows to the index and search (D73),
-  saving views, CSV and embed operations (#128 to #132).
+- Search learns computed values from the service, not the files (#362):
+  `index_row` renders a row as text, and after every write an `IndexFeed`
+  names each row to index again, rollup readers included.

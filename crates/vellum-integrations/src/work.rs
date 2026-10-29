@@ -288,7 +288,18 @@ fn new_issue(
     new.body = draft.description;
     new.intake = intake;
     new.priority = draft.priority.map(priority);
-    new.labels = draft.labels.into_iter().collect();
+    // Outside sources name labels the team may not have (Sentry adds
+    // `sentry`); filing the issue matters more, so unknown ones are dropped.
+    let known = |label: &str| {
+        graph
+            .team(&new.team)
+            .into_iter()
+            .flat_map(|t| t.labels.iter())
+            .chain(graph.workspace_labels())
+            .any(|l| l.reference().eq_ignore_ascii_case(label))
+    };
+    let labels: Vec<String> = draft.labels.into_iter().filter(|l| known(l)).collect();
+    new.labels = labels;
     new.assignee = draft
         .assignee
         .as_deref()

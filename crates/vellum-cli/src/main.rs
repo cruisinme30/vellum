@@ -20,6 +20,7 @@ mod serve;
 mod services;
 #[cfg(test)]
 mod sso_tests;
+mod watcher;
 mod workspace;
 
 use std::io::Write as _;

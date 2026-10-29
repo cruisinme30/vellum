@@ -35,6 +35,7 @@
 
 pub mod access;
 pub mod api;
+pub mod index;
 mod state;
 
 use std::fmt;
@@ -56,6 +57,7 @@ pub use api::{
     ExportCsvInput, ImportCsvInput, ListCollections, PropertyInfo, QueryInput, RelationInfo,
     RollupInfo, RowDetail, RowKey, RowWritten, SaveViewInput, UpdateRowInput, ViewInfo, ViewKey,
 };
+pub use index::{IndexFeed, IndexField, RowDocument};
 pub use state::{MAX_FILE_BYTES, MAX_ROWS_PER_COLLECTION};
 
 /// Largest CSV file accepted for import, in bytes.
@@ -141,6 +143,7 @@ pub struct CollectionsService {
     access: Arc<dyn Access>,
     clock: Clock,
     state: RwLock<Option<State>>,
+    index_feed: Option<Arc<dyn IndexFeed>>,
 }
 
 impl fmt::Debug for CollectionsService {
@@ -160,7 +163,51 @@ impl CollectionsService {
             access,
             clock: Arc::new(system_now),
             state: RwLock::new(None),
+            index_feed: None,
         }
+    }
+
+    /// Tells `feed` which rows to index again after every write, so search
+    /// sees computed values (formulas, rollups) as they change.
+    #[must_use]
+    pub fn with_index_feed(mut self, feed: Arc<dyn IndexFeed>) -> Self {
+        self.index_feed = Some(feed);
+        self
+    }
+
+    fn feed(&self, rows: Vec<DocId>) {
+        if let Some(feed) = &self.index_feed
+            && !rows.is_empty()
+        {
+            feed.rows_changed(rows);
+        }
+    }
+
+    /// A row as search should see it, computed values included; `None`
+    /// when no collection has it (deleted, or never a row). No access
+    /// check: this is for the indexer, and search filters every hit by
+    /// what the reader may open.
+    ///
+    /// # Errors
+    ///
+    /// When the collections cannot be read from the store.
+    pub async fn index_row(&self, row: DocId) -> Result<Option<RowDocument>, Error> {
+        let state = self.read().await?;
+        let mut computer = Computer::new(&state.ws, (self.clock)());
+        let doc = index::row_document(&state, &mut computer, row);
+        drop(computer);
+        drop(state);
+        Ok(doc)
+    }
+
+    /// Every row, for a full rebuild of the search index.
+    ///
+    /// # Errors
+    ///
+    /// When the collections cannot be read from the store.
+    pub async fn index_rows(&self) -> Result<Vec<DocId>, Error> {
+        let state = self.read().await?;
+        Ok(index::all_rows(&state))
     }
 
     /// Replaces the clock, for tests and reproducible exports.
@@ -431,6 +478,7 @@ impl CollectionsService {
                 *guard = None;
                 return Err(e);
             }
+            self.feed(index::affected_rows(state, &changed));
             let row = row.map(|r| self.detail(state, id, r)).transpose();
             drop(guard);
             Ok(RowWritten { row: row?, changed })
@@ -865,6 +913,7 @@ impl CollectionsService {
                     *guard = None;
                     return Err(e);
                 }
+                self.feed(index::affected_rows(state, &changed));
             }
             let collection = match (state.ws.collection(id), state.folder(id)) {
                 (Some(c), Ok(f)) => CollectionInfo::new(
@@ -965,6 +1014,8 @@ impl CollectionsService {
                 crate::telemetry::wrote("create_from_csv", result.is_ok());
                 if result.is_err() {
                     *guard = None;
+                } else {
+                    self.feed(changed.written.iter().map(|r| r.row).collect());
                 }
                 drop(guard);
                 result

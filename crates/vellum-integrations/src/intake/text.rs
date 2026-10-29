@@ -147,29 +147,13 @@ impl Fact {
     }
 }
 
-/// Word joiner: invisible, and stops `@name` being read as a mention.
-const JOINER: char = '\u{2060}';
-
-/// A text node. The serializer escapes `@name` as `\@name`, but the issue
-/// core's mention scanner (`vellum_work::mention::mentions`) reads raw
-/// Markdown and still notifies on it, so a word joiner after `@` keeps an
-/// outsider's text from notifying people.
+/// A text node. The serializer escapes `@name` as `\@name`, and both the
+/// parser and the issue core's mention scanner read that back as text, so
+/// an outsider's text never notifies anyone.
 fn text_node(text: &str) -> Inline {
-    let mut out = String::with_capacity(text.len());
-    let mut prev: Option<char> = None;
-    let mut chars = text.chars().peekable();
-    while let Some(c) = chars.next() {
-        out.push(c);
-        // The parser's mention boundary. An extra joiner is harmless; a
-        // missing one lets the text mention someone.
-        let word_start = !prev
-            .is_some_and(|p| p.is_alphanumeric() || matches!(p, '_' | '-' | '.' | '/' | '@' | ':'));
-        if c == '@' && word_start && chars.peek().is_some_and(char::is_ascii_alphabetic) {
-            out.push(JOINER);
-        }
-        prev = Some(c);
+    Inline::Text {
+        text: text.to_owned(),
     }
-    Inline::Text { text: out }
 }
 
 fn one_line(text: &str) -> String {
@@ -287,7 +271,7 @@ mod tests {
             let Some(Block::Paragraph { content, .. }) = blocks.first() else {
                 panic!("no paragraph for {input:?}");
             };
-            let shown = vellum_format::plain_text(content).replace(JOINER, "");
+            let shown = vellum_format::plain_text(content);
             let words: Vec<&str> = input.split_whitespace().collect();
             let seen: Vec<&str> = shown.split_whitespace().collect();
             assert_eq!(seen, words.get(..seen.len()).unwrap_or_default());

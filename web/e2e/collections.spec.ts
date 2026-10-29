@@ -1,8 +1,19 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
+// The one conditional skip below says why: these run at laptop size only.
+/* eslint-disable sonarjs/no-skipped-tests */
+
 import { AxeBuilder } from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+
+// These are feature tests: they run once per browser, at laptop size. The UI
+// suite (e2e/ui) covers every screen size; the phone cases below set their own.
+test.use({ viewport: { width: 1366, height: 768 }, hasTouch: false, isMobile: false });
+// eslint-disable-next-line no-empty-pattern -- Playwright needs the fixtures object
+test.beforeEach(({}, testInfo) => {
+  test.skip(!testInfo.project.name.endsWith("-laptop"), "runs at laptop size only");
+});
 
 const ISSUES = "/data/01JB3KD0COLL0ISSUES0000001";
 

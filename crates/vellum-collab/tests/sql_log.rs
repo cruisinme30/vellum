@@ -90,12 +90,15 @@ async fn sqlite_log_sealed() {
     let dir = tempfile::tempdir().unwrap();
     let index = sqlite(&dir).await;
     conformance(&SqlUpdateStore::new(index.clone(), Envelope(keyring()))).await;
+    index.close().await;
 }
 
 #[tokio::test]
 async fn sqlite_log_in_clear() {
     let dir = tempfile::tempdir().unwrap();
-    conformance(&SqlUpdateStore::new(sqlite(&dir).await, Plaintext)).await;
+    let index = sqlite(&dir).await;
+    conformance(&SqlUpdateStore::new(index.clone(), Plaintext)).await;
+    index.close().await;
 }
 
 #[tokio::test]
@@ -123,11 +126,12 @@ async fn sealed_records_are_unreadable_without_the_key() {
     let other = SqlUpdateStore::new(index.clone(), Envelope(keyring()));
     assert!(other.load(key).await.is_err());
     assert!(
-        SqlUpdateStore::new(index, Plaintext)
+        SqlUpdateStore::new(index.clone(), Plaintext)
             .load(key)
             .await
             .is_err()
     );
+    index.close().await;
 }
 
 #[tokio::test]
@@ -148,6 +152,7 @@ async fn a_record_moved_to_another_document_is_refused() {
         .await
         .unwrap();
     assert!(store.load(to).await.is_err());
+    index.close().await;
 }
 
 #[tokio::test]
@@ -169,7 +174,8 @@ async fn a_second_hub_rebuilds_the_room_from_the_database() {
     let key = room();
     files.put(key, "Seed\n");
 
-    let first = hub(sqlite(&dir).await);
+    let first_index = sqlite(&dir).await;
+    let first = hub(first_index.clone());
     let mut alice = Editor::join(&first, key, Access::Write).await;
     assert!(alice.pump_until(|e| e.markdown() == "Seed\n").await);
     alice.edit(|doc| add_paragraph(doc, "typed")).await;
@@ -177,13 +183,21 @@ async fn a_second_hub_rebuilds_the_room_from_the_database() {
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // A different process opens the same database.
-    let second = hub(sqlite(&dir).await);
+    let second_index = sqlite(&dir).await;
+    let second = hub(second_index.clone());
     let mut bob = Editor::join(&second, key, Access::Write).await;
     assert!(
         bob.pump_until(|e| e.markdown() == "Seed\n\ntyped\n").await,
         "{}",
         bob.markdown()
     );
+
+    // Stop the rooms and the database threads before the process exits,
+    // so none of them is still inside SQLCipher during exit-time cleanup.
+    first.shutdown().await;
+    second.shutdown().await;
+    first_index.close().await;
+    second_index.close().await;
 }
 
 type Started = Result<(ContainerAsync<Postgres>, String), Box<dyn std::error::Error>>;
