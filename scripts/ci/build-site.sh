@@ -98,6 +98,26 @@ html_escape() {
   sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/"/\&quot;/g' <<<"$1"
 }
 
+# fix_html <dir>: patches mdBook 0.5.4's HTML where it fails WCAG 2.2 AA
+# or breaks its own scripts (#249):
+#   - the sidebar toggle is a <label> carrying button ARIA: give it the role;
+#   - code blocks and tables that scroll sideways become focusable;
+#   - task-list checkboxes get a name;
+#   - headings named like a JavaScript module global (exports, module,
+#     define, require) get a suffix: the browser exposes an element id as
+#     a window property, and mdBook's search and copy libraries then take
+#     the page for CommonJS and fail.
+fix_html() {
+  find "$1" -name '*.html' -exec sed -i -E \
+    -e 's/<label id="mdbook-sidebar-toggle" /<label id="mdbook-sidebar-toggle" role="button" /' \
+    -e 's/<pre([^>]*)><code( |>)/<pre\1><code tabindex="0"\2/g' \
+    -e 's/<div class="table-wrapper">/<div class="table-wrapper" tabindex="0">/g' \
+    -e 's/<input disabled="" type="checkbox" checked="">/<input disabled="" type="checkbox" checked="" aria-label="Done">/g' \
+    -e 's/<input disabled="" type="checkbox">/<input disabled="" type="checkbox" aria-label="To do">/g' \
+    -e 's/id="(exports|module|define|require)"/id="\1-section"/g' \
+    -e 's/href="([^"]*)#(exports|module|define|require)"/href="\1#\2-section"/g' {} +
+}
+
 # build_book <name> <title> <staged-src>: runs mdBook on a staged source.
 build_book() {
   local name="$1" title="$2" src="$3" dir="${work}/$1" toml_title
@@ -120,8 +140,14 @@ git-repository-url = "${repo}"
 default-theme = "light"
 preferred-dark-theme = "navy"
 additional-css = ["theme/vellum.css"]
+
+# No "run" button: it calls play.rust-lang.org from every page with Rust
+# code, which leaks readers to a third party and fails offline (#249).
+[output.html.playground]
+runnable = false
 EOF
   "${mdbook}" build "${dir}" --dest-dir "${out}/docs/${name}"
+  fix_html "${out}/docs/${name}"
   books+=("${name}"$'\t'"${title}")
 }
 

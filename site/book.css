@@ -4,7 +4,7 @@
  *
  * Vellum colours for the mdBook help books (Material 3 tokens, brief
  * section 13). Only the light theme is recoloured; the dark themes stay
- * mdBook's own.
+ * mdBook's own apart from the fixes below.
  */
 
 html {
@@ -34,4 +34,56 @@ html {
   --searchresults-header-fg: #46464f;
   --searchresults-border-color: #c5c6d0;
   --search-mark-bg: #dde1ff;
+}
+
+/* WCAG 2.2 AA fixes for mdBook's default theme (#249). */
+
+/* The active chapter in the dark themes: mdBook's #2b79a2 is 2.8:1 on the navy sidebar. */
+/* Links: mdBook's #2b79a2 is 3.6:1 on the navy page. */
+.navy,
+.coal {
+  --sidebar-active: #b8c3ff;
+  --links: #b8c3ff;
+}
+
+/* Syntax colours below 4.5:1 in the dark code theme. */
+.navy .hljs-attr,
+.coal .hljs-attr,
+.ayu .hljs-attr {
+  color: #e48a8a;
+}
+
+/* Links in running text are underlined, not told apart by colour alone (SC 1.4.1). */
+.content main a:not(.header) {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+/* Menu bar buttons reach the 24 × 24 px minimum target (SC 2.5.8). */
+#mdbook-menu-bar .icon-button,
+#mdbook-menu-bar .right-buttons a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+}
+
+/* Long titles and code wrap instead of spilling over the page or the next cell. */
+.chapter li a,
+td,
+th,
+td code {
+  overflow-wrap: anywhere;
+}
+
+td code {
+  white-space: normal;
+}
+
+/* Scrolling code blocks and tables take keyboard focus (build-site.sh adds tabindex). */
+pre > code:focus-visible,
+.table-wrapper:focus-visible {
+  outline: 3px solid var(--links);
+  outline-offset: 2px;
 }
