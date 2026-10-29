@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Tests may assert with unwrap/expect/panic and index directly; production
+# code may not.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-indexing-slicing-in-tests = true
+allow-print-in-tests = true
+
+# Product and protocol names that are not code identifiers.
+doc-valid-idents = ["SQLite", "OpenTelemetry", "GraphQL", "OpenAPI", "..."]

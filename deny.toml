@@ -1,0 +1,56 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# cargo-deny: licences, advisories, banned crates and sources.
+# CI runs `cargo deny check`; every finding fails the build.
+
+[graph]
+all-features = true
+
+[advisories]
+version = 2
+yanked = "deny"
+ignore = []
+
+[licenses]
+version = 2
+confidence-threshold = 0.93
+unused-allowed-license = "allow"
+# Licences compatible with distributing Vellum under AGPL-3.0-only.
+allow = [
+    "AGPL-3.0-only",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "CDLA-Permissive-2.0",
+    "ISC",
+    "MIT",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Zlib",
+]
+
+[licenses.private]
+ignore = true
+
+[bans]
+multiple-versions = "deny"
+wildcards = "deny"
+allow-wildcard-paths = true
+highlight = "all"
+# Each skip names the older copy of a crate mid-way through an ecosystem
+# upgrade, with the reason. Remove the entry once upstream catches up.
+skip = [
+    { crate = "syn@2", reason = "proc-macro ecosystem is moving from syn 2 to 3" },
+    { crate = "getrandom@0.3", reason = "older crates still on 0.3 during the 0.4 move" },
+    { crate = "r-efi@5", reason = "pulled by getrandom 0.3" },
+]
+skip-tree = []
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
