@@ -28,6 +28,7 @@ use vellum_drive::sql::SqlIndex;
 use vellum_drive::{Drive, DriveIndex, DriveService};
 use vellum_identity::Identity;
 use vellum_kernel::{Config, Error, ErrorKind, UserId};
+use vellum_notify::service::NotifyStore;
 use vellum_store::{BlobPath, BlobStore, LocalStore};
 use vellum_work::{UserRef, WorkEvent};
 use vellum_work_service::{Directory, EventSink, SystemClock, WorkService};
@@ -120,7 +121,8 @@ impl Directory for IdentityDirectory {
     }
 }
 
-/// Logs Work events until the event log service takes them.
+/// Logs Work events; used when describing the API, where nothing is
+/// notified.
 #[derive(Debug)]
 struct TracingSink;
 
@@ -158,6 +160,7 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
     index: Arc<dyn DriveIndex>,
     spaces: &Arc<Spaces>,
     identity: &Arc<Identity>,
+    events: Arc<dyn EventSink>,
 ) -> Result<Workspace, Error> {
     let drive = Arc::new(Drive::new(
         Arc::clone(&store),
@@ -184,7 +187,7 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
     let (work, report) = WorkService::open(
         Arc::clone(&store),
         Arc::new(IdentityDirectory(Arc::clone(identity))),
-        Arc::new(TracingSink),
+        events,
         Arc::new(SystemClock),
     )
     .await?;
@@ -218,6 +221,7 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
 pub async fn open(
     config: &Config,
     identity: &Arc<Identity>,
+    notify: &Arc<NotifyStore>,
     var: impl Fn(&str) -> Option<String> + Send + Sync,
 ) -> Result<Opened, Error> {
     let index_config = match index_config(config, &var)? {
@@ -238,14 +242,22 @@ pub async fn open(
     let authz = Arc::new(Authz::new(SqlStore::new(index.clone())));
     let drive_index = Arc::new(SqlIndex::new(index));
     let spaces = Arc::new(Spaces::default());
+    let (events, queued) = crate::notifications::channel();
     let workspace = build(
         Arc::clone(&store),
         authz,
         Arc::clone(&drive_index) as Arc<dyn DriveIndex>,
         &spaces,
         identity,
+        events,
     )
     .await?;
+    crate::notifications::start(
+        queued,
+        Arc::clone(&workspace.work),
+        Arc::clone(identity),
+        Arc::clone(notify),
+    )?;
     // The watcher starts before the rescan, so nothing edited in between
     // is missed; whatever it sees twice is applied idempotently.
     crate::watcher::start(&config.data_dir, &store, &workspace.drive, &workspace.books).await?;
@@ -290,7 +302,15 @@ pub async fn describe(
     );
     let authz = Arc::new(Authz::new(MemoryStore::new()));
     let index = Arc::new(vellum_drive::memory::MemoryIndex::new());
-    let workspace = build(store, authz, index, &Arc::new(Spaces::default()), identity).await?;
+    let workspace = build(
+        store,
+        authz,
+        index,
+        &Arc::new(Spaces::default()),
+        identity,
+        Arc::new(TracingSink),
+    )
+    .await?;
     Ok(workspace.services)
 }
 

@@ -11,6 +11,8 @@
 //! | `notify.push_unsubscribe` | `DELETE /v1/push/subscriptions?endpoint=` | forgets this browser |
 //! | `notify.preferences` | `GET /v1/notifications/preferences` | your channels per kind, mutes and snooze |
 //! | `notify.set_preferences` | `PUT /v1/notifications/preferences` | replaces them |
+//! | `notify.inbox` | `GET /v1/notifications` | your inbox, newest first, and the unread count |
+//! | `notify.read` | `POST /v1/notifications/read` | marks lines (or all) read |
 //!
 //! Everything is the caller's own: no operation takes a user ID. State
 //! lives in `.vellum/notify.json` in the data folder, written atomically
@@ -32,6 +34,7 @@ use url::Url;
 use vellum_contracts::{HttpMethod, Operation, RequestContext, Scope, Service};
 use vellum_kernel::{Error, ErrorKind, UserId};
 
+use crate::inbox::{self, InboxEntry, InboxItem};
 use crate::notification::{Channel, NotificationKind, Preferences};
 use crate::webpush::{PushSubscription, VapidKey};
 
@@ -78,6 +81,8 @@ pub struct UserState {
     pub preferences: Preferences,
     /// Registered browsers, oldest first.
     pub push: Vec<StoredSubscription>,
+    /// The in-app inbox, newest first.
+    pub inbox: Vec<InboxEntry>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -405,6 +410,41 @@ impl PreferencesView {
     }
 }
 
+/// Which inbox lines to list.
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct InboxQuery {
+    /// Only unread lines.
+    #[serde(default)]
+    pub unread_only: bool,
+}
+
+/// Your inbox.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct InboxPage {
+    /// Lines, newest first.
+    pub items: Vec<InboxItem>,
+    /// How many are unread.
+    pub unread: usize,
+}
+
+/// Which lines to mark read.
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct MarkRead {
+    /// Line IDs.
+    #[serde(default)]
+    pub ids: Vec<String>,
+    /// Every line instead.
+    #[serde(default)]
+    pub all: bool,
+}
+
+/// The unread count after a change.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct Unread {
+    /// How many lines are unread.
+    pub unread: usize,
+}
+
 /// The notifications service.
 #[derive(Debug, Clone)]
 pub struct NotifyService {
@@ -477,6 +517,53 @@ fn subscription(input: &Subscribe, now: Timestamp) -> Result<StoredSubscription,
     })
 }
 
+fn inbox_operations(store: &Arc<NotifyStore>) -> Vec<Operation> {
+    let list = {
+        let store = Arc::clone(store);
+        move |ctx: RequestContext, input: InboxQuery| {
+            let store = Arc::clone(&store);
+            async move {
+                let user = ctx.principal.require_user()?;
+                let state = store.user(user);
+                let unread = state.inbox.iter().filter(|e| !e.read).count();
+                let items = state
+                    .inbox
+                    .iter()
+                    .filter(|e| !input.unread_only || !e.read)
+                    .map(InboxItem::from)
+                    .collect();
+                Ok(InboxPage { items, unread })
+            }
+        }
+    };
+    let read = {
+        let store = Arc::clone(store);
+        move |ctx: RequestContext, input: MarkRead| {
+            let store = Arc::clone(&store);
+            async move {
+                let user = ctx.principal.require_user()?;
+                let unread = store.update(user, |state| {
+                    let _ = inbox::mark_read(&mut state.inbox, &input.ids, input.all);
+                    Ok(state.inbox.iter().filter(|e| !e.read).count())
+                })?;
+                Ok(Unread { unread })
+            }
+        }
+    };
+    vec![
+        Operation::query("notify.inbox", "/v1/notifications", Scope::Read, list)
+            .summary("Your notifications, newest first"),
+        Operation::mutation(
+            "notify.read",
+            HttpMethod::Post,
+            "/v1/notifications/read",
+            Scope::Read,
+            read,
+        )
+        .summary("Mark notifications read"),
+    ]
+}
+
 impl Service for NotifyService {
     fn name(&self) -> &'static str {
         "notify"
@@ -514,6 +601,7 @@ impl Service for NotifyService {
                 }
             }
         };
+        let store = Arc::clone(&self.store);
         let set_preferences = {
             let s = self;
             move |ctx: RequestContext, input: PreferencesView| {
@@ -530,7 +618,7 @@ impl Service for NotifyService {
                 }
             }
         };
-        vec![
+        let mut ops = vec![
             Operation::query("notify.push_key", "/v1/push/vapid-key", Scope::Read, key)
                 .summary("The server's web push key, for subscribing a browser"),
             Operation::mutation(
@@ -564,7 +652,9 @@ impl Service for NotifyService {
                 set_preferences,
             )
             .summary("Change your notification channels, mutes and snooze"),
-        ]
+        ];
+        ops.extend(inbox_operations(&store));
+        ops
     }
 }
 

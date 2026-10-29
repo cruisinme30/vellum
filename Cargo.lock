@@ -8966,6 +8966,7 @@ dependencies = [
  "hmac 0.13.0",
  "http",
  "http-body-util",
+ "jiff",
  "serde",
  "serde-saphyr 2.0.0",
  "serde_json",
@@ -9319,12 +9320,14 @@ dependencies = [
  "subtle",
  "tempfile",
  "thiserror",
+ "time",
  "tokio",
  "tracing",
  "url",
  "vellum-contracts",
  "vellum-kernel",
  "vellum-security",
+ "vellum-work",
 ]
 
 [[package]]

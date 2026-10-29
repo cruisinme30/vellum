@@ -17,6 +17,7 @@ mod identity;
 mod identity_tests;
 mod integrations;
 mod mcp;
+mod notifications;
 mod private;
 #[cfg(test)]
 mod private_tests;

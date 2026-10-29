@@ -20,15 +20,18 @@
 //! of the write that caused it (ADR 0017).
 
 pub mod delivery;
+pub mod dispatch;
 pub mod email;
 pub mod endpoint;
 pub mod event;
+pub mod inbox;
 pub mod notification;
 pub mod secret;
 pub mod service;
 pub mod signature;
 pub mod webhook;
 pub mod webpush;
+pub mod work;
 
 mod encoding;
 

@@ -739,3 +739,110 @@ async fn the_pwa_registers_and_removes_a_browser_for_push() {
     assert_eq!(saved.status, StatusCode::OK, "{}", saved.text);
     assert_eq!(saved.json()["channels"]["commented"], json!(["push"]));
 }
+
+#[tokio::test]
+async fn a_mention_reaches_the_mentioned_persons_inbox() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut config = vellum_kernel::Config::default();
+    config.data_dir = dir.path().to_path_buf();
+    let services = Services::open(ORIGIN, Some(dir.path()))
+        .unwrap()
+        .with_workspace(&config, |k| {
+            (k == crate::workspace::PLAINTEXT_VAR).then(|| "1".to_owned())
+        })
+        .await
+        .unwrap();
+    let mut gateway = GatewayConfig::new(ORIGIN, vec![3; 32]);
+    gateway.rate_per_second = 10_000;
+    gateway.rate_burst = 10_000;
+    let app = services
+        .mount(GatewayBuilder::new(gateway, VERSION))
+        .build()
+        .unwrap()
+        .router();
+
+    let priya = signed_in_admin(&app).await;
+    let token = csrf(&app, &priya).await;
+    let post = |path: &str, body: Value| {
+        finish(
+            json_request("POST", path, &body)
+                .header(header::COOKIE, &priya)
+                .header("x-csrf-token", &token),
+        )
+    };
+    for (path, body) in [
+        (
+            "/api/v1/admin/users",
+            json!({"email": "bo@northstar.dev", "name": "Bo", "password": "battery horse staple"}),
+        ),
+        (
+            "/api/v1/work/teams",
+            json!({"key": "ENG", "name": "Engineering"}),
+        ),
+        (
+            "/api/v1/work/issues",
+            json!({"team": "ENG", "title": "Fix login"}),
+        ),
+        (
+            "/api/v1/work/comments",
+            json!({"target": "ENG-1", "body": "@bo can you look at this?"}),
+        ),
+    ] {
+        let reply = send(&app, post(path, body)).await;
+        assert_eq!(reply.status, StatusCode::OK, "{path}: {}", reply.text);
+    }
+
+    let signed_in = send(
+        &app,
+        finish(json_request(
+            "POST",
+            "/auth/sign-in",
+            &json!({"email": "bo@northstar.dev", "password": "battery horse staple"}),
+        )),
+    )
+    .await;
+    assert_eq!(signed_in.status, StatusCode::OK, "{}", signed_in.text);
+    let bo = cookie_of(&signed_in);
+
+    // Notifications are delivered in the background, just after the write.
+    let mut inbox = Value::Null;
+    for _ in 0..50 {
+        inbox = send(
+            &app,
+            finish(request("GET", "/api/v1/notifications").header(header::COOKIE, &bo)),
+        )
+        .await
+        .json();
+        if inbox["unread"] == 1 {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    assert_eq!(inbox["unread"], 1, "{inbox}");
+    let item = &inbox["items"][0];
+    assert_eq!(item["kind"], "mentioned");
+    assert_eq!(item["subject"], "ENG-1");
+    assert_eq!(item["actor"], "priya");
+
+    // The author is not told about their own comment.
+    let own = send(
+        &app,
+        finish(request("GET", "/api/v1/notifications").header(header::COOKIE, &priya)),
+    )
+    .await
+    .json();
+    assert_eq!(own["unread"], 0, "{own}");
+
+    let bo_token = csrf(&app, &bo).await;
+    let read = send(
+        &app,
+        finish(
+            json_request("POST", "/api/v1/notifications/read", &json!({"all": true}))
+                .header(header::COOKIE, &bo)
+                .header("x-csrf-token", &bo_token),
+        ),
+    )
+    .await;
+    assert_eq!(read.status, StatusCode::OK, "{}", read.text);
+    assert_eq!(read.json()["unread"], 0);
+}
