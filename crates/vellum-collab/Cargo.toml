@@ -42,4 +42,4 @@ axum = { version = "0.8.9", default-features = false, features = ["ws", "tokio",
 # proptest 1.12 moves to rand 0.10 while OpenTelemetry is on rand 0.9.
 proptest = ">=1.11.0, <1.12"
 tokio = { version = "1.54.1", features = ["rt-multi-thread", "net", "test-util"] }
-tokio-tungstenite = "0.29"
+tokio-tungstenite = "0.30"
