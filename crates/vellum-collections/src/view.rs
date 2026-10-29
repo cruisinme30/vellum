@@ -198,7 +198,7 @@ impl Filter {
         })
     }
 
-    fn to_text(&self) -> String {
+    pub(crate) fn to_text(&self) -> String {
         let value = if self.value.trim() != self.value || self.value.contains(' ') {
             format!("\"{}\"", self.value)
         } else {
@@ -256,7 +256,7 @@ impl Sort {
         })
     }
 
-    fn to_text(&self) -> String {
+    pub(crate) fn to_text(&self) -> String {
         if self.descending {
             format!("{} desc", self.key)
         } else {

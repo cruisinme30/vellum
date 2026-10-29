@@ -11,6 +11,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "C4Context\n  title Northstar gateway: system context\n  Person(dev, \"API developer\", \"Calls Northstar APIs\")\n  System(gw, \"Northstar gateway\", \"Authenticates, rate limits and audits requests\")\n  System_Ext(idp, \"Identity provider\", \"Issues tokens\")\n  System_Ext(backend, \"Customer backend\", \"Serves the API\")\n  Rel(dev, gw, \"Calls\", \"HTTPS\")\n  Rel(gw, idp, \"Validates tokens\")\n  Rel(gw, backend, \"Forwards allowed requests\")\n"
       }
     ]

@@ -25,6 +25,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "sections": [
           [
             {
@@ -65,6 +66,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "flowchart TD\n  A[p95 over 150 ms for 10 min] --> B{Deploy in the last hour?}\n  B -->|yes| C[Roll back the deploy]\n  B -->|no| D{CPU over 80%?}\n  D -->|yes| E[Scale out]\n  D -->|no| F[Page the gateway team]\n"
       },
       {
@@ -92,6 +94,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "rps: Current requests per second = 4000 [500..20000 step 500]\nper: Requests per replica = 900 [200..2000 step 50]\nresult: Replicas needed = round(rps / per + 1) (replicas)\n"
       },
       {
@@ -119,6 +122,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "sections": [
           [
             {
@@ -128,6 +132,11 @@
               "items": [
                 {
                   "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
                   "blocks": [
                     {
                       "type": "paragraph",
@@ -156,6 +165,11 @@
                 },
                 {
                   "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
                   "blocks": [
                     {
                       "type": "paragraph",
@@ -184,6 +198,11 @@
                 },
                 {
                   "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
                   "blocks": [
                     {
                       "type": "paragraph",
@@ -212,6 +231,11 @@
                 },
                 {
                   "task": null,
+                  "attrs": {
+                    "id": null,
+                    "classes": [],
+                    "pairs": []
+                  },
                   "blocks": [
                     {
                       "type": "paragraph",

@@ -11,6 +11,7 @@
           "classes": [],
           "pairs": []
         },
+        "id": null,
         "literal": "title: p95 latency\ntype: line\nunit: ms\nlabels: [Mon, Tue, Wed, Thu, Fri]\nvalues: [52, 48, 50, 41, 38]\n"
       }
     ]
