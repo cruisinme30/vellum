@@ -18,6 +18,8 @@
 -- writers. drive_change_meta holds the newest pruned position: a reader
 -- behind it starts over.
 --
+-- rate_counts (at the end) shares rate-limit counts between replicas.
+--
 -- cluster_cursors keeps a named reader's position, such as the search
 -- feed's, so the next replica to hold its lease carries on from there.
 
@@ -104,3 +106,15 @@ CREATE TABLE cluster_cursors (
     minor BIGINT NOT NULL,
     updated_ms BIGINT NOT NULL
 );
+
+-- Requests each caller made in each one-minute window, summed over the
+-- replicas, so a rate limit holds for the whole cluster (ADR 0040).
+-- Windows older than a few minutes are pruned.
+CREATE TABLE rate_counts (
+    caller TEXT NOT NULL CHECK (caller <> ''),
+    window_ms BIGINT NOT NULL,
+    hits BIGINT NOT NULL CHECK (hits >= 0),
+    PRIMARY KEY (caller, window_ms)
+);
+
+CREATE INDEX rate_counts_window ON rate_counts (window_ms);

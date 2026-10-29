@@ -49,6 +49,23 @@ const READINESS_TIMEOUT: Duration = Duration::from_secs(2);
 /// Callers tracked by the rate limiter before drained ones are evicted.
 const RATE_LIMIT_KEYS: usize = 100_000;
 
+/// A rate allowance shared by every replica of a deployment (ADR 0040,
+/// D173). The gateway's own limiter stays the first line on each replica;
+/// this one sees the requests the other replicas served too.
+pub trait SharedLimit: Send + Sync + 'static {
+    /// Counts one request by `caller` and returns how long to wait when
+    /// the cluster has used up the caller's allowance. Must not block: it
+    /// runs on every request.
+    fn hit(&self, caller: &str) -> Option<Duration>;
+}
+
+/// Says whether a request is exempt from rate limits.
+///
+/// Replicas forwarding signed live-editing joins to each other share one
+/// address, and would otherwise spend one caller's allowance for every
+/// editor they carry.
+pub type RateExempt = Arc<dyn Fn(&HeaderMap, &str) -> bool + Send + Sync>;
+
 /// A router mounted by the binary (collab rooms, MCP, downloads, auth
 /// callbacks).
 struct Mount {
@@ -69,6 +86,8 @@ pub struct GatewayBuilder {
     mounts: Vec<Mount>,
     web_app: Option<Router>,
     metrics: RouteMetrics,
+    shared_limit: Option<Arc<dyn SharedLimit>>,
+    rate_exempt: Option<RateExempt>,
 }
 
 impl std::fmt::Debug for GatewayBuilder {
@@ -103,7 +122,26 @@ impl GatewayBuilder {
             mounts: Vec::new(),
             web_app: None,
             metrics: RouteMetrics::new(),
+            shared_limit: None,
+            rate_exempt: None,
         }
+    }
+
+    /// Adds a rate allowance shared with the other replicas, checked after
+    /// this replica's own limiter.
+    #[must_use]
+    pub fn shared_limit(mut self, limit: Arc<dyn SharedLimit>) -> Self {
+        self.shared_limit = Some(limit);
+        self
+    }
+
+    /// Exempts requests from rate limits when `exempt(headers, path)` says
+    /// so. Keep it cheap and strict: it must only accept requests carrying
+    /// proof, such as a signature, that another replica sent them.
+    #[must_use]
+    pub fn rate_exempt(mut self, exempt: RateExempt) -> Self {
+        self.rate_exempt = Some(exempt);
+        self
     }
 
     /// Serves a service's operations.
@@ -216,6 +254,8 @@ impl GatewayBuilder {
             authenticator: self.authenticator,
             idempotency: self.idempotency,
             limiter,
+            cluster_limit: self.shared_limit,
+            rate_exempt: self.rate_exempt,
             draining: AtomicBool::new(false),
             openapi,
             graphql,
@@ -236,6 +276,8 @@ struct Shared {
     authenticator: Arc<dyn Authenticator>,
     idempotency: Arc<dyn IdempotencyStore>,
     limiter: RateLimiter<String>,
+    cluster_limit: Option<Arc<dyn SharedLimit>>,
+    rate_exempt: Option<RateExempt>,
     draining: AtomicBool,
     openapi: Value,
     graphql: async_graphql::dynamic::Schema,
@@ -377,6 +419,25 @@ async fn observe(
     response
 }
 
+/// How long `caller` must wait, if this replica's limiter or the shared
+/// allowance refuses the request.
+fn limited(state: &Shared, caller: &str, request: &Request) -> Option<Duration> {
+    if state
+        .rate_exempt
+        .as_ref()
+        .is_some_and(|exempt| exempt(request.headers(), request.uri().path()))
+    {
+        return None;
+    }
+    if let Err(limited) = state.limiter.check(&caller.to_owned(), Instant::now()) {
+        return Some(limited.retry_after);
+    }
+    state
+        .cluster_limit
+        .as_ref()
+        .and_then(|shared| shared.hit(caller))
+}
+
 #[derive(Clone, Copy)]
 struct Protect {
     csrf: bool,
@@ -404,8 +465,7 @@ async fn protect(
         .map(|u| format!("user:{u}"))
         .or_else(|| ip.map(|ip| format!("ip:{ip}")))
         .unwrap_or_else(|| "anonymous".to_owned());
-    if let Err(limited) = state.limiter.check(&caller, Instant::now()) {
-        let wait = limited.retry_after;
+    if let Some(wait) = limited(&state, &caller, &request) {
         let mut response =
             ErrorResponse::of(ErrorKind::RateLimited, "too many requests; slow down", id)
                 .into_response();

@@ -46,6 +46,8 @@ pub struct Services {
     collab: Option<Collab>,
     /// This replica's place in the cluster, when an index is configured.
     replica: Option<crate::cluster::Replica>,
+    /// Rate-limit counts shared with the other replicas.
+    rate_counts: Option<vellum_db::rate::SharedCounts>,
     /// My Work, for its feed, CalDAV and capture routes.
     tasks: Option<Arc<TasksService>>,
     /// The admin console (requests, routes, audit, settings, backups).
@@ -116,6 +118,7 @@ impl Services {
             hooks: None,
             collab: None,
             replica: None,
+            rate_counts: None,
             tasks: None,
             admin: None,
             observability: Observability::new(),
@@ -164,8 +167,15 @@ impl Services {
         self.hooks = opened.hooks;
         self.collab = opened.collab;
         self.replica = opened.replica;
+        self.rate_counts = opened.rate_counts;
         self.tasks = opened.tasks;
         Ok(self)
+    }
+
+    /// Rate-limit counts shared with the other replicas, when an index is
+    /// configured.
+    pub const fn rate_counts(&self) -> Option<&vellum_db::rate::SharedCounts> {
+        self.rate_counts.as_ref()
     }
 
     /// The live-editing endpoint, mounted at `/collab` by [`Self::mount`]:

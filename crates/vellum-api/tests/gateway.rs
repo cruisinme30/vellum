@@ -19,7 +19,7 @@ use tower::ServiceExt as _;
 use vellum_api::auth::{Authenticated, Authenticator, RequestMeta};
 use vellum_api::breaker::BreakerPolicy;
 use vellum_api::config::GatewayConfig;
-use vellum_api::gateway::{Gateway, GatewayBuilder};
+use vellum_api::gateway::{Gateway, GatewayBuilder, SharedLimit};
 use vellum_api::security::csrf_token;
 use vellum_contracts::{
     BoxFuture, CredentialKind, HttpMethod, Operation, Principal, Readiness, Scope, ScopeSet,
@@ -705,6 +705,57 @@ async fn rate_limits_per_caller() -> TestResult {
             StatusCode::TOO_MANY_REQUESTS
         ]
     );
+    Ok(())
+}
+
+/// A cluster allowance of `left` requests, shared by every caller.
+struct Allowance(AtomicUsize);
+
+impl SharedLimit for Allowance {
+    fn hit(&self, _caller: &str) -> Option<Duration> {
+        let left = self.0.load(Ordering::SeqCst);
+        if left == 0 {
+            return Some(Duration::from_secs(7));
+        }
+        self.0.store(left - 1, Ordering::SeqCst);
+        None
+    }
+}
+
+#[tokio::test]
+async fn the_shared_allowance_and_signed_exemptions_apply() -> TestResult {
+    let gw = GatewayBuilder::new(config(), "1.0.0-test")
+        .service(Arc::new(Notes {
+            created: AtomicUsize::new(0),
+            ready: Readiness::Ready,
+        }) as Arc<dyn Service>)
+        .authenticator(Arc::new(FakeAuth))
+        .shared_limit(Arc::new(Allowance(AtomicUsize::new(1))))
+        .rate_exempt(Arc::new(|headers: &http::HeaderMap, _path: &str| {
+            headers
+                .get("x-forwarded-by-replica")
+                .is_some_and(|v| v == "signed")
+        }))
+        .build()?;
+    let first = send(&gw, get("/api/v1/notes/count", "Bearer read")?).await?;
+    assert_eq!(first.status, StatusCode::OK);
+    // This replica would allow it, but the cluster has used the allowance.
+    let second = send(&gw, get("/api/v1/notes/count", "Bearer read")?).await?;
+    assert_eq!(second.status, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(
+        second
+            .headers
+            .get(http::header::RETRY_AFTER)
+            .map(http::HeaderValue::as_bytes),
+        Some(b"7".as_slice())
+    );
+    // An exempt request is not counted or refused.
+    let mut forwarded = get("/api/v1/notes/count", "Bearer read")?;
+    let _ = forwarded.headers_mut().insert(
+        "x-forwarded-by-replica",
+        http::HeaderValue::from_static("signed"),
+    );
+    assert_eq!(send(&gw, forwarded).await?.status, StatusCode::OK);
     Ok(())
 }
 

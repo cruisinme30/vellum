@@ -258,10 +258,7 @@ impl Cluster {
     }
 
     fn mac(&self, payload: &str) -> String {
-        let mut mac = Hmac::<Sha256>::new_from_slice(&self.config.key)
-            .unwrap_or_else(|_| unreachable!("HMAC takes any key length"));
-        mac.update(payload.as_bytes());
-        hex::encode(mac.finalize().into_bytes())
+        mac(&self.config.key, payload)
     }
 
     /// The header value that lets the owner trust a join authorized here.
@@ -291,31 +288,60 @@ impl Cluster {
     }
 
     fn verify_at(&self, header: &str, room: RoomKey, now: u64) -> Option<(UserId, Access)> {
-        let (payload, mac) = header.rsplit_once('.')?;
-        let expected = self.mac(payload);
-        if !bool::from(subtle::ConstantTimeEq::ct_eq(
-            expected.as_bytes(),
-            mac.as_bytes(),
-        )) {
-            return None;
-        }
-        let parts: Vec<&str> = payload.split('.').collect();
-        let [version, space, doc, user, access, expires] = parts.as_slice() else {
-            return None;
-        };
-        if *version != "v1" || expires.parse::<u64>().ok()? < now {
-            return None;
-        }
-        if space.parse::<SpaceId>().ok()? != room.space || doc.parse::<DocId>().ok()? != room.doc {
-            return None;
-        }
-        let access = match *access {
-            "w" => Access::Write,
-            "r" => Access::Read,
-            _ => return None,
-        };
-        Some((user.parse().ok()?, access))
+        verify(&self.config.key, header, room, now)
     }
+}
+
+fn mac(key: &[u8], payload: &str) -> String {
+    let mut mac = Hmac::<Sha256>::new_from_slice(key)
+        .unwrap_or_else(|_| unreachable!("HMAC takes any key length"));
+    mac.update(payload.as_bytes());
+    hex::encode(mac.finalize().into_bytes())
+}
+
+/// Whether `header` holds a valid forwarded join for the room `path` names.
+///
+/// `path` ends in `/{space_id}/{doc_id}`, with or without the mount
+/// prefix; the join must be signed with `key` and unexpired. The gateway
+/// uses it to exempt replica-to-replica forwards from
+/// per-address rate limits (ADR 0040).
+#[must_use]
+pub fn is_signed_forward(key: &[u8], header: &str, path: &str) -> bool {
+    let mut parts = path.trim_end_matches('/').rsplit('/');
+    let (Some(doc), Some(space)) = (parts.next(), parts.next()) else {
+        return false;
+    };
+    let (Ok(space), Ok(doc)) = (space.parse::<SpaceId>(), doc.parse::<DocId>()) else {
+        return false;
+    };
+    verify(key, header, RoomKey { space, doc }, now_ms()).is_some()
+}
+
+fn verify(key: &[u8], header: &str, room: RoomKey, now: u64) -> Option<(UserId, Access)> {
+    let (payload, mac) = header.rsplit_once('.')?;
+    let expected = self::mac(key, payload);
+    if !bool::from(subtle::ConstantTimeEq::ct_eq(
+        expected.as_bytes(),
+        mac.as_bytes(),
+    )) {
+        return None;
+    }
+    let parts: Vec<&str> = payload.split('.').collect();
+    let [version, space, doc, user, access, expires] = parts.as_slice() else {
+        return None;
+    };
+    if *version != "v1" || expires.parse::<u64>().ok()? < now {
+        return None;
+    }
+    if space.parse::<SpaceId>().ok()? != room.space || doc.parse::<DocId>().ok()? != room.doc {
+        return None;
+    }
+    let access = match *access {
+        "w" => Access::Write,
+        "r" => Access::Read,
+        _ => return None,
+    };
+    Some((user.parse().ok()?, access))
 }
 
 #[cfg(test)]
@@ -434,5 +460,31 @@ mod tests {
             members,
         );
         assert_eq!(other.verify_at(&header, room(1), 2_000), None);
+    }
+
+    #[test]
+    fn a_signed_forward_is_recognised_from_its_path() {
+        let members = Arc::new(Fake::default());
+        let a = cluster("a", &members);
+        let join = JoinRequest {
+            room: room(1),
+            user: UserId::from_u128(9),
+            access: Access::Read,
+            traceparent: None,
+        };
+        let header = a.sign(&join);
+        let path = format!("/collab/{}/{}", room(1).space, room(1).doc);
+        let key = &a.config.key;
+        assert!(is_signed_forward(key, &header, &path));
+        assert!(is_signed_forward(
+            key,
+            &header,
+            path.trim_start_matches("/collab")
+        ));
+        let other = format!("/collab/{}/{}", room(2).space, room(2).doc);
+        assert!(!is_signed_forward(key, &header, &other));
+        assert!(!is_signed_forward(&[8; 32], &header, &path));
+        assert!(!is_signed_forward(key, "forged", &path));
+        assert!(!is_signed_forward(key, &header, "/collab"));
     }
 }

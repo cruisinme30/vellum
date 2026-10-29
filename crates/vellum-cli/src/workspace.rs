@@ -332,6 +332,8 @@ pub struct Opened {
     pub collab: Option<Collab>,
     /// This replica in the cluster's heartbeat table.
     pub replica: Option<Replica>,
+    /// Rate-limit counts shared with the other replicas.
+    pub rate_counts: Option<vellum_db::rate::SharedCounts>,
     /// My Work, which also serves the feed, CalDAV and capture routes.
     pub tasks: Option<Arc<TasksService>>,
 }
@@ -576,6 +578,7 @@ pub async fn open(
     }
     rescan(&replica, others_alive, &workspace.drive).await;
     replica.maintain(&index);
+    let rate_counts = vellum_db::rate::SharedCounts::new(index.clone());
     let hooks = crate::integrations::hooks(&store, &workspace.work, &var).await?;
     let collab = Collab::open(
         Arc::clone(&workspace.drive),
@@ -597,6 +600,7 @@ pub async fn open(
         hooks,
         collab: Some(collab),
         replica: Some(replica),
+        rate_counts: Some(rate_counts),
         tasks: Some(workspace.tasks),
     })
 }

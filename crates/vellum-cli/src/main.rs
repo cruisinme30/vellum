@@ -26,6 +26,7 @@ mod identity;
 mod identity_tests;
 mod integrations;
 mod keys;
+mod limits;
 mod mcp;
 mod notifications;
 mod observability;

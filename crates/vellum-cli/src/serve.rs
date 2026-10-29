@@ -27,6 +27,7 @@
 
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
@@ -217,8 +218,19 @@ pub fn key_file(data_dir: &Path, name: &str) -> Result<Vec<u8>, Error> {
 ///
 /// An invalid operation or `GraphQL` schema.
 pub fn app_gateway(services: &services::Services, config: GatewayConfig) -> Result<Gateway, Error> {
+    let per_minute = u64::from(config.rate_per_second) * 60 + u64::from(config.rate_burst);
+    let mut builder = GatewayBuilder::new(config, services::VERSION);
+    // With an index, the per-caller allowance holds across replicas (D173).
+    if let Some(counts) = services.rate_counts() {
+        let limit = Arc::new(crate::limits::ClusterLimit::new(per_minute));
+        limit.spawn_sync(counts.clone());
+        builder = builder.shared_limit(limit);
+    }
+    if let Some(exempt) = crate::limits::forwarded_joins(|k| std::env::var(k).ok()) {
+        builder = builder.rate_exempt(exempt);
+    }
     services
-        .mount(GatewayBuilder::new(config, services::VERSION))
+        .mount(builder)
         // Live editing is mounted at `/collab` with the services (#415);
         // the web app's fallback never answers there.
         .web_app(web::router(web::embedded()))

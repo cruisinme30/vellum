@@ -10,8 +10,8 @@
 //! - the startup rescan of the workspace files runs only when no other
 //!   replica is alive (one that is has kept the index current), and only
 //!   on the replica that takes the `drive.rescan` lease;
-//! - pruning the change feed, the page change log and finished jobs runs
-//!   on whichever replica holds `maintenance`;
+//! - pruning the change feed, the page change log, finished jobs and old
+//!   rate counts runs on whichever replica holds `maintenance`;
 //! - the Google Calendar sync runs on whichever holds `tasks.google_sync`.
 //!
 //! On a single server all of this simply runs there, as before.
@@ -24,6 +24,7 @@ use vellum_db::changes::DriveChanges;
 use vellum_db::cluster::{Leases, Node, Nodes, singleton};
 use vellum_db::feed::Feed;
 use vellum_db::jobs::Queue;
+use vellum_db::rate::SharedCounts;
 
 /// Variable with the address other replicas reach this one at
 /// (`host:port`), set from the pod IP in Kubernetes.
@@ -153,14 +154,21 @@ impl Replica {
     /// Prunes the change feed, the page change log and finished jobs,
     /// on one replica at a time.
     pub fn maintain(&self, index: &Index) {
-        let (feed, changes, jobs) = (
+        let (feed, changes, jobs, rates) = (
             Feed::new(index.clone()),
             DriveChanges::new(index.clone()),
             Queue::new(index.clone()),
+            SharedCounts::new(index.clone()),
         );
         self.every("maintenance", MAINTAIN_EVERY, move || {
-            let (feed, changes, jobs) = (feed.clone(), changes.clone(), jobs.clone());
+            let (feed, changes, jobs, rates) =
+                (feed.clone(), changes.clone(), jobs.clone(), rates.clone());
             async move {
+                let window = i64::try_from(crate::limits::WINDOW.as_millis()).unwrap_or(i64::MAX);
+                let before = vellum_db::cluster::now_ms().saturating_sub(2 * window);
+                if let Err(error) = rates.prune(before).await {
+                    tracing::warn!(%error, "cannot prune old rate counts");
+                }
                 match feed.prune(crate::feed::KEEP).await {
                     Ok(gone) => tracing::debug!(gone, "pruned the change feed"),
                     Err(error) => tracing::warn!(%error, "cannot prune the change feed"),

@@ -233,3 +233,28 @@ async fn a_worker_runs_jobs_and_retries_failures() {
     }
     assert_eq!(handler.0.load(Ordering::SeqCst), 4);
 }
+
+#[tokio::test]
+async fn rate_counts_add_up_across_replicas() {
+    use vellum_db::rate::SharedCounts;
+    let dir = tempfile::tempdir().unwrap();
+    let index = Index::open(&IndexConfig::sqlite(dir.path().join("index.sqlite"), None))
+        .await
+        .unwrap();
+    let counts = SharedCounts::new(index);
+    let a = counts
+        .add(60_000, &[("ip:1".to_owned(), 3), ("ip:2".to_owned(), 1)])
+        .await
+        .unwrap();
+    assert!(a.contains(&("ip:1".to_owned(), 3)));
+    // Another replica's hits for the same caller and window add up.
+    let b = counts.add(60_000, &[("ip:1".to_owned(), 4)]).await.unwrap();
+    assert_eq!(b, [("ip:1".to_owned(), 7)]);
+    // A new window starts from zero.
+    let c = counts
+        .add(120_000, &[("ip:1".to_owned(), 1)])
+        .await
+        .unwrap();
+    assert_eq!(c, [("ip:1".to_owned(), 1)]);
+    assert_eq!(counts.prune(120_000).await.unwrap(), 2);
+}
