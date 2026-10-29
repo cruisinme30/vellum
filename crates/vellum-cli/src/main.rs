@@ -37,11 +37,13 @@ mod private;
 #[cfg(test)]
 mod private_tests;
 mod reindex;
+mod reminders;
 mod search;
 mod serve;
 mod services;
 #[cfg(test)]
 mod sso_tests;
+mod task_prefs;
 mod tasks;
 mod tasks_http;
 #[cfg(test)]

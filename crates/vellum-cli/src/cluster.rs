@@ -12,7 +12,8 @@
 //!   on the replica that takes the `drive.rescan` lease;
 //! - pruning the change feed, the page change log, finished jobs and old
 //!   rate counts runs on whichever replica holds `maintenance`;
-//! - the Google Calendar sync runs on whichever holds `tasks.google_sync`.
+//! - the Google Calendar sync runs on whichever holds `tasks.google_sync`,
+//!   and My Work reminders on whichever holds `tasks.reminders`.
 //!
 //! On a single server all of this simply runs there, as before.
 

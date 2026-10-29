@@ -27,10 +27,11 @@ struct Fixture {
 
 impl Fixture {
     async fn new() -> Self {
+        static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
         let dir = std::env::temp_dir().join(format!(
             "vellum-tasks-test-{}-{}",
             std::process::id(),
-            line!()
+            NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
         ));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
@@ -300,4 +301,125 @@ Message-ID: <m1@northstar.dev>\r\nContent-Type: text/plain\r\n\r\nIt expires soo
         .trim_start_matches("/feeds/tasks/")
         .trim_end_matches(".ics");
     assert!(!secrets.contains(feed_token));
+}
+
+fn tasks_of_kind(view: &Value, kind: &str) -> Vec<Value> {
+    view["sections"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .flat_map(|s| s["tasks"].as_array().into_iter().flatten())
+        .filter(|t| t["kind"] == kind)
+        .cloned()
+        .collect()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn mentions_and_settings_reach_my_work() {
+    let f = Fixture::new().await;
+    for (path, body) in [
+        (
+            "/api/v1/admin/users",
+            json!({"email": "bo@northstar.dev", "name": "Bo", "password": "correct horse battery"}),
+        ),
+        (
+            "/api/v1/work/teams",
+            json!({"key": "ENG", "name": "Engineering"}),
+        ),
+        (
+            "/api/v1/work/issues",
+            json!({"team": "ENG", "title": "Fix login"}),
+        ),
+        (
+            "/api/v1/work/comments",
+            json!({"target": "ENG-1", "body": "@bo can you look at this?"}),
+        ),
+    ] {
+        let reply = f.post(path, body).await;
+        assert_eq!(reply.status, StatusCode::OK, "{path}: {}", reply.text);
+    }
+    let bo = sign_in(&f.app, "bo@northstar.dev").await;
+    let bo_csrf = csrf(&f.app, &bo).await;
+    let bo_get = |path: &'static str| {
+        let app = f.app.clone();
+        let bo = bo.clone();
+        async move {
+            send(
+                &app,
+                finish(request("GET", path).header(header::COOKIE, &bo)),
+            )
+            .await
+        }
+    };
+    let bo_send = |method: &'static str, path: String, body: Value| {
+        let app = f.app.clone();
+        let bo = bo.clone();
+        let token = bo_csrf.clone();
+        async move {
+            send(
+                &app,
+                finish(
+                    json_request(method, &path, &body)
+                        .header(header::COOKIE, &bo)
+                        .header("x-csrf-token", &token),
+                ),
+            )
+            .await
+        }
+    };
+
+    // The mention waits in Bo's Inbox, and not in the author's My Work.
+    let view = bo_get("/api/v1/my-work").await;
+    assert_eq!(view.status, StatusCode::OK, "{}", view.text);
+    let mentions = tasks_of_kind(&view.json(), "mention");
+    assert_eq!(mentions.len(), 1, "{}", view.text);
+    assert_eq!(mentions[0]["issue_key"], "ENG-1");
+    assert_eq!(mentions[0]["title"], "@bo can you look at this?");
+    let mine = f.get("/api/v1/my-work").await;
+    assert!(tasks_of_kind(&mine.json(), "mention").is_empty());
+
+    // Dismissing takes it out.
+    let comment = mentions[0]["id"]
+        .as_str()
+        .unwrap()
+        .trim_start_matches("mention.")
+        .to_owned();
+    let dismissed = bo_send(
+        "POST",
+        format!("/api/v1/my-work/mentions/{comment}/dismiss"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(dismissed.status, StatusCode::OK, "{}", dismissed.text);
+    let view = bo_get("/api/v1/my-work").await;
+    assert!(
+        tasks_of_kind(&view.json(), "mention").is_empty(),
+        "{}",
+        view.text
+    );
+
+    // Settings: the server's zone until Bo picks one; bad zones refused.
+    let settings = bo_get("/api/v1/my-work/settings").await;
+    assert_eq!(settings.status, StatusCode::OK, "{}", settings.text);
+    assert_eq!(settings.json()["time_zone"], Value::Null);
+    let saved = bo_send(
+        "PUT",
+        "/api/v1/my-work/settings".to_owned(),
+        json!({"time_zone": "America/Los_Angeles", "day_starts_at": "08:00", "digest_at": null}),
+    )
+    .await;
+    assert_eq!(saved.status, StatusCode::OK, "{}", saved.text);
+    assert_eq!(saved.json()["effective_time_zone"], "America/Los_Angeles");
+    let bad = bo_send(
+        "PUT",
+        "/api/v1/my-work/settings".to_owned(),
+        json!({"time_zone": "Nowhere/Land"}),
+    )
+    .await;
+    assert_eq!(bad.status, StatusCode::BAD_REQUEST, "{}", bad.text);
+    let again = bo_get("/api/v1/my-work/settings").await;
+    assert_eq!(again.json()["time_zone"], "America/Los_Angeles");
+    assert_eq!(again.json()["digest_at"], Value::Null);
+    let people = std::fs::read_to_string(f.dir.join(".vellum/tasks/people.json")).unwrap();
+    assert!(people.contains("America/Los_Angeles"), "{people}");
 }

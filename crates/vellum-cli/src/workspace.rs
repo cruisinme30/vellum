@@ -654,8 +654,15 @@ async fn rescan_and_maintain(
     replica.maintain(index);
 }
 
-/// Syncs Google Calendar every [`GOOGLE_SYNC_EVERY`] on one replica.
-fn sync_calendars(replica: &Replica, tasks: &Arc<TasksService>) {
+/// My Work's cluster jobs: Google Calendar sync every
+/// [`GOOGLE_SYNC_EVERY`], and reminders and digests, each on one replica.
+fn task_jobs(
+    replica: &Replica,
+    tasks: &Arc<TasksService>,
+    notify: &Arc<NotifyStore>,
+    data_dir: &Path,
+) -> Result<(), Error> {
+    crate::reminders::start(replica, tasks, notify, data_dir)?;
     let timer = Arc::clone(tasks);
     replica.every("tasks.google_sync", GOOGLE_SYNC_EVERY, move || {
         let timer = Arc::clone(&timer);
@@ -665,6 +672,7 @@ fn sync_calendars(replica: &Replica, tasks: &Arc<TasksService>) {
             }
         }
     });
+    Ok(())
 }
 
 /// Opens the workspace services for `config`, or returns none (with a
@@ -772,7 +780,7 @@ pub async fn open(
     .await?;
     workspace.services.push(Arc::new(search));
     keep_fresh(feed, me, cursor, &workspace, &spaces, drive_index);
-    sync_calendars(&replica, &workspace.tasks);
+    task_jobs(&replica, &workspace.tasks, notify, &config.data_dir)?;
     let mut services = workspace.services;
     services.push(Arc::new(Storage(store)));
     Ok(Opened {
