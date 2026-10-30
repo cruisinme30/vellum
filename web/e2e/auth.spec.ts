@@ -167,11 +167,14 @@ test("single sign-on goes to the SAML provider and back", async ({ page }) => {
   );
   await page.goto("/sign-in?next=%2Fdata");
   const app = new URL(page.url()).origin;
-  // The server sends the browser to the provider with a request...
+  // The server sends the browser to the provider with a request. The real
+  // server answers 302; here a page moves on instead, because Chromium does
+  // not hand the hop after a faked 302 to the routes below, so the made-up
+  // provider host would be looked up for real and fail.
   await page.route("**/auth/sso/start?**", (route) =>
     route.fulfill({
-      status: 302,
-      headers: { location: "https://idp.northstar.test/sso?SAMLRequest=x&RelayState=r" },
+      contentType: "text/html",
+      body: `<!doctype html><meta http-equiv="refresh" content="0;url=https://idp.northstar.test/sso?SAMLRequest=x&amp;RelayState=r">`,
     }),
   );
   // ...the provider signs the person in and posts the response back...
