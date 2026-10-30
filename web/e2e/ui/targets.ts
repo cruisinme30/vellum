@@ -35,6 +35,11 @@ export interface Target {
   visual: boolean;
   /** What the stand-in server says; absent for the demo and the site. */
   server?: ServerState;
+  /**
+   * The name of a button to press once the page has settled, to audit
+   * the dialog or panel it opens (D285) rather than the page under it.
+   */
+  open?: RegExp;
 }
 
 /** quick (the default): the fast subset; full: every page; exhaustive: every page in every mode. */
@@ -52,7 +57,7 @@ export const SITE_DIR = path.resolve(
 const app = (
   name: string,
   route: string,
-  options: { server?: ServerState; visual?: boolean; fast?: boolean } = {},
+  options: { server?: ServerState; visual?: boolean; fast?: boolean; open?: RegExp } = {},
 ): Target => ({
   name: `app ${name}`,
   url: `http://127.0.0.1:${String(APP_PORT)}${route}`,
@@ -61,6 +66,7 @@ const app = (
   sweep: false,
   visual: options.visual ?? true,
   ...(options.server === undefined ? {} : { server: options.server }),
+  ...(options.open === undefined ? {} : { open: options.open }),
 });
 
 /**
@@ -72,6 +78,10 @@ const app = (
 const screen = (name: string, route: string, fast = false): Target =>
   app(name, route, { server: "signed-in", fast, visual: fast });
 
+/** A dialog or panel on a server screen, opened by pressing `button`. */
+const panel = (name: string, route: string, button: RegExp): Target =>
+  app(name, route, { server: "signed-in", fast: false, visual: false, open: button });
+
 function serverScreens(): Target[] {
   return [
     screen("home (server)", "/"),
@@ -80,6 +90,11 @@ function serverScreens(): Target[] {
     screen("issue", "/issues/ENG-12"),
     screen("books", "/books"),
     screen("book section", `/books/${HANDBOOK}/setup`, true),
+    panel("book publish", `/books/${HANDBOOK}/setup`, /^Publish$/),
+    panel("book snapshots", `/books/${HANDBOOK}/setup`, /^Snapshots$/),
+    panel("book section access", `/books/${HANDBOOK}/setup`, /^Section access$/),
+    panel("book outline history", `/books/${HANDBOOK}/setup`, /^Outline history$/),
+    panel("book move section", `/books/${HANDBOOK}/setup`, /^Move to another book$/),
     screen("appearance (server)", "/settings/appearance"),
     screen("notification settings", "/settings/notifications"),
     screen("private spaces", "/settings/private-spaces"),

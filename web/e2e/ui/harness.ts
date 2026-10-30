@@ -114,6 +114,13 @@ async function attachEvidence(page: Page, testInfo: TestInfo, problems: Problem[
   }
 }
 
+/** Presses the target's `open` button, if any, and waits for what it opens. */
+export async function openPanel(page: Page, target: Target): Promise<void> {
+  if (target.open === undefined) return;
+  await page.getByRole("button", { name: target.open }).first().click();
+  await settle(page);
+}
+
 /** Opens a target in a mode and returns everything wrong with it. */
 export async function auditTarget(
   page: Page,
@@ -127,6 +134,7 @@ export async function auditTarget(
   await fakeServer(page, target.server);
   await page.goto(target.url, { waitUntil: "load" });
   await settle(page);
+  await openPanel(page, target);
 
   const problems: Problem[] = [...errors];
   const findings: Finding[] = await page.evaluate(layoutAudit);
