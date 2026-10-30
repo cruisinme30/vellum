@@ -42,6 +42,25 @@ gitGraph
 release build, end-to-end and accessibility tests, and external links.
 Releases are tagged on `main`.
 
+From a pushed branch to a release:
+
+```mermaid
+flowchart LR
+  B[feat/... branch, signed and signed off] --> I[Integration batch]
+  I --> D[develop: fast suite]
+  D --> N[Nightly and chaos runs]
+  D --> R[Release pull request: full suite, CodeQL]
+  R --> M[main: one signed snapshot]
+  M --> T[Tag vX.Y.Z: signed binaries, images and the website]
+```
+
+| Stage | What runs | Blocks a release when red |
+| --- | --- | --- |
+| Pull request into `develop` | Formatting, lints, tests, boundaries, commit rules | Yes |
+| `develop` | The fast suite again on the merged result | Yes |
+| Nightly | Fuzzing, load, chaos and the browser matrix | Yes |
+| Release pull request | The full suite, coverage, CodeQL, external links | Yes |
+
 ## One feature per pull request {#one-feature}
 
 A pull request carries one feature, complete with its tests and

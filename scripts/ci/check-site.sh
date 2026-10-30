@@ -12,7 +12,12 @@
 #   - the build left no placeholder unfilled, on any page;
 #   - every help book page has the light and dark toggle and loads only the
 #     site's own fonts, not mdBook's (D307, D308);
-#   - every help book page ends with the feedback and edit links (D257).
+#   - every help book page ends with the feedback and edit links (D257);
+#   - every page, the landing page, docs home and every book, has the one
+#     site bar, the same links in the same order with only their paths and
+#     the current section differing (ADR 0071, D310);
+#   - no Mermaid, architecture or chart fence is published as source: the
+#     rich blocks were drawn (D309).
 #
 # Usage: scripts/ci/check-site.sh [site-dir] (default: _site)
 set -euo pipefail
@@ -65,22 +70,39 @@ for page in "${site}/index.html" "${site}/docs/index.html"; do
     grep -qE '^<script src="(\.\./)?theme\.js"></script>$' <<<"${script}" || fail "${name} has a script other than theme.js: ${script}"
   done < <(grep -oiE '<script[^>]*>(</script>)?' <<<"${html}")
   grep -qE '[[:space:]]style="' <<<"${html}" && fail "${name} has an inline style attribute"
-  grep -qE '<!-- (BOOKS|COUNT:[a-z]+) -->' <<<"${html}" && fail "${name} has an unfilled placeholder"
+  grep -qE '<!-- (BOOKS|SITEBAR|COUNT:[a-z]+) -->' <<<"${html}" && fail "${name} has an unfilled placeholder"
   while IFS= read -r img; do
     grep -q ' alt="' <<<"${img}" || fail "${name} has an image without alt text: ${img}"
   done < <(grep -oE '<img[^>]*>' <<<"${html}")
   check_links "${page}" "${html}"
 done
 
+# site_bar <page>: the page's site bar, and its shape with paths, the
+# current-section mark and the release links taken out.
+site_bar() {
+  sed -n '/<header class="vellum-site">/,/<\/header>/p' "$1"
+}
+bar_shape() {
+  sed -E -e 's/(href|src)="[^"]*"/\1=""/g' -e 's/ aria-current="page"//g' -e 's#<span class="vellum-versions">.*</span>##' -e 's/^[[:space:]]+//' <<<"$1" | grep -v '^$'
+}
+home_bar="$(site_bar "${site}/index.html")"
+[[ -n "${home_bar}" ]] || fail "index.html has no site bar"
+home_shape="$(bar_shape "${home_bar}")"
+docs_bar="$(site_bar "${site}/docs/index.html")"
+[[ "$(bar_shape "${docs_bar}")" == "${home_shape}" ]] || fail "docs/index.html has a different site bar from the landing page"
+
 # The site bar on every help book page.
 while IFS= read -r -d '' page; do
-  bar="$(sed -n '/<nav class="vellum-site"/,/<\/nav>/p' "${page}")"
+  bar="$(site_bar "${page}")"
   if [[ -z "${bar}" ]]; then
     fail "${page#"${site}"/} has no site bar"
     continue
   fi
+  [[ "$(bar_shape "${bar}")" == "${home_shape}" ]] || fail "${page#"${site}"/} has a different site bar from the landing page"
+  grep -qE 'class="language-(mermaid|architecture|chart|timeline|roadmap)"' "${page}" && fail "${page#"${site}"/} shows a diagram as source instead of drawing it"
   check_links "${page}" "${bar}"
-  grep -qE '@(ROOT|DOCS|VERSIONS|FONTS)@' "${page}" && fail "${page#"${site}"/} has an unfilled placeholder"
+  # Code spans may name a placeholder on purpose (ADR 0027 does).
+  sed -E 's#<code>[^<]*</code>##g' "${page}" | grep -qE '@(ROOT|HOME|DOCS|GUIDES|VERSIONS|FONTS|CUR-[a-z]+)@' && fail "${page#"${site}"/} has an unfilled placeholder"
   grep -q 'class="theme-toggle"' <<<"${bar}" || fail "${page#"${site}"/} has no light and dark toggle"
   grep -qE 'href="[^"]*fonts/fonts-[0-9a-f]+\.css"' "${page}" && fail "${page#"${site}"/} still loads mdBook's own fonts"
   case "${page}" in

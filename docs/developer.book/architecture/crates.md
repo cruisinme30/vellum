@@ -16,12 +16,9 @@ storage.
 layer = "foundation"
 ```
 
-```graphviz
-digraph layers {
-  rankdir=LR;
-  node [shape=box, style=rounded];
-  kernel -> contracts -> foundation -> engine -> service -> edge -> app;
-}
+```mermaid
+flowchart LR
+  kernel --> contracts --> foundation --> engine --> service --> edge --> app
 ```
 
 | Layer | Crates | Holds |

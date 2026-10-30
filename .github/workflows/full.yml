@@ -190,7 +190,7 @@ jobs:
     needs: gate
     if: needs.gate.outputs.run == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 25
     env:
       # Keep in step with site.yml.
       MDBOOK_VERSION: 0.5.4
@@ -207,6 +207,12 @@ jobs:
           echo "${MDBOOK_SHA256}  ${RUNNER_TEMP}/${tarball}" | sha256sum --check
           tar -xzf "${RUNNER_TEMP}/${tarball}" -C "${RUNNER_TEMP}" mdbook
           echo "MDBOOK=${RUNNER_TEMP}/mdbook" >> "${GITHUB_ENV}"
+      # build-site.sh builds vellum-render's site_blocks example (ADR 0071).
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: site
+          save-if: false
       - run: scripts/ci/build-site.sh _site
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

@@ -6,6 +6,19 @@ vellum: 1
 
 # Exporting and publishing a book
 
+Every export goes through the same steps, so a book looks the same in
+every format:
+
+```mermaid
+flowchart LR
+  B[Book or section] --> L[Lowered into one flow: headings, tables, figures, cross-references]
+  L --> PDF[PDF, typeset in Vellum]
+  L --> DOCX[Word]
+  L --> HTML[HTML and static site]
+  L --> MD[Markdown and mdBook]
+  DOCX --> GD[Google Docs]
+```
+
 ## Export {#export}
 
 Open **⋯ → Export** on a section and choose what to include:

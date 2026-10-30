@@ -215,7 +215,8 @@ kbd {
   position: absolute;
   top: 8px;
   inset-inline-start: 8px;
-  z-index: 50;
+  /* Above the site bar (bar.css, z-index 200). */
+  z-index: 300;
   padding: 10px 16px;
   border-radius: 999px;
   background: var(--primary);
@@ -316,23 +317,7 @@ kbd {
   gap: 12px;
 }
 
-/* Top bar. The links wrap instead of pushing off screen (#248). */
-header.top {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  border-bottom: 1px solid var(--line);
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
-  backdrop-filter: saturate(1.4) blur(12px);
-}
-.bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 28px;
-  min-height: 64px;
-  padding-block: 8px;
-}
+/* The brand mark in the footer. The site bar is in bar.css (ADR 0071, D310). */
 .brand {
   display: inline-flex;
   align-items: center;
@@ -351,67 +336,6 @@ header.top {
   color: var(--ink-3);
   font-size: 1rem;
   font-weight: 400;
-}
-.nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 20px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: 0.9375rem;
-}
-.nav a {
-  color: var(--ink-2);
-  text-decoration: none;
-}
-.nav a:hover,
-.nav a[aria-current] {
-  color: var(--primary);
-}
-.bar .end {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-inline-start: auto;
-}
-.bar .btn {
-  min-height: 40px;
-  padding: 8px 18px;
-  font-size: 0.9375rem;
-}
-/* The light and dark toggle (theme.js, D308): a moon in light, a sun in dark. */
-.theme-toggle {
-  display: inline-grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  padding: 0;
-  border: 1px solid var(--line-strong);
-  border-radius: 50%;
-  background: transparent;
-  color: var(--ink-2);
-  cursor: pointer;
-}
-:root:not([data-theme-toggle]) .theme-toggle,
-.theme-toggle[aria-pressed="true"] .theme-moon,
-.theme-toggle:not([aria-pressed="true"]) .theme-sun {
-  display: none;
-}
-.theme-toggle:hover {
-  background: color-mix(in srgb, var(--primary) 8%, transparent);
-  color: var(--primary);
-}
-.theme-toggle:focus-visible {
-  outline: 3px solid var(--primary);
-  outline-offset: 2px;
-}
-@media (max-width: 860px) {
-  .nav {
-    order: 3;
-    width: 100%;
-    padding-bottom: 4px;
-  }
 }
 
 /* Status note under the bar: Vellum is not released yet. */

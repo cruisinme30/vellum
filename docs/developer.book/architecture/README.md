@@ -49,6 +49,12 @@ flowchart TB
   AU --> DB
 ```
 
+::: info
+Every box above runs in the one `vellum` binary. In the org profile the
+same binary runs as several replicas, and live editing rooms are routed
+to one replica per document.
+:::
+
 ## Services {#services}
 
 | Service | Owns |
@@ -77,3 +83,28 @@ on different database shards, collaboration nodes and search shards.
 Objects are identified by typed ULIDs (`PageId`, `BookId`, `IssueId` and
 so on), never by path. Share tokens are 22-character base62 strings from
 a cryptographic random source, stored only as SHA-256 hashes.
+
+## Sign-in and tokens {#sign-in}
+
+The identity service is the OAuth authorization server for every
+client. Browsers get a session cookie; the desktop app, MCP clients and
+scripts get bearer tokens, each with scopes. Every other service sees
+only the resulting `Principal`.
+
+```mermaid
+sequenceDiagram
+  participant C as MCP client or desktop app
+  participant G as Gateway
+  participant I as Identity
+  participant S as A service
+  C->>G: GET /.well-known/oauth-authorization-server
+  G-->>C: endpoints (RFC 8414)
+  C->>I: authorize with PKCE, the person signs in
+  I-->>C: access token with scopes
+  C->>G: request with the bearer token
+  G->>I: verify the token
+  I-->>G: Principal and scopes
+  G->>S: operation with the Principal
+  S-->>C: result, filtered by authorization
+```
+

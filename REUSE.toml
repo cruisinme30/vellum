@@ -56,6 +56,14 @@ precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 The Vellum contributors"
 SPDX-License-Identifier = "AGPL-3.0-only"
 
+# Screenshots of the Northstar demo in the help books, copies of the
+# website's (ADR 0071).
+[[annotations]]
+path = ["docs/*.book/**/assets/*.jpg"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 The Vellum contributors"
+SPDX-License-Identifier = "AGPL-3.0-only"
+
 # Google Sans Flex and Google Sans Code, self-hosted by the website.
 [[annotations]]
 path = ["site/fonts/google-sans-flex-*.woff2"]
