@@ -48,6 +48,7 @@ const TEAM: TeamOut = {
   templates: [],
   timezone: "UTC",
   triage: false,
+  archived: false,
 };
 
 function issue(key: string, title: string, extra: Partial<IssueOut> = {}): IssueOut {
@@ -205,6 +206,7 @@ export function fakeApi(overrides: Partial<WorkApi> = {}) {
     teamSettings: () => Promise.reject(new Error("unused")),
     saveTeamSettings: () => Promise.reject(new Error("unused")),
     createTeam: () => Promise.reject(new Error("unused")),
+    setTeamArchived: () => Promise.reject(new Error("unused")),
     myWork,
     addTask,
     setDone,

@@ -26,6 +26,7 @@ const TEAM: TeamOut = {
   templates: ["Bug"],
   timezone: "UTC",
   triage: true,
+  archived: false,
 };
 
 function project(id: string, title: string, extra: Partial<ProjectOut> = {}): ProjectOut {

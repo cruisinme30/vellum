@@ -113,6 +113,24 @@ export interface AddComment {
 }
 
 /**
+ * A new milestone.
+ */
+export interface AddMilestone {
+  /**
+   * Name.
+   */
+  name: string;
+  /**
+   * Project ID.
+   */
+  project_id: string;
+  /**
+   * Target date, `YYYY-MM-DD`.
+   */
+  target_date?: string | null;
+}
+
+/**
  * A passkey the browser just created.
  */
 export interface AddPasskey {
@@ -636,6 +654,28 @@ export type AdminVerifyAuditEmpty = Record<string, unknown>;
  */
 export type Aggregation = "count" | "sum" | "avg" | "min" | "max" | "checked" | "pct" | "unique" | "show";
 
+/**
+ * A summary or an answer.
+ */
+export interface Answer {
+  /**
+   * The sources cited, in order of first use.
+   */
+  citations: Citation[];
+  /**
+   * The model that answered.
+   */
+  model: string;
+  /**
+   * The text, as Markdown, with `[n]` citation marks.
+   */
+  text: string;
+  /**
+   * The input or the answer was cut short.
+   */
+  truncated: boolean;
+}
+
 export type AnyValue = unknown;
 
 /**
@@ -663,6 +703,12 @@ export interface ApiError {
    */
   retryable: boolean;
 }
+
+/**
+ * A model provider's API key. It is accepted from the request and passed
+ * to the provider; it is never serialised, stored or printed.
+ */
+export type ApiKey = string;
 
 /**
  * A connected `OAuth` app.
@@ -724,6 +770,24 @@ export type Array_of_SessionView = SessionView[];
 export type Array_of_TokenView = TokenView[];
 
 export type Array_of_UserView = UserView[];
+
+/**
+ * `POST /v1/assist/ask`.
+ */
+export interface AskInput {
+  /**
+   * The model to use.
+   */
+  model: ModelSettings;
+  /**
+   * The question.
+   */
+  question: string;
+  /**
+   * Limit the search to one space (slug).
+   */
+  space?: string | null;
+}
 
 /**
  * Assign a thread.
@@ -1551,6 +1615,32 @@ export interface ChipOut {
 }
 
 /**
+ * One source an answer cites.
+ */
+export interface Citation {
+  /**
+   * The page's id.
+   */
+  doc_id: string;
+  /**
+   * The number the answer uses, `[n]`.
+   */
+  n: number;
+  /**
+   * The quoted text.
+   */
+  snippet: string;
+  /**
+   * Page title and headings above the block.
+   */
+  title: string;
+  /**
+   * Opens the block in the app.
+   */
+  url: string;
+}
+
+/**
  * A CollectionId as a 26-character ULID.
  */
 export type CollectionId = string;
@@ -2143,6 +2233,32 @@ export interface CreateGroup {
 }
 
 /**
+ * A new initiative.
+ */
+export interface CreateInitiative {
+  /**
+   * The description, in Vellum Markdown.
+   */
+  description?: string;
+  /**
+   * Owner handle.
+   */
+  owner?: string | null;
+  /**
+   * Project IDs, in display order.
+   */
+  projects?: string[];
+  /**
+   * Target date, `YYYY-MM-DD`.
+   */
+  target_date?: string | null;
+  /**
+   * Title.
+   */
+  title: string;
+}
+
+/**
  * A new task.
  */
 export interface CreateInput {
@@ -2190,6 +2306,10 @@ export interface CreateIssue {
    */
   labels?: string[];
   /**
+   * Milestone ID within the project.
+   */
+  milestone?: string | null;
+  /**
    * Parent issue key.
    */
   parent?: string | null;
@@ -2205,6 +2325,10 @@ export interface CreateIssue {
    * The selected text, for a block.
    */
   quote?: string | null;
+  /**
+   * Repeat after the due date passes: `3d`, `1w`, `2w`, `1m`.
+   */
+  repeat?: string | null;
   /**
    * `<doc id>#blk-…` when filed from a page.
    */
@@ -2275,6 +2399,44 @@ export interface CreatePage {
    * Its title.
    */
   title: string;
+}
+
+/**
+ * A new project.
+ */
+export interface CreateProject {
+  /**
+   * The spec, in Vellum Markdown.
+   */
+  description?: string;
+  /**
+   * Lead handle.
+   */
+  lead?: string | null;
+  /**
+   * Start date, `YYYY-MM-DD`.
+   */
+  start_date?: string | null;
+  /**
+   * backlog (default), planned, in-progress, completed or canceled.
+   */
+  status?: string | null;
+  /**
+   * Target date, `YYYY-MM-DD`.
+   */
+  target_date?: string | null;
+  /**
+   * Team keys; at least one.
+   */
+  teams: string[];
+  /**
+   * Title.
+   */
+  title: string;
+  /**
+   * weekly (default), biweekly, monthly or never.
+   */
+  update_cadence?: string | null;
 }
 
 /**
@@ -2916,6 +3078,59 @@ export interface Done {
    * Always `true`.
    */
   ok: boolean;
+}
+
+/**
+ * The draft page that was created for review.
+ */
+export interface Draft {
+  /**
+   * Its body.
+   */
+  markdown: string;
+  /**
+   * The model that wrote it.
+   */
+  model: string;
+  /**
+   * The new page's id.
+   */
+  page_id: string;
+  /**
+   * The template or the answer was cut short.
+   */
+  truncated: boolean;
+  /**
+   * Opens it.
+   */
+  url: string;
+}
+
+/**
+ * `POST /v1/assist/draft`.
+ */
+export interface DraftInput {
+  /**
+   * What the page should say.
+   */
+  instructions: string;
+  /**
+   * The model to use.
+   */
+  model: ModelSettings;
+  /**
+   * Where the draft goes (a page id or `space:<slug>`); by default, the
+   * template's space.
+   */
+  parent?: string | null;
+  /**
+   * The page whose structure the draft follows.
+   */
+  template_page_id: string;
+  /**
+   * The new page's title.
+   */
+  title: string;
 }
 
 /**
@@ -5023,6 +5238,54 @@ export interface IngestedOutput {
 }
 
 /**
+ * An initiative with its projects rolled up.
+ */
+export interface InitiativeOut {
+  /**
+   * The worst latest health among active projects.
+   */
+  health?: string | null;
+  /**
+   * Initiative ID.
+   */
+  id: string;
+  /**
+   * The initiative file, front matter and description.
+   */
+  markdown: string;
+  /**
+   * Owner handle.
+   */
+  owner?: string | null;
+  /**
+   * Percent complete by points over every project.
+   */
+  percent: number;
+  /**
+   * The projects, in display order.
+   */
+  projects: ProjectOut[];
+  /**
+   * Target date.
+   */
+  target_date?: string | null;
+  /**
+   * Title.
+   */
+  title: string;
+}
+
+/**
+ * Every initiative.
+ */
+export interface InitiativesOut {
+  /**
+   * Initiatives by title.
+   */
+  initiatives: InitiativeOut[];
+}
+
+/**
  * The answer to an insights question.
  */
 export interface InsightsOut {
@@ -5166,6 +5429,10 @@ export interface IssueOut {
    * Relations to other issues.
    */
   relations: RelationOut[];
+  /**
+   * How often it repeats (`1w`, `2w`, `1m`, `3d`).
+   */
+  repeat?: string | null;
   /**
    * The running or last SLA.
    */
@@ -5461,6 +5728,59 @@ export interface MetadataUrl {
    * The provider's SAML metadata URL (`https`).
    */
   url: string;
+}
+
+/**
+ * A milestone with its progress.
+ */
+export interface MilestoneOut {
+  /**
+   * Completed issues.
+   */
+  completed_issues: number;
+  /**
+   * Milestone ID.
+   */
+  id: string;
+  /**
+   * Issues in the milestone.
+   */
+  issues: number;
+  /**
+   * Name.
+   */
+  name: string;
+  /**
+   * Percent complete by points.
+   */
+  percent: number;
+  /**
+   * Target date.
+   */
+  target_date?: string | null;
+}
+
+/**
+ * Which model to call and how: sent by the browser with every request.
+ */
+export interface ModelSettings {
+  /**
+   * The user's own API key. Optional only for an endpoint an admin
+   * configured that needs none (a self-hosted model).
+   */
+  api_key?: ApiKey | null;
+  /**
+   * The endpoint; the provider's public API when absent.
+   */
+  base_url?: string | null;
+  /**
+   * The model name, such as `claude-opus-5-5`.
+   */
+  model: string;
+  /**
+   * The wire format.
+   */
+  provider: Provider;
 }
 
 /**
@@ -5963,6 +6283,24 @@ export interface PointOut {
 }
 
 /**
+ * A health update to post.
+ */
+export interface PostUpdate {
+  /**
+   * The notes, in Vellum Markdown.
+   */
+  body?: string;
+  /**
+   * on-track, at-risk or off-track.
+   */
+  health: string;
+  /**
+   * Project ID.
+   */
+  project_id: string;
+}
+
+/**
  * Notification settings, as the API shows them.
  */
 export interface PreferencesView {
@@ -6014,9 +6352,21 @@ export interface ProfileResponse {
 }
 
 /**
- * A project with its computed progress.
+ * A project with its computed progress and latest health.
  */
 export interface ProjectOut {
+  /**
+   * Completed points.
+   */
+  completed: number;
+  /**
+   * Completed issues.
+   */
+  completed_issues: number;
+  /**
+   * on-track, at-risk or off-track, from the latest update.
+   */
+  health?: string | null;
   /**
    * Project ID.
    */
@@ -6034,11 +6384,27 @@ export interface ProjectOut {
    */
   markdown: string;
   /**
+   * Member handles.
+   */
+  members: string[];
+  /**
+   * Milestones in order, with progress.
+   */
+  milestones: MilestoneOut[];
+  /**
    * Percent complete by points.
    */
   percent: number;
   /**
-   * planned, started, paused, completed or canceled.
+   * Points in scope.
+   */
+  scope: number;
+  /**
+   * Start date.
+   */
+  start_date?: string | null;
+  /**
+   * backlog, planned, in-progress, completed or canceled.
    */
   status: string;
   /**
@@ -6053,6 +6419,18 @@ export interface ProjectOut {
    * Title.
    */
   title: string;
+  /**
+   * weekly, biweekly, monthly or never.
+   */
+  update_cadence: string;
+  /**
+   * Whether the lead owes an update by the project's cadence.
+   */
+  update_due: boolean;
+  /**
+   * When the latest update was posted.
+   */
+  updated_at?: string | null;
 }
 
 /**
@@ -6130,6 +6508,11 @@ export interface PropertyKey {
    */
   key: string;
 }
+
+/**
+ * The wire format a model endpoint speaks.
+ */
+export type Provider = "anthropic" | "openai_compatible";
 
 /**
  * A provider, by ID in the path.
@@ -6367,6 +6750,20 @@ export interface PushKeys {
    * The browser's P-256 public key, base64url.
    */
   p256dh: string;
+}
+
+/**
+ * Replace an initiative.
+ */
+export interface PutInitiative {
+  /**
+   * Initiative ID; must match the file.
+   */
+  initiative_id: string;
+  /**
+   * The whole initiative page.
+   */
+  markdown: string;
 }
 
 /**
@@ -8398,6 +8795,20 @@ export interface SuggestionOut {
 }
 
 /**
+ * `POST /v1/assist/summarize`.
+ */
+export interface SummarizeInput {
+  /**
+   * The model to use.
+   */
+  model: ModelSettings;
+  /**
+   * The page to summarise.
+   */
+  page_id: string;
+}
+
+/**
  * What a sync did.
  */
 export interface SyncView {
@@ -8994,6 +9405,86 @@ export interface TelemetrySettings {
 }
 
 /**
+ * A team's issue template.
+ */
+export interface TemplateOut {
+  /**
+   * Assignee handle.
+   */
+  assignee?: string | null;
+  /**
+   * Body, in Vellum Markdown.
+   */
+  body: string;
+  /**
+   * Estimate.
+   */
+  estimate?: string | null;
+  /**
+   * Labels added.
+   */
+  labels: string[];
+  /**
+   * Name, unique within the team.
+   */
+  name: string;
+  /**
+   * Priority 0–4.
+   */
+  priority?: number | null;
+  /**
+   * Project ID.
+   */
+  project?: string | null;
+  /**
+   * Repeat (`1w`).
+   */
+  repeat?: string | null;
+  /**
+   * Starting status slug.
+   */
+  state?: string | null;
+  /**
+   * Title to start from.
+   */
+  title?: string | null;
+}
+
+/**
+ * A team's templates.
+ */
+export interface TemplatesOut {
+  /**
+   * In the team file's order.
+   */
+  templates: TemplateOut[];
+}
+
+/**
+ * `POST /v1/assist/test`.
+ */
+export interface TestInput {
+  /**
+   * The model to try.
+   */
+  model: ModelSettings;
+}
+
+/**
+ * Whether the model answered.
+ */
+export interface TestResult {
+  /**
+   * What happened, in a sentence.
+   */
+  detail: string;
+  /**
+   * The model answered.
+   */
+  ok: boolean;
+}
+
+/**
  * A comment thread.
  */
 export interface ThreadOut {
@@ -9483,6 +9974,10 @@ export interface UpdateIssue {
    */
   key: string;
   /**
+   * Milestone ID; empty clears.
+   */
+  milestone?: string | null;
+  /**
    * Parent issue key; empty clears.
    */
   parent?: string | null;
@@ -9502,6 +9997,10 @@ export interface UpdateIssue {
    * Relations to remove.
    */
   remove_relations?: RelationIn[];
+  /**
+   * How often it repeats (`1w`); empty stops it.
+   */
+  repeat?: string | null;
   /**
    * New status slug.
    */
@@ -9524,6 +10023,36 @@ export interface UpdateMe {
    * The new display name.
    */
   name: string;
+}
+
+/**
+ * A project update.
+ */
+export interface UpdateOut {
+  /**
+   * Author handle.
+   */
+  author: string;
+  /**
+   * The notes, in Vellum Markdown.
+   */
+  body: string;
+  /**
+   * Important project changes since the update before.
+   */
+  changes: string[];
+  /**
+   * When it was posted.
+   */
+  created_at: string;
+  /**
+   * on-track, at-risk or off-track.
+   */
+  health: string;
+  /**
+   * Update ID.
+   */
+  id: string;
 }
 
 /**
@@ -9690,6 +10219,16 @@ export interface UpdateUser {
    * A new display name.
    */
   name?: string | null;
+}
+
+/**
+ * A project's updates.
+ */
+export interface UpdatesOut {
+  /**
+   * Newest first.
+   */
+  updates: UpdateOut[];
 }
 
 /**
@@ -10449,6 +10988,10 @@ export interface WorkAcceptSuggestionIssueOut {
    */
   relations: RelationOut[];
   /**
+   * How often it repeats (`1w`, `2w`, `1m`, `3d`).
+   */
+  repeat?: string | null;
+  /**
    * The running or last SLA.
    */
   sla?: SlaOut | null;
@@ -10476,6 +11019,88 @@ export interface WorkAcceptSuggestionIssueOut {
    * Last updated.
    */
   updated_at: string;
+}
+
+/**
+ * A project with its computed progress and latest health.
+ */
+export interface WorkAddMilestoneProjectOut {
+  /**
+   * Completed points.
+   */
+  completed: number;
+  /**
+   * Completed issues.
+   */
+  completed_issues: number;
+  /**
+   * on-track, at-risk or off-track, from the latest update.
+   */
+  health?: string | null;
+  /**
+   * Project ID.
+   */
+  id: string;
+  /**
+   * Issues in the project.
+   */
+  issues: number;
+  /**
+   * Lead handle.
+   */
+  lead?: string | null;
+  /**
+   * The project file, front matter and spec.
+   */
+  markdown: string;
+  /**
+   * Member handles.
+   */
+  members: string[];
+  /**
+   * Milestones in order, with progress.
+   */
+  milestones: MilestoneOut[];
+  /**
+   * Percent complete by points.
+   */
+  percent: number;
+  /**
+   * Points in scope.
+   */
+  scope: number;
+  /**
+   * Start date.
+   */
+  start_date?: string | null;
+  /**
+   * backlog, planned, in-progress, completed or canceled.
+   */
+  status: string;
+  /**
+   * Target date.
+   */
+  target_date?: string | null;
+  /**
+   * Team keys.
+   */
+  teams: string[];
+  /**
+   * Title.
+   */
+  title: string;
+  /**
+   * weekly, biweekly, monthly or never.
+   */
+  update_cadence: string;
+  /**
+   * Whether the lead owes an update by the project's cadence.
+   */
+  update_due: boolean;
+  /**
+   * When the latest update was posted.
+   */
+  updated_at?: string | null;
 }
 
 /**
@@ -10534,6 +11159,126 @@ export interface WorkArchiveTeamTeamOut {
    * Whether intake issues go to triage first.
    */
   triage: boolean;
+}
+
+/**
+ * An initiative with its projects rolled up.
+ */
+export interface WorkCreateInitiativeInitiativeOut {
+  /**
+   * The worst latest health among active projects.
+   */
+  health?: string | null;
+  /**
+   * Initiative ID.
+   */
+  id: string;
+  /**
+   * The initiative file, front matter and description.
+   */
+  markdown: string;
+  /**
+   * Owner handle.
+   */
+  owner?: string | null;
+  /**
+   * Percent complete by points over every project.
+   */
+  percent: number;
+  /**
+   * The projects, in display order.
+   */
+  projects: ProjectOut[];
+  /**
+   * Target date.
+   */
+  target_date?: string | null;
+  /**
+   * Title.
+   */
+  title: string;
+}
+
+/**
+ * A project with its computed progress and latest health.
+ */
+export interface WorkCreateProjectProjectOut {
+  /**
+   * Completed points.
+   */
+  completed: number;
+  /**
+   * Completed issues.
+   */
+  completed_issues: number;
+  /**
+   * on-track, at-risk or off-track, from the latest update.
+   */
+  health?: string | null;
+  /**
+   * Project ID.
+   */
+  id: string;
+  /**
+   * Issues in the project.
+   */
+  issues: number;
+  /**
+   * Lead handle.
+   */
+  lead?: string | null;
+  /**
+   * The project file, front matter and spec.
+   */
+  markdown: string;
+  /**
+   * Member handles.
+   */
+  members: string[];
+  /**
+   * Milestones in order, with progress.
+   */
+  milestones: MilestoneOut[];
+  /**
+   * Percent complete by points.
+   */
+  percent: number;
+  /**
+   * Points in scope.
+   */
+  scope: number;
+  /**
+   * Start date.
+   */
+  start_date?: string | null;
+  /**
+   * backlog, planned, in-progress, completed or canceled.
+   */
+  status: string;
+  /**
+   * Target date.
+   */
+  target_date?: string | null;
+  /**
+   * Team keys.
+   */
+  teams: string[];
+  /**
+   * Title.
+   */
+  title: string;
+  /**
+   * weekly, biweekly, monthly or never.
+   */
+  update_cadence: string;
+  /**
+   * Whether the lead owes an update by the project's cadence.
+   */
+  update_due: boolean;
+  /**
+   * When the latest update was posted.
+   */
+  updated_at?: string | null;
 }
 
 /**
@@ -10739,6 +11484,10 @@ export interface WorkDismissSuggestionIssueOut {
    */
   relations: RelationOut[];
   /**
+   * How often it repeats (`1w`, `2w`, `1m`, `3d`).
+   */
+  repeat?: string | null;
+  /**
    * The running or last SLA.
    */
   sla?: SlaOut | null;
@@ -10853,6 +11602,10 @@ export interface WorkGetIssueIssueOut {
    */
   relations: RelationOut[];
   /**
+   * How often it repeats (`1w`, `2w`, `1m`, `3d`).
+   */
+  repeat?: string | null;
+  /**
    * The running or last SLA.
    */
   sla?: SlaOut | null;
@@ -10883,9 +11636,21 @@ export interface WorkGetIssueIssueOut {
 }
 
 /**
- * A project with its computed progress.
+ * A project with its computed progress and latest health.
  */
 export interface WorkGetProjectProjectOut {
+  /**
+   * Completed points.
+   */
+  completed: number;
+  /**
+   * Completed issues.
+   */
+  completed_issues: number;
+  /**
+   * on-track, at-risk or off-track, from the latest update.
+   */
+  health?: string | null;
   /**
    * Project ID.
    */
@@ -10903,11 +11668,27 @@ export interface WorkGetProjectProjectOut {
    */
   markdown: string;
   /**
+   * Member handles.
+   */
+  members: string[];
+  /**
+   * Milestones in order, with progress.
+   */
+  milestones: MilestoneOut[];
+  /**
    * Percent complete by points.
    */
   percent: number;
   /**
-   * planned, started, paused, completed or canceled.
+   * Points in scope.
+   */
+  scope: number;
+  /**
+   * Start date.
+   */
+  start_date?: string | null;
+  /**
+   * backlog, planned, in-progress, completed or canceled.
    */
   status: string;
   /**
@@ -10922,6 +11703,18 @@ export interface WorkGetProjectProjectOut {
    * Title.
    */
   title: string;
+  /**
+   * weekly, biweekly, monthly or never.
+   */
+  update_cadence: string;
+  /**
+   * Whether the lead owes an update by the project's cadence.
+   */
+  update_due: boolean;
+  /**
+   * When the latest update was posted.
+   */
+  updated_at?: string | null;
 }
 
 /**
@@ -11067,6 +11860,10 @@ export interface WorkMoveIssueIssueOut {
    */
   relations: RelationOut[];
   /**
+   * How often it repeats (`1w`, `2w`, `1m`, `3d`).
+   */
+  repeat?: string | null;
+  /**
    * The running or last SLA.
    */
   sla?: SlaOut | null;
@@ -11097,9 +11894,89 @@ export interface WorkMoveIssueIssueOut {
 }
 
 /**
- * A project with its computed progress.
+ * A project update.
+ */
+export interface WorkPostUpdateUpdateOut {
+  /**
+   * Author handle.
+   */
+  author: string;
+  /**
+   * The notes, in Vellum Markdown.
+   */
+  body: string;
+  /**
+   * Important project changes since the update before.
+   */
+  changes: string[];
+  /**
+   * When it was posted.
+   */
+  created_at: string;
+  /**
+   * on-track, at-risk or off-track.
+   */
+  health: string;
+  /**
+   * Update ID.
+   */
+  id: string;
+}
+
+/**
+ * An initiative with its projects rolled up.
+ */
+export interface WorkPutInitiativeInitiativeOut {
+  /**
+   * The worst latest health among active projects.
+   */
+  health?: string | null;
+  /**
+   * Initiative ID.
+   */
+  id: string;
+  /**
+   * The initiative file, front matter and description.
+   */
+  markdown: string;
+  /**
+   * Owner handle.
+   */
+  owner?: string | null;
+  /**
+   * Percent complete by points over every project.
+   */
+  percent: number;
+  /**
+   * The projects, in display order.
+   */
+  projects: ProjectOut[];
+  /**
+   * Target date.
+   */
+  target_date?: string | null;
+  /**
+   * Title.
+   */
+  title: string;
+}
+
+/**
+ * A project with its computed progress and latest health.
  */
 export interface WorkPutProjectProjectOut {
+  /**
+   * Completed points.
+   */
+  completed: number;
+  /**
+   * Completed issues.
+   */
+  completed_issues: number;
+  /**
+   * on-track, at-risk or off-track, from the latest update.
+   */
+  health?: string | null;
   /**
    * Project ID.
    */
@@ -11117,11 +11994,27 @@ export interface WorkPutProjectProjectOut {
    */
   markdown: string;
   /**
+   * Member handles.
+   */
+  members: string[];
+  /**
+   * Milestones in order, with progress.
+   */
+  milestones: MilestoneOut[];
+  /**
    * Percent complete by points.
    */
   percent: number;
   /**
-   * planned, started, paused, completed or canceled.
+   * Points in scope.
+   */
+  scope: number;
+  /**
+   * Start date.
+   */
+  start_date?: string | null;
+  /**
+   * backlog, planned, in-progress, completed or canceled.
    */
   status: string;
   /**
@@ -11136,6 +12029,18 @@ export interface WorkPutProjectProjectOut {
    * Title.
    */
   title: string;
+  /**
+   * weekly, biweekly, monthly or never.
+   */
+  update_cadence: string;
+  /**
+   * Whether the lead owes an update by the project's cadence.
+   */
+  update_due: boolean;
+  /**
+   * When the latest update was posted.
+   */
+  updated_at?: string | null;
 }
 
 /**
@@ -11389,6 +12294,10 @@ export interface WorkSubmitFormIssueOut {
    */
   relations: RelationOut[];
   /**
+   * How often it repeats (`1w`, `2w`, `1m`, `3d`).
+   */
+  repeat?: string | null;
+  /**
    * The running or last SLA.
    */
   sla?: SlaOut | null;
@@ -11541,6 +12450,10 @@ export interface WorkTriageIssueIssueOut {
    */
   relations: RelationOut[];
   /**
+   * How often it repeats (`1w`, `2w`, `1m`, `3d`).
+   */
+  repeat?: string | null;
+  /**
    * The running or last SLA.
    */
   sla?: SlaOut | null;
@@ -11654,6 +12567,10 @@ export interface WorkUpdateIssueIssueOut {
    * Relations to other issues.
    */
   relations: RelationOut[];
+  /**
+   * How often it repeats (`1w`, `2w`, `1m`, `3d`).
+   */
+  repeat?: string | null;
   /**
    * The running or last SLA.
    */
@@ -11818,6 +12735,34 @@ export interface Operations {
     path: "/v1/admin/search";
     input: NoInput;
     output: SearchStatusView;
+  };
+  /** Ask this space, answered with citations by your own model */
+  "assist.ask": {
+    method: "POST";
+    path: "/v1/assist/ask";
+    input: AskInput;
+    output: Answer;
+  };
+  /** Draft a page from a template with your own model */
+  "assist.draft": {
+    method: "POST";
+    path: "/v1/assist/draft";
+    input: DraftInput;
+    output: Draft;
+  };
+  /** Summarise a page with your own model */
+  "assist.summarize": {
+    method: "POST";
+    path: "/v1/assist/summarize";
+    input: SummarizeInput;
+    output: Answer;
+  };
+  /** Check that your own model answers */
+  "assist.test": {
+    method: "POST";
+    path: "/v1/assist/test";
+    input: TestInput;
+    output: TestResult;
   };
   /** Add a section */
   "books.add_section": {
@@ -13065,6 +14010,13 @@ export interface Operations {
     input: AddComment;
     output: CommentResult;
   };
+  /** Adds a milestone to a project */
+  "work.add_milestone": {
+    method: "POST";
+    path: "/v1/work/projects/{project_id}/milestones";
+    input: AddMilestone;
+    output: WorkAddMilestoneProjectOut;
+  };
   /** Archives a team */
   "work.archive_team": {
     method: "POST";
@@ -13079,12 +14031,26 @@ export interface Operations {
     input: AssignThread;
     output: CommentResult;
   };
+  /** Creates an initiative */
+  "work.create_initiative": {
+    method: "POST";
+    path: "/v1/work/initiatives";
+    input: CreateInitiative;
+    output: WorkCreateInitiativeInitiativeOut;
+  };
   /** Creates an issue */
   "work.create_issue": {
     method: "POST";
     path: "/v1/work/issues";
     input: CreateIssue;
     output: CreatedIssue;
+  };
+  /** Creates a project from fields */
+  "work.create_project": {
+    method: "POST";
+    path: "/v1/work/projects";
+    input: CreateProject;
+    output: WorkCreateProjectProjectOut;
   };
   /** Creates a team */
   "work.create_team": {
@@ -13191,6 +14157,13 @@ export interface Operations {
     input: TeamRef;
     output: FormsOut;
   };
+  /** Lists initiatives with their projects' rolled-up health and progress */
+  "work.list_initiatives": {
+    method: "GET";
+    path: "/v1/work/initiatives";
+    input: NoInput;
+    output: InitiativesOut;
+  };
   /** Lists projects with progress */
   "work.list_projects": {
     method: "GET";
@@ -13204,6 +14177,20 @@ export interface Operations {
     path: "/v1/work/teams";
     input: ListTeams;
     output: TeamsOut;
+  };
+  /** Lists a team's issue templates in full */
+  "work.list_templates": {
+    method: "GET";
+    path: "/v1/work/teams/{team}/templates";
+    input: TeamRef;
+    output: TemplatesOut;
+  };
+  /** Lists a project's health updates, newest first */
+  "work.list_updates": {
+    method: "GET";
+    path: "/v1/work/projects/{project_id}/updates";
+    input: ProjectRef;
+    output: UpdatesOut;
   };
   /** Lists the saved views the caller can open */
   "work.list_views": {
@@ -13232,6 +14219,20 @@ export interface Operations {
     path: "/v1/work/me/issues";
     input: MyIssues;
     output: MyIssuesOut;
+  };
+  /** Posts a health update: on track, at risk or off track */
+  "work.post_update": {
+    method: "POST";
+    path: "/v1/work/projects/{project_id}/updates";
+    input: PostUpdate;
+    output: WorkPostUpdateUpdateOut;
+  };
+  /** Replaces an initiative page */
+  "work.put_initiative": {
+    method: "PUT";
+    path: "/v1/work/initiatives/{initiative_id}";
+    input: PutInitiative;
+    output: WorkPutInitiativeInitiativeOut;
   };
   /** Creates or replaces a project page */
   "work.put_project": {
@@ -13340,6 +14341,10 @@ export const OPERATIONS = {
   "admin.usage": { method: "GET", path: "/v1/admin/usage", mutation: false },
   "admin.verify_audit": { method: "POST", path: "/v1/admin/audit/verify", mutation: true },
   "admin_search.status": { method: "GET", path: "/v1/admin/search", mutation: false },
+  "assist.ask": { method: "POST", path: "/v1/assist/ask", mutation: true },
+  "assist.draft": { method: "POST", path: "/v1/assist/draft", mutation: true },
+  "assist.summarize": { method: "POST", path: "/v1/assist/summarize", mutation: true },
+  "assist.test": { method: "POST", path: "/v1/assist/test", mutation: true },
   "books.add_section": { method: "POST", path: "/v1/books/{book_id}/sections", mutation: true },
   "books.copy_section": { method: "POST", path: "/v1/books/{book_id}/sections/{section_id}/copy", mutation: true },
   "books.create_snapshot": { method: "POST", path: "/v1/books/{book_id}/snapshots", mutation: true },
@@ -13518,9 +14523,12 @@ export const OPERATIONS = {
   "webhooks.update": { method: "PUT", path: "/v1/admin/webhooks/{id}", mutation: true },
   "work.accept_suggestion": { method: "POST", path: "/v1/work/issues/{key}/triage/suggestion/accept", mutation: true },
   "work.add_comment": { method: "POST", path: "/v1/work/comments", mutation: true },
+  "work.add_milestone": { method: "POST", path: "/v1/work/projects/{project_id}/milestones", mutation: true },
   "work.archive_team": { method: "POST", path: "/v1/work/teams/{team}/archive", mutation: true },
   "work.assign_thread": { method: "POST", path: "/v1/work/threads/{thread_id}/assign", mutation: true },
+  "work.create_initiative": { method: "POST", path: "/v1/work/initiatives", mutation: true },
   "work.create_issue": { method: "POST", path: "/v1/work/issues", mutation: true },
+  "work.create_project": { method: "POST", path: "/v1/work/projects", mutation: true },
   "work.create_team": { method: "POST", path: "/v1/work/teams", mutation: true },
   "work.create_view": { method: "POST", path: "/v1/work/views", mutation: true },
   "work.delete_comment": { method: "DELETE", path: "/v1/work/comments/{comment_id}", mutation: true },
@@ -13536,12 +14544,17 @@ export const OPERATIONS = {
   "work.list_comments": { method: "GET", path: "/v1/work/comments", mutation: false },
   "work.list_cycles": { method: "GET", path: "/v1/work/teams/{team}/cycles", mutation: false },
   "work.list_forms": { method: "GET", path: "/v1/work/teams/{team}/forms", mutation: false },
+  "work.list_initiatives": { method: "GET", path: "/v1/work/initiatives", mutation: false },
   "work.list_projects": { method: "GET", path: "/v1/work/projects", mutation: false },
   "work.list_teams": { method: "GET", path: "/v1/work/teams", mutation: false },
+  "work.list_templates": { method: "GET", path: "/v1/work/teams/{team}/templates", mutation: false },
+  "work.list_updates": { method: "GET", path: "/v1/work/projects/{project_id}/updates", mutation: false },
   "work.list_views": { method: "GET", path: "/v1/work/views", mutation: false },
   "work.move_issue": { method: "POST", path: "/v1/work/issues/{key}/move", mutation: true },
   "work.my_assignments": { method: "GET", path: "/v1/work/me/assignments", mutation: false },
   "work.my_issues": { method: "GET", path: "/v1/work/me/issues", mutation: false },
+  "work.post_update": { method: "POST", path: "/v1/work/projects/{project_id}/updates", mutation: true },
+  "work.put_initiative": { method: "PUT", path: "/v1/work/initiatives/{initiative_id}", mutation: true },
   "work.put_project": { method: "PUT", path: "/v1/work/projects/{project_id}", mutation: true },
   "work.put_team": { method: "PUT", path: "/v1/work/teams/{team}", mutation: true },
   "work.put_view": { method: "PUT", path: "/v1/work/views/{view_id}", mutation: true },
