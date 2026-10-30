@@ -870,3 +870,53 @@ async fn team_settings_round_trip_as_json_and_numbers_never_go_back() {
         .is_err()
     );
 }
+
+/// RT-040: a refused view's reason quoted the caller's filter values and
+/// was leaked to get a `&'static str`, so each bad request kept up to a
+/// request body of memory for good; and views had no bounds. A bad
+/// filter is now a plain error, filters are capped at 16 kilobytes and each
+/// person at 200 views.
+#[tokio::test]
+async fn saved_views_are_bounded_and_refusals_hold_nothing() {
+    let w = world().await;
+    with_eng(&w).await;
+    let dev = w.principal("dev", ScopeSet::FULL);
+    let big = "x".repeat(8 * 1024);
+    let bad = format!(r#"{{"field":"priority","op":"is","values":["{big}"]}}"#);
+    assert_eq!(
+        w.call_as(
+            dev.clone(),
+            "work.create_view",
+            json!({"name": "x", "filter": bad})
+        )
+        .await,
+        Err(ErrorKind::InvalidInput)
+    );
+    let huge = format!(
+        r#"{{"field":"title","op":"contains","values":["{}"]}}"#,
+        "y".repeat(20 * 1024)
+    );
+    assert_eq!(
+        w.call_as(
+            dev.clone(),
+            "work.create_view",
+            json!({"name": "x", "filter": huge})
+        )
+        .await,
+        Err(ErrorKind::InvalidInput)
+    );
+    for n in 0..200 {
+        let _ = w
+            .call("dev", "work.create_view", json!({"name": format!("v{n}")}))
+            .await;
+    }
+    assert_eq!(
+        w.call_as(dev, "work.create_view", json!({"name": "one too many"}))
+            .await,
+        Err(ErrorKind::InvalidInput)
+    );
+    // Someone else still can.
+    let _ = w
+        .call("priya", "work.create_view", json!({"name": "mine"}))
+        .await;
+}

@@ -145,10 +145,12 @@ impl View {
     ///
     /// Returns [`WorkError::Invalid`] naming the problem.
     pub fn check(&self) -> Result<(), WorkError> {
-        let invalid = |reason: String| WorkError::Invalid {
-            what: "view",
-            value: self.name.clone(),
-            reason: Box::leak(reason.into_boxed_str()),
+        // Never leak the reason to get a `&'static str`: it can quote the
+        // caller's filter values, so every refused view would keep its
+        // text in memory for good (RT-040).
+        let invalid = |reason: String| WorkError::InvalidView {
+            name: self.name.clone(),
+            reason,
         };
         if self.visibility == Visibility::Team && self.team.is_none() {
             return Err(invalid("a team-visible view needs a team".to_owned()));

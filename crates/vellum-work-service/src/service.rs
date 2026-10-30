@@ -678,8 +678,21 @@ impl WorkService {
         new: bool,
     ) -> Result<ViewOut, Error> {
         let me = self.actor(&rc).await?;
+        if i.filter
+            .as_ref()
+            .is_some_and(|f| f.len() > MAX_VIEW_FILTER_BYTES)
+        {
+            return Err(invalid("filter: at most 16 KiB of JSON"));
+        }
         let mut st = self.write_state().await?;
-        if !new {
+        if new {
+            let owned = st.views.values().filter(|v| v.owner == me).count();
+            if owned >= MAX_VIEWS_PER_PERSON {
+                return Err(invalid(
+                    "you have 200 saved views; delete one to save another",
+                ));
+            }
+        } else {
             let _ = Self::own_view(&st, &id, &me)?;
         }
         let name = i.name.trim();
@@ -1407,6 +1420,12 @@ fn date(text: &str) -> Result<Date, Error> {
     Date::parse(text, format_description!("[year]-[month]-[day]"))
         .map_err(|_| invalid(&format!("date {text:?} must be YYYY-MM-DD")))
 }
+
+/// Saved views one person may own (RT-040): every view stays in memory
+/// and is listed on each read.
+const MAX_VIEWS_PER_PERSON: usize = 200;
+/// The largest filter a saved view takes, as JSON text (RT-040).
+const MAX_VIEW_FILTER_BYTES: usize = 16 * 1024;
 
 /// An optional engine enum from its serde name.
 fn pick<T: serde::de::DeserializeOwned>(
