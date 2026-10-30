@@ -434,6 +434,7 @@ impl Services {
             .authenticator(Arc::new(IdentityAuthenticator::new(Arc::clone(identity))))
             .mount("/auth", identity_http::browser_router(Arc::clone(identity)))
             .mount_cross_site("/oauth", identity_http::oauth_router(Arc::clone(identity)))
+            .mount_cross_site("/saml", identity_http::saml_router(Arc::clone(identity)))
             .mount_cross_site("/.well-known", well_known)
             .mount("/collab", self.collab())
             // The help books, for the app's `?` buttons (ADR 0024, D256).

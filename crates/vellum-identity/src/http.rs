@@ -451,15 +451,25 @@ struct SsoStartQuery {
 
 /// Sends the browser to the provider's sign-in page.
 async fn sso_start(State(identity): Shared, Query(query): Query<SsoStartQuery>) -> Response {
-    let (provider, sso) = match identity.sso_provider(query.provider.as_deref()) {
-        Ok(found) => found,
-        Err(e) => return sso_failed(e.message()),
-    };
-    let redirect_uri = format!("{}{SSO_CALLBACK_PATH}", identity.config().base());
     let reauth = query
         .reauth
         .as_deref()
         .is_some_and(|v| matches!(v, "1" | "true"));
+    let chosen = query
+        .provider
+        .clone()
+        .filter(|p| !p.is_empty())
+        .or_else(|| identity.sign_in_buttons().into_iter().next().map(|b| b.id));
+    if let Some(id) = chosen.as_deref()
+        && identity.is_saml_provider(id)
+    {
+        return saml_start(&identity, id, query.next.as_deref(), reauth);
+    }
+    let (provider, sso) = match identity.sso_provider(chosen.as_deref()) {
+        Ok(found) => found,
+        Err(e) => return sso_failed(e.message()),
+    };
+    let redirect_uri = format!("{}{SSO_CALLBACK_PATH}", identity.config().base());
     match sso
         .start(&redirect_uri, query.next.as_deref(), reauth)
         .await
@@ -557,6 +567,112 @@ async fn sso_callback(
         sso_state_cookie(&identity, "", Duration::ZERO),
     );
     no_store(response)
+}
+
+const fn saml_cookie_name(identity: &Identity) -> &'static str {
+    if identity.config().https {
+        "__Host-vellum_saml"
+    } else {
+        "vellum_saml"
+    }
+}
+
+/// The relay state cookie. Providers post responses cross-site, so over
+/// HTTPS it is `SameSite=None` (the relay state it holds is a one-time
+/// secret, so this only binds the sign-in to the browser that began it).
+fn saml_cookie(identity: &Identity, value: &str, max_age: Duration) -> HeaderValue {
+    let attributes = if identity.config().https {
+        "; SameSite=None; Secure"
+    } else {
+        "; SameSite=Lax"
+    };
+    let text = format!(
+        "{}={value}; Path=/saml; HttpOnly; Max-Age={}{attributes}",
+        saml_cookie_name(identity),
+        max_age.as_secs()
+    );
+    HeaderValue::from_str(&text).unwrap_or_else(|_| HeaderValue::from_static(""))
+}
+
+fn saml_start(identity: &Identity, provider: &str, next: Option<&str>, force: bool) -> Response {
+    match identity.saml_start(provider, next, force) {
+        Ok(started) => {
+            let mut response = Redirect::to(&started.url).into_response();
+            let _ = response.headers_mut().insert(
+                header::SET_COOKIE,
+                saml_cookie(
+                    identity,
+                    &started.relay_state,
+                    crate::saml_sign_in::SAML_PENDING,
+                ),
+            );
+            no_store(response)
+        }
+        Err(e) => sso_failed(e.message()),
+    }
+}
+
+#[derive(Deserialize)]
+struct SamlPost {
+    #[serde(rename = "SAMLResponse")]
+    response: String,
+    #[serde(rename = "RelayState", default)]
+    relay_state: String,
+}
+
+/// The assertion consumer service: the provider posts its response here.
+async fn saml_acs(
+    State(identity): Shared,
+    headers: HeaderMap,
+    Form(post): Form<SamlPost>,
+) -> Response {
+    let cookie_value = cookie(&headers, saml_cookie_name(&identity));
+    let mut response = match identity.saml_finish(
+        &post.relay_state,
+        cookie_value,
+        &post.response,
+        user_agent(&headers),
+    ) {
+        Ok((session, next)) => {
+            let max_age = Duration::from_millis(
+                u64::try_from(
+                    session.session.expires_at.unix_ms() - session.session.created_at.unix_ms(),
+                )
+                .unwrap_or(0),
+            );
+            let mut ok = Redirect::to(&next).into_response();
+            let _ = ok.headers_mut().append(
+                header::SET_COOKIE,
+                session_cookie(&identity, &session.secret, max_age),
+            );
+            ok
+        }
+        Err(e) => sso_failed(e.message()),
+    };
+    let _ = response.headers_mut().append(
+        header::SET_COOKIE,
+        saml_cookie(&identity, "", Duration::ZERO),
+    );
+    no_store(response)
+}
+
+/// Vellum's SAML service provider metadata.
+async fn saml_metadata(State(identity): Shared) -> Response {
+    let mut response = crate::saml::sp_metadata(&identity.saml_service()).into_response();
+    let _ = response.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/samlmetadata+xml"),
+    );
+    response
+}
+
+/// SAML endpoints, to mount at `/saml` without the CSRF check: providers
+/// post from their own site, and the relay state binds the browser.
+pub fn saml_router(identity: Arc<Identity>) -> Router {
+    Router::new()
+        .route("/acs", post(saml_acs))
+        .route("/metadata", get(saml_metadata))
+        .with_state(identity)
 }
 
 /// The browser endpoints, to mount at `/auth`.

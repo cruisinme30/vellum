@@ -37,6 +37,8 @@ pub mod mfa;
 pub mod oauth;
 pub mod password;
 pub mod providers;
+pub mod saml;
+pub mod saml_sign_in;
 pub mod seal;
 pub mod secret;
 pub mod service;
@@ -45,6 +47,7 @@ pub mod sso;
 pub mod store;
 pub mod totp;
 pub mod webauthn;
+pub mod xmldsig;
 
 pub use groups::{GroupMembers, GroupsService};
 pub use identity::{

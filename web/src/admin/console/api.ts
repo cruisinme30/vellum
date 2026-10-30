@@ -28,6 +28,7 @@ import type {
   GroupView,
   ProviderInput,
   ProviderView,
+  SamlMetadataView,
   UsageCounts,
   SettingsView,
   SignInView,
@@ -117,6 +118,8 @@ export interface AdminSignInApi {
   updateProvider(id: string, input: ProviderInput): Promise<ProviderView>;
   /** Removes a provider and answers with the settings as they now are. */
   removeProvider(id: string): Promise<SignInView>;
+  /** Reads a SAML provider's metadata URL to fill in its settings (D293). */
+  samlMetadata(url: string): Promise<SamlMetadataView>;
 }
 
 /** What an admin changes about an account; unset fields stay as they are. */
@@ -220,13 +223,13 @@ export function createHttpAdminConsoleApi(http: Http): AdminConsoleApi {
       },
       addProvider: (input) => http.send<ProviderView>("POST", `${ADMIN}/sign-in/providers`, input),
       updateProvider: (id, input) =>
-        http.send<ProviderView>(
-          "PUT",
-          `${ADMIN}/sign-in/providers/${encodeURIComponent(id)}`,
-          input,
-        ),
+        http.send<ProviderView>("PUT", `${ADMIN}/sign-in/providers/${encodeURIComponent(id)}`, {
+          provider: input,
+        }),
       removeProvider: (id) =>
         http.send<SignInView>("DELETE", `${ADMIN}/sign-in/providers/${encodeURIComponent(id)}`),
+      samlMetadata: (url) =>
+        http.send<SamlMetadataView>("POST", `${ADMIN}/sign-in/saml-metadata`, { url }),
     },
     tokens: {
       list: () => http.get<AdminTokenView[]>(`${ADMIN}/tokens`),

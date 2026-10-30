@@ -386,6 +386,13 @@ pub struct State {
     /// Second-factor challenges by the base64 of their secret's hash.
     #[serde(default)]
     pub mfa_challenges: BTreeMap<String, MfaChallenge>,
+    /// SAML sign-ins in progress by the base64 of their relay state's hash.
+    #[serde(default)]
+    pub saml_requests: BTreeMap<String, SamlRequest>,
+    /// Assertions already used, by the base64 of the hash of provider and
+    /// assertion ID, until they expire (replay protection).
+    #[serde(default)]
+    pub saml_seen: BTreeMap<String, Timestamp>,
 }
 
 /// The workspace's sign-in rules, one record set by administrators
@@ -439,6 +446,31 @@ pub enum Protocol {
         /// public client.
         client_secret: Option<String>,
     },
+    /// SAML 2.0, Vellum as the service provider (D293).
+    Saml {
+        /// The provider's entity ID, as its assertions name their issuer.
+        entity_id: String,
+        /// Where sign-in requests go (HTTP-Redirect binding).
+        sso_url: String,
+        /// The signing certificates, base64 DER.
+        certificates: Vec<String>,
+        /// The metadata URL the settings were imported from, if any.
+        #[serde(default)]
+        metadata_url: Option<String>,
+    },
+}
+
+/// A SAML sign-in in progress, by the hash of its relay state.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SamlRequest {
+    /// The provider it went to.
+    pub provider: String,
+    /// The `AuthnRequest` ID the response must answer.
+    pub request_id: String,
+    /// Where to go afterwards (a local path).
+    pub next: String,
+    /// When it lapses.
+    pub expires: Timestamp,
 }
 
 /// Who must use a second factor when signing in with a password.
@@ -527,6 +559,8 @@ impl State {
         self.oauth_consents.retain(|_, c| c.expires > now);
         self.oauth_codes.retain(|_, c| c.expires > now);
         self.mfa_challenges.retain(|_, c| c.expires > now);
+        self.saml_requests.retain(|_, r| r.expires > now);
+        self.saml_seen.retain(|_, until| *until > now);
         let forget = i64::try_from(LOCKOUT_MEMORY.as_millis()).unwrap_or(i64::MAX);
         self.lockouts
             .retain(|_, a| a.until.unix_ms().saturating_add(forget) > now.unix_ms());

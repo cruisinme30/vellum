@@ -9261,10 +9261,13 @@ dependencies = [
  "base64 0.23.1",
  "ciborium",
  "data-encoding",
+ "flate2",
  "getrandom 0.4.3",
  "http",
  "http-body-util",
  "qrcodegen",
+ "rcgen",
+ "roxmltree 0.21.2",
  "schemars 1.2.3",
  "serde",
  "serde_json",
@@ -9281,6 +9284,7 @@ dependencies = [
  "vellum-db",
  "vellum-kernel",
  "vellum-security",
+ "x509-parser",
 ]
 
 [[package]]

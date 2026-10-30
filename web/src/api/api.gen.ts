@@ -4408,6 +4408,10 @@ export interface IdentityAdminAddProviderProviderView {
    */
   autoCreate: boolean;
   /**
+   * For SAML, the SHA-256 fingerprints of the signing certificates.
+   */
+  certificateFingerprints: string[];
+  /**
    * For OIDC, the client ID.
    */
   clientId?: string | null;
@@ -4415,6 +4419,10 @@ export interface IdentityAdminAddProviderProviderView {
    * Whether the sign-in page offers it.
    */
   enabled: boolean;
+  /**
+   * For SAML, the provider's entity ID.
+   */
+  entityId?: string | null;
   /**
    * For OIDC, whether a client secret is stored.
    */
@@ -4432,6 +4440,10 @@ export interface IdentityAdminAddProviderProviderView {
    */
   kind: string;
   /**
+   * For SAML, the metadata URL the settings came from.
+   */
+  metadataUrl?: string | null;
+  /**
    * The button label.
    */
   name: string;
@@ -4439,6 +4451,10 @@ export interface IdentityAdminAddProviderProviderView {
    * Set by environment variables: shown, not changed here.
    */
   readOnly: boolean;
+  /**
+   * For SAML, where sign-in requests go.
+   */
+  ssoUrl?: string | null;
   /**
    * Where its sign-in button goes.
    */
@@ -4505,9 +4521,13 @@ export interface IdentityAdminUpdateProviderProviderInput {
    */
   autoCreate?: boolean;
   /**
-   * The client ID registered with the provider.
+   * SAML: the signing certificates as PEM; empty keeps the stored ones.
    */
-  clientId: string;
+  certificate?: string;
+  /**
+   * OIDC: the client ID registered with the provider.
+   */
+  clientId?: string;
   /**
    * A new client secret; absent keeps the stored one, empty removes it.
    */
@@ -4517,13 +4537,29 @@ export interface IdentityAdminUpdateProviderProviderInput {
    */
   enabled?: boolean;
   /**
-   * The issuer URL (`https`, or `http` on this machine for testing).
+   * SAML: the provider's entity ID.
    */
-  issuer: string;
+  entityId?: string;
+  /**
+   * OIDC: the issuer URL (`https`, or `http` on this machine).
+   */
+  issuer?: string;
+  /**
+   * `oidc` (the default) or `saml`. A provider keeps its kind.
+   */
+  kind?: ProviderKind;
+  /**
+   * SAML: the metadata URL the settings came from, for reference.
+   */
+  metadataUrl?: string | null;
   /**
    * The button label, 1 to 60 characters.
    */
   name: string;
+  /**
+   * SAML: the provider's sign-in URL (HTTP-Redirect binding).
+   */
+  ssoUrl?: string;
 }
 
 /**
@@ -4539,6 +4575,10 @@ export interface IdentityAdminUpdateProviderProviderView {
    */
   autoCreate: boolean;
   /**
+   * For SAML, the SHA-256 fingerprints of the signing certificates.
+   */
+  certificateFingerprints: string[];
+  /**
    * For OIDC, the client ID.
    */
   clientId?: string | null;
@@ -4546,6 +4586,10 @@ export interface IdentityAdminUpdateProviderProviderView {
    * Whether the sign-in page offers it.
    */
   enabled: boolean;
+  /**
+   * For SAML, the provider's entity ID.
+   */
+  entityId?: string | null;
   /**
    * For OIDC, whether a client secret is stored.
    */
@@ -4563,6 +4607,10 @@ export interface IdentityAdminUpdateProviderProviderView {
    */
   kind: string;
   /**
+   * For SAML, the metadata URL the settings came from.
+   */
+  metadataUrl?: string | null;
+  /**
    * The button label.
    */
   name: string;
@@ -4570,6 +4618,10 @@ export interface IdentityAdminUpdateProviderProviderView {
    * Set by environment variables: shown, not changed here.
    */
   readOnly: boolean;
+  /**
+   * For SAML, where sign-in requests go.
+   */
+  ssoUrl?: string | null;
   /**
    * Where its sign-in button goes.
    */
@@ -5358,6 +5410,16 @@ export interface MergeSection {
 }
 
 /**
+ * A metadata URL to read.
+ */
+export interface MetadataUrl {
+  /**
+   * The provider's SAML metadata URL (`https`).
+   */
+  url: string;
+}
+
+/**
  * Dragging a task to another bucket.
  */
 export interface MoveInput {
@@ -6048,9 +6110,13 @@ export interface ProviderInput {
    */
   autoCreate?: boolean;
   /**
-   * The client ID registered with the provider.
+   * SAML: the signing certificates as PEM; empty keeps the stored ones.
    */
-  clientId: string;
+  certificate?: string;
+  /**
+   * OIDC: the client ID registered with the provider.
+   */
+  clientId?: string;
   /**
    * A new client secret; absent keeps the stored one, empty removes it.
    */
@@ -6060,14 +6126,35 @@ export interface ProviderInput {
    */
   enabled?: boolean;
   /**
-   * The issuer URL (`https`, or `http` on this machine for testing).
+   * SAML: the provider's entity ID.
    */
-  issuer: string;
+  entityId?: string;
+  /**
+   * OIDC: the issuer URL (`https`, or `http` on this machine).
+   */
+  issuer?: string;
+  /**
+   * `oidc` (the default) or `saml`. A provider keeps its kind.
+   */
+  kind?: ProviderKind;
+  /**
+   * SAML: the metadata URL the settings came from, for reference.
+   */
+  metadataUrl?: string | null;
   /**
    * The button label, 1 to 60 characters.
    */
   name: string;
+  /**
+   * SAML: the provider's sign-in URL (HTTP-Redirect binding).
+   */
+  ssoUrl?: string;
 }
+
+/**
+ * How Vellum talks to a provider.
+ */
+export type ProviderKind = "oidc" | "saml";
 
 /**
  * A provider as Admin → Sign-in shows it. Secrets are never returned.
@@ -6082,6 +6169,10 @@ export interface ProviderView {
    */
   autoCreate: boolean;
   /**
+   * For SAML, the SHA-256 fingerprints of the signing certificates.
+   */
+  certificateFingerprints: string[];
+  /**
    * For OIDC, the client ID.
    */
   clientId?: string | null;
@@ -6089,6 +6180,10 @@ export interface ProviderView {
    * Whether the sign-in page offers it.
    */
   enabled: boolean;
+  /**
+   * For SAML, the provider's entity ID.
+   */
+  entityId?: string | null;
   /**
    * For OIDC, whether a client secret is stored.
    */
@@ -6106,6 +6201,10 @@ export interface ProviderView {
    */
   kind: string;
   /**
+   * For SAML, the metadata URL the settings came from.
+   */
+  metadataUrl?: string | null;
+  /**
    * The button label.
    */
   name: string;
@@ -6113,6 +6212,10 @@ export interface ProviderView {
    * Set by environment variables: shown, not changed here.
    */
   readOnly: boolean;
+  /**
+   * For SAML, where sign-in requests go.
+   */
+  ssoUrl?: string | null;
   /**
    * Where its sign-in button goes.
    */
@@ -6924,6 +7027,42 @@ export interface RowWritten {
 }
 
 /**
+ * What a provider's SAML metadata says, to fill in the form.
+ */
+export interface SamlMetadataView {
+  /**
+   * Its signing certificates as PEM.
+   */
+  certificate: string;
+  /**
+   * Their SHA-256 fingerprints.
+   */
+  certificateFingerprints: string[];
+  /**
+   * The provider's entity ID.
+   */
+  entityId: string;
+  /**
+   * Its HTTP-Redirect sign-in URL.
+   */
+  ssoUrl: string;
+}
+
+/**
+ * What a SAML provider needs to know about Vellum.
+ */
+export interface SamlServiceView {
+  /**
+   * The assertion consumer service URL (HTTP-POST).
+   */
+  acsUrl: string;
+  /**
+   * Vellum's entity ID (also its metadata URL).
+   */
+  entityId: string;
+}
+
+/**
  * A new version of a page's content.
  */
 export interface SaveInput {
@@ -7640,6 +7779,10 @@ export interface SignInView {
    * Whether passwords are refused, except for break-glass admins.
    */
   requireSso: boolean;
+  /**
+   * What to register with SAML providers.
+   */
+  saml: SamlServiceView;
   /**
    * Who must use a second factor with a password.
    */
@@ -12074,7 +12217,7 @@ export interface Operations {
     input: AddPasskey;
     output: IdentityAddPasskeyFactorAdded;
   };
-  /** Add an OpenID Connect sign-in provider */
+  /** Add an OpenID Connect or SAML sign-in provider */
   "identity.admin_add_provider": {
     method: "POST";
     path: "/v1/admin/sign-in/providers";
@@ -12101,6 +12244,13 @@ export interface Operations {
     path: "/v1/admin/tokens/{id}";
     input: ById;
     output: Done;
+  };
+  /** Read a SAML provider's metadata to fill in its settings */
+  "identity.admin_saml_metadata": {
+    method: "POST";
+    path: "/v1/admin/sign-in/saml-metadata";
+    input: MetadataUrl;
+    output: SamlMetadataView;
   };
   /** The workspace's sign-in rules and providers */
   "identity.admin_sign_in": {
@@ -13012,6 +13162,7 @@ export const OPERATIONS = {
   "identity.admin_remove_provider": { method: "DELETE", path: "/v1/admin/sign-in/providers/{id}", mutation: true },
   "identity.admin_reset_factors": { method: "POST", path: "/v1/admin/users/{id}/second-factors/reset", mutation: true },
   "identity.admin_revoke_token": { method: "DELETE", path: "/v1/admin/tokens/{id}", mutation: true },
+  "identity.admin_saml_metadata": { method: "POST", path: "/v1/admin/sign-in/saml-metadata", mutation: true },
   "identity.admin_sign_in": { method: "GET", path: "/v1/admin/sign-in", mutation: false },
   "identity.admin_sign_out": { method: "POST", path: "/v1/admin/users/{id}/sign-out", mutation: true },
   "identity.admin_token_policy": { method: "PUT", path: "/v1/admin/token-policy", mutation: true },

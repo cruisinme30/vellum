@@ -558,6 +558,20 @@ pub fn diff(old: &State, new: &State) -> Result<Vec<Row>, Error> {
         Clone::clone,
         &mut rows,
     )?;
+    diff_map(
+        "saml_request",
+        &old.saml_requests,
+        &new.saml_requests,
+        Clone::clone,
+        &mut rows,
+    )?;
+    diff_map(
+        "saml_seen",
+        &old.saml_seen,
+        &new.saml_seen,
+        Clone::clone,
+        &mut rows,
+    )?;
     if old.sign_in != new.sign_in {
         rows.push(Row {
             kind: "sign_in".to_owned(),
@@ -613,6 +627,8 @@ fn apply(state: &mut State, delta: &Delta) -> Result<(), Error> {
             "oauth_code" => put(&mut state.oauth_codes, row)?,
             "group" => put(&mut state.groups, row)?,
             "mfa_challenge" => put(&mut state.mfa_challenges, row)?,
+            "saml_request" => put(&mut state.saml_requests, row)?,
+            "saml_seen" => put(&mut state.saml_seen, row)?,
             "sign_in" => {
                 state.sign_in = match &row.record {
                     Some(json) => decode(&row.kind, &row.id, json)?,
@@ -716,6 +732,8 @@ mod tests {
             "groups",
             "sign_in",
             "mfa_challenges",
+            "saml_requests",
+            "saml_seen",
         ];
         maps.sort_unstable();
         assert_eq!(fields, maps);
