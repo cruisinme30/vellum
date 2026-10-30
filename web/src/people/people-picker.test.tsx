@@ -12,6 +12,7 @@ import { I18nProvider } from "../i18n/i18n";
 import {
   combineDirectories,
   createHttpDirectory,
+  createHttpGroupDirectory,
   createListDirectory,
   isPrincipal,
   type DirectoryApi,
@@ -115,6 +116,18 @@ describe("directory", () => {
     } as unknown as Http);
     await api.search("pri");
     expect(get).toHaveBeenCalledWith("/api/v1/directory", { q: "pri" });
+  });
+
+  it("asks the server for groups", async () => {
+    const entry = { kind: "group", principal: "group:01SRE", name: "SRE", detail: "On call" };
+    const get = vi.fn(() => Promise.resolve({ entries: [entry] }));
+    const api = createHttpGroupDirectory({
+      get,
+      send: vi.fn(),
+      forgetSession: vi.fn(),
+    } as unknown as Http);
+    expect(await api.search("sr")).toEqual([entry]);
+    expect(get).toHaveBeenCalledWith("/api/v1/directory/groups", { q: "sr", limit: 8 });
   });
 
   it("merges people and groups, skipping a failed source", async () => {

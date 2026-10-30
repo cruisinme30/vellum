@@ -23,6 +23,7 @@ use vellum_contracts::{BoxFuture, HttpMethod, Operation, RequestContext, Scope, 
 use vellum_kernel::{Error, ErrorKind, ObjectId, Timestamp, UserId};
 
 use crate::identity::{Identity, UserView};
+use crate::service::{Directory, DirectoryEntry};
 use crate::store::Group;
 
 /// How recent a sign-in group administration needs, as for users.
@@ -303,26 +304,6 @@ pub struct GroupSearch {
     pub limit: Option<usize>,
 }
 
-/// What a people picker shows for one group.
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct DirectoryEntry {
-    /// Always `group`.
-    pub kind: &'static str,
-    /// What a grant names: `group:<ID>`.
-    pub principal: String,
-    /// The group's name.
-    pub name: String,
-    /// Its description, or "Group".
-    pub detail: String,
-}
-
-/// Groups matching a search, in the people picker's shape.
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct DirectoryEntries {
-    /// Names starting with the query first, then by name.
-    pub entries: Vec<DirectoryEntry>,
-}
-
 impl GroupsService {
     /// Serves `identity`'s groups. Without `members` (no permission
     /// engine, as when only printing the API) membership calls answer
@@ -383,15 +364,15 @@ impl GroupsService {
         Ok(GroupDeleted { id })
     }
 
-    fn search(&self, input: &GroupSearch) -> DirectoryEntries {
+    fn search(&self, input: &GroupSearch) -> Directory {
         let limit = input.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
-        DirectoryEntries {
+        Directory {
             entries: self
                 .identity
                 .search_groups(&input.q, limit)
                 .into_iter()
                 .map(|g| DirectoryEntry {
-                    kind: "group",
+                    kind: "group".to_owned(),
                     principal: format!("group:{}", g.id),
                     detail: if g.description.is_empty() {
                         "Group".to_owned()
