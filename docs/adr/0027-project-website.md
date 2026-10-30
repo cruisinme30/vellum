@@ -84,9 +84,10 @@ tools, Google's colours, and every guide readable on the site itself.
 ### D307: book type in mdBook's 10-pixel rems, fonts that always arrive
 
 - mdBook sets the root font size to 62.5%, so a rem inside a book is
-  10 px, not 16. `site/book.css` sizes everything in those rems: body
-  text 17 px (`1.7rem`), the site bar and feedback line 14 px. The first
-  version used 16-pixel rems and printed body text at 10.6 px (#549).
+  10 pixels, not 16. `site/book.css` sizes everything in those rems:
+  body text 17 pixels (`1.7rem`), the site bar and feedback line 14
+  pixels. The first version used 16-pixel rems and printed body text at
+  10.6 pixels (#549).
 - Fonts use `font-display: swap` and the Google Sans Flex file is
   preloaded on the docs home and every book page (`site/book-head.hbs`),
   so readers always get the site font. `optional` kept the fallback for

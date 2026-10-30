@@ -61,7 +61,7 @@ the web editor.
 
 - A SAML re-authentication records that it is one, and the assertion
   must carry an `AuthnInstant` from the last five minutes, the window
-  OIDC's `auth_time` already has (RT-046). `ForceAuthn` alone is a
+  the OIDC `auth_time` already has (RT-046). `ForceAuthn` alone is a
   request the provider may ignore.
 - An MCP listen stream verifies its bearer token again at every
   keep-alive and before each notification, and closes with its result
