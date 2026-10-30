@@ -157,7 +157,6 @@ export function PageView() {
   const page = workspace.pages.find((p) => p.id === pageId);
   const trail = useMemo(() => ancestors(workspace.pages, pageId), [workspace.pages, pageId]);
   const space = workspace.spaces.find((s) => s.id === page?.spaceId);
-  const owner = workspace.people.find((p) => p.handle === page?.owner);
   const pages = workspace.pages;
   const resolvePage = useCallback(
     (target: string) => {
@@ -191,12 +190,6 @@ export function PageView() {
       <NotFoundView />
     );
   }
-  const updated = new Date(page.updatedAt).toLocaleDateString("en", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-
   return (
     <article className="vl-page">
       <nav aria-label={t("breadcrumbs")} className="vl-breadcrumbs">
@@ -252,26 +245,7 @@ export function PageView() {
         <FolderContents pages={pages} folder={page} />
       ) : (
         <>
-          <dl className="vl-page-props">
-            <div>
-              <dt>{t("page-status")}</dt>
-              <dd>
-                <span className={`vl-chip vl-status-${page.status}`}>
-                  {t(`status-${page.status}`)}
-                </span>
-              </dd>
-            </div>
-            <div>
-              <dt>{t("page-owner")}</dt>
-              <dd>{owner?.name ?? page.owner}</dd>
-            </div>
-            <div>
-              <dt>{t("page-updated")}</dt>
-              <dd>
-                <time dateTime={page.updatedAt}>{updated}</time>
-              </dd>
-            </div>
-          </dl>
+          <PageFacts page={page} />
           {view.toggle}
           {view.reading && view.render !== undefined ? (
             <ReadingView pageId={page.id} api={view.render} />
@@ -304,6 +278,38 @@ export function PageView() {
         </>
       )}
     </article>
+  );
+}
+
+/** Status, owner and last update of a page. */
+function PageFacts({ page }: { readonly page: PageMeta }) {
+  const t = useT();
+  const workspace = useWorkspace();
+  const owner = workspace.people.find((p) => p.handle === page.owner);
+  const updated = new Date(page.updatedAt).toLocaleDateString("en", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  return (
+    <dl className="vl-page-props">
+      <div>
+        <dt>{t("page-status")}</dt>
+        <dd>
+          <span className={`vl-chip vl-status-${page.status}`}>{t(`status-${page.status}`)}</span>
+        </dd>
+      </div>
+      <div>
+        <dt>{t("page-owner")}</dt>
+        <dd>{owner?.name ?? page.owner}</dd>
+      </div>
+      <div>
+        <dt>{t("page-updated")}</dt>
+        <dd>
+          <time dateTime={page.updatedAt}>{updated}</time>
+        </dd>
+      </div>
+    </dl>
   );
 }
 

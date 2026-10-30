@@ -194,7 +194,7 @@
   gap: 8px;
 }
 
-/* Work views, triage and cycles (issue #504). */
+/* Work views, triage and cycles (issue 504). */
 
 .vl-work-wide {
   max-width: none;
@@ -356,12 +356,12 @@
 /* SLA risk: colour plus words, never colour alone. */
 .vl-sla-yellow {
   border-width: 2px;
-  border-color: #c9a000;
+  border-color: #c9a000; /* fixed: SLA risk reads the same in every theme, with words beside it */
 }
 
 .vl-sla-orange {
   border-width: 2px;
-  border-color: #e07000;
+  border-color: #e07000; /* fixed: SLA risk reads the same in every theme, with words beside it */
 }
 
 .vl-sla-red {

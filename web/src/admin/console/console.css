@@ -298,8 +298,8 @@
 }
 
 .vl-admin-badge-off {
-  background: var(--md-error-container, #ffdad6);
-  color: var(--md-on-error-container, #410002);
+  background: var(--md-error);
+  color: var(--md-on-error);
 }
 
 .vl-admin-panel {

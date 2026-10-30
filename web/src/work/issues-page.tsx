@@ -294,7 +294,12 @@ function IssuesForApi({ api }: { readonly api: WorkApi }) {
 export function IssuesPage() {
   const t = useT();
   return (
-    <ServerScreen api="work" help="work.create-issue" title={t("issues")} className="vl-work vl-work-wide">
+    <ServerScreen
+      api="work"
+      help="work.create-issue"
+      title={t("issues")}
+      className="vl-work vl-work-wide"
+    >
       {(api) => (
         <>
           <WorkNav />

@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: 2026 The Vellum contributors */
 /* SPDX-License-Identifier: AGPL-3.0-only */
 
-/* Account settings: API tokens and two-step verification (issue #523). */
+/* Account settings: API tokens and two-step verification (issue 523). */
 
 .vl-admin-form .vl-account-scope {
   display: flex;
@@ -90,8 +90,8 @@
 }
 
 .vl-account-on {
-  background: var(--md-primary-container, #d8e2ff);
-  color: var(--md-on-primary-container, #001a41);
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
 }
 
 .vl-account-required {

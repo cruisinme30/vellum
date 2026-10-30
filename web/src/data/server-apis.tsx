@@ -13,8 +13,8 @@ import { useT } from "../i18n/i18n";
 import type { DirectoryApi } from "../people/directory";
 import type { PrivateSpacesApi } from "../platform/private/api";
 import type { RenderApi } from "../render/api";
-import { CopyDiagnostic } from "../shell/copy-diagnostic";
 import type { SharingApi } from "../sharing/api";
+import { CopyDiagnostic } from "../shell/copy-diagnostic";
 import type { WorkApi } from "../work/api";
 
 import type { Loaded } from "./use-loaded";
