@@ -188,8 +188,10 @@ async fn postgres_replicas_share_oauth_codes() {
     oauth_codes_cross_replicas_once(&config).await;
 }
 
+// The name starts with "postgres" so `cargo xtask fast` leaves it out
+// where Docker is missing, like the other container tests.
 #[tokio::test(flavor = "multi_thread")]
-async fn concurrent_writers_on_two_replicas_lose_nothing() {
+async fn postgres_concurrent_writers_on_two_replicas_lose_nothing() {
     let (_container, config) = postgres().await;
     let a = std::sync::Arc::new(replica(&config));
     let b = std::sync::Arc::new(replica(&config));
