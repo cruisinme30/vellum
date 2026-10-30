@@ -298,6 +298,15 @@ describe("settings page", () => {
     expect(settings.telemetry?.interval_hours).toBe(6);
     expect(settings.telemetry?.enabled).toBe(false);
   });
+
+  it("reads the secret-scanning policy and its allow-list, one entry per line", () => {
+    const data = new FormData();
+    data.set("security.secret_scanning", "block");
+    data.set("security.secret_allow", "jwt\n\n  AKIAIOSFODNN7EXAMPLE  \n");
+    const settings = settingsFromForm(SETTINGS.settings, data);
+    expect(settings.security?.secret_scanning).toBe("block");
+    expect(settings.security?.secret_allow).toEqual(["jwt", "AKIAIOSFODNN7EXAMPLE"]);
+  });
 });
 
 describe("backups page", () => {

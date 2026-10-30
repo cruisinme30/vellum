@@ -295,6 +295,8 @@ impl Drive {
                 yaml = frontmatter::set(&yaml, key, value);
             }
             let text = format!("---\n{yaml}vellum: 1\n---\n\n{body}");
+            self.check_content(actor, space.id, &path, text.as_bytes())
+                .await?;
             let bytes = Bytes::from(text);
             let size = bytes.len() as u64;
             // Content plus its first version.

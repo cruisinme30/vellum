@@ -16,6 +16,10 @@
 
 use std::ops::Range;
 
+/// How a refused save's error message starts, so the API can answer it
+/// with `422 Unprocessable Content` and clients can show it in place.
+pub const SECRETS_FOUND: &str = "secrets found";
+
 /// The marker that exempts a line from scanning.
 pub const ALLOW_MARKER: &str = "vellum:allow-secret";
 

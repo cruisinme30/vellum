@@ -58,6 +58,9 @@ mod published;
 mod reindex;
 mod reminders;
 mod search;
+mod secrets;
+#[cfg(test)]
+mod secrets_tests;
 mod serve;
 mod services;
 mod shards_cli;

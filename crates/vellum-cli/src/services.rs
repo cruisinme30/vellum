@@ -79,6 +79,8 @@ pub struct Services {
     drive: Option<Arc<vellum_drive::Drive>>,
     /// The virus scanner every upload goes through, when one is set.
     scanner: Option<Arc<Clamd>>,
+    /// Secret scanning on save, following the admin settings (D296).
+    secrets: Arc<crate::secrets::SecretGuard>,
 }
 
 impl std::fmt::Debug for Services {
@@ -178,6 +180,7 @@ impl Services {
             audit: Arc::default(),
             drive: None,
             scanner: None,
+            secrets: Arc::default(),
         })
     }
 
@@ -205,6 +208,7 @@ impl Services {
         let (sampler, facts) = observability::counted(config, counts);
         observability::spawn_sampling(sampler);
         self.audit.attach(service.audit_log());
+        self.secrets.attach(Arc::clone(&service));
         observability::spawn_ticks(Arc::clone(&service), Arc::clone(&facts));
         self.admin_audit = Some(service.audit_log());
         self.admin = Some(observability::api(service, facts));
@@ -228,6 +232,7 @@ impl Services {
             self.notify.store(),
             &self.webhooks,
             &self.origin,
+            &self.secrets,
             var,
         )
         .await?;
@@ -350,6 +355,9 @@ impl Services {
             Arc::clone(&self.notify) as Arc<dyn Service>,
             Arc::new(WebhooksService::new(Arc::clone(&self.webhooks))),
         ];
+        all.push(Arc::new(crate::secrets::SecretsService::new(Arc::clone(
+            &self.secrets,
+        ))));
         all.extend(self.workspace.iter().cloned());
         if let Some(log) = &self.admin_audit {
             all = all

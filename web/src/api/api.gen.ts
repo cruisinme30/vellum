@@ -6585,6 +6585,61 @@ export interface SearchQueryQueryInput {
 }
 
 /**
+ * One likely secret, as the editor shows it.
+ */
+export interface SecretFinding {
+  /**
+   * 1-based column, in characters.
+   */
+  column: number;
+  /**
+   * Its length in characters, so the editor can select it to remove.
+   */
+  length: number;
+  /**
+   * 1-based line.
+   */
+  line: number;
+  /**
+   * The first four characters and the length.
+   */
+  redacted: string;
+  /**
+   * What it looks like, such as `github-token`.
+   */
+  rule: string;
+}
+
+/**
+ * Text to scan.
+ */
+export interface SecretScanInput {
+  /**
+   * The page's Markdown.
+   */
+  text: string;
+}
+
+/**
+ * What a save of the text would meet.
+ */
+export interface SecretScanResult {
+  /**
+   * Likely secrets the allow-list does not excuse; empty when off.
+   */
+  findings: SecretFinding[];
+  /**
+   * `off`, `warn` or `block`.
+   */
+  policy: SecretScanning;
+}
+
+/**
+ * Secret scanning on save (R-SE-6, D296).
+ */
+export type SecretScanning = "off" | "warn" | "block";
+
+/**
  * A newly issued secret URL or address. It is shown once.
  */
 export interface SecretView {
@@ -6711,6 +6766,16 @@ export interface SecuritySettings {
    * Admin actions need a sign-in this recent, in minutes.
    */
   fresh_auth_minutes?: number;
+  /**
+   * Exceptions to secret scanning: a rule id (such as `jwt`) skips that
+   * kind of secret, anything else skips secrets containing that text
+   * (a documented example key, say).
+   */
+  secret_allow?: string[];
+  /**
+   * What a page save containing a likely secret does (R-SE-6, D296).
+   */
+  secret_scanning?: SecretScanning;
   /**
    * Session lifetime in hours.
    */
@@ -11314,6 +11379,13 @@ export interface Operations {
     input: TitlesInput;
     output: TitlesPage;
   };
+  /** Finds likely secrets in page text */
+  "security.scan_secrets": {
+    method: "POST";
+    path: "/v1/security/secrets/scan";
+    input: SecretScanInput;
+    output: SecretScanResult;
+  };
   /** Completes a task; a repeating task moves to its next date */
   "tasks.complete": {
     method: "POST";
@@ -11947,6 +12019,7 @@ export const OPERATIONS = {
   "search.context": { method: "GET", path: "/v1/search/context/{doc_id}/{block_id}", mutation: false },
   "search.query": { method: "GET", path: "/v1/search", mutation: false },
   "search.titles": { method: "GET", path: "/v1/search/titles", mutation: false },
+  "security.scan_secrets": { method: "POST", path: "/v1/security/secrets/scan", mutation: true },
   "tasks.complete": { method: "POST", path: "/v1/tasks/{task}/complete", mutation: true },
   "tasks.create": { method: "POST", path: "/v1/tasks", mutation: true },
   "tasks.create_list": { method: "POST", path: "/v1/task-lists", mutation: true },

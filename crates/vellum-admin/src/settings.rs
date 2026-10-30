@@ -118,6 +118,12 @@ pub struct SecuritySettings {
     pub fresh_auth_minutes: u32,
     /// Session lifetime in hours.
     pub session_hours: u32,
+    /// What a page save containing a likely secret does (R-SE-6, D296).
+    pub secret_scanning: SecretScanning,
+    /// Exceptions to secret scanning: a rule id (such as `jwt`) skips that
+    /// kind of secret, anything else skips secrets containing that text
+    /// (a documented example key, say).
+    pub secret_allow: Vec<String>,
 }
 
 impl Default for SecuritySettings {
@@ -125,9 +131,42 @@ impl Default for SecuritySettings {
         Self {
             fresh_auth_minutes: 5,
             session_hours: 336,
+            secret_scanning: SecretScanning::default(),
+            secret_allow: Vec::new(),
         }
     }
 }
+
+impl SecuritySettings {
+    /// Checks the secret-scanning allow-list.
+    fn allow_problems(&self, problems: &mut Vec<String>) {
+        let bad = |entry: &String| {
+            let entry = entry.trim();
+            entry.len() < 3 || entry.len() > 200 || entry.chars().any(char::is_control)
+        };
+        if self.secret_allow.len() > MAX_SECRET_ALLOW || self.secret_allow.iter().any(bad) {
+            problems.push(format!(
+                "security.secret_allow takes at most {MAX_SECRET_ALLOW} entries of 3 to 200 printable characters"
+            ));
+        }
+    }
+}
+
+/// Secret scanning on save (R-SE-6, D296).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum SecretScanning {
+    /// Pages are not scanned.
+    Off,
+    /// The save goes through; the editor warns and the finding is audited.
+    #[default]
+    Warn,
+    /// The save is refused until the secret is removed.
+    Block,
+}
+
+/// Most entries in the secret-scanning allow-list.
+pub const MAX_SECRET_ALLOW: usize = 100;
 
 /// The organisation's look (R-TH-1, R-TH-4; ADR 0007 D245).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -320,6 +359,7 @@ impl AdminSettings {
             1,
             720,
         );
+        s.allow_problems(&mut problems);
         self.appearance.problems(&mut problems);
         if problems.is_empty() {
             Ok(())
@@ -552,6 +592,32 @@ mod tests {
         let mut http = AdminSettings::default();
         http.telemetry.endpoint = Some("http://insecure".into());
         assert!(http.validate().unwrap_err().message().contains("https://"));
+    }
+
+    #[test]
+    fn secret_scanning_warns_by_default_and_its_allow_list_is_bounded() {
+        let s = AdminSettings::default();
+        assert_eq!(s.security.secret_scanning, SecretScanning::Warn);
+        // Settings saved before the field existed read as the default.
+        let old: SecuritySettings =
+            serde_json::from_str(r#"{"fresh_auth_minutes": 5, "session_hours": 336}"#).unwrap();
+        assert_eq!(old.secret_scanning, SecretScanning::Warn);
+        let block: SecuritySettings =
+            serde_json::from_str(r#"{"secret_scanning": "block", "secret_allow": ["jwt"]}"#)
+                .unwrap();
+        assert_eq!(block.secret_scanning, SecretScanning::Block);
+        let mut bad = AdminSettings::default();
+        bad.security.secret_allow = vec!["x".into()];
+        assert!(
+            bad.validate()
+                .unwrap_err()
+                .message()
+                .contains("secret_allow")
+        );
+        bad.security.secret_allow = vec!["jwt".into(); MAX_SECRET_ALLOW + 1];
+        assert!(bad.validate().is_err());
+        bad.security.secret_allow = vec!["jwt".into(), "AKIAIOSFODNN7EXAMPLE".into()];
+        bad.validate().unwrap();
     }
 
     #[test]

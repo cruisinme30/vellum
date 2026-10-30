@@ -35,6 +35,7 @@ import { CommentsPanel } from "./comments/comments-panel";
 import { FileIssue } from "./comments/file-issue";
 import { vellumExtensions } from "./extensions";
 import type { ResolvePage } from "./nodes/inline";
+import { SecretsBanner, type ScanSecrets } from "./secrets-banner";
 import { Toolbar } from "./toolbar";
 
 /** Props of {@link PageEditor}. */
@@ -66,6 +67,11 @@ export interface PageEditorProperties {
    * chips. Read when the page opens: pass one object for the page's life.
    */
   readonly chips?: ChipSources | undefined;
+  /**
+   * Asks the server about secrets in the page, for the warning banner;
+   * without it (demo mode) there is no banner.
+   */
+  readonly scanSecrets?: ScanSecrets | undefined;
 }
 
 /** What the page around the editor may do with it. */
@@ -260,6 +266,7 @@ function BoundEditor({
   work,
   me,
   chips,
+  scanSecrets,
 }: BoundProperties) {
   const t = useT();
   const live = useLive(session.live);
@@ -384,6 +391,7 @@ function BoundEditor({
         </SaveControls>
       </div>
       <LiveNotice state={live} />
+      {scanSecrets && <SecretsBanner editor={editor} scan={scanSecrets} />}
       <EditorContent editor={editor} />
       {work && side?.kind === "comments" && (
         <CommentsPanel
