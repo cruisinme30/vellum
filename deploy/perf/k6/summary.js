@@ -11,6 +11,7 @@ const SOURCES = {
   render_cold: 'render_cold',
   collab_sync: 'collab_sync',
   keystroke: 'keystroke',
+  pdf_export: 'pdf_export',
 };
 
 export function summarise(data, path) {

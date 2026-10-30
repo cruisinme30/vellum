@@ -17,6 +17,9 @@ export const routes = {
   createPage: (space) => `/api/v1/drive/spaces/${space}/pages`,
   content: (id) => `/api/v1/drive/items/${id}/content`,
   render: (id) => `/api/v1/pages/${id}/render`,
+  // Plain HTTP, outside the OpenAPI document; the check reads it from
+  // vellum-cli's exports module (D304).
+  exportPage: (id, format) => `/api/v1/export/pages/${id}?format=${format}`,
   collectionQuery: (id) => `/api/v1/collections/${id}/query`,
   search: (q) => `/api/v1/search?q=${encodeURIComponent(q)}`,
   issues: '/api/v1/work/issues',

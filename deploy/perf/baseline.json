@@ -5,6 +5,7 @@
     "write": { "p95_ms": 150 },
     "render_cold": { "p95_ms": 300 },
     "collab_sync": { "p95_ms": 200 },
-    "keystroke": { "p95_ms": 200 }
+    "keystroke": { "p95_ms": 200 },
+    "pdf_export": { "p95_ms": 3000 }
   }
 }

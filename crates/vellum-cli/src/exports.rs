@@ -72,6 +72,17 @@ pub const EXPORT_PREFIX: &str = "/api/v1/export";
 /// Where the import routes are mounted.
 pub const IMPORT_PREFIX: &str = "/api/v1/import";
 
+/// A page export, under [`EXPORT_PREFIX`].
+pub const EXPORT_PAGE: &str = "/pages/{page_id}";
+/// A page sent to Google Docs, under [`EXPORT_PREFIX`].
+pub const EXPORT_GOOGLE: &str = "/pages/{page_id}/google-docs";
+/// A book export, under [`EXPORT_PREFIX`].
+pub const EXPORT_BOOK: &str = "/books/{book_id}";
+/// Every export route. They are plain HTTP, outside the OpenAPI
+/// document, so the load-test route check reads them from here (D304).
+#[cfg(test)]
+pub const EXPORT_ROUTES: [&str; 3] = [EXPORT_PAGE, EXPORT_GOOGLE, EXPORT_BOOK];
+
 /// Exports and imports that may typeset or parse at once (D231).
 const SLOTS: usize = 2;
 /// How long a request waits for a slot before it is told to retry.
@@ -129,9 +140,9 @@ impl<S: Scanner + 'static> Transfer<S> {
     /// The export routes, for [`EXPORT_PREFIX`].
     pub fn export_router(self: &Arc<Self>) -> Router {
         Router::new()
-            .route("/pages/{page_id}", get(export_page::<S>))
-            .route("/pages/{page_id}/google-docs", post(export_google::<S>))
-            .route("/books/{book_id}", get(export_book::<S>))
+            .route(EXPORT_PAGE, get(export_page::<S>))
+            .route(EXPORT_GOOGLE, post(export_google::<S>))
+            .route(EXPORT_BOOK, get(export_book::<S>))
             .with_state(Arc::clone(self))
     }
 
