@@ -53,6 +53,25 @@ debug = "line-tables-only"
 debug = false
 
 [profile.release]
-lto = "thin"
+lto = "fat"
 codegen-units = 1
 strip = "symbols"
+
+# Mermaid rendering runs per request and is about a sixth of the binary's
+# code, so it is optimised for size (ADR 0067, D280).
+[profile.release.package.merman]
+opt-level = "s"
+[profile.release.package.merman-core]
+opt-level = "s"
+[profile.release.package.merman-render]
+opt-level = "s"
+[profile.release.package.merman-unicode-linebreak]
+opt-level = "s"
+[profile.release.package.roughr-merman]
+opt-level = "s"
+[profile.release.package.dugong]
+opt-level = "s"
+[profile.release.package.dugong-graphlib]
+opt-level = "s"
+[profile.release.package.manatee]
+opt-level = "s"

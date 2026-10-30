@@ -65,7 +65,7 @@ vellum-notify = { path = "../vellum-notify" }
 vellum-observe = { path = "../vellum-observe" }
 vellum-private = { path = "../vellum-private", features = ["os-keychain"] }
 vellum-render = { path = "../vellum-render" }
-vellum-search = { path = "../vellum-search" }
+vellum-search = { path = "../vellum-search", features = ["onnx"] }
 vellum-security = { path = "../vellum-security" }
 vellum-store = { path = "../vellum-store", features = ["s3"] }
 vellum-tasks = { path = "../vellum-tasks" }
