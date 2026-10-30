@@ -138,3 +138,8 @@ holder = "templates screen and recurring issue settings (#144), ADR 0051"
 adrs = "0072"
 decisions = "D315-D317"
 holder = "red team round 6 (#529)"
+
+[[reservation]]
+adrs = "0073"
+decisions = "D318"
+holder = "local CI gate (#532), reserved by the coordinator"
