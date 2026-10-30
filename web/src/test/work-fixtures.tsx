@@ -35,6 +35,7 @@ export const TEAM: TeamOut = {
   templates: [],
   timezone: "UTC",
   triage: true,
+  archived: false,
 };
 
 /** ENG's settings file, as the settings route returns it. */
@@ -170,6 +171,9 @@ export function fakeApi(overrides: Partial<WorkApi> = {}): WorkApi {
     saveTeamSettings: vi.fn(() => Promise.resolve(TEAM)),
     createTeam: vi.fn((team: NewTeam) =>
       Promise.resolve({ ...TEAM, id: "t2", key: team.key, name: team.name }),
+    ),
+    setTeamArchived: vi.fn((key: string, archived: boolean) =>
+      Promise.resolve({ ...TEAM, key, archived }),
     ),
     ...overrides,
   };

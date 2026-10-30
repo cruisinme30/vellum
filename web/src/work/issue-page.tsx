@@ -30,7 +30,7 @@ interface Loaded {
 }
 
 async function loadIssue(api: WorkApi, key: string): Promise<Loaded> {
-  const [issue, teams] = await Promise.all([api.issue(key), api.teams()]);
+  const [issue, teams] = await Promise.all([api.issue(key), api.teams({ includeArchived: true })]);
   return { issue, team: teams.find((team) => team.key === issue.team) };
 }
 

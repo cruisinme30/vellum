@@ -11,8 +11,8 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D220, D221, D222, D297
-- Issue: #504, #524
+- Decisions: D220, D221, D222, D297, D303
+- Issue: #504, #524, #538
 - Pull requests: none yet
 
 :::
@@ -77,6 +77,23 @@ saved views had no server side.
 - The Git mapping lives in `team.yaml` and wins over
   `.vellum/integrations.yaml`, read on every event, so edits apply live.
 
+### `D303`: archived teams keep their issues and take no new ones
+
+- `team.yaml` gains `archived: true`, written only when set. `POST
+  /v1/work/teams/{team}/archive` and `.../restore` flip it (admin, fresh
+  sign-in, like other team settings); doing it twice changes nothing.
+- An archived team's issues, keys, aliases and history stay readable and
+  editable where they are. Creating an issue there, moving one in, or a
+  triage rule routing one there is refused with a conflict
+  ([#538](https://github.com/cruisinme30/vellum/issues/538)), and
+  nothing is numbered. Restoring continues the numbering.
+- `GET /v1/work/teams` lists active teams; `include_archived=true` adds
+  the rest. The issue page and live chips ask for all teams, so an
+  archived team's issues still show their state names.
+- Team settings has an Archive section that asks first, then shows the
+  team as archived with Restore. "Show archived teams" adds them to the
+  picker, named "(archived)".
+
 ## Alternatives
 
 - **Saved views in browser storage**: rejected; R-WK-4 needs shared views,
@@ -85,11 +102,14 @@ saved views had no server side.
   builder edits the same tree the server stores.
 - **A charting library for the burn-up**: rejected; one line chart does
   not justify the bundle size.
+- **Deleting a team**: rejected; issue keys and links in pages must keep
+  resolving, so a team only ever leaves lists.
 
 ## Consequences
 
 - Team settings stay admin-only with fresh sign-in; team leads cannot
-  save them yet. Archiving a team has no server support yet.
+  save them yet. Archived teams stay out of pickers and boards' team
+  lists but keep every issue (D303).
 - A board grouped by assignee, label or project does not move cards; those
   changes stay on the issue page.
 - Projects, insights and intake screens are a separate workstream and

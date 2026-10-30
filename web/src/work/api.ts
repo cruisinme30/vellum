@@ -107,7 +107,8 @@ export interface WorkApi extends CommentsApi {
   /** The person's time zone, start of day and digest time. */
   settings(): Promise<MyWorkSettingsView>;
   saveSettings(settings: MyWorkSettingsInput): Promise<MyWorkSettingsView>;
-  teams(): Promise<TeamOut[]>;
+  /** Active teams; `includeArchived` adds archived ones (D303). */
+  teams(options?: { readonly includeArchived?: boolean }): Promise<TeamOut[]>;
   /** A team's open issues, most important first. */
   issues(team: string): Promise<IssueOut[]>;
   /** Issues whose title contains `query`, or the issue with that key, at most 8. */
@@ -146,6 +147,11 @@ export interface WorkApi extends CommentsApi {
   saveTeamSettings(team: string, settings: TeamFile): Promise<TeamOut>;
   /** Creates a team (admins). */
   createTeam(team: NewTeam): Promise<TeamOut>;
+  /**
+   * Archives a team, or restores it (admins; needs a recent sign-in). An
+   * archived team keeps its issues but takes no new ones (D303).
+   */
+  setTeamArchived(team: string, archived: boolean): Promise<TeamOut>;
 }
 
 /** A new team. */
@@ -182,8 +188,10 @@ export function createHttpWorkApi(http: Http): WorkApi {
     settings: () => http.get<MyWorkSettingsView>("/api/v1/my-work/settings"),
     saveSettings: (settings) =>
       http.send<MyWorkSettingsView>("PUT", "/api/v1/my-work/settings", settings),
-    async teams() {
-      const list = await http.get<TeamsOut>(`${WORK}/teams`);
+    async teams(options) {
+      const list = await (options?.includeArchived === true
+        ? http.get<TeamsOut>(`${WORK}/teams`, { include_archived: "true" })
+        : http.get<TeamsOut>(`${WORK}/teams`));
       return list.teams;
     },
     async issues(team) {
@@ -263,6 +271,12 @@ export function createHttpWorkApi(http: Http): WorkApi {
         yaml: JSON.stringify(settings),
       }),
     createTeam: (team) => http.send<TeamOut>("POST", `${WORK}/teams`, team),
+    setTeamArchived: (team, archived) =>
+      http.send<TeamOut>(
+        "POST",
+        `${WORK}/teams/${segment(team)}/${archived ? "archive" : "restore"}`,
+        {},
+      ),
     async threads(target) {
       const list = await http.get<ThreadsOut>(`${WORK}/comments`, { target });
       return list.threads;
@@ -325,7 +339,8 @@ export interface IssueChipStatus {
 export function issueChipStatus(api: WorkApi): (key: string) => Promise<IssueChipStatus> {
   let teams: Promise<TeamOut[]> | undefined;
   return async (key) => {
-    teams ??= api.teams().catch(() => []);
+    // An archived team's issues still show their state names.
+    teams ??= api.teams({ includeArchived: true }).catch(() => []);
     const [issue, known] = await Promise.all([api.issue(key), teams]);
     const team = known.find((candidate) => candidate.key === issue.team);
     const state = team?.statuses.find((status) => status.key === issue.state)?.name ?? issue.state;

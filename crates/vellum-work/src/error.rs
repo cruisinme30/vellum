@@ -34,6 +34,9 @@ pub enum WorkError {
     /// No team has this key.
     #[error("unknown team {0}")]
     UnknownTeam(TeamKey),
+    /// The team is archived and takes no new issues (D303).
+    #[error("team {0} is archived; restore it first")]
+    ArchivedTeam(TeamKey),
     /// A team with this key or ID already exists.
     #[error("team {0} already exists")]
     DuplicateTeam(TeamKey),
@@ -101,6 +104,7 @@ impl WorkError {
             Self::DuplicateTeam(_)
             | Self::DuplicateIssue(_)
             | Self::DuplicateKey(_)
+            | Self::ArchivedTeam(_)
             | Self::InvalidState { .. } => K::Conflict,
             Self::File { .. } => K::Internal,
             Self::Invalid { .. }

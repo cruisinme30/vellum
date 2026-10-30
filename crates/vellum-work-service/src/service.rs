@@ -37,10 +37,10 @@ use vellum_work::{
 use crate::api::{
     self, AddComment, AssignThread, AssignmentOut, AssignmentsOut, ChipOut, CommentRef,
     CommentResult, CreateIssue, CreateTeam, CreatedIssue, CycleOut, CyclesOut, EditComment,
-    FocusedIssue, GroupOut, IssueGroups, IssueOut, IssueRef, ListComments, MoveIssue, MyIssues,
-    MyIssuesOut, NoInput, ProjectOut, ProjectRef, PutProject, PutTeam, QueryIssues, React,
-    ResolveThread, TeamOut, TeamRef, ThreadOut, ThreadsOut, TriageIssue, UpdateIssue, invalid,
-    parse_name,
+    FocusedIssue, GroupOut, IssueGroups, IssueOut, IssueRef, ListComments, ListTeams, MoveIssue,
+    MyIssues, MyIssuesOut, NoInput, ProjectOut, ProjectRef, PutProject, PutTeam, QueryIssues,
+    React, ResolveThread, TeamOut, TeamRef, ThreadOut, ThreadsOut, TriageIssue, UpdateIssue,
+    invalid, parse_name,
 };
 use crate::api::{Done, ListViews, PutView, ViewIn, ViewOut, ViewRef, ViewsOut};
 use crate::journal::{self, CatchUp};
@@ -462,11 +462,16 @@ impl WorkService {
     pub(crate) async fn list_teams(
         &self,
         _rc: RequestContext,
-        _: NoInput,
+        i: ListTeams,
     ) -> Result<routes::TeamsOut, Error> {
         let st = self.read_state().await;
         Ok(routes::TeamsOut {
-            teams: st.graph.teams().map(TeamOut::of).collect(),
+            teams: st
+                .graph
+                .teams()
+                .filter(|t| i.include_archived || !t.archived)
+                .map(TeamOut::of)
+                .collect(),
         })
     }
 
@@ -1065,6 +1070,35 @@ impl WorkService {
             ctx.actor.as_ref(),
         )
         .await?;
+        st.graph
+            .team(&key)
+            .map(TeamOut::of)
+            .ok_or_else(|| Error::new(ErrorKind::NotFound, key.to_string()))
+    }
+
+    /// Archives or restores a team (D303).
+    pub(crate) async fn set_team_archived(
+        &self,
+        rc: RequestContext,
+        i: TeamRef,
+        archived: bool,
+    ) -> Result<TeamOut, Error> {
+        let ctx = self.ctx(&rc).await?;
+        let mut st = self.write_state().await?;
+        let key = Self::team_key(&st.graph, &i.team)?;
+        let backup = st.clone();
+        let changes = st.graph.set_team_archived(&key, archived)?;
+        if !changes.teams.is_empty() {
+            self.commit(
+                &mut st,
+                backup,
+                changes,
+                None,
+                Vec::new(),
+                ctx.actor.as_ref(),
+            )
+            .await?;
+        }
         st.graph
             .team(&key)
             .map(TeamOut::of)

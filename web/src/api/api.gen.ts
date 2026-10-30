@@ -4783,6 +4783,16 @@ export interface ListObjects {
 }
 
 /**
+ * Which teams to list.
+ */
+export interface ListTeams {
+  /**
+   * Include archived teams; by default only active teams are listed.
+   */
+  include_archived?: boolean;
+}
+
+/**
  * A task list.
  */
 export interface ListView {
@@ -7877,6 +7887,10 @@ export interface TeamOptionOut {
  */
 export interface TeamOut {
   /**
+   * Archived teams keep their issues but take no new ones (D303).
+   */
+  archived: boolean;
+  /**
    * Whether the team runs cycles.
    */
   cycles: boolean;
@@ -9346,7 +9360,69 @@ export interface WorkAcceptSuggestionIssueOut {
 /**
  * A team and its workflow.
  */
+export interface WorkArchiveTeamTeamOut {
+  /**
+   * Archived teams keep their issues but take no new ones (D303).
+   */
+  archived: boolean;
+  /**
+   * Whether the team runs cycles.
+   */
+  cycles: boolean;
+  /**
+   * The status new issues get.
+   */
+  default_status: string;
+  /**
+   * Team ID.
+   */
+  id: string;
+  /**
+   * Key prefix, such as `ENG`.
+   */
+  key: string;
+  /**
+   * Label references (`group/name` or `name`).
+   */
+  labels: string[];
+  /**
+   * The team lead's handle.
+   */
+  lead?: string | null;
+  /**
+   * Member handles.
+   */
+  members: string[];
+  /**
+   * Display name.
+   */
+  name: string;
+  /**
+   * Statuses in board order.
+   */
+  statuses: StatusOut[];
+  /**
+   * Template names.
+   */
+  templates: string[];
+  /**
+   * IANA time zone for cycles and recurring work.
+   */
+  timezone: string;
+  /**
+   * Whether intake issues go to triage first.
+   */
+  triage: boolean;
+}
+
+/**
+ * A team and its workflow.
+ */
 export interface WorkCreateTeamTeamOut {
+  /**
+   * Archived teams keep their issues but take no new ones (D303).
+   */
+  archived: boolean;
   /**
    * Whether the team runs cycles.
    */
@@ -9732,6 +9808,10 @@ export interface WorkGetProjectProjectOut {
  */
 export interface WorkGetTeamTeamOut {
   /**
+   * Archived teams keep their issues but take no new ones (D303).
+   */
+  archived: boolean;
+  /**
    * Whether the team runs cycles.
    */
   cycles: boolean;
@@ -9942,6 +10022,10 @@ export interface WorkPutProjectProjectOut {
  */
 export interface WorkPutTeamTeamOut {
   /**
+   * Archived teams keep their issues but take no new ones (D303).
+   */
+  archived: boolean;
+  /**
    * Whether the team runs cycles.
    */
   cycles: boolean;
@@ -10039,6 +10123,64 @@ export interface WorkPutViewViewOut {
    * `private`, `team` or `workspace`.
    */
   visibility: string;
+}
+
+/**
+ * A team and its workflow.
+ */
+export interface WorkRestoreTeamTeamOut {
+  /**
+   * Archived teams keep their issues but take no new ones (D303).
+   */
+  archived: boolean;
+  /**
+   * Whether the team runs cycles.
+   */
+  cycles: boolean;
+  /**
+   * The status new issues get.
+   */
+  default_status: string;
+  /**
+   * Team ID.
+   */
+  id: string;
+  /**
+   * Key prefix, such as `ENG`.
+   */
+  key: string;
+  /**
+   * Label references (`group/name` or `name`).
+   */
+  labels: string[];
+  /**
+   * The team lead's handle.
+   */
+  lead?: string | null;
+  /**
+   * Member handles.
+   */
+  members: string[];
+  /**
+   * Display name.
+   */
+  name: string;
+  /**
+   * Statuses in board order.
+   */
+  statuses: StatusOut[];
+  /**
+   * Template names.
+   */
+  templates: string[];
+  /**
+   * IANA time zone for cycles and recurring work.
+   */
+  timezone: string;
+  /**
+   * Whether intake issues go to triage first.
+   */
+  triage: boolean;
 }
 
 /**
@@ -11613,6 +11755,13 @@ export interface Operations {
     input: AddComment;
     output: CommentResult;
   };
+  /** Archives a team */
+  "work.archive_team": {
+    method: "POST";
+    path: "/v1/work/teams/{team}/archive";
+    input: TeamRef;
+    output: WorkArchiveTeamTeamOut;
+  };
   /** Assigns, reassigns or unassigns a thread */
   "work.assign_thread": {
     method: "POST";
@@ -11743,7 +11892,7 @@ export interface Operations {
   "work.list_teams": {
     method: "GET";
     path: "/v1/work/teams";
-    input: NoInput;
+    input: ListTeams;
     output: TeamsOut;
   };
   /** Lists the saved views the caller can open */
@@ -11815,6 +11964,13 @@ export interface Operations {
     path: "/v1/work/threads/{thread_id}/resolve";
     input: ResolveThread;
     output: CommentResult;
+  };
+  /** Restores an archived team */
+  "work.restore_team": {
+    method: "POST";
+    path: "/v1/work/teams/{team}/restore";
+    input: TeamRef;
+    output: WorkRestoreTeamTeamOut;
   };
   /** Submits answers to an intake form as a triage issue */
   "work.submit_form": {
@@ -12025,6 +12181,7 @@ export const OPERATIONS = {
   "webhooks.update": { method: "PUT", path: "/v1/admin/webhooks/{id}", mutation: true },
   "work.accept_suggestion": { method: "POST", path: "/v1/work/issues/{key}/triage/suggestion/accept", mutation: true },
   "work.add_comment": { method: "POST", path: "/v1/work/comments", mutation: true },
+  "work.archive_team": { method: "POST", path: "/v1/work/teams/{team}/archive", mutation: true },
   "work.assign_thread": { method: "POST", path: "/v1/work/threads/{thread_id}/assign", mutation: true },
   "work.create_issue": { method: "POST", path: "/v1/work/issues", mutation: true },
   "work.create_team": { method: "POST", path: "/v1/work/teams", mutation: true },
@@ -12054,6 +12211,7 @@ export const OPERATIONS = {
   "work.query_issues": { method: "GET", path: "/v1/work/issues", mutation: false },
   "work.react": { method: "POST", path: "/v1/work/comments/{comment_id}/reactions", mutation: true },
   "work.resolve_thread": { method: "POST", path: "/v1/work/threads/{thread_id}/resolve", mutation: true },
+  "work.restore_team": { method: "POST", path: "/v1/work/teams/{team}/restore", mutation: true },
   "work.submit_form": { method: "POST", path: "/v1/work/teams/{team}/forms/{slug}", mutation: true },
   "work.suggest_triage": { method: "PUT", path: "/v1/work/issues/{key}/triage/suggestion", mutation: true },
   "work.triage_brief": { method: "GET", path: "/v1/work/issues/{key}/triage/brief", mutation: false },

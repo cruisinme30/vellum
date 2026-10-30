@@ -79,6 +79,8 @@ pub struct TeamOut {
     pub labels: Vec<String>,
     /// Template names.
     pub templates: Vec<String>,
+    /// Archived teams keep their issues but take no new ones (D303).
+    pub archived: bool,
 }
 
 /// A status in a team's workflow.
@@ -121,6 +123,7 @@ impl TeamOut {
                 .map(vellum_work::label::Label::reference)
                 .collect(),
             templates: team.templates.iter().map(|t| t.name.clone()).collect(),
+            archived: team.archived,
         }
     }
 }
@@ -607,6 +610,15 @@ pub struct Done {
 /// No input.
 #[derive(Debug, Clone, Default, Deserialize, JsonSchema)]
 pub struct NoInput {}
+
+/// Which teams to list.
+#[derive(Debug, Clone, Default, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ListTeams {
+    /// Include archived teams; by default only active teams are listed.
+    #[serde(default)]
+    pub include_archived: bool,
+}
 
 /// A team by key.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
