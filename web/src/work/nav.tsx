@@ -9,7 +9,7 @@ import { NavLink, useNavigate, useSearchParams } from "react-router";
 import { useT } from "../i18n/i18n";
 import { useScreenCommands } from "../keyboard/keyboard-root";
 import type { Scope } from "../keyboard/keymap";
-import { workCommands, type WorkActions } from "../keyboard/work-commands";
+import { SCREEN_DESTINATIONS, workCommands, type WorkActions } from "../keyboard/work-commands";
 
 import type { TeamOut } from "./api";
 
@@ -94,6 +94,7 @@ export function useWorkKeys(team: string | undefined, actions: Omit<WorkActions,
     const query = team === undefined ? "" : `?team=${encodeURIComponent(team)}`;
     return workCommands({
       ...(newIssue === undefined ? {} : { newIssue }),
+      destinations: SCREEN_DESTINATIONS,
       goTo(destination) {
         const path = {
           inbox: "/inbox",

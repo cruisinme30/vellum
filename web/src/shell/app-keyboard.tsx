@@ -14,10 +14,10 @@ import { searchTitles } from "../data/search";
 import { useWorkspace } from "../data/workspace-context";
 import type { PageFinder } from "../keyboard/command-menu";
 import { KeyboardRoot } from "../keyboard/keyboard-root";
-import { workCommands, type Destination } from "../keyboard/work-commands";
+import { APP_DESTINATIONS, workCommands, type Destination } from "../keyboard/work-commands";
 import { useQuickAdd } from "../work/quick-add";
 
-/** The `G` chords with a screen behind them. */
+/** Where the app's `G` chords go. */
 const ROUTES: Partial<Record<Destination, string>> = {
   inbox: "/inbox",
   "my-work": "/my-work",
@@ -39,7 +39,7 @@ export function AppKeyboard({ children }: { readonly children: ReactNode }) {
             quickAdd();
           },
         }),
-        destinations: Object.keys(ROUTES) as Destination[],
+        destinations: APP_DESTINATIONS,
         goTo: (destination) => {
           const path = ROUTES[destination];
           if (path !== undefined) void navigate(path);

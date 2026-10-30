@@ -13,6 +13,16 @@ import type { Command, Scope } from "./keymap";
 /** Where the `G` chords go. */
 export type Destination = "inbox" | "my-work" | "board" | "cycle" | "triage";
 
+/**
+ * The `G` chords the app keyboard binds on every screen. A Work screen binds
+ * only `SCREEN_DESTINATIONS`, because both sets are global and the keymap
+ * throws when two commands share a chord.
+ */
+export const APP_DESTINATIONS: readonly Destination[] = ["inbox", "my-work"];
+
+/** The `G` chords only the Work screens bind. */
+export const SCREEN_DESTINATIONS: readonly Destination[] = ["board", "cycle", "triage"];
+
 /** What the current screen can do. Every action is optional. */
 export interface WorkActions {
   readonly newIssue?: () => void;
