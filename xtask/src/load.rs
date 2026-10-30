@@ -257,6 +257,10 @@ fn dechunk(mut rest: &[u8]) -> Option<Vec<u8>> {
     }
 }
 
+/// The handshake nonce every room connection sends: base64 of
+/// "vellum-budgets-1". The server only echoes it back, so it is not a secret.
+const WEBSOCKET_KEY: &str = "dmVsbHVtLWJ1ZGdldHMtMQ=="; // gitleaks:allow
+
 /// Opens a collaboration WebSocket, sends Yjs sync step 1 with an empty
 /// state vector and waits for the server's first message.
 fn open_room(address: SocketAddr, path: &str, auth: &str) -> Result<TcpStream, String> {
@@ -266,7 +270,7 @@ fn open_room(address: SocketAddr, path: &str, auth: &str) -> Result<TcpStream, S
         writer,
         "GET {path} HTTP/1.1\r\nHost: {address}\r\nUpgrade: websocket\r\n\
          Connection: Upgrade\r\nSec-WebSocket-Version: 13\r\n\
-         Sec-WebSocket-Key: dmVsbHVtLWJ1ZGdldHMtMQ==\r\nAuthorization: {auth}\r\n\r\n"
+         Sec-WebSocket-Key: {WEBSOCKET_KEY}\r\nAuthorization: {auth}\r\n\r\n"
     )
     .map_err(|e| format!("{path}: {e}"))?;
     let mut reader = BufReader::new(stream);
