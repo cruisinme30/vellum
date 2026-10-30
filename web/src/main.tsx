@@ -44,6 +44,7 @@ import { createHttpPrivateSpacesApi } from "./platform/private/api";
 import { DocumentCache } from "./platform/store/document-cache";
 import { openLocalDatabase } from "./platform/store/persistence";
 import { createHttpRenderApi } from "./render/api";
+import { createHttpSharingApi } from "./sharing/api";
 import { createHttpOrganisationAppearance } from "./theme/organisation";
 import { createHttpWorkApi } from "./work/api";
 
@@ -115,6 +116,7 @@ root.render(
           : combineDirectories(createHttpDirectory(http), createHttpGroupDirectory(http))
       }
       attachments={status === undefined ? undefined : createHttpAttachmentsApi(http)}
+      sharing={status === undefined ? undefined : createHttpSharingApi(http)}
       privateSpaces={status === undefined ? undefined : createHttpPrivateSpacesApi(http)}
       render={status === undefined ? undefined : createHttpRenderApi(http)}
       collections={

@@ -64,6 +64,7 @@ mod secrets_tests;
 mod serve;
 mod services;
 mod shards_cli;
+mod sharing;
 mod site_http;
 #[cfg(test)]
 mod site_tests;

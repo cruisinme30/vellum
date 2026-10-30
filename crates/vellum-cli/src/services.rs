@@ -57,6 +57,8 @@ pub struct Services {
     rate_counts: Option<vellum_db::rate::SharedCounts>,
     /// My Work, for its feed, CalDAV and capture routes.
     tasks: Option<Arc<TasksService>>,
+    /// Share links on the public origin, when an index is configured.
+    public: Option<Arc<dyn vellum_api::public::PublicSite>>,
     /// The admin console (requests, routes, audit, settings, backups).
     admin: Option<Arc<dyn Service>>,
     /// Books, for their public sites at `/published`.
@@ -170,6 +172,7 @@ impl Services {
             replica: None,
             rate_counts: None,
             tasks: None,
+            public: None,
             admin: None,
             books: None,
             admin_audit: None,
@@ -264,6 +267,7 @@ impl Services {
         }
         self.books = opened.books;
         self.drive = opened.drive;
+        self.public = opened.public;
         Ok(self)
     }
 
@@ -286,6 +290,11 @@ impl Services {
                     UploadPolicy::default(),
                 )
             })
+    }
+
+    /// Share links on the public origin, when an index is configured.
+    pub fn public_site(&self) -> Option<Arc<dyn vellum_api::public::PublicSite>> {
+        self.public.clone()
     }
 
     /// Rate-limit counts shared with the other replicas, when an index is
