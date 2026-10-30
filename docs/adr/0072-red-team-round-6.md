@@ -1,6 +1,6 @@
 ---
 id: 01M65BZWG5QNAF99JQY42NCN3E
-title: "ADR 0071: Red team round 6, the merged 1.0 build"
+title: "ADR 0072: Red team round 6, the merged 1.0 build"
 status: draft
 owner: "@cruisinme30"
 tags: [adr, security, red-team]
@@ -11,7 +11,7 @@ vellum: 1
 
 - Date: 2026-10-30
 - Status: accepted
-- Decisions: D307, D308, D309
+- Decisions: D315, D316, D317
 - Issue: #529 (findings #547, #548, #550, #551, #552)
 - Pull requests: to be linked when merged
 
@@ -38,7 +38,7 @@ the web editor.
 
 ## Decisions
 
-### D307: a provider reaches only accounts in its own domains
+### D315: a provider reaches only accounts in its own domains
 
 - Signing in through a provider links to an existing account with the
   same verified address only when the address is in the provider's
@@ -48,7 +48,7 @@ the web editor.
   change an admin's address (RT-044), so the provisioning token cannot
   steer a provider sign-in into an admin account.
 
-### D308: upload bodies held in memory come from one budget
+### D316: upload bodies held in memory come from one budget
 
 - Every route that reads an upload into memory (attachments, file import,
   issue import) first reserves its `Content-Length` from one budget per
@@ -57,7 +57,7 @@ the web editor.
   before its body is read (RT-045).
 - The body is moved, not copied, into the upload check.
 
-### D309: re-authentication and long-lived streams prove access again
+### D317: re-authentication and long-lived streams prove access again
 
 - A SAML re-authentication records that it is one, and the assertion
   must carry an `AuthnInstant` from the last five minutes, the window
