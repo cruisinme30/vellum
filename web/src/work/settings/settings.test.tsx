@@ -22,6 +22,20 @@ function saved(api: ReturnType<typeof fakeApi>) {
   return file;
 }
 
+/** A promise the test settles when it is ready. */
+function deferred<T>() {
+  const settle: { resolve?: (value: T) => void } = {};
+  const promise = new Promise<T>((resolve) => {
+    settle.resolve = resolve;
+  });
+  return {
+    promise,
+    resolve: (value: T) => {
+      settle.resolve?.(value);
+    },
+  };
+}
+
 describe("team settings file", () => {
   it("makes keys, reorders within a category and drops dangling Git moments", () => {
     expect(slug("In Review!")).toBe("in-review");
@@ -196,6 +210,19 @@ describe("team settings screen", () => {
     expect(screen.getByRole("option", { name: "Engineering (archived)" })).toBeDefined();
     await user.click(screen.getByRole("button", { name: "Restore team" }));
     expect(api.setTeamArchived).toHaveBeenLastCalledWith("ENG", false);
+    expect(await screen.findByRole("button", { name: "Archive Engineering" })).toBeDefined();
+  });
+
+  it("shows the archive section only once the settings have loaded", async () => {
+    // Regression: it rendered first and jumped down the page (layout shift).
+    const settings = deferred<typeof TEAM_FILE>();
+    const api = fakeApi({ teamSettings: vi.fn(() => settings.promise) });
+    renderAt("/issues/settings", api, route);
+    await waitFor(() => {
+      expect(api.teamSettings).toHaveBeenCalled();
+    });
+    expect(screen.queryByRole("button", { name: "Archive Engineering" })).toBeNull();
+    settings.resolve(TEAM_FILE);
     expect(await screen.findByRole("button", { name: "Archive Engineering" })).toBeDefined();
   });
 

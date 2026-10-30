@@ -182,10 +182,12 @@ function TeamEditor({
     [api, team.key, team.archived, version],
     failureText,
   );
+  // The archive section comes with the settings, not before them, so it
+  // doesn't jump down the page when they load.
   return (
-    <>
-      <Ready loaded={loaded}>
-        {(file) => (
+    <Ready loaded={loaded}>
+      {(file) => (
+        <>
           <Editor
             key={`${team.key}:${String(team.archived)}:${String(version)}`}
             api={api}
@@ -197,16 +199,16 @@ function TeamEditor({
               setVersion((v) => v + 1);
             }}
           />
-        )}
-      </Ready>
-      <ArchiveSection
-        api={api}
-        team={team}
-        onChanged={() => {
-          onArchived(team.key);
-        }}
-      />
-    </>
+          <ArchiveSection
+            api={api}
+            team={team}
+            onChanged={() => {
+              onArchived(team.key);
+            }}
+          />
+        </>
+      )}
+    </Ready>
   );
 }
 
