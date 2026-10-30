@@ -356,3 +356,44 @@ async fn groups_are_admin_groups_with_engine_members() {
         ErrorKind::NotFound
     );
 }
+
+/// RT-044 (#548): the provisioning token cannot move an admin's address,
+/// which would let a provider sign-in for that address reach the admin.
+#[tokio::test]
+async fn an_admins_address_is_out_of_reach() {
+    let f = fixture();
+    let priya = f.identity.users()[0].clone();
+    let path = format!("/Users/{}", priya.id);
+    let move_admin = json!({ "Operations": [
+        { "op": "replace", "path": "userName", "value": "mallory@evil.dev" }
+    ] });
+    let (status, body) = f.call("PATCH", &path, Some(move_admin)).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
+    let replace = json!({
+        "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+        "userName": "mallory@evil.dev",
+        "displayName": "Priya",
+    });
+    let (status, _) = f.call("PUT", &path, Some(replace)).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(
+        f.identity.user(priya.id).unwrap().email,
+        "priya@northstar.dev"
+    );
+    // Renaming the admin and setting its external ID still work.
+    let rename = json!({ "Operations": [
+        { "op": "replace", "path": "displayName", "value": "Priya Rao" },
+        { "op": "replace", "path": "externalId", "value": "00u1" }
+    ] });
+    let (status, _) = f.call("PATCH", &path, Some(rename)).await;
+    assert_eq!(status, StatusCode::OK);
+    // A member's address still changes.
+    let (_, sam) = f.call("POST", "/Users", Some(sam())).await;
+    let sam_path = format!("/Users/{}", sam["id"].as_str().unwrap());
+    let moved = json!({ "Operations": [
+        { "op": "replace", "path": "userName", "value": "sam.k@northstar.dev" }
+    ] });
+    let (status, body) = f.call("PATCH", &sam_path, Some(moved)).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["userName"], "sam.k@northstar.dev");
+}

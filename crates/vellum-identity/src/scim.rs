@@ -11,7 +11,8 @@
 //! - Accounts it creates have no password and are never admins.
 //!   `active: false` or a delete blocks the account, which ends its
 //!   sessions and tokens; its content stays where it is.
-//! - Break-glass admins are managed only in Vellum.
+//! - Break-glass admins are managed only in Vellum, and an admin's
+//!   address is changed only in Vellum (RT-044).
 //! - Groups are the admin groups (names unique ignoring case); members
 //!   change through the permission engine ([`GroupMembers`]).
 //! - Filters: `<attribute> eq "<value>"` on `userName`, `externalId`,
@@ -555,6 +556,15 @@ fn apply_account(identity: &Identity, user: &User, next: &Account) -> Result<Use
     let now = Account::of(user);
     let email = normalise_email(&next.email)?;
     let name = check_name(&next.name)?;
+    // An admin's address decides which provider sign-ins reach the
+    // account, so the provisioning token must not move it (RT-044).
+    if user.admin && email != now.email {
+        return Err(ScimError::new(
+            StatusCode::FORBIDDEN,
+            None,
+            "an admin's address is changed in Vellum, not by provisioning",
+        ));
+    }
     if email != now.email || next.external_id != now.external_id {
         identity.store().write(|s| {
             if email != now.email
