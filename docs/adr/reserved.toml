@@ -124,3 +124,12 @@ holder = "SQLite write transactions begin IMMEDIATE (#542), ADR 0006"
 [[reservation]]
 decisions = "D307-D308"
 holder = "docs site type and light and dark toggle (#549), ADR 0027"
+
+[[reservation]]
+adrs = "0071"
+decisions = "D309-D312"
+holder = "allocated to #556 by the coordinator"
+
+[[reservation]]
+decisions = "D313-D314"
+holder = "templates screen and recurring issue settings (#144), ADR 0051"

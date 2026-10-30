@@ -181,6 +181,16 @@ export function fakeApi(overrides: Partial<FakeApi> = {}): FakeApi {
         { name: "Bug", labels: ["bug"], priority: 2, body: "Steps to reproduce:", repeat: "1w" },
       ]),
     ),
+    recurring: vi.fn(() =>
+      Promise.resolve([
+        issue("ENG-4", "Rotate the on-call pager", { due: "2026-11-02", repeat: "1w" }),
+      ]),
+    ),
+    setRepeat: vi.fn((key, repeat, due) =>
+      Promise.resolve(
+        issue(key, "Rotate the on-call pager", due === undefined ? { repeat } : { due, repeat }),
+      ),
+    ),
     createIssue: vi.fn((draft) => Promise.resolve(issue("ENG-9", draft.title))),
     insights: vi.fn(() => Promise.resolve(INSIGHTS)),
     forms: vi.fn(() => Promise.resolve([FORM])),

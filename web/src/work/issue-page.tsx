@@ -13,6 +13,7 @@ import { CopyDiagnostic } from "../shell/copy-diagnostic";
 
 import type { CommentOut, IssueOut, TeamOut, WorkApi } from "./api";
 import { stateName } from "./issues-page";
+import { RepeatSettings } from "./planning/repeat-settings";
 import { TriageSuggestion } from "./planning/suggestion";
 
 import "./work.css";
@@ -215,9 +216,12 @@ function Issue({ api, issueKey }: { readonly api: WorkApi; readonly issueKey: st
           <h1>{found.issue.title}</h1>
           <StatePicker loaded={found} onChange={setState} />
           <CreatePageFromIssue issue={found.issue} />
-          {found.issue.repeat != undefined && (
-            <p className="vl-muted">{t("plan-repeats", { repeat: found.issue.repeat })}</p>
-          )}
+          <RepeatSettings
+            issue={found.issue}
+            onSaved={() => {
+              setVersion((v) => v + 1);
+            }}
+          />
           <TriageSuggestion
             issueKey={found.issue.key}
             onApplied={() => {

@@ -4,9 +4,12 @@
 /**
  * A team's settings file (`team.yaml`) as JSON, the shape
  * `GET /v1/work/teams/{team}/settings` returns and `PUT /v1/work/teams/{team}`
- * takes back. Fields the screen does not edit (labels, templates, forms,
+ * takes back. The templates screen edits `templates` (#144). Fields the
+ * settings screen does not edit (labels, templates, forms,
  * `last_number`) ride along untouched.
  */
+
+import type { Template } from "../templates/template-file";
 
 export const CATEGORIES = [
   "triage",
@@ -98,6 +101,7 @@ export interface TeamFile {
   readonly triage_rules?: readonly TriageRule[];
   readonly sla?: { readonly rules?: readonly SlaRule[] };
   readonly git?: Partial<Record<GitMoment, string>>;
+  readonly templates?: readonly Template[];
   readonly [other: string]: unknown;
 }
 

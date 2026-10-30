@@ -147,6 +147,7 @@ const APP_TARGETS: Target[] = [
   app("triage", "/issues/triage", { server: "work", visual: false }),
   app("cycles", "/issues/cycles", { server: "work", visual: false }),
   app("team settings", "/issues/settings", { server: "work", visual: false }),
+  app("templates", "/issues/templates", { server: "work", visual: false }),
   ...serverScreens(),
 ];
 

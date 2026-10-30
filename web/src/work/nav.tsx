@@ -18,6 +18,7 @@ const TABS = [
   ["/issues/mine", "work-tab-mine"],
   ["/issues/triage", "work-tab-triage"],
   ["/issues/cycles", "work-tab-cycles"],
+  ["/issues/templates", "work-tab-templates"],
   ["/issues/settings", "work-tab-settings"],
 ] as const;
 
