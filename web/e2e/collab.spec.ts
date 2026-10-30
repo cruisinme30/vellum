@@ -10,7 +10,15 @@ import { fakeCollab } from "./support/fake-collab";
 import { signedIn } from "./support/server-session";
 
 // Feature tests: once per browser, at laptop size. The UI suite covers sizes.
-test.use({ viewport: { width: 1366, height: 768 }, hasTouch: false, isMobile: false });
+// The offline worker is blocked: once it controls the page, WebKit and
+// Firefox send the app's API calls past the routes that fake the server.
+// The PWA has its own tests.
+test.use({
+  viewport: { width: 1366, height: 768 },
+  hasTouch: false,
+  isMobile: false,
+  serviceWorkers: "block",
+});
 // eslint-disable-next-line no-empty-pattern -- Playwright needs the fixtures object
 test.beforeEach(({}, testInfo) => {
   test.skip(!testInfo.project.name.endsWith("-laptop"), "runs at laptop size only");

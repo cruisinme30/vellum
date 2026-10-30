@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 //! The admin console behind `vellum serve`: the request recorder, route
-//! metrics, the audit log, admin settings and backups.
+//! metrics, usage counts, the audit log, admin settings and backups.
 //!
 //! One [`Observability`] is shared by three parts of the server. The
 //! recorder layer (installed with telemetry) fills the trace buffer, the
@@ -25,15 +25,18 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use vellum_admin::api::{AdminApi, UsageFactsSource};
+use vellum_admin::api::{AdminApi, USAGE_MAX_AGE_MS, UsageFactsSource};
+use vellum_admin::counts::{CountsSource, UsageCounts, UsageSampler};
 use vellum_admin::usage::{HttpUsageTransport, UsageFacts, UsageTransport};
 use vellum_admin::{
     AdminPaths, AdminService, FileAuditLog, FileSettingsStore, MemoryAuditLog, MemorySettingsStore,
 };
 use vellum_contracts::Service;
 use vellum_crypto::{KekId, LocalKeyring, SecretKey};
+use vellum_drive::{DriveIndex, DriveTotals};
+use vellum_identity::Identity;
 use vellum_kernel::config::Profile;
-use vellum_kernel::{Config, Error, ErrorKind};
+use vellum_kernel::{Config, Error, ErrorKind, Timestamp};
 use vellum_observe::{RequestRecorder, RouteMetrics, TraceStore, recorder_layer};
 
 use crate::serve::key_file;
@@ -47,6 +50,10 @@ pub const BACKUP_KEY_VAR: &str = "VELLUM_BACKUP_KEY";
 /// How often scheduled backups, restore drills and usage reports are
 /// checked.
 const TICK: Duration = Duration::from_mins(5);
+
+/// How often the usage counts are taken. Exports and Admin → Usage read
+/// the last sample in between.
+const SAMPLE_EVERY: Duration = Duration::from_mins(5);
 
 /// The trace buffer and route metrics shared by the recorder, the gateway
 /// and the admin console.
@@ -73,12 +80,13 @@ impl Observability {
 }
 
 /// Counts the anonymous usage report may include. The deployment shape is
-/// known from the configuration; the user, space and document counts stay
-/// at zero until the services that own them report them.
+/// known from the configuration; users, spaces and documents come from the
+/// usage sampler's latest counts, when the server keeps one.
 #[derive(Debug, Clone)]
 struct ServerFacts {
     profile: &'static str,
     database: &'static str,
+    sampler: Option<Arc<UsageSampler>>,
 }
 
 impl ServerFacts {
@@ -94,6 +102,7 @@ impl ServerFacts {
             } else {
                 "sqlite"
             },
+            sampler: None,
         }
     }
 }
@@ -101,12 +110,101 @@ impl ServerFacts {
 #[async_trait]
 impl UsageFactsSource for ServerFacts {
     async fn facts(&self) -> UsageFacts {
+        let counts = match &self.sampler {
+            Some(sampler) => sampler
+                .current(USAGE_MAX_AGE_MS)
+                .await
+                .unwrap_or_else(|_| sampler.latest()),
+            None => UsageCounts::default(),
+        };
         UsageFacts {
             profile: self.profile.to_owned(),
             database: self.database.to_owned(),
+            users: counts.active_users_30d,
+            spaces: counts.spaces,
+            documents: counts.documents(),
             ..UsageFacts::default()
         }
     }
+
+    fn sampler(&self) -> Option<Arc<UsageSampler>> {
+        self.sampler.clone()
+    }
+}
+
+/// Counts people from identity and pages, storage and activity from the
+/// drive index (D194). Without a drive index only people are counted.
+pub struct WorkspaceCounts {
+    /// Accounts, sessions and tokens.
+    pub identity: Arc<Identity>,
+    /// The drive index, when the workspace is open.
+    pub drive: Option<Arc<dyn DriveIndex>>,
+}
+
+#[async_trait]
+impl CountsSource for WorkspaceCounts {
+    async fn count(&self, now: Timestamp) -> Result<UsageCounts, Error> {
+        let people = self.identity.people(now);
+        let drive = match &self.drive {
+            Some(drive) => drive.totals(now).await.map_err(|e| {
+                Error::new(ErrorKind::Unavailable, "cannot count the drive").with_source(e)
+            })?,
+            None => DriveTotals::default(),
+        };
+        Ok(UsageCounts {
+            sampled_at_ms: now.unix_ms(),
+            users: people.users,
+            enabled_users: people.enabled,
+            admins: people.admins,
+            active_users_1d: people.active_1d,
+            active_users_7d: people.active_7d,
+            active_users_30d: people.active_30d,
+            sessions: people.sessions,
+            api_tokens: people.api_tokens,
+            spaces: drive.spaces,
+            folders: drive.folders,
+            pages: drive.pages,
+            books: drive.books,
+            collections: drive.collections,
+            trashed: drive.trashed,
+            versions: drive.versions,
+            file_bytes: drive.file_bytes,
+            version_bytes: drive.version_bytes,
+            events_1d: drive.events_1d,
+            events_7d: drive.events_7d,
+        })
+    }
+}
+
+/// The usage sampler over `counts`, with its gauges registered, and the
+/// facts source that reads it.
+pub fn counted(
+    config: &Config,
+    counts: Arc<dyn CountsSource>,
+) -> (Arc<UsageSampler>, Arc<dyn UsageFactsSource>) {
+    let sampler = Arc::new(UsageSampler::new(counts));
+    sampler.register_metrics();
+    let facts = ServerFacts {
+        sampler: Some(Arc::clone(&sampler)),
+        ..ServerFacts::of(config)
+    };
+    (sampler, Arc::new(facts))
+}
+
+/// Takes the usage counts now and then every few minutes, for as long as
+/// the server runs.
+pub fn spawn_sampling(sampler: Arc<UsageSampler>) {
+    drop(tokio::spawn(async move {
+        let mut tick = tokio::time::interval(SAMPLE_EVERY);
+        tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        loop {
+            let _ = tick.tick().await;
+            match sampler.refresh().await {
+                Ok(counts) => tracing::debug!(?counts, "usage counted"),
+                Err(error) => tracing::warn!(%error, "cannot count usage; keeping the last counts"),
+            }
+        }
+    }));
 }
 
 /// A keyring holding one key, named `id`.
@@ -282,6 +380,39 @@ mod tests {
             .map(|e| e.to_string())
             .unwrap_or_default();
         assert!(error.contains(ADMIN_KEY_VAR), "{error}");
+    }
+
+    #[tokio::test]
+    async fn the_report_carries_the_real_counts() -> Result<(), Error> {
+        let url = url::Url::parse("https://vellum.northstar.dev")
+            .map_err(|e| Error::new(ErrorKind::Internal, e.to_string()))?;
+        let identity = Arc::new(Identity::new(
+            vellum_identity::IdentityConfig::new(url),
+            vellum_identity::Store::memory(),
+        ));
+        let _ = identity.setup(
+            "priya@northstar.dev",
+            "Priya",
+            "correct horse battery staple",
+        )?;
+        let _ = identity.sign_in(
+            "priya@northstar.dev",
+            "correct horse battery staple",
+            None,
+            None,
+        )?;
+        let counts = Arc::new(WorkspaceCounts {
+            identity,
+            drive: Some(Arc::new(vellum_drive::memory::MemoryIndex::new())),
+        });
+        let (sampler, facts) = counted(&config(Path::new(".")), counts);
+        let report = facts.facts().await;
+        assert_eq!((report.users, report.spaces, report.documents), (1, 0, 0));
+        let latest = sampler.latest();
+        assert!(latest.sampled_at_ms > 0);
+        assert_eq!((latest.users, latest.admins, latest.sessions), (1, 1, 1));
+        assert!(facts.sampler().is_some());
+        Ok(())
     }
 
     #[test]

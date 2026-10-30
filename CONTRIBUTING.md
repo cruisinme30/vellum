@@ -164,13 +164,13 @@ workflow is renamed.
 | --- | --- | --- |
 | Checks: fast suite | `ci.yml` | pull requests into `develop`, pushes to `develop` |
 | Checks: full suite (release PRs) | `full.yml` | release pull requests into `main` |
-| Checks: labels and tracker | `pr-housekeeping.yml` | every pull request event |
+| Checks: labels and tracker | `pr-housekeeping.yml` | pull requests opened, pushed to or retitled; descriptions edited; closed |
 | PR: auto-merge Dependabot patches | `dependabot-auto-merge.yml` | Dependabot pull requests |
 | Security: CodeQL | `codeql.yml` | release pull requests, pushes to `main`, weekly |
 | Security: weekly Scorecard | `scorecard.yml` | weekly |
 | Scheduled: nightly load, security and fuzz, chaos on Sundays | `nightly.yml` | nightly; skips when `develop` is unchanged |
 | Release: server, desktop and drill | `release.yml` | version tags |
-| Repo: sync labels and project board | `repo-sync.yml` | label file changes, issue changes, every six hours |
+| Repo: sync labels and project board | `repo-sync.yml` | label file changes; the project board every 15 minutes |
 | Repo: develop is red alarm | `develop-health.yml` | after the fast suite runs on `develop` |
 | Website: build and deploy | `site.yml` | website changes, pushes to `main` |
 
@@ -183,13 +183,17 @@ Every change is traceable to the discussion that led to it.
   the answers, so the issue is the feature's full history.
 - **The pull request links it.** Put `Closes #N` (or `Refs #N` when the
   issue stays open) in the **Issue** section of the description.
-- **A feature records its decisions.** Copy `docs/adr/0000-template.md`
-  to `docs/adr/NNNN-<slug>.md`, ask for the next record and decision
-  numbers, and fill it in. Every record has the same four sections,
+- **A feature records its decisions.** Run
+  `cargo xtask adr new <slug> --decisions N --issue N`. It writes
+  `docs/adr/NNNN-<slug>.md` from `docs/adr/0000-template.md` with the next
+  free record and decision numbers across all branches
+  (`cargo xtask adr next` only prints them), skipping those reserved in
+  `docs/adr/reserved.toml`. Push the branch right away to claim the
+  numbers, then fill it in. Every record has the same four sections,
   **Context**, **Decisions**, **Alternatives** and **Consequences**, plus
   the issue and pull requests in its facts block. Keep it short: under
   150 lines and at most six bullets in a row; the **Decision records**
-  check enforces both. When a feature only extends an existing decision,
+  check enforces both, and fails when two records share a number. When a feature only extends an existing decision,
   update that record or name it as `ADR NNNN` in the description.
 
 The **Issue and decision record** check in the fast suite enforces this.
@@ -245,6 +249,8 @@ that file lands on `develop`.
 The **Labels** check fails a pull request without at least one `type/*`
 and one `area/*` label. Branch protection requires it next to the suite
 check. When a new crate lands, add its path to `.github/labeler.yml`.
+Adding a label by hand does not re-run the check; push a commit or edit
+the title to run it again, or re-run the failed job from the Actions tab.
 
 ## Definition of done
 

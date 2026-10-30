@@ -79,8 +79,10 @@ memory only, and serves them to your AI client read-only.
    **Enrol this device** on the space. (From a terminal:
    `vellum private enrol --server <url> --space <id> --label "My laptop"`
    with an API token in `VELLUM_TOKEN`.)
-2. On a device that can already open the space, choose **Reseal pages
-   for every device**, so existing pages open on the new one too.
+2. On a device that can already open the space, choose **Seal pages
+   for every device**, so existing pages open on the new one too. If
+   the app lists new devices to check, ask each owner to read out the
+   fingerprint from their screen, and trust it only if it matches.
 3. Add Vellum to your client with the space's ID and your server:
 
 ```json

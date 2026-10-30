@@ -113,6 +113,60 @@ export interface AddComment {
 }
 
 /**
+ * Adds a property (a column) to a collection. The server picks its key
+ * from the name.
+ */
+export interface AddPropertyInput {
+  /**
+   * A rollup's aggregation.
+   */
+  agg?: Aggregation | null;
+  /**
+   * The name of the paired property in the target collection; this
+   * collection's title when absent.
+   */
+  back_name?: string | null;
+  /**
+   * The collection.
+   */
+  collection_id: CollectionId;
+  /**
+   * How numbers show.
+   */
+  format?: NumberFormat | null;
+  /**
+   * A formula's expression (`round(Estimate * 0.5, 1)`).
+   */
+  formula?: string | null;
+  /**
+   * The display name, unique in the collection.
+   */
+  name: string;
+  /**
+   * Options of a select or multi-select, in order.
+   */
+  options?: SelectOption[];
+  /**
+   * A rollup's property on the related rows, by key or name.
+   */
+  prop?: string | null;
+  /**
+   * A relation's target collection. Relations are two-way: the target
+   * gets a paired property too.
+   */
+  to?: CollectionId | null;
+  /**
+   * The type: `text`, `number`, `select`, `multi`, `person`, `date`,
+   * `checkbox`, `url`, `relation`, `rollup`, `formula` or `created`.
+   */
+  type: string;
+  /**
+   * A rollup's relation property, by key or name.
+   */
+  via?: string | null;
+}
+
+/**
  * `books.add_section`.
  */
 export interface AddSection {
@@ -2143,6 +2197,62 @@ export interface DeletedView {
 }
 
 /**
+ * A hook's recent attempts.
+ */
+export interface DeliveryList {
+  /**
+   * Newest first.
+   */
+  deliveries: DeliveryView[];
+}
+
+/**
+ * One delivery attempt, as the admin sees it.
+ */
+export interface DeliveryView {
+  /**
+   * When it was sent (RFC 3339).
+   */
+  at: string;
+  /**
+   * 1 for the first attempt.
+   */
+  attempt: number;
+  /**
+   * The delivery ID, as sent in `Vellum-Delivery`.
+   */
+  delivery_id: string;
+  /**
+   * How long it took.
+   */
+  duration_ms: number;
+  /**
+   * Why there was no answer.
+   */
+  error?: string | null;
+  /**
+   * `issue.create`, `comment.update`, … or `ping`.
+   */
+  event: string;
+  /**
+   * The event ID, as in the payload's `id`.
+   */
+  event_id: string;
+  /**
+   * When it will be tried again (RFC 3339).
+   */
+  next_attempt?: string | null;
+  /**
+   * `delivered`, `retry`, `rejected` or `gone`.
+   */
+  outcome: string;
+  /**
+   * The receiver's status code, when it answered.
+   */
+  status?: number | null;
+}
+
+/**
  * One enrolled device.
  */
 export interface DeviceKeyInfo {
@@ -2701,6 +2811,11 @@ export interface DriveMoveNodeView {
 }
 
 /**
+ * No input.
+ */
+export type DriveMyDriveNoInput = Record<string, never>;
+
+/**
  * An operation that returns nothing else.
  */
 export interface DrivePurgeDone {
@@ -2861,6 +2976,16 @@ export interface DriveRestoreNodeView {
 }
 
 /**
+ * No input.
+ */
+export type DriveSharedDrivesNoInput = Record<string, never>;
+
+/**
+ * No input.
+ */
+export type DriveSharedWithMeNoInput = Record<string, never>;
+
+/**
  * An operation that returns nothing else.
  */
 export interface DriveStarDone {
@@ -2869,6 +2994,11 @@ export interface DriveStarDone {
    */
   ok: boolean;
 }
+
+/**
+ * No input.
+ */
+export type DriveStarredNoInput = Record<string, never>;
 
 /**
  * An item in a space.
@@ -3255,6 +3385,11 @@ export interface GetObject {
    */
   path: string;
   /**
+   * Also return a readable page, so a member's device can seal it
+   * (needs edit access). Off by default: only ciphertext is served.
+   */
+  plaintext?: boolean;
+  /**
    * The space.
    */
   space_id: SpaceId;
@@ -3322,6 +3457,162 @@ export interface HighlightView {
    * Start, in UTF-16 code units (`JavaScript` string indices).
    */
   start: number;
+}
+
+/**
+ * A hook with its secret, shown once.
+ */
+export interface HookCreated {
+  /**
+   * The hook.
+   */
+  hook: HookView;
+  /**
+   * The signing secret (`whsec_…`). Store it now: it is not shown again.
+   */
+  secret: string;
+}
+
+/**
+ * A hook by ID.
+ */
+export interface HookId {
+  /**
+   * The hook's ID.
+   */
+  id: string;
+}
+
+/**
+ * A new hook.
+ */
+export interface HookInput {
+  /**
+   * A note for admins.
+   */
+  description?: string;
+  /**
+   * The resources to send: `issue`, `comment`, `project`,
+   * `project_update`, `cycle`, `label`, `user`, `issue_sla`.
+   */
+  event_types: string[];
+  /**
+   * Team keys to cover, private ones included; empty for every public
+   * team.
+   */
+  teams?: string[];
+  /**
+   * Where to post events: `https`, port 443 or 8443, a public address.
+   */
+  url: string;
+}
+
+/**
+ * The hooks.
+ */
+export interface HookList {
+  /**
+   * The resources a hook can want.
+   */
+  event_types: string[];
+  /**
+   * Every hook, oldest first.
+   */
+  hooks: HookView[];
+}
+
+/**
+ * A hook's new settings; everything is replaced.
+ */
+export interface HookUpdate {
+  /**
+   * A note for admins.
+   */
+  description?: string;
+  /**
+   * On or off. Turning a paused hook on clears its failures.
+   */
+  enabled: boolean;
+  /**
+   * The resources to send: `issue`, `comment`, `project`,
+   * `project_update`, `cycle`, `label`, `user`, `issue_sla`.
+   */
+  event_types: string[];
+  /**
+   * The hook's ID.
+   */
+  id: string;
+  /**
+   * Team keys to cover, private ones included; empty for every public
+   * team.
+   */
+  teams?: string[];
+  /**
+   * Where to post events: `https`, port 443 or 8443, a public address.
+   */
+  url: string;
+}
+
+/**
+ * A webhook, as the admin sees it. The secret is never shown again.
+ */
+export interface HookView {
+  /**
+   * Final failures in a row.
+   */
+  consecutive_failures: number;
+  /**
+   * When it was created (RFC 3339).
+   */
+  created_at: string;
+  /**
+   * A note for admins.
+   */
+  description: string;
+  /**
+   * Whether it receives events.
+   */
+  enabled: boolean;
+  /**
+   * The resources it wants (`issue`, `comment`, …).
+   */
+  event_types: string[];
+  /**
+   * When the current run of failures began (RFC 3339).
+   */
+  failing_since?: string | null;
+  /**
+   * The hook's ID.
+   */
+  id: string;
+  /**
+   * The latest attempt.
+   */
+  last_delivery?: DeliveryView | null;
+  /**
+   * Why Vellum paused it, when it did.
+   */
+  paused_reason?: string | null;
+  /**
+   * Deliveries waiting.
+   */
+  queued: number;
+  /**
+   * Whether a rotated-out secret still signs too.
+   */
+  rotating: boolean;
+  /**
+   * The last four characters of the current secret.
+   */
+  secret_hint: string;
+  /**
+   * The team keys it covers; empty means every public team.
+   */
+  teams: string[];
+  /**
+   * Where events are posted.
+   */
+  url: string;
 }
 
 /**
@@ -4143,7 +4434,7 @@ export interface NewAuditEvent {
 /**
  * No input.
  */
-export type NoInput = Record<string, never>;
+export type NoInput = Record<string, unknown>;
 
 /**
  * Names an item (a folder, page, book, collection or shortcut).
@@ -4556,6 +4847,20 @@ export interface PropertyInfo {
 }
 
 /**
+ * Names one property.
+ */
+export interface PropertyKey {
+  /**
+   * The collection.
+   */
+  collection_id: CollectionId;
+  /**
+   * The property's key.
+   */
+  key: string;
+}
+
+/**
  * The result of a push registration change.
  */
 export interface PushDevices {
@@ -4767,6 +5072,20 @@ export interface RecentList {
    * The items.
    */
   items: RecentItem[];
+}
+
+/**
+ * A logged delivery of a hook.
+ */
+export interface RedeliverInput {
+  /**
+   * The delivery to send again.
+   */
+  delivery_id: string;
+  /**
+   * The hook's ID.
+   */
+  id: string;
 }
 
 /**
@@ -5244,7 +5563,8 @@ export type Scope = "read" | "write:draft" | "write:direct" | "work" | "admin";
  */
 export interface SealedObject {
   /**
-   * The recipient envelope (or the space's folder manifest), base64.
+   * The recipient envelope (or, when not `sealed`, the readable
+   * bytes), base64.
    */
   envelope: string;
   /**
@@ -5255,6 +5575,11 @@ export interface SealedObject {
    * Its path inside the space folder.
    */
   path: string;
+  /**
+   * False for a readable object: the folder manifest, or a page still
+   * to convert when `plaintext` was asked for.
+   */
+  sealed: boolean;
 }
 
 /**
@@ -5706,6 +6031,16 @@ export interface SlaOut {
    * When it stopped (closed or met).
    */
   stopped_at?: string | null;
+}
+
+/**
+ * A code from Slack's "Save as task" reply.
+ */
+export interface SlackLinkInput {
+  /**
+   * The `slack_link` value from the link Slack showed.
+   */
+  code: string;
 }
 
 /**
@@ -6305,39 +6640,14 @@ export interface TasksCreateTaskView {
 }
 
 /**
- * No input.
- */
-export type TasksDigestNoInput = Record<string, unknown>;
-
-/**
- * No input.
- */
-export type TasksGoogleConnectNoInput = Record<string, unknown>;
-
-/**
  * An acknowledgement with nothing to return.
  */
 export type TasksGoogleDisconnectDone = Record<string, unknown>;
 
 /**
- * No input.
+ * An acknowledgement with nothing to return.
  */
-export type TasksGoogleDisconnectNoInput = Record<string, unknown>;
-
-/**
- * No input.
- */
-export type TasksGoogleStatusNoInput = Record<string, unknown>;
-
-/**
- * No input.
- */
-export type TasksGoogleSyncNoInput = Record<string, unknown>;
-
-/**
- * No input.
- */
-export type TasksListsNoInput = Record<string, unknown>;
+export type TasksLinkSlackDone = Record<string, unknown>;
 
 /**
  * An acknowledgement with nothing to return.
@@ -6397,11 +6707,6 @@ export interface TasksMoveTaskView {
    */
   title: string;
 }
-
-/**
- * No input.
- */
-export type TasksMyWorkNoInput = Record<string, unknown>;
 
 /**
  * What a recognised quick-add phrase set.
@@ -6468,34 +6773,9 @@ export interface TasksReopenTaskView {
 export type TasksRevokeCaptureDone = Record<string, unknown>;
 
 /**
- * No input.
- */
-export type TasksRevokeCaptureNoInput = Record<string, unknown>;
-
-/**
  * An acknowledgement with nothing to return.
  */
 export type TasksRevokeFeedDone = Record<string, unknown>;
-
-/**
- * No input.
- */
-export type TasksRevokeFeedNoInput = Record<string, unknown>;
-
-/**
- * No input.
- */
-export type TasksRotateCaptureNoInput = Record<string, unknown>;
-
-/**
- * No input.
- */
-export type TasksRotateFeedNoInput = Record<string, unknown>;
-
-/**
- * No input.
- */
-export type TasksSettingsNoInput = Record<string, unknown>;
 
 /**
  * A task list.
@@ -6526,6 +6806,11 @@ export interface TasksShareListListView {
    */
   title: string;
 }
+
+/**
+ * An acknowledgement with nothing to return.
+ */
+export type TasksUnlinkSlackDone = Record<string, unknown>;
 
 /**
  * A task list.
@@ -7144,6 +7429,55 @@ export interface UpdateMe {
 }
 
 /**
+ * Changes a property. Fields left out stay as they are; the key never
+ * changes. A rename rewrites the formulas that name the property.
+ */
+export interface UpdatePropertyInput {
+  /**
+   * A rollup's aggregation.
+   */
+  agg?: Aggregation | null;
+  /**
+   * The collection.
+   */
+  collection_id: CollectionId;
+  /**
+   * How numbers show.
+   */
+  format?: NumberFormat | null;
+  /**
+   * A formula's new expression.
+   */
+  formula?: string | null;
+  /**
+   * The property's key.
+   */
+  key: string;
+  /**
+   * A new display name.
+   */
+  name?: string | null;
+  /**
+   * The full new option list of a select or multi-select.
+   */
+  options?: SelectOption[] | null;
+  /**
+   * A rollup's property on the related rows, by key or name.
+   */
+  prop?: string | null;
+  /**
+   * A new type. Row files are not rewritten: each value is read again
+   * as the new type, and one that does not fit is kept as written and
+   * reported. Titles and relations keep their type.
+   */
+  type?: string | null;
+  /**
+   * A rollup's relation, by key or name (when changing to a rollup).
+   */
+  via?: string | null;
+}
+
+/**
  * Changes some values of a row, and optionally its body.
  */
 export interface UpdateRowInput {
@@ -7225,6 +7559,104 @@ export interface UpdateUser {
    * A new display name.
    */
   name?: string | null;
+}
+
+/**
+ * The workspace's size and activity at one moment.
+ */
+export interface UsageCounts {
+  /**
+   * People seen in the last 24 hours.
+   */
+  active_users_1d: number;
+  /**
+   * People seen in the last 30 days.
+   */
+  active_users_30d: number;
+  /**
+   * People seen in the last 7 days.
+   */
+  active_users_7d: number;
+  /**
+   * Enabled administrators.
+   */
+  admins: number;
+  /**
+   * Personal API tokens.
+   */
+  api_tokens: number;
+  /**
+   * Live books.
+   */
+  books: number;
+  /**
+   * Live collections.
+   */
+  collections: number;
+  /**
+   * Accounts that may sign in.
+   */
+  enabled_users: number;
+  /**
+   * Drive activity entries (edits, moves, shares…) in the last 24 hours.
+   */
+  events_1d: number;
+  /**
+   * Drive activity entries in the last 7 days.
+   */
+  events_7d: number;
+  /**
+   * Bytes of current files, live and trashed.
+   */
+  file_bytes: number;
+  /**
+   * Live folders.
+   */
+  folders: number;
+  /**
+   * Live pages.
+   */
+  pages: number;
+  /**
+   * When the counts were taken (Unix milliseconds); 0 before the first
+   * sample.
+   */
+  sampled_at_ms: number;
+  /**
+   * Browser sessions that have not expired.
+   */
+  sessions: number;
+  /**
+   * Spaces (shared and personal drives).
+   */
+  spaces: number;
+  /**
+   * Items in the trash.
+   */
+  trashed: number;
+  /**
+   * Accounts, enabled or not.
+   */
+  users: number;
+  /**
+   * Bytes of saved versions.
+   */
+  version_bytes: number;
+  /**
+   * Saved page versions.
+   */
+  versions: number;
+}
+
+/**
+ * How fresh the usage counts must be.
+ */
+export interface UsageInput {
+  /**
+   * Count again now instead of answering from the last sample (at most
+   * five minutes old).
+   */
+  refresh?: boolean;
 }
 
 /**
@@ -7530,6 +7962,134 @@ export interface ViewResult {
    * The view name.
    */
   view: string;
+}
+
+/**
+ * Done.
+ */
+export interface WebhooksDeleteDone {
+  /**
+   * Always true.
+   */
+  ok: boolean;
+}
+
+/**
+ * Done.
+ */
+export interface WebhooksRedeliverDone {
+  /**
+   * Always true.
+   */
+  ok: boolean;
+}
+
+/**
+ * One delivery attempt, as the admin sees it.
+ */
+export interface WebhooksTestDeliveryView {
+  /**
+   * When it was sent (RFC 3339).
+   */
+  at: string;
+  /**
+   * 1 for the first attempt.
+   */
+  attempt: number;
+  /**
+   * The delivery ID, as sent in `Vellum-Delivery`.
+   */
+  delivery_id: string;
+  /**
+   * How long it took.
+   */
+  duration_ms: number;
+  /**
+   * Why there was no answer.
+   */
+  error?: string | null;
+  /**
+   * `issue.create`, `comment.update`, … or `ping`.
+   */
+  event: string;
+  /**
+   * The event ID, as in the payload's `id`.
+   */
+  event_id: string;
+  /**
+   * When it will be tried again (RFC 3339).
+   */
+  next_attempt?: string | null;
+  /**
+   * `delivered`, `retry`, `rejected` or `gone`.
+   */
+  outcome: string;
+  /**
+   * The receiver's status code, when it answered.
+   */
+  status?: number | null;
+}
+
+/**
+ * A webhook, as the admin sees it. The secret is never shown again.
+ */
+export interface WebhooksUpdateHookView {
+  /**
+   * Final failures in a row.
+   */
+  consecutive_failures: number;
+  /**
+   * When it was created (RFC 3339).
+   */
+  created_at: string;
+  /**
+   * A note for admins.
+   */
+  description: string;
+  /**
+   * Whether it receives events.
+   */
+  enabled: boolean;
+  /**
+   * The resources it wants (`issue`, `comment`, …).
+   */
+  event_types: string[];
+  /**
+   * When the current run of failures began (RFC 3339).
+   */
+  failing_since?: string | null;
+  /**
+   * The hook's ID.
+   */
+  id: string;
+  /**
+   * The latest attempt.
+   */
+  last_delivery?: DeliveryView | null;
+  /**
+   * Why Vellum paused it, when it did.
+   */
+  paused_reason?: string | null;
+  /**
+   * Deliveries waiting.
+   */
+  queued: number;
+  /**
+   * Whether a rotated-out secret still signs too.
+   */
+  rotating: boolean;
+  /**
+   * The last four characters of the current secret.
+   */
+  secret_hint: string;
+  /**
+   * The team keys it covers; empty means every public team.
+   */
+  teams: string[];
+  /**
+   * Where events are posted.
+   */
+  url: string;
 }
 
 /**
@@ -8035,16 +8595,6 @@ export interface WorkGetTeamTeamOut {
 }
 
 /**
- * No input.
- */
-export type WorkListProjectsNoInput = Record<string, unknown>;
-
-/**
- * No input.
- */
-export type WorkListTeamsNoInput = Record<string, unknown>;
-
-/**
  * An issue.
  */
 export interface WorkMoveIssueIssueOut {
@@ -8157,11 +8707,6 @@ export interface WorkMoveIssueIssueOut {
    */
   updated_at: string;
 }
-
-/**
- * No input.
- */
-export type WorkMyAssignmentsNoInput = Record<string, unknown>;
 
 /**
  * A project with its computed progress.
@@ -8746,6 +9291,13 @@ export interface Operations {
     input: SettingsUpdate;
     output: AdminUpdateSettingsVersioned;
   };
+  /** People, pages, storage and activity on this server, counted at most five minutes ago */
+  "admin.usage": {
+    method: "GET";
+    path: "/v1/admin/usage";
+    input: UsageInput;
+    output: UsageCounts;
+  };
   /** Checks the audit log's hash chain end to end */
   "admin.verify_audit": {
     method: "POST";
@@ -8830,6 +9382,13 @@ export interface Operations {
     input: UpdateSection;
     output: SectionDoc;
   };
+  /** Add a property (a column) to a collection */
+  "collections.add_property": {
+    method: "POST";
+    path: "/v1/collections/{collection_id}/properties";
+    input: AddPropertyInput;
+    output: CollectionInfo;
+  };
   /** Compute a chart's data from a collection */
   "collections.chart": {
     method: "GET";
@@ -8850,6 +9409,13 @@ export interface Operations {
     path: "/v1/collections/{collection_id}/rows";
     input: CreateRowInput;
     output: RowWritten;
+  };
+  /** Remove a property and the view settings that use it */
+  "collections.delete_property": {
+    method: "DELETE";
+    path: "/v1/collections/{collection_id}/properties/{key}";
+    input: PropertyKey;
+    output: CollectionInfo;
   };
   /** Delete a row and unlink it */
   "collections.delete_row": {
@@ -8919,6 +9485,13 @@ export interface Operations {
     method: "PUT";
     path: "/v1/collections/{collection_id}/views/{view}";
     input: SaveViewInput;
+    output: CollectionInfo;
+  };
+  /** Rename a property or change its type, options, formula or format */
+  "collections.update_property": {
+    method: "PATCH";
+    path: "/v1/collections/{collection_id}/properties/{key}";
+    input: UpdatePropertyInput;
     output: CollectionInfo;
   };
   /** Change a row's values or body */
@@ -9016,7 +9589,7 @@ export interface Operations {
   "drive.my_drive": {
     method: "GET";
     path: "/v1/drive/my-drive";
-    input: NoInput;
+    input: DriveMyDriveNoInput;
     output: MyDrive;
   };
   /** Apply the space's version retention now */
@@ -9086,14 +9659,14 @@ export interface Operations {
   "drive.shared_drives": {
     method: "GET";
     path: "/v1/drive/shared-drives";
-    input: NoInput;
+    input: DriveSharedDrivesNoInput;
     output: SpaceList;
   };
   /** List items in other people's My Drives shared with you */
   "drive.shared_with_me": {
     method: "GET";
     path: "/v1/drive/shared-with-me";
-    input: NoInput;
+    input: DriveSharedWithMeNoInput;
     output: NodeList;
   };
   /** Star or unstar an item */
@@ -9107,7 +9680,7 @@ export interface Operations {
   "drive.starred": {
     method: "GET";
     path: "/v1/drive/starred";
-    input: NoInput;
+    input: DriveStarredNoInput;
     output: NodeList;
   };
   /** Move an item, with everything in it, to the trash */
@@ -9408,35 +9981,35 @@ export interface Operations {
   "tasks.digest": {
     method: "GET";
     path: "/v1/my-work/digest";
-    input: TasksDigestNoInput;
+    input: NoInput;
     output: DigestView;
   };
   /** Starts connecting Google Calendar; returns Google's consent page */
   "tasks.google_connect": {
     method: "POST";
     path: "/v1/my-work/google/connect";
-    input: TasksGoogleConnectNoInput;
+    input: NoInput;
     output: SecretView;
   };
   /** Disconnects Google Calendar */
   "tasks.google_disconnect": {
     method: "DELETE";
     path: "/v1/my-work/google";
-    input: TasksGoogleDisconnectNoInput;
+    input: NoInput;
     output: TasksGoogleDisconnectDone;
   };
   /** Whether Google Calendar time-blocking is set up and connected */
   "tasks.google_status": {
     method: "GET";
     path: "/v1/my-work/google";
-    input: TasksGoogleStatusNoInput;
+    input: NoInput;
     output: GoogleView;
   };
   /** Syncs time blocks with Google Calendar now */
   "tasks.google_sync": {
     method: "POST";
     path: "/v1/my-work/google/sync";
-    input: TasksGoogleSyncNoInput;
+    input: NoInput;
     output: SyncView;
   };
   /** Imports tasks from Google Tasks, Todoist or Things */
@@ -9446,11 +10019,18 @@ export interface Operations {
     input: ImportInput;
     output: ImportView;
   };
+  /** Links your Slack account for Save as task, with the code Slack showed you */
+  "tasks.link_slack": {
+    method: "POST";
+    path: "/v1/my-work/slack-link";
+    input: SlackLinkInput;
+    output: TasksLinkSlackDone;
+  };
   /** Lists the person's task lists and lists shared with them */
   "tasks.lists": {
     method: "GET";
     path: "/v1/task-lists";
-    input: TasksListsNoInput;
+    input: NoInput;
     output: ListsView;
   };
   /** Takes a mention out of My Work without replying */
@@ -9471,7 +10051,7 @@ export interface Operations {
   "tasks.my_work": {
     method: "GET";
     path: "/v1/my-work";
-    input: TasksMyWorkNoInput;
+    input: NoInput;
     output: MyWorkView;
   };
   /** Parses a quick-add line for highlighting */
@@ -9492,35 +10072,35 @@ export interface Operations {
   "tasks.revoke_capture": {
     method: "DELETE";
     path: "/v1/my-work/capture-address";
-    input: TasksRevokeCaptureNoInput;
+    input: NoInput;
     output: TasksRevokeCaptureDone;
   };
   /** Turns the calendar feed off */
   "tasks.revoke_feed": {
     method: "DELETE";
     path: "/v1/my-work/feed";
-    input: TasksRevokeFeedNoInput;
+    input: NoInput;
     output: TasksRevokeFeedDone;
   };
   /** Issues a new capture e-mail address and revokes the old one */
   "tasks.rotate_capture": {
     method: "POST";
     path: "/v1/my-work/capture-address";
-    input: TasksRotateCaptureNoInput;
+    input: NoInput;
     output: SecretView;
   };
   /** Issues a new calendar feed URL and revokes the old one */
   "tasks.rotate_feed": {
     method: "POST";
     path: "/v1/my-work/feed";
-    input: TasksRotateFeedNoInput;
+    input: NoInput;
     output: SecretView;
   };
   /** Your My Work settings: time zone, start of day and digest time */
   "tasks.settings": {
     method: "GET";
     path: "/v1/my-work/settings";
-    input: TasksSettingsNoInput;
+    input: NoInput;
     output: MyWorkSettingsView;
   };
   /** Replaces your My Work settings */
@@ -9537,6 +10117,13 @@ export interface Operations {
     input: MemberInput;
     output: TasksShareListListView;
   };
+  /** Unlinks your Slack account */
+  "tasks.unlink_slack": {
+    method: "DELETE";
+    path: "/v1/my-work/slack-link";
+    input: NoInput;
+    output: TasksUnlinkSlackDone;
+  };
   /** Stops sharing a list with someone */
   "tasks.unshare_list": {
     method: "DELETE";
@@ -9550,6 +10137,62 @@ export interface Operations {
     path: "/v1/tasks/{task}";
     input: UpdateInput;
     output: TasksUpdateTaskView;
+  };
+  /** Add a webhook; its signing secret is shown once */
+  "webhooks.create": {
+    method: "POST";
+    path: "/v1/admin/webhooks";
+    input: HookInput;
+    output: HookCreated;
+  };
+  /** Remove a webhook */
+  "webhooks.delete": {
+    method: "DELETE";
+    path: "/v1/admin/webhooks/{id}";
+    input: HookId;
+    output: WebhooksDeleteDone;
+  };
+  /** A webhook's last 100 delivery attempts */
+  "webhooks.deliveries": {
+    method: "GET";
+    path: "/v1/admin/webhooks/{id}/deliveries";
+    input: HookId;
+    output: DeliveryList;
+  };
+  /** Every webhook, with its health and last delivery */
+  "webhooks.list": {
+    method: "GET";
+    path: "/v1/admin/webhooks";
+    input: NoInput;
+    output: HookList;
+  };
+  /** Send a logged event to a webhook again */
+  "webhooks.redeliver": {
+    method: "POST";
+    path: "/v1/admin/webhooks/{id}/redeliver";
+    input: RedeliverInput;
+    output: WebhooksRedeliverDone;
+  };
+  /** Make a new signing secret; the old one signs for 24 more hours */
+  "webhooks.rotate_secret": {
+    method: "POST";
+    path: "/v1/admin/webhooks/{id}/secret";
+    input: HookId;
+    output: HookCreated;
+  };
+  /** Send a signed test delivery now */
+  "webhooks.test": {
+    method: "POST";
+    path: "/v1/admin/webhooks/{id}/test";
+    input: HookId;
+    output: WebhooksTestDeliveryView;
+  };
+  /** Change a webhook's URL, events, teams or turn it on or off */
+  "webhooks.update": {
+    method: "PUT";
+    path: "/v1/admin/webhooks/{id}";
+    input: HookUpdate;
+    output: WebhooksUpdateHookView;
   };
   /** Applies the waiting triage suggestion as the caller */
   "work.accept_suggestion": {
@@ -9667,14 +10310,14 @@ export interface Operations {
   "work.list_projects": {
     method: "GET";
     path: "/v1/work/projects";
-    input: WorkListProjectsNoInput;
+    input: NoInput;
     output: ProjectsOut;
   };
   /** Lists teams with their workflows */
   "work.list_teams": {
     method: "GET";
     path: "/v1/work/teams";
-    input: WorkListTeamsNoInput;
+    input: NoInput;
     output: TeamsOut;
   };
   /** Moves an issue to another team; the old key keeps working */
@@ -9688,7 +10331,7 @@ export interface Operations {
   "work.my_assignments": {
     method: "GET";
     path: "/v1/work/me/assignments";
-    input: WorkMyAssignmentsNoInput;
+    input: NoInput;
     output: AssignmentsOut;
   };
   /** Lists my issues in focus order */
@@ -9787,6 +10430,7 @@ export const OPERATIONS = {
   "admin.state": { method: "GET", path: "/v1/admin/state", mutation: false },
   "admin.telemetry_preview": { method: "GET", path: "/v1/admin/telemetry/preview", mutation: false },
   "admin.update_settings": { method: "PUT", path: "/v1/admin/settings", mutation: true },
+  "admin.usage": { method: "GET", path: "/v1/admin/usage", mutation: false },
   "admin.verify_audit": { method: "POST", path: "/v1/admin/audit/verify", mutation: true },
   "books.add_section": { method: "POST", path: "/v1/books/{book_id}/sections", mutation: true },
   "books.create_snapshot": { method: "POST", path: "/v1/books/{book_id}/snapshots", mutation: true },
@@ -9799,9 +10443,11 @@ export const OPERATIONS = {
   "books.remove_section": { method: "DELETE", path: "/v1/books/{book_id}/sections/{section_id}", mutation: true },
   "books.set_section_access": { method: "PUT", path: "/v1/books/{book_id}/sections/{section_id}/access", mutation: true },
   "books.update_section": { method: "PATCH", path: "/v1/books/{book_id}/sections/{section_id}", mutation: true },
+  "collections.add_property": { method: "POST", path: "/v1/collections/{collection_id}/properties", mutation: true },
   "collections.chart": { method: "GET", path: "/v1/collections/chart", mutation: false },
   "collections.create_from_csv": { method: "POST", path: "/v1/collections", mutation: true },
   "collections.create_row": { method: "POST", path: "/v1/collections/{collection_id}/rows", mutation: true },
+  "collections.delete_property": { method: "DELETE", path: "/v1/collections/{collection_id}/properties/{key}", mutation: true },
   "collections.delete_row": { method: "DELETE", path: "/v1/collections/{collection_id}/rows/{row_id}", mutation: true },
   "collections.delete_view": { method: "DELETE", path: "/v1/collections/{collection_id}/views/{view}", mutation: true },
   "collections.embed": { method: "GET", path: "/v1/collections/embed", mutation: false },
@@ -9812,6 +10458,7 @@ export const OPERATIONS = {
   "collections.list": { method: "GET", path: "/v1/collections", mutation: false },
   "collections.query": { method: "GET", path: "/v1/collections/{collection_id}/query", mutation: false },
   "collections.save_view": { method: "PUT", path: "/v1/collections/{collection_id}/views/{view}", mutation: true },
+  "collections.update_property": { method: "PATCH", path: "/v1/collections/{collection_id}/properties/{key}", mutation: true },
   "collections.update_row": { method: "PATCH", path: "/v1/collections/{collection_id}/rows/{row_id}", mutation: true },
   "drive.activity": { method: "GET", path: "/v1/drive/items/{id}/activity", mutation: false },
   "drive.backlinks": { method: "GET", path: "/v1/drive/items/{id}/backlinks", mutation: false },
@@ -9887,6 +10534,7 @@ export const OPERATIONS = {
   "tasks.google_status": { method: "GET", path: "/v1/my-work/google", mutation: false },
   "tasks.google_sync": { method: "POST", path: "/v1/my-work/google/sync", mutation: true },
   "tasks.import": { method: "POST", path: "/v1/tasks/import", mutation: true },
+  "tasks.link_slack": { method: "POST", path: "/v1/my-work/slack-link", mutation: true },
   "tasks.lists": { method: "GET", path: "/v1/task-lists", mutation: false },
   "tasks.mention_dismiss": { method: "POST", path: "/v1/my-work/mentions/{comment}/dismiss", mutation: true },
   "tasks.move": { method: "POST", path: "/v1/tasks/{task}/move", mutation: true },
@@ -9900,8 +10548,17 @@ export const OPERATIONS = {
   "tasks.settings": { method: "GET", path: "/v1/my-work/settings", mutation: false },
   "tasks.settings_update": { method: "PUT", path: "/v1/my-work/settings", mutation: true },
   "tasks.share_list": { method: "POST", path: "/v1/task-lists/{list_id}/members", mutation: true },
+  "tasks.unlink_slack": { method: "DELETE", path: "/v1/my-work/slack-link", mutation: true },
   "tasks.unshare_list": { method: "DELETE", path: "/v1/task-lists/{list_id}/members/{member}", mutation: true },
   "tasks.update": { method: "PATCH", path: "/v1/tasks/{task}", mutation: true },
+  "webhooks.create": { method: "POST", path: "/v1/admin/webhooks", mutation: true },
+  "webhooks.delete": { method: "DELETE", path: "/v1/admin/webhooks/{id}", mutation: true },
+  "webhooks.deliveries": { method: "GET", path: "/v1/admin/webhooks/{id}/deliveries", mutation: false },
+  "webhooks.list": { method: "GET", path: "/v1/admin/webhooks", mutation: false },
+  "webhooks.redeliver": { method: "POST", path: "/v1/admin/webhooks/{id}/redeliver", mutation: true },
+  "webhooks.rotate_secret": { method: "POST", path: "/v1/admin/webhooks/{id}/secret", mutation: true },
+  "webhooks.test": { method: "POST", path: "/v1/admin/webhooks/{id}/test", mutation: true },
+  "webhooks.update": { method: "PUT", path: "/v1/admin/webhooks/{id}", mutation: true },
   "work.accept_suggestion": { method: "POST", path: "/v1/work/issues/{key}/triage/suggestion/accept", mutation: true },
   "work.add_comment": { method: "POST", path: "/v1/work/comments", mutation: true },
   "work.assign_thread": { method: "POST", path: "/v1/work/threads/{thread_id}/assign", mutation: true },

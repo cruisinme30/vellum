@@ -159,7 +159,8 @@ impl RetryPolicy {
 }
 
 /// Failure tracking for one subscription or push endpoint.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
 pub struct EndpointHealth {
     /// Deliveries that finally failed since the last success.
     pub consecutive_failures: u32,
@@ -220,6 +221,31 @@ pub async fn attempt<T: HttpTransport>(
     channel: &'static str,
     attempt_number: usize,
 ) -> Outcome {
+    attempt_detailed(transport, request, channel, attempt_number)
+        .await
+        .outcome
+}
+
+/// What one attempt did, for delivery logs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Attempted {
+    /// The classified outcome.
+    pub outcome: Outcome,
+    /// The receiver's status code, when it answered.
+    pub status: Option<u16>,
+    /// The transport error, when it did not.
+    pub error: Option<String>,
+    /// How long the attempt took.
+    pub elapsed_ms: u64,
+}
+
+/// As [`attempt`], also returning the status code and timing.
+pub async fn attempt_detailed<T: HttpTransport>(
+    transport: &T,
+    request: &OutboundRequest,
+    channel: &'static str,
+    attempt_number: usize,
+) -> Attempted {
     let span = tracing::info_span!(
         "notify.deliver",
         otel.kind = "client",
@@ -253,7 +279,12 @@ pub async fn attempt<T: HttpTransport>(
             channel,
             outcome = outcome.as_str(),
         );
-        outcome
+        Attempted {
+            outcome,
+            status: result.as_ref().ok().map(|r| r.status),
+            error: result.err().map(|e| e.to_string()),
+            elapsed_ms,
+        }
     }
     .instrument(span)
     .await

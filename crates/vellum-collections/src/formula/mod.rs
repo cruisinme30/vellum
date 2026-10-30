@@ -144,6 +144,44 @@ pub fn compile(source: &str, schema: &Schema) -> Result<Formula, FormulaError> {
     })
 }
 
+/// Rewrites `source` so its references to the property `key` use `new_name`.
+///
+/// The rest of the text stays as written. Each reference becomes
+/// `prop("New name")`, which reads the same whatever the name holds.
+/// `schema` is the schema before the rename.
+///
+/// # Errors
+///
+/// A syntax error in `source`.
+pub fn rename_references(
+    source: &str,
+    schema: &Schema,
+    key: &str,
+    new_name: &str,
+) -> Result<String, FormulaError> {
+    let mut root = parse(source)?;
+    let mut spans = Vec::new();
+    root.walk_mut(&mut |node| {
+        if let Expr::Prop(name) = &node.expr
+            && schema.resolve(name).is_some_and(|p| p.key == key)
+        {
+            spans.push(node.span);
+        }
+    });
+    let replacement = Node::new(Expr::Prop(new_name.to_owned()), Span::default()).to_string();
+    let chars: Vec<char> = source.chars().collect();
+    let mut out = String::with_capacity(source.len());
+    let mut at = 0;
+    spans.sort_by_key(|s| s.start);
+    for span in spans {
+        out.extend(chars.get(at..span.start).unwrap_or_default());
+        out.push_str(&replacement);
+        at = span.end;
+    }
+    out.extend(chars.get(at..).unwrap_or_default());
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
@@ -164,6 +202,27 @@ mod tests {
         fn now(&self) -> DateValue {
             DateValue::parse("2026-10-29T08:00").unwrap()
         }
+    }
+
+    #[test]
+    fn renames_rewrite_only_that_property() {
+        let s = schema();
+        let renamed = |src: &str| rename_references(src, &s, "est", "Story points").unwrap();
+        assert_eq!(
+            renamed("round(Estimate * 0.5, 1)"),
+            r#"round(prop("Story points") * 0.5, 1)"#
+        );
+        assert_eq!(
+            renamed(r#"prop("estimate") + Progress + (Estimate)"#),
+            r#"prop("Story points") + Progress + prop("Story points")"#
+        );
+        assert_eq!(
+            renamed(r#"concat("Estimate", Team)"#),
+            r#"concat("Estimate", Team)"#
+        );
+        let again = rename_references(&renamed("Estimate - 1"), &s, "est", "x");
+        assert!(again.is_ok());
+        assert!(rename_references("1 +", &s, "est", "x").is_err());
     }
 
     fn schema() -> Schema {

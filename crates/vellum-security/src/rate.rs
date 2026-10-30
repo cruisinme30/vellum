@@ -18,8 +18,27 @@
 
 use std::collections::HashMap;
 use std::hash::Hash;
+use std::net::{IpAddr, Ipv6Addr};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
+
+/// The address that limits and lockouts count a client under: an `IPv4`
+/// address as is, and an `IPv6` address as its `/64` network.
+///
+/// One `IPv6` customer is usually given a whole `/64`, so keying on the
+/// full address let a single client rotate through 2^64 addresses and
+/// never reach a per-address limit (red team round 4). `IPv4`-mapped
+/// addresses count as the `IPv4` address they carry.
+#[must_use]
+pub fn client_bucket(ip: IpAddr) -> IpAddr {
+    match ip {
+        IpAddr::V4(_) => ip,
+        IpAddr::V6(v6) => v6.to_ipv4_mapped().map_or_else(
+            || IpAddr::V6(Ipv6Addr::from(u128::from(v6) & !((1_u128 << 64) - 1))),
+            IpAddr::V4,
+        ),
+    }
+}
 
 /// How many requests a key may make: `burst` at once, refilling at one
 /// request every `period / burst`.

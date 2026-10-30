@@ -70,6 +70,10 @@ export interface Http {
   get<T>(path: string, query?: Query): Promise<T>;
   /** An unsafe request with a JSON body. */
   send<T>(method: Exclude<Method, "GET">, path: string, body?: unknown): Promise<T>;
+  /** A GET whose answer is a file (an export). */
+  blob(path: string, query?: Query): Promise<Blob>;
+  /** A POST whose body is a file (an import), with the CSRF token. */
+  upload<T>(path: string, query: Query, file: Blob): Promise<T>;
   /** Forgets the CSRF token; called after signing in or out, when the session changes. */
   forgetSession(): void;
 }
@@ -174,6 +178,35 @@ export function createHttp(options: HttpOptions = {}): Http {
     return (await response.json()) as T;
   };
 
+  /** An unsafe request with the CSRF token and an idempotency key. */
+  const unsafe = async (
+    method: Exclude<Method, "GET">,
+    path: string,
+    withBody: (headers: Record<string, string>) => { body?: BodyInit },
+  ): Promise<Response> => {
+    const key = idempotencyKey();
+    const attempt = async (): Promise<Response> => {
+      const token = await csrfToken();
+      const headers: Record<string, string> = {
+        accept: "application/json",
+        "idempotency-key": key,
+      };
+      if (token !== undefined) headers["x-csrf-token"] = token;
+      const body = withBody(headers);
+      return request(method, path, { headers, ...body });
+    };
+    let response = await attempt();
+    // A new session (just signed in or out) needs a new token: fetch it once more.
+    if (response.status === 403) {
+      const error = await errorOf(response.clone());
+      if (/csrf/i.test(error.message)) {
+        csrf = undefined;
+        response = await attempt();
+      }
+    }
+    return response;
+  };
+
   return {
     async get<T>(path: string, query?: Query): Promise<T> {
       const response = await request("GET", `${path}${queryString(query)}`, {
@@ -183,29 +216,25 @@ export function createHttp(options: HttpOptions = {}): Http {
     },
 
     async send<T>(method: Exclude<Method, "GET">, path: string, body?: unknown): Promise<T> {
-      const key = idempotencyKey();
-      const attempt = async (): Promise<Response> => {
-        const token = await csrfToken();
-        const headers: Record<string, string> = {
-          accept: "application/json",
-          "idempotency-key": key,
-        };
-        if (token !== undefined) headers["x-csrf-token"] = token;
-        if (body !== undefined) headers["content-type"] = "application/json";
-        return request(method, path, {
-          headers,
-          ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-        });
-      };
-      let response = await attempt();
-      // A new session (just signed in or out) needs a new token: fetch it once more.
-      if (response.status === 403) {
-        const error = await errorOf(response.clone());
-        if (/csrf/i.test(error.message)) {
-          csrf = undefined;
-          response = await attempt();
-        }
-      }
+      const response = await unsafe(method, path, (headers) => {
+        if (body === undefined) return {};
+        headers["content-type"] = "application/json";
+        return { body: JSON.stringify(body) };
+      });
+      return parse<T>(response);
+    },
+
+    async blob(path: string, query?: Query): Promise<Blob> {
+      const response = await request("GET", `${path}${queryString(query)}`, {});
+      if (!response.ok) throw await errorOf(response);
+      return response.blob();
+    },
+
+    async upload<T>(path: string, query: Query, file: Blob): Promise<T> {
+      const response = await unsafe("POST", `${path}${queryString(query)}`, (headers) => {
+        headers["content-type"] = file.type === "" ? "application/octet-stream" : file.type;
+        return { body: file };
+      });
       return parse<T>(response);
     },
 

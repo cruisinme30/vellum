@@ -24,15 +24,23 @@ vellum: 1
 | `formula` | A value computed from other properties | 1.5 |
 | `created` | Who created the row and when | Priya Shah, 2026-10-02 |
 
-Change a property's type from its header menu. Vellum converts the
-values it can and keeps the original text for those it cannot, so a
-change of type never loses data.
+Select **Properties** on a collection to rename a property, change its
+type, change the options of a select or a formula, delete a property, or add
+a new one at the end. Renaming a property updates the formulas that use
+it. Changing the type keeps every value in the files: values that do not
+fit the new type are listed under **Problems** until you fix them or
+change the type back. Titles and relations keep their type. Deleting a
+property also removes the filters, sorts and grouping that used it;
+Vellum refuses while a formula or rollup still reads it.
 
 ## Relations {#relations}
 
 A relation links rows in one collection to rows in another. Relations
 are always two-way: adding a requirement to a release adds the release
-to the requirement. In the schema, `to:` names the other collection by
+to the requirement. To add one, open **Properties**, pick **Relation**,
+choose the collection it links to and name the matching property there;
+you need to be able to edit both collections. Deleting a relation
+removes it from both. In the schema, `to:` names the other collection by
 ID.
 
 ```yaml
@@ -41,9 +49,10 @@ ID.
 
 ## Rollups {#rollups}
 
-A rollup summarises a property of the related rows. On the releases
-collection, this rollup adds up the estimates of each release's
-requirements:
+A rollup summarises a property of the related rows. In **Properties**,
+pick **Rollup**, then the relation, the property of the linked rows and
+how to combine them. On the releases collection, this rollup adds up the
+estimates of each release's requirements:
 
 ```yaml
 - {key: pts, name: Total points, type: rollup, via: rq, prop: est, agg: sum}

@@ -29,10 +29,11 @@ cleanly in Git and takes the same permissions as any other folder.
 
 ## Create a collection {#create}
 
-1. Select **New → Collection**, or type `/collection` in a page to create one inline.
-2. Name it, for example "Requirements tracker".
-3. Add properties with **+** at the end of the header row.
-4. Add rows with **New row**, or paste rows from a spreadsheet.
+1. Open **Data** and select **New collection**.
+2. Name it, for example "Requirements tracker", and pick the drive folder it lives in.
+3. Leave the CSV empty for a blank collection, or start from a CSV file:
+   its first column becomes the title and Vellum guesses the other types.
+4. Add properties under **Properties**, and rows with **New row**.
 
 ## The schema
 
@@ -81,9 +82,10 @@ Notes about this requirement.
 
 ## Import and export CSV {#csv}
 
-**⋯ → Import CSV** creates rows from a CSV file and maps columns to
-properties; Vellum suggests a type for each new column. **⋯ → Export
-CSV** writes the current view, with its filters and sort, to a file.
+**Import CSV** adds rows from a CSV file, matching columns to properties
+by name. **Check** shows how many rows would be added and which columns
+would be ignored; **Import** then adds every row or none. **Export CSV**
+writes the current view, with its filters and sort, to a file.
 
 ## In this part
 

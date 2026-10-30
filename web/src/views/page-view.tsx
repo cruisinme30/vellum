@@ -11,6 +11,7 @@ import { useServices, useWorkspace } from "../data/workspace-context";
 import { PageEditor, type EditorControls } from "../editor/page-editor";
 import { useT } from "../i18n/i18n";
 import { Icon } from "../shell/icon";
+import { ExportButton } from "../transfer/export-button";
 
 import { HistoryPanel } from "./history-panel";
 import { NotFoundView } from "./info";
@@ -200,7 +201,12 @@ export function PageView() {
             resolvePage={resolvePage}
             onOpenPage={onOpenPage}
             onControls={pageHistory.setControls}
-            actions={pageHistory.button}
+            actions={
+              <>
+                <ExportButton target={{ kind: "page", id: page.id, title: page.title }} />
+                {pageHistory.button}
+              </>
+            }
           />
           {pageHistory.panel}
         </>

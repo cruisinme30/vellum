@@ -69,6 +69,12 @@ pub fn parse(xml: &str) -> Result<Page, String> {
     })
 }
 
+/// The unescaped, trimmed text of the first `<tag>` in `xml`, for the
+/// other small XML answers the adapter reads (STS).
+pub fn element_text(xml: &str, tag: &str) -> Option<String> {
+    element(xml, tag).map(|text| unescape(text.trim()))
+}
+
 /// The text of the first `<tag>` in `xml`; `<tag/>` reads as empty.
 fn element<'a>(xml: &'a str, tag: &'a str) -> Option<&'a str> {
     elements(xml, tag).next()

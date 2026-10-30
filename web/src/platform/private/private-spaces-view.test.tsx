@@ -38,8 +38,8 @@ function setup(spaces: PrivateSpace[]) {
   const enrol = vi.fn<(space: string) => Promise<{ lines: string[] }>>(() =>
     Promise.resolve({ lines: ["enrolled laptop"] }),
   );
-  const reseal = vi.fn<(space: string) => Promise<{ lines: string[] }>>(() =>
-    Promise.resolve({ lines: ["1 resealed"] }),
+  const reseal = vi.fn<(space: string, trust?: readonly string[]) => Promise<{ lines: string[] }>>(
+    () => Promise.resolve({ lines: ["1 resealed"] }),
   );
   const device = {
     deviceKey: () => Promise.resolve({ publicKey: "ab", fingerprint: MINE }),
@@ -91,7 +91,7 @@ describe("private spaces screen", () => {
     expect(within(board).getByText(/this device/)).toBeTruthy();
     expect(within(board).queryByRole("button", { name: /Enrol/ })).toBeNull();
     expect(within(board).queryByRole("button", { name: "Remove Ben's phone" })).toBeNull();
-    await user.click(within(board).getByRole("button", { name: "Reseal pages for every device" }));
+    await user.click(within(board).getByRole("button", { name: "Seal pages for every device" }));
     expect(reseal).toHaveBeenCalledWith("01JDB0BRD00000000000000000");
     expect(await screen.findByText("1 resealed")).toBeTruthy();
     const reloaded = await screen.findByRole("region", { name: "Board" });
@@ -119,5 +119,31 @@ describe("private spaces screen", () => {
     );
     await user.click(await screen.findByRole("button", { name: /Make private/ }));
     expect(await text(screen.findByRole("alert"))).toContain("only a manager");
+  });
+});
+
+describe("untrusted device keys", () => {
+  it("lists the new keys and seals once the person trusts them", async () => {
+    const user = userEvent.setup();
+    const { api, device, reseal } = setup([
+      space("01JDB0BRD00000000000000000", "Board", [key(MINE, "Ana's laptop", true)]),
+    ]);
+    reseal.mockRejectedValueOnce(
+      new Error(
+        `Error invoking remote method: untrusted device keys: ${OTHER} (Ben's phone); compare`,
+      ),
+    );
+    render(
+      <I18nProvider>
+        <PrivateSpaces api={api} device={device} />
+      </I18nProvider>,
+    );
+    await user.click(await screen.findByRole("button", { name: "Seal pages for every device" }));
+    const check = await screen.findByRole("region", { name: "New devices to check" });
+    expect(within(check).getByText("2222 3333 4444 5555 6666 7777 8888 9999")).toBeTruthy();
+    await user.click(within(check).getByRole("button", { name: /trust and seal/ }));
+    expect(reseal).toHaveBeenLastCalledWith("01JDB0BRD00000000000000000", [OTHER]);
+    expect(await screen.findByText("1 resealed")).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "New devices to check" })).toBeNull();
   });
 });

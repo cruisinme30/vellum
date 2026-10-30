@@ -6,6 +6,7 @@ import { createContext, use, type ReactNode } from "react";
 import type { BooksApi } from "../books/api";
 import { useT } from "../i18n/i18n";
 import type { PrivateSpacesApi } from "../platform/private/api";
+import type { TransferApi } from "../transfer/api";
 import type { WorkApi } from "../work/api";
 
 import type { Loaded } from "./use-loaded";
@@ -15,6 +16,8 @@ export interface ServerApis {
   readonly work?: WorkApi | undefined;
   readonly books?: BooksApi | undefined;
   readonly privateSpaces?: PrivateSpacesApi | undefined;
+  /** Export and import. */
+  readonly transfer?: TransferApi | undefined;
 }
 
 const ServerApisContext = createContext<ServerApis>({});
@@ -28,6 +31,11 @@ export function ServerApisProvider({
   readonly children: ReactNode;
 }) {
   return <ServerApisContext value={apis}>{children}</ServerApisContext>;
+}
+
+/** The server-only APIs; each is absent in demo mode. */
+export function useServerApis(): ServerApis {
+  return use(ServerApisContext);
 }
 
 /**

@@ -53,7 +53,30 @@ pub enum PrivateCommand {
     Reseal {
         #[command(flatten)]
         remote: RemoteArgs,
+        /// Trust a device key that is new since this device last sealed
+        /// the space, after comparing its fingerprint with its owner.
+        /// Repeat for more keys.
+        #[arg(long, value_parser = parse_fingerprint)]
+        trust: Vec<String>,
     },
+}
+
+/// Parses a `--trust` fingerprint: 32 hex digits, spaces allowed.
+///
+/// # Errors
+///
+/// Anything else.
+pub fn parse_fingerprint(value: &str) -> Result<String, String> {
+    let clean: String = value
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect::<String>()
+        .to_ascii_lowercase();
+    if clean.len() == 32 && clean.chars().all(|c| c.is_ascii_hexdigit()) {
+        Ok(clean)
+    } else {
+        Err(format!("`{value}`: a fingerprint is 32 hex digits"))
+    }
 }
 
 /// Which server and space a remote command works on.
@@ -101,31 +124,41 @@ pub fn run(command: &PrivateCommand) -> Result<Vec<String>, String> {
         PrivateCommand::Enrol { remote, label } => {
             let client = remote.client()?;
             let identity = device_identity()?;
+            let pins = crate::pins::Pins::from_env()?;
             let enrolled = block_on(crate::private_remote::enrol(
                 &client,
                 &identity,
                 remote.space,
                 label,
-            ))?
-            .map_err(|e| e.to_string())?;
+                &pins,
+            ))??;
             Ok(vec![
                 format!("enrolled \"{}\" in {}", enrolled.label, remote.space),
                 format!("fingerprint: {}", enrolled.fingerprint),
                 "Another member's device must now run `vellum private reseal` so existing pages open here.".to_owned(),
             ])
         }
-        PrivateCommand::Reseal { remote } => {
+        PrivateCommand::Reseal { remote, trust } => {
             let client = remote.client()?;
             let identity = device_identity()?;
+            let pins = crate::pins::Pins::from_env()?;
             let report = block_on(crate::private_remote::reseal(
                 &client,
                 &identity,
                 remote.space,
+                &pins,
+                trust,
             ))??;
             let mut lines = vec![format!(
-                "{} resealed, {} already current, {} sealed for other devices only",
-                report.resealed, report.current, report.not_for_this_device
+                "{} resealed, {} sealed for the first time, {} already current, {} sealed for other devices only",
+                report.resealed, report.converted, report.current, report.not_for_this_device
             )];
+            if report.first_use {
+                lines.push(
+                    "First reseal on this device: the space's device keys are now trusted as found."
+                        .to_owned(),
+                );
+            }
             if report.changed > 0 {
                 lines.push(format!(
                     "{} changed during the pass; run it again",

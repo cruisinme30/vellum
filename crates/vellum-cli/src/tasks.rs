@@ -204,16 +204,80 @@ impl Secrets {
     }
 }
 
-/// Reads `slack-users.json`: `{"<team>/<user>": "<handle>"}`.
-fn slack_links(dir: Option<&Path>) -> Result<HashMap<String, String>, Error> {
-    let Some(path) = dir.map(|d| d.join("slack-users.json")) else {
-        return Ok(HashMap::new());
-    };
-    if !path.exists() {
-        return Ok(HashMap::new());
+/// Slack users linked to Vellum handles, kept in `slack-users.json` as
+/// `{"<team>/<user>": "<handle>"}`. People link themselves from the "Save
+/// as task" shortcut (#163); an admin may also edit the file.
+#[derive(Debug)]
+struct SlackLinks {
+    path: Option<PathBuf>,
+    links: Mutex<HashMap<String, String>>,
+}
+
+impl SlackLinks {
+    fn open(dir: Option<&Path>) -> Result<Self, Error> {
+        let path = dir.map(|d| d.join("slack-users.json"));
+        let links = match &path {
+            Some(p) if p.exists() => {
+                let bytes =
+                    std::fs::read(p).map_err(|e| unavailable("cannot read Slack links", e))?;
+                serde_json::from_slice(&bytes)
+                    .map_err(|e| unavailable("Slack links are not valid JSON", e))?
+            }
+            _ => HashMap::new(),
+        };
+        Ok(Self {
+            path,
+            links: Mutex::new(links),
+        })
     }
-    let bytes = std::fs::read(&path).map_err(|e| unavailable("cannot read Slack links", e))?;
-    serde_json::from_slice(&bytes).map_err(|e| unavailable("Slack links are not valid JSON", e))
+
+    fn lock(&self) -> std::sync::MutexGuard<'_, HashMap<String, String>> {
+        self.links
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    fn get(&self, key: &str) -> Option<String> {
+        self.lock().get(key).cloned()
+    }
+
+    /// Changes the links and saves them.
+    fn change<R>(&self, f: impl FnOnce(&mut HashMap<String, String>) -> R) -> Result<R, Error> {
+        let (out, bytes) = {
+            let mut links = self.lock();
+            let out = f(&mut links);
+            let sorted: BTreeMap<&String, &String> = links.iter().collect();
+            let bytes = serde_json::to_vec_pretty(&sorted)
+                .map_err(|e| Error::new(ErrorKind::Internal, e.to_string()))?;
+            drop(links);
+            (out, bytes)
+        };
+        let Some(path) = &self.path else {
+            return Ok(out);
+        };
+        if let Some(dir) = path.parent() {
+            std::fs::create_dir_all(dir).map_err(|e| unavailable("cannot save Slack links", e))?;
+        }
+        let temp = path.with_extension("json.tmp");
+        std::fs::write(&temp, bytes).map_err(|e| unavailable("cannot save Slack links", e))?;
+        std::fs::rename(&temp, path).map_err(|e| unavailable("cannot save Slack links", e))?;
+        Ok(out)
+    }
+}
+
+/// Posts Slack replies; only to `https://hooks.slack.com/`, never
+/// following redirects, within Slack's three-second window.
+fn slack_client() -> Result<reqwest::Client, Error> {
+    reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(std::time::Duration::from_millis(2500))
+        .build()
+        .map_err(|e| {
+            Error::new(
+                ErrorKind::Internal,
+                format!("cannot build the Slack client: {e}"),
+            )
+        })
 }
 
 /// Settings for [`DriveTasks`].
@@ -236,7 +300,8 @@ pub struct DriveTasks<S> {
     work: Arc<WorkService>,
     secrets: Secrets,
     people: PeoplePrefs,
-    slack: HashMap<String, String>,
+    slack: SlackLinks,
+    slack_http: reqwest::Client,
     time_zone: TimeZone,
 }
 
@@ -279,7 +344,8 @@ impl<S: AuthzStore + 'static> DriveTasks<S> {
             work: parts.work,
             secrets: Secrets::open(dir)?,
             people: PeoplePrefs::open(dir)?,
-            slack: slack_links(dir)?,
+            slack: SlackLinks::open(dir)?,
+            slack_http: slack_client()?,
             time_zone: settings.time_zone.clone().unwrap_or_else(TimeZone::system),
         })
     }
@@ -825,8 +891,50 @@ impl<S: AuthzStore + 'static> Workspace for DriveTasks<S> {
             Ok(self
                 .slack
                 .get(&format!("{team}/{slack_user}"))
-                .and_then(|handle| self.identity.user_by_handle(handle))
+                .and_then(|handle| self.identity.user_by_handle(&handle))
                 .map(|person| person.id))
+        })
+    }
+
+    fn link_slack(
+        &self,
+        user: UserId,
+        team: String,
+        slack_user: String,
+    ) -> BoxFuture<'_, Result<(), Error>> {
+        Box::pin(async move {
+            let handle = self.handle_of(user)?;
+            self.slack.change(|links| {
+                let _ = links.insert(format!("{team}/{slack_user}"), handle);
+            })
+        })
+    }
+
+    fn unlink_slack(&self, user: UserId) -> BoxFuture<'_, Result<usize, Error>> {
+        Box::pin(async move {
+            let handle = self.handle_of(user)?;
+            self.slack.change(|links| {
+                let before = links.len();
+                links.retain(|_, h| *h != handle);
+                before - links.len()
+            })
+        })
+    }
+
+    fn slack_say(&self, response_url: String, text: String) -> BoxFuture<'_, ()> {
+        Box::pin(async move {
+            if !response_url.starts_with(vellum_tasks::capture::SLACK_RESPONSE_PREFIX) {
+                return;
+            }
+            let sent = self
+                .slack_http
+                .post(&response_url)
+                .json(&serde_json::json!({ "response_type": "ephemeral", "text": text }))
+                .send()
+                .await;
+            if let Err(error) = sent {
+                tracing::warn!(%error, "Slack reply not sent");
+            }
         })
     }
 }

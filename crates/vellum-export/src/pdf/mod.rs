@@ -231,30 +231,7 @@ impl PdfEngine {
     }
 
     fn render_inner(&self, flow: &Flow, theme: &PrintTheme) -> Result<PdfOutput, ExportError> {
-        let mut files = HashMap::new();
-        let _ = files.insert(file_id("/flow.json")?, Bytes::new(json(flow)?));
-        let _ = files.insert(file_id("/theme.json")?, Bytes::new(json(theme)?));
-        for asset in &flow.assets {
-            let _ = files.insert(
-                file_id(&format!("/{}", asset.name))?,
-                Bytes::new(asset.bytes.clone()),
-            );
-        }
-        let main = file_id("/print.typ")?;
-        let job = Job {
-            engine: self,
-            main,
-            source: Source::new(main, TEMPLATE.to_owned()),
-            files,
-        };
-        let warned = typst::compile::<PagedDocument>(&job);
-        // Drop memoised results older than a few compilations so a long
-        // running server keeps a flat memory profile.
-        typst::comemo::evict(4);
-        for warning in &warned.warnings {
-            tracing::debug!(message = %warning.message, "typst warning");
-        }
-        let document = warned.output.map_err(|errors| typeset_error(&errors))?;
+        let document = self.compile(flow, theme)?;
         let options = typst_pdf::PdfOptions {
             ident: Smart::Auto,
             ..typst_pdf::PdfOptions::default()
@@ -278,6 +255,77 @@ impl PdfEngine {
 }
 
 impl PdfEngine {
+    /// Typesets `flow` like [`Self::render`] and draws its first
+    /// `max_pages` pages as standalone SVG, for a preview the app shows as
+    /// images (the app's CSP allows no frames or plugins). Returns the
+    /// pages and the page count.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::render`].
+    #[tracing::instrument(name = "export.pdf_preview", skip_all, fields(blocks = flow.blocks.len()))]
+    pub fn preview(
+        &self,
+        flow: &Flow,
+        theme: &PrintTheme,
+        max_pages: usize,
+    ) -> Result<(Vec<String>, usize), ExportError> {
+        let started = Instant::now();
+        let result = self.compile(flow, theme).map(|document| {
+            let pages = document
+                .pages()
+                .iter()
+                .take(max_pages)
+                .map(|page| {
+                    typst_svg::svg(
+                        page,
+                        &typst_svg::SvgOptions {
+                            render_bleed: false,
+                            pretty: false,
+                        },
+                    )
+                })
+                .collect::<Vec<_>>();
+            (pages, document.pages().len())
+        });
+        metrics::export_done(
+            "pdf_preview",
+            started,
+            result
+                .as_ref()
+                .map(|(pages, _)| pages.iter().map(String::len).sum()),
+        );
+        result
+    }
+
+    /// Lays `flow` out as pages.
+    fn compile(&self, flow: &Flow, theme: &PrintTheme) -> Result<PagedDocument, ExportError> {
+        let mut files = HashMap::new();
+        let _ = files.insert(file_id("/flow.json")?, Bytes::new(json(flow)?));
+        let _ = files.insert(file_id("/theme.json")?, Bytes::new(json(theme)?));
+        for asset in &flow.assets {
+            let _ = files.insert(
+                file_id(&format!("/{}", asset.name))?,
+                Bytes::new(asset.bytes.clone()),
+            );
+        }
+        let main = file_id("/print.typ")?;
+        let job = Job {
+            engine: self,
+            main,
+            source: Source::new(main, TEMPLATE.to_owned()),
+            files,
+        };
+        let warned = typst::compile::<PagedDocument>(&job);
+        // Drop memoised results older than a few compilations so a long
+        // running server keeps a flat memory profile.
+        typst::comemo::evict(4);
+        for warning in &warned.warnings {
+            tracing::debug!(message = %warning.message, "typst warning");
+        }
+        warned.output.map_err(|errors| typeset_error(&errors))
+    }
+
     /// Typesets one formula, given in Typst maths syntax (see
     /// [`crate::math::to_typst`]), as a standalone SVG.
     ///

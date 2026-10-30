@@ -12,6 +12,7 @@
 //! name.book/                    a book: book.yaml + SUMMARY.md + chapters
 //! name.collection/              a collection: schema.yaml + rows/*.md
 //! name.shortcut.yaml            an ID link that never grants access
+//! Page/.attachments/            files uploaded to the page Page.md (D211)
 //! ```
 //!
 //! Identity is the front-matter ULID, never the path, so this module only
@@ -28,6 +29,9 @@ pub const BUILD_DIR: &str = ".mdbook";
 /// A book's published snapshots: data the books service owns, not
 /// documents to index.
 pub const SNAPSHOTS_DIR: &str = ".snapshots";
+/// A page's uploaded files, in the directory beside the page
+/// (`Plan/.attachments/` for `Plan.md`): assets, never documents (D211).
+pub const ATTACHMENTS_DIR: &str = ".attachments";
 /// Longest file name, in bytes, that every supported backend accepts.
 pub const MAX_NAME_BYTES: usize = 200;
 
@@ -78,6 +82,9 @@ impl Kind {
         if is_scratch(name) {
             return Self::Scratch;
         }
+        if in_attachments(path) {
+            return Self::Asset;
+        }
         let parent = path.parent();
         let parent_name = parent.as_ref().map_or("", BlobPath::file_name);
         match name {
@@ -118,6 +125,13 @@ impl Kind {
 fn has_ext(name: &str, ext: &str) -> bool {
     name.rsplit_once('.')
         .is_some_and(|(stem, e)| !stem.is_empty() && e.eq_ignore_ascii_case(ext))
+}
+
+/// True for anything in a page's `.attachments/` directory: an uploaded
+/// `notes.md` there is a file, not a page.
+#[must_use]
+pub fn in_attachments(path: &BlobPath) -> bool {
+    path.segments().any(|s| s == ATTACHMENTS_DIR)
 }
 
 /// True for anything under `<name>.book/.snapshots/`.
@@ -282,6 +296,14 @@ mod tests {
         assert_eq!(
             kind("drives/shared/Ops/Notes/.snapshots/intro.md"),
             Kind::Document
+        );
+        assert_eq!(
+            kind("drives/shared/Ops/Plan/.attachments/notes.md"),
+            Kind::Asset
+        );
+        assert_eq!(
+            kind("drives/shared/Ops/Plan/.attachments/.vellum-folder.yaml"),
+            Kind::Asset
         );
         let collection = BlobPath::new("drives/shared/Ops/Vendors.collection")?;
         let schema = "drives/shared/Ops/Vendors.collection/schema.yaml";

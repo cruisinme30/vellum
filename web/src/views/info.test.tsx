@@ -39,6 +39,7 @@ describe("pending views", () => {
     renderWithProviders(<AdminView />);
     expect(screen.getByRole("heading", { level: 1, name: "Admin" })).toBeDefined();
     const screens: [string, string][] = [
+      ["Usage", "/admin/usage"],
       ["Audit log", "/admin/audit"],
       ["Settings", "/admin/settings"],
       ["Backups", "/admin/backups"],

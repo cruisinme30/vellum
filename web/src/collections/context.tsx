@@ -18,6 +18,11 @@ export function CollectionsProvider({
   return <CollectionsContext value={store}>{children}</CollectionsContext>;
 }
 
+/** The collections store, or undefined outside a provider (editor previews, tests). */
+export function useOptionalCollections(): CollectionsStore | undefined {
+  return use(CollectionsContext);
+}
+
 /** The collections store; throws outside a provider. */
 export function useCollections(): CollectionsStore {
   const store = use(CollectionsContext);

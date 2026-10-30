@@ -16,7 +16,7 @@ export interface BridgeServices {
   /** Private spaces; the inputs are checked by the implementation. */
   privateDeviceKey(): Promise<unknown>;
   privateEnrol(spaceId: unknown, label: unknown): Promise<unknown>;
-  privateReseal(spaceId: unknown): Promise<unknown>;
+  privateReseal(spaceId: unknown, trust: unknown): Promise<unknown>;
 }
 
 /** A notification; `url` is an app path opened on click. */
@@ -57,7 +57,16 @@ export function bridgeHandlers(services: BridgeServices): ReadonlyMap<ChannelNam
         return services.privateEnrol(spaceId, label);
       },
     ],
-    [Channel.privateReseal, (input) => services.privateReseal(input)],
+    [
+      Channel.privateReseal,
+      (input) => {
+        const { spaceId, trust } = (typeof input === "object" && input !== null ? input : {}) as {
+          spaceId?: unknown;
+          trust?: unknown;
+        };
+        return services.privateReseal(spaceId, trust);
+      },
+    ],
     [
       Channel.notify,
       (input) => {

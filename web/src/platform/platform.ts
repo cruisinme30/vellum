@@ -53,8 +53,14 @@ interface PrivateSpacesBridge {
   deviceKey(): Promise<{ readonly publicKey: string; readonly fingerprint: string }>;
   /** Enrols this device in a space for the signed-in account. */
   enrol(spaceId: string, label?: string): Promise<{ readonly lines: readonly string[] }>;
-  /** Reseals the pages this device can open to the space's current keys. */
-  reseal(spaceId: string): Promise<{ readonly lines: readonly string[] }>;
+  /**
+   * Seals the space's pages to its current keys (readable ones too). Keys
+   * new since this device last sealed must be listed in `trust`.
+   */
+  reseal(
+    spaceId: string,
+    trust?: readonly string[],
+  ): Promise<{ readonly lines: readonly string[] }>;
 }
 
 /** What screens may ask of the shell. */
@@ -125,7 +131,9 @@ export async function startPlatform(
 ): Promise<WorkerHandle | undefined> {
   if (platform.kind === "desktop" || !options.production) return undefined;
   const storage = (navigator as Partial<Navigator>).storage;
-  await storage?.persist().catch(() => false);
+  // Not awaited: Firefox asks the person first, and the answer can take
+  // forever. Offline start-up must not wait on that prompt.
+  void storage?.persist().catch(() => false);
   return registerServiceWorker(
     options.onUpdateReady === undefined ? {} : { onUpdateReady: options.onUpdateReady },
   );

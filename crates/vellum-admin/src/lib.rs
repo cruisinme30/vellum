@@ -6,6 +6,7 @@
 //! - [`api`]: the operations the gateway serves (`vellum_contracts::Service`);
 //! - [`audit`]: the append-only, hash-chained, sealed audit log;
 //! - [`settings`]: typed, validated, versioned admin settings;
+//! - [`counts`]: real usage counts, cached and exported as gauges;
 //! - [`usage`]: opt-in anonymous telemetry with an exact preview;
 //! - [`backup`]: encrypted backups, restore and the monthly restore drill;
 //! - [`profile`]: the `vellum profile` command;
@@ -18,6 +19,7 @@ pub mod api;
 pub mod audit;
 pub mod backup;
 pub mod budgets;
+pub mod counts;
 mod fsutil;
 mod http;
 pub mod profile;

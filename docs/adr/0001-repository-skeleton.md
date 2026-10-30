@@ -12,7 +12,7 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D31, D32, D33, D112, D119
-- Issue: #157
+- Issue: #157, #43 (full suite), #215 (traceability check)
 - Pull requests: #2, #36, #183
 
 :::

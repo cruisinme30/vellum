@@ -84,7 +84,7 @@ impl Fixture {
 #[test]
 fn declares_valid_operations() {
     let f = fixture();
-    assert_eq!(f.operations.len(), 16);
+    assert_eq!(f.operations.len(), 17);
     for op in &f.operations {
         op.validate("admin").unwrap();
         if op.id() == "admin.client_report" {
@@ -213,4 +213,17 @@ async fn refuses_callers_without_the_admin_scope() {
     let c = caller(&share);
     assert_eq!(c.actor.kind, "external");
     assert!(c.trace_id.is_none());
+}
+
+#[tokio::test]
+async fn usage_is_empty_until_the_server_counts() {
+    let f = fixture();
+    let counts = f
+        .call("admin.usage", json!({ "refresh": true }))
+        .await
+        .unwrap();
+    assert_eq!(counts["sampled_at_ms"], 0);
+    assert_eq!(counts["pages"], 0);
+    let viewer = ctx(CredentialKind::Session, &[Scope::Read]);
+    assert!(f.op("admin.usage").call(viewer, json!({})).await.is_err());
 }

@@ -3942,6 +3942,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "20870f649af7073d53e38067b2a84312175d56ea15217e1b15bc83506ec50afb"
 
 [[package]]
+name = "lettre"
+version = "0.11.23"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2c646bd5cc763b1087b15493e29a64be6147ba8f19342004fa52048ee596eae"
+dependencies = [
+ "async-trait",
+ "base64 0.23.1",
+ "email_address",
+ "futures-io",
+ "futures-util",
+ "idna",
+ "nom 8.0.0",
+ "percent-encoding",
+ "rustls",
+ "rustls-platform-verifier",
+ "socket2",
+ "tokio",
+ "tokio-rustls",
+ "url",
+]
+
+[[package]]
 name = "levenshtein_automata"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8970,6 +8992,7 @@ dependencies = [
  "http",
  "http-body-util",
  "jiff",
+ "lettre",
  "reqwest",
  "schemars 1.2.3",
  "serde",
@@ -8983,6 +9006,7 @@ dependencies = [
  "tower",
  "tracing",
  "url",
+ "uuid",
  "vellum-admin",
  "vellum-api",
  "vellum-authz",
@@ -8994,10 +9018,12 @@ dependencies = [
  "vellum-db",
  "vellum-drive",
  "vellum-e2e",
+ "vellum-export",
  "vellum-format",
  "vellum-help",
  "vellum-identity",
  "vellum-integrations",
+ "vellum-jobs",
  "vellum-kernel",
  "vellum-mcp",
  "vellum-notify",
@@ -9010,6 +9036,7 @@ dependencies = [
  "vellum-tasks",
  "vellum-work",
  "vellum-work-service",
+ "zip",
 ]
 
 [[package]]
@@ -9103,6 +9130,7 @@ dependencies = [
 name = "vellum-db"
 version = "0.0.0"
 dependencies = [
+ "futures-util",
  "libsqlite3-sys",
  "serde",
  "serde-saphyr 2.0.0",
@@ -9367,6 +9395,7 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
+ "uuid",
  "vellum-contracts",
  "vellum-kernel",
  "vellum-security",
@@ -9503,6 +9532,7 @@ dependencies = [
  "tracing",
  "url",
  "vellum-kernel",
+ "zip",
 ]
 
 [[package]]

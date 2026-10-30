@@ -397,41 +397,10 @@ async fn page_templates_come_from_templates_folders() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn export_hands_over_the_file_and_its_route() {
-    use std::sync::Arc;
-
-    use crate::mcp_workspace::{ExportFile, ExportWhat};
-
     let dir = tempfile::tempdir().unwrap();
     let (services, app) = server(dir.path()).await;
     let w = world(&app).await;
-    let off = tool(
-        &app,
-        &w.bearer,
-        "export",
-        json!({ "target": w.page_id, "format": "pdf" }),
-    )
-    .await;
-    assert_eq!(off.json()["result"]["isError"], true, "{}", off.text);
-
-    // The export routes' code, as the server wires it; here a stand-in
-    // that echoes what it was asked for.
-    services
-        .mcp_adapter()
-        .unwrap()
-        .set_exporter(Arc::new(|principal, what, format| {
-            Box::pin(async move {
-                assert!(principal.user_id().is_some());
-                let name = match what {
-                    ExportWhat::Page(id) => format!("page-{id}"),
-                    ExportWhat::Book { id, section } => format!("book-{id}-{section:?}"),
-                };
-                Ok(ExportFile {
-                    file_name: format!("{name}.{format}"),
-                    mime: "application/pdf".to_owned(),
-                    bytes: b"%PDF-1.7".to_vec(),
-                })
-            })
-        }));
+    // The tool runs the export routes' own code, as the token's user.
     let made = tool(
         &app,
         &w.bearer,
@@ -441,33 +410,42 @@ async fn export_hands_over_the_file_and_its_route() {
     .await;
     let body = made.json();
     let a = &body["result"]["structuredContent"];
-    assert_eq!(
-        a["name"],
-        format!("page-{}.pdf", w.page_id),
-        "{}",
-        made.text
-    );
-    assert_eq!(a["size"], 8);
+    assert_eq!(a["mime_type"], "application/pdf", "{}", made.text);
+    assert_eq!(a["name"], "Runbook.pdf", "{a}");
+    assert!(a["size"].as_u64().unwrap() > 0, "{a}");
     assert_eq!(
         a["url"],
         format!("{ORIGIN}/api/v1/export/pages/{}?format=pdf", w.page_id)
     );
     assert!(a.get("data").is_none(), "the file is not repeated: {a}");
-    let blob = &body["result"]["content"][2]["resource"]["blob"];
-    assert_eq!(blob, "JVBERi0xLjc=", "{}", made.text);
-    let book = tool(
+    let blob = body["result"]["content"][2]["resource"]["blob"]
+        .as_str()
+        .unwrap();
+    assert!(blob.starts_with("JVBERi0"), "a PDF: {}", made.text);
+
+    // The same file comes from the route the result links.
+    let route = send(
+        &app,
+        Request::get(format!("/api/v1/export/pages/{}?format=pdf", w.page_id))
+            .header(header::AUTHORIZATION, format!("Bearer {}", w.bearer))
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(route.status, StatusCode::OK, "{}", route.text);
+
+    let missing = tool(
         &app,
         &w.bearer,
         "export",
         json!({ "target": "01JBQ8Y4ZK6V3W2N5R7T9X1C41", "format": "docx", "section": "s1" }),
     )
     .await;
-    let url = book.json()["result"]["structuredContent"]["url"].clone();
-    assert!(
-        url.as_str()
-            .unwrap()
-            .ends_with("format=docx&scope=subtree&section=s1"),
-        "{url}"
+    assert_eq!(
+        missing.json()["result"]["isError"],
+        true,
+        "{}",
+        missing.text
     );
     services.shutdown().await;
 }

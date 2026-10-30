@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { useState, type ComponentProps } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 
 import { failureText } from "../data/failure";
 import { Ready, ServerScreen } from "../data/server-apis";
@@ -227,6 +227,71 @@ function Settings({ api, onSaved }: { readonly api: WorkApi; readonly onSaved: (
   );
 }
 
+/**
+ * Opened from Slack's "Save as task" reply (`?slack_link=CODE`): asks
+ * before linking, so a link someone else sent cannot link their Slack
+ * account to yours unnoticed.
+ */
+function SlackLink({ api }: { readonly api: WorkApi }) {
+  const t = useT();
+  const [parameters, setParameters] = useSearchParams();
+  const code = parameters.get("slack_link");
+  const [state, setState] = useState<"ask" | "busy" | "done">("ask");
+  const [error, setError] = useState<string>();
+  const link = api.linkSlack?.bind(api);
+  if (code === null || link === undefined) return;
+  const close = () => {
+    const next = new URLSearchParams(parameters);
+    next.delete("slack_link");
+    setParameters(next, { replace: true });
+  };
+  if (state === "done") {
+    return (
+      <div className="vl-work-banner" role="status">
+        <p>{t("my-work-slack-linked")}</p>
+        <button type="button" className="vl-text-button" onClick={close}>
+          {t("my-work-slack-close")}
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="vl-work-banner" role="region" aria-label={t("my-work-slack-title")}>
+      <p>{t("my-work-slack-ask")}</p>
+      <div className="vl-work-banner-actions">
+        <button
+          type="button"
+          className="vl-filled-button"
+          disabled={state === "busy"}
+          onClick={() => {
+            setState("busy");
+            setError(undefined);
+            link(code).then(
+              () => {
+                setState("done");
+              },
+              (error_: unknown) => {
+                setState("ask");
+                setError(failureText(error_));
+              },
+            );
+          }}
+        >
+          {t("my-work-slack-link")}
+        </button>
+        <button type="button" className="vl-text-button" onClick={close}>
+          {t("my-work-slack-cancel")}
+        </button>
+      </div>
+      {error !== undefined && (
+        <p className="vl-field-error" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function MyWork({ api }: { readonly api: WorkApi }) {
   const t = useT();
   const [version, setVersion] = useState(0);
@@ -253,6 +318,7 @@ function MyWork({ api }: { readonly api: WorkApi }) {
   };
   return (
     <>
+      <SlackLink api={api} />
       <form className="vl-work-add" onSubmit={add}>
         <label>
           {t("my-work-add")}

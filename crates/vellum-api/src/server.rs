@@ -33,6 +33,7 @@ use tokio_rustls::{LazyConfigAcceptor, TlsAcceptor};
 use tokio_stream::StreamExt as _;
 use vellum_kernel::{Error, ErrorKind};
 
+use crate::deadline::{Activity, Deadline, Tracked};
 use crate::gateway::Gateway;
 
 /// How the listener secures connections.
@@ -86,6 +87,47 @@ pub struct ConnectionLimits {
     /// Connections served at once. Further connections wait in the
     /// kernel's accept queue until one closes.
     pub max_connections: usize,
+    /// Connections one client address (one `IPv6` `/64`) may hold at once;
+    /// 0 for no cap. Leave it off behind a proxy, where every connection
+    /// comes from the proxy's address.
+    pub max_connections_per_ip: usize,
+    /// Time for a whole request body to arrive. Gaps between its chunks
+    /// may be at most `header_read_timeout`.
+    pub body_timeout: Duration,
+    /// How long a connection may hold no request before it is closed.
+    /// For HTTP/2, where the header timer does not apply, this is what
+    /// frees a connection whose client only answers pings.
+    pub idle_timeout: Duration,
+    /// The upload routes' path prefixes. A body sent there with a
+    /// `Content-Length` gets `body_timeout` plus the time to send that
+    /// many bytes at `upload_rate`, so a large file on a slow link
+    /// finishes; gaps are still bounded by `header_read_timeout` (D213).
+    pub upload_prefixes: &'static [&'static str],
+    /// The slowest average rate, in bytes a second, an upload is given
+    /// time for.
+    pub upload_rate: u64,
+}
+
+/// The most extra time an upload body is given.
+const MAX_UPLOAD_EXTRA: Duration = Duration::from_mins(30);
+
+impl ConnectionLimits {
+    /// The time a request body to `path` declaring `length` bytes may take.
+    #[must_use]
+    pub fn body_time(&self, path: &str, length: Option<u64>) -> Duration {
+        let upload = self.upload_prefixes.iter().any(|prefix| {
+            path.strip_prefix(prefix)
+                .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+        });
+        match length {
+            // The route's own body limit refuses a larger declared length
+            // before the body is read; the cap only bounds a lie.
+            Some(length) if upload && self.upload_rate > 0 => self.body_timeout.saturating_add(
+                Duration::from_secs(length / self.upload_rate).min(MAX_UPLOAD_EXTRA),
+            ),
+            _ => self.body_timeout,
+        }
+    }
 }
 
 impl Default for ConnectionLimits {
@@ -94,6 +136,49 @@ impl Default for ConnectionLimits {
             handshake_timeout: Duration::from_secs(10),
             header_read_timeout: Duration::from_secs(15),
             max_connections: 4096,
+            max_connections_per_ip: 0,
+            body_timeout: Duration::from_mins(2),
+            idle_timeout: Duration::from_mins(1),
+            upload_prefixes: &[],
+            upload_rate: 512 * 1024,
+        }
+    }
+}
+
+/// Connections held per client address, for
+/// [`ConnectionLimits::max_connections_per_ip`].
+#[derive(Debug, Default)]
+struct PerClient {
+    held: std::sync::Mutex<std::collections::HashMap<std::net::IpAddr, usize>>,
+}
+
+impl PerClient {
+    /// Counts a connection from `ip`, or `None` when it already holds `cap`.
+    fn enter(self: &Arc<Self>, ip: std::net::IpAddr, cap: usize) -> Option<Held> {
+        let ip = vellum_security::rate::client_bucket(ip);
+        let mut held = self.held.lock().ok()?;
+        let count = held.entry(ip).or_insert(0);
+        let full = cap > 0 && *count >= cap;
+        if !full {
+            *count += 1;
+        }
+        drop(held);
+        (!full).then(|| Held(Arc::clone(self), ip))
+    }
+}
+
+/// One counted connection; see [`PerClient::enter`].
+struct Held(Arc<PerClient>, std::net::IpAddr);
+
+impl Drop for Held {
+    fn drop(&mut self) {
+        if let Ok(mut held) = self.0.held.lock()
+            && let Some(count) = held.get_mut(&self.1)
+        {
+            *count = count.saturating_sub(1);
+            if *count == 0 {
+                let _ = held.remove(&self.1);
+            }
         }
     }
 }
@@ -242,6 +327,7 @@ pub async fn serve_listener(
     let limits = config.limits;
     let cap = fit_to_open_file_limit(limits.max_connections);
     let slots = Arc::new(Semaphore::new(cap));
+    let clients = Arc::new(PerClient::default());
     let mut accept_errors = AcceptErrors::default();
     tokio::pin!(shutdown);
     loop {
@@ -270,19 +356,21 @@ pub async fn serve_listener(
             },
             () = &mut shutdown => break,
         };
-        let service = tower::ServiceExt::map_request(
-            router.clone(),
-            move |mut request: http::Request<Incoming>| {
-                let _ = request.extensions_mut().insert(ConnectInfo(peer));
-                request
-            },
-        );
+        let Some(held) = clients.enter(peer.ip(), limits.max_connections_per_ip) else {
+            tracing::info!(event = "gateway.client_connection_cap", peer = %peer.ip(), "refused a connection: this client holds too many");
+            drop(tcp);
+            continue;
+        };
+        let activity = Activity::new();
+        let service = per_connection(router.clone(), peer, limits, Arc::clone(&activity));
         let acceptor = Arc::clone(&acceptor);
         let watcher = graceful.watcher();
         drop(tokio::spawn(async move {
-            if let Err(err) = connection(&acceptor, tcp, service, watcher, limits).await {
+            if let Err(err) = connection(&acceptor, tcp, service, watcher, limits, &activity).await
+            {
                 tracing::debug!(error = %err, peer = %peer, "connection ended with an error");
             }
+            drop(held);
             drop(slot);
         }));
     }
@@ -296,12 +384,77 @@ pub async fn serve_listener(
     Ok(())
 }
 
+/// The router as one connection sees it: the peer address in each
+/// request, bodies under [`Deadline`], and every request counted in
+/// `activity` until its response is sent.
+fn per_connection(
+    router: Router,
+    peer: SocketAddr,
+    limits: ConnectionLimits,
+    activity: Arc<Activity>,
+) -> impl tower::Service<
+    http::Request<Incoming>,
+    Response = Response,
+    Error = std::convert::Infallible,
+    Future = impl Future<Output = Result<Response, std::convert::Infallible>> + Send,
+> + Clone
++ Send
++ 'static {
+    tower::service_fn(move |request: http::Request<Incoming>| {
+        let busy = activity.begin();
+        let (mut parts, body) = request.into_parts();
+        let _ = parts.extensions.insert(ConnectInfo(peer));
+        let length = parts
+            .headers
+            .get(http::header::CONTENT_LENGTH)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.parse::<u64>().ok());
+        let body = axum::body::Body::new(Deadline::new(
+            body,
+            limits.header_read_timeout,
+            limits.body_time(parts.uri.path(), length),
+        ));
+        let router = router.clone();
+        async move {
+            let response =
+                tower::ServiceExt::oneshot(router, http::Request::from_parts(parts, body)).await?;
+            Ok(response.map(|body| axum::body::Body::new(Tracked::new(body, busy))))
+        }
+    })
+}
+
+/// Runs `conn` until it ends, or until it has held no request for
+/// `idle`; then it is dropped, which closes the socket.
+async fn until_idle<E>(
+    conn: impl Future<Output = Result<(), E>>,
+    activity: &Activity,
+    idle: Duration,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
+where
+    E: Into<Box<dyn std::error::Error + Send + Sync>>,
+{
+    tokio::pin!(conn);
+    let mut tick = tokio::time::interval((idle / 4).max(Duration::from_millis(10)));
+    loop {
+        tokio::select! {
+            done = &mut conn => return done.map_err(Into::into),
+            _ = tick.tick() => {
+                if activity.idle_for() >= idle {
+                    tracing::debug!("closing a connection that held no request");
+                    return Ok(());
+                }
+            }
+        }
+    }
+}
+
 async fn connection<S>(
     acceptor: &Acceptor,
     tcp: TcpStream,
     service: S,
     watcher: hyper_util::server::graceful::Watcher,
     limits: ConnectionLimits,
+    activity: &Activity,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
 where
     S: tower::Service<
@@ -317,6 +470,7 @@ where
     let service = TowerToHyperService::new(service);
     let builder = builder(limits);
     let handshake = limits.handshake_timeout;
+    let idle = limits.idle_timeout;
     match acceptor {
         Acceptor::Plain => {
             // A client that connects and sends nothing never reaches hyper's
@@ -328,17 +482,15 @@ where
                 Ok(Err(err)) => return Err(err.into()),
                 Err(_) => return Err("no request before the handshake timeout".into()),
             }
-            watcher
-                .watch(builder.serve_connection_with_upgrades(TokioIo::new(tcp), service))
-                .await
+            let conn = builder.serve_connection_with_upgrades(TokioIo::new(tcp), service);
+            until_idle(watcher.watch(conn), activity, idle).await
         }
         Acceptor::Tls(tls) => {
             let stream = tokio::time::timeout(handshake, tls.accept(tcp))
                 .await
                 .map_err(|_| "TLS handshake timed out")??;
-            watcher
-                .watch(builder.serve_connection_with_upgrades(TokioIo::new(stream), service))
-                .await
+            let conn = builder.serve_connection_with_upgrades(TokioIo::new(stream), service);
+            until_idle(watcher.watch(conn), activity, idle).await
         }
         Acceptor::Acme { default, challenge } => {
             let start = tokio::time::timeout(
@@ -359,9 +511,8 @@ where
             let stream = tokio::time::timeout(handshake, start.into_stream(Arc::clone(default)))
                 .await
                 .map_err(|_| "TLS handshake timed out")??;
-            watcher
-                .watch(builder.serve_connection_with_upgrades(TokioIo::new(stream), service))
-                .await
+            let conn = builder.serve_connection_with_upgrades(TokioIo::new(stream), service);
+            until_idle(watcher.watch(conn), activity, idle).await
         }
     }
 }
@@ -517,6 +668,28 @@ async fn redirect(request: Request) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn uploads_get_time_for_their_size() {
+        let limits = ConnectionLimits {
+            upload_prefixes: &["/api/v1/attachments"],
+            ..ConnectionLimits::default()
+        };
+        let base = limits.body_timeout;
+        let mib100 = 100 * 1024 * 1024;
+        assert_eq!(
+            limits.body_time("/api/v1/attachments/01J", Some(mib100)),
+            base + Duration::from_secs(200)
+        );
+        // Other routes, unknown lengths and lies keep their bounds.
+        assert_eq!(limits.body_time("/api/v1/books", Some(mib100)), base);
+        assert_eq!(limits.body_time("/api/v1/attachmentsX", Some(mib100)), base);
+        assert_eq!(limits.body_time("/api/v1/attachments/01J", None), base);
+        assert_eq!(
+            limits.body_time("/api/v1/attachments/01J", Some(u64::MAX)),
+            base + MAX_UPLOAD_EXTRA
+        );
+    }
 
     #[tokio::test]
     async fn redirects_keep_host_and_path() {

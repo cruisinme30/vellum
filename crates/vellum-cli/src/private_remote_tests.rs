@@ -19,7 +19,8 @@ use vellum_kernel::{Error, ErrorKind, SpaceId, Timestamp, UserId};
 use vellum_private::{DeviceIdentity, PrivateAgent, PrivateSpace};
 use vellum_store::{BlobPath, BlobStore, LocalStore, Precondition};
 
-use crate::private_remote::{E2eClient, RemoteSpaces, enrol, reseal};
+use crate::pins::Pins;
+use crate::private_remote::{E2eClient, RemoteSpaces, UNTRUSTED, enrol, reseal};
 
 const OWNER: UserId = UserId::from_u128(1);
 const MEMBER: UserId = UserId::from_u128(2);
@@ -133,7 +134,10 @@ async fn devices_enrol_seal_reseal_and_search_through_the_server() {
 
     // The owner makes the space private by enrolling their laptop, then
     // uploads a page sealed to it.
-    let first = enrol(&owner, &laptop, space, "Owner's laptop")
+    let (laptop_dir, phone_dir) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let laptop_pins = Pins::new(laptop_dir.path().to_owned());
+    let phone_pins = Pins::new(phone_dir.path().to_owned());
+    let first = enrol(&owner, &laptop, space, "Owner's laptop", &laptop_pins)
         .await
         .unwrap();
     assert_eq!(first.fingerprint, laptop.fingerprint_hex());
@@ -156,13 +160,24 @@ async fn devices_enrol_seal_reseal_and_search_through_the_server() {
     );
 
     // The member's phone joins. Until a device that can open the page
-    // reseals it, the phone cannot read it, and reseal from the phone
-    // itself changes nothing.
-    let _ = enrol(&member, &phone, space, "Member's phone")
+    // reseals it, the phone cannot read it.
+    let phone_key = enrol(&member, &phone, space, "Member's phone", &phone_pins)
         .await
         .unwrap();
-    let report = reseal(&member, &phone, space).await.unwrap();
-    assert_eq!((report.resealed, report.not_for_this_device), (0, 1));
+    // The phone cannot open the page yet, but it seals the readable page
+    // left from before the space turned private.
+    let report = reseal(&member, &phone, space, &phone_pins, &[])
+        .await
+        .unwrap();
+    assert_eq!(
+        (
+            report.resealed,
+            report.converted,
+            report.not_for_this_device
+        ),
+        (0, 1, 1)
+    );
+    assert!(!report.first_use, "enrolling pinned the keys it found");
     let stale = seal_for(&[laptop_secret.public()], b"x").unwrap();
     let (_, etag) = owner.get(space, "plan.md").await.unwrap();
     assert_eq!(
@@ -175,12 +190,33 @@ async fn devices_enrol_seal_reseal_and_search_through_the_server() {
         "an upload that leaves out the new device is refused"
     );
 
-    let report = reseal(&owner, &laptop, space).await.unwrap();
-    assert_eq!(report.resealed, 1);
+    // The laptop has not seen the phone's key before: it refuses to seal
+    // to it until the owner trusts its fingerprint.
+    let refused = reseal(&owner, &laptop, space, &laptop_pins, &[])
+        .await
+        .unwrap_err();
+    assert!(refused.starts_with(UNTRUSTED), "{refused}");
+    assert!(refused.contains(&phone_key.fingerprint), "{refused}");
+    let report = reseal(
+        &owner,
+        &laptop,
+        space,
+        &laptop_pins,
+        std::slice::from_ref(&phone_key.fingerprint),
+    )
+    .await
+    .unwrap();
+    assert_eq!((report.resealed, report.current), (1, 1));
     let (bytes, _) = member.get(space, "plan.md").await.unwrap();
     assert_eq!(phone.open(&bytes).unwrap(), PAGE.as_bytes());
-    let again = reseal(&owner, &laptop, space).await.unwrap();
-    assert_eq!((again.resealed, again.current), (0, 1));
+    let again = reseal(&owner, &laptop, space, &laptop_pins, &[])
+        .await
+        .unwrap();
+    assert_eq!(
+        (again.resealed, again.current),
+        (0, 2),
+        "trusted keys stay trusted"
+    );
 
     // The phone's private agent reads the space from the server.
     let store: Arc<dyn BlobStore> = Arc::new(RemoteSpaces::new(member));
@@ -192,7 +228,7 @@ async fn devices_enrol_seal_reseal_and_search_through_the_server() {
     let agent = PrivateAgent::new(phone, store, vec![opened]).unwrap();
     let pass = agent.refresh().await.unwrap();
     assert_eq!(pass.opened, 1);
-    assert_eq!(pass.unreadable, 1, "the server refuses the plaintext page");
+    assert_eq!(pass.unreadable, 1, "the converted readme has no page ID");
 }
 
 #[tokio::test]

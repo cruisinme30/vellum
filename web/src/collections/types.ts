@@ -43,7 +43,8 @@ export type ViewKind = "table" | "board" | "gallery" | "calendar" | "timeline" |
 
 type NumberFormat = "plain" | "percent";
 
-type Aggregation = "count" | "sum" | "avg" | "min" | "max" | "checked" | "pct" | "unique" | "show";
+export type Aggregation =
+  "count" | "sum" | "avg" | "min" | "max" | "checked" | "pct" | "unique" | "show";
 
 export interface SelectOption {
   readonly name: string;
@@ -238,4 +239,121 @@ export interface RowWritten {
     readonly written: readonly RowReference[];
     readonly deleted: readonly RowReference[];
   };
+}
+
+/** `ViewKey`: names one saved view (any case). */
+export interface ViewKey {
+  readonly collection_id: string;
+  readonly view: string;
+}
+
+/** `SaveViewInput`: replaces the view named `view`, or adds it at the end. */
+export interface SaveViewInput {
+  readonly collection_id: string;
+  readonly view: string;
+  readonly rename_to?: string;
+  readonly kind?: ViewKind;
+  /** Filters in `schema.yaml` text (`Status is Done`), all of which must match. */
+  readonly filter?: readonly string[];
+  /** Sort keys (`Due desc`), most significant first. */
+  readonly sort?: readonly string[];
+  readonly group?: string;
+  readonly hide?: readonly string[];
+  readonly date?: string;
+  readonly end?: string;
+  readonly limit?: number;
+}
+
+/** The types a property can be added as: anything but a second title. */
+export type NewPropertyType = Exclude<PropertyType, "title">;
+
+/** `AddPropertyInput`: the server picks the key from the name. */
+export interface AddPropertyInput {
+  readonly collection_id: string;
+  readonly name: string;
+  readonly type: NewPropertyType;
+  readonly options?: readonly SelectOption[];
+  readonly formula?: string;
+  readonly via?: string;
+  readonly prop?: string;
+  readonly agg?: Aggregation;
+  readonly format?: NumberFormat;
+  /** A relation's target collection; the target gets the paired property. */
+  readonly to?: string;
+  /** The paired property's name; this collection's title when absent. */
+  readonly back_name?: string;
+}
+
+/**
+ * `UpdatePropertyInput`: fields left out stay as they are. A rename
+ * rewrites the formulas that name the property.
+ */
+export interface UpdatePropertyInput {
+  readonly collection_id: string;
+  readonly key: string;
+  readonly name?: string;
+  /** A new type; titles and relations keep theirs. */
+  readonly type?: Exclude<PropertyType, "title" | "relation">;
+  readonly via?: string;
+  readonly prop?: string;
+  readonly agg?: Aggregation;
+  /** The full new option list. */
+  readonly options?: readonly SelectOption[];
+  readonly formula?: string;
+  readonly format?: NumberFormat;
+}
+
+/** `PropertyKey`. */
+export interface PropertyKey {
+  readonly collection_id: string;
+  readonly key: string;
+}
+
+/** `ExportCsvInput`: a view's columns, filters and order, every row. */
+export interface ExportCsvInput {
+  readonly collection_id: string;
+  readonly view?: string;
+}
+
+/** `CsvExport`. */
+export interface CsvExport {
+  /** A suggested file name (`Issues - Open.csv`). */
+  readonly fileName: string;
+  readonly csv: string;
+}
+
+/** `ImportCsvInput`: adds rows, all or nothing. */
+export interface ImportCsvInput {
+  readonly collection_id: string;
+  readonly csv: string;
+  /** Check the file and report, without writing. */
+  readonly dry_run?: boolean;
+}
+
+/** `CreateFromCsvInput`: a new `Title.collection` folder in a drive folder. */
+export interface CreateFromCsvInput {
+  readonly folder: string;
+  readonly title: string;
+  readonly csv: string;
+  readonly dry_run?: boolean;
+}
+
+/** `CsvImported`: what an import did, or would do on a dry run. */
+export interface CsvImported {
+  readonly written: boolean;
+  readonly rows: number;
+  /** Headers that matched no writable property. */
+  readonly skippedColumns: readonly string[];
+  readonly diagnostics: readonly Diagnostic[];
+  readonly collection: CollectionInfo;
+  readonly changed: RowWritten["changed"];
+}
+
+/** `EmbedResult`: a `collection` block's view, as the reader sees it. */
+export interface EmbedResult {
+  readonly collectionId: string;
+  readonly title: string;
+  /** The `name.collection` folder. */
+  readonly path: string;
+  readonly result: ViewResult;
 }

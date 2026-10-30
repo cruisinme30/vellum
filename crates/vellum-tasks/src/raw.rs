@@ -638,14 +638,30 @@ impl TasksService {
             .slack_user(saved.team.clone(), saved.slack_user.clone())
             .await?
         else {
-            return Ok(RawResponse::text(
-                403,
-                "link your Slack account in Vellum first",
-            ));
+            // Not linked yet: answer with a link that, opened while signed
+            // in to Vellum, links this Slack user (#163, D177).
+            let code = capture::slack_link_code(secret, &saved.team, &saved.slack_user, self.now());
+            let text = format!(
+                "Link your Slack account to Vellum to save messages as tasks: {}/my-work?slack_link={code} (the link works for 15 minutes). Then use Save as task again.",
+                self.config.base_url
+            );
+            return Ok(self.slack_reply(saved.response_url, text).await);
         };
         let me = self.me(user).await?;
         self.add_capture(user, &me, &saved.capture).await?;
-        Ok(RawResponse::new(200))
+        let text = format!("Saved to your Vellum inbox: {}", saved.capture.title);
+        Ok(self.slack_reply(saved.response_url, text).await)
+    }
+
+    /// Tells the Slack user `text`: through `response_url` (Slack ignores
+    /// the body of a message shortcut's answer) and in the body (which a
+    /// slash command shows).
+    async fn slack_reply(&self, response_url: Option<String>, text: String) -> RawResponse {
+        if let Some(url) = response_url {
+            self.workspace.slack_say(url, text.clone()).await;
+        }
+        let body = serde_json::json!({ "response_type": "ephemeral", "text": text }).to_string();
+        RawResponse::new(200).with_body("application/json", body)
     }
 
     async fn add_capture(

@@ -12,14 +12,20 @@
 //! device's key for end-to-end encrypted private spaces. `vellum profile`
 //! and `vellum budgets` ask a running server for a flame graph and for
 //! routes over their latency budget. `vellum admin` issues break-glass
-//! codes and takes, lists and restores encrypted backups.
+//! codes, takes, lists and restores encrypted backups, and moves a space
+//! to another shard.
 
 mod admin;
 mod backup_cli;
 mod cluster;
 mod collab;
+#[cfg(test)]
+mod delivery_tests;
 mod docs;
 mod e2e;
+mod exports;
+#[cfg(test)]
+mod exports_tests;
 mod feed;
 mod google_http;
 #[cfg(test)]
@@ -30,6 +36,7 @@ mod identity_tests;
 mod integrations;
 mod keys;
 mod limits;
+mod mail;
 mod mcp;
 mod mcp_edit;
 mod mcp_serve;
@@ -39,6 +46,9 @@ mod mcp_workspace;
 mod notifications;
 mod observability;
 mod page_render;
+#[cfg(test)]
+mod perf_routes_tests;
+mod pins;
 mod private;
 mod private_remote;
 #[cfg(test)]
@@ -50,6 +60,7 @@ mod reminders;
 mod search;
 mod serve;
 mod services;
+mod shards_cli;
 #[cfg(test)]
 mod sso_tests;
 mod task_prefs;
@@ -59,6 +70,9 @@ mod tasks_http;
 mod tasks_tests;
 #[cfg(test)]
 mod typescript_tests;
+mod uploads;
+#[cfg(test)]
+mod uploads_tests;
 mod watcher;
 mod web;
 #[cfg(test)]
@@ -142,6 +156,15 @@ enum AdminCommand {
     },
     /// Restores a backup into an empty folder and checks every file.
     Restore(backup_cli::RestoreArgs),
+    /// Moves a space and everything stored about it to another shard
+    /// (`VELLUM_SHARDS`). Stop every replica first.
+    MoveSpace {
+        /// The space's ID.
+        space: String,
+        /// The shard to move it to.
+        #[arg(long)]
+        to: String,
+    },
 }
 
 /// Runs an async admin command on a fresh runtime and prints its lines.
@@ -254,6 +277,9 @@ fn main() -> ExitCode {
         Command::Admin(AdminCommand::Restore(args)) => {
             with_telemetry(|| run_admin(|| backup_cli::restore(&args)))
         }
+        Command::Admin(AdminCommand::MoveSpace { space, to }) => {
+            with_telemetry(|| run_admin(|| shards_cli::move_space(&space, &to)))
+        }
         Command::Private(command) => match private::run(&command) {
             Ok(lines) => print(&lines.join("\n")),
             Err(error) => fail(&error),
@@ -292,6 +318,8 @@ fn main() -> ExitCode {
                 Ok(guard) => guard,
                 Err(error) => return fail(&error),
             };
+            // Resident memory and threads, for the saturation panels.
+            vellum_observe::process::register_metrics();
             match serve::run(config.as_deref(), observability) {
                 Ok(()) => ExitCode::SUCCESS,
                 Err(error) => {

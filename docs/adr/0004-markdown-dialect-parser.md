@@ -13,7 +13,7 @@ vellum: 1
 - Status: accepted
 - Decisions: D40, D41, D42
 - Pull requests: #35, #220, #228, #255
-- Issues: #64, #65, #66, #67, #68, #69, #285
+- Issues: #64, #65, #66, #67, #68, #69, #285, #72 (golden corpus)
 
 :::
 

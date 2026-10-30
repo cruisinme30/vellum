@@ -19,6 +19,9 @@
 //!   is left out and no revoked device is kept in. Nothing that is not
 //!   ciphertext is served here, apart from the space's own folder manifest.
 //!
+//! - **Guard** (D208): [`Guard`] wraps the workspace's store and refuses
+//!   any readable write into a private space, whichever service makes it.
+//!
 //! [`E2e`] is the application service over two ports: a [`BlobStore`]
 //! and a [`SpaceAccess`] that the composition root builds from the drive's
 //! spaces and permissions.
@@ -27,6 +30,7 @@
 
 mod api;
 mod app;
+mod guard;
 mod keys;
 mod ports;
 mod service;
@@ -37,5 +41,6 @@ pub use api::{
     SpaceKeys, SpaceRef, Stored,
 };
 pub use app::E2e;
+pub use guard::{Guard, PrivateRoots, structural};
 pub use keys::{KEYS_DIR, keys_path};
 pub use ports::{Need, SpaceAccess};

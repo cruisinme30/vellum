@@ -18,7 +18,7 @@ use vellum_kernel::{ObjectId, SpaceId, Timestamp, UserId, VersionId};
 use vellum_store::BlobPath;
 
 use crate::error::DriveResult;
-use crate::model::{Activity, Node, Space, VersionRecord};
+use crate::model::{Activity, DriveTotals, Node, Space, VersionRecord};
 
 /// The drive's index: nodes, per-user state, activity, links and versions.
 #[async_trait]
@@ -79,6 +79,10 @@ pub trait DriveIndex: Send + Sync + fmt::Debug {
 
     /// Bytes used by a space's nodes (live and trashed) and versions.
     async fn usage(&self, space: SpaceId) -> DriveResult<u64>;
+
+    /// Counts across every space, with activity counted back from `now`,
+    /// for Admin → Usage and the usage metrics.
+    async fn totals(&self, now: Timestamp) -> DriveResult<DriveTotals>;
 }
 
 /// What a caller wants to do with a node.

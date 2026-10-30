@@ -3,6 +3,7 @@
 
 //! Accounts, sessions, API tokens, lockout and break-glass access.
 
+use std::collections::BTreeMap;
 use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -170,11 +171,33 @@ impl From<&User> for UserView {
     }
 }
 
+/// Counts of people, from [`Identity::people`].
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct PeopleCounts {
+    /// Accounts, enabled or not.
+    pub users: u64,
+    /// Accounts that may sign in.
+    pub enabled: u64,
+    /// Enabled administrators.
+    pub admins: u64,
+    /// People seen in the last 24 hours.
+    pub active_1d: u64,
+    /// People seen in the last 7 days.
+    pub active_7d: u64,
+    /// People seen in the last 30 days.
+    pub active_30d: u64,
+    /// Browser sessions that have not expired.
+    pub sessions: u64,
+    /// Personal API tokens.
+    pub api_tokens: u64,
+}
+
 /// The identity service.
 pub struct Identity {
     config: IdentityConfig,
     store: Store,
     lockouts: Lockouts,
+    hashing: password::Gate,
     pub(crate) oauth: OAuthState,
     pub(crate) fetcher: Arc<dyn ClientMetadataFetcher>,
     sso: Option<Arc<Sso>>,
@@ -191,6 +214,10 @@ impl std::fmt::Debug for Identity {
 pub(crate) fn after(now: Timestamp, span: Duration) -> Timestamp {
     let ms = i64::try_from(span.as_millis()).unwrap_or(i64::MAX);
     Timestamp::from_unix_ms(now.unix_ms().saturating_add(ms)).unwrap_or(now)
+}
+
+fn count(n: usize) -> u64 {
+    u64::try_from(n).unwrap_or(u64::MAX)
 }
 
 fn elapsed(since: Timestamp, now: Timestamp) -> Duration {
@@ -258,6 +285,7 @@ impl Identity {
             config,
             store,
             lockouts: Lockouts::new(),
+            hashing: password::Gate::default(),
             oauth: OAuthState::default(),
             fetcher: Arc::new(NoMetadataFetch),
             sso: None,
@@ -449,6 +477,7 @@ impl Identity {
         let password_hash = match password {
             Some(p) => {
                 password::check_policy(p)?;
+                let _slot = self.hashing.permit()?;
                 Some(password::hash(p)?)
             }
             None => None,
@@ -490,6 +519,48 @@ impl Identity {
         });
         users.sort_by_key(|u| u.created_at);
         users
+    }
+
+    /// How many people have accounts and how many used the server
+    /// recently, for Admin → Usage and the usage metrics. The break-glass
+    /// account is left out. A person counts as active in a window when one
+    /// of their sessions was seen, or one of their API tokens used, in it.
+    #[must_use]
+    pub fn people(&self, now: Timestamp) -> PeopleCounts {
+        self.store.read(|s| {
+            let mut last: BTreeMap<UserId, i64> = BTreeMap::new();
+            let seen = s
+                .sessions
+                .values()
+                .map(|x| (x.user, x.last_seen_at.unix_ms()))
+                .chain(
+                    s.api_tokens
+                        .values()
+                        .filter_map(|t| t.last_used_at.map(|at| (t.user, at.unix_ms()))),
+                );
+            for (user, at) in seen {
+                let entry = last.entry(user).or_insert(at);
+                *entry = (*entry).max(at);
+            }
+            let mut counts = PeopleCounts {
+                sessions: count(s.sessions.values().filter(|x| x.expires_at > now).count()),
+                api_tokens: count(s.api_tokens.len()),
+                ..PeopleCounts::default()
+            };
+            let day = 86_400_000_i64;
+            for user in s.users.values().filter(|u| u.email != BREAK_GLASS_EMAIL) {
+                counts.users += 1;
+                counts.enabled += u64::from(!user.disabled);
+                counts.admins += u64::from(user.admin && !user.disabled);
+                if let Some(at) = last.get(&user.id) {
+                    let ago = now.unix_ms().saturating_sub(*at);
+                    counts.active_1d += u64::from(ago <= day);
+                    counts.active_7d += u64::from(ago <= 7 * day);
+                    counts.active_30d += u64::from(ago <= 30 * day);
+                }
+            }
+            counts
+        })
     }
 
     /// A user by ID.
@@ -578,6 +649,8 @@ impl Identity {
         self.lockouts
             .check(&self.store, Key::Email(&email), now)
             .map_err(locked)?;
+        // Refused while too many checks run, before any failure counts.
+        let slot = self.hashing.permit()?;
         let user = self.store.read(|s| s.user_by_email(&email).cloned());
         let stored = user.as_ref().and_then(|u| u.password_hash.as_deref());
         let verified = stored.map_or_else(
@@ -613,6 +686,7 @@ impl Identity {
             .is_some_and(password::needs_rehash)
         {
             let upgraded = password::hash(password)?;
+            drop(slot);
             self.store.write(|s| {
                 if let Some(u) = s.users.get_mut(&user.id) {
                     u.password_hash = Some(upgraded);
@@ -768,6 +842,7 @@ impl Identity {
             .store
             .read(|s| s.users.get(&user).map(|u| u.password_hash.clone()))
             .ok_or_else(|| Error::new(ErrorKind::NotFound, "user not found"))?;
+        let _slot = self.hashing.permit()?;
         if let Some(hash) = stored {
             let ok = current.is_some_and(|c| password::verify(c, &hash));
             if !ok {

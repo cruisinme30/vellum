@@ -22,7 +22,8 @@ use crate::api::{
     MAX_LABEL_CHARS, ObjectInfo, ObjectList, PutObject, RevokeDevice, Revoked, SealedObject,
     SpaceKeys, Stored,
 };
-use crate::keys::{Entry, KeyFile, keys_path, parse_key};
+use crate::guard::PrivateRoots;
+use crate::keys::{Entry, KEYS_DIR, KeyFile, keys_path, parse_key};
 use crate::ports::{Need, SpaceAccess};
 
 /// Attempts at a key-list change before giving up on a busy space.
@@ -35,6 +36,7 @@ const MAX_PAGE: usize = 1000;
 pub struct E2e {
     store: Arc<dyn BlobStore>,
     access: Arc<dyn SpaceAccess>,
+    roots: PrivateRoots,
 }
 
 impl fmt::Debug for E2e {
@@ -42,6 +44,7 @@ impl fmt::Debug for E2e {
         f.debug_struct("E2e")
             .field("store", &self.store.backend())
             .field("access", &self.access)
+            .field("roots", &self.roots)
             .finish()
     }
 }
@@ -57,7 +60,56 @@ impl E2e {
     /// `access`.
     #[must_use]
     pub fn new(store: Arc<dyn BlobStore>, access: Arc<dyn SpaceAccess>) -> Self {
-        Self { store, access }
+        Self {
+            store,
+            access,
+            roots: PrivateRoots::default(),
+        }
+    }
+
+    /// Shares `roots` with the [`crate::Guard`] in front of the store, so
+    /// a space turns private there the moment its first key is enrolled.
+    #[must_use]
+    pub fn with_roots(mut self, roots: PrivateRoots) -> Self {
+        self.roots = roots;
+        self
+    }
+
+    /// Reloads which spaces are private from the key lists in the store,
+    /// so changes made on other replicas reach this one's guard.
+    ///
+    /// # Errors
+    ///
+    /// The store or the space index cannot be read.
+    #[tracing::instrument(name = "e2e.refresh_roots", skip(self), err(level = "warn"))]
+    pub async fn refresh_roots(&self) -> Result<usize, Error> {
+        let dir = BlobPath::new(format!("{SYSTEM_DIR}/{KEYS_DIR}"))
+            .map_err(|e| Error::new(ErrorKind::Internal, "bad key list folder").with_source(e))?;
+        let entries: Vec<_> = match self.store.list(Some(&dir)).try_collect().await {
+            Ok(entries) => entries,
+            Err(StoreError::NotFound(_)) => Vec::new(),
+            Err(e) => return Err(store_error(e)),
+        };
+        let mut roots = BTreeSet::new();
+        for entry in entries {
+            let Some(space) = entry
+                .path
+                .file_name()
+                .strip_suffix(".yaml")
+                .and_then(|id| id.parse::<SpaceId>().ok())
+            else {
+                continue;
+            };
+            if self.load(space).await?.file.keys.is_empty() {
+                continue;
+            }
+            if let Some(root) = self.access.root(space).await? {
+                let _ = roots.insert(root);
+            }
+        }
+        let count = roots.len();
+        self.roots.replace(roots);
+        Ok(count)
     }
 
     /// The blob store, for readiness checks.
@@ -172,7 +224,7 @@ impl E2e {
         let space = request.space_id;
         let key = parse_key(&request.public_key)?;
         let label = clean_label(&request.label)?;
-        let _root = self.space_root(user, space, Need::View).await?;
+        let root = self.space_root(user, space, Need::View).await?;
         for _ in 0..KEY_WRITE_ATTEMPTS {
             let mut loaded = self.load(space).await?;
             if loaded.file.keys.is_empty() {
@@ -189,6 +241,7 @@ impl E2e {
             let info = entry.info(user)?;
             loaded.file.keys.push(entry);
             if self.save(space, &loaded.file, loaded.etag).await?.is_some() {
+                self.roots.insert(root.clone());
                 tracing::info!(
                     space = %space,
                     user = %user,
@@ -299,10 +352,17 @@ impl E2e {
     /// not end-to-end encrypted.
     #[tracing::instrument(name = "e2e.get", skip(self, request), fields(space = %request.space_id), err(level = "debug"))]
     pub async fn get(&self, user: UserId, request: GetObject) -> Result<SealedObject, Error> {
-        let root = self.space_root(user, request.space_id, Need::View).await?;
+        // Readable pages go only to members who may convert them (D209).
+        let need = if request.plaintext {
+            Need::Edit
+        } else {
+            Need::View
+        };
+        let root = self.space_root(user, request.space_id, need).await?;
         let (path, rel) = object_path(&root, &request.path)?;
         let blob = self.store.get(&path).await.map_err(store_error)?;
-        if rel != FOLDER_META && !is_recipient_envelope(&blob.bytes) {
+        let sealed = is_recipient_envelope(&blob.bytes);
+        if !sealed && rel != FOLDER_META && !request.plaintext {
             return Err(Error::new(
                 ErrorKind::Conflict,
                 "this object is not end-to-end encrypted; open it through the drive",
@@ -312,6 +372,7 @@ impl E2e {
             path: rel,
             etag: blob.meta.etag.as_str().to_owned(),
             envelope: STANDARD.encode(&blob.bytes),
+            sealed,
         })
     }
 
