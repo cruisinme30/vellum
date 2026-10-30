@@ -7,5 +7,5 @@
 #     --python-platform x86_64-manylinux_2_28 \
 #     .github/requirements/hygiene.in -o .github/requirements/hygiene.txt
 yamllint==1.38.0
-sqlfluff==4.2.0
+sqlfluff==4.4.0
 zizmor==1.31.1

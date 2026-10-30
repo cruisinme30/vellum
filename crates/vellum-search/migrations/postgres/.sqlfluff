@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Released migrations never change, because sqlx checks each one's
+# checksum. These were written with a space before array brackets
+# (`TEXT []`), so sqlfluff 4.4's LT01 reads that spacing as their style.
+
+[sqlfluff:layout:type:start_square_bracket]
+spacing_before = single
