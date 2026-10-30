@@ -35,6 +35,11 @@ pub fn serialize(document: &Document) -> String {
         after_dash: false,
     };
     out.push_str(&blocks(&document.blocks, pos, "\n"));
+    // A byte order mark at the very start is dropped when the file is
+    // read, so text that starts with one keeps it as a character reference.
+    if let Some(rest) = out.strip_prefix('\u{feff}') {
+        out = format!("&#65279;{rest}");
+    }
     out
 }
 

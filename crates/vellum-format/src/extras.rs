@@ -335,8 +335,10 @@ fn match_extra(rest: &str) -> Option<(usize, Inline)> {
     } else {
         return None;
     };
-    // The extra must end at a word boundary too.
-    let after = rest.get(len..)?;
+    // The extra must end at a word boundary too. A backslash does not make
+    // one: the canonical text escapes `@` after a word character, so
+    // `@ann\@x` must read as `@ann@x` does.
+    let after = rest.get(len..)?.trim_start_matches(ESCAPED);
     let mut tail = after.chars();
     let ends_cleanly = match tail.next() {
         Some(c) if c.is_alphanumeric() || c == '_' => false,

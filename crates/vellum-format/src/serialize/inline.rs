@@ -217,8 +217,7 @@ impl Writer {
     }
 
     fn code(&mut self, code: &str) {
-        let longest = longest_run(code, '`');
-        let fence = "`".repeat(longest + 1);
+        let fence = "`".repeat(code_fence_len(code));
         let pad = code.starts_with('`')
             || code.ends_with('`')
             || (code.starts_with(' ') && code.ends_with(' ') && !code.trim().is_empty());
@@ -464,8 +463,25 @@ fn bare_autolink<'a>(url: &str, title: &str, content: &'a [Inline]) -> Option<&'
     (title.is_empty() && shape && safe).then_some(text.as_str())
 }
 
-fn longest_run(s: &str, c: char) -> usize {
-    s.split(|x| x != c).map(str::len).max().unwrap_or(0)
+/// The parser reads code spans with fences of at most this many backticks.
+const MAX_CODE_FENCE: usize = 80;
+
+/// A backtick fence for `code`: one longer than its longest backtick run,
+/// or, when that is too long for the parser, the shortest length that is
+/// not a run in the code (a run of the fence's length would close it).
+fn code_fence_len(code: &str) -> usize {
+    let runs: Vec<usize> = code
+        .split(|c| c != '`')
+        .map(str::len)
+        .filter(|&n| n > 0)
+        .collect();
+    let longest = runs.iter().copied().max().unwrap_or(0);
+    if longest < MAX_CODE_FENCE {
+        return longest + 1;
+    }
+    (1..=MAX_CODE_FENCE)
+        .find(|n| !runs.contains(n))
+        .unwrap_or(MAX_CODE_FENCE)
 }
 
 /// Escapes a fence info string word, which is read with escapes and
