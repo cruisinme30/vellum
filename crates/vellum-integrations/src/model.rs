@@ -361,6 +361,16 @@ pub trait WorkCommands: Send + Sync {
         author: Option<&str>,
         body: &str,
     ) -> impl Future<Output = Result<(), WorkError>> + Send;
+
+    /// The Git mapping the team chose in its own settings; it wins over the
+    /// integration file's mapping. `None` when the team set none.
+    fn git_mapping(
+        &self,
+        team: &str,
+    ) -> impl Future<Output = Result<Option<crate::git::Mapping>, WorkError>> + Send {
+        let _ = team;
+        async { Ok(None) }
+    }
 }
 
 #[cfg(test)]

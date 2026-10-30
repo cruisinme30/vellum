@@ -32,6 +32,48 @@ const TEAM = {
   templates: [],
 };
 
+/** CORE's settings file, as `GET /v1/work/teams/CORE/settings` returns it. */
+const SETTINGS = {
+  id: TEAM.id,
+  key: TEAM.key,
+  name: TEAM.name,
+  timezone: TEAM.timezone,
+  lead: TEAM.lead,
+  members: TEAM.members,
+  last_number: 40,
+  workflow: {
+    default: "todo",
+    statuses: [...TEAM.statuses, { key: "duplicate", name: "Duplicate", category: "duplicate" }],
+  },
+  estimates: { scale: "fibonacci", allow_zero: false, unestimated_points: 1 },
+  cycles: { duration_weeks: 2, start_day: "monday", cooldown_weeks: 0, upcoming: 3 },
+  triage: true,
+  triage_rules: [
+    {
+      name: "Gateway bugs to Dev",
+      when: {
+        and: [
+          { field: "label", op: "is", values: ["gateway"] },
+          { field: "title", op: "contains", values: ["timeout"] },
+        ],
+      },
+      // eslint-disable-next-line unicorn/no-thenable -- the field's name in team.yaml
+      then: { assignee: "dev", priority: 2 },
+    },
+  ],
+  sla: {
+    rules: [
+      {
+        name: "Urgent",
+        when: { field: "priority", op: "is", values: ["urgent"] },
+        within_hours: 24,
+      },
+      { name: "High", when: { field: "priority", op: "is", values: ["high"] }, within_hours: 168 },
+    ],
+  },
+  git: { branch_pushed: "in-progress", pr_opened: "in-review", pr_merged: "done" },
+};
+
 const RISKS = ["gray", "yellow", "orange", "red"] as const;
 
 const TITLES = [
@@ -175,6 +217,7 @@ export async function workRoutes(context: BrowserContext): Promise<void> {
     if (path.endsWith("/inbox"))
       return route.fulfill(json({ groups: [{ key: undefined, issues: INBOX }] }));
     if (path.endsWith("/cycles")) return route.fulfill(json(CYCLES));
+    if (path.endsWith("/settings")) return route.fulfill(json({ settings: SETTINGS, yaml: "" }));
     if (path === "/me/issues") return route.fulfill(json(MINE));
     return route.fulfill({ status: 404, json: { code: "not_found", message: path } });
   });

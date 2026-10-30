@@ -12,7 +12,8 @@ import { vi } from "vitest";
 import { ServerApisProvider } from "../data/server-apis";
 import { I18nProvider } from "../i18n/i18n";
 import { KeyboardRoot } from "../keyboard/keyboard-root";
-import type { CycleOut, GroupOut, IssueOut, TeamOut, ViewOut, WorkApi } from "../work/api";
+import type { CycleOut, GroupOut, IssueOut, NewTeam, TeamOut, ViewOut, WorkApi } from "../work/api";
+import type { TeamFile } from "../work/settings/team-file";
 
 // eslint-disable-next-line unicorn/no-null -- the API's "none"
 const NONE = null;
@@ -34,6 +35,40 @@ export const TEAM: TeamOut = {
   templates: [],
   timezone: "UTC",
   triage: true,
+};
+
+/** ENG's settings file, as the settings route returns it. */
+export const TEAM_FILE: TeamFile = {
+  id: "t1",
+  key: "ENG",
+  name: "Engineering",
+  timezone: "UTC",
+  members: ["dev", "priya"],
+  last_number: 9,
+  workflow: {
+    default: "todo",
+    statuses: [
+      { key: "triage", name: "Triage", category: "triage" },
+      { key: "todo", name: "Todo", category: "unstarted" },
+      { key: "next", name: "Next", category: "unstarted" },
+      { key: "doing", name: "In Progress", category: "started" },
+      { key: "done", name: "Done", category: "completed" },
+      { key: "canceled", name: "Canceled", category: "canceled" },
+      { key: "duplicate", name: "Duplicate", category: "duplicate" },
+    ],
+  },
+  estimates: { scale: "fibonacci", allow_zero: false, unestimated_points: 1 },
+  triage: true,
+  sla: {
+    rules: [
+      {
+        name: "Urgent",
+        when: { field: "priority", op: "is", values: ["urgent"] },
+        within_hours: 24,
+      },
+    ],
+  },
+  labels: [{ name: "gateway" }],
 };
 
 export function issue(key: string, title: string, extra: Partial<IssueOut> = {}): IssueOut {
@@ -131,6 +166,11 @@ export function fakeApi(overrides: Partial<WorkApi> = {}): WorkApi {
     react: unused,
     resolve: unused,
     assign: unused,
+    teamSettings: vi.fn(() => Promise.resolve(TEAM_FILE)),
+    saveTeamSettings: vi.fn(() => Promise.resolve(TEAM)),
+    createTeam: vi.fn((team: NewTeam) =>
+      Promise.resolve({ ...TEAM, id: "t2", key: team.key, name: team.name }),
+    ),
     ...overrides,
   };
 }

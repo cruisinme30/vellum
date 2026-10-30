@@ -180,6 +180,9 @@ function fakeApi(overrides: Partial<WorkApi> = {}) {
     createView: () => Promise.reject(new Error("unused")),
     updateView: () => Promise.reject(new Error("unused")),
     deleteView: () => Promise.resolve(),
+    teamSettings: () => Promise.reject(new Error("unused")),
+    saveTeamSettings: () => Promise.reject(new Error("unused")),
+    createTeam: () => Promise.reject(new Error("unused")),
     ...overrides,
   };
   return {

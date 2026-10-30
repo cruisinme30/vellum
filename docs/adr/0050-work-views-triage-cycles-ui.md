@@ -11,8 +11,8 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D220, D221, D222
-- Issue: #504
+- Decisions: D220, D221, D222, D297
+- Issue: #504, #524
 - Pull requests: none yet
 
 :::
@@ -65,6 +65,18 @@ saved views had no server side.
 - The burn-up is a small SVG chart with a table of the same points;
   velocity is the engine's mean of the last three finished cycles.
 
+### `D297`: team settings edit the whole team file
+
+- `/issues/settings` edits statuses, cycles, triage rules, SLAs,
+  estimates and the Git mapping, reading `GET
+  /v1/work/teams/{team}/settings` and saving the whole file with `PUT
+  /v1/work/teams/{team}`, which validates it first.
+- Removing a status with issues asks where they go; the moves run on
+  save, before the status disappears. A save never lowers `last_number`
+  and never changes the team ID.
+- The Git mapping lives in `team.yaml` and wins over
+  `.vellum/integrations.yaml`, read on every event, so edits apply live.
+
 ## Alternatives
 
 - **Saved views in browser storage**: rejected; R-WK-4 needs shared views,
@@ -76,8 +88,8 @@ saved views had no server side.
 
 ## Consequences
 
-- Team status editing still goes through `team.yaml` (admins); the
-  Issues screen lists each team's statuses by category.
+- Team settings stay admin-only with fresh sign-in; team leads cannot
+  save them yet. Archiving a team has no server support yet.
 - A board grouped by assignee, label or project does not move cards; those
   changes stay on the issue page.
 - Projects, insights and intake screens are a separate workstream and
