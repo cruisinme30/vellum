@@ -120,3 +120,7 @@ holder = "search and secret-scanning leftovers: hybrid toggle and status (#526, 
 [[reservation]]
 decisions = "D306"
 holder = "SQLite write transactions begin IMMEDIATE (#542), ADR 0006"
+
+[[reservation]]
+decisions = "D307-D308"
+holder = "docs site type and light and dark toggle (#549), ADR 0027"
