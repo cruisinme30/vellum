@@ -439,6 +439,27 @@ fn folder_nodes(
     })
 }
 
+/// Puts collections made through the API in the drive's folder tree,
+/// where their permissions come from (D321).
+#[derive(Debug)]
+struct DriveTree(Arc<Drive>);
+
+#[async_trait::async_trait]
+impl vellum_collections::service::Tree for DriveTree {
+    async fn created(
+        &self,
+        principal: &vellum_contracts::Principal,
+        dir: &BlobPath,
+    ) -> Result<(), Error> {
+        let user = principal.require_user()?;
+        let _ = self
+            .0
+            .add_unit(&vellum_kernel::Actor::User { user }, dir)
+            .await?;
+        Ok(())
+    }
+}
+
 /// How often accounts made since startup are checked for a My Drive.
 const DRIVES_EVERY: Duration = Duration::from_secs(30);
 
@@ -766,6 +787,7 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
     if let Some(check) = feeds.row_check {
         collections = collections.with_row_check(check);
     }
+    collections = collections.with_tree(Arc::new(DriveTree(Arc::clone(&drive))));
     let collections = Arc::new(collections);
     let books = books_service(Arc::clone(&store), authz, Arc::clone(&space_of));
     let directory = Arc::new(IdentityDirectory(Arc::clone(identity)));

@@ -147,3 +147,7 @@ holder = "local CI gate (#532), reserved by the coordinator"
 [[reservation]]
 decisions = "D319"
 holder = "local gate reuses stages that passed on the same inputs, ADR 0073"
+
+[[reservation]]
+decisions = "D321"
+holder = "new collections indexed by the drive (#565), addendum to ADR 0045"
