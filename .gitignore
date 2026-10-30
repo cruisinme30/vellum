@@ -22,3 +22,6 @@ node_modules/
 __pycache__/
 *.pyc
 *.tsbuildinfo
+
+# pnpm's package cache, if a container run puts it in the checkout
+.pnpm-store/
