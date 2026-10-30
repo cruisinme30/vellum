@@ -12,6 +12,8 @@
  * request waiting at the same time shares one prompt.
  */
 
+import type { AssertionJson, RequestOptionsJson } from "../account/webauthn";
+
 import { ApiError, type Http } from "./http";
 
 /** The server's message for a session that is too old for the action. */
@@ -95,9 +97,36 @@ export function withReauth(http: Http, gate: ReauthGate): Http {
   };
 }
 
+/** The server's answer when the person has a second factor and sent none (D290). */
+const SECOND_FACTOR_REQUIRED = "second factor required";
+
+/** Whether re-authentication needs a code or passkey as well as the password. */
+export function needsSecondFactor(error: unknown): boolean {
+  return error instanceof ApiError && error.message === SECOND_FACTOR_REQUIRED;
+}
+
+/** The second factor sent with the password, for people who have one. */
+export interface ReauthFactor {
+  readonly code?: string;
+  readonly passkey?: AssertionJson;
+  /** The ticket of the passkey ceremony, from {@link reauthPasskeyOptions}. */
+  readonly ticket?: string;
+}
+
 /** Proves the password again; the session counts as a fresh sign-in after it. */
-export async function reauthenticate(http: Http, password: string): Promise<void> {
-  await http.send("POST", "/auth/reauthenticate", { password });
+export async function reauthenticate(
+  http: Http,
+  password: string,
+  factor: ReauthFactor = {},
+): Promise<void> {
+  await http.send("POST", "/auth/reauthenticate", { password, ...factor });
+}
+
+/** A passkey ceremony to confirm the signed-in person. */
+export function reauthPasskeyOptions(
+  http: Http,
+): Promise<{ readonly ticket: string; readonly options: RequestOptionsJson }> {
+  return http.send("POST", "/auth/reauthenticate/passkey-options");
 }
 
 /** Where single sign-on re-authentication starts, returning to `next`. */

@@ -7,9 +7,10 @@
 //! which applies its middleware and puts the caller's [`Principal`] in
 //! each request:
 //!
-//! - [`browser_router`] at `/auth` (CSRF-checked): sign-in, sign-out,
-//!   re-authentication, password change, break-glass, `OAuth` consent,
-//!   and the single sign-on start and callback (top-level `GET`s).
+//! - [`browser_router`] at `/auth` (CSRF-checked): sign-in and its second
+//!   step, sign-out, re-authentication, password change, break-glass,
+//!   `OAuth` consent, and the single sign-on start and callback
+//!   (top-level `GET`s).
 //! - [`oauth_router`] at `/oauth` (cross-site): authorize, token, revoke.
 //! - [`well_known_router`] at `/.well-known` (cross-site): server metadata.
 
@@ -28,7 +29,9 @@ use vellum_contracts::{ApiError, Principal};
 use vellum_kernel::{Error, ErrorKind, RequestId};
 
 use crate::identity::{Identity, NewSession};
+use crate::mfa::{Proof, SignIn};
 use crate::oauth::{Authorize, AuthorizeRequest, TokenRequest};
+use crate::webauthn::{Assertion, Registration};
 
 type Shared = State<Arc<Identity>>;
 
@@ -109,7 +112,7 @@ fn signed_in(identity: &Identity, session: &NewSession) -> Response {
 }
 
 #[derive(Debug, Deserialize)]
-struct SignIn {
+struct Credentials {
     email: String,
     password: String,
 }
@@ -119,19 +122,124 @@ async fn sign_in(
     id: Option<Extension<RequestId>>,
     info: Option<Extension<ConnectInfo<SocketAddr>>>,
     headers: HeaderMap,
-    Json(input): Json<SignIn>,
+    Json(input): Json<Credentials>,
 ) -> Response {
     let ip = client_ip(info.as_ref());
     let worker = Arc::clone(&identity);
     let agent = user_agent(&headers).map(str::to_owned);
     // Argon2 is deliberately slow: keep it off the async workers.
     let result = tokio::task::spawn_blocking(move || {
-        worker.sign_in(&input.email, &input.password, ip, agent.as_deref())
+        worker.sign_in_password(&input.email, &input.password, ip, agent.as_deref())
     })
     .await
     .unwrap_or_else(|e| Err(Error::new(ErrorKind::Internal, e.to_string())));
     match result {
+        Ok(SignIn::Session(session)) => signed_in(&identity, &session),
+        // The password was right; the browser answers the second step.
+        Ok(SignIn::Verify(ticket)) => {
+            no_store(Json(json!({ "secondFactor": ticket })).into_response())
+        }
+        Ok(SignIn::Enrol(ticket)) => no_store(Json(json!({ "enrol": ticket })).into_response()),
+        Err(e) => error_response(&e, id),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Verify {
+    ticket: String,
+    code: Option<String>,
+    passkey: Option<Assertion>,
+}
+
+/// The second step of a sign-in: a code or a passkey for the ticket.
+async fn sign_in_verify(
+    State(identity): Shared,
+    id: Option<Extension<RequestId>>,
+    info: Option<Extension<ConnectInfo<SocketAddr>>>,
+    Json(input): Json<Verify>,
+) -> Response {
+    let proof = Proof {
+        code: input.code,
+        passkey: input.passkey,
+    };
+    match identity.verify_sign_in(&input.ticket, &proof, client_ip(info.as_ref())) {
         Ok(session) => signed_in(&identity, &session),
+        Err(e) => error_response(&e, id),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct TicketOnly {
+    ticket: String,
+}
+
+/// The passkey ceremony for a ticket: an assertion to sign in, or a new
+/// passkey to enrol.
+async fn sign_in_passkey_options(
+    State(identity): Shared,
+    id: Option<Extension<RequestId>>,
+    Json(input): Json<TicketOnly>,
+) -> Response {
+    match identity.ticket_passkey_options(&input.ticket) {
+        Ok(options) => no_store(Json(json!({ "options": options })).into_response()),
+        Err(e) => error_response(&e, id),
+    }
+}
+
+/// An authenticator app to set up with an enrolment ticket.
+async fn sign_in_authenticator(
+    State(identity): Shared,
+    id: Option<Extension<RequestId>>,
+    Json(input): Json<TicketOnly>,
+) -> Response {
+    match identity.ticket_totp_setup(&input.ticket) {
+        Ok(setup) => no_store(Json(setup).into_response()),
+        Err(e) => error_response(&e, id),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct NewPasskey {
+    name: String,
+    credential: Registration,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Enrol {
+    ticket: String,
+    code: Option<String>,
+    passkey: Option<NewPasskey>,
+}
+
+/// Adds the first factor with an enrolment ticket and signs in; the
+/// answer carries the recovery codes, shown once.
+async fn sign_in_enrol(
+    State(identity): Shared,
+    id: Option<Extension<RequestId>>,
+    info: Option<Extension<ConnectInfo<SocketAddr>>>,
+    Json(input): Json<Enrol>,
+) -> Response {
+    let passkey = input
+        .passkey
+        .as_ref()
+        .map(|p| (p.name.as_str(), &p.credential));
+    match identity.enrol_with_ticket(
+        &input.ticket,
+        input.code.as_deref(),
+        passkey,
+        client_ip(info.as_ref()),
+    ) {
+        Ok((session, codes)) => {
+            let mut response = signed_in(&identity, &session);
+            let user = identity.user(session.session.user).ok();
+            *response.body_mut() = axum::body::Body::from(
+                json!({ "user": user, "sessionId": session.session.id, "recoveryCodes": codes })
+                    .to_string(),
+            );
+            response
+        }
         Err(e) => error_response(&e, id),
     }
 }
@@ -159,8 +267,12 @@ async fn sign_out(
 }
 
 #[derive(Debug, Deserialize)]
-struct Password {
+#[serde(deny_unknown_fields)]
+struct Reauthenticate {
     password: String,
+    code: Option<String>,
+    passkey: Option<Assertion>,
+    ticket: Option<String>,
 }
 
 async fn reauthenticate(
@@ -168,7 +280,7 @@ async fn reauthenticate(
     id: Option<Extension<RequestId>>,
     info: Option<Extension<ConnectInfo<SocketAddr>>>,
     headers: HeaderMap,
-    Json(input): Json<Password>,
+    Json(input): Json<Reauthenticate>,
 ) -> Response {
     let Some(value) = cookie(&headers, identity.config().cookie_name()).map(str::to_owned) else {
         return error_response(
@@ -178,12 +290,35 @@ async fn reauthenticate(
     };
     let ip = client_ip(info.as_ref());
     let worker = Arc::clone(&identity);
-    let result =
-        tokio::task::spawn_blocking(move || worker.reauthenticate(&value, &input.password, ip))
-            .await
-            .unwrap_or_else(|e| Err(Error::new(ErrorKind::Internal, e.to_string())));
+    let result = tokio::task::spawn_blocking(move || {
+        let proof = Proof {
+            code: input.code,
+            passkey: input.passkey,
+        };
+        worker.reauthenticate(&value, &input.password, &proof, input.ticket.as_deref(), ip)
+    })
+    .await
+    .unwrap_or_else(|e| Err(Error::new(ErrorKind::Internal, e.to_string())));
     match result {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(e) => error_response(&e, id),
+    }
+}
+
+/// A passkey ceremony to confirm the signed-in person.
+async fn reauth_passkey_options(
+    State(identity): Shared,
+    id: Option<Extension<RequestId>>,
+    headers: HeaderMap,
+) -> Response {
+    let Some(value) = cookie(&headers, identity.config().cookie_name()) else {
+        return error_response(
+            &Error::new(ErrorKind::Unauthenticated, "sign in to continue"),
+            id,
+        );
+    };
+    match identity.reauth_passkey_options(value) {
+        Ok(ceremony) => no_store(Json(ceremony).into_response()),
         Err(e) => error_response(&e, id),
     }
 }
@@ -403,6 +538,14 @@ pub fn browser_router(identity: Arc<Identity>) -> Router {
         .route("/sso/start", get(sso_start))
         .route("/sso/callback", get(sso_callback))
         .route("/sign-in", post(sign_in))
+        .route("/sign-in/verify", post(sign_in_verify))
+        .route("/sign-in/passkey-options", post(sign_in_passkey_options))
+        .route("/sign-in/authenticator", post(sign_in_authenticator))
+        .route("/sign-in/enrol", post(sign_in_enrol))
+        .route(
+            "/reauthenticate/passkey-options",
+            post(reauth_passkey_options),
+        )
         .route("/sign-out", post(sign_out))
         .route("/reauthenticate", post(reauthenticate))
         .route("/password", post(change_password))

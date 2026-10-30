@@ -66,6 +66,7 @@ export function PendingView({ title, body }: { readonly title: string; readonly 
 
 const ADMIN_SCREENS = [
   "users",
+  "sign-in",
   "spaces",
   "groups",
   "tokens",
@@ -121,6 +122,9 @@ function AccountSection() {
       <h2 id="account-heading">{t("auth-signed-in-as", { name: user.name, email: user.email })}</h2>
       <nav aria-label={t("account-links")}>
         <ul className="vl-account-links">
+          <li>
+            <Link to="/settings/security">{t("account-security-link")}</Link>
+          </li>
           <li>
             <Link to="/settings/api-tokens">{t("account-tokens-link")}</Link>
           </li>

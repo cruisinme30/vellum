@@ -4,7 +4,13 @@
 import { screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { AuthApi, AuthStatus, User } from "../api/auth";
+import {
+  SecondStepRequired,
+  type AuthApi,
+  type AuthStatus,
+  type SignInSteps,
+  type User,
+} from "../api/auth";
 import { ApiError } from "../api/http";
 import { safeNext } from "../api/session";
 import { renderApp } from "../test/render-app";
@@ -198,5 +204,99 @@ describe("helpers", () => {
   it("describes errors", () => {
     expect(describeError(new ApiError("conflict", "Changed"), "x")).toBe("Changed");
     expect(describeError(new Error("raw"), "fallback")).toBe("fallback");
+  });
+});
+
+function withSteps(step: SecondStepRequired) {
+  const session = fakeAuth(SIGNED_OUT);
+  let status: AuthStatus = SIGNED_OUT;
+  const verify = vi.fn((_ticket: string, proof: { code?: string }) => {
+    if (proof.code !== "123456") {
+      return Promise.reject(new ApiError("unauthenticated", "the code is wrong"));
+    }
+    status = SIGNED_IN;
+    return Promise.resolve(USER);
+  });
+  const enrol = vi.fn(() => {
+    status = SIGNED_IN;
+    return Promise.resolve({ user: USER, recoveryCodes: ["aaaaa-bbbbb", "ccccc-ddddd"] });
+  });
+  const steps: SignInSteps = {
+    verify,
+    passkeyOptions: vi.fn(() => Promise.reject(new Error("not in this test"))),
+    authenticator: vi.fn(() =>
+      Promise.resolve({
+        secret: "JBSWY3DPEHPK3PXP",
+        uri: "otpauth://totp/x",
+        qr: ["101", "010", "101"],
+      }),
+    ),
+    enrol,
+  };
+  const auth: AuthApi = {
+    ...session.auth,
+    status: () => Promise.resolve(status),
+    signIn: vi.fn(() => Promise.reject(step)),
+    steps,
+  };
+  return { auth, verify, enrol };
+}
+
+async function password(app: ReturnType<typeof renderApp>) {
+  await app.user.type(await screen.findByLabelText("Email"), "priya@northstar.dev");
+  await app.user.type(screen.getByLabelText("Password"), "correct horse");
+  await app.user.click(screen.getByRole("button", { name: "Sign in" }));
+}
+
+describe("the second sign-in step", () => {
+  it("asks for the app code, then signs in", async () => {
+    const { auth, verify } = withSteps(
+      new SecondStepRequired("verify", "vmt_t", ["totp", "recovery"]),
+    );
+    const app = renderApp("/sign-in?next=%2Fdata", undefined, undefined, {
+      auth,
+      status: SIGNED_OUT,
+    });
+    await password(app);
+    expect(await screen.findByRole("heading", { name: "Two-step verification" })).toBeTruthy();
+    await app.user.type(screen.getByLabelText("Code from your authenticator app"), "000000");
+    await app.user.click(screen.getByRole("button", { name: "Verify" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe("the code is wrong");
+    await app.user.click(screen.getByRole("button", { name: "Use a recovery code instead" }));
+    expect(screen.getByLabelText("Recovery code")).toBeTruthy();
+    await app.user.click(
+      screen.getByRole("button", { name: "Use your authenticator app instead" }),
+    );
+    await app.user.type(screen.getByLabelText("Code from your authenticator app"), "123456");
+    await app.user.click(screen.getByRole("button", { name: "Verify" }));
+    await waitFor(() => {
+      expect(app.location()).toBe("/data");
+    });
+    expect(verify).toHaveBeenLastCalledWith("vmt_t", { code: "123456" });
+  });
+
+  it("makes a covered person add an app and save the recovery codes first", async () => {
+    const { auth, enrol } = withSteps(
+      new SecondStepRequired("enrol", "vmt_e", ["totp", "passkey"]),
+    );
+    const app = renderApp("/sign-in", undefined, undefined, { auth, status: SIGNED_OUT });
+    await password(app);
+    expect(
+      await screen.findByRole("heading", { name: "Set up two-step verification" }),
+    ).toBeTruthy();
+    await app.user.click(screen.getByRole("button", { name: "Set up an authenticator app" }));
+    expect(await screen.findByRole("img", { name: /QR code/ })).toBeTruthy();
+    expect(screen.getByText("JBSWY3DPEHPK3PXP")).toBeTruthy();
+    await app.user.type(screen.getByLabelText("Enter the 6-digit code it shows"), "654321");
+    await app.user.click(screen.getByRole("button", { name: "Turn on" }));
+    const codes = await screen.findByTestId("recovery-codes");
+    expect(codes.textContent).toContain("aaaaa-bbbbb");
+    expect(enrol).toHaveBeenCalledWith("vmt_e", { code: "654321" });
+    expect(app.location()).toBe("/sign-in");
+    await app.user.click(screen.getByRole("button", { name: "I have saved them" }));
+    await waitFor(() => {
+      expect(app.location()).toBe("/");
+    });
   });
 });

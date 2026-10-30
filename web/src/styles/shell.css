@@ -639,3 +639,30 @@ kbd {
 .vl-home-shortcuts a:focus-visible {
   background: var(--md-surface-container);
 }
+
+/* Single sign-on above the password form, and the second sign-in step (issue #523). */
+.vl-auth-sso {
+  display: grid;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.vl-auth-sso .vl-filled-button {
+  justify-content: center;
+  text-decoration: none;
+}
+
+.vl-auth-or {
+  margin: 0;
+  text-align: center;
+}
+
+.vl-second-step {
+  display: grid;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.vl-second-step .vl-filled-button {
+  justify-content: center;
+}

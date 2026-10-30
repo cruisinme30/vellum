@@ -19,7 +19,8 @@ use vellum_contracts::{
 use vellum_kernel::{Error, ErrorKind, Timestamp, UserId};
 
 use crate::identity::{Identity, UserView};
-use crate::store::SessionMethod;
+use crate::store::{SecondFactorPolicy, SessionMethod};
+use crate::webauthn::Registration;
 
 /// How recent a sign-in admin actions and token creation need.
 pub const FRESH_AUTH: Duration = Duration::from_mins(15);
@@ -195,6 +196,68 @@ pub struct SetTokenPolicy {
     pub max_days: Option<u32>,
 }
 
+/// A code from the authenticator app being added.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct TotpCode {
+    /// The 6-digit code the app shows now.
+    pub code: String,
+}
+
+/// A passkey the browser just created.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AddPasskey {
+    /// The ticket from the ceremony's options.
+    pub ticket: String,
+    /// A label, such as "Laptop" or "Security key".
+    pub name: String,
+    /// What `navigator.credentials.create()` returned, binary fields in
+    /// base64url.
+    pub credential: Registration,
+}
+
+/// A new set of recovery codes, shown once.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RecoveryCodes {
+    /// The codes; each works once.
+    pub recovery_codes: Vec<String>,
+}
+
+/// A user, by ID in the path.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct UserById {
+    /// The user's ID.
+    pub id: UserId,
+}
+
+/// How many sessions ended.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct SignedOut {
+    /// Sessions ended.
+    pub sessions: usize,
+}
+
+/// The workspace's sign-in rules, as Admin → Sign-in shows them.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SignInView {
+    /// Who must use a second factor with a password.
+    pub second_factor: SecondFactorPolicy,
+    /// The longest expiry of new API tokens, in days, if capped.
+    pub max_token_days: Option<u32>,
+}
+
+/// Changes to the sign-in rules; absent fields stay as they are.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct UpdateSignIn {
+    /// Who must use a second factor with a password.
+    pub second_factor: Option<SecondFactorPolicy>,
+}
+
 /// A connected `OAuth` app.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -271,6 +334,13 @@ const fn credential_name(kind: CredentialKind) -> &'static str {
         CredentialKind::ApiToken => "api_token",
         CredentialKind::BreakGlass => "break_glass",
         CredentialKind::ShareLink => "share_link",
+    }
+}
+
+fn sign_in_view(identity: &Identity) -> SignInView {
+    SignInView {
+        second_factor: identity.second_factor_policy(),
+        max_token_days: identity.max_token_days(),
     }
 }
 
@@ -466,6 +536,110 @@ impl Service for IdentityService {
                 }
             }
         };
+        let factors = {
+            let id = Arc::clone(id);
+            move |ctx: RequestContext, _: Empty| {
+                let id = Arc::clone(&id);
+                async move { id.factors(require_session(&ctx)?) }
+            }
+        };
+        let start_totp = {
+            let id = Arc::clone(id);
+            move |ctx: RequestContext, _: Empty| {
+                let id = Arc::clone(&id);
+                async move { id.start_totp(require_session(&ctx)?) }
+            }
+        };
+        let confirm_totp = {
+            let id = Arc::clone(id);
+            move |ctx: RequestContext, input: TotpCode| {
+                let id = Arc::clone(&id);
+                async move { id.confirm_totp(require_session(&ctx)?, &input.code) }
+            }
+        };
+        let remove_totp = {
+            let id = Arc::clone(id);
+            move |ctx: RequestContext, _: Empty| {
+                let id = Arc::clone(&id);
+                async move { id.remove_totp(require_session(&ctx)?) }
+            }
+        };
+        let start_passkey = {
+            let id = Arc::clone(id);
+            move |ctx: RequestContext, _: Empty| {
+                let id = Arc::clone(&id);
+                async move { id.start_passkey(require_session(&ctx)?) }
+            }
+        };
+        let add_passkey = {
+            let id = Arc::clone(id);
+            move |ctx: RequestContext, input: AddPasskey| {
+                let id = Arc::clone(&id);
+                async move {
+                    id.finish_passkey(
+                        require_session(&ctx)?,
+                        &input.ticket,
+                        &input.name,
+                        &input.credential,
+                    )
+                }
+            }
+        };
+        let remove_passkey = {
+            let id = Arc::clone(id);
+            move |ctx: RequestContext, input: ById| {
+                let id = Arc::clone(&id);
+                async move { id.remove_passkey(require_session(&ctx)?, &input.id) }
+            }
+        };
+        let recovery_codes = {
+            let id = Arc::clone(id);
+            move |ctx: RequestContext, _: Empty| {
+                let id = Arc::clone(&id);
+                async move {
+                    Ok(RecoveryCodes {
+                        recovery_codes: id.new_recovery_codes(require_session(&ctx)?)?,
+                    })
+                }
+            }
+        };
+        let admin_reset_factors = {
+            let id = Arc::clone(id);
+            move |_: RequestContext, input: UserById| {
+                let id = Arc::clone(&id);
+                async move { id.reset_factors(input.id) }
+            }
+        };
+        let admin_sign_out = {
+            let id = Arc::clone(id);
+            move |_: RequestContext, input: UserById| {
+                let id = Arc::clone(&id);
+                async move {
+                    Ok(SignedOut {
+                        sessions: id.sign_out_everywhere(input.id)?,
+                    })
+                }
+            }
+        };
+        let admin_sign_in = {
+            let id = Arc::clone(id);
+            move |_: RequestContext, _: Empty| {
+                let id = Arc::clone(&id);
+                async move { Ok(sign_in_view(&id)) }
+            }
+        };
+        let admin_update_sign_in = {
+            let id = Arc::clone(id);
+            move |_: RequestContext, input: UpdateSignIn| {
+                let id = Arc::clone(&id);
+                async move {
+                    if let Some(policy) = input.second_factor {
+                        let _ = id.set_second_factor_policy(policy)?;
+                    }
+                    Ok(sign_in_view(&id))
+                }
+            }
+        };
         let apps = {
             let id = Arc::clone(id);
             move |ctx: RequestContext, _: Empty| {
@@ -615,6 +789,111 @@ impl Service for IdentityService {
             )
             .fresh_auth(FRESH_AUTH)
             .summary("Cap how long new API tokens may last"),
+            Operation::query(
+                "identity.factors",
+                "/v1/me/second-factors",
+                Scope::Read,
+                factors,
+            )
+            .summary("Your authenticator app, passkeys and recovery codes"),
+            Operation::mutation(
+                "identity.start_totp",
+                HttpMethod::Post,
+                "/v1/me/second-factors/totp",
+                Scope::Read,
+                start_totp,
+            )
+            .fresh_auth(FRESH_AUTH)
+            .summary("Start adding an authenticator app; confirm it with a code"),
+            Operation::mutation(
+                "identity.confirm_totp",
+                HttpMethod::Post,
+                "/v1/me/second-factors/totp/confirm",
+                Scope::Read,
+                confirm_totp,
+            )
+            .fresh_auth(FRESH_AUTH)
+            .summary("Confirm the authenticator app with its first code"),
+            Operation::mutation(
+                "identity.remove_totp",
+                HttpMethod::Delete,
+                "/v1/me/second-factors/totp",
+                Scope::Read,
+                remove_totp,
+            )
+            .fresh_auth(FRESH_AUTH)
+            .summary("Remove your authenticator app"),
+            Operation::mutation(
+                "identity.start_passkey",
+                HttpMethod::Post,
+                "/v1/me/second-factors/passkeys/options",
+                Scope::Read,
+                start_passkey,
+            )
+            .fresh_auth(FRESH_AUTH)
+            .summary("Start adding a passkey: the options for the browser"),
+            Operation::mutation(
+                "identity.add_passkey",
+                HttpMethod::Post,
+                "/v1/me/second-factors/passkeys",
+                Scope::Read,
+                add_passkey,
+            )
+            .fresh_auth(FRESH_AUTH)
+            .summary("Add the passkey the browser created"),
+            Operation::mutation(
+                "identity.remove_passkey",
+                HttpMethod::Delete,
+                "/v1/me/second-factors/passkeys/{id}",
+                Scope::Read,
+                remove_passkey,
+            )
+            .fresh_auth(FRESH_AUTH)
+            .summary("Remove a passkey"),
+            Operation::mutation(
+                "identity.recovery_codes",
+                HttpMethod::Post,
+                "/v1/me/second-factors/recovery-codes",
+                Scope::Read,
+                recovery_codes,
+            )
+            .fresh_auth(FRESH_AUTH)
+            .summary("Replace your recovery codes; the new ones are shown once"),
+            Operation::mutation(
+                "identity.admin_reset_factors",
+                HttpMethod::Post,
+                "/v1/admin/users/{id}/second-factors/reset",
+                Scope::Admin,
+                admin_reset_factors,
+            )
+            .fresh_auth(FRESH_AUTH)
+            .summary("Remove someone's second factors and end their sessions"),
+            Operation::mutation(
+                "identity.admin_sign_out",
+                HttpMethod::Post,
+                "/v1/admin/users/{id}/sign-out",
+                Scope::Admin,
+                admin_sign_out,
+            )
+            .fresh_auth(FRESH_AUTH)
+            .summary("End every session of one person"),
+            Operation::query(
+                "identity.admin_sign_in",
+                "/v1/admin/sign-in",
+                Scope::Admin,
+                admin_sign_in,
+            )
+            .fresh_auth(FRESH_AUTH)
+            .summary("The workspace's sign-in rules"),
+            Operation::mutation(
+                "identity.admin_update_sign_in",
+                HttpMethod::Patch,
+                "/v1/admin/sign-in",
+                Scope::Admin,
+                admin_update_sign_in,
+            )
+            .fresh_auth(FRESH_AUTH)
+            .summary("Change the workspace's sign-in rules"),
             Operation::query("identity.apps", "/v1/me/apps", Scope::Read, apps)
                 .summary("List apps you connected with OAuth"),
             Operation::mutation(

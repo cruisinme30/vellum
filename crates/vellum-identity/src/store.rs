@@ -61,6 +61,108 @@ pub struct User {
     /// Single sign-on identities that sign in as this user.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub sso: Vec<SsoLink>,
+    /// Authenticator apps, passkeys and recovery codes (D290).
+    #[serde(default, skip_serializing_if = "SecondFactors::is_empty")]
+    pub factors: SecondFactors,
+}
+
+/// A person's second factors (ADR 0069, D290).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SecondFactors {
+    /// The authenticator app, once confirmed.
+    pub totp: Option<TotpFactor>,
+    /// An authenticator app being added, until its first code is entered.
+    pub pending_totp: Option<PendingTotp>,
+    /// Registered passkeys.
+    pub passkeys: Vec<Passkey>,
+    /// Hashes of the recovery codes not used yet.
+    pub recovery: Vec<String>,
+}
+
+impl SecondFactors {
+    /// Whether nothing is stored.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self == &Self::default()
+    }
+
+    /// Whether sign-in needs a second step: a confirmed app or a passkey.
+    #[must_use]
+    pub const fn any(&self) -> bool {
+        self.totp.is_some() || !self.passkeys.is_empty()
+    }
+}
+
+/// A confirmed authenticator app.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TotpFactor {
+    /// The secret, sealed with the identity key ([`crate::seal`]).
+    pub sealed: String,
+    /// The last step a code was accepted for; earlier steps are refused.
+    pub last_step: Option<u64>,
+    /// When it was added.
+    pub added_at: Timestamp,
+}
+
+/// An authenticator app waiting for its first code.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PendingTotp {
+    /// The secret, sealed.
+    pub sealed: String,
+    /// When the offer lapses.
+    pub expires: Timestamp,
+}
+
+/// A registered passkey.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Passkey {
+    /// The credential ID, base64url.
+    pub id: String,
+    /// The owner's label for it.
+    pub name: String,
+    /// The public key.
+    pub key: crate::webauthn::PublicKey,
+    /// The signature counter last seen.
+    pub sign_count: u32,
+    /// When it was added.
+    pub created_at: Timestamp,
+    /// When it last signed in.
+    pub last_used_at: Option<Timestamp>,
+}
+
+/// What a second-factor challenge is for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ChallengePurpose {
+    /// The second step of a password sign-in.
+    SignIn,
+    /// A sign-in that may finish only once a factor is added.
+    Enrol,
+    /// Adding a passkey from the settings page.
+    Register,
+    /// Confirming a session's owner with a passkey.
+    Reauth,
+}
+
+/// A second-factor challenge in flight: a sign-in ticket or a passkey
+/// ceremony, keyed by the hash of its secret.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MfaChallenge {
+    /// Whose it is.
+    pub user: UserId,
+    /// What it is for.
+    pub purpose: ChallengePurpose,
+    /// The `WebAuthn` challenge issued for it, base64url.
+    pub webauthn: Option<String>,
+    /// Wrong answers so far; the ticket ends after a few.
+    pub failures: u32,
+    /// When it lapses.
+    pub expires: Timestamp,
+    /// The browser that started it.
+    pub user_agent: Option<String>,
+    /// For [`ChallengePurpose::Reauth`], the session it confirms.
+    pub session: Option<String>,
 }
 
 /// A named group of people (ADR 0057, D273). Who is in it lives in the
@@ -267,6 +369,9 @@ pub struct State {
     /// How people may sign in, set in Admin → Sign-in (ADR 0069).
     #[serde(default)]
     pub sign_in: SignInSettings,
+    /// Second-factor challenges by the base64 of their secret's hash.
+    #[serde(default)]
+    pub mfa_challenges: BTreeMap<String, MfaChallenge>,
 }
 
 /// The workspace's sign-in rules, one record set by administrators
@@ -277,6 +382,33 @@ pub struct SignInSettings {
     /// The longest expiry, in days, a personal API token may have; `None`
     /// allows tokens that never expire (D291).
     pub max_token_days: Option<u32>,
+    /// Who must use a second factor with a password (D290).
+    pub second_factor: SecondFactorPolicy,
+}
+
+/// Who must use a second factor when signing in with a password.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum SecondFactorPolicy {
+    /// Nobody: people choose.
+    #[default]
+    Optional,
+    /// Administrators.
+    Admins,
+    /// Everyone.
+    Everyone,
+}
+
+impl SecondFactorPolicy {
+    /// Whether the policy covers `user`.
+    #[must_use]
+    pub const fn covers(self, user: &User) -> bool {
+        match self {
+            Self::Optional => false,
+            Self::Admins => user.admin,
+            Self::Everyone => true,
+        }
+    }
 }
 
 impl State {
@@ -339,6 +471,7 @@ impl State {
             .retain(|_, t| t.expires_at > now && grants.contains_key(&t.grant));
         self.oauth_consents.retain(|_, c| c.expires > now);
         self.oauth_codes.retain(|_, c| c.expires > now);
+        self.mfa_challenges.retain(|_, c| c.expires > now);
         let forget = i64::try_from(LOCKOUT_MEMORY.as_millis()).unwrap_or(i64::MAX);
         self.lockouts
             .retain(|_, a| a.until.unix_ms().saturating_add(forget) > now.unix_ms());
@@ -362,6 +495,7 @@ impl State {
     /// Revokes every credential of a user.
     pub fn revoke_user(&mut self, user: UserId) {
         self.sessions.retain(|_, s| s.user != user);
+        self.mfa_challenges.retain(|_, c| c.user != user);
         self.api_tokens.retain(|_, t| t.user != user);
         self.grants.retain(|_, g| g.user != user);
         let grants = &self.grants;
@@ -619,6 +753,7 @@ mod tests {
                         disabled: false,
                         created_at: Timestamp::now(),
                         sso: Vec::new(),
+                        factors: SecondFactors::default(),
                     },
                 );
                 let _ = s.sessions.insert(

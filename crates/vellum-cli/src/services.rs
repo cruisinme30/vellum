@@ -121,8 +121,12 @@ impl Services {
         let subject = url.to_string();
         let mut config = IdentityConfig::new(url.clone());
         config.data_dir = data_dir.map(Path::to_path_buf);
+        let shared = store.is_shared();
         let mut identity =
             Identity::new(config, store).with_metadata_fetcher(Arc::new(GuardedFetcher::new()?));
+        if let Some(key) = identity_key(data_dir, shared, |k| std::env::var(k).ok())? {
+            identity = identity.with_sealing_key(&key)?;
+        }
         if let Some(sso) = sso {
             let http = Arc::new(GuardedSsoHttp::new(&sso.issuer)?);
             tracing::info!(issuer = %sso.issuer, "single sign-on is on");
@@ -297,6 +301,46 @@ impl Services {
             )
             .mount("/collab", self.collab())
     }
+}
+
+/// Overrides the key that seals authenticator secrets and identity
+/// provider secrets (64 hex characters). Replicas must share it.
+pub const IDENTITY_KEY_VAR: &str = "VELLUM_IDENTITY_KEY";
+
+/// The identity key (ADR 0069, D290): `VELLUM_IDENTITY_KEY`, or
+/// `.vellum/keys/identity.key` in the data folder, created on first start.
+/// Without a data folder, `None`: identity uses a key that lasts until
+/// the process ends.
+///
+/// # Errors
+///
+/// A malformed variable or an unreadable key file.
+pub fn identity_key(
+    data_dir: Option<&Path>,
+    shared: bool,
+    var: impl Fn(&str) -> Option<String>,
+) -> Result<Option<[u8; 32]>, Error> {
+    if let Some(hex) = var(IDENTITY_KEY_VAR).filter(|v| !v.trim().is_empty()) {
+        return crate::reindex::parse_hex_key(IDENTITY_KEY_VAR, hex.trim())
+            .map(Some)
+            .map_err(|why| Error::new(ErrorKind::InvalidInput, why));
+    }
+    let Some(dir) = data_dir else {
+        return Ok(None);
+    };
+    if shared {
+        tracing::warn!(
+            "VELLUM_IDENTITY_KEY is not set: each replica makes its own identity key, so \
+             authenticator codes fail on replicas other than the one that set them up; \
+             set it from a shared secret"
+        );
+    }
+    let bytes = crate::keys::key_file(dir, "identity.key")?;
+    let key: [u8; 32] = bytes
+        .get(..32)
+        .and_then(|b| b.try_into().ok())
+        .ok_or_else(|| Error::new(ErrorKind::Internal, "the identity key is too short"))?;
+    Ok(Some(key))
 }
 
 /// A gateway built only to describe the API: no listener, in-memory

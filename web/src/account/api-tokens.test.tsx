@@ -23,6 +23,8 @@ const CI: TokenView = {
   expiresAt: "2099-01-01T00:00:00Z",
 };
 
+const unused = () => Promise.reject(new Error("not in this test"));
+
 function fakeAccount(overrides: Partial<AccountApi> = {}) {
   const createToken = vi.fn<AccountApi["createToken"]>((input) =>
     Promise.resolve({
@@ -36,6 +38,14 @@ function fakeAccount(overrides: Partial<AccountApi> = {}) {
     tokenPolicy: () => Promise.resolve({ maxDays: 90, scopes: ["read", "write:draft", "work"] }),
     createToken,
     revokeToken,
+    factors: unused,
+    startTotp: unused,
+    confirmTotp: unused,
+    removeTotp: unused,
+    startPasskey: unused,
+    addPasskey: unused,
+    removePasskey: unused,
+    newRecoveryCodes: unused,
     ...overrides,
   };
   return { api, createToken, revokeToken };

@@ -49,3 +49,53 @@
   padding: 0;
   list-style: none;
 }
+
+.vl-account-qr {
+  display: block;
+  width: min(200px, 100%);
+  height: auto;
+  margin: 8px 0;
+}
+
+.vl-account-secret {
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.vl-account-code {
+  max-width: 14ch;
+  font-family: var(--vl-font-mono, monospace);
+  letter-spacing: 0.1em;
+}
+
+.vl-account-steps {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding-inline-start: 20px;
+}
+
+.vl-account-steps li {
+  display: grid;
+  gap: 4px;
+}
+
+.vl-account-recovery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14ch, 1fr));
+  gap: 4px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vl-account-on {
+  background: var(--md-primary-container, #d8e2ff);
+  color: var(--md-on-primary-container, #001a41);
+}
+
+.vl-account-required {
+  padding: 8px 12px;
+  border-inline-start: 4px solid var(--md-primary);
+  background: color-mix(in srgb, var(--md-primary) 8%, transparent);
+}

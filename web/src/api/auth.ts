@@ -1,6 +1,9 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import type { AssertionJson, RegistrationJson } from "../account/webauthn";
+
+import type { TotpSetup } from "./api.gen";
 import { ApiError, type Http } from "./http";
 
 /** `UserView`: a user as the API shows it. */
@@ -38,14 +41,66 @@ interface SetupInput {
   readonly password: string;
 }
 
+/**
+ * The password was right, and a second step remains (issue #523, D290):
+ * `verify` with a code or passkey, or `enrol` a first factor because the
+ * workspace requires one. The ticket works for five minutes.
+ */
+export class SecondStepRequired extends Error {
+  constructor(
+    readonly step: "verify" | "enrol",
+    readonly ticket: string,
+    readonly methods: readonly string[],
+  ) {
+    super(step === "verify" ? "second factor required" : "second factor setup required");
+    this.name = "SecondStepRequired";
+  }
+}
+
+/** A code, or a passkey's answer, for the second step. */
+interface SecondStepProof {
+  readonly code?: string;
+  readonly passkey?: AssertionJson;
+}
+
+/** A first factor added at sign-in. */
+type Enrolment =
+  | { readonly code: string }
+  | { readonly passkey: { readonly name: string; readonly credential: RegistrationJson } };
+
+/** The second step of a sign-in, against a ticket. */
+export interface SignInSteps {
+  /** Redeems the ticket with a code, recovery code or passkey; signs in. */
+  verify(ticket: string, proof: SecondStepProof): Promise<User | undefined>;
+  /** The passkey options for the ticket: sign with one, or create one to enrol. */
+  passkeyOptions(ticket: string): Promise<unknown>;
+  /** An authenticator app to set up with an enrolment ticket. */
+  authenticator(ticket: string): Promise<TotpSetup>;
+  /** Adds the first factor and signs in; the recovery codes are shown once. */
+  enrol(
+    ticket: string,
+    enrolment: Enrolment,
+  ): Promise<{ readonly user: User | undefined; readonly recoveryCodes: readonly string[] }>;
+}
+
 /** Sign-in, sign-out and first-run set-up, on top of the HTTP client. */
 export interface AuthApi {
   /** `identity.status`; `undefined` when no Vellum server answers (demo mode). */
   status(): Promise<AuthStatus | undefined>;
+  /** Signs in, or throws {@link SecondStepRequired} when a second step remains. */
   signIn(email: string, password: string): Promise<User | undefined>;
   signOut(): Promise<void>;
   /** Creates the first administrator, then signs them in. */
   setUp(input: SetupInput): Promise<User | undefined>;
+  /** The second step; absent in tests that do not need it. */
+  readonly steps?: SignInSteps;
+}
+
+interface SignInAnswer {
+  readonly user?: User | null;
+  readonly secondFactor?: { readonly ticket: string; readonly methods: readonly string[] };
+  readonly enrol?: { readonly ticket: string; readonly methods: readonly string[] };
+  readonly recoveryCodes?: readonly string[];
 }
 
 const isStatus = (value: unknown): value is AuthStatus =>
@@ -55,12 +110,52 @@ const isStatus = (value: unknown): value is AuthStatus =>
 
 export function createAuthApi(http: Http): AuthApi {
   const signIn = async (email: string, password: string): Promise<User | undefined> => {
-    const result = await http.send<{ user?: User | null }>("POST", "/auth/sign-in", {
+    const result = await http.send<SignInAnswer>("POST", "/auth/sign-in", {
       email,
       password,
     });
+    if (result.secondFactor !== undefined) {
+      throw new SecondStepRequired(
+        "verify",
+        result.secondFactor.ticket,
+        result.secondFactor.methods,
+      );
+    }
+    if (result.enrol !== undefined) {
+      throw new SecondStepRequired("enrol", result.enrol.ticket, result.enrol.methods);
+    }
     http.forgetSession();
     return result.user ?? undefined;
+  };
+  const steps: SignInSteps = {
+    async verify(ticket, proof) {
+      const result = await http.send<SignInAnswer>("POST", "/auth/sign-in/verify", {
+        ticket,
+        ...proof,
+      });
+      http.forgetSession();
+      return result.user ?? undefined;
+    },
+    async passkeyOptions(ticket) {
+      const result = await http.send<{ options: unknown }>(
+        "POST",
+        "/auth/sign-in/passkey-options",
+        {
+          ticket,
+        },
+      );
+      return result.options;
+    },
+    authenticator: (ticket) =>
+      http.send<TotpSetup>("POST", "/auth/sign-in/authenticator", { ticket }),
+    async enrol(ticket, enrolment) {
+      const result = await http.send<SignInAnswer>("POST", "/auth/sign-in/enrol", {
+        ticket,
+        ...enrolment,
+      });
+      http.forgetSession();
+      return { user: result.user ?? undefined, recoveryCodes: result.recoveryCodes ?? [] };
+    },
   };
   return {
     async status() {
@@ -84,5 +179,6 @@ export function createAuthApi(http: Http): AuthApi {
       await http.send("POST", "/api/v1/setup", input);
       return signIn(input.email, input.password);
     },
+    steps,
   };
 }

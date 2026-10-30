@@ -113,6 +113,25 @@ export interface AddComment {
 }
 
 /**
+ * A passkey the browser just created.
+ */
+export interface AddPasskey {
+  /**
+   * What `navigator.credentials.create()` returned, binary fields in
+   * base64url.
+   */
+  credential: Registration;
+  /**
+   * A label, such as "Laptop" or "Security key".
+   */
+  name: string;
+  /**
+   * The ticket from the ceremony's options.
+   */
+  ticket: string;
+}
+
+/**
  * Adds a property (a column) to a collection. The server picks its key
  * from the name.
  */
@@ -3385,6 +3404,42 @@ export interface ExportCsvInput {
 }
 
 /**
+ * A factor just added.
+ */
+export interface FactorAdded {
+  /**
+   * The person's factors now.
+   */
+  factors: IdentityConfirmTotpFactorsView;
+  /**
+   * New recovery codes, when this was the first factor. Shown once.
+   */
+  recoveryCodes?: string[] | null;
+}
+
+/**
+ * A person's factors, as their settings page shows them.
+ */
+export interface FactorsView {
+  /**
+   * Registered passkeys.
+   */
+  passkeys: PasskeyView[];
+  /**
+   * Recovery codes not used yet.
+   */
+  recoveryCodesLeft: number;
+  /**
+   * Whether the workspace requires a factor of this person.
+   */
+  required: boolean;
+  /**
+   * Whether an authenticator app is set up.
+   */
+  totp: boolean;
+}
+
+/**
  * One question on a form.
  */
 export interface FieldOut {
@@ -3926,6 +3981,106 @@ export interface HookView {
 }
 
 /**
+ * A factor just added.
+ */
+export interface IdentityAddPasskeyFactorAdded {
+  /**
+   * The person's factors now.
+   */
+  factors: IdentityAddPasskeyFactorsView;
+  /**
+   * New recovery codes, when this was the first factor. Shown once.
+   */
+  recoveryCodes?: string[] | null;
+}
+
+/**
+ * A person's factors, as their settings page shows them.
+ */
+export interface IdentityAddPasskeyFactorsView {
+  /**
+   * Registered passkeys.
+   */
+  passkeys: PasskeyView[];
+  /**
+   * Recovery codes not used yet.
+   */
+  recoveryCodesLeft: number;
+  /**
+   * Whether the workspace requires a factor of this person.
+   */
+  required: boolean;
+  /**
+   * Whether an authenticator app is set up.
+   */
+  totp: boolean;
+}
+
+/**
+ * A user as the API shows it.
+ */
+export interface IdentityAdminResetFactorsUserView {
+  /**
+   * Whether the user administers the workspace.
+   */
+  admin: boolean;
+  /**
+   * When the account was created.
+   */
+  createdAt: Timestamp;
+  /**
+   * Whether sign-in is blocked.
+   */
+  disabled: boolean;
+  /**
+   * The sign-in address.
+   */
+  email: string;
+  /**
+   * The unique handle used for assignees and mentions.
+   */
+  handle: string;
+  /**
+   * Whether the account has a password (otherwise SSO only).
+   */
+  hasPassword: boolean;
+  /**
+   * The user's ID.
+   */
+  id: UserId;
+  /**
+   * The display name.
+   */
+  name: string;
+  /**
+   * Whether the account has an authenticator app or passkey.
+   */
+  secondFactor?: boolean;
+}
+
+/**
+ * A person's factors, as their settings page shows them.
+ */
+export interface IdentityConfirmTotpFactorsView {
+  /**
+   * Registered passkeys.
+   */
+  passkeys: PasskeyView[];
+  /**
+   * Recovery codes not used yet.
+   */
+  recoveryCodesLeft: number;
+  /**
+   * Whether the workspace requires a factor of this person.
+   */
+  required: boolean;
+  /**
+   * Whether an authenticator app is set up.
+   */
+  totp: boolean;
+}
+
+/**
  * A user as the API shows it.
  */
 export interface IdentityCreateUserUserView {
@@ -3961,6 +4116,10 @@ export interface IdentityCreateUserUserView {
    * The display name.
    */
   name: string;
+  /**
+   * Whether the account has an authenticator app or passkey.
+   */
+  secondFactor?: boolean;
 }
 
 /**
@@ -3999,6 +4158,10 @@ export interface IdentitySetupUserView {
    * The display name.
    */
   name: string;
+  /**
+   * Whether the account has an authenticator app or passkey.
+   */
+  secondFactor?: boolean;
 }
 
 /**
@@ -4037,6 +4200,10 @@ export interface IdentityUpdateMeUserView {
    * The display name.
    */
   name: string;
+  /**
+   * Whether the account has an authenticator app or passkey.
+   */
+  secondFactor?: boolean;
 }
 
 /**
@@ -4075,6 +4242,10 @@ export interface IdentityUpdateUserUserView {
    * The display name.
    */
   name: string;
+  /**
+   * Whether the account has an authenticator app or passkey.
+   */
+  secondFactor?: boolean;
 }
 
 /**
@@ -4979,6 +5150,43 @@ export interface ParseView {
 }
 
 /**
+ * A `WebAuthn` ceremony to run in the browser.
+ */
+export interface PasskeyCeremony {
+  /**
+   * The options for `navigator.credentials.create()` or `.get()`, with
+   * binary fields in base64url.
+   */
+  options: unknown;
+  /**
+   * The ticket that answers it.
+   */
+  ticket: string;
+}
+
+/**
+ * A passkey as listed.
+ */
+export interface PasskeyView {
+  /**
+   * When it was added.
+   */
+  createdAt: Timestamp;
+  /**
+   * The credential ID.
+   */
+  id: string;
+  /**
+   * When it last signed in.
+   */
+  lastUsedAt?: Timestamp | null;
+  /**
+   * Its label.
+   */
+  name: string;
+}
+
+/**
  * Where to move or copy an item.
  */
 export interface PlaceInput {
@@ -5399,6 +5607,16 @@ export interface RecentList {
 }
 
 /**
+ * A new set of recovery codes, shown once.
+ */
+export interface RecoveryCodes {
+  /**
+   * The codes; each works once.
+   */
+  recoveryCodes: string[];
+}
+
+/**
  * A logged delivery of a hook.
  */
 export interface RedeliverInput {
@@ -5416,6 +5634,34 @@ export interface RedeliverInput {
  * A region of the summary.
  */
 export type Region = "prefix" | "numbered" | "suffix";
+
+/**
+ * A credential as the browser returns it from `navigator.credentials.create()`.
+ */
+export interface Registration {
+  /**
+   * The credential ID, base64url.
+   */
+  id: string;
+  /**
+   * The attestation response.
+   */
+  response: RegistrationResponse;
+}
+
+/**
+ * The attestation response fields, base64url.
+ */
+export interface RegistrationResponse {
+  /**
+   * The CBOR attestation object.
+   */
+  attestationObject: string;
+  /**
+   * The client data JSON.
+   */
+  clientDataJson: string;
+}
 
 /**
  * A relation to add or remove.
@@ -6030,6 +6276,11 @@ export interface SearchQueryQueryInput {
 }
 
 /**
+ * Who must use a second factor when signing in with a password.
+ */
+export type SecondFactorPolicy = "optional" | "admins" | "everyone";
+
+/**
  * A newly issued secret URL or address. It is shown once.
  */
 export interface SecretView {
@@ -6344,6 +6595,30 @@ export interface SetupInput {
  * How serious a diagnostic is.
  */
 export type Severity = "warning" | "error";
+
+/**
+ * The workspace's sign-in rules, as Admin → Sign-in shows them.
+ */
+export interface SignInView {
+  /**
+   * The longest expiry of new API tokens, in days, if capped.
+   */
+  maxTokenDays?: number | null;
+  /**
+   * Who must use a second factor with a password.
+   */
+  secondFactor: SecondFactorPolicy;
+}
+
+/**
+ * How many sessions ended.
+ */
+export interface SignedOut {
+  /**
+   * Sessions ended.
+   */
+  sessions: number;
+}
 
 /**
  * An open issue with a similar title.
@@ -7589,6 +7864,34 @@ export interface TokenView {
 }
 
 /**
+ * A code from the authenticator app being added.
+ */
+export interface TotpCode {
+  /**
+   * The 6-digit code the app shows now.
+   */
+  code: string;
+}
+
+/**
+ * A new authenticator app: what to scan or type into it.
+ */
+export interface TotpSetup {
+  /**
+   * The link as a QR code: one string per row, `1` for a dark module.
+   */
+  qr: string[];
+  /**
+   * The secret in base32, to type in by hand.
+   */
+  secret: string;
+  /**
+   * The `otpauth://` link, which a phone opens in its app.
+   */
+  uri: string;
+}
+
+/**
  * One trace.
  */
 export interface TraceInput {
@@ -7929,6 +8232,16 @@ export interface UpdateSection {
 }
 
 /**
+ * Changes to the sign-in rules; absent fields stay as they are.
+ */
+export interface UpdateSignIn {
+  /**
+   * Who must use a second factor with a password.
+   */
+  secondFactor?: SecondFactorPolicy | null;
+}
+
+/**
  * Changes to a space.
  */
 export interface UpdateSpace {
@@ -8131,6 +8444,16 @@ export interface UsageView {
 }
 
 /**
+ * A user, by ID in the path.
+ */
+export interface UserById {
+  /**
+   * The user's ID.
+   */
+  id: UserId;
+}
+
+/**
  * A UserId as a 26-character ULID.
  */
 export type UserId = string;
@@ -8171,6 +8494,10 @@ export interface UserView {
    * The display name.
    */
   name: string;
+  /**
+   * Whether the account has an authenticator app or passkey.
+   */
+  secondFactor?: boolean;
 }
 
 /**
@@ -10265,12 +10592,40 @@ export interface Operations {
     input: UpdateGroup;
     output: GroupsUpdateGroupView;
   };
+  /** Add the passkey the browser created */
+  "identity.add_passkey": {
+    method: "POST";
+    path: "/v1/me/second-factors/passkeys";
+    input: AddPasskey;
+    output: IdentityAddPasskeyFactorAdded;
+  };
+  /** Remove someone's second factors and end their sessions */
+  "identity.admin_reset_factors": {
+    method: "POST";
+    path: "/v1/admin/users/{id}/second-factors/reset";
+    input: UserById;
+    output: IdentityAdminResetFactorsUserView;
+  };
   /** Revoke anyone's API token */
   "identity.admin_revoke_token": {
     method: "DELETE";
     path: "/v1/admin/tokens/{id}";
     input: ById;
     output: Done;
+  };
+  /** The workspace's sign-in rules */
+  "identity.admin_sign_in": {
+    method: "GET";
+    path: "/v1/admin/sign-in";
+    input: Empty;
+    output: SignInView;
+  };
+  /** End every session of one person */
+  "identity.admin_sign_out": {
+    method: "POST";
+    path: "/v1/admin/users/{id}/sign-out";
+    input: UserById;
+    output: SignedOut;
   };
   /** Cap how long new API tokens may last */
   "identity.admin_token_policy": {
@@ -10286,12 +10641,26 @@ export interface Operations {
     input: Empty;
     output: Array_of_AdminTokenView;
   };
+  /** Change the workspace's sign-in rules */
+  "identity.admin_update_sign_in": {
+    method: "PATCH";
+    path: "/v1/admin/sign-in";
+    input: UpdateSignIn;
+    output: SignInView;
+  };
   /** List apps you connected with OAuth */
   "identity.apps": {
     method: "GET";
     path: "/v1/me/apps";
     input: Empty;
     output: Array_of_AppView;
+  };
+  /** Confirm the authenticator app with its first code */
+  "identity.confirm_totp": {
+    method: "POST";
+    path: "/v1/me/second-factors/totp/confirm";
+    input: TotpCode;
+    output: FactorAdded;
   };
   /** Create an API token; the secret is returned once */
   "identity.create_token": {
@@ -10306,6 +10675,34 @@ export interface Operations {
     path: "/v1/admin/users";
     input: CreateUser;
     output: IdentityCreateUserUserView;
+  };
+  /** Your authenticator app, passkeys and recovery codes */
+  "identity.factors": {
+    method: "GET";
+    path: "/v1/me/second-factors";
+    input: Empty;
+    output: FactorsView;
+  };
+  /** Replace your recovery codes; the new ones are shown once */
+  "identity.recovery_codes": {
+    method: "POST";
+    path: "/v1/me/second-factors/recovery-codes";
+    input: Empty;
+    output: RecoveryCodes;
+  };
+  /** Remove a passkey */
+  "identity.remove_passkey": {
+    method: "DELETE";
+    path: "/v1/me/second-factors/passkeys/{id}";
+    input: ById;
+    output: FactorsView;
+  };
+  /** Remove your authenticator app */
+  "identity.remove_totp": {
+    method: "DELETE";
+    path: "/v1/me/second-factors/totp";
+    input: Empty;
+    output: FactorsView;
   };
   /** Disconnect an app */
   "identity.revoke_app": {
@@ -10341,6 +10738,20 @@ export interface Operations {
     path: "/v1/setup";
     input: SetupInput;
     output: IdentitySetupUserView;
+  };
+  /** Start adding a passkey: the options for the browser */
+  "identity.start_passkey": {
+    method: "POST";
+    path: "/v1/me/second-factors/passkeys/options";
+    input: Empty;
+    output: PasskeyCeremony;
+  };
+  /** Start adding an authenticator app; confirm it with a code */
+  "identity.start_totp": {
+    method: "POST";
+    path: "/v1/me/second-factors/totp";
+    input: Empty;
+    output: TotpSetup;
   };
   /** Who is signed in, and whether the workspace needs set-up */
   "identity.status": {
@@ -11023,17 +11434,29 @@ export const OPERATIONS = {
   "groups.members": { method: "GET", path: "/v1/admin/groups/{id}/members", mutation: false },
   "groups.search": { method: "GET", path: "/v1/directory/groups", mutation: false },
   "groups.update": { method: "PATCH", path: "/v1/admin/groups/{id}", mutation: true },
+  "identity.add_passkey": { method: "POST", path: "/v1/me/second-factors/passkeys", mutation: true },
+  "identity.admin_reset_factors": { method: "POST", path: "/v1/admin/users/{id}/second-factors/reset", mutation: true },
   "identity.admin_revoke_token": { method: "DELETE", path: "/v1/admin/tokens/{id}", mutation: true },
+  "identity.admin_sign_in": { method: "GET", path: "/v1/admin/sign-in", mutation: false },
+  "identity.admin_sign_out": { method: "POST", path: "/v1/admin/users/{id}/sign-out", mutation: true },
   "identity.admin_token_policy": { method: "PUT", path: "/v1/admin/token-policy", mutation: true },
   "identity.admin_tokens": { method: "GET", path: "/v1/admin/tokens", mutation: false },
+  "identity.admin_update_sign_in": { method: "PATCH", path: "/v1/admin/sign-in", mutation: true },
   "identity.apps": { method: "GET", path: "/v1/me/apps", mutation: false },
+  "identity.confirm_totp": { method: "POST", path: "/v1/me/second-factors/totp/confirm", mutation: true },
   "identity.create_token": { method: "POST", path: "/v1/me/tokens", mutation: true },
   "identity.create_user": { method: "POST", path: "/v1/admin/users", mutation: true },
+  "identity.factors": { method: "GET", path: "/v1/me/second-factors", mutation: false },
+  "identity.recovery_codes": { method: "POST", path: "/v1/me/second-factors/recovery-codes", mutation: true },
+  "identity.remove_passkey": { method: "DELETE", path: "/v1/me/second-factors/passkeys/{id}", mutation: true },
+  "identity.remove_totp": { method: "DELETE", path: "/v1/me/second-factors/totp", mutation: true },
   "identity.revoke_app": { method: "DELETE", path: "/v1/me/apps/{id}", mutation: true },
   "identity.revoke_session": { method: "DELETE", path: "/v1/me/sessions/{id}", mutation: true },
   "identity.revoke_token": { method: "DELETE", path: "/v1/me/tokens/{id}", mutation: true },
   "identity.sessions": { method: "GET", path: "/v1/me/sessions", mutation: false },
   "identity.setup": { method: "POST", path: "/v1/setup", mutation: true },
+  "identity.start_passkey": { method: "POST", path: "/v1/me/second-factors/passkeys/options", mutation: true },
+  "identity.start_totp": { method: "POST", path: "/v1/me/second-factors/totp", mutation: true },
   "identity.status": { method: "GET", path: "/v1/auth/status", mutation: false },
   "identity.token_policy": { method: "GET", path: "/v1/me/token-policy", mutation: false },
   "identity.tokens": { method: "GET", path: "/v1/me/tokens", mutation: false },
