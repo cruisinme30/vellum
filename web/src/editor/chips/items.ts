@@ -57,7 +57,8 @@ const matches = (query: string, ...fields: string[]) => {
 /** An ISO date (`YYYY-MM-DD`) in local time. */
 export function isoDate(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${String(date.getFullYear())}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  const month = pad(date.getMonth() + 1);
+  return `${String(date.getFullYear())}-${month}-${pad(date.getDate())}`;
 }
 
 const addDays = (date: Date, days: number) =>

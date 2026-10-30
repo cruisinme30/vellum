@@ -3,7 +3,8 @@
 
 [package]
 name = "vellum-contracts"
-description = "Public API types shared by the server, the clients and the MCP server."
+description = """\
+    Public API types shared by the server, the clients and the MCP server."""
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

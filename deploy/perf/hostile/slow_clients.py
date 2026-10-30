@@ -75,11 +75,15 @@ async def slow_body(host, port, results):
 
 
 async def idle_h2(host, port, results):
-    """HTTP/2 with prior knowledge: preface, settings, then only ping answers."""
+    """HTTP/2 with prior knowledge: preface, settings, then only ping
+    answers."""
     start = time.monotonic()
     try:
         reader, writer = await asyncio.open_connection(host, port)
-        writer.write(b"PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n" + bytes([0, 0, 0, 4, 0, 0, 0, 0, 0]))
+        writer.write(
+            b"PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
+            + bytes([0, 0, 0, 4, 0, 0, 0, 0, 0])
+        )
         await writer.drain()
         while True:
             head = await reader.readexactly(9)
@@ -103,8 +107,13 @@ async def reader_loop(host, port, stop, latencies, failures):
     while not stop.is_set():
         start = time.monotonic()
         try:
-            reader, writer = await asyncio.wait_for(asyncio.open_connection(host, port), 5)
-            writer.write(b"GET /readyz HTTP/1.1\r\nHost: vellum\r\nConnection: close\r\n\r\n")
+            reader, writer = await asyncio.wait_for(
+                asyncio.open_connection(host, port), 5
+            )
+            writer.write(
+                b"GET /readyz HTTP/1.1\r\nHost: vellum\r\n"
+                b"Connection: close\r\n\r\n"
+            )
             await writer.drain()
             reply = await asyncio.wait_for(reader.read(64), 5)
             writer.close()
@@ -120,16 +129,25 @@ async def reader_loop(host, port, stop, latencies, failures):
 async def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("base_url")
-    parser.add_argument("--scale", type=float, default=1.0, help="multiplies the connection counts")
+    parser.add_argument(
+        "--scale", type=float, default=1.0,
+        help="multiplies the connection counts",
+    )
     args = parser.parse_args()
     url = urllib.parse.urlparse(args.base_url)
     host, port = url.hostname, url.port or 80
     counts = {"slow_headers": 300, "slow_body": 100, "idle_h2": 100}
-    attacks = {"slow_headers": slow_headers, "slow_body": slow_body, "idle_h2": idle_h2}
+    attacks = {
+        "slow_headers": slow_headers,
+        "slow_body": slow_body,
+        "idle_h2": idle_h2,
+    }
     results = {name: [] for name in attacks}
     stop = asyncio.Event()
     latencies, failures = [], []
-    reader_task = asyncio.create_task(reader_loop(host, port, stop, latencies, failures))
+    reader_task = asyncio.create_task(
+        reader_loop(host, port, stop, latencies, failures)
+    )
     tasks = [
         asyncio.wait_for(attacks[name](host, port, results), BUDGET[name] + 30)
         for name, n in counts.items()
@@ -144,12 +162,21 @@ async def main():
     for name, times in results.items():
         over = [t for t in times if t > BUDGET[name]]
         worst = max(times, default=0.0)
-        print(f"{name}: {len(times)} closed, slowest after {worst:.1f}s (budget {BUDGET[name]:.0f}s), {len(over)} over budget")
+        print(
+            f"{name}: {len(times)} closed, slowest after {worst:.1f}s "
+            f"(budget {BUDGET[name]:.0f}s), {len(over)} over budget"
+        )
         ok &= not over
     if held_forever:
         print(f"{held_forever} attacking connections were never closed")
-    p95 = statistics.quantiles(latencies, n=20)[-1] if len(latencies) >= 20 else max(latencies, default=0.0)
-    print(f"reader: {len(latencies)} answers, p95 {p95 * 1000:.0f} ms, {len(failures)} failures")
+    if len(latencies) >= 20:
+        p95 = statistics.quantiles(latencies, n=20)[-1]
+    else:
+        p95 = max(latencies, default=0.0)
+    print(
+        f"reader: {len(latencies)} answers, p95 {p95 * 1000:.0f} ms, "
+        f"{len(failures)} failures"
+    )
     ok &= not failures and p95 < 1.0
     if failures:
         print(f"reader failures: {failures[:5]}")

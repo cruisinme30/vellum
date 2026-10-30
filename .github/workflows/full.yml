@@ -26,7 +26,9 @@ on:
   workflow_dispatch:
     inputs:
       ui-scope:
-        description: "UI suite scope: full, or exhaustive (every help page in every display mode)"
+        description: >-
+          UI suite scope: full, or exhaustive (every help page in every display
+          mode)
         type: choice
         options: [full, exhaustive]
         default: full
@@ -62,17 +64,21 @@ jobs:
           # suite on every merge into develop, and none of those runs
           # finishes. Release from a frozen snapshot instead.
           if [[ "${EVENT}" == "pull_request" && "${HEAD}" == "develop" ]]; then
-            echo "::error::Open release pull requests from a chore/release-YYYY-MM-DD branch cut" \
-              "from develop, not from develop itself (see CONTRIBUTING.md, Branches)."
+            echo "::error::Open release pull requests from a" \
+              "chore/release-YYYY-MM-DD branch cut" \
+              "from develop, not from develop itself" \
+              "(see CONTRIBUTING.md, Branches)."
             exit 1
           fi
           passed=0
           if [[ "${EVENT}" == "pull_request" && "${ACTION}" == "edited" ]]; then
-            passed="$(gh api "repos/${GH_REPO}/actions/workflows/full.yml/runs?head_sha=${SHA}&status=success" \
+            runs="repos/${GH_REPO}/actions/workflows/full.yml/runs"
+            passed="$(gh api "${runs}?head_sha=${SHA}&status=success" \
               --jq '.total_count' || echo 0)"
           fi
           if ((passed > 0)); then
-            echo "This commit already passed the Full suite; checking the description only."
+            echo "This commit already passed the Full suite; checking the" \
+              "description only."
             echo "run=false" >> "${GITHUB_OUTPUT}"
           else
             echo "run=true" >> "${GITHUB_OUTPUT}"
@@ -179,7 +185,8 @@ jobs:
       - name: Build the binary from scratch
         run: |
           docker buildx build --no-cache --target binary \
-            --output "type=local,dest=${RUNNER_TEMP}/build" -f deploy/docker/Dockerfile .
+            --output "type=local,dest=${RUNNER_TEMP}/build" \
+            -f deploy/docker/Dockerfile .
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-binary-${{ matrix.build }}
@@ -204,7 +211,8 @@ jobs:
       - name: The two builds are byte-identical
         run: |
           sha256sum "${RUNNER_TEMP}"/release-binary-*/vellum
-          cmp "${RUNNER_TEMP}/release-binary-1/vellum" "${RUNNER_TEMP}/release-binary-2/vellum"
+          cmp "${RUNNER_TEMP}/release-binary-1/vellum" \
+            "${RUNNER_TEMP}/release-binary-2/vellum"
           chmod +x "${RUNNER_TEMP}/release-binary-1/vellum"
       - run: rustup toolchain install
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
@@ -212,15 +220,18 @@ jobs:
       - name: Build the image from that binary
         run: |
           mkdir -p "${RUNNER_TEMP}/dist"
-          cp "${RUNNER_TEMP}/release-binary-1/vellum" "${RUNNER_TEMP}/dist/vellum-linux-amd64"
+          cp "${RUNNER_TEMP}/release-binary-1/vellum" \
+            "${RUNNER_TEMP}/dist/vellum-linux-amd64"
           docker buildx build --load --target runtime \
-            --build-arg DIST=release --build-context "release=${RUNNER_TEMP}/dist" \
+            --build-arg DIST=release --build-context \
+            "release=${RUNNER_TEMP}/dist" \
             -t vellum:ci -f deploy/docker/Dockerfile .
       - name: Size, cold start, idle memory and drain within budget
         run: |
           image_bytes="$(docker save vellum:ci | gzip -9 | wc -c)"
           cargo run --locked --package xtask -- budgets \
-            --binary "${RUNNER_TEMP}/release-binary-1/vellum" --image-bytes "${image_bytes}"
+            --binary "${RUNNER_TEMP}/release-binary-1/vellum" \
+            --image-bytes "${image_bytes}"
 
   website:
     name: Website build for the UI suite
@@ -231,7 +242,8 @@ jobs:
     env:
       # Keep in step with site.yml.
       MDBOOK_VERSION: 0.5.4
-      MDBOOK_SHA256: 3f28de05dafca9d0f2eab99c662116b0e37b89b1d96a08f8f430b9eeae958cd7
+      MDBOOK_SHA256: >-
+        3f28de05dafca9d0f2eab99c662116b0e37b89b1d96a08f8f430b9eeae958cd7
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -257,7 +269,9 @@ jobs:
           path: _site
 
   e2e:
-    name: End-to-end, UI and accessibility (${{ matrix.browser }} ${{ matrix.shard }}/6)
+    name: >-
+      End-to-end, UI and accessibility (${{ matrix.browser }} ${{ matrix.shard
+      }}/6)
     needs: [gate, website]
     if: needs.gate.outputs.run == 'true'
     runs-on: ubuntu-24.04
@@ -321,7 +335,8 @@ jobs:
       - uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
           args: >-
-            --no-progress --exclude-path LICENSES --exclude-path web/node_modules --exclude-path corpus
+            --no-progress --exclude-path LICENSES
+            --exclude-path web/node_modules --exclude-path corpus
             '**/*.md'
           fail: true
 
@@ -343,8 +358,8 @@ jobs:
       - name: Stream a 30 MB file and the EICAR test file through clamd
         working-directory: deploy/compose
         run: |
-          ip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' \
-            "$(docker compose ps -q clamav)")"
+          ips='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'
+          ip="$(docker inspect -f "${ips}" "$(docker compose ps -q clamav)")"
           ../clamav/smoke.sh "${ip}" 3310
       - name: ClamAV logs
         if: failure()
@@ -381,6 +396,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Every check passed
-        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        if: >-
+          contains(needs.*.result, 'failure') || contains(needs.*.result,
+          'cancelled')
         run: exit 1
       - run: echo "Full suite passed."

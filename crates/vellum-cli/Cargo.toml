@@ -20,7 +20,9 @@ path = "src/main.rs"
 
 [dependencies]
 async-trait = "0.1"
-axum = { version = "0.8.9", default-features = false, features = ["original-uri"] }
+axum.version = "0.8.9"
+axum.default-features = false
+axum.features = ["original-uri"]
 base64 = "0.23.1"
 bytes = "1.12.1"
 clap = { version = "4.6.7", features = ["derive"] }
@@ -28,18 +30,39 @@ futures = "0.3.34"
 hex = "0.4.3"
 getrandom = "0.4"
 hkdf = "0.13.0"
-reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "json", "form"] }
+reqwest.version = "0.13.5"
+reqwest.default-features = false
+reqwest.features = ["rustls", "json", "form"]
 http = "1.5.0"
 jiff = "0.2.38"
-lettre = { version = "0.11.23", default-features = false, features = ["smtp-transport", "tokio1-rustls", "aws-lc-rs", "rustls-platform-verifier"] }
+lettre.version = "0.11.23"
+lettre.default-features = false
+lettre.features = [
+    "smtp-transport",
+    "tokio1-rustls",
+    "aws-lc-rs",
+    "rustls-platform-verifier",
+]
 lru = "0.18.5"
-schemars = { version = "1.2.3", default-features = false, features = ["std", "derive"] }
+schemars.version = "1.2.3"
+schemars.default-features = false
+schemars.features = ["std", "derive"]
 serde = { version = "1.0.229", features = ["derive"] }
-serde-saphyr = { version = "2.0.0", default-features = false, features = ["deserialize"] }
+serde-saphyr.version = "2.0.0"
+serde-saphyr.default-features = false
+serde-saphyr.features = ["deserialize"]
 serde_json = "1.0.154"
 sha2 = "0.11.1"
 thiserror = "2.0.21"
-tokio = { version = "1.54.1", features = ["io-std", "macros", "rt-multi-thread", "signal", "sync", "time"] }
+tokio.version = "1.54.1"
+tokio.features = [
+    "io-std",
+    "macros",
+    "rt-multi-thread",
+    "signal",
+    "sync",
+    "time",
+]
 tracing = "0.1.44"
 url = "2.5.8"
 uuid = "1.29.0"
@@ -79,8 +102,12 @@ vellum-work-service = { path = "../vellum-work-service" }
 zeroize = "1.9.1"
 
 [dev-dependencies]
-aws-lc-rs = { version = "1.19.0", default-features = false, features = ["aws-lc-sys"] }
-axum = { version = "0.8.9", default-features = false, features = ["http1", "json", "tokio"] }
+aws-lc-rs.version = "1.19.0"
+aws-lc-rs.default-features = false
+aws-lc-rs.features = ["aws-lc-sys"]
+axum.version = "0.8.9"
+axum.default-features = false
+axum.features = ["http1", "json", "tokio"]
 bytes = "1"
 hmac = "0.13.0"
 http-body-util = "0.1.3"

@@ -128,9 +128,12 @@ fn autolinks_inside_link_text_stay_links() {
 #[test]
 fn fuzz_reproducer_round_trips() {
     assert_fixed_point(concat!(
-        "See [the deploy runboo \"Deploy runbook\"), <https://northstar.dev/status> ",
-        "or https://northstav.dev/changelo\0\0hcs](<docs/getting started.md>).\n\n",
-        "![Architwww.re overView]k](https://northstar.dev/runbooks/deploy \"Deploy runbook\"), ",
+        "See [the deploy runboo \"Deploy runbook\"), \
+            <https://northstar.dev/status> ",
+        "or https://northstav.dev/changelo\0\0hcs](<docs/getting \
+            started.md>).\n\n",
+        "![Architwww.re overView]k](https://northstar.dev/runbooks/deploy \
+            \"Deploy runbook\"), ",
         "<https://northstar.r.dev, or open [the docs](<dost path\")\n",
     ));
     for src in [

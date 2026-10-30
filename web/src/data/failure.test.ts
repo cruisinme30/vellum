@@ -13,21 +13,24 @@ import {
 } from "./failure";
 
 describe("failureText", () => {
-  it("quotes the request ID and remembers the diagnostic behind the line", () => {
-    const error = new ApiError("conflict", "The page changed.", {
-      status: 409,
-      requestId: "req-42",
-      route: "PATCH /api/v1/drive/items/1",
-    });
-    const text = failureText(error);
-    expect(text).toBe("The page changed. (request req-42)");
-    expect(recentDiagnostic(text)).toMatchObject({
-      requestId: "req-42",
-      route: "PATCH /api/v1/drive/items/1",
-      code: "conflict",
-      status: 409,
-    });
-  });
+  it(
+    "quotes the request ID and remembers the diagnostic behind the " + "line",
+    () => {
+      const error = new ApiError("conflict", "The page changed.", {
+        status: 409,
+        requestId: "req-42",
+        route: "PATCH /api/v1/drive/items/1",
+      });
+      const text = failureText(error);
+      expect(text).toBe("The page changed. (request req-42)");
+      expect(recentDiagnostic(text)).toMatchObject({
+        requestId: "req-42",
+        route: "PATCH /api/v1/drive/items/1",
+        code: "conflict",
+        status: 409,
+      });
+    },
+  );
 
   it("handles plain errors and anything thrown", () => {
     expect(failureText(new Error("boom"))).toBe("boom");

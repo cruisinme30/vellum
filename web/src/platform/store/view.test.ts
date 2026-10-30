@@ -26,18 +26,34 @@ describe("View", () => {
     });
   });
 
-  it("scans base and overlay merged, sorted by key, without deleted rows", () => {
-    const view = new View(issueMutators);
-    view.load([
-      { op: "put", collection: "issues", key: "ENG-3", value: { title: "c" } },
-      { op: "put", collection: "issues", key: "ENG-1", value: { title: "a" } },
-    ]);
-    view.apply(create("ENG-2"));
-    view.apply({ name: "deleteIssue", args: { key: "ENG-3" } });
-    expect(view.scan("issues").map(([key]) => key)).toEqual(["ENG-1", "ENG-2"]);
-    expect(view.get("issues", "ENG-3")).toBeUndefined();
-    expect(view.scan("missing")).toEqual([]);
-  });
+  it(
+    "scans base and overlay merged, sorted by key, without deleted " + "rows",
+    () => {
+      const view = new View(issueMutators);
+      view.load([
+        {
+          op: "put",
+          collection: "issues",
+          key: "ENG-3",
+          value: { title: "c" },
+        },
+        {
+          op: "put",
+          collection: "issues",
+          key: "ENG-1",
+          value: { title: "a" },
+        },
+      ]);
+      view.apply(create("ENG-2"));
+      view.apply({ name: "deleteIssue", args: { key: "ENG-3" } });
+      expect(view.scan("issues").map(([key]) => key)).toEqual([
+        "ENG-1",
+        "ENG-2",
+      ]);
+      expect(view.get("issues", "ENG-3")).toBeUndefined();
+      expect(view.scan("missing")).toEqual([]);
+    },
+  );
 
   it("keeps null values distinct from missing ones", () => {
     const mutators: Mutators = {

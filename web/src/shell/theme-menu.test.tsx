@@ -14,25 +14,28 @@ const saved = (): unknown =>
 const root = document.documentElement;
 
 describe("ThemeSettings", () => {
-  it("starts from the system theme, comfortable density and the default seed", () => {
-    renderWithProviders(<ThemeSettings />);
-    expect(
-      screen.getByRole("radio", { name: "Match the system" }),
-    ).toHaveProperty("checked", true);
-    expect(screen.getByRole("radio", { name: "Comfortable" })).toHaveProperty(
-      "checked",
-      true,
-    );
-    expect(screen.getByLabelText("Accent colour")).toHaveProperty(
-      "value",
-      DEFAULT_SEED,
-    );
-    expect(screen.getByRole("button", { name: "Reset colour" })).toHaveProperty(
-      "disabled",
-      true,
-    );
-    expect(root.dataset["theme"]).toBe("light");
-  });
+  it(
+    "starts from the system theme, comfortable density and the default " +
+      "seed",
+    () => {
+      renderWithProviders(<ThemeSettings />);
+      expect(
+        screen.getByRole("radio", { name: "Match the system" }),
+      ).toHaveProperty("checked", true);
+      expect(screen.getByRole("radio", { name: "Comfortable" })).toHaveProperty(
+        "checked",
+        true,
+      );
+      expect(screen.getByLabelText("Accent colour")).toHaveProperty(
+        "value",
+        DEFAULT_SEED,
+      );
+      expect(
+        screen.getByRole("button", { name: "Reset colour" }),
+      ).toHaveProperty("disabled", true);
+      expect(root.dataset["theme"]).toBe("light");
+    },
+  );
 
   it("switches the theme, saves it and themes the document", async () => {
     const { user } = renderWithProviders(<ThemeSettings />);

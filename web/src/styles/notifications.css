@@ -41,7 +41,8 @@
   white-space: nowrap;
 }
 
-/* Channel columns stay as narrow as their heading; the kind column takes the rest. */
+/* Channel columns stay as narrow as their heading; the kind column takes the
+   rest. */
 .vl-notify-table td,
 .vl-notify-table thead th:not(:first-child) {
   width: 1%;

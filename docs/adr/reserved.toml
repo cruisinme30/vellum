@@ -10,15 +10,20 @@
 
 [[reservation]]
 decisions = "D205-D213"
-holder = "collections (D205-D207), desktop (D208-D210), upload route (D211-D213)"
+holder = """\
+    collections (D205-D207), desktop (D208-D210), upload route (D211-D213)"""
 
 [[reservation]]
 decisions = "D217-D261"
-holder = "16 threads, allocated by the coordinator on 2026-10-29; see the project memory registry"
+holder = """\
+    16 threads, allocated by the coordinator on 2026-10-29; see the project \
+    memory registry"""
 
 [[reservation]]
 adrs = "0050-0064"
-holder = "15 gap workstreams: workstream n gets ADR 0049+n (drive UI, workstream 3, gets 0052)"
+holder = """\
+    15 gap workstreams: workstream n gets ADR 0049+n (drive UI, workstream 3, \
+    gets 0052)"""
 
 [[reservation]]
 decisions = "D262-D263"
@@ -87,7 +92,9 @@ holder = "identity (#523)"
 
 [[reservation]]
 decisions = "D295-D296"
-holder = "serve wiring: llms.txt and hybrid search (#526, ADR 0011), secret scanning (#527, ADR 0025)"
+holder = """\
+    serve wiring: llms.txt and hybrid search (#526, ADR 0011), secret \
+    scanning (#527, ADR 0025)"""
 
 [[reservation]]
 decisions = "D297"
@@ -99,7 +106,8 @@ holder = "#525"
 
 [[reservation]]
 decisions = "D299"
-holder = "reliability gates thread: perf gates from the 1.0 audit (#528), ADR 0061"
+holder = """\
+    reliability gates thread: perf gates from the 1.0 audit (#528), ADR 0061"""
 
 [[reservation]]
 adrs = "0070"
@@ -111,11 +119,15 @@ holder = "collections from CSV in serve (#541, ADR 0045)"
 
 [[reservation]]
 decisions = "D302-D304"
-holder = "UI and perf leftovers: figure accent (D302, ADR 0068), team archiving (D303), k6 PDF export (D304)"
+holder = """\
+    UI and perf leftovers: figure accent (D302, ADR 0068), team archiving \
+    (D303), k6 PDF export (D304)"""
 
 [[reservation]]
 decisions = "D300-D301"
-holder = "search and secret-scanning leftovers: hybrid toggle and status (#526, ADR 0011), uploads and rows (#527, ADR 0025)"
+holder = """\
+    search and secret-scanning leftovers: hybrid toggle and status (#526, ADR \
+    0011), uploads and rows (#527, ADR 0025)"""
 
 [[reservation]]
 decisions = "D306"

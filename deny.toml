@@ -13,20 +13,33 @@ yanked = "deny"
 ignore = [
     # smallstr is unmaintained (no vulnerability); yrs 0.28 depends on it.
     # Drop this once yrs replaces it. Mirrored in .cargo/audit.toml.
-    { id = "RUSTSEC-2026-0215", reason = "unmaintained, pulled by yrs; no safe upgrade yet" },
+    { id = "RUSTSEC-2026-0215", reason = """\
+        unmaintained, pulled by yrs; no safe upgrade yet""" },
     # Typst 0.15 (print PDF export) pulls these. Our Typst world is closed:
     # it serves only our own templates and JSON data, never a bibliography,
     # CSL style or YAML file, and syntax highlighting reads only bundled
     # grammars. Drop each once Typst moves off the crate. Mirrored in
     # .cargo/audit.toml.
-    { id = "RUSTSEC-2025-0141", reason = "bincode unmaintained; syntect loads only bundled syntax dumps" },
-    { id = "RUSTSEC-2024-0436", reason = "paste unmaintained; proc-macro used by biblatex at build time" },
-    { id = "RUSTSEC-2026-0194", reason = "quick-xml 0.38 in citationberg; export never parses CSL or bibliography XML" },
-    { id = "RUSTSEC-2026-0195", reason = "quick-xml 0.38 NsReader in citationberg; export never parses CSL or bibliography XML" },
-    { id = "RUSTSEC-2026-0206", reason = "rustybuzz unmaintained; Typst's shaper, fonts are our bundled set" },
-    { id = "RUSTSEC-2026-0192", reason = "ttf-parser unmaintained; Typst's font reader, fonts are our bundled set" },
-    { id = "RUSTSEC-2024-0449", reason = "unsafe-libyaml unmaintained; hayagriva YAML is never read by export" },
-    { id = "RUSTSEC-2024-0320", reason = "yaml-rust unmaintained; syntect YAML grammars are never loaded" },
+    { id = "RUSTSEC-2025-0141", reason = """\
+        bincode unmaintained; syntect loads only bundled syntax dumps""" },
+    { id = "RUSTSEC-2024-0436", reason = """\
+        paste unmaintained; proc-macro used by biblatex at build time""" },
+    { id = "RUSTSEC-2026-0194", reason = """\
+        quick-xml 0.38 in citationberg; export never parses CSL or \
+        bibliography XML""" },
+    { id = "RUSTSEC-2026-0195", reason = """\
+        quick-xml 0.38 NsReader in citationberg; export never parses CSL or \
+        bibliography XML""" },
+    { id = "RUSTSEC-2026-0206", reason = """\
+        rustybuzz unmaintained; Typst's shaper, fonts are our bundled set""" },
+    { id = "RUSTSEC-2026-0192", reason = """\
+        ttf-parser unmaintained; Typst's font reader, fonts are our bundled \
+        set""" },
+    { id = "RUSTSEC-2024-0449", reason = """\
+        unsafe-libyaml unmaintained; hayagriva YAML is never read by \
+        export""" },
+    { id = "RUSTSEC-2024-0320", reason = """\
+        yaml-rust unmaintained; syntect YAML grammars are never loaded""" },
 ]
 
 [licenses]
@@ -69,37 +82,63 @@ highlight = "all"
 # Each skip names the older copy of a crate mid-way through an ecosystem
 # upgrade, with the reason. Remove the entry once upstream catches up.
 skip = [
-    { crate = "syn@2", reason = "proc-macro ecosystem is moving from syn 2 to 3" },
-    { crate = "getrandom@0.3", reason = "older crates still on 0.3 during the 0.4 move" },
+    { crate = "syn@2", reason = """\
+        proc-macro ecosystem is moving from syn 2 to 3""" },
+    { crate = "getrandom@0.3", reason = """\
+        older crates still on 0.3 during the 0.4 move""" },
     { crate = "r-efi@5", reason = "pulled by getrandom 0.3" },
     { crate = "base64@0.22", reason = "sqlx 0.9 is still on base64 0.22" },
-    { crate = "hashbrown@0.16", reason = "sqlx-core 0.9 pins hashbrown 0.16; indexmap moved to 0.17" },
-    { crate = "sha2@0.10", reason = "sqlx-core 0.9 is still on the RustCrypto 0.10 line" },
+    { crate = "hashbrown@0.16", reason = """\
+        sqlx-core 0.9 pins hashbrown 0.16; indexmap moved to 0.17""" },
+    { crate = "sha2@0.10", reason = """\
+        sqlx-core 0.9 is still on the RustCrypto 0.10 line""" },
     { crate = "digest@0.10", reason = "RustCrypto 0.10 line, see sha2@0.10" },
-    { crate = "block-buffer@0.10", reason = "RustCrypto 0.10 line, see sha2@0.10" },
-    { crate = "crypto-common@0.1", reason = "RustCrypto 0.10 line, see sha2@0.10" },
-    { crate = "cpufeatures@0.2", reason = "RustCrypto 0.10 line, see sha2@0.10" },
-    { crate = "rand@0.9", reason = "bollard (testcontainers, tests only) is still on rand 0.9" },
-    { crate = "getrandom@0.2", reason = "ring (rustls, testcontainers only) is still on getrandom 0.2" },
-    { crate = "windows-sys@0.52", reason = "ring is still on windows-sys 0.52" },
-    { crate = "miniz_oxide@0.8", reason = "png still on 0.8 while flate2 moved to 0.9" },
-    { crate = "hashbrown@0.14", reason = "dashmap 6 (via yrs) has not moved to hashbrown 0.15+" },
-    { crate = "base64@0.22", reason = "async-graphql 7 and the axum/tungstenite WebSocket handshakes are on base64 0.22" },
-    { crate = "digest@0.10", reason = "the WebSocket handshake hashes with sha1 0.10; RustCrypto 0.11 elsewhere" },
-    { crate = "block-buffer@0.10", reason = "pulled by digest 0.10 (WebSocket sha1)" },
-    { crate = "crypto-common@0.1", reason = "pulled by digest 0.10 (WebSocket sha1)" },
-    { crate = "cpufeatures@0.2", reason = "pulled by sha1 0.10 (WebSocket handshake)" },
-    { crate = "granit-parser@1", reason = "merman-core still on 1 while serde-saphyr moved to 2" },
-    { crate = "pastey@0.1", reason = "htmlize (merman-core) while tantivy moved to 0.2" },
-    { crate = "bit-set@0.8", reason = "fancy-regex in syntect (Typst 0.15) is on 0.8" },
+    { crate = "block-buffer@0.10", reason = """\
+        RustCrypto 0.10 line, see sha2@0.10""" },
+    { crate = "crypto-common@0.1", reason = """\
+        RustCrypto 0.10 line, see sha2@0.10""" },
+    { crate = "cpufeatures@0.2", reason = """\
+        RustCrypto 0.10 line, see sha2@0.10""" },
+    { crate = "rand@0.9", reason = """\
+        bollard (testcontainers, tests only) is still on rand 0.9""" },
+    { crate = "getrandom@0.2", reason = """\
+        ring (rustls, testcontainers only) is still on getrandom 0.2""" },
+    { crate = "windows-sys@0.52", reason = """\
+        ring is still on windows-sys 0.52""" },
+    { crate = "miniz_oxide@0.8", reason = """\
+        png still on 0.8 while flate2 moved to 0.9""" },
+    { crate = "hashbrown@0.14", reason = """\
+        dashmap 6 (via yrs) has not moved to hashbrown 0.15+""" },
+    { crate = "base64@0.22", reason = """\
+        async-graphql 7 and the axum/tungstenite WebSocket handshakes are on \
+        base64 0.22""" },
+    { crate = "digest@0.10", reason = """\
+        the WebSocket handshake hashes with sha1 0.10; RustCrypto 0.11 \
+        elsewhere""" },
+    { crate = "block-buffer@0.10", reason = """\
+        pulled by digest 0.10 (WebSocket sha1)""" },
+    { crate = "crypto-common@0.1", reason = """\
+        pulled by digest 0.10 (WebSocket sha1)""" },
+    { crate = "cpufeatures@0.2", reason = """\
+        pulled by sha1 0.10 (WebSocket handshake)""" },
+    { crate = "granit-parser@1", reason = """\
+        merman-core still on 1 while serde-saphyr moved to 2""" },
+    { crate = "pastey@0.1", reason = """\
+        htmlize (merman-core) while tantivy moved to 0.2""" },
+    { crate = "bit-set@0.8", reason = """\
+        fancy-regex in syntect (Typst 0.15) is on 0.8""" },
     { crate = "bit-vec@0.8", reason = "pulled by bit-set 0.8 (Typst 0.15)" },
-    { crate = "fearless_simd@0.4", reason = "Typst 0.15's raster stack is on 0.4" },
-    { crate = "hayro-ccitt@0.3", reason = "Typst 0.15's PDF image stack is on 0.3" },
+    { crate = "fearless_simd@0.4", reason = """\
+        Typst 0.15's raster stack is on 0.4""" },
+    { crate = "hayro-ccitt@0.3", reason = """\
+        Typst 0.15's PDF image stack is on 0.3""" },
     { crate = "phf@0.13", reason = "Typst 0.15 dependencies are on phf 0.13" },
-    { crate = "phf_generator@0.13", reason = "pulled by phf 0.13 (Typst 0.15)" },
+    { crate = "phf_generator@0.13", reason = """\
+        pulled by phf 0.13 (Typst 0.15)""" },
     { crate = "phf_macros@0.13", reason = "pulled by phf 0.13 (Typst 0.15)" },
     { crate = "phf_shared@0.13", reason = "pulled by phf 0.13 (Typst 0.15)" },
-    { crate = "quick-xml@0.38", reason = "citationberg (Typst 0.15) is on 0.38; export uses 0.42" },
+    { crate = "quick-xml@0.38", reason = """\
+        citationberg (Typst 0.15) is on 0.38; export uses 0.42""" },
     { crate = "rand@0.8", reason = "Typst 0.15 dependencies are on rand 0.8" },
     { crate = "rand_chacha@0.3", reason = "pulled by rand 0.8 (Typst 0.15)" },
     { crate = "rand_core@0.6", reason = "pulled by rand 0.8 (Typst 0.15)" },
@@ -109,21 +148,35 @@ skip = [
     { crate = "toml_datetime@0.6", reason = "pulled by toml 0.8 (Typst 0.15)" },
     { crate = "toml_edit@0.22", reason = "pulled by toml 0.8 (Typst 0.15)" },
     { crate = "winnow@0.7", reason = "pulled by toml 0.8 (Typst 0.15)" },
-    { crate = "synstructure@0.13", reason = "asn1-rs-derive (x509-parser via rustls-acme) still on synstructure 0.13" },
-    { crate = "windows-sys@0.59", reason = "fs4 (tantivy) is still on windows-sys 0.59" },
-    { crate = "itertools@0.14", reason = "tantivy and prost-derive are on itertools 0.14; tract moved to 0.15" },
-    { crate = "nom@7", reason = "tantivy-query-grammar is on nom 7; tract moved to nom 8" },
-    { crate = "darling@0.23", reason = "async-graphql-derive is on darling 0.23; bon (tantivy) moved to 0.24" },
-    { crate = "darling_core@0.23", reason = "async-graphql-derive is on darling 0.23; bon (tantivy) moved to 0.24" },
-    { crate = "darling_macro@0.23", reason = "async-graphql-derive is on darling 0.23; bon (tantivy) moved to 0.24" },
+    { crate = "synstructure@0.13", reason = """\
+        asn1-rs-derive (x509-parser via rustls-acme) still on synstructure \
+        0.13""" },
+    { crate = "windows-sys@0.59", reason = """\
+        fs4 (tantivy) is still on windows-sys 0.59""" },
+    { crate = "itertools@0.14", reason = """\
+        tantivy and prost-derive are on itertools 0.14; tract moved to \
+        0.15""" },
+    { crate = "nom@7", reason = """\
+        tantivy-query-grammar is on nom 7; tract moved to nom 8""" },
+    { crate = "darling@0.23", reason = """\
+        async-graphql-derive is on darling 0.23; bon (tantivy) moved to \
+        0.24""" },
+    { crate = "darling_core@0.23", reason = """\
+        async-graphql-derive is on darling 0.23; bon (tantivy) moved to \
+        0.24""" },
+    { crate = "darling_macro@0.23", reason = """\
+        async-graphql-derive is on darling 0.23; bon (tantivy) moved to \
+        0.24""" },
 ]
 skip-tree = [
     # merman's HTML label rewriting uses lol_html 3, which is on cssparser
     # 0.36 and phf 0.13; ammonia is on cssparser 0.38 and phf 0.14.
-    { crate = "lol_html@3", reason = "merman-core pins lol_html 3 (older cssparser and phf)" },
+    { crate = "lol_html@3", reason = """\
+        merman-core pins lol_html 3 (older cssparser and phf)""" },
     # Linux Secret Service (os-keychain feature only) still uses the previous
     # RustCrypto generation (sha2 0.10, cipher 0.4) for its session encryption.
-    { crate = "dbus-secret-service@4", depth = 20, reason = "Linux keychain; waiting for its RustCrypto 0.11 release" },
+    { crate = "dbus-secret-service@4", depth = 20, reason = """\
+        Linux keychain; waiting for its RustCrypto 0.11 release""" },
 ]
 
 [sources]

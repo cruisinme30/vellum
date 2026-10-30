@@ -162,28 +162,32 @@ describe("the HTTP workspace store", () => {
     expect(strange.store.getSnapshot().problem).toEqual({ message: "odd" });
   });
 
-  it("reloads for a new person, drops a stale answer and empties on sign-out", async () => {
-    const { http, store } = await loaded();
-    store.setUser?.(PRIYA);
-    expect(store.getSnapshot().loading).toBe(false);
-    store.setUser?.(SAM);
-    store.setUser?.(undefined);
-    expect(store.getSnapshot()).toMatchObject({
-      loading: false,
-      pages: [],
-      me: { handle: "" },
-    });
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(store.getSnapshot().pages).toEqual([]);
-    const failing = fakeHttp({
-      "GET /api/v1/drive/my-drive": new Error("late"),
-    });
-    const other = createHttpWorkspaceStore(failing, { user: PRIYA });
-    other.setUser?.(undefined);
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(other.getSnapshot().problem).toBeUndefined();
-    expect(http.get.mock.calls.length).toBeGreaterThan(0);
-  });
+  it(
+    "reloads for a new person, drops a stale answer and empties on " +
+      "sign-out",
+    async () => {
+      const { http, store } = await loaded();
+      store.setUser?.(PRIYA);
+      expect(store.getSnapshot().loading).toBe(false);
+      store.setUser?.(SAM);
+      store.setUser?.(undefined);
+      expect(store.getSnapshot()).toMatchObject({
+        loading: false,
+        pages: [],
+        me: { handle: "" },
+      });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(store.getSnapshot().pages).toEqual([]);
+      const failing = fakeHttp({
+        "GET /api/v1/drive/my-drive": new Error("late"),
+      });
+      const other = createHttpWorkspaceStore(failing, { user: PRIYA });
+      other.setUser?.(undefined);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(other.getSnapshot().problem).toBeUndefined();
+      expect(http.get.mock.calls.length).toBeGreaterThan(0);
+    },
+  );
 
   it("creates a page and answers with the server's ID", async () => {
     const { http, store } = await loaded({
@@ -338,34 +342,37 @@ describe("the HTTP workspace store", () => {
     expect(page(store, "p2")?.parentId).toBe("f1");
   });
 
-  it("trashes a folder with what is in it, and brings it back on failure", async () => {
-    const answers = [
-      { id: "f1" },
-      new ApiError("permission_denied", "read only"),
-    ];
-    const { store } = await loaded({
-      "POST /api/v1/drive/items/f1/trash": () => answers.shift(),
-    });
-    store.trashPage("f1");
-    expect(store.getSnapshot().pages.map((p) => p.id)).toEqual(["p1", "t1"]);
-    await settled(store);
-    expect(store.getSnapshot().pages.map((p) => p.id)).toEqual(["p1", "t1"]);
-    const second = await loaded({
-      "POST /api/v1/drive/items/f1/trash": new ApiError(
-        "permission_denied",
-        "read only",
-      ),
-    });
-    second.store.trashPage("f1");
-    await settled(second.store);
-    expect(
-      second.store
-        .getSnapshot()
-        .pages.map((p) => p.id)
-        .toSorted((a, b) => a.localeCompare(b)),
-    ).toEqual(["f1", "p1", "p2", "t1"]);
-    expect(second.store.getSnapshot().problem?.message).toBe("read only");
-  });
+  it(
+    "trashes a folder with what is in it, and brings it back on " + "failure",
+    async () => {
+      const answers = [
+        { id: "f1" },
+        new ApiError("permission_denied", "read only"),
+      ];
+      const { store } = await loaded({
+        "POST /api/v1/drive/items/f1/trash": () => answers.shift(),
+      });
+      store.trashPage("f1");
+      expect(store.getSnapshot().pages.map((p) => p.id)).toEqual(["p1", "t1"]);
+      await settled(store);
+      expect(store.getSnapshot().pages.map((p) => p.id)).toEqual(["p1", "t1"]);
+      const second = await loaded({
+        "POST /api/v1/drive/items/f1/trash": new ApiError(
+          "permission_denied",
+          "read only",
+        ),
+      });
+      second.store.trashPage("f1");
+      await settled(second.store);
+      expect(
+        second.store
+          .getSnapshot()
+          .pages.map((p) => p.id)
+          .toSorted((a, b) => a.localeCompare(b)),
+      ).toEqual(["f1", "p1", "p2", "t1"]);
+      expect(second.store.getSnapshot().problem?.message).toBe("read only");
+    },
+  );
 
   it("stops telling a listener once it unsubscribes", async () => {
     const { store } = await loaded({

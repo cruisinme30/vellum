@@ -210,33 +210,40 @@ describe("admin console API", () => {
 });
 
 describe("usage page", () => {
-  it("shows people, activity, content and storage, and counts again on demand", async () => {
-    const usage = vi.fn<AdminConsoleApi["usage"]>(() => Promise.resolve(USAGE));
-    const { api } = fakeApi({ usage });
-    const user = renderWith(api, <UsagePage />);
-    const people = await screen.findByRole("region", { name: "People" });
-    expect(within(people).getByText("Accounts").nextSibling?.textContent).toBe(
-      "12",
-    );
-    const content = screen.getByRole("region", { name: "Content" });
-    expect(within(content).getByText("Pages").nextSibling?.textContent).toBe(
-      "1,250",
-    );
-    const storage = screen.getByRole("region", { name: "Storage" });
-    expect(
-      within(storage).getByText("Total stored").nextSibling?.textContent,
-    ).toBe("4.0 MB");
-    const activity = screen.getByRole("region", { name: "Activity" });
-    expect(
-      within(activity).getByText("Changes this week").nextSibling?.textContent,
-    ).toBe("310");
-    expect(screen.getByRole("status").textContent).toMatch(/^Counted /);
-    expect(usage).toHaveBeenLastCalledWith(false);
-    await user.click(screen.getByRole("button", { name: "Count now" }));
-    await waitFor(() => {
-      expect(usage).toHaveBeenLastCalledWith(true);
-    });
-  });
+  it(
+    "shows people, activity, content and storage, and counts again on " +
+      "demand",
+    async () => {
+      const usage = vi.fn<AdminConsoleApi["usage"]>(() =>
+        Promise.resolve(USAGE),
+      );
+      const { api } = fakeApi({ usage });
+      const user = renderWith(api, <UsagePage />);
+      const people = await screen.findByRole("region", { name: "People" });
+      expect(
+        within(people).getByText("Accounts").nextSibling?.textContent,
+      ).toBe("12");
+      const content = screen.getByRole("region", { name: "Content" });
+      expect(within(content).getByText("Pages").nextSibling?.textContent).toBe(
+        "1,250",
+      );
+      const storage = screen.getByRole("region", { name: "Storage" });
+      expect(
+        within(storage).getByText("Total stored").nextSibling?.textContent,
+      ).toBe("4.0 MB");
+      const activity = screen.getByRole("region", { name: "Activity" });
+      expect(
+        within(activity).getByText("Changes this week").nextSibling
+          ?.textContent,
+      ).toBe("310");
+      expect(screen.getByRole("status").textContent).toMatch(/^Counted /);
+      expect(usage).toHaveBeenLastCalledWith(false);
+      await user.click(screen.getByRole("button", { name: "Count now" }));
+      await waitFor(() => {
+        expect(usage).toHaveBeenLastCalledWith(true);
+      });
+    },
+  );
 
   it("says when nothing was counted yet, and reports failures", async () => {
     const { api } = fakeApi({
@@ -354,17 +361,21 @@ describe("settings page", () => {
     expect(settings.telemetry?.enabled).toBe(false);
   });
 
-  it("reads the secret-scanning policy and its allow-list, one entry per line", () => {
-    const data = new FormData();
-    data.set("security.secret_scanning", "block");
-    data.set("security.secret_allow", "jwt\n\n  AKIAIOSFODNN7EXAMPLE  \n");
-    const settings = settingsFromForm(SETTINGS.settings, data);
-    expect(settings.security?.secret_scanning).toBe("block");
-    expect(settings.security?.secret_allow).toEqual([
-      "jwt",
-      "AKIAIOSFODNN7EXAMPLE",
-    ]);
-  });
+  it(
+    "reads the secret-scanning policy and its allow-list, one entry per " +
+      "line",
+    () => {
+      const data = new FormData();
+      data.set("security.secret_scanning", "block");
+      data.set("security.secret_allow", "jwt\n\n  AKIAIOSFODNN7EXAMPLE  \n");
+      const settings = settingsFromForm(SETTINGS.settings, data);
+      expect(settings.security?.secret_scanning).toBe("block");
+      expect(settings.security?.secret_allow).toEqual([
+        "jwt",
+        "AKIAIOSFODNN7EXAMPLE",
+      ]);
+    },
+  );
 
   it("reads the hybrid-ranking switch", () => {
     const on = new FormData();

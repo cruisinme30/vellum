@@ -3,7 +3,9 @@
 
 [package]
 name = "vellum-assist"
-description = "Bring-your-own-model features: summarise, ask this space with citations, draft from a template."
+description = """\
+    Bring-your-own-model features: summarise, ask this space with citations, \
+    draft from a template."""
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

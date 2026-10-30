@@ -258,7 +258,8 @@ export function groupRows(
     items: property ? groupItems(world, property, group) : [],
   }));
   if (!property) {
-    // eslint-disable-next-line unicorn/no-null -- the server sends null for an ungrouped result
+    // The server sends null for an ungrouped result.
+    // eslint-disable-next-line unicorn/no-null
     return [{ value: null, label: "", rows: keyed.map((k) => k.row) }];
   }
   const options = board ? (property.options ?? []).map((o) => o.name) : [];
@@ -283,7 +284,8 @@ export function groupRows(
   }));
   const none = keyed.filter((k) => k.items.length === 0).map((k) => k.row);
   if (none.length > 0 || (board && groups.length === 0)) {
-    // eslint-disable-next-line unicorn/no-null -- the server sends null for the "No …" group
+    // The server sends null for the "No …" group.
+    // eslint-disable-next-line unicorn/no-null
     groups.push({ value: null, label: `No ${property.name}`, rows: none });
   }
   return groups;

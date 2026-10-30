@@ -142,5 +142,6 @@ export function reauthPasskeyOptions(
 /** Where single sign-on re-authentication starts, returning to `next`. */
 export function ssoReauthUrl(startUrl: string, next: string): string {
   const joiner = startUrl.includes("?") ? "&" : "?";
-  return `${startUrl}${joiner}${new URLSearchParams({ reauth: "1", next }).toString()}`;
+  const query = new URLSearchParams({ reauth: "1", next }).toString();
+  return `${startUrl}${joiner}${query}`;
 }

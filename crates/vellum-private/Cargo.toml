@@ -3,7 +3,9 @@
 
 [package]
 name = "vellum-private"
-description = "The private agent: opens end-to-end encrypted spaces on the member's own device, for local search and MCP."
+description = """\
+    The private agent: opens end-to-end encrypted spaces on the member's own \
+    device, for local search and MCP."""
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -26,7 +28,9 @@ os-keychain = ["vellum-crypto/os-keychain"]
 async-trait = "0.1.92"
 futures = "0.3.34"
 serde = { version = "1.0.229", features = ["derive"] }
-serde-saphyr = { version = "2.0.0", default-features = false, features = ["deserialize"] }
+serde-saphyr.version = "2.0.0"
+serde-saphyr.default-features = false
+serde-saphyr.features = ["deserialize"]
 thiserror = "2.0.21"
 tokio = { version = "1.54.1", features = ["sync"] }
 tracing = "0.1.44"

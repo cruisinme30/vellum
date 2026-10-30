@@ -43,7 +43,10 @@ const onDocument = (body: string): string =>
 // it.
 const addStyle = (css: string): string =>
   onDocument(
-    `const sheet = new CSSStyleSheet(); sheet.replaceSync(${JSON.stringify(css)}); document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];`,
+    `const sheet = new CSSStyleSheet(); ` +
+      `sheet.replaceSync(${JSON.stringify(css)}); ` +
+      `document.adoptedStyleSheets = [...document.adoptedStyleSheets, ` +
+      `sheet];`,
   );
 
 /**
@@ -153,16 +156,26 @@ const ALL_MODES: readonly Mode[] = [
           const extra = ${JSON.stringify(STRESS)};
           const stretch = (node) => {
             const parent = node.parentElement;
-            if (!parent || /^(SCRIPT|STYLE|CODE|PRE|KBD|TITLE)$/.test(parent.tagName)) return;
-            if ((node.textContent ?? "").trim().length > 1 && !node.textContent.endsWith(extra)) node.textContent += extra;
+            const skip = /^(SCRIPT|STYLE|CODE|PRE|KBD|TITLE)$/;
+            if (!parent || skip.test(parent.tagName)) return;
+            const text = node.textContent ?? "";
+            if (text.trim().length > 1 && !text.endsWith(extra)) {
+              node.textContent += extra;
+            }
           };
           new MutationObserver((records) => {
             for (const record of records) {
               for (const added of record.addedNodes) {
-                if (added.nodeType === Node.TEXT_NODE) { stretch(added); continue; }
+                if (added.nodeType === Node.TEXT_NODE) {
+                  stretch(added);
+                  continue;
+                }
                 if (added.nodeType !== Node.ELEMENT_NODE) continue;
-                const walker = document.createTreeWalker(added, NodeFilter.SHOW_TEXT);
-                for (let node = walker.nextNode(); node; node = walker.nextNode()) stretch(node);
+                const walker =
+                  document.createTreeWalker(added, NodeFilter.SHOW_TEXT);
+                for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+                  stretch(n);
+                }
               }
             }
           }).observe(document, { childList: true, subtree: true });

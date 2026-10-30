@@ -3,7 +3,8 @@
 
 [package]
 name = "vellum-format"
-description = "The Vellum Markdown dialect: parser, AST and canonical serializer."
+description = """\
+    The Vellum Markdown dialect: parser, AST and canonical serializer."""
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -18,9 +19,13 @@ layer = "foundation"
 workspace = true
 
 [dependencies]
-comrak = { version = "0.59.0", default-features = false, features = ["attributes"] }
+comrak.version = "0.59.0"
+comrak.default-features = false
+comrak.features = ["attributes"]
 serde = { version = "1.0.229", features = ["derive"] }
-serde-saphyr = { version = "2.0.0", default-features = false, features = ["serialize", "deserialize"] }
+serde-saphyr.version = "2.0.0"
+serde-saphyr.default-features = false
+serde-saphyr.features = ["serialize", "deserialize"]
 serde_json = { version = "1.0.154", features = ["preserve_order"] }
 tracing = "0.1.44"
 vellum-kernel.workspace = true

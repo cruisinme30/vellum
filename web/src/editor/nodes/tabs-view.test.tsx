@@ -31,17 +31,20 @@ const visiblePanelText = () =>
     .map((panel) => panel.textContent);
 
 describe("TabsView", () => {
-  it("shows a tab list with the first tab selected and its panel visible", async () => {
-    await renderEditor(content);
-    expect(screen.getByRole("tablist", { name: "Tabs" })).toBeDefined();
-    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
-      "Overview",
-      "Details",
-      "Untitled tab",
-    ]);
-    expect(selectedTab()?.textContent).toBe("Overview");
-    expect(visiblePanelText()).toEqual(["first"]);
-  });
+  it(
+    "shows a tab list with the first tab selected and its panel " + "visible",
+    async () => {
+      await renderEditor(content);
+      expect(screen.getByRole("tablist", { name: "Tabs" })).toBeDefined();
+      expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+        "Overview",
+        "Details",
+        "Untitled tab",
+      ]);
+      expect(selectedTab()?.textContent).toBe("Overview");
+      expect(visiblePanelText()).toEqual(["first"]);
+    },
+  );
 
   it("links each tab to its panel both ways", async () => {
     await renderEditor(content);
@@ -67,23 +70,26 @@ describe("TabsView", () => {
     expect(visiblePanelText()).toEqual(["second"]);
   });
 
-  it("moves with the arrow keys, wrapping at both ends, and Home and End", async () => {
-    const user = userEvent.setup();
-    await renderEditor(content);
-    screen.getByRole("tab", { name: "Overview" }).focus();
-    await user.keyboard("{ArrowRight}");
-    expect(document.activeElement?.textContent).toBe("Details");
-    expect(selectedTab()?.textContent).toBe("Details");
-    await user.keyboard("{ArrowRight}{ArrowRight}");
-    expect(selectedTab()?.textContent).toBe("Overview");
-    await user.keyboard("{ArrowLeft}");
-    expect(selectedTab()?.textContent).toBe("Untitled tab");
-    await user.keyboard("{Home}");
-    expect(document.activeElement?.textContent).toBe("Overview");
-    await user.keyboard("{End}");
-    expect(selectedTab()?.textContent).toBe("Untitled tab");
-    expect(visiblePanelText()).toEqual(["third"]);
-  });
+  it(
+    "moves with the arrow keys, wrapping at both ends, and Home and " + "End",
+    async () => {
+      const user = userEvent.setup();
+      await renderEditor(content);
+      screen.getByRole("tab", { name: "Overview" }).focus();
+      await user.keyboard("{ArrowRight}");
+      expect(document.activeElement?.textContent).toBe("Details");
+      expect(selectedTab()?.textContent).toBe("Details");
+      await user.keyboard("{ArrowRight}{ArrowRight}");
+      expect(selectedTab()?.textContent).toBe("Overview");
+      await user.keyboard("{ArrowLeft}");
+      expect(selectedTab()?.textContent).toBe("Untitled tab");
+      await user.keyboard("{Home}");
+      expect(document.activeElement?.textContent).toBe("Overview");
+      await user.keyboard("{End}");
+      expect(selectedTab()?.textContent).toBe("Untitled tab");
+      expect(visiblePanelText()).toEqual(["third"]);
+    },
+  );
 
   it("ignores other keys", async () => {
     const user = userEvent.setup();
@@ -118,14 +124,17 @@ describe("TabsView", () => {
     expect(screen.getByRole("tab", { name: "Summary" })).toBeDefined();
   });
 
-  it("offers no add button and read-only titles in a read-only editor", async () => {
-    await renderEditor(content, { editable: false });
-    expect(screen.queryByRole("button", { name: "Add a tab" })).toBeNull();
-    const titles = screen.getAllByRole("textbox", { name: "Tab title" });
-    expect(titles.every((title) => (title as HTMLInputElement).readOnly)).toBe(
-      true,
-    );
-  });
+  it(
+    "offers no add button and read-only titles in a read-only " + "editor",
+    async () => {
+      await renderEditor(content, { editable: false });
+      expect(screen.queryByRole("button", { name: "Add a tab" })).toBeNull();
+      const titles = screen.getAllByRole("textbox", { name: "Tab title" });
+      expect(
+        titles.every((title) => (title as HTMLInputElement).readOnly),
+      ).toBe(true);
+    },
+  );
 
   it("adds nothing once the block has left the document", async () => {
     const user = userEvent.setup();

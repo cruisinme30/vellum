@@ -1371,7 +1371,8 @@ impl CollectionsService {
                 .delete(&file.path, vellum_store::Precondition::None)
                 .await
             {
-                tracing::warn!(%error, path = %file.path, "new collection file not removed");
+                tracing::warn!(%error, path = %file.path, "new collection file \
+                    not removed");
             }
         }
     }

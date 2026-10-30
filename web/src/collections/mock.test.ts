@@ -110,39 +110,42 @@ describe("the mock collections store", () => {
     expect(result.columns.map((c) => c.key)).not.toContain("link");
   });
 
-  it("groups by lists, checkboxes and relations, with an empty group last", async () => {
-    const store = createMockCollectionsStore();
-    const byLabel = await store.query({
-      collection_id: ISSUES,
-      group: "labels",
-    });
-    expect(byLabel.groups.map((g) => g.label)).toEqual([
-      "bug",
-      "feature",
-      "docs",
-      "performance",
-    ]);
-    expect(byLabel.groups[0]?.rows).toHaveLength(2);
-    const byBlocked = await store.query({
-      collection_id: ISSUES,
-      group: "Blocked",
-    });
-    expect(byBlocked.groups.map((g) => [g.label, g.value])).toEqual([
-      ["No", bool(false)],
-      ["Yes", bool(true)],
-    ]);
-    const byRelease = await store.query({
-      collection_id: ISSUES,
-      group: "release",
-    });
-    expect(byRelease.groups.map((g) => g.label)).toEqual([
-      "Gateway beta",
-      "Gateway 1.0",
-      "Gateway 1.1",
-      "No Release",
-    ]);
-    expect(byRelease.groups.at(-1)?.value).toBeNull();
-  });
+  it(
+    "groups by lists, checkboxes and relations, with an empty group " + "last",
+    async () => {
+      const store = createMockCollectionsStore();
+      const byLabel = await store.query({
+        collection_id: ISSUES,
+        group: "labels",
+      });
+      expect(byLabel.groups.map((g) => g.label)).toEqual([
+        "bug",
+        "feature",
+        "docs",
+        "performance",
+      ]);
+      expect(byLabel.groups[0]?.rows).toHaveLength(2);
+      const byBlocked = await store.query({
+        collection_id: ISSUES,
+        group: "Blocked",
+      });
+      expect(byBlocked.groups.map((g) => [g.label, g.value])).toEqual([
+        ["No", bool(false)],
+        ["Yes", bool(true)],
+      ]);
+      const byRelease = await store.query({
+        collection_id: ISSUES,
+        group: "release",
+      });
+      expect(byRelease.groups.map((g) => g.label)).toEqual([
+        "Gateway beta",
+        "Gateway 1.0",
+        "Gateway 1.1",
+        "No Release",
+      ]);
+      expect(byRelease.groups.at(-1)?.value).toBeNull();
+    },
+  );
 
   it("keeps an empty group on a board with no options", async () => {
     const result = await createMockCollectionsStore().query({

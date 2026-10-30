@@ -77,7 +77,8 @@ export function createHttpRenderApi(http: Http): RenderApi {
       http.get<RenderStylesheet>(
         seed === undefined
           ? "/api/v1/render/stylesheet"
-          : `/api/v1/render/stylesheet?seed=${encodeURIComponent(seed.replace(/^#/, ""))}`,
+          : "/api/v1/render/stylesheet?seed=" +
+              encodeURIComponent(seed.replace(/^#/, "")),
       ),
   };
 }

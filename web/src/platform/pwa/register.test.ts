@@ -54,24 +54,27 @@ describe("registerServiceWorker", () => {
     });
   });
 
-  it("announces a new version, activates it on request and reloads once", async () => {
-    const { container, reload, onUpdateReady, options } = setup();
-    const handle = await registerServiceWorker(options);
-    expect(handle?.updateReady).toBe(false);
-    const next = new FakeWorker();
-    container.registration.installing = next;
-    container.registration.dispatchEvent(new Event("updatefound"));
-    next.state = "installed";
-    next.dispatchEvent(new Event("statechange"));
-    expect(onUpdateReady).toHaveBeenCalledTimes(1);
-    expect(handle?.updateReady).toBe(true);
-    container.registration.waiting = next;
-    handle?.applyUpdate();
-    expect(next.postMessage).toHaveBeenCalledWith("skip-waiting");
-    container.dispatchEvent(new Event("controllerchange"));
-    container.dispatchEvent(new Event("controllerchange"));
-    expect(reload).toHaveBeenCalledTimes(1);
-  });
+  it(
+    "announces a new version, activates it on request and reloads " + "once",
+    async () => {
+      const { container, reload, onUpdateReady, options } = setup();
+      const handle = await registerServiceWorker(options);
+      expect(handle?.updateReady).toBe(false);
+      const next = new FakeWorker();
+      container.registration.installing = next;
+      container.registration.dispatchEvent(new Event("updatefound"));
+      next.state = "installed";
+      next.dispatchEvent(new Event("statechange"));
+      expect(onUpdateReady).toHaveBeenCalledTimes(1);
+      expect(handle?.updateReady).toBe(true);
+      container.registration.waiting = next;
+      handle?.applyUpdate();
+      expect(next.postMessage).toHaveBeenCalledWith("skip-waiting");
+      container.dispatchEvent(new Event("controllerchange"));
+      container.dispatchEvent(new Event("controllerchange"));
+      expect(reload).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it("treats the first install as no update and does not reload", async () => {
     const { container, reload, onUpdateReady, options } = setup(NULL);

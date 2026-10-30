@@ -234,7 +234,8 @@ export function createHttpAdminConsoleApi(http: Http): AdminConsoleApi {
     setMember: (spaceId, userId, role) =>
       http.send<AdminSpaceView>(
         "PUT",
-        `${ADMIN}/spaces/${encodeURIComponent(spaceId)}/members/${encodeURIComponent(userId)}`,
+        `${ADMIN}/spaces/${encodeURIComponent(spaceId)}` +
+          `/members/${encodeURIComponent(userId)}`,
         role === undefined ? {} : { role },
       ),
     async groups() {

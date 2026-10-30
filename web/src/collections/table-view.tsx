@@ -63,7 +63,9 @@ function GridCell(properties: CellProperties) {
       aria-colindex={properties.columnIndex + 1}
       aria-readonly={property.computed || undefined}
       aria-invalid={error === undefined ? undefined : true}
-      data-cell={`${String(properties.rowIndex)}:${String(properties.columnIndex)}`}
+      data-cell={
+        String(properties.rowIndex) + `:${String(properties.columnIndex)}`
+      }
       data-type={property.type}
       tabIndex={properties.active ? 0 : -1}
       onClick={properties.onSelect}

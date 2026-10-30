@@ -29,7 +29,8 @@ data:
   VELLUM_KROKI_URL: {{ .Values.kroki.externalUrl | quote }}
   {{- end }}
   {{- if .Values.clamav.enabled }}
-  VELLUM_CLAMD_ADDRESS: {{ printf "%s-clamav:3310" (include "vellum.fullname" .) | quote }}
+  VELLUM_CLAMD_ADDRESS:
+    {{ printf "%s-clamav:3310" (include "vellum.fullname" .) | quote }}
   {{- else if .Values.clamav.externalAddress }}
   VELLUM_CLAMD_ADDRESS: {{ .Values.clamav.externalAddress | quote }}
   {{- end }}

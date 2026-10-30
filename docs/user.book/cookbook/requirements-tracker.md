@@ -16,7 +16,8 @@ release collection that rolls the points up.
 2. Add properties: Priority (select: P0, P1, P2), Status (select: Open, In
    review, Done, Blocked), Owner (person), Target (date), Estimate (number) and
    Progress (number, shown as percent).
-3. Add a formula property "Remaining" with `round(Estimate * (1 - Progress), 1)`.
+3. Add a formula property "Remaining" with
+   `round(Estimate * (1 - Progress), 1)`.
 4. Create a second collection, "Releases", and add a relation from requirements
    to releases.
 5. On Releases, add a rollup "Total points" that sums Estimate through the

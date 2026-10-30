@@ -61,29 +61,32 @@ async function text(found: Promise<HTMLElement>): Promise<string> {
 }
 
 describe("private spaces screen", () => {
-  it("offers to make a shared drive private, and enrols this device", async () => {
-    const user = userEvent.setup();
-    const { api, device, enrol, listSpaces } = setup([
-      space("01JDB0BRD00000000000000000", "Board", []),
-    ]);
-    render(
-      <I18nProvider>
-        <PrivateSpaces api={api} device={device} />
-      </I18nProvider>,
-    );
-    expect(
-      await screen.findByText("aaaa bbbb cccc dddd eeee ffff 0000 1111"),
-    ).toBeTruthy();
-    expect(screen.getByText(/Not private/)).toBeTruthy();
-    await user.click(
-      screen.getByRole("button", {
-        name: "Make private and enrol this device",
-      }),
-    );
-    expect(enrol).toHaveBeenCalledWith("01JDB0BRD00000000000000000");
-    expect(await text(screen.findByRole("status"))).toContain("enrolled");
-    expect(listSpaces).toHaveBeenCalledTimes(2);
-  });
+  it(
+    "offers to make a shared drive private, and enrols this " + "device",
+    async () => {
+      const user = userEvent.setup();
+      const { api, device, enrol, listSpaces } = setup([
+        space("01JDB0BRD00000000000000000", "Board", []),
+      ]);
+      render(
+        <I18nProvider>
+          <PrivateSpaces api={api} device={device} />
+        </I18nProvider>,
+      );
+      expect(
+        await screen.findByText("aaaa bbbb cccc dddd eeee ffff 0000 1111"),
+      ).toBeTruthy();
+      expect(screen.getByText(/Not private/)).toBeTruthy();
+      await user.click(
+        screen.getByRole("button", {
+          name: "Make private and enrol this device",
+        }),
+      );
+      expect(enrol).toHaveBeenCalledWith("01JDB0BRD00000000000000000");
+      expect(await text(screen.findByRole("status"))).toContain("enrolled");
+      expect(listSpaces).toHaveBeenCalledTimes(2);
+    },
+  );
 
   it("shows the devices, reseals, and removes only one's own", async () => {
     const user = userEvent.setup();
@@ -119,35 +122,40 @@ describe("private spaces screen", () => {
     expect(revoke).toHaveBeenCalledWith("01JDB0BRD00000000000000000", MINE);
   });
 
-  it("explains that enrolling needs the desktop app, and shows failures", async () => {
-    const user = userEvent.setup();
-    const { api, device, enrol } = setup([
-      space("01JDB0BRD00000000000000000", "Board", []),
-    ]);
-    const { unmount } = render(
-      <I18nProvider>
-        <PrivateSpaces api={api} device={undefined} />
-      </I18nProvider>,
-    );
-    expect(
-      await screen.findByText(/needs the Vellum desktop app/),
-    ).toBeTruthy();
-    expect(screen.queryByRole("button")).toBeNull();
-    unmount();
+  it(
+    "explains that enrolling needs the desktop app, and shows " + "failures",
+    async () => {
+      const user = userEvent.setup();
+      const { api, device, enrol } = setup([
+        space("01JDB0BRD00000000000000000", "Board", []),
+      ]);
+      const { unmount } = render(
+        <I18nProvider>
+          <PrivateSpaces api={api} device={undefined} />
+        </I18nProvider>,
+      );
+      expect(
+        await screen.findByText(/needs the Vellum desktop app/),
+      ).toBeTruthy();
+      expect(screen.queryByRole("button")).toBeNull();
+      unmount();
 
-    enrol.mockRejectedValueOnce(
-      new Error("only a manager of the space can do this"),
-    );
-    render(
-      <I18nProvider>
-        <PrivateSpaces api={api} device={device} />
-      </I18nProvider>,
-    );
-    await user.click(
-      await screen.findByRole("button", { name: /Make private/ }),
-    );
-    expect(await text(screen.findByRole("alert"))).toContain("only a manager");
-  });
+      enrol.mockRejectedValueOnce(
+        new Error("only a manager of the space can do this"),
+      );
+      render(
+        <I18nProvider>
+          <PrivateSpaces api={api} device={device} />
+        </I18nProvider>,
+      );
+      await user.click(
+        await screen.findByRole("button", { name: /Make private/ }),
+      );
+      expect(await text(screen.findByRole("alert"))).toContain(
+        "only a manager",
+      );
+    },
+  );
 });
 
 describe("untrusted device keys", () => {
@@ -160,7 +168,8 @@ describe("untrusted device keys", () => {
     ]);
     reseal.mockRejectedValueOnce(
       new Error(
-        `Error invoking remote method: untrusted device keys: ${OTHER} (Ben's phone); compare`,
+        `Error invoking remote method: untrusted device keys: ${OTHER} ` +
+          `(Ben's phone); compare`,
       ),
     );
     render(

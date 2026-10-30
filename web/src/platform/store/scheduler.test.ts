@@ -35,34 +35,37 @@ describe("SyncScheduler", () => {
     scheduler.stop();
   });
 
-  it("backs off exponentially on retryable failures and resets on success", async () => {
-    let fail = 3;
-    const sync = vi.fn(() => {
-      if (fail > 0) {
-        fail -= 1;
-        return Promise.reject(new SyncError("down", 503, true, "r"));
-      }
-      return Promise.resolve();
-    });
-    const scheduler = new SyncScheduler(
-      { sync },
-      { pollMs: 100_000, maxBackoffMs: 3000, random: one },
-    );
-    scheduler.start();
-    await vi.advanceTimersByTimeAsync(0);
-    expect(scheduler.failures).toBe(1);
-    await vi.advanceTimersByTimeAsync(1000);
-    expect(scheduler.failures).toBe(2);
-    scheduler.changed(); // a change during backoff waits for the backoff
-    await vi.advanceTimersByTimeAsync(1999);
-    expect(sync).toHaveBeenCalledTimes(2);
-    await vi.advanceTimersByTimeAsync(1);
-    expect(scheduler.failures).toBe(3);
-    await vi.advanceTimersByTimeAsync(3000); // capped at maxBackoffMs
-    expect(scheduler.failures).toBe(0);
-    expect(sync).toHaveBeenCalledTimes(4);
-    scheduler.stop();
-  });
+  it(
+    "backs off exponentially on retryable failures and resets on " + "success",
+    async () => {
+      let fail = 3;
+      const sync = vi.fn(() => {
+        if (fail > 0) {
+          fail -= 1;
+          return Promise.reject(new SyncError("down", 503, true, "r"));
+        }
+        return Promise.resolve();
+      });
+      const scheduler = new SyncScheduler(
+        { sync },
+        { pollMs: 100_000, maxBackoffMs: 3000, random: one },
+      );
+      scheduler.start();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(scheduler.failures).toBe(1);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(scheduler.failures).toBe(2);
+      scheduler.changed(); // a change during backoff waits for the backoff
+      await vi.advanceTimersByTimeAsync(1999);
+      expect(sync).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(scheduler.failures).toBe(3);
+      await vi.advanceTimersByTimeAsync(3000); // capped at maxBackoffMs
+      expect(scheduler.failures).toBe(0);
+      expect(sync).toHaveBeenCalledTimes(4);
+      scheduler.stop();
+    },
+  );
 
   it("stops on a fatal error and reports it", async () => {
     const fatal = new SyncError("forbidden", 403, false, "r");

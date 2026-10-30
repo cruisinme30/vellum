@@ -301,7 +301,8 @@ mod tests {
                 "content": [{"type": "text", "text": "Steps"}]
             },
             {"type": "orderedList", "content": [
-                {"type": "listItem", "content": [{"type": "paragraph", "content": [
+                {"type": "listItem", "content": [{"type": "paragraph",
+                    "content": [
                     {
                         "type": "text",
                         "text": "Open "
@@ -310,7 +311,8 @@ mod tests {
                         "text": "Export",
                         "marks": [{"type": "strong"}]
                     }]}]},
-                {"type": "listItem", "content": [{"type": "paragraph", "content": [
+                {"type": "listItem", "content": [{"type": "paragraph",
+                    "content": [
                     {
                         "type": "text",
                         "text": "docs",

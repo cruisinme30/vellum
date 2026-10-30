@@ -124,40 +124,45 @@ describe("groups API", () => {
 });
 
 describe("groups page", () => {
-  it("adds a member and deletes a group only after a confirmation", async () => {
-    const { api, changeGroupMembers, deleteGroup } = fakeApi();
-    const user = renderPage(api);
-    await user.click(await screen.findByRole("button", { name: "Manage SRE" }));
-    const panel = screen.getByRole("region", {
-      name: /Name and members of SRE/,
-    });
-    expect(await within(panel).findByText("Priya Shah")).toBeDefined();
-
-    await user.selectOptions(
-      within(panel).getByRole("combobox", { name: "Add to group" }),
-      MARCO.id,
-    );
-    await user.click(
-      within(panel).getByRole("button", { name: "Add to group" }),
-    );
-    await waitFor(() => {
-      expect(changeGroupMembers).toHaveBeenCalledWith(SRE.id, {
-        add: [MARCO.id],
+  it(
+    "adds a member and deletes a group only after a " + "confirmation",
+    async () => {
+      const { api, changeGroupMembers, deleteGroup } = fakeApi();
+      const user = renderPage(api);
+      await user.click(
+        await screen.findByRole("button", { name: "Manage SRE" }),
+      );
+      const panel = screen.getByRole("region", {
+        name: /Name and members of SRE/,
       });
-    });
-    expect(await within(panel).findByText("Marco Ruiz")).toBeDefined();
+      expect(await within(panel).findByText("Priya Shah")).toBeDefined();
 
-    await user.click(
-      within(panel).getByRole("button", { name: "Delete group" }),
-    );
-    expect(deleteGroup).not.toHaveBeenCalled();
-    await user.click(
-      within(panel).getByRole("button", { name: "Delete group" }),
-    );
-    await waitFor(() => {
-      expect(deleteGroup).toHaveBeenCalledWith(SRE.id);
-    });
-  });
+      await user.selectOptions(
+        within(panel).getByRole("combobox", { name: "Add to group" }),
+        MARCO.id,
+      );
+      await user.click(
+        within(panel).getByRole("button", { name: "Add to group" }),
+      );
+      await waitFor(() => {
+        expect(changeGroupMembers).toHaveBeenCalledWith(SRE.id, {
+          add: [MARCO.id],
+        });
+      });
+      expect(await within(panel).findByText("Marco Ruiz")).toBeDefined();
+
+      await user.click(
+        within(panel).getByRole("button", { name: "Delete group" }),
+      );
+      expect(deleteGroup).not.toHaveBeenCalled();
+      await user.click(
+        within(panel).getByRole("button", { name: "Delete group" }),
+      );
+      await waitFor(() => {
+        expect(deleteGroup).toHaveBeenCalledWith(SRE.id);
+      });
+    },
+  );
 
   it("creates a group", async () => {
     const { api, createGroup } = fakeApi();

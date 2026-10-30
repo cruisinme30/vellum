@@ -95,18 +95,21 @@ describe("Toolbar", () => {
     ).toBe("true");
   });
 
-  it("offers the current address and removes the link when it is cleared", async () => {
-    const { user, editor } = await setup(
-      body(p(link("Hello", "https://old.example"), " world")),
-    );
-    const prompt = vi.spyOn(globalThis, "prompt").mockReturnValue("");
-    await user.click(screen.getByRole("button", { name: "Link" }));
-    expect(prompt).toHaveBeenCalledWith(
-      expect.any(String),
-      "https://old.example",
-    );
-    expect(marksOnHello(editor)).toEqual([]);
-  });
+  it(
+    "offers the current address and removes the link when it is " + "cleared",
+    async () => {
+      const { user, editor } = await setup(
+        body(p(link("Hello", "https://old.example"), " world")),
+      );
+      const prompt = vi.spyOn(globalThis, "prompt").mockReturnValue("");
+      await user.click(screen.getByRole("button", { name: "Link" }));
+      expect(prompt).toHaveBeenCalledWith(
+        expect.any(String),
+        "https://old.example",
+      );
+      expect(marksOnHello(editor)).toEqual([]);
+    },
+  );
 
   it("refuses an unsafe address by removing the link", async () => {
     const { user, editor } = await setup(
@@ -119,7 +122,8 @@ describe("Toolbar", () => {
 
   it("changes nothing when the prompt is cancelled", async () => {
     const { user, editor } = await setup();
-    // eslint-disable-next-line unicorn/no-null -- window.prompt returns null on cancel
+    // Window.prompt returns null on cancel.
+    // eslint-disable-next-line unicorn/no-null
     vi.spyOn(globalThis, "prompt").mockReturnValue(null);
     const before = editor.getJSON();
     await user.click(screen.getByRole("button", { name: "Link" }));
@@ -135,21 +139,26 @@ describe("Toolbar", () => {
     ).toBeDefined();
   });
 
-  it("makes a task from the selection, and only with something selected", async () => {
-    const user = userEvent.setup();
-    const { editor } = await renderEditor(body(p("Hello world")));
-    const onSelectionTask = vi.fn();
-    render(<Toolbar editor={editor} onSelectionTask={onSelectionTask} />);
-    const button = screen.getByRole("button", {
-      name: "Make a task from the selection",
-    });
-    expect(button.getAttribute("aria-keyshortcuts")).toBe("Control+Alt+Enter");
-    expect(button).toHaveProperty("disabled", true);
-    act(() => {
-      editor.commands.setTextSelection({ from: 1, to: 6 });
-    });
-    expect(button).toHaveProperty("disabled", false);
-    await user.click(button);
-    expect(onSelectionTask).toHaveBeenCalledOnce();
-  });
+  it(
+    "makes a task from the selection, and only with something " + "selected",
+    async () => {
+      const user = userEvent.setup();
+      const { editor } = await renderEditor(body(p("Hello world")));
+      const onSelectionTask = vi.fn();
+      render(<Toolbar editor={editor} onSelectionTask={onSelectionTask} />);
+      const button = screen.getByRole("button", {
+        name: "Make a task from the selection",
+      });
+      expect(button.getAttribute("aria-keyshortcuts")).toBe(
+        "Control+Alt+Enter",
+      );
+      expect(button).toHaveProperty("disabled", true);
+      act(() => {
+        editor.commands.setTextSelection({ from: 1, to: 6 });
+      });
+      expect(button).toHaveProperty("disabled", false);
+      await user.click(button);
+      expect(onSelectionTask).toHaveBeenCalledOnce();
+    },
+  );
 });

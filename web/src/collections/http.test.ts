@@ -129,42 +129,48 @@ describe("the HTTP collections store's other operations", () => {
     ]);
   });
 
-  it("tells views to reload after a CSV import writes, not after a dry run", async () => {
-    const http = fakeHttp();
-    let written = false;
-    http.send.mockImplementation(
-      (method: string, path: string, body?: unknown) =>
-        Promise.resolve({ method, path, body, written }),
-    );
-    const store = createHttpCollectionsStore(http, {});
-    const listener = vi.fn();
-    store.subscribe(listener);
-    await store.importCsv({
-      collection_id: "C1",
-      csv: "Name\nA",
-      dry_run: true,
-    });
-    await store.createFromCsv({
-      folder: "drives/x",
-      title: "T",
-      csv: "Name\n",
-      dry_run: true,
-    });
-    expect(listener).not.toHaveBeenCalled();
-    written = true;
-    await store.importCsv({ collection_id: "C1", csv: "Name\nA" });
-    await store.createFromCsv({
-      folder: "drives/x",
-      title: "T",
-      csv: "Name\n",
-    });
-    expect(listener).toHaveBeenCalledTimes(2);
-    expect(
-      http.send.mock.calls
-        .map(([method, path]) => `${method} ${path}`)
-        .slice(-2),
-    ).toEqual(["POST /api/v1/collections/C1/csv", "POST /api/v1/collections"]);
-  });
+  it(
+    "tells views to reload after a CSV import writes, not after a dry " + "run",
+    async () => {
+      const http = fakeHttp();
+      let written = false;
+      http.send.mockImplementation(
+        (method: string, path: string, body?: unknown) =>
+          Promise.resolve({ method, path, body, written }),
+      );
+      const store = createHttpCollectionsStore(http, {});
+      const listener = vi.fn();
+      store.subscribe(listener);
+      await store.importCsv({
+        collection_id: "C1",
+        csv: "Name\nA",
+        dry_run: true,
+      });
+      await store.createFromCsv({
+        folder: "drives/x",
+        title: "T",
+        csv: "Name\n",
+        dry_run: true,
+      });
+      expect(listener).not.toHaveBeenCalled();
+      written = true;
+      await store.importCsv({ collection_id: "C1", csv: "Name\nA" });
+      await store.createFromCsv({
+        folder: "drives/x",
+        title: "T",
+        csv: "Name\n",
+      });
+      expect(listener).toHaveBeenCalledTimes(2);
+      expect(
+        http.send.mock.calls
+          .map(([method, path]) => `${method} ${path}`)
+          .slice(-2),
+      ).toEqual([
+        "POST /api/v1/collections/C1/csv",
+        "POST /api/v1/collections",
+      ]);
+    },
+  );
 });
 
 function page() {
@@ -210,33 +216,36 @@ describe("keeping views fresh", () => {
     vi.useRealTimers();
   });
 
-  it("reloads when the tab comes back and on a slow timer while visible", () => {
-    vi.useFakeTimers();
-    const p = page();
-    const store = createHttpCollectionsStore(fakeHttp(), p.freshness);
-    const listener = vi.fn();
-    const stop = store.subscribe(listener);
-    expect(
-      [...p.handlers.keys()].toSorted((a, b) => a.localeCompare(b)),
-    ).toEqual(["focus", "visibilitychange"]);
+  it(
+    "reloads when the tab comes back and on a slow timer while " + "visible",
+    () => {
+      vi.useFakeTimers();
+      const p = page();
+      const store = createHttpCollectionsStore(fakeHttp(), p.freshness);
+      const listener = vi.fn();
+      const stop = store.subscribe(listener);
+      expect(
+        [...p.handlers.keys()].toSorted((a, b) => a.localeCompare(b)),
+      ).toEqual(["focus", "visibilitychange"]);
 
-    p.tick(REFRESH_MS);
-    expect(listener).toHaveBeenCalledTimes(1);
+      p.tick(REFRESH_MS);
+      expect(listener).toHaveBeenCalledTimes(1);
 
-    // Hidden tabs do not poll; focus right after a reload is skipped.
-    p.hide();
-    p.tick(REFRESH_MS);
-    expect(listener).toHaveBeenCalledTimes(1);
-    p.show();
-    p.handlers.get("visibilitychange")?.();
-    expect(listener).toHaveBeenCalledTimes(2);
-    p.handlers.get("focus")?.();
-    expect(listener).toHaveBeenCalledTimes(2);
+      // Hidden tabs do not poll; focus right after a reload is skipped.
+      p.hide();
+      p.tick(REFRESH_MS);
+      expect(listener).toHaveBeenCalledTimes(1);
+      p.show();
+      p.handlers.get("visibilitychange")?.();
+      expect(listener).toHaveBeenCalledTimes(2);
+      p.handlers.get("focus")?.();
+      expect(listener).toHaveBeenCalledTimes(2);
 
-    // The last listener leaving stops everything.
-    stop();
-    expect(p.handlers.size).toBe(0);
-    p.tick(REFRESH_MS * 3);
-    expect(listener).toHaveBeenCalledTimes(2);
-  });
+      // The last listener leaving stops everything.
+      stop();
+      expect(p.handlers.size).toBe(0);
+      p.tick(REFRESH_MS * 3);
+      expect(listener).toHaveBeenCalledTimes(2);
+    },
+  );
 });

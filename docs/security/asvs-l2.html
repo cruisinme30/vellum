@@ -1,275 +1,905 @@
-<!DOCTYPE html>
+<!doctype html>
 <!--
 SPDX-FileCopyrightText: 2026 The Vellum contributors
 SPDX-License-Identifier: AGPL-3.0-only
 -->
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Vellum ASVS L2 self-assessment</title>
-<meta name="description" content="Vellum's self-assessment against OWASP ASVS 5.0 level 2, chapter by chapter, with evidence and owners.">
-<style>
-:root {
-  --bg: #fbfaf7; --surface: #ffffff; --ink: #1d1c1a; --muted: #6b675f; --line: #e6e2d9;
-  --met: #1f7a4d; --met-bg: #e3f3ea; --prog: #8a5a00; --prog-bg: #fbf0d9;
-  --plan: #4b4f9c; --plan-bg: #e9eafb; --na: #6b675f; --na-bg: #efede8; --accent: #3d3a8f;
-  color-scheme: light;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #161614; --surface: #1f1e1b; --ink: #ecebe6; --muted: #a29e95; --line: #34322d;
-    --met: #6fd39e; --met-bg: #183526; --prog: #f0c062; --prog-bg: #3a2e14;
-    --plan: #aeb2f5; --plan-bg: #262848; --na: #a29e95; --na-bg: #2a2925; --accent: #aeb2f5;
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #161614; --surface: #1f1e1b; --ink: #ecebe6; --muted: #a29e95; --line: #34322d;
-  --met: #6fd39e; --met-bg: #183526; --prog: #f0c062; --prog-bg: #3a2e14;
-  --plan: #aeb2f5; --plan-bg: #262848; --na: #a29e95; --na-bg: #2a2925; --accent: #aeb2f5;
-  color-scheme: dark;
-}
-* { box-sizing: border-box; }
-body {
-  margin: 0; background: var(--bg); color: var(--ink);
-  font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-}
-main { max-width: 1040px; margin: 0 auto; padding: 40px 16px 80px; }
-h1 { font-size: 2rem; line-height: 1.2; margin: 0 0 8px; letter-spacing: -0.01em; }
-h2 { font-size: 1.15rem; margin: 40px 0 4px; }
-.lede { color: var(--muted); max-width: 70ch; margin: 0 0 24px; }
-code { font: 0.85em ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
-.facts { display: flex; flex-wrap: wrap; gap: 8px 24px; color: var(--muted); font-size: 0.9rem; margin-bottom: 28px; }
-.summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 12px; }
-.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
-.tile b { display: block; font-size: 1.8rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
-.tile span { color: var(--muted); font-size: 0.9rem; }
-.bar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: var(--line); margin: 4px 0 24px; }
-.bar i { display: block; }
-.filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
-.filters button {
-  font: inherit; font-size: 0.9rem; padding: 6px 12px; border-radius: 999px; cursor: pointer;
-  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
-}
-.filters button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); font-weight: 600; }
-.chapter-note { color: var(--muted); font-size: 0.9rem; margin: 0 0 8px; }
-table { width: 100%; table-layout: fixed; border-collapse: collapse; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-top: 1px solid var(--line); font-size: 0.92rem; }
-th { border-top: 0; color: var(--muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
-th:nth-child(1) { width: 40%; } th:nth-child(2) { width: 15%; } th:nth-child(3) { width: 31%; } th:nth-child(4) { width: 14%; }
-.pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 0.8rem; font-weight: 600; }
-.met { color: var(--met); background: var(--met-bg); }
-.prog { color: var(--prog); background: var(--prog-bg); }
-.plan { color: var(--plan); background: var(--plan-bg); }
-.na { color: var(--na); background: var(--na-bg); }
-.evidence { color: var(--muted); }
-footer { margin-top: 48px; color: var(--muted); font-size: 0.9rem; max-width: 70ch; }
-@media (max-width: 640px) {
-  table, tbody, tr, td { display: block; width: 100%; }
-  thead { display: none; }
-  tr { border-top: 1px solid var(--line); padding: 8px 0; }
-  td { border: 0; padding: 4px 12px; }
-}
-</style>
-</head>
-<body>
-<main>
-  <h1>OWASP ASVS level 2 self-assessment</h1>
-  <p class="lede">
-    Where Vellum stands against the OWASP Application Security Verification Standard 5.0 at level 2,
-    the target set in the brief (§11, §12; R-SE-11). Each row summarizes a group of requirements in our
-    own words, with the evidence in the repository and the owning workstream. It is updated as
-    controls land. An independent penetration test is deferred past 1.0.
-  </p>
-  <div class="facts">
-    <span>As of 2026-10-29, 3:30 PM PT</span>
-    <span>Scope: Vellum 1.0, all deployment profiles</span>
-    <span>Decisions: ADR 0002, 0003, 0008, 0020, 0025, 0030, 0032, 0047</span>
-  </div>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Vellum ASVS L2 self-assessment</title>
+    <meta
+      name="description"
+      content="Vellum's self-assessment against OWASP ASVS 5.0 level 2,
+        chapter by chapter, with evidence and owners."
+    />
+    <style>
+      :root {
+        --bg: #fbfaf7;
+        --surface: #ffffff;
+        --ink: #1d1c1a;
+        --muted: #6b675f;
+        --line: #e6e2d9;
+        --met: #1f7a4d;
+        --met-bg: #e3f3ea;
+        --prog: #8a5a00;
+        --prog-bg: #fbf0d9;
+        --plan: #4b4f9c;
+        --plan-bg: #e9eafb;
+        --na: #6b675f;
+        --na-bg: #efede8;
+        --accent: #3d3a8f;
+        color-scheme: light;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --bg: #161614;
+          --surface: #1f1e1b;
+          --ink: #ecebe6;
+          --muted: #a29e95;
+          --line: #34322d;
+          --met: #6fd39e;
+          --met-bg: #183526;
+          --prog: #f0c062;
+          --prog-bg: #3a2e14;
+          --plan: #aeb2f5;
+          --plan-bg: #262848;
+          --na: #a29e95;
+          --na-bg: #2a2925;
+          --accent: #aeb2f5;
+          color-scheme: dark;
+        }
+      }
+      :root[data-theme="dark"] {
+        --bg: #161614;
+        --surface: #1f1e1b;
+        --ink: #ecebe6;
+        --muted: #a29e95;
+        --line: #34322d;
+        --met: #6fd39e;
+        --met-bg: #183526;
+        --prog: #f0c062;
+        --prog-bg: #3a2e14;
+        --plan: #aeb2f5;
+        --plan-bg: #262848;
+        --na: #a29e95;
+        --na-bg: #2a2925;
+        --accent: #aeb2f5;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font:
+          16px/1.55 system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          sans-serif;
+      }
+      main {
+        max-width: 1040px;
+        margin: 0 auto;
+        padding: 40px 16px 80px;
+      }
+      h1 {
+        font-size: 2rem;
+        line-height: 1.2;
+        margin: 0 0 8px;
+        letter-spacing: -0.01em;
+      }
+      h2 {
+        font-size: 1.15rem;
+        margin: 40px 0 4px;
+      }
+      .lede {
+        color: var(--muted);
+        max-width: 70ch;
+        margin: 0 0 24px;
+      }
+      code {
+        font:
+          0.85em ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          monospace;
+        overflow-wrap: anywhere;
+      }
+      .facts {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 24px;
+        color: var(--muted);
+        font-size: 0.9rem;
+        margin-bottom: 28px;
+      }
+      .summary {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      .tile {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px 16px;
+      }
+      .tile b {
+        display: block;
+        font-size: 1.8rem;
+        line-height: 1.1;
+        font-variant-numeric: tabular-nums;
+      }
+      .tile span {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+      .bar {
+        display: flex;
+        height: 10px;
+        border-radius: 5px;
+        overflow: hidden;
+        background: var(--line);
+        margin: 4px 0 24px;
+      }
+      .bar i {
+        display: block;
+      }
+      .filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+      .filters button {
+        font: inherit;
+        font-size: 0.9rem;
+        padding: 6px 12px;
+        border-radius: 999px;
+        cursor: pointer;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--ink);
+      }
+      .filters button[aria-pressed="true"] {
+        border-color: var(--accent);
+        color: var(--accent);
+        font-weight: 600;
+      }
+      .chapter-note {
+        color: var(--muted);
+        font-size: 0.9rem;
+        margin: 0 0 8px;
+      }
+      table {
+        width: 100%;
+        table-layout: fixed;
+        border-collapse: collapse;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      th,
+      td {
+        text-align: left;
+        vertical-align: top;
+        padding: 10px 12px;
+        border-top: 1px solid var(--line);
+        font-size: 0.92rem;
+      }
+      th {
+        border-top: 0;
+        color: var(--muted);
+        font-weight: 600;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      th:nth-child(1) {
+        width: 40%;
+      }
+      th:nth-child(2) {
+        width: 15%;
+      }
+      th:nth-child(3) {
+        width: 31%;
+      }
+      th:nth-child(4) {
+        width: 14%;
+      }
+      .pill {
+        display: inline-block;
+        padding: 2px 9px;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        font-weight: 600;
+      }
+      .met {
+        color: var(--met);
+        background: var(--met-bg);
+      }
+      .prog {
+        color: var(--prog);
+        background: var(--prog-bg);
+      }
+      .plan {
+        color: var(--plan);
+        background: var(--plan-bg);
+      }
+      .na {
+        color: var(--na);
+        background: var(--na-bg);
+      }
+      .evidence {
+        color: var(--muted);
+      }
+      footer {
+        margin-top: 48px;
+        color: var(--muted);
+        font-size: 0.9rem;
+        max-width: 70ch;
+      }
+      @media (max-width: 640px) {
+        table,
+        tbody,
+        tr,
+        td {
+          display: block;
+          width: 100%;
+        }
+        thead {
+          display: none;
+        }
+        tr {
+          border-top: 1px solid var(--line);
+          padding: 8px 0;
+        }
+        td {
+          border: 0;
+          padding: 4px 12px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>OWASP ASVS level 2 self-assessment</h1>
+      <p class="lede">
+        Where Vellum stands against the OWASP Application Security Verification
+        Standard 5.0 at level 2, the target set in the brief (§11, §12;
+        R-SE-11). Each row summarizes a group of requirements in our own words,
+        with the evidence in the repository and the owning workstream. It is
+        updated as controls land. An independent penetration test is deferred
+        past 1.0.
+      </p>
+      <div class="facts">
+        <span>As of 2026-10-29, 3:30 PM PT</span>
+        <span>Scope: Vellum 1.0, all deployment profiles</span>
+        <span
+          >Decisions: ADR 0002, 0003, 0008, 0020, 0025, 0030, 0032, 0047</span
+        >
+      </div>
 
-  <div class="summary" id="summary"></div>
-  <div class="bar" id="bar" role="img" aria-label="Share of rows by status"></div>
+      <div class="summary" id="summary"></div>
+      <div
+        class="bar"
+        id="bar"
+        role="img"
+        aria-label="Share of rows by status"
+      ></div>
 
-  <div class="filters" role="group" aria-label="Filter by status">
-    <button type="button" data-filter="all" aria-pressed="true">All</button>
-    <button type="button" data-filter="met" aria-pressed="false">Met</button>
-    <button type="button" data-filter="prog" aria-pressed="false">In progress</button>
-    <button type="button" data-filter="plan" aria-pressed="false">Planned</button>
-    <button type="button" data-filter="na" aria-pressed="false">Not applicable</button>
-  </div>
+      <div class="filters" role="group" aria-label="Filter by status">
+        <button type="button" data-filter="all" aria-pressed="true">All</button>
+        <button type="button" data-filter="met" aria-pressed="false">
+          Met
+        </button>
+        <button type="button" data-filter="prog" aria-pressed="false">
+          In progress
+        </button>
+        <button type="button" data-filter="plan" aria-pressed="false">
+          Planned
+        </button>
+        <button type="button" data-filter="na" aria-pressed="false">
+          Not applicable
+        </button>
+      </div>
 
-  <div id="chapters"></div>
+      <div id="chapters"></div>
 
-  <footer>
-    <p><b>Met</b> means implemented on <code>develop</code> or in an open pull request of this series, with tests.
-    <b>In progress</b> means the design is accepted in an ADR and the owning workstream is building it.
-    <b>Planned</b> means it is required for 1.0 and not started. Status changes go through a pull request
-    that edits this page together with the code.</p>
-    <p>Report a vulnerability through the private channel in <code>SECURITY.md</code>, not in a public issue.</p>
-  </footer>
-</main>
+      <footer>
+        <p>
+          <b>Met</b> means implemented on <code>develop</code> or in an open
+          pull request of this series, with tests. <b>In progress</b> means the
+          design is accepted in an ADR and the owning workstream is building it.
+          <b>Planned</b> means it is required for 1.0 and not started. Status
+          changes go through a pull request that edits this page together with
+          the code.
+        </p>
+        <p>
+          Report a vulnerability through the private channel in
+          <code>SECURITY.md</code>, not in a public issue.
+        </p>
+      </footer>
+    </main>
 
-<script>
-const LABEL = { met: "Met", prog: "In progress", plan: "Planned", na: "Not applicable" };
+    <script>
+      const LABEL = {
+        met: "Met",
+        prog: "In progress",
+        plan: "Planned",
+        na: "Not applicable",
+      };
 
-const CHAPTERS = [
-  ["V1 Encoding and sanitization", "", [
-    ["Rendered HTML passes an allow-list sanitizer; the Markdown dialect has no raw HTML", "met", "<code>vellum_render::sanitize</code> (ammonia allow-list); the parser has no raw HTML (ADR 0004)", "render"],
-    ["Diagram SVG is sanitized: no scripts, no external references", "met", "<code>sanitize/xml.rs</code>; SVG uploads served as attachment (D104)", "render"],
-    ["Server-side requests to user-supplied URLs cannot reach private networks", "met", "<code>vellum_security::ssrf</code>, D103; rebinding-safe resolver, per-hop redirect checks", "security"],
-    ["Database queries are parameterized, never built from strings", "met", "<code>sqlx</code> bound parameters throughout <code>vellum-db</code> (ADR 0006)", "db"],
-  ]],
-  ["V2 Validation and business logic", "", [
-    ["Identifiers and tokens are parsed strictly into types", "met", "<code>vellum-kernel</code> IDs and share tokens, D37 to D39, property tests", "kernel"],
-    ["Configuration is validated at start-up and rejects unknown keys", "met", "<code>vellum_kernel::Config</code>", "kernel"],
-    ["Anti-automation: per-IP, per-user and per-token rate limits", "met", "<code>vellum_security::rate</code> (GCRA) in the gateway; IPv6 /64 buckets and connection caps (ADR 0047)", "security, gateway"],
-    ["Bounded work for hostile input: query, upload and body limits", "met", "Red-team rounds 1 to 4 (ADR 0030, 0047), nightly fuzzing", "red team"],
-  ]],
-  ["V3 Web frontend security", "", [
-    ["Strict Content-Security-Policy, HSTS, <code>nosniff</code>, frame protection", "met", "<code>vellum_api::security</code> headers, ADR 0020; ZAP baseline nightly", "gateway"],
-    ["Cookies are <code>HttpOnly</code>, <code>Secure</code>, <code>SameSite=Lax</code>", "met", "<code>vellum-identity</code> session cookies, ADR 0020", "identity"],
-    ["Public and shared pages are served from a separate origin", "met", "<code>VELLUM_PUBLIC_PAGES_URL</code>, R-SE-3", "gateway"],
-    ["Embeds are sandboxed iframes without scripts", "met", "<code>sandbox</code> attribute in the render sanitizer; <code>VELLUM_EMBED_ORIGINS</code> allow-list", "render, web"],
-  ]],
-  ["V4 API and web service", "", [
-    ["State-changing requests are protected against CSRF", "met", "Signed CSRF tokens (<code>VELLUM_CSRF_KEY</code>), ADR 0020", "gateway"],
-    ["Untrusted files are served with a fixed type and attachment disposition", "met", "<code>upload::Kind::inline</code>, D104", "security"],
-    ["API errors are typed and never leak internals", "met", "<code>vellum_kernel::ErrorKind</code>, D39", "kernel"],
-    ["Every upload route goes through one check", "met", "<code>vellum_security::upload::check</code> (ClamAV and archive limits)", "security"],
-  ]],
-  ["V5 File handling", "", [
-    ["File type is decided by content, and the extension must match", "met", "<code>upload::sniff</code>, <code>UploadPolicy::clean</code>", "security"],
-    ["Size, dimension and decompression limits", "met", "100 MiB, 16384 px, 512 MiB decode cap, 200x zip expansion (RT-025)", "security"],
-    ["Images are re-encoded to drop metadata and polyglot payloads", "met", "<code>tests/it/upload.rs</code>", "security"],
-    ["File names cannot traverse paths or carry control characters", "met", "<code>upload::safe_file_name</code>; <code>BlobPath</code> in the store", "security, store"],
-    ["Antivirus scanning, failing closed", "met", "<code>upload::Clamd</code> (optional ClamAV), bounded concurrency (RT-031)", "security"],
-  ]],
-  ["V6 Authentication", "", [
-    ["Brute-force protection on sign-in and share passwords", "met", "<code>vellum_identity::lockout</code>, Argon2 gate (RT-035)", "identity"],
-    ["Passwords hashed with Argon2id; OIDC sign-in", "met", "<code>vellum-identity</code>, <code>VELLUM_OIDC_*</code>, ADR 0020", "identity"],
-    ["Admin actions require recent re-authentication", "met", "<code>fresh_auth</code> on admin operations (5 minutes), R-SE-7", "identity, admin"],
-  ]],
-  ["V7 Session management", "", [
-    ["Sessions are bound, rotated on sign-in and revocable", "met", "Server-side sessions, Postgres-backed for replicas, ADR 0020", "identity"],
-    ["Sessions survive an identity provider outage; break-glass admin", "met", "Local break-glass account, brief &sect;12", "identity"],
-  ]],
-  ["V8 Authorization", "", [
-    ["Deny-by-default relationship-based access control", "met", "<code>vellum-authz</code>, ADR 0008, property tests", "authz"],
-    ["Search results are filtered by a batch access check", "met", "<code>Authz::filter</code> in <code>vellum-search</code>", "search"],
-    ["Live editing re-checks access while a socket is open", "met", "<code>Authorizer::recheck</code> every minute (RT-028)", "collab"],
-    ["End-to-end spaces refuse every server feature that needs plaintext", "met", "<code>e2e::SpaceMode::allows</code>, D105", "security"],
-  ]],
-  ["V9 Self-contained tokens", "", [
-    ["Share links are opaque random tokens, not self-contained tokens", "met", "22-char base62, SHA-256 at rest, constant-time compare (D39)", "kernel"],
-    ["Access tokens for MCP are validated against the authorization server", "met", "<code>verify_token</code>, MCP as a resource server (ADR 0019, 0020)", "identity, mcp"],
-  ]],
-  ["V10 OAuth and OIDC", "", [
-    ["OAuth 2.1 authorization server with PKCE, exact redirect URIs", "met", "<code>vellum_identity::oauth</code>, RFC 8414 metadata", "identity"],
-    ["OIDC client validates issuer, audience, nonce and signature", "met", "<code>vellum_identity::sso</code>", "identity"],
-  ]],
-  ["V11 Cryptography", "", [
-    ["Only reviewed primitives: XChaCha20-Poly1305, Argon2id, X25519, SHA-256", "met", "<code>vellum-crypto</code>, ADR 0002", "crypto"],
-    ["All randomness comes from the OS CSPRNG", "met", "<code>getrandom</code> in kernel and crypto", "kernel, crypto"],
-    ["Weak (small-order) X25519 public keys are rejected", "met", "<code>e2e::DeviceKey::new</code>", "security"],
-    ["Keys live in a key service, reached with role credentials, not static keys", "met", "<code>vellum-kms</code>: AWS KMS (IRSA, Pod Identity, ECS, IMDSv2), Cloud KMS, Vault (D259)", "security"],
-    ["Key rotation re-wraps data keys", "met", "<code>vellum_crypto::rewrap</code>, <code>Sealed::reseal</code>; envelopes name their KEK", "crypto"],
-  ]],
-  ["V12 Secure communication", "", [
-    ["TLS 1.3 with automatic certificates in the single binary", "met", "<code>VELLUM_TLS=acme</code> in <code>vellum_api::server</code>, R-SE-2", "gateway"],
-    ["Outbound connections use rustls with certificate validation", "met", "<code>ssrf::SafeClient</code>, <code>vellum-kms</code> clients refuse redirects", "security"],
-  ]],
-  ["V13 Configuration", "", [
-    ["Secrets never appear in logs or debug output", "met", "Redacted Debug for config, tokens and credentials", "kernel"],
-    ["Dependencies checked for advisories, licenses and duplicates", "met", "cargo-deny, cargo-audit, pnpm audit in CI; triaged advisories in <code>osv-scanner.toml</code> (D261)", "security"],
-    ["Secrets kept out of the repository", "met", "gitleaks in CI, GitHub push protection", "security"],
-    ["Build dependencies pinned by hash", "met", "Actions pinned by SHA, linters by hash (D261); OpenSSF Scorecard weekly", "security"],
-    ["SBOM, Sigstore signatures, reproducible builds, SLSA level 3", "met", "CycloneDX SBOM, cosign and SLSA provenance in <code>release.yml</code>, R-SE-8", "release"],
-  ]],
-  ["V14 Data protection", "", [
-    ["Per-document encryption at rest, on by default", "met", "<code>vellum serve</code> seals every file (<code>at_rest</code>, D260); plaintext is an explicit setting", "security"],
-    ["Secret scanning on save, with an admin policy to block", "met", "<code>vellum_security::secrets</code>, D104", "security"],
-    ["End-to-end encrypted private spaces", "met", "Recipient envelopes, <code>e2e::KeyRegistry</code>, device enrolment (ADR 0036, 0043)", "crypto, security"],
-    ["Encrypted backups and a monthly restore drill", "met", "<code>vellum_admin::backup</code>, <code>drill.yml</code>", "admin, deploy"],
-  ]],
-  ["V15 Secure coding and architecture", "", [
-    ["No unsafe code; no unwrap, panic or unchecked indexing", "met", "Workspace lints, <code>-D warnings</code> in CI", "skeleton"],
-    ["Crate layering is enforced", "met", "<code>cargo xtask boundaries</code>", "skeleton"],
-    ["Security controls live in one reviewed crate", "met", "<code>vellum-security</code>, ADR 0025", "security"],
-    ["Independent penetration test", "plan", "Deferred past 1.0 by the maintainer (2026-10-29); internal red teaming (ADR 0030, 0047) covers 1.0. Scope ready in <code>docs/security/pen-test-scope.md</code>", "security"],
-  ]],
-  ["V16 Security logging and error handling", "", [
-    ["Security events are logged with request IDs and traced", "met", "OpenTelemetry via <code>vellum_kernel::telemetry</code>", "kernel, observability"],
-    ["Append-only, exportable audit log", "met", "Hash-chained, sealed audit log in <code>vellum_admin::audit</code>", "admin"],
-    ["Errors fail closed (scanner, limits, authorization, keys)", "met", "D104, ADR 0008; a missing files key stops start-up (D260)", "security, authz"],
-  ]],
-  ["V17 WebRTC", "Collaboration runs over WebSockets through the gateway; Vellum has no WebRTC.", [
-    ["WebRTC media and signalling", "na", "Not used", "n/a"],
-  ]],
-];
+      const CHAPTERS = [
+        [
+          "V1 Encoding and sanitization",
+          "",
+          [
+            [
+              "Rendered HTML passes an allow-list sanitizer; the Markdown " +
+                "dialect has no raw HTML",
+              "met",
+              "<code>vellum_render::sanitize</code> (ammonia allow-list); " +
+                "the parser has no raw HTML (ADR 0004)",
+              "render",
+            ],
+            [
+              "Diagram SVG is sanitized: no scripts, no external references",
+              "met",
+              "<code>sanitize/xml.rs</code>; SVG uploads served as " +
+                "attachment (D104)",
+              "render",
+            ],
+            [
+              "Server-side requests to user-supplied URLs cannot reach " +
+                "private networks",
+              "met",
+              "<code>vellum_security::ssrf</code>, D103; rebinding-safe " +
+                "resolver, per-hop redirect checks",
+              "security",
+            ],
+            [
+              "Database queries are parameterized, never built from strings",
+              "met",
+              "<code>sqlx</code> bound parameters throughout " +
+                "<code>vellum-db</code> (ADR 0006)",
+              "db",
+            ],
+          ],
+        ],
+        [
+          "V2 Validation and business logic",
+          "",
+          [
+            [
+              "Identifiers and tokens are parsed strictly into types",
+              "met",
+              "<code>vellum-kernel</code> IDs and share tokens, D37 to D39, " +
+                "property tests",
+              "kernel",
+            ],
+            [
+              "Configuration is validated at start-up and rejects unknown keys",
+              "met",
+              "<code>vellum_kernel::Config</code>",
+              "kernel",
+            ],
+            [
+              "Anti-automation: per-IP, per-user and per-token rate limits",
+              "met",
+              "<code>vellum_security::rate</code> (GCRA) in the gateway; " +
+                "IPv6 /64 buckets and connection caps (ADR 0047)",
+              "security, gateway",
+            ],
+            [
+              "Bounded work for hostile input: query, upload and body limits",
+              "met",
+              "Red-team rounds 1 to 4 (ADR 0030, 0047), nightly fuzzing",
+              "red team",
+            ],
+          ],
+        ],
+        [
+          "V3 Web frontend security",
+          "",
+          [
+            [
+              "Strict Content-Security-Policy, HSTS, <code>nosniff</code>, " +
+                "frame protection",
+              "met",
+              "<code>vellum_api::security</code> headers, ADR 0020; ZAP " +
+                "baseline nightly",
+              "gateway",
+            ],
+            [
+              "Cookies are <code>HttpOnly</code>, <code>Secure</code>, " +
+                "<code>SameSite=Lax</code>",
+              "met",
+              "<code>vellum-identity</code> session cookies, ADR 0020",
+              "identity",
+            ],
+            [
+              "Public and shared pages are served from a separate origin",
+              "met",
+              "<code>VELLUM_PUBLIC_PAGES_URL</code>, R-SE-3",
+              "gateway",
+            ],
+            [
+              "Embeds are sandboxed iframes without scripts",
+              "met",
+              "<code>sandbox</code> attribute in the render sanitizer; " +
+                "<code>VELLUM_EMBED_ORIGINS</code> allow-list",
+              "render, web",
+            ],
+          ],
+        ],
+        [
+          "V4 API and web service",
+          "",
+          [
+            [
+              "State-changing requests are protected against CSRF",
+              "met",
+              "Signed CSRF tokens (<code>VELLUM_CSRF_KEY</code>), ADR 0020",
+              "gateway",
+            ],
+            [
+              "Untrusted files are served with a fixed type and attachment " +
+                "disposition",
+              "met",
+              "<code>upload::Kind::inline</code>, D104",
+              "security",
+            ],
+            [
+              "API errors are typed and never leak internals",
+              "met",
+              "<code>vellum_kernel::ErrorKind</code>, D39",
+              "kernel",
+            ],
+            [
+              "Every upload route goes through one check",
+              "met",
+              "<code>vellum_security::upload::check</code> (ClamAV and " +
+                "archive limits)",
+              "security",
+            ],
+          ],
+        ],
+        [
+          "V5 File handling",
+          "",
+          [
+            [
+              "File type is decided by content, and the extension must match",
+              "met",
+              "<code>upload::sniff</code>, <code>UploadPolicy::clean</code>",
+              "security",
+            ],
+            [
+              "Size, dimension and decompression limits",
+              "met",
+              "100 MiB, 16384 px, 512 MiB decode cap, 200x zip expansion " +
+                "(RT-025)",
+              "security",
+            ],
+            [
+              "Images are re-encoded to drop metadata and polyglot payloads",
+              "met",
+              "<code>tests/it/upload.rs</code>",
+              "security",
+            ],
+            [
+              "File names cannot traverse paths or carry control characters",
+              "met",
+              "<code>upload::safe_file_name</code>; <code>BlobPath</code> in " +
+                "the store",
+              "security, store",
+            ],
+            [
+              "Antivirus scanning, failing closed",
+              "met",
+              "<code>upload::Clamd</code> (optional ClamAV), bounded " +
+                "concurrency (RT-031)",
+              "security",
+            ],
+          ],
+        ],
+        [
+          "V6 Authentication",
+          "",
+          [
+            [
+              "Brute-force protection on sign-in and share passwords",
+              "met",
+              "<code>vellum_identity::lockout</code>, Argon2 gate (RT-035)",
+              "identity",
+            ],
+            [
+              "Passwords hashed with Argon2id; OIDC sign-in",
+              "met",
+              "<code>vellum-identity</code>, <code>VELLUM_OIDC_*</code>, ADR " +
+                "0020",
+              "identity",
+            ],
+            [
+              "Admin actions require recent re-authentication",
+              "met",
+              "<code>fresh_auth</code> on admin operations (5 minutes), R-SE-7",
+              "identity, admin",
+            ],
+          ],
+        ],
+        [
+          "V7 Session management",
+          "",
+          [
+            [
+              "Sessions are bound, rotated on sign-in and revocable",
+              "met",
+              "Server-side sessions, Postgres-backed for replicas, ADR 0020",
+              "identity",
+            ],
+            [
+              "Sessions survive an identity provider outage; break-glass admin",
+              "met",
+              "Local break-glass account, brief &sect;12",
+              "identity",
+            ],
+          ],
+        ],
+        [
+          "V8 Authorization",
+          "",
+          [
+            [
+              "Deny-by-default relationship-based access control",
+              "met",
+              "<code>vellum-authz</code>, ADR 0008, property tests",
+              "authz",
+            ],
+            [
+              "Search results are filtered by a batch access check",
+              "met",
+              "<code>Authz::filter</code> in <code>vellum-search</code>",
+              "search",
+            ],
+            [
+              "Live editing re-checks access while a socket is open",
+              "met",
+              "<code>Authorizer::recheck</code> every minute (RT-028)",
+              "collab",
+            ],
+            [
+              "End-to-end spaces refuse every server feature that needs " +
+                "plaintext",
+              "met",
+              "<code>e2e::SpaceMode::allows</code>, D105",
+              "security",
+            ],
+          ],
+        ],
+        [
+          "V9 Self-contained tokens",
+          "",
+          [
+            [
+              "Share links are opaque random tokens, not self-contained tokens",
+              "met",
+              "22-char base62, SHA-256 at rest, constant-time compare (D39)",
+              "kernel",
+            ],
+            [
+              "Access tokens for MCP are validated against the authorization " +
+                "server",
+              "met",
+              "<code>verify_token</code>, MCP as a resource server (ADR " +
+                "0019, 0020)",
+              "identity, mcp",
+            ],
+          ],
+        ],
+        [
+          "V10 OAuth and OIDC",
+          "",
+          [
+            [
+              "OAuth 2.1 authorization server with PKCE, exact redirect URIs",
+              "met",
+              "<code>vellum_identity::oauth</code>, RFC 8414 metadata",
+              "identity",
+            ],
+            [
+              "OIDC client validates issuer, audience, nonce and signature",
+              "met",
+              "<code>vellum_identity::sso</code>",
+              "identity",
+            ],
+          ],
+        ],
+        [
+          "V11 Cryptography",
+          "",
+          [
+            [
+              "Only reviewed primitives: XChaCha20-Poly1305, Argon2id, " +
+                "X25519, SHA-256",
+              "met",
+              "<code>vellum-crypto</code>, ADR 0002",
+              "crypto",
+            ],
+            [
+              "All randomness comes from the OS CSPRNG",
+              "met",
+              "<code>getrandom</code> in kernel and crypto",
+              "kernel, crypto",
+            ],
+            [
+              "Weak (small-order) X25519 public keys are rejected",
+              "met",
+              "<code>e2e::DeviceKey::new</code>",
+              "security",
+            ],
+            [
+              "Keys live in a key service, reached with role credentials, " +
+                "not static keys",
+              "met",
+              "<code>vellum-kms</code>: AWS KMS (IRSA, Pod Identity, ECS, " +
+                "IMDSv2), Cloud KMS, Vault (D259)",
+              "security",
+            ],
+            [
+              "Key rotation re-wraps data keys",
+              "met",
+              "<code>vellum_crypto::rewrap</code>, " +
+                "<code>Sealed::reseal</code>; envelopes name their KEK",
+              "crypto",
+            ],
+          ],
+        ],
+        [
+          "V12 Secure communication",
+          "",
+          [
+            [
+              "TLS 1.3 with automatic certificates in the single binary",
+              "met",
+              "<code>VELLUM_TLS=acme</code> in " +
+                "<code>vellum_api::server</code>, R-SE-2",
+              "gateway",
+            ],
+            [
+              "Outbound connections use rustls with certificate validation",
+              "met",
+              "<code>ssrf::SafeClient</code>, <code>vellum-kms</code> " +
+                "clients refuse redirects",
+              "security",
+            ],
+          ],
+        ],
+        [
+          "V13 Configuration",
+          "",
+          [
+            [
+              "Secrets never appear in logs or debug output",
+              "met",
+              "Redacted Debug for config, tokens and credentials",
+              "kernel",
+            ],
+            [
+              "Dependencies checked for advisories, licenses and duplicates",
+              "met",
+              "cargo-deny, cargo-audit, pnpm audit in CI; triaged advisories " +
+                "in <code>osv-scanner.toml</code> (D261)",
+              "security",
+            ],
+            [
+              "Secrets kept out of the repository",
+              "met",
+              "gitleaks in CI, GitHub push protection",
+              "security",
+            ],
+            [
+              "Build dependencies pinned by hash",
+              "met",
+              "Actions pinned by SHA, linters by hash (D261); OpenSSF " +
+                "Scorecard weekly",
+              "security",
+            ],
+            [
+              "SBOM, Sigstore signatures, reproducible builds, SLSA level 3",
+              "met",
+              "CycloneDX SBOM, cosign and SLSA provenance in " +
+                "<code>release.yml</code>, R-SE-8",
+              "release",
+            ],
+          ],
+        ],
+        [
+          "V14 Data protection",
+          "",
+          [
+            [
+              "Per-document encryption at rest, on by default",
+              "met",
+              "<code>vellum serve</code> seals every file " +
+                "(<code>at_rest</code>, D260); plaintext is an explicit " +
+                "setting",
+              "security",
+            ],
+            [
+              "Secret scanning on save, with an admin policy to block",
+              "met",
+              "<code>vellum_security::secrets</code>, D104",
+              "security",
+            ],
+            [
+              "End-to-end encrypted private spaces",
+              "met",
+              "Recipient envelopes, <code>e2e::KeyRegistry</code>, device " +
+                "enrolment (ADR 0036, 0043)",
+              "crypto, security",
+            ],
+            [
+              "Encrypted backups and a monthly restore drill",
+              "met",
+              "<code>vellum_admin::backup</code>, <code>drill.yml</code>",
+              "admin, deploy",
+            ],
+          ],
+        ],
+        [
+          "V15 Secure coding and architecture",
+          "",
+          [
+            [
+              "No unsafe code; no unwrap, panic or unchecked indexing",
+              "met",
+              "Workspace lints, <code>-D warnings</code> in CI",
+              "skeleton",
+            ],
+            [
+              "Crate layering is enforced",
+              "met",
+              "<code>cargo xtask boundaries</code>",
+              "skeleton",
+            ],
+            [
+              "Security controls live in one reviewed crate",
+              "met",
+              "<code>vellum-security</code>, ADR 0025",
+              "security",
+            ],
+            [
+              "Independent penetration test",
+              "plan",
+              "Deferred past 1.0 by the maintainer (2026-10-29); internal " +
+                "red teaming (ADR 0030, 0047) covers 1.0. Scope ready in " +
+                "<code>docs/security/pen-test-scope.md</code>",
+              "security",
+            ],
+          ],
+        ],
+        [
+          "V16 Security logging and error handling",
+          "",
+          [
+            [
+              "Security events are logged with request IDs and traced",
+              "met",
+              "OpenTelemetry via <code>vellum_kernel::telemetry</code>",
+              "kernel, observability",
+            ],
+            [
+              "Append-only, exportable audit log",
+              "met",
+              "Hash-chained, sealed audit log in " +
+                "<code>vellum_admin::audit</code>",
+              "admin",
+            ],
+            [
+              "Errors fail closed (scanner, limits, authorization, keys)",
+              "met",
+              "D104, ADR 0008; a missing files key stops start-up (D260)",
+              "security, authz",
+            ],
+          ],
+        ],
+        [
+          "V17 WebRTC",
+          "Collaboration runs over WebSockets through the gateway; Vellum " +
+            "has no WebRTC.",
+          [["WebRTC media and signalling", "na", "Not used", "n/a"]],
+        ],
+      ];
 
-function render() {
-  const counts = { met: 0, prog: 0, plan: 0, na: 0 };
-  const root = document.getElementById("chapters");
-  for (const [title, note, rows] of CHAPTERS) {
-    const h = document.createElement("h2");
-    h.textContent = title;
-    root.append(h);
-    if (note) {
-      const p = document.createElement("p");
-      p.className = "chapter-note";
-      p.textContent = note;
-      root.append(p);
-    }
-    const table = document.createElement("table");
-    table.innerHTML = "<thead><tr><th>Control</th><th>Status</th><th>Evidence</th><th>Owner</th></tr></thead>";
-    const body = document.createElement("tbody");
-    for (const [control, status, evidence, owner] of rows) {
-      counts[status] += 1;
-      const tr = document.createElement("tr");
-      tr.dataset.status = status;
-      tr.innerHTML = `<td>${control}</td><td><span class="pill ${status}">${LABEL[status]}</span></td>` +
-        `<td class="evidence">${evidence}</td><td>${owner}</td>`;
-      body.append(tr);
-    }
-    table.append(body);
-    root.append(table);
-  }
-  const total = Object.values(counts).reduce((a, b) => a + b, 0);
-  const summary = document.getElementById("summary");
-  const bar = document.getElementById("bar");
-  const colour = { met: "var(--met)", prog: "var(--prog)", plan: "var(--plan)", na: "var(--na)" };
-  for (const key of ["met", "prog", "plan", "na"]) {
-    summary.insertAdjacentHTML("beforeend", `<div class="tile"><b>${counts[key]}</b><span>${LABEL[key]}</span></div>`);
-    const seg = document.createElement("i");
-    seg.style.width = `${(100 * counts[key]) / total}%`;
-    seg.style.background = colour[key];
-    bar.append(seg);
-  }
-}
+      function render() {
+        const counts = { met: 0, prog: 0, plan: 0, na: 0 };
+        const root = document.getElementById("chapters");
+        for (const [title, note, rows] of CHAPTERS) {
+          const h = document.createElement("h2");
+          h.textContent = title;
+          root.append(h);
+          if (note) {
+            const p = document.createElement("p");
+            p.className = "chapter-note";
+            p.textContent = note;
+            root.append(p);
+          }
+          const table = document.createElement("table");
+          table.innerHTML =
+            "<thead><tr><th>Control</th><th>Status</th>" +
+            "<th>Evidence</th><th>Owner</th></tr></thead>";
+          const body = document.createElement("tbody");
+          for (const [control, status, evidence, owner] of rows) {
+            counts[status] += 1;
+            const tr = document.createElement("tr");
+            tr.dataset.status = status;
+            tr.innerHTML =
+              `<td>${control}</td><td><span class="pill ${status}` +
+              `">${LABEL[status]}</span></td>` +
+              `<td class="evidence">${evidence}</td><td>${owner}</td>`;
+            body.append(tr);
+          }
+          table.append(body);
+          root.append(table);
+        }
+        const total = Object.values(counts).reduce((a, b) => a + b, 0);
+        const summary = document.getElementById("summary");
+        const bar = document.getElementById("bar");
+        const colour = {
+          met: "var(--met)",
+          prog: "var(--prog)",
+          plan: "var(--plan)",
+          na: "var(--na)",
+        };
+        for (const key of ["met", "prog", "plan", "na"]) {
+          summary.insertAdjacentHTML(
+            "beforeend",
+            `<div class="tile"><b>${counts[key]}</b><span>${LABEL[key]}` +
+              `</span></div>`,
+          );
+          const seg = document.createElement("i");
+          seg.style.width = `${(100 * counts[key]) / total}%`;
+          seg.style.background = colour[key];
+          bar.append(seg);
+        }
+      }
 
-function filter(status) {
-  for (const button of document.querySelectorAll(".filters button")) {
-    button.setAttribute("aria-pressed", String(button.dataset.filter === status));
-  }
-  for (const table of document.querySelectorAll("#chapters table")) {
-    let shown = 0;
-    for (const tr of table.tBodies[0].rows) {
-      const visible = status === "all" || tr.dataset.status === status;
-      tr.hidden = !visible;
-      shown += visible ? 1 : 0;
-    }
-    table.hidden = shown === 0;
-    let el = table.previousElementSibling;
-    while (el && el.tagName !== "H2") { el.hidden = shown === 0; el = el.previousElementSibling; }
-    if (el) el.hidden = shown === 0;
-  }
-}
+      function filter(status) {
+        for (const button of document.querySelectorAll(".filters button")) {
+          button.setAttribute(
+            "aria-pressed",
+            String(button.dataset.filter === status),
+          );
+        }
+        for (const table of document.querySelectorAll("#chapters table")) {
+          let shown = 0;
+          for (const tr of table.tBodies[0].rows) {
+            const visible = status === "all" || tr.dataset.status === status;
+            tr.hidden = !visible;
+            shown += visible ? 1 : 0;
+          }
+          table.hidden = shown === 0;
+          let el = table.previousElementSibling;
+          while (el && el.tagName !== "H2") {
+            el.hidden = shown === 0;
+            el = el.previousElementSibling;
+          }
+          if (el) el.hidden = shown === 0;
+        }
+      }
 
-render();
-for (const button of document.querySelectorAll(".filters button")) {
-  button.addEventListener("click", () => filter(button.dataset.filter));
-}
-</script>
-</body>
+      render();
+      for (const button of document.querySelectorAll(".filters button")) {
+        button.addEventListener("click", () => filter(button.dataset.filter));
+      }
+    </script>
+  </body>
 </html>

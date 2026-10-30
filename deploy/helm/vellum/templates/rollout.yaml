@@ -65,23 +65,34 @@ spec:
       interval: {{ .Values.canary.interval }}
       failureLimit: 1
       consecutiveErrorLimit: 3
-      successCondition: len(result) == 0 || isNaN(result[0]) || result[0] <= {{ .Values.canary.maxErrorRatio }}
+      successCondition: >-
+        len(result) == 0 || isNaN(result[0]) ||
+        result[0] <= {{ .Values.canary.maxErrorRatio }}
       provider:
         prometheus:
           address: {{ .Values.canary.prometheus.address }}
           query: |
-            sum(rate(http_server_request_duration_seconds_count{rollouts_pod_template_hash="{{ "{{" }}args.canary-hash{{ "}}" }}",http_response_status_code=~"5.."}[2m]))
+            sum(rate(http_server_request_duration_seconds_count{
+              rollouts_pod_template_hash="{{ "{{" }}args.canary-hash{{ "}}" }}",
+              http_response_status_code=~"5.."}[2m]))
             /
-            sum(rate(http_server_request_duration_seconds_count{rollouts_pod_template_hash="{{ "{{" }}args.canary-hash{{ "}}" }}"}[2m]))
+            sum(rate(http_server_request_duration_seconds_count{
+              rollouts_pod_template_hash="{{ "{{" }}args.canary-hash{{ "}}" }}"
+              }[2m]))
     # p95 latency of the canary pods against the uncached-read target.
     - name: latency-p95
       interval: {{ .Values.canary.interval }}
       failureLimit: 1
       consecutiveErrorLimit: 3
-      successCondition: len(result) == 0 || isNaN(result[0]) || result[0] <= {{ .Values.canary.maxP95Seconds }}
+      successCondition: >-
+        len(result) == 0 || isNaN(result[0]) ||
+        result[0] <= {{ .Values.canary.maxP95Seconds }}
       provider:
         prometheus:
           address: {{ .Values.canary.prometheus.address }}
           query: |
-            histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{rollouts_pod_template_hash="{{ "{{" }}args.canary-hash{{ "}}" }}"}[2m])))
+            histogram_quantile(0.95, sum by (le) (rate(
+              http_server_request_duration_seconds_bucket{
+              rollouts_pod_template_hash="{{ "{{" }}args.canary-hash{{ "}}" }}"
+              }[2m])))
 {{- end }}

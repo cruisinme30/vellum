@@ -421,7 +421,8 @@ function MyWork({ api }: { readonly api: WorkApi }) {
   return (
     <>
       <SlackLink api={api} />
-      {/* QuickAddForm tells the page through TASKS_CHANGED, like the Q dialog. */}
+      {/* QuickAddForm tells the page through TASKS_CHANGED, like the Q
+          dialog. */}
       <QuickAddForm
         api={api}
         onAdded={() => {

@@ -25,7 +25,8 @@ describe("admin requests API", () => {
     expect(rows).toEqual([SUMMARY]);
     const [url, init] = doFetch.mock.calls[0] ?? [];
     expect(url).toBe(
-      `${REQUESTS_PATH}?route=%2Fa&min_duration_ms=50&errors_only=true&id=req-1&before=9&limit=20`,
+      REQUESTS_PATH +
+        `?route=%2Fa&min_duration_ms=50&errors_only=true&id=req-1&before=9&limit=20`,
     );
     expect(new Headers(init?.headers).get("traceparent")).toMatch(/^00-/);
     await fetchRequests({}, doFetch);

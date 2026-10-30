@@ -285,34 +285,37 @@ describe("spaces page", () => {
     expect(screen.queryByRole("button", { name: "Add member" })).toBeNull();
   });
 
-  it("creates a shared drive with a folder name made from its name", async () => {
-    const { api, createSpace } = fakeApi();
-    const user = renderWith(api, <SpacesPage />);
-    const form = await screen.findByRole("form", {
-      name: "Create a shared drive",
-    });
-    await user.type(
-      within(form).getByRole("textbox", { name: "Name" }),
-      "Field Ops",
-    );
-    expect(
-      within(form).getByRole("textbox", { name: /Folder name/ }),
-    ).toHaveProperty("value", "field-ops");
-    await user.selectOptions(
-      within(form).getByRole("combobox", { name: "Owner" }),
-      MARCO.id,
-    );
-    await user.click(
-      within(form).getByRole("button", { name: "Create a shared drive" }),
-    );
-    await waitFor(() => {
-      expect(createSpace).toHaveBeenCalledWith({
-        name: "Field Ops",
-        slug: "field-ops",
-        owner_id: MARCO.id,
+  it(
+    "creates a shared drive with a folder name made from its " + "name",
+    async () => {
+      const { api, createSpace } = fakeApi();
+      const user = renderWith(api, <SpacesPage />);
+      const form = await screen.findByRole("form", {
+        name: "Create a shared drive",
       });
-    });
-  });
+      await user.type(
+        within(form).getByRole("textbox", { name: "Name" }),
+        "Field Ops",
+      );
+      expect(
+        within(form).getByRole("textbox", { name: /Folder name/ }),
+      ).toHaveProperty("value", "field-ops");
+      await user.selectOptions(
+        within(form).getByRole("combobox", { name: "Owner" }),
+        MARCO.id,
+      );
+      await user.click(
+        within(form).getByRole("button", { name: "Create a shared drive" }),
+      );
+      await waitFor(() => {
+        expect(createSpace).toHaveBeenCalledWith({
+          name: "Field Ops",
+          slug: "field-ops",
+          owner_id: MARCO.id,
+        });
+      });
+    },
+  );
 
   it("reads the quota in MiB and keeps the version retention", () => {
     const data = new FormData();

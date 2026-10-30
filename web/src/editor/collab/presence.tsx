@@ -98,7 +98,8 @@ function useAwarenessKey(awareness: Awareness): string {
       [...awareness.getStates()]
         .map(
           ([id, state]) =>
-            `${String(id)}:${JSON.stringify((state as { user?: unknown }).user ?? "")}`,
+            String(id) +
+            `:${JSON.stringify((state as { user?: unknown }).user ?? "")}`,
         )
         .join("|"),
     [awareness],

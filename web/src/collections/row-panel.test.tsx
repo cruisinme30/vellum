@@ -74,34 +74,38 @@ describe("RowPanel", () => {
     );
   });
 
-  it("saves text on Enter or when leaving the field, and explains bad input", async () => {
-    const { user, panel, row } = await openPanel();
-    const title = within(panel).getByRole("textbox", { name: "Issue" });
-    await user.clear(title);
-    await user.type(title, "Token buckets{Enter}");
-    expect(
-      await screen.findByRole("heading", { level: 2, name: "Token buckets" }),
-    ).toBeDefined();
-    const estimate = within(panel).getByRole("textbox", { name: "Estimate" });
-    await user.clear(estimate);
-    await user.type(estimate, "five");
-    await user.tab();
-    expect(within(panel).getByRole("alert").textContent).toBe(
-      "Enter a number, such as 3 or 2.5.",
-    );
-    expect(estimate.getAttribute("aria-invalid")).toBe("true");
-    await user.clear(estimate);
-    await user.type(estimate, "1,234");
-    await user.tab();
-    await waitFor(async () => {
-      expect(await row("est")).toEqual({ type: "number", value: 1234 });
-    });
-    const link = within(panel).getByRole("textbox", { name: "Link" });
-    await user.type(link, "not a url{Enter}");
-    expect(within(panel).getByRole("alert").textContent).toBe(
-      "Enter a full address, such as https://example.com.",
-    );
-  });
+  it(
+    "saves text on Enter or when leaving the field, and explains bad " +
+      "input",
+    async () => {
+      const { user, panel, row } = await openPanel();
+      const title = within(panel).getByRole("textbox", { name: "Issue" });
+      await user.clear(title);
+      await user.type(title, "Token buckets{Enter}");
+      expect(
+        await screen.findByRole("heading", { level: 2, name: "Token buckets" }),
+      ).toBeDefined();
+      const estimate = within(panel).getByRole("textbox", { name: "Estimate" });
+      await user.clear(estimate);
+      await user.type(estimate, "five");
+      await user.tab();
+      expect(within(panel).getByRole("alert").textContent).toBe(
+        "Enter a number, such as 3 or 2.5.",
+      );
+      expect(estimate.getAttribute("aria-invalid")).toBe("true");
+      await user.clear(estimate);
+      await user.type(estimate, "1,234");
+      await user.tab();
+      await waitFor(async () => {
+        expect(await row("est")).toEqual({ type: "number", value: 1234 });
+      });
+      const link = within(panel).getByRole("textbox", { name: "Link" });
+      await user.type(link, "not a url{Enter}");
+      expect(within(panel).getByRole("alert").textContent).toBe(
+        "Enter a full address, such as https://example.com.",
+      );
+    },
+  );
 
   it("picks options, people and related rows", async () => {
     const { user, panel, row } = await openPanel();

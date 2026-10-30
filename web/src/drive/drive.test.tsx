@@ -323,26 +323,30 @@ describe("Drive screens", () => {
     expect(screen.getByText(/needs a Vellum server/)).toBeDefined();
   });
 
-  it("shows My Drive with its places, items, usage and a nearly-full warning", async () => {
-    renderAt("/drive", fakeApi());
-    const plan = await screen.findByRole("link", { name: "Launch plan" });
-    expect(plan.getAttribute("href")).toBe("/p/n1");
-    const places = screen.getByRole("navigation", { name: "Drive" });
-    expect(
-      within(places)
-        .getByRole("link", { name: "My Drive" })
-        .getAttribute("aria-current"),
-    ).toBe("page");
-    expect(
-      screen.getByRole("link", { name: "Docs" }).getAttribute("href"),
-    ).toBe("/drive/s/s1/f/f1");
-    expect(await screen.findByText("Nearly full")).toBeDefined();
-    expect(
-      screen
-        .getByRole("button", { name: "Unstar “Launch plan”" })
-        .getAttribute("aria-pressed"),
-    ).toBe("true");
-  });
+  it(
+    "shows My Drive with its places, items, usage and a nearly-full " +
+      "warning",
+    async () => {
+      renderAt("/drive", fakeApi());
+      const plan = await screen.findByRole("link", { name: "Launch plan" });
+      expect(plan.getAttribute("href")).toBe("/p/n1");
+      const places = screen.getByRole("navigation", { name: "Drive" });
+      expect(
+        within(places)
+          .getByRole("link", { name: "My Drive" })
+          .getAttribute("aria-current"),
+      ).toBe("page");
+      expect(
+        screen.getByRole("link", { name: "Docs" }).getAttribute("href"),
+      ).toBe("/drive/s/s1/f/f1");
+      expect(await screen.findByText("Nearly full")).toBeDefined();
+      expect(
+        screen
+          .getByRole("button", { name: "Unstar “Launch plan”" })
+          .getAttribute("aria-pressed"),
+      ).toBe("true");
+    },
+  );
 
   it("moves an item to a chosen folder and reloads", async () => {
     const api = fakeApi();
@@ -383,35 +387,40 @@ describe("Drive screens", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("stars, trashes and shows details with activity and backlinks", async () => {
-    const api = fakeApi();
-    const user = renderAt("/drive", api);
-    await user.click(
-      await screen.findByRole("button", { name: "Star “Docs”" }),
-    );
-    expect(api.star).toHaveBeenCalledWith("f1", true);
-    await user.click(
-      screen.getByRole("button", { name: "Details of “Launch plan”" }),
-    );
-    const details = screen.getByRole("complementary", { name: "Launch plan" });
-    expect(
-      await within(details).findByText(
-        /renamed it from “Plan” to “Launch plan”/,
-      ),
-    ).toBeDefined();
-    expect(
-      within(details)
-        .getByRole("link", { name: "Roadmap" })
-        .getAttribute("href"),
-    ).toBe("/p/n2");
-    await user.click(
-      screen.getByRole("button", { name: "Move “Launch plan” to the trash" }),
-    );
-    expect(api.trash).toHaveBeenCalledWith("n1");
-    expect(
-      await screen.findByText("Moved “Launch plan” to the trash."),
-    ).toBeDefined();
-  });
+  it(
+    "stars, trashes and shows details with activity and " + "backlinks",
+    async () => {
+      const api = fakeApi();
+      const user = renderAt("/drive", api);
+      await user.click(
+        await screen.findByRole("button", { name: "Star “Docs”" }),
+      );
+      expect(api.star).toHaveBeenCalledWith("f1", true);
+      await user.click(
+        screen.getByRole("button", { name: "Details of “Launch plan”" }),
+      );
+      const details = screen.getByRole("complementary", {
+        name: "Launch plan",
+      });
+      expect(
+        await within(details).findByText(
+          /renamed it from “Plan” to “Launch plan”/,
+        ),
+      ).toBeDefined();
+      expect(
+        within(details)
+          .getByRole("link", { name: "Roadmap" })
+          .getAttribute("href"),
+      ).toBe("/p/n2");
+      await user.click(
+        screen.getByRole("button", { name: "Move “Launch plan” to the trash" }),
+      );
+      expect(api.trash).toHaveBeenCalledWith("n1");
+      expect(
+        await screen.findByText("Moved “Launch plan” to the trash."),
+      ).toBeDefined();
+    },
+  );
 
   it("follows a shortcut to its target", async () => {
     const user = renderAt("/drive", fakeApi());
@@ -442,28 +451,32 @@ describe("Drive screens", () => {
     ).toBeDefined();
   });
 
-  it("restores, deletes for good after a confirmation, and empties the trash", async () => {
-    const api = fakeApi();
-    const user = renderAt("/drive/s/s1/trash", api);
-    expect(
-      await screen.findByText(/stay in the trash for 30 days/),
-    ).toBeDefined();
-    await user.click(
-      screen.getByRole("button", { name: "Restore “Old notes”" }),
-    );
-    expect(api.restore).toHaveBeenCalledWith("t1");
-    await user.click(screen.getByRole("button", { name: "Delete for good" }));
-    expect(api.purge).not.toHaveBeenCalled();
-    await user.click(
-      screen.getByRole("button", { name: "Delete “Old notes” for good" }),
-    );
-    expect(api.purge).toHaveBeenCalledWith("t1");
-    await user.click(screen.getByRole("button", { name: "Empty trash" }));
-    await user.click(
-      screen.getByRole("button", { name: "Delete 1 item for good" }),
-    );
-    expect(await screen.findByText("Deleted 1 item for good.")).toBeDefined();
-  });
+  it(
+    "restores, deletes for good after a confirmation, and empties the " +
+      "trash",
+    async () => {
+      const api = fakeApi();
+      const user = renderAt("/drive/s/s1/trash", api);
+      expect(
+        await screen.findByText(/stay in the trash for 30 days/),
+      ).toBeDefined();
+      await user.click(
+        screen.getByRole("button", { name: "Restore “Old notes”" }),
+      );
+      expect(api.restore).toHaveBeenCalledWith("t1");
+      await user.click(screen.getByRole("button", { name: "Delete for good" }));
+      expect(api.purge).not.toHaveBeenCalled();
+      await user.click(
+        screen.getByRole("button", { name: "Delete “Old notes” for good" }),
+      );
+      expect(api.purge).toHaveBeenCalledWith("t1");
+      await user.click(screen.getByRole("button", { name: "Empty trash" }));
+      await user.click(
+        screen.getByRole("button", { name: "Delete 1 item for good" }),
+      );
+      expect(await screen.findByText("Deleted 1 item for good.")).toBeDefined();
+    },
+  );
 
   it("saves quota and retention settings and prunes versions", async () => {
     const api = fakeApi();

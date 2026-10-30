@@ -35,12 +35,15 @@ services:
       VELLUM_BIND: 0.0.0.0:7700
       VELLUM_DATA_DIR: /data
       VELLUM_PUBLIC_URL: ${VELLUM_PUBLIC_URL:-http://localhost:7700}
-      VELLUM_DATABASE_URL: postgres://vellum:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/vellum
+      VELLUM_DATABASE_URL: >-
+        postgres://vellum:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in
+        .env}@postgres:5432/vellum
       VELLUM_BLOB_URL: s3://vellum
       VELLUM_S3_ENDPOINT: http://minio:9000
       VELLUM_S3_REGION: us-east-1
       AWS_ACCESS_KEY_ID: vellum
-      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
+      AWS_SECRET_ACCESS_KEY: >-
+        ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
       VELLUM_KROKI_URL: http://kroki:8000
       VELLUM_CLAMD_ADDRESS: clamav:3310
       VELLUM_KEK_PASSPHRASE_FILE: /run/secrets/vellum_kek
@@ -82,7 +85,8 @@ services:
 
   postgres:
     <<: *restart
-    image: postgres:17.6-alpine3.22@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94
+    image: >-
+      postgres:17.6-alpine3.22@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94
     environment:
       POSTGRES_USER: vellum
       POSTGRES_DB: vellum
@@ -104,9 +108,12 @@ services:
       context: minio
     environment:
       MINIO_ROOT_USER: vellum
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
+      MINIO_ROOT_PASSWORD: >-
+        ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
       MINIO_BROWSER: "off"
-      MC_HOST_local: http://vellum:${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}@127.0.0.1:9000
+      MC_HOST_local: >-
+        http://vellum:${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in
+        .env}@127.0.0.1:9000
     volumes:
       - minio-data:/data
     tmpfs: [/tmp]
@@ -126,12 +133,15 @@ services:
     depends_on:
       minio: { condition: service_healthy }
     environment:
-      MC_HOST_local: http://vellum:${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}@minio:9000
+      MC_HOST_local: >-
+        http://vellum:${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in
+        .env}@minio:9000
     tmpfs: [/tmp]
 
   kroki:
     <<: [*restart, *hardening]
-    image: yuzutech/kroki:0.28.0@sha256:710a5e8d57344769846695431ceefc02aaf908e9958c9d459171d2255ee2f7f5
+    image: >-
+      yuzutech/kroki:0.28.0@sha256:710a5e8d57344769846695431ceefc02aaf908e9958c9d459171d2255ee2f7f5
     environment:
       KROKI_SAFE_MODE: secure
       KROKI_EXCALIDRAW_HOST: kroki-excalidraw
@@ -145,17 +155,20 @@ services:
 
   kroki-excalidraw:
     <<: *restart
-    image: yuzutech/kroki-excalidraw:0.28.0@sha256:fddd0bac124f259b5cbcae664b32fed9da1a8b2fda8d4cd8edf04e8349ee6ef8
+    image: >-
+      yuzutech/kroki-excalidraw:0.28.0@sha256:fddd0bac124f259b5cbcae664b32fed9da1a8b2fda8d4cd8edf04e8349ee6ef8
 
   kroki-diagramsnet:
     <<: *restart
-    image: yuzutech/kroki-diagramsnet:0.28.0@sha256:6139cb660c4a2526c2e2e0f7fff64b9b92ac4d8398f85fde53cf25bb6521383b
+    image: >-
+      yuzutech/kroki-diagramsnet:0.28.0@sha256:6139cb660c4a2526c2e2e0f7fff64b9b92ac4d8398f85fde53cf25bb6521383b
 
   # Scans every upload (INSTREAM over TCP). Signatures live in a volume and
   # freshclam refreshes them; the config is shared with the Helm chart.
   clamav:
     <<: [*restart, *hardening]
-    image: clamav/clamav:1.5.4@sha256:bda39705e291105049c3936e2803ac90b955172af8030f94f05dce1252df6c6d
+    image: >-
+      clamav/clamav:1.5.4@sha256:bda39705e291105049c3936e2803ac90b955172af8030f94f05dce1252df6c6d
     user: clamav
     entrypoint: ["/sbin/tini", "--", "/bin/sh", "-c"]
     command:
@@ -163,7 +176,8 @@ services:
       # update fails; freshclam keeps retrying in the background.
       - >-
         freshclam --config-file=/etc/vellum/freshclam.conf --stdout
-        || echo "Signature update failed; starting with the signatures on disk.";
+        || echo "Signature update failed;
+        starting with the signatures on disk.";
         freshclam --config-file=/etc/vellum/freshclam.conf --stdout --daemon &
         exec clamd --config-file=/etc/vellum/clamd.conf
     volumes:

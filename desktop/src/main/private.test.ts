@@ -41,26 +41,29 @@ describe("private spaces", () => {
     expect(run).toHaveBeenCalledWith(["private", "key", "--json"], {});
   });
 
-  it("enrols with the token in the environment, never on the command line", async () => {
-    const { run, spaces } = setup("enrolled\nfingerprint: cd\n");
-    expect(await spaces.enrol(SPACE)).toEqual({
-      lines: ["enrolled", "fingerprint: cd"],
-    });
-    const [commandArguments, environment] = run.mock.calls[0] ?? [];
-    expect(commandArguments).toEqual([
-      "private",
-      "enrol",
-      "--space",
-      SPACE,
-      "--label=ana-mbp (Vellum desktop)",
-    ]);
-    expect(commandArguments?.join(" ")).not.toContain("at-123");
-    expect(environment).toEqual({
-      VELLUM_SERVER: "https://vellum.northstar.dev",
-      VELLUM_TOKEN: "at-123",
-      VELLUM_PRIVATE_DIR: "/u/private",
-    });
-  });
+  it(
+    "enrols with the token in the environment, never on the command " + "line",
+    async () => {
+      const { run, spaces } = setup("enrolled\nfingerprint: cd\n");
+      expect(await spaces.enrol(SPACE)).toEqual({
+        lines: ["enrolled", "fingerprint: cd"],
+      });
+      const [commandArguments, environment] = run.mock.calls[0] ?? [];
+      expect(commandArguments).toEqual([
+        "private",
+        "enrol",
+        "--space",
+        SPACE,
+        "--label=ana-mbp (Vellum desktop)",
+      ]);
+      expect(commandArguments?.join(" ")).not.toContain("at-123");
+      expect(environment).toEqual({
+        VELLUM_SERVER: "https://vellum.northstar.dev",
+        VELLUM_TOKEN: "at-123",
+        VELLUM_PRIVATE_DIR: "/u/private",
+      });
+    },
+  );
 
   it("reseals and reports the binary's error", async () => {
     const ok = setup("1 resealed\n");

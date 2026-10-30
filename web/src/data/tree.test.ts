@@ -202,16 +202,20 @@ describe("movePage", () => {
     expect(moved).not.toBe(PAGES);
   });
 
-  it("refuses an unknown page, a missing parent or a parent in another space", () => {
-    const target = { spaceId: SPACE, parentId: undefined, index: 0 };
-    expect(movePage(PAGES, "unknown", target)).toEqual(PAGES);
-    expect(
-      movePage(PAGES, "root-2", { ...target, parentId: "missing" }),
-    ).toEqual(PAGES);
-    expect(
-      movePage(PAGES, "root-2", { ...target, parentId: "elsewhere" }),
-    ).toEqual(PAGES);
-  });
+  it(
+    "refuses an unknown page, a missing parent or a parent in another " +
+      "space",
+    () => {
+      const target = { spaceId: SPACE, parentId: undefined, index: 0 };
+      expect(movePage(PAGES, "unknown", target)).toEqual(PAGES);
+      expect(
+        movePage(PAGES, "root-2", { ...target, parentId: "missing" }),
+      ).toEqual(PAGES);
+      expect(
+        movePage(PAGES, "root-2", { ...target, parentId: "elsewhere" }),
+      ).toEqual(PAGES);
+    },
+  );
 });
 
 describe("targetFor", () => {

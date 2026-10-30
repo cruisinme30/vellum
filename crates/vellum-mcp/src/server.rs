@@ -677,8 +677,10 @@ impl McpServer {
                             .iter()
                             .map(|l| {
                                 json!({
-                                    "uri": l.uri, "name": l.uri, "title": l.title,
-                                    "description": l.description, "mimeType": "text/markdown"
+                                    "uri": l.uri, "name": l.uri,
+                                        "title": l.title,
+                                    "description": l.description,
+                                        "mimeType": "text/markdown"
                                 })
                             })
                             .collect();

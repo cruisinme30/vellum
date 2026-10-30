@@ -680,7 +680,8 @@
   resize: vertical;
 }
 
-/* Collection settings: actions, side panels, CSV and embed previews (ADR 0045) */
+/* Collection settings: actions, side panels, CSV and embed previews (ADR 0045)
+ */
 .vl-collection-actions,
 .vl-view-actions,
 .vl-panel-actions {

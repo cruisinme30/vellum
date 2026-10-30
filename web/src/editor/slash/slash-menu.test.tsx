@@ -45,13 +45,16 @@ const selected = () =>
     ?.textContent;
 
 describe("SlashMenu", () => {
-  it("lists the matching blocks in a labelled listbox, first one selected", () => {
-    setup();
-    const list = screen.getByRole("listbox", { name: "Blocks" });
-    expect(list.id).toBe(LIST_ID);
-    expect(within(list).getAllByRole("option")).toHaveLength(6);
-    expect(selected()).toContain("Info callout");
-  });
+  it(
+    "lists the matching blocks in a labelled listbox, first one " + "selected",
+    () => {
+      setup();
+      const list = screen.getByRole("listbox", { name: "Blocks" });
+      expect(list.id).toBe(LIST_ID);
+      expect(within(list).getAllByRole("option")).toHaveLength(6);
+      expect(selected()).toContain("Info callout");
+    },
+  );
 
   it("groups consecutive entries of a section under its heading", () => {
     setup(SLASH_ITEMS);

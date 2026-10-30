@@ -171,104 +171,120 @@ describe("comments panel", () => {
     expect(screen.queryByRole("button", { name: "Comments" })).toBeNull();
   });
 
-  it("starts a thread on the selected block, marks it, and resolves it", async () => {
-    const user = userEvent.setup();
-    const work = fakeWork();
-    const editor = await openEditor(work);
-    select(editor, "the beta");
-    expect(anchorOf(editor.state).blockId).toBeUndefined();
-    await user.click(screen.getByRole("button", { name: "Comments" }));
-    // A block without an ID yet gets one, so the thread can point at it.
-    const blockId = anchorOf(editor.state).blockId;
-    expect(blockId).toMatch(/^blk-/);
-    const panel = screen.getByRole("complementary", { name: "Comments" });
-    expect(within(panel).getByText("New thread on “the beta”")).toBeDefined();
-    expect(
-      within(panel).getByText("No open threads on this page."),
-    ).toBeDefined();
+  it(
+    "starts a thread on the selected block, marks it, and resolves " + "it",
+    async () => {
+      const user = userEvent.setup();
+      const work = fakeWork();
+      const editor = await openEditor(work);
+      select(editor, "the beta");
+      expect(anchorOf(editor.state).blockId).toBeUndefined();
+      await user.click(screen.getByRole("button", { name: "Comments" }));
+      // A block without an ID yet gets one, so the thread can point at it.
+      const blockId = anchorOf(editor.state).blockId;
+      expect(blockId).toMatch(/^blk-/);
+      const panel = screen.getByRole("complementary", { name: "Comments" });
+      expect(within(panel).getByText("New thread on “the beta”")).toBeDefined();
+      expect(
+        within(panel).getByText("No open threads on this page."),
+      ).toBeDefined();
 
-    await user.type(
-      within(panel).getByRole("textbox", { name: "Comment" }),
-      "Is May right?",
-    );
-    await user.click(within(panel).getByRole("button", { name: "Comment" }));
-    await within(panel).findByText("Is May right?");
-    expect(work.all()[0]?.target).toEqual({ doc: "page-1", block: blockId });
-    expect(work.all()[0]?.quote).toBe("the beta");
-    await waitFor(() => {
-      expect(editor.view.dom.querySelectorAll(".vl-commented")).toHaveLength(1);
-    });
-
-    await user.type(
-      within(panel).getByRole("textbox", { name: "Reply" }),
-      "Yes",
-    );
-    await user.click(within(panel).getByRole("button", { name: "Reply" }));
-    await within(panel).findByText("Yes");
-
-    const [like] = within(panel).getAllByRole("button", { name: "👍 (0)" });
-    if (!like) throw new Error("no like button");
-    await user.click(like);
-    const liked = await within(panel).findByRole("button", { name: "👍 (1)" });
-    expect(liked.getAttribute("aria-pressed")).toBe("true");
-
-    await user.type(
-      within(panel).getByRole("textbox", { name: "Assign this thread to" }),
-      "@sam",
-    );
-    await user.click(within(panel).getByRole("button", { name: "Assign" }));
-    await within(panel).findByText("Assigned to @sam");
-
-    await user.click(within(panel).getByRole("button", { name: "Resolve" }));
-    await within(panel).findByText("No open threads on this page.");
-    await waitFor(() => {
-      expect(editor.view.dom.querySelectorAll(".vl-commented")).toHaveLength(0);
-    });
-    await user.click(within(panel).getByRole("button", { name: "Resolved" }));
-    expect(within(panel).getByText("Is May right?")).toBeDefined();
-    await user.click(within(panel).getByRole("button", { name: "Reopen" }));
-    await user.click(within(panel).getByRole("button", { name: "Open" }));
-    expect(within(panel).getByText("Is May right?")).toBeDefined();
-
-    await user.click(
-      within(panel).getByRole("button", { name: "Close comments" }),
-    );
-    expect(
-      screen.queryByRole("complementary", { name: "Comments" }),
-    ).toBeNull();
-  });
-
-  it("files an issue from the selection and writes its chip into the block", async () => {
-    const user = userEvent.setup();
-    const work = fakeWork();
-    const editor = await openEditor(work);
-    select(editor, "Ship the beta");
-    await user.click(
-      screen.getByRole("button", { name: "Create issue from selection" }),
-    );
-    const blockId = anchorOf(editor.state).blockId;
-    const dialog = await screen.findByRole("dialog", { name: "Create issue" });
-    const title = await within(dialog).findByRole("textbox", { name: "Title" });
-    expect((title as HTMLInputElement).value).toBe("Ship the beta");
-    await user.click(
-      within(dialog).getByRole("button", { name: "Create issue" }),
-    );
-    await waitFor(() => {
-      expect(work.fileIssue).toHaveBeenCalledWith({
-        team: "ENG",
-        title: "Ship the beta",
-        sourceBlock: `page-1#${String(blockId)}`,
-        quote: "Ship the beta",
-      });
-    });
-    await waitFor(() => {
-      expect(editor.view.dom.querySelector(".vl-issue")?.textContent).toBe(
-        "ENG-42",
+      await user.type(
+        within(panel).getByRole("textbox", { name: "Comment" }),
+        "Is May right?",
       );
-    });
-    expect(editor.state.doc.child(1).textContent).toContain(
-      "Ship the beta in May.",
-    );
-    expect(screen.queryByRole("dialog", { name: "Create issue" })).toBeNull();
-  });
+      await user.click(within(panel).getByRole("button", { name: "Comment" }));
+      await within(panel).findByText("Is May right?");
+      expect(work.all()[0]?.target).toEqual({ doc: "page-1", block: blockId });
+      expect(work.all()[0]?.quote).toBe("the beta");
+      await waitFor(() => {
+        expect(editor.view.dom.querySelectorAll(".vl-commented")).toHaveLength(
+          1,
+        );
+      });
+
+      await user.type(
+        within(panel).getByRole("textbox", { name: "Reply" }),
+        "Yes",
+      );
+      await user.click(within(panel).getByRole("button", { name: "Reply" }));
+      await within(panel).findByText("Yes");
+
+      const [like] = within(panel).getAllByRole("button", { name: "👍 (0)" });
+      if (!like) throw new Error("no like button");
+      await user.click(like);
+      const liked = await within(panel).findByRole("button", {
+        name: "👍 (1)",
+      });
+      expect(liked.getAttribute("aria-pressed")).toBe("true");
+
+      await user.type(
+        within(panel).getByRole("textbox", { name: "Assign this thread to" }),
+        "@sam",
+      );
+      await user.click(within(panel).getByRole("button", { name: "Assign" }));
+      await within(panel).findByText("Assigned to @sam");
+
+      await user.click(within(panel).getByRole("button", { name: "Resolve" }));
+      await within(panel).findByText("No open threads on this page.");
+      await waitFor(() => {
+        expect(editor.view.dom.querySelectorAll(".vl-commented")).toHaveLength(
+          0,
+        );
+      });
+      await user.click(within(panel).getByRole("button", { name: "Resolved" }));
+      expect(within(panel).getByText("Is May right?")).toBeDefined();
+      await user.click(within(panel).getByRole("button", { name: "Reopen" }));
+      await user.click(within(panel).getByRole("button", { name: "Open" }));
+      expect(within(panel).getByText("Is May right?")).toBeDefined();
+
+      await user.click(
+        within(panel).getByRole("button", { name: "Close comments" }),
+      );
+      expect(
+        screen.queryByRole("complementary", { name: "Comments" }),
+      ).toBeNull();
+    },
+  );
+
+  it(
+    "files an issue from the selection and writes its chip into the " + "block",
+    async () => {
+      const user = userEvent.setup();
+      const work = fakeWork();
+      const editor = await openEditor(work);
+      select(editor, "Ship the beta");
+      await user.click(
+        screen.getByRole("button", { name: "Create issue from selection" }),
+      );
+      const blockId = anchorOf(editor.state).blockId;
+      const dialog = await screen.findByRole("dialog", {
+        name: "Create issue",
+      });
+      const title = await within(dialog).findByRole("textbox", {
+        name: "Title",
+      });
+      expect((title as HTMLInputElement).value).toBe("Ship the beta");
+      await user.click(
+        within(dialog).getByRole("button", { name: "Create issue" }),
+      );
+      await waitFor(() => {
+        expect(work.fileIssue).toHaveBeenCalledWith({
+          team: "ENG",
+          title: "Ship the beta",
+          sourceBlock: `page-1#${String(blockId)}`,
+          quote: "Ship the beta",
+        });
+      });
+      await waitFor(() => {
+        expect(editor.view.dom.querySelector(".vl-issue")?.textContent).toBe(
+          "ENG-42",
+        );
+      });
+      expect(editor.state.doc.child(1).textContent).toContain(
+        "Ship the beta in May.",
+      );
+      expect(screen.queryByRole("dialog", { name: "Create issue" })).toBeNull();
+    },
+  );
 });

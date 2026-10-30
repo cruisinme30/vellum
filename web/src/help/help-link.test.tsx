@@ -27,13 +27,18 @@ describe("contextual help", () => {
     expect(serverUrl("mywork.buckets")).toBe("/guide/topics/mywork.buckets");
   });
 
-  it("opens the topic in a new tab with a name that says what it explains", () => {
-    renderWithProviders(<HelpLink topic="collection.views" label="Roadmap" />);
-    const link = screen.getByRole("link", { name: "Help: Roadmap" });
-    expect(link.getAttribute("href")).toBe(publishedUrl("collection.views"));
-    expect(link.getAttribute("target")).toBe("_blank");
-    expect(link.getAttribute("rel")).toBe("noreferrer");
-  });
+  it(
+    "opens the topic in a new tab with a name that says what it " + "explains",
+    () => {
+      renderWithProviders(
+        <HelpLink topic="collection.views" label="Roadmap" />,
+      );
+      const link = screen.getByRole("link", { name: "Help: Roadmap" });
+      expect(link.getAttribute("href")).toBe(publishedUrl("collection.views"));
+      expect(link.getAttribute("target")).toBe("_blank");
+      expect(link.getAttribute("rel")).toBe("noreferrer");
+    },
+  );
 
   it("keeps the heading's name to the title alone", () => {
     renderWithProviders(<ViewTitle title="Data" help="collection.create" />);

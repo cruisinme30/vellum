@@ -10,7 +10,8 @@ import { createTestEditor, typeText } from "../test-editor";
 
 import { atomRule, findWikiLink, formatDate, IssueKey } from "./inline";
 
-// eslint-disable-next-line unicorn/no-useless-undefined -- a resolver that never finds a page
+// A resolver that never finds a page.
+// eslint-disable-next-line unicorn/no-useless-undefined
 const noPage = () => undefined;
 
 let editor: Editor | undefined;

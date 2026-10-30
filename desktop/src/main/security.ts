@@ -50,7 +50,8 @@ export function allowPermission(
  */
 export function contentSecurityPolicy(server: string): string {
   const origin = new URL(server);
-  const socket = `${origin.protocol === "https:" ? "wss" : "ws"}://${origin.host}`;
+  const socket =
+    (origin.protocol === "https:" ? "wss" : "ws") + `://${origin.host}`;
   return [
     "default-src 'self'",
     "script-src 'self' 'wasm-unsafe-eval'",

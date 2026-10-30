@@ -31,11 +31,14 @@ while read -r _local_ref local_sha remote_ref _remote_sha; do
   esac
   tree="$(git rev-parse "${local_sha}^{tree}")"
   stamp="${stamps}/${tree}"
-  if [[ ! -f "${stamp}" ]] || { [[ "${need}" == release ]] && ! grep -qx 'mode=release' "${stamp}"; }; then
+  if [[ ! -f "${stamp}" ]] || { [[ "${need}" == release ]] \
+    && ! grep -qx 'mode=release' "${stamp}"; }; then
     command="scripts/dev/gate.sh"
     [[ "${need}" == release ]] && command+=" --release"
-    echo "pre-push: ${remote_ref#refs/heads/} takes only commits the local gate passed," >&2
-    echo "and tree ${tree:0:12} (commit ${local_sha:0:12}) has no ${need} gate stamp. Check out that commit and run:" >&2
+    echo "pre-push: ${remote_ref#refs/heads/} takes only commits the local" \
+        "gate passed," >&2
+    echo "and tree ${tree:0:12} (commit ${local_sha:0:12}) has no ${need}" \
+        "gate stamp. Check out that commit and run:" >&2
     echo >&2
     echo "    ${command}" >&2
     echo >&2

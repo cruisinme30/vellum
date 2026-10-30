@@ -3,7 +3,9 @@
 
 [package]
 name = "vellum-db"
-description = "The rebuildable index: migrations and database access for Postgres and SQLite."
+description = """\
+    The rebuildable index: migrations and database access for Postgres and \
+    SQLite."""
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -20,17 +22,33 @@ workspace = true
 [dependencies]
 # SQLCipher is compiled in (vendored OpenSSL) so the single binary needs no
 # system crypto library.
-futures-util = { version = "0.3.31", default-features = false, features = ["std"] }
-libsqlite3-sys = { version = "0.37", features = ["bundled-sqlcipher-vendored-openssl"] }
+futures-util.version = "0.3.31"
+futures-util.default-features = false
+futures-util.features = ["std"]
+libsqlite3-sys.version = "0.37"
+libsqlite3-sys.features = ["bundled-sqlcipher-vendored-openssl"]
 # The same OpenSSL SQLCipher links: initialised without its racy exit handler
 # (see index.rs).
 openssl-sys = "0.9.117"
-sqlx = { version = "0.9", default-features = false, features = ["macros", "migrate", "postgres", "runtime-tokio", "sqlite", "tls-rustls-aws-lc-rs", "uuid"] }
+sqlx.version = "0.9"
+sqlx.default-features = false
+sqlx.features = [
+    "macros",
+    "migrate",
+    "postgres",
+    "runtime-tokio",
+    "sqlite",
+    "tls-rustls-aws-lc-rs",
+    "uuid",
+]
 serde = { version = "1.0.229", features = ["derive"] }
-serde-saphyr = { version = "2.0.0", default-features = false, features = ["deserialize", "serialize"] }
+serde-saphyr.version = "2.0.0"
+serde-saphyr.default-features = false
+serde-saphyr.features = ["deserialize", "serialize"]
 sha2 = "0.11.1"
 thiserror = "2.0.21"
-tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread", "time"] }
+tokio.version = "1"
+tokio.features = ["macros", "rt", "rt-multi-thread", "time"]
 tracing = "0.1.44"
 uuid = "1.29.0"
 vellum-kernel.workspace = true

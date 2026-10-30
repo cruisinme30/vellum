@@ -86,7 +86,8 @@ if ((BASH_VERSINFO[0] * 100 + BASH_VERSINFO[1] < 501)); then
   exit 2
 fi
 
-usage() { sed -n '/^# The local CI gate/,/^set -euo/p' "$0" | sed -e '$d' -e 's/^# \{0,1\}//'; }
+usage() { sed -n '/^# The local CI gate/,/^set -euo/p' "$0" \
+  | sed -e '$d' -e 's/^# \{0,1\}//'; }
 
 release=0
 focused=0
@@ -131,11 +132,19 @@ want() { [[ "${wanted}" == *",$1,"* ]]; }
 want e2e && wanted+="site,"
 
 readonly PLAYWRIGHT_IMAGE=mcr.microsoft.com/playwright:v1.64.1-noble
+readonly CONTAINER_PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:\
+/sbin:/bin
+# docker inspect templates: a container's IP address and its network's name.
+readonly NETWORK_IP='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'
+# shellcheck disable=SC2016 # a Go template, not shell
+readonly NETWORK_NAME='{{range $k, $v := .NetworkSettings.Networks}}'\
+'{{$k}}{{end}}'
 IFS=, read -r -a BROWSERS <<<"${browsers}"
 readonly BROWSERS
 # A narrowed run checks less than CI does, so it earns no stamp.
 partial="${only}"
-[[ "${browsers}" != chromium,firefox,webkit ]] && partial+=" --browsers ${browsers}"
+[[ "${browsers}" != chromium,firefox,webkit ]] \
+  && partial+=" --browsers ${browsers}"
 [[ -n "${grep_tests}" ]] && partial+=" --grep"
 
 root="$(git rev-parse --show-toplevel)"
@@ -147,8 +156,10 @@ if ! docker info >/dev/null 2>&1; then
 fi
 # Gate runs share their volumes, so one at a time. Other tools may use the
 # label too; the gate's own containers are also named vellum-gate-<run>-*.
-if [[ -n "$(docker ps -q --filter label=vellum-gate --filter name=^vellum-gate-)" ]]; then
-  echo "gate.sh: another gate run is still going (docker ps --filter name=^vellum-gate-)." >&2
+if [[ -n "$(docker ps -q --filter label=vellum-gate \
+  --filter name=^vellum-gate-)" ]]; then
+  echo "gate.sh: another gate run is still going (docker ps --filter" \
+    "name=^vellum-gate-)." >&2
   exit 2
 fi
 
@@ -157,19 +168,22 @@ sha="$(git rev-parse HEAD)"
 tree="$(git rev-parse 'HEAD^{tree}')"
 branch="$(git symbolic-ref --quiet --short HEAD || true)"
 base="$(git rev-parse --quiet --verify origin/develop || true)"
-repo_slug="$(git remote get-url origin 2>/dev/null | sed -E 's#(\.git)?$##; s#^.*github\.com[:/]##')"
+repo_slug="$(git remote get-url origin 2>/dev/null \
+  | sed -E 's#(\.git)?$##; s#^.*github\.com[:/]##')"
 run_id="$(date +%Y%m%d-%H%M%S)-$$"
 compose_project="vellum-gate-${run_id}"
 logs="$(mktemp -d "${TMPDIR:-/tmp}/vellum-gate.XXXXXX")"
 logs="$(cd "${logs}" && pwd -P)"
 if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
-  echo "Note: uncommitted changes are not checked; the gate tests the commit ${sha:0:12}."
+  echo "Note: uncommitted changes are not checked; the gate tests the commit" \
+      "${sha:0:12}."
 fi
 
 memory_gb=$(($(docker info --format '{{.MemTotal}}') / 1024 / 1024 / 1024))
 if [[ -z "${parallel}" ]]; then
   # About 3 GB per browser beside the Rust build.
-  if ((memory_gb >= 16)); then parallel=3; elif ((memory_gb >= 11)); then parallel=2; else parallel=1; fi
+  if ((memory_gb >= 16)); then parallel=3; elif ((memory_gb >= 11)); \
+    then parallel=2; else parallel=1; fi
 fi
 
 # --- cleanup -----------------------------------------------------------------
@@ -184,13 +198,20 @@ cleanup() {
   mapfile -t pids < <(jobs -pr)
   ((${#pids[@]} == 0)) || kill "${pids[@]}" 2>/dev/null || true
   mapfile -t leftovers < <(docker ps -aq --filter "label=vellum-gate=${run_id}"
-    docker ps -aq --filter "label=com.docker.compose.project=${compose_project}")
-  ((${#leftovers[@]} == 0)) || docker rm -f -v "${leftovers[@]}" >/dev/null 2>&1 || true
-  mapfile -t leftovers < <(docker network ls -q --filter "label=vellum-gate=${run_id}"
-    docker network ls -q --filter "label=com.docker.compose.project=${compose_project}")
-  ((${#leftovers[@]} == 0)) || docker network rm "${leftovers[@]}" >/dev/null 2>&1 || true
-  mapfile -t leftovers < <(docker volume ls -q --filter "label=com.docker.compose.project=${compose_project}")
-  ((${#leftovers[@]} == 0)) || docker volume rm "${leftovers[@]}" >/dev/null 2>&1 || true
+    docker ps -aq --filter \
+      "label=com.docker.compose.project=${compose_project}")
+  ((${#leftovers[@]} == 0)) || docker rm -f -v "${leftovers[@]}" >/dev/null \
+    2>&1 || true
+  mapfile -t leftovers < <(docker network ls \
+    -q --filter "label=vellum-gate=${run_id}"
+    docker network ls -q --filter \
+      "label=com.docker.compose.project=${compose_project}")
+  ((${#leftovers[@]} == 0)) || docker network rm \
+    "${leftovers[@]}" >/dev/null 2>&1 || true
+  mapfile -t leftovers < <(docker volume ls \
+    -q --filter "label=com.docker.compose.project=${compose_project}")
+  ((${#leftovers[@]} == 0)) || docker volume rm \
+    "${leftovers[@]}" >/dev/null 2>&1 || true
   docker image rm -f "vellum-gate-release:${run_id}" >/dev/null 2>&1 || true
   wait 2>/dev/null || true
   if ((interrupted)); then
@@ -202,9 +223,12 @@ cleanup() {
   # cannot. Those are listed, not removed: they carry no gate label, and
   # other work on this Docker may own containers started meanwhile.
   local id
-  for id in $(docker ps -aq --filter label=org.testcontainers=true; docker ps -aq --filter ancestor=localstack/localstack:4); do
+  for id in $(docker ps -aq --filter label=org.testcontainers=true; docker ps \
+    -aq --filter ancestor=localstack/localstack:4); do
     [[ " ${before_run} " == *" ${id} "* ]] && continue
-    docker ps -a --filter "id=${id}" --format 'Started during this run and still there (a killed test?): {{.ID}} {{.Image}} {{.Status}}'
+    leftover_format='Started during this run and still there (a killed test?):'
+    leftover_format+=' {{.ID}} {{.Image}} {{.Status}}'
+    docker ps -a --filter "id=${id}" --format "${leftover_format}"
   done
   exit "${status}"
 }
@@ -231,13 +255,15 @@ run_stage() {
     record_pass "${name}"
     echo "  pass   ${name} ($(duration $((SECONDS - start))))"
   else
-    echo "  FAIL   ${name} ($(duration $((SECONDS - start)))): ${logs}/${name}.log"
+    echo "  FAIL   ${name} ($(duration $((SECONDS \
+      - start)))): ${logs}/${name}.log"
   fi
   return "${status}"
 }
 skip_stage() { echo "skip 0 $2" >"${logs}/$1.status"; }
 duration() { printf '%dm%02ds' $(($1 / 60)) $(($1 % 60)); }
-passed() { [[ -f "${logs}/$1.status" ]] && [[ "$(cut -d' ' -f1 "${logs}/$1.status")" == 0 ]]; }
+passed() { [[ -f "${logs}/$1.status" ]] && [[ \
+  "$(cut -d' ' -f1 "${logs}/$1.status")" == 0 ]]; }
 
 # --- earlier passes (D319) ---------------------------------------------------
 
@@ -259,7 +285,8 @@ fingerprint() {
   local name="$1" include="$2" exclude="$3"
   shift 3
   {
-    printf 'stage=%s\ngate=%s\nimage=%s\n' "${name}" "${gate_blob}" "${image_tag}"
+    printf 'stage=%s\ngate=%s\nimage=%s\n' "${name}" "${gate_blob}" \
+      "${image_tag}"
     printf 'extra=%s\n' "$@"
     awk -F'\t' -v inc="${include}" -v exc="${exclude}" \
       '$2 ~ inc && (exc == "" || $2 !~ exc)' "${logs}/tree.lst"
@@ -282,7 +309,8 @@ record_pass() {
   local key="${stage_key[$1]:-}"
   [[ -n "${key}" ]] || return 0
   mkdir -p "${pass_dir}"
-  printf 'passed at %s on %s\n' "${sha:0:12}" "$(date +%Y-%m-%d)" >"${pass_dir}/$1-${key}.$$"
+  printf 'passed at %s on %s\n' "${sha:0:12}" \
+    "$(date +%Y-%m-%d)" >"${pass_dir}/$1-${key}.$$"
   mv -f "${pass_dir}/$1-${key}.$$" "${pass_dir}/$1-${key}"
 }
 
@@ -290,13 +318,17 @@ record_pass() {
 drun() {
   local name="$1"
   shift
-  docker run --rm --init --label "vellum-gate=${run_id}" --name "vellum-gate-${run_id}-${name}" "$@"
+  docker run --rm --init --label "vellum-gate=${run_id}" \
+    --name "vellum-gate-${run_id}-${name}" "$@"
 }
 
 # The image's inputs: the files that pin its tools.
-image_inputs=(scripts/dev/ci-image/Dockerfile rust-toolchain.toml .github/requirements/hygiene.txt
-  scripts/dev/install-tools.sh scripts/ci/install-infra-tools.sh web/package.json)
-image_tag="$(git ls-tree HEAD -- "${image_inputs[@]}" | git hash-object --stdin | cut -c1-12)"
+image_inputs=(scripts/dev/ci-image/Dockerfile rust-toolchain.toml \
+  .github/requirements/hygiene.txt
+  scripts/dev/install-tools.sh scripts/ci/install-infra-tools.sh \
+    web/package.json)
+image_tag="$(git ls-tree HEAD -- "${image_inputs[@]}" \
+  | git hash-object --stdin | cut -c1-12)"
 ci_image="vellum-ci-local:${image_tag}"
 
 # build_image <platform> <tag>: builds vellum-ci-local from HEAD's pins.
@@ -348,7 +380,8 @@ docker_mounts=(
 stage_prepare() {
   # shellcheck disable=SC2016 # expanded in the container
   drun prepare --platform linux/arm64 --pull never "${ci_mounts[@]}" \
-    -e "COMMON=${common}" -e "SHA=${sha}" -e "BRANCH=${branch}" -e "BASE=${base}" \
+    -e "COMMON=${common}" -e "SHA=${sha}" -e "BRANCH=${branch}" \
+    -e "BASE=${base}" \
     "${ci_image}" bash -euo pipefail -c '
       src=/work/vellum
       if ! git -C "${src}" rev-parse --git-dir >/dev/null 2>&1; then
@@ -369,7 +402,8 @@ stage_prepare() {
       fi
       git archive --format=tar -o /work/src.tar HEAD
       rm -rf /work/_site
-      echo "Checked out $(git rev-parse --short HEAD) (${BRANCH:-detached}), base ${BASE:0:12}."
+      echo "Checked out $(git rev-parse --short HEAD)" \
+        "(${BRANCH:-detached}), base ${BASE:0:12}."
     '
 }
 
@@ -393,7 +427,8 @@ stage_site() {
     "${ci_mounts[@]}" -w /work/vellum \
     -e CARGO_TARGET_DIR=/cache/target -e SITE_VERSIONS=0 \
     "${ci_image}" bash -euo pipefail -c \
-    'scripts/ci/build-site.sh /work/_site && scripts/ci/check-site.sh /work/_site'
+    'scripts/ci/build-site.sh /work/_site &&
+      scripts/ci/check-site.sh /work/_site'
 }
 
 # The Playwright containers unpack the commit into /e2e/vellum and keep
@@ -407,14 +442,16 @@ pw_mounts=(
   -e COREPACK_HOME=/cache/corepack
   -e COREPACK_ENABLE_DOWNLOAD_PROMPT=0
   -e CI=true
-  -e PATH=/cache/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+  -e "PATH=/cache/bin:${CONTAINER_PATH}"
 )
 # pnpm through corepack, at web/package.json's packageManager version.
-readonly PW_SETUP='mkdir -p /cache/bin && corepack enable --install-directory /cache/bin pnpm &&
+readonly PW_SETUP='mkdir -p /cache/bin &&
+  corepack enable --install-directory /cache/bin pnpm &&
   tar -xf /work/src.tar -C /e2e/vellum && cd /e2e/vellum/web'
 
 stage_pw_install() {
-  drun pw-install --platform linux/arm64 "${pw_mounts[@]}" "${PLAYWRIGHT_IMAGE}" \
+  drun pw-install --platform linux/arm64 "${pw_mounts[@]}" \
+    "${PLAYWRIGHT_IMAGE}" \
     bash -euo pipefail -c "${PW_SETUP} && pnpm install --frozen-lockfile"
 }
 
@@ -432,7 +469,9 @@ stage_e2e() {
     "${PLAYWRIGHT_IMAGE}" bash -uo pipefail -c "${PW_SETUP}"' || exit 1
       pnpm exec playwright test --workers="${WORKERS}" ${GREP:+-g "${GREP}"}
       status=$?
-      if ((status != 0)); then cp -R playwright-report test-results /out/ 2>/dev/null; fi
+      if ((status != 0)); then
+        cp -R playwright-report test-results /out/ 2>/dev/null
+      fi
       exit "${status}"'
 }
 
@@ -472,13 +511,16 @@ stage_x86() {
   mkdir -p "${out}/dist"
   build_image linux/amd64 "${ci_image}-amd64"
   for build in 1 2; do
-    git archive HEAD | docker buildx build --no-cache --platform linux/amd64 --target binary \
-      --output "type=local,dest=${out}/build-${build}" -f deploy/docker/Dockerfile -
+    git archive HEAD | docker buildx build --no-cache --platform linux/amd64 \
+      --target binary \
+      --output "type=local,dest=${out}/build-${build}" \
+      -f deploy/docker/Dockerfile -
   done
   shasum -a 256 "${out}"/build-*/vellum
   cmp "${out}/build-1/vellum" "${out}/build-2/vellum"
   cp "${out}/build-1/vellum" "${out}/dist/vellum-linux-amd64"
-  git archive HEAD | docker buildx build --platform linux/amd64 --load --target runtime \
+  git archive HEAD | docker buildx build --platform linux/amd64 \
+    --load --target runtime \
     --build-arg DIST=release --build-context "release=${out}/dist" \
     -t "${image}" -f deploy/docker/Dockerfile -
   bytes="$(docker save "${image}" | gzip -9 | wc -c | tr -d ' ')"
@@ -498,16 +540,18 @@ stage_clamav() {
   mkdir -p "${dir}"
   git archive HEAD deploy | tar -x -C "${dir}"
   cp "${dir}/deploy/compose/.env.example" "${dir}/deploy/compose/.env"
-  local compose=(docker compose -p "${compose_project}" --project-directory "${dir}/deploy/compose"
+  local compose=(docker compose -p "${compose_project}" \
+    --project-directory "${dir}/deploy/compose"
     -f "${dir}/deploy/compose/compose.yaml")
   "${compose[@]}" up -d --wait --wait-timeout 900 clamav || status=$?
   if ((status == 0)); then
-    ip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' \
+    ip="$(docker inspect -f "${NETWORK_IP}" \
       "$("${compose[@]}" ps -q clamav)")"
     drun clamav-smoke --platform linux/arm64 --pull never \
-      --network "$(docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{end}}' \
+      --network "$(docker inspect -f "${NETWORK_NAME}" \
         "$("${compose[@]}" ps -q clamav)")" \
-      -v "${dir}/deploy:/deploy:ro" "${ci_image}" /deploy/clamav/smoke.sh "${ip}" 3310 || status=$?
+      -v "${dir}/deploy:/deploy:ro" "${ci_image}" /deploy/clamav/smoke.sh \
+      "${ip}" 3310 || status=$?
   fi
   ((status == 0)) || "${compose[@]}" logs clamav
   "${compose[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
@@ -516,7 +560,8 @@ stage_clamav() {
 
 # full.yml's links job: lychee online, with the same arguments.
 stage_links() {
-  drun links --platform linux/arm64 --pull never "${ci_mounts[@]}" "${token_env[@]}" \
+  drun links --platform linux/arm64 --pull never "${ci_mounts[@]}" \
+    "${token_env[@]}" \
     -w /work/vellum "${ci_image}" lychee --no-progress --exclude-path LICENSES \
     --exclude-path web/node_modules --exclude-path corpus '**/*.md'
 }
@@ -537,14 +582,16 @@ codeql_cli() {
   if [[ -n "${VELLUM_CODEQL:-}" ]]; then
     echo "${VELLUM_CODEQL}"
   else
-    command -v codeql || echo "$(dirname "$(dirname "${common}")")/vellum-tools/codeql/codeql"
+    command -v codeql || echo "$(dirname "$(dirname \
+      "${common}")")/vellum-tools/codeql/codeql"
   fi
 }
 stage_codeql() {
   local codeql dir="${logs}/codeql" lang pack errors total
   codeql="$(codeql_cli)"
   if [[ ! -x "${codeql}" ]]; then
-    echo "No CodeQL CLI: set VELLUM_CODEQL to the codeql binary of a CodeQL bundle."
+    echo "No CodeQL CLI: set VELLUM_CODEQL to the codeql binary of a CodeQL" \
+      "bundle."
     return 1
   fi
   mkdir -p "${dir}/src"
@@ -557,8 +604,10 @@ paths-ignore:
 EOF
   for lang in actions javascript-typescript; do
     pack="${lang%%-*}"
-    "${codeql}" database create "${dir}/db-${lang}" --language="${lang}" --build-mode=none \
-      --source-root="${dir}/src" --codescanning-config="${dir}/config.yml" --threads=2 --overwrite
+    "${codeql}" database create "${dir}/db-${lang}" \
+      --language="${lang}" --build-mode=none \
+      --source-root="${dir}/src" --codescanning-config="${dir}/config.yml" \
+      --threads=2 --overwrite
     "${codeql}" database analyze "${dir}/db-${lang}" \
       "codeql/${pack}-queries:codeql-suites/${pack}-security-extended.qls" \
       --format=sarif-latest --output="${dir}/${lang}.sarif" --threads=2
@@ -577,14 +626,17 @@ for path in sys.argv[1:]:
 print(errors, total)
 EOF
   )
-  echo "CodeQL (actions, JavaScript): ${total} result(s), ${errors} at error level."
+  echo "CodeQL (actions, JavaScript): ${total} result(s), ${errors} at error" \
+      "level."
   ((errors == 0))
 }
 
 # --- run ---------------------------------------------------------------------
 
-echo "Vellum gate ${run_id}: ${sha:0:12} (tree ${tree:0:12}) on ${branch:-a detached HEAD}"
-echo "Logs: ${logs}   Docker memory: ${memory_gb} GB, browsers at once: ${parallel}"
+echo "Vellum gate ${run_id}: ${sha:0:12} (tree ${tree:0:12}) on" \
+    "${branch:-a detached HEAD}"
+echo "Logs: ${logs}   Docker memory: ${memory_gb} GB, browsers at once:" \
+    "${parallel}"
 start="${SECONDS}"
 
 # What each stage reads (D319). When unsure, a stage reads more: a missed
@@ -598,7 +650,8 @@ if [[ -z "${grep_tests}" ]]; then
   stage_key[site]="$(fingerprint site "${site_inputs}" '')"
   # The UI suite: the web app and the website it serves.
   for browser in "${BROWSERS[@]}"; do
-    stage_key[e2e-${browser}]="$(fingerprint "e2e-${browser}" "${site_inputs}|^web/" '' \
+    stage_key[e2e-${browser}]="$(fingerprint "e2e-${browser}" \
+      "${site_inputs}|^web/" '' \
       "${PLAYWRIGHT_IMAGE}")"
   done
 fi
@@ -610,8 +663,9 @@ if ((!focused)); then
 fi
 # The Rust tests read the whole tree but the website, the desktop shell
 # and the web app, of which they read only the generated files and pins.
-stage_key[coverage]="$(fingerprint coverage \
-  '^[^w]|^w[^e]|^we[^b]|^web[^/]|^web/(package\.json|pnpm-lock\.yaml)$|^web/.*\.gen\.ts$' \
+not_web_sources='^[^w]|^w[^e]|^we[^b]|^web[^/]'
+not_web_sources+='|^web/(package\.json|pnpm-lock\.yaml)$|^web/.*\.gen\.ts$'
+stage_key[coverage]="$(fingerprint coverage "${not_web_sources}" \
   '^(site|desktop)/')"
 # The release image copies the whole tree.
 stage_key[x86]="$(fingerprint x86 . '')"
@@ -642,21 +696,25 @@ stages+=(image prepare)
 # for the main stages unless Docker has room to spare.
 background=()
 for name in links reliability codeql; do
-  if want "${name}"; then run_stage "${name}" "stage_${name}" & background+=($!); stages+=("${name}"); fi
+  if want "${name}"; then run_stage "${name}" "stage_${name}" & \
+    background+=($!); stages+=("${name}"); fi
 done
 heavy=()
 for name in coverage x86 clamav; do want "${name}" && heavy+=("${name}"); done
 if ((memory_gb >= 16)); then
-  for name in "${heavy[@]}"; do run_stage "${name}" "stage_${name}" & background+=($!); done
+  for name in "${heavy[@]}"; do run_stage "${name}" "stage_${name}" & \
+    background+=($!); done
 fi
 
-if want fast; then run_stage fast stage_fast & background+=($!); stages+=(fast); fi
+if want fast; then run_stage fast stage_fast & background+=($!); \
+  stages+=(fast); fi
 if want site; then run_stage site stage_site & site_pid=$!; stages+=(site); fi
 if want e2e; then
   if ((e2e_needed)); then
     run_stage pw-install stage_pw_install & pw_pid=$!
   else
-    echo "0 0 not needed: every browser passed earlier" >"${logs}/pw-install.status"
+    echo "0 0 not needed: every browser passed earlier" \
+      >"${logs}/pw-install.status"
   fi
   stages+=(pw-install)
 fi
@@ -667,7 +725,8 @@ if want e2e; then
   if passed site && passed pw-install; then
     run_e2e
   else
-    for browser in "${BROWSERS[@]}"; do skip_stage "e2e-${browser}" "website or install failed"; done
+    for browser in "${BROWSERS[@]}"; do skip_stage "e2e-${browser}" \
+      "website or install failed"; done
   fi
   for browser in "${BROWSERS[@]}"; do stages+=("e2e-${browser}"); done
 elif want site; then
@@ -675,7 +734,8 @@ elif want site; then
 fi
 for pid in "${background[@]}"; do wait "${pid}" || true; done
 if ((memory_gb < 16)); then
-  for name in "${heavy[@]}"; do run_stage "${name}" "stage_${name}" || true; done
+  for name in "${heavy[@]}"; do run_stage "${name}" "stage_${name}" \
+    || true; done
 fi
 stages+=("${heavy[@]}")
 
@@ -685,7 +745,8 @@ failed=0
 echo
 printf '%-12s %-6s %8s  %s\n' Stage Result Time Log
 for name in "${stages[@]}"; do
-  read -r status seconds rest <"${logs}/${name}.status" || { status=1; seconds=0; }
+  read -r status seconds rest <"${logs}/${name}.status" \
+    || { status=1; seconds=0; }
   if [[ "${status}" == skip ]]; then
     result=NOT-RUN
     failed=1
@@ -695,12 +756,15 @@ for name in "${stages[@]}"; do
     result=FAIL
     failed=1
   fi
-  printf '%-12s %-6s %8s  %s\n' "${name}" "${result}" "$(duration "${seconds}")" \
+  printf '%-12s %-6s %8s  %s\n' "${name}" "${result}" \
+    "$(duration "${seconds}")" \
     "${rest:-${logs}/${name}.log}"
 done
 echo "Total: $(duration $((SECONDS - start)))"
 cached="$(cat "${logs}"/*.status 2>/dev/null | grep -c ' cached: ' || true)"
-((cached == 0)) || echo "${cached} stage(s) reused an earlier pass on the same inputs; --fresh reruns them."
+((cached == 0)) || echo \
+  "${cached} stage(s) reused an earlier pass on the same inputs;" \
+  "--fresh reruns them."
 
 # Every CI check this run did not perform, so no one mistakes a stamp for
 # more than it is.
@@ -710,15 +774,19 @@ echo "  - pull request title, description, linked issue and decision record:"
 echo "    run cargo xtask pr-check before opening the pull request"
 echo "  - dependency review of the pull request (GitHub only)"
 [[ -z "${GH_TOKEN:-}" ]] && want fast &&
-  echo "  - zizmor's online audits: no GH_TOKEN set, so only its offline audits ran"
+  echo "  - zizmor's online audits: no GH_TOKEN set, so only its offline" \
+      "audits ran"
 if ((release)) || want codeql; then
   echo "  - CodeQL for Rust: the macOS CodeQL CLI cannot extract Rust code"
 else
-  echo "  - CodeQL, coverage, release builds, budgets, ClamAV, external links and"
-  echo "    nightly results: run with --release (main and release branches need it)"
+  echo "  - CodeQL, coverage, release builds, budgets, ClamAV, external links" \
+      "and"
+  echo "    nightly results: run with --release (main and release branches" \
+    "need it)"
 fi
 if want e2e; then
-  echo "  - CI runs the UI suite in four shards of four workers per browser; here"
+  echo "  - CI runs the UI suite in four shards of four workers per browser;" \
+      "here"
   echo "    each browser runs whole, with ${workers} workers (same tests)"
 fi
 echo
@@ -738,10 +806,13 @@ mode=standard
 ((release)) && mode=release
 stamp_dir="${common}/vellum-gate"
 mkdir -p "${stamp_dir}"
-if ! grep -qx 'mode=release' "${stamp_dir}/${tree}" 2>/dev/null || ((release)); then
+if ! grep -qx 'mode=release' "${stamp_dir}/${tree}" 2>/dev/null \
+  || ((release)); then
   printf 'mode=%s\ncommit=%s\nbranch=%s\nstarted=%s\nrun=%s\n' \
-    "${mode}" "${sha}" "${branch}" "${started_at}" "${run_id}" >"${stamp_dir}/${tree}"
+    "${mode}" "${sha}" "${branch}" "${started_at}" \
+    "${run_id}" >"${stamp_dir}/${tree}"
 fi
-echo "Passed. Stamped tree ${tree:0:12} (${mode}). Push it with: scripts/dev/push.sh <branch> ${sha:0:12}"
+echo "Passed. Stamped tree ${tree:0:12} (${mode}). Push it with:" \
+    "scripts/dev/push.sh <branch> ${sha:0:12}"
 exit 0
 }

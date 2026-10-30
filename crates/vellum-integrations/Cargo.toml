@@ -3,7 +3,9 @@
 
 [package]
 name = "vellum-integrations"
-description = "Work integrations: Git automation, intake, imports, recurring issues, insights and AI triage."
+description = """\
+    Work integrations: Git automation, intake, imports, recurring issues, \
+    insights and AI triage."""
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -18,7 +20,9 @@ layer = "service"
 workspace = true
 
 [dependencies]
-axum = { version = "0.8.9", default-features = false, features = ["json", "tokio"] }
+axum.version = "0.8.9"
+axum.default-features = false
+axum.features = ["json", "tokio"]
 base64 = "0.23.1"
 hmac = "0.13.0"
 jiff = { version = "0.2.38", features = ["serde"] }

@@ -37,7 +37,8 @@ export class FakeRoom {
 
   constructor() {
     // The room keeps no awareness of its own.
-    // eslint-disable-next-line unicorn/no-null -- y-protocols removes a state with null
+    // Y-protocols removes a state with null.
+    // eslint-disable-next-line unicorn/no-null
     this.awareness.setLocalState(null);
   }
 

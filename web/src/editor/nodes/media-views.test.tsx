@@ -12,17 +12,20 @@ import { renderEditor } from "../test-editor";
 const page = (block: ReturnType<typeof embed>) => body(p("intro"), block);
 
 describe("LinkCardView", () => {
-  it("links a safe address in a new tab, titled and with its host", async () => {
-    await renderEditor(
-      page(linkCard("https://docs.example.com/guide", "The guide")),
-    );
-    const link = screen.getByRole("link", { name: /The guide/ });
-    expect(link.getAttribute("href")).toBe("https://docs.example.com/guide");
-    expect(link.getAttribute("target")).toBe("_blank");
-    expect(link.getAttribute("rel")).toBe("noopener noreferrer");
-    expect(link.textContent).toContain("docs.example.com");
-    expect(screen.queryByRole("textbox", { name: "Address" })).toBeNull();
-  });
+  it(
+    "links a safe address in a new tab, titled and with its " + "host",
+    async () => {
+      await renderEditor(
+        page(linkCard("https://docs.example.com/guide", "The guide")),
+      );
+      const link = screen.getByRole("link", { name: /The guide/ });
+      expect(link.getAttribute("href")).toBe("https://docs.example.com/guide");
+      expect(link.getAttribute("target")).toBe("_blank");
+      expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+      expect(link.textContent).toContain("docs.example.com");
+      expect(screen.queryByRole("textbox", { name: "Address" })).toBeNull();
+    },
+  );
 
   it("falls back to the address when it has no title", async () => {
     await renderEditor(page(linkCard("/p/123", "")));
@@ -137,23 +140,29 @@ describe("ImageView", () => {
     },
   };
 
-  it("shows a safe image with its alt text, width, caption and alignment", async () => {
-    await renderEditor(page(sized));
-    const picture = screen.getByRole("img", { name: "A chart" });
-    expect(picture.getAttribute("src")).toBe("/assets/chart.png");
-    expect(picture.style.width).toBe("50%");
-    expect(screen.getByText("Weekly").tagName).toBe("FIGCAPTION");
-    expect(picture.closest<HTMLElement>("[data-align]")?.dataset["align"]).toBe(
-      "left",
-    );
-  });
+  it(
+    "shows a safe image with its alt text, width, caption and " + "alignment",
+    async () => {
+      await renderEditor(page(sized));
+      const picture = screen.getByRole("img", { name: "A chart" });
+      expect(picture.getAttribute("src")).toBe("/assets/chart.png");
+      expect(picture.style.width).toBe("50%");
+      expect(screen.getByText("Weekly").tagName).toBe("FIGCAPTION");
+      expect(
+        picture.closest<HTMLElement>("[data-align]")?.dataset["align"],
+      ).toBe("left");
+    },
+  );
 
-  it("leaves the width to CSS and drops the caption when they are empty", async () => {
-    await renderEditor(page(image("https://example.com/a.png", "A")));
-    const picture = screen.getByRole("img", { name: "A" });
-    expect(picture.getAttribute("style")).toBeNull();
-    expect(document.querySelector("figcaption")).toBeNull();
-  });
+  it(
+    "leaves the width to CSS and drops the caption when they are " + "empty",
+    async () => {
+      await renderEditor(page(image("https://example.com/a.png", "A")));
+      const picture = screen.getByRole("img", { name: "A" });
+      expect(picture.getAttribute("style")).toBeNull();
+      expect(document.querySelector("figcaption")).toBeNull();
+    },
+  );
 
   it("refuses an unsafe source", async () => {
     await renderEditor(page(image("data:image/png;base64,AAAA", "x")));

@@ -82,9 +82,18 @@ export async function watchLayoutShift(page: Page): Promise<void> {
             window.__vellumCls += entry.value;
             for (const source of entry.sources ?? []) {
               const node = source.node;
-              const name = node && node.nodeType === 1 ? node.tagName.toLowerCase() + (node.id ? "#" + node.id : "") + (node.classList.length ? "." + [...node.classList].join(".") : "") : String(node && node.nodeName);
+              const name = node && node.nodeType === 1
+                ? node.tagName.toLowerCase() + (node.id ? "#" + node.id : "") +
+                  (node.classList.length
+                    ? "." + [...node.classList].join(".")
+                    : "")
+                : String(node && node.nodeName);
               const from = source.previousRect, to = source.currentRect;
-              window.__vellumShifts.push(name + " moved " + Math.round(from.x) + "," + Math.round(from.y) + " → " + Math.round(to.x) + "," + Math.round(to.y) + " at " + Math.round(entry.startTime) + " ms (" + entry.value.toFixed(3) + ")");
+              window.__vellumShifts.push(
+                name + " moved " + Math.round(from.x) + "," +
+                  Math.round(from.y) + " → " + Math.round(to.x) + "," +
+                  Math.round(to.y) + " at " + Math.round(entry.startTime) +
+                  " ms (" + entry.value.toFixed(3) + ")");
             }
           }
         }).observe({ type: "layout-shift", buffered: true });
@@ -211,7 +220,9 @@ export async function auditTarget(
     problems.push({
       rule: "layout-shift",
       target: "page",
-      message: `CLS ${cls.toFixed(3)} > ${String(CLS_LIMIT)}: ${shifts.slice(0, 3).join("; ")}`,
+      message:
+        `CLS ${cls.toFixed(3)} > ${String(CLS_LIMIT)}: ` +
+        shifts.slice(0, 3).join("; "),
     });
   }
 

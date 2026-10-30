@@ -42,12 +42,15 @@ describe("seedUpdate", () => {
     expect(twice.getXmlFragment(FIELD)).toHaveLength(2);
   });
 
-  it("keeps content a user deleted deleted when the seed is applied again", () => {
-    const seed = seedUpdate(schema, CONTENT);
-    const document_ = applied(seed);
-    document_.getXmlFragment(FIELD).delete(0, 1);
-    Y.applyUpdate(document_, seed);
-    expect(document_.getXmlFragment(FIELD)).toHaveLength(1);
-    expect(document_.getXmlFragment(FIELD).toJSON()).not.toContain("Hello");
-  });
+  it(
+    "keeps content a user deleted deleted when the seed is applied " + "again",
+    () => {
+      const seed = seedUpdate(schema, CONTENT);
+      const document_ = applied(seed);
+      document_.getXmlFragment(FIELD).delete(0, 1);
+      Y.applyUpdate(document_, seed);
+      expect(document_.getXmlFragment(FIELD)).toHaveLength(1);
+      expect(document_.getXmlFragment(FIELD).toJSON()).not.toContain("Hello");
+    },
+  );
 });

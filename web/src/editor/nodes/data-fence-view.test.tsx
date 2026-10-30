@@ -158,58 +158,68 @@ describe("DataFenceView", () => {
     expect((options as HTMLInputElement).readOnly).toBe(true);
   });
 
-  it("shows the schema's icon for its language, and a generic one otherwise", async () => {
-    const iconPath = (name: string) => {
-      const { container, unmount } = render(<Icon name={name} />);
-      const path = container.querySelector("path")?.getAttribute("d");
-      unmount();
-      return path;
-    };
-    const { editor } = await renderEditor(body(fence("chart", "values: [1]")));
-    expect(headIcon()).toBe(iconPath("bar_chart"));
-    act(() => {
-      editor.commands.command(({ tr }) => {
-        tr.setNodeAttribute(0, "lang", "sparkline");
-        return true;
+  it(
+    "shows the schema's icon for its language, and a generic one " +
+      "otherwise",
+    async () => {
+      const iconPath = (name: string) => {
+        const { container, unmount } = render(<Icon name={name} />);
+        const path = container.querySelector("path")?.getAttribute("d");
+        unmount();
+        return path;
+      };
+      const { editor } = await renderEditor(
+        body(fence("chart", "values: [1]")),
+      );
+      expect(headIcon()).toBe(iconPath("bar_chart"));
+      act(() => {
+        editor.commands.command(({ tr }) => {
+          tr.setNodeAttribute(0, "lang", "sparkline");
+          return true;
+        });
       });
-    });
-    await screen.findByText("sparkline");
-    expect(headIcon()).toBe(iconPath("data_object"));
-  });
+      await screen.findByText("sparkline");
+      expect(headIcon()).toBe(iconPath("data_object"));
+    },
+  );
 
   describe("with a server", () => {
-    it("shows the server's drawing, with the source behind the Source button", async () => {
-      const user = userEvent.setup();
-      const { api, spy } = fakeRender(() =>
-        Promise.resolve(
-          drawn(
-            '<article class="vl-doc"><ol ' +
-              'class="vl-timeline"><li>Kickoff</li></ol></article>',
+    it(
+      "shows the server's drawing, with the source behind the Source " +
+        "button",
+      async () => {
+        const user = userEvent.setup();
+        const { api, spy } = fakeRender(() =>
+          Promise.resolve(
+            drawn(
+              '<article class="vl-doc"><ol ' +
+                'class="vl-timeline"><li>Kickoff</li></ol></article>',
+            ),
           ),
-        ),
-      );
-      await renderEditor(body(fence("timeline", "2026-01-10 | Kickoff\n")), {
-        render: api,
-      });
-      expect(await preview().findByText("Kickoff")).toBeDefined();
-      expect(spy).toHaveBeenCalledWith({
-        lang: "timeline",
-        args: "",
-        source: "2026-01-10 | Kickoff\n",
-      });
-      expect(
-        document
-          .querySelector(".vl-fence-render")
-          ?.classList.contains("vl-render"),
-      ).toBe(true);
-      const source = screen.getByLabelText("timeline source");
-      expect(source.hidden).toBe(true);
-      const toggle = screen.getByRole("button", { name: "Source" });
-      expect(toggle.getAttribute("aria-pressed")).toBe("false");
-      await user.click(toggle);
-      expect(source.hidden).toBe(false);
-      expect(toggle.getAttribute("aria-pressed")).toBe("true");
-    });
+        );
+        await renderEditor(body(fence("timeline", "2026-01-10 | Kickoff\n")), {
+          render: api,
+        });
+        expect(await preview().findByText("Kickoff")).toBeDefined();
+        expect(spy).toHaveBeenCalledWith({
+          lang: "timeline",
+          args: "",
+          source: "2026-01-10 | Kickoff\n",
+        });
+        expect(
+          document
+            .querySelector(".vl-fence-render")
+            ?.classList.contains("vl-render"),
+        ).toBe(true);
+        const source = screen.getByLabelText("timeline source");
+        expect(source.hidden).toBe(true);
+        const toggle = screen.getByRole("button", { name: "Source" });
+        expect(toggle.getAttribute("aria-pressed")).toBe("false");
+        await user.click(toggle);
+        expect(source.hidden).toBe(false);
+        expect(toggle.getAttribute("aria-pressed")).toBe("true");
+      },
+    );
 
     it("opens the source of an empty block, to write it", async () => {
       const { api } = fakeRender(() =>
@@ -239,28 +249,32 @@ describe("DataFenceView", () => {
       ).toBeDefined();
     });
 
-    it("falls back to the client preview when the server cannot draw", async () => {
-      const { api } = fakeRender(() =>
-        Promise.reject(
-          new ApiError("unavailable", "The renderer is busy.", {
-            requestId: "req-9",
-            route: "POST /api/v1/render/block",
-          }),
-        ),
-      );
-      await renderEditor(body(fence("chart", "labels: [A]\nvalues: [3]\n")), {
-        render: api,
-      });
-      expect(
-        await preview().findByText(
-          "The block could not be drawn: The renderer is busy. (request req-9)",
-        ),
-      ).toBeDefined();
-      expect(preview().getByRole("img", { name: ": A 3" })).toBeDefined();
-      expect(
-        preview().getByRole("button", { name: "Copy diagnostic" }),
-      ).toBeDefined();
-    });
+    it(
+      "falls back to the client preview when the server cannot " + "draw",
+      async () => {
+        const { api } = fakeRender(() =>
+          Promise.reject(
+            new ApiError("unavailable", "The renderer is busy.", {
+              requestId: "req-9",
+              route: "POST /api/v1/render/block",
+            }),
+          ),
+        );
+        await renderEditor(body(fence("chart", "labels: [A]\nvalues: [3]\n")), {
+          render: api,
+        });
+        expect(
+          await preview().findByText(
+            "The block could not be drawn: The renderer is busy. (request " +
+              "req-9)",
+          ),
+        ).toBeDefined();
+        expect(preview().getByRole("img", { name: ": A 3" })).toBeDefined();
+        expect(
+          preview().getByRole("button", { name: "Copy diagnostic" }),
+        ).toBeDefined();
+      },
+    );
 
     it("keeps collections on the client preview", async () => {
       const { api, spy } = fakeRender(() =>

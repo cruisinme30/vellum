@@ -106,13 +106,16 @@ describe("pages on a server", () => {
     expect(screen.getByRole("heading", { name: /Mine/ })).toBeDefined();
   });
 
-  it("says the pages are loading rather than that a page is missing", async () => {
-    renderServer("/p/P1", fakeDrive({ hold: true }));
-    expect(
-      await screen.findByText("Loading your pages…", {}, { timeout: 5000 }),
-    ).toBeDefined();
-    expect(screen.queryByText("This page does not exist")).toBeNull();
-  });
+  it(
+    "says the pages are loading rather than that a page is " + "missing",
+    async () => {
+      renderServer("/p/P1", fakeDrive({ hold: true }));
+      expect(
+        await screen.findByText("Loading your pages…", {}, { timeout: 5000 }),
+      ).toBeDefined();
+      expect(screen.queryByText("This page does not exist")).toBeNull();
+    },
+  );
 
   it(
     "opens a page shared on its own, outside every space the person can " +
@@ -131,15 +134,18 @@ describe("pages on a server", () => {
     },
   );
 
-  it("says a page does not exist when the server has none by that ID", async () => {
-    renderServer("/p/NOPE", fakeDrive());
-    expect(
-      await screen.findByRole("heading", {
-        level: 1,
-        name: "This page does not exist",
-      }),
-    ).toBeDefined();
-  });
+  it(
+    "says a page does not exist when the server has none by that " + "ID",
+    async () => {
+      renderServer("/p/NOPE", fakeDrive());
+      expect(
+        await screen.findByRole("heading", {
+          level: 1,
+          name: "This page does not exist",
+        }),
+      ).toBeDefined();
+    },
+  );
 
   it("shows a folder as the list of pages in it", async () => {
     renderServer("/p/F1", fakeDrive());

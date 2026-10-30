@@ -8,7 +8,9 @@
 
 [[IgnoredVulns]]
 id = "RUSTSEC-2026-0215"
-reason = "smallstr is unmaintained, not vulnerable; pulled by yrs with no safe upgrade yet"
+reason = """\
+    smallstr is unmaintained, not vulnerable; pulled by yrs with no safe \
+    upgrade yet"""
 
 [[IgnoredVulns]]
 id = "RUSTSEC-2025-0141"
@@ -20,11 +22,15 @@ reason = "paste unmaintained; a build-time proc-macro of biblatex"
 
 [[IgnoredVulns]]
 id = "RUSTSEC-2026-0194"
-reason = "quick-xml 0.38 in citationberg; export never parses CSL or bibliography XML"
+reason = """\
+    quick-xml 0.38 in citationberg; export never parses CSL or bibliography \
+    XML"""
 
 [[IgnoredVulns]]
 id = "RUSTSEC-2026-0195"
-reason = "quick-xml 0.38 NsReader in citationberg; export never parses CSL or bibliography XML"
+reason = """\
+    quick-xml 0.38 NsReader in citationberg; export never parses CSL or \
+    bibliography XML"""
 
 [[IgnoredVulns]]
 id = "RUSTSEC-2026-0206"
@@ -32,7 +38,8 @@ reason = "rustybuzz unmaintained; Typst's shaper only sees our bundled fonts"
 
 [[IgnoredVulns]]
 id = "RUSTSEC-2026-0192"
-reason = "ttf-parser unmaintained; Typst's font reader only sees our bundled fonts"
+reason = """\
+    ttf-parser unmaintained; Typst's font reader only sees our bundled fonts"""
 
 [[IgnoredVulns]]
 id = "RUSTSEC-2024-0449"
@@ -48,4 +55,6 @@ reason = "yaml-rust unmaintained; syntect YAML grammars are never loaded"
 # then reused after catch_unwind; no Vellum code catches a panic around a
 # hasher, and 0.10 has no fixed release. Our own crates use 0.12.1.
 id = "GHSA-qwgh-2vcv-g2f7"
-reason = "only reachable by reusing a hasher after a caught panic, which Vellum never does; no fixed 0.10 release"
+reason = """\
+    only reachable by reusing a hasher after a caught panic, which Vellum \
+    never does; no fixed 0.10 release"""

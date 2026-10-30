@@ -22,7 +22,9 @@
   --vb-line: #dde3ea;
   --vb-line-strong: #c4c7c5;
   --vb-primary: #0b57d0;
-  --vb-font: "Google Sans Flex", "Vellum Sans Fallback", "Google Sans", Roboto, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --vb-font:
+    "Google Sans Flex", "Vellum Sans Fallback", "Google Sans", Roboto,
+    system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
   --vb-height: 64px;
 }
 :root[data-theme="dark"] {
@@ -135,7 +137,8 @@
   outline-offset: 2px;
 }
 
-/* The light and dark toggle (theme.js, D308): a moon in light, a sun in dark. */
+/* The light and dark toggle (theme.js, D308): a moon in light, a sun in dark.
+ */
 .vellum-site .theme-toggle {
   display: inline-grid;
   place-items: center;

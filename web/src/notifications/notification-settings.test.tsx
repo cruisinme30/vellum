@@ -152,37 +152,42 @@ describe("the notification settings screen", () => {
     ]);
   });
 
-  it("shows load and save errors with the request ID, and retries", async () => {
-    const failing: NotificationPreferencesStore = {
-      load: vi
-        .fn()
-        .mockRejectedValueOnce(
-          new ApiError("unavailable", "The server is busy.", {
-            requestId: "01JR",
-          }),
-        )
-        .mockResolvedValue(DEFAULT_PREFERENCES),
-      save: vi
-        .fn()
-        .mockRejectedValue(new ApiError("invalid_input", "Too many mutes.")),
-    };
-    const { user } = renderSettings({ store: failing });
-    const loadAlert = await screen.findByRole("alert");
-    expect(loadAlert.textContent).toContain(
-      "The server is busy. (request 01JR)",
-    );
-    await user.click(screen.getByRole("button", { name: "Try again" }));
-    await user.click(
-      await screen.findByRole("checkbox", { name: "Push for Status changes" }),
-    );
-    await user.click(screen.getByRole("button", { name: "Save" }));
-    const saveAlert = await screen.findByRole("alert");
-    expect(saveAlert.textContent).toContain("Too many mutes.");
-    // The edit is still there to save again.
-    expect(
-      screen.getByRole("checkbox", { name: "Push for Status changes" }),
-    ).toHaveProperty("checked", true);
-  });
+  it(
+    "shows load and save errors with the request ID, and " + "retries",
+    async () => {
+      const failing: NotificationPreferencesStore = {
+        load: vi
+          .fn()
+          .mockRejectedValueOnce(
+            new ApiError("unavailable", "The server is busy.", {
+              requestId: "01JR",
+            }),
+          )
+          .mockResolvedValue(DEFAULT_PREFERENCES),
+        save: vi
+          .fn()
+          .mockRejectedValue(new ApiError("invalid_input", "Too many mutes.")),
+      };
+      const { user } = renderSettings({ store: failing });
+      const loadAlert = await screen.findByRole("alert");
+      expect(loadAlert.textContent).toContain(
+        "The server is busy. (request 01JR)",
+      );
+      await user.click(screen.getByRole("button", { name: "Try again" }));
+      await user.click(
+        await screen.findByRole("checkbox", {
+          name: "Push for Status changes",
+        }),
+      );
+      await user.click(screen.getByRole("button", { name: "Save" }));
+      const saveAlert = await screen.findByRole("alert");
+      expect(saveAlert.textContent).toContain("Too many mutes.");
+      // The edit is still there to save again.
+      expect(
+        screen.getByRole("checkbox", { name: "Push for Status changes" }),
+      ).toHaveProperty("checked", true);
+    },
+  );
 
   it("marks urgent kinds and labels every checkbox", async () => {
     renderSettings({

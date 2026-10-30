@@ -35,10 +35,14 @@ impl Scanner for NoVirus {
 }
 
 const ISSUES: &str = r#"[
-  {"number": 7, "title": "Crash on save", "body": "Steps to reproduce.", "state": "open",
-   "created_at": "2026-10-01T09:00:00Z", "user": {"login": "dana"}, "labels": [{"name": "bug"}]},
-  {"number": 9, "title": "Ship dark mode", "body": "", "state": "closed", "state_reason": "completed",
-   "created_at": "2026-10-02T09:00:00Z", "closed_at": "2026-10-05T09:00:00Z", "user": {"login": "lee"}},
+  {"number": 7, "title": "Crash on save", "body": "Steps to reproduce.",
+    "state": "open",
+   "created_at": "2026-10-01T09:00:00Z", "user": {"login": "dana"},
+     "labels": [{"name": "bug"}]},
+  {"number": 9, "title": "Ship dark mode", "body": "", "state": "closed",
+    "state_reason": "completed",
+   "created_at": "2026-10-02T09:00:00Z", "closed_at": "2026-10-05T09:00:00Z",
+     "user": {"login": "lee"}},
   {"number": 10, "title": "Add search", "state": "open", "pull_request": {},
    "created_at": "2026-10-03T09:00:00Z"}
 ]"#;

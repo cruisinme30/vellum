@@ -162,11 +162,13 @@ fn close_in_background(
                     });
                     if closed.is_err() {
                         tracing::warn!(
-                            "index connections still in use after {CLOSE_TIMEOUT:?}; not waiting"
+                            "index connections still in use after \
+                                {CLOSE_TIMEOUT:?}; not waiting"
                         );
                     }
                 }
-                Err(error) => tracing::warn!(%error, "could not close the index on drop"),
+                Err(error) => tracing::warn!(%error, "could not close the \
+                    index on drop"),
             }
         });
     if let Err(error) = &spawned {

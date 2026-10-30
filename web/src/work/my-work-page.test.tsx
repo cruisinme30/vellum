@@ -103,13 +103,16 @@ describe("My Work rows", () => {
     },
   );
 
-  it("marks overdue tasks, names their list and heads a day by its date", async () => {
-    renderPage();
-    const row = around(await screen.findByText("Renew passport"), "li");
-    expect(row.className).toContain("vl-task-overdue");
-    expect(within(row).getByText("#home")).toBeDefined();
-    expect(screen.getByRole("heading", { name: "2026-11-02" })).toBeDefined();
-  });
+  it(
+    "marks overdue tasks, names their list and heads a day by its " + "date",
+    async () => {
+      renderPage();
+      const row = around(await screen.findByText("Renew passport"), "li");
+      expect(row.className).toContain("vl-task-overdue");
+      expect(within(row).getByText("#home")).toBeDefined();
+      expect(screen.getByRole("heading", { name: "2026-11-02" })).toBeDefined();
+    },
+  );
 
   it("does not drag or move a finished task", async () => {
     renderPage();
@@ -133,20 +136,23 @@ describe("My Work rows", () => {
     expect(move).not.toHaveBeenCalled();
   });
 
-  it("ignores drags that carry no task, and tasks it does not know", async () => {
-    const { move } = renderPage();
-    await screen.findByRole("heading", { name: "2026-11-02" });
-    const section = sectionOf("2026-11-02");
-    const other = transfer(["text/plain"], "");
-    expect(fireEvent.dragOver(section, { dataTransfer: other })).toBe(true);
-    fireEvent.drop(section, { dataTransfer: other });
-    fireEvent.drop(section, { dataTransfer: transfer([TASK_DRAG], "nope") });
-    expect(move).not.toHaveBeenCalled();
-    // Done completes tasks rather than taking drops.
-    const done = sectionOf("Done");
-    fireEvent.drop(done, { dataTransfer: transfer([TASK_DRAG], "D2.b1") });
-    expect(move).not.toHaveBeenCalled();
-  });
+  it(
+    "ignores drags that carry no task, and tasks it does not " + "know",
+    async () => {
+      const { move } = renderPage();
+      await screen.findByRole("heading", { name: "2026-11-02" });
+      const section = sectionOf("2026-11-02");
+      const other = transfer(["text/plain"], "");
+      expect(fireEvent.dragOver(section, { dataTransfer: other })).toBe(true);
+      fireEvent.drop(section, { dataTransfer: other });
+      fireEvent.drop(section, { dataTransfer: transfer([TASK_DRAG], "nope") });
+      expect(move).not.toHaveBeenCalled();
+      // Done completes tasks rather than taking drops.
+      const done = sectionOf("Done");
+      fireEvent.drop(done, { dataTransfer: transfer([TASK_DRAG], "D2.b1") });
+      expect(move).not.toHaveBeenCalled();
+    },
+  );
 
   it("moves a dropped task onto an Upcoming day", async () => {
     const { move } = renderPage();

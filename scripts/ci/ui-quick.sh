@@ -35,5 +35,7 @@ if [[ -z "${UI_CHROMIUM_PATH:-}" ]]; then
   done
 fi
 
-UI_SCOPE=quick UI_BROWSERS=chromium UI_VIEWPORTS=phone,laptop UI_SITE_DIR="${site}" \
-  exec pnpm exec playwright test e2e/ui --workers="${UI_WORKERS:-4}" --reporter=line "$@"
+UI_SCOPE=quick UI_BROWSERS=chromium UI_VIEWPORTS=phone,laptop \
+  UI_SITE_DIR="${site}" \
+  exec pnpm exec playwright test e2e/ui --workers="${UI_WORKERS:-4}" \
+  --reporter=line "$@"

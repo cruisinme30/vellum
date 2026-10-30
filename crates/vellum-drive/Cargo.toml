@@ -3,7 +3,9 @@
 
 [package]
 name = "vellum-drive"
-description = "The drive: spaces, folders, pages, trash, move and copy, shortcuts, stars, recents, activity, backlinks, quotas and version history."
+description = """\
+    The drive: spaces, folders, pages, trash, move and copy, shortcuts, \
+    stars, recents, activity, backlinks, quotas and version history."""
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -22,9 +24,13 @@ async-trait = "0.1.92"
 bytes = "1.12.1"
 futures = "0.3.34"
 opentelemetry = "0.33.1"
-schemars = { version = "1.2.3", default-features = false, features = ["std", "derive"] }
+schemars.version = "1.2.3"
+schemars.default-features = false
+schemars.features = ["std", "derive"]
 serde = { version = "1.0.229", features = ["derive"] }
-serde-saphyr = { version = "2.0.0", default-features = false, features = ["serialize", "deserialize"] }
+serde-saphyr.version = "2.0.0"
+serde-saphyr.default-features = false
+serde-saphyr.features = ["serialize", "deserialize"]
 thiserror = "2.0.21"
 tracing = "0.1.44"
 vellum-authz = { path = "../vellum-authz" }

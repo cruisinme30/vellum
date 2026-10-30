@@ -30,19 +30,25 @@ in a terminal, a side-by-side diff and a review on a phone.
 
 ### D320: every line fits in 80 characters
 
-- rustfmt `max_width`, Prettier `printWidth` (web and desktop) and
-  `.editorconfig` are set to 80; yamllint `line-length` and markdownlint
-  MD013 follow once the old lines they would flag are wrapped.
+- rustfmt `max_width`, Prettier `printWidth` (web and desktop),
+  markdownlint MD013 and `.editorconfig` are set to 80. yamllint's own
+  length rule is off: it cannot make the exemptions below, so the check
+  holds YAML to 80 like every other file.
 - `scripts/ci/check-line-length.sh` fails on longer lines. The pre-commit
   hook runs it on the lines a commit adds; without arguments it checks the
   whole tree.
-- Exempt are only lines that can't be wrapped: a line that fits once its
-  URLs are removed, Markdown table rows, binary files, and files marked
-  `line-length=off` in `.gitattributes` (lockfiles, generated files,
-  licence texts, test data whose exact bytes are compared, and Fluent
-  messages, whose line breaks are part of the text).
+- Exempt are only lines that can't be wrapped, listed in the script:
+  one word; a line that fits once its URLs and pinned hashes are removed;
+  Markdown headings, tables, code examples, fence openers and one-line
+  fields (also in Rust doc comments); JSON lines holding one string; ESLint
+  next-line directives and one-name imports, which Prettier keeps on one
+  line; binary files; and files marked `line-length=off` in
+  `.gitattributes` (lockfiles, generated files, licence texts, test data
+  whose exact bytes are compared, and Fluent messages, whose line breaks
+  are part of the text).
 - Long strings are split without changing their value: a `\` line
-  continuation or `concat!` in Rust, `+` in TypeScript.
+  continuation or `concat!` in Rust, `+` in TypeScript, folded blocks in
+  YAML, multi-line strings in TOML.
 - Size limits counted lines at 100 columns, so they grow by the same
   quarter: ESLint `max-lines` from 400 to 500, clippy's
   `too-many-lines-threshold` from 100 to 125.
@@ -59,11 +65,11 @@ in a terminal, a side-by-side diff and a review on a phone.
 
 ## Consequences
 
-- rustfmt and Prettier could not wrap every old line: long strings and
-  macros, shell scripts, workflows, site HTML and CSS, and config files
-  still hold about 2,000. A follow-up wraps them, sets yamllint and
-  markdownlint to 80, and has the Fast suite run the whole-tree check so
-  CI enforces the limit too.
+- The formatters left about 2,000 old lines too long. A second pass
+  wrapped all but about 80 in Rust (test data strings, signatures rustfmt
+  keeps on one line); those need rustfmt to check the result. Once they
+  are done, the Fast suite runs the whole-tree check so CI enforces the
+  limit too; until then the commit hook guards every new line.
 - Open branches conflict with the reformat. They rebase by running
   rustfmt and Prettier, then fixing what the check reports.
 - Code formatted at 100 columns now wraps more; generated Rust and

@@ -62,37 +62,45 @@ function renderPage(api?: ConnectionsApi) {
 }
 
 describe("My Work settings", () => {
-  it("issues and turns off the calendar feed, and makes a CalDAV app password", async () => {
-    const api = fakeApi();
-    const user = renderPage(api);
-    expect(
-      await screen.findByRole("textbox", { name: "CalDAV account URL" }),
-    ).toHaveProperty("value", VIEW.caldav_url);
-    await user.click(
-      screen.getByRole("button", { name: "Get a new feed URL" }),
-    );
-    expect(
-      await screen.findByRole("textbox", { name: "Your calendar feed URL" }),
-    ).toHaveProperty(
-      "value",
-      "https://vellum.northstar.dev/feeds/tasks/abc.ics",
-    );
-    await user.click(screen.getByRole("button", { name: "Turn the feed off" }));
-    expect(
-      await screen.findByText("The feed is off. Its URL no longer works."),
-    ).toBeDefined();
-    expect(
-      screen.queryByRole("textbox", { name: "Your calendar feed URL" }),
-    ).toBeNull();
+  it(
+    "issues and turns off the calendar feed, and makes a CalDAV app " +
+      "password",
+    async () => {
+      const api = fakeApi();
+      const user = renderPage(api);
+      expect(
+        await screen.findByRole("textbox", { name: "CalDAV account URL" }),
+      ).toHaveProperty("value", VIEW.caldav_url);
+      await user.click(
+        screen.getByRole("button", { name: "Get a new feed URL" }),
+      );
+      expect(
+        await screen.findByRole("textbox", { name: "Your calendar feed URL" }),
+      ).toHaveProperty(
+        "value",
+        "https://vellum.northstar.dev/feeds/tasks/abc.ics",
+      );
+      await user.click(
+        screen.getByRole("button", { name: "Turn the feed off" }),
+      );
+      expect(
+        await screen.findByText("The feed is off. Its URL no longer works."),
+      ).toBeDefined();
+      expect(
+        screen.queryByRole("textbox", { name: "Your calendar feed URL" }),
+      ).toBeNull();
 
-    await user.click(
-      screen.getByRole("button", { name: "Make an app password" }),
-    );
-    expect(api.appPassword).toHaveBeenCalledWith("CalDAV task app");
-    expect(
-      await screen.findByRole("textbox", { name: "App password (shown once)" }),
-    ).toHaveProperty("value", "vt_secret");
-  });
+      await user.click(
+        screen.getByRole("button", { name: "Make an app password" }),
+      );
+      expect(api.appPassword).toHaveBeenCalledWith("CalDAV task app");
+      expect(
+        await screen.findByRole("textbox", {
+          name: "App password (shown once)",
+        }),
+      ).toHaveProperty("value", "vt_secret");
+    },
+  );
 
   it("issues a capture address and explains how Slack connects", async () => {
     const api = fakeApi();
@@ -110,17 +118,21 @@ describe("My Work settings", () => {
     expect(api.revokeCapture).toHaveBeenCalledOnce();
   });
 
-  it("disconnects a linked Slack account, and says when capture is not set up", async () => {
-    const linked = fakeApi({ ...VIEW, slack_linked: true });
-    const user = renderPage(linked);
-    await user.click(
-      await screen.findByRole("button", { name: "Disconnect Slack" }),
-    );
-    expect(linked.unlinkSlack).toHaveBeenCalledOnce();
-    await waitFor(() => {
-      expect(linked.connections).toHaveBeenCalledTimes(2);
-    });
-  });
+  it(
+    "disconnects a linked Slack account, and says when capture is not set " +
+      "up",
+    async () => {
+      const linked = fakeApi({ ...VIEW, slack_linked: true });
+      const user = renderPage(linked);
+      await user.click(
+        await screen.findByRole("button", { name: "Disconnect Slack" }),
+      );
+      expect(linked.unlinkSlack).toHaveBeenCalledOnce();
+      await waitFor(() => {
+        expect(linked.connections).toHaveBeenCalledTimes(2);
+      });
+    },
+  );
 
   it("says what the server does not offer", async () => {
     renderPage(fakeApi({ ...VIEW, email: false, slack: false }));

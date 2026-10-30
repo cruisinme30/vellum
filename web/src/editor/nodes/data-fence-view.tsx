@@ -44,7 +44,8 @@ function ChartSvg({ chart }: { readonly chart: ChartPreview }) {
   const line = chart.type === "line" || chart.type === "area";
   const points = chart.values.map(
     (v, index) =>
-      `${String(index * step + step / 2)},${String(height - (v / max) * (height - 10))}`,
+      String(index * step + step / 2) +
+      `,${String(height - (v / max) * (height - 10))}`,
   );
   return (
     <figure className="vl-chart">

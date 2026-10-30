@@ -7,16 +7,21 @@ import { TRACE } from "./fixtures";
 import { formatDuration, waterfallRows } from "./layout";
 
 describe("waterfall layout", () => {
-  it("orders browser spans, then the server tree depth-first, then orphans", () => {
-    const rows = waterfallRows(TRACE);
-    expect(rows.map((r) => `${r.lane}:${r.name}:${String(r.depth)}`)).toEqual([
-      "browser:navigation:0",
-      "server:http.request:0",
-      "server:authz.check:1",
-      "server:db.query:2",
-      "server:orphan:0",
-    ]);
-  });
+  it(
+    "orders browser spans, then the server tree depth-first, then " + "orphans",
+    () => {
+      const rows = waterfallRows(TRACE);
+      expect(rows.map((r) => `${r.lane}:${r.name}:${String(r.depth)}`)).toEqual(
+        [
+          "browser:navigation:0",
+          "server:http.request:0",
+          "server:authz.check:1",
+          "server:db.query:2",
+          "server:orphan:0",
+        ],
+      );
+    },
+  );
 
   it(
     "scales bars to the whole timeline, including browser time before the " +

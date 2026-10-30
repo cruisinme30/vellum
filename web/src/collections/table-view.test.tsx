@@ -102,29 +102,32 @@ describe("TableView", () => {
     expect(document.activeElement).toBe(cell(1, 0));
   });
 
-  it("edits text with Enter, keeps it with Enter and drops it with Escape", async () => {
-    const { user, cell, focus, query } = await renderTable();
-    focus(1, 0);
-    await user.keyboard("{Enter}");
-    const input = within(cell(1, 0)).getByRole("textbox", {
-      name: "Issue of Trace sampling knobs",
-    });
-    expect(document.activeElement).toBe(input);
-    await user.clear(input);
-    await user.type(input, "Trace sampling controls{Enter}");
-    expect(
-      await within(cell(1, 0)).findByText("Trace sampling controls"),
-    ).toBeDefined();
-    expect(document.activeElement).toBe(cell(1, 0));
-    const result = await query();
-    expect(result.groups[0]?.rows[0]?.title).toBe("Trace sampling controls");
+  it(
+    "edits text with Enter, keeps it with Enter and drops it with " + "Escape",
+    async () => {
+      const { user, cell, focus, query } = await renderTable();
+      focus(1, 0);
+      await user.keyboard("{Enter}");
+      const input = within(cell(1, 0)).getByRole("textbox", {
+        name: "Issue of Trace sampling knobs",
+      });
+      expect(document.activeElement).toBe(input);
+      await user.clear(input);
+      await user.type(input, "Trace sampling controls{Enter}");
+      expect(
+        await within(cell(1, 0)).findByText("Trace sampling controls"),
+      ).toBeDefined();
+      expect(document.activeElement).toBe(cell(1, 0));
+      const result = await query();
+      expect(result.groups[0]?.rows[0]?.title).toBe("Trace sampling controls");
 
-    await user.keyboard("{F2}");
-    await user.keyboard("{Control>}a{/Control}Nope{Escape}");
-    expect(within(cell(1, 0)).queryByRole("textbox")).toBeNull();
-    expect(cell(1, 0).textContent).toContain("Trace sampling controls");
-    expect(document.activeElement).toBe(cell(1, 0));
-  });
+      await user.keyboard("{F2}");
+      await user.keyboard("{Control>}a{/Control}Nope{Escape}");
+      expect(within(cell(1, 0)).queryByRole("textbox")).toBeNull();
+      expect(cell(1, 0).textContent).toContain("Trace sampling controls");
+      expect(document.activeElement).toBe(cell(1, 0));
+    },
+  );
 
   it("explains a number it cannot read and keeps the editor open", async () => {
     const { user, cell, focus } = await renderTable();
@@ -143,21 +146,24 @@ describe("TableView", () => {
     expect(await within(cell(1, ESTIMATE)).findByText("8")).toBeDefined();
   });
 
-  it("keeps an edit when focus leaves, and drops one that does not parse", async () => {
-    const { user, cell, focus } = await renderTable();
-    focus(1, ESTIMATE);
-    await user.keyboard("{Enter}");
-    await user.clear(within(cell(1, ESTIMATE)).getByRole("textbox"));
-    await user.type(within(cell(1, ESTIMATE)).getByRole("textbox"), "13");
-    await user.click(cell(2, 0));
-    expect(await within(cell(1, ESTIMATE)).findByText("13")).toBeDefined();
+  it(
+    "keeps an edit when focus leaves, and drops one that does not " + "parse",
+    async () => {
+      const { user, cell, focus } = await renderTable();
+      focus(1, ESTIMATE);
+      await user.keyboard("{Enter}");
+      await user.clear(within(cell(1, ESTIMATE)).getByRole("textbox"));
+      await user.type(within(cell(1, ESTIMATE)).getByRole("textbox"), "13");
+      await user.click(cell(2, 0));
+      expect(await within(cell(1, ESTIMATE)).findByText("13")).toBeDefined();
 
-    await user.dblClick(cell(2, ESTIMATE));
-    await user.type(within(cell(2, ESTIMATE)).getByRole("textbox"), "x");
-    await user.click(cell(3, 0));
-    expect(within(cell(2, ESTIMATE)).queryByRole("textbox")).toBeNull();
-    expect(cell(2, ESTIMATE).textContent).toBe("5");
-  });
+      await user.dblClick(cell(2, ESTIMATE));
+      await user.type(within(cell(2, ESTIMATE)).getByRole("textbox"), "x");
+      await user.click(cell(3, 0));
+      expect(within(cell(2, ESTIMATE)).queryByRole("textbox")).toBeNull();
+      expect(cell(2, ESTIMATE).textContent).toBe("5");
+    },
+  );
 
   it("edits a date", async () => {
     const { user, cell, focus } = await renderTable();
@@ -257,23 +263,26 @@ describe("TableView", () => {
     },
   );
 
-  it("shows a refused write inline and clears it after a good one", async () => {
-    const { user, cell, focus, collections } = await renderTable();
-    const spy = vi
-      .spyOn(collections, "updateRow")
-      .mockRejectedValueOnce(new Error("conflict: the file changed on disk"));
-    focus(1, 0);
-    await user.keyboard("{Enter}x{Enter}");
-    const alert = await within(cell(1, 0)).findByRole("alert");
-    expect(alert.textContent).toBe("conflict: the file changed on disk");
-    expect(cell(1, 0).getAttribute("aria-invalid")).toBe("true");
-    spy.mockRestore();
-    await user.keyboard("{Enter}y{Enter}");
-    expect(
-      await within(cell(1, 0)).findByText("Trace sampling knobsy"),
-    ).toBeDefined();
-    expect(within(cell(1, 0)).queryByRole("alert")).toBeNull();
-  });
+  it(
+    "shows a refused write inline and clears it after a good " + "one",
+    async () => {
+      const { user, cell, focus, collections } = await renderTable();
+      const spy = vi
+        .spyOn(collections, "updateRow")
+        .mockRejectedValueOnce(new Error("conflict: the file changed on disk"));
+      focus(1, 0);
+      await user.keyboard("{Enter}x{Enter}");
+      const alert = await within(cell(1, 0)).findByRole("alert");
+      expect(alert.textContent).toBe("conflict: the file changed on disk");
+      expect(cell(1, 0).getAttribute("aria-invalid")).toBe("true");
+      spy.mockRestore();
+      await user.keyboard("{Enter}y{Enter}");
+      expect(
+        await within(cell(1, 0)).findByText("Trace sampling knobsy"),
+      ).toBeDefined();
+      expect(within(cell(1, 0)).queryByRole("alert")).toBeNull();
+    },
+  );
 
   it("does not write a value that did not change", async () => {
     const { user, focus, collections } = await renderTable();

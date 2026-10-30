@@ -131,7 +131,9 @@ export function Links({
                   {t(linkState(link))}
                   {link.has_password && ` · ${t("share-link-has-password")}`}
                   {link.expires_at != undefined &&
-                    ` · ${t("share-until-date", { date: DATE.format(new Date(link.expires_at)) })}`}
+                    ` · ${t("share-until-date", {
+                      date: DATE.format(new Date(link.expires_at)),
+                    })}`}
                 </small>
               </span>
               {link.live && (

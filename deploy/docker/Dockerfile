@@ -46,7 +46,8 @@ WORKDIR /src
 # pinned by digest.
 # hadolint ignore=DL3008
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends musl-tools perl make binutils \
+    && apt-get install -y --no-install-recommends \
+        musl-tools perl make binutils \
     && rm -rf /var/lib/apt/lists/*
 # Use the image's toolchain (the same version as rust-toolchain.toml)
 # without downloading the extra components the file asks for. The musl
@@ -54,7 +55,8 @@ RUN apt-get update \
 ENV RUSTUP_TOOLCHAIN=1.97.0 \
     CARGO_INCREMENTAL=0 \
     CARGO_TERM_COLOR=never \
-    RUSTFLAGS="--remap-path-prefix=/src=. --remap-path-prefix=/usr/local/cargo=cargo" \
+    RUSTFLAGS="--remap-path-prefix=/src=. \
+--remap-path-prefix=/usr/local/cargo=cargo" \
     SOURCE_DATE_EPOCH=0
 RUN case "${TARGETARCH}" in \
       amd64) triple=x86_64-unknown-linux-musl ;; \
@@ -78,12 +80,14 @@ COPY --from=web /src/web/dist web/dist
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     triple="$(cat /target)" \
     && export "CC_$(echo "${triple}" | tr - _)=musl-gcc" \
-    && cargo build --release --locked --package vellum-cli --target "${triple}" \
+    && cargo build --release --locked --package vellum-cli \
+        --target "${triple}" \
     && mkdir -p /out \
     && cp "target/${triple}/release/vellum" /out/vellum \
     && headers="$(readelf --program-headers --dynamic --wide /out/vellum)" \
     && if grep -E 'INTERP|\(NEEDED\)' <<<"${headers}" >&2; then \
-         echo "error: the vellum binary is dynamically linked; the runtime image needs a static binary" >&2; \
+         echo "error: the vellum binary is dynamically linked;" \
+           "the runtime image needs a static binary" >&2; \
          exit 1; \
        fi
 
@@ -107,7 +111,8 @@ ARG TARGETARCH
 ARG VERSION=0.0.0
 ARG REVISION=unknown
 LABEL org.opencontainers.image.title="Vellum" \
-      org.opencontainers.image.description="Self-hosted workspace where every object is a Markdown file" \
+      org.opencontainers.image.description="Self-hosted workspace where \
+every object is a Markdown file" \
       org.opencontainers.image.source="https://github.com/cruisinme30/vellum" \
       org.opencontainers.image.licenses="AGPL-3.0-only" \
       org.opencontainers.image.version="${VERSION}" \

@@ -103,24 +103,28 @@ describe("QuickAddForm", () => {
     );
   });
 
-  it("says a rule repeats on schedule when it does not count from completion", async () => {
-    const { api } = fakeApi({
-      parse: (text) => {
-        const parsed = fullParse(text);
-        return Promise.resolve({
-          ...parsed,
-          fields: { ...parsed.fields, recur_from: NONE },
-        });
-      },
-    });
-    const { user } = renderForm(api);
-    await user.type(
-      screen.getByRole("textbox", { name: "Add a task" }),
-      "Pay rent",
-    );
-    expect(await screen.findByText(/^Repeats: /)).toBeDefined();
-    expect(screen.queryByText(/Repeats after done/)).toBeNull();
-  });
+  it(
+    "says a rule repeats on schedule when it does not count from " +
+      "completion",
+    async () => {
+      const { api } = fakeApi({
+        parse: (text) => {
+          const parsed = fullParse(text);
+          return Promise.resolve({
+            ...parsed,
+            fields: { ...parsed.fields, recur_from: NONE },
+          });
+        },
+      });
+      const { user } = renderForm(api);
+      await user.type(
+        screen.getByRole("textbox", { name: "Add a task" }),
+        "Pay rent",
+      );
+      expect(await screen.findByText(/^Repeats: /)).toBeDefined();
+      expect(screen.queryByText(/Repeats after done/)).toBeNull();
+    },
+  );
 
   it("shows no facts list when the parse sets nothing", async () => {
     const parse = vi.fn<WorkApi["parse"]>((text) =>

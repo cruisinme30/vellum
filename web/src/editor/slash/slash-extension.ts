@@ -29,7 +29,8 @@ export function place(element: HTMLElement, rect: DOMRect | null | undefined) {
   const below = rect.bottom + 6;
   const room = globalThis.innerHeight - below;
   element.style.position = "fixed";
-  element.style.left = `${String(Math.max(8, Math.min(rect.left, globalThis.innerWidth - 328)))}px`;
+  const left = Math.max(8, Math.min(rect.left, globalThis.innerWidth - 328));
+  element.style.left = `${String(left)}px`;
   element.style.top = room < 240 ? "" : `${String(below)}px`;
   element.style.bottom =
     room < 240 ? `${String(globalThis.innerHeight - rect.top + 6)}px` : "";

@@ -209,7 +209,10 @@ function ProjectIssues({
       <h2 id="vl-plan-issues">{t("issues")}</h2>
       <p>
         <Link
-          to={`/issues/new?team=${encodeURIComponent(team)}&project=${encodeURIComponent(project.id)}`}
+          to={
+            `/issues/new?team=${encodeURIComponent(team)}` +
+            `&project=${encodeURIComponent(project.id)}`
+          }
         >
           {t("plan-issue-new")}
         </Link>

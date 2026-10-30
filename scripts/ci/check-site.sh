@@ -43,8 +43,10 @@ check_target() {
   [[ -z "${path}" ]] && return 0
   path="$(realpath -m "$(dirname "${page}")/${path}")"
   [[ -d "${path}" ]] && path="${path}/index.html"
-  [[ "${path}" == "${site}"/* ]] || { fail "${page#"${site}"/} links outside the site: ${url}"; return 0; }
-  [[ -f "${path}" ]] || fail "${page#"${site}"/} links to a missing file: ${url}"
+  [[ "${path}" == "${site}"/* ]] || { fail \
+    "${page#"${site}"/} links outside the site: ${url}"; return 0; }
+  [[ -f "${path}" ]] || fail \
+    "${page#"${site}"/} links to a missing file: ${url}"
 }
 
 # check_links <page> <html>: every href, src and poster in <html>.
@@ -52,10 +54,13 @@ check_links() {
   local page="$1" url
   while IFS= read -r url; do
     check_target "${page}" "${url}"
-  done < <(grep -oE '(href|src|poster)="[^"]*"' <<<"$2" | sed -E 's/^[a-z]+="//; s/"$//')
+  done < <(grep -oE '(href|src|poster)="[^"]*"' <<<"$2" \
+    | sed -E 's/^[a-z]+="//; s/"$//')
 }
 
-[[ -f "${site}/index.html" ]] || { echo "check-site: no site in ${site}; run scripts/ci/build-site.sh first" >&2; exit 1; }
+[[ -f "${site}/index.html" ]] || { echo \
+  "check-site: no site in ${site}; run scripts/ci/build-site.sh first" >&2; \
+  exit 1; }
 
 for page in "${site}/index.html" "${site}/docs/index.html"; do
   name="${page#"${site}"/}"
@@ -64,15 +69,21 @@ for page in "${site}/index.html" "${site}/docs/index.html"; do
     continue
   fi
   html="$(cat "${page}")"
-  grep -q 'http-equiv="Content-Security-Policy"' <<<"${html}" || fail "${name} has no Content-Security-Policy"
-  grep -qiE "script-src 'self'" <<<"${html}" || fail "${name} does not allow its theme script"
+  grep -q 'http-equiv="Content-Security-Policy"' <<<"${html}" \
+    || fail "${name} has no Content-Security-Policy"
+  grep -qiE "script-src 'self'" <<<"${html}" \
+    || fail "${name} does not allow its theme script"
   while IFS= read -r script; do
-    grep -qE '^<script src="(\.\./)?theme\.js"></script>$' <<<"${script}" || fail "${name} has a script other than theme.js: ${script}"
+    grep -qE '^<script src="(\.\./)?theme\.js"></script>$' <<<"${script}" \
+      || fail "${name} has a script other than theme.js: ${script}"
   done < <(grep -oiE '<script[^>]*>(</script>)?' <<<"${html}")
-  grep -qE '[[:space:]]style="' <<<"${html}" && fail "${name} has an inline style attribute"
-  grep -qE '<!-- (BOOKS|SITEBAR|COUNT:[a-z]+) -->' <<<"${html}" && fail "${name} has an unfilled placeholder"
+  grep -qE '[[:space:]]style="' <<<"${html}" \
+    && fail "${name} has an inline style attribute"
+  grep -qE '<!-- (BOOKS|SITEBAR|COUNT:[a-z]+) -->' <<<"${html}" \
+    && fail "${name} has an unfilled placeholder"
   while IFS= read -r img; do
-    grep -q ' alt="' <<<"${img}" || fail "${name} has an image without alt text: ${img}"
+    grep -q ' alt="' <<<"${img}" || fail \
+      "${name} has an image without alt text: ${img}"
   done < <(grep -oE '<img[^>]*>' <<<"${html}")
   check_links "${page}" "${html}"
 done
@@ -83,13 +94,16 @@ site_bar() {
   sed -n '/<header class="vellum-site">/,/<\/header>/p' "$1"
 }
 bar_shape() {
-  sed -E -e 's/(href|src)="[^"]*"/\1=""/g' -e 's/ aria-current="page"//g' -e 's#<span class="vellum-versions">.*</span>##' -e 's/^[[:space:]]+//' <<<"$1" | grep -v '^$'
+  sed -E -e 's/(href|src)="[^"]*"/\1=""/g' -e 's/ aria-current="page"//g' \
+    -e 's#<span class="vellum-versions">.*</span>##' \
+    -e 's/^[[:space:]]+//' <<<"$1" | grep -v '^$'
 }
 home_bar="$(site_bar "${site}/index.html")"
 [[ -n "${home_bar}" ]] || fail "index.html has no site bar"
 home_shape="$(bar_shape "${home_bar}")"
 docs_bar="$(site_bar "${site}/docs/index.html")"
-[[ "$(bar_shape "${docs_bar}")" == "${home_shape}" ]] || fail "docs/index.html has a different site bar from the landing page"
+[[ "$(bar_shape "${docs_bar}")" == "${home_shape}" ]] \
+  || fail "docs/index.html has a different site bar from the landing page"
 
 # The site bar on every help book page.
 while IFS= read -r -d '' page; do
@@ -98,18 +112,27 @@ while IFS= read -r -d '' page; do
     fail "${page#"${site}"/} has no site bar"
     continue
   fi
-  [[ "$(bar_shape "${bar}")" == "${home_shape}" ]] || fail "${page#"${site}"/} has a different site bar from the landing page"
-  grep -qE 'class="language-(mermaid|architecture|chart|timeline|roadmap)"' "${page}" && fail "${page#"${site}"/} shows a diagram as source instead of drawing it"
+  [[ "$(bar_shape "${bar}")" == "${home_shape}" ]] \
+    || fail "${page#"${site}"/} has a different site bar from the landing page"
+  grep -qE 'class="language-(mermaid|architecture|chart|timeline|roadmap)"' \
+    "${page}" && fail \
+    "${page#"${site}"/} shows a diagram as source instead of drawing it"
   check_links "${page}" "${bar}"
   # Code spans may name a placeholder on purpose (ADR 0027 does).
-  sed -E 's#<code>[^<]*</code>##g' "${page}" | grep -qE '@(ROOT|HOME|DOCS|GUIDES|VERSIONS|FONTS|CUR-[a-z]+)@' && fail "${page#"${site}"/} has an unfilled placeholder"
-  grep -q 'class="theme-toggle"' <<<"${bar}" || fail "${page#"${site}"/} has no light and dark toggle"
-  grep -qE 'href="[^"]*fonts/fonts-[0-9a-f]+\.css"' "${page}" && fail "${page#"${site}"/} still loads mdBook's own fonts"
+  sed -E 's#<code>[^<]*</code>##g' "${page}" \
+    | grep -qE '@(ROOT|HOME|DOCS|GUIDES|VERSIONS|FONTS|CUR-[a-z]+)@' \
+    && fail "${page#"${site}"/} has an unfilled placeholder"
+  grep -q 'class="theme-toggle"' <<<"${bar}" \
+    || fail "${page#"${site}"/} has no light and dark toggle"
+  grep -qE 'href="[^"]*fonts/fonts-[0-9a-f]+\.css"' "${page}" \
+    && fail "${page#"${site}"/} still loads mdBook's own fonts"
   case "${page}" in
     */decisions/*) ;;
-    *) grep -q 'class="vellum-feedback"' "${page}" || fail "${page#"${site}"/} has no feedback links" ;;
+    *) grep -q 'class="vellum-feedback"' "${page}" \
+      || fail "${page#"${site}"/} has no feedback links" ;;
   esac
-done < <(find "${site}/docs" -mindepth 2 -name '*.html' -not -name 'toc.html' -not -name 'print.html' -not -name '404.html' -print0)
+done < <(find "${site}/docs" -mindepth 2 -name '*.html' -not -name 'toc.html' \
+  -not -name 'print.html' -not -name '404.html' -print0)
 
 if ((failures > 0)); then
   echo "check-site: ${failures} problem(s) found" >&2

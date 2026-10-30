@@ -55,7 +55,9 @@ export const LAUNCH: ProjectOut = {
     },
     {
       id: "m2",
-      name: "Public launch with the documentation site and the install channels",
+      name:
+        "Public launch with the documentation site and the install " +
+        "channels",
       target_date: "2026-11-30",
       issues: 14,
       completed_issues: 5,
@@ -95,7 +97,9 @@ export const UPDATES: readonly UpdateOut[] = [
     author: "priya",
     health: "at_risk",
     created_at: `2026-10-28${DAY}`,
-    body: "Sign-in loops on an expired session (ENG-12). Everything else is on track.",
+    body:
+      "Sign-in loops on an expired session (ENG-12). Everything else is " +
+      "on track.",
     changes: ["Target date moved from Nov 15 to Nov 30"],
   },
   {
@@ -244,7 +248,9 @@ export const MCP_SNIPPETS: readonly Snippet[] = [
     title: "Claude Code",
     instructions: "Run this in a terminal.",
     language: "shell",
-    code: "claude mcp add --transport http vellum https://vellum.northstar.dev/mcp",
+    code:
+      "claude mcp add --transport http vellum " +
+      "https://vellum.northstar.dev/mcp",
   },
   {
     client: "claude-desktop",

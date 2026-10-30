@@ -38,7 +38,8 @@ export function Chips({
     <span className="vl-chips">
       {names.map((name, index) => (
         <Fragment key={name}>
-          {/* A space between chips keeps their names apart for screen readers. */}
+          {/* A space between chips keeps their names apart for screen
+              readers. */}
           {index > 0 && " "}
           <span
             className="vl-chip"

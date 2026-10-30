@@ -162,7 +162,8 @@ mod tests {
                 "default_branch": "main"
             },
             "object_attributes": {
-                "iid": 5, "action": action, "title": "ENG-9 Speed up", "description": "",
+                "iid": 5, "action": action, "title": "ENG-9 Speed up",
+                    "description": "",
                 "url": "https://gitlab.northstar.dev/northstar/web/-/merge_requ\
                     ests/5",
                 "source_branch": "bo/eng-9-speed-up", "draft": false

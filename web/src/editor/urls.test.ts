@@ -74,7 +74,8 @@ describe("embedTarget", () => {
 
   it.each([
     "not a url",
-    // eslint-disable-next-line sonarjs/no-clear-text-protocols -- plain http must not embed.
+    // Plain http must not embed.
+    // eslint-disable-next-line sonarjs/no-clear-text-protocols
     "http://www.youtube.com/watch?v=dQw4w9WgXcQ",
     "https://www.youtube.com/watch",
     "https://www.youtube.com/watch?v=bad",

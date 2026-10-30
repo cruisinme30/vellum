@@ -76,26 +76,30 @@ describe("planning API", () => {
 });
 
 describe("projects", () => {
-  it("lists active projects with health and progress, and filters by status", async () => {
-    const user = renderAt(
-      "/projects",
-      fakeApi(),
-      <Route path="/projects" element={<ProjectsPage />} />,
-    );
-    const title = await screen.findByText("Gateway replay");
-    const row = title.closest("li");
-    expect(row).not.toBeNull();
-    const scoped = within(row as HTMLElement);
-    expect(scoped.getByText("At risk")).toBeTruthy();
-    expect(
-      scoped.getByRole("progressbar", { name: "Progress of Gateway replay" }),
-    ).toHaveProperty("value", 25);
-    expect(scoped.getByText(/update due/)).toBeTruthy();
-    expect(screen.queryByText("Old docs")).toBeNull();
-    await user.selectOptions(screen.getByLabelText("Show"), "completed");
-    expect(screen.getByText("Old docs")).toBeTruthy();
-    expect(screen.queryByText("Gateway replay")).toBeNull();
-  });
+  it(
+    "lists active projects with health and progress, and filters by " +
+      "status",
+    async () => {
+      const user = renderAt(
+        "/projects",
+        fakeApi(),
+        <Route path="/projects" element={<ProjectsPage />} />,
+      );
+      const title = await screen.findByText("Gateway replay");
+      const row = title.closest("li");
+      expect(row).not.toBeNull();
+      const scoped = within(row as HTMLElement);
+      expect(scoped.getByText("At risk")).toBeTruthy();
+      expect(
+        scoped.getByRole("progressbar", { name: "Progress of Gateway replay" }),
+      ).toHaveProperty("value", 25);
+      expect(scoped.getByText(/update due/)).toBeTruthy();
+      expect(screen.queryByText("Old docs")).toBeNull();
+      await user.selectOptions(screen.getByLabelText("Show"), "completed");
+      expect(screen.getByText("Old docs")).toBeTruthy();
+      expect(screen.queryByText("Gateway replay")).toBeNull();
+    },
+  );
 
   it("creates a project and opens it", async () => {
     const api = fakeApi();
@@ -128,56 +132,63 @@ describe("projects", () => {
     expect(inStatus(GATEWAY, "all")).toBe(true);
   });
 
-  it("shows milestones, posts an update and moves an issue between milestones", async () => {
-    const api = fakeApi();
-    const user = renderAt(
-      "/projects/p1",
-      api,
-      <Route path="/projects/:projectId" element={<ProjectPage />} />,
-    );
-    expect(
-      await screen.findByRole("heading", { name: "Gateway replay", level: 1 }),
-    ).toBeTruthy();
-    expect(
-      screen.getByText("An update is due. Say how the project is going."),
-    ).toBeTruthy();
-    expect(
-      screen.getByRole("progressbar", { name: "Progress of Beta" }),
-    ).toHaveProperty("value", 50);
-    expect(await screen.findByText("Replay is slow.")).toBeTruthy();
-    expect(screen.getByText(/Target date moved/)).toBeTruthy();
+  it(
+    "shows milestones, posts an update and moves an issue between " +
+      "milestones",
+    async () => {
+      const api = fakeApi();
+      const user = renderAt(
+        "/projects/p1",
+        api,
+        <Route path="/projects/:projectId" element={<ProjectPage />} />,
+      );
+      expect(
+        await screen.findByRole("heading", {
+          name: "Gateway replay",
+          level: 1,
+        }),
+      ).toBeTruthy();
+      expect(
+        screen.getByText("An update is due. Say how the project is going."),
+      ).toBeTruthy();
+      expect(
+        screen.getByRole("progressbar", { name: "Progress of Beta" }),
+      ).toHaveProperty("value", 50);
+      expect(await screen.findByText("Replay is slow.")).toBeTruthy();
+      expect(screen.getByText(/Target date moved/)).toBeTruthy();
 
-    await user.click(screen.getByRole("radio", { name: "Off track" }));
-    await user.type(
-      screen.getByLabelText(/What changed/),
-      "Blocked on storage.",
-    );
-    await user.click(screen.getByRole("button", { name: "Post update" }));
-    await waitFor(() => {
-      expect(api.postUpdate).toHaveBeenCalledWith(
-        "p1",
-        "off-track",
+      await user.click(screen.getByRole("radio", { name: "Off track" }));
+      await user.type(
+        screen.getByLabelText(/What changed/),
         "Blocked on storage.",
       );
-    });
+      await user.click(screen.getByRole("button", { name: "Post update" }));
+      await waitFor(() => {
+        expect(api.postUpdate).toHaveBeenCalledWith(
+          "p1",
+          "off-track",
+          "Blocked on storage.",
+        );
+      });
 
-    await user.type(screen.getByLabelText("Milestone"), "GA");
-    await user.click(screen.getByRole("button", { name: "Add milestone" }));
-    await waitFor(() => {
-      expect(api.addMilestone).toHaveBeenCalledWith("p1", "GA", "");
-    });
+      await user.type(screen.getByLabelText("Milestone"), "GA");
+      await user.click(screen.getByRole("button", { name: "Add milestone" }));
+      await waitFor(() => {
+        expect(api.addMilestone).toHaveBeenCalledWith("p1", "GA", "");
+      });
 
-    await user.selectOptions(
-      await screen.findByLabelText("Milestone of ENG-1"),
-      "",
-    );
-    await waitFor(() => {
-      expect(api.setMilestone).toHaveBeenCalledWith("ENG-1", "");
-    });
-    expect(
-      screen.getByRole("link", { name: "New issue" }).getAttribute("href"),
-    ).toBe("/issues/new?team=ENG&project=p1");
-  });
+      await user.selectOptions(
+        await screen.findByLabelText("Milestone of ENG-1"),
+        "",
+      );
+      await waitFor(() => {
+        expect(api.setMilestone).toHaveBeenCalledWith("ENG-1", "");
+      });
+      expect(
+        screen.getByRole("link", { name: "New issue" }).getAttribute("href"),
+      ).toBe("/issues/new?team=ENG&project=p1");
+    },
+  );
 
   it("rolls initiatives up", async () => {
     renderAt(

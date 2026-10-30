@@ -302,17 +302,20 @@ impl DriveService {
 
     pub(super) fn sharing_ops(self: &Arc<Self>) -> Vec<Operation> {
         vec![
-            op!(self, query "drive.sharing", "/v1/drive/items/{id}/sharing", sharing_state,
+            op!(self, query "drive.sharing", "/v1/drive/items/{id}/sharing",
+                sharing_state,
                 "List who has access to an item and its share links"),
             op!(self, Put "drive.share", "/v1/drive/items/{id}/grants", share,
                 "Give a person or group a role on an item"),
             op!(self, Delete "drive.unshare", "/v1/drive/items/{id}/grants/{pri\
                 ncipal}", unshare,
                 "Remove the roles a person or group holds on an item"),
-            op!(self, Post "drive.create_link", "/v1/drive/items/{id}/links", create_link,
+            op!(self, Post "drive.create_link", "/v1/drive/items/{id}/links",
+                create_link,
                 "Make a share link to a page, optionally expiring and \
                     password-protected"),
-            op!(self, Delete "drive.revoke_link", "/v1/drive/links/{link_id}", revoke_link,
+            op!(self, Delete "drive.revoke_link", "/v1/drive/links/{link_id}",
+                revoke_link,
                 "Revoke a share link"),
         ]
     }

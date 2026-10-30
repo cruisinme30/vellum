@@ -1,7 +1,15 @@
 {
   "config": {
     "default": true,
-    "MD013": false,
+    // Lines stop at 80 characters (ADR 0074, D320). Tables, code blocks
+    // and headings can't be wrapped; a line whose overflow is one long word
+    // (a URL) is allowed.
+    "MD013": {
+      "line_length": 80,
+      "tables": false,
+      "code_blocks": false,
+      "headings": false
+    },
     "MD024": { "siblings_only": true },
     // Vellum pages carry their title in front matter and repeat it as the
     // H1 that plain mdBook shows; only a second H1 in the body is an error.

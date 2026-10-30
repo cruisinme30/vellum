@@ -73,54 +73,70 @@ function fakeAuth(start: AuthStatus) {
 }
 
 describe("signing in against a server", () => {
-  it("sends a signed-out visitor to sign-in, then back where they were", async () => {
-    const session = fakeAuth(SIGNED_OUT);
-    const app = renderApp("/data?x=1", undefined, undefined, session);
-    expect(
-      await screen.findByRole("heading", { level: 1, name: "Sign in" }),
-    ).toBeTruthy();
-    expect(app.location()).toBe(
-      `/sign-in?next=${encodeURIComponent("/data?x=1")}`,
-    );
-    await app.user.type(screen.getByLabelText("Email"), "priya@northstar.dev");
-    await app.user.type(screen.getByLabelText("Password"), "correct horse");
-    await app.user.click(screen.getByRole("button", { name: "Sign in" }));
-    await waitFor(() => {
-      expect(app.location()).toBe("/data?x=1");
-    });
-    expect(session.signIn).toHaveBeenCalledWith(
-      "priya@northstar.dev",
-      "correct horse",
-    );
-  });
+  it(
+    "sends a signed-out visitor to sign-in, then back where they " + "were",
+    async () => {
+      const session = fakeAuth(SIGNED_OUT);
+      const app = renderApp("/data?x=1", undefined, undefined, session);
+      expect(
+        await screen.findByRole("heading", { level: 1, name: "Sign in" }),
+      ).toBeTruthy();
+      expect(app.location()).toBe(
+        `/sign-in?next=${encodeURIComponent("/data?x=1")}`,
+      );
+      await app.user.type(
+        screen.getByLabelText("Email"),
+        "priya@northstar.dev",
+      );
+      await app.user.type(screen.getByLabelText("Password"), "correct horse");
+      await app.user.click(screen.getByRole("button", { name: "Sign in" }));
+      await waitFor(() => {
+        expect(app.location()).toBe("/data?x=1");
+      });
+      expect(session.signIn).toHaveBeenCalledWith(
+        "priya@northstar.dev",
+        "correct horse",
+      );
+    },
+  );
 
-  it("offers every sign-in provider, returning to the page asked for", async () => {
-    const okta = {
-      id: "okta",
-      name: "Okta",
-      startUrl: "/auth/sso/start?provider=okta",
-    };
-    const entra = {
-      id: "entra",
-      name: "Entra ID",
-      startUrl: "/auth/sso/start?provider=entra",
-    };
-    const status: AuthStatus = {
-      ...SIGNED_OUT,
-      sso: okta,
-      providers: [okta, entra],
-    };
-    renderApp("/sign-in?next=%2Fdata", undefined, undefined, fakeAuth(status));
-    const link = await screen.findByRole("link", { name: "Sign in with Okta" });
-    expect(link.getAttribute("href")).toBe(
-      "/auth/sso/start?provider=okta&next=%2Fdata",
-    );
-    expect(
-      screen
-        .getByRole("link", { name: "Sign in with Entra ID" })
-        .getAttribute("href"),
-    ).toBe("/auth/sso/start?provider=entra&next=%2Fdata");
-  });
+  it(
+    "offers every sign-in provider, returning to the page asked " + "for",
+    async () => {
+      const okta = {
+        id: "okta",
+        name: "Okta",
+        startUrl: "/auth/sso/start?provider=okta",
+      };
+      const entra = {
+        id: "entra",
+        name: "Entra ID",
+        startUrl: "/auth/sso/start?provider=entra",
+      };
+      const status: AuthStatus = {
+        ...SIGNED_OUT,
+        sso: okta,
+        providers: [okta, entra],
+      };
+      renderApp(
+        "/sign-in?next=%2Fdata",
+        undefined,
+        undefined,
+        fakeAuth(status),
+      );
+      const link = await screen.findByRole("link", {
+        name: "Sign in with Okta",
+      });
+      expect(link.getAttribute("href")).toBe(
+        "/auth/sso/start?provider=okta&next=%2Fdata",
+      );
+      expect(
+        screen
+          .getByRole("link", { name: "Sign in with Entra ID" })
+          .getAttribute("href"),
+      ).toBe("/auth/sso/start?provider=entra&next=%2Fdata");
+    },
+  );
 
   it("goes to sign-in without a next for the home page", async () => {
     const app = renderApp("/", undefined, undefined, fakeAuth(SIGNED_OUT));
@@ -203,29 +219,35 @@ describe("signing in against a server", () => {
 });
 
 describe("setting up a new workspace", () => {
-  it("sends everyone to set-up and creates the first administrator", async () => {
-    const session = fakeAuth(NEW);
-    const app = renderApp("/search", undefined, undefined, session);
-    expect(
-      await screen.findByRole("heading", { name: "Set up your workspace" }),
-    ).toBeTruthy();
-    await app.user.type(screen.getByLabelText("Your name"), "Priya Raman");
-    await app.user.type(screen.getByLabelText("Email"), "priya@northstar.dev");
-    const password = screen.getByLabelText("Password");
-    expect(password.getAttribute("aria-describedby")).toBeTruthy();
-    await app.user.type(password, "a long enough password");
-    await app.user.click(
-      screen.getByRole("button", { name: "Create account" }),
-    );
-    await waitFor(() => {
-      expect(app.location()).toBe("/");
-    });
-    expect(session.setUp).toHaveBeenCalledWith({
-      name: "Priya Raman",
-      email: "priya@northstar.dev",
-      password: "a long enough password",
-    });
-  });
+  it(
+    "sends everyone to set-up and creates the first " + "administrator",
+    async () => {
+      const session = fakeAuth(NEW);
+      const app = renderApp("/search", undefined, undefined, session);
+      expect(
+        await screen.findByRole("heading", { name: "Set up your workspace" }),
+      ).toBeTruthy();
+      await app.user.type(screen.getByLabelText("Your name"), "Priya Raman");
+      await app.user.type(
+        screen.getByLabelText("Email"),
+        "priya@northstar.dev",
+      );
+      const password = screen.getByLabelText("Password");
+      expect(password.getAttribute("aria-describedby")).toBeTruthy();
+      await app.user.type(password, "a long enough password");
+      await app.user.click(
+        screen.getByRole("button", { name: "Create account" }),
+      );
+      await waitFor(() => {
+        expect(app.location()).toBe("/");
+      });
+      expect(session.setUp).toHaveBeenCalledWith({
+        name: "Priya Raman",
+        email: "priya@northstar.dev",
+        password: "a long enough password",
+      });
+    },
+  );
 
   it("sends sign-in to set-up while the workspace is new", async () => {
     const app = renderApp("/sign-in", undefined, undefined, fakeAuth(NEW));
@@ -364,39 +386,42 @@ describe("the second sign-in step", () => {
     expect(verify).toHaveBeenLastCalledWith("vmt_t", { code: "123456" });
   });
 
-  it("makes a covered person add an app and save the recovery codes first", async () => {
-    const { auth, enrol } = withSteps(
-      new SecondStepRequired("enrol", "vmt_e", ["totp", "passkey"]),
-    );
-    const app = renderApp("/sign-in", undefined, undefined, {
-      auth,
-      status: SIGNED_OUT,
-    });
-    await password(app);
-    expect(
-      await screen.findByRole("heading", {
-        name: "Set up two-step verification",
-      }),
-    ).toBeTruthy();
-    await app.user.click(
-      screen.getByRole("button", { name: "Set up an authenticator app" }),
-    );
-    expect(await screen.findByRole("img", { name: /QR code/ })).toBeTruthy();
-    expect(screen.getByText("JBSWY3DPEHPK3PXP")).toBeTruthy();
-    await app.user.type(
-      screen.getByLabelText("Enter the 6-digit code it shows"),
-      "654321",
-    );
-    await app.user.click(screen.getByRole("button", { name: "Turn on" }));
-    const codes = await screen.findByTestId("recovery-codes");
-    expect(codes.textContent).toContain("aaaaa-bbbbb");
-    expect(enrol).toHaveBeenCalledWith("vmt_e", { code: "654321" });
-    expect(app.location()).toBe("/sign-in");
-    await app.user.click(
-      screen.getByRole("button", { name: "I have saved them" }),
-    );
-    await waitFor(() => {
-      expect(app.location()).toBe("/");
-    });
-  });
+  it(
+    "makes a covered person add an app and save the recovery codes " + "first",
+    async () => {
+      const { auth, enrol } = withSteps(
+        new SecondStepRequired("enrol", "vmt_e", ["totp", "passkey"]),
+      );
+      const app = renderApp("/sign-in", undefined, undefined, {
+        auth,
+        status: SIGNED_OUT,
+      });
+      await password(app);
+      expect(
+        await screen.findByRole("heading", {
+          name: "Set up two-step verification",
+        }),
+      ).toBeTruthy();
+      await app.user.click(
+        screen.getByRole("button", { name: "Set up an authenticator app" }),
+      );
+      expect(await screen.findByRole("img", { name: /QR code/ })).toBeTruthy();
+      expect(screen.getByText("JBSWY3DPEHPK3PXP")).toBeTruthy();
+      await app.user.type(
+        screen.getByLabelText("Enter the 6-digit code it shows"),
+        "654321",
+      );
+      await app.user.click(screen.getByRole("button", { name: "Turn on" }));
+      const codes = await screen.findByTestId("recovery-codes");
+      expect(codes.textContent).toContain("aaaaa-bbbbb");
+      expect(enrol).toHaveBeenCalledWith("vmt_e", { code: "654321" });
+      expect(app.location()).toBe("/sign-in");
+      await app.user.click(
+        screen.getByRole("button", { name: "I have saved them" }),
+      );
+      await waitFor(() => {
+        expect(app.location()).toBe("/");
+      });
+    },
+  );
 });

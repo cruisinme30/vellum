@@ -80,17 +80,22 @@ describe("RoutesPage", () => {
     });
   });
 
-  it("says when every route is within budget, and when there is no traffic", async () => {
-    render(<RoutesPage fetcher={server([FAST, { ...FAST, method: "GET" }])} />);
-    expect(
-      await screen.findByText(/Every route is within its p95 budget/),
-    ).toBeTruthy();
-    cleanup();
-    render(<RoutesPage fetcher={server([])} />);
-    expect(
-      await screen.findByText("No requests in the last 15 minutes."),
-    ).toBeTruthy();
-  });
+  it(
+    "says when every route is within budget, and when there is no " + "traffic",
+    async () => {
+      render(
+        <RoutesPage fetcher={server([FAST, { ...FAST, method: "GET" }])} />,
+      );
+      expect(
+        await screen.findByText(/Every route is within its p95 budget/),
+      ).toBeTruthy();
+      cleanup();
+      render(<RoutesPage fetcher={server([])} />);
+      expect(
+        await screen.findByText("No requests in the last 15 minutes."),
+      ).toBeTruthy();
+    },
+  );
 
   it("shows failures", async () => {
     render(

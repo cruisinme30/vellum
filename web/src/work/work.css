@@ -361,12 +361,14 @@
 /* SLA risk: colour plus words, never colour alone. */
 .vl-sla-yellow {
   border-width: 2px;
-  border-color: #c9a000; /* fixed: SLA risk reads the same in every theme, with words beside it */
+  /* SLA risk reads the same in every theme, with words beside it. */
+  border-color: #c9a000; /* fixed: same in every theme */
 }
 
 .vl-sla-orange {
   border-width: 2px;
-  border-color: #e07000; /* fixed: SLA risk reads the same in every theme, with words beside it */
+  /* SLA risk reads the same in every theme, with words beside it. */
+  border-color: #e07000; /* fixed: same in every theme */
 }
 
 .vl-sla-red {

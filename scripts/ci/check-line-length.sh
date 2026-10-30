@@ -14,7 +14,13 @@
 #     files, licence texts, test data whose exact bytes are checked and
 #     Fluent messages;
 #   - binary files;
-#   - a line that fits once its URLs are taken out.
+#   - a line that is a single word, an ESLint next-line directive, or a
+#     one-name import (Prettier keeps it on one line);
+#   - a line that fits once its URLs and pinned hashes (40 or more hex
+#     digits, such as a sha256 digest) are taken out;
+#   - Markdown table rows and code examples (also in Rust doc comments),
+#     fence openers, headings, and title, alt and caption lines;
+#   - a JSON line holding a single string, which JSON can't continue.
 set -euo pipefail
 
 readonly MAX=80
@@ -32,10 +38,55 @@ checked() {
 # "<path>\t<line number>\t<text>"; prints the ones that are too long.
 too_long() {
   perl -CSD -ne '
+    # in_fence(path, n): line n of the file is inside a Markdown code fence.
+    sub in_fence {
+      my ($file, $n) = @_;
+      unless (exists $fenced{$file}) {
+        my (%lines, $fence);
+        if (open my $in, "<:encoding(UTF-8)", $file) {
+          while (my $line = <$in>) {
+            # Rust doc comments are Markdown too.
+            if ($file =~ /\.rs\z/) {
+              unless ($line =~ s{^\s*//[/!] ?}{}) { undef $fence; next }
+            }
+            if (defined $fence) {
+              undef $fence if $line =~ /^\s*\Q$fence\E\s*$/;
+              $lines{$.} = 1 if defined $fence;
+            } elsif ($line =~ /^\s*(```+|~~~+)/) {
+              $fence = $1;
+            }
+          }
+        }
+        $fenced{$file} = \%lines;
+      }
+      return $fenced{$file}{$n};
+    }
     chomp;
     my ($path, $number, $text) = split /\t/, $_, 3;
     next if length($text) <= '"${MAX}"';
+    next if $text =~ /^\s*\S+\s*\z/;    # one word: nowhere to break
+    # A directive for the next line cannot span lines, and Prettier keeps
+    # an import of one name on one line.
+    next if $text =~ m{^\s*// eslint-disable-next-line \S+\z};
+    next if $path =~ /\.[cm]?[jt]sx?\z/
+      && $text =~ /^import (type )?(\{ \w+ \}|\w+) from "[^"]+";\z/;
+    next if $path =~ /\.md\z/ && $text =~ /^\s*\|/;
+    # Markdown code examples are text to copy exactly, a heading and a
+    # fence opener are one line each, and front matter titles and the
+    # key: value lines of data fences are read one line at a time.
+    next if $path =~ /\.md\z/
+      && ($text =~ /^\s*(```|~~~)/ || $text =~ /^(title|alt|caption): /
+        || $text =~ /^#{1,6} /
+        || in_fence($path, $number));
+    next if $path =~ /\.rs\z/ && $text =~ m{^\s*//[/!] \|};
+    next if $path =~ /\.rs\z/ && $text =~ m{^\s*//[/!]}
+      && in_fence($path, $number);
+    # JSON has no way to continue a string on the next line.
+    next if $path =~ /\.(json|webmanifest)\z/
+      && $text =~ /^\s*("[^"]*":\s*)?"(?:[^"\\]|\\.)*",?\s*\z/;
     (my $short = $text) =~ s{[a-z][a-z0-9+.-]*://[^\s"'"'"'<>)`]+}{}g;
+    $short =~ s{\$\{\w+\}/\S+}{}g;    # a URL built from a variable
+    $short =~ s{[0-9a-f]{40,}}{}g;
     printf "%s:%d: %d characters\n", $path, $number, length($text)
       if length($short) > '"${MAX}"';
   '

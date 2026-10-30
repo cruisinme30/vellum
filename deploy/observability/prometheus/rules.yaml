@@ -12,84 +12,111 @@ groups:
   - name: vellum-red
     rules:
       - record: vellum:http_requests:rate5m
-        expr: sum by (http_route, http_request_method) (rate(http_server_request_duration_seconds_count[5m]))
+        expr: >-
+          sum by (http_route, http_request_method)
+          (rate(http_server_request_duration_seconds_count[5m]))
       - record: vellum:http_errors:ratio_rate5m
         expr: |
           sum by (http_route, http_request_method) (
-            rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m])
+            rate(http_server_request_duration_seconds_count{
+              http_response_status_code=~"5.."}[5m])
           )
-          / sum by (http_route, http_request_method) (rate(http_server_request_duration_seconds_count[5m]))
+          / sum by (http_route, http_request_method) (rate(
+            http_server_request_duration_seconds_count[5m]))
       - record: vellum:http_latency_p50:5m
         expr: |
           histogram_quantile(0.5,
-            sum by (http_route, http_request_method, le) (rate(http_server_request_duration_seconds_bucket[5m])))
+            sum by (http_route, http_request_method, le) (rate(
+              http_server_request_duration_seconds_bucket[5m])))
       - record: vellum:http_latency_p95:5m
         expr: |
           histogram_quantile(0.95,
-            sum by (http_route, http_request_method, le) (rate(http_server_request_duration_seconds_bucket[5m])))
+            sum by (http_route, http_request_method, le) (rate(
+              http_server_request_duration_seconds_bucket[5m])))
       - record: vellum:http_latency_p99:5m
         expr: |
           histogram_quantile(0.99,
-            sum by (http_route, http_request_method, le) (rate(http_server_request_duration_seconds_bucket[5m])))
+            sum by (http_route, http_request_method, le) (rate(
+              http_server_request_duration_seconds_bucket[5m])))
 
   - name: vellum-slo
     rules:
       - record: vellum:slo_availability:error_ratio_5m
         expr: |
-          sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m]))
+          sum(rate(http_server_request_duration_seconds_count{
+            http_response_status_code=~"5.."}[5m]))
           / sum(rate(http_server_request_duration_seconds_count[5m]))
       - record: vellum:slo_availability:error_ratio_30m
         expr: |
-          sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[30m]))
+          sum(rate(http_server_request_duration_seconds_count{
+            http_response_status_code=~"5.."}[30m]))
           / sum(rate(http_server_request_duration_seconds_count[30m]))
       - record: vellum:slo_availability:error_ratio_1h
         expr: |
-          sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[1h]))
+          sum(rate(http_server_request_duration_seconds_count{
+            http_response_status_code=~"5.."}[1h]))
           / sum(rate(http_server_request_duration_seconds_count[1h]))
       - record: vellum:slo_availability:error_ratio_6h
         expr: |
-          sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[6h]))
+          sum(rate(http_server_request_duration_seconds_count{
+            http_response_status_code=~"5.."}[6h]))
           / sum(rate(http_server_request_duration_seconds_count[6h]))
       - record: vellum:slo_read_latency:error_ratio_5m
         expr: |
-          1 - sum(rate(http_server_request_duration_seconds_bucket{le="0.15",http_request_method="GET"}[5m]))
-          / sum(rate(http_server_request_duration_seconds_count{http_request_method="GET"}[5m]))
+          1 - sum(rate(http_server_request_duration_seconds_bucket{le="0.15",
+            http_request_method="GET"}[5m]))
+          / sum(rate(http_server_request_duration_seconds_count{
+            http_request_method="GET"}[5m]))
       - record: vellum:slo_read_latency:error_ratio_30m
         expr: |
-          1 - sum(rate(http_server_request_duration_seconds_bucket{le="0.15",http_request_method="GET"}[30m]))
-          / sum(rate(http_server_request_duration_seconds_count{http_request_method="GET"}[30m]))
+          1 - sum(rate(http_server_request_duration_seconds_bucket{le="0.15",
+            http_request_method="GET"}[30m]))
+          / sum(rate(http_server_request_duration_seconds_count{
+            http_request_method="GET"}[30m]))
       - record: vellum:slo_read_latency:error_ratio_1h
         expr: |
-          1 - sum(rate(http_server_request_duration_seconds_bucket{le="0.15",http_request_method="GET"}[1h]))
-          / sum(rate(http_server_request_duration_seconds_count{http_request_method="GET"}[1h]))
+          1 - sum(rate(http_server_request_duration_seconds_bucket{le="0.15",
+            http_request_method="GET"}[1h]))
+          / sum(rate(http_server_request_duration_seconds_count{
+            http_request_method="GET"}[1h]))
       - record: vellum:slo_read_latency:error_ratio_6h
         expr: |
-          1 - sum(rate(http_server_request_duration_seconds_bucket{le="0.15",http_request_method="GET"}[6h]))
-          / sum(rate(http_server_request_duration_seconds_count{http_request_method="GET"}[6h]))
+          1 - sum(rate(http_server_request_duration_seconds_bucket{le="0.15",
+            http_request_method="GET"}[6h]))
+          / sum(rate(http_server_request_duration_seconds_count{
+            http_request_method="GET"}[6h]))
       - record: vellum:slo_write_latency:error_ratio_5m
         expr: |
           1 - sum(rate(
-            http_server_request_duration_seconds_bucket{le="0.3",http_request_method=~"POST|PUT|PATCH|DELETE"}[5m]
+            http_server_request_duration_seconds_bucket{le="0.3",
+              http_request_method=~"POST|PUT|PATCH|DELETE"}[5m]
           ))
-          / sum(rate(http_server_request_duration_seconds_count{http_request_method=~"POST|PUT|PATCH|DELETE"}[5m]))
+          / sum(rate(http_server_request_duration_seconds_count{
+            http_request_method=~"POST|PUT|PATCH|DELETE"}[5m]))
       - record: vellum:slo_write_latency:error_ratio_30m
         expr: |
           1 - sum(rate(
-            http_server_request_duration_seconds_bucket{le="0.3",http_request_method=~"POST|PUT|PATCH|DELETE"}[30m]
+            http_server_request_duration_seconds_bucket{le="0.3",
+              http_request_method=~"POST|PUT|PATCH|DELETE"}[30m]
           ))
-          / sum(rate(http_server_request_duration_seconds_count{http_request_method=~"POST|PUT|PATCH|DELETE"}[30m]))
+          / sum(rate(http_server_request_duration_seconds_count{
+            http_request_method=~"POST|PUT|PATCH|DELETE"}[30m]))
       - record: vellum:slo_write_latency:error_ratio_1h
         expr: |
           1 - sum(rate(
-            http_server_request_duration_seconds_bucket{le="0.3",http_request_method=~"POST|PUT|PATCH|DELETE"}[1h]
+            http_server_request_duration_seconds_bucket{le="0.3",
+              http_request_method=~"POST|PUT|PATCH|DELETE"}[1h]
           ))
-          / sum(rate(http_server_request_duration_seconds_count{http_request_method=~"POST|PUT|PATCH|DELETE"}[1h]))
+          / sum(rate(http_server_request_duration_seconds_count{
+            http_request_method=~"POST|PUT|PATCH|DELETE"}[1h]))
       - record: vellum:slo_write_latency:error_ratio_6h
         expr: |
           1 - sum(rate(
-            http_server_request_duration_seconds_bucket{le="0.3",http_request_method=~"POST|PUT|PATCH|DELETE"}[6h]
+            http_server_request_duration_seconds_bucket{le="0.3",
+              http_request_method=~"POST|PUT|PATCH|DELETE"}[6h]
           ))
-          / sum(rate(http_server_request_duration_seconds_count{http_request_method=~"POST|PUT|PATCH|DELETE"}[6h]))
+          / sum(rate(http_server_request_duration_seconds_count{
+            http_request_method=~"POST|PUT|PATCH|DELETE"}[6h]))
 
   - name: vellum-slo-alerts
     rules:
@@ -101,8 +128,12 @@ groups:
           severity: page
           slo: availability
         annotations:
-          summary: "99.9 % of requests succeed: the error budget is burning 14.4 times too fast"
-          description: "At this rate the 30-day budget is gone in about two days. Open Admin -> Requests."
+          summary: >-
+            99.9 % of requests succeed: the error budget is burning 14.4 times
+            too fast
+          description: >-
+            At this rate the 30-day budget is gone in about two days. Open Admin
+            -> Requests.
       - alert: VellumAvailabilityBudgetBurnSlow
         expr: |
           vellum:slo_availability:error_ratio_6h > (6 * 0.001)
@@ -111,7 +142,9 @@ groups:
           severity: ticket
           slo: availability
         annotations:
-          summary: "99.9 % of requests succeed: the error budget is burning 6 times too fast"
+          summary: >-
+            99.9 % of requests succeed: the error budget is burning 6 times too
+            fast
           description: "At this rate the 30-day budget is gone in five days."
       - alert: VellumReadLatencyBudgetBurnFast
         expr: |
@@ -121,8 +154,12 @@ groups:
           severity: page
           slo: read-latency
         annotations:
-          summary: "95 % of reads finish within 150 ms: the error budget is burning 14.4 times too fast"
-          description: "At this rate the 30-day budget is gone in about two days. Open Admin -> Requests."
+          summary: >-
+            95 % of reads finish within 150 ms: the error budget is burning 14.4
+            times too fast
+          description: >-
+            At this rate the 30-day budget is gone in about two days. Open Admin
+            -> Requests.
       - alert: VellumReadLatencyBudgetBurnSlow
         expr: |
           vellum:slo_read_latency:error_ratio_6h > (6 * 0.05)
@@ -131,7 +168,9 @@ groups:
           severity: ticket
           slo: read-latency
         annotations:
-          summary: "95 % of reads finish within 150 ms: the error budget is burning 6 times too fast"
+          summary: >-
+            95 % of reads finish within 150 ms: the error budget is burning 6
+            times too fast
           description: "At this rate the 30-day budget is gone in five days."
       - alert: VellumWriteLatencyBudgetBurnFast
         expr: |
@@ -141,8 +180,12 @@ groups:
           severity: page
           slo: write-latency
         annotations:
-          summary: "99 % of writes finish within 300 ms: the error budget is burning 14.4 times too fast"
-          description: "At this rate the 30-day budget is gone in about two days. Open Admin -> Requests."
+          summary: >-
+            99 % of writes finish within 300 ms: the error budget is burning
+            14.4 times too fast
+          description: >-
+            At this rate the 30-day budget is gone in about two days. Open Admin
+            -> Requests.
       - alert: VellumWriteLatencyBudgetBurnSlow
         expr: |
           vellum:slo_write_latency:error_ratio_6h > (6 * 0.01)
@@ -151,14 +194,17 @@ groups:
           severity: ticket
           slo: write-latency
         annotations:
-          summary: "99 % of writes finish within 300 ms: the error budget is burning 6 times too fast"
+          summary: >-
+            99 % of writes finish within 300 ms: the error budget is burning 6
+            times too fast
           description: "At this rate the 30-day budget is gone in five days."
 
   - name: vellum-golden
     rules:
       - alert: VellumHighErrorRate
         expr: |
-          sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m]))
+          sum(rate(http_server_request_duration_seconds_count{
+            http_response_status_code=~"5.."}[5m]))
           / sum(rate(http_server_request_duration_seconds_count[5m])) > 0.01
         for: 5m
         labels:
@@ -170,13 +216,18 @@ groups:
       - alert: VellumRouteOverBudget
         expr: |
           (vellum:http_latency_p95:5m{http_request_method="GET"} > 0.15)
-          or (vellum:http_latency_p95:5m{http_request_method=~"POST|PUT|PATCH|DELETE"} > 0.3)
+          or (vellum:http_latency_p95:5m{
+            http_request_method=~"POST|PUT|PATCH|DELETE"} > 0.3)
         for: 10m
         labels:
           severity: ticket
         annotations:
-          summary: "{{ $labels.http_request_method }} {{ $labels.http_route }} is over its p95 budget"
-          description: "p95 is {{ $value | humanizeDuration }}. Run vellum profile --route to see where the time goes."
+          summary: >-
+            {{ $labels.http_request_method }} {{ $labels.http_route }} is over
+            its p95 budget
+          description: >-
+            p95 is {{ $value | humanizeDuration }}. Run vellum profile --route
+            to see where the time goes.
       - alert: VellumTraceBufferChurn
         expr: rate(vellum_observe_traces_evicted_total[5m]) > 50
         for: 30m
@@ -184,34 +235,50 @@ groups:
           severity: info
         annotations:
           summary: "Admin -> Requests keeps less than a few minutes of history"
-          description: "Raise observability.trace_buffer_capacity, or rely on the OTLP backend for older traces."
+          description: >-
+            Raise observability.trace_buffer_capacity, or rely on the OTLP
+            backend for older traces.
 
   - name: vellum-backups
     rules:
       - alert: VellumBackupFailed
-        expr: increase(vellum_backup_duration_seconds_count{operation="create",outcome="failure"}[1d]) > 0
+        expr: >-
+          increase(vellum_backup_duration_seconds_count{operation="create",
+            outcome="failure"}[1d])
+          > 0
         labels:
           severity: ticket
         annotations:
           summary: "A scheduled backup failed in the last day"
       - alert: VellumBackupMissing
-        expr: sum(increase(vellum_backup_duration_seconds_count{operation="create",outcome="success"}[26h])) == 0
+        expr: >-
+          sum(increase(vellum_backup_duration_seconds_count{operation="create",
+            outcome="success"}[26h]))
+          == 0
         for: 1h
         labels:
           severity: ticket
         annotations:
           summary: "No successful backup for more than a day"
       - alert: VellumRestoreDrillFailed
-        expr: increase(vellum_backup_duration_seconds_count{operation="drill",outcome="failure"}[1d]) > 0
+        expr: >-
+          increase(vellum_backup_duration_seconds_count{operation="drill",
+            outcome="failure"}[1d])
+          > 0
         labels:
           severity: page
         annotations:
           summary: "The restore drill failed: backups may not be restorable"
       - alert: VellumRestoreDrillOverdue
-        expr: sum(increase(vellum_backup_duration_seconds_count{operation="drill",outcome="success"}[32d])) == 0
+        expr: >-
+          sum(increase(vellum_backup_duration_seconds_count{operation="drill",
+            outcome="success"}[32d]))
+          == 0
         for: 1h
         labels:
           severity: ticket
         annotations:
           summary: "No restore drill has passed in the last month"
-          description: "Run one from Admin -> Backups; the drill checks restores finish within the 15-minute RTO."
+          description: >-
+            Run one from Admin -> Backups; the drill checks restores finish
+            within the 15-minute RTO.

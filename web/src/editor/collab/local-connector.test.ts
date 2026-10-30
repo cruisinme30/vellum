@@ -141,30 +141,33 @@ describe("createLocalConnector", () => {
     expect(first.awareness.getStates().has(second.doc.clientID)).toBe(false);
   });
 
-  it("loads cached updates before announcing itself, and appends new ones", async () => {
-    const source = new Y.Doc();
-    source.getText("t").insert(0, "cached");
-    const { cache, stored, append } = memoryCache({
-      "page-1": [Y.encodeStateAsUpdate(source)],
-    });
-    const bus = createBus();
-    const session = track(
-      createLocalConnector({ cache, channel: bus.factory }).open(
-        "page-1",
-        "space-1",
-      ),
-    );
-    await session.ready;
-    expect(text(session)).toBe("cached");
-    expect(append).not.toHaveBeenCalled();
-    expect(bus.posted.at(-1)).toMatchObject({
-      kind: "hello",
-      from: session.doc.clientID,
-    });
-    session.doc.getText("t").insert(0, "new ");
-    expect(append).toHaveBeenCalledTimes(1);
-    expect(stored.get("page-1")).toHaveLength(2);
-  });
+  it(
+    "loads cached updates before announcing itself, and appends new " + "ones",
+    async () => {
+      const source = new Y.Doc();
+      source.getText("t").insert(0, "cached");
+      const { cache, stored, append } = memoryCache({
+        "page-1": [Y.encodeStateAsUpdate(source)],
+      });
+      const bus = createBus();
+      const session = track(
+        createLocalConnector({ cache, channel: bus.factory }).open(
+          "page-1",
+          "space-1",
+        ),
+      );
+      await session.ready;
+      expect(text(session)).toBe("cached");
+      expect(append).not.toHaveBeenCalled();
+      expect(bus.posted.at(-1)).toMatchObject({
+        kind: "hello",
+        from: session.doc.clientID,
+      });
+      session.doc.getText("t").insert(0, "new ");
+      expect(append).toHaveBeenCalledTimes(1);
+      expect(stored.get("page-1")).toHaveLength(2);
+    },
+  );
 
   it("caches remote updates without echoing them back", async () => {
     const { cache, append } = memoryCache();

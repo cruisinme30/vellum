@@ -4,7 +4,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 */}}
 {{- if .Values.autoscaling.enabled }}
 {{- if lt (int .Values.autoscaling.minReplicas) 2 }}
-{{- fail "autoscaling.minReplicas must be at least 2: one replica is a single point of failure" }}
+{{- fail (print "autoscaling.minReplicas must be at least 2: "
+  "one replica is a single point of failure") }}
 {{- end }}
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -30,5 +31,6 @@ spec:
         name: cpu
         target:
           type: Utilization
-          averageUtilization: {{ .Values.autoscaling.targetCPUUtilizationPercentage }}
+          averageUtilization:
+            {{ .Values.autoscaling.targetCPUUtilizationPercentage }}
 {{- end }}

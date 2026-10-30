@@ -158,7 +158,9 @@ export function layoutAudit(): Finding[] {
     findings.push({
       rule: "horizontal-overflow",
       target: "html",
-      message: `the page scrolls sideways: ${String(root.scrollWidth)}px of content in a ${String(viewportWidth)}px viewport`,
+      message:
+        `the page scrolls sideways: ${String(root.scrollWidth)}px of ` +
+        `content in a ${String(viewportWidth)}px viewport`,
     });
   }
 
@@ -185,7 +187,8 @@ export function layoutAudit(): Finding[] {
       add(
         "outside-viewport",
         element,
-        `spans x=${rect.left.toFixed(0)}..${rect.right.toFixed(0)}, viewport is 0..${String(viewportWidth)}`,
+        `spans x=${rect.left.toFixed(0)}..${rect.right.toFixed(0)}, viewport ` +
+          `is 0..${String(viewportWidth)}`,
       );
     }
 
@@ -209,7 +212,9 @@ export function layoutAudit(): Finding[] {
         add(
           "clipped",
           element,
-          `content ${String(element.scrollWidth)}×${String(element.scrollHeight)} is cut to ${String(element.clientWidth)}×${String(element.clientHeight)}`,
+          `content ${String(element.scrollWidth)}` +
+            `×${String(element.scrollHeight)} is cut to ` +
+            `${String(element.clientWidth)}×${String(element.clientHeight)}`,
         );
       }
     }
@@ -227,7 +232,8 @@ export function layoutAudit(): Finding[] {
       add(
         "text-overflows-box",
         element,
-        `text is ${String(element.scrollWidth)}px wide in a ${String(element.clientWidth)}px box`,
+        `text is ${String(element.scrollWidth)}px wide in a ` +
+          `${String(element.clientWidth)}px box`,
       );
     }
   }
@@ -317,7 +323,8 @@ export function layoutAudit(): Finding[] {
         add(
           "overlap",
           a.element,
-          `overlaps ${path(b.element)} by ${width.toFixed(0)}×${height.toFixed(0)}px`,
+          `overlaps ${path(b.element)} by ` +
+            `${width.toFixed(0)}×${height.toFixed(0)}px`,
         );
       }
     }

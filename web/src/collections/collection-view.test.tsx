@@ -39,32 +39,39 @@ describe("CollectionView", () => {
     ).toBe("/data");
   });
 
-  it("switches views with a click or the arrow keys, in the address", async () => {
-    const { user, location } = renderApp(ISSUES);
-    await user.click(await screen.findByRole("tab", { name: "Board" }));
-    expect(location()).toBe(`${ISSUES}?view=Board`);
-    expect(await screen.findByRole("region", { name: /^Done/ })).toBeDefined();
-    expect(
-      screen.getByRole("tab", { name: "Board" }).getAttribute("aria-selected"),
-    ).toBe("true");
-    act(() => {
-      screen.getByRole("tab", { name: "Board" }).focus();
-    });
-    await user.keyboard("{ArrowRight}");
-    expect(location()).toBe(`${ISSUES}?view=Gallery`);
-    expect(document.activeElement).toBe(
-      screen.getByRole("tab", { name: "Gallery" }),
-    );
-    await user.keyboard("{End}");
-    expect(location()).toBe(`${ISSUES}?view=Open`);
-    await user.keyboard("{ArrowRight}");
-    expect(location()).toBe(`${ISSUES}?view=All+issues`);
-    await user.keyboard("{ArrowLeft}");
-    expect(location()).toBe(`${ISSUES}?view=Open`);
-    await user.keyboard("{Home}x");
-    expect(location()).toBe(`${ISSUES}?view=All+issues`);
-    expect(await screen.findByRole("grid")).toBeDefined();
-  });
+  it(
+    "switches views with a click or the arrow keys, in the " + "address",
+    async () => {
+      const { user, location } = renderApp(ISSUES);
+      await user.click(await screen.findByRole("tab", { name: "Board" }));
+      expect(location()).toBe(`${ISSUES}?view=Board`);
+      expect(
+        await screen.findByRole("region", { name: /^Done/ }),
+      ).toBeDefined();
+      expect(
+        screen
+          .getByRole("tab", { name: "Board" })
+          .getAttribute("aria-selected"),
+      ).toBe("true");
+      act(() => {
+        screen.getByRole("tab", { name: "Board" }).focus();
+      });
+      await user.keyboard("{ArrowRight}");
+      expect(location()).toBe(`${ISSUES}?view=Gallery`);
+      expect(document.activeElement).toBe(
+        screen.getByRole("tab", { name: "Gallery" }),
+      );
+      await user.keyboard("{End}");
+      expect(location()).toBe(`${ISSUES}?view=Open`);
+      await user.keyboard("{ArrowRight}");
+      expect(location()).toBe(`${ISSUES}?view=All+issues`);
+      await user.keyboard("{ArrowLeft}");
+      expect(location()).toBe(`${ISSUES}?view=Open`);
+      await user.keyboard("{Home}x");
+      expect(location()).toBe(`${ISSUES}?view=All+issues`);
+      expect(await screen.findByRole("grid")).toBeDefined();
+    },
+  );
 
   it("opens the view named in the address", async () => {
     renderApp(`${ISSUES}?view=timeline`);

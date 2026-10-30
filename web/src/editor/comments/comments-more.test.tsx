@@ -46,29 +46,32 @@ function editorWith(
 }
 
 describe("comments in memory", () => {
-  it("lists a page's threads with its block threads, or one block's", async () => {
-    const api = createMemoryCommentsApi("priya", CLOCK);
-    await api.startThread({ target: "page-1", body: "On the page" });
-    await api.startThread({
-      target: `page-1#${BLOCK}`,
-      body: "On a block",
-      quote: "beta",
-    });
-    await api.startThread({
-      target: `page-1#${OTHER}`,
-      body: "Elsewhere",
-      assignTo: "sam",
-    });
-    await api.startThread({ target: "ENG-7", body: "On an issue" });
-    expect(await api.threads("page-1")).toHaveLength(3);
-    const one = await api.threads(`page-1#${BLOCK}`);
-    expect(one.map((t) => t.quote)).toEqual(["beta"]);
-    const issue = await api.threads("ENG-7");
-    expect(issue[0]?.target).toEqual({ issue: "ENG-7" });
-    expect(api.all().find((t) => t.target.block === OTHER)?.assignee).toBe(
-      "sam",
-    );
-  });
+  it(
+    "lists a page's threads with its block threads, or one " + "block's",
+    async () => {
+      const api = createMemoryCommentsApi("priya", CLOCK);
+      await api.startThread({ target: "page-1", body: "On the page" });
+      await api.startThread({
+        target: `page-1#${BLOCK}`,
+        body: "On a block",
+        quote: "beta",
+      });
+      await api.startThread({
+        target: `page-1#${OTHER}`,
+        body: "Elsewhere",
+        assignTo: "sam",
+      });
+      await api.startThread({ target: "ENG-7", body: "On an issue" });
+      expect(await api.threads("page-1")).toHaveLength(3);
+      const one = await api.threads(`page-1#${BLOCK}`);
+      expect(one.map((t) => t.quote)).toEqual(["beta"]);
+      const issue = await api.threads("ENG-7");
+      expect(issue[0]?.target).toEqual({ issue: "ENG-7" });
+      expect(api.all().find((t) => t.target.block === OTHER)?.assignee).toBe(
+        "sam",
+      );
+    },
+  );
 
   it("replies, edits, deletes, reacts, resolves and assigns", async () => {
     const api = createMemoryCommentsApi("priya");
@@ -150,84 +153,95 @@ describe("comments panel", () => {
     expect(alert.textContent).toContain("Server down.");
   });
 
-  it("starts a page thread with an assignee, then works the thread", async () => {
-    const api = createMemoryCommentsApi("priya", CLOCK);
-    const start = vi.spyOn(api, "startThread");
-    const { user, onClose } = renderPanel(api, { me: "priya" });
-    expect(
-      await screen.findByText("No open threads on this page."),
-    ).toBeDefined();
-    expect(screen.getByText("New thread on this page")).toBeDefined();
+  it(
+    "starts a page thread with an assignee, then works the " + "thread",
+    async () => {
+      const api = createMemoryCommentsApi("priya", CLOCK);
+      const start = vi.spyOn(api, "startThread");
+      const { user, onClose } = renderPanel(api, { me: "priya" });
+      expect(
+        await screen.findByText("No open threads on this page."),
+      ).toBeDefined();
+      expect(screen.getByText("New thread on this page")).toBeDefined();
 
-    await user.type(
-      screen.getByRole("textbox", { name: "Comment" }),
-      "Who owns this?",
-    );
-    await user.type(screen.getByRole("textbox", { name: "Assign to" }), "@sam");
-    await user.click(screen.getByRole("button", { name: "Comment" }));
-    expect(start).toHaveBeenCalledWith({
-      target: "page-1",
-      body: "Who owns this?",
-      assignTo: "sam",
-    });
-    expect(await screen.findByText("Assigned to @sam")).toBeDefined();
-    // A page thread has no block to show.
-    expect(screen.queryByRole("button", { name: "Show in page" })).toBeNull();
+      await user.type(
+        screen.getByRole("textbox", { name: "Comment" }),
+        "Who owns this?",
+      );
+      await user.type(
+        screen.getByRole("textbox", { name: "Assign to" }),
+        "@sam",
+      );
+      await user.click(screen.getByRole("button", { name: "Comment" }));
+      expect(start).toHaveBeenCalledWith({
+        target: "page-1",
+        body: "Who owns this?",
+        assignTo: "sam",
+      });
+      expect(await screen.findByText("Assigned to @sam")).toBeDefined();
+      // A page thread has no block to show.
+      expect(screen.queryByRole("button", { name: "Show in page" })).toBeNull();
 
-    await user.click(screen.getByRole("button", { name: "Unassign" }));
-    expect(await screen.findByText("Not assigned")).toBeDefined();
-    await user.type(
-      screen.getByRole("textbox", { name: "Assign this thread to" }),
-      "@ada",
-    );
-    await user.click(screen.getByRole("button", { name: "Assign" }));
-    expect(await screen.findByText("Assigned to @ada")).toBeDefined();
+      await user.click(screen.getByRole("button", { name: "Unassign" }));
+      expect(await screen.findByText("Not assigned")).toBeDefined();
+      await user.type(
+        screen.getByRole("textbox", { name: "Assign this thread to" }),
+        "@ada",
+      );
+      await user.click(screen.getByRole("button", { name: "Assign" }));
+      expect(await screen.findByText("Assigned to @ada")).toBeDefined();
 
-    await user.type(screen.getByRole("textbox", { name: "Reply" }), "I do.");
-    await user.click(screen.getByRole("button", { name: "Reply" }));
-    expect(await screen.findByText("I do.")).toBeDefined();
+      await user.type(screen.getByRole("textbox", { name: "Reply" }), "I do.");
+      await user.click(screen.getByRole("button", { name: "Reply" }));
+      expect(await screen.findByText("I do.")).toBeDefined();
 
-    const reactions =
-      screen.getAllByRole("group", { name: "Reactions" })[0] ?? document.body;
-    await user.click(within(reactions).getByRole("button", { name: "👍 (0)" }));
-    const on = await screen.findByRole("button", { name: "👍 (1)" });
-    expect(on.getAttribute("aria-pressed")).toBe("true");
-    await user.click(on);
-    expect(
-      await screen.findAllByRole("button", { name: "👍 (0)" }),
-    ).toHaveLength(2);
+      const reactions =
+        screen.getAllByRole("group", { name: "Reactions" })[0] ?? document.body;
+      await user.click(
+        within(reactions).getByRole("button", { name: "👍 (0)" }),
+      );
+      const on = await screen.findByRole("button", { name: "👍 (1)" });
+      expect(on.getAttribute("aria-pressed")).toBe("true");
+      await user.click(on);
+      expect(
+        await screen.findAllByRole("button", { name: "👍 (0)" }),
+      ).toHaveLength(2);
 
-    await user.click(screen.getByRole("button", { name: "Resolve" }));
-    expect(
-      await screen.findByText("No open threads on this page."),
-    ).toBeDefined();
-    await user.click(screen.getByRole("button", { name: "Resolved" }));
-    expect(await screen.findByText(/resolved by @priya/u)).toBeDefined();
-    await user.click(screen.getByRole("button", { name: "Reopen" }));
-    expect(await screen.findByText("No resolved threads yet.")).toBeDefined();
+      await user.click(screen.getByRole("button", { name: "Resolve" }));
+      expect(
+        await screen.findByText("No open threads on this page."),
+      ).toBeDefined();
+      await user.click(screen.getByRole("button", { name: "Resolved" }));
+      expect(await screen.findByText(/resolved by @priya/u)).toBeDefined();
+      await user.click(screen.getByRole("button", { name: "Reopen" }));
+      expect(await screen.findByText("No resolved threads yet.")).toBeDefined();
 
-    await user.click(screen.getByRole("button", { name: "Close comments" }));
-    expect(onClose).toHaveBeenCalled();
-  });
+      await user.click(screen.getByRole("button", { name: "Close comments" }));
+      expect(onClose).toHaveBeenCalled();
+    },
+  );
 
-  it("starts a thread on a quote, and shows its block in the page", async () => {
-    const api = createMemoryCommentsApi("priya", CLOCK);
-    const { user, editor } = renderPanel(api, {
-      blockId: BLOCK,
-      quote: "beta",
-    });
-    expect(await screen.findByText("New thread on “beta”")).toBeDefined();
-    await user.type(
-      screen.getByRole("textbox", { name: "Comment" }),
-      "Which beta?",
-    );
-    await user.click(screen.getByRole("button", { name: "Comment" }));
-    expect(
-      await screen.findByText("beta", { selector: "blockquote" }),
-    ).toBeDefined();
-    await user.click(screen.getByRole("button", { name: "Show in page" }));
-    expect(editor.state.selection.$from.parent.attrs["blockId"]).toBe(BLOCK);
-  });
+  it(
+    "starts a thread on a quote, and shows its block in the " + "page",
+    async () => {
+      const api = createMemoryCommentsApi("priya", CLOCK);
+      const { user, editor } = renderPanel(api, {
+        blockId: BLOCK,
+        quote: "beta",
+      });
+      expect(await screen.findByText("New thread on “beta”")).toBeDefined();
+      await user.type(
+        screen.getByRole("textbox", { name: "Comment" }),
+        "Which beta?",
+      );
+      await user.click(screen.getByRole("button", { name: "Comment" }));
+      expect(
+        await screen.findByText("beta", { selector: "blockquote" }),
+      ).toBeDefined();
+      await user.click(screen.getByRole("button", { name: "Show in page" }));
+      expect(editor.state.selection.$from.parent.attrs["blockId"]).toBe(BLOCK);
+    },
+  );
 
   it("names a block thread without a quote, and shows failures", async () => {
     const api = createMemoryCommentsApi("priya");

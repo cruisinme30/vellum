@@ -66,22 +66,26 @@ describe("PageMenu", () => {
     expect(screen.queryByRole("menu")).toBeNull();
   });
 
-  it("moves through its items with the arrows, Home and End, wrapping around", async () => {
-    const { user, openMenu } = renderMenu();
-    await openMenu("On-call handbook");
-    await user.keyboard("{ArrowUp}");
-    expect(document.activeElement?.textContent).toBe("Move to trash");
-    await user.keyboard("{ArrowDown}");
-    expect(document.activeElement?.textContent).toBe("Add subpage");
-    await user.keyboard("{ArrowDown}");
-    expect(document.activeElement?.textContent).toBe("Rename");
-    await user.keyboard("{End}");
-    expect(document.activeElement?.textContent).toBe("Move to trash");
-    await user.keyboard("{Home}");
-    expect(document.activeElement?.textContent).toBe("Add subpage");
-    await user.keyboard("x");
-    expect(screen.getByRole("menu")).toBeDefined();
-  });
+  it(
+    "moves through its items with the arrows, Home and End, wrapping " +
+      "around",
+    async () => {
+      const { user, openMenu } = renderMenu();
+      await openMenu("On-call handbook");
+      await user.keyboard("{ArrowUp}");
+      expect(document.activeElement?.textContent).toBe("Move to trash");
+      await user.keyboard("{ArrowDown}");
+      expect(document.activeElement?.textContent).toBe("Add subpage");
+      await user.keyboard("{ArrowDown}");
+      expect(document.activeElement?.textContent).toBe("Rename");
+      await user.keyboard("{End}");
+      expect(document.activeElement?.textContent).toBe("Move to trash");
+      await user.keyboard("{Home}");
+      expect(document.activeElement?.textContent).toBe("Add subpage");
+      await user.keyboard("x");
+      expect(screen.getByRole("menu")).toBeDefined();
+    },
+  );
 
   it.each(["{Escape}", "{Tab}"])(
     "closes on %s and focuses the row",

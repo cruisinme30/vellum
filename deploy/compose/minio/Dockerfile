@@ -17,7 +17,8 @@ ENV CGO_ENABLED=0 GOFLAGS=-trimpath
 ADD https://github.com/minio/minio.git#9e49d5e7a648f00e26f2246f4dc28e6b07f8c84a /src/minio
 ADD https://github.com/minio/mc.git#7394ce0dd2a80935aded936b09fa12cbb3cb8096 /src/mc
 WORKDIR /src/minio
-RUN --mount=type=cache,target=/go/pkg/mod go build -ldflags "-s -w" -o /out/minio .
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go build -ldflags "-s -w" -o /out/minio .
 WORKDIR /src/mc
 RUN --mount=type=cache,target=/go/pkg/mod go build -ldflags "-s -w" -o /out/mc .
 

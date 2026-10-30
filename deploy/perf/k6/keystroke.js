@@ -26,7 +26,7 @@ function varString(out, text) {
 }
 
 /** The root text the probe writes to. */
-export const PROBE_ROOT = 'k6probe';
+export const PROBE_ROOT = "k6probe";
 
 /**
  * A Yjs v1 update from `client` inserting `text` (ASCII) at the start of
@@ -62,10 +62,10 @@ export function stamp(pair, sentMs) {
 /** Every stamp for `pair` in a frame, as send times (ms). */
 export function stampsIn(frame, pair) {
   const bytes = new Uint8Array(frame);
-  let text = '';
+  let text = "";
   for (const b of bytes) text += String.fromCharCode(b);
   const found = [];
-  const pattern = new RegExp(`<k6\\|${pair}\\|(\\d+)>`, 'g');
+  const pattern = new RegExp(`<k6\\|${pair}\\|(\\d+)>`, "g");
   let match = pattern.exec(text);
   while (match !== null) {
     found.push(Number(match[1]));

@@ -53,7 +53,8 @@ afterEach(() => {
 
 describe("passkeys in the browser", () => {
   it("knows when the browser has none", () => {
-    // eslint-disable-next-line unicorn/no-useless-undefined -- stubGlobal takes a value: none here
+    // StubGlobal takes a value: none here.
+    // eslint-disable-next-line unicorn/no-useless-undefined
     vi.stubGlobal("PublicKeyCredential", undefined);
     expect(passkeysSupported()).toBe(false);
     browser();
@@ -117,37 +118,40 @@ describe("passkeys in the browser", () => {
     );
   });
 
-  it("signs with a passkey, with and without the optional settings", async () => {
-    const { get } = browser(
-      new FakeCredential(bytes(7), {
-        clientDataJSON: bytes(1),
-        authenticatorData: bytes(2),
-        signature: bytes(3),
-      }),
-    );
-    const signed = await signWithPasskey(REQUEST);
-    expect(signed).toEqual({
-      id: "Bw",
-      response: {
-        clientDataJson: "AQ",
-        authenticatorData: "Ag",
-        signature: "Aw",
-      },
-    });
-    let options = get.mock.calls[0]?.[0].publicKey;
-    expect(options?.userVerification).toBe("preferred");
-    expect(options).not.toHaveProperty("timeout");
-    await signWithPasskey({
-      ...REQUEST,
-      allowCredentials: [{ type: "public-key", id: "Bw" }],
-      userVerification: "required",
-      timeout: 30_000,
-    });
-    options = get.mock.calls[1]?.[0].publicKey;
-    expect(options?.userVerification).toBe("required");
-    expect(options?.timeout).toBe(30_000);
-    expect(options?.allowCredentials?.length).toBe(1);
-  });
+  it(
+    "signs with a passkey, with and without the optional " + "settings",
+    async () => {
+      const { get } = browser(
+        new FakeCredential(bytes(7), {
+          clientDataJSON: bytes(1),
+          authenticatorData: bytes(2),
+          signature: bytes(3),
+        }),
+      );
+      const signed = await signWithPasskey(REQUEST);
+      expect(signed).toEqual({
+        id: "Bw",
+        response: {
+          clientDataJson: "AQ",
+          authenticatorData: "Ag",
+          signature: "Aw",
+        },
+      });
+      let options = get.mock.calls[0]?.[0].publicKey;
+      expect(options?.userVerification).toBe("preferred");
+      expect(options).not.toHaveProperty("timeout");
+      await signWithPasskey({
+        ...REQUEST,
+        allowCredentials: [{ type: "public-key", id: "Bw" }],
+        userVerification: "required",
+        timeout: 30_000,
+      });
+      options = get.mock.calls[1]?.[0].publicKey;
+      expect(options?.userVerification).toBe("required");
+      expect(options?.timeout).toBe(30_000);
+      expect(options?.allowCredentials?.length).toBe(1);
+    },
+  );
 
   it("reads base64url with and without padding", () => {
     expect([...fromBase64Url("_-8")]).toEqual([255, 239]);

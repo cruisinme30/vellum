@@ -260,7 +260,9 @@ describe("the mock store's schema, CSV and embed operations", () => {
     const made = await store.createFromCsv({
       folder: "drives/shared/Northstar/",
       title: "Hosts",
-      csv: "Host,Cores,Since,Notes\nalpha,8,2026-01-02,fast\nbeta,4,2026-03-04,\n",
+      csv:
+        "Host,Cores,Since,Notes\n" +
+        "alpha,8,2026-01-02,fast\nbeta,4,2026-03-04,\n",
     });
     expect(made.collection.path).toBe(
       "drives/shared/Northstar/Hosts.collection",

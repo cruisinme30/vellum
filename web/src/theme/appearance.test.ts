@@ -24,7 +24,8 @@ const NO_STORAGE = undefined;
  * A storage stub; like the Web Storage API it answers `null` for a missing key.
  */
 const storing = (value?: string) => ({
-  // eslint-disable-next-line unicorn/no-null -- Storage.getItem returns null for a missing key.
+  // Storage.getItem returns null for a missing key.
+  // eslint-disable-next-line unicorn/no-null
   getItem: () => value ?? null,
 });
 
@@ -212,25 +213,31 @@ describe("applyAppearance", () => {
     expect(effectiveSeed(DEFAULT_APPEARANCE)).toBe(DEFAULT_SEED);
   });
 
-  it("draws figures in the accent in use, or a custom theme's seed (D302)", () => {
-    expect(figureSeed(DEFAULT_APPEARANCE)).toBeUndefined();
-    expect(
-      figureSeed({ ...DEFAULT_APPEARANCE, seed: DEFAULT_SEED }),
-    ).toBeUndefined();
-    expect(figureSeed(DEFAULT_APPEARANCE, "#B02020")).toBe("#b02020");
-    expect(
-      figureSeed({ ...DEFAULT_APPEARANCE, seed: "#205020" }, "#b02020"),
-    ).toBe("#205020");
-    const custom = {
-      name: "Ink",
-      base: "dark",
-      seed: "#225588",
-      tokens: {},
-    } as const;
-    expect(
-      figureSeed({ ...DEFAULT_APPEARANCE, theme: "custom", custom }, "#b02020"),
-    ).toBe("#225588");
-  });
+  it(
+    "draws figures in the accent in use, or a custom theme's seed " + "(D302)",
+    () => {
+      expect(figureSeed(DEFAULT_APPEARANCE)).toBeUndefined();
+      expect(
+        figureSeed({ ...DEFAULT_APPEARANCE, seed: DEFAULT_SEED }),
+      ).toBeUndefined();
+      expect(figureSeed(DEFAULT_APPEARANCE, "#B02020")).toBe("#b02020");
+      expect(
+        figureSeed({ ...DEFAULT_APPEARANCE, seed: "#205020" }, "#b02020"),
+      ).toBe("#205020");
+      const custom = {
+        name: "Ink",
+        base: "dark",
+        seed: "#225588",
+        tokens: {},
+      } as const;
+      expect(
+        figureSeed(
+          { ...DEFAULT_APPEARANCE, theme: "custom", custom },
+          "#b02020",
+        ),
+      ).toBe("#225588");
+    },
+  );
 
   it("applies a custom theme's tokens and marks the page", () => {
     const root = document.createElement("div");

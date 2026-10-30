@@ -7,13 +7,13 @@
 // moves breaks the build instead of the numbers.
 
 export const routes = {
-  ready: '/readyz',
-  setup: '/api/v1/setup',
-  signIn: '/auth/sign-in',
-  csrf: '/api/csrf',
-  tokens: '/api/v1/me/tokens',
-  sharedDrives: '/api/v1/drive/shared-drives',
-  spaces: '/api/v1/drive/spaces',
+  ready: "/readyz",
+  setup: "/api/v1/setup",
+  signIn: "/auth/sign-in",
+  csrf: "/api/csrf",
+  tokens: "/api/v1/me/tokens",
+  sharedDrives: "/api/v1/drive/shared-drives",
+  spaces: "/api/v1/drive/spaces",
   createPage: (space) => `/api/v1/drive/spaces/${space}/pages`,
   content: (id) => `/api/v1/drive/items/${id}/content`,
   render: (id) => `/api/v1/pages/${id}/render`,
@@ -22,7 +22,7 @@ export const routes = {
   exportPage: (id, format) => `/api/v1/export/pages/${id}?format=${format}`,
   collectionQuery: (id) => `/api/v1/collections/${id}/query`,
   search: (q) => `/api/v1/search?q=${encodeURIComponent(q)}`,
-  issues: '/api/v1/work/issues',
+  issues: "/api/v1/work/issues",
   // y-protocols sync and awareness; extra tags 100-102 can be ignored.
   collab: (space, id) => `/collab/${space}/${id}`,
 };

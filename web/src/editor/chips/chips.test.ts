@@ -17,7 +17,8 @@ import {
   type ChipSources,
 } from "./items";
 
-const NOW = new Date(2026, 9, 29, 14, 0); // Thursday 29 October 2026, local time
+// Thursday 29 October 2026, local time.
+const NOW = new Date(2026, 9, 29, 14, 0);
 
 const sources: ChipSources = {
   people: () => [

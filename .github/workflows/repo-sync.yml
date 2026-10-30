@@ -6,9 +6,10 @@
 #   Sync the Vellum 1.0 project: keeps the public "Vellum 1.0" GitHub
 #     Project in step with the task issues every 15 minutes. It is a full
 #     sync, so it runs on a schedule rather than once per issue event,
-#     which used to start dozens of runs an hour. It needs the PROJECT_TOKEN secret (a token with the
-#     `project` scope), because the default GITHUB_TOKEN cannot write a
-#     user-owned project; without the secret the job is skipped.
+#     which used to start dozens of runs an hour. It needs the
+#     PROJECT_TOKEN secret (a token with the `project` scope), because the
+#     default GITHUB_TOKEN cannot write a user-owned project; without the
+#     secret the job is skipped.
 # Both run only the scripts on the default branch.
 name: "Repo: sync labels and project board"
 
@@ -42,7 +43,8 @@ jobs:
 
   project:
     name: Sync the Vellum 1.0 project
-    if: contains(fromJSON('["schedule", "workflow_dispatch"]'), github.event_name)
+    if: >-
+      contains(fromJSON('["schedule", "workflow_dispatch"]'), github.event_name)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     concurrency:
@@ -57,7 +59,8 @@ jobs:
           if [[ -n "${PROJECT_TOKEN}" ]]; then
             echo "present=true" >>"${GITHUB_OUTPUT}"
           else
-            echo "::notice::PROJECT_TOKEN is not set; the project is not synced."
+            echo "::notice::PROJECT_TOKEN is not set; the project is not" \
+              "synced."
           fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: steps.token.outputs.present == 'true'

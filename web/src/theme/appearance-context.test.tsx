@@ -106,17 +106,21 @@ describe("AppearanceProvider", () => {
     });
   });
 
-  it("follows the OS dark preference for the system theme, and unsubscribes", () => {
-    const query = fakeDarkQuery(false);
-    const { unmount } = renderHook(() => useAppearance(), { wrapper });
-    expect(document.documentElement.dataset["theme"]).toBe("light");
-    act(() => {
-      query.set(true);
-    });
-    expect(document.documentElement.dataset["theme"]).toBe("dark");
-    unmount();
-    expect(query.listeners.size).toBe(0);
-  });
+  it(
+    "follows the OS dark preference for the system theme, and " +
+      "unsubscribes",
+    () => {
+      const query = fakeDarkQuery(false);
+      const { unmount } = renderHook(() => useAppearance(), { wrapper });
+      expect(document.documentElement.dataset["theme"]).toBe("light");
+      act(() => {
+        query.set(true);
+      });
+      expect(document.documentElement.dataset["theme"]).toBe("dark");
+      unmount();
+      expect(query.listeners.size).toBe(0);
+    },
+  );
 
   it("works without matchMedia or localStorage", () => {
     const restoreMatchMedia = removeMatchMedia();
@@ -164,19 +168,22 @@ describe("the organisation's look", () => {
     ).toBe(buildScheme("light", "#b02020")["primary"]);
   });
 
-  it("keeps Vellum's seed when the organisation's look cannot load", async () => {
-    const organisation = vi.fn().mockRejectedValue(new Error("offline"));
-    const { result } = renderHook(() => useAppearance(), {
-      wrapper: withOrganisation(organisation),
-    });
-    await waitFor(() => {
-      expect(organisation).toHaveBeenCalled();
-    });
-    expect(result.current.organisation).toBeUndefined();
-    expect(
-      document.documentElement.style.getPropertyValue("--md-primary"),
-    ).toBe(buildScheme("light")["primary"]);
-  });
+  it(
+    "keeps Vellum's seed when the organisation's look cannot " + "load",
+    async () => {
+      const organisation = vi.fn().mockRejectedValue(new Error("offline"));
+      const { result } = renderHook(() => useAppearance(), {
+        wrapper: withOrganisation(organisation),
+      });
+      await waitFor(() => {
+        expect(organisation).toHaveBeenCalled();
+      });
+      expect(result.current.organisation).toBeUndefined();
+      expect(
+        document.documentElement.style.getPropertyValue("--md-primary"),
+      ).toBe(buildScheme("light")["primary"]);
+    },
+  );
 });
 
 describe("server rendering", () => {

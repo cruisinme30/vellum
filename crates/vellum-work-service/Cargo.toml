@@ -3,7 +3,9 @@
 
 [package]
 name = "vellum-work-service"
-description = "The Work service: every issue tracking and comment operation, served through the gateway as REST, OpenAPI and GraphQL."
+description = """\
+    The Work service: every issue tracking and comment operation, served \
+    through the gateway as REST, OpenAPI and GraphQL."""
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

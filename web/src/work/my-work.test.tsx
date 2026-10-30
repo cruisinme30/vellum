@@ -146,45 +146,50 @@ describe("My Work", () => {
     );
   });
 
-  it("reschedules from the Move menu and by dragging onto a section", async () => {
-    const { api, move } = fakeApi();
-    const user = renderAt(
-      "/my-work",
-      api,
-      <Route path="my-work" element={<MyWorkPage />} />,
-    );
-    const menu = await screen.findByRole("combobox", {
-      name: "Move “Book flights”",
-    });
-    // Issues and tasks without a block ID cannot move.
-    expect(
-      screen.queryByRole("combobox", { name: "Move “Fix sign-in”" }),
-    ).toBeNull();
-    await user.selectOptions(menu, "someday");
-    expect(move).toHaveBeenCalledWith("D1.b2", "someday");
+  it(
+    "reschedules from the Move menu and by dragging onto a " + "section",
+    async () => {
+      const { api, move } = fakeApi();
+      const user = renderAt(
+        "/my-work",
+        api,
+        <Route path="my-work" element={<MyWorkPage />} />,
+      );
+      const menu = await screen.findByRole("combobox", {
+        name: "Move “Book flights”",
+      });
+      // Issues and tasks without a block ID cannot move.
+      expect(
+        screen.queryByRole("combobox", { name: "Move “Fix sign-in”" }),
+      ).toBeNull();
+      await user.selectOptions(menu, "someday");
+      expect(move).toHaveBeenCalledWith("D1.b2", "someday");
 
-    const row = screen.getByText("Book flights").closest("li");
-    expect(row?.getAttribute("draggable")).toBe("true");
-    const dataTransfer = {
-      types: ["application/x-vellum-task"],
-      getData: () => "D1.b2",
-      setData: vi.fn(),
-      dropEffect: "none",
-      effectAllowed: "all",
-    };
-    fireEvent.dragStart(row as HTMLElement, { dataTransfer });
-    const bar = screen.getByRole("list", {
-      name: "Drop the task on a day or bucket",
-    });
-    fireEvent.dragOver(within(bar).getByText("Tomorrow"), { dataTransfer });
-    fireEvent.drop(within(bar).getByText("Tomorrow"), { dataTransfer });
-    expect(move).toHaveBeenLastCalledWith("D1.b2", "2026-10-30");
+      const row = screen.getByText("Book flights").closest("li");
+      expect(row?.getAttribute("draggable")).toBe("true");
+      const dataTransfer = {
+        types: ["application/x-vellum-task"],
+        getData: () => "D1.b2",
+        setData: vi.fn(),
+        dropEffect: "none",
+        effectAllowed: "all",
+      };
+      fireEvent.dragStart(row as HTMLElement, { dataTransfer });
+      const bar = screen.getByRole("list", {
+        name: "Drop the task on a day or bucket",
+      });
+      fireEvent.dragOver(within(bar).getByText("Tomorrow"), { dataTransfer });
+      fireEvent.drop(within(bar).getByText("Tomorrow"), { dataTransfer });
+      expect(move).toHaveBeenLastCalledWith("D1.b2", "2026-10-30");
 
-    const today = screen.getByRole("heading", { name: "Today" }).parentElement;
-    if (today === null) throw new Error("no Today section");
-    fireEvent.drop(today, { dataTransfer });
-    expect(move).toHaveBeenLastCalledWith("D1.b2", "today");
-  });
+      const today = screen.getByRole("heading", {
+        name: "Today",
+      }).parentElement;
+      if (today === null) throw new Error("no Today section");
+      fireEvent.drop(today, { dataTransfer });
+      expect(move).toHaveBeenLastCalledWith("D1.b2", "today");
+    },
+  );
 
   it("shows and changes a task's time block", async () => {
     const { api, update } = fakeApi();
@@ -280,34 +285,37 @@ function OpenFromPage() {
 }
 
 describe("the quick-add dialog", () => {
-  it("opens with a page's selection and links the task back to the page", async () => {
-    const { api, addTask, update } = fakeApi();
-    const user = userEvent.setup();
-    render(
-      <I18nProvider>
-        <ServerApisProvider apis={{ work: api }}>
-          <QuickAddProvider>
-            <OpenFromPage />
-          </QuickAddProvider>
-        </ServerApisProvider>
-      </I18nProvider>,
-    );
-    await user.click(screen.getByRole("button", { name: "From page" }));
-    const dialog = screen.getByRole("dialog", { name: "Quick-add a task" });
-    const line = within(dialog).getByRole("textbox", { name: "Add a task" });
-    expect(document.activeElement).toBe(line);
-    expect(line).toHaveProperty("value", "Review the plan");
-    await user.click(within(dialog).getByRole("button", { name: "Add" }));
-    expect(addTask).toHaveBeenCalledWith("Review the plan", undefined);
-    await waitFor(() => {
-      expect(update).toHaveBeenCalledWith("new", {
-        title: "Review the plan [Launch draft](/p/P1)",
+  it(
+    "opens with a page's selection and links the task back to the " + "page",
+    async () => {
+      const { api, addTask, update } = fakeApi();
+      const user = userEvent.setup();
+      render(
+        <I18nProvider>
+          <ServerApisProvider apis={{ work: api }}>
+            <QuickAddProvider>
+              <OpenFromPage />
+            </QuickAddProvider>
+          </ServerApisProvider>
+        </I18nProvider>,
+      );
+      await user.click(screen.getByRole("button", { name: "From page" }));
+      const dialog = screen.getByRole("dialog", { name: "Quick-add a task" });
+      const line = within(dialog).getByRole("textbox", { name: "Add a task" });
+      expect(document.activeElement).toBe(line);
+      expect(line).toHaveProperty("value", "Review the plan");
+      await user.click(within(dialog).getByRole("button", { name: "Add" }));
+      expect(addTask).toHaveBeenCalledWith("Review the plan", undefined);
+      await waitFor(() => {
+        expect(update).toHaveBeenCalledWith("new", {
+          title: "Review the plan [Launch draft](/p/P1)",
+        });
       });
-    });
-    await waitFor(() => {
-      expect(screen.queryByRole("dialog")).toBeNull();
-    });
-  });
+      await waitFor(() => {
+        expect(screen.queryByRole("dialog")).toBeNull();
+      });
+    },
+  );
 
   it("closes on Escape and does nothing without a server", async () => {
     const { api } = fakeApi();

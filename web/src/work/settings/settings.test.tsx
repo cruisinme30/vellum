@@ -45,22 +45,26 @@ function deferred<T>() {
 }
 
 describe("team settings file", () => {
-  it("makes keys, reorders within a category and drops dangling Git moments", () => {
-    expect(slug("In Review!")).toBe("in-review");
-    expect(freshKey("Todo", ["todo", "todo-2"])).toBe("todo-3");
-    const statuses = TEAM_FILE.workflow.statuses;
-    const moved = moveWithinCategory(statuses, "next", -1).map(
-      (status) => status.key,
-    );
-    expect(moved.slice(1, 3)).toEqual(["next", "todo"]);
-    // Nothing above "triage" in its own category: unchanged.
-    expect(moveWithinCategory(statuses, "triage", -1)).toEqual(statuses);
-    const pruned = pruneGit({
-      ...TEAM_FILE,
-      git: { pr_merged: "done", pr_opened: "gone" },
-    });
-    expect(pruned.git).toEqual({ pr_merged: "done" });
-  });
+  it(
+    "makes keys, reorders within a category and drops dangling Git " +
+      "moments",
+    () => {
+      expect(slug("In Review!")).toBe("in-review");
+      expect(freshKey("Todo", ["todo", "todo-2"])).toBe("todo-3");
+      const statuses = TEAM_FILE.workflow.statuses;
+      const moved = moveWithinCategory(statuses, "next", -1).map(
+        (status) => status.key,
+      );
+      expect(moved.slice(1, 3)).toEqual(["next", "todo"]);
+      // Nothing above "triage" in its own category: unchanged.
+      expect(moveWithinCategory(statuses, "triage", -1)).toEqual(statuses);
+      const pruned = pruneGit({
+        ...TEAM_FILE,
+        git: { pr_merged: "done", pr_opened: "gone" },
+      });
+      expect(pruned.git).toEqual({ pr_merged: "done" });
+    },
+  );
 });
 
 describe("team settings API", () => {
@@ -258,57 +262,65 @@ describe("team settings screen", () => {
     });
   });
 
-  it("archives a team after asking, then shows it archived with Restore", async () => {
-    let archived = false;
-    const api = fakeApi({
-      teams: vi.fn(() =>
-        Promise.resolve([
-          { ...TEAM, archived },
-          { ...TEAM, id: "t2", key: "OPS", name: "Operations" },
-        ]),
-      ),
-      setTeamArchived: vi.fn((key: string, value: boolean) => {
-        archived = value;
-        return Promise.resolve({ ...TEAM, key, archived: value });
-      }),
-    });
-    const user = renderAt("/issues/settings", api, route);
-    await user.click(
-      await screen.findByRole("button", { name: "Archive Engineering" }),
-    );
-    const ask = screen.getByRole("group", { name: "Archive Engineering?" });
-    expect(api.setTeamArchived).not.toHaveBeenCalled();
-    await user.click(within(ask).getByRole("button", { name: "Archive team" }));
-    expect(api.setTeamArchived).toHaveBeenCalledWith("ENG", true);
-    // The screen stays on the team, now archived, with a way back.
-    expect(await screen.findByText(/Engineering is archived/)).toBeDefined();
-    expect(where()).toBe("/issues/settings?team=ENG");
-    expect(
-      screen.getByRole("option", { name: "Engineering (archived)" }),
-    ).toBeDefined();
-    await user.click(screen.getByRole("button", { name: "Restore team" }));
-    expect(api.setTeamArchived).toHaveBeenLastCalledWith("ENG", false);
-    expect(
-      await screen.findByRole("button", { name: "Archive Engineering" }),
-    ).toBeDefined();
-  });
+  it(
+    "archives a team after asking, then shows it archived with " + "Restore",
+    async () => {
+      let archived = false;
+      const api = fakeApi({
+        teams: vi.fn(() =>
+          Promise.resolve([
+            { ...TEAM, archived },
+            { ...TEAM, id: "t2", key: "OPS", name: "Operations" },
+          ]),
+        ),
+        setTeamArchived: vi.fn((key: string, value: boolean) => {
+          archived = value;
+          return Promise.resolve({ ...TEAM, key, archived: value });
+        }),
+      });
+      const user = renderAt("/issues/settings", api, route);
+      await user.click(
+        await screen.findByRole("button", { name: "Archive Engineering" }),
+      );
+      const ask = screen.getByRole("group", { name: "Archive Engineering?" });
+      expect(api.setTeamArchived).not.toHaveBeenCalled();
+      await user.click(
+        within(ask).getByRole("button", { name: "Archive team" }),
+      );
+      expect(api.setTeamArchived).toHaveBeenCalledWith("ENG", true);
+      // The screen stays on the team, now archived, with a way back.
+      expect(await screen.findByText(/Engineering is archived/)).toBeDefined();
+      expect(where()).toBe("/issues/settings?team=ENG");
+      expect(
+        screen.getByRole("option", { name: "Engineering (archived)" }),
+      ).toBeDefined();
+      await user.click(screen.getByRole("button", { name: "Restore team" }));
+      expect(api.setTeamArchived).toHaveBeenLastCalledWith("ENG", false);
+      expect(
+        await screen.findByRole("button", { name: "Archive Engineering" }),
+      ).toBeDefined();
+    },
+  );
 
-  it("shows the archive section only once the settings have loaded", async () => {
-    // Regression: it rendered first and jumped down the page (layout shift).
-    const settings = deferred<typeof TEAM_FILE>();
-    const api = fakeApi({ teamSettings: vi.fn(() => settings.promise) });
-    renderAt("/issues/settings", api, route);
-    await waitFor(() => {
-      expect(api.teamSettings).toHaveBeenCalled();
-    });
-    expect(
-      screen.queryByRole("button", { name: "Archive Engineering" }),
-    ).toBeNull();
-    settings.resolve(TEAM_FILE);
-    expect(
-      await screen.findByRole("button", { name: "Archive Engineering" }),
-    ).toBeDefined();
-  });
+  it(
+    "shows the archive section only once the settings have " + "loaded",
+    async () => {
+      // Regression: it rendered first and jumped down the page (layout shift).
+      const settings = deferred<typeof TEAM_FILE>();
+      const api = fakeApi({ teamSettings: vi.fn(() => settings.promise) });
+      renderAt("/issues/settings", api, route);
+      await waitFor(() => {
+        expect(api.teamSettings).toHaveBeenCalled();
+      });
+      expect(
+        screen.queryByRole("button", { name: "Archive Engineering" }),
+      ).toBeNull();
+      settings.resolve(TEAM_FILE);
+      expect(
+        await screen.findByRole("button", { name: "Archive Engineering" }),
+      ).toBeDefined();
+    },
+  );
 
   it(
     "hides archived teams from the picker until asked, and shows a refused " +

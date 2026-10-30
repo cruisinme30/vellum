@@ -31,7 +31,8 @@ while read -r sha; do
   if [[ "${author_email}" == *"[bot]@users.noreply.github.com" ]]; then
     bot=true
   fi
-  if ! { check_subject "${subject}" || { "${bot}" && check_bot_subject "${subject}"; }; }; then
+  if ! { check_subject "${subject}" || { "${bot}" \
+    && check_bot_subject "${subject}"; }; }; then
     echo "::error::${sha:0:12} subject is not a Conventional Commit: ${subject}"
     failures=$((failures + 1))
   fi
@@ -39,11 +40,13 @@ while read -r sha; do
     continue
   fi
   if ! check_body "${message}"; then
-    echo "::error::${sha:0:12} needs a blank line after the subject and a body saying why (see .gitmessage)"
+    echo "::error::${sha:0:12} needs a blank line after the subject and a" \
+        "body saying why (see .gitmessage)"
     failures=$((failures + 1))
   fi
   if ! check_signoff "${message}" "${author_name}" "${author_email}"; then
-    echo "::error::${sha:0:12} lacks 'Signed-off-by: ${author_name} <${author_email}>' (use git commit -s)"
+    echo "::error::${sha:0:12} lacks 'Signed-off-by: ${author_name}" \
+        "<${author_email}>' (use git commit -s)"
     failures=$((failures + 1))
   fi
 done < <(git rev-list --no-merges "${base}..${head}")

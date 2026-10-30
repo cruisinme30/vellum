@@ -27,7 +27,8 @@ export function triage(
   const fresh: Problem[] = [];
   const known: string[] = [];
   for (const problem of problems) {
-    // eslint-disable-next-line sonarjs/no-empty-collection -- empty until a bug is filed
+    // Empty until a bug is filed.
+    // eslint-disable-next-line sonarjs/no-empty-collection
     const entry = KNOWN.find(
       (candidate) =>
         candidate.rule === problem.rule && candidate.test.test(title),

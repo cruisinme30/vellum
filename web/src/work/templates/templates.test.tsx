@@ -135,33 +135,36 @@ describe("template file", () => {
 });
 
 describe("planning API for repeats", () => {
-  it("asks for repeating issues and sets a repeat with its due date", async () => {
-    const get = vi.fn(() =>
-      Promise.resolve({ groups: [{ issues: [issue("ENG-4", "Rotate")] }] }),
-    );
-    const send = vi.fn(() => Promise.resolve(issue("ENG-4", "Rotate")));
-    const api = createHttpPlanningApi({ get, send } as unknown as Http);
-    const found = await api.recurring("ENG");
-    expect(found.map((each) => each.key)).toEqual(["ENG-4"]);
-    expect(get).toHaveBeenCalledWith("/api/v1/work/issues", {
-      team: "ENG",
-      filter: JSON.stringify({ field: "repeat", op: "is_not_empty" }),
-      group_by: "none",
-      order_by: "due",
-      show_closed: "none",
-    });
-    await api.setRepeat("ENG-4", "2w", "2026-11-02");
-    expect(send).toHaveBeenCalledWith("PATCH", "/api/v1/work/issues/ENG-4", {
-      due: "2026-11-02",
-      repeat: "2w",
-    });
-    await api.setRepeat("ENG-4", "");
-    expect(send).toHaveBeenLastCalledWith(
-      "PATCH",
-      "/api/v1/work/issues/ENG-4",
-      { repeat: "" },
-    );
-  });
+  it(
+    "asks for repeating issues and sets a repeat with its due " + "date",
+    async () => {
+      const get = vi.fn(() =>
+        Promise.resolve({ groups: [{ issues: [issue("ENG-4", "Rotate")] }] }),
+      );
+      const send = vi.fn(() => Promise.resolve(issue("ENG-4", "Rotate")));
+      const api = createHttpPlanningApi({ get, send } as unknown as Http);
+      const found = await api.recurring("ENG");
+      expect(found.map((each) => each.key)).toEqual(["ENG-4"]);
+      expect(get).toHaveBeenCalledWith("/api/v1/work/issues", {
+        team: "ENG",
+        filter: JSON.stringify({ field: "repeat", op: "is_not_empty" }),
+        group_by: "none",
+        order_by: "due",
+        show_closed: "none",
+      });
+      await api.setRepeat("ENG-4", "2w", "2026-11-02");
+      expect(send).toHaveBeenCalledWith("PATCH", "/api/v1/work/issues/ENG-4", {
+        due: "2026-11-02",
+        repeat: "2w",
+      });
+      await api.setRepeat("ENG-4", "");
+      expect(send).toHaveBeenLastCalledWith(
+        "PATCH",
+        "/api/v1/work/issues/ENG-4",
+        { repeat: "" },
+      );
+    },
+  );
 });
 
 describe("templates screen", () => {

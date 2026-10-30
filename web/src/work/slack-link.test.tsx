@@ -13,7 +13,8 @@ import { I18nProvider } from "../i18n/i18n";
 import { createHttpWorkApi, type MyWorkView, type WorkApi } from "./api";
 import { MyWorkPage } from "./my-work-page";
 
-// eslint-disable-next-line unicorn/no-null -- the API reads null as "the server's zone"
+// The API reads null as "the server's zone".
+// eslint-disable-next-line unicorn/no-null
 const NONE = null;
 const EMPTY = { sections: [] } as unknown as MyWorkView;
 

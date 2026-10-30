@@ -66,17 +66,20 @@ const request = (path: string, mode = "cors", method = "GET") => ({
 });
 
 describe("shell cache", () => {
-  it("installs every entry under a versioned cache and revisioned keys", async () => {
-    const { caches, stores } = fakeCaches();
-    await installShell(caches, manifest);
-    expect([...(stores.get("vellum-shell-v2")?.keys() ?? [])]).toEqual([
-      "/index.html?__rev=abc",
-      "/assets/index-1.js?__rev=def",
-      "/icons/icon-192.png",
-    ]);
-    expect(shellCacheName(manifest)).toBe("vellum-shell-v2");
-    expect(entryKey({ url: "/a" })).toBe("/a");
-  });
+  it(
+    "installs every entry under a versioned cache and revisioned " + "keys",
+    async () => {
+      const { caches, stores } = fakeCaches();
+      await installShell(caches, manifest);
+      expect([...(stores.get("vellum-shell-v2")?.keys() ?? [])]).toEqual([
+        "/index.html?__rev=abc",
+        "/assets/index-1.js?__rev=def",
+        "/icons/icon-192.png",
+      ]);
+      expect(shellCacheName(manifest)).toBe("vellum-shell-v2");
+      expect(entryKey({ url: "/a" })).toBe("/a");
+    },
+  );
 
   it("deletes only older shell caches on activation", async () => {
     const { caches, stores } = fakeCaches({
@@ -119,17 +122,20 @@ describe("respond", () => {
     Promise.resolve(new Response(`network ${url}`)),
   );
 
-  it("serves navigations from the cached shell and assets cache-first", async () => {
-    const { caches } = fakeCaches();
-    await installShell(caches, manifest);
-    const context = { caches, origin: ORIGIN, manifest, fetch: fetchMock };
-    const shell = await respond(request("/docs/1", "navigate"), context);
-    expect(await shell?.text()).toBe("body of /index.html?__rev=abc");
-    const asset = await respond(request("/assets/index-1.js"), context);
-    expect(await asset?.text()).toBe("body of /assets/index-1.js?__rev=def");
-    expect(await respond(request("/api/v1/x"), context)).toBeUndefined();
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
+  it(
+    "serves navigations from the cached shell and assets " + "cache-first",
+    async () => {
+      const { caches } = fakeCaches();
+      await installShell(caches, manifest);
+      const context = { caches, origin: ORIGIN, manifest, fetch: fetchMock };
+      const shell = await respond(request("/docs/1", "navigate"), context);
+      expect(await shell?.text()).toBe("body of /index.html?__rev=abc");
+      const asset = await respond(request("/assets/index-1.js"), context);
+      expect(await asset?.text()).toBe("body of /assets/index-1.js?__rev=def");
+      expect(await respond(request("/api/v1/x"), context)).toBeUndefined();
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
 
   it("falls back to the network on a cache miss", async () => {
     const { caches } = fakeCaches();
@@ -140,19 +146,22 @@ describe("respond", () => {
     expect(await asset?.text()).toBe("network /icons/icon-192.png");
   });
 
-  it("lets the browser handle navigations when no shell is precached", async () => {
-    const { caches } = fakeCaches();
-    const bare = { version: "x", entries: [] };
-    const context = {
-      caches,
-      origin: ORIGIN,
-      manifest: bare,
-      fetch: fetchMock,
-    };
-    expect(
-      await respond(request("/docs/1", "navigate"), context),
-    ).toBeUndefined();
-  });
+  it(
+    "lets the browser handle navigations when no shell is " + "precached",
+    async () => {
+      const { caches } = fakeCaches();
+      const bare = { version: "x", entries: [] };
+      const context = {
+        caches,
+        origin: ORIGIN,
+        manifest: bare,
+        fetch: fetchMock,
+      };
+      expect(
+        await respond(request("/docs/1", "navigate"), context),
+      ).toBeUndefined();
+    },
+  );
 });
 
 describe("push", () => {

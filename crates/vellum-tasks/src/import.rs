@@ -801,9 +801,13 @@ mod tests {
     #[test]
     fn google_takeout() {
         let json = r#"{"kind":"tasks#taskLists","items":[{"kind":"tasks#tasks","title":"Errands","items":[
-          {"id":"b","title":"Child","status":"needsAction","parent":"a","position":"001"},
-          {"id":"a","title":"Buy <milk> {soon}","notes":"- semi-skimmed\n2 litres","status":"needsAction","due":"2026-11-03T00:00:00.000Z","position":"000"},
-          {"id":"c","title":"Done one","status":"completed","completed":"2026-10-01T10:00:00.000Z","position":"002"},
+          {"id":"b","title":"Child","status":"needsAction","parent":"a",
+            "position":"001"},
+          {"id":"a","title":"Buy <milk> {soon}",
+            "notes":"- semi-skimmed\n2 litres","status":"needsAction",
+              "due":"2026-11-03T00:00:00.000Z","position":"000"},
+          {"id":"c","title":"Done one","status":"completed",
+            "completed":"2026-10-01T10:00:00.000Z","position":"002"},
           {"id":"d","title":"Gone","status":"needsAction","deleted":true,"position":"003"}]}]}"#;
         let lists = google_tasks(json).unwrap();
         assert_eq!(lists.len(), 1);
@@ -921,10 +925,13 @@ task,Plan trip,Ideas,2,1,,,Nov 20 2026,en,\ntask,Fête,,,1,,,demain,fr,\n";
     #[test]
     fn things_projects_headings_and_checklists() {
         let json = r#"[
-          {"type":"to-do","attributes":{"title":"Loose","when":"evening","tags":["Home"]}},
+          {"type":"to-do","attributes":{"title":"Loose","when":"evening",
+            "tags":["Home"]}},
           {"type":"project","attributes":{"title":"Launch","items":[
-            {"type":"to-do","id":"T1","attributes":{"title":"Draft","when":"2026-11-04@09:30","deadline":"2026-11-06",
-              "checklist-items":[{"type":"checklist-item","attributes":{"title":"Outline","completed":true}}]}},
+            {"type":"to-do","id":"T1","attributes":{"title":"Draft",
+              "when":"2026-11-04@09:30","deadline":"2026-11-06",
+              "checklist-items":[{"type":"checklist-item",
+                "attributes":{"title":"Outline","completed":true}}]}},
             {"type":"heading","attributes":{"title":"Ship"}},
             {"type":"to-do","attributes":{"title":"Post","when":"someday","completed":true}}]}}]"#;
         let today = date(2026, 11, 2);
