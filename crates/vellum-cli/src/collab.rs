@@ -17,6 +17,10 @@
 //!
 //! The change log is [`vellum_collab::sql::SqlUpdateStore`], sealed with a
 //! key kept in the data folder.
+//!
+//! With several replicas, [`cluster`] puts this one in the live-editing
+//! cluster: each page's room lives on one replica, and a connection that
+//! lands on another is forwarded there (ADR 0037, D151 and D278).
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -30,6 +34,7 @@ use axum::response::IntoResponse as _;
 use bytes::Bytes;
 use vellum_api::auth::{Authenticator, RequestMeta};
 use vellum_api::error::ErrorResponse;
+use vellum_collab::cluster::{Cluster, ClusterConfig, Node};
 use vellum_collab::sql::{Envelope, SqlUpdateStore};
 use vellum_collab::ws::Authorizer;
 use vellum_collab::{
@@ -53,18 +58,68 @@ pub struct Collab {
     hub: Hub,
     files: Arc<DriveFiles>,
     authorizer: Arc<dyn Authorizer>,
+    /// This replica's place among several, and the task that keeps it
+    /// fresh; `None` on a single replica.
+    cluster: Option<(Arc<Cluster>, tokio::task::AbortHandle)>,
 }
 
 impl std::fmt::Debug for Collab {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Collab")
             .field("open_rooms", &self.hub.open_rooms())
+            .field("clustered", &self.cluster.is_some())
             .finish_non_exhaustive()
     }
 }
 
+/// Puts this replica, named `me`, in the live-editing cluster when
+/// `VELLUM_CLUSTER_KEY` and `VELLUM_NODE_ADDRESS` are both set (D278).
+/// Without the key it serves every room itself, as a single server does.
+///
+/// # Errors
+///
+/// `invalid_input` when the key is shorter than 32 bytes: replicas that
+/// cannot forward would each keep their own copy of a room, so editors on
+/// different replicas would not see each other live.
+pub fn cluster(
+    index: &Index,
+    me: &str,
+    var: impl Fn(&str) -> Option<String>,
+) -> Result<Option<Arc<Cluster>>> {
+    let set = |name: &str| var(name).filter(|v| !v.trim().is_empty());
+    let Some(key) = set(crate::limits::CLUSTER_KEY_VAR) else {
+        return Ok(None);
+    };
+    let Some(address) = set(crate::cluster::ADDRESS_VAR) else {
+        tracing::warn!(
+            "{} is set but {} is not; other replicas cannot reach this one, \
+             so it serves every page's live editing itself",
+            crate::limits::CLUSTER_KEY_VAR,
+            crate::cluster::ADDRESS_VAR,
+        );
+        return Ok(None);
+    };
+    let me = Node {
+        name: me.to_owned(),
+        address: address.trim().to_owned(),
+    };
+    let config = ClusterConfig::new(me, key.into_bytes()).map_err(|e| {
+        Error::new(
+            ErrorKind::InvalidInput,
+            format!("{}: {}", crate::limits::CLUSTER_KEY_VAR, e.message()),
+        )
+    })?;
+    tracing::info!(address = %config.me.address, "live editing runs across replicas");
+    Ok(Some(Arc::new(Cluster::new(
+        config,
+        Arc::new(vellum_db::cluster::Nodes::new(index.clone())),
+    ))))
+}
+
 impl Collab {
-    /// Builds the hub over `drive` and the `index` database.
+    /// Builds the hub over `drive` and the `index` database. With a
+    /// `cluster` (see [`cluster`]), rooms live on their owner replica and
+    /// the cluster's list of replicas is kept fresh until [`Self::shutdown`].
     ///
     /// # Errors
     ///
@@ -76,6 +131,7 @@ impl Collab {
         data_dir: &Path,
         app_origin: &str,
         authenticator: Arc<dyn Authenticator>,
+        cluster: Option<Arc<Cluster>>,
     ) -> Result<Self> {
         let keyring = log_keyring(data_dir)?;
         let files = Arc::new(DriveFiles::new(Arc::clone(&drive)));
@@ -91,20 +147,46 @@ impl Collab {
             origin: app_origin.trim_end_matches('/').to_owned(),
             authenticator: Some(authenticator),
         });
+        let cluster = cluster.map(|cluster| {
+            let task = Arc::clone(&cluster).spawn(hub.clone()).abort_handle();
+            (cluster, task)
+        });
         Ok(Self {
             hub,
             files,
             authorizer,
+            cluster,
         })
     }
 
-    /// The router to mount at `/collab`.
+    /// The router to mount at `/collab`: with a cluster, a connection for a
+    /// room another replica owns is forwarded there.
     pub fn router(&self) -> Router {
-        vellum_collab::ws::router(self.hub.clone(), Arc::clone(&self.authorizer))
+        let authorizer = Arc::clone(&self.authorizer);
+        match &self.cluster {
+            Some((cluster, _)) => vellum_collab::ws::clustered_router(
+                self.hub.clone(),
+                authorizer,
+                Arc::clone(cluster),
+            ),
+            None => vellum_collab::ws::router(self.hub.clone(), authorizer),
+        }
     }
 
-    /// Saves every open page and closes its connections.
+    /// Stops beating in the cluster's list and leaves it, so the other
+    /// replicas take over this one's rooms at once. Does nothing on a
+    /// single replica, and nothing more the second time.
+    pub async fn leave_cluster(&self) {
+        if let Some((cluster, task)) = &self.cluster {
+            task.abort();
+            cluster.leave().await;
+        }
+    }
+
+    /// Leaves the cluster, then saves every open page and closes its
+    /// connections.
     pub async fn shutdown(&self) {
+        self.leave_cluster().await;
         self.hub.shutdown().await;
     }
 }
@@ -720,6 +802,52 @@ mod tests {
             .trash(&Actor::User { user: world.owner }, world.page.id)
             .await?;
         assert!(auth.recheck(&owner, room).await.is_err());
+        Ok(())
+    }
+
+    /// D278: the cluster key and this replica's address turn on room
+    /// forwarding; a short key stops startup.
+    #[tokio::test]
+    async fn the_cluster_key_and_address_turn_on_forwarding() -> TestResult {
+        let dir = tempfile::tempdir()?;
+        let index = Index::open(&vellum_db::IndexConfig::sqlite(
+            dir.path().join("index.sqlite"),
+            None,
+        ))
+        .await?;
+        let key = "k".repeat(32);
+        let env = |pairs: &'static [(&'static str, &'static str)]| {
+            move |name: &str| {
+                pairs
+                    .iter()
+                    .find(|(k, _)| *k == name)
+                    .map(|(_, v)| (*v).to_owned())
+            }
+        };
+        let with = |key: String, address: Option<&'static str>| {
+            move |name: &str| match name {
+                crate::limits::CLUSTER_KEY_VAR => Some(key.clone()),
+                crate::cluster::ADDRESS_VAR => address.map(str::to_owned),
+                _ => None,
+            }
+        };
+
+        assert!(cluster(&index, "pod-a:1:1", env(&[]))?.is_none());
+        let only_address = env(&[("VELLUM_NODE_ADDRESS", "10.0.0.7:7700")]);
+        assert!(cluster(&index, "pod-a:1:1", only_address)?.is_none());
+        assert!(cluster(&index, "pod-a:1:1", with(key.clone(), None))?.is_none());
+
+        let on = cluster(&index, "pod-a:1:1", with(key, Some(" 10.0.0.7:7700 ")))?
+            .ok_or("no cluster")?;
+        assert_eq!(on.config().me.name, "pod-a:1:1");
+        assert_eq!(on.config().me.address, "10.0.0.7:7700");
+
+        let short = cluster(&index, "pod-a:1:1", with("short".to_owned(), Some("a:1")));
+        assert_eq!(
+            short.map(|_| ()).map_err(|e| e.kind()),
+            Err(ErrorKind::InvalidInput)
+        );
+        index.close().await;
         Ok(())
     }
 

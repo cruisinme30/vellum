@@ -59,6 +59,7 @@ use crate::cluster::Replica;
 use crate::collab::{Collab, LivePages};
 use crate::feed::{AnnouncingStore, Caches};
 use crate::google_http::{self, Endpoints, FileLinks, GoogleHttp};
+use crate::identity::IdentityAuthenticator;
 use crate::page_render::{Handles, PageRenderService};
 use crate::reindex::{KEY_VAR, key_bytes};
 use crate::tasks::{DriveTasks, Parts, TasksSettings};
@@ -992,6 +993,7 @@ fn open_collab(
     config: &Config,
     app_origin: &str,
     identity: &Arc<Identity>,
+    cluster: Option<Arc<vellum_collab::cluster::Cluster>>,
 ) -> Result<Collab, Error> {
     Collab::open(
         Arc::clone(&workspace.drive),
@@ -1005,6 +1007,7 @@ fn open_collab(
         Arc::new(crate::identity::IdentityAuthenticator::new(Arc::clone(
             identity,
         ))),
+        cluster,
     )
 }
 
@@ -1094,6 +1097,7 @@ pub async fn open(
         config,
         app_origin,
         identity,
+        crate::collab::cluster(&index, &me, &var)?,
     )?;
     keep_drives(&workspace.drive, &drive_index, identity).await?;
     live_pages.attach(&collab);

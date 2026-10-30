@@ -5,6 +5,8 @@
 
 #![allow(dead_code, missing_docs, clippy::missing_panics_doc)]
 
+pub mod socket;
+
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::sync::Arc;
