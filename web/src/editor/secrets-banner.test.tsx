@@ -72,16 +72,19 @@ describe("SecretsBanner", () => {
     expect(editor.getText()).toContain("The bot uses  to push.");
   });
 
-  it("lets the writer say it is not a secret, unless saves are blocked", async () => {
-    show(vi.fn<ScanSecrets>().mockResolvedValue(answer("warn")));
-    await screen.findByRole("alert");
-    act(() => {
-      fireEvent.click(
-        screen.getByRole("button", { name: "It's not a secret" }),
-      );
-    });
-    expect(screen.queryByRole("alert")).toBeNull();
-  });
+  it(
+    "lets the writer say it is not a secret, unless saves are " + "blocked",
+    async () => {
+      show(vi.fn<ScanSecrets>().mockResolvedValue(answer("warn")));
+      await screen.findByRole("alert");
+      act(() => {
+        fireEvent.click(
+          screen.getByRole("button", { name: "It's not a secret" }),
+        );
+      });
+      expect(screen.queryByRole("alert")).toBeNull();
+    },
+  );
 
   it("says a blocked page will not save", async () => {
     show(vi.fn<ScanSecrets>().mockResolvedValue(answer("block")));

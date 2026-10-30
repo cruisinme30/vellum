@@ -127,8 +127,10 @@ proptest! {
     #[test]
     fn repeat_phrases_start_on_or_after_today(
         phrase in prop::sample::select(&[
-            "every day", "every weekday", "every 2 weeks", "every! 3 days", "every mon, thu",
-            "every 15th", "every last fri", "every jan 1", "monthly", "every other month",
+            "every day", "every weekday", "every 2 weeks", "every! 3 days",
+                "every mon, thu",
+            "every 15th", "every last fri", "every jan 1", "monthly",
+                "every other month",
         ][..]),
         now in now_strategy(),
     ) {
@@ -141,7 +143,8 @@ proptest! {
 
     #[test]
     fn sigils_never_swallow_text(
-        list in "[a-z]{1,8}", label in "[a-z]{1,8}", person in "[a-z]{1,8}", level in 1_u8..=4,
+        list in "[a-z]{1,8}", label in "[a-z]{1,8}", person in "[a-z]{1,8}",
+            level in 1_u8..=4,
         now in now_strategy(),
     ) {
         let input = format!("Pack bags #{list} @{label} +{person} p{level}");

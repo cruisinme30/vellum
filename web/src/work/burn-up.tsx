@@ -30,7 +30,8 @@ function path(
   return points
     .map(
       (p, index) =>
-        `${index === 0 ? "M" : "L"}${x(index).toFixed(1)},${y(value(p)).toFixed(1)}`,
+        `${index === 0 ? "M" : "L"}${x(index).toFixed(1)}` +
+        `,${y(value(p)).toFixed(1)}`,
     )
     .join(" ");
 }

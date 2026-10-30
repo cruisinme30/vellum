@@ -191,7 +191,8 @@ mod tests {
     fn alerts_and_ignored_resources() -> Result<(), InboundError> {
         let alert = serde_json::to_vec(&json!({
             "action": "triggered",
-            "data": {"event": {"title": "Out of memory", "level": "fatal", "issue_id": "42",
+            "data": {"event": {"title": "Out of memory", "level": "fatal",
+                               "issue_id": "42",
                                "web_url": "https://northstar.sentry.io/issues/4\
                                    2/events/x/", "project_slug": "api"}}
         }))

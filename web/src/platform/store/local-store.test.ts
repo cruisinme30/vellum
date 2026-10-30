@@ -48,32 +48,35 @@ describe("LocalStore", () => {
   });
   afterAll(() => setTelemetrySink(previous));
 
-  it("applies a mutation synchronously and notifies subscribers once", async () => {
-    const { store } = await setup();
-    const listener = vi.fn();
-    const unsubscribe = store.subscribe(["issues", "other"], listener);
-    const before = store.version;
-    const mutation = store.mutate("createIssue", {
-      key: "ENG-1",
-      title: "Fix login",
-    });
-    expect(mutation.id).toBe(1);
-    expect(store.get("issues", "ENG-1")).toEqual({
-      title: "Fix login",
-      state: "backlog",
-    });
-    expect(store.scan("issues")).toHaveLength(1);
-    expect(listener).toHaveBeenCalledTimes(1);
-    expect(store.version).toBe(before + 1);
-    expect(
-      recorded.some(
-        (entry) => entry.name === "vellum.client.mutation.perceived_ms",
-      ),
-    ).toBe(true);
-    unsubscribe();
-    store.mutate("createIssue", { key: "ENG-2", title: "b" });
-    expect(listener).toHaveBeenCalledTimes(1);
-  });
+  it(
+    "applies a mutation synchronously and notifies subscribers " + "once",
+    async () => {
+      const { store } = await setup();
+      const listener = vi.fn();
+      const unsubscribe = store.subscribe(["issues", "other"], listener);
+      const before = store.version;
+      const mutation = store.mutate("createIssue", {
+        key: "ENG-1",
+        title: "Fix login",
+      });
+      expect(mutation.id).toBe(1);
+      expect(store.get("issues", "ENG-1")).toEqual({
+        title: "Fix login",
+        state: "backlog",
+      });
+      expect(store.scan("issues")).toHaveLength(1);
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(store.version).toBe(before + 1);
+      expect(
+        recorded.some(
+          (entry) => entry.name === "vellum.client.mutation.perceived_ms",
+        ),
+      ).toBe(true);
+      unsubscribe();
+      store.mutate("createIssue", { key: "ENG-2", title: "b" });
+      expect(listener).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it("keeps pending mutations and the client ID across a restart", async () => {
     const { database, server, store } = await setup();
@@ -90,26 +93,30 @@ describe("LocalStore", () => {
     expect(again.mutate("deleteIssue", { key: "ENG-1" }).id).toBe(3);
   });
 
-  it("pushes, pulls and confirms, then continues mutation IDs after a restart", async () => {
-    const { database, server, store } = await setup();
-    store.mutate("createIssue", { key: "ENG-1", title: "a" });
-    const outcome = await store.sync();
-    expect(outcome).toEqual({ pushed: 1, pulled: 1, pending: 0 });
-    expect(store.get("issues", "ENG-1")).toEqual({
-      title: "a",
-      state: "backlog",
-    });
-    const again = await reopen(database, server);
-    expect(again.pending).toEqual([]);
-    expect(again.get("issues", "ENG-1")).toEqual({
-      title: "a",
-      state: "backlog",
-    });
-    expect(again.mutate("setState", { key: "ENG-1", state: "done" }).id).toBe(
-      2,
-    );
-    expect(await again.sync()).toEqual({ pushed: 1, pulled: 1, pending: 0 });
-  });
+  it(
+    "pushes, pulls and confirms, then continues mutation IDs after a " +
+      "restart",
+    async () => {
+      const { database, server, store } = await setup();
+      store.mutate("createIssue", { key: "ENG-1", title: "a" });
+      const outcome = await store.sync();
+      expect(outcome).toEqual({ pushed: 1, pulled: 1, pending: 0 });
+      expect(store.get("issues", "ENG-1")).toEqual({
+        title: "a",
+        state: "backlog",
+      });
+      const again = await reopen(database, server);
+      expect(again.pending).toEqual([]);
+      expect(again.get("issues", "ENG-1")).toEqual({
+        title: "a",
+        state: "backlog",
+      });
+      expect(again.mutate("setState", { key: "ENG-1", state: "done" }).id).toBe(
+        2,
+      );
+      expect(await again.sync()).toEqual({ pushed: 1, pulled: 1, pending: 0 });
+    },
+  );
 
   it("merges other people's changes under local pending edits", async () => {
     const { server, store } = await setup();

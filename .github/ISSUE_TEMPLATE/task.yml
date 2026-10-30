@@ -21,7 +21,9 @@ body:
     id: requirements
     attributes:
       label: Requirements
-      description: Requirement and decision IDs from the brief and PRD, such as R-DR-4 or D12.
+      description: >-
+        Requirement and decision IDs from the brief and PRD, such as R-DR-4 or
+        D12.
     validations:
       required: true
   - type: input
@@ -35,14 +37,17 @@ body:
     id: adr
     attributes:
       label: ADR
-      description: The decision record in docs/adr/ for this feature, such as ADR 0012. It must link back to this issue.
+      description: >-
+        The decision record in docs/adr/ for this feature, such as ADR 0012. It
+        must link back to this issue.
     validations:
       required: true
   - type: input
     id: prs
     attributes:
       label: Pull requests
-      description: 'Pull requests for this feature. Each one says "Closes #N" or "Refs #N".'
+      description: >-
+        Pull requests for this feature. Each one says "Closes #N" or "Refs #N".
       value: None yet
   - type: textarea
     id: history
@@ -59,6 +64,10 @@ body:
     attributes:
       label: Definition of done
       options:
-        - label: 'One pull request for the feature, merged into develop, with "Closes #N" in its description'
+        - label: >-
+            One pull request for the feature, merged into develop, with "Closes
+            #N" in its description
         - label: The ADR links back to this issue, and this issue links the ADR
-        - label: Tests at the right layer, tracing on new I/O, public items documented
+        - label: >-
+            Tests at the right layer, tracing on new I/O, public items
+            documented

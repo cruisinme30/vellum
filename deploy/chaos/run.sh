@@ -28,7 +28,8 @@ k6_job() {
   shift 2
   local env_args=(-e "BASE_URL=${base_url}" -e "TOKEN=${TOKEN:-}")
   for pair in "$@"; do env_args+=(-e "${pair}"); done
-  kubectl create job "${name}" --image="${K6_IMAGE}" --dry-run=client -o json -- \
+  kubectl create job "${name}" --image="${K6_IMAGE}" --dry-run=client -o json \
+    -- \
     k6 run -q "${env_args[@]}" "/scripts/${script}" |
     jq '.spec.backoffLimit = 0
       | .spec.template.spec.volumes = [
@@ -44,10 +45,12 @@ k6_job() {
 wait_job() {
   local name="$1" deadline=$((SECONDS + $2))
   while ((SECONDS < deadline)); do
-    if [[ "$(kubectl get job "${name}" -o jsonpath='{.status.succeeded}')" == "1" ]]; then
+    if [[ "$(kubectl get job "${name}" -o jsonpath='{.status.succeeded}')" == \
+      "1" ]]; then
       return 0
     fi
-    if [[ "$(kubectl get job "${name}" -o jsonpath='{.status.failed}')" == "1" ]]; then
+    if [[ "$(kubectl get job "${name}" -o jsonpath='{.status.failed}')" == "1" \
+      ]]; then
       kubectl logs "job/${name}" | tail -60
       echo "::error::${name} failed."
       return 1
@@ -61,29 +64,34 @@ wait_job() {
 echo "Installing MinIO and Vellum."
 kubectl create secret generic vellum-kek --from-literal=passphrase="$(random)"
 kubectl create secret generic minio-credentials \
-  --from-literal=AWS_ACCESS_KEY_ID=vellum --from-literal=AWS_SECRET_ACCESS_KEY="$(random)"
+  --from-literal=AWS_ACCESS_KEY_ID=vellum \
+  --from-literal=AWS_SECRET_ACCESS_KEY="$(random)"
 kubectl apply -f "${here}/minio.yaml"
 kubectl wait --for=condition=complete job/minio-bucket --timeout=300s
 helm install vellum "${repo}/deploy/helm/vellum" -f "${here}/values-kind.yaml" \
   --set fullnameOverride=vellum --wait --timeout 15m
 
 kubectl create configmap k6-scripts \
-  --from-file="${repo}/deploy/perf/k6/" --from-file="${here}/writes.js" --from-file="${here}/verify.js"
+  --from-file="${repo}/deploy/perf/k6/" --from-file="${here}/writes.js" \
+  --from-file="${here}/verify.js"
 
 echo "Starting load (${DURATION}) and the acknowledged-write log."
 k6_job chaos-load suite.js "SCALE=0.05" "DURATION=${DURATION}" "PAGES=100"
 k6_job chaos-writes writes.js "DURATION=${DURATION}"
 
-experiments=(kill-vellum-node kill-kroki kill-postgres-primary blob-outage slow-postgres)
+experiments=(kill-vellum-node kill-kroki kill-postgres-primary blob-outage \
+  slow-postgres)
 for experiment in "${experiments[@]}"; do
   sleep "${GAP}"
   echo "Fault: ${experiment}"
-  yq "select(.metadata.name == \"${experiment}\")" "${here}/experiments.yaml" | kubectl apply -f -
+  yq "select(.metadata.name == \"${experiment}\")" "${here}/experiments.yaml" \
+    | kubectl apply -f -
 done
 
 minutes="${DURATION%m}"
 wait_job chaos-writes $((minutes * 60 + 600))
-kubectl logs job/chaos-writes | grep -o 'ACK [A-Za-z0-9_-]*' | cut -d' ' -f2 >"${work}/acks.txt"
+kubectl logs job/chaos-writes | grep -o 'ACK [A-Za-z0-9_-]*' \
+  | cut -d' ' -f2 >"${work}/acks.txt"
 echo "$(wc -l <"${work}/acks.txt") writes were acknowledged."
 kubectl create configmap chaos-acks --from-file=acks.txt="${work}/acks.txt"
 k6_job chaos-verify verify.js "ACKS_FILE=/acks/acks.txt"

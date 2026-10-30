@@ -15,16 +15,19 @@ subject="$(head -n1 <<<"${message}")"
 [[ "${subject}" == Merge* ]] && exit 0
 
 if ! check_subject "${subject}"; then
-  echo "commit-msg: subject must be a Conventional Commit, e.g. 'feat(format): parse callouts'." >&2
+  echo "commit-msg: subject must be a Conventional Commit, e.g." \
+    "'feat(format): parse callouts'." >&2
   exit 1
 fi
 if ! check_body "${message}"; then
-  echo "commit-msg: add a blank line after the subject and a body saying why (see .gitmessage)." >&2
+  echo "commit-msg: add a blank line after the subject and a body saying why" \
+    "(see .gitmessage)." >&2
   exit 1
 fi
 name="$(git config user.name)"
 email="$(git config user.email)"
 if ! check_signoff "${message}" "${name}" "${email}"; then
-  echo "commit-msg: missing 'Signed-off-by: ${name} <${email}>'; commit with -s." >&2
+  echo "commit-msg: missing 'Signed-off-by: ${name} <${email}>'; commit with" \
+      "-s." >&2
   exit 1
 fi

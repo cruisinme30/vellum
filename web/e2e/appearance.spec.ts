@@ -17,7 +17,8 @@ test.use({
   hasTouch: false,
   isMobile: false,
 });
-// eslint-disable-next-line no-empty-pattern -- Playwright needs the fixtures object
+// Playwright needs the fixtures object.
+// eslint-disable-next-line no-empty-pattern
 test.beforeEach(({}, testInfo) => {
   test.skip(
     !testInfo.project.name.endsWith("-laptop"),
@@ -114,57 +115,60 @@ test("allow motion overrides the system's reduced motion", async ({ page }) => {
   expect(Number.parseFloat(motion)).toBeGreaterThan(0);
 });
 
-test("the theme editor checks contrast, exports and re-imports a theme", async ({
-  page,
-}, info) => {
-  await page.goto(PAGE);
-  const custom = editor(page);
-  await custom.getByLabel("Theme name").fill("Northstar ink");
-  await custom.locator("summary", { hasText: "Colours" }).click();
-  // Body text almost the page colour: the theme cannot be used.
-  await custom.getByLabel("on-surface", { exact: true }).fill("#f2f2f2");
-  await expect(custom.getByRole("status").first()).toContainText(
-    "too little contrast",
-  );
-  await expect(
-    custom.getByRole("button", { name: "Use this theme" }),
-  ).toBeDisabled();
-  await custom.getByRole("button", { name: "Reset colours" }).click();
-  await expect(custom.getByRole("status").first()).toContainText("pass");
+test(
+  "the theme editor checks contrast, exports and re-imports a " + "theme",
+  async ({ page }, info) => {
+    await page.goto(PAGE);
+    const custom = editor(page);
+    await custom.getByLabel("Theme name").fill("Northstar ink");
+    await custom.locator("summary", { hasText: "Colours" }).click();
+    // Body text almost the page colour: the theme cannot be used.
+    await custom.getByLabel("on-surface", { exact: true }).fill("#f2f2f2");
+    await expect(custom.getByRole("status").first()).toContainText(
+      "too little contrast",
+    );
+    await expect(
+      custom.getByRole("button", { name: "Use this theme" }),
+    ).toBeDisabled();
+    await custom.getByRole("button", { name: "Reset colours" }).click();
+    await expect(custom.getByRole("status").first()).toContainText("pass");
 
-  const downloading = page.waitForEvent("download");
-  await custom.getByRole("button", { name: "Export JSON" }).click();
-  const download = await downloading;
-  expect(download.suggestedFilename()).toBe("northstar-ink.vellum-theme.json");
-  const saved = info.outputPath("theme.json");
-  await download.saveAs(saved);
-  const text = await readFile(saved, "utf8");
-  expect(JSON.parse(text)).toMatchObject({
-    format: "vellum.theme/1",
-    name: "Northstar ink",
-  });
+    const downloading = page.waitForEvent("download");
+    await custom.getByRole("button", { name: "Export JSON" }).click();
+    const download = await downloading;
+    expect(download.suggestedFilename()).toBe(
+      "northstar-ink.vellum-theme.json",
+    );
+    const saved = info.outputPath("theme.json");
+    await download.saveAs(saved);
+    const text = await readFile(saved, "utf8");
+    expect(JSON.parse(text)).toMatchObject({
+      format: "vellum.theme/1",
+      name: "Northstar ink",
+    });
 
-  await custom.getByLabel("Theme name").fill("Something else");
-  await custom.getByLabel("Import JSON").setInputFiles(saved);
-  await expect(custom.getByText(/Imported "Northstar ink"/)).toBeVisible();
-  await custom.getByRole("button", { name: "Use this theme" }).click();
-  expect(await html(page, "data-custom-theme")).toBe("Northstar ink");
-  await expectNoViolations(page);
+    await custom.getByLabel("Theme name").fill("Something else");
+    await custom.getByLabel("Import JSON").setInputFiles(saved);
+    await expect(custom.getByText(/Imported "Northstar ink"/)).toBeVisible();
+    await custom.getByRole("button", { name: "Use this theme" }).click();
+    expect(await html(page, "data-custom-theme")).toBe("Northstar ink");
+    await expectNoViolations(page);
 
-  const bad = JSON.stringify({
-    format: "vellum.theme/1",
-    name: "Fog",
-    base: "light",
-    seed: "#225588",
-    tokens: { "on-surface": "#eeeeee" },
-  });
-  await custom.getByLabel("Import JSON").setInputFiles({
-    name: "fog.json",
-    mimeType: "application/json",
-    buffer: Buffer.from(bad),
-  });
-  await expect(custom.getByRole("alert")).toContainText("not imported");
-});
+    const bad = JSON.stringify({
+      format: "vellum.theme/1",
+      name: "Fog",
+      base: "light",
+      seed: "#225588",
+      tokens: { "on-surface": "#eeeeee" },
+    });
+    await custom.getByLabel("Import JSON").setInputFiles({
+      name: "fog.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(bad),
+    });
+    await expect(custom.getByRole("alert")).toContainText("not imported");
+  },
+);
 
 test("the quick theme menu links to every appearance setting", async ({
   page,

@@ -13,7 +13,8 @@
   function setUp(block, n) {
     var sections = [];
     for (var i = 0; i < block.children.length; i++) {
-      if (block.children[i].classList.contains("vl-tab")) sections.push(block.children[i]);
+      if (block.children[i].classList.contains("vl-tab"))
+        sections.push(block.children[i]);
     }
     if (sections.length < 2) return;
     var list = document.createElement("div");
@@ -53,7 +54,8 @@
       tab.addEventListener("keydown", function (event) {
         var next = null;
         if (event.key === "ArrowRight") next = (i + 1) % tabs.length;
-        else if (event.key === "ArrowLeft") next = (i - 1 + tabs.length) % tabs.length;
+        else if (event.key === "ArrowLeft")
+          next = (i - 1 + tabs.length) % tabs.length;
         else if (event.key === "Home") next = 0;
         else if (event.key === "End") next = tabs.length - 1;
         if (next === null) return;
@@ -74,6 +76,7 @@
     for (var i = 0; i < blocks.length; i++) setUp(blocks[i], i);
   }
 
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", wire);
+  if (document.readyState === "loading")
+    document.addEventListener("DOMContentLoaded", wire);
   else wire();
 })();

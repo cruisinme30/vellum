@@ -450,32 +450,53 @@ impl Drive {
     /// `Invalid` for any other path or a manifest without an ID,
     /// `PermissionDenied` without edit rights on the folder,
     /// `AlreadyExists` if another node holds the ID.
-    #[tracing::instrument(name = "drive.add_unit", skip_all, fields(path = %path), err)]
-    pub async fn add_unit(&self, actor: &Actor, path: &BlobPath) -> DriveResult<Node> {
+    #[tracing::instrument(
+        name = "drive.add_unit",
+        skip_all,
+        fields(path = %path),
+        err
+    )]
+    pub async fn add_unit(
+        &self,
+        actor: &Actor,
+        path: &BlobPath,
+    ) -> DriveResult<Node> {
         self.observe("add_unit", async {
             let name = path.file_name();
             let kind = [NodeKind::Book, NodeKind::Collection]
                 .into_iter()
-                .find(|k| name.len() > k.suffix().len() && name.ends_with(k.suffix()))
+                .find(|k| {
+                    name.len() > k.suffix().len() && name.ends_with(k.suffix())
+                })
                 .ok_or_else(|| {
-                    DriveError::Invalid(format!("{path} is not a book or collection"))
+                    DriveError::Invalid(format!(
+                        "{path} is not a book or collection"
+                    ))
                 })?;
-            let dir = path
-                .parent()
-                .ok_or_else(|| DriveError::Invalid(format!("{path} is not in a space")))?;
+            let dir = path.parent().ok_or_else(|| {
+                DriveError::Invalid(format!("{path} is not in a space"))
+            })?;
             let space = self
                 .index
                 .spaces()
                 .await?
                 .into_iter()
                 .find(|s| dir.starts_with(&s.root))
-                .ok_or_else(|| DriveError::Invalid(format!("{path} is not in a space")))?;
+                .ok_or_else(|| {
+                    DriveError::Invalid(format!("{path} is not in a space"))
+                })?;
             let parent = if dir == space.root {
                 None
             } else {
                 match self.index.node_at(space.id, &dir).await? {
-                    Some(n) if n.kind == NodeKind::Folder && n.is_live() => Some(n.id),
-                    _ => return Err(DriveError::Invalid(format!("{dir} is not a folder"))),
+                    Some(n) if n.kind == NodeKind::Folder && n.is_live() => {
+                        Some(n.id)
+                    }
+                    _ => {
+                        return Err(DriveError::Invalid(format!(
+                            "{dir} is not a folder"
+                        )));
+                    }
                 }
             };
             self.authorize(
@@ -485,10 +506,13 @@ impl Drive {
                 Permission::Edit,
             )
             .await?;
-            let (text, _) = self.read_text(&layout::id_file(kind, path)?).await?;
+            let (text, _) =
+                self.read_text(&layout::id_file(kind, path)?).await?;
             let id: ObjectId = frontmatter::get(&text, "id")
                 .and_then(|id| id.parse().ok())
-                .ok_or_else(|| DriveError::Invalid(format!("{path} has no id")))?;
+                .ok_or_else(|| {
+                    DriveError::Invalid(format!("{path} has no id"))
+                })?;
             if let Some(known) = self.index.node(id).await? {
                 if known.path == *path && known.is_live() {
                     return Ok(known);

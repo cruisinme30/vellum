@@ -35,20 +35,23 @@ function page(
 const NOW = Date.parse("2026-10-29T12:00:00Z");
 
 describe("highlight", () => {
-  it("marks every query word, case-insensitively, and keeps the text whole", () => {
-    const runs = highlight(
-      "Gateway architecture: the gateway routes",
-      "GATEWAY routes",
-    );
-    expect(runs.map((run) => run.text).join("")).toBe(
-      "Gateway architecture: the gateway routes",
-    );
-    expect(runs.filter((run) => run.hit).map((run) => run.text)).toEqual([
-      "Gateway",
-      "gateway",
-      "routes",
-    ]);
-  });
+  it(
+    "marks every query word, case-insensitively, and keeps the text " + "whole",
+    () => {
+      const runs = highlight(
+        "Gateway architecture: the gateway routes",
+        "GATEWAY routes",
+      );
+      expect(runs.map((run) => run.text).join("")).toBe(
+        "Gateway architecture: the gateway routes",
+      );
+      expect(runs.filter((run) => run.hit).map((run) => run.text)).toEqual([
+        "Gateway",
+        "gateway",
+        "routes",
+      ]);
+    },
+  );
 
   it(
     "strips quotes and punctuation from the query and merges overlapping " +
@@ -118,19 +121,23 @@ describe("searchTitles", () => {
     page("6", "Review of the 2027 plan"),
   ];
 
-  it("ranks prefixes, then word starts, then inside words, and skips folders", () => {
-    expect(searchTitles(pages, " road ").map((each) => each.id)).toEqual([
-      "1",
-      "2",
-      "3",
-      "4",
-    ]);
-    expect(searchTitles(pages, "2027 review").map((each) => each.id)).toEqual([
-      "6",
-    ]);
-    expect(searchTitles(pages, "")).toEqual([]);
-    expect(searchTitles(pages, "road", 2)).toHaveLength(2);
-  });
+  it(
+    "ranks prefixes, then word starts, then inside words, and skips " +
+      "folders",
+    () => {
+      expect(searchTitles(pages, " road ").map((each) => each.id)).toEqual([
+        "1",
+        "2",
+        "3",
+        "4",
+      ]);
+      expect(searchTitles(pages, "2027 review").map((each) => each.id)).toEqual(
+        ["6"],
+      );
+      expect(searchTitles(pages, "")).toEqual([]);
+      expect(searchTitles(pages, "road", 2)).toHaveLength(2);
+    },
+  );
 
   it("answers within the 20 ms budget for a large workspace", () => {
     const many = Array.from({ length: 20_000 }, (_, index) =>

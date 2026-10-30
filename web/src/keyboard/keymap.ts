@@ -115,7 +115,8 @@ export class Keymap {
       const other = seen.get(id);
       if (other !== undefined) {
         throw new Error(
-          `${command.id} and ${other} share the binding ${key(binding)} in ${command.scope}`,
+          `${command.id} and ${other} share the binding ${key(binding)} in ` +
+            command.scope,
         );
       }
       seen.set(id, command.id);

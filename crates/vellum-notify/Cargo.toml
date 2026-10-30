@@ -3,7 +3,9 @@
 
 [package]
 name = "vellum-notify"
-description = "The notifications and webhooks service: signed webhooks, in-app, email and web push."
+description = """\
+    The notifications and webhooks service: signed webhooks, in-app, email \
+    and web push."""
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

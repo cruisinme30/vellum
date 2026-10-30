@@ -13,7 +13,8 @@ import { CopyDiagnostic } from "../shell/copy-diagnostic";
 
 import type { MyWorkSettingsView, WorkApi } from "./api";
 
-// eslint-disable-next-line unicorn/no-null -- the API reads null as "none": the server's zone, no digest
+// The API reads null as "none": the server's zone, no digest.
+// eslint-disable-next-line unicorn/no-null
 const NONE = null;
 
 /** The browser's IANA time zone, if it reports one. */

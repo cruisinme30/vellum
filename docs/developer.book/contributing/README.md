@@ -32,8 +32,8 @@ gitGraph
 
 1. **Branch** from `develop` as `<type>/<topic>`, such as `feat/typed-ids` or
    `docs/help-books`.
-2. **Commit** with Conventional Commits, a body that says why, and `git commit -s`
-   for the sign-off.
+2. **Commit** with Conventional Commits, a body that says why, and
+   `git commit -s` for the sign-off.
 3. **Open a pull request** into `develop` that fills in every section of the
    template.
 4. **Pass the fast suite**: formatting, linters, tests, crate boundaries, supply

@@ -40,7 +40,8 @@ spec:
         {{- include "vellum.labels" . | nindent 8 }}
         {{- include "vellum.clamavSelector" . | nindent 8 }}
       annotations:
-        checksum/config: {{ printf "%s%s" (.Files.Get "files/clamd.conf") (.Files.Get "files/freshclam.conf") | sha256sum }}
+        checksum/config: {{ printf "%s%s" (.Files.Get "files/clamd.conf")
+          (.Files.Get "files/freshclam.conf") | sha256sum }}
     spec:
       automountServiceAccountToken: false
       securityContext:
@@ -59,7 +60,8 @@ spec:
                   {{- include "vellum.clamavSelector" . | nindent 18 }}
       initContainers:
         - name: seed
-          image: {{ include "vellum.image" (dict "image" .Values.clamav.image "default" "") }}
+          image: {{ include "vellum.image"
+            (dict "image" .Values.clamav.image "default" "") }}
           imagePullPolicy: Always
           command: ["cp", "-R", "/var/lib/clamav/.", "/db/"]
           resources:
@@ -70,7 +72,8 @@ spec:
             - { name: db, mountPath: /db }
       containers:
         - name: clamd
-          image: {{ include "vellum.image" (dict "image" .Values.clamav.image "default" "") }}
+          image: {{ include "vellum.image"
+            (dict "image" .Values.clamav.image "default" "") }}
           imagePullPolicy: Always
           command: ["clamd", "--config-file=/etc/vellum/clamd.conf"]
           ports:
@@ -82,7 +85,8 @@ spec:
             failureThreshold: 30
           livenessProbe:
             exec:
-              command: ["sh", "-c", "echo PING | nc 127.0.0.1 3310 | grep -q PONG"]
+              command:
+                ["sh", "-c", "echo PING | nc 127.0.0.1 3310 | grep -q PONG"]
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 4
@@ -98,9 +102,14 @@ spec:
             - { name: config, mountPath: /etc/vellum, readOnly: true }
             - { name: tmp, mountPath: /tmp }
         - name: freshclam
-          image: {{ include "vellum.image" (dict "image" .Values.clamav.image "default" "") }}
+          image: {{ include "vellum.image"
+            (dict "image" .Values.clamav.image "default" "") }}
           imagePullPolicy: Always
-          command: ["freshclam", "--config-file=/etc/vellum/freshclam.conf", "--stdout", "--daemon"]
+          command:
+            - freshclam
+            - --config-file=/etc/vellum/freshclam.conf
+            - --stdout
+            - --daemon
           resources:
             {{- toYaml .Values.clamav.updaterResources | nindent 12 }}
           securityContext:

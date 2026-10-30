@@ -299,8 +299,10 @@ async fn closing_unmerged_returns_the_issue_and_webhooks_parse() {
     let body = serde_json::json!({
         "action": "opened",
         "repository": {"full_name": "northstar/api", "default_branch": "main"},
-        "pull_request": {"number": 3, "title": "Speed up search", "body": "Closes ENG-7",
-                         "html_url": "https://github.com/northstar/api/pull/3", "draft": false,
+        "pull_request": {"number": 3, "title": "Speed up search",
+                         "body": "Closes ENG-7",
+                         "html_url": "https://github.com/northstar/api/pull/3",
+                             "draft": false,
                          "merged": false, "head": {"ref": "speed"}}
     })
     .to_string();

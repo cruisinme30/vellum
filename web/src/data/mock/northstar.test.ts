@@ -58,19 +58,22 @@ describe("the Northstar demo", () => {
     );
   });
 
-  it("builds a tree for each space with the gateway under engineering home", () => {
-    const store = createNorthstarStore();
-    const snapshot = store.getSnapshot();
-    expect(snapshot.name).toBe("Northstar");
-    expect(snapshot.spaces).toHaveLength(3);
-    const [engineering] = snapshot.spaces;
-    const tree = buildTree(snapshot.pages, engineering?.id ?? "");
-    const home = tree.find((node) => node.page.id === PAGE.engHome);
-    expect(home?.children.map((node) => node.page.id)).toEqual([
-      PAGE.gateway,
-      PAGE.onCall,
-    ]);
-  });
+  it(
+    "builds a tree for each space with the gateway under engineering " + "home",
+    () => {
+      const store = createNorthstarStore();
+      const snapshot = store.getSnapshot();
+      expect(snapshot.name).toBe("Northstar");
+      expect(snapshot.spaces).toHaveLength(3);
+      const [engineering] = snapshot.spaces;
+      const tree = buildTree(snapshot.pages, engineering?.id ?? "");
+      const home = tree.find((node) => node.page.id === PAGE.engHome);
+      expect(home?.children.map((node) => node.page.id)).toEqual([
+        PAGE.gateway,
+        PAGE.onCall,
+      ]);
+    },
+  );
 
   it("finds pages by body text", async () => {
     const hits = await createNorthstarStore().search("token buckets");

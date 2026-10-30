@@ -21,9 +21,13 @@ spec:
           imagePullPolicy: Never
           env:
             - name: MINIO_ROOT_USER
-              valueFrom: { secretKeyRef: { name: minio-credentials, key: AWS_ACCESS_KEY_ID } }
+              valueFrom:
+                secretKeyRef:
+                  { name: minio-credentials, key: AWS_ACCESS_KEY_ID }
             - name: MINIO_ROOT_PASSWORD
-              valueFrom: { secretKeyRef: { name: minio-credentials, key: AWS_SECRET_ACCESS_KEY } }
+              valueFrom:
+                secretKeyRef:
+                  { name: minio-credentials, key: AWS_SECRET_ACCESS_KEY }
             - { name: MINIO_BROWSER, value: "off" }
           ports:
             - containerPort: 9000
@@ -60,7 +64,9 @@ spec:
           command: ["/bin/sh", "-c"]
           args:
             - >-
-              mc alias set local http://minio:9000 "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" &&
-              mc mb --ignore-existing local/vellum && mc version enable local/vellum
+              mc alias set local http://minio:9000
+              "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" &&
+              mc mb --ignore-existing local/vellum &&
+              mc version enable local/vellum
           envFrom:
             - secretRef: { name: minio-credentials }

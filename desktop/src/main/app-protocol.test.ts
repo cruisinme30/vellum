@@ -113,41 +113,50 @@ describe("handleAppRequest", () => {
     expect(await status("app://vellum/", "POST")).toBe(405);
   });
 
-  it("forwards API calls with the bearer token and without page credentials", async () => {
-    let seen: { url: string; init: RequestInit | undefined } | undefined;
-    const fetcher: Fetch = (url, init) => {
-      seen = { url, init };
-      return Promise.resolve(
-        new Response('{"ok":true}', {
-          status: 201,
-          headers: { "set-cookie": "a=b", "content-type": "application/json" },
+  it(
+    "forwards API calls with the bearer token and without page " +
+      "credentials",
+    async () => {
+      let seen: { url: string; init: RequestInit | undefined } | undefined;
+      const fetcher: Fetch = (url, init) => {
+        seen = { url, init };
+        return Promise.resolve(
+          new Response('{"ok":true}', {
+            status: 201,
+            headers: {
+              "set-cookie": "a=b",
+              "content-type": "application/json",
+            },
+          }),
+        );
+      };
+      const response = await handleAppRequest(
+        new Request("app://vellum/api/v1/sync/push?x=1", {
+          method: "POST",
+          headers: {
+            authorization: "Bearer stolen",
+            cookie: "c=d",
+            "x-request-id": "r1",
+          },
+          body: '{"m":1}',
         }),
+        options({ fetch: fetcher }),
       );
-    };
-    const response = await handleAppRequest(
-      new Request("app://vellum/api/v1/sync/push?x=1", {
-        method: "POST",
-        headers: {
-          authorization: "Bearer stolen",
-          cookie: "c=d",
-          "x-request-id": "r1",
-        },
-        body: '{"m":1}',
-      }),
-      options({ fetch: fetcher }),
-    );
-    expect(response.status).toBe(201);
-    expect(response.headers.get("set-cookie")).toBeNull();
-    expect(seen?.url).toBe("https://vellum.northstar.dev/api/v1/sync/push?x=1");
-    const headers = new Headers(seen?.init?.headers);
-    expect(headers.get("authorization")).toBe("Bearer token1");
-    expect(headers.get("cookie")).toBeNull();
-    expect(headers.get("x-request-id")).toBe("r1");
-    expect(new TextDecoder().decode(seen?.init?.body as ArrayBuffer)).toBe(
-      '{"m":1}',
-    );
-    expect(seen?.init?.redirect).toBe("manual");
-  });
+      expect(response.status).toBe(201);
+      expect(response.headers.get("set-cookie")).toBeNull();
+      expect(seen?.url).toBe(
+        "https://vellum.northstar.dev/api/v1/sync/push?x=1",
+      );
+      const headers = new Headers(seen?.init?.headers);
+      expect(headers.get("authorization")).toBe("Bearer token1");
+      expect(headers.get("cookie")).toBeNull();
+      expect(headers.get("x-request-id")).toBe("r1");
+      expect(new TextDecoder().decode(seen?.init?.body as ArrayBuffer)).toBe(
+        '{"m":1}',
+      );
+      expect(seen?.init?.redirect).toBe("manual");
+    },
+  );
 
   it(
     "forwards signed-out GETs without a token and reports an unreachable " +

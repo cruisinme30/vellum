@@ -163,7 +163,9 @@ for (const target of TARGETS.filter((candidate) => !candidate.sweep)) {
         problems.push({
           rule: "focus-offscreen",
           target: stop.path,
-          message: `focused at x=${stop.x.toFixed(0)} y=${stop.y.toFixed(0)}, out of view`,
+          message:
+            `focused at x=${stop.x.toFixed(0)} ` +
+            `y=${stop.y.toFixed(0)}, out of view`,
         });
         continue;
       }

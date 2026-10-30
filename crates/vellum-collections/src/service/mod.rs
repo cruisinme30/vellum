@@ -1322,10 +1322,13 @@ impl CollectionsService {
                 "a collection needs a title",
             ));
         }
-        let folder = vellum_store::BlobPath::new(input.folder.trim_end_matches('/'))
-            .map_err(state::store_error)?;
+        let folder =
+            vellum_store::BlobPath::new(input.folder.trim_end_matches('/'))
+                .map_err(state::store_error)?;
         if !matches!(
-            vellum_store::layout::Kind::of(&folder.join("x.md").map_err(state::store_error)?),
+            vellum_store::layout::Kind::of(
+                &folder.join("x.md").map_err(state::store_error)?
+            ),
             vellum_store::layout::Kind::Document
         ) {
             return Err(Error::new(
@@ -1354,7 +1357,8 @@ impl CollectionsService {
     /// picks up like any file written outside Vellum.
     async fn remove_dir(&self, dir: &vellum_store::BlobPath) {
         use futures::TryStreamExt;
-        let files: Vec<_> = match self.store.list(Some(dir)).try_collect().await {
+        let files: Vec<_> = match self.store.list(Some(dir)).try_collect().await
+        {
             Ok(files) => files,
             Err(error) => {
                 tracing::warn!(%error, %dir, "new collection not removed");
@@ -1367,7 +1371,8 @@ impl CollectionsService {
                 .delete(&file.path, vellum_store::Precondition::None)
                 .await
             {
-                tracing::warn!(%error, path = %file.path, "new collection file not removed");
+                tracing::warn!(%error, path = %file.path, "new collection file \
+                    not removed");
             }
         }
     }

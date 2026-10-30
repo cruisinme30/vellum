@@ -9,7 +9,8 @@ write (RPO 0) and writes resume in under 30 s.
 {{- if eq .Values.postgres.mode "operator" }}
 {{- $pg := .Values.postgres.operator }}
 {{- if lt (int $pg.instances) 2 }}
-{{- fail "postgres.operator.instances must be at least 2 (primary + synchronous replica)" }}
+{{- fail (print "postgres.operator.instances must be at least 2 "
+  "(primary + synchronous replica)") }}
 {{- end }}
 {{- range .Values.shards }}
 ---

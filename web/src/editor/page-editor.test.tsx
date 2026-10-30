@@ -97,35 +97,41 @@ afterEach(() => {
 });
 
 describe("PageEditor", () => {
-  it("shows a loading state, then the toolbar and the seeded page", async () => {
-    const { factory } = memoryChannels();
-    render(
-      <PageEditor
-        {...editorProperties(createLocalConnector({ channel: factory }))}
-      />,
-    );
-    expect(screen.getByRole("status").textContent).toBe("Opening the page…");
-    await settle();
-    expect(screen.getByRole("toolbar", { name: "Formatting" })).toBeDefined();
-    const [editor] = editors();
-    expect(editor?.getAttribute("aria-multiline")).toBe("true");
-    expect(editor?.querySelector("h1")?.textContent).toBe("Plan");
-  });
+  it(
+    "shows a loading state, then the toolbar and the seeded " + "page",
+    async () => {
+      const { factory } = memoryChannels();
+      render(
+        <PageEditor
+          {...editorProperties(createLocalConnector({ channel: factory }))}
+        />,
+      );
+      expect(screen.getByRole("status").textContent).toBe("Opening the page…");
+      await settle();
+      expect(screen.getByRole("toolbar", { name: "Formatting" })).toBeDefined();
+      const [editor] = editors();
+      expect(editor?.getAttribute("aria-multiline")).toBe("true");
+      expect(editor?.querySelector("h1")?.textContent).toBe("Plan");
+    },
+  );
 
-  it("seeds the content once when two sessions open the same page", async () => {
-    const { factory } = memoryChannels();
-    const connector = createLocalConnector({ channel: factory });
-    render(
-      <>
-        <PageEditor {...editorProperties(connector)} />
-        <PageEditor {...editorProperties(connector)} />
-      </>,
-    );
-    await settle();
-    for (const editor of editors()) {
-      expect(editor.querySelectorAll("h1")).toHaveLength(1);
-    }
-  });
+  it(
+    "seeds the content once when two sessions open the same " + "page",
+    async () => {
+      const { factory } = memoryChannels();
+      const connector = createLocalConnector({ channel: factory });
+      render(
+        <>
+          <PageEditor {...editorProperties(connector)} />
+          <PageEditor {...editorProperties(connector)} />
+        </>,
+      );
+      await settle();
+      for (const editor of editors()) {
+        expect(editor.querySelectorAll("h1")).toHaveLength(1);
+      }
+    },
+  );
 
   it("converges two sessions after an edit in one of them", async () => {
     const { factory } = memoryChannels();
@@ -234,39 +240,45 @@ describe("PageEditor", () => {
     expect(onOpenPage).not.toHaveBeenCalled();
   });
 
-  it("opens a new session for another page and closes the old one", async () => {
-    const { factory, open } = memoryChannels();
-    const connector = createLocalConnector({ channel: factory });
-    const { rerender, unmount } = render(
-      <PageEditor {...editorProperties(connector)} />,
-    );
-    await settle();
-    rerender(
-      <PageEditor
-        {...editorProperties(connector, {
-          pageId: "page-2",
-          seed: body(h(1, "Other")),
-        })}
-      />,
-    );
-    await settle();
-    expect(open()).toBe(1);
-    expect(editors()[0]?.querySelector("h1")?.textContent).toBe("Other");
-    unmount();
-    expect(open()).toBe(0);
-  });
+  it(
+    "opens a new session for another page and closes the old " + "one",
+    async () => {
+      const { factory, open } = memoryChannels();
+      const connector = createLocalConnector({ channel: factory });
+      const { rerender, unmount } = render(
+        <PageEditor {...editorProperties(connector)} />,
+      );
+      await settle();
+      rerender(
+        <PageEditor
+          {...editorProperties(connector, {
+            pageId: "page-2",
+            seed: body(h(1, "Other")),
+          })}
+        />,
+      );
+      await settle();
+      expect(open()).toBe(1);
+      expect(editors()[0]?.querySelector("h1")?.textContent).toBe("Other");
+      unmount();
+      expect(open()).toBe(0);
+    },
+  );
 
-  it("does not bind a session that finished opening after unmount", async () => {
-    const { factory, open } = memoryChannels();
-    const { unmount } = render(
-      <PageEditor
-        {...editorProperties(createLocalConnector({ channel: factory }))}
-      />,
-    );
-    unmount();
-    await settle();
-    expect(open()).toBe(0);
-  });
+  it(
+    "does not bind a session that finished opening after " + "unmount",
+    async () => {
+      const { factory, open } = memoryChannels();
+      const { unmount } = render(
+        <PageEditor
+          {...editorProperties(createLocalConnector({ channel: factory }))}
+        />,
+      );
+      unmount();
+      await settle();
+      expect(open()).toBe(0);
+    },
+  );
 
   it("loads the PRD page, which starts with a facts block", async () => {
     const { factory } = memoryChannels();
@@ -299,63 +311,69 @@ describe("PageEditor", () => {
       expect(open).toHaveBeenCalledWith("01JPAGE", "01JSPACE");
     });
 
-    it("saves a version on Done and on Ctrl+S, and says when it is saved", async () => {
-      const { connector, live } = serverConnector({
-        status: "online",
-        canWrite: true,
-        peers: new Map(),
-      });
-      const onControls = vi.fn();
-      render(<PageEditor {...editorProperties(connector, { onControls })} />);
-      await settle();
-      const done = screen.getByRole("button", { name: "Done" });
-      expect(done.hasAttribute("disabled")).toBe(false);
-      act(() => {
-        editorOf(editors()[0]).commands.insertContent("More");
-      });
-      expect(screen.getByText("Unsaved changes")).toBeDefined();
+    it(
+      "saves a version on Done and on Ctrl+S, and says when it is " + "saved",
+      async () => {
+        const { connector, live } = serverConnector({
+          status: "online",
+          canWrite: true,
+          peers: new Map(),
+        });
+        const onControls = vi.fn();
+        render(<PageEditor {...editorProperties(connector, { onControls })} />);
+        await settle();
+        const done = screen.getByRole("button", { name: "Done" });
+        expect(done.hasAttribute("disabled")).toBe(false);
+        act(() => {
+          editorOf(editors()[0]).commands.insertContent("More");
+        });
+        expect(screen.getByText("Unsaved changes")).toBeDefined();
 
-      act(() => {
-        done.click();
-      });
-      await settle();
-      expect(live.done).toHaveBeenCalledTimes(1);
-      expect(screen.getByText("Saved")).toBeDefined();
+        act(() => {
+          done.click();
+        });
+        await settle();
+        expect(live.done).toHaveBeenCalledTimes(1);
+        expect(screen.getByText("Saved")).toBeDefined();
 
-      const body = editors()[0];
-      act(() => {
-        body?.dispatchEvent(
-          new KeyboardEvent("keydown", {
-            key: "s",
-            ctrlKey: true,
-            bubbles: true,
-          }),
+        const body = editors()[0];
+        act(() => {
+          body?.dispatchEvent(
+            new KeyboardEvent("keydown", {
+              key: "s",
+              ctrlKey: true,
+              bubbles: true,
+            }),
+          );
+        });
+        await settle();
+        expect(live.done).toHaveBeenCalledTimes(2);
+        expect(onControls).toHaveBeenLastCalledWith(
+          expect.objectContaining({ canWrite: true }),
         );
-      });
-      await settle();
-      expect(live.done).toHaveBeenCalledTimes(2);
-      expect(onControls).toHaveBeenLastCalledWith(
-        expect.objectContaining({ canWrite: true }),
-      );
-    });
+      },
+    );
 
-    it("is read-only with a notice until the server lets this person write", async () => {
-      const { connector, set } = serverConnector({
-        status: "online",
-        canWrite: false,
-        peers: new Map(),
-      });
-      render(<PageEditor {...editorProperties(connector)} />);
-      await settle();
-      const editor = editorOf(editors()[0]);
-      expect(editor.isEditable).toBe(false);
-      expect(notice().textContent).toBe(
-        "You can view this page but not edit it.",
-      );
-      set({ canWrite: true });
-      expect(editor.isEditable).toBe(true);
-      expect(notice().textContent).toBe("");
-    });
+    it(
+      "is read-only with a notice until the server lets this person " + "write",
+      async () => {
+        const { connector, set } = serverConnector({
+          status: "online",
+          canWrite: false,
+          peers: new Map(),
+        });
+        render(<PageEditor {...editorProperties(connector)} />);
+        await settle();
+        const editor = editorOf(editors()[0]);
+        expect(editor.isEditable).toBe(false);
+        expect(notice().textContent).toBe(
+          "You can view this page but not edit it.",
+        );
+        set({ canWrite: true });
+        expect(editor.isEditable).toBe(true);
+        expect(notice().textContent).toBe("");
+      },
+    );
 
     it("keeps editing offline and says the changes will sync", async () => {
       const { connector, set } = serverConnector({

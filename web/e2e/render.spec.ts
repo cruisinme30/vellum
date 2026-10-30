@@ -24,7 +24,8 @@ test.use({
   isMobile: false,
   serviceWorkers: "block",
 });
-// eslint-disable-next-line no-empty-pattern -- Playwright needs the fixtures object
+// Playwright needs the fixtures object.
+// eslint-disable-next-line no-empty-pattern
 test.beforeEach(({}, testInfo) => {
   test.skip(
     !testInfo.project.name.endsWith("-laptop"),
@@ -152,7 +153,9 @@ for (const [theme, scheme] of THEMES) {
   }, testInfo) => {
     await page.emulateMedia({ colorScheme: scheme });
     await page.addInitScript(
-      `new MutationObserver((_, o) => { if (document.documentElement) { document.documentElement.dataset.theme = ${JSON.stringify(theme)}; o.disconnect(); } }).observe(document, { childList: true });`,
+      `new MutationObserver((_, o) => { if (document.documentElement) { ` +
+        `document.documentElement.dataset.theme = ${JSON.stringify(theme)}; ` +
+        `o.disconnect(); } }).observe(document, { childList: true });`,
     );
     await signedIn(page);
     await fakeCollab(page);
@@ -183,23 +186,25 @@ for (const [theme, scheme] of THEMES) {
   });
 }
 
-test("a theme change re-themes drawn blocks without asking the server again", async ({
-  page,
-}) => {
-  await signedIn(page);
-  await fakeCollab(page);
-  const counts = await fakeRenderer(page);
-  await page.goto(`/p/${PAGE}?view=read`);
-  const bar = page.locator(".vl-reading .vl-chart svg rect").first();
-  await expect(bar).toBeVisible();
-  const fill = () => bar.evaluate((element) => getComputedStyle(element).fill);
-  const light = await fill();
-  await page.evaluate(() => {
-    document.documentElement.dataset["theme"] = "dark";
-  });
-  await expect.poll(fill).not.toBe(light);
-  expect(counts.page).toBe(1);
-});
+test(
+  "a theme change re-themes drawn blocks without asking the server " + "again",
+  async ({ page }) => {
+    await signedIn(page);
+    await fakeCollab(page);
+    const counts = await fakeRenderer(page);
+    await page.goto(`/p/${PAGE}?view=read`);
+    const bar = page.locator(".vl-reading .vl-chart svg rect").first();
+    await expect(bar).toBeVisible();
+    const fill = () =>
+      bar.evaluate((element) => getComputedStyle(element).fill);
+    const light = await fill();
+    await page.evaluate(() => {
+      document.documentElement.dataset["theme"] = "dark";
+    });
+    await expect.poll(fill).not.toBe(light);
+    expect(counts.page).toBe(1);
+  },
+);
 
 test("a custom accent colour tints drawn blocks (D302)", async ({ page }) => {
   await signedIn(page);
@@ -250,42 +255,43 @@ test("calculators in the reading view recompute as a slider moves", async ({
   );
 });
 
-test("the editor shows server-drawn blocks, with their source a click away", async ({
-  page,
-}) => {
-  await signedIn(page);
-  const mermaid = "flowchart LR\n  A[Request] --> B{Allowed?}\n";
-  await fakeCollab(page, {
-    fences: [
-      { lang: "mermaid", source: mermaid },
-      { lang: "timeline", source: "2026-10-01 | Beta opens\n" },
-    ],
-  });
-  const counts = await fakeRenderer(page);
-  await page.goto(`/p/${PAGE}`);
-  const mermaidBlock = page.locator('.vl-fence[data-lang="mermaid"]');
-  await expect(
-    mermaidBlock.locator(".vl-fence-render .vl-diagram svg"),
-  ).toBeVisible();
-  await expect(
-    page.locator(
-      '.vl-fence[data-lang="timeline"] .vl-fence-render .vl-timeline',
-    ),
-  ).toBeVisible();
-  expect(counts.block).toBeGreaterThanOrEqual(2);
+test(
+  "the editor shows server-drawn blocks, with their source a click " + "away",
+  async ({ page }) => {
+    await signedIn(page);
+    const mermaid = "flowchart LR\n  A[Request] --> B{Allowed?}\n";
+    await fakeCollab(page, {
+      fences: [
+        { lang: "mermaid", source: mermaid },
+        { lang: "timeline", source: "2026-10-01 | Beta opens\n" },
+      ],
+    });
+    const counts = await fakeRenderer(page);
+    await page.goto(`/p/${PAGE}`);
+    const mermaidBlock = page.locator('.vl-fence[data-lang="mermaid"]');
+    await expect(
+      mermaidBlock.locator(".vl-fence-render .vl-diagram svg"),
+    ).toBeVisible();
+    await expect(
+      page.locator(
+        '.vl-fence[data-lang="timeline"] .vl-fence-render .vl-timeline',
+      ),
+    ).toBeVisible();
+    expect(counts.block).toBeGreaterThanOrEqual(2);
 
-  const source = mermaidBlock.getByLabel("mermaid source");
-  await expect(source).toBeHidden();
-  await mermaidBlock.getByRole("button", { name: "Source" }).click();
-  await expect(source).toBeVisible();
-  await expect(source).toContainText("A[Request]");
-  await expectNoOverflow(page, ".vl-prose");
-  const axe = await new AxeBuilder({ page })
-    .include(".vl-fence")
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
-    .analyze();
-  expect(axe.violations).toEqual([]);
-});
+    const source = mermaidBlock.getByLabel("mermaid source");
+    await expect(source).toBeHidden();
+    await mermaidBlock.getByRole("button", { name: "Source" }).click();
+    await expect(source).toBeVisible();
+    await expect(source).toContainText("A[Request]");
+    await expectNoOverflow(page, ".vl-prose");
+    const axe = await new AxeBuilder({ page })
+      .include(".vl-fence")
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+      .analyze();
+    expect(axe.violations).toEqual([]);
+  },
+);
 
 test("a block the server cannot draw says why, with Copy diagnostic", async ({
   page,

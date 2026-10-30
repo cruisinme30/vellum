@@ -40,11 +40,15 @@ describe("parseChart", () => {
     });
   });
 
-  it("returns undefined without values or with a value that is not a number", () => {
-    expect(parseChart("title: Empty")).toBeUndefined();
-    expect(parseChart("values: [1, two]")).toBeUndefined();
-    expect(parseChart("values: []")).toBeUndefined();
-  });
+  it(
+    "returns undefined without values or with a value that is not a " +
+      "number",
+    () => {
+      expect(parseChart("title: Empty")).toBeUndefined();
+      expect(parseChart("values: [1, two]")).toBeUndefined();
+      expect(parseChart("values: []")).toBeUndefined();
+    },
+  );
 
   it("accepts lists without brackets", () => {
     expect(parseChart("labels: a, b\nvalues: 3, 4")?.labels).toEqual([

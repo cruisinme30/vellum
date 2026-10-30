@@ -245,33 +245,36 @@ describe("Admin → Sign-in", () => {
     expect(await screen.findByText("Entra ID saved.")).toBeDefined();
   });
 
-  it("changes a provider without resending its secret, and removes it", async () => {
-    const { api, updateProvider, removeProvider } = fakeSignIn({
-      ...BASE,
-      providers: [OKTA],
-    });
-    const user = renderPage(api);
-    await user.click(
-      await screen.findByRole("button", { name: "Change Okta" }),
-    );
-    const form = screen.getByRole("form", { name: "Change Okta" });
-    const secret = within(form).getByLabelText("Client secret");
-    expect(secret.getAttribute("placeholder")).toBe(
-      "Stored. Leave blank to keep it.",
-    );
-    const name = within(form).getByLabelText("Name");
-    await user.clear(name);
-    await user.type(name, "Okta SSO");
-    await user.click(within(form).getByRole("button", { name: "Save" }));
-    const [id, input] = updateProvider.mock.calls[0] ?? [];
-    expect(id).toBe("okta");
-    expect(input?.name).toBe("Okta SSO");
-    expect(input && "clientSecret" in input).toBe(false);
-    expect(await screen.findByText("Okta SSO saved.")).toBeDefined();
-    await user.click(screen.getByRole("button", { name: "Remove Okta SSO" }));
-    expect(removeProvider).toHaveBeenCalledWith("okta");
-    expect(await screen.findByText(/Okta SSO removed/)).toBeDefined();
-  });
+  it(
+    "changes a provider without resending its secret, and removes " + "it",
+    async () => {
+      const { api, updateProvider, removeProvider } = fakeSignIn({
+        ...BASE,
+        providers: [OKTA],
+      });
+      const user = renderPage(api);
+      await user.click(
+        await screen.findByRole("button", { name: "Change Okta" }),
+      );
+      const form = screen.getByRole("form", { name: "Change Okta" });
+      const secret = within(form).getByLabelText("Client secret");
+      expect(secret.getAttribute("placeholder")).toBe(
+        "Stored. Leave blank to keep it.",
+      );
+      const name = within(form).getByLabelText("Name");
+      await user.clear(name);
+      await user.type(name, "Okta SSO");
+      await user.click(within(form).getByRole("button", { name: "Save" }));
+      const [id, input] = updateProvider.mock.calls[0] ?? [];
+      expect(id).toBe("okta");
+      expect(input?.name).toBe("Okta SSO");
+      expect(input && "clientSecret" in input).toBe(false);
+      expect(await screen.findByText("Okta SSO saved.")).toBeDefined();
+      await user.click(screen.getByRole("button", { name: "Remove Okta SSO" }));
+      expect(removeProvider).toHaveBeenCalledWith("okta");
+      expect(await screen.findByText(/Okta SSO removed/)).toBeDefined();
+    },
+  );
 
   it(
     "requires single sign-on and says how many admins can still use a " +
@@ -293,30 +296,37 @@ describe("Admin → Sign-in", () => {
     },
   );
 
-  it("turns SCIM on, shows the token once, rotates and turns it off", async () => {
-    const { api } = fakeSignIn(BASE);
-    const user = renderPage(api);
-    expect(
-      await screen.findByText("https://vellum.northstar.dev/scim/v2"),
-    ).toBeDefined();
-    await user.click(
-      screen.getByRole("button", { name: "Turn on and make a token" }),
-    );
-    const shown = await screen.findByTestId("scim-token");
-    expect(shown.textContent).toBe("vsc_new-token");
-    expect(
-      screen.getByText(/On, with a token made on Oct 30, 2026/),
-    ).toBeDefined();
-    await user.click(screen.getByRole("button", { name: "Done" }));
-    expect(screen.queryByTestId("scim-token")).toBeNull();
-    await user.click(screen.getByRole("button", { name: "Make a new token" }));
-    expect(screen.getByText(/stops working at once/)).toBeDefined();
-    await user.click(screen.getByRole("button", { name: "Make a new token" }));
-    expect(await screen.findByTestId("scim-token")).toBeDefined();
-    await user.click(screen.getByRole("button", { name: "Turn off" }));
-    expect(await screen.findByText(/Off\. Turn it on/)).toBeDefined();
-    expect(screen.queryByTestId("scim-token")).toBeNull();
-  });
+  it(
+    "turns SCIM on, shows the token once, rotates and turns it " + "off",
+    async () => {
+      const { api } = fakeSignIn(BASE);
+      const user = renderPage(api);
+      expect(
+        await screen.findByText("https://vellum.northstar.dev/scim/v2"),
+      ).toBeDefined();
+      await user.click(
+        screen.getByRole("button", { name: "Turn on and make a token" }),
+      );
+      const shown = await screen.findByTestId("scim-token");
+      expect(shown.textContent).toBe("vsc_new-token");
+      expect(
+        screen.getByText(/On, with a token made on Oct 30, 2026/),
+      ).toBeDefined();
+      await user.click(screen.getByRole("button", { name: "Done" }));
+      expect(screen.queryByTestId("scim-token")).toBeNull();
+      await user.click(
+        screen.getByRole("button", { name: "Make a new token" }),
+      );
+      expect(screen.getByText(/stops working at once/)).toBeDefined();
+      await user.click(
+        screen.getByRole("button", { name: "Make a new token" }),
+      );
+      expect(await screen.findByTestId("scim-token")).toBeDefined();
+      await user.click(screen.getByRole("button", { name: "Turn off" }));
+      expect(await screen.findByText(/Off\. Turn it on/)).toBeDefined();
+      expect(screen.queryByTestId("scim-token")).toBeNull();
+    },
+  );
 
   it("marks environment providers read-only", async () => {
     const { api } = fakeSignIn({
@@ -427,24 +437,33 @@ describe("Admin → Sign-in when the server refuses", () => {
     },
   );
 
-  it("keeps the SCIM token when making a new one is cancelled or fails", async () => {
-    const fake = fakeSignIn({
-      ...BASE,
-      scim: {
-        enabled: true,
-        tokenCreatedAt: "2026-10-30T08:00:00Z",
-        baseUrl: BASE.scim.baseUrl,
-      },
-    });
-    const user = renderPage(fake.api);
-    await user.click(
-      await screen.findByRole("button", { name: "Make a new token" }),
-    );
-    await user.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(screen.queryByText(/stops working at once/)).toBeNull();
-    fake.rotateScim.mockRejectedValueOnce(refused());
-    await user.click(screen.getByRole("button", { name: "Make a new token" }));
-    await user.click(screen.getByRole("button", { name: "Make a new token" }));
-    expect(await textOf(screen.findByRole("alert"))).toBe("the server said no");
-  });
+  it(
+    "keeps the SCIM token when making a new one is cancelled or " + "fails",
+    async () => {
+      const fake = fakeSignIn({
+        ...BASE,
+        scim: {
+          enabled: true,
+          tokenCreatedAt: "2026-10-30T08:00:00Z",
+          baseUrl: BASE.scim.baseUrl,
+        },
+      });
+      const user = renderPage(fake.api);
+      await user.click(
+        await screen.findByRole("button", { name: "Make a new token" }),
+      );
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(screen.queryByText(/stops working at once/)).toBeNull();
+      fake.rotateScim.mockRejectedValueOnce(refused());
+      await user.click(
+        screen.getByRole("button", { name: "Make a new token" }),
+      );
+      await user.click(
+        screen.getByRole("button", { name: "Make a new token" }),
+      );
+      expect(await textOf(screen.findByRole("alert"))).toBe(
+        "the server said no",
+      );
+    },
+  );
 });

@@ -883,8 +883,10 @@ async fn saved_views_are_shared_by_visibility_and_survive_a_restart() {
         .call(
             "dev",
             "work.create_view",
-            json!({"name": "Urgent or mine", "team": "ENG", "visibility": "team",
-                   "layout": "board", "group_by": "assignee", "filter": filter}),
+            json!({"name": "Urgent or mine", "team": "ENG",
+                   "visibility": "team",
+                   "layout": "board", "group_by": "assignee",
+                       "filter": filter}),
         )
         .await;
     let team_id = team_view["id"].as_str().unwrap().to_owned();
@@ -945,7 +947,8 @@ async fn saved_views_are_shared_by_visibility_and_survive_a_restart() {
             "work.put_view",
             json!({"view_id": team_id, "name": "Hot", "team": "ENG", "visibilit\
                 y": "team",
-                   "layout": "board", "group_by": "assignee", "filter": filter}),
+                   "layout": "board", "group_by": "assignee",
+                       "filter": filter}),
         )
         .await;
     assert_eq!(renamed["name"], "Hot");

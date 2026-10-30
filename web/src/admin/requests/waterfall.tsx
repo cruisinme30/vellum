@@ -42,10 +42,17 @@ function Row({
   readonly open: boolean;
   readonly onToggle: () => void;
 }) {
-  const label = `${row.lane === "browser" ? "Browser" : "Server"} ${row.name}, ${formatDuration(row.durationUs)}${row.error ? ", failed" : ""}`;
+  const label =
+    `${row.lane === "browser" ? "Browser" : "Server"} ` +
+    `${row.name}, ` +
+    `${formatDuration(row.durationUs)}${row.error ? ", failed" : ""}`;
   return (
     <li
-      className={`vl-waterfall__row vl-waterfall__row--${row.lane}${row.error ? " vl-waterfall__row--error" : ""}`}
+      className={
+        `vl-waterfall__row ` +
+        `vl-waterfall__row--${row.lane}` +
+        (row.error ? " vl-waterfall__row--error" : "")
+      }
     >
       <button
         type="button"

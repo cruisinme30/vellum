@@ -13,7 +13,9 @@
   "use strict";
   var KEY = "vellum-site-theme";
   var root = document.documentElement;
-  var system = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+  var system = window.matchMedia
+    ? window.matchMedia("(prefers-color-scheme: dark)")
+    : null;
 
   function stored() {
     try {
@@ -35,7 +37,11 @@
   }
 
   function current() {
-    return root.dataset.theme || stored() || (system && system.matches ? "dark" : "light");
+    return (
+      root.dataset.theme ||
+      stored() ||
+      (system && system.matches ? "dark" : "light")
+    );
   }
 
   // With no choice made, follow the system when it changes.
@@ -57,7 +63,11 @@
   // later; without JavaScript it stays hidden, since it could not work.
   root.setAttribute("data-theme-toggle", "");
   try {
-    if (choice) localStorage.setItem("mdbook-theme", choice === "dark" ? "navy" : "light");
+    if (choice)
+      localStorage.setItem(
+        "mdbook-theme",
+        choice === "dark" ? "navy" : "light",
+      );
     else localStorage.removeItem("mdbook-theme");
   } catch (e) {
     // No storage: mdBook falls back to the system setting on its own.
@@ -76,7 +86,9 @@
     root.dataset.theme = next;
     store(next);
     // In a help book, let mdBook swap its classes and code highlighting.
-    var book = document.getElementById("mdbook-theme-" + (next === "dark" ? "navy" : "light"));
+    var book = document.getElementById(
+      "mdbook-theme-" + (next === "dark" ? "navy" : "light"),
+    );
     if (book) book.click();
     render();
   }
@@ -102,12 +114,15 @@
 
   function wire() {
     var buttons = document.querySelectorAll(".theme-toggle");
-    for (var i = 0; i < buttons.length; i++) buttons[i].addEventListener("click", toggle);
+    for (var i = 0; i < buttons.length; i++)
+      buttons[i].addEventListener("click", toggle);
     measureBar();
     render();
   }
 
-  if (system && system.addEventListener) system.addEventListener("change", follow);
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", wire);
+  if (system && system.addEventListener)
+    system.addEventListener("change", follow);
+  if (document.readyState === "loading")
+    document.addEventListener("DOMContentLoaded", wire);
   else wire();
 })();

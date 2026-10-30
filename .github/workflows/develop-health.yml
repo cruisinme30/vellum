@@ -9,7 +9,8 @@
 name: "Repo: develop is red alarm"
 
 on:
-  workflow_run: # zizmor: ignore[dangerous-triggers] -- no checkout; reads only the run's metadata
+  # No checkout: the job reads only the finished run's metadata.
+  workflow_run: # zizmor: ignore[dangerous-triggers] -- metadata only
     workflows: ["Checks: fast suite"]
     types: [completed]
     branches: [develop]
@@ -26,7 +27,8 @@ jobs:
     name: Report develop status
     if: >-
       github.event.workflow_run.event == 'push' &&
-      contains(fromJSON('["success", "failure"]'), github.event.workflow_run.conclusion)
+      contains(fromJSON('["success", "failure"]'),
+        github.event.workflow_run.conclusion)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -42,21 +44,27 @@ jobs:
           COMMIT_TITLE: ${{ github.event.workflow_run.display_title }}
         run: |
           title="develop is red"
-          open="$(gh issue list --state open --label status/blocked --search "\"${title}\" in:title" \
-            --json number,title --jq "map(select(.title == \"${title}\")) | .[0].number // empty")"
+          open="$(gh issue list --state open --label status/blocked \
+            --search "\"${title}\" in:title" --json number,title \
+            --jq "map(select(.title == \"${title}\")) | .[0].number // empty")"
           commit="${SHA:0:7} ${COMMIT_TITLE}"
           if [[ "${CONCLUSION}" == "failure" ]]; then
             note="The Fast suite failed on \`develop\` at ${commit}: ${RUN_URL}"
             if [[ -n "${open}" ]]; then
               gh issue comment "${open}" --body "Still red. ${note}"
             else
-              body="$(printf '%s\n\n%s %s %s' "${note}" \
-                "Whoever merged that change, or the first one after the last green run, fixes" \
-                "\`develop\` or reverts the change. Hold other merges until this issue closes;" \
-                "it closes itself when the Fast suite passes on \`develop\` again.")"
-              gh issue create --title "${title}" --label status/blocked,type/fix,area/ci,priority/p0 \
+              body="$(printf '%s\n\n%s %s %s %s %s %s' "${note}" \
+                "Whoever merged that change, or the first one after the" \
+                "last green run, fixes \`develop\` or reverts the change." \
+                "Hold other merges until this issue closes;" \
+                "it closes itself when the Fast suite passes on" \
+                "\`develop\`" \
+                "again.")"
+              gh issue create --title "${title}" \
+                --label status/blocked,type/fix,area/ci,priority/p0 \
                 --body "${body}"
             fi
           elif [[ -n "${open}" ]]; then
-            gh issue close "${open}" --comment "Green again at ${commit}: ${RUN_URL}"
+            gh issue close "${open}" --comment \
+              "Green again at ${commit}: ${RUN_URL}"
           fi

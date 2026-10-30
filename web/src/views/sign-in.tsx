@@ -185,7 +185,11 @@ export function SignInView() {
             <a
               key={button.id ?? button.startUrl}
               className="vl-filled-button"
-              href={`${button.startUrl}${button.startUrl.includes("?") ? "&" : "?"}${query}`}
+              href={
+                button.startUrl +
+                (button.startUrl.includes("?") ? "&" : "?") +
+                query
+              }
             >
               {t("sign-in-sso", { name: button.name })}
             </a>

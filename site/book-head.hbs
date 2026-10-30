@@ -1,7 +1,16 @@
 {{!-- SPDX-FileCopyrightText: 2026 The Vellum contributors --}}
 {{!-- SPDX-License-Identifier: AGPL-3.0-only --}}
-{{!-- Added to the head of every help book page (ADR 0027, D307 and D308): the site's text and code fonts start loading at once (ADR 0071, D309), and the site's light and dark choice applies before first paint. build-site.sh fills in @ROOT@. --}}
-<link rel="preload" href="{{ path_to_root }}@ROOT@fonts/google-sans-flex-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="{{ path_to_root }}@ROOT@fonts/google-sans-code-latin.woff2" as="font" type="font/woff2" crossorigin>
+{{!--
+  Added to the head of every help book page (ADR 0027, D307 and D308): the
+  site's text and code fonts start loading at once (ADR 0071, D309), and the
+  site's light and dark choice applies before first paint. build-site.sh fills
+  in @ROOT@.
+--}}
+<link rel="preload"
+  href="{{ path_to_root }}@ROOT@fonts/google-sans-flex-latin.woff2"
+  as="font" type="font/woff2" crossorigin>
+<link rel="preload"
+  href="{{ path_to_root }}@ROOT@fonts/google-sans-code-latin.woff2"
+  as="font" type="font/woff2" crossorigin>
 <script src="{{ path_to_root }}@ROOT@theme.js"></script>
 <script src="{{ path_to_root }}@ROOT@blocks.js" defer></script>

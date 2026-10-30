@@ -88,48 +88,54 @@ describe("InboxView", () => {
 });
 
 describe("SearchView filters and highlights", () => {
-  it("marks the matched words and narrows by the filters in the URL", async () => {
-    const { user, location } = renderWithProviders(
-      <SearchView />,
-      "/search?q=gateway",
-    );
-    const results = await screen.findAllByRole("link", { name: /gateway/i });
-    expect(results[0]?.querySelector("mark")?.textContent.toLowerCase()).toBe(
-      "gateway",
-    );
+  it(
+    "marks the matched words and narrows by the filters in the " + "URL",
+    async () => {
+      const { user, location } = renderWithProviders(
+        <SearchView />,
+        "/search?q=gateway",
+      );
+      const results = await screen.findAllByRole("link", { name: /gateway/i });
+      expect(results[0]?.querySelector("mark")?.textContent.toLowerCase()).toBe(
+        "gateway",
+      );
 
-    await user.click(screen.getByRole("checkbox", { name: "Starred only" }));
-    expect(location()).toBe("/search?q=gateway&starred=1");
-    await user.selectOptions(
-      screen.getByRole("combobox", { name: "Modified" }),
-      "30",
-    );
-    expect(location()).toBe("/search?q=gateway&starred=1&modified=30");
-    await user.selectOptions(
-      screen.getByRole("combobox", { name: "Owner" }),
-      "me",
-    );
-    expect(location()).toContain("owner=me");
-    await user.selectOptions(
-      screen.getByRole("combobox", { name: "Owner" }),
-      "",
-    );
-    expect(location()).not.toContain("owner=");
-  });
+      await user.click(screen.getByRole("checkbox", { name: "Starred only" }));
+      expect(location()).toBe("/search?q=gateway&starred=1");
+      await user.selectOptions(
+        screen.getByRole("combobox", { name: "Modified" }),
+        "30",
+      );
+      expect(location()).toBe("/search?q=gateway&starred=1&modified=30");
+      await user.selectOptions(
+        screen.getByRole("combobox", { name: "Owner" }),
+        "me",
+      );
+      expect(location()).toContain("owner=me");
+      await user.selectOptions(
+        screen.getByRole("combobox", { name: "Owner" }),
+        "",
+      );
+      expect(location()).not.toContain("owner=");
+    },
+  );
 
-  it("reads filters from the URL and leaves out pages that fail them", async () => {
-    renderWithProviders(
-      <SearchView />,
-      "/search?q=gateway&owner=me&modified=7",
-    );
-    expect(screen.getByRole("combobox", { name: "Owner" })).toHaveProperty(
-      "value",
-      "me",
-    );
-    expect(screen.getByRole("combobox", { name: "Modified" })).toHaveProperty(
-      "value",
-      "7",
-    );
-    expect(await screen.findByRole("status")).toBeDefined();
-  });
+  it(
+    "reads filters from the URL and leaves out pages that fail " + "them",
+    async () => {
+      renderWithProviders(
+        <SearchView />,
+        "/search?q=gateway&owner=me&modified=7",
+      );
+      expect(screen.getByRole("combobox", { name: "Owner" })).toHaveProperty(
+        "value",
+        "me",
+      );
+      expect(screen.getByRole("combobox", { name: "Modified" })).toHaveProperty(
+        "value",
+        "7",
+      );
+      expect(await screen.findByRole("status")).toBeDefined();
+    },
+  );
 });

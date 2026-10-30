@@ -146,14 +146,17 @@ describe("createMemoryStore", () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
-  it("creates the first page of an empty parent with an empty title", async () => {
-    const created = await createStore().createPage({
-      spaceId: SPACE,
-      parentId: "child",
-    });
-    expect(created?.position).toBe(1);
-    expect(created?.title).toBe("");
-  });
+  it(
+    "creates the first page of an empty parent with an empty " + "title",
+    async () => {
+      const created = await createStore().createPage({
+        spaceId: SPACE,
+        parentId: "child",
+      });
+      expect(created?.position).toBe(1);
+      expect(created?.title).toBe("");
+    },
+  );
 
   it("renames and stars a page", () => {
     const store = createStore();
@@ -250,11 +253,16 @@ describe("search", () => {
 });
 
 describe("mentions", () => {
-  it("lists pages that mention a handle, newest first, with a snippet", async () => {
-    const hits = await createStore().mentions("dev");
-    expect(hits.map((hit) => hit.page.id)).toEqual(["child", "parent"]);
-    expect(squash(hits[1]?.snippet ?? "")).toBe("Ask @dev about the gateway .");
-  });
+  it(
+    "lists pages that mention a handle, newest first, with a " + "snippet",
+    async () => {
+      const hits = await createStore().mentions("dev");
+      expect(hits.map((hit) => hit.page.id)).toEqual(["child", "parent"]);
+      expect(squash(hits[1]?.snippet ?? "")).toBe(
+        "Ask @dev about the gateway .",
+      );
+    },
+  );
 
   it("is empty for a handle nobody mentions", async () => {
     expect(await createStore().mentions("nobody")).toEqual([]);

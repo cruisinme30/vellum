@@ -3,7 +3,9 @@
 
 [package]
 name = "xtask"
-description = "Repository automation: architecture, budget and performance checks run by CI."
+description = """\
+    Repository automation: architecture, budget and performance checks run by \
+    CI."""
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

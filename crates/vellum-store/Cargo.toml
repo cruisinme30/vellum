@@ -3,7 +3,9 @@
 
 [package]
 name = "vellum-store"
-description = "The blob store port and its adapters (local folder, S3, Git and cloud drives)."
+description = """\
+    The blob store port and its adapters (local folder, S3, Git and cloud \
+    drives)."""
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -44,7 +46,10 @@ hmac = { version = "0.13.0", optional = true }
 httpdate = { version = "1.0.3", optional = true }
 notify = "8.2.0"
 opentelemetry = "0.33.1"
-reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "json", "form", "query"], optional = true }
+reqwest.version = "0.13.5"
+reqwest.default-features = false
+reqwest.features = ["rustls", "json", "form", "query"]
+reqwest.optional = true
 serde = { version = "1.0.229", features = ["derive"], optional = true }
 serde_json = { version = "1.0.154", optional = true }
 sha2 = "0.11.1"
@@ -54,8 +59,18 @@ tracing = "0.1.44"
 vellum-kernel.workspace = true
 
 [dev-dependencies]
-axum = { version = "0.8.9", default-features = false, features = ["http1", "tokio", "json", "query"] }
+axum.version = "0.8.9"
+axum.default-features = false
+axum.features = ["http1", "tokio", "json", "query"]
 proptest = ">=1.11.0, <1.13"
 tempfile = "3.27.0"
 tokio = { version = "1.49.0", features = ["macros", "rt-multi-thread"] }
-vellum-store = { path = ".", features = ["conformance", "git", "dropbox", "onedrive", "s3", "gdrive"] }
+vellum-store.path = "."
+vellum-store.features = [
+    "conformance",
+    "git",
+    "dropbox",
+    "onedrive",
+    "s3",
+    "gdrive",
+]

@@ -88,7 +88,8 @@ describe("RequestsPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Apply" }));
     await waitFor(() => {
       expect(fetcher).toHaveBeenLastCalledWith(
-        `${REQUESTS_PATH}?route=%2Fapi%2Fv1%2Fx&min_duration_ms=250&errors_only=true&id=req-9`,
+        REQUESTS_PATH +
+          `?route=%2Fapi%2Fv1%2Fx&min_duration_ms=250&errors_only=true&id=req-9`,
         expect.any(Object),
       );
     });

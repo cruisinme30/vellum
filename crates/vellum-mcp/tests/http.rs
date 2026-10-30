@@ -519,7 +519,8 @@ async fn read_only_tokens_cannot_write() {
 async fn stale_edits_are_reported_to_the_model() {
     let h = harness();
     let args = json!({
-        "doc_id": "01JDLAUNCH0000000000000000", "base_version": "v0", "summary": "fix date",
+        "doc_id": "01JDLAUNCH0000000000000000", "base_version": "v0",
+            "summary": "fix date",
         "edits": [{
             "op": "replace",
             "block_id": "blk-ship0001",
@@ -711,7 +712,8 @@ async fn every_call_is_audited_with_its_trace() {
 #[tokio::test]
 async fn legacy_clients_can_initialize_and_call_without_meta() {
     let h = harness();
-    let init = json!({ "jsonrpc": "2.0", "id": 0, "method": "initialize", "params": {
+    let init = json!({ "jsonrpc": "2.0", "id": 0, "method": "initialize",
+        "params": {
         "protocolVersion": "2025-11-25", "capabilities": {}, "clientInfo": {
             "name": "old",
             "version": "1"

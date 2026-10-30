@@ -24,7 +24,8 @@ random() { head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 32; }
 compose() {
   local project="$1"
   shift
-  docker compose -f "${compose_file}" -p "${project}" --env-file "${state}/${project}.env" "$@"
+  docker compose -f "${compose_file}" -p "${project}" \
+    --env-file "${state}/${project}.env" "$@"
 }
 
 # write_env PROJECT IMAGE PORT [KEK]: secrets for a new stack; an existing
@@ -105,8 +106,10 @@ case "${command}" in
     compose "$1" --profile replicas down --volumes --remove-orphans
     ;;
   *)
-    echo "usage: stack.sh up IMAGE PROJECT PORT [KEK] | up-deps PROJECT PORT [KEK]" >&2
-    echo "       | start-vellum PROJECT IMAGE PORT | compose PROJECT ARGS... | down PROJECT" >&2
+    echo "usage: stack.sh up IMAGE PROJECT PORT [KEK] | up-deps PROJECT PORT" \
+      "[KEK]" >&2
+    echo "       | start-vellum PROJECT IMAGE PORT | compose PROJECT ARGS..." \
+      "| down PROJECT" >&2
     exit 2
     ;;
 esac

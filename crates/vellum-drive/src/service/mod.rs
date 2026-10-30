@@ -656,13 +656,17 @@ impl DriveService {
         vec![
             op!(self, query "drive.my_drive", "/v1/drive/my-drive", my_drive,
                 "Get your My Drive, made for you if you have none yet"),
-            op!(self, query "drive.shared_drives", "/v1/drive/shared-drives", shared_drives,
+            op!(self, query "drive.shared_drives", "/v1/drive/shared-drives",
+                shared_drives,
                 "List the shared drives you can open"),
-            op!(self, query "drive.shared_with_me", "/v1/drive/shared-with-me", shared_with_me,
+            op!(self, query "drive.shared_with_me", "/v1/drive/shared-with-me",
+                shared_with_me,
                 "List items in other people's My Drives shared with you"),
-            op!(self, query "drive.list", "/v1/drive/spaces/{space_id}/items", list,
+            op!(self, query "drive.list", "/v1/drive/spaces/{space_id}/items",
+                list,
                 "List the items in a folder or at the top of a space"),
-            op!(self, query "drive.tree", "/v1/drive/spaces/{space_id}/tree", tree,
+            op!(self, query "drive.tree", "/v1/drive/spaces/{space_id}/tree",
+                tree,
                 "List every item in a space, or under one item, in tree order"),
             op!(
                 self,
@@ -676,7 +680,8 @@ impl DriveService {
             op!(self, query "drive.resolve_shortcut", "/v1/drive/items/{id}/tar\
                 get",
                 resolve_shortcut, "Get the item a shortcut points at"),
-            op!(self, query "drive.versions", "/v1/drive/items/{id}/versions", versions,
+            op!(self, query "drive.versions", "/v1/drive/items/{id}/versions",
+                versions,
                 "List a page's saved versions"),
             op!(self, query "drive.version", "/v1/drive/items/{id}/versions/{ve\
                 rsion_id}", version,
@@ -685,11 +690,14 @@ impl DriveService {
                 "List the items you starred"),
             op!(self, query "drive.recent", "/v1/drive/recent", recent,
                 "List the items you opened recently"),
-            op!(self, query "drive.activity", "/v1/drive/items/{id}/activity", activity,
+            op!(self, query "drive.activity", "/v1/drive/items/{id}/activity",
+                activity,
                 "List the changes to an item, or to a whole space by its ID"),
-            op!(self, query "drive.backlinks", "/v1/drive/items/{id}/backlinks", backlinks,
+            op!(self, query "drive.backlinks",
+                "/v1/drive/items/{id}/backlinks", backlinks,
                 "List the pages that link to a page"),
-            op!(self, query "drive.usage", "/v1/drive/spaces/{space_id}/usage", usage,
+            op!(self, query "drive.usage", "/v1/drive/spaces/{space_id}/usage",
+                usage,
                 "Get how much of its quota a space uses"),
             op!(self, query "drive.trash_list", "/v1/drive/spaces/{space_id}/tr\
                 ash", trash_list,
@@ -701,9 +709,11 @@ impl DriveService {
 
     fn changes(self: &Arc<Self>) -> Vec<Operation> {
         vec![
-            op!(self, Post "drive.create_space", "/v1/drive/spaces", create_space,
+            op!(self, Post "drive.create_space", "/v1/drive/spaces",
+                create_space,
                 "Create a shared drive, or your My Drive"),
-            op!(self, Patch "drive.update_space", "/v1/drive/spaces/{space_id}", update_space,
+            op!(self, Patch "drive.update_space",
+                "/v1/drive/spaces/{space_id}", update_space,
                 "Rename a space and change its quota, trash and version \
                     settings"),
             op!(self, Post "drive.create_folder", "/v1/drive/spaces/{space_id}/\
@@ -718,7 +728,8 @@ impl DriveService {
             op!(self, Put "drive.save", "/v1/drive/items/{id}/content", save,
                 "Save a page, merging changes made meanwhile"),
             op!(self, Post "drive.restore_version",
-                "/v1/drive/items/{id}/versions/{version_id}/restore", restore_version,
+                "/v1/drive/items/{id}/versions/{version_id}/restore",
+                    restore_version,
                 "Make an old version the page's content again"),
             op!(self, Patch "drive.rename", "/v1/drive/items/{id}", rename,
                 "Rename an item and fix the links to it"),
@@ -728,7 +739,8 @@ impl DriveService {
                 "Copy an item, with fresh IDs, into a folder or space"),
             op!(self, Post "drive.trash", "/v1/drive/items/{id}/trash", trash,
                 "Move an item, with everything in it, to the trash"),
-            op!(self, Post "drive.restore", "/v1/drive/items/{id}/restore", restore,
+            op!(self, Post "drive.restore", "/v1/drive/items/{id}/restore",
+                restore,
                 "Bring a trashed item back"),
             op!(self, Delete "drive.purge", "/v1/drive/items/{id}", purge,
                 "Delete a trashed item for good"),

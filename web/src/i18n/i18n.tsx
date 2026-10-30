@@ -24,7 +24,8 @@ export function createTranslator(locale: string, source: string): Translate {
   const errors = bundle.addResource(new FluentResource(source));
   if (errors.length > 0) {
     throw new Error(
-      `Vellum: ${locale} messages do not parse: ${errors.map(String).join("; ")}`,
+      `Vellum: ${locale} messages do not parse: ` +
+        errors.map(String).join("; "),
     );
   }
   return (id, arguments_) => {

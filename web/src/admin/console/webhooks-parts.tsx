@@ -303,7 +303,10 @@ export function Deliveries({
         <tbody>
           {loaded.value.map((delivery) => (
             <tr
-              key={`${delivery.delivery_id}:${String(delivery.attempt)}:${delivery.at}`}
+              key={
+                `${delivery.delivery_id}:${String(delivery.attempt)}` +
+                `:${delivery.at}`
+              }
             >
               <td>{when(delivery.at)}</td>
               <td>

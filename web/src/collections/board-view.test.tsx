@@ -69,32 +69,35 @@ describe("BoardView", () => {
     expect(within(column("Done")).getAllByText("Owner")).toHaveLength(2);
   });
 
-  it("moves a card with Alt+Right and Alt+Left, keeping focus on it", async () => {
-    const { user, card, titlesIn } = await renderBoard();
-    act(() => {
-      card("Gateway returns 502").focus();
-    });
-    await user.keyboard("{Alt>}{ArrowRight}{/Alt}");
-    await waitFor(() => {
-      expect(titlesIn("Done")).toContain("Gateway returns 502 on cold start");
-    });
-    expect(document.activeElement).toBe(card("Gateway returns 502"));
-    expect(screen.getByRole("status").textContent).toBe(
-      "Moved Gateway returns 502 on cold start to Done.",
-    );
-    await user.keyboard("{Alt>}{ArrowRight}{/Alt}");
-    await user.keyboard("{Alt>}{ArrowLeft}{/Alt}");
-    await waitFor(() => {
-      expect(titlesIn("In review")).toContain(
-        "Gateway returns 502 on cold start",
+  it(
+    "moves a card with Alt+Right and Alt+Left, keeping focus on " + "it",
+    async () => {
+      const { user, card, titlesIn } = await renderBoard();
+      act(() => {
+        card("Gateway returns 502").focus();
+      });
+      await user.keyboard("{Alt>}{ArrowRight}{/Alt}");
+      await waitFor(() => {
+        expect(titlesIn("Done")).toContain("Gateway returns 502 on cold start");
+      });
+      expect(document.activeElement).toBe(card("Gateway returns 502"));
+      expect(screen.getByRole("status").textContent).toBe(
+        "Moved Gateway returns 502 on cold start to Done.",
       );
-    });
-    act(() => {
-      card("Token bucket").focus();
-    });
-    await user.keyboard("{ArrowRight}");
-    expect(titlesIn("In progress")).toContain("Token bucket per tenant");
-  });
+      await user.keyboard("{Alt>}{ArrowRight}{/Alt}");
+      await user.keyboard("{Alt>}{ArrowLeft}{/Alt}");
+      await waitFor(() => {
+        expect(titlesIn("In review")).toContain(
+          "Gateway returns 502 on cold start",
+        );
+      });
+      act(() => {
+        card("Token bucket").focus();
+      });
+      await user.keyboard("{ArrowRight}");
+      expect(titlesIn("In progress")).toContain("Token bucket per tenant");
+    },
+  );
 
   it("moves a card from its Move to menu", async () => {
     const { user, column, titlesIn } = await renderBoard();
@@ -167,19 +170,22 @@ describe("BoardView", () => {
     });
   });
 
-  it("ignores drops of other things and onto the card's own column", async () => {
-    const { card, column, collections } = await renderBoard();
-    const spy = vi.spyOn(collections, "updateRow");
-    fireEvent.dragOver(column("Done"), {
-      dataTransfer: dataTransfer(["text/plain"]),
-    });
-    expect(column("Done").dataset["over"]).toBeUndefined();
-    fireEvent.drop(column("Done"), { dataTransfer: dataTransfer() });
-    const transfer = dataTransfer();
-    fireEvent.dragStart(card("Token bucket"), { dataTransfer: transfer });
-    fireEvent.drop(column("In progress"), { dataTransfer: transfer });
-    expect(spy).not.toHaveBeenCalled();
-  });
+  it(
+    "ignores drops of other things and onto the card's own " + "column",
+    async () => {
+      const { card, column, collections } = await renderBoard();
+      const spy = vi.spyOn(collections, "updateRow");
+      fireEvent.dragOver(column("Done"), {
+        dataTransfer: dataTransfer(["text/plain"]),
+      });
+      expect(column("Done").dataset["over"]).toBeUndefined();
+      fireEvent.drop(column("Done"), { dataTransfer: dataTransfer() });
+      const transfer = dataTransfer();
+      fireEvent.dragStart(card("Token bucket"), { dataTransfer: transfer });
+      fireEvent.drop(column("In progress"), { dataTransfer: transfer });
+      expect(spy).not.toHaveBeenCalled();
+    },
+  );
 
   it("opens a card's row with a click, Enter or Space", async () => {
     const { user, card } = await renderBoard();

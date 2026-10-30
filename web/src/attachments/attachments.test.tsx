@@ -205,66 +205,75 @@ describe("the files panel", () => {
 });
 
 describe("the attachments API", () => {
-  it("uploads the raw file under its name and deletes only attachment paths", async () => {
-    const upload = vi.fn(() => Promise.resolve(file("a b.png")));
-    const send = vi.fn(() => Promise.resolve());
-    const get = vi.fn(() =>
-      Promise.resolve({ items: [file("z.txt"), file("a.txt")] }),
-    );
-    const api = createHttpAttachmentsApi({
-      get,
-      send,
-      upload,
-      forgetSession: vi.fn(),
-    } as unknown as Http);
-    const picked = new File(["x"], "a b.png");
-    await api.upload(PAGE, picked);
-    expect(upload).toHaveBeenCalledWith(
-      `/api/v1/attachments/${PAGE}`,
-      { name: "a b.png" },
-      picked,
-      "application/octet-stream",
-    );
-    const listed = await api.list(PAGE);
-    expect(listed.map((found) => found.name)).toEqual(["a.txt", "z.txt"]);
-    await api.remove(`/api/v1/attachments/${PAGE}/a.txt`);
-    expect(send).toHaveBeenCalledWith(
-      "DELETE",
-      `/api/v1/attachments/${PAGE}/a.txt`,
-    );
-    await expect(api.remove("/api/v1/drive/items/x")).rejects.toThrow(
-      "not an attachment",
-    );
-  });
-
-  it("sends an upload's bytes with the CSRF token and its media type", async () => {
-    const calls: { url: string; init: RequestInit }[] = [];
-    const fetch = vi.fn((input: RequestInfo | URL, init: RequestInit = {}) => {
-      const url = input instanceof Request ? input.url : input.toString();
-      calls.push({ url, init });
-      return Promise.resolve(
-        url === "/api/csrf"
-          ? Response.json({ token: "t0k" })
-          : Response.json(file("x.png"), { status: 201 }),
+  it(
+    "uploads the raw file under its name and deletes only attachment " +
+      "paths",
+    async () => {
+      const upload = vi.fn(() => Promise.resolve(file("a b.png")));
+      const send = vi.fn(() => Promise.resolve());
+      const get = vi.fn(() =>
+        Promise.resolve({ items: [file("z.txt"), file("a.txt")] }),
       );
-    });
-    const http = createHttp({
-      fetch: fetch as unknown as typeof globalThis.fetch,
-      idempotencyKey: () => "k",
-    });
-    const body = png();
-    await http.upload(
-      "/api/v1/attachments/P",
-      { name: "x y.png" },
-      body,
-      "image/png",
-    );
-    const sent = calls.find((call) => call.init.method === "POST");
-    const headers = sent?.init.headers as Record<string, string>;
-    expect(sent?.url).toBe("/api/v1/attachments/P?name=x+y.png");
-    expect(sent?.init.body).toBe(body);
-    expect(headers["x-csrf-token"]).toBe("t0k");
-    expect(headers["content-type"]).toBe("image/png");
-    expect(headers["idempotency-key"]).toBe("k");
-  });
+      const api = createHttpAttachmentsApi({
+        get,
+        send,
+        upload,
+        forgetSession: vi.fn(),
+      } as unknown as Http);
+      const picked = new File(["x"], "a b.png");
+      await api.upload(PAGE, picked);
+      expect(upload).toHaveBeenCalledWith(
+        `/api/v1/attachments/${PAGE}`,
+        { name: "a b.png" },
+        picked,
+        "application/octet-stream",
+      );
+      const listed = await api.list(PAGE);
+      expect(listed.map((found) => found.name)).toEqual(["a.txt", "z.txt"]);
+      await api.remove(`/api/v1/attachments/${PAGE}/a.txt`);
+      expect(send).toHaveBeenCalledWith(
+        "DELETE",
+        `/api/v1/attachments/${PAGE}/a.txt`,
+      );
+      await expect(api.remove("/api/v1/drive/items/x")).rejects.toThrow(
+        "not an attachment",
+      );
+    },
+  );
+
+  it(
+    "sends an upload's bytes with the CSRF token and its media " + "type",
+    async () => {
+      const calls: { url: string; init: RequestInit }[] = [];
+      const fetch = vi.fn(
+        (input: RequestInfo | URL, init: RequestInit = {}) => {
+          const url = input instanceof Request ? input.url : input.toString();
+          calls.push({ url, init });
+          return Promise.resolve(
+            url === "/api/csrf"
+              ? Response.json({ token: "t0k" })
+              : Response.json(file("x.png"), { status: 201 }),
+          );
+        },
+      );
+      const http = createHttp({
+        fetch: fetch as unknown as typeof globalThis.fetch,
+        idempotencyKey: () => "k",
+      });
+      const body = png();
+      await http.upload(
+        "/api/v1/attachments/P",
+        { name: "x y.png" },
+        body,
+        "image/png",
+      );
+      const sent = calls.find((call) => call.init.method === "POST");
+      const headers = sent?.init.headers as Record<string, string>;
+      expect(sent?.url).toBe("/api/v1/attachments/P?name=x+y.png");
+      expect(sent?.init.body).toBe(body);
+      expect(headers["x-csrf-token"]).toBe("t0k");
+      expect(headers["content-type"]).toBe("image/png");
+      expect(headers["idempotency-key"]).toBe("k");
+    },
+  );
 });

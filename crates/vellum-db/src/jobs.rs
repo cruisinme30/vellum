@@ -547,7 +547,8 @@ impl Queue {
         &self,
         id: i64,
     ) -> Result<Option<(State, u32, Option<String>)>> {
-        let row: Option<(String, i64, Option<String>)> = each!(self.index, pool, system => traced(
+        let row: Option<(String, i64, Option<String>)> = each!(self.index,
+            pool, system => traced(
             system,
             "jobs.status",
             sqlx::query_as("SELECT state, attempts, last_error FROM jobs WHERE \

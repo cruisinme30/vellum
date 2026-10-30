@@ -189,28 +189,32 @@ describe("PageTree", () => {
     expect(onNavigate).toHaveBeenCalledTimes(2);
   });
 
-  it("renames with F2: Enter saves, Escape cancels, leaving the field saves", async () => {
-    const { user, item, focusOn, titleOf } = renderTree();
-    focusOn("On-call handbook");
-    await user.keyboard("{F2}");
-    const field = screen.getByRole("textbox", { name: "Page title" });
-    expect(document.activeElement).toBe(field);
-    await user.click(field);
-    await user.clear(field);
-    await user.keyboard("  Pager guide  {Enter}");
-    expect(titleOf(PAGE.onCall)?.title).toBe("Pager guide");
-    expect(document.activeElement).toBe(item("Pager guide"));
+  it(
+    "renames with F2: Enter saves, Escape cancels, leaving the field " +
+      "saves",
+    async () => {
+      const { user, item, focusOn, titleOf } = renderTree();
+      focusOn("On-call handbook");
+      await user.keyboard("{F2}");
+      const field = screen.getByRole("textbox", { name: "Page title" });
+      expect(document.activeElement).toBe(field);
+      await user.click(field);
+      await user.clear(field);
+      await user.keyboard("  Pager guide  {Enter}");
+      expect(titleOf(PAGE.onCall)?.title).toBe("Pager guide");
+      expect(document.activeElement).toBe(item("Pager guide"));
 
-    await user.keyboard("{F2}");
-    await user.keyboard("Ignored{Escape}");
-    expect(titleOf(PAGE.onCall)?.title).toBe("Pager guide");
-    expect(screen.queryByRole("textbox")).toBeNull();
+      await user.keyboard("{F2}");
+      await user.keyboard("Ignored{Escape}");
+      expect(titleOf(PAGE.onCall)?.title).toBe("Pager guide");
+      expect(screen.queryByRole("textbox")).toBeNull();
 
-    await user.keyboard("{F2}");
-    await user.keyboard("{End} v2");
-    await user.tab();
-    expect(titleOf(PAGE.onCall)?.title).toBe("Pager guide v2");
-  });
+      await user.keyboard("{F2}");
+      await user.keyboard("{End} v2");
+      await user.tab();
+      expect(titleOf(PAGE.onCall)?.title).toBe("Pager guide v2");
+    },
+  );
 
   it("shows untitled pages by a placeholder name", () => {
     const { store, item } = renderTree();
@@ -304,20 +308,24 @@ describe("PageTree drag and drop", () => {
     expect(titles().at(-1)).toBe("Platform roadmap 2027");
   });
 
-  it("accepts a page dragged from elsewhere and ignores empty or self drops", () => {
-    const { item, titles, titleOf } = renderTree();
-    const before = titles();
-    drop(item("Engineering home"), 20);
-    expect(titles()).toEqual(before);
-    fireEvent.dragStart(item("On-call handbook"), {
-      dataTransfer: dataTransfer(),
-    });
-    drop(item("On-call handbook"), 20);
-    expect(titleOf(PAGE.onCall)?.parentId).toBe(PAGE.engHome);
-    const foreign = dataTransfer();
-    foreign.setData("application/x-vellum-page", PAGE.launch);
-    drop(item("Platform roadmap 2027"), 38, foreign);
-    expect(titleOf(PAGE.launch)?.spaceId).toBe(ENGINEERING);
-    expect(titles().at(-1)).toBe("Launch checklist");
-  });
+  it(
+    "accepts a page dragged from elsewhere and ignores empty or self " +
+      "drops",
+    () => {
+      const { item, titles, titleOf } = renderTree();
+      const before = titles();
+      drop(item("Engineering home"), 20);
+      expect(titles()).toEqual(before);
+      fireEvent.dragStart(item("On-call handbook"), {
+        dataTransfer: dataTransfer(),
+      });
+      drop(item("On-call handbook"), 20);
+      expect(titleOf(PAGE.onCall)?.parentId).toBe(PAGE.engHome);
+      const foreign = dataTransfer();
+      foreign.setData("application/x-vellum-page", PAGE.launch);
+      drop(item("Platform roadmap 2027"), 38, foreign);
+      expect(titleOf(PAGE.launch)?.spaceId).toBe(ENGINEERING);
+      expect(titles().at(-1)).toBe("Launch checklist");
+    },
+  );
 });

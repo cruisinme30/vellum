@@ -59,22 +59,26 @@ describe("web push", () => {
     expect([...decodeBase64Url("AQID-_8")]).toEqual([1, 2, 3, 251, 255]);
   });
 
-  it("subscribes with the server's VAPID key and registers the subscription", async () => {
-    const { pushEnvironment, fetchMock, pushManager } = environment({});
-    expect(await enablePush(pushEnvironment)).toBe("enabled");
-    expect(pushManager.subscribe).toHaveBeenCalledWith({
-      userVisibleOnly: true,
-      applicationServerKey: decodeBase64Url("AQID-_8"),
-    });
-    const [url, init] = fetchMock.mock.calls[1] ?? [];
-    expect(url).toBe("https://northstar.dev/api/v1/push/subscriptions");
-    expect(init?.method).toBe("POST");
-    expect(
-      JSON.parse(typeof init?.body === "string" ? init.body : "{}"),
-    ).toMatchObject({
-      endpoint: "https://push.example/new",
-    });
-  });
+  it(
+    "subscribes with the server's VAPID key and registers the " +
+      "subscription",
+    async () => {
+      const { pushEnvironment, fetchMock, pushManager } = environment({});
+      expect(await enablePush(pushEnvironment)).toBe("enabled");
+      expect(pushManager.subscribe).toHaveBeenCalledWith({
+        userVisibleOnly: true,
+        applicationServerKey: decodeBase64Url("AQID-_8"),
+      });
+      const [url, init] = fetchMock.mock.calls[1] ?? [];
+      expect(url).toBe("https://northstar.dev/api/v1/push/subscriptions");
+      expect(init?.method).toBe("POST");
+      expect(
+        JSON.parse(typeof init?.body === "string" ? init.body : "{}"),
+      ).toMatchObject({
+        endpoint: "https://push.example/new",
+      });
+    },
+  );
 
   it("reuses an existing subscription", async () => {
     const { pushEnvironment, pushManager, fetchMock } = environment({

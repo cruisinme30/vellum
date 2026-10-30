@@ -107,7 +107,8 @@ mod tests {
     #[test]
     fn reads_issues_and_skips_pull_requests() -> Result<(), ImportError> {
         let json = json!([
-            {"number": 3, "title": "Crash on start", "body": "Steps…", "state": "closed", "state_reason": "not_planned",
+            {"number": 3, "title": "Crash on start", "body": "Steps…",
+             "state": "closed", "state_reason": "not_planned",
              "labels": [
                  {"name": "bug"},
                  "p1"

@@ -3,7 +3,9 @@
 
 [package]
 name = "vellum-books"
-description = "Books: a tree of documents with an mdBook SUMMARY.md, numbering, cross-references, snapshots and publishing."
+description = """\
+    Books: a tree of documents with an mdBook SUMMARY.md, numbering, \
+    cross-references, snapshots and publishing."""
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -21,7 +23,9 @@ workspace = true
 pulldown-cmark = { version = "0.13.5", default-features = false }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
-serde-saphyr = { version = "2.0.0", default-features = false, features = ["serialize", "deserialize"] }
+serde-saphyr.version = "2.0.0"
+serde-saphyr.default-features = false
+serde-saphyr.features = ["serialize", "deserialize"]
 similar = "3.2.1"
 thiserror = "2.0.21"
 tracing = "0.1.44"

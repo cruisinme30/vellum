@@ -1027,7 +1027,8 @@ impl DriveIndex for SqlIndex {
     }
 
     async fn versions(&self, doc: ObjectId) -> DriveResult<Vec<VersionRecord>> {
-        let rows: Vec<(Uuid, Uuid, Uuid, i64, String)> = on_pool!(self, pool, system => {
+        let rows: Vec<(Uuid, Uuid, Uuid, i64, String)> = on_pool!(self, pool,
+            system => {
             Ok(run!(
                 system,
                 "version.list",

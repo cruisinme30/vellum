@@ -109,10 +109,13 @@ describe("socket connector", () => {
     await expect(session.live?.done()).rejects.toThrow("read only");
   });
 
-  it("does not know whether it may write until the server has listed it", () => {
-    const session = open();
-    expect(session.live?.getSnapshot().canWrite).toBeUndefined();
-  });
+  it(
+    "does not know whether it may write until the server has listed " + "it",
+    () => {
+      const session = open();
+      expect(session.live?.getSnapshot().canWrite).toBeUndefined();
+    },
+  );
 
   it("asks for a version on Done and resolves when it is written", async () => {
     const session = open();

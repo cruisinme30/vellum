@@ -65,7 +65,8 @@ const SETTINGS = {
           { field: "title", op: "contains", values: ["timeout"] },
         ],
       },
-      // eslint-disable-next-line unicorn/no-thenable -- the field's name in team.yaml
+      // The field's name in team.yaml.
+      // eslint-disable-next-line unicorn/no-thenable
       then: { assignee: "dev", priority: 2 },
     },
   ],
@@ -110,7 +111,9 @@ const SETTINGS = {
       body: "- [ ] Review open pages\n- [ ] Hand the pager to the next person",
     },
     {
-      name: "Monthly dependency audit with a long name that has to wrap on phones",
+      name:
+        "Monthly dependency audit with a long name that has to wrap on " +
+        "phones",
       estimate: "M",
       repeat: "1m",
     },

@@ -29,7 +29,8 @@ function withActions(
   rule: Omit<TriageRule, "then">,
   actions: TriageRule["then"],
 ): TriageRule {
-  // eslint-disable-next-line unicorn/no-thenable -- the field's name in team.yaml
+  // The field's name in team.yaml.
+  // eslint-disable-next-line unicorn/no-thenable
   return { ...rule, then: actions };
 }
 

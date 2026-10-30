@@ -122,7 +122,8 @@ pub fn list() -> Value {
                     "title": p.title,
                     "description": p.description,
                     "arguments": p.arguments.iter().map(|a| json!({
-                        "name": a.name, "description": a.description, "required": a.required
+                        "name": a.name, "description": a.description,
+                            "required": a.required
                     })).collect::<Vec<_>>()
                 })
             })

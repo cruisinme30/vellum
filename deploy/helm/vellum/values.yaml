@@ -120,15 +120,18 @@ kroki:
   image:
     repository: yuzutech/kroki
     tag: 0.28.0
-    digest: sha256:710a5e8d57344769846695431ceefc02aaf908e9958c9d459171d2255ee2f7f5
+    digest: >-
+      sha256:710a5e8d57344769846695431ceefc02aaf908e9958c9d459171d2255ee2f7f5
   excalidraw:
     repository: yuzutech/kroki-excalidraw
     tag: 0.28.0
-    digest: sha256:fddd0bac124f259b5cbcae664b32fed9da1a8b2fda8d4cd8edf04e8349ee6ef8
+    digest: >-
+      sha256:fddd0bac124f259b5cbcae664b32fed9da1a8b2fda8d4cd8edf04e8349ee6ef8
   diagramsnet:
     repository: yuzutech/kroki-diagramsnet
     tag: 0.28.0
-    digest: sha256:6139cb660c4a2526c2e2e0f7fff64b9b92ac4d8398f85fde53cf25bb6521383b
+    digest: >-
+      sha256:6139cb660c4a2526c2e2e0f7fff64b9b92ac4d8398f85fde53cf25bb6521383b
   resources:
     requests: { cpu: 100m, memory: 512Mi, ephemeral-storage: 128Mi }
     limits: { cpu: "1", memory: 1Gi, ephemeral-storage: 512Mi }
@@ -148,7 +151,8 @@ clamav:
   image:
     repository: clamav/clamav
     tag: 1.5.4
-    digest: sha256:bda39705e291105049c3936e2803ac90b955172af8030f94f05dce1252df6c6d
+    digest: >-
+      sha256:bda39705e291105049c3936e2803ac90b955172af8030f94f05dce1252df6c6d
   resources:
     requests: { cpu: 200m, memory: 1536Mi, ephemeral-storage: 512Mi }
     limits: { cpu: "2", memory: 3Gi, ephemeral-storage: 2Gi }

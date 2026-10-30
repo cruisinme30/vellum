@@ -733,7 +733,8 @@ kbd {
   background: var(--md-surface-container);
 }
 
-/* Single sign-on above the password form, and the second sign-in step (issue 523). */
+/* Single sign-on above the password form, and the second sign-in step (issue
+   523). */
 .vl-auth-sso {
   display: grid;
   gap: 8px;

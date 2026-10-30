@@ -22,7 +22,8 @@ body() { jq -cn --arg email "${email}" --arg password "${password}" "$1"; }
 
 # 200 makes the administrator; 409 means one exists already.
 # shellcheck disable=SC2016
-status="$(curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' \
+status="$(curl -sS -o /dev/null -w '%{http_code}' \
+  -H 'Content-Type: application/json' \
   -d "$(body '{email: $email, name: "Northstar load", password: $password}')" \
   "${base}/api/v1/setup")"
 if [[ "${status}" != 200 && "${status}" != 409 ]]; then
@@ -31,7 +32,8 @@ if [[ "${status}" != 200 && "${status}" != 409 ]]; then
 fi
 
 # shellcheck disable=SC2016
-curl -sSf -c "${jar}" -b "${jar}" -o /dev/null -H 'Content-Type: application/json' \
+curl -sSf -c "${jar}" -b "${jar}" -o /dev/null \
+  -H 'Content-Type: application/json' \
   -d "$(body '{email: $email, password: $password}')" "${base}/auth/sign-in"
 csrf="$(curl -sSf -c "${jar}" -b "${jar}" "${base}/api/csrf" | jq -r .token)"
 curl -sSf -c "${jar}" -b "${jar}" -H 'Content-Type: application/json' \

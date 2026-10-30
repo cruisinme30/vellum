@@ -113,25 +113,26 @@ versions CI uses, with:
 scripts/dev/install-tools.sh
 ```
 
-Cloud sessions get them from the environment's setup script, which runs `curl -sSfL
-https://raw.githubusercontent.com/cruisinme30/vellum/develop/scripts/dev/install-tools.sh |
-bash`. Set `VELLUM_ALLOW_MISSING_TOOLS=1` to skip a missing tool instead. The
-local run is focused: clippy, rustdoc and the Rust tests cover only the crates
-your branch changed, and the web and desktop unit tests only the files related
-to your changes, without the coverage gate. The batch pull request into develop
-runs the entire suite in CI, so don't run it in a feature branch;
-`VELLUM_FAST_ALL_TESTS=1` does it locally if you need to. Tests that need Docker
-are left out without a Docker daemon, and CI runs them. Local builds skip debug
-info and incremental caches (`CARGO_PROFILE_DEV_DEBUG=0`, `CARGO_INCREMENTAL=0`)
-so a test build fits a small disk; set either variable yourself to override. In
-an emergency, `git push --no-verify` skips the hook, but CI still gates the
-merge.
+Cloud sessions get them from the environment's setup script, which pipes
+<https://raw.githubusercontent.com/cruisinme30/vellum/develop/scripts/dev/install-tools.sh>
+to `bash` with `curl -sSfL`. Set `VELLUM_ALLOW_MISSING_TOOLS=1` to skip a
+missing tool instead. The local run is focused: clippy, rustdoc and the Rust
+tests cover only the crates your branch changed, and the web and desktop unit
+tests only the files related to your changes, without the coverage gate. The
+batch pull request into develop runs the entire suite in CI, so don't run it in
+a feature branch; `VELLUM_FAST_ALL_TESTS=1` does it locally if you need to.
+Tests that need Docker are left out without a Docker daemon, and CI runs them.
+Local builds skip debug info and incremental caches
+(`CARGO_PROFILE_DEV_DEBUG=0`, `CARGO_INCREMENTAL=0`) so a test build fits a
+small disk; set either variable yourself to override. In an emergency, `git
+push --no-verify` skips the hook, but CI still gates the merge.
 
 Before opening a pull request, or after editing its title or description,
 check them the way CI will:
 
 ```sh
-cargo xtask pr-check --title "feat(db): keep jobs once per cluster" --body-file pr.md
+cargo xtask pr-check --title "feat(db): keep jobs once per cluster" \
+  --body-file pr.md
 ```
 
 It checks the branch name, the title (a Conventional Commit, at most 72
@@ -168,7 +169,8 @@ suite as before, in the gate's container when cargo is not installed.
 Then push with:
 
 ```sh
-scripts/dev/push.sh develop          # or another branch; [<commit>] defaults to HEAD
+# Or another branch; [<commit>] defaults to HEAD.
+scripts/dev/push.sh develop
 ```
 
 It refuses without the stamp (a `--release` stamp for `main` and
@@ -238,17 +240,18 @@ Every change is traceable to the discussion that led to it.
   the answers, so the issue is the feature's full history.
 - **The pull request links it.** Put `Closes #N` (or `Refs #N` when the
   issue stays open) in the **Issue** section of the description.
-- **A feature records its decisions.** Run `cargo xtask adr new <slug> --decisions
-  N --issue N`. It writes `docs/adr/NNNN-<slug>.md` from
+- **A feature records its decisions.** Run `cargo xtask adr new <slug>
+  --decisions N --issue N`. It writes `docs/adr/NNNN-<slug>.md` from
   `docs/adr/0000-template.md` with the next free record and decision numbers
   across all branches (`cargo xtask adr next` only prints them), skipping those
   reserved in `docs/adr/reserved.toml`. Push the branch right away to claim the
-  numbers, then fill it in. Every record has the same four sections, **Context**, **Decisions**, **Alternatives**
-  and **Consequences**, plus the issue and pull requests in its facts block.
-  Keep it short: under 150 lines and at most six bullets in a row; the **Decision
-  records** check enforces both, and fails when two records share a number. When
-  a feature only extends an existing decision, update that record or name it as
-  `ADR NNNN` in the description.
+  numbers, then fill it in. Every record has the same four sections,
+  **Context**, **Decisions**, **Alternatives** and **Consequences**, plus the
+  issue and pull requests in its facts block. Keep it short: under 150 lines and
+  at most six bullets in a row; the **Decision records** check enforces both,
+  and fails when two records share a number. When a feature only extends an
+  existing decision, update that record or name it as `ADR NNNN` in the
+  description.
 
 The **Issue and decision record** check in the fast suite enforces this.
 Release pull requests, Dependabot, and `chore` or `ci` pull requests are

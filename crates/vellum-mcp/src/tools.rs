@@ -372,7 +372,8 @@ pub const TOOLS: [ToolDef; 15] = [
                 json!({
                     "collection": s("Collection id."),
                     "view": s("Saved view name."),
-                    "filters": { "type": "array", "items": { "type": "object", "properties": {
+                    "filters": { "type": "array", "items": { "type": "object",
+                        "properties": {
                         "property": {
                             "type": "string"
                         }, "op": {
@@ -380,7 +381,8 @@ pub const TOOLS: [ToolDef; 15] = [
                             "enum": ["contains", "is", "not"]
                         }, "value": {} },
                         "required": ["property", "op", "value"] } },
-                    "sorts": { "type": "array", "items": { "type": "object", "properties": {
+                    "sorts": { "type": "array", "items": { "type": "object",
+                        "properties": {
                         "property": {
                             "type": "string"
                         }, "direction": {
@@ -792,8 +794,10 @@ pub async fn call(
                         ];
                         // The file itself, when the workspace handed it over.
                         if let Some(blob) = a.data.take() {
-                            content.push(json!({ "type": "resource", "resource": {
-                                "uri": a.url, "mimeType": a.mime_type, "blob": blob
+                            content.push(json!({ "type": "resource",
+                                "resource": {
+                                "uri": a.url, "mimeType": a.mime_type,
+                                    "blob": blob
                             } }));
                         }
                         let mut result = Map::new();
@@ -1057,8 +1061,10 @@ async fn get_doc(
         Ok(doc) => {
             let (text, warnings) = guarded(&doc.markdown);
             let structured = json!({
-                "id": doc.id, "title": doc.title, "url": doc.url, "space": doc.space,
-                "version": doc.version, "updated_at": doc.updated_at, "markdown": text,
+                "id": doc.id, "title": doc.title, "url": doc.url,
+                    "space": doc.space,
+                "version": doc.version, "updated_at": doc.updated_at,
+                    "markdown": text,
                 "warnings": warnings
             });
             ok(text, structured, vec![id])

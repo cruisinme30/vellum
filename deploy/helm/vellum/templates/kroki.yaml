@@ -42,7 +42,8 @@ spec:
                   {{- include "vellum.krokiSelector" . | nindent 18 }}
       containers:
         - name: kroki
-          image: {{ include "vellum.image" (dict "image" .Values.kroki.image "default" "") }}
+          image: {{ include "vellum.image"
+            (dict "image" .Values.kroki.image "default" "") }}
           imagePullPolicy: Always
           env:
             - { name: KROKI_SAFE_MODE, value: secure }
@@ -67,12 +68,15 @@ spec:
             - { name: tmp, mountPath: /tmp }
         {{- range $name, $port := dict "excalidraw" 8004 "diagramsnet" 8005 }}
         - name: {{ $name }}
-          image: {{ include "vellum.image" (dict "image" (index $.Values.kroki $name) "default" "") }}
+          image: {{ include "vellum.image"
+            (dict "image" (index $.Values.kroki $name) "default" "") }}
           imagePullPolicy: Always
           env:
             - { name: HOME, value: /tmp }
           ports:
-            - { name: {{ $name | trunc 10 }}, containerPort: {{ $port }}, protocol: TCP }
+            - name: {{ $name | trunc 10 }}
+              containerPort: {{ $port }}
+              protocol: TCP
           # Readiness only: a crashed companion restarts on its own, and a
           # TCP liveness check would duplicate this probe.
           readinessProbe:

@@ -20,24 +20,27 @@ const entries = () =>
     .map((item) => [item.dataset["level"], item.textContent]);
 
 describe("TocView", () => {
-  it("lists the non-empty headings below it, nested blocks included", async () => {
-    await renderEditor(
-      body(
-        h(1, "Before"),
-        toc(),
-        h(2, "Purpose"),
-        p("text"),
-        h(3, "  "),
-        callout("info", h(3, "Inside a callout")),
-        h(2, "Scope"),
-      ),
-    );
-    expect(entries()).toEqual([
-      ["2", "Purpose"],
-      ["3", "Inside a callout"],
-      ["2", "Scope"],
-    ]);
-  });
+  it(
+    "lists the non-empty headings below it, nested blocks " + "included",
+    async () => {
+      await renderEditor(
+        body(
+          h(1, "Before"),
+          toc(),
+          h(2, "Purpose"),
+          p("text"),
+          h(3, "  "),
+          callout("info", h(3, "Inside a callout")),
+          h(2, "Scope"),
+        ),
+      );
+      expect(entries()).toEqual([
+        ["2", "Purpose"],
+        ["3", "Inside a callout"],
+        ["2", "Scope"],
+      ]);
+    },
+  );
 
   it("explains itself when there is no heading below", async () => {
     await renderEditor(body(toc(), p("just text")));
@@ -78,22 +81,25 @@ describe("TocView", () => {
 });
 
 describe("TocView outside the document", () => {
-  it("lists the headings from the top of the page when it has no position", () => {
-    const editor = createTestEditor({
-      content: body(p("x"), h(2, "Top"), toc(), h(2, "Below")),
-    });
-    const node = editor.state.doc.child(2);
-    render(<TocView {...detachedViewProperties(editor, node)} />);
-    expect(entries()).toEqual([
-      ["2", "Top"],
-      ["2", "Below"],
-    ]);
-    act(() => {
-      editor.commands.insertContentAt(3, h(3, "First"));
-    });
-    expect(entries()[0]).toEqual(["3", "First"]);
-    editor.destroy();
-  });
+  it(
+    "lists the headings from the top of the page when it has no " + "position",
+    () => {
+      const editor = createTestEditor({
+        content: body(p("x"), h(2, "Top"), toc(), h(2, "Below")),
+      });
+      const node = editor.state.doc.child(2);
+      render(<TocView {...detachedViewProperties(editor, node)} />);
+      expect(entries()).toEqual([
+        ["2", "Top"],
+        ["2", "Below"],
+      ]);
+      act(() => {
+        editor.commands.insertContentAt(3, h(3, "First"));
+      });
+      expect(entries()[0]).toEqual(["3", "First"]);
+      editor.destroy();
+    },
+  );
 });
 
 describe("headingsAfter", () => {

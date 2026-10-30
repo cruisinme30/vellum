@@ -312,7 +312,8 @@ export function FirstSection({
           async (added) => {
             await onChanged();
             void navigate(
-              `/books/${encodeURIComponent(book)}/${encodeURIComponent(added.id)}`,
+              `/books/${encodeURIComponent(book)}` +
+                `/${encodeURIComponent(added.id)}`,
             );
           },
           (error_: unknown) => {

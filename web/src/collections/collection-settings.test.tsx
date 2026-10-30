@@ -193,51 +193,64 @@ describe("types, relations and rollups", () => {
     expect(within(title).queryByLabelText("Type")).toBeNull();
   });
 
-  it("links to another collection, then rolls up through the link", async () => {
-    const { user, collections } = await openIssues();
-    await user.click(screen.getByRole("button", { name: "Properties" }));
-    const panel = screen.getByRole("dialog", { name: "Properties" });
-    const add = within(panel).getByRole("form", { name: "Add property" });
-    await user.type(within(add).getByLabelText("Name"), "Shipped in");
-    await user.selectOptions(within(add).getByLabelText("Type"), "relation");
-    const target = within(add).getByLabelText("Links to");
-    await within(target).findByRole("option", { name: "Releases" });
-    await user.selectOptions(target, "Releases");
-    await user.type(
-      within(add).getByLabelText("Name in the linked collection"),
-      "Shipped work",
-    );
-    await user.click(within(add).getByRole("button", { name: "Add property" }));
-    expect(await within(panel).findByDisplayValue("Shipped in")).toBeDefined();
-    const releases = await collections.info(COLLECTION.releases);
-    expect(releases.properties.at(-1)?.name).toBe("Shipped work");
+  it(
+    "links to another collection, then rolls up through the " + "link",
+    async () => {
+      const { user, collections } = await openIssues();
+      await user.click(screen.getByRole("button", { name: "Properties" }));
+      const panel = screen.getByRole("dialog", { name: "Properties" });
+      const add = within(panel).getByRole("form", { name: "Add property" });
+      await user.type(within(add).getByLabelText("Name"), "Shipped in");
+      await user.selectOptions(within(add).getByLabelText("Type"), "relation");
+      const target = within(add).getByLabelText("Links to");
+      await within(target).findByRole("option", { name: "Releases" });
+      await user.selectOptions(target, "Releases");
+      await user.type(
+        within(add).getByLabelText("Name in the linked collection"),
+        "Shipped work",
+      );
+      await user.click(
+        within(add).getByRole("button", { name: "Add property" }),
+      );
+      expect(
+        await within(panel).findByDisplayValue("Shipped in"),
+      ).toBeDefined();
+      const releases = await collections.info(COLLECTION.releases);
+      expect(releases.properties.at(-1)?.name).toBe("Shipped work");
 
-    await user.type(within(add).getByLabelText("Name"), "Ship dates");
-    await user.selectOptions(within(add).getByLabelText("Type"), "rollup");
-    await user.selectOptions(
-      within(add).getByLabelText("Relation"),
-      "Shipped in",
-    );
-    const property = within(add).getByLabelText("Property of the linked rows");
-    await within(property).findByRole("option", { name: "Ships" });
-    await user.selectOptions(property, "Ships");
-    await user.selectOptions(within(add).getByLabelText("Combine as"), "max");
-    await user.click(within(add).getByRole("button", { name: "Add property" }));
-    expect(await within(panel).findByDisplayValue("Ship dates")).toBeDefined();
-    const issues = await collections.info(COLLECTION.issues);
-    expect(issues.properties.at(-1)?.rollup).toMatchObject({
-      prop: "ships",
-      agg: "max",
-    });
+      await user.type(within(add).getByLabelText("Name"), "Ship dates");
+      await user.selectOptions(within(add).getByLabelText("Type"), "rollup");
+      await user.selectOptions(
+        within(add).getByLabelText("Relation"),
+        "Shipped in",
+      );
+      const property = within(add).getByLabelText(
+        "Property of the linked rows",
+      );
+      await within(property).findByRole("option", { name: "Ships" });
+      await user.selectOptions(property, "Ships");
+      await user.selectOptions(within(add).getByLabelText("Combine as"), "max");
+      await user.click(
+        within(add).getByRole("button", { name: "Add property" }),
+      );
+      expect(
+        await within(panel).findByDisplayValue("Ship dates"),
+      ).toBeDefined();
+      const issues = await collections.info(COLLECTION.issues);
+      expect(issues.properties.at(-1)?.rollup).toMatchObject({
+        prop: "ships",
+        agg: "max",
+      });
 
-    const row = within(panel).getByRole("form", { name: "Release" });
-    await user.click(
-      within(row).getByRole("button", { name: "Delete Release" }),
-    );
-    expect(
-      within(row).getByRole("button", { name: /from both collections/ }),
-    ).toBeDefined();
-  });
+      const row = within(panel).getByRole("form", { name: "Release" });
+      await user.click(
+        within(row).getByRole("button", { name: "Delete Release" }),
+      );
+      expect(
+        within(row).getByRole("button", { name: /from both collections/ }),
+      ).toBeDefined();
+    },
+  );
 
   it("says a rollup needs a relation first", async () => {
     const collections = createMockCollectionsStore();

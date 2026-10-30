@@ -93,7 +93,8 @@ export function ExportPanel({ target, api, onClose }: ExportPanelProperties) {
   const [failure, setFailure] = useState<string>();
   const targetKey = JSON.stringify(target);
 
-  // The target is compared by value, so a new object for the same target does not reload.
+  // The target is compared by value, so a new object for the same target does
+  // not reload.
   const preview = useLoaded(
     () => api.preview(target, paper),
     [api, targetKey, paper],

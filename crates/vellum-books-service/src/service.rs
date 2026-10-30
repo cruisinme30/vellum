@@ -1520,7 +1520,8 @@ impl Service for BooksService {
         vec![
             op!(self, query "books.list", "/v1/books", Scope::Read, list_op,
                 "List the books you can open"),
-            op!(self, query "books.get", "/v1/books/{book_id}", Scope::Read, get_op,
+            op!(self, query "books.get", "/v1/books/{book_id}", Scope::Read,
+                get_op,
                 "Get a book's settings and table of contents"),
             op!(self, query "books.get_section", "/v1/books/{book_id}/sections/\
                 {section_id}",
@@ -1550,9 +1551,11 @@ impl Service for BooksService {
             op!(self, Post "books.create_snapshot", "/v1/books/{book_id}/snapsh\
                 ots",
                 Scope::WriteDirect, create_snapshot, "Tag the current book"),
-            op!(self, query "books.diff", "/v1/books/{book_id}/diff", Scope::Read, diff,
+            op!(self, query "books.diff", "/v1/books/{book_id}/diff",
+                Scope::Read, diff,
                 "Compare a snapshot with another snapshot or the current book"),
-            op!(self, query "books.history", "/v1/books/{book_id}/history", Scope::Read, history,
+            op!(self, query "books.history", "/v1/books/{book_id}/history",
+                Scope::Read, history,
                 "List the book's outline changes, newest first"),
             op!(self, Post "books.restore_outline", "/v1/books/{book_id}/histor\
                 y/restore",
@@ -1575,7 +1578,8 @@ impl Service for BooksService {
                 /{section_id}/merge",
                 Scope::WriteDirect, merge_section,
                 "Fold a section's children back into it as headings"),
-            op!(self, Post "books.publish", "/v1/books/{book_id}/publish", Scope::WriteDirect,
+            op!(self, Post "books.publish", "/v1/books/{book_id}/publish",
+                Scope::WriteDirect,
                 publish, "Publish the book as a static site or an mdBook tree"),
             op!(self, query "books.publications", "/v1/books/{book_id}/publicat\
                 ions", Scope::Read,

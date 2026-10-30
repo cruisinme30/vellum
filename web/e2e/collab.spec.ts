@@ -19,7 +19,8 @@ test.use({
   isMobile: false,
   serviceWorkers: "block",
 });
-// eslint-disable-next-line no-empty-pattern -- Playwright needs the fixtures object
+// Playwright needs the fixtures object.
+// eslint-disable-next-line no-empty-pattern
 test.beforeEach(({}, testInfo) => {
   test.skip(
     !testInfo.project.name.endsWith("-laptop"),

@@ -33,14 +33,18 @@ const pad = (value: number, width = 2) =>
 
 /** `12345` ms → `00:00:12.345`. */
 function timestamp(ms: number): string {
-  return `${pad(ms / 3_600_000)}:${pad((ms / 60_000) % 60)}:${pad((ms / 1000) % 60)}.${pad(ms % 1000, 3)}`;
+  const hours = pad(ms / 3_600_000);
+  const minutes = pad((ms / 60_000) % 60);
+  const seconds = pad((ms / 1000) % 60);
+  return `${hours}:${minutes}:${seconds}.${pad(ms % 1000, 3)}`;
 }
 
 /** The captions file for a tour's cues. */
 function webVtt(cues: readonly Cue[]): string {
   const body = cues.map(
     (cue, index) =>
-      `${String(index + 1)}\n${timestamp(cue.from)} --> ${timestamp(cue.to)}\n${cue.caption}\n`,
+      `${String(index + 1)}\n${timestamp(cue.from)} --> ` +
+      `${timestamp(cue.to)}\n${cue.caption}\n`,
   );
   return ["WEBVTT", "", ...body].join("\n");
 }

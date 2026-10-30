@@ -39,22 +39,25 @@ describe("CopyDiagnostic", () => {
     expect(screen.getByRole("status").textContent).toBe("Diagnostic copied");
   });
 
-  it("shows the text to copy by hand when the clipboard is blocked", async () => {
-    const user = userEvent.setup();
-    vi.spyOn(navigator.clipboard, "writeText").mockRejectedValue(
-      new Error("denied"),
-    );
-    render(
-      <I18nProvider>
-        <CopyDiagnostic message="Something broke" />
-      </I18nProvider>,
-    );
-    await user.click(screen.getByRole("button", { name: "Copy diagnostic" }));
-    const manual = await screen.findByRole("textbox", {
-      name: "Diagnostic to copy",
-    });
-    expect((manual as HTMLTextAreaElement).value).toContain(
-      "Message: Something broke",
-    );
-  });
+  it(
+    "shows the text to copy by hand when the clipboard is " + "blocked",
+    async () => {
+      const user = userEvent.setup();
+      vi.spyOn(navigator.clipboard, "writeText").mockRejectedValue(
+        new Error("denied"),
+      );
+      render(
+        <I18nProvider>
+          <CopyDiagnostic message="Something broke" />
+        </I18nProvider>,
+      );
+      await user.click(screen.getByRole("button", { name: "Copy diagnostic" }));
+      const manual = await screen.findByRole("textbox", {
+        name: "Diagnostic to copy",
+      });
+      expect((manual as HTMLTextAreaElement).value).toContain(
+        "Message: Something broke",
+      );
+    },
+  );
 });

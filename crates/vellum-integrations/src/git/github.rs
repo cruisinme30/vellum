@@ -203,7 +203,8 @@ mod tests {
                 "default_branch": "main"
             },
             "pull_request": {
-                "number": 12, "title": "ENG-142 Fix login", "body": "Fixes ENG-143",
+                "number": 12, "title": "ENG-142 Fix login",
+                    "body": "Fixes ENG-143",
                 "html_url": "https://github.com/northstar/api/pull/12",
                 "draft": draft, "merged": merged, "head": {"ref": "ada/eng-142-\
                     fix-login"}

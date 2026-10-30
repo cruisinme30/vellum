@@ -26,7 +26,9 @@ case "$(uname -s)" in
     case "$(uname -m)" in
       x86_64 | amd64) file="vellum-linux-amd64" ;;
       aarch64 | arm64) file="vellum-linux-arm64" ;;
-      armv7l | armv6l) fail "32-bit ARM is not supported; install a 64-bit OS (Raspberry Pi 3 or later)" ;;
+      armv7l | armv6l) fail \
+        "32-bit ARM is not supported; install a 64-bit OS" \
+        "(Raspberry Pi 3 or later)" ;;
       *) fail "no release binary for $(uname -m)" ;;
     esac
     ;;
@@ -61,7 +63,8 @@ echo "Downloading ${file} from ${base}"
 fetch "${base}/${file}" "${work}/${file}"
 fetch "${base}/SHA256SUMS" "${work}/SHA256SUMS"
 
-expected="$(awk -v f="${file}" '$2 == f || $2 == "*" f { print $1 }' "${work}/SHA256SUMS")"
+expected="$(awk -v f="${file}" '$2 == f || $2 == "*" f { print $1 }' \
+  "${work}/SHA256SUMS")"
 [ -n "${expected}" ] || fail "SHA256SUMS does not list ${file}"
 if command -v sha256sum >/dev/null 2>&1; then
   actual="$(sha256sum "${work}/${file}" | awk '{ print $1 }')"
@@ -72,9 +75,11 @@ fi
 
 if command -v cosign >/dev/null 2>&1; then
   fetch "${base}/${file}.sigstore.json" "${work}/${file}.sigstore.json"
-  cosign verify-blob "${work}/${file}" --bundle "${work}/${file}.sigstore.json" \
+  cosign verify-blob "${work}/${file}" --bundle \
+    "${work}/${file}.sigstore.json" \
     --certificate-identity-regexp "^https://github.com/${repo}/" \
-    --certificate-oidc-issuer https://token.actions.githubusercontent.com >/dev/null 2>&1 ||
+    --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+    >/dev/null 2>&1 ||
     fail "the Sigstore signature of ${file} does not verify"
   echo "Signature verified"
 fi

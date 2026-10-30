@@ -78,32 +78,35 @@ describe("new issue", () => {
     });
   });
 
-  it("prefills from the URL, previews the template and sends every field", async () => {
-    const api = fakeApi();
-    const user = renderAt(
-      "/issues/new?team=ENG&title=Rotate+keys&labels=ops&due=2026-11-02&repeat=2w&template=Bug",
-      api,
-      <Route path="/issues/new" element={<NewIssuePage />} />,
-    );
-    expect(await screen.findByDisplayValue("Rotate keys")).toBeTruthy();
-    expect(await screen.findByText("Steps to reproduce:")).toBeTruthy();
-    expect(screen.getByText("Repeats every 1w")).toBeTruthy();
-    expect(screen.getByLabelText("Repeat")).toHaveProperty("value", "2w");
-    await user.selectOptions(screen.getByLabelText("Priority"), "1");
-    await user.click(screen.getByRole("button", { name: "Create issue" }));
-    expect(await screen.findByText("issue page")).toBeTruthy();
-    expect(api.createIssue).toHaveBeenCalledWith(
-      expect.objectContaining({
-        team: "ENG",
-        title: "Rotate keys",
-        template: "Bug",
-        priority: 1,
-        labels: ["ops"],
-        due: "2026-11-02",
-        repeat: "2w",
-      }),
-    );
-  });
+  it(
+    "prefills from the URL, previews the template and sends every " + "field",
+    async () => {
+      const api = fakeApi();
+      const user = renderAt(
+        "/issues/new?team=ENG&title=Rotate+keys&labels=ops&due=2026-11-02&repeat=2w&template=Bug",
+        api,
+        <Route path="/issues/new" element={<NewIssuePage />} />,
+      );
+      expect(await screen.findByDisplayValue("Rotate keys")).toBeTruthy();
+      expect(await screen.findByText("Steps to reproduce:")).toBeTruthy();
+      expect(screen.getByText("Repeats every 1w")).toBeTruthy();
+      expect(screen.getByLabelText("Repeat")).toHaveProperty("value", "2w");
+      await user.selectOptions(screen.getByLabelText("Priority"), "1");
+      await user.click(screen.getByRole("button", { name: "Create issue" }));
+      expect(await screen.findByText("issue page")).toBeTruthy();
+      expect(api.createIssue).toHaveBeenCalledWith(
+        expect.objectContaining({
+          team: "ENG",
+          title: "Rotate keys",
+          template: "Bug",
+          priority: 1,
+          labels: ["ops"],
+          due: "2026-11-02",
+          repeat: "2w",
+        }),
+      );
+    },
+  );
 });
 
 describe("triage suggestion", () => {

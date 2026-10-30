@@ -20,7 +20,8 @@ test.use({
   isMobile: false,
   serviceWorkers: "block",
 });
-// eslint-disable-next-line no-empty-pattern -- Playwright needs the fixtures object
+// Playwright needs the fixtures object.
+// eslint-disable-next-line no-empty-pattern
 test.beforeEach(({}, testInfo) => {
   test.skip(
     !testInfo.project.name.endsWith("-laptop"),
@@ -61,36 +62,37 @@ async function fakeScanner(page: Page, policy: "warn" | "block") {
   return scanned;
 }
 
-test("a likely secret shows a banner that names it, and Remove takes it out", async ({
-  page,
-}) => {
-  await signedIn(page);
-  const room = await fakeCollab(page, {
-    paragraph: `The deploy bot pushes with ${TOKEN}.`,
-  });
-  const scanned = await fakeScanner(page, "warn");
-  await page.goto(`/p/${PAGE}`);
+test(
+  "a likely secret shows a banner that names it, and Remove takes it " + "out",
+  async ({ page }) => {
+    await signedIn(page);
+    const room = await fakeCollab(page, {
+      paragraph: `The deploy bot pushes with ${TOKEN}.`,
+    });
+    const scanned = await fakeScanner(page, "warn");
+    await page.goto(`/p/${PAGE}`);
 
-  const banner = page
-    .getByRole("alert")
-    .filter({ hasText: "looks like it holds a secret" });
-  await expect(banner).toBeVisible();
-  await expect(banner).toContainText(
-    /GitHub token on line \D?1\D? \(ghp_…\(40\)\)/u,
-  );
-  // Only the redacted preview is ever shown, never the token itself.
-  await expect(banner).not.toContainText(TOKEN);
-  expect(scanned.some((text) => text.includes(TOKEN))).toBe(true);
-  const axe = await new AxeBuilder({ page })
-    .include(".vl-secrets-banner")
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
-    .analyze();
-  expect(axe.violations).toEqual([]);
+    const banner = page
+      .getByRole("alert")
+      .filter({ hasText: "looks like it holds a secret" });
+    await expect(banner).toBeVisible();
+    await expect(banner).toContainText(
+      /GitHub token on line \D?1\D? \(ghp_…\(40\)\)/u,
+    );
+    // Only the redacted preview is ever shown, never the token itself.
+    await expect(banner).not.toContainText(TOKEN);
+    expect(scanned.some((text) => text.includes(TOKEN))).toBe(true);
+    const axe = await new AxeBuilder({ page })
+      .include(".vl-secrets-banner")
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+      .analyze();
+    expect(axe.violations).toEqual([]);
 
-  await banner.getByRole("button", { name: "Remove" }).click();
-  await expect.poll(() => room.text()).toBe("The deploy bot pushes with .");
-  await expect(banner).toBeHidden();
-});
+    await banner.getByRole("button", { name: "Remove" }).click();
+    await expect.poll(() => room.text()).toBe("The deploy bot pushes with .");
+    await expect(banner).toBeHidden();
+  },
+);
 
 test("It's not a secret hides the warning for that finding", async ({
   page,

@@ -1808,7 +1808,8 @@ mod tests {
     #[test]
     fn books_render_as_nested_lists() {
         let info = json!({ "title": "Handbook", "toc": [
-            { "kind": "chapter", "id": "01JD0000000000000000000001", "title": "Intro", "number": "1", "depth": 1,
+            { "kind": "chapter", "id": "01JD0000000000000000000001",
+              "title": "Intro", "number": "1", "depth": 1,
               "children": [{
                   "id": null,
                   "title": "Why",

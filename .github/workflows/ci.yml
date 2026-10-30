@@ -96,20 +96,25 @@ jobs:
           passed=0
           warm=false
           if [[ "${EVENT}" == "pull_request" && "${ACTION}" == "edited" ]]; then
-            passed="$(gh api "repos/${GH_REPO}/actions/workflows/${WORKFLOW}/runs?head_sha=${SHA}&status=success" \
+            runs="repos/${GH_REPO}/actions/workflows/${WORKFLOW}/runs"
+            passed="$(gh api "${runs}?head_sha=${SHA}&status=success" \
               --jq '.total_count' || echo 0)"
           fi
           # A merge commit on develop whose tree is exactly its pull
           # request's head was already tested on that pull request (the
           # integrator's batches), so its push run checks nothing again.
-          if [[ "${EVENT}" == "push" ]] && git rev-parse --verify --quiet HEAD^2 >/dev/null &&
-            [[ "$(git rev-parse 'HEAD^{tree}')" == "$(git rev-parse 'HEAD^2^{tree}')" ]]; then
+          if [[ "${EVENT}" == "push" ]] && git rev-parse \
+            --verify --quiet HEAD^2 >/dev/null &&
+            [[ "$(git rev-parse 'HEAD^{tree}')" == \
+              "$(git rev-parse 'HEAD^2^{tree}')" ]]; then
             pr_head="$(git rev-parse HEAD^2)"
-            passed="$(gh api "repos/${GH_REPO}/actions/workflows/${WORKFLOW}/runs?head_sha=${pr_head}&status=success" \
+            runs="repos/${GH_REPO}/actions/workflows/${WORKFLOW}/runs"
+            passed="$(gh api "${runs}?head_sha=${pr_head}&status=success" \
               --jq '.total_count' || echo 0)"
           fi
           if ((passed > 0)) && [[ "${EVENT}" == "push" ]] &&
-            git diff --name-only HEAD^1 HEAD | scripts/ci/changed-areas.sh | grep -qx 'rust=true'; then
+            git diff --name-only HEAD^1 HEAD | scripts/ci/changed-areas.sh \
+              | grep -qx 'rust=true'; then
             # Only develop saves the Rust caches (D138), so the Rust jobs
             # still build, without checking again, to keep them warm for
             # the next batch (ADR 0049, D215).
@@ -118,26 +123,35 @@ jobs:
           echo "warm=${warm}" | tee -a "${GITHUB_OUTPUT}"
           if ((passed > 0)); then
             echo "This commit already passed; checking the description only."
-            printf 'rust=false\nweb=false\ndesktop=false\nui=false\nfiles=false\n' | tee -a "${GITHUB_OUTPUT}"
-          elif [[ "${EVENT}" == "pull_request" && "${BASE}" == "develop" ]]; then
-            git diff --name-only HEAD^1 HEAD | scripts/ci/changed-areas.sh | tee -a "${GITHUB_OUTPUT}"
+            printf '%s=false\n' rust web desktop ui files \
+              | tee -a "${GITHUB_OUTPUT}"
+          elif [[ "${EVENT}" == "pull_request" \
+            && "${BASE}" == "develop" ]]; then
+            git diff --name-only HEAD^1 HEAD | scripts/ci/changed-areas.sh \
+              | tee -a "${GITHUB_OUTPUT}"
             echo "files=true" | tee -a "${GITHUB_OUTPUT}"
-          elif [[ "${EVENT}" == "push" && -n "${BEFORE}" && "${BEFORE}" != 0000000* ]] &&
+          elif [[ "${EVENT}" == "push" && -n "${BEFORE}" \
+            && "${BEFORE}" != 0000000* ]] &&
             git fetch --quiet --depth=1 origin "${BEFORE}"; then
             # A push to develop checks only the areas its commits touch.
-            git diff --name-only "${BEFORE}" HEAD | scripts/ci/changed-areas.sh | tee -a "${GITHUB_OUTPUT}"
+            git diff --name-only "${BEFORE}" HEAD \
+              | scripts/ci/changed-areas.sh | tee -a "${GITHUB_OUTPUT}"
             echo "files=true" | tee -a "${GITHUB_OUTPUT}"
           elif [[ "${FULL}" == "true" ]]; then
             # The full suite runs every UI test in every browser itself.
-            printf 'rust=true\nweb=true\ndesktop=true\nui=false\nfiles=true\n' | tee -a "${GITHUB_OUTPUT}"
+            printf 'rust=true\nweb=true\ndesktop=true\nui=false\nfiles=true\n' \
+              | tee -a "${GITHUB_OUTPUT}"
           else
-            printf 'rust=true\nweb=true\ndesktop=true\nui=true\nfiles=true\n' | tee -a "${GITHUB_OUTPUT}"
+            printf 'rust=true\nweb=true\ndesktop=true\nui=true\nfiles=true\n' \
+              | tee -a "${GITHUB_OUTPUT}"
           fi
 
   rust:
     name: Rust
     needs: changes
-    if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.warm == 'true'
+    if: >-
+      needs.changes.outputs.rust == 'true' || needs.changes.outputs.warm ==
+      'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -184,7 +198,9 @@ jobs:
     # coverage job.
     name: Rust tests
     needs: changes
-    if: (needs.changes.outputs.rust == 'true' || needs.changes.outputs.warm == 'true') && !inputs.full-suite
+    if: >-
+      (needs.changes.outputs.rust == 'true' || needs.changes.outputs.warm ==
+      'true') && !inputs.full-suite
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -259,7 +275,8 @@ jobs:
     env:
       # Keep in step with site.yml.
       MDBOOK_VERSION: 0.5.4
-      MDBOOK_SHA256: 3f28de05dafca9d0f2eab99c662116b0e37b89b1d96a08f8f430b9eeae958cd7
+      MDBOOK_SHA256: >-
+        3f28de05dafca9d0f2eab99c662116b0e37b89b1d96a08f8f430b9eeae958cd7
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -322,7 +339,9 @@ jobs:
           UI_BROWSERS: chromium
           UI_VIEWPORTS: phone,laptop
           UI_SITE_DIR: ../_site
-        run: pnpm exec playwright test e2e/ui --shard=${{ matrix.shard }}/4 --workers=4
+        run: >-
+          pnpm exec playwright test e2e/ui --shard=${{ matrix.shard }}/4
+          --workers=4
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -392,11 +411,15 @@ jobs:
           python-version: "3.13"
       - name: Install linters
         # Every package pinned by hash (Scorecard "Pinned-Dependencies").
-        run: pip install --require-hashes --no-deps -r .github/requirements/hygiene.txt
+        run: >-
+          pip install --require-hashes --no-deps -r
+          .github/requirements/hygiene.txt
       - name: YAML
         run: yamllint --strict .
       - name: Shell
-        run: shellcheck -x scripts/*/*.sh deploy/*/*.sh deploy/packages/linux/*.sh site/*.sh .githooks/*
+        run: >-
+          shellcheck -x scripts/*/*.sh deploy/*/*.sh deploy/packages/linux/*.sh
+          site/*.sh .githooks/*
       - name: Workflow security (zizmor)
         # ADR 0032, D126: template injection, excessive token permissions,
         # unpinned or impostor actions, credential persistence, cooldowns.
@@ -412,8 +435,11 @@ jobs:
           VALE_VERSION: 3.25.1
         run: |
           base="https://github.com/errata-ai/vale/releases/download/v${VALE_VERSION}"
-          curl -sSfL "${base}/vale_${VALE_VERSION}_Linux_64-bit.tar.gz" | tar -xz -C "${RUNNER_TEMP}" vale
-          "${RUNNER_TEMP}/vale" --glob='!{**/node_modules/**,target/**,LICENSES/**,LICENSE,corpus/**}' .
+          curl -sSfL "${base}/vale_${VALE_VERSION}_Linux_64-bit.tar.gz" \
+            | tar -xz -C "${RUNNER_TEMP}" vale
+          skip='!{**/node_modules/**,target/**,'
+          skip+='LICENSES/**,LICENSE,corpus/**}'
+          "${RUNNER_TEMP}/vale" --glob="${skip}" .
       - name: Local links
         uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
@@ -457,10 +483,12 @@ jobs:
           if [[ "${BASE}" == "main" && "${BRANCH}" == "develop" ]]; then
             echo "Release pull request from develop."
           elif ! check_branch "${BRANCH}"; then
-            echo "::error::Branch '${BRANCH}' must be named <type>/<topic>, e.g. feat/typed-ids"
+            echo "::error::Branch '${BRANCH}' must be named <type>/<topic>," \
+              "e.g. feat/typed-ids"
             exit 1
           fi
-          if [[ "${AUTHOR_TYPE}" == "Bot" ]] && check_bot_subject "${TITLE}"; then
+          if [[ "${AUTHOR_TYPE}" == "Bot" ]] &&
+            check_bot_subject "${TITLE}"; then
             echo "Bot title: type checked, length not limited."
           elif ! check_subject "${TITLE}"; then
             echo "::error::Title is not a Conventional Commit: ${TITLE}"
@@ -474,7 +502,8 @@ jobs:
       - name: Commit template and DCO sign-off
         run: >-
           scripts/ci/check-commits.sh
-          ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }}
+          ${{ github.event.pull_request.base.sha }}
+          ${{ github.event.pull_request.head.sha }}
 
   traceability:
     name: Issue and decision record
@@ -518,11 +547,24 @@ jobs:
   fast-suite:
     name: Fast suite
     if: always()
-    needs: [changes, rust, rust-tests, web, desktop, website, ui, hygiene, commits, traceability, dependencies]
+    needs:
+      - changes
+      - rust
+      - rust-tests
+      - web
+      - desktop
+      - website
+      - ui
+      - hygiene
+      - commits
+      - traceability
+      - dependencies
     runs-on: ubuntu-24.04
     steps:
       # A job skipped by the changed-areas filter counts as not applicable.
       - name: Every fast check passed or was not applicable
-        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        if: >-
+          contains(needs.*.result, 'failure') || contains(needs.*.result,
+          'cancelled')
         run: exit 1
       - run: echo "Fast suite passed."

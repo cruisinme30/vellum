@@ -19,7 +19,8 @@ test.use({
   isMobile: false,
   serviceWorkers: "block",
 });
-// eslint-disable-next-line no-empty-pattern -- Playwright needs the fixtures object
+// Playwright needs the fixtures object.
+// eslint-disable-next-line no-empty-pattern
 test.beforeEach(({}, testInfo) => {
   test.skip(
     !testInfo.project.name.endsWith("-laptop"),
@@ -102,24 +103,25 @@ test("a new workspace creates its first administrator", async ({ page }) => {
   ).toBeVisible();
 });
 
-test("signing in returns to the page asked for, and says why it failed", async ({
-  page,
-}) => {
-  await fakeServer(page, "signed-out");
-  await page.goto("/data");
-  await expect(page).toHaveURL(/\/sign-in\?next=%2Fdata$/);
-  await expectNoViolations(page);
-  await page.getByLabel("Email").fill("priya@northstar.dev");
-  await page.getByLabel("Password").fill("not the password");
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByRole("alert")).toHaveText(
-    "the email or password is wrong (request 01M6409MCMEH1TRKXZ1VVZ4C7H)",
-  );
-  await page.getByLabel("Password").fill("a long enough password");
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/data$/);
-  await expect(page.getByText("There are no collections yet.")).toBeVisible();
-});
+test(
+  "signing in returns to the page asked for, and says why it " + "failed",
+  async ({ page }) => {
+    await fakeServer(page, "signed-out");
+    await page.goto("/data");
+    await expect(page).toHaveURL(/\/sign-in\?next=%2Fdata$/);
+    await expectNoViolations(page);
+    await page.getByLabel("Email").fill("priya@northstar.dev");
+    await page.getByLabel("Password").fill("not the password");
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(page.getByRole("alert")).toHaveText(
+      "the email or password is wrong (request 01M6409MCMEH1TRKXZ1VVZ4C7H)",
+    );
+    await page.getByLabel("Password").fill("a long enough password");
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(page).toHaveURL(/\/data$/);
+    await expect(page.getByText("There are no collections yet.")).toBeVisible();
+  },
+);
 
 test("a second step asks for the authenticator code", async ({ page }) => {
   await fakeServer(page, "signed-out");
@@ -210,16 +212,20 @@ test("single sign-on goes to the SAML provider and back", async ({ page }) => {
   await page.route("**/auth/sso/start?**", (route) =>
     route.fulfill({
       contentType: "text/html",
-      body: `<!doctype html><meta http-equiv="refresh" content="0;url=https://idp.northstar.test/sso?SAMLRequest=x&amp;RelayState=r">`,
+      body:
+        `<!doctype html><meta http-equiv="refresh" ` +
+        `content="0;url=https://idp.northstar.test/sso?SAMLRequest=x&amp;RelayState=r">`,
     }),
   );
   // ...the provider signs the person in and posts the response back...
   await page.route("https://idp.northstar.test/**", (route) =>
     route.fulfill({
       contentType: "text/html",
-      body: `<!doctype html><html lang="en"><title>Northstar IdP</title><main><h1>Northstar sign-in</h1>
+      body: `<!doctype html><html lang="en"><title>Northstar IdP</title>
+        <main><h1>Northstar sign-in</h1>
         <form method="post" action="${app}/saml/acs">
-          <input type="hidden" name="SAMLResponse" value="PHNhbWxwOlJlc3BvbnNlLz4=">
+          <input type="hidden" name="SAMLResponse"
+            value="PHNhbWxwOlJlc3BvbnNlLz4=">
           <input type="hidden" name="RelayState" value="r">
           <button>Continue</button>
         </form></main></html>`,
@@ -234,7 +240,9 @@ test("single sign-on goes to the SAML provider and back", async ({ page }) => {
     signedIn = true;
     await route.fulfill({
       contentType: "text/html",
-      body: `<!doctype html><meta http-equiv="refresh" content="0;url=${app}/data">`,
+      body:
+        `<!doctype html><meta http-equiv="refresh" ` +
+        `content="0;url=${app}/data">`,
     });
   });
   await page.getByRole("link", { name: "Sign in with Entra ID" }).click();

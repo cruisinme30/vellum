@@ -99,7 +99,9 @@ function fakeSetup() {
         title: "Claude Code",
         instructions: "Run in a terminal.",
         language: "shell" as const,
-        code: "claude mcp add --transport http vellum https://vellum.northstar.dev/mcp",
+        code:
+          "claude mcp add --transport http vellum " +
+          "https://vellum.northstar.dev/mcp",
       },
     ]),
   );

@@ -206,7 +206,7 @@ export function fakeApi(overrides: Partial<WorkApi> = {}): WorkApi {
 function Where() {
   const location = useLocation();
   return (
-    <output data-testid="where">{`${location.pathname}${location.search}`}</output>
+    <output data-testid="where">{location.pathname + location.search}</output>
   );
 }
 

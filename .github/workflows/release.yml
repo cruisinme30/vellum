@@ -79,13 +79,16 @@ jobs:
       server: ${{ steps.kind.outputs.server }}
       version: ${{ steps.version.outputs.version }}
     steps:
-      - name: Only vX.Y.Z tags release the server; other v* tags build the desktop app
+      - name: >-
+          Only vX.Y.Z tags release the server; other v* tags build the desktop
+          app
         id: kind
         run: |
           if [[ "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "server=true" >>"${GITHUB_OUTPUT}"
           else
-            echo "::notice::${GITHUB_REF_NAME} is not vX.Y.Z; only the desktop app is built."
+            echo "::notice::${GITHUB_REF_NAME} is not vX.Y.Z;" \
+              "only the desktop app is built."
           fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: steps.kind.outputs.server == 'true'
@@ -105,9 +108,11 @@ jobs:
         id: version
         run: |
           version="${GITHUB_REF_NAME#v}"
-          declared="$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -1)"
+          declared="$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml \
+            | head -1)"
           if [[ "${declared}" != "${version}" ]]; then
-            echo "::error::Tag ${GITHUB_REF_NAME} but Cargo.toml declares ${declared}."
+            echo "::error::Tag ${GITHUB_REF_NAME} but Cargo.toml declares" \
+              "${declared}."
             exit 1
           fi
           echo "version=${version}" >>"${GITHUB_OUTPUT}"
@@ -136,14 +141,16 @@ jobs:
         run: |
           for n in 1 2; do
             docker buildx build --no-cache --target binary \
-              --output "type=local,dest=${RUNNER_TEMP}/build-${n}" -f deploy/docker/Dockerfile .
+              --output "type=local,dest=${RUNNER_TEMP}/build-${n}" \
+              -f deploy/docker/Dockerfile .
           done
       - name: The builds are byte-identical
         run: cmp "${RUNNER_TEMP}/build-1/vellum" "${RUNNER_TEMP}/build-2/vellum"
       - name: Name the binary
         run: |
           mkdir -p dist
-          cp "${RUNNER_TEMP}/build-1/vellum" "dist/vellum-linux-${{ matrix.arch }}"
+          cp "${RUNNER_TEMP}/build-1/vellum" \
+            "dist/vellum-linux-${{ matrix.arch }}"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: binary-${{ matrix.arch }}
@@ -161,8 +168,12 @@ jobs:
       matrix:
         include:
           - { os: macos-15, file: vellum-macos-universal }
-          - { os: windows-2025, file: vellum-windows-x64.exe, target: x86_64-pc-windows-msvc }
-          - { os: windows-2025, file: vellum-windows-arm64.exe, target: aarch64-pc-windows-msvc }
+          - os: windows-2025
+            file: vellum-windows-x64.exe
+            target: x86_64-pc-windows-msvc
+          - os: windows-2025
+            file: vellum-windows-arm64.exe
+            target: aarch64-pc-windows-msvc
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     defaults:
@@ -192,11 +203,14 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           rustup target add aarch64-apple-darwin x86_64-apple-darwin
-          cargo build --release --locked -p vellum-cli --target aarch64-apple-darwin
-          cargo build --release --locked -p vellum-cli --target x86_64-apple-darwin
+          cargo build --release --locked -p vellum-cli \
+            --target aarch64-apple-darwin
+          cargo build --release --locked -p vellum-cli \
+            --target x86_64-apple-darwin
           mkdir -p dist
           lipo -create -output "dist/${{ matrix.file }}" \
-            target/aarch64-apple-darwin/release/vellum target/x86_64-apple-darwin/release/vellum
+            target/aarch64-apple-darwin/release/vellum \
+            target/x86_64-apple-darwin/release/vellum
       - name: Windows binary
         if: runner.os == 'Windows'
         env:
@@ -213,12 +227,14 @@ jobs:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_APP_SPECIFIC_PASSWORD: >-
+            ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           FILE: ${{ matrix.file }}
         run: |
           if [[ -z "${CSC_LINK}" || -z "${APPLE_ID}" ]]; then
-            echo "::notice::No Apple signing secrets: the macOS binary keeps its ad-hoc signature."
+            echo "::notice::No Apple signing secrets: the macOS binary keeps" \
+              "its ad-hoc signature."
             exit 0
           fi
           keychain="${RUNNER_TEMP}/signing.keychain-db"
@@ -227,15 +243,19 @@ jobs:
           security set-keychain-settings -lut 900 "${keychain}"
           security unlock-keychain -p "${password}" "${keychain}"
           base64 --decode <<<"${CSC_LINK}" >"${RUNNER_TEMP}/cert.p12"
-          security import "${RUNNER_TEMP}/cert.p12" -k "${keychain}" -P "${CSC_KEY_PASSWORD}" -T /usr/bin/codesign
+          security import "${RUNNER_TEMP}/cert.p12" -k "${keychain}" \
+            -P "${CSC_KEY_PASSWORD}" -T /usr/bin/codesign
           rm -f "${RUNNER_TEMP}/cert.p12"
-          security set-key-partition-list -S apple-tool:,apple: -s -k "${password}" "${keychain}" >/dev/null
+          security set-key-partition-list -S apple-tool:,apple: \
+            -s -k "${password}" "${keychain}" >/dev/null
           security list-keychains -d user -s "${keychain}"
-          codesign --force --options runtime --timestamp --keychain "${keychain}" \
+          codesign --force --options runtime --timestamp --keychain \
+            "${keychain}" \
             --sign "Developer ID Application" "dist/${FILE}"
           ditto -c -k "dist/${FILE}" "${RUNNER_TEMP}/notarise.zip"
           xcrun notarytool submit "${RUNNER_TEMP}/notarise.zip" --wait \
-            --apple-id "${APPLE_ID}" --password "${APPLE_APP_SPECIFIC_PASSWORD}" --team-id "${APPLE_TEAM_ID}"
+            --apple-id "${APPLE_ID}" --password \
+            "${APPLE_APP_SPECIFIC_PASSWORD}" --team-id "${APPLE_TEAM_ID}"
           security delete-keychain "${keychain}"
       - name: Is Windows signing set up?
         id: azure
@@ -246,7 +266,8 @@ jobs:
           if [[ -n "${ENDPOINT}" ]]; then
             echo "sign=true" >>"${GITHUB_OUTPUT}"
           else
-            echo "::notice::No Azure Trusted Signing variables: the Windows binary is unsigned."
+            echo "::notice::No Azure Trusted Signing variables: the Windows" \
+              "binary is unsigned."
           fi
       - name: Sign the Windows binary (Azure Trusted Signing)
         if: steps.azure.outputs.sign == 'true'
@@ -281,7 +302,8 @@ jobs:
     timeout-minutes: 15
     env:
       NFPM_VERSION: 2.43.0
-      NFPM_SHA256: a80d5f724ed70b192ffa8a2bde469c013cef559c8afa3441eb51dd9a918beb6b
+      NFPM_SHA256: >-
+        a80d5f724ed70b192ffa8a2bde469c013cef559c8afa3441eb51dd9a918beb6b
       VERSION: ${{ needs.verify.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -304,8 +326,10 @@ jobs:
           for arch in amd64 arm64; do
             chmod +x "bin/vellum-linux-${arch}"
             for packager in deb rpm; do
-              ARCH="${arch}" BINARY="bin/vellum-linux-${arch}" "${RUNNER_TEMP}/nfpm" package \
-                --config deploy/packages/nfpm.yaml --packager "${packager}" --target dist/
+              ARCH="${arch}" BINARY="bin/vellum-linux-${arch}" \
+                "${RUNNER_TEMP}/nfpm" package \
+                --config deploy/packages/nfpm.yaml --packager "${packager}" \
+                --target dist/
             done
           done
           ls -l dist
@@ -386,7 +410,8 @@ jobs:
       contents: write
     # SLSA requires the generator to be referenced by tag, not by digest
     # (see .github/zizmor.yml).
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
+    uses: >-
+      slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
     with:
       base64-subjects: ${{ needs.assemble.outputs.subjects }}
       provenance-name: vellum.intoto.jsonl
@@ -422,12 +447,17 @@ jobs:
         env:
           VERSION: ${{ needs.verify.outputs.version }}
         run: |
-          docker buildx build --push --platform linux/amd64,linux/arm64 --target runtime \
+          docker buildx build --push --platform linux/amd64,linux/arm64 \
+            --target runtime \
             --build-arg DIST=release --build-context release=dist \
-            --build-arg "VERSION=${VERSION}" --build-arg "REVISION=${GITHUB_SHA}" \
-            --provenance=false --sbom=false --metadata-file "${RUNNER_TEMP}/metadata.json" \
-            -t "${IMAGE}:${VERSION}" -t "${IMAGE}:latest" -f deploy/docker/Dockerfile .
-          echo "digest=$(jq -r '."containerimage.digest"' "${RUNNER_TEMP}/metadata.json")" >>"${GITHUB_OUTPUT}"
+            --build-arg "VERSION=${VERSION}" --build-arg \
+            "REVISION=${GITHUB_SHA}" \
+            --provenance=false --sbom=false --metadata-file \
+            "${RUNNER_TEMP}/metadata.json" \
+            -t "${IMAGE}:${VERSION}" -t "${IMAGE}:latest" \
+            -f deploy/docker/Dockerfile .
+          echo "digest=$(jq -r '."containerimage.digest"' \
+            "${RUNNER_TEMP}/metadata.json")" >>"${GITHUB_OUTPUT}"
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
       - name: Sign the image and attest its SBOM
         env:
@@ -435,7 +465,8 @@ jobs:
           VERSION: ${{ needs.verify.outputs.version }}
         run: |
           cosign sign --yes "${IMAGE}@${DIGEST}"
-          cosign attest --yes --type cyclonedx --predicate "dist/vellum-${VERSION}.cdx.json" "${IMAGE}@${DIGEST}"
+          cosign attest --yes --type cyclonedx \
+            --predicate "dist/vellum-${VERSION}.cdx.json" "${IMAGE}@${DIGEST}"
 
   image-provenance:
     name: SLSA provenance (image)
@@ -445,7 +476,8 @@ jobs:
       id-token: write
       packages: write
     # Referenced by tag on purpose, like provenance above.
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
+    uses: >-
+      slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
     with:
       image: ghcr.io/${{ github.repository }}
       digest: ${{ needs.image.outputs.digest }}
@@ -481,14 +513,18 @@ jobs:
           Verify a binary before running it:
 
           \`\`\`sh
-          cosign verify-blob vellum-linux-amd64 --bundle vellum-linux-amd64.sigstore.json \\
+          cosign verify-blob vellum-linux-amd64 \\
+            --bundle vellum-linux-amd64.sigstore.json \\
             --certificate-identity-regexp '^https://github.com/${GITHUB_REPOSITORY}/' \\
             --certificate-oidc-issuer https://token.actions.githubusercontent.com
-          slsa-verifier verify-artifact vellum-linux-amd64 --provenance-path vellum.intoto.jsonl \\
-            --source-uri github.com/${GITHUB_REPOSITORY} --source-tag ${GITHUB_REF_NAME}
+          slsa-verifier verify-artifact vellum-linux-amd64 \\
+            --provenance-path vellum.intoto.jsonl \\
+            --source-uri github.com/${GITHUB_REPOSITORY} \\
+            --source-tag ${GITHUB_REF_NAME}
           \`\`\`
           NOTES
-          gh release create "${GITHUB_REF_NAME}" dist/* --repo "${GITHUB_REPOSITORY}" \
+          gh release create "${GITHUB_REF_NAME}" dist/* \
+            --repo "${GITHUB_REPOSITORY}" \
             --verify-tag --title "Vellum ${VERSION}" --notes-file notes.md
 
   channels:
@@ -513,25 +549,30 @@ jobs:
       - name: Write the formula and manifests from the signed checksums
         run: |
           cargo run --locked --package xtask -- installers \
-            --version "${VERSION}" --sums dist/SHA256SUMS --out channels --repo "${GITHUB_REPOSITORY}"
+            --version "${VERSION}" --sums dist/SHA256SUMS --out channels \
+            --repo "${GITHUB_REPOSITORY}"
           cp channels/homebrew/vellum.rb vellum.rb
           tar -czf winget-manifests.tar.gz -C channels/winget manifests
-          gh release upload "${GITHUB_REF_NAME}" vellum.rb winget-manifests.tar.gz --repo "${GITHUB_REPOSITORY}"
+          gh release upload "${GITHUB_REF_NAME}" vellum.rb \
+            winget-manifests.tar.gz --repo "${GITHUB_REPOSITORY}"
       - name: Update the Homebrew tap
         env:
           TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
           if [[ -z "${TAP_TOKEN}" ]]; then
-            echo "::notice::No HOMEBREW_TAP_TOKEN: the tap was not updated. vellum.rb is on the release."
+            echo "::notice::No HOMEBREW_TAP_TOKEN: the tap was not updated." \
+              "vellum.rb is on the release."
             exit 0
           fi
           tap="${GITHUB_REPOSITORY_OWNER}/homebrew-vellum"
-          git clone --depth 1 "https://x-access-token:${TAP_TOKEN}@github.com/${tap}.git" tap
+          git clone --depth 1 \
+            "https://x-access-token:${TAP_TOKEN}@github.com/${tap}.git" tap
           mkdir -p tap/Formula
           cp channels/homebrew/vellum.rb tap/Formula/vellum.rb
           cd tap
           git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
           git add Formula/vellum.rb
           git commit -m "vellum ${VERSION}"
           git push origin HEAD
@@ -540,12 +581,14 @@ jobs:
           WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
         run: |
           if [[ -z "${WINGET_TOKEN}" ]]; then
-            echo "::notice::No WINGET_TOKEN: no winget pull request. winget-manifests.tar.gz is on the release."
+            echo "::notice::No WINGET_TOKEN: no winget pull request." \
+              "winget-manifests.tar.gz is on the release."
             exit 0
           fi
           export GH_TOKEN="${WINGET_TOKEN}"
           owner="$(gh api user --jq .login)"
-          gh repo sync "${owner}/winget-pkgs" --source microsoft/winget-pkgs --branch master
+          gh repo sync "${owner}/winget-pkgs" --source microsoft/winget-pkgs \
+            --branch master
           git clone --depth 1 --filter=blob:none --sparse \
             "https://x-access-token:${WINGET_TOKEN}@github.com/${owner}/winget-pkgs.git" winget-pkgs
           cd winget-pkgs
@@ -558,7 +601,8 @@ jobs:
           git add manifests/v/Vellum
           git commit -m "New version: Vellum.Vellum version ${VERSION}"
           git push origin "${branch}"
-          gh pr create --repo microsoft/winget-pkgs --head "${owner}:${branch}" \
+          gh pr create --repo microsoft/winget-pkgs \
+            --head "${owner}:${branch}" \
             --title "New version: Vellum.Vellum version ${VERSION}" \
             --body "Vellum ${VERSION}: https://github.com/${GITHUB_REPOSITORY}/releases/tag/${GITHUB_REF_NAME}"
 
@@ -566,7 +610,8 @@ jobs:
     name: Desktop app (${{ matrix.os }})
     needs: [binaries, native]
     if: >-
-      !cancelled() && needs.binaries.result == 'success' && needs.native.result == 'success'
+      !cancelled() && needs.binaries.result == 'success' &&
+      needs.native.result == 'success'
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write # electron-builder uploads to the draft release
@@ -609,10 +654,13 @@ jobs:
       - name: Place one binary per architecture
         shell: bash
         run: |
-          place() { mkdir -p "target/desktop-bin/$2" && cp "bin/$1" "target/desktop-bin/$2/${VELLUM_BINARY}"; }
+          place() { mkdir -p "target/desktop-bin/$2" \
+            && cp "bin/$1" "target/desktop-bin/$2/${VELLUM_BINARY}"; }
           case "${RUNNER_OS}" in
-            macOS) place vellum-macos-universal x64 && place vellum-macos-universal arm64 ;;
-            Windows) place vellum-windows-x64.exe x64 && place vellum-windows-arm64.exe arm64 ;;
+            macOS) place vellum-macos-universal x64 \
+              && place vellum-macos-universal arm64 ;;
+            Windows) place vellum-windows-x64.exe x64 \
+              && place vellum-windows-arm64.exe arm64 ;;
             Linux)
               place vellum-linux-amd64 x64 && place vellum-linux-arm64 arm64
               sudo apt-get install -y rpm # electron-builder's rpm target
@@ -625,13 +673,18 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_LINK: ${{ runner.os == 'macOS' && secrets.CSC_LINK || '' }}
-          CSC_KEY_PASSWORD: ${{ runner.os == 'macOS' && secrets.CSC_KEY_PASSWORD || '' }}
+          CSC_KEY_PASSWORD: >-
+            ${{ runner.os == 'macOS' && secrets.CSC_KEY_PASSWORD || '' }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_APP_SPECIFIC_PASSWORD: >-
+            ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          AZURE_TENANT_ID: ${{ runner.os == 'Windows' && secrets.AZURE_TENANT_ID || '' }}
-          AZURE_CLIENT_ID: ${{ runner.os == 'Windows' && secrets.AZURE_CLIENT_ID || '' }}
-          AZURE_CLIENT_SECRET: ${{ runner.os == 'Windows' && secrets.AZURE_CLIENT_SECRET || '' }}
+          AZURE_TENANT_ID: >-
+            ${{ runner.os == 'Windows' && secrets.AZURE_TENANT_ID || '' }}
+          AZURE_CLIENT_ID: >-
+            ${{ runner.os == 'Windows' && secrets.AZURE_CLIENT_ID || '' }}
+          AZURE_CLIENT_SECRET: >-
+            ${{ runner.os == 'Windows' && secrets.AZURE_CLIENT_SECRET || '' }}
           AZURE_SIGNING_ENDPOINT: ${{ vars.AZURE_SIGNING_ENDPOINT }}
           AZURE_SIGNING_ACCOUNT: ${{ vars.AZURE_SIGNING_ACCOUNT }}
           AZURE_SIGNING_PROFILE: ${{ vars.AZURE_SIGNING_PROFILE }}
@@ -644,28 +697,34 @@ jobs:
             # A tagged release never ships an unsigned macOS build (ADR 0023,
             # D99).
             if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-              echo "::error::Set APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID, CSC_LINK and CSC_KEY_PASSWORD"
+              echo "::error::Set APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD," \
+                "APPLE_TEAM_ID, CSC_LINK and CSC_KEY_PASSWORD"
               exit 1
             fi
             args+=(-c.mac.notarize=false)
           fi
           if [[ "${RUNNER_OS}" == "Windows" ]]; then
             if [[ -n "${AZURE_SIGNING_ENDPOINT}" ]]; then
+              azure=-c.win.azureSignOptions
               args+=(
-                "-c.win.azureSignOptions.endpoint=${AZURE_SIGNING_ENDPOINT}"
-                "-c.win.azureSignOptions.codeSigningAccountName=${AZURE_SIGNING_ACCOUNT}"
-                "-c.win.azureSignOptions.certificateProfileName=${AZURE_SIGNING_PROFILE}"
-                "-c.win.azureSignOptions.publisherName=${WINDOWS_PUBLISHER_NAME}"
+                "${azure}.endpoint=${AZURE_SIGNING_ENDPOINT}"
+                "${azure}.codeSigningAccountName=${AZURE_SIGNING_ACCOUNT}"
+                "${azure}.certificateProfileName=${AZURE_SIGNING_PROFILE}"
+                "${azure}.publisherName=${WINDOWS_PUBLISHER_NAME}"
               )
-            elif [[ "${GITHUB_REF}" =~ ^refs/tags/v[1-9][0-9]*\.[0-9]+\.[0-9]+$ ]]; then
+            elif [[ "${GITHUB_REF}" =~ \
+              ^refs/tags/v[1-9][0-9]*\.[0-9]+\.[0-9]+$ ]]; then
               # 1.0 and later never ship an unsigned Windows build (D252).
-              echo "::error::Set the Azure Trusted Signing secrets and variables (see the top of this file)"
+              echo "::error::Set the Azure Trusted Signing secrets and" \
+                "variables (see the top of this file)"
               exit 1
             else
-              echo "::notice::No Azure Trusted Signing variables: the Windows app is unsigned."
+              echo "::notice::No Azure Trusted Signing variables: the" \
+                "Windows app is unsigned."
             fi
           fi
-          if [[ -z "${CSC_LINK}" ]]; then export CSC_IDENTITY_AUTO_DISCOVERY=false; fi
+          if [[ -z "${CSC_LINK}" ]]; then export \
+            CSC_IDENTITY_AUTO_DISCOVERY=false; fi
           pnpm exec electron-builder "${args[@]}"
 
   drill:
@@ -699,7 +758,8 @@ jobs:
             docker pull "${image}"
           else
             image="vellum:ci"
-            docker buildx build --load -t "${image}" -f deploy/docker/Dockerfile .
+            docker buildx build --load -t "${image}" \
+              -f deploy/docker/Dockerfile .
           fi
           echo "image=${image}" >>"${GITHUB_OUTPUT}"
       # Fails the job when the image cannot run, with docker's own error,
@@ -715,13 +775,16 @@ jobs:
           IMAGE: ${{ steps.image.outputs.image }}
           TAG: ${{ github.event_name == 'push' && github.ref_name || '' }}
         run: |
-          mapfile -t previous < <(gh release list --repo "${GITHUB_REPOSITORY}" --exclude-drafts \
-            --exclude-pre-releases --json tagName --jq '.[].tagName' | grep -vxF "${TAG:-none}" | head -2)
+          mapfile -t previous < <(gh release list \
+            --repo "${GITHUB_REPOSITORY}" --exclude-drafts \
+            --exclude-pre-releases --json tagName --jq '.[].tagName' \
+            | grep -vxF "${TAG:-none}" | head -2)
           if ((${#previous[@]} == 0)); then
             echo "::notice::No earlier release to upgrade from."
           fi
           for tag in "${previous[@]}"; do
-            deploy/drills/upgrade.sh "ghcr.io/${GITHUB_REPOSITORY}:${tag#v}" "${IMAGE}"
+            deploy/drills/upgrade.sh "ghcr.io/${GITHUB_REPOSITORY}:${tag#v}" \
+              "${IMAGE}"
           done
       - name: Restore a backup into a scratch stack
         if: steps.serve.outcome == 'success'

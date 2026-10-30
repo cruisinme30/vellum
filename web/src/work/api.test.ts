@@ -122,14 +122,17 @@ describe("the Work API over HTTP", () => {
     ]);
   });
 
-  it("returns the changed thread, or nothing when the server sends none", async () => {
-    let answer: object = { thread: { id: "t1" } };
-    const { http } = fakeHttp(() => answer);
-    const api = createHttpWorkApi(http);
-    await expect(api.reply("c1", "Thanks")).resolves.toEqual({ id: "t1" });
-    answer = {};
-    await expect(api.resolve("t1", true)).resolves.toBeUndefined();
-  });
+  it(
+    "returns the changed thread, or nothing when the server sends " + "none",
+    async () => {
+      let answer: object = { thread: { id: "t1" } };
+      const { http } = fakeHttp(() => answer);
+      const api = createHttpWorkApi(http);
+      await expect(api.reply("c1", "Thanks")).resolves.toEqual({ id: "t1" });
+      answer = {};
+      await expect(api.resolve("t1", true)).resolves.toBeUndefined();
+    },
+  );
 });
 
 describe("issue chip status", () => {
@@ -152,22 +155,26 @@ describe("issue chip status", () => {
       : Promise.resolve(found);
   };
 
-  it("names states the way the team does, and says when an issue is finished", async () => {
-    const teams = vi.fn(() => Promise.resolve([team]));
-    const status = issueChipStatus({ teams, issue } as unknown as WorkApi);
-    await expect(status("ENG-7")).resolves.toEqual({
-      title: "Fix sign-in",
-      state: "Up next",
-      closed: false,
-    });
-    await expect(status("ENG-8")).resolves.toEqual({
-      title: "Fix sign-in",
-      state: "shipped",
-      closed: true,
-    });
-    await expect(status("OPS-1")).resolves.toMatchObject({ closed: true });
-    expect(teams).toHaveBeenCalledTimes(1);
-  });
+  it(
+    "names states the way the team does, and says when an issue is " +
+      "finished",
+    async () => {
+      const teams = vi.fn(() => Promise.resolve([team]));
+      const status = issueChipStatus({ teams, issue } as unknown as WorkApi);
+      await expect(status("ENG-7")).resolves.toEqual({
+        title: "Fix sign-in",
+        state: "Up next",
+        closed: false,
+      });
+      await expect(status("ENG-8")).resolves.toEqual({
+        title: "Fix sign-in",
+        state: "shipped",
+        closed: true,
+      });
+      await expect(status("OPS-1")).resolves.toMatchObject({ closed: true });
+      expect(teams).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it("shows raw state keys when the teams cannot be read", async () => {
     const status = issueChipStatus({

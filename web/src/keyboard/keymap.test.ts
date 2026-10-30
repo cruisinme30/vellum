@@ -97,21 +97,24 @@ describe("Keymap", () => {
     expect(keymap.bindingsOf(cycle)).toHaveLength(1);
   });
 
-  it("lets typing through but still honours mod shortcuts in text fields", () => {
-    const create = command("create", ["c"]);
-    const menu = command("menu", ["mod+k"]);
-    const keymap = new Keymap([create, menu], { platform: "mac" });
-    const input = document.createElement("input");
-    expect(keymap.dispatch(press("c", { target: input }), GLOBAL)).toEqual({
-      kind: "none",
-    });
-    expect(
-      keymap.dispatch(press("k", { metaKey: true, target: input }), GLOBAL),
-    ).toEqual({
-      kind: "run",
-      command: menu,
-    });
-  });
+  it(
+    "lets typing through but still honours mod shortcuts in text " + "fields",
+    () => {
+      const create = command("create", ["c"]);
+      const menu = command("menu", ["mod+k"]);
+      const keymap = new Keymap([create, menu], { platform: "mac" });
+      const input = document.createElement("input");
+      expect(keymap.dispatch(press("c", { target: input }), GLOBAL)).toEqual({
+        kind: "none",
+      });
+      expect(
+        keymap.dispatch(press("k", { metaKey: true, target: input }), GLOBAL),
+      ).toEqual({
+        kind: "run",
+        command: menu,
+      });
+    },
+  );
 
   it("ignores events it cannot read", () => {
     const keymap = new Keymap([command("menu", ["mod+k"])], {

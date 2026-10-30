@@ -18,7 +18,9 @@ export interface Redirect {
 const TIMEOUT_MS = 5 * 60_000;
 
 const page = (message: string) =>
-  `<!doctype html><meta charset="utf-8"><title>Vellum</title><body style="font:16px system-ui;margin:4rem auto;max-width:32rem">${message}</body>`;
+  `<!doctype html><meta charset="utf-8"><title>Vellum</title><body ` +
+  `style="font:16px system-ui;margin:4rem ` +
+  `auto;max-width:32rem">${message}</body>`;
 
 /**
  * Listens on an ephemeral 127.0.0.1 port until the browser returns or five

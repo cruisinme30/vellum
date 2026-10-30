@@ -57,11 +57,18 @@ describe("hydrateCalculators", () => {
   it("recomputes results as a slider moves, and stops when unwired", () => {
     const root = document.createElement("div");
     root.innerHTML = `<div class="vl-calculator">
-      <label for="u"><span>Units</span><input type="range" id="u" data-key="units" min="0" max="1000" step="10" value="100"><output for="u">100</output></label>
-      <label for="p"><span>Price</span><input type="range" id="p" data-key="price" min="0" max="24" value="12"><output for="p">12</output></label>
-      <div class="vl-calc-result" data-key="total" data-formula="units * price" data-unit="USD"><span>Total</span> <output>1,200 USD</output></div>
-      <div class="vl-calc-result" data-key="half" data-formula="total / 2" data-unit=""><span>Half</span> <output>600</output></div>
-      <div class="vl-calc-result" data-key="bad" data-formula="units / 0" data-unit=""><span>Bad</span> <output>–</output></div>
+      <label for="u"><span>Units</span><input type="range" id="u"
+        data-key="units" min="0" max="1000" step="10" value="100"><output
+        for="u">100</output></label>
+      <label for="p"><span>Price</span><input type="range" id="p"
+        data-key="price" min="0" max="24" value="12"><output
+        for="p">12</output></label>
+      <div class="vl-calc-result" data-key="total" data-formula="units * price"
+        data-unit="USD"><span>Total</span> <output>1,200 USD</output></div>
+      <div class="vl-calc-result" data-key="half" data-formula="total / 2"
+        data-unit=""><span>Half</span> <output>600</output></div>
+      <div class="vl-calc-result" data-key="bad" data-formula="units / 0"
+        data-unit=""><span>Bad</span> <output>–</output></div>
     </div>`;
     document.body.append(root);
     const unwire = hydrateCalculators(root);

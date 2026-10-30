@@ -3,7 +3,9 @@
 
 [package]
 name = "vellum-e2e"
-description = "End-to-end encrypted private spaces on the server: device enrolment and the ciphertext members' devices read and write."
+description = """\
+    End-to-end encrypted private spaces on the server: device enrolment and \
+    the ciphertext members' devices read and write."""
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -23,9 +25,13 @@ base64 = "0.23.1"
 bytes = "1.12.1"
 futures = "0.3.34"
 hex = "0.4.3"
-schemars = { version = "1.2.3", default-features = false, features = ["std", "derive"] }
+schemars.version = "1.2.3"
+schemars.default-features = false
+schemars.features = ["std", "derive"]
 serde = { version = "1.0.229", features = ["derive"] }
-serde-saphyr = { version = "2.0.0", default-features = false, features = ["serialize", "deserialize"] }
+serde-saphyr.version = "2.0.0"
+serde-saphyr.default-features = false
+serde-saphyr.features = ["serialize", "deserialize"]
 tracing = "0.1.44"
 vellum-contracts = { path = "../vellum-contracts" }
 vellum-crypto = { path = "../vellum-crypto" }

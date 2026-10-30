@@ -24,7 +24,8 @@
 set -euo pipefail
 
 usage() {
-  sed -n '/^# The one way to push/,/^set -euo/p' "$0" | sed -e '$d' -e 's/^# \{0,1\}//'
+  sed -n '/^# The one way to push/,/^set -euo/p' "$0" \
+    | sed -e '$d' -e 's/^# \{0,1\}//'
 }
 
 branch=""
@@ -74,8 +75,10 @@ case "${branch}" in
 esac
 gate="scripts/dev/gate.sh"
 [[ "${need}" == release ]] && gate+=" --release"
-if [[ ! -f "${stamp}" ]] || { [[ "${need}" == release ]] && ! grep -qx 'mode=release' "${stamp}"; }; then
-  echo "push.sh: refused. Tree ${tree:0:12} (commit ${sha:0:12}) has no ${need} gate stamp." >&2
+if [[ ! -f "${stamp}" ]] || { [[ "${need}" == release ]] \
+  && ! grep -qx 'mode=release' "${stamp}"; }; then
+  echo "push.sh: refused. Tree ${tree:0:12} (commit ${sha:0:12}) has no" \
+      "${need} gate stamp." >&2
   echo "Check out that commit and run:" >&2
   echo >&2
   echo "    ${gate}" >&2
@@ -83,10 +86,13 @@ if [[ ! -f "${stamp}" ]] || { [[ "${need}" == release ]] && ! grep -qx 'mode=rel
 fi
 
 if [[ "${branch}" == develop ]] && ((!supersede)); then
-  repo="$(git remote get-url origin | sed -E 's#(\.git)?$##; s#^.*github\.com[:/]##')"
-  if ! running="$(gh run list --repo "${repo}" --branch develop --workflow ci.yml \
+  repo="$(git remote get-url origin | sed \
+    -E 's#(\.git)?$##; s#^.*github\.com[:/]##')"
+  if ! running="$(gh run list --repo "${repo}" --branch develop \
+    --workflow ci.yml \
     --status in_progress --json databaseId,url --jq '.[].url')"; then
-    echo "push.sh: refused. Could not ask GitHub whether a Fast suite run on develop is in progress." >&2
+    echo "push.sh: refused. Could not ask GitHub whether a Fast suite run on" \
+      "develop is in progress." >&2
     exit 1
   fi
   if [[ -n "${running}" ]]; then

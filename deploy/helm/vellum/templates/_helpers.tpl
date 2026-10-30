@@ -13,7 +13,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 {{- else if contains (include "vellum.name" .) .Release.Name }}
 {{- .Release.Name | trunc 63 | trimSuffix "-" }}
 {{- else }}
-{{- printf "%s-%s" .Release.Name (include "vellum.name" .) | trunc 63 | trimSuffix "-" }}
+{{- printf "%s-%s" .Release.Name (include "vellum.name" .)
+  | trunc 63 | trimSuffix "-" }}
 {{- end }}
 {{- end }}
 
@@ -44,11 +45,13 @@ app.kubernetes.io/component: clamav
 
 {{/* The secret holding the shared CSRF key (see csrf-secret.yaml). */}}
 {{- define "vellum.csrfSecret" -}}
-{{- .Values.csrf.secret.name | default (printf "%s-csrf" (include "vellum.fullname" .)) -}}
+{{- .Values.csrf.secret.name
+  | default (printf "%s-csrf" (include "vellum.fullname" .)) -}}
 {{- end }}
 
 {{- define "vellum.clusterSecret" -}}
-{{- .Values.cluster.secret.name | default (printf "%s-cluster" (include "vellum.fullname" .)) -}}
+{{- .Values.cluster.secret.name
+  | default (printf "%s-cluster" (include "vellum.fullname" .)) -}}
 {{- end }}
 
 {{- define "vellum.serviceAccountName" -}}
@@ -69,9 +72,11 @@ app.kubernetes.io/component: clamav
 {{- end }}
 {{- end }}
 
-{{/* The Patroni cluster name for a shard; the operator requires the team prefix. */}}
+{{/* The Patroni cluster name for a shard; the operator requires the team
+prefix. */}}
 {{- define "vellum.pgCluster" -}}
-{{- printf "%s-%s-%s" .root.Values.postgres.operator.teamId .root.Release.Name .shard.name | trunc 50 | trimSuffix "-" }}
+{{- printf "%s-%s-%s" .root.Values.postgres.operator.teamId
+  .root.Release.Name .shard.name | trunc 50 | trimSuffix "-" }}
 {{- end }}
 
 {{/* The shard names, comma-separated, in order. */}}
@@ -79,7 +84,8 @@ app.kubernetes.io/component: clamav
 {{- $names := list }}
 {{- range .Values.shards }}
 {{- if not (regexMatch "^[a-z][a-z0-9-]{0,14}$" .name) }}
-{{- fail (printf "shard name %q must be lower-case letters, digits and dashes" .name) }}
+{{- fail (printf
+  "shard name %q must be lower-case letters, digits and dashes" .name) }}
 {{- end }}
 {{- $names = append $names .name }}
 {{- end }}
@@ -111,7 +117,8 @@ metadata:
     {{- include "vellum.labels" . | nindent 4 }}
     {{- include "vellum.selector" . | nindent 4 }}
   annotations:
-    checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") .
+      | sha256sum }}
     {{- with .Values.podAnnotations }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
@@ -154,7 +161,8 @@ spec:
   {{- end }}
   containers:
     - name: vellum
-      image: {{ include "vellum.image" (dict "image" .Values.image "default" .Chart.AppVersion) }}
+      image: {{ include "vellum.image"
+        (dict "image" .Values.image "default" .Chart.AppVersion) }}
       imagePullPolicy: {{ .Values.image.pullPolicy }}
       args: ["serve"]
       ports:
@@ -206,19 +214,25 @@ spec:
         {{- $env := include "vellum.shardEnv" . }}
         {{- if eq $.Values.postgres.mode "operator" }}
         {{- $cluster := include "vellum.pgCluster" (dict "root" $ "shard" .) }}
-        {{- $secret := printf "vellum.%s.credentials.postgresql.acid.zalan.do" $cluster }}
+        {{- $secret := printf "vellum.%s.credentials.postgresql.acid.zalan.do"
+          $cluster }}
         - name: VELLUM_SHARD_{{ $env }}_DB_USER
           valueFrom:
             secretKeyRef: { name: {{ $secret }}, key: username }
         - name: VELLUM_SHARD_{{ $env }}_DB_PASSWORD
           valueFrom:
             secretKeyRef: { name: {{ $secret }}, key: password }
+        {{- $user := printf "$(VELLUM_SHARD_%s_DB_USER)" $env }}
+        {{- $pass := printf "$(VELLUM_SHARD_%s_DB_PASSWORD)" $env }}
+        {{- $host := printf "%s:5432/%s" $cluster $.Values.postgres.database }}
         - name: VELLUM_SHARD_{{ $env }}_DATABASE_URL
-          value: postgres://$(VELLUM_SHARD_{{ $env }}_DB_USER):$(VELLUM_SHARD_{{ $env }}_DB_PASSWORD)@{{ $cluster }}:5432/{{ $.Values.postgres.database }}?sslmode=require
+          value: postgres://{{ $user }}:{{ $pass }}@{{ $host }}?sslmode=require
         {{- else }}
         - name: VELLUM_SHARD_{{ $env }}_DATABASE_URL
           valueFrom:
-            secretKeyRef: { name: {{ $.Values.postgres.externalSecret }}, key: {{ .name }} }
+            secretKeyRef:
+              name: {{ $.Values.postgres.externalSecret }}
+              key: {{ .name }}
         {{- end }}
         {{- end }}
         {{- $home := include "vellum.shardEnv" (first .Values.shards) }}

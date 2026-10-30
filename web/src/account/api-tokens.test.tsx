@@ -107,36 +107,45 @@ describe("Settings → API tokens", () => {
     expect(screen.getByText(/needs a Vellum server/i)).toBeDefined();
   });
 
-  it("lists tokens and creates one within the cap, showing the secret once", async () => {
-    const { api, createToken } = fakeAccount();
-    const user = renderTokens(api);
-    const table = await screen.findByRole("table");
-    expect(within(table).getByRole("rowheader", { name: "CI" })).toBeDefined();
-    expect(within(table).getByText("Never")).toBeDefined();
+  it(
+    "lists tokens and creates one within the cap, showing the secret " + "once",
+    async () => {
+      const { api, createToken } = fakeAccount();
+      const user = renderTokens(api);
+      const table = await screen.findByRole("table");
+      expect(
+        within(table).getByRole("rowheader", { name: "CI" }),
+      ).toBeDefined();
+      expect(within(table).getByText("Never")).toBeDefined();
 
-    // No admin scope offered to a member, and no "never" under a cap.
-    expect(screen.queryByRole("checkbox", { name: /Administer/ })).toBeNull();
-    const expiry = screen.getByRole("combobox", { name: /Expires after/ });
-    expect(within(expiry).queryByRole("option", { name: "Never" })).toBeNull();
-    expect(screen.getByText(/at most 90 days/)).toBeDefined();
+      // No admin scope offered to a member, and no "never" under a cap.
+      expect(screen.queryByRole("checkbox", { name: /Administer/ })).toBeNull();
+      const expiry = screen.getByRole("combobox", { name: /Expires after/ });
+      expect(
+        within(expiry).queryByRole("option", { name: "Never" }),
+      ).toBeNull();
+      expect(screen.getByText(/at most 90 days/)).toBeDefined();
 
-    await user.type(
-      screen.getByRole("textbox", { name: "Name" }),
-      "Claude Desktop",
-    );
-    await user.click(screen.getByRole("checkbox", { name: /Work/ }));
-    await user.selectOptions(expiry, "90");
-    await user.click(screen.getByRole("button", { name: "Create token" }));
-    expect(createToken).toHaveBeenCalledWith({
-      name: "Claude Desktop",
-      scopes: ["read", "work"],
-      expiresInDays: 90,
-    });
-    const secret = await screen.findByTestId("new-token");
-    expect(secret.textContent).toBe("vlm_secret_once");
-    await user.click(screen.getByRole("button", { name: "I have stored it" }));
-    expect(screen.queryByTestId("new-token")).toBeNull();
-  });
+      await user.type(
+        screen.getByRole("textbox", { name: "Name" }),
+        "Claude Desktop",
+      );
+      await user.click(screen.getByRole("checkbox", { name: /Work/ }));
+      await user.selectOptions(expiry, "90");
+      await user.click(screen.getByRole("button", { name: "Create token" }));
+      expect(createToken).toHaveBeenCalledWith({
+        name: "Claude Desktop",
+        scopes: ["read", "work"],
+        expiresInDays: 90,
+      });
+      const secret = await screen.findByTestId("new-token");
+      expect(secret.textContent).toBe("vlm_secret_once");
+      await user.click(
+        screen.getByRole("button", { name: "I have stored it" }),
+      );
+      expect(screen.queryByTestId("new-token")).toBeNull();
+    },
+  );
 
   it("refuses a token with no scope before calling the server", async () => {
     const { api, createToken } = fakeAccount();

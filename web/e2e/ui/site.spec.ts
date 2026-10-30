@@ -118,33 +118,35 @@ test.describe("site look", () => {
     });
   }
 
-  test("the bar never covers the guide's sidebar or page, and leaves no gap", async ({
-    page,
-  }) => {
-    await page.goto(url("docs/developer/architecture/index.html"));
-    const { barBottom, menuTop, sidebarTop, sidebarShown } =
-      await page.evaluate(() => {
-        const header = document
-          .querySelector("header.vellum-site")
-          ?.getBoundingClientRect();
-        const menu = document
-          .querySelector("#mdbook-menu-bar")
-          ?.getBoundingClientRect();
-        const sidebar = document.querySelector("#mdbook-sidebar");
-        return {
-          barBottom: header?.bottom ?? 0,
-          menuTop: menu?.top ?? 0,
-          sidebarTop: sidebar?.getBoundingClientRect().top ?? 0,
-          sidebarShown:
-            document.documentElement.classList.contains("sidebar-visible"),
-        };
-      });
-    // The guide's own menu bar sits right under the site bar: not under
-    // it, and with no empty strip between them.
-    expect(menuTop).toBeGreaterThanOrEqual(barBottom - 1);
-    expect(menuTop).toBeLessThanOrEqual(barBottom + 1);
-    if (sidebarShown) expect(sidebarTop).toBeGreaterThanOrEqual(barBottom - 1);
-  });
+  test(
+    "the bar never covers the guide's sidebar or page, and leaves no " + "gap",
+    async ({ page }) => {
+      await page.goto(url("docs/developer/architecture/index.html"));
+      const { barBottom, menuTop, sidebarTop, sidebarShown } =
+        await page.evaluate(() => {
+          const header = document
+            .querySelector("header.vellum-site")
+            ?.getBoundingClientRect();
+          const menu = document
+            .querySelector("#mdbook-menu-bar")
+            ?.getBoundingClientRect();
+          const sidebar = document.querySelector("#mdbook-sidebar");
+          return {
+            barBottom: header?.bottom ?? 0,
+            menuTop: menu?.top ?? 0,
+            sidebarTop: sidebar?.getBoundingClientRect().top ?? 0,
+            sidebarShown:
+              document.documentElement.classList.contains("sidebar-visible"),
+          };
+        });
+      // The guide's own menu bar sits right under the site bar: not under
+      // it, and with no empty strip between them.
+      expect(menuTop).toBeGreaterThanOrEqual(barBottom - 1);
+      expect(menuTop).toBeLessThanOrEqual(barBottom + 1);
+      if (sidebarShown)
+        expect(sidebarTop).toBeGreaterThanOrEqual(barBottom - 1);
+    },
+  );
 
   test("diagrams are drawn, fit the page and follow the theme toggle", async ({
     page,

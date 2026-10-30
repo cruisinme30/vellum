@@ -78,7 +78,9 @@ function ItemName({
       >
         {node.title}
       </button>
-      <span className="vl-visually-hidden">{`, ${t("drive-kind-shortcut")}`}</span>
+      <span className="vl-visually-hidden">
+        {`, ${t("drive-kind-shortcut")}`}
+      </span>
       {problem !== undefined && (
         <small className="vl-field-error" role="alert">
           {problem}

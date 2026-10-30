@@ -38,12 +38,15 @@ describe("ensureRenderStylesheet", () => {
     },
   );
 
-  it("keeps only the newest accent when answers arrive out of order", async () => {
-    const { api } = fakeApi();
-    const first = ensureRenderStylesheet(api, "#111111");
-    const second = ensureRenderStylesheet(api, "#222222");
-    const third = ensureRenderStylesheet(api, "#333333");
-    await Promise.all([third, second, first]);
-    expect(sheets()).toEqual([".vl-render { --seed: #333333; }"]);
-  });
+  it(
+    "keeps only the newest accent when answers arrive out of " + "order",
+    async () => {
+      const { api } = fakeApi();
+      const first = ensureRenderStylesheet(api, "#111111");
+      const second = ensureRenderStylesheet(api, "#222222");
+      const third = ensureRenderStylesheet(api, "#333333");
+      await Promise.all([third, second, first]);
+      expect(sheets()).toEqual([".vl-render { --seed: #333333; }"]);
+    },
+  );
 });

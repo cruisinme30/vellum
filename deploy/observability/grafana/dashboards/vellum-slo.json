@@ -2,10 +2,7 @@
   "uid": "vellum-slo",
   "title": "Vellum: SLOs and error budgets",
   "description": "The service level objectives, their remaining error budget and burn rates.",
-  "tags": [
-    "vellum",
-    "slo"
-  ],
+  "tags": ["vellum", "slo"],
   "schemaVersion": 39,
   "version": 1,
   "editable": true,

@@ -843,7 +843,8 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
     if let Some(check) = feeds.row_check {
         collections = collections.with_row_check(check);
     }
-    collections = collections.with_tree(Arc::new(DriveTree(Arc::clone(&drive))));
+    collections =
+        collections.with_tree(Arc::new(DriveTree(Arc::clone(&drive))));
     let collections = Arc::new(collections);
     let books = books_service(Arc::clone(&store), authz, Arc::clone(&space_of));
     let directory = Arc::new(IdentityDirectory(Arc::clone(identity)));

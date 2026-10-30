@@ -70,20 +70,23 @@ describe("DocumentCache", () => {
     expect(await cache.load("pinned-doc")).toEqual([]);
   });
 
-  it("keeps size and access time when a known document is tracked again", async () => {
-    const { database, cache } = await setup(100);
-    await cache.append("doc", bytes(1, 2));
-    await cache.track("doc", "space-2");
-    expect(await database.get("documents", "doc")).toMatchObject({
-      spaceId: "space-2",
-      bytes: 2,
-    });
-    await cache.compact("new-doc", bytes(1));
-    expect(await database.get("documents", "new-doc")).toMatchObject({
-      spaceId: "",
-      bytes: 1,
-    });
-  });
+  it(
+    "keeps size and access time when a known document is tracked " + "again",
+    async () => {
+      const { database, cache } = await setup(100);
+      await cache.append("doc", bytes(1, 2));
+      await cache.track("doc", "space-2");
+      expect(await database.get("documents", "doc")).toMatchObject({
+        spaceId: "space-2",
+        bytes: 2,
+      });
+      await cache.compact("new-doc", bytes(1));
+      expect(await database.get("documents", "new-doc")).toMatchObject({
+        spaceId: "",
+        bytes: 1,
+      });
+    },
+  );
 
   it("removes a document", async () => {
     const { cache } = await setup();

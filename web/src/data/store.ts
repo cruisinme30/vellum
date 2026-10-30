@@ -148,7 +148,9 @@ function snippet(text: string, query: string): string {
   }
   const start = Math.max(0, at - 40);
   const end = Math.min(text.length, at + query.length + 60);
-  return `${start > 0 ? "…" : ""}${text.slice(start, end).trim()}${end < text.length ? "…" : ""}`;
+  const before = start > 0 ? "…" : "";
+  const after = end < text.length ? "…" : "";
+  return `${before}${text.slice(start, end).trim()}${after}`;
 }
 
 /** Makes a page ULID: 48-bit time plus 80 random bits, Crockford base32. */

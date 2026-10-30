@@ -142,30 +142,33 @@ describe("BottomBar", () => {
     });
   });
 
-  it("scrolls a control focused by keyboard out from under the bar", async () => {
-    vi.stubGlobal("matchMedia", matchQueries(COMPACT, MEDIUM));
-    const { user } = renderApp("/help");
-    const bar = screen.getByRole("navigation", { name: "Main" });
-    const main = screen.getByRole("main");
-    const below = document.createElement("button");
-    const above = document.createElement("button");
-    main.append(above, below);
-    vi.spyOn(bar, "getBoundingClientRect").mockReturnValue(rect(754, 844));
-    vi.spyOn(above, "getBoundingClientRect").mockReturnValue(rect(600, 700));
-    vi.spyOn(below, "getBoundingClientRect").mockReturnValue(rect(719, 825));
-    // jsdom never matches :focus-visible; a browser does after Tab.
-    for (const button of [above, below]) {
-      const matches = button.matches.bind(button);
-      vi.spyOn(button, "matches").mockImplementation(
-        (selector) => selector === ":focus-visible" || matches(selector),
-      );
-    }
-    const aboveScroll = vi.spyOn(above, "scrollIntoView");
-    const belowScroll = vi.spyOn(below, "scrollIntoView");
-    above.focus();
-    await user.tab();
-    expect(document.activeElement).toBe(below);
-    expect(aboveScroll).not.toHaveBeenCalled();
-    expect(belowScroll).toHaveBeenCalledWith({ block: "nearest" });
-  });
+  it(
+    "scrolls a control focused by keyboard out from under the " + "bar",
+    async () => {
+      vi.stubGlobal("matchMedia", matchQueries(COMPACT, MEDIUM));
+      const { user } = renderApp("/help");
+      const bar = screen.getByRole("navigation", { name: "Main" });
+      const main = screen.getByRole("main");
+      const below = document.createElement("button");
+      const above = document.createElement("button");
+      main.append(above, below);
+      vi.spyOn(bar, "getBoundingClientRect").mockReturnValue(rect(754, 844));
+      vi.spyOn(above, "getBoundingClientRect").mockReturnValue(rect(600, 700));
+      vi.spyOn(below, "getBoundingClientRect").mockReturnValue(rect(719, 825));
+      // jsdom never matches :focus-visible; a browser does after Tab.
+      for (const button of [above, below]) {
+        const matches = button.matches.bind(button);
+        vi.spyOn(button, "matches").mockImplementation(
+          (selector) => selector === ":focus-visible" || matches(selector),
+        );
+      }
+      const aboveScroll = vi.spyOn(above, "scrollIntoView");
+      const belowScroll = vi.spyOn(below, "scrollIntoView");
+      above.focus();
+      await user.tab();
+      expect(document.activeElement).toBe(below);
+      expect(aboveScroll).not.toHaveBeenCalled();
+      expect(belowScroll).toHaveBeenCalledWith({ block: "nearest" });
+    },
+  );
 });

@@ -159,7 +159,8 @@ describe("block nodes", () => {
   it("writes no language for a code block whose language is unset", () => {
     const target = open(body(codeBlock("rust", "x")));
     target.commands.command(({ tr }) => {
-      // eslint-disable-next-line unicorn/no-null -- ProseMirror's unset attribute
+      // ProseMirror's unset attribute.
+      // eslint-disable-next-line unicorn/no-null
       tr.setNodeAttribute(0, "language", null);
       return true;
     });

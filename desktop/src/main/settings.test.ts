@@ -21,7 +21,8 @@ describe("settings", () => {
     expect(normalizeServerUrl("http://127.0.0.1:7700/")).toBe(
       "http://127.0.0.1:7700",
     );
-    // eslint-disable-next-line sonarjs/no-clear-text-protocols -- checks that plain HTTP is refused
+    // Checks that plain HTTP is refused.
+    // eslint-disable-next-line sonarjs/no-clear-text-protocols
     expect(() => normalizeServerUrl("http://vellum.northstar.dev")).toThrow(
       /https/,
     );

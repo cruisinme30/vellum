@@ -19,107 +19,111 @@
 // than 1 % of the reads it was asked to send; `cargo xtask perf-gate`
 // separately fails the run when any p95 grows 10 % or more over recent nights.
 
-import http from 'k6/http';
-import { check, fail } from 'k6';
-import { WebSocket } from 'k6/websockets';
-import { Counter, Trend } from 'k6/metrics';
-import { clearInterval, setInterval, setTimeout } from 'k6/timers';
-import { insertUpdate, stamp, stampsIn, updateFrame } from './keystroke.js';
-import { northstarPage } from './pages.js';
-import { routes } from './routes.js';
-import { base, bases, createPage, savePage, signIn, space } from './session.js';
-import { summarise } from './summary.js';
+import http from "k6/http";
+import { check, fail } from "k6";
+import { WebSocket } from "k6/websockets";
+import { Counter, Trend } from "k6/metrics";
+import { clearInterval, setInterval, setTimeout } from "k6/timers";
+import { insertUpdate, stamp, stampsIn, updateFrame } from "./keystroke.js";
+import { northstarPage } from "./pages.js";
+import { routes } from "./routes.js";
+import { base, bases, createPage, savePage, signIn, space } from "./session.js";
+import { summarise } from "./summary.js";
 
 const PAGES = Number(__ENV.PAGES || 500);
 const SCALE = Number(__ENV.SCALE || 1);
-const DURATION = __ENV.DURATION || '5m';
+const DURATION = __ENV.DURATION || "5m";
 
-const collabSync = new Trend('collab_sync', true);
-const keystroke = new Trend('keystroke', true);
-const renderCold = new Trend('render_cold', true);
-const pdfExport = new Trend('pdf_export', true);
+const collabSync = new Trend("collab_sync", true);
+const keystroke = new Trend("keystroke", true);
+const renderCold = new Trend("render_cold", true);
+const pdfExport = new Trend("pdf_export", true);
 // Exports refused because both typesetting slots stayed busy (D231).
-const pdfBusy = new Counter('pdf_export_busy');
+const pdfBusy = new Counter("pdf_export_busy");
 
 // Pairs of editors (two sessions each), pages kept for cold renders, and
 // the reads k6 may fail to send before the 2,000 reads/s claim is false.
 const PAIRS = Math.max(1, Math.round(25 * SCALE));
 const COLD_PAGES = 50;
-const seconds = (d) => Number(d.slice(0, -1)) * { s: 1, m: 60, h: 3600 }[d.slice(-1)];
+const seconds = (d) =>
+  Number(d.slice(0, -1)) * { s: 1, m: 60, h: 3600 }[d.slice(-1)];
 const READ_RATE = 2000 * SCALE;
-const MAX_DROPPED = Math.max(1, Math.ceil(0.01 * READ_RATE * seconds(DURATION)));
+const MAX_DROPPED = Math.max(
+  1,
+  Math.ceil(0.01 * READ_RATE * seconds(DURATION)),
+);
 
 export const options = {
   discardResponseBodies: false,
   scenarios: {
     read_cached: {
-      executor: 'constant-arrival-rate',
-      exec: 'readCached',
+      executor: "constant-arrival-rate",
+      exec: "readCached",
       rate: 1600 * SCALE,
-      timeUnit: '1s',
+      timeUnit: "1s",
       duration: DURATION,
       preAllocatedVUs: 200,
     },
     read_uncached: {
-      executor: 'constant-arrival-rate',
-      exec: 'readUncached',
+      executor: "constant-arrival-rate",
+      exec: "readUncached",
       rate: 400 * SCALE,
-      timeUnit: '1s',
+      timeUnit: "1s",
       duration: DURATION,
       preAllocatedVUs: 100,
     },
     write: {
-      executor: 'constant-arrival-rate',
-      exec: 'write',
+      executor: "constant-arrival-rate",
+      exec: "write",
       rate: 50 * SCALE,
-      timeUnit: '1s',
+      timeUnit: "1s",
       duration: DURATION,
       preAllocatedVUs: 50,
     },
     render_cold: {
-      executor: 'constant-arrival-rate',
-      exec: 'renderAfterSave',
+      executor: "constant-arrival-rate",
+      exec: "renderAfterSave",
       rate: Math.max(1, Math.round(10 * SCALE)),
-      timeUnit: '1s',
+      timeUnit: "1s",
       duration: DURATION,
       preAllocatedVUs: 20,
     },
     collab_sync: {
-      executor: 'constant-vus',
-      exec: 'collab',
+      executor: "constant-vus",
+      exec: "collab",
       vus: Math.max(1, Math.round(50 * SCALE)),
       duration: DURATION,
     },
     keystroke: {
-      executor: 'constant-vus',
-      exec: 'keystrokes',
+      executor: "constant-vus",
+      exec: "keystrokes",
       vus: PAIRS,
       duration: DURATION,
     },
     // Two typesetting slots per replica (D231): one export a second keeps
     // them busy part of the time without queueing for the 30 s slot wait.
     pdf_export: {
-      executor: 'constant-arrival-rate',
-      exec: 'exportPdf',
+      executor: "constant-arrival-rate",
+      exec: "exportPdf",
       rate: Math.max(1, Math.round(SCALE)),
-      timeUnit: '1s',
+      timeUnit: "1s",
       duration: DURATION,
       preAllocatedVUs: 10,
     },
   },
   thresholds: {
-    'http_req_duration{scenario:read_cached}': ['p(95)<50', 'p(99)<120'],
-    'http_req_duration{scenario:read_uncached}': ['p(95)<150'],
-    'http_req_duration{scenario:write}': ['p(95)<150'],
-    render_cold: ['p(95)<300'],
-    collab_sync: ['p(95)<200'],
-    keystroke: ['p(95)<200'],
-    pdf_export: ['p(95)<3000'],
-    pdf_export_busy: ['count<1'],
-    'checks{scenario:pdf_export}': ['rate>0.999'],
-    'dropped_iterations{scenario:read_cached}': [`count<${MAX_DROPPED}`],
-    'dropped_iterations{scenario:read_uncached}': [`count<${MAX_DROPPED}`],
-    http_req_failed: ['rate<0.001'],
+    "http_req_duration{scenario:read_cached}": ["p(95)<50", "p(99)<120"],
+    "http_req_duration{scenario:read_uncached}": ["p(95)<150"],
+    "http_req_duration{scenario:write}": ["p(95)<150"],
+    render_cold: ["p(95)<300"],
+    collab_sync: ["p(95)<200"],
+    keystroke: ["p(95)<200"],
+    pdf_export: ["p(95)<3000"],
+    pdf_export_busy: ["count<1"],
+    "checks{scenario:pdf_export}": ["rate>0.999"],
+    "dropped_iterations{scenario:read_cached}": [`count<${MAX_DROPPED}`],
+    "dropped_iterations{scenario:read_uncached}": [`count<${MAX_DROPPED}`],
+    http_req_failed: ["rate<0.001"],
   },
 };
 
@@ -136,15 +140,39 @@ export function setup() {
   const spaceId = space(bases[0], headers);
   const ids = [];
   for (let i = 0; i < PAGES; i += 1) {
-    ids.push(createPage(base(i), headers, spaceId, `Northstar handbook ${i}`, northstarPage(i)));
+    ids.push(
+      createPage(
+        base(i),
+        headers,
+        spaceId,
+        `Northstar handbook ${i}`,
+        northstarPage(i),
+      ),
+    );
   }
   const cold = [];
   for (let i = 0; i < COLD_PAGES; i += 1) {
-    cold.push(createPage(base(i), headers, spaceId, `Northstar cold ${i}`, northstarPage(i)));
+    cold.push(
+      createPage(
+        base(i),
+        headers,
+        spaceId,
+        `Northstar cold ${i}`,
+        northstarPage(i),
+      ),
+    );
   }
   const rooms = [];
   for (let i = 0; i < PAIRS; i += 1) {
-    rooms.push(createPage(base(i), headers, spaceId, `Northstar pairing ${i}`, '# Pairing\n'));
+    rooms.push(
+      createPage(
+        base(i),
+        headers,
+        spaceId,
+        `Northstar pairing ${i}`,
+        "# Pairing\n",
+      ),
+    );
   }
   return { headers, spaceId, ids, cold, rooms };
 }
@@ -157,35 +185,41 @@ const server = () => base(__VU + __ITER);
 export function readCached(data) {
   const res = http.get(`${server()}${routes.render(data.ids[__ITER % 10])}`, {
     headers: data.headers,
-    tags: { name: 'render' },
+    tags: { name: "render" },
   });
-  check(res, { 'cached read 200': (r) => r.status === 200 });
+  check(res, { "cached read 200": (r) => r.status === 200 });
 }
 
 // Any of the seeded pages, with no copy in the browser.
 export function readUncached(data) {
   const res = http.get(`${server()}${routes.render(pick(data.ids))}`, {
-    headers: { ...data.headers, 'Cache-Control': 'no-cache' },
-    tags: { name: 'render' },
+    headers: { ...data.headers, "Cache-Control": "no-cache" },
+    tags: { name: "render" },
   });
-  check(res, { 'uncached read 200': (r) => r.status === 200 });
+  check(res, { "uncached read 200": (r) => r.status === 200 });
 }
 
 // A cold render: save a 50-block page, then time only its first render.
 export function renderAfterSave(data) {
   const id = data.cold[__ITER % data.cold.length];
   const target = server();
-  const saved = savePage(target, data.headers, id, northstarPage(`${__VU}-${__ITER}`), {
-    headers: { 'Idempotency-Key': `k6-cold-${__VU}-${__ITER}` },
-  });
+  const saved = savePage(
+    target,
+    data.headers,
+    id,
+    northstarPage(`${__VU}-${__ITER}`),
+    {
+      headers: { "Idempotency-Key": `k6-cold-${__VU}-${__ITER}` },
+    },
+  );
   if (saved.status !== 200) {
     return; // another writer saved first; nothing new to render
   }
   const res = http.get(`${target}${routes.render(id)}`, {
     headers: data.headers,
-    tags: { name: 'render-cold' },
+    tags: { name: "render-cold" },
   });
-  if (check(res, { 'cold render 200': (r) => r.status === 200 })) {
+  if (check(res, { "cold render 200": (r) => r.status === 200 })) {
     renderCold.add(res.timings.duration);
   }
 }
@@ -193,21 +227,24 @@ export function renderAfterSave(data) {
 // A 50-block Northstar page as PDF, read as the caller. Only the PDF's
 // arrival is timed; a refusal because the slots were busy is counted.
 export function exportPdf(data) {
-  const res = http.get(`${server()}${routes.exportPage(pick(data.ids), 'pdf')}`, {
-    headers: data.headers,
-    responseType: 'binary',
-    tags: { name: 'export-pdf' },
-  });
+  const res = http.get(
+    `${server()}${routes.exportPage(pick(data.ids), "pdf")}`,
+    {
+      headers: data.headers,
+      responseType: "binary",
+      tags: { name: "export-pdf" },
+    },
+  );
   if (res.status === 503) {
     pdfBusy.add(1);
     return;
   }
   const pdf = check(res, {
-    'pdf export 200': (r) => r.status === 200,
-    'pdf export is a PDF': (r) =>
-      String(r.headers['Content-Type']).startsWith('application/pdf') &&
+    "pdf export 200": (r) => r.status === 200,
+    "pdf export is a PDF": (r) =>
+      String(r.headers["Content-Type"]).startsWith("application/pdf") &&
       r.body.byteLength >= 4 &&
-      String.fromCharCode(...new Uint8Array(r.body, 0, 4)) === '%PDF',
+      String.fromCharCode(...new Uint8Array(r.body, 0, 4)) === "%PDF",
   });
   if (pdf) {
     pdfExport.add(res.timings.duration);
@@ -217,20 +254,23 @@ export function exportPdf(data) {
 export function write(data) {
   const content = `# Edited\n\nIteration ${__ITER} by VU ${__VU}.\n`;
   const res = savePage(server(), data.headers, pick(data.ids), content, {
-    headers: { 'Idempotency-Key': `k6-${__VU}-${__ITER}` },
+    headers: { "Idempotency-Key": `k6-${__VU}-${__ITER}` },
   });
-  check(res, { 'write saved or lost a race': (r) => r.status === 200 || r.status === 409 });
+  check(res, {
+    "write saved or lost a race": (r) => r.status === 200 || r.status === 409,
+  });
 }
 
 // One editing session: opens the page's collab socket and times the Yjs
 // sync handshake (sync step 1 to sync step 2) for as long as it lasts.
 export function collab(data) {
   const ws = new WebSocket(
-    `${server().replace(/^http/, 'ws')}${routes.collab(data.spaceId, pick(data.ids))}`,
+    server().replace(/^http/, "ws") +
+      routes.collab(data.spaceId, pick(data.ids)),
     null,
     { headers: data.headers },
   );
-  ws.binaryType = 'arraybuffer';
+  ws.binaryType = "arraybuffer";
   let sent = 0;
   const syncStep1 = new Uint8Array([0, 0, 1, 0]).buffer; // empty state vector
   ws.onopen = () => {
@@ -257,18 +297,19 @@ export function collab(data) {
 export function keystrokes(data) {
   const pair = (__VU - 1) % data.rooms.length;
   const room = routes.collab(data.spaceId, data.rooms[pair]);
-  const url = (n) => `${base(n).replace(/^http/, 'ws')}${room}`;
+  const url = (n) => `${base(n).replace(/^http/, "ws")}${room}`;
   const tag = `${__VU}x${__ITER}`;
   const reader = new WebSocket(url(1), null, { headers: data.headers });
-  reader.binaryType = 'arraybuffer';
+  reader.binaryType = "arraybuffer";
   reader.onmessage = (event) => {
     const now = Date.now();
     for (const sent of stampsIn(event.data, tag)) keystroke.add(now - sent);
   };
   const writer = new WebSocket(url(0), null, { headers: data.headers });
-  writer.binaryType = 'arraybuffer';
+  writer.binaryType = "arraybuffer";
   // A client ID of its own per session, as a browser tab would have.
-  const client = (__VU * 100003 + __ITER * 7919 + Math.floor(Math.random() * 1e6)) % 2 ** 31;
+  const client =
+    (__VU * 100003 + __ITER * 7919 + Math.floor(Math.random() * 1e6)) % 2 ** 31;
   let clock = 0;
   let typing;
   const type = () => {
@@ -290,5 +331,5 @@ export function keystrokes(data) {
 }
 
 export function handleSummary(data) {
-  return summarise(data, __ENV.SUMMARY || 'perf-summary.json');
+  return summarise(data, __ENV.SUMMARY || "perf-summary.json");
 }

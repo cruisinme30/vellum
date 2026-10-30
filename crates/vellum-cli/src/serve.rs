@@ -403,7 +403,11 @@ pub fn run(
         }
         let gateway = app_gateway(&services, gateway)?;
         let databases = services.databases();
-        tracing::info!(bind = %serve_config.bind, app = %host_of(&config.public_url.clone().unwrap_or_default()), "starting vellum");
+        tracing::info!(
+            bind = %serve_config.bind,
+            app = %host_of(&config.public_url.clone().unwrap_or_default()),
+            "starting vellum"
+        );
         // Live-editing sockets stay open until their rooms close, so save
         // and close the rooms before the server waits for connections.
         let stop = async move {
@@ -417,7 +421,8 @@ pub fn run(
 }
 
 /// How long shutdown waits for database connections still in use.
-const DATABASE_CLOSE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+const DATABASE_CLOSE_TIMEOUT: std::time::Duration =
+    std::time::Duration::from_secs(30);
 
 /// Closes every workspace database while the runtime still runs, so no
 /// connection is left closing on its own thread when the process exits.
@@ -433,7 +438,8 @@ async fn close_databases(databases: &[vellum_db::Index]) {
         .is_err()
     {
         tracing::warn!(
-            "database connections still in use after {DATABASE_CLOSE_TIMEOUT:?}; exiting anyway"
+            "database connections still in use after \
+                {DATABASE_CLOSE_TIMEOUT:?}; exiting anyway"
         );
     } else {
         tracing::info!(databases = databases.len(), "databases closed");

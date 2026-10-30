@@ -46,11 +46,11 @@ function RecurringRow({
       },
     );
   };
+  const href = `/issues/${encodeURIComponent(issue.key)}`;
   return (
     <li className="vl-tpl-recurring">
       <span className="vl-tpl-recurring-title">
-        <Link to={`/issues/${encodeURIComponent(issue.key)}`}>{issue.key}</Link>{" "}
-        {issue.title}
+        <Link to={href}>{issue.key}</Link> {issue.title}
       </span>
       <span className="vl-muted">
         {issue.due == undefined

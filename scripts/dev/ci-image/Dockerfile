@@ -55,9 +55,11 @@ RUN case "${TARGETARCH}" in \
     && curl -sSfL --retry 3 -o rustup-init "https://static.rust-lang.org/rustup/archive/${RUSTUP}/${triple}/rustup-init" \
     && echo "${sha}  rustup-init" | sha256sum --check --quiet \
     && chmod +x rustup-init \
-    && ./rustup-init -y --no-modify-path --profile minimal --default-toolchain none \
+    && ./rustup-init -y --no-modify-path --profile minimal \
+        --default-toolchain none \
     && rustup toolchain install \
-    && rustup default "$(sed -nE 's/^channel = "([^"]+)"/\1/p' rust-toolchain.toml)" \
+    && rustup default \
+        "$(sed -nE 's/^channel = "([^"]+)"/\1/p' rust-toolchain.toml)" \
     && rm rustup-init && rustc --version && cargo clippy --version
 
 # Node 22, as CI's setup-node, checked against nodejs.org's SHASUMS256.
@@ -68,13 +70,15 @@ RUN case "${TARGETARCH}" in \
     esac \
     && curl -sSfL --retry 3 -o node.tar.xz "https://nodejs.org/dist/v${NODE}/node-v${NODE}-linux-${arch}.tar.xz" \
     && echo "${sha}  node.tar.xz" | sha256sum --check --quiet \
-    && mkdir -p /usr/local/node && tar -xJf node.tar.xz -C /usr/local/node --strip-components=1 \
+    && mkdir -p /usr/local/node \
+    && tar -xJf node.tar.xz -C /usr/local/node --strip-components=1 \
     && rm node.tar.xz && node --version
 
 # pnpm at web/package.json's packageManager version; corepack checks the
 # package's signature.
 COPY web/package.json web-package.json
-RUN pnpm="$(sed -nE 's/.*"packageManager": "(pnpm@[^"]+)".*/\1/p' web-package.json)" \
+RUN pnpm="$(sed -nE 's/.*"packageManager": "(pnpm@[^"]+)".*/\1/p' \
+        web-package.json)" \
     && test -n "${pnpm}" \
     && corepack enable pnpm \
     && corepack install --global "${pnpm}" \
@@ -95,7 +99,8 @@ RUN case "${TARGETARCH}" in \
 COPY .github/requirements/hygiene.txt .github/requirements/hygiene.txt
 COPY scripts/dev/install-tools.sh scripts/dev/install-tools.sh
 COPY scripts/ci/install-infra-tools.sh scripts/ci/install-infra-tools.sh
-RUN VELLUM_TOOLS_DIR=/usr/local/bin VELLUM_TOOLS_VENV=/usr/local/share/vellum-hygiene \
+RUN VELLUM_TOOLS_DIR=/usr/local/bin \
+    VELLUM_TOOLS_VENV=/usr/local/share/vellum-hygiene \
     VELLUM_INSTALL_HELM=1 bash scripts/dev/install-tools.sh
 
 WORKDIR /

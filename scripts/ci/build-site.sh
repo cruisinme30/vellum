@@ -43,8 +43,12 @@ trap 'rm -rf "${work}"' EXIT
 # The renderer for rich blocks, and its stylesheet for every book (D309).
 blocks="${SITE_BLOCKS:-}"
 if [[ -z "${blocks}" ]]; then
-  cargo build --quiet --profile site --locked -p vellum-render --example site_blocks --manifest-path "${root}/Cargo.toml"
-  blocks="$(cargo metadata --format-version 1 --no-deps --manifest-path "${root}/Cargo.toml" | sed -E 's/.*"target_directory":"([^"]*)".*/\1/')/site/examples/site_blocks"
+  cargo build --quiet --profile site --locked -p vellum-render \
+    --example site_blocks --manifest-path "${root}/Cargo.toml"
+  target='s/.*"target_directory":"([^"]*)".*/\1/'
+  blocks="$(cargo metadata --format-version 1 --no-deps \
+    --manifest-path "${root}/Cargo.toml" | sed -E "${target}")"
+  blocks+=/site/examples/site_blocks
 fi
 "${blocks}" --css "${work}/render.css"
 
@@ -58,12 +62,14 @@ site_bar() {
     /^<!--/ { comment = 1 }
     comment { if ($0 ~ /-->$/) comment = 0; next }
     /@VERSIONS@/ {
-      if (links != "") { while ((getline line < links) > 0) print "      " line; close(links) }
+      if (links != "") { while ((getline line < links) > 0) print "      " line;
+        close(links) }
       next
     }
     { print }
   ' "${root}/site/bar.html" |
-    sed -e "s#@HOME@#${home}#g" -e "s#@DOCS@#${docs}#g" -e "s#@GUIDES@#${guides}#g" |
+    sed -e "s#@HOME@#${home}#g" -e "s#@DOCS@#${docs}#g" \
+      -e "s#@GUIDES@#${guides}#g" |
     {
       local bar
       bar="$(cat)"
@@ -106,14 +112,16 @@ to_commonmark() {
       out = out s
       if (match(out, /^ ? ? ?\[[^]]+\]:[ \t]*/) && RLENGTH < length(out)) {
         link = substr(out, RSTART + RLENGTH); sub(/[ \t].*$/, "", link)
-        out = substr(out, 1, RLENGTH) fix_target(link) substr(out, RLENGTH + 1 + length(link))
+        out = substr(out, 1, RLENGTH) fix_target(link) substr(out,
+          RLENGTH + 1 + length(link))
       }
       return out
     }
     NR == 1 && $0 == "---" { front = 1; next }
     front {
       if ($0 == "---" || $0 == "...") front = 0
-      else if ($0 ~ /^title:/) { heading = $0; sub(/^title:[ \t]*/, "", heading); gsub(/^["\047]|["\047]$/, "", heading) }
+      else if ($0 ~ /^title:/) { heading = $0; sub(/^title:[ \t]*/, "",
+        heading); gsub(/^["\047]|["\047]$/, "", heading) }
       next
     }
     heading != "" && $0 !~ /^[ \t]*$/ {
@@ -134,7 +142,8 @@ to_commonmark() {
         $0 = fix_links($0)
       } else {
         line = $0; sub(/^ +/, "", line); sub(/[ \t]+$/, "", line)
-        if (substr(line, 1, 1) == substr(fence, 1, 1) && line ~ /^(`+|~+)$/ && length(line) >= length(fence)) fence = ""
+        if (substr(line, 1, 1) == substr(fence, 1, 1) && line ~ /^(`+|~+)$/ &&
+          length(line) >= length(fence)) fence = ""
       }
       print
     }
@@ -163,15 +172,22 @@ add_feedback() {
   local file="$1" book="$2" page="$3" version="$4" title issue
   title="$(yaml_title "${file}")"
   title="${title:-${page}}"
-  issue="${repo}/issues/new?labels=docs-feedback&amp;title=$(url_encode "Docs feedback: ${title}")"
+  issue="${repo}/issues/new?labels=docs-feedback&amp;title=$(url_encode \
+    "Docs feedback: ${title}")"
   local body="Page: ${book}/${page} (${version})"
   {
     echo
-    echo '<div class="vellum-feedback" role="group" aria-label="Feedback on this page">'
+    echo '<div class="vellum-feedback" role="group"' \
+      'aria-label="Feedback on this page">'
     echo "<span>Was this page helpful?</span>"
-    echo "<a href=\"${issue}%20(helpful)&amp;body=$(url_encode "${body}"$'\n\nWhat helped most?')\">Yes</a>"
-    echo "<a href=\"${issue}%20(not%20helpful)&amp;body=$(url_encode "${body}"$'\n\nWhat were you looking for, and what was missing or wrong?')\">No</a>"
-    echo "<a class=\"vellum-edit\" href=\"${repo}/edit/${edit_ref}/docs/${book}.book/${page}\">Edit this page</a>"
+    echo "<a href=\"${issue}%20(helpful)&amp;body=$(url_encode \
+      "${body}"$'\n\nWhat helped most?')\">Yes</a>"
+    local missing=$'\n\nWhat were you looking for,'
+    missing+=' and what was missing or wrong?'
+    echo "<a href=\"${issue}%20(not%20helpful)&amp;body=$(url_encode \
+      "${body}${missing}")\">No</a>"
+    local edit="${repo}/edit/${edit_ref}/docs/${book}.book/${page}"
+    echo "<a class=\"vellum-edit\" href=\"${edit}\">Edit this page</a>"
     echo '</div>'
   } >>"${file}"
 }
@@ -179,11 +195,13 @@ add_feedback() {
 # yaml_title <file>: the top-level title: value of a YAML file or front
 # matter, without quotes.
 yaml_title() {
-  sed -n 's/^title:[[:space:]]*//p' "$1" | head -n 1 | sed -e 's/^["'\'']//' -e 's/["'\'']$//'
+  sed -n 's/^title:[[:space:]]*//p' "$1" | head -n 1 \
+    | sed -e 's/^["'\'']//' -e 's/["'\'']$//'
 }
 
 html_escape() {
-  sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/"/\&quot;/g' <<<"$1"
+  sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' \
+    -e 's/"/\&quot;/g' <<<"$1"
 }
 
 # fix_html <dir>: patches mdBook 0.5.4's HTML where it fails WCAG 2.2 AA
@@ -200,16 +218,20 @@ html_escape() {
 #     a window property, and mdBook's search and copy libraries then take
 #     the page for CommonJS and fail.
 fix_html() {
+  local fonts='<link rel="stylesheet" '
+  fonts+='href="([^"]*\/)?fonts\/fonts-[0-9a-f]*\.css">'
+  local box='<input disabled="" type="checkbox"'
+  local ids='(exports|module|define|require)'
   find "$1" -name '*.html' -exec sed -i -E \
-    -e '/<link rel="stylesheet" href="([^"]*\/)?fonts\/fonts-[0-9a-f]*\.css">/d' \
-    -e 's/<label id="mdbook-sidebar-toggle" /<label id="mdbook-sidebar-toggle" role="button" /' \
+    -e "/${fonts}/d" \
+    -e 's/<label id="mdbook-sidebar-toggle" /&role="button" /' \
     -e 's/<pre([^>]*)><code( |>)/<pre\1><code tabindex="0"\2/g' \
-    -e 's/<div class="table-wrapper">/<div class="table-wrapper" tabindex="0">/g' \
-    -e 's/<div class="(vl-table-wrap|vl-board)"/<div class="\1" tabindex="0"/g' \
-    -e 's/<input disabled="" type="checkbox" checked="">/<input disabled="" type="checkbox" checked="" aria-label="Done">/g' \
-    -e 's/<input disabled="" type="checkbox">/<input disabled="" type="checkbox" aria-label="To do">/g' \
-    -e 's/id="(exports|module|define|require)"/id="\1-section"/g' \
-    -e 's/href="([^"]*)#(exports|module|define|require)"/href="\1#\2-section"/g' {} +
+    -e 's/(<div class="table-wrapper")>/\1 tabindex="0">/g' \
+    -e 's/<div class="(vl-table-wrap|vl-board)"/& tabindex="0"/g' \
+    -e "s/(${box} checked=\"\")>/\\1 aria-label=\"Done\">/g" \
+    -e "s/(${box})>/\\1 aria-label=\"To do\">/g" \
+    -e "s/id=\"${ids}\"/id=\"\\1-section\"/g" \
+    -e "s/href=\"([^\"]*)#${ids}\"/href=\"\\1#\\2-section\"/g" {} +
 }
 
 # version_links <name> <current>: the site bar's version links for book
@@ -220,11 +242,17 @@ version_links() {
   ((${#versions[@]} > 0)) || return 0
   printf '<span class="vellum-versions">Version:'
   for version in latest "${versions[@]}"; do
-    if [[ "${version}" == latest ]]; then href="${name}/index.html"; else href="v/${version}/${name}/index.html"; fi
-    if [[ "${version}" == "${current}" ]]; then
-      printf ' <a href="{{ path_to_root }}@DOCS@%s" aria-current="true">%s</a>' "${href}" "${version}"
+    if [[ "${version}" == latest ]]; then
+      href="${name}/index.html"
     else
-      printf ' <a href="{{ path_to_root }}@DOCS@%s">%s</a>' "${href}" "${version}"
+      href="v/${version}/${name}/index.html"
+    fi
+    if [[ "${version}" == "${current}" ]]; then
+      printf ' <a href="{{ path_to_root }}@DOCS@%s" %s>%s</a>' \
+        "${href}" 'aria-current="true"' "${version}"
+    else
+      printf ' <a href="{{ path_to_root }}@DOCS@%s">%s</a>' "${href}" \
+        "${version}"
     fi
   done
   printf '</span>'
@@ -234,7 +262,8 @@ version_links() {
 # staged source, into docs/<name>/, or docs/v/<version>/<name>/ for an
 # older release. Only the current books are listed on the docs home.
 build_book() {
-  local name="$1" title="$2" src="$3" version="${4:-latest}" dir dest up docs toml_title
+  local name="$1" title="$2" src="$3" version="${4:-latest}" dir dest up docs \
+    toml_title
   dir="${work}/build-${version}-${name}"
   if [[ "${version}" == latest ]]; then
     dest="docs/${name}"
@@ -246,7 +275,8 @@ build_book() {
   docs="${up%../}"
   toml_title="${2//\\/\\\\}"
   toml_title="${toml_title//\"/\\\"}"
-  find "${src}" -name '*.md' -not -name SUMMARY.md -print0 | xargs -0 -r "${blocks}"
+  find "${src}" -name '*.md' -not -name SUMMARY.md -print0 \
+    | xargs -0 -r "${blocks}"
   find "${src}" -name '*.md' -print0 | while IFS= read -r -d '' page; do
     to_commonmark "${page}"
   done
@@ -259,14 +289,18 @@ build_book() {
   done
   mkdir -p "${dir}/theme"
   # book.css lands in <dest>/theme/, one folder below the book.
-  sed "s#@FONTS@#../${up}fonts/#g" "${root}/site/book.css" >"${dir}/theme/vellum.css"
+  sed "s#@FONTS@#../${up}fonts/#g" "${root}/site/book.css" \
+    >"${dir}/theme/vellum.css"
   cp "${root}/site/bar.css" "${work}/render.css" "${dir}/theme/"
   sed "s#@ROOT@#${up}#g" "${root}/site/book-head.hbs" >"${dir}/theme/head.hbs"
-  version_links "${name}" "${version}" | sed "s#@DOCS@#${docs}#g" >"${dir}/versions.html"
+  version_links "${name}" "${version}" | sed \
+    "s#@DOCS@#${docs}#g" >"${dir}/versions.html"
   {
-    site_bar "{{ path_to_root }}${up}" "{{ path_to_root }}${docs}" "{{ path_to_root }}../" "${name}" "${dir}/versions.html"
+    site_bar "{{ path_to_root }}${up}" "{{ path_to_root }}${docs}" \
+      "{{ path_to_root }}../" "${name}" "${dir}/versions.html"
     # Measure the bar before first paint (theme.js, D310).
-    echo '<script>if (window.vellumMeasureBar) window.vellumMeasureBar();</script>'
+    echo '<script>if (window.vellumMeasureBar)' \
+      'window.vellumMeasureBar();</script>'
   } >"${dir}/theme/header.hbs"
   cat >"${dir}/book.toml" <<EOF
 [book]
@@ -307,7 +341,8 @@ build_guides() {
       [[ -d "${docs_dir}/${name}.book" ]] && echo "${docs_dir}/${name}.book"
     done
     find "${docs_dir}" -mindepth 1 -maxdepth 1 -type d -name '*.book' \
-      -not -name user.book -not -name admin.book -not -name developer.book | sort
+      -not -name user.book -not -name admin.book -not -name developer.book \
+      | sort
   )
   for book in "${book_dirs[@]}"; do
     [[ -f "${book}/SUMMARY.md" ]] || continue
@@ -315,7 +350,8 @@ build_guides() {
     title="$(yaml_title "${book}/book.yaml" 2>/dev/null || true)"
     cp -R "${book}" "${stage}/${name}"
     while IFS= read -r -d '' page; do
-      add_feedback "${page}" "${name}" "${page#"${stage}/${name}/"}" "${version}"
+      add_feedback "${page}" "${name}" "${page#"${stage}/${name}/"}" \
+        "${version}"
     done < <(find "${stage}/${name}" -name '*.md' -not -name SUMMARY.md -print0)
     build_book "${name}" "${title:-${name}}" "${stage}/${name}" "${version}"
   done
@@ -324,7 +360,9 @@ build_guides() {
 
 rm -rf "${out}"
 mkdir -p "${out}/docs"
-cp "${root}/site/style.css" "${root}/site/bar.css" "${root}/site/theme.js" "${root}/site/blocks.js" "${root}/site/favicon.svg" "${root}/site/install.sh" "${out}/"
+cp "${root}/site/style.css" "${root}/site/bar.css" "${root}/site/theme.js" \
+  "${root}/site/blocks.js" "${root}/site/favicon.svg" \
+  "${root}/site/install.sh" "${out}/"
 cp -R "${root}/site/fonts" "${root}/site/img" "${root}/site/media" "${out}/"
 
 # build_decisions <adr-dir> <version>: the architecture decision records,
@@ -361,15 +399,18 @@ books=()
 
 # Release tags, newest first: each gets a copy of its own books.
 versions=()
-if ((max_versions > 0)) && git -C "${root}" rev-parse --git-dir >/dev/null 2>&1; then
-  mapfile -t versions < <(git -C "${root}" tag --list 'v[0-9]*' --sort=-version:refname | head -n "${max_versions}")
+if ((max_versions > 0)) && git -C "${root}" rev-parse \
+  --git-dir >/dev/null 2>&1; then
+  mapfile -t versions < <(git -C "${root}" tag --list 'v[0-9]*' \
+    --sort=-version:refname | head -n "${max_versions}")
 fi
 
 # The current books, then each release's.
 build_guides "${root}/docs" latest
 for version in "${versions[@]}"; do
   mkdir -p "${work}/tag-${version}"
-  git -C "${root}" archive "${version}" docs | tar -x -C "${work}/tag-${version}"
+  git -C "${root}" archive "${version}" docs \
+    | tar -x -C "${work}/tag-${version}"
   build_guides "${work}/tag-${version}/docs" "${version}"
 done
 
@@ -380,7 +421,8 @@ done
 # listed under "Reference".
 summary_html() {
   awk -v book="$1" '
-    function esc(t) { gsub(/&/, "\\&amp;", t); gsub(/</, "\\&lt;", t); gsub(/>/, "\\&gt;", t); gsub(/"/, "\\&quot;", t); return t }
+    function esc(t) { gsub(/&/, "\\&amp;", t); gsub(/</, "\\&lt;", t); gsub(/>/,
+      "\\&gt;", t); gsub(/"/, "\\&quot;", t); return t }
     function href(t) {
       if (t ~ /(^|\/)README\.md$/) sub(/README\.md$/, "index.html", t)
       else sub(/\.md$/, ".html", t)
@@ -392,14 +434,19 @@ summary_html() {
       return "<a href=\"" esc(href(target)) "\">" esc(title) "</a>"
     }
     function close_sub() { if (sub_open) { printf "</ul>"; sub_open = 0 } }
-    function close_item() { close_sub(); if (item_open) { print "</li>"; item_open = 0 } }
-    function close_part() { close_item(); if (part_open) { print "            </ul>\n          </div>"; part_open = 0 } }
+    function close_item() { close_sub(); if (item_open) { print "</li>";
+      item_open = 0 } }
+    function close_part() { close_item(); if (part_open) {
+      print "            </ul>\n          </div>"; part_open = 0 } }
     function open_part(title) {
       close_part()
-      print "          <div class=\"part\">\n            <h4>" esc(title) "</h4>\n            <ul>"
+      print "          <div class=\"part\">"
+      print "            <h4>" esc(title) "</h4>"
+      print "            <ul>"
       part_open = 1
     }
-    /^# / { title = substr($0, 3); if (title != "Summary") { parts = 1; open_part(title) } next }
+    /^# / { title = substr($0, 3); if (title != "Summary") { parts = 1;
+      open_part(title) } next }
     /^---[ \t]*$/ { if (parts) { open_part("Reference"); suffix = 1 } next }
     (parts && /^- \[/) || (suffix && /^\[/) {
       close_item(); printf "              <li>%s", link($0); item_open = 1; next
@@ -415,9 +462,12 @@ summary_html() {
 # describe <name>: the one-line summary under a guide's title.
 describe() {
   case "$1" in
-    user) echo "For everyone: write pages and books, organise data, track work, plan your day and work with Claude." ;;
-    admin) echo "For whoever runs Vellum: install, configure, secure, back up, upgrade and monitor it." ;;
-    developer) echo "For builders: the architecture, the Markdown dialect, the APIs, the MCP server and how to contribute." ;;
+    user) echo "For everyone: write pages and books, organise data," \
+      "track work, plan your day and work with Claude." ;;
+    admin) echo "For whoever runs Vellum: install, configure, secure," \
+      "back up, upgrade and monitor it." ;;
+    developer) echo "For builders: the architecture, the Markdown dialect," \
+      "the APIs, the MCP server and how to contribute." ;;
     *) echo "Read the guide." ;;
   esac
 }
@@ -431,7 +481,8 @@ cards="${work}/cards.html"
     [[ "${name}" == decisions ]] && continue
     title="$(html_escape "${entry#*$'\t'}")"
     echo '          <li class="book">'
-    printf '          <h3><a href="%s/index.html">%s</a></h3>\n' "${name}" "${title}"
+    printf '          <h3><a href="%s/index.html">%s</a></h3>\n' "${name}" \
+      "${title}"
     printf '          <p>%s</p>\n' "$(describe "${name}")"
     echo '          <div class="parts">'
     summary_html "${name}" "${root}/docs/${name}.book/SUMMARY.md"
@@ -442,16 +493,22 @@ cards="${work}/cards.html"
 } >"${cards}"
 
 # Counts shown on both pages, so they never go stale.
-pages="$(find "${root}/docs" -path '*.book/*' -name '*.md' -not -name SUMMARY.md | wc -l)"
-crates="$(find "${root}/crates" -mindepth 2 -maxdepth 2 -name Cargo.toml | wc -l)"
-decisions="$(find "${root}/docs/adr" -maxdepth 1 -name '[0-9]*.md' -not -name '0000-*' | wc -l)"
+pages="$(find "${root}/docs" -path '*.book/*' -name '*.md' \
+  -not -name SUMMARY.md | wc -l)"
+crates="$(find "${root}/crates" -mindepth 2 -maxdepth 2 -name Cargo.toml \
+  | wc -l)"
+decisions="$(find "${root}/docs/adr" -maxdepth 1 -name '[0-9]*.md' \
+  -not -name '0000-*' | wc -l)"
 
 # fill <template> <output> <bar-file>: puts in the site bar, the guide
 # cards and the counts.
 fill() {
-  awk -v cards="${cards}" -v bar="$3" -v pages="${pages// /}" -v crates="${crates// /}" -v decisions="${decisions// /}" '
-    /<!-- BOOKS -->/ { while ((getline line < cards) > 0) print line; close(cards); next }
-    /<!-- SITEBAR -->/ { while ((getline line < bar) > 0) print "    " line; close(bar); next }
+  awk -v cards="${cards}" -v bar="$3" -v pages="${pages// /}" \
+    -v crates="${crates// /}" -v decisions="${decisions// /}" '
+    /<!-- BOOKS -->/ { while ((getline line < cards) > 0) print line;
+      close(cards); next }
+    /<!-- SITEBAR -->/ { while ((getline line < bar) > 0) print "    " line;
+      close(bar); next }
     {
       gsub(/<!-- COUNT:pages -->/, pages)
       gsub(/<!-- COUNT:crates -->/, crates)
@@ -465,4 +522,5 @@ site_bar "../" "" "" docs >"${work}/bar-docs.html"
 fill "${root}/site/index.html" "${out}/index.html" "${work}/bar-home.html"
 fill "${root}/site/docs.html" "${out}/docs/index.html" "${work}/bar-docs.html"
 
-echo "Built the site in ${out} with ${#books[@]} book(s) and ${pages} help pages."
+echo "Built the site in ${out} with ${#books[@]} book(s) and ${pages} help" \
+    "pages."

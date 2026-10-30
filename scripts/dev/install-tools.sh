@@ -31,7 +31,8 @@ case "$(uname -sm)" in
   "Linux x86_64") arch=x86_64 ;;
   "Linux aarch64" | "Linux arm64") arch=aarch64 ;;
   *)
-    echo "install-tools.sh supports Linux x86_64 and aarch64; on a Mac, use scripts/dev/gate.sh." >&2
+    echo "install-tools.sh supports Linux x86_64 and aarch64; on a Mac, use" \
+      "scripts/dev/gate.sh." >&2
     exit 1
     ;;
 esac
@@ -91,8 +92,10 @@ have() { command -v "$1" >/dev/null 2>&1; }
 # checks its SHA-256 and installs the one binary from it.
 from_release() {
   local tool="$1" url sha member archive="${tmp}/$1.archive"
-  read -r url sha member < <(awk -v t="${tool}" -v a="${arch}" '$1 == t && $2 == a { print $3, $4, $5 }' <<<"${downloads}")
-  [[ -n "${url:-}" ]] || { echo "no ${tool} download for ${arch}" >&2; return 1; }
+  read -r url sha member < <(awk -v t="${tool}" \
+    -v a="${arch}" '$1 == t && $2 == a { print $3, $4, $5 }' <<<"${downloads}")
+  [[ -n "${url:-}" ]] || { echo "no ${tool} download for ${arch}" >&2; return \
+    1; }
   curl -sSfL --retry 3 -o "${archive}" "${url}"
   echo "${sha}  ${archive}" | sha256sum --check --quiet
   mkdir -p "${tmp}/${tool}"
@@ -125,7 +128,8 @@ repo_file() {
   fi
 }
 
-for tool in vale gitleaks shellcheck lychee cargo-nextest cargo-deny cargo-audit mdbook cargo-llvm-cov; do
+for tool in vale gitleaks shellcheck lychee cargo-nextest cargo-deny \
+  cargo-audit mdbook cargo-llvm-cov; do
   want "${tool}" from_release "${tool}"
 done
 if [[ "${VELLUM_INSTALL_HELM:-0}" == "1" ]]; then
@@ -135,16 +139,19 @@ fi
 # The hygiene job's Python linters (yamllint, sqlfluff, zizmor), every
 # package pinned by hash as CI installs them, in a venv of their own.
 hygiene() {
-  local venv="${VELLUM_TOOLS_VENV:-${dest}/../share/vellum-hygiene}" requirements tool
+  local venv="${VELLUM_TOOLS_VENV:-${dest}/../share/vellum-hygiene}" \
+    requirements tool
   requirements="$(repo_file .github/requirements/hygiene.txt)"
   if have uv; then
     # CI uses Python 3.13; uv fetches it when the system has another.
     uv venv --quiet --allow-existing --python 3.13 "${venv}"
-    uv pip install --quiet --python "${venv}/bin/python" --require-hashes --no-deps -r "${requirements}"
+    uv pip install --quiet --python "${venv}/bin/python" \
+      --require-hashes --no-deps -r "${requirements}"
     uv pip install --quiet --python "${venv}/bin/python" "reuse==${REUSE}"
   else
     python3 -m venv "${venv}"
-    "${venv}/bin/pip" install --quiet --require-hashes --no-deps -r "${requirements}"
+    "${venv}/bin/pip" install --quiet --require-hashes --no-deps -r \
+      "${requirements}"
     "${venv}/bin/pip" install --quiet "reuse==${REUSE}"
   fi
   for tool in yamllint sqlfluff zizmor reuse; do
@@ -158,11 +165,13 @@ if ! have yamllint || ! have sqlfluff || ! have zizmor || ! have reuse; then
   done
 fi
 
-want markdownlint-cli2 npm install --global --silent "markdownlint-cli2@${MARKDOWNLINT}"
+want markdownlint-cli2 npm install --global --silent \
+  "markdownlint-cli2@${MARKDOWNLINT}"
 
 # hadolint and kube-score, with the checksums CI checks.
 if ! have hadolint || ! have kube-score; then
-  if bash "$(repo_file scripts/ci/install-infra-tools.sh)" "${dest}" >"${tmp}/infra.log" 2>&1; then
+  if bash "$(repo_file scripts/ci/install-infra-tools.sh)" \
+    "${dest}" >"${tmp}/infra.log" 2>&1; then
     installed+=(hadolint kube-score)
   else
     failed+=(hadolint kube-score)
@@ -174,7 +183,8 @@ if ((${#installed[@]} > 0)); then
   echo "Installed into ${dest}: ${installed[*]}"
 fi
 if ((${#failed[@]} > 0)); then
-  echo "Could not install: ${failed[*]}. cargo xtask fast will stop until they are installed." >&2
+  echo "Could not install: ${failed[*]}. cargo xtask fast will stop until" \
+      "they are installed." >&2
   exit 1
 fi
 echo "Every Fast suite tool is installed."

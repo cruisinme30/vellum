@@ -42,23 +42,26 @@ describe("the auth API", () => {
     });
   });
 
-  it("treats no server, a 404 or a non-Vellum answer as demo mode", async () => {
-    const offline = fakeHttp({
-      get: () => Promise.reject(new ApiError("network", "offline")),
-    });
-    await expect(createAuthApi(offline).status()).resolves.toBeUndefined();
-    const missing = fakeHttp({
-      get: () =>
-        Promise.reject(
-          new ApiError("not_found", "no such API route", { status: 404 }),
-        ),
-    });
-    await expect(createAuthApi(missing).status()).resolves.toBeUndefined();
-    const html = fakeHttp({
-      get: <T>() => Promise.resolve("<!doctype html>" as T),
-    });
-    await expect(createAuthApi(html).status()).resolves.toBeUndefined();
-  });
+  it(
+    "treats no server, a 404 or a non-Vellum answer as demo " + "mode",
+    async () => {
+      const offline = fakeHttp({
+        get: () => Promise.reject(new ApiError("network", "offline")),
+      });
+      await expect(createAuthApi(offline).status()).resolves.toBeUndefined();
+      const missing = fakeHttp({
+        get: () =>
+          Promise.reject(
+            new ApiError("not_found", "no such API route", { status: 404 }),
+          ),
+      });
+      await expect(createAuthApi(missing).status()).resolves.toBeUndefined();
+      const html = fakeHttp({
+        get: <T>() => Promise.resolve("<!doctype html>" as T),
+      });
+      await expect(createAuthApi(html).status()).resolves.toBeUndefined();
+    },
+  );
 
   it("passes a real server error on", async () => {
     const broken = fakeHttp({

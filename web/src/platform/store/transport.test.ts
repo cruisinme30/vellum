@@ -15,25 +15,28 @@ function respond(status: number, body: unknown) {
 const NULL: unknown = JSON.parse("null");
 
 describe("httpTransport", () => {
-  it("posts mutations with tracing headers and the session cookie", async () => {
-    const fetchMock = respond(200, { lastMutationId: 3, rejected: [] });
-    const transport = httpTransport({
-      baseUrl: "https://northstar.dev",
-      fetch: fetchMock,
-    });
-    const result = await transport.push({ clientId: "c", mutations: [] });
-    expect(result).toEqual({ lastMutationId: 3, rejected: [] });
-    const [url, init] = fetchMock.mock.calls[0] ?? [];
-    expect(url).toBe("https://northstar.dev/api/v1/sync/push");
-    expect(init?.method).toBe("POST");
-    expect(init?.credentials).toBe("include");
-    const headers = new Headers(init?.headers);
-    expect(headers.get("content-type")).toBe("application/json");
-    expect(headers.get("traceparent")).toMatch(
-      /^00-[\da-f]{32}-[\da-f]{16}-01$/,
-    );
-    expect(headers.get("x-request-id")).toMatch(/^[\da-f-]{36}$/);
-  });
+  it(
+    "posts mutations with tracing headers and the session " + "cookie",
+    async () => {
+      const fetchMock = respond(200, { lastMutationId: 3, rejected: [] });
+      const transport = httpTransport({
+        baseUrl: "https://northstar.dev",
+        fetch: fetchMock,
+      });
+      const result = await transport.push({ clientId: "c", mutations: [] });
+      expect(result).toEqual({ lastMutationId: 3, rejected: [] });
+      const [url, init] = fetchMock.mock.calls[0] ?? [];
+      expect(url).toBe("https://northstar.dev/api/v1/sync/push");
+      expect(init?.method).toBe("POST");
+      expect(init?.credentials).toBe("include");
+      const headers = new Headers(init?.headers);
+      expect(headers.get("content-type")).toBe("application/json");
+      expect(headers.get("traceparent")).toMatch(
+        /^00-[\da-f]{32}-[\da-f]{16}-01$/,
+      );
+      expect(headers.get("x-request-id")).toMatch(/^[\da-f-]{36}$/);
+    },
+  );
 
   it("pulls with the client ID and cursor in the query", async () => {
     const body = { cursor: "9", lastMutationId: 0, reset: false, patches: [] };

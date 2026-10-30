@@ -22,7 +22,8 @@
 # run first: [{"name", "conclusion", "html_url", "completed_at"}].
 set -euo pipefail
 
-CHECKS=("Load test (k6)" "Virus scanner under hostile uploads (ClamAV)" "Security scan (ZAP baseline)"
+CHECKS=("Load test (k6)" "Virus scanner under hostile uploads (ClamAV)" \
+  "Security scan (ZAP baseline)"
   "PDF budget (release build)" "Chaos under load")
 FUZZ_PREFIX="Fuzz "
 STALE_DAYS="${STALE_DAYS:-8}"
@@ -31,7 +32,8 @@ jobs_from_api() {
   local runs ids
   runs="repos/${GH_REPO:?}/actions/workflows/nightly.yml/runs"
   ids="$(gh api "${runs}?branch=develop&status=completed&per_page=30" \
-    --jq '.workflow_runs[] | select(.event == "schedule" or .event == "workflow_dispatch") | .id')"
+    --jq '.workflow_runs[]
+      | select(.event == "schedule" or .event == "workflow_dispatch") | .id')"
   local id
   for id in ${ids}; do
     gh api "repos/${GH_REPO}/actions/runs/${id}/jobs?per_page=100" \
@@ -54,16 +56,19 @@ failed=0
 now="$(date -u +%s)"
 for check in "${checks[@]}"; do
   latest="$(jq -c --arg n "${check}" \
-    'first(.[] | select(.name == $n and (.conclusion == "success" or .conclusion == "failure"
-      or .conclusion == "timed_out"))) // empty' <<<"${jobs}")"
+    'first(.[] | select(.name == $n and (.conclusion == "success"
+      or .conclusion == "failure" or .conclusion == "timed_out"))) // empty' \
+    <<<"${jobs}")"
   if [[ -z "${latest}" ]]; then
-    echo "::warning::${check} has not run on develop yet; it cannot vouch for this release."
+    echo "::warning::${check} has not run on develop yet; it cannot vouch for" \
+        "this release."
     continue
   fi
   conclusion="$(jq -r .conclusion <<<"${latest}")"
   url="$(jq -r .html_url <<<"${latest}")"
   if [[ "${conclusion}" != "success" ]]; then
-    echo "::error::${check} failed in its latest run on develop (${url}). Fix it, then run" \
+    echo "::error::${check} failed in its latest run on develop (${url}). Fix" \
+        "it, then run" \
       "nightly.yml on develop by hand; a green run clears this gate."
     failed=1
     continue

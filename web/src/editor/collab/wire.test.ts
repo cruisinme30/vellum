@@ -76,17 +76,20 @@ describe("collab wire format", () => {
 });
 
 describe("peer lists", () => {
-  it("round-trips the server's encode_peers, with client IDs past 32 bits", () => {
-    const entries = [
-      { clientId: 7, user: "01J0000000000000000000USER", canWrite: true },
-      {
-        clientId: 2 ** 40 + 3,
-        user: "01J0000000000000000000VIEW",
-        canWrite: false,
-      },
-    ];
-    expect(decodePeers(encodePeers(entries))).toEqual(entries);
-  });
+  it(
+    "round-trips the server's encode_peers, with client IDs past 32 " + "bits",
+    () => {
+      const entries = [
+        { clientId: 7, user: "01J0000000000000000000USER", canWrite: true },
+        {
+          clientId: 2 ** 40 + 3,
+          user: "01J0000000000000000000VIEW",
+          canWrite: false,
+        },
+      ];
+      expect(decodePeers(encodePeers(entries))).toEqual(entries);
+    },
+  );
 
   it("matches the server's layout byte for byte", () => {
     // count 1, client 5, user "u", can_write 1

@@ -2,10 +2,7 @@
   "uid": "vellum-red",
   "title": "Vellum: RED and saturation",
   "description": "Rate, errors and duration per route, with saturation (brief §12).",
-  "tags": [
-    "vellum",
-    "red"
-  ],
+  "tags": ["vellum", "red"],
   "schemaVersion": 39,
   "version": 1,
   "editable": true,

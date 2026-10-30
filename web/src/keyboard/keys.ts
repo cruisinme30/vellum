@@ -105,7 +105,8 @@ function parseStroke(spec: string): Stroke {
 /**
  * Parses a binding such as `mod+k` or `g i`.
  *
- * @throws Error for an unknown modifier, an empty key, or more than two strokes.
+ * @throws Error for an unknown modifier, an empty key, or more than two
+ *   strokes.
  */
 export function parseBinding(spec: string): Binding {
   const strokes = spec
@@ -186,7 +187,11 @@ const MAC_GLYPHS: Readonly<Record<string, string>> = {
 function formatStroke(stroke: Stroke, platform: KeyPlatform): string {
   const key = MAC_GLYPHS[stroke.key] ?? stroke.key.toUpperCase();
   if (platform === "mac") {
-    return `${stroke.mod ? "⌘" : ""}${stroke.alt ? "⌥" : ""}${stroke.shift ? "⇧" : ""}${key}`;
+    const mods =
+      (stroke.mod ? "⌘" : "") +
+      (stroke.alt ? "⌥" : "") +
+      (stroke.shift ? "⇧" : "");
+    return `${mods}${key}`;
   }
   const mods = [
     stroke.mod ? "Ctrl" : "",

@@ -90,7 +90,9 @@ export default defineConfig({
       reuseExistingServer: !process.env["CI"],
     },
     {
-      command: `node e2e/support/serve-static.ts ${JSON.stringify(SITE_DIR)} ${String(SITE_PORT)}`,
+      command:
+        `node e2e/support/serve-static.ts ${JSON.stringify(SITE_DIR)} ` +
+        String(SITE_PORT),
       url: `http://127.0.0.1:${String(SITE_PORT)}/index.html`,
       reuseExistingServer: !process.env["CI"],
     },

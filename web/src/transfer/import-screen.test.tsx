@@ -99,51 +99,58 @@ describe("import screen", () => {
     expect(screen.queryByRole("button", { name: "Import" })).toBeNull();
   });
 
-  it("imports a Word file into the chosen space and links the new folder", async () => {
-    const pending = deferred<ImportResult>();
-    const importFile = vi.fn<TransferApi["importFile"]>(() => pending.promise);
-    const { container, refresh, user } = renderWith(
-      <ImportScreen />,
-      fakeApi({ importFile }),
-    );
-    const { pages, pageForm } = forms(container);
-    const submit = pages.getByRole("button", { name: "Import" });
-    expect(submit).toHaveProperty("disabled", true);
+  it(
+    "imports a Word file into the chosen space and links the new " + "folder",
+    async () => {
+      const pending = deferred<ImportResult>();
+      const importFile = vi.fn<TransferApi["importFile"]>(
+        () => pending.promise,
+      );
+      const { container, refresh, user } = renderWith(
+        <ImportScreen />,
+        fakeApi({ importFile }),
+      );
+      const { pages, pageForm } = forms(container);
+      const submit = pages.getByRole("button", { name: "Import" });
+      expect(submit).toHaveProperty("disabled", true);
 
-    const file = new File(["PK"], "Report.docx");
-    await user.upload(
-      pages.getByLabelText("File (.zip export or .docx)"),
-      file,
-    );
-    expect(pages.getByLabelText("Exported from")).toHaveProperty(
-      "value",
-      "docx",
-    );
-    await user.selectOptions(pages.getByLabelText("Into"), PRODUCT);
-    expect(pages.getByLabelText("Folder")).toHaveProperty("value", "");
-    expect(submit).toHaveProperty("disabled", false);
-    submitPages(pageForm);
-    expect(importFile).toHaveBeenCalledWith(file, {
-      space: PRODUCT,
-      parent: undefined,
-      source: "docx",
-    });
-    expect(pages.getByRole("button", { name: "Importing…" })).toHaveProperty(
-      "disabled",
-      true,
-    );
+      const file = new File(["PK"], "Report.docx");
+      await user.upload(
+        pages.getByLabelText("File (.zip export or .docx)"),
+        file,
+      );
+      expect(pages.getByLabelText("Exported from")).toHaveProperty(
+        "value",
+        "docx",
+      );
+      await user.selectOptions(pages.getByLabelText("Into"), PRODUCT);
+      expect(pages.getByLabelText("Folder")).toHaveProperty("value", "");
+      expect(submit).toHaveProperty("disabled", false);
+      submitPages(pageForm);
+      expect(importFile).toHaveBeenCalledWith(file, {
+        space: PRODUCT,
+        parent: undefined,
+        source: "docx",
+      });
+      expect(pages.getByRole("button", { name: "Importing…" })).toHaveProperty(
+        "disabled",
+        true,
+      );
 
-    pending.resolve(RESULT);
-    expect(
-      await pages.findByText(/Imported 12 items into “Team wiki”/),
-    ).toBeTruthy();
-    expect(refresh).toHaveBeenCalled();
-    expect(
-      pages.getByRole("link", { name: "Open the folder" }).getAttribute("href"),
-    ).toBe("/p/f%201");
-    expect(pages.getByText("Roadmap.md")).toBeTruthy();
-    expect(pages.getByText(/an embed became a link/)).toBeTruthy();
-  });
+      pending.resolve(RESULT);
+      expect(
+        await pages.findByText(/Imported 12 items into “Team wiki”/),
+      ).toBeTruthy();
+      expect(refresh).toHaveBeenCalled();
+      expect(
+        pages
+          .getByRole("link", { name: "Open the folder" })
+          .getAttribute("href"),
+      ).toBe("/p/f%201");
+      expect(pages.getByText("Roadmap.md")).toBeTruthy();
+      expect(pages.getByText(/an embed became a link/)).toBeTruthy();
+    },
+  );
 
   it(
     "keeps the picked source when the file name says nothing, and shows no " +
@@ -229,32 +236,35 @@ describe("issue import form", () => {
     dry_run: false,
   };
 
-  it("imports a Linear CSV without a repository, and lists its notes", async () => {
-    const importIssues = vi.fn<TransferApi["importIssues"]>(() =>
-      Promise.resolve(REPORT),
-    );
-    const { container, user } = renderWith(
-      <ImportScreen />,
-      fakeApi({ importIssues }),
-    );
-    const { issues } = forms(container);
-    expect(issues.queryByLabelText("Repository")).toBeNull();
-    const submit = issues.getByRole("button", { name: "Import" });
-    const file = new File(["id,title"], "linear.csv", { type: "text/csv" });
-    await user.upload(issues.getByLabelText("Export file"), file);
-    expect(submit).toHaveProperty("disabled", true);
-    await user.type(issues.getByLabelText("Team key"), "  ops ");
-    await user.click(submit);
-    expect(importIssues).toHaveBeenCalledWith(file, {
-      tracker: "linear",
-      team: "OPS",
-      repo: undefined,
-      dryRun: false,
-    });
-    expect(await issues.findByText(/Created 4 issues/)).toBeTruthy();
-    expect(issues.getByText("two columns were ignored")).toBeTruthy();
-    expect(issues.getByText(/ENG-9/)).toBeTruthy();
-  });
+  it(
+    "imports a Linear CSV without a repository, and lists its " + "notes",
+    async () => {
+      const importIssues = vi.fn<TransferApi["importIssues"]>(() =>
+        Promise.resolve(REPORT),
+      );
+      const { container, user } = renderWith(
+        <ImportScreen />,
+        fakeApi({ importIssues }),
+      );
+      const { issues } = forms(container);
+      expect(issues.queryByLabelText("Repository")).toBeNull();
+      const submit = issues.getByRole("button", { name: "Import" });
+      const file = new File(["id,title"], "linear.csv", { type: "text/csv" });
+      await user.upload(issues.getByLabelText("Export file"), file);
+      expect(submit).toHaveProperty("disabled", true);
+      await user.type(issues.getByLabelText("Team key"), "  ops ");
+      await user.click(submit);
+      expect(importIssues).toHaveBeenCalledWith(file, {
+        tracker: "linear",
+        team: "OPS",
+        repo: undefined,
+        dryRun: false,
+      });
+      expect(await issues.findByText(/Created 4 issues/)).toBeTruthy();
+      expect(issues.getByText("two columns were ignored")).toBeTruthy();
+      expect(issues.getByText(/ENG-9/)).toBeTruthy();
+    },
+  );
 
   it("needs a repository for GitHub, and reports a failed import", async () => {
     const importIssues = vi
@@ -324,28 +334,31 @@ describe("export button", () => {
     expect(container.querySelector("button")).toBeNull();
   });
 
-  it("opens and closes the export panel from an icon or a labelled button", async () => {
-    const { user } = renderWith(
-      <>
-        <ExportButton target={PAGE} />
-        <ExportButton target={PAGE} label="Export book" />
-      </>,
-      fakeApi(),
-    );
-    const icon = screen.getByRole("button", { name: "Export" });
-    expect(icon.getAttribute("aria-expanded")).toBe("false");
-    await user.click(icon);
-    expect(icon.getAttribute("aria-expanded")).toBe("true");
-    expect(
-      await screen.findByRole("button", { name: "Download" }),
-    ).toBeTruthy();
-    await user.click(icon);
-    expect(icon.getAttribute("aria-expanded")).toBe("false");
+  it(
+    "opens and closes the export panel from an icon or a labelled " + "button",
+    async () => {
+      const { user } = renderWith(
+        <>
+          <ExportButton target={PAGE} />
+          <ExportButton target={PAGE} label="Export book" />
+        </>,
+        fakeApi(),
+      );
+      const icon = screen.getByRole("button", { name: "Export" });
+      expect(icon.getAttribute("aria-expanded")).toBe("false");
+      await user.click(icon);
+      expect(icon.getAttribute("aria-expanded")).toBe("true");
+      expect(
+        await screen.findByRole("button", { name: "Download" }),
+      ).toBeTruthy();
+      await user.click(icon);
+      expect(icon.getAttribute("aria-expanded")).toBe("false");
 
-    const labelled = screen.getByRole("button", { name: "Export book" });
-    await user.click(labelled);
-    expect(labelled.getAttribute("aria-expanded")).toBe("true");
-    await user.click(screen.getByRole("button", { name: "Close export" }));
-    expect(labelled.getAttribute("aria-expanded")).toBe("false");
-  });
+      const labelled = screen.getByRole("button", { name: "Export book" });
+      await user.click(labelled);
+      expect(labelled.getAttribute("aria-expanded")).toBe("true");
+      await user.click(screen.getByRole("button", { name: "Close export" }));
+      expect(labelled.getAttribute("aria-expanded")).toBe("false");
+    },
+  );
 });

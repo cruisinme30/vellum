@@ -66,7 +66,8 @@ async fn token(
     let claims = json!({
         "iss": p.issuer, "aud": "vellum", "sub": "okta-ana",
         "exp": now + 300, "iat": now, "nonce": *p.nonce.lock().unwrap(),
-        "email": "ana@northstar.dev", "email_verified": true, "name": "Ana Lima",
+        "email": "ana@northstar.dev", "email_verified": true,
+            "name": "Ana Lima",
     });
     let header = b64(br#"{"alg":"ES256","kid":"k1"}"#);
     let message = format!("{header}.{}", b64(claims.to_string().as_bytes()));

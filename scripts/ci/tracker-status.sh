@@ -22,7 +22,8 @@ if ((${#issues[@]} == 0)); then
 fi
 
 for n in "${issues[@]}"; do
-  labels="$(gh issue view "${n}" --json labels --jq '.labels[].name' 2>/dev/null || true)"
+  labels="$(gh issue view "${n}" --json labels \
+    --jq '.labels[].name' 2>/dev/null || true)"
   if ! grep -qxF task <<<"${labels}"; then
     echo "#${n} is not a task issue; skipped."
     continue

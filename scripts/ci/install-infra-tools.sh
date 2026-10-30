@@ -21,12 +21,16 @@ fetch() {
 # The release assets and their SHA-256 sums, per architecture.
 case "$(uname -m)" in
   x86_64)
-    hadolint=(hadolint-linux-x86_64 6bf226944684f56c84dd014e8b979d27425c0148f61b3bd99bcc6f39e9dc5a47)
-    kube_score=(kube-score_1.20.0_linux_amd64.tar.gz ff777b4b3f45905b2d22c69e93c57a7a170e61529a79d54e59cb95cca4bc2a55)
+    hadolint=(hadolint-linux-x86_64 \
+      6bf226944684f56c84dd014e8b979d27425c0148f61b3bd99bcc6f39e9dc5a47)
+    kube_score=(kube-score_1.20.0_linux_amd64.tar.gz \
+      ff777b4b3f45905b2d22c69e93c57a7a170e61529a79d54e59cb95cca4bc2a55)
     ;;
   aarch64 | arm64)
-    hadolint=(hadolint-linux-arm64 331f1d3511b84a4f1e3d18d52fec284723e4019552f4f47b19322a53ce9a40ed)
-    kube_score=(kube-score_1.20.0_linux_arm64.tar.gz 0fafe8a00cbc98935f0c0953ba91e83e199f65e56d6816e7b2d2af5da1862051)
+    hadolint=(hadolint-linux-arm64 \
+      331f1d3511b84a4f1e3d18d52fec284723e4019552f4f47b19322a53ce9a40ed)
+    kube_score=(kube-score_1.20.0_linux_arm64.tar.gz \
+      0fafe8a00cbc98935f0c0953ba91e83e199f65e56d6816e7b2d2af5da1862051)
     ;;
   *)
     echo "install-infra-tools.sh: no hadolint or kube-score for $(uname -m)" >&2

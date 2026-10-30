@@ -141,11 +141,17 @@ impl Writer {
                 title,
                 content,
             } => {
-                if let Some(bare) = bare_autolink(url, title, content).filter(|_| {
-                    bare_ok
-                        && self.link_depth == 0
-                        && self.out.chars().next_back().is_none_or(char::is_whitespace)
-                }) {
+                if let Some(bare) =
+                    bare_autolink(url, title, content).filter(|_| {
+                        bare_ok
+                            && self.link_depth == 0
+                            && self
+                                .out
+                                .chars()
+                                .next_back()
+                                .is_none_or(char::is_whitespace)
+                    })
+                {
                     self.out.push_str(bare);
                 } else if let Some(auto) = autolink(url, title, content) {
                     self.out.push('<');

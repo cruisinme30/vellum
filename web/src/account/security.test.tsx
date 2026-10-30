@@ -77,35 +77,40 @@ describe("base64url", () => {
 });
 
 describe("Settings → Two-step verification", () => {
-  it("adds an authenticator app and shows the recovery codes once", async () => {
-    const { api, confirmTotp } = fakeAccount(NONE);
-    const user = renderSecurity(api);
-    await user.click(
-      await screen.findByRole("button", {
-        name: "Set up an authenticator app",
-      }),
-    );
-    expect(await screen.findByRole("img", { name: /QR code/ })).toBeDefined();
-    const code = screen.getByLabelText("Enter the 6-digit code it shows");
-    await user.type(code, "000000");
-    await user.click(screen.getByRole("button", { name: "Turn on" }));
-    const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toBe("the code is wrong");
-    await user.clear(code);
-    await user.type(code, "123456");
-    await user.click(screen.getByRole("button", { name: "Turn on" }));
-    expect(confirmTotp).toHaveBeenLastCalledWith("123456");
-    const codes = await screen.findByTestId("recovery-codes");
-    expect(codes.textContent).toContain("ccccc-ddddd");
-    await user.click(screen.getByRole("button", { name: "I have saved them" }));
-    expect(screen.queryByTestId("recovery-codes")).toBeNull();
-    expect(
-      screen.getByText(
-        "10 recovery codes left. Each works once, if you lose your app and " +
-          "passkeys.",
-      ),
-    ).toBeDefined();
-  });
+  it(
+    "adds an authenticator app and shows the recovery codes " + "once",
+    async () => {
+      const { api, confirmTotp } = fakeAccount(NONE);
+      const user = renderSecurity(api);
+      await user.click(
+        await screen.findByRole("button", {
+          name: "Set up an authenticator app",
+        }),
+      );
+      expect(await screen.findByRole("img", { name: /QR code/ })).toBeDefined();
+      const code = screen.getByLabelText("Enter the 6-digit code it shows");
+      await user.type(code, "000000");
+      await user.click(screen.getByRole("button", { name: "Turn on" }));
+      const alert = await screen.findByRole("alert");
+      expect(alert.textContent).toBe("the code is wrong");
+      await user.clear(code);
+      await user.type(code, "123456");
+      await user.click(screen.getByRole("button", { name: "Turn on" }));
+      expect(confirmTotp).toHaveBeenLastCalledWith("123456");
+      const codes = await screen.findByTestId("recovery-codes");
+      expect(codes.textContent).toContain("ccccc-ddddd");
+      await user.click(
+        screen.getByRole("button", { name: "I have saved them" }),
+      );
+      expect(screen.queryByTestId("recovery-codes")).toBeNull();
+      expect(
+        screen.getByText(
+          "10 recovery codes left. Each works once, if you lose your app and " +
+            "passkeys.",
+        ),
+      ).toBeDefined();
+    },
+  );
 
   it(
     "removes the app after a confirmation and says when the workspace " +

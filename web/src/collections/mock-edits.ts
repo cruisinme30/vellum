@@ -237,7 +237,8 @@ export function updateProperty(
     (old.type === "title" || old.type === "relation")
   ) {
     throw new Error(
-      `${old.name} cannot become a ${input.type}: titles and relations keep their type`,
+      `${old.name} cannot become a ${input.type}: titles and relations keep ` +
+        `their type`,
     );
   }
   const type = input.type ?? old.type;

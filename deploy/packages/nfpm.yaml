@@ -5,7 +5,8 @@
 # The release workflow runs, once per architecture:
 #
 #   VERSION=1.2.3 ARCH=amd64 BINARY=dist/vellum-linux-amd64 \
-#     nfpm package --config deploy/packages/nfpm.yaml --packager deb --target dist/
+#     nfpm package --config deploy/packages/nfpm.yaml --packager deb \
+#       --target dist/
 #
 # ARCH is the Go-style name (amd64, arm64); nfpm maps it to x86_64/aarch64
 # for RPM. The package installs `vellum` on the PATH, a `vellum` system user

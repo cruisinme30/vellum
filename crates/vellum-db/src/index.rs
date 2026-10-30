@@ -146,7 +146,9 @@ impl Drop for SqliteCloser {
 
 /// Closes `pool` on a thread with its own runtime, which needs nothing
 /// from the caller's runtime except that it keeps running.
-fn close_in_background(pool: SqlitePool) -> std::io::Result<std::thread::JoinHandle<()>> {
+fn close_in_background(
+    pool: SqlitePool,
+) -> std::io::Result<std::thread::JoinHandle<()>> {
     let spawned = std::thread::Builder::new()
         .name("vellum-db-close".into())
         .spawn(move || {
@@ -160,11 +162,13 @@ fn close_in_background(pool: SqlitePool) -> std::io::Result<std::thread::JoinHan
                     });
                     if closed.is_err() {
                         tracing::warn!(
-                            "index connections still in use after {CLOSE_TIMEOUT:?}; not waiting"
+                            "index connections still in use after \
+                                {CLOSE_TIMEOUT:?}; not waiting"
                         );
                     }
                 }
-                Err(error) => tracing::warn!(%error, "could not close the index on drop"),
+                Err(error) => tracing::warn!(%error, "could not close the \
+                    index on drop"),
             }
         });
     if let Err(error) = &spawned {

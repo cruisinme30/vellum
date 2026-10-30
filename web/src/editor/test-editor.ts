@@ -228,7 +228,8 @@ export function detachedViewProperties(
     editor,
     node,
     view: editor.view,
-    // eslint-disable-next-line unicorn/no-useless-undefined -- a detached node has no position
+    // A detached node has no position.
+    // eslint-disable-next-line unicorn/no-useless-undefined
     getPos: () => undefined,
     decorations: [],
     innerDecorations: DecorationSet.empty,

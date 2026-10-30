@@ -51,7 +51,8 @@ mapfile -t composes < <(git ls-files '*compose.yaml')
 run_if_files sqlfluff "SQL" "${sql[@]}" -- sqlfluff lint --dialect postgres
 run_if_files hadolint "Dockerfiles" "${dockerfiles[@]}" -- hadolint
 run_if_files helm "Helm charts" "${charts[@]}" -- helm lint --strict
-run_if_files kube-score "Kubernetes manifests" "${manifests[@]}" -- kube-score score
+run_if_files kube-score "Kubernetes manifests" "${manifests[@]}" \
+  -- kube-score score
 
 # Compose files must resolve with their example environment.
 for file in "${composes[@]}"; do
@@ -60,7 +61,8 @@ for file in "${composes[@]}"; do
     break
   fi
   echo "Compose: ${file}"
-  docker compose -f "${file}" --env-file "$(dirname "${file}")/.env.example" config -q ||
+  docker compose -f "${file}" --env-file "$(dirname "${file}")/.env.example" \
+    config -q ||
     failures=$((failures + 1))
 done
 

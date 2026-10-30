@@ -56,7 +56,11 @@ function fakeRender(page: RenderApi["page"]) {
 const RENDERED = {
   id: PAGE.runbook,
   title: "Runbook",
-  html: '<article class="vl-doc"><h1 id="runbook">Runbook</h1><figure class="vl-figure vl-diagram"><svg viewBox="0 0 10 10" role="img"><rect style="fill:var(--vl-chart-1)" width="4" height="4"></rect></svg></figure></article>',
+  html:
+    '<article class="vl-doc"><h1 id="runbook">Runbook</h1><figure ' +
+    'class="vl-figure vl-diagram"><svg viewBox="0 0 10 10" role="img"><rect ' +
+    'style="fill:var(--vl-chart-1)" width="4" ' +
+    'height="4"></rect></svg></figure></article>',
   outline: [],
   warnings: [],
   stale_figures: 0,
@@ -65,64 +69,75 @@ const RENDERED = {
 };
 
 describe("the reading view", () => {
-  it("shows the server's rendering, and switches to the editor and back", async () => {
-    const { api, pageSpy, stylesheet } = fakeRender(() =>
-      Promise.resolve(RENDERED),
-    );
-    const user = renderPage(`/p/${PAGE.runbook}?view=read`, api);
-    const reading = await screen.findByRole("region", {
-      name: "Rendered page",
-    });
-    expect(reading.classList.contains("vl-render")).toBe(true);
-    expect(reading.querySelector("rect")?.style.getPropertyValue("fill")).toBe(
-      "var(--vl-chart-1)",
-    );
-    expect(pageSpy).toHaveBeenCalledWith(PAGE.runbook);
-    expect(stylesheet).toHaveBeenCalledTimes(1);
-    expect(
-      screen.getByRole("button", { name: "Read" }).getAttribute("aria-pressed"),
-    ).toBe("true");
+  it(
+    "shows the server's rendering, and switches to the editor and " + "back",
+    async () => {
+      const { api, pageSpy, stylesheet } = fakeRender(() =>
+        Promise.resolve(RENDERED),
+      );
+      const user = renderPage(`/p/${PAGE.runbook}?view=read`, api);
+      const reading = await screen.findByRole("region", {
+        name: "Rendered page",
+      });
+      expect(reading.classList.contains("vl-render")).toBe(true);
+      expect(
+        reading.querySelector("rect")?.style.getPropertyValue("fill"),
+      ).toBe("var(--vl-chart-1)");
+      expect(pageSpy).toHaveBeenCalledWith(PAGE.runbook);
+      expect(stylesheet).toHaveBeenCalledTimes(1);
+      expect(
+        screen
+          .getByRole("button", { name: "Read" })
+          .getAttribute("aria-pressed"),
+      ).toBe("true");
 
-    await user.click(screen.getByRole("button", { name: "Edit" }));
-    expect(
-      await screen.findByRole(
-        "textbox",
-        { name: "Page body" },
-        { timeout: 5000 },
-      ),
-    ).toBeDefined();
-    expect(screen.getByTestId("where").textContent).toBe("");
+      await user.click(screen.getByRole("button", { name: "Edit" }));
+      expect(
+        await screen.findByRole(
+          "textbox",
+          { name: "Page body" },
+          { timeout: 5000 },
+        ),
+      ).toBeDefined();
+      expect(screen.getByTestId("where").textContent).toBe("");
 
-    await user.click(screen.getByRole("button", { name: "Read" }));
-    expect(
-      await screen.findByRole("region", { name: "Rendered page" }),
-    ).toBeDefined();
-    expect(screen.getByTestId("where").textContent).toBe("?view=read");
-  });
+      await user.click(screen.getByRole("button", { name: "Read" }));
+      expect(
+        await screen.findByRole("region", { name: "Rendered page" }),
+      ).toBeDefined();
+      expect(screen.getByTestId("where").textContent).toBe("?view=read");
+    },
+  );
 
-  it("says why a page could not be rendered, with Copy diagnostic", async () => {
-    const { api } = fakeRender(() =>
-      Promise.reject(
-        new ApiError("internal", "Render failed.", { requestId: "req-3" }),
-      ),
-    );
-    renderPage(`/p/${PAGE.runbook}?view=read`, api);
-    const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toContain("Render failed. (request req-3)");
-    expect(
-      screen.getByRole("button", { name: "Copy diagnostic" }),
-    ).toBeDefined();
-  });
+  it(
+    "says why a page could not be rendered, with Copy " + "diagnostic",
+    async () => {
+      const { api } = fakeRender(() =>
+        Promise.reject(
+          new ApiError("internal", "Render failed.", { requestId: "req-3" }),
+        ),
+      );
+      renderPage(`/p/${PAGE.runbook}?view=read`, api);
+      const alert = await screen.findByRole("alert");
+      expect(alert.textContent).toContain("Render failed. (request req-3)");
+      expect(
+        screen.getByRole("button", { name: "Copy diagnostic" }),
+      ).toBeDefined();
+    },
+  );
 
-  it("has no switch in demo mode, where only the editor can show the page", async () => {
-    renderPage(`/p/${PAGE.runbook}?view=read`);
-    expect(
-      await screen.findByRole(
-        "textbox",
-        { name: "Page body" },
-        { timeout: 5000 },
-      ),
-    ).toBeDefined();
-    expect(screen.queryByRole("group", { name: "Page view" })).toBeNull();
-  });
+  it(
+    "has no switch in demo mode, where only the editor can show the " + "page",
+    async () => {
+      renderPage(`/p/${PAGE.runbook}?view=read`);
+      expect(
+        await screen.findByRole(
+          "textbox",
+          { name: "Page body" },
+          { timeout: 5000 },
+        ),
+      ).toBeDefined();
+      expect(screen.queryByRole("group", { name: "Page view" })).toBeNull();
+    },
+  );
 });

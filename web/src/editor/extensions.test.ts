@@ -178,7 +178,8 @@ describe("task item attributes", () => {
       editor.commands.setContent(html);
       expect(itemAttributes(editor)?.["attributes"]).toBe("");
       editor.commands.command(({ tr }) => {
-        // eslint-disable-next-line unicorn/no-null -- ProseMirror's unset attribute
+        // ProseMirror's unset attribute.
+        // eslint-disable-next-line unicorn/no-null
         tr.setNodeAttribute(1, "attributes", null);
         return true;
       });
@@ -189,25 +190,32 @@ describe("task item attributes", () => {
 });
 
 describe("links", () => {
-  it("keeps http, https, mailto and relative links and drops other schemes", () => {
-    const editor = createTestEditor({
-      content:
-        '<p><a href="https://a.example">a</a> <a ' +
-        'href="mailto:x@a.example">m</a> ' +
-        '<a href="/p/1">r</a> <a href="javascript:alert(1)">j</a> <a ' +
-        'href="ftp://a.example">f</a></p>',
-    });
-    const hrefs: unknown[] = [];
-    editor.state.doc.descendants((node) => {
-      for (const mark of node.marks) {
-        hrefs.push(mark.attrs["href"]);
-      }
-    });
-    expect(hrefs).toEqual(["https://a.example", "mailto:x@a.example", "/p/1"]);
-    expect(editor.getHTML()).toContain('rel="noopener noreferrer"');
-    expect(editor.getHTML()).not.toContain("target=");
-    editor.destroy();
-  });
+  it(
+    "keeps http, https, mailto and relative links and drops other " + "schemes",
+    () => {
+      const editor = createTestEditor({
+        content:
+          '<p><a href="https://a.example">a</a> <a ' +
+          'href="mailto:x@a.example">m</a> ' +
+          '<a href="/p/1">r</a> <a href="javascript:alert(1)">j</a> <a ' +
+          'href="ftp://a.example">f</a></p>',
+      });
+      const hrefs: unknown[] = [];
+      editor.state.doc.descendants((node) => {
+        for (const mark of node.marks) {
+          hrefs.push(mark.attrs["href"]);
+        }
+      });
+      expect(hrefs).toEqual([
+        "https://a.example",
+        "mailto:x@a.example",
+        "/p/1",
+      ]);
+      expect(editor.getHTML()).toContain('rel="noopener noreferrer"');
+      expect(editor.getHTML()).not.toContain("target=");
+      editor.destroy();
+    },
+  );
 
   it("turns a typed web address into a link", () => {
     const editor = createTestEditor({ content: "<p></p>" });
@@ -262,16 +270,23 @@ function parse(
 }
 
 describe("tiptapAttributes", () => {
-  it("reads every attribute type from data-* and falls back to defaults", () => {
-    expect(parse("heading", "level", { "data-level": "3" })).toBe(3);
-    expect(parse("heading", "level", { "data-level": "x" })).toBe(1);
-    expect(parse("taskItem", "checked", { "data-checked": "true" })).toBe(true);
-    expect(parse("taskItem", "checked", { "data-checked": "no" })).toBe(false);
-    expect(parse("callout", "kind", { "data-kind": "warn" })).toBe("warn");
-    expect(parse("callout", "kind", { "data-kind": "shout" })).toBe("info");
-    expect(parse("image", "src", { "data-src": "/a.png" })).toBe("/a.png");
-    expect(parse("image", "src", {})).toBe("");
-  });
+  it(
+    "reads every attribute type from data-* and falls back to " + "defaults",
+    () => {
+      expect(parse("heading", "level", { "data-level": "3" })).toBe(3);
+      expect(parse("heading", "level", { "data-level": "x" })).toBe(1);
+      expect(parse("taskItem", "checked", { "data-checked": "true" })).toBe(
+        true,
+      );
+      expect(parse("taskItem", "checked", { "data-checked": "no" })).toBe(
+        false,
+      );
+      expect(parse("callout", "kind", { "data-kind": "warn" })).toBe("warn");
+      expect(parse("callout", "kind", { "data-kind": "shout" })).toBe("info");
+      expect(parse("image", "src", { "data-src": "/a.png" })).toBe("/a.png");
+      expect(parse("image", "src", {})).toBe("");
+    },
+  );
 
   it("skips transient attributes, which are never saved", () => {
     const spec = {

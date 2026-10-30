@@ -94,47 +94,50 @@ describe("transfer API", () => {
 });
 
 describe("export panel", () => {
-  it("shows the preview pages as images and downloads the chosen format", async () => {
-    const user = userEvent.setup();
-    const download = vi.fn(() => Promise.resolve(new Blob(["%PDF-"])));
-    const preview = vi.fn<TransferApi["preview"]>(() =>
-      Promise.resolve({
-        title: "Launch plan",
-        pages: [SVG, SVG],
-        page_count: 14,
-        warnings: [{ location: "chart", message: "drawn as a table" }],
-      }),
-    );
-    const api = fakeApi({ download, preview });
-    const createObjectURL = vi.fn(() => "blob:x");
-    const revokeObjectURL = vi.fn();
-    vi.stubGlobal(
-      "URL",
-      Object.assign(URL, { createObjectURL, revokeObjectURL }),
-    );
-    const click = vi
-      .spyOn(HTMLAnchorElement.prototype, "click")
-      .mockImplementation(vi.fn());
-    render(
-      <I18nProvider>
-        <ExportPanel target={PAGE} api={api} onClose={vi.fn()} />
-      </I18nProvider>,
-    );
-    const pages = await screen.findAllByRole("img");
-    expect(pages).toHaveLength(2);
-    expect(pages[0]?.getAttribute("src")).toMatch(/^data:image\/svg\+xml/);
-    expect(screen.getByText(/12 more pages/)).toBeTruthy();
-    expect(screen.getByText(/One block exports differently/)).toBeTruthy();
+  it(
+    "shows the preview pages as images and downloads the chosen " + "format",
+    async () => {
+      const user = userEvent.setup();
+      const download = vi.fn(() => Promise.resolve(new Blob(["%PDF-"])));
+      const preview = vi.fn<TransferApi["preview"]>(() =>
+        Promise.resolve({
+          title: "Launch plan",
+          pages: [SVG, SVG],
+          page_count: 14,
+          warnings: [{ location: "chart", message: "drawn as a table" }],
+        }),
+      );
+      const api = fakeApi({ download, preview });
+      const createObjectURL = vi.fn(() => "blob:x");
+      const revokeObjectURL = vi.fn();
+      vi.stubGlobal(
+        "URL",
+        Object.assign(URL, { createObjectURL, revokeObjectURL }),
+      );
+      const click = vi
+        .spyOn(HTMLAnchorElement.prototype, "click")
+        .mockImplementation(vi.fn());
+      render(
+        <I18nProvider>
+          <ExportPanel target={PAGE} api={api} onClose={vi.fn()} />
+        </I18nProvider>,
+      );
+      const pages = await screen.findAllByRole("img");
+      expect(pages).toHaveLength(2);
+      expect(pages[0]?.getAttribute("src")).toMatch(/^data:image\/svg\+xml/);
+      expect(screen.getByText(/12 more pages/)).toBeTruthy();
+      expect(screen.getByText(/One block exports differently/)).toBeTruthy();
 
-    await user.click(screen.getByLabelText("Word"));
-    await user.click(screen.getByLabelText("US Letter"));
-    await user.click(screen.getByRole("button", { name: "Download" }));
-    expect(download).toHaveBeenCalledWith(PAGE, "docx", "letter");
-    expect(click).toHaveBeenCalled();
-    expect(preview).toHaveBeenLastCalledWith(PAGE, "letter");
-    click.mockRestore();
-    vi.unstubAllGlobals();
-  });
+      await user.click(screen.getByLabelText("Word"));
+      await user.click(screen.getByLabelText("US Letter"));
+      await user.click(screen.getByRole("button", { name: "Download" }));
+      expect(download).toHaveBeenCalledWith(PAGE, "docx", "letter");
+      expect(click).toHaveBeenCalled();
+      expect(preview).toHaveBeenLastCalledWith(PAGE, "letter");
+      click.mockRestore();
+      vi.unstubAllGlobals();
+    },
+  );
 
   it("shows why an export failed", async () => {
     const user = userEvent.setup();

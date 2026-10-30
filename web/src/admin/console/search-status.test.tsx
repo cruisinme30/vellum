@@ -67,24 +67,30 @@ describe("search status", () => {
     },
   );
 
-  it("says how to add a model when there is none, and checks again on request", async () => {
-    const load = vi.fn(() =>
-      Promise.resolve<SearchStatusView>({
-        engine: "postgres",
-        model_configured: false,
-        hybrid: false,
-        loaded: false,
-        job: "idle",
-        done: 0,
-        total: 0,
-      }),
-    );
-    show(load);
-    expect(await screen.findByText(/set VELLUM_EMBEDDINGS/)).toBeDefined();
-    expect(screen.getByText(/postgres/)).toBeDefined();
-    await userEvent.click(screen.getByRole("button", { name: "Check again" }));
-    expect(load).toHaveBeenCalledTimes(2);
-  });
+  it(
+    "says how to add a model when there is none, and checks again on " +
+      "request",
+    async () => {
+      const load = vi.fn(() =>
+        Promise.resolve<SearchStatusView>({
+          engine: "postgres",
+          model_configured: false,
+          hybrid: false,
+          loaded: false,
+          job: "idle",
+          done: 0,
+          total: 0,
+        }),
+      );
+      show(load);
+      expect(await screen.findByText(/set VELLUM_EMBEDDINGS/)).toBeDefined();
+      expect(screen.getByText(/postgres/)).toBeDefined();
+      await userEvent.click(
+        screen.getByRole("button", { name: "Check again" }),
+      );
+      expect(load).toHaveBeenCalledTimes(2);
+    },
+  );
 
   it("shows why indexing stopped, and a failed read", async () => {
     show(() =>
