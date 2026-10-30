@@ -253,6 +253,17 @@ export function layoutAudit(): Finding[] {
       }));
     })
     .toSorted((a, b) => a.rect.top - b.rect.top);
+  // A fixed dialog or side sheet sits above the page and covers it by
+  // design, so a leaf inside one is only checked against the sheet's own
+  // leaves. A fixed bar that is not a dialog still counts: content hidden
+  // behind it is a bug.
+  const sheetOf = (element: Element): Element | undefined => {
+    const sheet = element.closest("dialog, aside, [role='dialog'], [role='alertdialog']");
+    if (sheet === null) return undefined;
+    return getComputedStyle(sheet).position === "fixed" || sheet.matches("dialog[open]")
+      ? sheet
+      : sheetOf(sheet.parentElement ?? document.documentElement);
+  };
   const minimum = 2;
   const reported = new Set<string>();
   for (let index = 0; index < leaves.length; index += 1) {
@@ -262,6 +273,7 @@ export function layoutAudit(): Finding[] {
       const b = leaves[next];
       if (b === undefined || b.rect.top >= a.rect.bottom - minimum) break;
       if (a.element.contains(b.element) || b.element.contains(a.element)) continue;
+      if (sheetOf(a.element) !== sheetOf(b.element)) continue;
       const width = Math.min(a.rect.right, b.rect.right) - Math.max(a.rect.left, b.rect.left);
       const height = Math.min(a.rect.bottom, b.rect.bottom) - Math.max(a.rect.top, b.rect.top);
       const key = `${path(a.element)}|${path(b.element)}`;

@@ -122,6 +122,20 @@ export async function openPanel(page: Page, target: Target): Promise<void> {
   if (target.open === undefined) return;
   await page.getByRole("button", { name: target.open }).first().click();
   await settle(page);
+  // A panel's pictures (an export preview) decode after the network is
+  // idle; give the ones in view a moment so the audit does not race them.
+  await page
+    .waitForFunction(
+      () =>
+        [...document.images].every(
+          (image) => image.complete || image.getBoundingClientRect().top > window.innerHeight,
+        ),
+      undefined,
+      { timeout: 5000 },
+    )
+    .catch(() => {
+      // The audit reports any picture still missing.
+    });
 }
 
 /** Opens a target in a mode and returns everything wrong with it. */

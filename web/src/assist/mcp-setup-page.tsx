@@ -50,7 +50,9 @@ function SnippetCard({ snippet }: { readonly snippet: Snippet }) {
     <li className="vl-mcp-snippet">
       <h2>{snippet.title}</h2>
       <p>{snippet.instructions}</p>
-      <pre aria-label={t("admin-mcp-code", { client: snippet.title })}>
+      {/* Focusable, so a keyboard can scroll a long command (WCAG 2.1.1). */}
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a scrolling region */}
+      <pre tabIndex={0} aria-label={t("admin-mcp-code", { client: snippet.title })}>
         <code>{snippet.code}</code>
       </pre>
       <div>
@@ -151,7 +153,8 @@ export function McpSetup({ api }: { readonly api: McpSetupApi }) {
           </ul>
         )}
       </Ready>
-      <TestConnection api={api} />
+      {/* Below the snippets once they are in, so it does not jump down. */}
+      {snippets.state !== "loading" && <TestConnection api={api} />}
     </>
   );
 }
