@@ -31,8 +31,11 @@ postgres:
   sslmode: verify-full
 storage:
   url: s3://northstar-vellum-content
-keys:
-  kms: aws-kms:arn:aws:kms:eu-west-1:000000000000:key/northstar-vellum
+encryption:
+  kms: aws-kms:eu-west-1:arn:aws:kms:eu-west-1:000000000000:key/northstar-vellum
+serviceAccount:
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::000000000000:role/northstar-vellum
 ```
 
 ## Rollouts {#rollouts}

@@ -60,17 +60,20 @@ vellum-help.workspace = true
 vellum-identity = { path = "../vellum-identity" }
 vellum-integrations = { path = "../vellum-integrations" }
 vellum-kernel.workspace = true
+vellum-kms = { path = "../vellum-kms" }
 vellum-mcp = { path = "../vellum-mcp" }
 vellum-notify = { path = "../vellum-notify" }
 vellum-observe = { path = "../vellum-observe" }
 vellum-private = { path = "../vellum-private", features = ["os-keychain"] }
 vellum-render = { path = "../vellum-render" }
+vellum-sealed-store = { path = "../vellum-sealed-store" }
 vellum-search = { path = "../vellum-search", features = ["onnx"] }
 vellum-security = { path = "../vellum-security" }
 vellum-store = { path = "../vellum-store", features = ["s3"] }
 vellum-tasks = { path = "../vellum-tasks" }
 vellum-work = { path = "../vellum-work" }
 vellum-work-service = { path = "../vellum-work-service" }
+zeroize = "1.9.1"
 
 [dev-dependencies]
 aws-lc-rs = { version = "1.19.0", default-features = false, features = ["aws-lc-sys"] }

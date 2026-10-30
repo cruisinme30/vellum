@@ -356,7 +356,8 @@ jobs:
         with:
           python-version: "3.13"
       - name: Install linters
-        run: pip install yamllint==1.37.1 sqlfluff==3.4.2 zizmor==1.31.1
+        # Every package pinned by hash (Scorecard "Pinned-Dependencies").
+        run: pip install --require-hashes --no-deps -r .github/requirements/hygiene.txt
       - name: YAML
         run: yamllint --strict .
       - name: Shell

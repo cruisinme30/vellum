@@ -163,8 +163,11 @@ pub fn index_config(
 /// Where the workspace files live.
 struct Files {
     store: Arc<dyn BlobStore>,
-    /// A folder on this machine, which the file watcher can follow.
+    /// A folder on this machine.
     local: bool,
+    /// Files people can edit outside Vellum, which the file watcher
+    /// follows: a local folder stored in plaintext.
+    watch: bool,
 }
 
 /// The shared bucket `VELLUM_BLOB_URL` names, or `None` to keep files in
@@ -193,25 +196,52 @@ pub fn bucket(var: impl Fn(&str) -> Option<String>) -> Result<Option<S3Config>, 
     })
 }
 
-/// Opens `bucket`, or the data folder when there is none.
+/// Opens `bucket`, or the data folder when there is none, metered and
+/// encrypted at rest unless the settings say otherwise (see
+/// [`crate::at_rest`]). Encryption wraps the metered store, so the
+/// storage metrics count the bytes actually stored.
 ///
 /// # Errors
 ///
-/// The S3 client cannot start, or the data folder cannot be opened.
-async fn open_files(config: &Config, bucket: Option<S3Config>) -> Result<Files, Error> {
+/// The S3 client cannot start, the data folder cannot be opened, or the
+/// encryption settings are incomplete.
+async fn open_files(
+    config: &Config,
+    bucket: Option<S3Config>,
+    var: impl Fn(&str) -> Option<String> + Sync,
+) -> Result<Files, Error> {
     let Some(bucket) = bucket else {
         let store = LocalStore::open(&config.data_dir)
             .await
             .map_err(|e| unavailable("cannot open the data folder", e))?;
-        return Ok(Files {
-            store: Arc::new(Metered::new(store)),
-            local: true,
-        });
+        let store = Metered::new(store);
+        return Ok(
+            match crate::at_rest::keys(config, &store, false, var).await? {
+                // Sealed files cannot be edited outside Vellum, so there is
+                // nothing for the watcher to follow.
+                Some(keys) => Files {
+                    store: crate::at_rest::seal(store, keys),
+                    local: true,
+                    watch: false,
+                },
+                None => Files {
+                    store: Arc::new(store),
+                    local: true,
+                    watch: true,
+                },
+            },
+        );
     };
     let store = S3Store::new(bucket).map_err(|e| unavailable("cannot use the blob store", e))?;
+    let store = Metered::new(store);
+    let store = match crate::at_rest::keys(config, &store, true, var).await? {
+        Some(keys) => crate::at_rest::seal(store, keys),
+        None => Arc::new(store),
+    };
     Ok(Files {
-        store: Arc::new(Metered::new(store)),
+        store,
         local: false,
+        watch: false,
     })
 }
 
@@ -979,13 +1009,13 @@ fn mcp_parts(
 async fn open_storage(
     config: &Config,
     bucket: Option<S3Config>,
-    var: impl Fn(&str) -> Option<String>,
+    var: impl Fn(&str) -> Option<String> + Sync,
 ) -> Result<(Index, Files), Error> {
-    let index_config = index_config(config, var)?;
+    let index_config = index_config(config, &var)?;
     let index = Index::open(&index_config)
         .await
         .map_err(|e| unavailable("cannot open the index", e))?;
-    let files = open_files(config, bucket).await?;
+    let files = open_files(config, bucket, &var).await?;
     warn_if_unshared(files.local, &index_config);
     tracing::info!(backend = files.store.backend(), "workspace files opened");
     Ok((index, files))
@@ -1045,6 +1075,7 @@ pub async fn open(
         Files {
             store: files,
             local,
+            watch,
         },
     ) = open_storage(config, bucket, &var).await?;
     // Follow the feed from before anything is loaded, so no change made
@@ -1090,7 +1121,7 @@ pub async fn open(
     )?;
     // The watcher starts before the rescan, so nothing edited in between
     // is missed; whatever it sees twice is applied idempotently.
-    if local {
+    if watch {
         crate::watcher::start(&config.data_dir, &store, &workspace.drive, &workspace.books).await?;
     }
     rescan_and_maintain(&replica, others_alive, &workspace.drive, &index, &shards).await;
@@ -1221,8 +1252,9 @@ mod tests {
         let mut config = Config::default();
         config.data_dir = dir.path().to_path_buf();
         let none = bucket(lookup(&[(BLOB_URL_VAR, "")])).unwrap();
-        let local = open_files(&config, none).await.unwrap();
-        assert!(local.local);
+        let plaintext = lookup(&[(crate::at_rest::PLAINTEXT_VAR, "1")]);
+        let local = open_files(&config, none, &plaintext).await.unwrap();
+        assert!(local.local && local.watch);
         assert_eq!(local.store.backend(), "local");
         assert_eq!(probe(local.store.as_ref()).await, Readiness::Ready);
 
@@ -1233,8 +1265,8 @@ mod tests {
             ("AWS_SECRET_ACCESS_KEY", "secret"),
         ]))
         .unwrap();
-        let shared = open_files(&config, named).await.unwrap();
-        assert!(!shared.local);
+        let shared = open_files(&config, named, &plaintext).await.unwrap();
+        assert!(!shared.local && !shared.watch);
         assert_eq!(shared.store.backend(), "s3");
     }
 

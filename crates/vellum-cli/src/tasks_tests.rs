@@ -45,7 +45,8 @@ impl Fixture {
         let services = Services::open(ORIGIN, Some(&dir), None)
             .unwrap()
             .with_workspace(&config, |k| {
-                if k == crate::workspace::PLAINTEXT_VAR {
+                // These tests read the task files on disk.
+                if k == crate::workspace::PLAINTEXT_VAR || k == crate::at_rest::PLAINTEXT_VAR {
                     return Some("1".to_owned());
                 }
                 env.iter()

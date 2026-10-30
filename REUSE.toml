@@ -10,6 +10,7 @@ version = 1
 [[annotations]]
 path = [
   "Cargo.lock",
+  ".github/requirements/*.txt",
   "fuzz/Cargo.lock",
   "web/pnpm-lock.yaml",
   "web/package.json",
