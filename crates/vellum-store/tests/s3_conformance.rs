@@ -82,7 +82,7 @@ async fn localstack(bucket: &str) -> Result<Option<LocalStack>, Box<dyn std::err
     };
     let port = docker(&["port", &stack.id, "4566/tcp"])?;
     let port = port.lines().next().unwrap_or_default();
-    stack.endpoint = format!("http://{port}");
+    stack.endpoint = endpoint(port, std::env::var("TESTCONTAINERS_HOST_OVERRIDE").ok());
     wait_for_s3(&stack.endpoint).await?;
     let _ = docker(&[
         "exec",
@@ -94,6 +94,33 @@ async fn localstack(bucket: &str) -> Result<Option<LocalStack>, Box<dyn std::err
         bucket,
     ])?;
     Ok(Some(stack))
+}
+
+/// The S3 endpoint for a `docker port` answer such as `127.0.0.1:49153`.
+/// Inside a container (the local gate, ADR 0073), published ports are
+/// reached through the Docker host instead, named the way testcontainers
+/// names it: `TESTCONTAINERS_HOST_OVERRIDE`.
+fn endpoint(published: &str, host_override: Option<String>) -> String {
+    host_override.filter(|host| !host.is_empty()).map_or_else(
+        || format!("http://{published}"),
+        |host| {
+            let port = published.rsplit(':').next().unwrap_or_default();
+            format!("http://{host}:{port}")
+        },
+    )
+}
+
+#[test]
+fn endpoint_follows_the_host_override() {
+    assert_eq!(endpoint("127.0.0.1:49153", None), "http://127.0.0.1:49153");
+    assert_eq!(
+        endpoint("127.0.0.1:49153", Some("host.docker.internal".into())),
+        "http://host.docker.internal:49153"
+    );
+    assert_eq!(
+        endpoint("127.0.0.1:1", Some(String::new())),
+        "http://127.0.0.1:1"
+    );
 }
 
 async fn wait_for_s3(endpoint: &str) -> Result<(), Box<dyn std::error::Error>> {
