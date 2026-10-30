@@ -5,11 +5,12 @@
 # Release gate (ADR 0022, D254): a release pull request fails while the
 # latest decisive run of a scheduled reliability check on develop failed:
 # the k6 load test with its budgets and 10 % regression gate, the ZAP scan,
-# each fuzz target, and the weekly chaos test. "Decisive" skips the nights
-# a job did not run (develop unchanged, or chaos on a weekday). A manual
-# run of nightly.yml on develop counts, so a fixed failure clears the gate
-# without waiting for the next night. A check that has never run is a
-# warning, not a failure, so the first releases are not blocked.
+# the PDF budget in a release build, each fuzz target, and the weekly chaos
+# test. "Decisive" skips the nights a job did not run (develop unchanged,
+# or chaos on a weekday). A manual run of nightly.yml on develop counts, so
+# a fixed failure clears the gate without waiting for the next night. A
+# check that has never run is a warning, not a failure, so the first
+# releases are not blocked.
 #
 # Reads only GitHub's API; it never re-runs the checks, so it adds seconds
 # to the full suite, not hours.
@@ -22,7 +23,7 @@
 set -euo pipefail
 
 CHECKS=("Load test (k6)" "Virus scanner under hostile uploads (ClamAV)" "Security scan (ZAP baseline)"
-  "Chaos under load")
+  "PDF budget (release build)" "Chaos under load")
 FUZZ_PREFIX="Fuzz "
 STALE_DAYS="${STALE_DAYS:-8}"
 
