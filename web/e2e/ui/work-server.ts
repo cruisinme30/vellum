@@ -72,7 +72,54 @@ const SETTINGS = {
     ],
   },
   git: { branch_pushed: "in-progress", pr_opened: "in-review", pr_merged: "done" },
+  // Templates and recurring issues (#144).
+  templates: [
+    {
+      name: "Bug report",
+      title: "Bug: ",
+      state: "triage",
+      priority: 2,
+      labels: ["gateway"],
+      body: "## Steps to reproduce\n\n1. \n\n## Expected\n\n## Actual\n",
+    },
+    {
+      name: "Weekly on-call handoff",
+      title: "On-call handoff",
+      state: "todo",
+      priority: 3,
+      estimate: 1,
+      assignee: "mara",
+      project: "01JNORTHSTARPROJECT0000000",
+      repeat: "1w",
+      body: "- [ ] Review open pages\n- [ ] Hand the pager to the next person",
+    },
+    {
+      name: "Monthly dependency audit with a long name that has to wrap on phones",
+      estimate: "M",
+      repeat: "1m",
+    },
+  ],
 };
+
+/** Northstar's one project, for the templates screen's project menu. */
+const PROJECTS = [
+  {
+    id: "01JNORTHSTARPROJECT0000000",
+    title: "Gateway reliability",
+    status: "in-progress",
+    teams: ["CORE"],
+    members: [],
+    milestones: [],
+    issues: 12,
+    completed_issues: 5,
+    scope: 30,
+    completed: 12,
+    percent: 40,
+    update_due: false,
+    update_cadence: "weekly",
+    markdown: "",
+  },
+];
 
 const RISKS = ["gray", "yellow", "orange", "red"] as const;
 
@@ -126,6 +173,17 @@ const BOARD = TEAM.statuses
   }));
 
 const INBOX = [1, 2, 3].map((n) => issue(n, "triage", "triage"));
+
+/** Open repeating issues, as the templates screen asks for them. */
+const RECURRING = [
+  { ...issue(30, "todo", "unstarted"), title: "On-call handoff", due: "2026-11-02", repeat: "1w" },
+  {
+    ...issue(31, "backlog", "backlog"),
+    title: "Monthly dependency audit",
+    due: "2026-11-30",
+    repeat: "1m",
+  },
+];
 
 const VIEWS = [
   {
@@ -213,7 +271,10 @@ export async function workRoutes(context: BrowserContext): Promise<void> {
     const path = url.pathname.replace(/^\/api\/v1\/work/, "");
     if (path === "/teams") return route.fulfill(json({ teams: [TEAM] }));
     if (path === "/views") return route.fulfill(json({ views: VIEWS }));
+    if (path === "/issues" && url.searchParams.get("filter")?.includes('"repeat"'))
+      return route.fulfill(json({ groups: [{ key: undefined, issues: RECURRING }] }));
     if (path === "/issues") return route.fulfill(json({ groups: BOARD }));
+    if (path === "/projects") return route.fulfill(json({ projects: PROJECTS }));
     if (path.endsWith("/inbox"))
       return route.fulfill(json({ groups: [{ key: undefined, issues: INBOX }] }));
     if (path.endsWith("/cycles")) return route.fulfill(json(CYCLES));

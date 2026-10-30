@@ -101,6 +101,8 @@ pub enum Field {
     Blocked,
     /// The SLA risk (`gray`, `yellow`, `orange`, `red`); empty with no SLA.
     Sla,
+    /// How often the issue repeats (`2w`); empty when it does not (D307).
+    Repeat,
 }
 
 impl Field {
@@ -338,6 +340,7 @@ fn extract(field: Field, issue: &Issue, ctx: &EvalContext<'_>) -> Vec<String> {
         Field::Cycle => opt(issue.cycle.as_ref().map(ToString::to_string)),
         Field::Parent => opt(issue.parent.as_ref().map(ToString::to_string)),
         Field::Due => opt(issue.due.map(date_text)),
+        Field::Repeat => opt(issue.repeat.map(|r| r.to_string())),
         Field::Created => day(Some(issue.created_at)),
         Field::Updated => day(Some(issue.updated_at)),
         Field::Started => day(issue.started_at),
@@ -500,6 +503,7 @@ pub(crate) mod tests {
             c(Field::Blocked, Op::Is, &["true"]),
             c(Field::Team, Op::Is, &["eng"]),
             c(Field::Sla, Op::IsEmpty, &[]),
+            c(Field::Repeat, Op::IsEmpty, &[]),
         ];
         for f in &yes {
             f.check().unwrap();
@@ -511,10 +515,27 @@ pub(crate) mod tests {
             c(Field::Estimate, Op::Gt, &["3"]),
             c(Field::Due, Op::Before, &["@today"]),
             c(Field::Started, Op::IsNotEmpty, &[]),
+            c(Field::Repeat, Op::IsNotEmpty, &[]),
         ];
         for f in &no {
             assert!(!matches(f, "priya"), "{f:?}");
         }
+    }
+
+    #[test]
+    fn repeat_finds_recurring_issues() {
+        let me = UserRef::parse("dev").unwrap();
+        let ctx = EvalContext {
+            today: date!(2026 - 10 - 29),
+            now: datetime!(2026-10-29 12:00 UTC),
+            me: Some(&me),
+            lookup: &Fixed,
+        };
+        let mut i = issue();
+        i.repeat = Some("2w".parse().unwrap());
+        assert!(c(Field::Repeat, Op::IsNotEmpty, &[]).matches(&i, &ctx));
+        assert!(c(Field::Repeat, Op::Is, &["2w"]).matches(&i, &ctx));
+        assert!(!c(Field::Repeat, Op::Is, &["1w"]).matches(&i, &ctx));
     }
 
     #[test]

@@ -51,6 +51,7 @@ export const FIELDS = [
   "text",
   "blocked",
   "sla",
+  "repeat",
 ] as const;
 
 export type Field = (typeof FIELDS)[number];
@@ -117,6 +118,9 @@ export function suggestionsFor(field: Field, statuses: readonly string[]): reado
     }
     case "cycle": {
       return ["@current"];
+    }
+    case "repeat": {
+      return ["1d", "1w", "2w", "1m"];
     }
     default: {
       return DATES.has(field) ? ["@today", "@today-7d", "@today+7d", "@today+2w"] : [];

@@ -11,8 +11,8 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D223, D224, D225
-- Issue: #505
+- Decisions: D223, D224, D225, D307, D308
+- Issue: #505, #144
 - Pull requests: to be linked when merged
 - Extends: [ADR 0016](0016-work-issue-tracking-core.md)
 
@@ -69,12 +69,29 @@ planning screens, plus the prefilled create URL from R-WK-13.
 - A waiting AI triage suggestion shows on the issue page with Accept and
   Dismiss; the component is reusable in the triage inbox.
 
+### `D307`: templates are edited in the team file, on their own screen
+
+Templates stay in `team.yaml`. `/issues/templates` (#144) edits them and
+saves the whole file through `PUT /v1/work/teams/{team}`, the route team
+settings uses, so the server checks the file once and fields it does not
+show (a template's milestone, labels, forms) come back unchanged. Each
+action (save, duplicate, reorder, remove) saves at once. The Work filter
+gains a `repeat` field so the screen can list a team's repeating issues.
+
+### `D308`: an issue's repeat is set with its due date
+
+The issue page edits the due date and the repeat in one `PATCH`, because a
+repeat needs a due date and the service sets the date before it checks the
+repeat. The recurring list changes or stops a repeat in place.
+
 ## Alternatives
 
 - **Wire the `vellum-integrations` schedule model**: it supports weekdays
   and end dates, but keeps schedules apart from issues and needs its own
   storage and screens. A repeat on the issue is one front matter key that
   people can read and edit; richer rules can map onto it later.
+- **A templates route of its own**: one more write path to check and keep
+  in step with team settings, for a list that is part of the team file.
 - **Edit projects only as raw Markdown**: honest to the file, but slow for
   the common steps, so milestones and updates get their own forms.
 - **A charting library for insights**: a table with inline bars is

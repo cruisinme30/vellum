@@ -91,6 +91,7 @@ import { ProjectPage } from "./work/planning/project-page";
 import { ProjectsPage } from "./work/planning/projects-page";
 import { QuickAddProvider } from "./work/quick-add";
 import { TeamSettingsPage } from "./work/settings/team-settings-page";
+import { TemplatesPage } from "./work/templates/templates-page";
 import { TriagePage } from "./work/triage-page";
 
 // The editor is most of the bundle, so it loads with the first page opened.
@@ -149,6 +150,7 @@ export function AppRoutes() {
         <Route path="issues/triage" element={<TriagePage />} />
         <Route path="issues/cycles" element={<CyclesPage />} />
         <Route path="issues/settings" element={<TeamSettingsPage />} />
+        <Route path="issues/templates" element={<TemplatesPage />} />
         {/* Work planning (D223-D225); /issues/new before /issues/:issueKey. */}
         <Route path="issues/new" element={<NewIssuePage />} />
         <Route path="projects" element={<ProjectsPage />} />

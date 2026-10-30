@@ -91,6 +91,13 @@ export interface PlanningApi {
   initiatives(): Promise<InitiativeOut[]>;
   createInitiative(initiative: NewInitiative): Promise<InitiativeOut>;
   templates(team: string): Promise<TemplateOut[]>;
+  /** A team's open repeating issues, soonest due first (#144). */
+  recurring(team: string): Promise<IssueOut[]>;
+  /**
+   * Sets how an issue repeats; `repeat` "" stops it. `due` is sent when
+   * given ("" clears it), before the repeat is checked against it.
+   */
+  setRepeat(issue: string, repeat: string, due?: string): Promise<IssueOut>;
   createIssue(draft: IssueDraft): Promise<IssueOut>;
   insights(question: InsightsQuestion): Promise<InsightsOut>;
   forms(team: string): Promise<FormOut[]>;
@@ -141,6 +148,19 @@ export function createHttpPlanningApi(http: Http): PlanningApi {
       return found.groups.flatMap((group) => group.issues);
     },
     setMilestone: (key, milestone) => http.send<IssueOut>("PATCH", issue(key), { milestone }),
+    async recurring(team) {
+      const filter = JSON.stringify({ field: "repeat", op: "is_not_empty" });
+      const found = await http.get<IssueGroups>(`${WORK}/issues`, {
+        team,
+        filter,
+        group_by: "none",
+        order_by: "due",
+        show_closed: "none",
+      });
+      return found.groups.flatMap((group) => group.issues);
+    },
+    setRepeat: (key, repeat, due) =>
+      http.send<IssueOut>("PATCH", issue(key), due === undefined ? { repeat } : { due, repeat }),
     async updates(id) {
       const found = await http.get<UpdatesOut>(`${project(id)}/updates`);
       return found.updates;
