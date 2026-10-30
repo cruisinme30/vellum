@@ -8,7 +8,7 @@ use zip::write::SimpleFileOptions;
 use super::*;
 use crate::flow::{Asset, Flow, Item, Layout, Media, Node, Span, Table as FlowTable, TableStyle};
 
-/// Imports without a collections engine; `tests/import.rs` covers the
+/// Imports without a collections engine; `tests/it/import.rs` covers the
 /// collections it builds.
 fn import(source: Source, name: &str, bytes: &[u8]) -> Result<ImportSet, ImportError> {
     super::import(source, name, bytes, &NoCollections)

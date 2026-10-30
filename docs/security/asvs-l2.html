@@ -141,7 +141,7 @@ const CHAPTERS = [
   ["V5 File handling", "", [
     ["File type is decided by content, and the extension must match", "met", "<code>upload::sniff</code>, <code>UploadPolicy::clean</code>", "security"],
     ["Size, dimension and decompression limits", "met", "100 MiB, 16384 px, 512 MiB decode cap, 200x zip expansion (RT-025)", "security"],
-    ["Images are re-encoded to drop metadata and polyglot payloads", "met", "<code>tests/upload.rs</code>", "security"],
+    ["Images are re-encoded to drop metadata and polyglot payloads", "met", "<code>tests/it/upload.rs</code>", "security"],
     ["File names cannot traverse paths or carry control characters", "met", "<code>upload::safe_file_name</code>; <code>BlobPath</code> in the store", "security, store"],
     ["Antivirus scanning, failing closed", "met", "<code>upload::Clamd</code> (optional ClamAV), bounded concurrency (RT-031)", "security"],
   ]],

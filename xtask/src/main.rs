@@ -17,6 +17,8 @@
 //!   only on Vellum crates in strictly lower layers. Crates in the same
 //!   layer (for example two services) can never depend on each other, so a
 //!   service cannot reach into another service's storage.
+//!   It also allows one integration test program per crate
+//!   (`tests/it/main.rs`), since each one links the whole graph.
 //! - `cargo xtask schema [--check]` generates the editor's and the server's
 //!   views of the block model from `schema/blocks.json`.
 //! - `cargo xtask help` checks the help books in `docs/`, and

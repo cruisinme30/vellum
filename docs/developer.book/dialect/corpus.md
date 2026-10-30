@@ -33,7 +33,7 @@ For every input, the test suite checks that:
 - rendering gives the expected HTML, PDF text and Word structure
 - charts and diagrams match their pixel fixtures within 0.1%
 
-Run `VELLUM_BLESS=1 cargo test -p vellum-format --test corpus` to
+Run `VELLUM_BLESS=1 cargo test -p vellum-format --test it corpus::` to
 regenerate expected files after a deliberate change, and review the
 diff.
 

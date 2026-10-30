@@ -156,3 +156,8 @@ holder = "new collections indexed by the drive (#565), addendum to ADR 0045"
 adrs = "0075"
 decisions = "D322-D323"
 holder = "creating books (#566)"
+
+[[reservation]]
+adrs = "0076"
+decisions = "D324"
+holder = "coverage within a runner's disk, reserved by the coordinator"

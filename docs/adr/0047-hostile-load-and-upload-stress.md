@@ -77,7 +77,7 @@ future route to the scan.
 - `deploy/perf/hostile/slow_clients.py` holds slow headers (`slowloris`), slow
   bodies and idle HTTP/2 connections, which k6 cannot, and fails if any
   stays open past its budget or a reader slows down.
-- `crates/vellum-security/tests/clamd_stress.rs` runs against a real
+- `crates/vellum-security/tests/it/clamd_stress.rs` runs against a real
   `clamd`: the config checks, and 56 hostile and clean uploads at once.
 - All three run in the nightly workflow; the unit and server tests for
   each finding run on every pull request.

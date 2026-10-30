@@ -318,9 +318,10 @@ fn desktop_steps(focus: Option<&str>) -> Vec<Step> {
 }
 
 /// Tests that start Postgres or Meilisearch in a container through
-/// testcontainers: two whole `vellum-db` binaries, plus every test named
-/// after the engine it starts.
-const DOCKER_TESTS: &str = "binary_id(vellum-db::postgres) | binary_id(vellum-db::shards) \
+/// testcontainers: every test named after the engine it starts (which
+/// covers the whole `postgres` module of `vellum-db`), plus that crate's
+/// `shards` module.
+const DOCKER_TESTS: &str = "(package(vellum-db) & test(/^shards::/)) \
      | test(/postgres/) | test(/meilisearch/)";
 
 /// Whether a Docker daemon looks reachable: `DOCKER_HOST` is set or the
@@ -858,7 +859,7 @@ mod tests {
         ];
         let paths = [
             "crates/vellum-db/src/lib.rs",
-            "crates/vellum-db/tests/jobs.rs",
+            "crates/vellum-db/tests/it/jobs.rs",
             "crates/vellum-db/inner/src/lib.rs",
             "xtask/src/fast.rs",
             "Cargo.lock",

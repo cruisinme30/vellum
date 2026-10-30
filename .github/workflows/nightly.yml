@@ -199,7 +199,7 @@ jobs:
           ip="$(cd deploy/compose && docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' \
             "$(docker compose ps -q clamav)")"
           VELLUM_TEST_CLAMD="${ip}:3310" cargo test --locked -p vellum-security \
-            --test clamd_stress -- --ignored --test-threads 1 --nocapture
+            --test it -- clamd_stress:: --ignored --test-threads 1 --nocapture
       - name: ClamAV logs
         if: failure()
         working-directory: deploy/compose
@@ -223,7 +223,9 @@ jobs:
         with:
           key: pdf-release
       - name: A 30-page PDF in under 3 s at p95
-        run: cargo test --release --locked -p vellum-export --test perf -- --nocapture
+        run: >-
+          cargo test --release --locked -p vellum-export --test it --
+          perf:: --nocapture
 
   zap:
     name: Security scan (ZAP baseline)
