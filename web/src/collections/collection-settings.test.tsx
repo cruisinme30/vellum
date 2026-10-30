@@ -77,7 +77,10 @@ describe("view settings", () => {
     await waitFor(() => {
       expect(screen.queryByRole("tab", { name: "Open" })).toBeNull();
     });
-    expect(location()).toBe(ISSUES);
+    // The tab goes before the address drops the deleted view.
+    await waitFor(() => {
+      expect(location()).toBe(ISSUES);
+    });
   });
 
   it("closes a panel with Escape and gives focus back", async () => {
