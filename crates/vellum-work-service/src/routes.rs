@@ -108,6 +108,17 @@ pub(crate) fn all(s: &Arc<WorkService>) -> Vec<Operation> {
         .summary("Replaces a team's configuration (team.yaml)")
         .description("Statuses, estimates, cycles, triage rules, SLAs, labels and templates. The file is validated before anything changes.")
         .fresh_auth(FRESH),
+        mutation(s, "work.archive_team", Post, "/v1/work/teams/{team}/archive", Admin, |s, c, i| async move {
+            s.set_team_archived(c, i, true).await
+        })
+        .summary("Archives a team")
+        .description("The team keeps its issues, keys and history, readable as before, but takes no new issues, moves or triage routes, and leaves team lists unless they ask for archived teams.")
+        .fresh_auth(FRESH),
+        mutation(s, "work.restore_team", Post, "/v1/work/teams/{team}/restore", Admin, |s, c, i| async move {
+            s.set_team_archived(c, i, false).await
+        })
+        .summary("Restores an archived team")
+        .fresh_auth(FRESH),
         query(s, "work.get_team_settings", "/v1/work/teams/{team}/settings", |s, c, i| async move {
             s.get_team_settings(c, i).await
         })

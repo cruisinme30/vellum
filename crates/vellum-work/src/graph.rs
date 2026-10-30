@@ -262,6 +262,36 @@ impl WorkGraph {
         Ok(changes)
     }
 
+    /// Archives or restores a team (D303). An archived team keeps its
+    /// issues, keys and history but takes no new issues, by creation, a
+    /// triage rule or a move. Setting the state it already has changes
+    /// nothing.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WorkError::UnknownTeam`].
+    pub fn set_team_archived(&mut self, key: &TeamKey, archived: bool) -> Result<Changes> {
+        let team = self
+            .teams
+            .get_mut(key)
+            .ok_or_else(|| WorkError::UnknownTeam(key.clone()))?;
+        let mut changes = Changes::default();
+        if team.archived != archived {
+            team.archived = archived;
+            let _ = changes.teams.insert(key.clone());
+        }
+        Ok(changes)
+    }
+
+    /// The team, refusing an archived one: it takes no new issues.
+    fn open_team(&self, key: &TeamKey) -> Result<&Team> {
+        let team = self.team_ref(key)?;
+        if team.archived {
+            return Err(WorkError::ArchivedTeam(key.clone()));
+        }
+        Ok(team)
+    }
+
     /// Replaces the workspace-wide labels.
     pub fn set_workspace_labels(&mut self, labels: Vec<Label>) -> Changes {
         let mut changes = Changes::default();
@@ -644,6 +674,8 @@ impl WorkGraph {
         let mut issue = self.draft_to_issue(draft, ctx)?;
         // Triage rules route the issue before it gets a number.
         let rule_name = self.route_by_rules(&mut issue, ctx)?;
+        // Checked after routing: a rule may point at an archived team.
+        let _ = self.open_team(&issue.team)?;
         let category = self
             .category_of(&issue)
             .ok_or_else(|| WorkError::UnknownStatus {
@@ -942,7 +974,7 @@ impl WorkGraph {
             return Ok(Changes::default());
         }
         let category = self.category_of(&before).unwrap_or(Category::Backlog);
-        let target = self.team_ref(to)?;
+        let target = self.open_team(to)?;
         let mut issue = before.clone();
         issue.state = target.workflow.map_from(&before.state, category);
         issue.team = to.clone();

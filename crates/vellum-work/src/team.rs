@@ -204,6 +204,10 @@ pub struct Team {
     /// The Git automation mapping; `None` leaves it to the integration.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub git: Option<GitMapping>,
+    /// An archived team keeps its issues, keys and history, readable as
+    /// before, but takes no new issues and leaves team lists (D303).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub archived: bool,
 }
 
 fn utc() -> String {
@@ -240,6 +244,7 @@ impl Team {
             templates: Vec::new(),
             forms: Vec::new(),
             git: None,
+            archived: false,
         })
     }
 
@@ -369,6 +374,16 @@ mod tests {
         assert!(t.check().is_err());
         t.triage = false;
         t.check().unwrap();
+    }
+
+    #[test]
+    fn archived_is_written_only_when_set() {
+        let mut t = team();
+        assert!(!t.to_yaml().unwrap().contains("archived"));
+        t.archived = true;
+        let yaml = t.to_yaml().unwrap();
+        assert!(yaml.contains("archived: true"));
+        assert!(Team::from_yaml("t", &yaml).unwrap().archived);
     }
 
     #[test]

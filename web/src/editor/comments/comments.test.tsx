@@ -59,6 +59,7 @@ function fakeWork() {
     teamSettings: notUsed,
     saveTeamSettings: notUsed,
     createTeam: notUsed,
+    setTeamArchived: notUsed,
   };
 }
 

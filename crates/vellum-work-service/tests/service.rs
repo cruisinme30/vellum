@@ -139,7 +139,15 @@ async fn every_operation_is_valid_and_unique() {
         .filter(|o| o.scope() == Scope::Admin)
         .map(Operation::id)
         .collect();
-    assert_eq!(admin, ["work.create_team", "work.put_team"]);
+    assert_eq!(
+        admin,
+        [
+            "work.create_team",
+            "work.put_team",
+            "work.archive_team",
+            "work.restore_team"
+        ]
+    );
     assert!(
         w.ops
             .iter()
@@ -438,6 +446,121 @@ async fn callers_need_a_handle_and_bad_input_changes_nothing() {
         )
         .await;
     assert_eq!(out["name"], "Platform");
+}
+
+#[tokio::test]
+async fn archived_teams_leave_lists_and_take_no_new_issues() {
+    let w = world().await;
+    with_eng(&w).await;
+    let _ = w
+        .call(
+            "mara",
+            "work.create_team",
+            json!({"key": "OPS", "name": "Operations"}),
+        )
+        .await;
+    let kept = w
+        .call(
+            "dev",
+            "work.create_issue",
+            json!({"team": "OPS", "title": "Rotate keys"}),
+        )
+        .await;
+    assert_eq!(kept["issue"]["key"], "OPS-1");
+
+    // Admin scope and a fresh sign-in, as every_operation_is_valid_and_unique checks.
+    let out = w
+        .call("mara", "work.archive_team", json!({"team": "OPS"}))
+        .await;
+    assert_eq!(out["archived"], true);
+    let yaml = std::fs::read_to_string(w.dir.path().join("teams/OPS/team.yaml")).unwrap();
+    assert!(yaml.contains("archived: true"), "{yaml}");
+
+    // Gone from the default list, there when asked for.
+    let keys = |v: &Value| -> Vec<String> {
+        v["teams"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|t| t["key"].as_str().unwrap().to_owned())
+            .collect()
+    };
+    assert_eq!(
+        keys(&w.call("dev", "work.list_teams", json!({})).await),
+        ["ENG"]
+    );
+    assert_eq!(
+        keys(
+            &w.call("dev", "work.list_teams", json!({"include_archived": true}))
+                .await
+        ),
+        ["ENG", "OPS"]
+    );
+
+    // Its issue still reads; new work is refused with a conflict.
+    assert_eq!(
+        w.call("dev", "work.get_issue", json!({"key": "OPS-1"}))
+            .await["title"],
+        "Rotate keys"
+    );
+    assert_eq!(
+        w.call("dev", "work.get_team", json!({"team": "OPS"})).await["archived"],
+        true
+    );
+    let me = w.principal("dev", ScopeSet::FULL);
+    assert_eq!(
+        w.call_as(
+            me.clone(),
+            "work.create_issue",
+            json!({"team": "OPS", "title": "New"})
+        )
+        .await,
+        Err(ErrorKind::Conflict)
+    );
+    let eng = w
+        .call(
+            "dev",
+            "work.create_issue",
+            json!({"team": "ENG", "title": "Move me"}),
+        )
+        .await;
+    assert_eq!(
+        w.call_as(
+            me,
+            "work.move_issue",
+            json!({"key": eng["issue"]["key"], "to": "OPS"})
+        )
+        .await,
+        Err(ErrorKind::Conflict)
+    );
+
+    // It survives a restart, and restoring reopens it.
+    let (w, _) = w.reopen().await;
+    assert_eq!(
+        keys(&w.call("dev", "work.list_teams", json!({})).await),
+        ["ENG"]
+    );
+    let out = w
+        .call("mara", "work.restore_team", json!({"team": "OPS"}))
+        .await;
+    assert_eq!(out["archived"], false);
+    let next = w
+        .call(
+            "dev",
+            "work.create_issue",
+            json!({"team": "OPS", "title": "Back"}),
+        )
+        .await;
+    assert_eq!(
+        next["issue"]["key"], "OPS-2",
+        "numbers continue after a restore"
+    );
+    assert_eq!(
+        w.call("mara", "work.restore_team", json!({"team": "OPS"}))
+            .await["archived"],
+        false,
+        "restoring twice is harmless"
+    );
 }
 
 #[tokio::test]
