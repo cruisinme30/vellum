@@ -22,6 +22,35 @@ const errorText = (error: unknown) => (error instanceof Error ? error.message : 
 /** An SVG page as an image source; images cannot run scripts. */
 const svgSource = (svg: string) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 
+const VIEW_BOX = /\sviewBox="([^"]*)"/;
+const WIDTH = /\swidth="([^"]*)"/;
+const HEIGHT = /\sheight="([^"]*)"/;
+
+/**
+ * A page's size from its SVG's `viewBox`, or failing that its `width` and
+ * `height`. Given to the picture, it keeps the page's box from the start;
+ * without it each page is a sliver until it decodes, then grows and pushes
+ * the next one down.
+ */
+export function svgPageSize(svg: string): { width: number; height: number } | undefined {
+  const start = svg.indexOf("<svg");
+  if (start === -1) return undefined;
+  const tag = svg.slice(start, svg.indexOf(">", start));
+  const box = VIEW_BOX.exec(tag)?.[1]
+    ?.trim()
+    .split(/[\s,]+/)
+    .map(Number);
+  const [width, height] =
+    box?.length === 4
+      ? [box[2], box[3]]
+      : [WIDTH.exec(tag)?.[1], HEIGHT.exec(tag)?.[1]].map((value) =>
+          Number.parseFloat(value ?? ""),
+        );
+  return width !== undefined && height !== undefined && width > 0 && height > 0
+    ? { width, height }
+    : undefined;
+}
+
 /** Saves a blob through a temporary link. */
 function save(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob);
@@ -167,6 +196,7 @@ export function ExportPanel({ target, api, onClose }: ExportPanelProperties) {
               {preview.value.pages.map((svg, index) => (
                 <li key={index}>
                   <img
+                    {...svgPageSize(svg)}
                     src={svgSource(svg)}
                     alt={t("export-page-alt", { page: index + 1 })}
                     loading="lazy"

@@ -41,8 +41,12 @@ type CollabStatus =
 /** A snapshot of a server-backed session. */
 export interface LiveState {
   readonly status: CollabStatus;
-  /** Whether this editor may change the page, as the server says. */
-  readonly canWrite: boolean;
+  /**
+   * Whether this editor may change the page, as the server says;
+   * `undefined` until the server has said, so a page that is still joining
+   * is not taken for a read-only one.
+   */
+  readonly canWrite: boolean | undefined;
   /** The signed-in user behind each awareness client ID, as the server vouches. */
   readonly peers: ReadonlyMap<number, { readonly user: string; readonly canWrite: boolean }>;
 }

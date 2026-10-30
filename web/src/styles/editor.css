@@ -48,6 +48,10 @@
   font-size: 0.875rem;
 }
 
+.vl-save-status[data-joining] {
+  visibility: hidden;
+}
+
 .vl-save-status[data-status="failed"] {
   color: var(--md-error);
 }

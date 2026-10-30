@@ -313,6 +313,30 @@ describe("PageEditor", () => {
       expect(notice().textContent).toBe("Connecting to the server…");
     });
 
+    it("keeps a writer's bar until the server says whether this person may write", async () => {
+      const { connector, set } = serverConnector({
+        status: "connecting",
+        canWrite: undefined,
+        peers: new Map(),
+      });
+      render(<PageEditor {...editorProperties(connector)} />);
+      await settle();
+      const buttons = () => screen.getAllByRole("button").length;
+      const before = buttons();
+      expect(notice().textContent).toBe("");
+      // Synced but not yet listed: still joining, not read-only.
+      set({ status: "online" });
+      expect(buttons()).toBe(before);
+      expect(notice().textContent).toBe("");
+      // A slow join is named after a second.
+      await act(() => new Promise((resolve) => setTimeout(resolve, 1050)));
+      expect(notice().textContent).toBe("Connecting to the server…");
+      set({ canWrite: true });
+      expect(buttons()).toBe(before);
+      expect(notice().textContent).toBe("");
+      expect(screen.getByText("Saved")).toBeDefined();
+    });
+
     it("stops editing when access is revoked", async () => {
       const { connector, set } = serverConnector({
         status: "online",

@@ -86,7 +86,7 @@ export function createSocketConnector(options: SocketConnectorOptions = {}): Col
       const document_ = new Y.Doc();
       const awareness = new Awareness(document_);
 
-      let state: LiveState = { status: "connecting", canWrite: false, peers: new Map() };
+      let state: LiveState = { status: "connecting", canWrite: undefined, peers: new Map() };
       const listeners = new Set<() => void>();
       const setState = (next: Partial<LiveState>) => {
         state = { ...state, ...next };
@@ -131,8 +131,9 @@ export function createSocketConnector(options: SocketConnectorOptions = {}): Col
             ]),
           );
           // The server lists this editor once it has seen its awareness;
-          // until then it stays read-only.
-          setState({ peers, canWrite: peers.get(document_.clientID)?.canWrite ?? false });
+          // until then whether it may write is not known, and it stays
+          // read-only.
+          setState({ peers, canWrite: peers.get(document_.clientID)?.canWrite });
         } else if (tag === MSG_DONE) {
           waiting.shift()?.resolve();
         }
@@ -293,7 +294,7 @@ export function createSocketConnector(options: SocketConnectorOptions = {}): Col
           if (state.status !== "online") {
             return Promise.reject(new Error("not connected"));
           }
-          if (!state.canWrite) {
+          if (state.canWrite !== true) {
             return Promise.reject(new Error("read only"));
           }
           return new Promise<void>((resolve, reject) => {

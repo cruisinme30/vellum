@@ -35,6 +35,7 @@ import { CommentMarkers, ensureAnchor, type Anchor } from "./comments/anchor";
 import { CommentsPanel } from "./comments/comments-panel";
 import { FileIssue } from "./comments/file-issue";
 import { vellumExtensions } from "./extensions";
+import { LiveNotice } from "./live-notice";
 import type { ResolvePage } from "./nodes/inline";
 import { SecretsBanner, type ScanSecrets } from "./secrets-banner";
 import {
@@ -119,40 +120,6 @@ function useLive(live: LiveConnection = LOCAL): LiveState {
   return useSyncExternalStore(live.subscribe, live.getSnapshot);
 }
 
-/** One line under the toolbar when the page is not plainly editable and synced. */
-function LiveNotice({ state }: { readonly state: LiveState }) {
-  const t = useT();
-  let key: string | undefined;
-  switch (state.status) {
-    case "revoked": {
-      key = "editor-revoked";
-
-      break;
-    }
-    case "offline": {
-      key = "editor-offline";
-
-      break;
-    }
-    case "connecting": {
-      key = "editor-connecting";
-
-      break;
-    }
-    default: {
-      if (!state.canWrite) {
-        key = "editor-read-only";
-      }
-    }
-  }
-  // The live region stays mounted so screen readers announce each change.
-  return (
-    <div role="status">
-      {key === undefined ? undefined : <p className="vl-editor-notice">{t(key)}</p>}
-    </div>
-  );
-}
-
 const SAVE_LABELS: Record<SaveStatus, string> = {
   saved: "editor-saved",
   unsaved: "editor-unsaved",
@@ -171,18 +138,26 @@ const isSaveKey = (event: KeyboardEvent) =>
 function SaveControls({
   saver,
   canSave,
+  joining,
   children,
 }: {
   readonly saver: Saver;
   readonly canSave: boolean;
+  /** Keeps the status's room, unshown, until the server says whether this person may write. */
+  readonly joining: boolean;
   readonly children?: ReactNode;
 }) {
   const t = useT();
   const status = useSyncExternalStore(saver.subscribe, saver.getSnapshot);
   return (
     <div className="vl-editor-save">
-      <span className="vl-save-status" aria-live="polite" data-status={status}>
-        {canSave ? t(SAVE_LABELS[status]) : ""}
+      <span
+        className="vl-save-status"
+        aria-live="polite"
+        data-status={status}
+        data-joining={joining || undefined}
+      >
+        {canSave || joining ? t(SAVE_LABELS[status]) : ""}
       </span>
       {children}
       <button
@@ -207,6 +182,7 @@ const LOCAL_LIVE = (): LiveConnection => LOCAL;
 function WorkActions({
   work,
   editable,
+  joining,
   side,
   onToggle,
   onClose,
@@ -215,6 +191,8 @@ function WorkActions({
 }: {
   readonly work: WorkApi;
   readonly editable: boolean;
+  /** Shows Create issue, disabled, until the server says whether this person may write. */
+  readonly joining: boolean;
   readonly side: Side | undefined;
   readonly onToggle: (kind: Side["kind"]) => void;
   readonly onClose: () => void;
@@ -236,11 +214,12 @@ function WorkActions({
       >
         <Icon name="comment" />
       </button>
-      {editable && (
+      {(editable || joining) && (
         <span className="vl-file-issue-anchor">
           <button
             type="button"
             className="vl-icon-button"
+            disabled={!editable}
             aria-label={t("file-issue-open")}
             title={t("file-issue-open")}
             aria-expanded={side?.kind === "issue"}
@@ -299,7 +278,10 @@ function BoundEditor({
     },
     [saver],
   );
-  const editable = live.status !== "revoked" && live.canWrite;
+  const editable = live.status !== "revoked" && live.canWrite === true;
+  // Until the server says whether this person may write, the bar keeps a
+  // writer's layout, so the usual answer moves nothing on the page.
+  const joining = live.status !== "revoked" && live.canWrite === undefined;
   useEffect(() => {
     onControls?.({
       save: async () => {
@@ -399,6 +381,7 @@ function BoundEditor({
     <WorkActions
       work={work}
       editable={editable}
+      joining={joining}
       side={side}
       onToggle={openSide}
       onClose={closeSide}
@@ -410,14 +393,21 @@ function BoundEditor({
   return (
     <div className="vl-editor">
       <div className="vl-editor-bar">
-        <Toolbar editor={editor} onSelectionTask={toolbarTask(editor, editable, onSelectionTask)} />
-        <SaveControls saver={saver} canSave={editable && live.status === "online"}>
+        <Toolbar
+          editor={editor}
+          onSelectionTask={toolbarTask(editor, editable || joining, onSelectionTask)}
+        />
+        <SaveControls
+          saver={saver}
+          canSave={editable && live.status === "online"}
+          joining={joining}
+        >
           {workActions}
           <PresenceBar awareness={session.awareness} live={session.live ? live : undefined} />
           {actions}
         </SaveControls>
       </div>
-      <LiveNotice state={live} />
+      <LiveNotice state={live} joining={joining} />
       {scanSecrets && <SecretsBanner editor={editor} scan={scanSecrets} />}
       <EditorContent editor={editor} />
       {work && side?.kind === "comments" && (
