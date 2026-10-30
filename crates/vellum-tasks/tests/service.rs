@@ -357,7 +357,7 @@ fn operations_are_unique_and_versioned() {
     ids.sort_unstable();
     ids.dedup();
     assert_eq!(ids.len(), count);
-    assert_eq!(count, 27);
+    assert_eq!(count, 28);
 }
 
 #[tokio::test]
