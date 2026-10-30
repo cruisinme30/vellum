@@ -24,21 +24,49 @@ use vellum_kernel::{Actor, Error, ErrorKind, ShareToken};
 use vellum_render::resolve::Resolver;
 use vellum_render::{RenderOptions, Renderer};
 
+/// The password checks share links may run at once (RT-042): two per
+/// CPU. The public origin has no sign-in rate limit, so without a bound a
+/// flood of guesses would run Argon2 (19 `MiB` each) without end, as
+/// sign-in did before red team round 4.
+static SLOTS: std::sync::LazyLock<tokio::sync::Semaphore> = std::sync::LazyLock::new(|| {
+    let cpus = std::thread::available_parallelism().map_or(2, std::num::NonZero::get);
+    tokio::sync::Semaphore::new(cpus.saturating_mul(2).clamp(2, 64))
+});
+
+/// How long a check waits for a slot before it is refused.
+const SLOT_WAIT: std::time::Duration = std::time::Duration::from_millis(500);
+
+/// A slot for one password check, or `None` when every slot stays taken.
+async fn slot() -> Option<tokio::sync::SemaphorePermit<'static>> {
+    tokio::time::timeout(SLOT_WAIT, SLOTS.acquire())
+        .await
+        .ok()
+        .and_then(Result::ok)
+}
+
 /// Link passwords through `vellum_identity::password` (Argon2id, pinned
-/// parameters), off the async workers.
+/// parameters), off the async workers and at most [`SLOTS`] at once.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct IdentityPasswords;
 
 #[async_trait]
 impl LinkPasswords for IdentityPasswords {
     async fn hash(&self, password: String) -> DriveResult<String> {
-        tokio::task::spawn_blocking(move || vellum_identity::password::hash(&password))
+        let _slot = slot()
             .await
-            .map_err(|e| DriveError::Index(format!("password hashing stopped: {e}")))?
-            .map_err(|e| DriveError::Index(e.to_string()))
+            .ok_or_else(|| DriveError::Index("the server is busy; try again".into()))?;
+        tokio::task::spawn_blocking(move || {
+            vellum_identity::password::hash(&password).map_err(|e| DriveError::Index(e.to_string()))
+        })
+        .await
+        .map_err(|e| DriveError::Index(format!("password hashing stopped: {e}")))?
     }
 
     async fn verify(&self, password: String, stored: String) -> bool {
+        // No slot: the guess is refused, and counts as wrong.
+        let Some(_slot) = slot().await else {
+            return false;
+        };
         tokio::task::spawn_blocking(move || vellum_identity::password::verify(&password, &stored))
             .await
             .unwrap_or(false)

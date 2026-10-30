@@ -284,3 +284,92 @@ fn grantees_and_roles_parse_strictly() {
     assert_eq!(Role::parse("editor").ok(), Some(Role::Editor));
     assert!(Role::parse("owner").is_err());
 }
+
+/// Counts how many passwords were checked.
+#[derive(Debug, Default)]
+struct CountingPasswords(std::sync::atomic::AtomicUsize);
+
+#[async_trait]
+impl LinkPasswords for CountingPasswords {
+    async fn hash(&self, password: String) -> DriveResult<String> {
+        Ok(format!("plain:{password}"))
+    }
+
+    async fn verify(&self, password: String, stored: String) -> bool {
+        let _ = self.0.fetch_add(1, Ordering::SeqCst);
+        stored == format!("plain:{password}")
+    }
+}
+
+/// RT-042: the public origin has no rate limit, so a link's password could
+/// be guessed without end, each guess a full Argon2 hash. After ten wrong
+/// guesses in 15 minutes a link stops checking passwords, even the right
+/// one, until the window passes.
+#[tokio::test]
+async fn link_passwords_lock_after_repeated_failures() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let store = Arc::new(LocalStore::open(dir.path()).await?);
+    let index: Arc<dyn DriveIndex> = Arc::new(MemoryIndex::new());
+    let authz = Arc::new(Authz::new(MemoryStore::new()));
+    let access = Arc::new(AuthzAccess::new(authz, index.clone()));
+    let drive = Arc::new(Drive::new(store, index, access.clone()));
+    let clock = Arc::new(AtomicI64::new(Timestamp::now().unix_ms()));
+    let now = Arc::clone(&clock);
+    let passwords = Arc::new(CountingPasswords::default());
+    let sharing = Sharing::new(
+        Arc::clone(&drive),
+        access,
+        Arc::new(MemoryShareLinks::default()),
+        passwords.clone(),
+    )
+    .with_public_origin(Some("https://pages.northstar.dev".into()))
+    .with_clock(Arc::new(move || {
+        Timestamp::from_unix_ms(now.load(Ordering::SeqCst)).unwrap_or_else(|_| Timestamp::now())
+    }));
+    let alice = Actor::User {
+        user: UserId::generate(),
+    };
+    let eng = drive
+        .create_space(&alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .await?;
+    let page = drive
+        .create_page(&alice, eng.id, None, "Roadmap", "Ship it.")
+        .await?;
+    let link = sharing
+        .create_link(&alice, page.id, None, Some("northstar-2026"))
+        .await?;
+    let other = sharing
+        .create_link(&alice, page.id, None, Some("northstar-2026"))
+        .await?;
+
+    for n in 0..100 {
+        assert_eq!(
+            sharing
+                .open(&link.token, Some(&format!("guess-{n}")))
+                .await?,
+            Opened::PasswordRequired { retry: true }
+        );
+    }
+    assert_eq!(
+        passwords.0.load(Ordering::SeqCst),
+        10,
+        "only ten guesses were hashed"
+    );
+    assert_eq!(
+        sharing.open(&link.token, Some("northstar-2026")).await?,
+        Opened::PasswordRequired { retry: true },
+        "locked, even for the right password"
+    );
+    // Other links are not affected.
+    assert!(matches!(
+        sharing.open(&other.token, Some("northstar-2026")).await?,
+        Opened::Page(_)
+    ));
+    // After the window the right password opens it again.
+    let _ = clock.fetch_add(15 * 60 * 1000, Ordering::SeqCst);
+    assert!(matches!(
+        sharing.open(&link.token, Some("northstar-2026")).await?,
+        Opened::Page(_)
+    ));
+    Ok(())
+}
