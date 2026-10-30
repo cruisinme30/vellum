@@ -21,6 +21,12 @@ Vellum and given you an account; if you are that someone, start with the
 
 :::
 
+```image
+src: assets/editor.jpg
+alt: The Vellum editor showing Northstar's "Gateway 2.0 launch plan" page, with the drive on the left and the Share and Export buttons at the top right
+caption: Northstar's launch plan in the editor. The drive is on the left; Share and Export are at the top right.
+```
+
 ## Create your first page {#first-page}
 
 Select **New** in the navigation rail. Vellum creates an untitled page

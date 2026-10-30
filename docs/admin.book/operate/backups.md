@@ -36,6 +36,16 @@ same goes for `.vellum/keys/index.key`, which holds the index key when
 
 ## Taking backups {#take}
 
+```mermaid
+flowchart LR
+  D[(Data folder or bucket)] --> B[Backup job]
+  K[VELLUM_BACKUP_KEY] --> B
+  B --> V[.vbk file: sealed 4 MiB chunks and a manifest of hashes]
+  V --> T[Another disk or a bucket]
+  T --> R[Restore drill: restore to scratch, check every hash, under 15 minutes]
+  R --> A[Audit log]
+```
+
 Turn on scheduled backups in the admin settings
 (`PUT /api/v1/admin/settings`, under `backups`), or take one now with
 `POST /api/v1/admin/backups`. Both need an administrator who signed in

@@ -11,6 +11,28 @@ Cursor or any MCP client, and the model can search, read and draft in
 Vellum under your own permissions: it sees exactly what you can see and
 nothing more.
 
+```image
+src: assets/ai.jpg
+alt: Claude drafting a change to a Northstar page, shown as a draft for review beside the page
+caption: Claude's edits arrive as a draft you review, never as a silent change.
+```
+
+```mermaid
+sequenceDiagram
+  participant You
+  participant Client as Claude or another MCP client
+  participant MCP as Vellum MCP server
+  participant V as Vellum
+  You->>Client: "Summarise the launch risks"
+  Client->>MCP: search and read (your token)
+  MCP->>V: same permission checks as you
+  V-->>Client: only pages you can open
+  Client->>MCP: propose an edit
+  MCP->>V: save it as a draft
+  V-->>You: a draft to review
+  You->>V: accept, edit or discard
+```
+
 ## Connect in one minute {#connect}
 
 1. Open **Settings → AI** and pick your client.

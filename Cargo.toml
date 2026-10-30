@@ -59,6 +59,13 @@ strip = "symbols"
 
 # Mermaid rendering runs per request and is about a sixth of the binary's
 # code, so it is optimised for size (ADR 0067, D280).
+# The website's site_blocks build (ADR 0071, D309): release speed without
+# fat LTO, so the Website workflow builds it in a few minutes.
+[profile.site]
+inherits = "release"
+lto = false
+codegen-units = 16
+
 [profile.release.package.merman]
 opt-level = "s"
 [profile.release.package.merman-core]

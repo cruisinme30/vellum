@@ -67,7 +67,7 @@ describe("EmbedView", () => {
     expect(frame.tagName).toBe("IFRAME");
     expect(frame.getAttribute("src")).toBe("https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ");
     expect(frame.getAttribute("sandbox")).toBe(
-      "allow-scripts allow-same-origin allow-popups allow-presentation",
+      "allow-scripts allow-same-origin allow-popups",
     );
     expect(frame.getAttribute("referrerpolicy")).toBe("strict-origin-when-cross-origin");
   });

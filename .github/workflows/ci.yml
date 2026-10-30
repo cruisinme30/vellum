@@ -240,12 +240,49 @@ jobs:
       - name: Dependency audit
         run: pnpm audit
 
+  website:
+    # The site is built once for every UI shard: build-site.sh compiles
+    # vellum-render's site_blocks example to draw the docs' diagrams
+    # (ADR 0071, D309), which should not happen four times.
+    name: Website build for the UI suite
+    needs: changes
+    if: needs.changes.outputs.ui == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      # Keep in step with site.yml.
+      MDBOOK_VERSION: 0.5.4
+      MDBOOK_SHA256: 3f28de05dafca9d0f2eab99c662116b0e37b89b1d96a08f8f430b9eeae958cd7
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install mdBook
+        run: |
+          tarball="mdbook-v${MDBOOK_VERSION}-x86_64-unknown-linux-gnu.tar.gz"
+          curl -sSfLo "${RUNNER_TEMP}/${tarball}" \
+            "https://github.com/rust-lang/mdBook/releases/download/v${MDBOOK_VERSION}/${tarball}"
+          echo "${MDBOOK_SHA256}  ${RUNNER_TEMP}/${tarball}" | sha256sum --check
+          tar -xzf "${RUNNER_TEMP}/${tarball}" -C "${RUNNER_TEMP}" mdbook
+          echo "MDBOOK=${RUNNER_TEMP}/mdbook" >> "${GITHUB_ENV}"
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: site
+          # Only develop saves the cache (ADR 0035, D138).
+          save-if: ${{ github.ref == 'refs/heads/develop' }}
+      - run: scripts/ci/build-site.sh _site
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: website
+          path: _site
+
   ui:
     # Four shards of four workers each (ADR 0049, D214). 334 tests took
     # 7.3 minutes on one runner; by 5:50 PM PT on 2026-10-29 there were
     # 962, and two shards took 8 to 9 minutes each.
     name: UI layout (quick ${{ matrix.shard }}/4)
-    needs: changes
+    needs: [changes, website]
     if: needs.changes.outputs.ui == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
@@ -253,10 +290,6 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2, 3, 4]
-    env:
-      # Keep in step with site.yml.
-      MDBOOK_VERSION: 0.5.4
-      MDBOOK_SHA256: 3f28de05dafca9d0f2eab99c662116b0e37b89b1d96a08f8f430b9eeae958cd7
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -270,16 +303,10 @@ jobs:
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
       - run: pnpm --dir web install --frozen-lockfile
-      - name: Install mdBook
-        run: |
-          tarball="mdbook-v${MDBOOK_VERSION}-x86_64-unknown-linux-gnu.tar.gz"
-          curl -sSfLo "${RUNNER_TEMP}/${tarball}" \
-            "https://github.com/rust-lang/mdBook/releases/download/v${MDBOOK_VERSION}/${tarball}"
-          echo "${MDBOOK_SHA256}  ${RUNNER_TEMP}/${tarball}" | sha256sum --check
-          tar -xzf "${RUNNER_TEMP}/${tarball}" -C "${RUNNER_TEMP}" mdbook
-          echo "MDBOOK=${RUNNER_TEMP}/mdbook" >> "${GITHUB_ENV}"
-      - name: Build the website
-        run: scripts/ci/build-site.sh _site
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: website
+          path: _site
       - run: pnpm --dir web exec playwright install --with-deps chromium
       - name: Layout, focus and loading checks (ADR 0031)
         working-directory: web
@@ -484,7 +511,7 @@ jobs:
   fast-suite:
     name: Fast suite
     if: always()
-    needs: [changes, rust, rust-tests, web, desktop, ui, hygiene, commits, traceability, dependencies]
+    needs: [changes, rust, rust-tests, web, desktop, website, ui, hygiene, commits, traceability, dependencies]
     runs-on: ubuntu-24.04
     steps:
       # A job skipped by the changed-areas filter counts as not applicable.

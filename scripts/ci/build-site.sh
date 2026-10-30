@@ -12,15 +12,21 @@
 #     of an older release find its guide (ADR 0024, D257).
 # Every help page ends with "Was this page helpful?" and "Edit this page"
 # links; neither sends anything until the reader submits a GitHub issue.
-# Vellum Markdown is turned into plain CommonMark on the way: front matter
-# is dropped and ::: container fences are unwrapped, so unmodified mdBook
-# can build the books (ADR 0027, D111).
+# Rich blocks are drawn by Vellum's own renderer first (ADR 0071, D309):
+# every ::: container and figure fence (Mermaid, architecture, charts) in
+# a staged page becomes the HTML the app shows, through the vellum-render
+# example site_blocks. The rest of the page is turned into plain CommonMark:
+# front matter is dropped and any ::: fence left is unwrapped, so unmodified
+# mdBook can build the books (ADR 0027, D111).
+# Every page, the landing page, docs home and every book alike, carries the
+# same site bar from site/bar.html and site/bar.css (D310).
 #
 # Usage: scripts/ci/build-site.sh [output-dir]
 # Environment: MDBOOK (default: mdbook), SITE_BASE (default: /vellum/), the
 # path the site is served under, used only by mdBook's 404 page;
 # SITE_VERSIONS (default: 5), how many release tags (vX.Y.Z) get their own
-# copy of the books, newest first; 0 builds only the current books.
+# copy of the books, newest first; 0 builds only the current books;
+# SITE_BLOCKS, a built site_blocks binary (default: built here with cargo).
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -33,6 +39,44 @@ edit_ref="develop"
 repo="https://github.com/cruisinme30/vellum"
 work="$(mktemp -d)"
 trap 'rm -rf "${work}"' EXIT
+
+# The renderer for rich blocks, and its stylesheet for every book (D309).
+blocks="${SITE_BLOCKS:-}"
+if [[ -z "${blocks}" ]]; then
+  cargo build --quiet --profile site --locked -p vellum-render --example site_blocks --manifest-path "${root}/Cargo.toml"
+  blocks="$(cargo metadata --format-version 1 --no-deps --manifest-path "${root}/Cargo.toml" | sed -E 's/.*"target_directory":"([^"]*)".*/\1/')/site/examples/site_blocks"
+fi
+"${blocks}" --css "${work}/render.css"
+
+# site_bar <home> <docs> <guides> <current> [<versions-file>]: the site bar
+# from site/bar.html (D310). <home> is the path to the site root, <docs>
+# to the docs home and <guides> to the folder holding this release's
+# guides; <current> names the bar link for the page's own section.
+site_bar() {
+  local home="$1" docs="$2" guides="$3" current="$4" versions_file="${5:-}" key
+  awk -v links="${versions_file}" '
+    /^<!--/ { comment = 1 }
+    comment { if ($0 ~ /-->$/) comment = 0; next }
+    /@VERSIONS@/ {
+      if (links != "") { while ((getline line < links) > 0) print "      " line; close(links) }
+      next
+    }
+    { print }
+  ' "${root}/site/bar.html" |
+    sed -e "s#@HOME@#${home}#g" -e "s#@DOCS@#${docs}#g" -e "s#@GUIDES@#${guides}#g" |
+    {
+      local bar
+      bar="$(cat)"
+      for key in product docs user admin developer decisions; do
+        if [[ "${key}" == "${current}" ]]; then
+          bar="${bar//@CUR-${key}@/ aria-current=\"page\"}"
+        else
+          bar="${bar//@CUR-${key}@/}"
+        fi
+      done
+      printf '%s\n' "${bar}"
+    }
+}
 
 # to_commonmark <file>: rewrites a Vellum Markdown page in place. Drops a
 # leading YAML front matter block and the opening and closing lines of
@@ -145,7 +189,8 @@ html_escape() {
 # fix_html <dir>: patches mdBook 0.5.4's HTML where it fails WCAG 2.2 AA
 # or breaks its own scripts (#249):
 #   - the sidebar toggle is a <label> carrying button ARIA: give it the role;
-#   - code blocks and tables that scroll sideways become focusable;
+#   - code blocks and tables that scroll sideways become focusable, and so
+#     do the rendered blocks that scroll (data tables and boards, D309);
 #   - task-list checkboxes get a name;
 #   - mdBook's web fonts are dropped, on every page however deep: they
 #     load without font-display, so text appears late and the page shifts,
@@ -160,6 +205,7 @@ fix_html() {
     -e 's/<label id="mdbook-sidebar-toggle" /<label id="mdbook-sidebar-toggle" role="button" /' \
     -e 's/<pre([^>]*)><code( |>)/<pre\1><code tabindex="0"\2/g' \
     -e 's/<div class="table-wrapper">/<div class="table-wrapper" tabindex="0">/g' \
+    -e 's/<div class="(vl-table-wrap|vl-board)"/<div class="\1" tabindex="0"/g' \
     -e 's/<input disabled="" type="checkbox" checked="">/<input disabled="" type="checkbox" checked="" aria-label="Done">/g' \
     -e 's/<input disabled="" type="checkbox">/<input disabled="" type="checkbox" aria-label="To do">/g' \
     -e 's/id="(exports|module|define|require)"/id="\1-section"/g' \
@@ -200,6 +246,7 @@ build_book() {
   docs="${up%../}"
   toml_title="${2//\\/\\\\}"
   toml_title="${toml_title//\"/\\\"}"
+  find "${src}" -name '*.md' -not -name SUMMARY.md -print0 | xargs -0 -r "${blocks}"
   find "${src}" -name '*.md' -print0 | while IFS= read -r -d '' page; do
     to_commonmark "${page}"
   done
@@ -213,12 +260,14 @@ build_book() {
   mkdir -p "${dir}/theme"
   # book.css lands in <dest>/theme/, one folder below the book.
   sed "s#@FONTS@#../${up}fonts/#g" "${root}/site/book.css" >"${dir}/theme/vellum.css"
+  cp "${root}/site/bar.css" "${work}/render.css" "${dir}/theme/"
   sed "s#@ROOT@#${up}#g" "${root}/site/book-head.hbs" >"${dir}/theme/head.hbs"
-  version_links "${name}" "${version}" >"${dir}/versions.html"
-  awk -v links="${dir}/versions.html" '
-    /@VERSIONS@/ { while ((getline line < links) > 0) print line; close(links); next }
-    { print }
-  ' "${root}/site/book-header.hbs" | sed -e "s#@ROOT@#${up}#g" -e "s#@DOCS@#${docs}#g" >"${dir}/theme/header.hbs"
+  version_links "${name}" "${version}" | sed "s#@DOCS@#${docs}#g" >"${dir}/versions.html"
+  {
+    site_bar "{{ path_to_root }}${up}" "{{ path_to_root }}${docs}" "{{ path_to_root }}../" "${name}" "${dir}/versions.html"
+    # Measure the bar before first paint (theme.js, D310).
+    echo '<script>if (window.vellumMeasureBar) window.vellumMeasureBar();</script>'
+  } >"${dir}/theme/header.hbs"
   cat >"${dir}/book.toml" <<EOF
 [book]
 title = "${toml_title}"
@@ -235,7 +284,7 @@ site-url = "${base}${dest}/"
 git-repository-url = "${repo}"
 default-theme = "light"
 preferred-dark-theme = "navy"
-additional-css = ["theme/vellum.css"]
+additional-css = ["theme/vellum.css", "theme/bar.css", "theme/render.css"]
 
 # No "run" button: it calls play.rust-lang.org from every page with Rust
 # code, which leaks readers to a third party and fails offline (#249).
@@ -275,7 +324,7 @@ build_guides() {
 
 rm -rf "${out}"
 mkdir -p "${out}/docs"
-cp "${root}/site/style.css" "${root}/site/theme.js" "${root}/site/favicon.svg" "${root}/site/install.sh" "${out}/"
+cp "${root}/site/style.css" "${root}/site/bar.css" "${root}/site/theme.js" "${root}/site/blocks.js" "${root}/site/favicon.svg" "${root}/site/install.sh" "${out}/"
 cp -R "${root}/site/fonts" "${root}/site/img" "${root}/site/media" "${out}/"
 
 # build_decisions <adr-dir> <version>: the architecture decision records,
@@ -397,10 +446,12 @@ pages="$(find "${root}/docs" -path '*.book/*' -name '*.md' -not -name SUMMARY.md
 crates="$(find "${root}/crates" -mindepth 2 -maxdepth 2 -name Cargo.toml | wc -l)"
 decisions="$(find "${root}/docs/adr" -maxdepth 1 -name '[0-9]*.md' -not -name '0000-*' | wc -l)"
 
-# fill <template> <output>: puts in the guide cards and the counts.
+# fill <template> <output> <bar-file>: puts in the site bar, the guide
+# cards and the counts.
 fill() {
-  awk -v cards="${cards}" -v pages="${pages// /}" -v crates="${crates// /}" -v decisions="${decisions// /}" '
+  awk -v cards="${cards}" -v bar="$3" -v pages="${pages// /}" -v crates="${crates// /}" -v decisions="${decisions// /}" '
     /<!-- BOOKS -->/ { while ((getline line < cards) > 0) print line; close(cards); next }
+    /<!-- SITEBAR -->/ { while ((getline line < bar) > 0) print "    " line; close(bar); next }
     {
       gsub(/<!-- COUNT:pages -->/, pages)
       gsub(/<!-- COUNT:crates -->/, crates)
@@ -409,7 +460,9 @@ fill() {
     }
   ' "$1" >"$2"
 }
-fill "${root}/site/index.html" "${out}/index.html"
-fill "${root}/site/docs.html" "${out}/docs/index.html"
+site_bar "./" "docs/" "docs/" product >"${work}/bar-home.html"
+site_bar "../" "" "" docs >"${work}/bar-docs.html"
+fill "${root}/site/index.html" "${out}/index.html" "${work}/bar-home.html"
+fill "${root}/site/docs.html" "${out}/docs/index.html" "${work}/bar-docs.html"
 
 echo "Built the site in ${out} with ${#books[@]} book(s) and ${pages} help pages."
