@@ -18,6 +18,12 @@ import { TARGETS } from "./targets";
  */
 const DEFAULT_MODE = MODES[0]?.name;
 
+// The stand-in servers answer on the browser context. WebKit sends a
+// request its service worker makes past those routes to the real preview
+// server, which answers 404 (D285), so the audit runs without one. The
+// loading spec covers the service worker.
+test.use({ serviceWorkers: "block" });
+
 for (const target of TARGETS) {
   test.describe(target.name, () => {
     for (const mode of MODES) {

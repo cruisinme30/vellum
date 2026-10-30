@@ -44,13 +44,20 @@ export async function registerServiceWorker(
     (() => {
       location.reload();
     });
-  let registration: ServiceWorkerRegistration;
+  // Typed as always a registration, but a browser that blocks service
+  // workers by policy (and Playwright's `serviceWorkers: "block"`)
+  // resolves to nothing; without this check the app crashed (D285).
+  let registered: unknown;
   try {
-    registration = await container.register("/sw.js", { scope: "/", updateViaCache: "none" });
+    registered = await container.register("/sw.js", { scope: "/", updateViaCache: "none" });
   } catch {
+    registered = undefined;
+  }
+  if (registered === undefined || registered === null) {
     telemetry().count("vellum.client.sw.register_failed");
     return undefined;
   }
+  const registration = registered as ServiceWorkerRegistration;
   let updateReady = registration.waiting !== null && container.controller !== null;
   const announce = () => {
     updateReady = true;

@@ -137,6 +137,15 @@ textarea {
   color: inherit;
 }
 
+/*
+ * A select keeps the browser's own fill, which in a dark scheme is a mid
+ * grey that the inherited light text fails WCAG contrast on (D285), so it
+ * takes the theme's field colour.
+ */
+select {
+  background-color: var(--md-surface-container-lowest);
+}
+
 [hidden] {
   display: none !important;
 }

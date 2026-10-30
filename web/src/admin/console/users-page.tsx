@@ -359,14 +359,18 @@ function Users({ api }: { readonly api: AdminConsoleApi }) {
           </table>
         </div>
       )}
-      <CreateUserForm
-        api={api}
-        onCreated={(user) => {
-          setNotice({ ok: true, message: t("admin-users-created-notice", { name: user.name }) });
-          setChanged({});
-          setReload((n) => n + 1);
-        }}
-      />
+      {/* Shown with the list, not before it: the list arriving above the
+          form pushed it down the page (CLS 0.38 on a phone, D285). */}
+      {loaded.state !== "loading" && (
+        <CreateUserForm
+          api={api}
+          onCreated={(user) => {
+            setNotice({ ok: true, message: t("admin-users-created-notice", { name: user.name }) });
+            setChanged({});
+            setReload((n) => n + 1);
+          }}
+        />
+      )}
     </>
   );
 }
