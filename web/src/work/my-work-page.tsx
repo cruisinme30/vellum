@@ -356,6 +356,9 @@ function MyWork({ api }: { readonly api: WorkApi }) {
   const [version, setVersion] = useState(0);
   const [error, setError] = useState<string>();
   const loaded = useLoaded(() => api.myWork(), [api, version], failureText);
+  // Panels wait for the first answer, or they jump down when it arrives.
+  const [answered, setAnswered] = useState(false);
+  if (!answered && loaded.state !== "loading") setAnswered(true);
   const reload = useCallback(() => {
     setVersion((v) => v + 1);
   }, []);
@@ -404,9 +407,9 @@ function MyWork({ api }: { readonly api: WorkApi }) {
       <Ready loaded={loaded}>
         {(view) => <Buckets api={api} view={view} actions={actions} onChanged={reload} />}
       </Ready>
-      <ListsPanel api={api} onChanged={reload} />
-      <CalendarPanel api={api} onChanged={reload} />
-      <Settings api={api} onSaved={reload} />
+      {answered && <ListsPanel api={api} onChanged={reload} />}
+      {answered && <CalendarPanel api={api} onChanged={reload} />}
+      {answered && <Settings api={api} onSaved={reload} />}
     </>
   );
 }
