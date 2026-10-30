@@ -107,4 +107,3 @@ sequenceDiagram
   G->>S: operation with the Principal
   S-->>C: result, filtered by authorization
 ```
-

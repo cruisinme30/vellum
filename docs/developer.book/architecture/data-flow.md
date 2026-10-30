@@ -131,4 +131,3 @@ flowchart LR
   F --> M[Markdown and mdBook]
   R[Render: charts and diagrams as SVG] --> F
 ```
-
