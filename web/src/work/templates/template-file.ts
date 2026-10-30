@@ -26,10 +26,10 @@ export interface Template {
 }
 
 /** The repeats offered in a menu; any other valid one is kept. */
-export const REPEATS = ["1d", "1w", "2w", "1m", "3m"] as const;
+const REPEATS = ["1d", "1w", "2w", "1m", "3m"] as const;
 
 /** The longest name a template may have. */
-export const MAX_NAME = 80;
+const MAX_NAME = 80;
 
 /** Whether `text` is a repeat the server accepts: 1 to 366 days, weeks or months. */
 export function isRepeat(text: string): boolean {
@@ -48,7 +48,7 @@ export function repeatChoices(current: string | undefined): readonly string[] {
 }
 
 /** An estimate as typed: whole points, or a t-shirt size. */
-export function estimateFrom(text: string): number | string | undefined {
+function estimateFrom(text: string): number | string | undefined {
   const value = text.trim();
   if (value === "") return undefined;
   return /^\d+$/.test(value) ? Number(value) : value.toUpperCase();
