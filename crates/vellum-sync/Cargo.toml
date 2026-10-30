@@ -29,5 +29,5 @@ vellum-kernel.workspace = true
 [dev-dependencies]
 tempfile = "3"
 testcontainers-modules = { version = "0.15", features = ["postgres"] }
-proptest = ">=1.11.0, <1.12"
+proptest = ">=1.11.0, <1.13"
 tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread", "time"] }
