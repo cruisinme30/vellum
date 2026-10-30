@@ -46,6 +46,13 @@
   cursor: pointer;
 }
 
+/* Wide tables scroll inside their own box instead of pushing the page
+   sideways; long routes and ids still wrap first. */
+.vl-requests__scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
 .vl-requests__table {
   width: 100%;
   border-collapse: collapse;
@@ -53,6 +60,7 @@
 
 .vl-requests__table th,
 .vl-requests__table td {
+  overflow-wrap: anywhere;
   text-align: start;
   padding: 6px 8px;
   border-block-end: 1px solid var(--md-outline-variant);

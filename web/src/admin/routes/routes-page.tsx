@@ -61,26 +61,32 @@ function RouteTable({ view }: { readonly view: RoutesView }) {
       <p role="status">
         {overSummary(over)} {view.in_flight} in flight.
       </p>
-      <table className="vl-requests__table">
-        <caption>Routes, busiest first, over the last {view.minutes} minutes</caption>
-        <thead>
-          <tr>
-            <th scope="col">Route</th>
-            <th scope="col">Rate</th>
-            <th scope="col">Errors</th>
-            <th scope="col">p50</th>
-            <th scope="col">p95</th>
-            <th scope="col">p99</th>
-            <th scope="col">Budget</th>
-            <th scope="col">In flight</th>
-          </tr>
-        </thead>
-        <tbody>
-          {view.routes.map((stat) => (
-            <RouteRow key={`${stat.method} ${stat.route}`} stat={stat} />
-          ))}
-        </tbody>
-      </table>
+      {/* The table scrolls sideways when large text or zoom makes it wider
+          than a phone, so the scroller takes keyboard focus (WCAG 2.1.1,
+          axe scrollable-region-focusable). */}
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- see above */}
+      <div className="vl-requests__scroll" role="region" aria-label="Routes table" tabIndex={0}>
+        <table className="vl-requests__table">
+          <caption>Routes, busiest first, over the last {view.minutes} minutes</caption>
+          <thead>
+            <tr>
+              <th scope="col">Route</th>
+              <th scope="col">Rate</th>
+              <th scope="col">Errors</th>
+              <th scope="col">p50</th>
+              <th scope="col">p95</th>
+              <th scope="col">p99</th>
+              <th scope="col">Budget</th>
+              <th scope="col">In flight</th>
+            </tr>
+          </thead>
+          <tbody>
+            {view.routes.map((stat) => (
+              <RouteRow key={`${stat.method} ${stat.route}`} stat={stat} />
+            ))}
+          </tbody>
+        </table>
+      </div>
     </>
   );
 }

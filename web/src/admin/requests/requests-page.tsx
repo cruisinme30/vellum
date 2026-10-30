@@ -85,45 +85,50 @@ function RequestTable({
     return <p>No requests match. The buffer keeps the most recent 10,000.</p>;
   }
   return (
-    <table className="vl-requests__table">
-      <caption>Recent requests, newest first</caption>
-      <thead>
-        <tr>
-          <th scope="col">Time</th>
-          <th scope="col">Request</th>
-          <th scope="col">Status</th>
-          <th scope="col">Duration</th>
-          <th scope="col">Spans</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row) => (
-          <tr
-            key={row.seq}
-            aria-selected={row.trace_id === selected}
-            className={row.error ? "vl-requests__row--error" : undefined}
-          >
-            <td>{new Date(row.started_at_ms).toLocaleTimeString()}</td>
-            <td>
-              <button
-                type="button"
-                onClick={() => {
-                  onSelect(row.trace_id);
-                }}
-              >
-                {row.method ?? ""} {row.route ?? row.name}
-              </button>
-            </td>
-            <td>{row.status ?? (row.error ? "failed" : "")}</td>
-            <td>{formatDuration(row.duration_us)}</td>
-            <td>
-              {row.span_count}
-              {row.has_client ? " + browser" : ""}
-            </td>
+    // The table scrolls sideways when large text or zoom makes it wider than a phone,
+    // so the scroller takes keyboard focus (WCAG 2.1.1, axe scrollable-region-focusable).
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- see above
+    <div className="vl-requests__scroll" role="region" aria-label="Requests table" tabIndex={0}>
+      <table className="vl-requests__table">
+        <caption>Recent requests, newest first</caption>
+        <thead>
+          <tr>
+            <th scope="col">Time</th>
+            <th scope="col">Request</th>
+            <th scope="col">Status</th>
+            <th scope="col">Duration</th>
+            <th scope="col">Spans</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr
+              key={row.seq}
+              aria-selected={row.trace_id === selected}
+              className={row.error ? "vl-requests__row--error" : undefined}
+            >
+              <td>{new Date(row.started_at_ms).toLocaleTimeString()}</td>
+              <td>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSelect(row.trace_id);
+                  }}
+                >
+                  {row.method ?? ""} {row.route ?? row.name}
+                </button>
+              </td>
+              <td>{row.status ?? (row.error ? "failed" : "")}</td>
+              <td>{formatDuration(row.duration_us)}</td>
+              <td>
+                {row.span_count}
+                {row.has_client ? " + browser" : ""}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
