@@ -3,3 +3,6 @@
 #
 # Commits that only reformat code. `git blame` skips them: GitHub reads this
 # file itself, and `cargo xtask install-hooks` sets blame.ignoreRevsFile.
+
+# style: reformat the repo to 80 columns (ADR 0074, #564)
+92b8c43558af7b5c3b1bbd2d13d83a184fcde585
