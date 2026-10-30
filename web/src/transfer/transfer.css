@@ -85,7 +85,7 @@
   height: auto;
   border: 1px solid var(--md-outline-variant);
   border-radius: 2px;
-  background: #fff;
+  background: #fff; /* fixed: paper is white in every theme, like the PDF */
 }
 
 .vl-transfer-warnings ul {
