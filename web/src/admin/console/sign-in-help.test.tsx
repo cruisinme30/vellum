@@ -32,14 +32,14 @@ describe("sign-in help on Admin → Users", () => {
       </I18nProvider>,
     );
     await user.click(
-      screen.getByRole("button", { name: "Reset Marco Ruiz's two-step verification" }),
+      screen.getByRole("button", { name: "Reset two-step verification: Marco Ruiz" }),
     );
     expect(onSignInHelp).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Reset two-step verification" }));
     expect(onSignInHelp).toHaveBeenLastCalledWith("reset-factors");
-    await user.click(screen.getByRole("button", { name: "Sign Marco Ruiz out everywhere" }));
+    await user.click(screen.getByRole("button", { name: "Sign out everywhere: Marco Ruiz" }));
     await user.click(screen.getByRole("button", { name: "Keep" }));
-    await user.click(screen.getByRole("button", { name: "Sign Marco Ruiz out everywhere" }));
+    await user.click(screen.getByRole("button", { name: "Sign out everywhere: Marco Ruiz" }));
     await user.click(screen.getByRole("button", { name: "Sign out everywhere" }));
     expect(onSignInHelp).toHaveBeenLastCalledWith("sign-out");
   });
