@@ -1133,38 +1133,7 @@ impl CollectionsService {
         ctx: &RequestContext,
         input: CreateFromCsvInput,
     ) -> Result<CsvImported, Error> {
-        csv_size(&input.csv)?;
-        let title = input.title.trim();
-        if title.is_empty() {
-            return Err(Error::new(
-                ErrorKind::InvalidInput,
-                "a collection needs a title",
-            ));
-        }
-        let folder = vellum_store::BlobPath::new(input.folder.trim_end_matches('/'))
-            .map_err(state::store_error)?;
-        if !matches!(
-            vellum_store::layout::Kind::of(&folder.join("x.md").map_err(state::store_error)?),
-            vellum_store::layout::Kind::Document
-        ) {
-            return Err(Error::new(
-                ErrorKind::InvalidInput,
-                "collections can only be created in a drive folder",
-            ));
-        }
-        if !self
-            .access
-            .allowed_in(&ctx.principal, &folder, Need::Edit)
-            .await?
-        {
-            return Err(Error::new(
-                ErrorKind::PermissionDenied,
-                "you cannot create collections in this folder",
-            ));
-        }
-        let dir = folder
-            .join(&vellum_store::layout::file_name(title, "collection"))
-            .map_err(state::store_error)?;
+        let (title, dir) = self.csv_destination(ctx, &input).await?;
         let id = CollectionId::generate();
         let import = crate::csv::import_new(&input.csv, id, title)?;
         let rows = import.rows.len();
@@ -1235,6 +1204,48 @@ impl CollectionsService {
             collection: info,
             changed,
         })
+    }
+
+    /// Checks a CSV import's size, title and folder, and returns the
+    /// trimmed title with the folder the new collection goes in.
+    async fn csv_destination<'a>(
+        &self,
+        ctx: &RequestContext,
+        input: &'a CreateFromCsvInput,
+    ) -> Result<(&'a str, vellum_store::BlobPath), Error> {
+        csv_size(&input.csv)?;
+        let title = input.title.trim();
+        if title.is_empty() {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "a collection needs a title",
+            ));
+        }
+        let folder = vellum_store::BlobPath::new(input.folder.trim_end_matches('/'))
+            .map_err(state::store_error)?;
+        if !matches!(
+            vellum_store::layout::Kind::of(&folder.join("x.md").map_err(state::store_error)?),
+            vellum_store::layout::Kind::Document
+        ) {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "collections can only be created in a drive folder",
+            ));
+        }
+        if !self
+            .access
+            .allowed_in(&ctx.principal, &folder, Need::Edit)
+            .await?
+        {
+            return Err(Error::new(
+                ErrorKind::PermissionDenied,
+                "you cannot create collections in this folder",
+            ));
+        }
+        let dir = folder
+            .join(&vellum_store::layout::file_name(title, "collection"))
+            .map_err(state::store_error)?;
+        Ok((title, dir))
     }
 
     /// Deletes the files of a collection whose create is being undone.
