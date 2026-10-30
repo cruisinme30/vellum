@@ -27,6 +27,7 @@ use crate::error::{Error, Result};
 use crate::index::{Index, Pool};
 use crate::reindex::{self, FileReader, Listing, ReindexReport, Snapshot};
 use crate::telemetry::traced;
+use crate::tx::BeginWrite as _;
 
 /// Environment variable naming the main database.
 pub const MAIN_URL_VAR: &str = "VELLUM_DATABASE_URL";
@@ -415,7 +416,7 @@ impl ShardedIndex {
         };
         macro_rules! write {
             ($pool:expr) => {{
-                let mut tx = $pool.begin().await?;
+                let mut tx = $pool.begin_write().await?;
                 for (space, name) in entries {
                     let q = sqlx::query(sql).bind(space.as_uuid()).bind(name).bind(now);
                     let _ = traced(system, "space_shards.put", q.execute(&mut *tx)).await?;

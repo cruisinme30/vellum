@@ -28,7 +28,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use tokio::sync::{mpsc as tmpsc, oneshot};
 use vellum_db::sqlx;
-use vellum_db::{Index, IndexConfig, IndexPool};
+use vellum_db::{BeginWrite as _, Index, IndexConfig, IndexPool};
 use vellum_kernel::{Error, ErrorKind};
 
 use crate::store::State;
@@ -354,7 +354,7 @@ async fn write(
 ) {
     let result: Result<(), Error> = on_pool!(index, |pool, _postgres| {
         let opened = async {
-            let mut tx = pool.begin().await.map_err(db)?;
+            let mut tx = pool.begin_write().await.map_err(db)?;
             // Bumping the version takes the row lock that serialises
             // writers on every replica.
             let (version, horizon): (i64, i64) = sqlx::query_as(
