@@ -489,6 +489,10 @@ pub struct SamlRequest {
     pub next: String,
     /// When it lapses.
     pub expires: Timestamp,
+    /// Whether it re-authenticates, so the provider must have checked
+    /// the person just now (RT-046).
+    #[serde(default)]
+    pub reauth: bool,
 }
 
 /// Who must use a second factor when signing in with a password.

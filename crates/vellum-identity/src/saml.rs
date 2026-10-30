@@ -113,6 +113,34 @@ pub struct Asserted {
     pub name: Option<String>,
     /// Until when the assertion could be replayed.
     pub expires: Timestamp,
+    /// When the provider last checked the person (`AuthnInstant`).
+    pub authn_instant: Option<Timestamp>,
+}
+
+/// How recent `AuthnInstant` must be for a re-authentication, as for
+/// OIDC's `auth_time`.
+const FRESH_MS: i64 = 5 * 60 * 1000;
+
+/// Checks that a re-authentication's assertion says the provider checked
+/// the person within the last five minutes (RT-046). Providers may ignore
+/// `ForceAuthn` and answer from a remembered sign-in.
+///
+/// # Errors
+///
+/// [`ErrorKind::Unauthenticated`] without a recent `AuthnInstant`.
+pub fn check_fresh(asserted: &Asserted, now: Timestamp) -> Result<(), Error> {
+    let now = now.unix_ms();
+    let fresh = asserted.authn_instant.is_some_and(|at| {
+        let at = at.unix_ms();
+        at <= now + CLOCK_SKEW_MS && now - at <= FRESH_MS + CLOCK_SKEW_MS
+    });
+    if fresh {
+        Ok(())
+    } else {
+        Err(refused(
+            "the provider did not confirm a fresh sign-in; sign in again",
+        ))
+    }
 }
 
 /// What a sign-in expects of the response.
@@ -372,7 +400,12 @@ fn read_assertion(assertion: Node<'_, '_>, expected: &Expected<'_>) -> Result<As
         .saturating_add(CLOCK_SKEW_MS)
         .min(now.saturating_add(MAX_REMEMBER_MS));
     let expires = Timestamp::from_unix_ms(until).unwrap_or(expected.now);
+    let authn_instant = only_child(assertion, ASSERTION_NS, "AuthnStatement")
+        .map(|s| time(s, "AuthnInstant"))
+        .transpose()?
+        .flatten();
     Ok(Asserted {
+        authn_instant,
         id,
         issuer,
         name_id,
