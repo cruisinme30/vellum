@@ -20,6 +20,7 @@ path = [
   "web/public/manifest.webmanifest",
   "web/public/icons/**",
   "web/e2e/__screenshots__/**",
+  "web/e2e/support/*.gen.json",
   "desktop/pnpm-lock.yaml",
   "desktop/package.json",
   "desktop/tsconfig.json",
