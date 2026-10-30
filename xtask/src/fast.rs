@@ -409,16 +409,6 @@ fn steps(base: Option<&str>, branch: Option<&str>, tested: Option<&[String]>) ->
     let focus = base.filter(|_| tested.is_some());
     steps.extend(web_steps(focus));
     steps.extend(desktop_steps(focus));
-    // The "UI layout (quick)" job: what a merged batch most often breaks
-    // without any single branch failing on its own (issue #532). It takes
-    // minutes, so only the integrator's full run (VELLUM_FAST_ALL_TESTS=1)
-    // includes it; threads run focused tests. The local gate runs the
-    // whole UI suite itself (ADR 0073), so it skips this one.
-    let mut ui = Step::new("UI layout (quick)", "scripts/ci/ui-quick.sh", &[])
-        .needs("mdbook")
-        .area(Area::Ui);
-    ui.not_needed = !env_flag(ALL_TESTS) || env_flag(SKIP_UI);
-    steps.push(ui);
     steps.extend([
         // Files, docs and secrets
         Step::new("REUSE headers", "reuse", &["lint"]),
@@ -499,6 +489,18 @@ fn steps(base: Option<&str>, branch: Option<&str>, tested: Option<&[String]>) ->
         name.args.push(branch.to_owned());
         steps.push(name);
     }
+    // Last, so the reports it leaves in web/test-results cannot reach
+    // the Markdown and prose checks, which in CI run in another job.
+    // The "UI layout (quick)" job: what a merged batch most often breaks
+    // without any single branch failing on its own (issue #532). It takes
+    // minutes, so only the integrator's full run (VELLUM_FAST_ALL_TESTS=1)
+    // includes it; threads run focused tests. The local gate runs the
+    // whole UI suite itself (ADR 0073), so it skips this one.
+    let mut ui = Step::new("UI layout (quick)", "scripts/ci/ui-quick.sh", &[])
+        .needs("mdbook")
+        .area(Area::Ui);
+    ui.not_needed = !env_flag(ALL_TESTS) || env_flag(SKIP_UI);
+    steps.push(ui);
 
     steps
 }
