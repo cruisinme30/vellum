@@ -25,6 +25,8 @@ interface Refusal {
 /** What the fake drive holds and what it was asked, for assertions. */
 export interface FakeDrive {
   readonly items: Item[];
+  /** Pages shared with the signed-in person from drives they cannot browse. */
+  readonly shared: Item[];
   readonly starred: Set<string>;
   /** "METHOD path" of every change, in order. */
   readonly changes: string[];
@@ -65,6 +67,19 @@ export async function fakeDrive(page: Page, owner: string): Promise<FakeDrive> {
       created_by: owner,
     },
   ];
+  // A page in someone else's drive, shared with the signed-in person on
+  // its own: in "Shared with me", never in their trees (#567).
+  const shared: Item[] = [
+    {
+      id: "01M6400000PAGE00LAUNCHQ101",
+      space_id: "01M6400000SPACE0OTHERDRV01",
+      kind: "page",
+      parent_id: "01M6400000FOLDER0OTHER0001",
+      title: "Launch plan Q1",
+      modified: now,
+      created_by: "01M6409GN2EYWS8Z7NFQQ3OTHR",
+    },
+  ];
   const starred = new Set<string>();
   const changes: string[] = [];
   const refusals = new Map<string, Refusal>();
@@ -94,6 +109,9 @@ export async function fakeDrive(page: Page, owner: string): Promise<FakeDrive> {
   const read = (path: string, query: URLSearchParams): unknown => {
     if (path === "/my-drive") return { space: SPACE };
     if (path === "/shared-drives") return { spaces: [] };
+    if (path === "/shared-with-me") return { items: shared };
+    const one = /^\/items\/([^/]+)$/.exec(path)?.[1];
+    if (one !== undefined) return [...items, ...shared].find((item) => item.id === one);
     if (path === "/starred") return { items: items.filter((item) => starred.has(item.id)) };
     if (path === `/spaces/${SPACE.id}/tree`) return { items: depthFirst(), truncated: false };
     if (path === `/spaces/${SPACE.id}/items`) {
@@ -180,6 +198,7 @@ export async function fakeDrive(page: Page, owner: string): Promise<FakeDrive> {
   });
   return {
     items,
+    shared,
     starred,
     changes,
     refuseNext(key, refusal) {

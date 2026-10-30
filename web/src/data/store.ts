@@ -74,6 +74,13 @@ export interface WorkspaceStore {
   setUser?(user: SignedInUser | undefined): void;
   /** Loads the spaces and pages again, after a change made elsewhere (an import). */
   refresh?(): void;
+  /**
+   * Fetches a page or folder that is not in the snapshot, such as one
+   * shared with the person on its own, outside any space they can browse
+   * (#567), and adds it to `pages`. `undefined` when there is no such
+   * page or the person may not open it; never rejects.
+   */
+  loadPage?(id: string): Promise<PageMeta | undefined>;
 }
 
 /** Seed data for an in-memory store. */

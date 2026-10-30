@@ -74,7 +74,9 @@ function usePageHistory(pageId: string) {
       }}
     />
   );
-  return { button, panel, controls, setControls };
+  // A viewer's title is not theirs to change (#567).
+  const readOnly = controls?.canWrite === false;
+  return { button, panel, controls, setControls, readOnly };
 }
 
 /**
@@ -144,6 +146,31 @@ function useChipSources(): ChipSources {
   );
 }
 
+/**
+ * Whether the page `pageId` may still arrive: the workspace is `loading`,
+ * or the store is being asked for it. A page shared on its own is in none
+ * of the person's spaces' trees (#567), so when the loaded workspace lacks
+ * it, the store fetches it by ID; it joins the workspace if the person may
+ * open it. False once it is `known` or known to be missing.
+ */
+function useOutsidePage(pageId: string, known: boolean, loading: boolean): boolean {
+  const { store } = useServices();
+  const absent = !known && !loading;
+  const [missing, setMissing] = useState<string>();
+  useEffect(() => {
+    if (!absent || store.loadPage === undefined) return;
+    let live = true;
+    void store.loadPage(pageId).then((found) => {
+      if (live && found === undefined) setMissing(pageId);
+    });
+    return () => {
+      live = false;
+    };
+  }, [absent, store, pageId]);
+  if (known || loading) return loading;
+  return store.loadPage !== undefined && missing !== pageId;
+}
+
 /** A page: breadcrumbs, title, properties and the editor. */
 export function PageView() {
   const t = useT();
@@ -159,6 +186,7 @@ export function PageView() {
   const chips = useChipSources();
   const pageFiles = usePageFilesPanel(pageId, pageHistory.controls?.canWrite ?? false);
   const page = workspace.pages.find((p) => p.id === pageId);
+  const waiting = useOutsidePage(pageId, page !== undefined, workspace.loading === true);
   const onSelectionTask = usePageTask(page);
   const trail = useMemo(() => ancestors(workspace.pages, pageId), [workspace.pages, pageId]);
   const space = workspace.spaces.find((s) => s.id === page?.spaceId);
@@ -187,7 +215,7 @@ export function PageView() {
   );
 
   if (!page) {
-    return workspace.loading === true ? (
+    return waiting ? (
       <p className="vl-muted" role="status">
         {t("workspace-loading")}
       </p>
@@ -218,6 +246,7 @@ export function PageView() {
             aria-label={t("page-title")}
             placeholder={t("page-untitled")}
             defaultValue={page.title}
+            readOnly={pageHistory.readOnly}
             onBlur={(event) => {
               const title = event.currentTarget.value.trim();
               if (title !== page.title) {
