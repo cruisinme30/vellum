@@ -116,7 +116,7 @@ export function EmbedView(properties: ReactNodeViewProps) {
         <iframe
           src={target.src}
           title={t("embed-title", { provider: target.provider })}
-          sandbox="allow-scripts allow-same-origin allow-popups allow-presentation"
+          sandbox="allow-scripts allow-same-origin allow-popups"
           referrerPolicy="strict-origin-when-cross-origin"
           loading="lazy"
           allowFullScreen

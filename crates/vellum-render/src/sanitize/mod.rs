@@ -139,7 +139,7 @@ static POLICY: LazyLock<Builder<'static>> = LazyLock::new(|| {
         .set_tag_attribute_value(
             "iframe",
             "sandbox",
-            "allow-scripts allow-same-origin allow-presentation allow-popups",
+            "allow-scripts allow-same-origin allow-popups",
         )
         .url_schemes(["http", "https", "mailto", "tel"].into_iter().collect())
         .url_relative(ammonia::UrlRelative::PassThrough)
@@ -273,7 +273,7 @@ mod tests {
             "{out}"
         );
         assert!(
-            out.contains("allow-scripts allow-same-origin allow-presentation allow-popups"),
+            out.contains("allow-scripts allow-same-origin allow-popups"),
             "{out}"
         );
         assert!(!out.contains("allow-top-navigation"), "{out}");
