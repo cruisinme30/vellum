@@ -30,6 +30,7 @@ pub fn write(inlines: &[Inline], place: Place) -> String {
         mark: None,
         edge: (false, false),
         next_visible: '\n',
+        link_depth: 0,
     };
     // Adjacent marks of a kind merge, as they do when read, so their
     // delimiters never run together.
@@ -58,6 +59,10 @@ struct Writer {
     edge: (bool, bool),
     /// The character the parser sees after the current inline.
     next_visible: char,
+    /// How many links and images enclose the current inline. The autolink
+    /// extension does not run inside link text or image descriptions, so a
+    /// link there is never bare.
+    link_depth: usize,
 }
 
 /// What the parser sees around a mark's delimiters when it decides whether
@@ -135,7 +140,9 @@ impl Writer {
                 content,
             } => {
                 if let Some(bare) = bare_autolink(url, title, content).filter(|_| {
-                    bare_ok && self.out.chars().next_back().is_none_or(char::is_whitespace)
+                    bare_ok
+                        && self.link_depth == 0
+                        && self.out.chars().next_back().is_none_or(char::is_whitespace)
                 }) {
                     self.out.push_str(bare);
                 } else if let Some(auto) = autolink(url, title, content) {
@@ -144,14 +151,18 @@ impl Writer {
                     self.out.push('>');
                 } else {
                     self.out.push('[');
+                    self.link_depth += 1;
                     self.enclosed(']', None, |w| w.inlines(content, None));
+                    self.link_depth -= 1;
                     self.out.push(']');
                     self.destination(url, title);
                 }
             }
             Inline::Image { url, title, alt } => {
                 self.out.push_str("![");
+                self.link_depth += 1;
                 self.enclosed(']', None, |w| w.inlines(alt, None));
+                self.link_depth -= 1;
                 self.out.push(']');
                 self.destination(url, title);
             }

@@ -30,6 +30,9 @@ pub enum DiagnosticCode {
     /// Blocks or inline markup nest deeper than [`crate::MAX_NESTING`]
     /// levels; the deeper content is kept as plain text.
     NestingTooDeep,
+    /// Emphasis-like delimiters pair differently once written as canonical
+    /// text; the markup is kept as that text reads (or as plain text).
+    AmbiguousMarkup,
 }
 
 /// A problem found while parsing, with the 1-based source line when known.

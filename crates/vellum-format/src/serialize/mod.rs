@@ -10,7 +10,7 @@
 //! math, `:::` containers with one extra colon per level of nesting, and
 //! one blank line between blocks.
 
-mod inline;
+pub mod inline;
 
 use crate::ast::{Alignment, Block, Container, Document, Fence, List, Table};
 use crate::{attrs, front_matter};
