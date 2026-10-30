@@ -935,6 +935,11 @@
   cursor: pointer;
 }
 
+/* The group clips its corners, so the focus ring draws inside the button. */
+.vl-segmented button:focus-visible {
+  outline-offset: -3px;
+}
+
 .vl-segmented button + button {
   border-inline-start: 1px solid var(--md-outline);
 }
