@@ -17,10 +17,13 @@ In **Admin → AI**:
 ::: facts
 
 - MCP server: on or off for the whole workspace
-- Allowed scopes: the most any client may ask for; `write:direct` and `admin` are off by default
+- Allowed scopes: the most any client may ask for; `write:direct` and `admin`
+  are off by default
 - Rate limits: calls per minute per token
-- Clients: every connected client, who connected it and when it was last used, with **Revoke**
-- Models for built-in features: the provider and key used for summarise, ask and draft, or none
+- Clients: every connected client, who connected it and when it was last used,
+  with **Revoke**
+- Models for built-in features: the provider and key used for summarise, ask and
+  draft, or none
 
 :::
 
@@ -46,7 +49,8 @@ in a folder the server can read (for example `all-MiniLM-L6-v2` or
 ::: facts
 
 - `VELLUM_EMBEDDINGS`: the model folder; unset, search is keyword-only
-- `VELLUM_EMBEDDINGS_IDLE_MINUTES`: how long the model stays in memory unused, 15 by default
+- `VELLUM_EMBEDDINGS_IDLE_MINUTES`: how long the model stays in memory unused,
+  15 by default
 
 :::
 

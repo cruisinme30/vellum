@@ -18,9 +18,11 @@ use http::{HeaderName, StatusCode};
 use vellum_contracts::BoxFuture;
 
 /// The request header carrying the key.
-pub const IDEMPOTENCY_KEY: HeaderName = HeaderName::from_static("idempotency-key");
+pub const IDEMPOTENCY_KEY: HeaderName =
+    HeaderName::from_static("idempotency-key");
 /// The response header set on a replayed response.
-pub const IDEMPOTENT_REPLAYED: HeaderName = HeaderName::from_static("idempotent-replayed");
+pub const IDEMPOTENT_REPLAYED: HeaderName =
+    HeaderName::from_static("idempotent-replayed");
 /// Longest accepted key.
 pub const MAX_KEY_LEN: usize = 255;
 
@@ -64,9 +66,18 @@ pub enum Begin {
 pub trait IdempotencyStore: Send + Sync + 'static {
     /// Claims `key` for a request whose method, path and body hash to
     /// `fingerprint`.
-    fn begin(&self, key: ScopedKey, fingerprint: [u8; 32], ttl: Duration) -> BoxFuture<'_, Begin>;
+    fn begin(
+        &self,
+        key: ScopedKey,
+        fingerprint: [u8; 32],
+        ttl: Duration,
+    ) -> BoxFuture<'_, Begin>;
     /// Stores the response for a claimed key.
-    fn complete(&self, key: ScopedKey, response: StoredResponse) -> BoxFuture<'_, ()>;
+    fn complete(
+        &self,
+        key: ScopedKey,
+        response: StoredResponse,
+    ) -> BoxFuture<'_, ()>;
     /// Releases a claimed key without storing (server error, client gone).
     fn abandon(&self, key: ScopedKey) -> BoxFuture<'_, ()>;
 }
@@ -87,7 +98,9 @@ enum Entry {
 impl Entry {
     const fn expires(&self) -> Instant {
         match self {
-            Self::Running { expires, .. } | Self::Done { expires, .. } => *expires,
+            Self::Running { expires, .. } | Self::Done { expires, .. } => {
+                *expires
+            }
         }
     }
 }
@@ -124,14 +137,23 @@ impl Default for MemoryIdempotencyStore {
 }
 
 impl IdempotencyStore for MemoryIdempotencyStore {
-    fn begin(&self, key: ScopedKey, fingerprint: [u8; 32], ttl: Duration) -> BoxFuture<'_, Begin> {
+    fn begin(
+        &self,
+        key: ScopedKey,
+        fingerprint: [u8; 32],
+        ttl: Duration,
+    ) -> BoxFuture<'_, Begin> {
         let now = Instant::now();
         let mut entries = self.lock();
         if entries.get(&key).is_some_and(|e| e.expires() <= now) {
             let _ = entries.remove(&key);
         }
         let verdict = match entries.get(&key) {
-            Some(Entry::Running { fingerprint: f, .. }) if *f == fingerprint => Begin::InFlight,
+            Some(Entry::Running { fingerprint: f, .. })
+                if *f == fingerprint =>
+            {
+                Begin::InFlight
+            }
             Some(Entry::Done {
                 fingerprint: f,
                 response,
@@ -158,7 +180,11 @@ impl IdempotencyStore for MemoryIdempotencyStore {
         Box::pin(std::future::ready(verdict))
     }
 
-    fn complete(&self, key: ScopedKey, response: StoredResponse) -> BoxFuture<'_, ()> {
+    fn complete(
+        &self,
+        key: ScopedKey,
+        response: StoredResponse,
+    ) -> BoxFuture<'_, ()> {
         let mut entries = self.lock();
         if let Some(Entry::Running {
             fingerprint,

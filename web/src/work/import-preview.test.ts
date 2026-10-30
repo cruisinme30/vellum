@@ -34,7 +34,10 @@ describe("previewCount", () => {
           items: [
             {
               type: "to-do",
-              attributes: { title: "B", "checklist-items": [{ type: "checklist-item" }] },
+              attributes: {
+                title: "B",
+                "checklist-items": [{ type: "checklist-item" }],
+              },
             },
           ],
         },
@@ -44,7 +47,8 @@ describe("previewCount", () => {
   });
 
   it("counts Todoist task rows and refuses other files", () => {
-    const csv = '"TYPE",CONTENT\r\ntask,One\r\nsection,Later\r\n"task",Two\r\nnote,x';
+    const csv =
+      '"TYPE",CONTENT\r\ntask,One\r\nsection,Later\r\n"task",Two\r\nnote,x';
     expect(previewCount("todoist", csv)).toBe(2);
     expect(previewCount("todoist", "a,b\n1,2")).toBeUndefined();
     expect(previewCount("google_tasks", "not json")).toBeUndefined();

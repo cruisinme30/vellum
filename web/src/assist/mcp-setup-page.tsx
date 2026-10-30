@@ -13,7 +13,9 @@ import type { ConnectionReport, McpSetupApi, Snippet } from "./api";
 import "../admin/console/console.css";
 import "./assist.css";
 
-/** `/admin/mcp`: setup snippets for MCP clients and "Test connection" (R-AI-5). */
+/**
+ * `/admin/mcp`: setup snippets for MCP clients and "Test connection" (R-AI-5).
+ */
 export function McpSetupPage() {
   const t = useT();
   return (
@@ -23,7 +25,13 @@ export function McpSetupPage() {
   );
 }
 
-function CopyButton({ text, label }: { readonly text: string; readonly label: string }) {
+function CopyButton({
+  text,
+  label,
+}: {
+  readonly text: string;
+  readonly label: string;
+}) {
   const t = useT();
   const [copied, setCopied] = useState(false);
   const clipboard = globalThis.navigator.clipboard as Clipboard | undefined;
@@ -51,8 +59,11 @@ function SnippetCard({ snippet }: { readonly snippet: Snippet }) {
       <h2>{snippet.title}</h2>
       <p>{snippet.instructions}</p>
       {/* Focusable, so a keyboard can scroll a long command (WCAG 2.1.1). */}
-      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a scrolling region */}
-      <pre tabIndex={0} aria-label={t("admin-mcp-code", { client: snippet.title })}>
+      <pre
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+        tabIndex={0}
+        aria-label={t("admin-mcp-code", { client: snippet.title })}
+      >
         <code>{snippet.code}</code>
       </pre>
       <div>
@@ -104,7 +115,11 @@ function TestConnection({ api }: { readonly api: McpSetupApi }) {
           />
         </label>
         <div className="vl-admin-actions">
-          <button type="submit" className="vl-filled-button" disabled={busy || token.trim() === ""}>
+          <button
+            type="submit"
+            className="vl-filled-button"
+            disabled={busy || token.trim() === ""}
+          >
             {busy ? t("admin-mcp-testing") : t("admin-mcp-test")}
           </button>
         </div>

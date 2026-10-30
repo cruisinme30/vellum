@@ -17,9 +17,21 @@ import type { CollabConnector } from "../editor/collab/provider";
 import { createMemoryCommentsApi } from "../editor/comments/memory-comments";
 import { I18nProvider } from "../i18n/i18n";
 
-import type { IssueOut, ListView, MyWorkView, ParseView, TaskView, TeamOut, WorkApi } from "./api";
+import type {
+  IssueOut,
+  ListView,
+  MyWorkView,
+  ParseView,
+  TaskView,
+  TeamOut,
+  WorkApi,
+} from "./api";
 
-function task(id: string, title: string, extra: Partial<TaskView> = {}): TaskView {
+function task(
+  id: string,
+  title: string,
+  extra: Partial<TaskView> = {},
+): TaskView {
   return {
     id,
     title,
@@ -51,7 +63,11 @@ const TEAM: TeamOut = {
   archived: false,
 };
 
-function issue(key: string, title: string, extra: Partial<IssueOut> = {}): IssueOut {
+function issue(
+  key: string,
+  title: string,
+  extra: Partial<IssueOut> = {},
+): IssueOut {
   return {
     id: `id-${key}`,
     key,
@@ -142,7 +158,8 @@ function parseOf(text: string): ParseView {
   const due = text.indexOf("tomorrow 3pm");
   if (due !== -1) highlights.push({ start: due, end: due + 12, kind: "due" });
   const list = text.indexOf("#ops");
-  if (list !== -1) highlights.push({ start: list, end: list + 4, kind: "list" });
+  if (list !== -1)
+    highlights.push({ start: list, end: list + 4, kind: "list" });
   return {
     title: text,
     assignees: [],
@@ -158,8 +175,12 @@ function parseOf(text: string): ParseView {
 
 export function fakeApi(overrides: Partial<WorkApi> = {}) {
   const myWork = vi.fn<WorkApi["myWork"]>(() => Promise.resolve(MY_WORK));
-  const addTask = vi.fn<WorkApi["addTask"]>((text) => Promise.resolve(task("new", text)));
-  const setDone = vi.fn<WorkApi["setDone"]>((id, done) => Promise.resolve(task(id, "x", { done })));
+  const addTask = vi.fn<WorkApi["addTask"]>((text) =>
+    Promise.resolve(task("new", text)),
+  );
+  const setDone = vi.fn<WorkApi["setDone"]>((id, done) =>
+    Promise.resolve(task(id, "x", { done })),
+  );
   const createIssue = vi.fn<WorkApi["createIssue"]>((created) =>
     Promise.resolve(issue("ENG-8", created.title)),
   );
@@ -167,7 +188,9 @@ export function fakeApi(overrides: Partial<WorkApi> = {}) {
     Promise.resolve(issue(key, "Fix sign-in", { state })),
   );
   const addComment = vi.fn<WorkApi["addComment"]>(() => Promise.resolve());
-  const dismissMention = vi.fn<WorkApi["dismissMention"]>(() => Promise.resolve());
+  const dismissMention = vi.fn<WorkApi["dismissMention"]>(() =>
+    Promise.resolve(),
+  );
   const saveSettings = vi.fn<WorkApi["saveSettings"]>((input) =>
     Promise.resolve({
       time_zone: input.time_zone ?? NONE,
@@ -187,14 +210,24 @@ export function fakeApi(overrides: Partial<WorkApi> = {}) {
     Promise.resolve({ ...OPS, doc: "list-new", title }),
   );
   const syncGoogle = vi.fn<WorkApi["syncGoogle"]>(() =>
-    Promise.resolve({ adopted: 0, created: 2, deleted: 0, moved: 1, unblocked: 0, updated: 0 }),
+    Promise.resolve({
+      adopted: 0,
+      created: 2,
+      deleted: 0,
+      moved: 1,
+      unblocked: 0,
+      updated: 0,
+    }),
   );
   const api: WorkApi = {
     ...createMemoryCommentsApi("ana"),
-    fileIssue: (created) => Promise.resolve({ issue: issue("ENG-9", created.title) }),
+    fileIssue: (created) =>
+      Promise.resolve({ issue: issue("ENG-9", created.title) }),
     searchIssues: () => Promise.resolve([issue("ENG-7", "Fix sign-in")]),
-    setPriority: (key, priority) => Promise.resolve(issue(key, "Fix sign-in", { priority })),
-    queryIssues: () => Promise.resolve([{ key: NONE, issues: [issue("ENG-7", "Fix sign-in")] }]),
+    setPriority: (key, priority) =>
+      Promise.resolve(issue(key, "Fix sign-in", { priority })),
+    queryIssues: () =>
+      Promise.resolve([{ key: NONE, issues: [issue("ENG-7", "Fix sign-in")] }]),
     inbox: () => Promise.resolve([]),
     triage: (key) => Promise.resolve(issue(key, "x")),
     cycles: () => Promise.resolve({ cycles: [], velocity: NONE }),
@@ -218,7 +251,8 @@ export function fakeApi(overrides: Partial<WorkApi> = {}) {
     createList,
     shareList,
     google: () => Promise.resolve({ configured: true, connected: true }),
-    connectGoogle: () => Promise.resolve("https://accounts.google.com/o/oauth2"),
+    connectGoogle: () =>
+      Promise.resolve("https://accounts.google.com/o/oauth2"),
     syncGoogle,
     disconnectGoogle: () => Promise.resolve(),
     settings: () =>

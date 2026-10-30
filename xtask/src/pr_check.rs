@@ -19,8 +19,8 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-const USAGE: &str = "usage: cargo xtask pr-check --title <title> --body-file <file> \
-                     [--base <branch>] [--branch <branch>]";
+const USAGE: &str = "usage: cargo xtask pr-check --title <title> --body-file \
+                     <file> [--base <branch>] [--branch <branch>]";
 
 /// The repository whose issues `Closes #N` must name.
 const DEFAULT_REPO: &str = "cruisinme30/vellum";
@@ -66,8 +66,9 @@ pub fn run(args: &[String]) -> Result<(), String> {
     let root = git(Path::new("."), &["rev-parse", "--show-toplevel"])
         .ok_or("cargo xtask pr-check must run inside the Vellum repository")?;
     let root = Path::new(&root);
-    let body = fs::read_to_string(&request.body_file)
-        .map_err(|error| format!("cannot read {}: {error}", request.body_file))?;
+    let body = fs::read_to_string(&request.body_file).map_err(|error| {
+        format!("cannot read {}: {error}", request.body_file)
+    })?;
     let branch = request
         .branch
         .clone()
@@ -77,7 +78,9 @@ pub fn run(args: &[String]) -> Result<(), String> {
         root,
         &["merge-base", &format!("origin/{}", request.base), "HEAD"],
     )
-    .ok_or_else(|| format!("cannot find origin/{}; run git fetch first", request.base))?;
+    .ok_or_else(|| {
+        format!("cannot find origin/{}; run git fetch first", request.base)
+    })?;
     let repo = env::var("GH_REPO").unwrap_or_else(|_| DEFAULT_REPO.to_owned());
 
     let mut failed = Vec::new();
@@ -112,7 +115,10 @@ pub fn run(args: &[String]) -> Result<(), String> {
     }
 
     if failed.is_empty() {
-        report("The pull request passes CI's title, branch, description and issue checks.");
+        report(
+            "The pull request passes CI's title, branch, description and issue \
+                checks.",
+        );
         Ok(())
     } else {
         Err(format!(
@@ -127,17 +133,15 @@ pub fn run(args: &[String]) -> Result<(), String> {
 fn names_script(base: &str, branch: &str, title: &str) -> String {
     let quote = |value: &str| format!("'{}'", value.replace('\'', r"'\''"));
     format!(
-        "source scripts/ci/commit-rules.sh\n\
-         base={}; branch={}; title={}\n\
+        "source scripts/ci/commit-rules.sh\nbase={}; branch={}; title={}\n\
          status=0\n\
          if [[ \"$base\" == main && \"$branch\" == develop ]]; then :\n\
          elif ! check_branch \"$branch\"; then\n\
-           echo \"Branch '$branch' must be named <type>/<topic>, e.g. feat/typed-ids\" >&2; status=1\n\
-         fi\n\
+         echo \"Branch '$branch' must be named <type>/<topic>, e.g. \
+         feat/typed-ids\" >&2; status=1\nfi\n\
          if ! check_subject \"$title\"; then\n\
-           echo \"Title is not a Conventional Commit of at most 72 characters after the type: $title\" >&2; status=1\n\
-         fi\n\
-         exit $status",
+         echo \"Title is not a Conventional Commit of at most 72 characters \
+         after the type: $title\" >&2; status=1\nfi\nexit $status",
         quote(base),
         quote(branch),
         quote(title)
@@ -172,7 +176,10 @@ fn issue_lookup_token(root: &Path, repo: &str) -> Lookup {
     } else if probe(true) {
         Lookup::Anonymous
     } else {
-        report("GitHub is not reachable with gh; the linked issue is checked in CI only.");
+        report(
+            "GitHub is not reachable with gh; the linked issue is checked in \
+                CI only.",
+        );
         Lookup::Unavailable
     }
 }
@@ -228,7 +235,9 @@ mod tests {
 
     #[test]
     fn parses_flags_with_develop_as_the_default_base() {
-        let request = parse(&args(&["--title", "ci: x", "--body-file", "pr.md"])).unwrap();
+        let request =
+            parse(&args(&["--title", "ci: x", "--body-file", "pr.md"]))
+                .unwrap();
         assert_eq!(request.base, "develop");
         assert_eq!(request.title, "ci: x");
         assert!(parse(&args(&["--title", "ci: x"])).is_err());

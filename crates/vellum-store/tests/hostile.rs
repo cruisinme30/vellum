@@ -30,7 +30,8 @@ fn paths_that_escape_on_windows_or_into_git_are_refused() {
 
 #[cfg(unix)]
 #[tokio::test]
-async fn listing_through_a_symlinked_folder_stays_inside_the_root() -> TestResult {
+async fn listing_through_a_symlinked_folder_stays_inside_the_root() -> TestResult
+{
     let outside = tempfile::tempdir()?;
     std::fs::create_dir_all(outside.path().join("inner"))?;
     std::fs::write(outside.path().join("inner/secret.md"), "secret")?;
@@ -76,7 +77,10 @@ async fn a_repository_inside_a_drive_is_not_listed() -> TestResult {
     let root = tempfile::tempdir()?;
     let store = LocalStore::open(root.path()).await?;
     std::fs::create_dir_all(root.path().join("drives/shared/Ops/.git/hooks"))?;
-    std::fs::write(root.path().join("drives/shared/Ops/.git/config"), "[core]")?;
+    std::fs::write(
+        root.path().join("drives/shared/Ops/.git/config"),
+        "[core]",
+    )?;
     std::fs::write(root.path().join("drives/shared/Ops/Plan.md"), "plan")?;
     let listed: Vec<String> = store
         .list(None)

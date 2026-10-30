@@ -15,7 +15,10 @@ import {
 export const DENSITIES = ["comfortable", "compact", "spacious"] as const;
 type Density = (typeof DENSITIES)[number];
 
-/** Motion: follow the system setting, or always reduce, or always allow (R-TH-5). */
+/**
+ * Motion: follow the system setting, or always reduce, or always allow
+ * (R-TH-5).
+ */
 export const MOTIONS = ["system", "reduce", "full"] as const;
 type Motion = (typeof MOTIONS)[number];
 
@@ -56,8 +59,11 @@ export const DEFAULT_APPEARANCE: Appearance = {
 
 const STORAGE_KEY = "vellum.appearance";
 
-const pick = <T extends string>(options: readonly T[], value: unknown, fallback: T): T =>
-  options.find((option) => option === value) ?? fallback;
+const pick = <T extends string>(
+  options: readonly T[],
+  value: unknown,
+  fallback: T,
+): T => options.find((option) => option === value) ?? fallback;
 
 function readCustom(value: unknown): CustomTheme | undefined {
   if (value === undefined) return undefined;
@@ -72,7 +78,8 @@ function readCustom(value: unknown): CustomTheme | undefined {
  * users should now follow their organisation's colour.
  */
 function readSeed(value: unknown): string | undefined {
-  if (typeof value !== "string" || !/^#[\da-f]{6}$/i.test(value)) return undefined;
+  if (typeof value !== "string" || !/^#[\da-f]{6}$/i.test(value))
+    return undefined;
   const seed = value.toLowerCase();
   return seed === DEFAULT_SEED ? undefined : seed;
 }
@@ -80,7 +87,8 @@ function readSeed(value: unknown): string | undefined {
 /** Reads one stored settings object, keeping what is valid. */
 function readAppearance(value: Record<string, unknown>): Appearance {
   const custom = readCustom(value["custom"]);
-  const choices: readonly ThemeChoice[] = custom === undefined ? THEMES : [...THEMES, "custom"];
+  const choices: readonly ThemeChoice[] =
+    custom === undefined ? THEMES : [...THEMES, "custom"];
   const size = TEXT_SIZES.find((each) => each === value["textSize"]);
   return {
     theme: pick(choices, value["theme"], DEFAULT_APPEARANCE.theme),
@@ -103,7 +111,9 @@ export function loadAppearance(
   pageTheme?: string,
 ): Appearance {
   const preset = THEMES.find((t) => t === pageTheme);
-  const fallback = preset ? { ...DEFAULT_APPEARANCE, theme: preset } : DEFAULT_APPEARANCE;
+  const fallback = preset
+    ? { ...DEFAULT_APPEARANCE, theme: preset }
+    : DEFAULT_APPEARANCE;
   try {
     const raw: unknown = JSON.parse(storage?.getItem(STORAGE_KEY) ?? "null");
     if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
@@ -115,8 +125,14 @@ export function loadAppearance(
   }
 }
 
-/** Saves settings; a browser that refuses storage keeps them for the session only. */
-export function saveAppearance(storage: Pick<Storage, "setItem"> | undefined, value: Appearance) {
+/**
+ * Saves settings; a browser that refuses storage keeps them for the session
+ * only.
+ */
+export function saveAppearance(
+  storage: Pick<Storage, "setItem"> | undefined,
+  value: Appearance,
+) {
   try {
     storage?.setItem(STORAGE_KEY, JSON.stringify(value));
   } catch {
@@ -124,7 +140,9 @@ export function saveAppearance(storage: Pick<Storage, "setItem"> | undefined, va
   }
 }
 
-/** Replaces `system` with the OS preference, and `custom` with its start theme. */
+/**
+ * Replaces `system` with the OS preference, and `custom` with its start theme.
+ */
 export function resolveTheme(
   theme: ThemeChoice,
   prefersDark: boolean,
@@ -139,8 +157,13 @@ export function resolveTheme(
   return theme;
 }
 
-/** The accent colour in use: the user's, else the organisation's, else Vellum's. */
-export function effectiveSeed(value: Appearance, organisationSeed?: string): string {
+/**
+ * The accent colour in use: the user's, else the organisation's, else Vellum's.
+ */
+export function effectiveSeed(
+  value: Appearance,
+  organisationSeed?: string,
+): string {
   return value.seed ?? organisationSeed ?? DEFAULT_SEED;
 }
 
@@ -149,7 +172,10 @@ export function effectiveSeed(value: Appearance, organisationSeed?: string): str
  * theme's own seed, else the accent in use. Vellum's own seed is
  * `undefined`, so the common case shares one cached stylesheet.
  */
-export function figureSeed(value: Appearance, organisationSeed?: string): string | undefined {
+export function figureSeed(
+  value: Appearance,
+  organisationSeed?: string,
+): string | undefined {
   const seed = (
     value.theme === "custom" && value.custom !== undefined
       ? value.custom.seed
@@ -180,7 +206,10 @@ export function loadReadingFont(font: ReadingFont): void {
   });
 }
 
-/** Writes the theme tokens and reading settings onto an element, normally `<html>`. */
+/**
+ * Writes the theme tokens and reading settings onto an element, normally
+ * `<html>`.
+ */
 export function applyAppearance(
   root: HTMLElement,
   value: Appearance,

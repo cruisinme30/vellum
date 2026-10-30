@@ -16,8 +16,8 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use std::time::Instant;
 
 use vellum_authz::{
-    Actor, Authz, AuthzStore as _, Change, Commit, Error, Id, MemoryStore, Object, Permission,
-    Principal, Relation, Scope, StoreError, Subject, Tuple,
+    Actor, Authz, AuthzStore as _, Change, Commit, Error, Id, MemoryStore,
+    Object, Permission, Principal, Relation, Scope, StoreError, Subject, Tuple,
 };
 
 const SPACE: Id = Id(0x5000);
@@ -61,7 +61,12 @@ fn grant(object: Object, relation: Relation, subject: Subject) -> Change {
     Change::Grant(Tuple::role(object, relation, subject))
 }
 
-async fn can(authz: &Authz<MemoryStore>, who: Principal, object: Id, p: Permission) -> bool {
+async fn can(
+    authz: &Authz<MemoryStore>,
+    who: Principal,
+    object: Id,
+    p: Permission,
+) -> bool {
     authz.check(SPACE, who, object, p).await.unwrap().allowed
 }
 
@@ -169,8 +174,16 @@ async fn moved_doc_keeps_explicit_grants_and_drops_inherited() {
             SPACE,
             Actor::System,
             &[
-                grant(Object::Node(ENG), Relation::Viewer, Subject::User(PRIYA)),
-                grant(Object::Node(SPEC), Relation::Editor, Subject::User(MARCUS)),
+                grant(
+                    Object::Node(ENG),
+                    Relation::Viewer,
+                    Subject::User(PRIYA),
+                ),
+                grant(
+                    Object::Node(SPEC),
+                    Relation::Editor,
+                    Subject::User(MARCUS),
+                ),
                 grant(
                     Object::Node(RUNBOOKS),
                     Relation::Commenter,
@@ -266,9 +279,21 @@ async fn users_cannot_hand_out_more_than_they_hold() {
             SPACE,
             Actor::System,
             &[
-                grant(Object::Node(ENG), Relation::Editor, Subject::User(PRIYA)),
-                grant(Object::Node(ENG), Relation::Manager, Subject::User(MARCUS)),
-                grant(Object::Space(SPACE), Relation::Owner, Subject::User(LENA)),
+                grant(
+                    Object::Node(ENG),
+                    Relation::Editor,
+                    Subject::User(PRIYA),
+                ),
+                grant(
+                    Object::Node(ENG),
+                    Relation::Manager,
+                    Subject::User(MARCUS),
+                ),
+                grant(
+                    Object::Space(SPACE),
+                    Relation::Owner,
+                    Subject::User(LENA),
+                ),
             ],
         )
         .await
@@ -320,7 +345,9 @@ async fn users_cannot_hand_out_more_than_they_hold() {
     ));
     // An owner can do all of it.
     let _ = authz.write(SPACE, Actor::User(LENA), &owner).await.unwrap();
-    assert!(can(&authz, user(Id(9)), SPEC, Permission::TransferOwnership).await);
+    assert!(
+        can(&authz, user(Id(9)), SPEC, Permission::TransferOwnership).await
+    );
 }
 
 #[tokio::test]
@@ -429,11 +456,31 @@ async fn restricted_book_sections_narrow_access() {
             SPACE,
             Actor::System,
             &[
-                grant(Object::Node(ENG), Relation::Editor, Subject::User(PRIYA)),
-                grant(Object::Node(ENG), Relation::Viewer, Subject::User(MARCUS)),
-                grant(Object::Node(ENG), Relation::Manager, Subject::User(LENA)),
-                grant(Object::Node(SPEC), Relation::Editor, Subject::User(MARCUS)),
-                grant(Object::Node(SPEC), Relation::Editor, Subject::User(Id(9))),
+                grant(
+                    Object::Node(ENG),
+                    Relation::Editor,
+                    Subject::User(PRIYA),
+                ),
+                grant(
+                    Object::Node(ENG),
+                    Relation::Viewer,
+                    Subject::User(MARCUS),
+                ),
+                grant(
+                    Object::Node(ENG),
+                    Relation::Manager,
+                    Subject::User(LENA),
+                ),
+                grant(
+                    Object::Node(SPEC),
+                    Relation::Editor,
+                    Subject::User(MARCUS),
+                ),
+                grant(
+                    Object::Node(SPEC),
+                    Relation::Editor,
+                    Subject::User(Id(9)),
+                ),
                 Change::Restrict(SPEC),
             ],
         )
@@ -465,8 +512,12 @@ async fn expired_grants_are_swept() {
     let clock = Arc::clone(&now);
     let store = MemoryStore::new();
     store.set_tree(SPACE, tree()).unwrap();
-    let authz = Authz::with_clock(store, Arc::new(move || clock.load(Ordering::SeqCst)));
-    let t = Tuple::role(Object::Node(SPEC), Relation::Viewer, Subject::User(PRIYA));
+    let authz = Authz::with_clock(
+        store,
+        Arc::new(move || clock.load(Ordering::SeqCst)),
+    );
+    let t =
+        Tuple::role(Object::Node(SPEC), Relation::Viewer, Subject::User(PRIYA));
     let _ = authz
         .write(
             SPACE,
@@ -474,8 +525,12 @@ async fn expired_grants_are_swept() {
             &[
                 Change::Grant(t.expiring(2_000)),
                 Change::Grant(
-                    Tuple::role(Object::Node(ENG), Relation::Viewer, Subject::User(LENA))
-                        .expiring(5_000),
+                    Tuple::role(
+                        Object::Node(ENG),
+                        Relation::Viewer,
+                        Subject::User(LENA),
+                    )
+                    .expiring(5_000),
                 ),
             ],
         )
@@ -558,7 +613,9 @@ async fn bad_changes_are_rejected() {
         assert!(
             matches!(
                 err,
-                Error::UnknownNode { .. } | Error::WrongSpace { .. } | Error::Malformed(_)
+                Error::UnknownNode { .. }
+                    | Error::WrongSpace { .. }
+                    | Error::Malformed(_)
             ),
             "{change:?} gave {err:?}"
         );

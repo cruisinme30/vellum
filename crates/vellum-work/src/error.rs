@@ -138,7 +138,8 @@ mod tests {
 
     #[test]
     fn errors_map_to_kernel_kinds() {
-        let e: vellum_kernel::Error = WorkError::UnknownIssue("ENG-9".into()).into();
+        let e: vellum_kernel::Error =
+            WorkError::UnknownIssue("ENG-9".into()).into();
         assert_eq!(e.kind(), vellum_kernel::ErrorKind::NotFound);
         assert_eq!(e.message(), "unknown issue ENG-9");
         let dup = WorkError::DuplicateKey("ENG-1".into());

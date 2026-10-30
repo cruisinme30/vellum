@@ -10,7 +10,9 @@ use serde_json::json;
 use vellum_api::config::GatewayConfig;
 use vellum_api::gateway::GatewayBuilder;
 
-use crate::identity_tests::{ORIGIN, Reply, cookie_of, finish, json_request, request, send};
+use crate::identity_tests::{
+    ORIGIN, Reply, cookie_of, finish, json_request, request, send,
+};
 use crate::mcp_tests::world;
 use crate::services::{Services, VERSION};
 
@@ -41,7 +43,11 @@ async fn server(dir: &std::path::Path) -> (Services, Router) {
     (services, app)
 }
 
-async fn get(app: &Router, path: &str, credential: Option<(header::HeaderName, &str)>) -> Reply {
+async fn get(
+    app: &Router,
+    path: &str,
+    credential: Option<(header::HeaderName, &str)>,
+) -> Reply {
     let mut b = request("GET", path);
     if let Some((name, value)) = credential {
         b = b.header(name, value);
@@ -69,7 +75,11 @@ async fn models_and_crawlers_see_only_the_pages_they_may_read() {
         &app,
         w.post(
             "/api/v1/admin/users",
-            &json!({"email": "bo@northstar.dev", "name": "Bo", "password": "battery horse staple"}),
+            &json!({
+                "email": "bo@northstar.dev",
+                "name": "Bo",
+                "password": "battery horse staple"
+            }),
         ),
     )
     .await;
@@ -79,7 +89,8 @@ async fn models_and_crawlers_see_only_the_pages_they_may_read() {
         finish(json_request(
             "POST",
             "/auth/sign-in",
-            &json!({"email": "bo@northstar.dev", "password": "battery horse staple"}),
+            &json!({"email": "bo@northstar.dev", "password": "battery horse \
+                staple"}),
         )),
     )
     .await;
@@ -99,7 +110,8 @@ async fn models_and_crawlers_see_only_the_pages_they_may_read() {
     assert!(llms.text.contains("[Runbook]"), "{}", llms.text);
     assert!(llms.text.contains(&page_md), "{}", llms.text);
     assert!(llms.text.contains("/sitemap.md"), "{}", llms.text);
-    let sitemap = get(&app, "/sitemap.md", Some((header::AUTHORIZATION, &bearer))).await;
+    let sitemap =
+        get(&app, "/sitemap.md", Some((header::AUTHORIZATION, &bearer))).await;
     assert_eq!(sitemap.status, StatusCode::OK, "{}", sitemap.text);
     assert!(content_type(&sitemap).starts_with("text/markdown"));
     assert!(sitemap.text.contains("## eng"), "{}", sitemap.text);

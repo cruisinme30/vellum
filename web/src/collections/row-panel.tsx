@@ -53,7 +53,12 @@ function BodyField({
  * ones. It is a non-modal dialog: Escape or the close button closes it and
  * focus goes back to what opened it.
  */
-export function RowPanel({ info, rowId, focusTitle, onClose }: RowPanelProperties) {
+export function RowPanel({
+  info,
+  rowId,
+  focusTitle,
+  onClose,
+}: RowPanelProperties) {
   const t = useT();
   const headingId = useId();
   const panel = useRef<HTMLDivElement>(null);
@@ -146,14 +151,16 @@ export function RowPanel({ info, rowId, focusTitle, onClose }: RowPanelPropertie
                 type="button"
                 className="vl-text-button vl-danger"
                 onClick={() => {
-                  store.deleteRow({ collection_id: info.id, row_id: rowId }).then(
-                    () => {
-                      close.current();
-                    },
-                    (error: unknown) => {
-                      setDeleteError(messageOf(error));
-                    },
-                  );
+                  store
+                    .deleteRow({ collection_id: info.id, row_id: rowId })
+                    .then(
+                      () => {
+                        close.current();
+                      },
+                      (error: unknown) => {
+                        setDeleteError(messageOf(error));
+                      },
+                    );
                 }}
               >
                 {t("collection-confirm-delete-row", {

@@ -17,7 +17,10 @@ import { useT } from "../i18n/i18n";
 import type { ListView, WorkApi } from "./api";
 
 /** Reads one trimmed text field of a submitted form, then clears the form. */
-function take(event: Parameters<NonNullable<ComponentProps<"form">["onSubmit"]>>[0], name: string) {
+function take(
+  event: Parameters<NonNullable<ComponentProps<"form">["onSubmit"]>>[0],
+  name: string,
+) {
   event.preventDefault();
   const form = event.currentTarget;
   const value = new FormData(form).get(name);
@@ -43,7 +46,9 @@ function ListRow({
     <li className="vl-list-row">
       <p>
         <strong>{list.title}</strong>{" "}
-        <small className="vl-muted">{t("my-work-list-open", { count: list.open })}</small>
+        <small className="vl-muted">
+          {t("my-work-list-open", { count: list.open })}
+        </small>
         {!mine && list.owner != undefined && (
           <small className="vl-muted">
             {" "}
@@ -63,7 +68,10 @@ function ListRow({
                 <button
                   type="button"
                   className="vl-text-button"
-                  aria-label={t("my-work-list-unshare", { member, list: list.title })}
+                  aria-label={t("my-work-list-unshare", {
+                    member,
+                    list: list.title,
+                  })}
                   onClick={() => {
                     run(() => api.shareList(list.doc, member, false));
                   }}
@@ -85,7 +93,12 @@ function ListRow({
         >
           <label>
             {t("my-work-list-share", { list: list.title })}
-            <input name="member" autoComplete="off" placeholder="@handle" required />
+            <input
+              name="member"
+              autoComplete="off"
+              placeholder="@handle"
+              required
+            />
           </label>
           <button type="submit" className="vl-text-button">
             {t("my-work-list-share-button")}

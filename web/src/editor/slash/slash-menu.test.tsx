@@ -29,7 +29,9 @@ function setup(items: readonly SlashItem[] = filterSlashItems("callout")) {
   const press = (key: string) => {
     let handled = false;
     act(() => {
-      handled = handle.current?.onKeyDown(new KeyboardEvent("keydown", { key })) ?? false;
+      handled =
+        handle.current?.onKeyDown(new KeyboardEvent("keydown", { key })) ??
+        false;
     });
     return handled;
   };
@@ -37,7 +39,9 @@ function setup(items: readonly SlashItem[] = filterSlashItems("callout")) {
 }
 
 const selected = () =>
-  screen.getAllByRole("option").find((option) => option.getAttribute("aria-selected") === "true")
+  screen
+    .getAllByRole("option")
+    .find((option) => option.getAttribute("aria-selected") === "true")
     ?.textContent;
 
 describe("SlashMenu", () => {
@@ -52,9 +56,9 @@ describe("SlashMenu", () => {
   it("groups consecutive entries of a section under its heading", () => {
     setup(SLASH_ITEMS);
     const groups = screen.getAllByRole("group");
-    expect(groups.map((group) => group.getAttribute("aria-labelledby"))).toContain(
-      `${LIST_ID}-group-0`,
-    );
+    expect(
+      groups.map((group) => group.getAttribute("aria-labelledby")),
+    ).toContain(`${LIST_ID}-group-0`);
     expect(screen.getByRole("group", { name: "Basic" })).toBeDefined();
     expect(screen.getByRole("group", { name: "Callouts" })).toBeDefined();
   });
@@ -64,9 +68,11 @@ describe("SlashMenu", () => {
     expect(onActive).toHaveBeenLastCalledWith(`${LIST_ID}-callout-0`);
     press("ArrowDown");
     expect(onActive).toHaveBeenLastCalledWith(`${LIST_ID}-callout-1`);
-    expect(document.querySelector(`#${LIST_ID}-callout-1`)?.getAttribute("aria-selected")).toBe(
-      "true",
-    );
+    expect(
+      document
+        .querySelector(`#${LIST_ID}-callout-1`)
+        ?.getAttribute("aria-selected"),
+    ).toBe("true");
   });
 
   it("wraps ArrowUp and ArrowDown around the list", () => {
@@ -81,7 +87,9 @@ describe("SlashMenu", () => {
     const { command, press } = setup();
     press("ArrowDown");
     expect(press(key)).toBe(true);
-    expect(command).toHaveBeenCalledWith(expect.objectContaining({ id: "callout-1" }));
+    expect(command).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "callout-1" }),
+    );
   });
 
   it("leaves other keys to the editor", () => {
@@ -97,7 +105,9 @@ describe("SlashMenu", () => {
     expect(selected()).toContain("Warning callout");
     const pressed = fireEvent.mouseDown(warning);
     expect(pressed).toBe(false);
-    expect(command).toHaveBeenCalledWith(expect.objectContaining({ id: "callout-1" }));
+    expect(command).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "callout-1" }),
+    );
   });
 
   it("starts again at the first match when the query changes", () => {

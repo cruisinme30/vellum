@@ -44,7 +44,8 @@ pub fn validate_tag(tag: &str) -> Result<()> {
     } else {
         Err(BookError::Tag {
             tag: tag.to_owned(),
-            reason: "use 1 to 64 letters, digits, '.', '_' or '-', starting with a letter or digit",
+            reason: "use 1 to 64 letters, digits, '.', '_' or '-', starting \
+                with a letter or digit",
         })
     }
 }
@@ -90,7 +91,8 @@ impl Snapshot {
     ///
     /// Returns [`BookError::Snapshot`] if serialisation fails.
     pub fn to_json(&self) -> Result<String> {
-        serde_json::to_string_pretty(self).map_err(|e| BookError::Snapshot(e.to_string()))
+        serde_json::to_string_pretty(self)
+            .map_err(|e| BookError::Snapshot(e.to_string()))
     }
 
     /// Parses a snapshot file.
@@ -100,8 +102,8 @@ impl Snapshot {
     /// Returns [`BookError::Snapshot`] for malformed JSON or an unknown
     /// version, and [`BookError::Tag`] for a malformed tag.
     pub fn from_json(text: &str) -> Result<Self> {
-        let snapshot: Self =
-            serde_json::from_str(text).map_err(|e| BookError::Snapshot(e.to_string()))?;
+        let snapshot: Self = serde_json::from_str(text)
+            .map_err(|e| BookError::Snapshot(e.to_string()))?;
         if snapshot.vellum != 1 {
             return Err(BookError::Snapshot(format!(
                 "unsupported version {}",
@@ -239,7 +241,12 @@ impl BookDiff {
     }
 }
 
-fn unified(old: &str, new: &str, old_name: &str, new_name: &str) -> (String, usize, usize) {
+fn unified(
+    old: &str,
+    new: &str,
+    old_name: &str,
+    new_name: &str,
+) -> (String, usize, usize) {
     let diff = TextDiff::from_lines(old, new);
     let mut added = 0;
     let mut removed = 0;
@@ -267,7 +274,9 @@ fn unified(old: &str, new: &str, old_name: &str, new_name: &str) -> (String, usi
 #[must_use]
 pub fn diff(old: &Book, new: &Book) -> BookDiff {
     let mut out = BookDiff::default();
-    let label = |book: &Book, id: &NodeId| book.label_of(id).unwrap_or_else(|_| id.to_string());
+    let label = |book: &Book, id: &NodeId| {
+        book.label_of(id).unwrap_or_else(|_| id.to_string())
+    };
     for id in new.manifest.nodes.keys() {
         if !old.contains(id) {
             out.added.push(SectionRef {

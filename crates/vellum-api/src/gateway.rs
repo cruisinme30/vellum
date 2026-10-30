@@ -10,7 +10,9 @@ use std::time::{Duration, Instant};
 
 use axum::Router;
 use axum::body::{Body, Bytes, to_bytes};
-use axum::extract::{ConnectInfo, MatchedPath, RawPathParams, RawQuery, Request, State};
+use axum::extract::{
+    ConnectInfo, MatchedPath, RawPathParams, RawQuery, Request, State,
+};
 use axum::middleware::{Next, from_fn_with_state};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{MethodRouter, get, on, post};
@@ -36,7 +38,9 @@ use crate::idempotency::{
 use crate::public::{NothingPublished, PublicSite};
 use crate::registry::{RegisteredOp, Registry};
 use crate::request_id::REQUEST_ID;
-use crate::security::{CSRF_HEADER, Surface, apply_headers, check_csrf, csrf_token};
+use crate::security::{
+    CSRF_HEADER, Surface, apply_headers, check_csrf, csrf_token,
+};
 use crate::{graphql, input, openapi};
 use vellum_observe::server_timing::collect;
 use vellum_observe::{RequestObservation, RouteMetrics, UNMATCHED_ROUTE};
@@ -155,14 +159,20 @@ impl GatewayBuilder {
 
     /// Sets the authenticator (the identity service).
     #[must_use]
-    pub fn authenticator(mut self, authenticator: Arc<dyn Authenticator>) -> Self {
+    pub fn authenticator(
+        mut self,
+        authenticator: Arc<dyn Authenticator>,
+    ) -> Self {
         self.authenticator = authenticator;
         self
     }
 
     /// Sets the idempotency store.
     #[must_use]
-    pub fn idempotency_store(mut self, store: Arc<dyn IdempotencyStore>) -> Self {
+    pub fn idempotency_store(
+        mut self,
+        store: Arc<dyn IdempotencyStore>,
+    ) -> Self {
         self.idempotency = store;
         self
     }
@@ -230,7 +240,11 @@ impl GatewayBuilder {
     /// the CSRF check is skipped. Such routes must carry their own
     /// protection (signed assertions, PKCE).
     #[must_use]
-    pub fn mount_cross_site(mut self, prefix: impl Into<String>, router: Router) -> Self {
+    pub fn mount_cross_site(
+        mut self,
+        prefix: impl Into<String>,
+        router: Router,
+    ) -> Self {
         self.mounts.push(Mount {
             prefix: prefix.into(),
             router,
@@ -240,13 +254,12 @@ impl GatewayBuilder {
         self
     }
 
-    /// Serves the web app on the app host for every path the gateway does
-    /// not own. Paths under `/api`, `/healthz`, `/readyz`, `/collab` and
-    /// every mount prefix never reach it, matched or not, so an unknown `/auth/…` or
-    /// `/api/…` path stays the gateway's not-found, never the app's index.
-    /// It gets the edge middleware and the app's security headers, but no
-    /// authentication or rate limiting: it serves only the app's static
-    /// files.
+    /// Serves the web app on the app host for every path the gateway does not
+    /// own. Paths under `/api`, `/healthz`, `/readyz`, `/collab` and every
+    /// mount prefix never reach it, matched or not, so an unknown `/auth/…` or
+    /// `/api/…` path stays the gateway's not-found, never the app's index. It
+    /// gets the edge middleware and the app's security headers, but no
+    /// authentication or rate limiting: it serves only the app's static files.
     #[must_use]
     pub fn web_app(mut self, router: Router) -> Self {
         self.web_app = Some(router);
@@ -262,14 +275,24 @@ impl GatewayBuilder {
     pub fn build(self) -> Result<Gateway, Error> {
         let registry = Registry::new(self.services, self.breaker)?;
         let openapi = openapi::document(&registry, self.version);
-        let graphql = graphql::schema(&registry, self.version)
-            .map_err(|e| Error::new(ErrorKind::Internal, format!("invalid GraphQL schema: {e}")))?;
+        let graphql =
+            graphql::schema(&registry, self.version).map_err(|e| {
+                Error::new(
+                    ErrorKind::Internal,
+                    format!("invalid GraphQL schema: {e}"),
+                )
+            })?;
         let quota = Quota::new(
             self.config.rate_burst.max(1),
             Duration::from_secs(1) * self.config.rate_burst.max(1)
                 / self.config.rate_per_second.max(1),
         )
-        .ok_or_else(|| Error::new(ErrorKind::InvalidInput, "the rate limit must be positive"))?;
+        .ok_or_else(|| {
+            Error::new(
+                ErrorKind::InvalidInput,
+                "the rate limit must be positive",
+            )
+        })?;
         let limiter = RateLimiter::new(quota, RATE_LIMIT_KEYS);
         let state = Arc::new(Shared {
             config: self.config,
@@ -331,17 +354,19 @@ impl Gateway {
         let app = self.app.clone();
         let public = self.public.clone();
         let public_host = self.state.config.public_host();
-        Router::new().fallback_service(tower::service_fn(move |request: Request| {
-            let is_public = public_host
-                .as_deref()
-                .is_some_and(|host| request_host(request.headers()) == host);
-            let router = if is_public {
-                public.clone()
-            } else {
-                app.clone()
-            };
-            tower::ServiceExt::oneshot(router, request)
-        }))
+        Router::new().fallback_service(tower::service_fn(
+            move |request: Request| {
+                let is_public = public_host.as_deref().is_some_and(|host| {
+                    request_host(request.headers()) == host
+                });
+                let router = if is_public {
+                    public.clone()
+                } else {
+                    app.clone()
+                };
+                tower::ServiceExt::oneshot(router, request)
+            },
+        ))
     }
 
     /// Marks the process as draining: `/readyz` fails so load balancers stop
@@ -399,8 +424,12 @@ fn edge(router: Router, state: &Arc<Shared>, surface: Surface) -> Router {
     router
         .layer(CatchPanicLayer::custom(
             |_: Box<dyn std::any::Any + Send>| {
-                ErrorResponse::of(ErrorKind::Internal, "panic", RequestId::generate())
-                    .into_response()
+                ErrorResponse::of(
+                    ErrorKind::Internal,
+                    "panic",
+                    RequestId::generate(),
+                )
+                .into_response()
             },
         ))
         .layer(from_fn_with_state((Arc::clone(state), surface), observe))
@@ -430,7 +459,8 @@ async fn observe(
         &id.to_string(),
     );
     let span = obs.span().clone();
-    let (mut response, timings) = collect(next.run(request).instrument(span)).await;
+    let (mut response, timings) =
+        collect(next.run(request).instrument(span)).await;
     let done = obs.finish(response.status().as_u16(), timings);
     let headers = response.headers_mut();
     if let Ok(value) = HeaderValue::from_str(&id.to_string()) {
@@ -445,7 +475,11 @@ async fn observe(
 
 /// How long `caller` must wait, if this replica's limiter or the shared
 /// allowance refuses the request.
-fn limited(state: &Shared, caller: &str, request: &Request) -> Option<Duration> {
+fn limited(
+    state: &Shared,
+    caller: &str,
+    request: &Request,
+) -> Option<Duration> {
     if state
         .rate_exempt
         .as_ref()
@@ -453,7 +487,9 @@ fn limited(state: &Shared, caller: &str, request: &Request) -> Option<Duration> 
     {
         return None;
     }
-    if let Err(limited) = state.limiter.check(&caller.to_owned(), Instant::now()) {
+    if let Err(limited) =
+        state.limiter.check(&caller.to_owned(), Instant::now())
+    {
         return Some(limited.retry_after);
     }
     state
@@ -496,12 +532,19 @@ async fn protect(
         .map(|u| format!("user:{u}"))
         // An IPv6 client counts as its /64, so rotating addresses inside
         // it does not reset the limit.
-        .or_else(|| ip.map(|ip| format!("ip:{}", vellum_security::rate::client_bucket(ip))))
+        .or_else(|| {
+            ip.map(|ip| {
+                format!("ip:{}", vellum_security::rate::client_bucket(ip))
+            })
+        })
         .unwrap_or_else(|| "anonymous".to_owned());
     if let Some(wait) = limited(&state, &caller, &request) {
-        let mut response =
-            ErrorResponse::of(ErrorKind::RateLimited, "too many requests; slow down", id)
-                .into_response();
+        let mut response = ErrorResponse::of(
+            ErrorKind::RateLimited,
+            "too many requests; slow down",
+            id,
+        )
+        .into_response();
         let seconds = wait.as_secs().max(1).to_string();
         if let Ok(value) = HeaderValue::from_str(&seconds) {
             let _ = response.headers_mut().insert(header::RETRY_AFTER, value);
@@ -528,7 +571,8 @@ async fn protect(
     if request.headers().contains_key(&IDEMPOTENCY_KEY)
         && crate::security::is_unsafe(request.method())
     {
-        return idempotent(&state, caller, request, next, policy.max_body).await;
+        return idempotent(&state, caller, request, next, policy.max_body)
+            .await;
     }
     next.run(request).await
 }
@@ -557,8 +601,12 @@ async fn idempotent(
     };
     let (parts, body) = request.into_parts();
     let Ok(bytes) = to_bytes(body, max_body).await else {
-        return ErrorResponse::of(ErrorKind::InvalidInput, "the request body is too large", id)
-            .into_response();
+        return ErrorResponse::of(
+            ErrorKind::InvalidInput,
+            "the request body is too large",
+            id,
+        )
+        .into_response();
     };
     let mut hasher = Sha256::new();
     hasher.update(parts.method.as_str());
@@ -627,14 +675,23 @@ async fn idempotent(
                 }
             } else {
                 state.idempotency.abandon(scoped).await;
-                ErrorResponse::of(ErrorKind::Internal, "response too large to store", id)
-                    .into_response()
+                ErrorResponse::of(
+                    ErrorKind::Internal,
+                    "response too large to store",
+                    id,
+                )
+                .into_response()
             }
         }
     }
 }
 
-fn layered(router: Router, state: &Arc<Shared>, csrf: bool, max_body: Option<usize>) -> Router {
+fn layered(
+    router: Router,
+    state: &Arc<Shared>,
+    csrf: bool,
+    max_body: Option<usize>,
+) -> Router {
     let max_body = max_body.unwrap_or(state.config.max_body_bytes);
     router
         .layer(from_fn_with_state(
@@ -650,7 +707,11 @@ fn under(path: &str, prefix: &str) -> bool {
         .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
 }
 
-fn app_router(state: &Arc<Shared>, mounts: Vec<Mount>, web_app: Option<Router>) -> Router {
+fn app_router(
+    state: &Arc<Shared>,
+    mounts: Vec<Mount>,
+    web_app: Option<Router>,
+) -> Router {
     // `/collab` is the live-editing socket's, mounted or not.
     let mut owned: Vec<String> = ["/api", "/healthz", "/readyz", "/collab"]
         .into_iter()
@@ -662,15 +723,17 @@ fn app_router(state: &Arc<Shared>, mounts: Vec<Mount>, web_app: Option<Router>) 
         return gateway;
     };
     let web_app = edge(web_app, state, Surface::App);
-    Router::new().fallback_service(tower::service_fn(move |request: Request| {
-        let path = request.uri().path();
-        let router = if owned.iter().any(|prefix| under(path, prefix)) {
-            gateway.clone()
-        } else {
-            web_app.clone()
-        };
-        tower::ServiceExt::oneshot(router, request)
-    }))
+    Router::new().fallback_service(tower::service_fn(
+        move |request: Request| {
+            let path = request.uri().path();
+            let router = if owned.iter().any(|prefix| under(path, prefix)) {
+                gateway.clone()
+            } else {
+                web_app.clone()
+            };
+            tower::ServiceExt::oneshot(router, request)
+        },
+    ))
 }
 
 fn gateway_router(state: &Arc<Shared>, mounts: Vec<Mount>) -> Router {
@@ -703,7 +766,9 @@ fn gateway_router(state: &Arc<Shared>, mounts: Vec<Mount>) -> Router {
     edge(app, state, Surface::App)
 }
 
-fn operation_route(registered: &Arc<RegisteredOp>) -> MethodRouter<Arc<Shared>> {
+fn operation_route(
+    registered: &Arc<RegisteredOp>,
+) -> MethodRouter<Arc<Shared>> {
     let filter = match registered.op.method() {
         HttpMethod::Get => axum::routing::MethodFilter::GET,
         HttpMethod::Post => axum::routing::MethodFilter::POST,
@@ -795,7 +860,9 @@ fn conditional(output: &Value, headers: &HeaderMap) -> Response {
         .flat_map(|v| v.split(','))
         .map(str::trim)
         .any(|candidate| {
-            candidate == "*" || candidate.trim_start_matches("W/") == tag.trim_start_matches("W/")
+            candidate == "*"
+                || candidate.trim_start_matches("W/")
+                    == tag.trim_start_matches("W/")
         });
     let mut response = if matches {
         StatusCode::NOT_MODIFIED.into_response()
@@ -821,7 +888,8 @@ fn conditional(output: &Value, headers: &HeaderMap) -> Response {
 }
 
 async fn api_not_found(Extension(id): Extension<RequestId>) -> Response {
-    ErrorResponse::of(ErrorKind::NotFound, "no such API route", id).into_response()
+    ErrorResponse::of(ErrorKind::NotFound, "no such API route", id)
+        .into_response()
 }
 
 async fn openapi_json(State(state): State<Arc<Shared>>) -> Response {
@@ -862,10 +930,24 @@ async fn csrf(
     Extension(auth): Extension<Authenticated>,
 ) -> Response {
     auth.csrf_binding.map_or_else(
-        || ErrorResponse::of(ErrorKind::Unauthenticated, "no browser session", id).into_response(),
+        || {
+            ErrorResponse::of(
+                ErrorKind::Unauthenticated,
+                "no browser session",
+                id,
+            )
+            .into_response()
+        },
         |binding| {
-            let mut response = Json(json!({ "token": csrf_token(&state.config.csrf_key, &binding), "header": CSRF_HEADER.as_str() })).into_response();
-            let _ = response.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+            let mut response = Json(json!({
+                "token": csrf_token(&state.config.csrf_key, &binding),
+                "header": CSRF_HEADER.as_str()
+            }))
+            .into_response();
+            let _ = response.headers_mut().insert(
+                header::CACHE_CONTROL,
+                HeaderValue::from_static("no-store"),
+            );
             response
         },
     )
@@ -886,9 +968,12 @@ async fn readyz(State(state): State<Arc<Shared>>) -> Response {
     let mut ready = true;
     let mut services = serde_json::Map::new();
     for service in state.registry.services() {
-        let readiness = tokio::time::timeout(READINESS_TIMEOUT, service.readiness())
-            .await
-            .unwrap_or_else(|_| Readiness::NotReady("readiness probe timed out".into()));
+        let readiness =
+            tokio::time::timeout(READINESS_TIMEOUT, service.readiness())
+                .await
+                .unwrap_or_else(|_| {
+                    Readiness::NotReady("readiness probe timed out".into())
+                });
         ready &= !matches!(readiness, Readiness::NotReady(_));
         let _ = services.insert(
             service.name().to_owned(),
@@ -900,6 +985,9 @@ async fn readyz(State(state): State<Arc<Shared>>) -> Response {
     } else {
         StatusCode::SERVICE_UNAVAILABLE
     };
-    let body = json!({ "status": if ready { "ready" } else { "not_ready" }, "services": services });
+    let body = json!({
+        "status": if ready { "ready" } else { "not_ready" },
+        "services": services
+    });
     (status, Json(body)).into_response()
 }

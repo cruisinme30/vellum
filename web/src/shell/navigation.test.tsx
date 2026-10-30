@@ -8,7 +8,8 @@ import { matchQueries, renderApp } from "../test/render-app";
 
 import { COMPACT, MEDIUM } from "./use-media";
 
-const rect = (top: number, bottom: number) => DOMRect.fromRect({ y: top, height: bottom - top });
+const rect = (top: number, bottom: number) =>
+  DOMRect.fromRect({ y: top, height: bottom - top });
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -19,7 +20,9 @@ describe("NavigationRail", () => {
     renderApp("/inbox");
     const rail = screen.getByRole("navigation", { name: "Main" });
     const links = within(rail).getAllByRole("link");
-    expect(links.map((link) => [link.textContent, link.getAttribute("href")])).toEqual([
+    expect(
+      links.map((link) => [link.textContent, link.getAttribute("href")]),
+    ).toEqual([
       ["Home", "/"],
       ["Search", "/search"],
       ["Favorites", "/favorites"],
@@ -28,19 +31,25 @@ describe("NavigationRail", () => {
       ["Help", "/help"],
       ["Admin", "/admin"],
     ]);
-    expect(within(rail).getByRole("link", { name: "Inbox" }).getAttribute("aria-current")).toBe(
-      "page",
-    );
-    expect(within(rail).getByRole("link", { name: "Home" }).hasAttribute("aria-current")).toBe(
-      false,
-    );
+    expect(
+      within(rail)
+        .getByRole("link", { name: "Inbox" })
+        .getAttribute("aria-current"),
+    ).toBe("page");
+    expect(
+      within(rail)
+        .getByRole("link", { name: "Home" })
+        .hasAttribute("aria-current"),
+    ).toBe(false);
   });
 
   it("navigates to a destination", async () => {
     const { user, location } = renderApp("/");
     await user.click(screen.getByRole("link", { name: "Help" }));
     expect(location()).toBe("/help");
-    expect(screen.getByRole("heading", { level: 1, name: "Help" })).toBeDefined();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Help" }),
+    ).toBeDefined();
   });
 
   it("opens and closes the theme settings", async () => {
@@ -92,7 +101,9 @@ describe("BottomBar", () => {
     await user.click(more);
     expect(more.getAttribute("aria-expanded")).toBe("true");
     const sheet = screen.getByRole("complementary", { name: "Pages" });
-    const links = within(sheet).getByRole("navigation", { name: "More destinations" });
+    const links = within(sheet).getByRole("navigation", {
+      name: "More destinations",
+    });
     expect(
       within(links)
         .getAllByRole("link")

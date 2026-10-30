@@ -24,7 +24,8 @@ use crate::exports::{EXPORT_PREFIX, IMPORT_PREFIX, Transfer};
 type TestResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
 
 /// The antivirus test file, which every scanner reports.
-const EICAR: &str = r"X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*";
+const EICAR: &str =
+    r"X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*";
 
 /// Finds the antivirus test file, or is down.
 struct FakeScanner {
@@ -32,14 +33,19 @@ struct FakeScanner {
 }
 
 impl Scanner for FakeScanner {
-    fn scan(&self, bytes: &[u8]) -> impl Future<Output = Result<(), UploadError>> + Send {
+    fn scan(
+        &self,
+        bytes: &[u8],
+    ) -> impl Future<Output = Result<(), UploadError>> + Send {
         // The real scanner looks inside archives; a stored zip entry
         // keeps the bytes visible to this stand-in.
         let found = bytes.windows(10).any(|w| w == b"EICAR-STAN");
         let down = self.down;
         async move {
             if down {
-                Err(UploadError::ScannerUnavailable("connection refused".into()))
+                Err(UploadError::ScannerUnavailable(
+                    "connection refused".into(),
+                ))
             } else if found {
                 Err(UploadError::Infected("Eicar-Signature".into()))
             } else {
@@ -82,7 +88,8 @@ impl World {
                 space.id,
                 None,
                 "Launch plan",
-                "# Launch plan\n\nShip the **Northstar** beta.\n\n- Docs\n- Pricing\n",
+                "# Launch plan\n\nShip the **Northstar** beta.\n\n- Docs\n\
+                    - Pricing\n",
             )
             .await?;
         Ok(Self {
@@ -95,7 +102,12 @@ impl World {
         })
     }
 
-    fn app(&self, user: Option<UserId>, scopes: &[Scope], scanner: FakeScanner) -> Router {
+    fn app(
+        &self,
+        user: Option<UserId>,
+        scopes: &[Scope],
+        scanner: FakeScanner,
+    ) -> Router {
         let principal = user.map_or_else(Principal::anonymous, |user| {
             Principal::user(
                 user,
@@ -147,7 +159,10 @@ fn post(path: &str, bytes: Vec<u8>) -> Request<Body> {
         .unwrap_or_else(|e| unreachable!("{e}"))
 }
 
-async fn call(app: &Router, request: Request<Body>) -> (StatusCode, http::HeaderMap, Vec<u8>) {
+async fn call(
+    app: &Router,
+    request: Request<Body>,
+) -> (StatusCode, http::HeaderMap, Vec<u8>) {
     let response = app
         .clone()
         .oneshot(request)
@@ -169,7 +184,8 @@ fn zip(entries: &[(&str, &[u8], bool)]) -> Vec<u8> {
         } else {
             zip::CompressionMethod::Stored
         };
-        let options = zip::write::SimpleFileOptions::default().compression_method(method);
+        let options =
+            zip::write::SimpleFileOptions::default().compression_method(method);
         out.start_file(*name, options)
             .unwrap_or_else(|e| unreachable!("{e}"));
         out.write_all(bytes).unwrap_or_else(|e| unreachable!("{e}"));
@@ -250,15 +266,18 @@ async fn export_needs_view_rights_and_the_read_scope() -> TestResult {
         matches!(status, StatusCode::NOT_FOUND | StatusCode::FORBIDDEN),
         "{status}"
     );
-    let (status, _, _) = call(&w.app(None, &[], ok()), get(&w.export("md"))).await;
+    let (status, _, _) =
+        call(&w.app(None, &[], ok()), get(&w.export("md"))).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
-    let (status, _, _) = call(&w.app(Some(w.owner), &[], ok()), get(&w.export("md"))).await;
+    let (status, _, _) =
+        call(&w.app(Some(w.owner), &[], ok()), get(&w.export("md"))).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
 
     let app = w.app(Some(w.owner), &Scope::ALL, ok());
     let (status, _, _) = call(&app, get(&w.export("exe"))).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
-    let (status, _, _) = call(&app, get(&format!("{EXPORT_PREFIX}/books/x?format=pdf"))).await;
+    let (status, _, _) =
+        call(&app, get(&format!("{EXPORT_PREFIX}/books/x?format=pdf"))).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
     let book = vellum_kernel::BookId::generate();
     let (status, _, _) = call(
@@ -337,7 +356,8 @@ async fn hostile_imports_are_refused_before_the_importer() -> TestResult {
 
     // Malware inside the archive.
     let infected = zip(&[("Notes/eicar.md", EICAR.as_bytes(), false)]);
-    let (status, _, body) = call(&app, post(&w.import("markdown", "notes.zip"), infected)).await;
+    let (status, _, body) =
+        call(&app, post(&w.import("markdown", "notes.zip"), infected)).await;
     assert_eq!(
         status,
         StatusCode::UNPROCESSABLE_ENTITY,
@@ -348,7 +368,8 @@ async fn hostile_imports_are_refused_before_the_importer() -> TestResult {
     // A zip bomb: 64 MiB of zeros packed into a few KiB.
     let zeros = vec![0_u8; 64 * 1024 * 1024];
     let bomb = zip(&[("Notes/bomb.md", &zeros, true)]);
-    let (status, _, body) = call(&app, post(&w.import("markdown", "bomb.zip"), bomb)).await;
+    let (status, _, body) =
+        call(&app, post(&w.import("markdown", "bomb.zip"), bomb)).await;
     assert_eq!(
         status,
         StatusCode::UNPROCESSABLE_ENTITY,
@@ -367,12 +388,14 @@ async fn hostile_imports_are_refused_before_the_importer() -> TestResult {
 
     // An extension that lies about the content.
     let archive = zip(&[("a.md", b"# A\n", true)]);
-    let (status, _, _) = call(&app, post(&w.import("docx", "a.png"), archive.clone())).await;
+    let (status, _, _) =
+        call(&app, post(&w.import("docx", "a.png"), archive.clone())).await;
     assert_eq!(status, StatusCode::UNSUPPORTED_MEDIA_TYPE);
 
     // The scanner is down: fail closed.
     let down = w.app(Some(w.owner), &Scope::ALL, FakeScanner { down: true });
-    let (status, _, _) = call(&down, post(&w.import("markdown", "a.zip"), archive)).await;
+    let (status, _, _) =
+        call(&down, post(&w.import("markdown", "a.zip"), archive)).await;
     assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
 
     let after = w
@@ -392,20 +415,24 @@ async fn import_needs_edit_rights_before_the_body_is_read() -> TestResult {
     let archive = zip(&[("a.md", b"# A\n", true)]);
 
     let app = w.app(Some(viewer), &Scope::ALL, ok());
-    let (status, _, _) = call(&app, post(&w.import("markdown", "a.zip"), archive.clone())).await;
+    let (status, _, _) =
+        call(&app, post(&w.import("markdown", "a.zip"), archive.clone())).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
 
     let app = w.app(Some(w.owner), &[Scope::Read], ok());
-    let (status, _, _) = call(&app, post(&w.import("markdown", "a.zip"), archive.clone())).await;
+    let (status, _, _) =
+        call(&app, post(&w.import("markdown", "a.zip"), archive.clone())).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
 
     // An import must say its length, so the limit applies before reading.
     let app = w.app(Some(w.owner), &Scope::ALL, ok());
-    let no_length = Request::post(w.import("markdown", "a.zip")).body(Body::from(archive))?;
+    let no_length = Request::post(w.import("markdown", "a.zip"))
+        .body(Body::from(archive))?;
     let (status, _, _) = call(&app, no_length).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 
-    let (status, _, _) = call(&app, post(&w.import("evernote", "a.zip"), Vec::new())).await;
+    let (status, _, _) =
+        call(&app, post(&w.import("evernote", "a.zip"), Vec::new())).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
     Ok(())
 }

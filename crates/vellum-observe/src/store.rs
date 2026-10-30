@@ -124,7 +124,8 @@ impl Trace {
     /// Whether any span failed or the response was a server error.
     #[must_use]
     pub fn is_error(&self) -> bool {
-        self.status().is_some_and(|s| s >= 500) || self.spans.iter().any(|s| s.error)
+        self.status().is_some_and(|s| s >= 500)
+            || self.spans.iter().any(|s| s.error)
     }
 
     /// The summary row shown in the request list.
@@ -149,8 +150,9 @@ impl Trace {
     /// A rough count of the heap bytes this trace holds.
     #[must_use]
     pub fn approx_bytes(&self) -> usize {
-        let pairs =
-            |p: &[(String, String)]| p.iter().map(|(k, v)| k.len() + v.len() + 48).sum::<usize>();
+        let pairs = |p: &[(String, String)]| {
+            p.iter().map(|(k, v)| k.len() + v.len() + 48).sum::<usize>()
+        };
         let spans: usize = self
             .spans
             .iter()
@@ -161,14 +163,22 @@ impl Trace {
                     + pairs(&s.fields)
                     + s.events
                         .iter()
-                        .map(|e| std::mem::size_of::<SpanEvent>() + e.level.len() + e.message.len())
+                        .map(|e| {
+                            std::mem::size_of::<SpanEvent>()
+                                + e.level.len()
+                                + e.message.len()
+                        })
                         .sum::<usize>()
             })
             .sum();
         let client: usize = self
             .client
             .iter()
-            .map(|c| std::mem::size_of::<ClientSpan>() + c.name.len() + pairs(&c.attributes))
+            .map(|c| {
+                std::mem::size_of::<ClientSpan>()
+                    + c.name.len()
+                    + pairs(&c.attributes)
+            })
             .sum();
         std::mem::size_of::<Self>() + spans + client
     }
@@ -226,7 +236,9 @@ pub struct TraceQuery {
 }
 
 /// Buffer counters for the admin console and metrics.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize,
+)]
 #[serde(default)]
 pub struct StoreStats {
     /// Traces currently held.
@@ -284,7 +296,9 @@ impl TraceStore {
     pub fn new(capacity: usize, byte_budget: usize) -> Self {
         let evictions = opentelemetry::global::meter("vellum-observe")
             .u64_counter("vellum.observe.traces.evicted")
-            .with_description("Traces evicted from the Admin → Requests ring buffer")
+            .with_description(
+                "Traces evicted from the Admin → Requests ring buffer",
+            )
             .build();
         Self {
             inner: Mutex::new(Inner::default()),
@@ -363,7 +377,8 @@ impl TraceStore {
             .filter(|s| !query.errors_only || s.error)
             .filter(|s| {
                 query.id.as_deref().is_none_or(|id| {
-                    s.request_id.as_deref() == Some(id) || s.trace_id.to_string() == id
+                    s.request_id.as_deref() == Some(id)
+                        || s.trace_id.to_string() == id
                 })
             })
             .take(limit)
@@ -386,7 +401,9 @@ impl TraceStore {
     /// is no longer (or not yet) in the buffer.
     pub fn attach_client(&self, id: TraceId, spans: Vec<ClientSpan>) -> bool {
         let mut inner = self.lock();
-        let Some(index) = inner.entries.iter().rposition(|e| e.trace.trace_id == id) else {
+        let Some(index) =
+            inner.entries.iter().rposition(|e| e.trace.trace_id == id)
+        else {
             return false;
         };
         let Some(entry) = inner.entries.get_mut(index) else {
@@ -420,7 +437,13 @@ impl TraceStore {
 pub(crate) mod tests {
     use super::*;
 
-    pub fn span(index: u32, parent: Option<u32>, name: &str, start: u64, dur: u64) -> RecordedSpan {
+    pub fn span(
+        index: u32,
+        parent: Option<u32>,
+        name: &str,
+        start: u64,
+        dur: u64,
+    ) -> RecordedSpan {
         RecordedSpan {
             index,
             parent,

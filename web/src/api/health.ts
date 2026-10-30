@@ -35,18 +35,29 @@ export class HealthMonitor {
   readonly snapshot = (): ServiceHealth => this.#health;
 
   /** Records one answer's HTTP status and `Retry-After` (seconds). */
-  report(status: number, retryAfterSeconds?: number, now: number = Date.now()): void {
+  report(
+    status: number,
+    retryAfterSeconds?: number,
+    now: number = Date.now(),
+  ): void {
     let next: ServiceHealth | undefined;
     if (status === 503) {
       next = {
         degraded: true,
-        retryAt: retryAfterSeconds === undefined ? undefined : now + retryAfterSeconds * 1000,
+        retryAt:
+          retryAfterSeconds === undefined
+            ? undefined
+            : now + retryAfterSeconds * 1000,
       };
     } else if (status < 500 && this.#health.degraded) {
       next = HEALTHY;
     }
     if (next === undefined) return;
-    if (next.degraded === this.#health.degraded && next.retryAt === this.#health.retryAt) return;
+    if (
+      next.degraded === this.#health.degraded &&
+      next.retryAt === this.#health.retryAt
+    )
+      return;
     this.#health = next;
     for (const listener of this.#listeners) listener();
   }
@@ -56,7 +67,9 @@ export class HealthMonitor {
 export const serviceHealth = new HealthMonitor();
 
 /** The current {@link ServiceHealth}, re-rendering when it changes. */
-export function useServiceHealth(monitor: HealthMonitor = serviceHealth): ServiceHealth {
+export function useServiceHealth(
+  monitor: HealthMonitor = serviceHealth,
+): ServiceHealth {
   return useSyncExternalStore(monitor.subscribe, monitor.snapshot);
 }
 

@@ -82,8 +82,10 @@ impl Nodes {
                     system,
                     "cluster.beat",
                     sqlx::query(
-                        "INSERT INTO cluster_nodes (name, address, heartbeat_ms) VALUES (?1, ?2, ?3) \
-                         ON CONFLICT (name) DO UPDATE SET address = excluded.address, heartbeat_ms = excluded.heartbeat_ms",
+                        "INSERT INTO cluster_nodes (name, address, \
+                         heartbeat_ms) VALUES (?1, ?2, ?3) ON CONFLICT (name) \
+                         DO UPDATE SET address = excluded.address, \
+                         heartbeat_ms = excluded.heartbeat_ms",
                     )
                     .bind(&node.name)
                     .bind(&node.address)
@@ -97,8 +99,10 @@ impl Nodes {
                     system,
                     "cluster.beat",
                     sqlx::query(
-                        "INSERT INTO cluster_nodes (name, address, heartbeat_ms) VALUES ($1, $2, $3) \
-                         ON CONFLICT (name) DO UPDATE SET address = excluded.address, heartbeat_ms = excluded.heartbeat_ms",
+                        "INSERT INTO cluster_nodes (name, address, \
+                         heartbeat_ms) VALUES ($1, $2, $3) ON CONFLICT (name) \
+                         DO UPDATE SET address = excluded.address, \
+                         heartbeat_ms = excluded.heartbeat_ms",
                     )
                     .bind(&node.name)
                     .bind(&node.address)
@@ -154,7 +158,11 @@ impl Nodes {
     ///
     /// # Errors
     /// When the database is unreachable.
-    pub async fn live_at(&self, window: Duration, at_ms: i64) -> Result<Vec<Node>> {
+    pub async fn live_at(
+        &self,
+        window: Duration,
+        at_ms: i64,
+    ) -> Result<Vec<Node>> {
         let since = at_ms.saturating_sub(ms(window));
         let system = self.index.backend().otel_system();
         let rows: Vec<(String, String)> = match self.index.pool() {
@@ -163,7 +171,8 @@ impl Nodes {
                     system,
                     "cluster.live",
                     sqlx::query_as(
-                        "SELECT name, address FROM cluster_nodes WHERE heartbeat_ms >= ?1 ORDER BY name",
+                        "SELECT name, address FROM cluster_nodes WHERE \
+                            heartbeat_ms >= ?1 ORDER BY name",
                     )
                     .bind(since)
                     .fetch_all(pool),
@@ -175,7 +184,8 @@ impl Nodes {
                     system,
                     "cluster.live",
                     sqlx::query_as(
-                        "SELECT name, address FROM cluster_nodes WHERE heartbeat_ms >= $1 ORDER BY name",
+                        "SELECT name, address FROM cluster_nodes WHERE \
+                            heartbeat_ms >= $1 ORDER BY name",
                     )
                     .bind(since)
                     .fetch_all(pool),
@@ -208,7 +218,12 @@ impl Leases {
     ///
     /// # Errors
     /// When the database is unreachable.
-    pub async fn acquire(&self, name: &str, holder: &str, ttl: Duration) -> Result<bool> {
+    pub async fn acquire(
+        &self,
+        name: &str,
+        holder: &str,
+        ttl: Duration,
+    ) -> Result<bool> {
         self.acquire_at(name, holder, ttl, now_ms()).await
     }
 
@@ -230,9 +245,11 @@ impl Leases {
                 system,
                 "cluster.lease",
                 sqlx::query(
-                    "INSERT INTO cluster_leases (name, holder, expires_ms) VALUES (?1, ?2, ?3) \
-                     ON CONFLICT (name) DO UPDATE SET holder = excluded.holder, expires_ms = excluded.expires_ms \
-                     WHERE cluster_leases.holder = excluded.holder OR cluster_leases.expires_ms < ?4",
+                    "INSERT INTO cluster_leases (name, holder, expires_ms) \
+                     VALUES (?1, ?2, ?3) ON CONFLICT (name) DO UPDATE SET \
+                     holder = excluded.holder, expires_ms = \
+                     excluded.expires_ms WHERE cluster_leases.holder = \
+                     excluded.holder OR cluster_leases.expires_ms < ?4",
                 )
                 .bind(name)
                 .bind(holder)
@@ -246,9 +263,11 @@ impl Leases {
                 system,
                 "cluster.lease",
                 sqlx::query(
-                    "INSERT INTO cluster_leases (name, holder, expires_ms) VALUES ($1, $2, $3) \
-                     ON CONFLICT (name) DO UPDATE SET holder = excluded.holder, expires_ms = excluded.expires_ms \
-                     WHERE cluster_leases.holder = excluded.holder OR cluster_leases.expires_ms < $4",
+                    "INSERT INTO cluster_leases (name, holder, expires_ms) \
+                     VALUES ($1, $2, $3) ON CONFLICT (name) DO UPDATE SET \
+                     holder = excluded.holder, expires_ms = \
+                     excluded.expires_ms WHERE cluster_leases.holder = \
+                     excluded.holder OR cluster_leases.expires_ms < $4",
                 )
                 .bind(name)
                 .bind(holder)
@@ -273,10 +292,13 @@ impl Leases {
                 let _ = traced(
                     system,
                     "cluster.release",
-                    sqlx::query("DELETE FROM cluster_leases WHERE name = ?1 AND holder = ?2")
-                        .bind(name)
-                        .bind(holder)
-                        .execute(pool),
+                    sqlx::query(
+                        "DELETE FROM cluster_leases WHERE name = ?1 \
+                        AND holder = ?2",
+                    )
+                    .bind(name)
+                    .bind(holder)
+                    .execute(pool),
                 )
                 .await?;
             }
@@ -284,10 +306,13 @@ impl Leases {
                 let _ = traced(
                     system,
                     "cluster.release",
-                    sqlx::query("DELETE FROM cluster_leases WHERE name = $1 AND holder = $2")
-                        .bind(name)
-                        .bind(holder)
-                        .execute(pool),
+                    sqlx::query(
+                        "DELETE FROM cluster_leases WHERE name = $1 \
+                        AND holder = $2",
+                    )
+                    .bind(name)
+                    .bind(holder)
+                    .execute(pool),
                 )
                 .await?;
             }
@@ -330,19 +355,31 @@ impl Leases {
             tokio::select! {
                 out = &mut work => {
                     if let Err(error) = self.release(name, holder).await {
-                        tracing::warn!(%error, lease = name, "cannot release the lease");
+                        tracing::warn!(%error, lease = name, "cannot release \
+                            the lease");
                     }
                     return Ok(Some(out));
                 }
-                _ = renew.tick() => match self.acquire(name, holder, ttl).await {
+                _ = renew.tick() => match self.acquire(
+                    name,
+                    holder,
+                    ttl
+                ).await {
                     Ok(true) => {}
                     Ok(false) => {
-                        tracing::warn!(lease = name, "lost the lease; stopping its work");
+                        tracing::warn!(lease = name, "lost the lease; stopping \
+                            its work");
                         return Ok(None);
                     }
                     // Keep going: the lease still runs until it expires,
                     // and the next renewal may reach the database.
-                    Err(error) => tracing::warn!(%error, lease = name, "cannot renew the lease"),
+                    Err(
+                        error
+                    ) => tracing::warn!(
+                        %error,
+                        lease = name,
+                        "cannot renew the lease"
+                    ),
                 },
             }
         }
@@ -374,13 +411,20 @@ where
     let (name, holder) = (name.to_owned(), holder.to_owned());
     tokio::spawn(async move {
         loop {
-            let span = tracing::info_span!("singleton", lease = %name, holder = %holder);
+            let span = tracing::info_span!(
+                "singleton",
+                lease = %name,
+                holder = %holder
+            );
             match leases
                 .hold(&name, &holder, ttl, make().instrument(span))
                 .await
             {
                 Ok(Some(()) | None) => {}
-                Err(error) => tracing::warn!(%error, lease = %name, "cannot take the lease"),
+                Err(error) => {
+                    tracing::warn!(%error, lease = %name, "cannot take the \
+                        lease")
+                }
             }
             tokio::time::sleep(ttl / 3).await;
         }
@@ -411,11 +455,13 @@ impl Cursors {
         Ok(match self.index.pool() {
             IndexPool::Sqlite(pool) => {
                 let query = sqlx::query_as(sql).bind(name);
-                traced(system, "cluster.cursor", query.fetch_optional(pool)).await?
+                traced(system, "cluster.cursor", query.fetch_optional(pool))
+                    .await?
             }
             IndexPool::Postgres(pool) => {
                 let query = sqlx::query_as(sql).bind(name);
-                traced(system, "cluster.cursor", query.fetch_optional(pool)).await?
+                traced(system, "cluster.cursor", query.fetch_optional(pool))
+                    .await?
             }
         })
     }
@@ -435,11 +481,12 @@ impl Cursors {
     ) -> Result<bool> {
         let system = self.index.backend().otel_system();
         let now = now_ms();
-        let sql = "INSERT INTO cluster_cursors (name, major, minor, updated_ms) \
-                   SELECT $1, $2, $3, $4 WHERE EXISTS (SELECT 1 FROM cluster_leases \
-                   WHERE name = $5 AND holder = $6 AND expires_ms >= $4) \
-                   ON CONFLICT (name) DO UPDATE SET major = excluded.major, \
-                   minor = excluded.minor, updated_ms = excluded.updated_ms";
+        let sql = "INSERT INTO cluster_cursors (name, major, minor, \
+                   updated_ms) SELECT $1, $2, $3, $4 WHERE EXISTS (SELECT 1 \
+                   FROM cluster_leases WHERE name = $5 AND holder = $6 AND \
+                   expires_ms >= $4) ON CONFLICT (name) DO UPDATE SET major = \
+                   excluded.major, minor = excluded.minor, updated_ms = \
+                   excluded.updated_ms";
         let affected = match self.index.pool() {
             IndexPool::Sqlite(pool) => traced(
                 system,

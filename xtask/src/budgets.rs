@@ -96,14 +96,19 @@ fn parse(args: &[String]) -> Result<Options, String> {
     let mut settle = Duration::from_secs(10);
     let mut iter = args.iter();
     while let Some(flag) = iter.next() {
-        let value = iter.next().ok_or_else(|| format!("{flag} needs a value"))?;
+        let value =
+            iter.next().ok_or_else(|| format!("{flag} needs a value"))?;
         match flag.as_str() {
             "--binary" => binary = Some(PathBuf::from(value)),
             "--image-bytes" => {
-                image_bytes = Some(value.parse().map_err(|e| format!("--image-bytes: {e}"))?);
+                image_bytes = Some(
+                    value.parse().map_err(|e| format!("--image-bytes: {e}"))?,
+                );
             }
             "--settle" => {
-                settle = Duration::from_secs(value.parse().map_err(|e| format!("--settle: {e}"))?);
+                settle = Duration::from_secs(
+                    value.parse().map_err(|e| format!("--settle: {e}"))?,
+                );
             }
             other => return Err(format!("unknown flag {other}")),
         }
@@ -121,7 +126,9 @@ pub fn run(args: &[String]) -> Result<(), String> {
     let mut measured = Measurements {
         binary_bytes: Some(
             std::fs::metadata(&options.binary)
-                .map_err(|e| format!("cannot read {}: {e}", options.binary.display()))?
+                .map_err(|e| {
+                    format!("cannot read {}: {e}", options.binary.display())
+                })?
                 .len(),
         ),
         download_bytes: Some(gzip_bytes(&options.binary)?),
@@ -133,7 +140,8 @@ pub fn run(args: &[String]) -> Result<(), String> {
         None
     } else {
         Some(
-            "The binary has no `serve` command yet: cold start, idle memory and drain are checked once it does.",
+            "The binary has no `serve` command yet: cold start, idle memory \
+                and drain are checked once it does.",
         )
     };
     let failures = evaluate(&measured, &LIMITS);
@@ -198,9 +206,12 @@ pub fn evaluate(measured: &Measurements, limits: &Limits) -> Vec<String> {
     }
     if let Some((time, clean)) = measured.drain {
         if !clean {
-            failures.push("shutdown: SIGTERM did not end in a clean exit".to_owned());
+            failures.push(
+                "shutdown: SIGTERM did not end in a clean exit".to_owned(),
+            );
         } else if time >= limits.drain {
-            failures.push(format!("shutdown: drain took {} ms", time.as_millis()));
+            failures
+                .push(format!("shutdown: drain took {} ms", time.as_millis()));
         }
     }
     failures
@@ -322,8 +333,10 @@ fn measure_server(
         .and_then(|listener| listener.local_addr())
         .map_err(|e| format!("no free port: {e}"))?
         .port();
-    let data = std::env::temp_dir().join(format!("vellum-budgets-{}", std::process::id()));
-    std::fs::create_dir_all(&data).map_err(|e| format!("cannot create {}: {e}", data.display()))?;
+    let data = std::env::temp_dir()
+        .join(format!("vellum-budgets-{}", std::process::id()));
+    std::fs::create_dir_all(&data)
+        .map_err(|e| format!("cannot create {}: {e}", data.display()))?;
     let address = SocketAddr::from((Ipv4Addr::LOCALHOST, port));
     let started = Instant::now();
     let mut child = Command::new(binary)
@@ -357,7 +370,9 @@ fn observe(
     let deadline = LIMITS.cold_start * 5;
     loop {
         if let Some(status) = child.try_wait().map_err(|e| e.to_string())? {
-            return Err(format!("the server exited before it was ready: {status}"));
+            return Err(format!(
+                "the server exited before it was ready: {status}"
+            ));
         }
         if get_status(address, "/readyz") == Some(200) {
             measured.cold_start = Some(started.elapsed());
@@ -413,7 +428,10 @@ fn idle_cpu(pid: u32) -> Result<u64, String> {
     let read = || {
         std::fs::read_to_string(format!("/proc/{pid}/stat"))
             .map_err(|e| format!("cannot read the server's CPU time: {e}"))
-            .and_then(|stat| cpu_ticks(&stat).ok_or_else(|| "unreadable /proc stat".to_owned()))
+            .and_then(|stat| {
+                cpu_ticks(&stat)
+                    .ok_or_else(|| "unreadable /proc stat".to_owned())
+            })
     };
     let before = read()?;
     let started = Instant::now();
@@ -449,7 +467,8 @@ const BUSY_SETTLE: Duration = Duration::from_secs(2);
 fn rss_bytes(pid: u32) -> Result<u64, String> {
     let status = std::fs::read_to_string(format!("/proc/{pid}/status"))
         .map_err(|e| format!("cannot read the server's memory: {e}"))?;
-    vm_rss_bytes(&status).ok_or_else(|| "no VmRSS line in /proc status".to_owned())
+    vm_rss_bytes(&status)
+        .ok_or_else(|| "no VmRSS line in /proc status".to_owned())
 }
 
 fn get_status(address: SocketAddr, path: &str) -> Option<u16> {
@@ -526,7 +545,8 @@ mod tests {
             "{failures:?}"
         );
         assert!(
-            failures[4].contains("busy resident memory: 260.0 MB over the 250.0 MB"),
+            failures[4]
+                .contains("busy resident memory: 260.0 MB over the 250.0 MB"),
             "{failures:?}"
         );
         assert!(failures[5].contains("1.5 % over the 1.0 %"), "{failures:?}");
@@ -541,7 +561,8 @@ mod tests {
 
     #[test]
     fn gzip_measures_the_compressed_size() {
-        let dir = std::env::temp_dir().join(format!("vellum-gzip-{}", std::process::id()));
+        let dir = std::env::temp_dir()
+            .join(format!("vellum-gzip-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let file = dir.join("zeros");
         std::fs::write(&file, vec![0_u8; 1_000_000]).unwrap();
@@ -553,7 +574,8 @@ mod tests {
 
     #[test]
     fn reads_vm_rss() {
-        let status = "Name:\tvellum\nVmHWM:\t  50000 kB\nVmRSS:\t   41236 kB\nThreads:\t4\n";
+        let status = "Name:\tvellum\nVmHWM:\t  50000 kB\nVmRSS:\t   41236 kB\n\
+            Threads:\t4\n";
         assert_eq!(vm_rss_bytes(status), Some(41_236 * 1024));
         assert_eq!(vm_rss_bytes("Name:\tvellum\n"), None);
     }
@@ -561,7 +583,8 @@ mod tests {
     #[test]
     fn reads_cpu_ticks() {
         // A command name with spaces and brackets must not shift the fields.
-        let stat = "4242 (vellum (x) y) S 1 4242 4242 0 -1 4194560 900 0 0 0 37 12 0 0 20 0 9 0";
+        let stat = "4242 (vellum (x) y) S 1 4242 4242 0 -1 4194560 900 0 0 0 \
+            37 12 0 0 20 0 9 0";
         assert_eq!(cpu_ticks(stat), Some(49));
         assert_eq!(cpu_ticks("4242 (vellum) S 1"), None);
         assert_eq!(cpu_ticks("no brackets"), None);
@@ -604,7 +627,10 @@ mod tests {
     fn a_binary_without_serve_checks_size_only() {
         // `true` accepts any arguments, so use `false`: no serve command.
         assert!(!has_serve(Path::new("false")));
-        assert!(run(&["--binary".to_owned(), "/nonexistent/vellum".to_owned()]).is_err());
+        assert!(
+            run(&["--binary".to_owned(), "/nonexistent/vellum".to_owned()])
+                .is_err()
+        );
     }
 
     #[test]

@@ -99,7 +99,12 @@ export function AppearanceProvider({
   }, [loadOrganisation]);
 
   useEffect(() => {
-    applyAppearance(document.documentElement, appearance, dark, organisation?.seed);
+    applyAppearance(
+      document.documentElement,
+      appearance,
+      dark,
+      organisation?.seed,
+    );
   }, [appearance, dark, organisation]);
 
   useEffect(() => {
@@ -138,5 +143,7 @@ export function useAppearance(): AppearanceState {
  */
 export function useFigureSeed(): string | undefined {
   const value = use(AppearanceContext);
-  return value === undefined ? undefined : figureSeed(value.appearance, value.organisation?.seed);
+  return value === undefined
+    ? undefined
+    : figureSeed(value.appearance, value.organisation?.seed);
 }

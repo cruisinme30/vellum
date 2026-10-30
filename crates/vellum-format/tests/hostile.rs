@@ -21,7 +21,8 @@ fn survive(src: String, budget: Duration) -> Vec<DiagnosticCode> {
         .spawn(move || {
             let started = Instant::now();
             let parsed = parse(&src);
-            let codes: Vec<DiagnosticCode> = parsed.diagnostics.iter().map(|d| d.code).collect();
+            let codes: Vec<DiagnosticCode> =
+                parsed.diagnostics.iter().map(|d| d.code).collect();
             let text = serialize(&parsed.document);
             let again = parse(&text);
             assert_eq!(
@@ -85,7 +86,8 @@ fn quotes_inside_list_items_do_not_overflow_the_stack() {
 
 #[test]
 fn deeply_nested_emphasis_does_not_overflow_the_stack() {
-    let _ = survive(format!("{}x{}", "*".repeat(DEEP), "*".repeat(DEEP)), BUDGET);
+    let _ =
+        survive(format!("{}x{}", "*".repeat(DEEP), "*".repeat(DEEP)), BUDGET);
     let _ = survive(
         format!("{}x{}", "~~".repeat(DEEP), "~~".repeat(DEEP)),
         BUDGET,
@@ -161,13 +163,15 @@ fn many_open_brackets_and_backticks_are_fast() {
 
 #[test]
 fn hostile_front_matter_is_bounded() {
-    let bomb = "---\na: &a [x,x,x,x,x,x,x,x,x]\nb: &b [*a,*a,*a,*a,*a,*a,*a,*a,*a]\n\
-c: &c [*b,*b,*b,*b,*b,*b,*b,*b,*b]\nd: &d [*c,*c,*c,*c,*c,*c,*c,*c,*c]\n\
-e: &e [*d,*d,*d,*d,*d,*d,*d,*d,*d]\nf: &f [*e,*e,*e,*e,*e,*e,*e,*e,*e]\n\
-g: &g [*f,*f,*f,*f,*f,*f,*f,*f,*f]\nh: &h [*g,*g,*g,*g,*g,*g,*g,*g,*g]\n\
-i: &i [*h,*h,*h,*h,*h,*h,*h,*h,*h]\n---\nbody\n";
+    let bomb = "---\na: &a [x,x,x,x,x,x,x,x,x]\n\
+b: &b [*a,*a,*a,*a,*a,*a,*a,*a,*a]\nc: &c [*b,*b,*b,*b,*b,*b,*b,*b,*b]\n\
+d: &d [*c,*c,*c,*c,*c,*c,*c,*c,*c]\ne: &e [*d,*d,*d,*d,*d,*d,*d,*d,*d]\n\
+f: &f [*e,*e,*e,*e,*e,*e,*e,*e,*e]\ng: &g [*f,*f,*f,*f,*f,*f,*f,*f,*f]\n\
+h: &h [*g,*g,*g,*g,*g,*g,*g,*g,*g]\ni: &i [*h,*h,*h,*h,*h,*h,*h,*h,*h]\n---\n\
+body\n";
     let _ = survive(bomb.to_owned(), BUDGET);
-    let deep = format!("---\na: {}{}\n---\n", "[".repeat(DEEP), "]".repeat(DEEP));
+    let deep =
+        format!("---\na: {}{}\n---\n", "[".repeat(DEEP), "]".repeat(DEEP));
     let _ = survive(deep, BUDGET);
     let deep_map = format!(
         "---\na: {}x{}\n---\n",

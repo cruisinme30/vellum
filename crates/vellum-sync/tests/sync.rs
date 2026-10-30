@@ -19,8 +19,9 @@ use vellum_sync::conformance::check_store;
 use vellum_sync::memory::MemoryStore;
 use vellum_sync::ports::BoxFuture;
 use vellum_sync::{
-    AccessKey, Change, ClientId, ClientMutation, MAX_PUSH, MutationContext, Mutators, PULL_PAGE,
-    Patch, PullRequest, PushRequest, ReadAccess, ServerMutator, Sync,
+    AccessKey, Change, ClientId, ClientMutation, MAX_PUSH, MutationContext,
+    Mutators, PULL_PAGE, Patch, PullRequest, PushRequest, ReadAccess,
+    ServerMutator, Sync,
 };
 
 /// Read access: the user reads every space in `allowed`, but no object
@@ -77,13 +78,22 @@ impl ServerMutator for SetIssue {
             let _ = self.calls.fetch_add(1, Ordering::SeqCst);
             let key = args["key"].as_str().unwrap_or_default().to_owned();
             match args["fail"].as_str() {
-                Some("denied") => Err(Error::new(ErrorKind::PermissionDenied, "not your issue")),
-                Some("down") => Err(Error::new(ErrorKind::Unavailable, "database restarting")),
+                Some("denied") => Err(Error::new(
+                    ErrorKind::PermissionDenied,
+                    "not your issue",
+                )),
+                Some("down") => Err(Error::new(
+                    ErrorKind::Unavailable,
+                    "database restarting",
+                )),
                 _ => Ok(vec![Change::put(
                     self.space,
                     "issues",
                     &key,
-                    json!({"value": args["value"], "by": context.client.as_str()}),
+                    json!({
+                        "value": args["value"],
+                        "by": context.client.as_str()
+                    }),
                 )]),
             }
         })
@@ -231,7 +241,8 @@ async fn rejects_and_continues_or_stops_for_a_retry() {
 #[tokio::test]
 async fn refuses_malformed_batches_and_foreign_clients() {
     let w = world();
-    let out_of_order = push(vec![mutation(2, json!({})), mutation(1, json!({}))]);
+    let out_of_order =
+        push(vec![mutation(2, json!({})), mutation(1, json!({}))]);
     let err = w
         .sync
         .push(w.user, RequestId::generate(), out_of_order)
@@ -317,7 +328,8 @@ async fn hides_what_the_user_cannot_read_and_resets_on_permission_changes() {
         .publish(vec![
             Change::put(w.space, "issues", "open", json!(1)),
             Change::put(secret, "issues", "secret", json!(2)),
-            Change::put(w.space, "pages", "narrowed", json!(3)).governed_by(object),
+            Change::put(w.space, "pages", "narrowed", json!(3))
+                .governed_by(object),
         ])
         .await
         .unwrap();

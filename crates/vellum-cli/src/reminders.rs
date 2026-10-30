@@ -4,13 +4,12 @@
 //! Sends My Work reminders and morning digests (R-MW-5, #472, D180).
 //!
 //! One replica at a time holds the `tasks.reminders` cluster lease
-//! ([`Replica::every`]) and runs the [`Schedule`]: it plans everyone every few minutes, plans again anyone
-//! whose tasks changed, and hands what falls due to the notifications
-//! [`Dispatcher`] (inbox line, web push, e-mail by each person's
-//! preferences). The time it has sent up to is kept in
-//! `<data>/.vellum/tasks/reminders.json`, so a restart neither repeats
-//! nor drops a reminder; a restart catches up at most
-//! [`CATCH_UP`].
+//! ([`Replica::every`]) and runs the [`Schedule`]: it plans everyone every few
+//! minutes, plans again anyone whose tasks changed, and hands what falls due to
+//! the notifications [`Dispatcher`] (inbox line, web push, e-mail by each
+//! person's preferences). The time it has sent up to is kept in
+//! `<data>/.vellum/tasks/reminders.json`, so a restart neither repeats nor
+//! drops a reminder; a restart catches up at most [`CATCH_UP`].
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -25,7 +24,9 @@ use vellum_notify::dispatch::Dispatcher;
 use vellum_notify::endpoint::{SafeTransport, policy};
 use vellum_notify::notification::{Notification, NotificationKind};
 use vellum_notify::service::NotifyStore;
-use vellum_tasks::schedule::{CATCH_UP, Notice, NoticeKind, PLAN_EVERY, Schedule, TICK};
+use vellum_tasks::schedule::{
+    CATCH_UP, Notice, NoticeKind, PLAN_EVERY, Schedule, TICK,
+};
 use vellum_tasks::service::TasksService;
 
 use crate::cluster::Replica;
@@ -174,7 +175,9 @@ impl<T: HttpTransport> Sender<T> {
         for user in people {
             match self.tasks.notices(user, after, until).await {
                 Ok(notices) => schedule.plan(user, notices),
-                Err(error) => tracing::warn!(%error, %user, "reminders: planning failed"),
+                Err(error) => {
+                    tracing::warn!(%error, %user, "reminders: planning failed")
+                }
             }
         }
         let due = schedule.fire(now);
@@ -208,7 +211,8 @@ pub fn start(
             format!("cannot build the push client: {e}"),
         )
     })?;
-    let watermark = Watermark::new(Some(&data_dir.join(".vellum").join("tasks")));
+    let watermark =
+        Watermark::new(Some(&data_dir.join(".vellum").join("tasks")));
     let sender = Arc::new(Mutex::new(Sender::new(
         Arc::clone(tasks),
         Dispatcher::new(Arc::clone(notify), transport),
@@ -244,7 +248,11 @@ mod tests {
         assert_eq!(mark.load(now), now.saturating_sub(CATCH_UP).unwrap());
         let future: Timestamp = "2026-11-04T10:00:00Z".parse().unwrap();
         mark.save(future).unwrap();
-        assert_eq!(mark.load(now), now, "a clock that ran ahead is pulled back");
+        assert_eq!(
+            mark.load(now),
+            now,
+            "a clock that ran ahead is pulled back"
+        );
     }
 
     #[test]

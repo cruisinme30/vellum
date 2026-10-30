@@ -18,12 +18,14 @@ use vellum_contracts::RequestContext;
 use vellum_kernel::{Error, ErrorKind};
 use vellum_work::project::{Cadence, Health, Milestone, ProjectStatus, rollup};
 use vellum_work::{
-    Changes, Initiative, InitiativeId, MilestoneId, Project, ProjectId, ProjectUpdate, Team,
-    TeamKey, UpdateId, UserRef, WorkEvent,
+    Changes, Initiative, InitiativeId, MilestoneId, Project, ProjectId,
+    ProjectUpdate, Team, TeamKey, UpdateId, UserRef, WorkEvent,
 };
 
 use super::{State, WorkService, date, parse_id};
-use crate::api::{ProjectOut, ProjectRef, TeamRef, invalid, name_of, parse_name, rfc3339};
+use crate::api::{
+    ProjectOut, ProjectRef, TeamRef, invalid, name_of, parse_name, rfc3339,
+};
 
 /// The longest title or name this API accepts.
 const MAX_TITLE: usize = 200;
@@ -42,7 +44,12 @@ pub struct Planning {
 
 impl Planning {
     /// Loads one update (`update`) or initiative page.
-    pub(crate) fn load(&mut self, update: bool, path: &str, text: &str) -> Result<(), Error> {
+    pub(crate) fn load(
+        &mut self,
+        update: bool,
+        path: &str,
+        text: &str,
+    ) -> Result<(), Error> {
         if update {
             self.add_update(ProjectUpdate::from_markdown(path, text)?);
         } else {
@@ -276,7 +283,8 @@ fn not_found(what: &str, id: &str) -> Error {
 
 fn title(text: &str, what: &str) -> Result<String, Error> {
     let t = text.trim();
-    if t.is_empty() || t.chars().count() > MAX_TITLE || t.contains(['\n', '\r']) {
+    if t.is_empty() || t.chars().count() > MAX_TITLE || t.contains(['\n', '\r'])
+    {
         return Err(invalid(&format!(
             "{what}: one line of 1 to {MAX_TITLE} characters"
         )));
@@ -313,7 +321,12 @@ fn project_dir(st: &State, id: &ProjectId, p: &Project) -> String {
         .map_or_else(|| "projects".to_owned(), |(dir, _)| dir.to_owned())
 }
 
-fn initiative_out(st: &State, i: &Initiative, md: String, today: Date) -> InitiativeOut {
+fn initiative_out(
+    st: &State,
+    i: &Initiative,
+    md: String,
+    today: Date,
+) -> InitiativeOut {
     let projects: Vec<&Project> = i
         .projects
         .iter()
@@ -464,10 +477,9 @@ impl WorkService {
         i: PostUpdate,
     ) -> Result<UpdateOut, Error> {
         let ctx = self.ctx(&rc).await?;
-        let author = ctx
-            .actor
-            .clone()
-            .ok_or_else(|| Error::new(ErrorKind::PermissionDenied, "sign in to post"))?;
+        let author = ctx.actor.clone().ok_or_else(|| {
+            Error::new(ErrorKind::PermissionDenied, "sign in to post")
+        })?;
         let mut st = self.write_state().await?;
         let id = parse_id::<ProjectId>("project_id", &i.project_id)?;
         let project = st
@@ -520,7 +532,14 @@ impl WorkService {
             .planning
             .initiatives
             .values()
-            .map(|(_, i)| initiative_out(&st, i, i.to_markdown().unwrap_or_default(), today))
+            .map(|(_, i)| {
+                initiative_out(
+                    &st,
+                    i,
+                    i.to_markdown().unwrap_or_default(),
+                    today,
+                )
+            })
             .collect();
         initiatives.sort_by_key(|a| a.title.to_lowercase());
         Ok(InitiativesOut { initiatives })
@@ -553,7 +572,10 @@ impl WorkService {
         i: PutInitiative,
     ) -> Result<InitiativeOut, Error> {
         let id = parse_id::<InitiativeId>("initiative_id", &i.initiative_id)?;
-        let initiative = Initiative::from_markdown("initiatives/new.md", &body(i.markdown)?)?;
+        let initiative = Initiative::from_markdown(
+            "initiatives/new.md",
+            &body(i.markdown)?,
+        )?;
         if initiative.id != id {
             return Err(invalid("the file's id must match initiative_id"));
         }

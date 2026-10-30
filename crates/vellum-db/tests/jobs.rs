@@ -10,15 +10,19 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
 use vellum_db::jobs::{
-    BoxFuture, Handler, Job, NewJob, Outcome, Queue, State, Worker, WorkerConfig,
+    BoxFuture, Handler, Job, NewJob, Outcome, Queue, State, Worker,
+    WorkerConfig,
 };
 use vellum_db::{Error, Index, IndexConfig};
 
 async fn queue(dir: &tempfile::TempDir) -> Queue {
     Queue::new(
-        Index::open(&IndexConfig::sqlite(dir.path().join("index.sqlite"), None))
-            .await
-            .unwrap(),
+        Index::open(&IndexConfig::sqlite(
+            dir.path().join("index.sqlite"),
+            None,
+        ))
+        .await
+        .unwrap(),
     )
 }
 
@@ -238,9 +242,12 @@ async fn a_worker_runs_jobs_and_retries_failures() {
 async fn rate_counts_add_up_across_replicas() {
     use vellum_db::rate::SharedCounts;
     let dir = tempfile::tempdir().unwrap();
-    let index = Index::open(&IndexConfig::sqlite(dir.path().join("index.sqlite"), None))
-        .await
-        .unwrap();
+    let index = Index::open(&IndexConfig::sqlite(
+        dir.path().join("index.sqlite"),
+        None,
+    ))
+    .await
+    .unwrap();
     let counts = SharedCounts::new(index);
     let a = counts
         .add(60_000, &[("ip:1".to_owned(), 3), ("ip:2".to_owned(), 1)])

@@ -24,7 +24,8 @@ use crate::pdf::PdfEngine;
 /// The Google Docs MIME type.
 pub const GOOGLE_DOC: &str = "application/vnd.google-apps.document";
 /// The Word MIME type.
-pub const DOCX: &str = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+pub const DOCX: &str =
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 /// Largest Word file downloaded for import.
 const MAX_IMPORT_BYTES: usize = 100 * 1024 * 1024;
@@ -89,7 +90,11 @@ impl Drive {
     /// # Errors
     ///
     /// [`ExportError::NotConfigured`] if the HTTP client cannot be built.
-    pub fn with_endpoints(api: Url, upload: Url, timeout: Duration) -> Result<Self, ExportError> {
+    pub fn with_endpoints(
+        api: Url,
+        upload: Url,
+        timeout: Duration,
+    ) -> Result<Self, ExportError> {
         let client = reqwest::Client::builder()
             .timeout(timeout)
             .redirect(reqwest::redirect::Policy::limited(3))
@@ -109,7 +114,11 @@ impl Drive {
     ///
     /// [`ExportError::Remote`] when Drive refuses or fails, and the Word
     /// writer's errors.
-    #[tracing::instrument(name = "export.gdocs", skip_all, fields(blocks = flow.blocks.len()))]
+    #[tracing::instrument(
+        name = "export.gdocs",
+        skip_all,
+        fields(blocks = flow.blocks.len())
+    )]
     pub async fn export(
         &self,
         flow: &Flow,
@@ -146,7 +155,8 @@ impl Drive {
         let _ = metadata.insert("mimeType".into(), GOOGLE_DOC.into());
         if let Some(folder) = folder {
             check_id(folder).map_err(|m| ExportError::Invalid(m.into()))?;
-            let _ = metadata.insert("parents".into(), serde_json::json!([folder]));
+            let _ =
+                metadata.insert("parents".into(), serde_json::json!([folder]));
         }
         let metadata = serde_json::Value::Object(metadata);
         let boundary = "vellum-export-boundary-7c1e";
@@ -154,7 +164,8 @@ impl Drive {
         let mut head = String::new();
         let _ = write!(
             head,
-            "--{boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{metadata}\r\n--{boundary}\r\nContent-Type: {DOCX}\r\n\r\n"
+            "--{boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\
+                \r\n{metadata}\r\n--{boundary}\r\nContent-Type: {DOCX}\r\n\r\n"
         );
         body.extend_from_slice(head.as_bytes());
         body.extend_from_slice(&bytes);
@@ -184,7 +195,10 @@ impl Drive {
         if !status.is_success() {
             return Err(ExportError::Remote {
                 service: "drive",
-                message: drive_message(status, &response.text().await.unwrap_or_default()),
+                message: drive_message(
+                    status,
+                    &response.text().await.unwrap_or_default(),
+                ),
                 retryable: status.is_server_error() || status.as_u16() == 429,
             });
         }
@@ -245,7 +259,9 @@ impl Drive {
         } else {
             return Err(ImportError::format(
                 "gdocs",
-                format!("the Drive file is {mime}, not a Google Doc or Word file"),
+                format!(
+                    "the Drive file is {mime}, not a Google Doc or Word file"
+                ),
             ));
         };
         let response = self.get(url, token).await?;
@@ -253,7 +269,9 @@ impl Drive {
             .content_length()
             .is_some_and(|n| n > MAX_IMPORT_BYTES as u64)
         {
-            return Err(ImportError::TooLarge("the document is over 100 MB".into()));
+            return Err(ImportError::TooLarge(
+                "the document is over 100 MB".into(),
+            ));
         }
         // A chunked reply has no length up front: stop reading at the
         // limit instead of buffering whatever is sent (RT-027).
@@ -261,14 +279,20 @@ impl Drive {
         let mut bytes = Vec::new();
         while let Some(chunk) = response.chunk().await.map_err(import_remote)? {
             if bytes.len() + chunk.len() > MAX_IMPORT_BYTES {
-                return Err(ImportError::TooLarge("the document is over 100 MB".into()));
+                return Err(ImportError::TooLarge(
+                    "the document is over 100 MB".into(),
+                ));
             }
             bytes.extend_from_slice(&chunk);
         }
         Ok((name, bytes))
     }
 
-    async fn get(&self, url: Url, token: &AccessToken) -> Result<reqwest::Response, ImportError> {
+    async fn get(
+        &self,
+        url: Url,
+        token: &AccessToken,
+    ) -> Result<reqwest::Response, ImportError> {
         let response = self
             .client
             .get(url)
@@ -282,7 +306,10 @@ impl Drive {
         } else {
             Err(ImportError::Remote {
                 service: "drive",
-                message: drive_message(status, &response.text().await.unwrap_or_default()),
+                message: drive_message(
+                    status,
+                    &response.text().await.unwrap_or_default(),
+                ),
                 retryable: status.is_server_error() || status.as_u16() == 429,
             })
         }
@@ -352,10 +379,9 @@ pub fn for_google_docs(flow: &Flow, engine: &PdfEngine) -> Flow {
             typst: Some(typst),
         } = node
         {
-            let image = engine
-                .math_svg(typst)
-                .ok()
-                .and_then(|svg| rasterize_svg(svg.as_bytes(), 3.0).map(|png| (svg, png)));
+            let image = engine.math_svg(typst).ok().and_then(|svg| {
+                rasterize_svg(svg.as_bytes(), 3.0).map(|png| (svg, png))
+            });
             if let Some((svg, png)) = image {
                 let (w, h) = svg_size(&svg);
                 let name = format!("a{}.png", next + extra.len());
@@ -404,7 +430,9 @@ fn walk_mut(nodes: &mut [Node], f: &mut impl FnMut(&mut Node)) {
     for node in nodes {
         f(node);
         match node {
-            Node::Quote { blocks } | Node::Callout { blocks, .. } | Node::Titled { blocks, .. } => {
+            Node::Quote { blocks }
+            | Node::Callout { blocks, .. }
+            | Node::Titled { blocks, .. } => {
                 walk_mut(blocks, f);
             }
             Node::List { items, .. } => {
@@ -442,7 +470,8 @@ mod tests {
 
     #[test]
     fn drive_errors_keep_only_the_message() {
-        let body = r#"{"error":{"code":403,"message":"Insufficient permissions"}}"#;
+        let body =
+            r#"{"error":{"code":403,"message":"Insufficient permissions"}}"#;
         assert_eq!(
             drive_message(reqwest::StatusCode::FORBIDDEN, body),
             "HTTP 403 Forbidden: Insufficient permissions"
@@ -466,7 +495,8 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn a_chunked_download_stops_at_the_limit() {
         use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let listener =
+            tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
         let sent = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let counter = std::sync::Arc::clone(&sent);
@@ -479,18 +509,25 @@ mod tests {
                 drop(tokio::spawn(async move {
                     let mut request = vec![0u8; 4096];
                     let n = socket.read(&mut request).await.unwrap_or(0);
-                    let line = String::from_utf8_lossy(&request[..n]).into_owned();
+                    let line =
+                        String::from_utf8_lossy(&request[..n]).into_owned();
                     if line.contains("fields=") {
-                        let body = format!(r#"{{"name":"Plan","mimeType":"{DOCX}"}}"#);
+                        let body =
+                            format!(r#"{{"name":"Plan","mimeType":"{DOCX}"}}"#);
                         let head = format!(
-                            "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
+                            "HTTP/1.1 200 OK\r\n\
+                                content-type: application/json\r\n\
+                                content-length: {}\r\nconnection: close\r\n\
+                                \r\n",
                             body.len()
                         );
                         let _ = socket.write_all(head.as_bytes()).await;
                         let _ = socket.write_all(body.as_bytes()).await;
                         return;
                     }
-                    let head = "HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\nconnection: close\r\n\r\n";
+                    let head = "HTTP/1.1 200 OK\r\n\
+                        transfer-encoding: chunked\r\nconnection: close\r\n\
+                        \r\n";
                     if socket.write_all(head.as_bytes()).await.is_err() {
                         return;
                     }
@@ -504,14 +541,19 @@ mod tests {
                         {
                             return;
                         }
-                        let _ = counter.fetch_add(chunk.len(), std::sync::atomic::Ordering::SeqCst);
+                        let _ = counter.fetch_add(
+                            chunk.len(),
+                            std::sync::atomic::Ordering::SeqCst,
+                        );
                     }
                     let _ = socket.write_all(b"0\r\n\r\n").await;
                 }));
             }
         }));
         let api = Url::parse(&format!("http://{addr}/")).unwrap();
-        let drive = Drive::with_endpoints(api.clone(), api, Duration::from_mins(1)).unwrap();
+        let drive =
+            Drive::with_endpoints(api.clone(), api, Duration::from_mins(1))
+                .unwrap();
         let result = drive.download_docx(&AccessToken::new("t"), "file1").await;
         assert!(
             matches!(result, Err(ImportError::TooLarge(_))),

@@ -28,7 +28,9 @@ fn random<const N: usize>() -> [u8; N] {
         let nanos = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(1, |d| d.as_nanos());
-        for (slot, byte) in bytes.iter_mut().zip(nanos.to_le_bytes().iter().cycle()) {
+        for (slot, byte) in
+            bytes.iter_mut().zip(nanos.to_le_bytes().iter().cycle())
+        {
             *slot = *byte;
         }
     }
@@ -41,7 +43,9 @@ fn random<const N: usize>() -> [u8; N] {
 }
 
 fn parse_hex<const N: usize>(s: &str) -> Result<[u8; N], ParseError> {
-    if s.len() != N * 2 || !s.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')) {
+    if s.len() != N * 2
+        || !s.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+    {
         return Err(ParseError::Malformed);
     }
     let mut out = [0_u8; N];
@@ -91,13 +95,18 @@ impl FromStr for TraceId {
 }
 
 impl Serialize for TraceId {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+    fn serialize<S: Serializer>(
+        &self,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
         serializer.collect_str(self)
     }
 }
 
 impl<'de> Deserialize<'de> for TraceId {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+    fn deserialize<D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
         s.parse().map_err(serde::de::Error::custom)
     }
@@ -199,7 +208,9 @@ impl FromStr for TraceParent {
 }
 
 fn parse_byte(s: &str) -> Result<u8, ParseError> {
-    if s.len() != 2 || !s.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')) {
+    if s.len() != 2
+        || !s.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+    {
         return Err(ParseError::Malformed);
     }
     u8::from_str_radix(s, 16).map_err(|_| ParseError::Malformed)
@@ -211,9 +222,10 @@ mod tests {
 
     #[test]
     fn parses_the_spec_example() {
-        let tp: TraceParent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
-            .parse()
-            .unwrap();
+        let tp: TraceParent =
+            "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+                .parse()
+                .unwrap();
         assert_eq!(tp.trace_id.to_string(), "4bf92f3577b34da6a3ce929d0e0e4736");
         assert_eq!(tp.parent_id.to_string(), "00f067aa0ba902b7");
         assert!(tp.sampled);
@@ -242,9 +254,10 @@ mod tests {
 
     #[test]
     fn future_versions_keep_known_fields() {
-        let tp: TraceParent = "01-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00-more"
-            .parse()
-            .unwrap();
+        let tp: TraceParent =
+            "01-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00-more"
+                .parse()
+                .unwrap();
         assert!(!tp.sampled);
     }
 

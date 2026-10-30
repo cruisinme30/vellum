@@ -225,7 +225,11 @@ impl Team {
     /// # Errors
     ///
     /// Never in practice; the standard workflow is valid.
-    pub fn new(id: TeamId, key: TeamKey, name: &str) -> Result<Self, WorkError> {
+    pub fn new(
+        id: TeamId,
+        key: TeamKey,
+        name: &str,
+    ) -> Result<Self, WorkError> {
         Ok(Self {
             id,
             key,
@@ -265,7 +269,8 @@ impl Team {
             reason,
         };
         self.workflow.check().map_err(fail)?;
-        let has_triage = self.workflow.first_in(crate::Category::Triage).is_some();
+        let has_triage =
+            self.workflow.first_in(crate::Category::Triage).is_some();
         if self.triage && !has_triage {
             return Err(fail(
                 "triage is on but the workflow has no triage status".to_owned(),
@@ -276,7 +281,9 @@ impl Team {
         }
         for (moment, status) in self.git.iter().flat_map(GitMapping::statuses) {
             if self.workflow.get(status).is_none() {
-                return Err(fail(format!("git {moment} names unknown status {status}")));
+                return Err(fail(format!(
+                    "git {moment} names unknown status {status}"
+                )));
             }
         }
         for (i, l) in self.labels.iter().enumerate() {
@@ -286,7 +293,10 @@ impl Team {
         }
         for (i, t) in self.templates.iter().enumerate() {
             if self.templates.iter().skip(i + 1).any(|u| u.name == t.name) {
-                return Err(fail(format!("template {} is defined twice", t.name)));
+                return Err(fail(format!(
+                    "template {} is defined twice",
+                    t.name
+                )));
             }
         }
         for (i, f) in self.forms.iter().enumerate() {
@@ -312,10 +322,11 @@ impl Team {
     /// Returns [`WorkError::File`] if the YAML is malformed, and the
     /// [`Team::check`] error if the settings break a rule.
     pub fn from_yaml(path: &str, text: &str) -> Result<Self, WorkError> {
-        let team: Self = serde_saphyr::from_str(text).map_err(|e| WorkError::File {
-            path: path.to_owned(),
-            reason: e.to_string(),
-        })?;
+        let team: Self =
+            serde_saphyr::from_str(text).map_err(|e| WorkError::File {
+                path: path.to_owned(),
+                reason: e.to_string(),
+            })?;
         team.check()?;
         Ok(team)
     }

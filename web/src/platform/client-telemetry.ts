@@ -49,23 +49,38 @@ export interface ClientReport {
 interface TimedEntry {
   readonly startTime: number;
   readonly requestStart: number;
-  readonly serverTiming?: readonly { readonly name: string; readonly description: string }[];
+  readonly serverTiming?: readonly {
+    readonly name: string;
+    readonly description: string;
+  }[];
 }
 
 const TRACEPARENT = /^00-[\da-f]{32}-[\da-f]{16}-[\da-f]{2}$/;
 
 /** The server trace of a navigation or fetch, from its `Server-Timing`. */
 export function serverTraceparent(entry: TimedEntry): string | undefined {
-  const value = entry.serverTiming?.find((metric) => metric.name === "traceparent")?.description;
+  const value = entry.serverTiming?.find(
+    (metric) => metric.name === "traceparent",
+  )?.description;
   return value !== undefined && TRACEPARENT.test(value) ? value : undefined;
 }
 
-function span(name: string, start: number, end: number): ClientSpan | undefined {
-  return start > 0 && end > start ? { name, start_ms: start, duration_ms: end - start } : undefined;
+function span(
+  name: string,
+  start: number,
+  end: number,
+): ClientSpan | undefined {
+  return start > 0 && end > start
+    ? { name, start_ms: start, duration_ms: end - start }
+    : undefined;
 }
 
-/** The phases of a page load as spans. Phases the browser skipped are left out. */
-export function navigationSpans(nav: PerformanceNavigationTiming): ClientSpan[] {
+/**
+ * The phases of a page load as spans. Phases the browser skipped are left out.
+ */
+export function navigationSpans(
+  nav: PerformanceNavigationTiming,
+): ClientSpan[] {
   const phases = [
     span("dns", nav.domainLookupStart, nav.domainLookupEnd),
     span("connect", nav.connectStart, nav.connectEnd),
@@ -77,7 +92,10 @@ export function navigationSpans(nav: PerformanceNavigationTiming): ClientSpan[] 
   return phases.filter((phase): phase is ClientSpan => phase !== undefined);
 }
 
-/** Builds the report for a page view, or nothing when the page has no server trace. */
+/**
+ * Builds the report for a page view, or nothing when the page has no server
+ * trace.
+ */
 export function navigationReport(
   nav: PerformanceNavigationTiming,
   vitals: Vitals,
@@ -94,12 +112,18 @@ export function navigationReport(
     page,
     request_start_ms: nav.requestStart,
     time_origin_ms: timeOrigin,
-    spans: navigationSpans(nav).map((s) => ({ ...s, attributes: { type: nav.type } })),
+    spans: navigationSpans(nav).map((s) => ({
+      ...s,
+      attributes: { type: nav.type },
+    })),
     vitals: ttfb > 0 ? { ...vitals, ttfb_ms: ttfb } : vitals,
   };
 }
 
-/** Builds the report for a slow API call, or nothing when it was fast or untraced. */
+/**
+ * Builds the report for a slow API call, or nothing when it was fast or
+ * untraced.
+ */
 export function resourceReport(
   entry: PerformanceResourceTiming,
   page: string,
@@ -113,7 +137,8 @@ export function resourceReport(
   return {
     traceparent,
     page,
-    request_start_ms: entry.requestStart > 0 ? entry.requestStart : entry.startTime,
+    request_start_ms:
+      entry.requestStart > 0 ? entry.requestStart : entry.startTime,
     time_origin_ms: timeOrigin,
     spans: [
       {
@@ -140,7 +165,8 @@ type ObserverConstructor = new (callback: PerformanceObserverCallback) => {
 };
 
 function availableObserver(): ObserverConstructor | undefined {
-  return (globalThis as { PerformanceObserver?: ObserverConstructor }).PerformanceObserver;
+  return (globalThis as { PerformanceObserver?: ObserverConstructor })
+    .PerformanceObserver;
 }
 
 /** Collects Core Web Vitals from `PerformanceObserver` entries. */
@@ -149,11 +175,18 @@ export class VitalsCollector {
   private readonly observers: { disconnect(): void }[] = [];
 
   /** Starts observing; entry types the browser lacks are skipped. */
-  observe(Observer: ObserverConstructor | undefined = availableObserver()): this {
+  observe(
+    Observer: ObserverConstructor | undefined = availableObserver(),
+  ): this {
     if (Observer === undefined) {
       return this;
     }
-    for (const type of ["largest-contentful-paint", "layout-shift", "event", "paint"]) {
+    for (const type of [
+      "largest-contentful-paint",
+      "layout-shift",
+      "event",
+      "paint",
+    ]) {
       try {
         const observer = new Observer((list) => {
           for (const entry of list.getEntries()) {
@@ -184,7 +217,10 @@ export class VitalsCollector {
       }
       case "event": {
         if ((entry.interactionId ?? 0) > 0) {
-          this.vitals.inp_ms = Math.max(this.vitals.inp_ms ?? 0, entry.duration);
+          this.vitals.inp_ms = Math.max(
+            this.vitals.inp_ms ?? 0,
+            entry.duration,
+          );
         }
         break;
       }

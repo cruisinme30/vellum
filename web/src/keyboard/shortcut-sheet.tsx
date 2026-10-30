@@ -23,8 +23,15 @@ const HEADINGS: Readonly<Record<Scope, string>> = {
 
 const ORDER: readonly Scope[] = ["global", "issues", "editor"];
 
-/** The `?` sheet: every shortcut for the current screen, by where it applies. */
-export function ShortcutSheet({ commands, platform, scopes, onClose }: ShortcutSheetProperties) {
+/**
+ * The `?` sheet: every shortcut for the current screen, by where it applies.
+ */
+export function ShortcutSheet({
+  commands,
+  platform,
+  scopes,
+  onClose,
+}: ShortcutSheetProperties) {
   const close = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     close.current?.focus();
@@ -49,7 +56,9 @@ export function ShortcutSheet({ commands, platform, scopes, onClose }: ShortcutS
     >
       <h2 id="shortcut-sheet-title">Keyboard shortcuts</h2>
       {ORDER.filter((scope) => scopes.has(scope)).flatMap((scope) => {
-        const rows = commands.filter((c) => c.scope === scope && c.keys.length > 0);
+        const rows = commands.filter(
+          (c) => c.scope === scope && c.keys.length > 0,
+        );
         if (rows.length === 0) {
           return [];
         }
@@ -62,7 +71,9 @@ export function ShortcutSheet({ commands, platform, scopes, onClose }: ShortcutS
                   <tr key={command.id}>
                     <td>
                       {command.keys.map((k) => (
-                        <kbd key={k}>{formatBinding(parseBinding(k), platform)}</kbd>
+                        <kbd key={k}>
+                          {formatBinding(parseBinding(k), platform)}
+                        </kbd>
                       ))}
                     </td>
                     <td>{command.title}</td>

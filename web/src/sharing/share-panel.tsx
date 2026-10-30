@@ -9,7 +9,13 @@ import type { DirectoryApi } from "../people/directory";
 import { PeoplePicker } from "../people/people-picker";
 import { Icon } from "../shell/icon";
 
-import type { CreatedLink, GrantRole, GrantView, SharingApi, SharingView } from "./api";
+import type {
+  CreatedLink,
+  GrantRole,
+  GrantView,
+  SharingApi,
+  SharingView,
+} from "./api";
 import { DATE, endOfDay, today } from "./dates";
 import { Links } from "./share-links";
 
@@ -17,7 +23,12 @@ import "./sharing.css";
 
 type Submit = NonNullable<ComponentProps<"form">["onSubmit"]>;
 
-const ROLES: readonly GrantRole[] = ["viewer", "commenter", "editor", "manager"];
+const ROLES: readonly GrantRole[] = [
+  "viewer",
+  "commenter",
+  "editor",
+  "manager",
+];
 
 /** Props of {@link SharePanel}. */
 export interface SharePanelProperties {
@@ -32,7 +43,12 @@ export interface SharePanelProperties {
  * remove their access, and make, copy and revoke share links. The server
  * decides who may share; someone who may not sees why.
  */
-export function SharePanel({ api, itemId, directory, onClose }: SharePanelProperties) {
+export function SharePanel({
+  api,
+  itemId,
+  directory,
+  onClose,
+}: SharePanelProperties) {
   const t = useT();
   const headingId = useId();
   const [state, setState] = useState<SharingView>();
@@ -78,10 +94,17 @@ export function SharePanel({ api, itemId, directory, onClose }: SharePanelProper
   };
 
   return (
-    <div className="vl-share-panel" role="dialog" aria-modal="false" aria-labelledby={headingId}>
+    <div
+      className="vl-share-panel"
+      role="dialog"
+      aria-modal="false"
+      aria-labelledby={headingId}
+    >
       <header className="vl-share-head">
         <h2 id={headingId}>
-          {state ? t("share-title", { title: state.item.title }) : t("share-title-plain")}
+          {state
+            ? t("share-title", { title: state.item.title })
+            : t("share-title-plain")}
         </h2>
         <button
           type="button"
@@ -119,7 +142,9 @@ export function SharePanel({ api, itemId, directory, onClose }: SharePanelProper
           />
           <Grants
             grants={state.grants}
-            onRole={(principal, role) => run(() => api.share(itemId, principal, role))}
+            onRole={(principal, role) =>
+              run(() => api.share(itemId, principal, role))
+            }
             onRemove={(principal) => run(() => api.unshare(itemId, principal))}
           />
           <Links
@@ -186,7 +211,11 @@ function AddPeople({
   onShare,
 }: {
   readonly directory: DirectoryApi | undefined;
-  readonly onShare: (principals: string[], role: GrantRole, until?: string) => Promise<boolean>;
+  readonly onShare: (
+    principals: string[],
+    role: GrantRole,
+    until?: string,
+  ) => Promise<boolean>;
 }) {
   const t = useT();
   const [people, setPeople] = useState<string[]>([]);
@@ -228,7 +257,11 @@ function AddPeople({
             <input type="date" name="until" min={today()} />
           </label>
         </div>
-        <button type="submit" className="vl-filled-button" disabled={busy || people.length === 0}>
+        <button
+          type="submit"
+          className="vl-filled-button"
+          disabled={busy || people.length === 0}
+        >
           {t("share-send")}
         </button>
       </form>
@@ -238,7 +271,8 @@ function AddPeople({
 
 /** A grant's name: the handle, else the principal. */
 function grantName(grant: GrantView): string {
-  if (grant.handle != undefined && grant.handle !== "") return `@${grant.handle}`;
+  if (grant.handle != undefined && grant.handle !== "")
+    return `@${grant.handle}`;
   return grant.principal;
 }
 
@@ -266,10 +300,14 @@ function Grants({
             return (
               <li key={`${grant.principal}-${grant.role}`}>
                 <span className="vl-share-name">
-                  {grant.principal.startsWith("group:") ? t("share-group", { name }) : name}
+                  {grant.principal.startsWith("group:")
+                    ? t("share-group", { name })
+                    : name}
                   {grant.expires_at != undefined && (
                     <small className="vl-muted">
-                      {t("share-until-date", { date: DATE.format(new Date(grant.expires_at)) })}
+                      {t("share-until-date", {
+                        date: DATE.format(new Date(grant.expires_at)),
+                      })}
                     </small>
                   )}
                 </span>

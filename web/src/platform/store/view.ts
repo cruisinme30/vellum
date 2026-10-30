@@ -1,7 +1,13 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import type { JsonValue, Mutators, Patch, PendingMutation, WriteTx } from "./types";
+import type {
+  JsonValue,
+  Mutators,
+  Patch,
+  PendingMutation,
+  WriteTx,
+} from "./types";
 
 /** Marks a record deleted by a pending mutation. */
 const TOMBSTONE = Symbol("tombstone");
@@ -55,9 +61,11 @@ export class View {
   /** Every live record of a collection, sorted by key. */
   scan(collection: string): readonly (readonly [string, JsonValue])[] {
     const merged = new Map<string, Slot>(this.#base.get(collection));
-    for (const [key, slot] of this.#overlay.get(collection) ?? []) merged.set(key, slot);
+    for (const [key, slot] of this.#overlay.get(collection) ?? [])
+      merged.set(key, slot);
     const rows: [string, JsonValue][] = [];
-    for (const [key, slot] of merged) if (slot !== TOMBSTONE) rows.push([key, slot]);
+    for (const [key, slot] of merged)
+      if (slot !== TOMBSTONE) rows.push([key, slot]);
     return rows.toSorted(([a], [b]) => compareKeys(a, b));
   }
 
@@ -115,7 +123,8 @@ export class View {
   /** Applies patches to the base without touching the overlay. */
   load(patches: readonly Patch[]): void {
     for (const patch of patches) {
-      const table = this.#base.get(patch.collection) ?? new Map<string, JsonValue>();
+      const table =
+        this.#base.get(patch.collection) ?? new Map<string, JsonValue>();
       if (patch.op === "put") table.set(patch.key, patch.value);
       else table.delete(patch.key);
       this.#base.set(patch.collection, table);
@@ -138,7 +147,10 @@ export class View {
       scan: (collection) => {
         const own = writes.get(collection);
         if (own === undefined) return this.scan(collection);
-        const keys = new Set([...this.scan(collection).map(([key]) => key), ...own.keys()]);
+        const keys = new Set([
+          ...this.scan(collection).map(([key]) => key),
+          ...own.keys(),
+        ]);
         const rows: [string, JsonValue][] = [];
         for (const key of [...keys].toSorted(compareKeys)) {
           const value = read(collection, key);

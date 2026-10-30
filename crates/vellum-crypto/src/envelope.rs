@@ -17,7 +17,8 @@
 //! | rest  | payload ciphertext + 16-byte tag          |
 //!
 //! The payload is not bound to the object's path, so renames keep working, and
-//! not to the header, so rotation re-wraps the DEK without touching the payload.
+//! not to the header, so rotation re-wraps the DEK without touching the
+//! payload.
 
 use crate::aead::{self, NONCE_LEN, TAG_LEN};
 use crate::error::CryptoError;
@@ -36,12 +37,20 @@ pub fn is_envelope(bytes: &[u8]) -> bool {
     bytes.starts_with(&MAGIC)
 }
 
-/// Encrypts `plaintext` under a fresh DEK wrapped by the provider's current KEK.
+/// Encrypts `plaintext` under a fresh DEK wrapped by the provider's current
+/// KEK.
 ///
 /// # Errors
 /// Any provider failure, or [`CryptoError::Rng`]/[`CryptoError::Encrypt`].
-#[tracing::instrument(name = "crypto.seal", skip_all, fields(bytes = plaintext.len()))]
-pub async fn seal<K: KeyProvider>(provider: &K, plaintext: &[u8]) -> Result<Vec<u8>, CryptoError> {
+#[tracing::instrument(
+    name = "crypto.seal",
+    skip_all,
+    fields(bytes = plaintext.len())
+)]
+pub async fn seal<K: KeyProvider>(
+    provider: &K,
+    plaintext: &[u8],
+) -> Result<Vec<u8>, CryptoError> {
     let result = async {
         let dek = SecretKey::generate()?;
         let wrapped = provider.wrap(&dek).await?;
@@ -58,8 +67,15 @@ pub async fn seal<K: KeyProvider>(provider: &K, plaintext: &[u8]) -> Result<Vec<
 /// [`CryptoError::Malformed`]/[`CryptoError::UnsupportedVersion`] for bad
 /// bytes, [`CryptoError::UnknownKek`] if the KEK is gone, and
 /// [`CryptoError::Decrypt`] if anything was tampered with.
-#[tracing::instrument(name = "crypto.open", skip_all, fields(bytes = sealed.len()))]
-pub async fn open<K: KeyProvider>(provider: &K, sealed: &[u8]) -> Result<Vec<u8>, CryptoError> {
+#[tracing::instrument(
+    name = "crypto.open",
+    skip_all,
+    fields(bytes = sealed.len())
+)]
+pub async fn open<K: KeyProvider>(
+    provider: &K,
+    sealed: &[u8],
+) -> Result<Vec<u8>, CryptoError> {
     let result = async {
         let parsed = decode(sealed)?;
         let dek = provider.unwrap(&parsed.wrapped).await?;
@@ -74,7 +90,11 @@ pub async fn open<K: KeyProvider>(provider: &K, sealed: &[u8]) -> Result<Vec<u8>
 ///
 /// # Errors
 /// As [`open`], for the DEK only.
-#[tracing::instrument(name = "crypto.rewrap", skip_all, fields(bytes = sealed.len()))]
+#[tracing::instrument(
+    name = "crypto.rewrap",
+    skip_all,
+    fields(bytes = sealed.len())
+)]
 pub async fn rewrap<K: KeyProvider>(
     provider: &K,
     sealed: &[u8],
@@ -94,7 +114,10 @@ pub async fn rewrap<K: KeyProvider>(
 
 /// Counts every envelope operation by kind and outcome (`OTel` counter
 /// `vellum_crypto_ops` via the tracing bridge).
-fn record<T>(op: &'static str, result: Result<T, CryptoError>) -> Result<T, CryptoError> {
+fn record<T>(
+    op: &'static str,
+    result: Result<T, CryptoError>,
+) -> Result<T, CryptoError> {
     let outcome = if result.is_ok() { "ok" } else { "error" };
     tracing::info!(monotonic_counter.vellum_crypto_ops = 1_u64, op, outcome);
     if let Err(error) = &result {
@@ -105,16 +128,16 @@ fn record<T>(op: &'static str, result: Result<T, CryptoError>) -> Result<T, Cryp
 
 /// The KEK an envelope's DEK is wrapped under, read from the header only.
 ///
-/// # Errors
-/// [`CryptoError::Malformed`]/[`CryptoError::UnsupportedVersion`] for bad bytes.
+/// # Errors [`CryptoError::Malformed`]/[`CryptoError::UnsupportedVersion`] for
+/// bad bytes.
 pub fn kek_of(sealed: &[u8]) -> Result<KekId, CryptoError> {
     decode(sealed).map(|parsed| parsed.wrapped.kek_id)
 }
 
 /// Length of the plaintext inside an envelope, read from the header only.
 ///
-/// # Errors
-/// [`CryptoError::Malformed`]/[`CryptoError::UnsupportedVersion`] for bad bytes.
+/// # Errors [`CryptoError::Malformed`]/[`CryptoError::UnsupportedVersion`] for
+/// bad bytes.
 pub fn plaintext_len(sealed: &[u8]) -> Result<usize, CryptoError> {
     let parsed = decode(sealed)?;
     parsed
@@ -136,11 +159,14 @@ fn encode(
     ciphertext: &[u8],
 ) -> Result<Vec<u8>, CryptoError> {
     let id = wrapped.kek_id.as_str().as_bytes();
-    let id_len = u8::try_from(id.len()).map_err(|_| CryptoError::InvalidKekId)?;
-    let blob_len = u16::try_from(wrapped.blob.len())
-        .map_err(|_| CryptoError::Provider("wrapped key longer than 64 KiB".into()))?;
-    let mut out =
-        Vec::with_capacity(8 + id.len() + wrapped.blob.len() + NONCE_LEN + ciphertext.len());
+    let id_len =
+        u8::try_from(id.len()).map_err(|_| CryptoError::InvalidKekId)?;
+    let blob_len = u16::try_from(wrapped.blob.len()).map_err(|_| {
+        CryptoError::Provider("wrapped key longer than 64 KiB".into())
+    })?;
+    let mut out = Vec::with_capacity(
+        8 + id.len() + wrapped.blob.len() + NONCE_LEN + ciphertext.len(),
+    );
     out.extend_from_slice(&MAGIC);
     out.push(VERSION);
     out.push(id_len);

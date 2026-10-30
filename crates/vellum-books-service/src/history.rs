@@ -107,7 +107,10 @@ pub fn is_record_id(raw: &str) -> bool {
 /// # Errors
 ///
 /// When the store cannot be listed.
-pub async fn ids(store: &dyn BlobStore, dir: &BlobPath) -> Result<Vec<String>, Error> {
+pub async fn ids(
+    store: &dyn BlobStore,
+    dir: &BlobPath,
+) -> Result<Vec<String>, Error> {
     let folder = folder(dir)?;
     let entries: Vec<_> = match store.list(Some(&folder)).try_collect().await {
         Ok(entries) => entries,
@@ -116,7 +119,10 @@ pub async fn ids(store: &dyn BlobStore, dir: &BlobPath) -> Result<Vec<String>, E
     };
     let mut ids: Vec<String> = entries
         .iter()
-        .filter(|e| e.path.parent().as_ref() == Some(&folder) && e.size <= MAX_FILE_BYTES)
+        .filter(|e| {
+            e.path.parent().as_ref() == Some(&folder)
+                && e.size <= MAX_FILE_BYTES
+        })
         .filter_map(|e| e.path.file_name().strip_suffix(".json"))
         .filter(|id| is_record_id(id))
         .map(str::to_owned)
@@ -130,7 +136,11 @@ pub async fn ids(store: &dyn BlobStore, dir: &BlobPath) -> Result<Vec<String>, E
 /// # Errors
 ///
 /// `not_found` for an unknown or malformed ID.
-pub async fn read(store: &dyn BlobStore, dir: &BlobPath, id: &str) -> Result<Record, Error> {
+pub async fn read(
+    store: &dyn BlobStore,
+    dir: &BlobPath,
+    id: &str,
+) -> Result<Record, Error> {
     let missing = || Error::new(ErrorKind::NotFound, "history entry not found");
     if !is_record_id(id) {
         return Err(missing());
@@ -153,12 +163,17 @@ pub async fn read(store: &dyn BlobStore, dir: &BlobPath, id: &str) -> Result<Rec
 /// # Errors
 ///
 /// A store failure.
-pub async fn append(store: &dyn BlobStore, dir: &BlobPath, record: &Record) -> Result<(), Error> {
+pub async fn append(
+    store: &dyn BlobStore,
+    dir: &BlobPath,
+    record: &Record,
+) -> Result<(), Error> {
     let started = Instant::now();
     let folder = folder(dir)?;
     let id = ObjectId::generate().to_string();
-    let json = serde_json::to_vec_pretty(record)
-        .map_err(|e| Error::new(ErrorKind::Internal, "history record").with_source(e))?;
+    let json = serde_json::to_vec_pretty(record).map_err(|e| {
+        Error::new(ErrorKind::Internal, "history record").with_source(e)
+    })?;
     let _ = store
         .put(
             &folder.join(&format!("{id}.json")).map_err(store_error)?,
@@ -168,7 +183,8 @@ pub async fn append(store: &dyn BlobStore, dir: &BlobPath, record: &Record) -> R
         .await
         .map_err(store_error)?;
     let all = ids(store, dir).await?;
-    let extra: BTreeSet<&String> = all.iter().take(all.len().saturating_sub(KEEP)).collect();
+    let extra: BTreeSet<&String> =
+        all.iter().take(all.len().saturating_sub(KEEP)).collect();
     for old in extra {
         let path = folder.join(&format!("{old}.json")).map_err(store_error)?;
         match store.delete(&path, Precondition::None).await {

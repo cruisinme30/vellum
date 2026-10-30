@@ -5,7 +5,9 @@
 
 use std::fmt;
 
-use vellum_crypto::recipients::{self, Fingerprint, RecipientPublic, RecipientSecret};
+use vellum_crypto::recipients::{
+    self, Fingerprint, RecipientPublic, RecipientSecret,
+};
 use vellum_crypto::{CryptoError, SecretStore};
 
 /// The name the device secret is stored under in the secret store.
@@ -37,12 +39,16 @@ impl DeviceIdentity {
     /// The store cannot be reached, the stored value is not a 32-byte key,
     /// or the random source fails.
     #[tracing::instrument(name = "private.identity.load", skip_all)]
-    pub fn load_or_create(store: &dyn SecretStore) -> Result<Self, CryptoError> {
+    pub fn load_or_create(
+        store: &dyn SecretStore,
+    ) -> Result<Self, CryptoError> {
         if let Some(bytes) = store.load(DEVICE_KEY_NAME)? {
-            let raw: [u8; KEY_LEN] = bytes
-                .as_slice()
-                .try_into()
-                .map_err(|_| CryptoError::Malformed("the stored device key is not 32 bytes"))?;
+            let raw: [u8; KEY_LEN] =
+                bytes.as_slice().try_into().map_err(|_| {
+                    CryptoError::Malformed(
+                        "the stored device key is not 32 bytes",
+                    )
+                })?;
             return Ok(Self::from_secret(RecipientSecret::from_bytes(raw)));
         }
         let secret = RecipientSecret::generate()?;
@@ -115,7 +121,10 @@ mod tests {
     struct Memory(Mutex<HashMap<String, Vec<u8>>>);
 
     impl SecretStore for Memory {
-        fn load(&self, name: &str) -> Result<Option<Zeroizing<Vec<u8>>>, CryptoError> {
+        fn load(
+            &self,
+            name: &str,
+        ) -> Result<Option<Zeroizing<Vec<u8>>>, CryptoError> {
             Ok(self
                 .0
                 .lock()
@@ -158,8 +167,10 @@ mod tests {
 
     #[test]
     fn it_opens_what_is_sealed_to_it_and_nothing_else() {
-        let me = DeviceIdentity::from_secret(RecipientSecret::generate().unwrap());
-        let other = DeviceIdentity::from_secret(RecipientSecret::generate().unwrap());
+        let me =
+            DeviceIdentity::from_secret(RecipientSecret::generate().unwrap());
+        let other =
+            DeviceIdentity::from_secret(RecipientSecret::generate().unwrap());
         let sealed = seal_for(&[me.public()], b"hello").unwrap();
         assert_eq!(me.open(&sealed).unwrap(), b"hello");
         assert!(other.open(&sealed).is_err());

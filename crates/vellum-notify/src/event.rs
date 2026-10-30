@@ -16,7 +16,18 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// A resource a webhook can subscribe to.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    Serialize,
+    Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum EventType {
     /// An issue.
@@ -70,7 +81,9 @@ impl EventType {
     pub const fn allows(self, action: EventAction) -> bool {
         let sla_action = matches!(
             action,
-            EventAction::SlaSet | EventAction::SlaHighRisk | EventAction::SlaBreached
+            EventAction::SlaSet
+                | EventAction::SlaHighRisk
+                | EventAction::SlaBreached
         );
         match self {
             Self::IssueSla => sla_action,

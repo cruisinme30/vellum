@@ -11,7 +11,9 @@ import "./console.css";
 
 import type { AdminConsoleApi } from "./api";
 
-const AdminConsoleContext = createContext<AdminConsoleApi | undefined>(undefined);
+const AdminConsoleContext = createContext<AdminConsoleApi | undefined>(
+  undefined,
+);
 
 /** Provides the admin console API; absent in demo mode. */
 export function AdminConsoleProvider({

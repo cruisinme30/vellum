@@ -17,7 +17,14 @@ import { IssueChips, PRIORITIES, stateName } from "./chips";
 
 /** What issues are grouped by. */
 export type GroupBy =
-  "status" | "assignee" | "priority" | "project" | "cycle" | "label" | "team" | "none";
+  | "status"
+  | "assignee"
+  | "priority"
+  | "project"
+  | "cycle"
+  | "label"
+  | "team"
+  | "none";
 
 /** Grouping where a card can move between columns. */
 function canMove(groupBy: GroupBy): boolean {
@@ -36,7 +43,9 @@ function useGroupName(team: TeamOut | undefined, groupBy: GroupBy) {
         return stateName(team, key);
       }
       case "priority": {
-        return (PRIORITIES as readonly string[]).includes(key) ? t(`work-priority-${key}`) : key;
+        return (PRIORITIES as readonly string[]).includes(key)
+          ? t(`work-priority-${key}`)
+          : key;
       }
       case "assignee": {
         return `@${key}`;
@@ -61,12 +70,19 @@ function columnOf(card: Element): HTMLElement | null {
 }
 
 /** The card after (or before) `from`, or the first card. */
-function nextInList(all: readonly HTMLElement[], from: HTMLElement, step: -1 | 1) {
+function nextInList(
+  all: readonly HTMLElement[],
+  from: HTMLElement,
+  step: -1 | 1,
+) {
   const at = all.indexOf(from);
   return at === -1 ? all[0] : all[at + step];
 }
 
-/** The card in the nearest non-empty column to the right or left, at the same row or the last. */
+/**
+ * The card in the nearest non-empty column to the right or left, at the same
+ * row or the last.
+ */
 function nextAcross(
   root: HTMLElement | null,
   from: HTMLElement,
@@ -76,9 +92,12 @@ function nextAcross(
   if (root === null || column === null) return undefined;
   const columns = [...root.querySelectorAll<HTMLElement>("[data-column]")];
   const at = columns.indexOf(column);
-  const ahead = step === 1 ? columns.slice(at + 1) : columns.slice(0, at).toReversed();
+  const ahead =
+    step === 1 ? columns.slice(at + 1) : columns.slice(0, at).toReversed();
   const row = Math.max(0, cards(column).indexOf(from as HTMLAnchorElement));
-  const target = ahead.map((each) => cards(each)).find((inColumn) => inColumn.length > 0);
+  const target = ahead
+    .map((each) => cards(each))
+    .find((inColumn) => inColumn.length > 0);
   return target?.[Math.min(row, target.length - 1)];
 }
 
@@ -161,7 +180,8 @@ export function IssueResults({
   const [announce, setAnnounce] = useState("");
   const [over, setOver] = useState<string>();
   const name = useGroupName(team, groupBy);
-  const movable = layout === "board" && onMove !== undefined && canMove(groupBy);
+  const movable =
+    layout === "board" && onMove !== undefined && canMove(groupBy);
   const total = groups.reduce((sum, group) => sum + group.issues.length, 0);
 
   const move = (issue: IssueOut, key: string | null | undefined) => {
@@ -172,7 +192,9 @@ export function IssueResults({
         // Keep the focus on the moved card once the board redraws.
         requestAnimationFrame(() => {
           root.current
-            ?.querySelector<HTMLElement>(`a[data-issue="${CSS.escape(issue.key)}"]`)
+            ?.querySelector<HTMLElement>(
+              `a[data-issue="${CSS.escape(issue.key)}"]`,
+            )
             ?.focus();
         });
       },
@@ -183,14 +205,17 @@ export function IssueResults({
   };
 
   const keyMove = (issue: IssueOut, step: -1 | 1) => {
-    const at = groups.findIndex((group) => group.issues.some((each) => each.id === issue.id));
+    const at = groups.findIndex((group) =>
+      group.issues.some((each) => each.id === issue.id),
+    );
     const target = groups[at + step];
     if (target !== undefined) move(issue, target.key);
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
-    const modified = event.altKey || event.ctrlKey || event.metaKey || event.shiftKey;
+    const modified =
+      event.altKey || event.ctrlKey || event.metaKey || event.shiftKey;
     if (TYPING.has(target.tagName) || modified) return;
     const found = focusTarget(event.key, layout, root.current, target);
     if (found !== undefined) {
@@ -206,7 +231,11 @@ export function IssueResults({
   return (
     // The container only forwards J/K/H/L to the cards inside it.
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions
-    <div ref={root} className={`vl-results vl-results-${layout}`} onKeyDown={onKeyDown}>
+    <div
+      ref={root}
+      className={`vl-results vl-results-${layout}`}
+      onKeyDown={onKeyDown}
+    >
       <p className="vl-visually-hidden" role="status" aria-live="polite">
         {announce}
       </p>
@@ -225,9 +254,16 @@ export function IssueResults({
               onDrop: (event: DragEvent) => {
                 event.preventDefault();
                 setOver(undefined);
-                const dropped = event.dataTransfer.getData("text/x-vellum-issue");
-                const issue = groups.flatMap((g) => g.issues).find((each) => each.key === dropped);
-                if (issue !== undefined && !group.issues.some((each) => each.id === issue.id)) {
+                const dropped = event.dataTransfer.getData(
+                  "text/x-vellum-issue",
+                );
+                const issue = groups
+                  .flatMap((g) => g.issues)
+                  .find((each) => each.key === dropped);
+                if (
+                  issue !== undefined &&
+                  !group.issues.some((each) => each.id === issue.id)
+                ) {
                   move(issue, group.key);
                 }
               },
@@ -237,14 +273,17 @@ export function IssueResults({
         return (
           <section
             key={key ?? "none"}
-            className={over === key && movable ? "vl-group vl-group-over" : "vl-group"}
+            className={
+              over === key && movable ? "vl-group vl-group-over" : "vl-group"
+            }
             data-column={key ?? ""}
             aria-label={heading}
             {...dropProperties}
           >
             {(groupBy !== "none" || layout === "board") && (
               <h2 className="vl-group-heading">
-                {heading} <span className="vl-muted">{group.issues.length}</span>
+                {heading}{" "}
+                <span className="vl-muted">{group.issues.length}</span>
               </h2>
             )}
             <ul className="vl-issue-list">

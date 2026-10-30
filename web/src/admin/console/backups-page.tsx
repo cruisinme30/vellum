@@ -9,7 +9,12 @@ import { useLoaded } from "../../data/use-loaded";
 import { useT } from "../../i18n/i18n";
 import { CopyDiagnostic } from "../../shell/copy-diagnostic";
 
-import { type AdminConsoleApi, type AdminState, type BackupFile, type DrillReport } from "./api";
+import {
+  type AdminConsoleApi,
+  type AdminState,
+  type BackupFile,
+  type DrillReport,
+} from "./api";
 import { AdminScreen } from "./context";
 import { ScrollRegion } from "./scroll-region";
 
@@ -25,12 +30,19 @@ const when = (iso: string) => TIME.format(new Date(iso));
 
 function DrillLine({ drill }: { readonly drill: DrillReport }) {
   const t = useT();
-  const arguments_ = { when: when(drill.ran_at), backup: drill.backup, files: drill.files };
+  const arguments_ = {
+    when: when(drill.ran_at),
+    backup: drill.backup,
+    files: drill.files,
+  };
   return drill.passed ? (
     <p>{t("admin-backups-drill-passed", arguments_)}</p>
   ) : (
     <p className="vl-field-error">
-      {t("admin-backups-drill-failed", { ...arguments_, error: drill.error ?? "" })}
+      {t("admin-backups-drill-failed", {
+        ...arguments_,
+        error: drill.error ?? "",
+      })}
     </p>
   );
 }
@@ -55,7 +67,11 @@ function StateSummary({ state }: { readonly state: AdminState }) {
       <div>
         <dt>{t("admin-backups-drill")}</dt>
         <dd>
-          {state.last_drill ? <DrillLine drill={state.last_drill} /> : t("admin-backups-never")}
+          {state.last_drill ? (
+            <DrillLine drill={state.last_drill} />
+          ) : (
+            t("admin-backups-never")
+          )}
         </dd>
       </div>
       <div>
@@ -117,11 +133,12 @@ function Overview({ api }: { readonly api: AdminConsoleApi }) {
     setNotice(undefined);
     const task =
       kind === "backup"
-        ? api
-            .backUpNow()
-            .then((info) =>
-              t("admin-backups-made", { name: info.name, size: formatSize(info.size) }),
-            )
+        ? api.backUpNow().then((info) =>
+            t("admin-backups-made", {
+              name: info.name,
+              size: formatSize(info.size),
+            }),
+          )
         : api
             .runDrill()
             .then((drill) =>
@@ -155,7 +172,9 @@ function Overview({ api }: { readonly api: AdminConsoleApi }) {
             act("backup");
           }}
         >
-          {busy === "backup" ? t("admin-backups-running") : t("admin-backups-now")}
+          {busy === "backup"
+            ? t("admin-backups-running")
+            : t("admin-backups-now")}
         </button>
         <button
           type="button"
@@ -165,9 +184,13 @@ function Overview({ api }: { readonly api: AdminConsoleApi }) {
             act("drill");
           }}
         >
-          {busy === "drill" ? t("admin-backups-drilling") : t("admin-backups-run-drill")}
+          {busy === "drill"
+            ? t("admin-backups-drilling")
+            : t("admin-backups-run-drill")}
         </button>
-        <div role="status">{notice?.ok === true && <p>{notice.message}</p>}</div>
+        <div role="status">
+          {notice?.ok === true && <p>{notice.message}</p>}
+        </div>
       </div>
       {notice?.ok === false && (
         <p className="vl-field-error" role="alert">
@@ -175,7 +198,9 @@ function Overview({ api }: { readonly api: AdminConsoleApi }) {
           <CopyDiagnostic message={notice.message} />
         </p>
       )}
-      {loaded.state === "loading" && <p className="vl-muted">{t("admin-loading")}</p>}
+      {loaded.state === "loading" && (
+        <p className="vl-muted">{t("admin-loading")}</p>
+      )}
       {loaded.state === "failed" && (
         <p className="vl-field-error" role="alert">
           {loaded.message}
@@ -192,11 +217,18 @@ function Overview({ api }: { readonly api: AdminConsoleApi }) {
   );
 }
 
-/** Admin → Backups: the last backup and drill, the backups kept, and both on demand. */
+/**
+ * Admin → Backups: the last backup and drill, the backups kept, and both on
+ * demand.
+ */
 export function BackupsPage() {
   const t = useT();
   return (
-    <AdminScreen help="admin.backups" title={t("admin-backups")} intro={t("admin-backups-intro")}>
+    <AdminScreen
+      help="admin.backups"
+      title={t("admin-backups")}
+      intro={t("admin-backups-intro")}
+    >
       {(api) => <Overview api={api} />}
     </AdminScreen>
   );

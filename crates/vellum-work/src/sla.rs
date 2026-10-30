@@ -18,7 +18,18 @@ use crate::issue::Issue;
 use crate::workflow::Category;
 
 /// How close an SLA is to breaching.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Risk {
     /// Less than half the time used.
@@ -209,7 +220,8 @@ pub fn evaluate(
             issue.sla = Some(Sla {
                 kind: rule.name.clone(),
                 started_at: now,
-                breaches_at: now + Duration::hours(i64::from(rule.within_hours)),
+                breaches_at: now
+                    + Duration::hours(i64::from(rule.within_hours)),
                 stopped_at: None,
                 notified: None,
             });
@@ -231,7 +243,11 @@ pub struct SlaNotice {
 /// Checks a running clock at `now` and records the step-up, if any.
 ///
 /// Called by the jobs service on a timer and after every update.
-pub fn tick(issue: &mut Issue, lead: Option<&UserRef>, now: OffsetDateTime) -> Option<SlaNotice> {
+pub fn tick(
+    issue: &mut Issue,
+    lead: Option<&UserRef>,
+    now: OffsetDateTime,
+) -> Option<SlaNotice> {
     let assignee = issue.assignee.clone();
     let sla = issue.sla.as_mut().filter(|s| s.is_running())?;
     let risk = sla.risk(now);
@@ -351,12 +367,23 @@ mod tests {
         assert_eq!(sla.risk(datetime!(2026-10-30 00:00 UTC)), Risk::Red);
 
         let lead = UserRef::parse("lead").unwrap();
-        assert!(tick(&mut i, Some(&lead), datetime!(2026-10-29 12:00 UTC)).is_none());
-        let n = tick(&mut i, Some(&lead), datetime!(2026-10-29 19:00 UTC)).unwrap();
+        assert!(
+            tick(&mut i, Some(&lead), datetime!(2026-10-29 12:00 UTC))
+                .is_none()
+        );
+        let n =
+            tick(&mut i, Some(&lead), datetime!(2026-10-29 19:00 UTC)).unwrap();
         assert_eq!((n.risk, n.recipients.len()), (Risk::Orange, 1));
-        assert!(tick(&mut i, Some(&lead), datetime!(2026-10-29 20:00 UTC)).is_none());
-        let n = tick(&mut i, Some(&lead), datetime!(2026-10-30 01:00 UTC)).unwrap();
+        assert!(
+            tick(&mut i, Some(&lead), datetime!(2026-10-29 20:00 UTC))
+                .is_none()
+        );
+        let n =
+            tick(&mut i, Some(&lead), datetime!(2026-10-30 01:00 UTC)).unwrap();
         assert_eq!((n.risk, n.recipients.len()), (Risk::Red, 2));
-        assert!(tick(&mut i, Some(&lead), datetime!(2026-10-30 02:00 UTC)).is_none());
+        assert!(
+            tick(&mut i, Some(&lead), datetime!(2026-10-30 02:00 UTC))
+                .is_none()
+        );
     }
 }

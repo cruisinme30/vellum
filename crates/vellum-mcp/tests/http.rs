@@ -86,7 +86,12 @@ fn harness() -> Harness {
     })
 }
 
-fn post(token: Option<&str>, method: &str, name: Option<&str>, body: &Value) -> Request<Body> {
+fn post(
+    token: Option<&str>,
+    method: &str,
+    name: Option<&str>,
+    body: &Value,
+) -> Request<Body> {
     let mut b = Request::post("/mcp")
         .header(header::CONTENT_TYPE, "application/json")
         .header(header::ACCEPT, "application/json, text/event-stream")
@@ -101,7 +106,10 @@ fn post(token: Option<&str>, method: &str, name: Option<&str>, body: &Value) -> 
     b.body(Body::from(body.to_string())).unwrap_or_default()
 }
 
-async fn send(app: &Router, req: Request<Body>) -> (StatusCode, axum::http::HeaderMap, Value) {
+async fn send(
+    app: &Router,
+    req: Request<Body>,
+) -> (StatusCode, axum::http::HeaderMap, Value) {
     let resp = app.clone().oneshot(req).await.unwrap_or_default();
     let status = resp.status();
     let headers = resp.headers().clone();
@@ -181,7 +189,8 @@ async fn requests_without_a_token_get_an_oauth_challenge() {
 #[tokio::test]
 async fn tokens_for_another_audience_are_refused() {
     let h = harness();
-    let (status, headers, _) = rpc(&h, "elsewhere", "server/discover", json!({})).await;
+    let (status, headers, _) =
+        rpc(&h, "elsewhere", "server/discover", json!({})).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
     let challenge = headers
         .get(header::WWW_AUTHENTICATE)
@@ -224,7 +233,8 @@ async fn get_and_delete_are_not_allowed() {
 #[tokio::test]
 async fn discover_reports_versions_capabilities_and_cache_hints() {
     let h = harness();
-    let (status, headers, body) = rpc(&h, "read", "server/discover", json!({})).await;
+    let (status, headers, body) =
+        rpc(&h, "read", "server/discover", json!({})).await;
     assert_eq!(status, StatusCode::OK);
     assert!(headers.contains_key("x-request-id"));
     assert!(headers.contains_key("server-timing"));
@@ -248,8 +258,14 @@ async fn discover_reports_versions_capabilities_and_cache_hints() {
 #[tokio::test]
 async fn missing_meta_is_invalid_params() {
     let h = harness();
-    let body = json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {} });
-    let (status, _, resp) = send(&h.app, post(Some("read"), "tools/list", None, &body)).await;
+    let body = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/list",
+        "params": {}
+    });
+    let (status, _, resp) =
+        send(&h.app, post(Some("read"), "tools/list", None, &body)).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(resp["error"]["code"], -32602);
 }
@@ -295,7 +311,8 @@ async fn mirrored_headers_must_match_the_body() {
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(resp["error"]["code"], -32020);
-    let (status, _, _) = send(&h.app, post(Some("read"), "tools/call", None, &body)).await;
+    let (status, _, _) =
+        send(&h.app, post(Some("read"), "tools/call", None, &body)).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
     // Base64-encoded Mcp-Name is decoded before comparison.
     let (status, _, resp) = send(
@@ -369,14 +386,16 @@ async fn tools_list_is_deterministic_and_public() {
 #[tokio::test]
 async fn search_is_permission_filtered_and_cites_blocks() {
     let h = harness();
-    let (status, _, body) = call_tool(&h, "read", "search", json!({ "query": "salary" })).await;
+    let (status, _, body) =
+        call_tool(&h, "read", "search", json!({ "query": "salary" })).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(
         body["result"]["structuredContent"]["hits"],
         json!([]),
         "Priya cannot read salary bands"
     );
-    let (_, _, body) = call_tool(&h, "read", "search", json!({ "query": "renderer" })).await;
+    let (_, _, body) =
+        call_tool(&h, "read", "search", json!({ "query": "renderer" })).await;
     let hit = &body["result"]["structuredContent"]["hits"][0];
     assert_eq!(hit["block_id"], "blk-pdfr0001");
     assert_eq!(hit["heading_path"], json!(["Risks"]));
@@ -420,8 +439,13 @@ async fn unreadable_documents_are_tool_errors_not_leaks() {
 #[tokio::test]
 async fn model_writes_are_drafts_attributed_to_the_model() {
     let h = harness();
-    let args = json!({ "parent": "space:eng", "title": "Q4 plan", "markdown": "Draft body." });
-    let (status, _, body) = call_tool(&h, "draft", "create_draft", args.clone()).await;
+    let args = json!({
+        "parent": "space:eng",
+        "title": "Q4 plan",
+        "markdown": "Draft body."
+    });
+    let (status, _, body) =
+        call_tool(&h, "draft", "create_draft", args.clone()).await;
     assert_eq!(status, StatusCode::OK, "{body}");
     assert_eq!(body["result"]["structuredContent"]["mode"], "draft");
     assert!(
@@ -445,9 +469,14 @@ async fn model_writes_are_drafts_attributed_to_the_model() {
 #[tokio::test]
 async fn direct_writes_need_write_direct() {
     let h = harness();
-    let args =
-        json!({ "parent": "space:eng", "title": "Q4 plan", "markdown": "Body.", "direct": true });
-    let (status, headers, body) = call_tool(&h, "draft", "create_draft", args.clone()).await;
+    let args = json!({
+        "parent": "space:eng",
+        "title": "Q4 plan",
+        "markdown": "Body.",
+        "direct": true
+    });
+    let (status, headers, body) =
+        call_tool(&h, "draft", "create_draft", args.clone()).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
     let challenge = headers
         .get(header::WWW_AUTHENTICATE)
@@ -491,7 +520,11 @@ async fn stale_edits_are_reported_to_the_model() {
     let h = harness();
     let args = json!({
         "doc_id": "01JDLAUNCH0000000000000000", "base_version": "v0", "summary": "fix date",
-        "edits": [{ "op": "replace", "block_id": "blk-ship0001", "markdown": "Ship on 2026-12-01." }]
+        "edits": [{
+            "op": "replace",
+            "block_id": "blk-ship0001",
+            "markdown": "Ship on 2026-12-01."
+        }]
     });
     let (_, _, body) = call_tool(&h, "draft", "propose_edit", args).await;
     assert_eq!(body["result"]["isError"], true);
@@ -505,7 +538,8 @@ async fn stale_edits_are_reported_to_the_model() {
 #[tokio::test]
 async fn bad_arguments_and_unknown_tools() {
     let h = harness();
-    let (_, _, body) = call_tool(&h, "read", "get_doc", json!({ "nope": 1 })).await;
+    let (_, _, body) =
+        call_tool(&h, "read", "get_doc", json!({ "nope": 1 })).await;
     assert_eq!(body["result"]["isError"], true);
     let (_, _, body) = call_tool(&h, "read", "drop_tables", json!({})).await;
     assert_eq!(body["error"]["code"], -32602);
@@ -572,7 +606,8 @@ async fn resources_read_lists_and_templates() {
         .collect();
     assert!(uris.contains(&"vellum://doc/01JDLAUNCH0000000000000000"));
     assert!(!uris.contains(&"vellum://doc/01JDSECRET0000000000000000"));
-    let (_, _, body) = rpc(&h, "read", "resources/templates/list", json!({})).await;
+    let (_, _, body) =
+        rpc(&h, "read", "resources/templates/list", json!({})).await;
     assert_eq!(
         body["result"]["resourceTemplates"].as_array().map(Vec::len),
         Some(5)
@@ -588,7 +623,8 @@ async fn prompts_embed_guarded_resources() {
         &h,
         "read",
         "prompts/get",
-        json!({ "name": "verify-page", "arguments": { "doc_id": "01JDLAUNCH0000000000000000" } }),
+        json!({ "name": "verify-page", "arguments": { "doc_id": "01JDLAUNCH0000\
+            000000000000" } }),
     )
     .await;
     let msgs = &body["result"]["messages"];
@@ -621,7 +657,8 @@ async fn rate_limits_apply_per_token() {
         let (status, _, _) = rpc(&h, "read", "tools/list", json!({})).await;
         assert_eq!(status, StatusCode::OK);
     }
-    let (status, headers, body) = rpc(&h, "read", "tools/list", json!({})).await;
+    let (status, headers, body) =
+        rpc(&h, "read", "tools/list", json!({})).await;
     assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
     assert!(headers.contains_key(header::RETRY_AFTER));
     assert_eq!(body["error"]["code"], -31029);
@@ -636,7 +673,8 @@ async fn every_call_is_audited_with_its_trace() {
     let mut body = request_body(
         9,
         "tools/call",
-        json!({ "name": "get_doc", "arguments": { "id": "01JDLAUNCH0000000000000000" } }),
+        json!({ "name": "get_doc", "arguments": { "id": "01JDLAUNCH000000000000\
+            0000" } }),
     );
     body["params"]["_meta"]["traceparent"] =
         json!("00-0af7651916cd43dd8448eb211c80319c-00f067aa0ba902b7-01");
@@ -665,7 +703,8 @@ async fn every_call_is_audited_with_its_trace() {
     assert!(
         events
             .iter()
-            .any(|e| e.target.as_deref() == Some("create_task") && e.outcome == "denied")
+            .any(|e| e.target.as_deref() == Some("create_task")
+                && e.outcome == "denied")
     );
 }
 
@@ -673,7 +712,10 @@ async fn every_call_is_audited_with_its_trace() {
 async fn legacy_clients_can_initialize_and_call_without_meta() {
     let h = harness();
     let init = json!({ "jsonrpc": "2.0", "id": 0, "method": "initialize", "params": {
-        "protocolVersion": "2025-11-25", "capabilities": {}, "clientInfo": { "name": "old", "version": "1" } } });
+        "protocolVersion": "2025-11-25", "capabilities": {}, "clientInfo": {
+            "name": "old",
+            "version": "1"
+        } } });
     let req = Request::post("/mcp")
         .header(header::AUTHORIZATION, "Bearer read")
         .header(header::CONTENT_TYPE, "application/json")
@@ -691,7 +733,8 @@ async fn legacy_clients_can_initialize_and_call_without_meta() {
     let (status, _, body) = send(&h.app, req).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["result"]["tools"].as_array().map(Vec::len), Some(15));
-    let note = json!({ "jsonrpc": "2.0", "method": "notifications/initialized" });
+    let note =
+        json!({ "jsonrpc": "2.0", "method": "notifications/initialized" });
     let req = Request::post("/mcp")
         .header(header::AUTHORIZATION, "Bearer read")
         .header("mcp-protocol-version", "2025-11-25")
@@ -709,7 +752,10 @@ async fn subscriptions_listen_streams_acknowledged_updates() {
         "subscriptions/listen",
         json!({ "notifications": {
         "toolsListChanged": true,
-        "resourceSubscriptions": ["vellum://doc/01JDLAUNCH0000000000000000", "vellum://doc/01JDSECRET0000000000000000"]
+        "resourceSubscriptions": [
+            "vellum://doc/01JDLAUNCH0000000000000000",
+            "vellum://doc/01JDSECRET0000000000000000"
+        ]
     } }),
     );
     let resp = h
@@ -733,7 +779,8 @@ async fn subscriptions_listen_streams_acknowledged_updates() {
     );
     let mut stream = resp.into_body();
     let mut next = async || -> String {
-        let frame = tokio::time::timeout(Duration::from_secs(2), stream.frame()).await;
+        let frame =
+            tokio::time::timeout(Duration::from_secs(2), stream.frame()).await;
         frame
             .ok()
             .flatten()
@@ -826,7 +873,9 @@ async fn llms_txt_sitemap_and_format_md() {
     )
     .into_owned();
     assert!(text.starts_with("# Northstar\n\n> "));
-    assert!(text.contains("[Launch plan](https://vellum.northstar.dev/eng/launch-plan?format=md)"));
+    assert!(text.contains(
+        "[Launch plan](https://vellum.northstar.dev/eng/launch-plan?format=md)"
+    ));
     assert!(
         !text.contains("Vendor notes"),
         "anonymous visitors see public pages only"
@@ -875,18 +924,21 @@ async fn llms_txt_sitemap_and_format_md() {
 #[tokio::test]
 async fn templates_are_listed_and_read() {
     let h = harness();
-    let (status, _, list) = call_tool(&h, "read", "get_template", json!({})).await;
+    let (status, _, list) =
+        call_tool(&h, "read", "get_template", json!({})).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(
         list["result"]["structuredContent"]["templates"][0]["name"],
         "prd"
     );
-    let (_, _, prd) = call_tool(&h, "read", "get_template", json!({ "name": "prd" })).await;
+    let (_, _, prd) =
+        call_tool(&h, "read", "get_template", json!({ "name": "prd" })).await;
     let md = prd["result"]["structuredContent"]["markdown"]
         .as_str()
         .unwrap_or_default();
     assert!(md.contains("## Requirements"), "{prd}");
-    let (_, _, missing) = call_tool(&h, "read", "get_template", json!({ "name": "nope" })).await;
+    let (_, _, missing) =
+        call_tool(&h, "read", "get_template", json!({ "name": "nope" })).await;
     assert_eq!(missing["result"]["isError"], true, "{missing}");
 }
 
@@ -898,7 +950,10 @@ struct Revocable {
 
 #[async_trait::async_trait]
 impl vellum_mcp::auth::TokenVerifier for Revocable {
-    async fn verify(&self, _token: &str) -> Result<VerifiedToken, vellum_mcp::auth::TokenError> {
+    async fn verify(
+        &self,
+        _token: &str,
+    ) -> Result<VerifiedToken, vellum_mcp::auth::TokenError> {
         if self.revoked.load(std::sync::atomic::Ordering::SeqCst) {
             Err(vellum_mcp::auth::TokenError::Invalid)
         } else {
@@ -943,9 +998,10 @@ async fn listen_streams_close_when_the_token_is_revoked() {
     assert_eq!(resp.status(), StatusCode::OK);
     let mut stream = resp.into_body();
     let mut next = async || -> Option<String> {
-        let frame = tokio::time::timeout(Duration::from_secs(2), stream.frame())
-            .await
-            .ok()??;
+        let frame =
+            tokio::time::timeout(Duration::from_secs(2), stream.frame())
+                .await
+                .ok()??;
         frame
             .ok()
             .and_then(|f| f.into_data().ok())

@@ -18,12 +18,21 @@ const VIEWPORTS = {
   wide: { viewport: { width: 2560, height: 1440 }, hasTouch: false },
 } as const;
 
-const pick = (variable: string, all: readonly string[], fallback: readonly string[]): string[] => {
-  const wanted = process.env[variable]?.split(",").map((value) => value.trim()) ?? fallback;
+const pick = (
+  variable: string,
+  all: readonly string[],
+  fallback: readonly string[],
+): string[] => {
+  const wanted =
+    process.env[variable]?.split(",").map((value) => value.trim()) ?? fallback;
   return all.filter((value) => wanted.includes(value));
 };
 const browsers = pick("UI_BROWSERS", BROWSERS, ["chromium"]);
-const viewports = pick("UI_VIEWPORTS", Object.keys(VIEWPORTS), Object.keys(VIEWPORTS));
+const viewports = pick(
+  "UI_VIEWPORTS",
+  Object.keys(VIEWPORTS),
+  Object.keys(VIEWPORTS),
+);
 // A sandbox with a preinstalled Chromium of another revision can point at it.
 const chromiumPath = process.env["UI_CHROMIUM_PATH"];
 
@@ -59,12 +68,20 @@ export default defineConfig({
     : [["list"], ["json", { outputFile: "test-results/results.json" }]],
   // Visual baselines are shared by every machine that runs the Playwright
   // container (D125), so the path names the project, not the OS.
-  snapshotPathTemplate: "{testDir}/__screenshots__/{projectName}/{testFileName}/{arg}{ext}",
+  snapshotPathTemplate:
+    "{testDir}/__screenshots__/{projectName}/{testFileName}/{arg}{ext}",
   expect: {
     // The brief's pixel threshold for golden fixtures: 0.1 % of the image.
-    toHaveScreenshot: { maxDiffPixelRatio: 0.001, animations: "disabled", caret: "hide" },
+    toHaveScreenshot: {
+      maxDiffPixelRatio: 0.001,
+      animations: "disabled",
+      caret: "hide",
+    },
   },
-  use: { baseURL: `http://127.0.0.1:${String(APP_PORT)}`, trace: "retain-on-failure" },
+  use: {
+    baseURL: `http://127.0.0.1:${String(APP_PORT)}`,
+    trace: "retain-on-failure",
+  },
   projects,
   webServer: [
     {

@@ -76,14 +76,15 @@ fn parse_ulid(kind: &'static str, text: &str) -> Result<u128, IdParseError> {
             actual,
         });
     }
-    let value =
-        base32::decode(text).map_err(|base32::DecodeError::Character { found, position }| {
+    let value = base32::decode(text).map_err(
+        |base32::DecodeError::Character { found, position }| {
             IdParseError::Character {
                 kind,
                 found,
                 position,
             }
-        })?;
+        },
+    )?;
     // 26 digits hold 130 bits; a first digit above 7 sets the top two.
     if text.starts_with(|c| base32::decode_digit(c).is_some_and(|d| d > 7)) {
         return Err(IdParseError::Overflow { kind });
@@ -102,7 +103,8 @@ macro_rules! define_id {
         }
 
         impl From<ObjectId> for $name {
-            /// Types an untyped ID once its kind is known (from its folder, say).
+            /// Types an untyped ID once its kind is known (from its folder,
+            /// say).
             fn from(id: ObjectId) -> Self {
                 Self::from_u128(id.as_u128())
             }
@@ -179,12 +181,18 @@ macro_rules! define_id {
                 stringify!($name).into()
             }
 
-            fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+            fn json_schema(
+                _: &mut schemars::SchemaGenerator
+            ) -> schemars::Schema {
                 schemars::json_schema!({
                     "type": "string",
                     "format": "ulid",
                     "pattern": ULID_PATTERN,
-                    "description": concat!("A ", stringify!($name), " as a 26-character ULID."),
+                    "description": concat!(
+                        "A ",
+                        stringify!($name),
+                        " as a 26-character ULID."
+                    ),
                 })
             }
         }
@@ -202,14 +210,21 @@ macro_rules! define_id {
         }
 
         impl Serialize for $name {
-            fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+            fn serialize<S: Serializer>(
+                &self,
+                serializer: S
+            ) -> Result<S::Ok, S::Error> {
                 serializer.collect_str(self)
             }
         }
 
         impl<'de> Deserialize<'de> for $name {
-            fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-                let text = <std::borrow::Cow<'de, str>>::deserialize(deserializer)?;
+            fn deserialize<D: Deserializer<'de>>(
+                deserializer: D
+            ) -> Result<Self, D::Error> {
+                let text = <std::borrow::Cow<'de, str>>::deserialize(
+                    deserializer
+                )?;
                 text.parse().map_err(serde::de::Error::custom)
             }
         }
@@ -231,7 +246,8 @@ define_ids! {
     ObjectId;
     /// A space: the shard key for every table and path.
     SpaceId typed;
-    /// A document (page, book leaf, collection row, issue body); the `id` in front matter.
+    /// A document (page, book leaf, collection row, issue body); the `id` in
+    /// front matter.
     DocId typed;
     /// A book (`name.book/`).
     BookId typed;

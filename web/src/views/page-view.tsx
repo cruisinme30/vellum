@@ -153,7 +153,11 @@ function useChipSources(): ChipSources {
  * it, the store fetches it by ID; it joins the workspace if the person may
  * open it. False once it is `known` or known to be missing.
  */
-function useOutsidePage(pageId: string, known: boolean, loading: boolean): boolean {
+function useOutsidePage(
+  pageId: string,
+  known: boolean,
+  loading: boolean,
+): boolean {
   const { store } = useServices();
   const absent = !known && !loading;
   const [missing, setMissing] = useState<string>();
@@ -184,11 +188,21 @@ export function PageView() {
   const view = usePageViewMode();
   const share = useShare(pageId);
   const chips = useChipSources();
-  const pageFiles = usePageFilesPanel(pageId, pageHistory.controls?.canWrite ?? false);
+  const pageFiles = usePageFilesPanel(
+    pageId,
+    pageHistory.controls?.canWrite ?? false,
+  );
   const page = workspace.pages.find((p) => p.id === pageId);
-  const waiting = useOutsidePage(pageId, page !== undefined, workspace.loading === true);
+  const waiting = useOutsidePage(
+    pageId,
+    page !== undefined,
+    workspace.loading === true,
+  );
   const onSelectionTask = usePageTask(page);
-  const trail = useMemo(() => ancestors(workspace.pages, pageId), [workspace.pages, pageId]);
+  const trail = useMemo(
+    () => ancestors(workspace.pages, pageId),
+    [workspace.pages, pageId],
+  );
   const space = workspace.spaces.find((s) => s.id === page?.spaceId);
   const pages = workspace.pages;
   const resolvePage = useCallback(
@@ -230,7 +244,9 @@ export function PageView() {
           <li>{space?.name}</li>
           {trail.map((p) => (
             <li key={p.id}>
-              <Link to={`/p/${p.id}`}>{p.title === "" ? t("page-untitled") : p.title}</Link>
+              <Link to={`/p/${p.id}`}>
+                {p.title === "" ? t("page-untitled") : p.title}
+              </Link>
             </li>
           ))}
         </ol>
@@ -302,7 +318,9 @@ export function PageView() {
                 actions={
                   <>
                     {assistant.button}
-                    <ExportButton target={{ kind: "page", id: page.id, title: page.title }} />
+                    <ExportButton
+                      target={{ kind: "page", id: page.id, title: page.title }}
+                    />
                     {pageFiles.button}
                     {pageHistory.button}
                   </>
@@ -334,7 +352,9 @@ function PageFacts({ page }: { readonly page: PageMeta }) {
       <div>
         <dt>{t("page-status")}</dt>
         <dd>
-          <span className={`vl-chip vl-status-${page.status}`}>{t(`status-${page.status}`)}</span>
+          <span className={`vl-chip vl-status-${page.status}`}>
+            {t(`status-${page.status}`)}
+          </span>
         </dd>
       </div>
       <div>
@@ -364,7 +384,9 @@ function FolderContents({
     <section>
       <p className="vl-muted">{t("folder-intro")}</p>
       <PageList
-        items={siblings(pages, folder.spaceId, folder.id).map((child) => ({ page: child }))}
+        items={siblings(pages, folder.spaceId, folder.id).map((child) => ({
+          page: child,
+        }))}
         empty={t("folder-empty")}
       />
     </section>

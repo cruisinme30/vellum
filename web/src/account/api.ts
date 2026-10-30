@@ -53,7 +53,11 @@ export interface AccountApi {
   confirmTotp(code: string): Promise<FactorAdded>;
   removeTotp(): Promise<FactorsView>;
   startPasskey(): Promise<PasskeyStart>;
-  addPasskey(ticket: string, name: string, credential: RegistrationJson): Promise<FactorAdded>;
+  addPasskey(
+    ticket: string,
+    name: string,
+    credential: RegistrationJson,
+  ): Promise<FactorAdded>;
   removePasskey(id: string): Promise<FactorsView>;
   /** Replaces the recovery codes; the new ones are shown once. */
   newRecoveryCodes(): Promise<string[]>;
@@ -67,24 +71,42 @@ export function createHttpAccountApi(http: Http): AccountApi {
   return {
     tokens: () => http.get<TokenView[]>(`${ME}/tokens`),
     tokenPolicy: () => http.get<TokenPolicy>(`${ME}/token-policy`),
-    createToken: (input) => http.send<CreatedToken>("POST", `${ME}/tokens`, input),
+    createToken: (input) =>
+      http.send<CreatedToken>("POST", `${ME}/tokens`, input),
     async revokeToken(id) {
       await http.send("DELETE", `${ME}/tokens/${encodeURIComponent(id)}`);
     },
     factors: () => http.get<FactorsView>(FACTORS),
     startTotp: () => http.send<TotpSetup>("POST", `${FACTORS}/totp`),
-    confirmTotp: (code) => http.send<FactorAdded>("POST", `${FACTORS}/totp/confirm`, { code }),
+    confirmTotp: (code) =>
+      http.send<FactorAdded>("POST", `${FACTORS}/totp/confirm`, { code }),
     removeTotp: () => http.send<FactorsView>("DELETE", `${FACTORS}/totp`),
     async startPasskey() {
-      const ceremony = await http.send<PasskeyCeremony>("POST", `${FACTORS}/passkeys/options`);
-      return { ticket: ceremony.ticket, options: ceremony.options as CreationOptionsJson };
+      const ceremony = await http.send<PasskeyCeremony>(
+        "POST",
+        `${FACTORS}/passkeys/options`,
+      );
+      return {
+        ticket: ceremony.ticket,
+        options: ceremony.options as CreationOptionsJson,
+      };
     },
     addPasskey: (ticket, name, credential) =>
-      http.send<FactorAdded>("POST", `${FACTORS}/passkeys`, { ticket, name, credential }),
+      http.send<FactorAdded>("POST", `${FACTORS}/passkeys`, {
+        ticket,
+        name,
+        credential,
+      }),
     removePasskey: (id) =>
-      http.send<FactorsView>("DELETE", `${FACTORS}/passkeys/${encodeURIComponent(id)}`),
+      http.send<FactorsView>(
+        "DELETE",
+        `${FACTORS}/passkeys/${encodeURIComponent(id)}`,
+      ),
     async newRecoveryCodes() {
-      const fresh = await http.send<RecoveryCodes>("POST", `${FACTORS}/recovery-codes`);
+      const fresh = await http.send<RecoveryCodes>(
+        "POST",
+        `${FACTORS}/recovery-codes`,
+      );
       return fresh.recoveryCodes;
     },
   };

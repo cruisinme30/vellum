@@ -52,8 +52,9 @@ owner asked for the UI to be red-teamed and kept fixed as features land
   and 400 %, text at 200 %, WCAG text spacing with a dyslexia font, RTL,
   reduced motion, and a stress mode that lengthens every text with long
   words, CJK, Arabic, emoji and an unbroken URL.
-- Themes are selected by `<html data-theme="light|dark|high-contrast|sepia|dim">`;
-  the app must read that attribute at start so the suite can set it.
+- Themes are selected by `<html
+  data-theme="light|dark|high-contrast|sepia|dim">`; the app must read that
+  attribute at start so the suite can set it.
 - Targets: app routes listed in `targets.ts`, plus every HTML page of the
   built website and help books, found on disk.
 - Fast suite: Chromium at phone and laptop on a quick subset. Full suite:
@@ -87,8 +88,10 @@ owner asked for the UI to be red-teamed and kept fixed as features land
 
 ## Alternatives
 
-- **Visual diffs of every page**: fail on every copy edit; the audit finds the real bugs.
-- **A hosted visual service (Percy, Chromatic)**: a third party sees unreleased UI, and costs money.
+- **Visual diffs of every page**: fail on every copy edit; the audit finds the
+  real bugs.
+- **A hosted visual service (Percy, Chromatic)**: a third party sees unreleased
+  UI, and costs money.
 - **axe only**: misses overlap, overflow, loading and focus problems.
 - **Chromium only**: WebKit and Firefox differ in flex, grid and font metrics.
 

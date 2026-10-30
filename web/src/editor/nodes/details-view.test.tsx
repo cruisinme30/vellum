@@ -28,9 +28,13 @@ describe("DetailsView", () => {
     await user.click(screen.getByRole("button", { name: "Expand section" }));
     const toggle = screen.getByRole("button", { name: "Collapse section" });
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByText("Hidden until opened").closest("[hidden]")).toBeNull();
+    expect(
+      screen.getByText("Hidden until opened").closest("[hidden]"),
+    ).toBeNull();
     await user.click(toggle);
-    expect(screen.getByRole("button", { name: "Expand section" })).toBeDefined();
+    expect(
+      screen.getByRole("button", { name: "Expand section" }),
+    ).toBeDefined();
   });
 
   it("does not save the open state in the document", async () => {

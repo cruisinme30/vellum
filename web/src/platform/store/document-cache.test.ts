@@ -10,7 +10,8 @@ import { freshDatabaseName } from "./test-support";
 
 const bytes = (...values: number[]) => new Uint8Array(values);
 // IndexedDB clones into another realm's Uint8Array; compare contents.
-const plain = (updates: readonly Uint8Array[]) => updates.map((update) => [...update]);
+const plain = (updates: readonly Uint8Array[]) =>
+  updates.map((update) => [...update]);
 
 async function setup(budgetBytes = 10) {
   let clock = 0;
@@ -36,7 +37,9 @@ describe("DocumentCache", () => {
     await cache.append("doc-a", bytes(1));
     await cache.append("doc-a", bytes(2, 3));
     await cache.append("doc-b", bytes(9));
-    expect(plain(await cache.load("doc-a"))).toEqual(plain([bytes(1), bytes(2, 3)]));
+    expect(plain(await cache.load("doc-a"))).toEqual(
+      plain([bytes(1), bytes(2, 3)]),
+    );
     await cache.compact("doc-a", bytes(7, 7));
     expect(plain(await cache.load("doc-a"))).toEqual(plain([bytes(7, 7)]));
     expect(plain(await cache.load("doc-b"))).toEqual(plain([bytes(9)]));
@@ -71,9 +74,15 @@ describe("DocumentCache", () => {
     const { database, cache } = await setup(100);
     await cache.append("doc", bytes(1, 2));
     await cache.track("doc", "space-2");
-    expect(await database.get("documents", "doc")).toMatchObject({ spaceId: "space-2", bytes: 2 });
+    expect(await database.get("documents", "doc")).toMatchObject({
+      spaceId: "space-2",
+      bytes: 2,
+    });
     await cache.compact("new-doc", bytes(1));
-    expect(await database.get("documents", "new-doc")).toMatchObject({ spaceId: "", bytes: 1 });
+    expect(await database.get("documents", "new-doc")).toMatchObject({
+      spaceId: "",
+      bytes: 1,
+    });
   });
 
   it("removes a document", async () => {

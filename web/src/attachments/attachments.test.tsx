@@ -32,7 +32,9 @@ const file = (name: string, size = 2048): Attachment => ({
 
 function fakeApi(overrides: Partial<AttachmentsApi> = {}): AttachmentsApi {
   return {
-    list: vi.fn(() => Promise.resolve([file("brief.pdf", 3 * 1024 ** 2), file("chart.png")])),
+    list: vi.fn(() =>
+      Promise.resolve([file("brief.pdf", 3 * 1024 ** 2), file("chart.png")]),
+    ),
     upload: vi.fn((_page: string, picked: File) =>
       Promise.resolve({ ...file(picked.name), media_type: "image/png" }),
     ),
@@ -52,7 +54,9 @@ function providers(api: AttachmentsApi | undefined) {
 }
 
 const png = () =>
-  new File([new Uint8Array([137, 80, 78, 71])], "Team photo.png", { type: "image/png" });
+  new File([new Uint8Array([137, 80, 78, 71])], "Team photo.png", {
+    type: "image/png",
+  });
 const picker = () => {
   const input = document.querySelector<HTMLInputElement>('input[type="file"]');
   if (input === null) throw new Error("no file input");
@@ -67,7 +71,9 @@ describe("attachment links", () => {
     expect(attachmentUrl(`vellum://attachment/${PAGE}/../x`)).toBeUndefined();
     expect(attachmentUrl("vellum://attachment/short/x.png")).toBeUndefined();
     expect(attachmentUrl("https://example.com/x.png")).toBeUndefined();
-    expect(mediaUrl("https://example.com/x.png")).toBe("https://example.com/x.png");
+    expect(mediaUrl("https://example.com/x.png")).toBe(
+      "https://example.com/x.png",
+    );
     expect(mediaUrl("javascript:alert(1)")).toBeUndefined();
   });
 
@@ -77,12 +83,16 @@ describe("attachment links", () => {
     const { editor } = await renderEditor(body(p("intro"), image("", "")), {
       wrapper: providers(api),
     });
-    expect(screen.getByRole("button", { name: "Upload an image" })).toBeDefined();
+    expect(
+      screen.getByRole("button", { name: "Upload an image" }),
+    ).toBeDefined();
     expect(picker().accept).toBe("image/*");
     await user.upload(picker(), png());
     expect(api.upload).toHaveBeenCalledWith(PAGE, expect.any(File));
     const shown = await screen.findByRole("img", { name: "Team photo" });
-    expect(shown.getAttribute("src")).toBe(`/api/v1/attachments/${PAGE}/Team%20photo.png`);
+    expect(shown.getAttribute("src")).toBe(
+      `/api/v1/attachments/${PAGE}/Team%20photo.png`,
+    );
     expect(editor.getJSON().content[1]?.attrs).toMatchObject({
       src: `vellum://attachment/${PAGE}/Team%20photo.png`,
       alt: "Team photo",
@@ -93,12 +103,16 @@ describe("attachment links", () => {
     const api = fakeApi({
       upload: vi.fn(() =>
         Promise.reject(
-          new ApiError("unavailable", "the virus scanner is unavailable", { status: 503 }),
+          new ApiError("unavailable", "the virus scanner is unavailable", {
+            status: 503,
+          }),
         ),
       ),
     });
     const user = userEvent.setup();
-    await renderEditor(body(p("intro"), image("", "")), { wrapper: providers(api) });
+    await renderEditor(body(p("intro"), image("", "")), {
+      wrapper: providers(api),
+    });
     await user.upload(picker(), png());
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("uploads are paused");
@@ -108,7 +122,9 @@ describe("attachment links", () => {
     await renderEditor(body(p("intro"), image("", "")), {
       wrapper: providers(undefined as AttachmentsApi | undefined),
     });
-    expect(screen.queryByRole("button", { name: "Upload an image" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Upload an image" }),
+    ).toBeNull();
   });
 
   it("names each refusal", () => {
@@ -137,7 +153,9 @@ describe("the files panel", () => {
   it("lists files with downloads and sizes", async () => {
     renderPanel(fakeApi(), false);
     const pdf = await screen.findByRole("link", { name: "brief.pdf" });
-    expect(pdf.getAttribute("href")).toBe(`/api/v1/attachments/${PAGE}/brief.pdf`);
+    expect(pdf.getAttribute("href")).toBe(
+      `/api/v1/attachments/${PAGE}/brief.pdf`,
+    );
     expect(pdf.hasAttribute("download")).toBe(true);
     expect(screen.getByText("3 MB")).toBeDefined();
     expect(screen.queryByRole("button", { name: /Delete/ })).toBeNull();
@@ -147,10 +165,16 @@ describe("the files panel", () => {
   it("deletes a file only after a second click, then reloads", async () => {
     const api = fakeApi();
     const { user } = renderPanel(api);
-    await user.click(await screen.findByRole("button", { name: "Delete chart.png" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Delete chart.png" }),
+    );
     expect(api.remove).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("button", { name: "Delete chart.png for good" }));
-    expect(api.remove).toHaveBeenCalledWith(`/api/v1/attachments/${PAGE}/chart.png`);
+    await user.click(
+      screen.getByRole("button", { name: "Delete chart.png for good" }),
+    );
+    expect(api.remove).toHaveBeenCalledWith(
+      `/api/v1/attachments/${PAGE}/chart.png`,
+    );
     expect(await screen.findByText("Deleted chart.png.")).toBeDefined();
     expect(api.list).toHaveBeenCalledTimes(2);
   });
@@ -165,8 +189,12 @@ describe("the files panel", () => {
 
   it("closes", async () => {
     const { user, onClose } = renderPanel(fakeApi());
-    const panel = screen.getByRole("complementary", { name: "Files on this page" });
-    await user.click(within(panel).getByRole("button", { name: "Close files" }));
+    const panel = screen.getByRole("complementary", {
+      name: "Files on this page",
+    });
+    await user.click(
+      within(panel).getByRole("button", { name: "Close files" }),
+    );
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -180,7 +208,9 @@ describe("the attachments API", () => {
   it("uploads the raw file under its name and deletes only attachment paths", async () => {
     const upload = vi.fn(() => Promise.resolve(file("a b.png")));
     const send = vi.fn(() => Promise.resolve());
-    const get = vi.fn(() => Promise.resolve({ items: [file("z.txt"), file("a.txt")] }));
+    const get = vi.fn(() =>
+      Promise.resolve({ items: [file("z.txt"), file("a.txt")] }),
+    );
     const api = createHttpAttachmentsApi({
       get,
       send,
@@ -198,8 +228,13 @@ describe("the attachments API", () => {
     const listed = await api.list(PAGE);
     expect(listed.map((found) => found.name)).toEqual(["a.txt", "z.txt"]);
     await api.remove(`/api/v1/attachments/${PAGE}/a.txt`);
-    expect(send).toHaveBeenCalledWith("DELETE", `/api/v1/attachments/${PAGE}/a.txt`);
-    await expect(api.remove("/api/v1/drive/items/x")).rejects.toThrow("not an attachment");
+    expect(send).toHaveBeenCalledWith(
+      "DELETE",
+      `/api/v1/attachments/${PAGE}/a.txt`,
+    );
+    await expect(api.remove("/api/v1/drive/items/x")).rejects.toThrow(
+      "not an attachment",
+    );
   });
 
   it("sends an upload's bytes with the CSRF token and its media type", async () => {
@@ -218,7 +253,12 @@ describe("the attachments API", () => {
       idempotencyKey: () => "k",
     });
     const body = png();
-    await http.upload("/api/v1/attachments/P", { name: "x y.png" }, body, "image/png");
+    await http.upload(
+      "/api/v1/attachments/P",
+      { name: "x y.png" },
+      body,
+      "image/png",
+    );
     const sent = calls.find((call) => call.init.method === "POST");
     const headers = sent?.init.headers as Record<string, string>;
     expect(sent?.url).toBe("/api/v1/attachments/P?name=x+y.png");

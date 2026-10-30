@@ -8,16 +8,31 @@ import { useT } from "../../i18n/i18n";
 
 import type { AdminSignInApi, SignInView } from "./api";
 
-const DAY = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" });
+const DAY = new Intl.DateTimeFormat("en", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
 
 /** The new token, shown once, with a way to copy it. */
-function NewToken({ token, onDone }: { readonly token: string; readonly onDone: () => void }) {
+function NewToken({
+  token,
+  onDone,
+}: {
+  readonly token: string;
+  readonly onDone: () => void;
+}) {
   const t = useT();
   const [copied, setCopied] = useState(false);
   return (
-    <div className="vl-admin-secret" role="region" aria-label={t("admin-scim-token-label")}>
+    <div
+      className="vl-admin-secret"
+      role="region"
+      aria-label={t("admin-scim-token-label")}
+    >
       <p>
-        <strong>{t("admin-scim-token-title")}</strong> {t("admin-scim-token-hint")}
+        <strong>{t("admin-scim-token-title")}</strong>{" "}
+        {t("admin-scim-token-hint")}
       </p>
       <code className="vl-account-secret" data-testid="scim-token">
         {token}
@@ -89,8 +104,12 @@ export function ScimSection({
         {t("admin-scim-url")} <code>{scim.baseUrl}</code>
       </p>
       <p className="vl-muted">
-        {scim.enabled && scim.tokenCreatedAt !== null && scim.tokenCreatedAt !== undefined
-          ? t("admin-scim-on", { date: DAY.format(new Date(scim.tokenCreatedAt)) })
+        {scim.enabled &&
+        scim.tokenCreatedAt !== null &&
+        scim.tokenCreatedAt !== undefined
+          ? t("admin-scim-on", {
+              date: DAY.format(new Date(scim.tokenCreatedAt)),
+            })
           : t("admin-scim-off")}
       </p>
       {token !== undefined && (
@@ -137,7 +156,12 @@ export function ScimSection({
         {scim.enabled && confirming && (
           <>
             <span>{t("admin-scim-rotate-confirm")}</span>
-            <button type="button" className="vl-filled-button" disabled={busy} onClick={rotate}>
+            <button
+              type="button"
+              className="vl-filled-button"
+              disabled={busy}
+              onClick={rotate}
+            >
               {t("admin-scim-rotate")}
             </button>
             <button
@@ -152,7 +176,12 @@ export function ScimSection({
           </>
         )}
         {!scim.enabled && (
-          <button type="button" className="vl-filled-button" disabled={busy} onClick={rotate}>
+          <button
+            type="button"
+            className="vl-filled-button"
+            disabled={busy}
+            onClick={rotate}
+          >
             {t("admin-scim-turn-on")}
           </button>
         )}

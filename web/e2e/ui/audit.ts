@@ -11,7 +11,8 @@
  * `data-allow-clip` (a deliberately clipped preview).
  */
 
-/* eslint-disable unicorn/consistent-function-scoping -- helpers must live inside the function that runs in the page */
+/* eslint-disable unicorn/consistent-function-scoping --
+   helpers must live inside the function that runs in the page */
 
 type Rule =
   | "horizontal-overflow"
@@ -62,7 +63,13 @@ export function layoutAudit(): Finding[] {
   };
 
   const visible = (element: Element): boolean => {
-    if (!element.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return false;
+    if (
+      !element.checkVisibility({
+        opacityProperty: true,
+        visibilityProperty: true,
+      })
+    )
+      return false;
     const rect = element.getBoundingClientRect();
     return rect.width > 0 && rect.height > 0;
   };
@@ -76,8 +83,10 @@ export function layoutAudit(): Finding[] {
       style.clipPath === "inset(50%)"
     );
   };
-  const clips = (value: string): boolean => value === "hidden" || value === "clip";
-  const scrolls = (value: string): boolean => value === "auto" || value === "scroll";
+  const clips = (value: string): boolean =>
+    value === "hidden" || value === "clip";
+  const scrolls = (value: string): boolean =>
+    value === "auto" || value === "scroll";
   const optedOut = (element: Element, attribute: string): boolean =>
     element.closest(`[${attribute}]`) !== null;
   /** True when an ancestor below <body> clips or scrolls horizontally. */
@@ -101,7 +110,8 @@ export function layoutAudit(): Finding[] {
       node = node.parentElement
     ) {
       const style = getComputedStyle(node);
-      if (style.overflowX === "visible" && style.overflowY === "visible") continue;
+      if (style.overflowX === "visible" && style.overflowY === "visible")
+        continue;
       const frame = node.getBoundingClientRect();
       if (style.overflowX !== "visible") {
         left = Math.max(left, frame.left);
@@ -112,11 +122,18 @@ export function layoutAudit(): Finding[] {
         bottom = Math.min(bottom, frame.bottom);
       }
     }
-    return new DOMRect(left, top, Math.max(0, right - left), Math.max(0, bottom - top));
+    return new DOMRect(
+      left,
+      top,
+      Math.max(0, right - left),
+      Math.max(0, bottom - top),
+    );
   };
   const ownText = (element: Element): boolean =>
     [...element.childNodes].some(
-      (child) => child.nodeType === Node.TEXT_NODE && (child.textContent ?? "").trim() !== "",
+      (child) =>
+        child.nodeType === Node.TEXT_NODE &&
+        (child.textContent ?? "").trim() !== "",
     );
   const replaced = new Set([
     "IMG",
@@ -132,7 +149,8 @@ export function layoutAudit(): Finding[] {
 
   const elements = [...document.body.querySelectorAll("*")].filter(
     (element) =>
-      !["SCRIPT", "STYLE", "TEMPLATE", "NOSCRIPT"].includes(element.tagName) && visible(element),
+      !["SCRIPT", "STYLE", "TEMPLATE", "NOSCRIPT"].includes(element.tagName) &&
+      visible(element),
   );
 
   // Horizontal overflow of the page: the most common responsive bug.
@@ -149,9 +167,9 @@ export function layoutAudit(): Finding[] {
     const rect = element.getBoundingClientRect();
     const style = getComputedStyle(element);
 
-    // Outside the viewport horizontally, reported once for the outermost element.
-    // An absolutely positioned element parked entirely off screen (a skip
-    // link) is a hiding technique; if it makes the page scroll, the
+    // Outside the viewport horizontally, reported once for the outermost
+    // element. An absolutely positioned element parked entirely off screen (a
+    // skip link) is a hiding technique; if it makes the page scroll, the
     // horizontal-overflow rule reports that.
     const parked =
       (style.position === "absolute" || style.position === "fixed") &&
@@ -173,16 +191,20 @@ export function layoutAudit(): Finding[] {
 
     // Content cut off by its own box.
     const truncates =
-      style.textOverflow === "ellipsis" || style.getPropertyValue("-webkit-line-clamp") !== "none";
+      style.textOverflow === "ellipsis" ||
+      style.getPropertyValue("-webkit-line-clamp") !== "none";
     if (
       !truncates &&
       !optedOut(element, "data-allow-clip") &&
       !screenReaderOnly(element) &&
       element.textContent.trim() !== ""
     ) {
-      const cutX = clips(style.overflowX) && element.scrollWidth > element.clientWidth + tolerance;
+      const cutX =
+        clips(style.overflowX) &&
+        element.scrollWidth > element.clientWidth + tolerance;
       const cutY =
-        clips(style.overflowY) && element.scrollHeight > element.clientHeight + tolerance;
+        clips(style.overflowY) &&
+        element.scrollHeight > element.clientHeight + tolerance;
       if (cutX || cutY) {
         add(
           "clipped",
@@ -192,7 +214,8 @@ export function layoutAudit(): Finding[] {
       }
     }
 
-    // Text spilling out of a visible box, e.g. a long word or URL without wrapping.
+    // Text spilling out of a visible box, e.g. a long word or URL without
+    // wrapping.
     if (
       ownText(element) &&
       style.display !== "inline" &&
@@ -219,7 +242,8 @@ export function layoutAudit(): Finding[] {
     // Shapes inside one drawing overlap by design; the drawing is the leaf.
     .filter(
       (element) =>
-        !optedOut(element, "data-allow-overlap") && !element.parentElement?.closest("svg"),
+        !optedOut(element, "data-allow-overlap") &&
+        !element.parentElement?.closest("svg"),
     )
     .slice(0, 4000)
     // Per line box: an inline element that wraps has one rectangle per line,
@@ -231,9 +255,12 @@ export function layoutAudit(): Finding[] {
       const inset =
         style.display === "inline"
           ? {
-              top: Number.parseFloat(style.paddingTop) + Number.parseFloat(style.borderTopWidth),
+              top:
+                Number.parseFloat(style.paddingTop) +
+                Number.parseFloat(style.borderTopWidth),
               bottom:
-                Number.parseFloat(style.paddingBottom) + Number.parseFloat(style.borderBottomWidth),
+                Number.parseFloat(style.paddingBottom) +
+                Number.parseFloat(style.borderBottomWidth),
             }
           : { top: 0, bottom: 0 };
       // Only the part a scrolling or clipping ancestor leaves visible counts:
@@ -258,9 +285,12 @@ export function layoutAudit(): Finding[] {
   // leaves. A fixed bar that is not a dialog still counts: content hidden
   // behind it is a bug.
   const sheetOf = (element: Element): Element | undefined => {
-    const sheet = element.closest("dialog, aside, [role='dialog'], [role='alertdialog']");
+    const sheet = element.closest(
+      "dialog, aside, [role='dialog'], [role='alertdialog']",
+    );
     if (sheet === null) return undefined;
-    return getComputedStyle(sheet).position === "fixed" || sheet.matches("dialog[open]")
+    return getComputedStyle(sheet).position === "fixed" ||
+      sheet.matches("dialog[open]")
       ? sheet
       : sheetOf(sheet.parentElement ?? document.documentElement);
   };
@@ -272,10 +302,15 @@ export function layoutAudit(): Finding[] {
     for (let next = index + 1; next < leaves.length; next += 1) {
       const b = leaves[next];
       if (b === undefined || b.rect.top >= a.rect.bottom - minimum) break;
-      if (a.element.contains(b.element) || b.element.contains(a.element)) continue;
+      if (a.element.contains(b.element) || b.element.contains(a.element))
+        continue;
       if (sheetOf(a.element) !== sheetOf(b.element)) continue;
-      const width = Math.min(a.rect.right, b.rect.right) - Math.max(a.rect.left, b.rect.left);
-      const height = Math.min(a.rect.bottom, b.rect.bottom) - Math.max(a.rect.top, b.rect.top);
+      const width =
+        Math.min(a.rect.right, b.rect.right) -
+        Math.max(a.rect.left, b.rect.left);
+      const height =
+        Math.min(a.rect.bottom, b.rect.bottom) -
+        Math.max(a.rect.top, b.rect.top);
       const key = `${path(a.element)}|${path(b.element)}`;
       if (width > minimum && height > minimum && !reported.has(key)) {
         reported.add(key);
@@ -291,14 +326,27 @@ export function layoutAudit(): Finding[] {
   // Resources that did not arrive.
   for (const image of document.images) {
     const lazyAndAway =
-      image.loading === "lazy" && image.getBoundingClientRect().top > window.innerHeight;
-    if (!lazyAndAway && visible(image) && (!image.complete || image.naturalWidth === 0)) {
-      add("image-not-loaded", image, `image ${image.currentSrc || image.src} did not load`);
+      image.loading === "lazy" &&
+      image.getBoundingClientRect().top > window.innerHeight;
+    if (
+      !lazyAndAway &&
+      visible(image) &&
+      (!image.complete || image.naturalWidth === 0)
+    ) {
+      add(
+        "image-not-loaded",
+        image,
+        `image ${image.currentSrc || image.src} did not load`,
+      );
     }
   }
   for (const use of document.querySelectorAll("use")) {
-    const reference = use.getAttribute("href") ?? use.getAttribute("xlink:href") ?? "";
-    if (reference.startsWith("#") && document.querySelector(reference) === null) {
+    const reference =
+      use.getAttribute("href") ?? use.getAttribute("xlink:href") ?? "";
+    if (
+      reference.startsWith("#") &&
+      document.querySelector(reference) === null
+    ) {
       add("icon-missing", use, `icon sprite ${reference} is not in the page`);
     }
   }

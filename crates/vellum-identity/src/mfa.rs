@@ -29,8 +29,8 @@ use crate::identity::{Identity, NewSession, after};
 use crate::lockout::Key;
 use crate::secret::{self, Kind};
 use crate::store::{
-    ChallengePurpose, MfaChallenge, Passkey, PendingTotp, SecondFactors, SessionMethod, TotpFactor,
-    User, hash_key,
+    ChallengePurpose, MfaChallenge, Passkey, PendingTotp, SecondFactors,
+    SessionMethod, TotpFactor, User, hash_key,
 };
 use crate::totp;
 use crate::webauthn::{self, Assertion, Registration};
@@ -160,7 +160,8 @@ pub const SECOND_FACTOR_REQUIRED: &str = "second factor required";
 fn factor_policy_conflict() -> Error {
     Error::new(
         ErrorKind::Conflict,
-        "your workspace requires two-step verification; add another method first",
+        "your workspace requires two-step verification; add another method \
+            first",
     )
 }
 
@@ -185,8 +186,9 @@ fn recovery_codes() -> Result<(Vec<String>, Vec<String>), Error> {
     let mut codes = Vec::with_capacity(RECOVERY_CODES);
     for _ in 0..RECOVERY_CODES {
         let mut bytes = [0_u8; 7];
-        getrandom::fill(&mut bytes)
-            .map_err(|_| Error::new(ErrorKind::Internal, "random source failed"))?;
+        getrandom::fill(&mut bytes).map_err(|_| {
+            Error::new(ErrorKind::Internal, "random source failed")
+        })?;
         let text = data_encoding::BASE32_NOPAD
             .encode(&bytes)
             .to_ascii_lowercase();
@@ -227,7 +229,10 @@ fn passkey_view(p: &Passkey) -> PasskeyView {
 
 fn check_passkey_name(name: &str) -> Result<String, Error> {
     let name = name.trim();
-    if name.is_empty() || name.chars().count() > 60 || name.chars().any(char::is_control) {
+    if name.is_empty()
+        || name.chars().count() > 60
+        || name.chars().any(char::is_control)
+    {
         return Err(Error::new(
             ErrorKind::InvalidInput,
             "name the passkey in 1 to 60 characters",
@@ -275,11 +280,21 @@ impl Identity {
             if !user.factors.recovery.is_empty() {
                 methods.push("recovery".to_owned());
             }
-            let ticket = self.new_challenge(user.id, ChallengePurpose::SignIn, user_agent, None)?;
+            let ticket = self.new_challenge(
+                user.id,
+                ChallengePurpose::SignIn,
+                user_agent,
+                None,
+            )?;
             return Ok(SignIn::Verify(Ticket { ticket, methods }));
         }
         if self.factor_required(user) {
-            let ticket = self.new_challenge(user.id, ChallengePurpose::Enrol, user_agent, None)?;
+            let ticket = self.new_challenge(
+                user.id,
+                ChallengePurpose::Enrol,
+                user_agent,
+                None,
+            )?;
             return Ok(SignIn::Enrol(Ticket {
                 ticket,
                 methods: vec!["totp".to_owned(), "passkey".to_owned()],
@@ -335,7 +350,9 @@ impl Identity {
             .read(|s| {
                 let c = s.mfa_challenges.get(&key)?;
                 let user = s.users.get(&c.user)?;
-                (c.expires > now && purposes.contains(&c.purpose) && !user.disabled)
+                (c.expires > now
+                    && purposes.contains(&c.purpose)
+                    && !user.disabled)
                     .then(|| (key.clone(), c.clone(), user.clone()))
             })
             .ok_or_else(no_ticket)
@@ -352,7 +369,9 @@ impl Identity {
             let Some(challenge) = challenge else {
                 return Ok(None);
             };
-            let Some(passkey) = user.factors.passkeys.iter().find(|p| p.id == assertion.id) else {
+            let Some(passkey) =
+                user.factors.passkeys.iter().find(|p| p.id == assertion.id)
+            else {
                 return Ok(None);
             };
             return Ok(webauthn::verify_assertion(
@@ -368,12 +387,14 @@ impl Identity {
         let Some(code) = proof.code.as_deref() else {
             return Ok(None);
         };
-        let digits: String = code.chars().filter(|c| !c.is_whitespace()).collect();
+        let digits: String =
+            code.chars().filter(|c| !c.is_whitespace()).collect();
         if digits.len() == 6 && digits.bytes().all(|b| b.is_ascii_digit()) {
             let Some(app) = &user.factors.totp else {
                 return Ok(None);
             };
-            let secret = self.sealer()?.open(&totp_purpose(user.id), &app.sealed)?;
+            let secret =
+                self.sealer()?.open(&totp_purpose(user.id), &app.sealed)?;
             return Ok(totp::verify(
                 &secret,
                 &digits,
@@ -401,7 +422,9 @@ impl Identity {
             };
             match checked {
                 Checked::Totp(step) => match &mut u.factors.totp {
-                    Some(app) if app.last_step.is_none_or(|last| *step > last) => {
+                    Some(app)
+                        if app.last_step.is_none_or(|last| *step > last) =>
+                    {
                         app.last_step = Some(*step);
                     }
                     _ => return Err(wrong_code()),
@@ -414,10 +437,14 @@ impl Identity {
                     }
                 }
                 Checked::Passkey(id, count) => {
-                    let Some(p) = u.factors.passkeys.iter_mut().find(|p| &p.id == id) else {
+                    let Some(p) =
+                        u.factors.passkeys.iter_mut().find(|p| &p.id == id)
+                    else {
                         return Err(wrong_code());
                     };
-                    if (*count != 0 || p.sign_count != 0) && *count <= p.sign_count {
+                    if (*count != 0 || p.sign_count != 0)
+                        && *count <= p.sign_count
+                    {
                         return Err(wrong_code());
                     }
                     p.sign_count = *count;
@@ -450,7 +477,11 @@ impl Identity {
         );
     }
 
-    fn check_lockout(&self, email: &str, ip: Option<IpAddr>) -> Result<(), Error> {
+    fn check_lockout(
+        &self,
+        email: &str,
+        ip: Option<IpAddr>,
+    ) -> Result<(), Error> {
         let now = Instant::now();
         if let Some(ip) = ip {
             self.lockouts
@@ -474,9 +505,12 @@ impl Identity {
         proof: &Proof,
         ip: Option<IpAddr>,
     ) -> Result<NewSession, Error> {
-        let (key, challenge, user) = self.challenge(ticket, &[ChallengePurpose::SignIn])?;
+        let (key, challenge, user) =
+            self.challenge(ticket, &[ChallengePurpose::SignIn])?;
         self.check_lockout(&user.email, ip)?;
-        let Some(checked) = self.check_proof(&user, challenge.webauthn.as_deref(), proof)? else {
+        let Some(checked) =
+            self.check_proof(&user, challenge.webauthn.as_deref(), proof)?
+        else {
             self.fail_ticket(&key, &user.email, ip);
             return Err(wrong_code());
         };
@@ -489,7 +523,12 @@ impl Identity {
         }
         self.spend(user.id, &checked)?;
         self.lockouts.succeed(self.store(), Key::Email(&user.email));
-        tracing::info!(event = "identity.signed_in", user = %user.id, second_factor = true, "signed in");
+        tracing::info!(
+            event = "identity.signed_in",
+            user = %user.id,
+            second_factor = true,
+            "signed in"
+        );
         self.open_session(
             user.id,
             SessionMethod::Password,
@@ -509,8 +548,9 @@ impl Identity {
 
     fn webauthn_challenge(&self, key: &str) -> Result<String, Error> {
         let mut bytes = [0_u8; 32];
-        getrandom::fill(&mut bytes)
-            .map_err(|_| Error::new(ErrorKind::Internal, "random source failed"))?;
+        getrandom::fill(&mut bytes).map_err(|_| {
+            Error::new(ErrorKind::Internal, "random source failed")
+        })?;
         let challenge = webauthn::encode(&bytes);
         let stored = challenge.clone();
         self.store().write(|s| {
@@ -574,8 +614,10 @@ impl Identity {
     ///
     /// [`ErrorKind::Unauthenticated`] for an unknown or spent ticket.
     pub fn ticket_passkey_options(&self, ticket: &str) -> Result<Value, Error> {
-        let (key, challenge, user) =
-            self.challenge(ticket, &[ChallengePurpose::SignIn, ChallengePurpose::Enrol])?;
+        let (key, challenge, user) = self.challenge(
+            ticket,
+            &[ChallengePurpose::SignIn, ChallengePurpose::Enrol],
+        )?;
         let issued = self.webauthn_challenge(&key)?;
         Ok(if challenge.purpose == ChallengePurpose::SignIn {
             self.request_options(&user, &issued)
@@ -591,7 +633,8 @@ impl Identity {
     ///
     /// [`ErrorKind::Unauthenticated`] for an unknown or spent ticket.
     pub fn ticket_totp_setup(&self, ticket: &str) -> Result<TotpSetup, Error> {
-        let (_, _, user) = self.challenge(ticket, &[ChallengePurpose::Enrol])?;
+        let (_, _, user) =
+            self.challenge(ticket, &[ChallengePurpose::Enrol])?;
         self.offer_totp(&user)
     }
 
@@ -609,12 +652,14 @@ impl Identity {
         passkey: Option<(&str, &Registration)>,
         ip: Option<IpAddr>,
     ) -> Result<(NewSession, Vec<String>), Error> {
-        let (key, challenge, user) = self.challenge(ticket, &[ChallengePurpose::Enrol])?;
+        let (key, challenge, user) =
+            self.challenge(ticket, &[ChallengePurpose::Enrol])?;
         self.check_lockout(&user.email, ip)?;
         let added = match (code, passkey) {
             (Some(code), None) => self.confirm_totp(user.id, code),
             (None, Some((name, registration))) => {
-                let issued = challenge.webauthn.as_deref().ok_or_else(no_ticket)?;
+                let issued =
+                    challenge.webauthn.as_deref().ok_or_else(no_ticket)?;
                 self.add_passkey(user.id, issued, name, registration)
             }
             _ => Err(Error::new(
@@ -711,7 +756,11 @@ impl Identity {
     ///
     /// [`ErrorKind::Unauthenticated`] for a wrong code, and
     /// [`ErrorKind::Conflict`] when no app was offered or the offer lapsed.
-    pub fn confirm_totp(&self, user: UserId, code: &str) -> Result<FactorAdded, Error> {
+    pub fn confirm_totp(
+        &self,
+        user: UserId,
+        code: &str,
+    ) -> Result<FactorAdded, Error> {
         let record = self.user_record(user)?;
         let pending = record
             .factors
@@ -724,9 +773,11 @@ impl Identity {
                     "start adding the authenticator app again",
                 )
             })?;
-        let secret = self.sealer()?.open(&totp_purpose(user), &pending.sealed)?;
-        let step = totp::verify(&secret, code, totp::step_at(unix_seconds()), None)
-            .ok_or_else(wrong_code)?;
+        let secret =
+            self.sealer()?.open(&totp_purpose(user), &pending.sealed)?;
+        let step =
+            totp::verify(&secret, code, totp::step_at(unix_seconds()), None)
+                .ok_or_else(wrong_code)?;
         let fresh = if record.factors.any() {
             None
         } else {
@@ -746,8 +797,14 @@ impl Identity {
             }
             Some(u.clone())
         })?;
-        let updated = updated.ok_or_else(|| Error::new(ErrorKind::NotFound, "user not found"))?;
-        tracing::info!(event = "identity.second_factor_added", user = %user, kind = "totp", "authenticator app added");
+        let updated = updated
+            .ok_or_else(|| Error::new(ErrorKind::NotFound, "user not found"))?;
+        tracing::info!(
+            event = "identity.second_factor_added",
+            user = %user,
+            kind = "totp",
+            "authenticator app added"
+        );
         Ok(FactorAdded {
             factors: self.factors_view(&updated),
             recovery_codes: fresh.map(|(codes, _)| codes),
@@ -791,8 +848,14 @@ impl Identity {
             }
             Some(u.clone())
         })?;
-        let updated = updated.ok_or_else(|| Error::new(ErrorKind::NotFound, "user not found"))?;
-        tracing::info!(event = "identity.second_factor_removed", user = %user, kind = "totp", "authenticator app removed");
+        let updated = updated
+            .ok_or_else(|| Error::new(ErrorKind::NotFound, "user not found"))?;
+        tracing::info!(
+            event = "identity.second_factor_removed",
+            user = %user,
+            kind = "totp",
+            "authenticator app removed"
+        );
         Ok(self.factors_view(&updated))
     }
 
@@ -801,7 +864,10 @@ impl Identity {
     /// # Errors
     ///
     /// [`ErrorKind::Conflict`] at the passkey limit.
-    pub fn start_passkey(&self, user: UserId) -> Result<PasskeyCeremony, Error> {
+    pub fn start_passkey(
+        &self,
+        user: UserId,
+    ) -> Result<PasskeyCeremony, Error> {
         let record = self.user_record(user)?;
         if record.factors.passkeys.len() >= MAX_PASSKEYS {
             return Err(Error::new(
@@ -809,8 +875,10 @@ impl Identity {
                 format!("you can keep at most {MAX_PASSKEYS} passkeys"),
             ));
         }
-        let ticket = self.new_challenge(user, ChallengePurpose::Register, None, None)?;
-        let issued = self.webauthn_challenge(&hash_key(&secret::hash(&ticket)))?;
+        let ticket =
+            self.new_challenge(user, ChallengePurpose::Register, None, None)?;
+        let issued =
+            self.webauthn_challenge(&hash_key(&secret::hash(&ticket)))?;
         Ok(PasskeyCeremony {
             ticket,
             options: self.creation_options(&record, &issued),
@@ -830,7 +898,8 @@ impl Identity {
         name: &str,
         registration: &Registration,
     ) -> Result<FactorAdded, Error> {
-        let (key, challenge, owner) = self.challenge(ticket, &[ChallengePurpose::Register])?;
+        let (key, challenge, owner) =
+            self.challenge(ticket, &[ChallengePurpose::Register])?;
         if owner.id != user {
             return Err(no_ticket());
         }
@@ -848,26 +917,27 @@ impl Identity {
         registration: &Registration,
     ) -> Result<FactorAdded, Error> {
         let name = check_passkey_name(name)?;
-        let registered =
-            webauthn::verify_registration(&self.relying_party(), challenge, registration)?;
+        let registered = webauthn::verify_registration(
+            &self.relying_party(),
+            challenge,
+            registration,
+        )?;
         let first = !self.user_record(user)?.factors.any();
         let fresh = if first { Some(recovery_codes()?) } else { None };
         let hashes = fresh.as_ref().map(|(_, h)| h.clone());
         let updated = self.store().write(|s| {
-            let taken = s
-                .users
-                .values()
-                .any(|u| u.factors.passkeys.iter().any(|p| p.id == registered.id));
+            let taken = s.users.values().any(|u| {
+                u.factors.passkeys.iter().any(|p| p.id == registered.id)
+            });
             if taken {
                 return Err(Error::new(
                     ErrorKind::Conflict,
                     "this passkey is already registered",
                 ));
             }
-            let u = s
-                .users
-                .get_mut(&user)
-                .ok_or_else(|| Error::new(ErrorKind::NotFound, "user not found"))?;
+            let u = s.users.get_mut(&user).ok_or_else(|| {
+                Error::new(ErrorKind::NotFound, "user not found")
+            })?;
             if u.factors.passkeys.len() >= MAX_PASSKEYS {
                 return Err(Error::new(
                     ErrorKind::Conflict,
@@ -887,7 +957,12 @@ impl Identity {
             }
             Ok(u.clone())
         })??;
-        tracing::info!(event = "identity.second_factor_added", user = %user, kind = "passkey", "passkey added");
+        tracing::info!(
+            event = "identity.second_factor_added",
+            user = %user,
+            kind = "passkey",
+            "passkey added"
+        );
         Ok(FactorAdded {
             factors: self.factors_view(&updated),
             recovery_codes: fresh.map(|(codes, _)| codes),
@@ -901,7 +976,11 @@ impl Identity {
     /// [`ErrorKind::NotFound`] for an unknown passkey, and
     /// [`ErrorKind::Conflict`] when the workspace requires a factor and
     /// this is the last one.
-    pub fn remove_passkey(&self, user: UserId, id: &str) -> Result<FactorsView, Error> {
+    pub fn remove_passkey(
+        &self,
+        user: UserId,
+        id: &str,
+    ) -> Result<FactorsView, Error> {
         let record = self.user_record(user)?;
         if !record.factors.passkeys.iter().any(|p| p.id == id) {
             return Err(Error::new(ErrorKind::NotFound, "passkey not found"));
@@ -915,8 +994,14 @@ impl Identity {
             }
             Some(u.clone())
         })?;
-        let updated = updated.ok_or_else(|| Error::new(ErrorKind::NotFound, "user not found"))?;
-        tracing::info!(event = "identity.second_factor_removed", user = %user, kind = "passkey", "passkey removed");
+        let updated = updated
+            .ok_or_else(|| Error::new(ErrorKind::NotFound, "user not found"))?;
+        tracing::info!(
+            event = "identity.second_factor_removed",
+            user = %user,
+            kind = "passkey",
+            "passkey removed"
+        );
         Ok(self.factors_view(&updated))
     }
 
@@ -925,7 +1010,10 @@ impl Identity {
     /// # Errors
     ///
     /// [`ErrorKind::Conflict`] without a factor to recover.
-    pub fn new_recovery_codes(&self, user: UserId) -> Result<Vec<String>, Error> {
+    pub fn new_recovery_codes(
+        &self,
+        user: UserId,
+    ) -> Result<Vec<String>, Error> {
         let record = self.user_record(user)?;
         if !record.factors.any() {
             return Err(Error::new(
@@ -939,7 +1027,11 @@ impl Identity {
                 u.factors.recovery = hashes;
             }
         })?;
-        tracing::info!(event = "identity.recovery_codes_replaced", user = %user, "recovery codes replaced");
+        tracing::info!(
+            event = "identity.recovery_codes_replaced",
+            user = %user,
+            "recovery codes replaced"
+        );
         Ok(codes)
     }
 
@@ -949,7 +1041,10 @@ impl Identity {
     /// # Errors
     ///
     /// [`ErrorKind::NotFound`] for an unknown user.
-    pub fn reset_factors(&self, user: UserId) -> Result<crate::identity::UserView, Error> {
+    pub fn reset_factors(
+        &self,
+        user: UserId,
+    ) -> Result<crate::identity::UserView, Error> {
         let view = self.store().write(|s| {
             let u = s.users.get_mut(&user)?;
             u.factors = SecondFactors::default();
@@ -958,7 +1053,11 @@ impl Identity {
             s.mfa_challenges.retain(|_, c| c.user != user);
             Some(view)
         })?;
-        tracing::warn!(event = "identity.second_factors_reset", user = %user, "second factors reset by an administrator");
+        tracing::warn!(
+            event = "identity.second_factors_reset",
+            user = %user,
+            "second factors reset by an administrator"
+        );
         view.ok_or_else(|| Error::new(ErrorKind::NotFound, "user not found"))
     }
 
@@ -968,7 +1067,10 @@ impl Identity {
     ///
     /// [`ErrorKind::Unauthenticated`] for an unknown session, and
     /// [`ErrorKind::Conflict`] when its owner has no passkey.
-    pub fn reauth_passkey_options(&self, cookie: &str) -> Result<PasskeyCeremony, Error> {
+    pub fn reauth_passkey_options(
+        &self,
+        cookie: &str,
+    ) -> Result<PasskeyCeremony, Error> {
         let hash = secret::hash(cookie);
         let (session, user) = self
             .store()
@@ -976,12 +1078,20 @@ impl Identity {
                 let session = s.session_by_hash(&hash)?;
                 Some((session.id.clone(), s.users.get(&session.user)?.clone()))
             })
-            .ok_or_else(|| Error::new(ErrorKind::Unauthenticated, "sign in to continue"))?;
+            .ok_or_else(|| {
+                Error::new(ErrorKind::Unauthenticated, "sign in to continue")
+            })?;
         if user.factors.passkeys.is_empty() {
             return Err(Error::new(ErrorKind::Conflict, "you have no passkey"));
         }
-        let ticket = self.new_challenge(user.id, ChallengePurpose::Reauth, None, Some(session))?;
-        let issued = self.webauthn_challenge(&hash_key(&secret::hash(&ticket)))?;
+        let ticket = self.new_challenge(
+            user.id,
+            ChallengePurpose::Reauth,
+            None,
+            Some(session),
+        )?;
+        let issued =
+            self.webauthn_challenge(&hash_key(&secret::hash(&ticket)))?;
         Ok(PasskeyCeremony {
             ticket,
             options: self.request_options(&user, &issued),
@@ -1009,7 +1119,8 @@ impl Identity {
         }
         let (challenge, ticket_key) = if proof.passkey.is_some() {
             let ticket = reauth_ticket.ok_or_else(no_ticket)?;
-            let (key, c, owner) = self.challenge(ticket, &[ChallengePurpose::Reauth])?;
+            let (key, c, owner) =
+                self.challenge(ticket, &[ChallengePurpose::Reauth])?;
             if owner.id != user.id || c.session.as_deref() != Some(session_id) {
                 return Err(no_ticket());
             }
@@ -1017,7 +1128,9 @@ impl Identity {
         } else {
             (None, None)
         };
-        let Some(checked) = self.check_proof(user, challenge.as_deref(), proof)? else {
+        let Some(checked) =
+            self.check_proof(user, challenge.as_deref(), proof)?
+        else {
             let at = Instant::now();
             self.lockouts
                 .fail(self.store(), Key::Email(&user.email), at);
@@ -1090,8 +1203,13 @@ mod tests {
         assert_eq!(added.recovery_codes.unwrap().len(), RECOVERY_CODES);
         // The ceremony was spent, and the same key cannot be added twice.
         assert!(
-            id.finish_passkey(priya.id, &ceremony.ticket, "Laptop", &registration)
-                .is_err()
+            id.finish_passkey(
+                priya.id,
+                &ceremony.ticket,
+                "Laptop",
+                &registration
+            )
+            .is_err()
         );
 
         let SignIn::Verify(step) = id
@@ -1159,8 +1277,13 @@ mod tests {
         let registration = key.register(&rp, &challenge_of(&ceremony.options));
         // Sam cannot finish Priya's ceremony.
         assert!(
-            id.finish_passkey(sam.id, &ceremony.ticket, "Stolen", &registration)
-                .is_err()
+            id.finish_passkey(
+                sam.id,
+                &ceremony.ticket,
+                "Stolen",
+                &registration
+            )
+            .is_err()
         );
         assert!(id.factors(sam.id).unwrap().passkeys.is_empty());
         // A passkey ceremony is not a sign-in ticket.
@@ -1173,7 +1296,8 @@ mod tests {
 
     #[test]
     fn the_qr_code_is_square() {
-        let rows = qr_rows("otpauth://totp/Vellum:priya%40northstar.dev?secret=ABC");
+        let rows =
+            qr_rows("otpauth://totp/Vellum:priya%40northstar.dev?secret=ABC");
         assert!(rows.len() >= 21);
         assert!(rows.iter().all(|r| r.len() == rows.len()));
     }

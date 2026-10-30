@@ -14,7 +14,11 @@ import { ThemeSettings } from "./theme-menu";
 function RailLink({ destination }: { readonly destination: Destination }) {
   const t = useT();
   return (
-    <NavLink to={destination.path} end={destination.path === "/"} className="vl-rail-item">
+    <NavLink
+      to={destination.path}
+      end={destination.path === "/"}
+      className="vl-rail-item"
+    >
       <span className="vl-rail-indicator">
         <Icon name={destination.icon} />
       </span>
@@ -32,7 +36,10 @@ export function NavigationRail({
   onNew,
   onToggleSidebar,
   sidebarOpen,
-}: NavProperties & { readonly onToggleSidebar: () => void; readonly sidebarOpen: boolean }) {
+}: NavProperties & {
+  readonly onToggleSidebar: () => void;
+  readonly sidebarOpen: boolean;
+}) {
   const t = useT();
   const [theme, setTheme] = useState(false);
   return (
@@ -95,7 +102,10 @@ export function BottomBar({
   onNew,
   onMore,
   moreOpen,
-}: NavProperties & { readonly onMore: () => void; readonly moreOpen: boolean }) {
+}: NavProperties & {
+  readonly onMore: () => void;
+  readonly moreOpen: boolean;
+}) {
   const t = useT();
   const bar = useRef<HTMLElement>(null);
   // Tab must not leave the focused control under the bar (WCAG 2.4.11).
@@ -106,9 +116,17 @@ export function BottomBar({
     const onFocus = (event: FocusEvent) => {
       const target = event.target;
       const element = bar.current;
-      if (!(target instanceof Element) || element === null || element.contains(target)) return;
+      if (
+        !(target instanceof Element) ||
+        element === null ||
+        element.contains(target)
+      )
+        return;
       if (!target.matches(":focus-visible")) return;
-      if (target.getBoundingClientRect().bottom > element.getBoundingClientRect().top)
+      if (
+        target.getBoundingClientRect().bottom >
+        element.getBoundingClientRect().top
+      )
         target.scrollIntoView({ block: "nearest" });
     };
     document.addEventListener("focusin", onFocus);
@@ -120,7 +138,12 @@ export function BottomBar({
     // The bar floats over the page by design (Material 3); the page's bottom
     // padding lets the last content scroll clear of it. The UI suite's
     // overlap check is told so.
-    <nav ref={bar} className="vl-bottom-bar" aria-label={t("nav-label")} data-allow-overlap="">
+    <nav
+      ref={bar}
+      className="vl-bottom-bar"
+      aria-label={t("nav-label")}
+      data-allow-overlap=""
+    >
       <button type="button" className="vl-rail-item" onClick={onNew}>
         <span className="vl-rail-indicator">
           <Icon name="edit" />

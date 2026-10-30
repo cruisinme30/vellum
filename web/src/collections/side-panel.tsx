@@ -29,7 +29,9 @@ export function SidePanel({
   });
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
-    panel.current?.querySelector<HTMLElement>("input, select, textarea")?.focus();
+    panel.current
+      ?.querySelector<HTMLElement>("input, select, textarea")
+      ?.focus();
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") close.current();
     };
@@ -75,8 +77,14 @@ export function FormError({ error }: { readonly error: string | undefined }) {
 }
 
 /** Saves a text file the browser offers to the user. */
-export function download(fileName: string, text: string, type = "text/csv"): void {
-  const url = URL.createObjectURL(new Blob([text], { type: `${type};charset=utf-8` }));
+export function download(
+  fileName: string,
+  text: string,
+  type = "text/csv",
+): void {
+  const url = URL.createObjectURL(
+    new Blob([text], { type: `${type};charset=utf-8` }),
+  );
   const link = document.createElement("a");
   link.href = url;
   link.download = fileName;

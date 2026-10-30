@@ -9,7 +9,11 @@ import { NavLink, useNavigate, useSearchParams } from "react-router";
 import { useT } from "../i18n/i18n";
 import { useScreenCommands } from "../keyboard/keyboard-root";
 import type { Scope } from "../keyboard/keymap";
-import { SCREEN_DESTINATIONS, workCommands, type WorkActions } from "../keyboard/work-commands";
+import {
+  SCREEN_DESTINATIONS,
+  workCommands,
+  type WorkActions,
+} from "../keyboard/work-commands";
 
 import type { TeamOut } from "./api";
 
@@ -68,7 +72,9 @@ export function TeamPicker({
         id={id}
         value={team.key}
         onChange={(event) => {
-          const next = reset ? new URLSearchParams() : new URLSearchParams(parameters);
+          const next = reset
+            ? new URLSearchParams()
+            : new URLSearchParams(parameters);
           next.set("team", event.target.value);
           next.delete("view");
           setParameters(next, { replace: true });
@@ -88,7 +94,10 @@ export function TeamPicker({
  * Registers the Work keyboard model for a screen: the `G` chords, plus
  * whatever else the screen can do.
  */
-export function useWorkKeys(team: string | undefined, actions: Omit<WorkActions, "goTo"> = {}) {
+export function useWorkKeys(
+  team: string | undefined,
+  actions: Omit<WorkActions, "goTo"> = {},
+) {
   const navigate = useNavigate();
   const { newIssue } = actions;
   const commands = useMemo(() => {

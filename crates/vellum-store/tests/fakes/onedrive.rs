@@ -179,7 +179,9 @@ struct Fail(StatusCode, &'static str);
 impl IntoResponse for Fail {
     fn into_response(self) -> Response {
         let Self(status, code) = self;
-        let body = json!({ "error": { "code": code, "message": format!("fake graph: {code}") } });
+        let body = json!({
+            "error": { "code": code, "message": format!("fake graph: {code}") }
+        });
         (status, axum::Json(body)).into_response()
     }
 }
@@ -274,7 +276,10 @@ impl GraphDrive {
             dir = child_path(&dir, segment);
             match self.items.get(&dir) {
                 Some(n) if n.content.is_some() => {
-                    return Err(error(StatusCode::CONFLICT, "nameAlreadyExists"));
+                    return Err(error(
+                        StatusCode::CONFLICT,
+                        "nameAlreadyExists",
+                    ));
                 }
                 Some(_) => {}
                 None => {
@@ -319,11 +324,17 @@ impl GraphDrive {
     }
 
     /// `412` unless the item exists with the expected `eTag`.
-    fn check_if_match(&self, path: &str, want: Option<&str>) -> Result<(), Fail> {
+    fn check_if_match(
+        &self,
+        path: &str,
+        want: Option<&str>,
+    ) -> Result<(), Fail> {
         let Some(want) = want else { return Ok(()) };
         match self.items.get(path) {
             Some(n) if want == "*" || n.etag() == want => Ok(()),
-            _ => Err(error(StatusCode::PRECONDITION_FAILED, "resourceModified")),
+            _ => {
+                Err(error(StatusCode::PRECONDITION_FAILED, "resourceModified"))
+            }
         }
     }
 
@@ -334,7 +345,8 @@ impl GraphDrive {
         let parent = parent_of(path);
         let parent_id = self.items.get(parent).map(|n| n.id.clone());
         let mut item = Map::new();
-        let mut set = |key: &str, value: Value| drop(item.insert(key.to_owned(), value));
+        let mut set =
+            |key: &str, value: Value| drop(item.insert(key.to_owned(), value));
         set("id", json!(node.id));
         set(
             "name",
@@ -355,12 +367,14 @@ impl GraphDrive {
             }),
         );
         if let Some(bytes) = &node.content {
-            let ctag = format!("\"c:{{{}}},{}\"", node.id, node.content_version);
+            let ctag =
+                format!("\"c:{{{}}},{}\"", node.id, node.content_version);
             set("cTag", json!(ctag));
             set("size", json!(bytes.len()));
             set("file", json!({ "mimeType": "application/octet-stream" }));
             if download {
-                let url = format!("{origin}/download/{}?tempauth=secret", node.id);
+                let url =
+                    format!("{origin}/download/{}?tempauth=secret", node.id);
                 set("@microsoft.graph.downloadUrl", json!(url));
             }
         } else {
@@ -378,8 +392,14 @@ impl GraphDrive {
             .collect()
     }
 
-    fn ok_item(&self, status: StatusCode, origin: &str, path: &str) -> Response {
-        (status, axum::Json(self.item_json(origin, path, false))).into_response()
+    fn ok_item(
+        &self,
+        status: StatusCode,
+        origin: &str,
+        path: &str,
+    ) -> Response {
+        (status, axum::Json(self.item_json(origin, path, false)))
+            .into_response()
     }
 }
 
@@ -411,7 +431,9 @@ fn dispatch(
         return upload_chunk(drive, origin, method, rest, headers, &body);
     }
     let bearer = format!("Bearer {}", drive.token);
-    if headers.get(AUTHORIZATION).and_then(|v| v.to_str().ok()) != Some(bearer.as_str()) {
+    if headers.get(AUTHORIZATION).and_then(|v| v.to_str().ok())
+        != Some(bearer.as_str())
+    {
         drive.counters.unauthorized += 1;
         return Err(error(
             StatusCode::UNAUTHORIZED,
@@ -432,23 +454,35 @@ fn dispatch(
             if !drive.items.contains_key(&path) {
                 return Err(not_found());
             }
-            Ok(axum::Json(drive.item_json(origin, &path, true)).into_response())
-        }
-        ("GET", "content") => match drive.items.get(&path) {
-            Some(Node {
-                id,
-                content: Some(_),
-                ..
-            }) => Ok((
-                StatusCode::FOUND,
-                [(LOCATION, format!("{origin}/download/{id}?tempauth=secret"))],
+            Ok(
+                axum::Json(drive.item_json(origin, &path, true))
+                    .into_response(),
             )
-                .into_response()),
-            _ => Err(not_found()),
-        },
+        }
+        ("GET", "content") => {
+            match drive.items.get(&path) {
+                Some(Node {
+                    id,
+                    content: Some(_),
+                    ..
+                }) => Ok((
+                    StatusCode::FOUND,
+                    [(
+                        LOCATION,
+                        format!("{origin}/download/{id}?tempauth=secret"),
+                    )],
+                )
+                    .into_response()),
+                _ => Err(not_found()),
+            }
+        }
         ("GET", "children") => list_children(drive, origin, &path, &query),
-        ("PUT", "content") => simple_upload(drive, origin, &path, if_match, behavior, body),
-        ("POST", "createUploadSession") => create_session(drive, origin, path, if_match, &body),
+        ("PUT", "content") => {
+            simple_upload(drive, origin, &path, if_match, behavior, body)
+        }
+        ("POST", "createUploadSession") => {
+            create_session(drive, origin, path, if_match, &body)
+        }
         ("POST", "children") => create_folder(drive, origin, &path, &body),
         ("DELETE", "") => {
             if !drive.items.contains_key(&path) || path.is_empty() {
@@ -478,7 +512,9 @@ fn simple_upload(
         return Err(error(StatusCode::PAYLOAD_TOO_LARGE, "requestTooLarge"));
     }
     drive.check_if_match(path, if_match)?;
-    if behavior == Some("fail") && drive.items.contains_key(path) || drive.is_folder(path) {
+    if behavior == Some("fail") && drive.items.contains_key(path)
+        || drive.is_folder(path)
+    {
         return Err(error(StatusCode::CONFLICT, "nameAlreadyExists"));
     }
     drive.ensure_parents(path)?;
@@ -499,7 +535,8 @@ fn create_session(
     if_match: Option<&str>,
     body: &Bytes,
 ) -> Reply {
-    let request: Value = serde_json::from_slice(body).map_err(|_| bad_request())?;
+    let request: Value =
+        serde_json::from_slice(body).map_err(|_| bad_request())?;
     let fail = request
         .pointer("/item/@microsoft.graph.conflictBehavior")
         .and_then(Value::as_str)
@@ -532,7 +569,8 @@ fn address(drive: &GraphDrive, rest: &str) -> Result<(String, String), Fail> {
     let bad = bad_request;
     if let Some(after) = rest.strip_prefix("/root:/") {
         let (encoded, op) = after.split_once(':').ok_or_else(bad)?;
-        let decoded: Option<Vec<String>> = encoded.split('/').map(decode).collect();
+        let decoded: Option<Vec<String>> =
+            encoded.split('/').map(decode).collect();
         let path = decoded.ok_or_else(bad)?.join("/");
         return Ok((path, op.trim_start_matches('/').to_owned()));
     }
@@ -589,8 +627,14 @@ fn list_children(
     Ok(axum::Json(Value::Object(page)).into_response())
 }
 
-fn create_folder(drive: &mut GraphDrive, origin: &str, parent: &str, body: &Bytes) -> Reply {
-    let request: Value = serde_json::from_slice(body).map_err(|_| bad_request())?;
+fn create_folder(
+    drive: &mut GraphDrive,
+    origin: &str,
+    parent: &str,
+    body: &Bytes,
+) -> Reply {
+    let request: Value =
+        serde_json::from_slice(body).map_err(|_| bad_request())?;
     let name = request
         .get("name")
         .and_then(Value::as_str)
@@ -624,7 +668,8 @@ fn move_item(
     behavior: Option<&str>,
     body: &Bytes,
 ) -> Reply {
-    let request: Value = serde_json::from_slice(body).map_err(|_| bad_request())?;
+    let request: Value =
+        serde_json::from_slice(body).map_err(|_| bad_request())?;
     if !drive.items.contains_key(from) {
         return Err(not_found());
     }
@@ -699,7 +744,10 @@ fn upload_chunk(
         .and_then(parse_range)
         .ok_or_else(bad_range)?;
     let session = drive.sessions.get_mut(sid).ok_or_else(not_found)?;
-    if start != session.received.len() || end + 1 - start != body.len() || end >= total {
+    if start != session.received.len()
+        || end + 1 - start != body.len()
+        || end >= total
+    {
         return Err(bad_range());
     }
     session.received.extend_from_slice(body);
@@ -756,7 +804,9 @@ fn decode(raw: &str) -> Option<String> {
     while let Some(b) = bytes.next() {
         if b == b'%' {
             let hex = [bytes.next()?, bytes.next()?];
-            out.push(u8::from_str_radix(std::str::from_utf8(&hex).ok()?, 16).ok()?);
+            out.push(
+                u8::from_str_radix(std::str::from_utf8(&hex).ok()?, 16).ok()?,
+            );
         } else {
             out.push(b);
         }

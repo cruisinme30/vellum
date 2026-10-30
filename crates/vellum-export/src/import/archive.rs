@@ -44,7 +44,11 @@ pub struct Entry {
 ///
 /// [`ImportError::Format`] when the bytes are not a zip archive, and
 /// [`ImportError::TooLarge`] past the limits above.
-pub fn read(format: &'static str, bytes: &[u8], nested: bool) -> Result<Vec<Entry>, ImportError> {
+pub fn read(
+    format: &'static str,
+    bytes: &[u8],
+    nested: bool,
+) -> Result<Vec<Entry>, ImportError> {
     let mut out = Vec::new();
     let mut total = 0u64;
     read_into(format, bytes, nested, "", &mut out, &mut total)?;
@@ -59,8 +63,9 @@ fn read_into(
     out: &mut Vec<Entry>,
     total: &mut u64,
 ) -> Result<(), ImportError> {
-    let mut zip = zip::ZipArchive::new(Cursor::new(bytes))
-        .map_err(|e| ImportError::format(format, format!("not a zip archive ({e})")))?;
+    let mut zip = zip::ZipArchive::new(Cursor::new(bytes)).map_err(|e| {
+        ImportError::format(format, format!("not a zip archive ({e})"))
+    })?;
     for index in 0..zip.len() {
         let mut file = zip
             .by_index(index)
@@ -74,7 +79,9 @@ fn read_into(
         let path: Vec<String> = name
             .components()
             .filter_map(|c| match c {
-                std::path::Component::Normal(part) => Some(part.to_string_lossy().into_owned()),
+                std::path::Component::Normal(part) => {
+                    Some(part.to_string_lossy().into_owned())
+                }
                 _ => None,
             })
             .collect();
@@ -123,7 +130,8 @@ fn read_into(
         }
         drop(file);
         if nested && path.to_ascii_lowercase().ends_with(".zip") {
-            let stem = path.get(..path.len() - 4).unwrap_or_default().to_owned();
+            let stem =
+                path.get(..path.len() - 4).unwrap_or_default().to_owned();
             read_into(format, &data, false, &stem, out, total)?;
         } else {
             out.push(Entry { path, bytes: data });
@@ -147,7 +155,8 @@ pub fn strip_common_root(entries: &mut [Entry]) {
             return;
         }
         for entry in entries.iter_mut() {
-            entry.path = entry.path.get(root.len()..).unwrap_or_default().to_owned();
+            entry.path =
+                entry.path.get(root.len()..).unwrap_or_default().to_owned();
         }
     }
 }
@@ -180,7 +189,8 @@ mod tests {
             ("__MACOSX/ok/._page.md", b"z"),
         ]);
         let entries = read("markdown", &bytes, false).unwrap();
-        let paths: Vec<&str> = entries.iter().map(|e| e.path.as_str()).collect();
+        let paths: Vec<&str> =
+            entries.iter().map(|e| e.path.as_str()).collect();
         assert!(!paths.iter().any(|p| p.contains("..")), "{paths:?}");
         assert!(paths.contains(&"ok/page.md"));
         assert!(!paths.iter().any(|p| p.contains("__MACOSX")));
@@ -213,15 +223,18 @@ mod tests {
         out.into_inner()
     }
 
-    /// RT-025 (#460): a small archive of zeros used to expand to 2 GB in memory.
-    /// It is now refused after reading at most one entry's allowance.
+    /// RT-025 (#460): a small archive of zeros used to expand to 2 GB in
+    /// memory. It is now refused after reading at most one entry's allowance.
     #[test]
     fn a_zip_bomb_is_refused_before_it_fills_memory() {
         let bomb = deflated(&[("a.md", 64), ("b.md", 64)]);
         assert!(bomb.len() < 1024 * 1024, "{} bytes", bomb.len());
         let refused = read("markdown", &bomb, false);
         assert!(
-            matches!(&refused, Err(ImportError::TooLarge(m)) if m.contains("expands")),
+            matches!(
+                &refused,
+                Err(ImportError::TooLarge(m)) if m.contains("expands")
+            ),
             "{refused:?}"
         );
         // Nested archives are held to the same rule.
@@ -237,7 +250,9 @@ mod tests {
         let mut seed = 7u64;
         let text: String = (0..200_000)
             .map(|_| {
-                seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+                seed = seed
+                    .wrapping_mul(6_364_136_223_846_793_005)
+                    .wrapping_add(1);
                 [
                     "ship ",
                     "plan ",

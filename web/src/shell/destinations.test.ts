@@ -23,6 +23,8 @@ describe("DESTINATIONS", () => {
   });
 
   it("only uses bundled icons", () => {
-    expect(all.filter(([, destination]) => !hasIcon(destination.icon))).toEqual([]);
+    expect(all.filter(([, destination]) => !hasIcon(destination.icon))).toEqual(
+      [],
+    );
   });
 });

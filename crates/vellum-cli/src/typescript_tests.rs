@@ -9,7 +9,8 @@ use crate::services;
 
 /// The committed client types, relative to this crate.
 fn committed_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../web/src/api/api.gen.ts")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../web/src/api/api.gen.ts")
 }
 
 /// Fails when the committed client no longer matches the server's
@@ -27,8 +28,8 @@ fn typescript_client_matches_the_server() {
     assert!(
         committed == generated,
         "web/src/api/api.gen.ts no longer matches the server's operations. \
-         Regenerate it with `VELLUM_BLESS=1 cargo test -p vellum-cli typescript_client` \
-         and commit the result."
+         Regenerate it with `VELLUM_BLESS=1 cargo test -p vellum-cli \
+         typescript_client` and commit the result."
     );
 }
 
@@ -57,7 +58,8 @@ fn every_path_parameter_is_a_required_input_field() {
             {
                 assert!(
                     required.contains(&param),
-                    "{method} {path} ({id}): `{param}` is not a required input field"
+                    "{method} {path} ({id}): `{param}` is not a required input \
+                        field"
                 );
             }
         }

@@ -19,10 +19,21 @@ function UsageLine({ usage }: { readonly usage: UsageView }) {
   const id = useId();
   const share = usedShare(usage.used_bytes, usage.quota_bytes);
   const used = formatBytes(usage.used_bytes);
-  if (share === undefined || usage.quota_bytes === undefined || usage.quota_bytes === null) {
-    return <p className="vl-drive-usage vl-muted">{t("drive-usage-unlimited", { used })}</p>;
+  if (
+    share === undefined ||
+    usage.quota_bytes === undefined ||
+    usage.quota_bytes === null
+  ) {
+    return (
+      <p className="vl-drive-usage vl-muted">
+        {t("drive-usage-unlimited", { used })}
+      </p>
+    );
   }
-  const text = t("drive-usage", { used, quota: formatBytes(usage.quota_bytes) });
+  const text = t("drive-usage", {
+    used,
+    quota: formatBytes(usage.quota_bytes),
+  });
   return (
     <div className="vl-drive-usage">
       <meter
@@ -45,8 +56,18 @@ function UsageLine({ usage }: { readonly usage: UsageView }) {
 }
 
 /** A space's usage against its quota (R-DR-10); nothing while it loads. */
-export function UsageMeter({ api, space }: { readonly api: DriveApi; readonly space: SpaceView }) {
-  const loaded = useLoaded(() => api.usage(space.id), [api, space.id], failureText);
+export function UsageMeter({
+  api,
+  space,
+}: {
+  readonly api: DriveApi;
+  readonly space: SpaceView;
+}) {
+  const loaded = useLoaded(
+    () => api.usage(space.id),
+    [api, space.id],
+    failureText,
+  );
   if (loaded.state === "loading") return;
   if (loaded.state === "failed") {
     return <p className="vl-muted">{loaded.message}</p>;

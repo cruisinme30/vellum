@@ -48,13 +48,18 @@ const CODES = new Set<string>([
   "internal",
 ]);
 
-/** A failed request. `message` is safe to show; quote `requestId` when reporting it. */
+/**
+ * A failed request. `message` is safe to show; quote `requestId` when reporting
+ * it.
+ */
 export class ApiError extends Error {
   readonly code: ErrorCode;
   readonly status: number;
   readonly retryable: boolean;
   readonly requestId: string | undefined;
-  /** The request that failed, such as `GET /api/v1/my-work` (no query string). */
+  /**
+   * The request that failed, such as `GET /api/v1/my-work` (no query string).
+   */
   readonly route: string | undefined;
   /** When it failed. */
   readonly at: Date;
@@ -62,7 +67,12 @@ export class ApiError extends Error {
   constructor(
     code: ErrorCode,
     message: string,
-    details: { status?: number; retryable?: boolean; requestId?: string; route?: string } = {},
+    details: {
+      status?: number;
+      retryable?: boolean;
+      requestId?: string;
+      route?: string;
+    } = {},
   ) {
     super(message);
     this.name = "ApiError";
@@ -85,7 +95,11 @@ export type Query = Readonly<
 export interface Http {
   get<T>(path: string, query?: Query): Promise<T>;
   /** An unsafe request with a JSON body. */
-  send<T>(method: Exclude<Method, "GET">, path: string, body?: unknown): Promise<T>;
+  send<T>(
+    method: Exclude<Method, "GET">,
+    path: string,
+    body?: unknown,
+  ): Promise<T>;
   /**
    * A POST whose body is raw bytes (a file upload), with its media type.
    * Like `send` it carries the CSRF token and an idempotency key.
@@ -93,7 +107,10 @@ export interface Http {
   upload<T>(path: string, query: Query, body: Blob, type: string): Promise<T>;
   /** A GET whose answer is a file (an export). */
   blob(path: string, query?: Query): Promise<Blob>;
-  /** Forgets the CSRF token; called after signing in or out, when the session changes. */
+  /**
+   * Forgets the CSRF token; called after signing in or out, when the session
+   * changes.
+   */
   forgetSession(): void;
 }
 
@@ -128,7 +145,10 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 
 /** The request ID from the body, else from the `X-Request-Id` header. */
-function requestIdOf(fromBody: unknown, header: string | undefined): { requestId?: string } {
+function requestIdOf(
+  fromBody: unknown,
+  header: string | undefined,
+): { requestId?: string } {
   if (typeof fromBody === "string") return { requestId: fromBody };
   return header === undefined ? {} : { requestId: header };
 }
@@ -150,7 +170,9 @@ async function errorOf(response: Response, route?: string): Promise<ApiError> {
   }
   if (isRecord(body) && typeof body["message"] === "string") {
     const code =
-      typeof body["code"] === "string" && CODES.has(body["code"]) ? body["code"] : "internal";
+      typeof body["code"] === "string" && CODES.has(body["code"])
+        ? body["code"]
+        : "internal";
     return new ApiError(code as ErrorCode, body["message"], {
       status: response.status,
       retryable: body["retryable"] === true,
@@ -184,31 +206,56 @@ export function createHttp(options: HttpOptions = {}): Http {
       }));
   let csrf: Promise<string | undefined> | undefined;
 
-  const once = async (method: Method, url: string, init: RequestInit): Promise<Response> => {
+  const once = async (
+    method: Method,
+    url: string,
+    init: RequestInit,
+  ): Promise<Response> => {
     let response: Response;
     try {
-      response = await doFetch(`${base}${url}`, { ...init, method, credentials: "same-origin" });
-    } catch {
-      throw new ApiError("network", "Vellum could not reach the server. Check your connection.", {
-        retryable: true,
-        route: routeOf(method, url),
+      response = await doFetch(`${base}${url}`, {
+        ...init,
+        method,
+        credentials: "same-origin",
       });
+    } catch {
+      throw new ApiError(
+        "network",
+        "Vellum could not reach the server. Check your connection.",
+        {
+          retryable: true,
+          route: routeOf(method, url),
+        },
+      );
     }
-    health.report(response.status, retryAfterSeconds(response.headers.get("retry-after")));
+    health.report(
+      response.status,
+      retryAfterSeconds(response.headers.get("retry-after")),
+    );
     return response;
   };
 
-  /** One request, and one retry when the server says it is briefly unavailable. */
-  const request = async (method: Method, url: string, init: RequestInit): Promise<Response> => {
+  /**
+   * One request, and one retry when the server says it is briefly unavailable.
+   */
+  const request = async (
+    method: Method,
+    url: string,
+    init: RequestInit,
+  ): Promise<Response> => {
     const response = await once(method, url, init);
     if (response.status !== 503) return response;
-    const wait = (retryAfterSeconds(response.headers.get("retry-after")) ?? 1) * 1000;
+    const wait =
+      (retryAfterSeconds(response.headers.get("retry-after")) ?? 1) * 1000;
     if (wait > MAX_RETRY_WAIT_MS) return response;
     await sleep(wait);
     return once(method, url, init);
   };
 
-  /** The session's CSRF token; none before sign-in, when only the origin is checked. */
+  /**
+   * The session's CSRF token; none before sign-in, when only the origin is
+   * checked.
+   */
   const csrfToken = (): Promise<string | undefined> => {
     csrf ??= (async () => {
       try {
@@ -217,7 +264,9 @@ export function createHttp(options: HttpOptions = {}): Http {
         });
         if (!response.ok) return;
         const body: unknown = await response.json();
-        return isRecord(body) && typeof body["token"] === "string" ? body["token"] : undefined;
+        return isRecord(body) && typeof body["token"] === "string"
+          ? body["token"]
+          : undefined;
       } catch {
         return;
       }
@@ -231,7 +280,10 @@ export function createHttp(options: HttpOptions = {}): Http {
     return (await response.json()) as T;
   };
 
-  /** A request that changes something: CSRF token, idempotency key, one retry for a new session. */
+  /**
+   * A request that changes something: CSRF token, idempotency key, one retry
+   * for a new session.
+   */
   const unsafe = async <T>(
     method: Exclude<Method, "GET">,
     path: string,
@@ -252,7 +304,8 @@ export function createHttp(options: HttpOptions = {}): Http {
       });
     };
     let response = await attempt();
-    // A new session (just signed in or out) needs a new token: fetch it once more.
+    // A new session (just signed in or out) needs a new token: fetch it once
+    // more.
     if (response.status === 403) {
       const error = await errorOf(response.clone());
       if (/csrf/i.test(error.message)) {
@@ -271,11 +324,17 @@ export function createHttp(options: HttpOptions = {}): Http {
       return parse<T>(response, routeOf("GET", path));
     },
 
-    send<T>(method: Exclude<Method, "GET">, path: string, body?: unknown): Promise<T> {
+    send<T>(
+      method: Exclude<Method, "GET">,
+      path: string,
+      body?: unknown,
+    ): Promise<T> {
       return unsafe<T>(
         method,
         path,
-        body === undefined ? undefined : { body: JSON.stringify(body), type: "application/json" },
+        body === undefined
+          ? undefined
+          : { body: JSON.stringify(body), type: "application/json" },
       );
     },
 
@@ -285,7 +344,12 @@ export function createHttp(options: HttpOptions = {}): Http {
       return response.blob();
     },
 
-    upload<T>(path: string, query: Query, body: Blob, type: string): Promise<T> {
+    upload<T>(
+      path: string,
+      query: Query,
+      body: Blob,
+      type: string,
+    ): Promise<T> {
       return unsafe<T>("POST", `${path}${queryString(query)}`, { body, type });
     },
 

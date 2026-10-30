@@ -61,8 +61,9 @@ fn read_json<T: serde::de::DeserializeOwned>(
     path: &std::path::Path,
     what: &'static str,
 ) -> Result<T> {
-    let text = std::fs::read_to_string(path)
-        .map_err(|e| Error::new(ErrorKind::InvalidInput, what).with_source(e))?;
+    let text = std::fs::read_to_string(path).map_err(|e| {
+        Error::new(ErrorKind::InvalidInput, what).with_source(e)
+    })?;
     serde_json::from_str(&text)
         .map_err(|e| Error::new(ErrorKind::InvalidInput, what).with_source(e))
 }
@@ -92,7 +93,10 @@ pub fn run(args: &BudgetsArgs) -> Result<Verdict> {
         let budgets: Budgets = read_json(path, "cannot read the budgets file")?;
         let problems = budgets.problems();
         if !problems.is_empty() {
-            return Err(Error::new(ErrorKind::InvalidInput, problems.join("; ")));
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                problems.join("; "),
+            ));
         }
         budgets.annotate(&mut routes);
         budgets.min_requests
@@ -149,7 +153,8 @@ mod tests {
     #[test]
     fn fails_on_routes_the_server_marked() {
         let dir = tempfile::tempdir().unwrap();
-        let verdict = run(&args(routes_file(dir.path(), &Budgets::default()))).unwrap();
+        let verdict =
+            run(&args(routes_file(dir.path(), &Budgets::default()))).unwrap();
         assert_eq!(verdict.judged, 2);
         assert!(!verdict.passed());
         assert_eq!(verdict.breaches.first().unwrap().route, "/v1/slow");
@@ -160,7 +165,11 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut a = args(routes_file(dir.path(), &Budgets::default()));
         let file = dir.path().join("budgets.json");
-        std::fs::write(&file, r#"{"routes":[{"route":"/v1/slow","p95_ms":1000}]}"#).unwrap();
+        std::fs::write(
+            &file,
+            r#"{"routes":[{"route":"/v1/slow","p95_ms":1000}]}"#,
+        )
+        .unwrap();
         a.budgets = Some(file.clone());
         assert!(run(&a).unwrap().passed());
         std::fs::write(&file, r#"{"read_ms":0}"#).unwrap();

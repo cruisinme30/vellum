@@ -30,7 +30,9 @@ use vellum_collections::service::collection_dir;
 use vellum_contracts::BoxFuture;
 use vellum_db::feed::{Change, Feed, PATH, SPACES};
 use vellum_store::layout::Kind;
-use vellum_store::{Blob, BlobEntry, BlobMeta, BlobPath, BlobStore, Precondition, StoreResult};
+use vellum_store::{
+    Blob, BlobEntry, BlobMeta, BlobPath, BlobStore, Precondition, StoreResult,
+};
 
 /// How often a replica reads the feed. The brief wants a change on one
 /// replica visible on the others within a second.
@@ -95,7 +97,8 @@ impl AnnouncingStore {
         // The write already happened; other replicas catch up at their
         // next full reload if this is lost.
         if let Err(error) = self.feed.publish(&self.origin, &items).await {
-            tracing::warn!(%error, "a write was not announced to the other replicas");
+            tracing::warn!(%error, "a write was not announced to the other \
+                replicas");
         }
     }
 }
@@ -125,19 +128,30 @@ impl BlobStore for AnnouncingStore {
         Ok(meta)
     }
 
-    async fn delete(&self, path: &BlobPath, condition: Precondition) -> StoreResult<()> {
+    async fn delete(
+        &self,
+        path: &BlobPath,
+        condition: Precondition,
+    ) -> StoreResult<()> {
         self.inner.delete(path, condition).await?;
         self.announce(&[path]).await;
         Ok(())
     }
 
-    async fn rename(&self, from: &BlobPath, to: &BlobPath) -> StoreResult<BlobMeta> {
+    async fn rename(
+        &self,
+        from: &BlobPath,
+        to: &BlobPath,
+    ) -> StoreResult<BlobMeta> {
         let meta = self.inner.rename(from, to).await?;
         self.announce(&[from, to]).await;
         Ok(meta)
     }
 
-    fn list(&self, dir: Option<&BlobPath>) -> BoxStream<'static, StoreResult<BlobEntry>> {
+    fn list(
+        &self,
+        dir: Option<&BlobPath>,
+    ) -> BoxStream<'static, StoreResult<BlobEntry>> {
         self.inner.list(dir)
     }
 }
@@ -223,7 +237,10 @@ pub fn follow(feed: Feed, me: String, mut cursor: i64, caches: Caches) {
             loop {
                 match feed.read(cursor, PAGE).await {
                     Ok(page) if page.reset => {
-                        tracing::info!("missed changes from other replicas; reloading caches");
+                        tracing::info!(
+                            "missed changes from other replicas; reloading \
+                                caches"
+                        );
                         caches.reset().await;
                         cursor = page.cursor;
                         break;
@@ -298,7 +315,10 @@ mod tests {
         );
         assert!(t.books && t.spaces && t.collections.is_empty());
         // A chapter edit does not move any book.
-        let t = touched(&[change("b", PATH, "spaces/eng/guide.book/intro.md")], "me");
+        let t = touched(
+            &[change("b", PATH, "spaces/eng/guide.book/intro.md")],
+            "me",
+        );
         assert_eq!(t, Touched::default());
     }
 
@@ -312,7 +332,8 @@ mod tests {
     #[test]
     fn origins_differ_by_host() {
         let a = origin(|k| (k == "HOSTNAME").then(|| "pod-a".to_owned()));
-        let b = origin(|k| (k == "VELLUM_NODE_NAME").then(|| "pod-b".to_owned()));
+        let b =
+            origin(|k| (k == "VELLUM_NODE_NAME").then(|| "pod-b".to_owned()));
         assert!(a.starts_with("pod-a:") && b.starts_with("pod-b:"));
     }
 
@@ -322,7 +343,8 @@ mod tests {
     #[tokio::test]
     #[expect(
         clippy::too_many_lines,
-        reason = "one end-to-end story across two replicas reads best in one place"
+        reason = "one end-to-end story across two replicas reads best in one \
+            place"
     )]
     async fn a_write_on_one_replica_reaches_another_within_a_second() {
         use std::sync::atomic::{AtomicUsize, Ordering};
@@ -336,9 +358,12 @@ mod tests {
 
         let dir = tempfile::tempdir().unwrap_or_else(|e| panic!("{e}"));
         let data = dir.path().join("data");
-        let index = Index::open(&IndexConfig::sqlite(dir.path().join("index.sqlite"), None))
-            .await
-            .unwrap_or_else(|e| panic!("{e}"));
+        let index = Index::open(&IndexConfig::sqlite(
+            dir.path().join("index.sqlite"),
+            None,
+        ))
+        .await
+        .unwrap_or_else(|e| panic!("{e}"));
         let feed = Feed::new(index.clone());
         let files: Arc<dyn BlobStore> = Arc::new(
             LocalStore::open(&data)
@@ -346,12 +371,17 @@ mod tests {
                 .unwrap_or_else(|e| panic!("{e}")),
         );
         let replica = |name: &str| -> Arc<dyn BlobStore> {
-            Arc::new(AnnouncingStore::new(Arc::clone(&files), feed.clone(), name))
+            Arc::new(AnnouncingStore::new(
+                Arc::clone(&files),
+                feed.clone(),
+                name,
+            ))
         };
         let (a, b) = (replica("a"), replica("b"));
 
         let authz = Arc::new(Authz::new(MemoryStore::new()));
-        let space_of: vellum_collections::service::SpaceOf = Arc::new(|_: &BlobPath| None);
+        let space_of: vellum_collections::service::SpaceOf =
+            Arc::new(|_: &BlobPath| None);
         let collections = Arc::new(CollectionsService::new(
             Arc::clone(&b),
             Arc::new(vellum_collections::service::AuthzAccess::new(
@@ -401,7 +431,9 @@ mod tests {
         };
         put(
             format!("{dir_path}/schema.yaml"),
-            "id: 01JBQ8Y4ZK6V3W2N5R7T9X1C30\ntitle: Bugs\nproperties:\n  - {key: t, name: Bug, type: title}\n".to_owned(),
+            "id: 01JBQ8Y4ZK6V3W2N5R7T9X1C30\ntitle: Bugs\n\
+                properties:\n  - {key: t, name: Bug, type: title}\n"
+                .to_owned(),
         )
         .await;
         put(

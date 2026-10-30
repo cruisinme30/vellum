@@ -19,7 +19,8 @@ use std::fmt::Write as _;
 use std::path::Path;
 use std::process::Command;
 
-const USAGE: &str = "usage: cargo xtask adr <next | new <slug> [--decisions N] [--issue N]>";
+const USAGE: &str =
+    "usage: cargo xtask adr <next | new <slug> [--decisions N] [--issue N]>";
 const TEMPLATE: &str = "docs/adr/0000-template.md";
 const RESERVED: &str = "docs/adr/reserved.toml";
 
@@ -47,7 +48,9 @@ impl Taken {
             };
             let value = value.trim().trim_matches('"');
             match key.trim() {
-                "decisions" => self.decisions.extend(range(value.trim_start_matches('D'))),
+                "decisions" => {
+                    self.decisions.extend(range(value.trim_start_matches('D')))
+                }
                 "adrs" => self.adrs.extend(range(value)),
                 _ => {}
             }
@@ -69,8 +72,9 @@ pub fn run(args: &[String]) -> Result<(), String> {
         "next" => {
             let taken = taken_everywhere()?;
             say(&format!(
-                "Next free: ADR {:04}, D{}.\nPush the branch with the new record \
-                 right away; that is what claims the numbers.",
+                "Next free: ADR {:04}, D{}.\n\
+                 Push the branch with the new record right away; that is what \
+                 claims the numbers.",
                 taken.next_adr(),
                 taken.next_decision()
             ));
@@ -96,10 +100,13 @@ fn new_record(args: &[String]) -> Result<(), String> {
                     .ok_or("--decisions takes a number from 1 to 6")?;
             }
             "--issue" => {
-                let value = args.next().ok_or("--issue takes an issue number")?;
+                let value =
+                    args.next().ok_or("--issue takes an issue number")?;
                 issue = Some(value.trim_start_matches('#').to_owned());
             }
-            other if slug.is_none() && is_slug(other) => slug = Some(other.to_owned()),
+            other if slug.is_none() && is_slug(other) => {
+                slug = Some(other.to_owned())
+            }
             _ => return Err(USAGE.to_owned()),
         }
     }
@@ -110,16 +117,19 @@ fn new_record(args: &[String]) -> Result<(), String> {
     let taken = taken_everywhere()?;
     let adr = taken.next_adr();
     let first = taken.next_decision();
-    let decisions: Vec<String> = (first..first + count).map(|d| format!("D{d}")).collect();
+    let decisions: Vec<String> =
+        (first..first + count).map(|d| format!("D{d}")).collect();
 
     let template = std::fs::read_to_string(root.join(TEMPLATE))
         .map_err(|error| format!("could not read {TEMPLATE}: {error}"))?;
-    let text = fill_template(&template, adr, &decisions, issue.as_deref(), &today()?);
+    let text =
+        fill_template(&template, adr, &decisions, issue.as_deref(), &today()?);
     let path = root.join(format!("docs/adr/{adr:04}-{slug}.md"));
     if path.exists() {
         return Err(format!("{} already exists", path.display()));
     }
-    std::fs::write(&path, text).map_err(|error| format!("could not write: {error}"))?;
+    std::fs::write(&path, text)
+        .map_err(|error| format!("could not write: {error}"))?;
     say(&format!(
         "Wrote docs/adr/{adr:04}-{slug}.md with {}.\nCommit and push it now to \
          claim the numbers, then record them in the project memory registry.",
@@ -162,7 +172,8 @@ fn fill_template(
             for d in headings.by_ref() {
                 let _ = write!(
                     block,
-                    "\n\n- What is decided.\n- Why, in one line.\n\n### {d}{rest}"
+                    "\n\n- What is decided.\n- Why, in one line.\n\n\
+                        ### {d}{rest}"
                 );
             }
             block
@@ -193,8 +204,8 @@ fn taken_everywhere() -> Result<Taken, String> {
 
     let mut taken = Taken::default();
     let dir = root.join("docs/adr");
-    let entries =
-        std::fs::read_dir(&dir).map_err(|error| format!("could not read docs/adr: {error}"))?;
+    let entries = std::fs::read_dir(&dir)
+        .map_err(|error| format!("could not read docs/adr: {error}"))?;
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().into_owned();
         if let Ok(text) = std::fs::read_to_string(entry.path()) {
@@ -207,7 +218,8 @@ fn taken_everywhere() -> Result<Taken, String> {
     }
 
     // Every record on every branch, read once per distinct blob.
-    let refs = git(&["for-each-ref", "--format=%(refname)", "refs/remotes/origin"])?;
+    let refs =
+        git(&["for-each-ref", "--format=%(refname)", "refs/remotes/origin"])?;
     let mut blobs = BTreeMap::new();
     for reference in refs.lines().filter(|r| !r.ends_with("/HEAD")) {
         let Ok(listing) = git(&["ls-tree", reference, "docs/adr/"]) else {
@@ -242,7 +254,9 @@ fn range(value: &str) -> Vec<u32> {
         first.trim().parse::<u32>(),
         last.trim().trim_start_matches('D').parse::<u32>(),
     ) {
-        (Ok(first), Ok(last)) if first <= last && last - first < 1000 => (first..=last).collect(),
+        (Ok(first), Ok(last)) if first <= last && last - first < 1000 => {
+            (first..=last).collect()
+        }
         _ => Vec::new(),
     }
 }
@@ -262,7 +276,8 @@ fn adr_number(file_name: &str) -> Option<u32> {
 
 /// The D numbers on a record's `- Decisions:` line.
 fn decision_numbers(text: &str) -> Vec<u32> {
-    let Some(line) = text.lines().find(|line| line.starts_with("- Decisions:")) else {
+    let Some(line) = text.lines().find(|line| line.starts_with("- Decisions:"))
+    else {
         return Vec::new();
     };
     line.split(|c: char| !c.is_ascii_alphanumeric())
@@ -333,7 +348,9 @@ mod tests {
     #[test]
     fn reads_decisions_with_and_without_backticks() {
         assert_eq!(
-            decision_numbers("x\n- Decisions: `D138`, D139, D165\n- Issue: #1\n"),
+            decision_numbers(
+                "x\n- Decisions: `D138`, D139, D165\n- Issue: #1\n"
+            ),
             vec![138, 139, 165]
         );
         assert!(decision_numbers("- Issue: #1\n").is_empty());
@@ -362,10 +379,12 @@ mod tests {
 
     #[test]
     fn fills_the_template() {
-        let template = "id: 0\ntitle: \"x\"\n- Date: `YYYY`\n- Decisions: `DNN`\n\
-                        - Issue: `#N`\n## Decisions\n\n### `DNN`: the decision\n\n- a\n";
+        let template = "id: 0\ntitle: \"x\"\n- Date: `YYYY`\n\
+                        - Decisions: `DNN`\n- Issue: `#N`\n## Decisions\n\n\
+                        ### `DNN`: the decision\n\n- a\n";
         let decisions = vec!["D214".to_owned(), "D215".to_owned()];
-        let text = fill_template(template, 49, &decisions, Some("500"), "2026-10-29");
+        let text =
+            fill_template(template, 49, &decisions, Some("500"), "2026-10-29");
         assert!(text.contains("title: \"ADR 0049: Short decision title\""));
         assert!(text.contains("- Decisions: D214, D215\n"));
         assert!(text.contains("- Issue: #500\n"));

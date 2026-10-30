@@ -78,7 +78,8 @@ fn lex(src: &str) -> Result<Vec<Token>, FormulaError> {
             }
             '"' | '\'' => lex_string(&chars, i, c)?,
             c if c.is_ascii_digit()
-                || (c == '.' && at(i + 1).is_some_and(|d| d.is_ascii_digit())) =>
+                || (c == '.'
+                    && at(i + 1).is_some_and(|d| d.is_ascii_digit())) =>
             {
                 lex_number(&chars, i)?
             }
@@ -87,7 +88,8 @@ fn lex(src: &str) -> Result<Vec<Token>, FormulaError> {
                 while at(j).is_some_and(|c| c.is_alphanumeric() || c == '_') {
                     j += 1;
                 }
-                let word: String = chars.get(i..j).unwrap_or_default().iter().collect();
+                let word: String =
+                    chars.get(i..j).unwrap_or_default().iter().collect();
                 let tok = match word.to_ascii_lowercase().as_str() {
                     "and" => Tok::Op(BinOp::And),
                     "or" => Tok::Op(BinOp::Or),
@@ -118,7 +120,11 @@ fn lex(src: &str) -> Result<Vec<Token>, FormulaError> {
     Ok(out)
 }
 
-fn lex_string(chars: &[char], start: usize, quote: char) -> Result<(Tok, usize), FormulaError> {
+fn lex_string(
+    chars: &[char],
+    start: usize,
+    quote: char,
+) -> Result<(Tok, usize), FormulaError> {
     let mut text = String::new();
     let mut i = start + 1;
     loop {
@@ -154,7 +160,10 @@ fn lex_string(chars: &[char], start: usize, quote: char) -> Result<(Tok, usize),
     Ok((Tok::Text(text), i + 1 - start))
 }
 
-fn lex_number(chars: &[char], start: usize) -> Result<(Tok, usize), FormulaError> {
+fn lex_number(
+    chars: &[char],
+    start: usize,
+) -> Result<(Tok, usize), FormulaError> {
     let mut i = start;
     let digit = |i: usize| chars.get(i).is_some_and(char::is_ascii_digit);
     while digit(i) {
@@ -219,7 +228,11 @@ impl Parser {
         t
     }
 
-    fn expect(&mut self, want: &Tok, what: &str) -> Result<Token, FormulaError> {
+    fn expect(
+        &mut self,
+        want: &Tok,
+        what: &str,
+    ) -> Result<Token, FormulaError> {
         let t = self.peek();
         if &t.tok == want {
             Ok(self.bump())
@@ -228,7 +241,11 @@ impl Parser {
         }
     }
 
-    fn expr(&mut self, min_prec: u8, depth: usize) -> Result<Node, FormulaError> {
+    fn expr(
+        &mut self,
+        min_prec: u8,
+        depth: usize,
+    ) -> Result<Node, FormulaError> {
         if depth > MAX_DEPTH {
             return Err(FormulaError::new(
                 format!("formula nests deeper than {MAX_DEPTH} levels"),
@@ -250,7 +267,8 @@ impl Parser {
             let _ = self.bump();
             let rhs = self.expr(prec, depth + 1)?;
             let span = lhs.span.to(rhs.span);
-            lhs = Node::new(Expr::Binary(op, Box::new(lhs), Box::new(rhs)), span);
+            lhs =
+                Node::new(Expr::Binary(op, Box::new(lhs), Box::new(rhs)), span);
         }
         Ok(lhs)
     }
@@ -265,11 +283,17 @@ impl Parser {
             Tok::False => Node::new(Expr::Bool(false), span),
             Tok::Minus => {
                 let e = self.expr(6, depth + 1)?;
-                Node::new(Expr::Unary(UnOp::Neg, Box::new(e.clone())), span.to(e.span))
+                Node::new(
+                    Expr::Unary(UnOp::Neg, Box::new(e.clone())),
+                    span.to(e.span),
+                )
             }
             Tok::Not => {
                 let e = self.expr(2, depth + 1)?;
-                Node::new(Expr::Unary(UnOp::Not, Box::new(e.clone())), span.to(e.span))
+                Node::new(
+                    Expr::Unary(UnOp::Not, Box::new(e.clone())),
+                    span.to(e.span),
+                )
             }
             Tok::LParen => {
                 let e = self.expr(0, depth + 1)?;
@@ -283,14 +307,21 @@ impl Parser {
                     Node::new(Expr::Prop(name), span)
                 }
             }
-            Tok::End => return Err(FormulaError::new("formula ends too early", span)),
+            Tok::End => {
+                return Err(FormulaError::new("formula ends too early", span));
+            }
             Tok::Op(_) | Tok::RParen | Tok::Comma => {
                 return Err(FormulaError::new("expected a value", span));
             }
         })
     }
 
-    fn call(&mut self, name: &str, name_span: Span, depth: usize) -> Result<Node, FormulaError> {
+    fn call(
+        &mut self,
+        name: &str,
+        name_span: Span,
+        depth: usize,
+    ) -> Result<Node, FormulaError> {
         let _ = self.bump(); // (
         if name.eq_ignore_ascii_case("prop") {
             let arg = self.bump();

@@ -38,11 +38,20 @@ interface WorkerScope {
   readonly clients: ClientsLike & { claim(): Promise<void> };
   readonly registration: ServiceWorkerRegistration;
   skipWaiting(): Promise<void>;
-  addEventListener(type: "install" | "activate", listener: (event: ExtendableEvent) => void): void;
+  addEventListener(
+    type: "install" | "activate",
+    listener: (event: ExtendableEvent) => void,
+  ): void;
   addEventListener(type: "fetch", listener: (event: FetchEvent) => void): void;
   addEventListener(type: "push", listener: (event: PushEvent) => void): void;
-  addEventListener(type: "notificationclick", listener: (event: NotificationEvent) => void): void;
-  addEventListener(type: "message", listener: (event: MessageEvent) => void): void;
+  addEventListener(
+    type: "notificationclick",
+    listener: (event: NotificationEvent) => void,
+  ): void;
+  addEventListener(
+    type: "message",
+    listener: (event: MessageEvent) => void,
+  ): void;
 }
 
 const scope = globalThis as unknown as WorkerScope;
@@ -54,12 +63,15 @@ scope.addEventListener("install", (event) => {
 });
 
 scope.addEventListener("activate", (event) => {
-  event.waitUntil(activateShell(caches, manifest).then(() => scope.clients.claim()));
+  event.waitUntil(
+    activateShell(caches, manifest).then(() => scope.clients.claim()),
+  );
 });
 
 // Only pages of this origin can message their worker, but check anyway.
 scope.addEventListener("message", (event) => {
-  if (event.origin === origin && event.data === "skip-waiting") void scope.skipWaiting();
+  if (event.origin === origin && event.data === "skip-waiting")
+    void scope.skipWaiting();
 });
 
 scope.addEventListener("fetch", (event) => {
@@ -88,6 +100,9 @@ scope.addEventListener("push", (event) => {
 
 scope.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const path = typeof event.notification.data === "string" ? event.notification.data : "/inbox";
+  const path =
+    typeof event.notification.data === "string"
+      ? event.notification.data
+      : "/inbox";
   event.waitUntil(openNotice(scope.clients, origin, path));
 });

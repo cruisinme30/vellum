@@ -22,8 +22,8 @@ use vellum_api::config::GatewayConfig;
 use vellum_api::gateway::{Gateway, GatewayBuilder, SharedLimit};
 use vellum_api::security::csrf_token;
 use vellum_contracts::{
-    BoxFuture, CredentialKind, HttpMethod, Operation, Principal, Readiness, Scope, ScopeSet,
-    Service,
+    BoxFuture, CredentialKind, HttpMethod, Operation, Principal, Readiness,
+    Scope, ScopeSet, Service,
 };
 use vellum_kernel::{Error, ErrorKind, Timestamp, UserId};
 
@@ -97,7 +97,10 @@ impl Service for Notes {
                 |ctx, input: GetNote| async move {
                     let _ = ctx.principal.require_user()?;
                     if input.id == 404 {
-                        return Err(Error::new(ErrorKind::NotFound, "no such note"));
+                        return Err(Error::new(
+                            ErrorKind::NotFound,
+                            "no such note",
+                        ));
                     }
                     let text = format!("note {} in {}", input.id, input.space);
                     let text = if input.shout == Some(true) {
@@ -168,7 +171,10 @@ impl Service for Notes {
                 "/v1/notes/broken",
                 Scope::Read,
                 |_ctx, _input: Empty| async {
-                    Err::<Count, _>(Error::new(ErrorKind::Unavailable, "disk on fire"))
+                    Err::<Count, _>(Error::new(
+                        ErrorKind::Unavailable,
+                        "disk on fire",
+                    ))
                 },
             ),
         ]
@@ -221,19 +227,22 @@ impl Authenticator for FakeAuth {
                     user,
                     CredentialKind::ApiToken,
                     ScopeSet::FULL,
-                    Timestamp::from_unix_ms(1).unwrap_or_else(|_| Timestamp::now()),
+                    Timestamp::from_unix_ms(1)
+                        .unwrap_or_else(|_| Timestamp::now()),
                 ),
                 csrf_binding: None,
             }),
-            "" if header("cookie").contains("vellum_session=ok") => Ok(Authenticated {
-                principal: Principal::user(
-                    user,
-                    CredentialKind::Session,
-                    ScopeSet::FULL,
-                    Timestamp::now(),
-                ),
-                csrf_binding: Some(BINDING),
-            }),
+            "" if header("cookie").contains("vellum_session=ok") => {
+                Ok(Authenticated {
+                    principal: Principal::user(
+                        user,
+                        CredentialKind::Session,
+                        ScopeSet::FULL,
+                        Timestamp::now(),
+                    ),
+                    csrf_binding: Some(BINDING),
+                })
+            }
             "" => Ok(Authenticated::anonymous()),
             _ => Err(Error::new(ErrorKind::Unauthenticated, "invalid token")),
         };
@@ -247,7 +256,10 @@ fn config() -> GatewayConfig {
     c
 }
 
-fn gateway_with(config: GatewayConfig, ready: Readiness) -> Result<(Gateway, Arc<Notes>), Error> {
+fn gateway_with(
+    config: GatewayConfig,
+    ready: Readiness,
+) -> Result<(Gateway, Arc<Notes>), Error> {
     let notes = Arc::new(Notes {
         created: AtomicUsize::new(0),
         ready,
@@ -307,7 +319,11 @@ fn get(uri: &str, auth: &str) -> Result<Request<Body>, http::Error> {
     b.body(Body::empty())
 }
 
-fn post_json(uri: &str, auth: &str, body: &Value) -> Result<Request<Body>, http::Error> {
+fn post_json(
+    uri: &str,
+    auth: &str,
+    body: &Value,
+) -> Result<Request<Body>, http::Error> {
     let mut b = Request::post(uri)
         .header("host", "vellum.northstar.dev")
         .header("content-type", "application/json");
@@ -328,12 +344,20 @@ async fn rest_round_trip_matches_the_openapi_schema() -> TestResult {
     assert_eq!(reply.status, StatusCode::OK, "{}", reply.text);
     assert_eq!(
         reply.body,
-        json!({"id": 7, "text": "NOTE 7 IN ENG", "labels": ["a"], "priority": "high"})
+        json!({
+            "id": 7,
+            "text": "NOTE 7 IN ENG",
+            "labels": ["a"],
+            "priority": "high"
+        })
     );
     // The response validates against the schema the OpenAPI document promises.
     let doc = gw.openapi();
     let schema_ref = doc
-        .pointer("/paths/~1v1~1spaces~1{space}~1notes~1{id}/get/responses/200/content/application~1json/schema/$ref")
+        .pointer(
+            "/paths/~1v1~1spaces~1{space}~1notes~1{id}/get/responses/200/c\
+            ontent/application~1json/schema/$ref",
+        )
         .and_then(Value::as_str)
         .ok_or("no response schema")?;
     let name = schema_ref.trim_start_matches("#/components/schemas/");
@@ -356,7 +380,8 @@ async fn rest_round_trip_matches_the_openapi_schema() -> TestResult {
 #[tokio::test]
 async fn revalidated_queries_answer_304_for_their_etag() -> TestResult {
     let (gw, _) = gateway()?;
-    let first = send(&gw, get("/api/v1/spaces/eng/notes/7", "Bearer read")?).await?;
+    let first =
+        send(&gw, get("/api/v1/spaces/eng/notes/7", "Bearer read")?).await?;
     assert_eq!(first.status, StatusCode::OK, "{}", first.text);
     let tag = first
         .headers
@@ -458,7 +483,8 @@ async fn openapi_document_is_valid_3_1() -> TestResult {
 async fn scopes_and_authentication() -> TestResult {
     let (gw, _) = gateway()?;
     let body = json!({"text": "hi"});
-    let anon = send(&gw, post_json("/api/v1/spaces/eng/notes", "", &body)?).await?;
+    let anon =
+        send(&gw, post_json("/api/v1/spaces/eng/notes", "", &body)?).await?;
     assert_eq!(anon.status, StatusCode::UNAUTHORIZED);
     assert_eq!(anon.body.get("code"), Some(&json!("unauthenticated")));
     assert!(
@@ -488,9 +514,11 @@ async fn scopes_and_authentication() -> TestResult {
     );
     let open = send(&gw, get("/api/v1/notes/count", "")?).await?;
     assert_eq!(open.status, StatusCode::OK, "anonymous-friendly operation");
-    let invalid = send(&gw, get("/api/v1/spaces/eng/notes/x", "Bearer read")?).await?;
+    let invalid =
+        send(&gw, get("/api/v1/spaces/eng/notes/x", "Bearer read")?).await?;
     assert_eq!(invalid.status, StatusCode::BAD_REQUEST);
-    let missing = send(&gw, get("/api/v1/spaces/eng/notes/404", "Bearer read")?).await?;
+    let missing =
+        send(&gw, get("/api/v1/spaces/eng/notes/404", "Bearer read")?).await?;
     assert_eq!(missing.status, StatusCode::NOT_FOUND);
     let nowhere = send(&gw, get("/api/v1/nowhere", "Bearer read")?).await?;
     assert_eq!(nowhere.status, StatusCode::NOT_FOUND);
@@ -640,7 +668,8 @@ async fn timeouts_and_circuit_breaker() -> TestResult {
         assert_eq!(r.status, StatusCode::SERVICE_UNAVAILABLE);
         assert_eq!(r.body.get("message"), Some(&json!("disk on fire")));
     }
-    let fast_fail = send(&gw, get("/api/v1/spaces/eng/notes/1", "Bearer read")?).await?;
+    let fast_fail =
+        send(&gw, get("/api/v1/spaces/eng/notes/1", "Bearer read")?).await?;
     assert_eq!(fast_fail.status, StatusCode::SERVICE_UNAVAILABLE);
     assert_eq!(
         fast_fail.body.get("message"),
@@ -737,14 +766,16 @@ async fn health_and_readiness() -> TestResult {
         "still alive while draining"
     );
 
-    let (down, _) = gateway_with(config(), Readiness::NotReady("index rebuilding".into()))?;
+    let (down, _) =
+        gateway_with(config(), Readiness::NotReady("index rebuilding".into()))?;
     let reply = send(&down, get("/readyz", "")?).await?;
     assert_eq!(reply.status, StatusCode::SERVICE_UNAVAILABLE);
     assert_eq!(
         reply.body.pointer("/services/notes/reason"),
         Some(&json!("index rebuilding"))
     );
-    let (degraded, _) = gateway_with(config(), Readiness::Degraded("blob store down".into()))?;
+    let (degraded, _) =
+        gateway_with(config(), Readiness::Degraded("blob store down".into()))?;
     assert_eq!(
         send(&degraded, get("/readyz", "")?).await?.status,
         StatusCode::OK
@@ -845,22 +876,39 @@ async fn graphql_covers_every_operation() -> TestResult {
     ] {
         assert!(sdl.contains(needle), "SDL lacks `{needle}`:\n{sdl}");
     }
-    let gql = |query: &str, auth: &str| post_json("/api/graphql", auth, &json!({ "query": query }));
+    let gql = |query: &str, auth: &str| {
+        post_json("/api/graphql", auth, &json!({ "query": query }))
+    };
     let read = send(
         &gw,
         gql(
-            r#"{ notesGet(input: {space: "eng", id: 3}) { id text priority labels } }"#,
+            concat!(
+                r#"{ notesGet(input: {space: "eng", id: 3}) { id text "#,
+                r#"priority labels } }"#,
+            ),
             "Bearer read",
         )?,
     )
     .await?;
     assert_eq!(
         read.body,
-        json!({"data": {"notesGet": {"id": 3, "text": "note 3 in eng", "priority": "high", "labels": ["a"]}}}),
+        json!({
+            "data": {
+                "notesGet": {
+                    "id": 3,
+                    "text": "note 3 in eng",
+                    "priority": "high",
+                    "labels": ["a"]
+                }
+            }
+        }),
         "{}",
         read.text
     );
-    let created = send(&gw, gql(r#"mutation { notesCreate(input: {space: "eng", text: "via graphql", labels: ["x"]}) { id text } }"#, "Bearer full")?).await?;
+    let created = send(&gw, gql(concat!(
+        r#"mutation { notesCreate(input: {space: "eng", text: "via graphql", "#,
+        r#"labels: ["x"]}) { id text } }"#,
+    ), "Bearer full")?).await?;
     assert_eq!(
         created.body.pointer("/data/notesCreate/text"),
         Some(&json!("via graphql")),
@@ -871,7 +919,10 @@ async fn graphql_covers_every_operation() -> TestResult {
     let denied = send(
         &gw,
         gql(
-            r#"mutation { notesCreate(input: {space: "eng", text: "no"}) { id } }"#,
+            concat!(
+                r#"mutation { notesCreate(input: {space: "eng", text: "no"}) "#,
+                r#"{ id } }"#,
+            ),
             "Bearer read",
         )?,
     )
@@ -888,10 +939,13 @@ async fn graphql_covers_every_operation() -> TestResult {
             .pointer("/errors/0/extensions/request_id")
             .is_some()
     );
-    let count = send(&gw, gql("{ notesCount { created } apiVersion }", "")?).await?;
+    let count =
+        send(&gw, gql("{ notesCount { created } apiVersion }", "")?).await?;
     assert_eq!(
         count.body,
-        json!({"data": {"notesCount": {"created": 1}, "apiVersion": "1.0.0-test"}})
+        json!({
+            "data": {"notesCount": {"created": 1}, "apiVersion": "1.0.0-test"}
+        })
     );
     let sdl_reply = send(&gw, get("/api/graphql/schema.graphql", "")?).await?;
     assert!(sdl_reply.text.contains("type Mutation"));
@@ -919,7 +973,8 @@ async fn public_origin_is_separate() -> TestResult {
     assert!(h("content-security-policy").contains("sandbox"));
     assert_eq!(h("referrer-policy"), "no-referrer");
     assert!(!reply.text.contains("<script"));
-    // The API is not reachable on the public origin, and shares not on the app origin.
+    // The API is not reachable on the public origin, and shares not on the app
+    // origin.
     let api = Request::get("/api/v1/notes/count")
         .header("host", "pages.northstar.dev")
         .body(Body::empty())?;

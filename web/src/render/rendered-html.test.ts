@@ -18,20 +18,25 @@ function fakeApi() {
   return { api, stylesheet };
 }
 
-const sheets = () => [...document.head.querySelectorAll("style")].map((s) => s.textContent);
+const sheets = () =>
+  [...document.head.querySelectorAll("style")].map((s) => s.textContent);
 
 describe("ensureRenderStylesheet", () => {
-  it("loads one sheet per accent colour and swaps it when the accent changes (D302)", async () => {
-    const { api, stylesheet } = fakeApi();
-    await ensureRenderStylesheet(api);
-    await ensureRenderStylesheet(api);
-    expect(stylesheet).toHaveBeenCalledTimes(1);
-    expect(sheets()).toEqual([".vl-render { --seed: none; }"]);
+  it(
+    "loads one sheet per accent colour and swaps it when the accent changes " +
+      "(D302)",
+    async () => {
+      const { api, stylesheet } = fakeApi();
+      await ensureRenderStylesheet(api);
+      await ensureRenderStylesheet(api);
+      expect(stylesheet).toHaveBeenCalledTimes(1);
+      expect(sheets()).toEqual([".vl-render { --seed: none; }"]);
 
-    await ensureRenderStylesheet(api, "#c2185b");
-    expect(stylesheet).toHaveBeenLastCalledWith("#c2185b");
-    expect(sheets()).toEqual([".vl-render { --seed: #c2185b; }"]);
-  });
+      await ensureRenderStylesheet(api, "#c2185b");
+      expect(stylesheet).toHaveBeenLastCalledWith("#c2185b");
+      expect(sheets()).toEqual([".vl-render { --seed: #c2185b; }"]);
+    },
+  );
 
   it("keeps only the newest accent when answers arrive out of order", async () => {
     const { api } = fakeApi();

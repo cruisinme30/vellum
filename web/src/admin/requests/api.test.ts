@@ -12,7 +12,14 @@ describe("admin requests API", () => {
       Promise.resolve(Response.json({ requests: [SUMMARY] })),
     );
     const rows = await fetchRequests(
-      { route: "/a", minDurationMs: 50, errorsOnly: true, id: "req-1", before: 9, limit: 20 },
+      {
+        route: "/a",
+        minDurationMs: 50,
+        errorsOnly: true,
+        id: "req-1",
+        before: 9,
+        limit: 20,
+      },
       doFetch,
     );
     expect(rows).toEqual([SUMMARY]);
@@ -28,17 +35,26 @@ describe("admin requests API", () => {
   it("fetches one trace", async () => {
     const doFetch = vi.fn(() => Promise.resolve(Response.json(TRACE)));
     expect(await fetchTrace("abc/def", doFetch)).toEqual(TRACE);
-    expect(doFetch).toHaveBeenCalledWith(`${REQUESTS_PATH}/abc%2Fdef`, expect.any(Object));
+    expect(doFetch).toHaveBeenCalledWith(
+      `${REQUESTS_PATH}/abc%2Fdef`,
+      expect.any(Object),
+    );
   });
 
   it("reports HTTP and network failures with the request id", async () => {
-    const notFound = vi.fn(() => Promise.resolve(new Response("", { status: 404 })));
-    const error = await fetchTrace("x", notFound).catch((error_: unknown) => error_);
+    const notFound = vi.fn(() =>
+      Promise.resolve(new Response("", { status: 404 })),
+    );
+    const error = await fetchTrace("x", notFound).catch(
+      (error_: unknown) => error_,
+    );
     expect(error).toBeInstanceOf(AdminApiError);
     expect((error as AdminApiError).status).toBe(404);
     expect((error as AdminApiError).requestId).toMatch(/-/);
     const offline = vi.fn(() => Promise.reject(new Error("offline")));
-    const networkError = await fetchRequests({}, offline).catch((error_: unknown) => error_);
+    const networkError = await fetchRequests({}, offline).catch(
+      (error_: unknown) => error_,
+    );
     expect((networkError as AdminApiError).status).toBe(0);
   });
 });

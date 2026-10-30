@@ -73,10 +73,17 @@ export interface CommentsApi {
   editComment(commentId: string, body: string): Promise<ThreadOut | undefined>;
   deleteComment(commentId: string): Promise<ThreadOut | undefined>;
   /** Adds (`on`) or takes back a reaction. */
-  react(commentId: string, emoji: string, on: boolean): Promise<ThreadOut | undefined>;
+  react(
+    commentId: string,
+    emoji: string,
+    on: boolean,
+  ): Promise<ThreadOut | undefined>;
   resolve(threadId: string, resolved: boolean): Promise<ThreadOut | undefined>;
   /** Assigns the thread to a handle; `undefined` unassigns. */
-  assign(threadId: string, assignee: string | undefined): Promise<ThreadOut | undefined>;
+  assign(
+    threadId: string,
+    assignee: string | undefined,
+  ): Promise<ThreadOut | undefined>;
 }
 
 /** How to list issues: the settings a view saves. */
@@ -97,7 +104,10 @@ export type TriageDecision =
   | { readonly action: "duplicate"; readonly duplicate_of: string }
   | { readonly action: "snooze"; readonly until: string };
 
-/** Which of my issues: assigned (in focus order), created, subscribed or recent activity. */
+/**
+ * Which of my issues: assigned (in focus order), created, subscribed or recent
+ * activity.
+ */
 export type MyIssuesTab = "assigned" | "created" | "subscribed" | "activity";
 
 /** Changes to a task; a field left out stays as it is. */
@@ -123,8 +133,8 @@ export interface WorkApi extends CommentsApi {
    */
   move(task: string, to: string): Promise<TaskView>;
   /**
-   * Changes a checklist task. `title` is kept as written, not parsed;
-   * `block` is a time block `YYYY-MM-DDTHH:MM/minutes` (R-MW-9), `""` clears it.
+   * Changes a checklist task. `title` is kept as written, not parsed; `block`
+   * is a time block `YYYY-MM-DDTHH:MM/minutes` (R-MW-9), `""` clears it.
    */
   update(task: string, changes: TaskChanges): Promise<TaskView>;
   /** The person's lists and the lists shared with them (R-MW-7). */
@@ -149,18 +159,25 @@ export interface WorkApi extends CommentsApi {
   teams(options?: { readonly includeArchived?: boolean }): Promise<TeamOut[]>;
   /** A team's open issues, most important first. */
   issues(team: string): Promise<IssueOut[]>;
-  /** Issues whose title contains `query`, or the issue with that key, at most 8. */
+  /**
+   * Issues whose title contains `query`, or the issue with that key, at most 8.
+   */
   searchIssues(query: string): Promise<IssueOut[]>;
   issue(key: string): Promise<IssueOut>;
   createIssue(issue: NewIssue): Promise<IssueOut>;
-  /** Files an issue and says which chip to write where (from a page selection). */
+  /**
+   * Files an issue and says which chip to write where (from a page selection).
+   */
   fileIssue(issue: NewIssue): Promise<CreatedIssue>;
   setState(key: string, state: string): Promise<IssueOut>;
   /** Changes an issue's priority (0 none, 1 urgent … 4 low). */
   setPriority(key: string, priority: number): Promise<IssueOut>;
   /** An issue's comments, oldest first, across its threads. */
   comments(key: string): Promise<CommentOut[]>;
-  /** Comments on an issue; `assignTo` gives the thread to that person as a task ("assign to"). */
+  /**
+   * Comments on an issue; `assignTo` gives the thread to that person as a task
+   * ("assign to").
+   */
   addComment(key: string, body: string, assignTo?: string): Promise<void>;
   /**
    * Links the Slack account behind a code from Slack's "Save as task"
@@ -214,16 +231,24 @@ export function createHttpWorkApi(http: Http): WorkApi {
       await http.send("POST", "/api/v1/my-work/slack-link", { code });
     },
     addTask: (text, list) =>
-      http.send<TaskView>("POST", "/api/v1/tasks", list === undefined ? { text } : { text, list }),
+      http.send<TaskView>(
+        "POST",
+        "/api/v1/tasks",
+        list === undefined ? { text } : { text, list },
+      ),
     parse: (text) => http.get<ParseView>("/api/v1/tasks/parse", { text }),
-    move: (task, to) => http.send<TaskView>("POST", `/api/v1/tasks/${segment(task)}/move`, { to }),
+    move: (task, to) =>
+      http.send<TaskView>("POST", `/api/v1/tasks/${segment(task)}/move`, {
+        to,
+      }),
     update: (task, changes) =>
       http.send<TaskView>("PATCH", `/api/v1/tasks/${segment(task)}`, changes),
     async lists() {
       const found = await http.get<ListsView>("/api/v1/task-lists");
       return found.lists;
     },
-    createList: (title) => http.send<ListView>("POST", "/api/v1/task-lists", { title }),
+    createList: (title) =>
+      http.send<ListView>("POST", "/api/v1/task-lists", { title }),
     shareList(list, member, shared) {
       const members = `/api/v1/task-lists/${segment(list)}/members`;
       const handle = member.replace(/^@/, "");
@@ -233,26 +258,43 @@ export function createHttpWorkApi(http: Http): WorkApi {
     },
     google: () => http.get<GoogleView>("/api/v1/my-work/google"),
     async connectGoogle() {
-      const consent = await http.send<SecretView>("POST", "/api/v1/my-work/google/connect", {});
+      const consent = await http.send<SecretView>(
+        "POST",
+        "/api/v1/my-work/google/connect",
+        {},
+      );
       return consent.value;
     },
-    syncGoogle: () => http.send<SyncView>("POST", "/api/v1/my-work/google/sync", {}),
+    syncGoogle: () =>
+      http.send<SyncView>("POST", "/api/v1/my-work/google/sync", {}),
     async disconnectGoogle() {
       await http.send("DELETE", "/api/v1/my-work/google");
     },
     async setDone(task, done) {
       const path = `/api/v1/tasks/${segment(task)}`;
       if (!done) return http.send<TaskView>("POST", `${path}/reopen`, {});
-      const completed = await http.send<CompleteView>("POST", `${path}/complete`, {});
+      const completed = await http.send<CompleteView>(
+        "POST",
+        `${path}/complete`,
+        {},
+      );
       return completed.task;
     },
     async dismissMention(task) {
       const comment = task.replace(/^mention\./, "");
-      await http.send("POST", `/api/v1/my-work/mentions/${segment(comment)}/dismiss`, {});
+      await http.send(
+        "POST",
+        `/api/v1/my-work/mentions/${segment(comment)}/dismiss`,
+        {},
+      );
     },
     settings: () => http.get<MyWorkSettingsView>("/api/v1/my-work/settings"),
     saveSettings: (settings) =>
-      http.send<MyWorkSettingsView>("PUT", "/api/v1/my-work/settings", settings),
+      http.send<MyWorkSettingsView>(
+        "PUT",
+        "/api/v1/my-work/settings",
+        settings,
+      ),
     async teams(options) {
       const list = await (options?.includeArchived === true
         ? http.get<TeamsOut>(`${WORK}/teams`, { include_archived: "true" })
@@ -277,7 +319,11 @@ export function createHttpWorkApi(http: Http): WorkApi {
         }
       }
       const found = await http.get<IssueGroups>(`${WORK}/issues`, {
-        filter: JSON.stringify({ field: "title", op: "contains", values: [query] }),
+        filter: JSON.stringify({
+          field: "title",
+          op: "contains",
+          values: [query],
+        }),
         group_by: "none",
         limit: 8,
       });
@@ -285,14 +331,23 @@ export function createHttpWorkApi(http: Http): WorkApi {
     },
     issue: (key) => http.get<IssueOut>(issuePath(key)),
     async createIssue(issue) {
-      const created = await http.send<CreatedIssue>("POST", `${WORK}/issues`, issueBody(issue));
+      const created = await http.send<CreatedIssue>(
+        "POST",
+        `${WORK}/issues`,
+        issueBody(issue),
+      );
       return created.issue;
     },
-    fileIssue: (issue) => http.send<CreatedIssue>("POST", `${WORK}/issues`, issueBody(issue)),
-    setState: (key, state) => http.send<IssueOut>("PATCH", issuePath(key), { state }),
-    setPriority: (key, priority) => http.send<IssueOut>("PATCH", issuePath(key), { priority }),
+    fileIssue: (issue) =>
+      http.send<CreatedIssue>("POST", `${WORK}/issues`, issueBody(issue)),
+    setState: (key, state) =>
+      http.send<IssueOut>("PATCH", issuePath(key), { state }),
+    setPriority: (key, priority) =>
+      http.send<IssueOut>("PATCH", issuePath(key), { priority }),
     async comments(key) {
-      const list = await http.get<ThreadsOut>(`${WORK}/comments`, { target: key });
+      const list = await http.get<ThreadsOut>(`${WORK}/comments`, {
+        target: key,
+      });
       return list.threads
         .flatMap((thread) => thread.comments)
         .filter((comment) => !comment.deleted)
@@ -303,7 +358,9 @@ export function createHttpWorkApi(http: Http): WorkApi {
       await http.send(
         "POST",
         `${WORK}/comments`,
-        assign === "" ? { target: key, body } : { target: key, body, assign_to: assign },
+        assign === ""
+          ? { target: key, body }
+          : { target: key, body, assign_to: assign },
       );
     },
     async queryIssues(query) {
@@ -311,11 +368,15 @@ export function createHttpWorkApi(http: Http): WorkApi {
       return found.groups;
     },
     async inbox(team) {
-      const found = await http.get<IssueGroups>(`${WORK}/teams/${segment(team)}/inbox`);
+      const found = await http.get<IssueGroups>(
+        `${WORK}/teams/${segment(team)}/inbox`,
+      );
       return found.groups.flatMap((group) => group.issues);
     },
-    triage: (key, decision) => http.send<IssueOut>("POST", `${issuePath(key)}/triage`, decision),
-    cycles: (team) => http.get<CyclesOut>(`${WORK}/teams/${segment(team)}/cycles`),
+    triage: (key, decision) =>
+      http.send<IssueOut>("POST", `${issuePath(key)}/triage`, decision),
+    cycles: (team) =>
+      http.get<CyclesOut>(`${WORK}/teams/${segment(team)}/cycles`),
     myIssues: (tab) => http.get<MyIssuesOut>(`${WORK}/me/issues`, { tab }),
     async views(team) {
       const found = await http.get<ViewsOut>(
@@ -325,7 +386,8 @@ export function createHttpWorkApi(http: Http): WorkApi {
       return found.views;
     },
     createView: (view) => http.send<ViewOut>("POST", `${WORK}/views`, view),
-    updateView: (id, view) => http.send<ViewOut>("PUT", `${WORK}/views/${segment(id)}`, view),
+    updateView: (id, view) =>
+      http.send<ViewOut>("PUT", `${WORK}/views/${segment(id)}`, view),
     async deleteView(id) {
       await http.send("DELETE", `${WORK}/views/${segment(id)}`);
     },
@@ -361,26 +423,47 @@ export function createHttpWorkApi(http: Http): WorkApi {
         }),
       ),
     reply: (commentId, body) =>
-      threadOf(http.send<CommentResult>("POST", `${WORK}/comments`, { reply_to: commentId, body })),
+      threadOf(
+        http.send<CommentResult>("POST", `${WORK}/comments`, {
+          reply_to: commentId,
+          body,
+        }),
+      ),
     editComment: (commentId, body) =>
-      threadOf(http.send<CommentResult>("PATCH", commentPath(commentId), { body })),
+      threadOf(
+        http.send<CommentResult>("PATCH", commentPath(commentId), { body }),
+      ),
     deleteComment: (commentId) =>
       threadOf(http.send<CommentResult>("DELETE", commentPath(commentId))),
     react: (commentId, emoji, on) =>
       threadOf(
-        http.send<CommentResult>("POST", `${commentPath(commentId)}/reactions`, { emoji, on }),
+        http.send<CommentResult>(
+          "POST",
+          `${commentPath(commentId)}/reactions`,
+          { emoji, on },
+        ),
       ),
     resolve: (threadId, resolved) =>
-      threadOf(http.send<CommentResult>("POST", `${threadPath(threadId)}/resolve`, { resolved })),
+      threadOf(
+        http.send<CommentResult>("POST", `${threadPath(threadId)}/resolve`, {
+          resolved,
+        }),
+      ),
     assign: (threadId, assignee) =>
-      threadOf(http.send<CommentResult>("POST", `${threadPath(threadId)}/assign`, { assignee })),
+      threadOf(
+        http.send<CommentResult>("POST", `${threadPath(threadId)}/assign`, {
+          assignee,
+        }),
+      ),
   };
 }
 
 const commentPath = (id: string) => `${WORK}/comments/${segment(id)}`;
 const threadPath = (id: string) => `${WORK}/threads/${segment(id)}`;
 
-async function threadOf(result: Promise<CommentResult>): Promise<ThreadOut | undefined> {
+async function threadOf(
+  result: Promise<CommentResult>,
+): Promise<ThreadOut | undefined> {
   const { thread } = await result;
   return thread ?? undefined;
 }
@@ -395,7 +478,10 @@ function issueBody(issue: NewIssue) {
   };
 }
 
-/** What an issue chip shows: the title, the state's name and whether it is finished. */
+/**
+ * What an issue chip shows: the title, the state's name and whether it is
+ * finished.
+ */
 export interface IssueChipStatus {
   readonly title: string;
   readonly state: string;
@@ -406,14 +492,18 @@ export interface IssueChipStatus {
  * Looks up issues for live chips (#93), naming each state the way its team
  * does; the team list is fetched once.
  */
-export function issueChipStatus(api: WorkApi): (key: string) => Promise<IssueChipStatus> {
+export function issueChipStatus(
+  api: WorkApi,
+): (key: string) => Promise<IssueChipStatus> {
   let teams: Promise<TeamOut[]> | undefined;
   return async (key) => {
     // An archived team's issues still show their state names.
     teams ??= api.teams({ includeArchived: true }).catch(() => []);
     const [issue, known] = await Promise.all([api.issue(key), teams]);
     const team = known.find((candidate) => candidate.key === issue.team);
-    const state = team?.statuses.find((status) => status.key === issue.state)?.name ?? issue.state;
+    const state =
+      team?.statuses.find((status) => status.key === issue.state)?.name ??
+      issue.state;
     return {
       title: issue.title,
       state,

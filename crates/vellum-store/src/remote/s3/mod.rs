@@ -25,7 +25,9 @@ mod credentials;
 mod list;
 mod sigv4;
 
-pub use credentials::{Container, CredentialSource, InstanceProfile, WebIdentity};
+pub use credentials::{
+    Container, CredentialSource, InstanceProfile, WebIdentity,
+};
 
 use std::{
     sync::{
@@ -40,7 +42,9 @@ use bytes::Bytes;
 use futures::{StreamExt, stream::BoxStream};
 use reqwest::{
     Method, Response, StatusCode, Url,
-    header::{AUTHORIZATION, CONTENT_LENGTH, DATE, ETAG, HeaderMap, LAST_MODIFIED},
+    header::{
+        AUTHORIZATION, CONTENT_LENGTH, DATE, ETAG, HeaderMap, LAST_MODIFIED,
+    },
 };
 use tracing::{Instrument, instrument};
 
@@ -125,15 +129,21 @@ impl S3Config {
     /// # Errors
     /// Returns [`StoreError::Backend`] naming a missing variable, or saying
     /// why `VELLUM_BLOB_URL` is malformed. Secret values are never quoted.
-    pub fn from_vars(var: impl Fn(&str) -> Option<String>) -> StoreResult<Self> {
+    pub fn from_vars(
+        var: impl Fn(&str) -> Option<String>,
+    ) -> StoreResult<Self> {
         let get = |name: &str| var(name).filter(|v| !v.is_empty());
         let require = |name: &str| {
             get(name).ok_or_else(|| {
-                StoreError::Backend(format!("s3: environment variable {name} is not set"))
+                StoreError::Backend(format!(
+                    "s3: environment variable {name} is not set"
+                ))
             })
         };
         let url = require("VELLUM_BLOB_URL")?;
-        let bad_url = |why: &str| StoreError::Backend(format!("s3: VELLUM_BLOB_URL {why}"));
+        let bad_url = |why: &str| {
+            StoreError::Backend(format!("s3: VELLUM_BLOB_URL {why}"))
+        };
         let rest = url
             .strip_prefix("s3://")
             .ok_or_else(|| bad_url("must start with s3://"))?;
@@ -142,7 +152,8 @@ impl S3Config {
             return Err(bad_url("names no bucket"));
         }
         let prefix = prefix.trim_end_matches('/');
-        let region = get("VELLUM_S3_REGION").unwrap_or_else(|| DEFAULT_REGION.to_owned());
+        let region = get("VELLUM_S3_REGION")
+            .unwrap_or_else(|| DEFAULT_REGION.to_owned());
         let (endpoint, addressing) = get("VELLUM_S3_ENDPOINT").map_or_else(
             || {
                 (
@@ -150,7 +161,9 @@ impl S3Config {
                     Addressing::VirtualHosted,
                 )
             },
-            |endpoint| (endpoint.trim_end_matches('/').to_owned(), Addressing::Path),
+            |endpoint| {
+                (endpoint.trim_end_matches('/').to_owned(), Addressing::Path)
+            },
         );
         let on_aws = addressing == Addressing::VirtualHosted;
         let credentials = CredentialSource::from_vars(&var, &region, on_aws)?;
@@ -225,12 +238,18 @@ impl S3Store {
     /// [`StoreError::InvalidPath`] when the prefix is not a valid
     /// [`BlobPath`].
     pub fn new(config: S3Config) -> StoreResult<Self> {
-        let invalid = |why: &str| StoreError::Backend(format!("s3: invalid endpoint: {why}"));
-        let url = Url::parse(&config.endpoint).map_err(|e| invalid(&e.to_string()))?;
+        let invalid = |why: &str| {
+            StoreError::Backend(format!("s3: invalid endpoint: {why}"))
+        };
+        let url = Url::parse(&config.endpoint)
+            .map_err(|e| invalid(&e.to_string()))?;
         if !matches!(url.scheme(), "http" | "https") {
             return Err(invalid("scheme must be http or https"));
         }
-        if url.path() != "/" || url.query().is_some() || url.fragment().is_some() {
+        if url.path() != "/"
+            || url.query().is_some()
+            || url.fragment().is_some()
+        {
             return Err(invalid("must not have a path, query or fragment"));
         }
         if !url.username().is_empty() || url.password().is_some() {
@@ -239,9 +258,11 @@ impl S3Store {
         let host = url.host_str().ok_or_else(|| invalid("no host"))?;
         let bucket = &config.bucket;
         let bucket_ok = !bucket.is_empty()
-            && bucket
-                .bytes()
-                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || matches!(b, b'-' | b'.'));
+            && bucket.bytes().all(|b| {
+                b.is_ascii_lowercase()
+                    || b.is_ascii_digit()
+                    || matches!(b, b'-' | b'.')
+            });
         if !bucket_ok {
             return Err(StoreError::Backend(format!(
                 "s3: invalid bucket name {bucket:?}"
@@ -257,7 +278,9 @@ impl S3Store {
         let origin = format!("{}://{host}", url.scheme());
         let bucket_path = match config.addressing {
             Addressing::VirtualHosted => String::new(),
-            Addressing::Path => format!("/{}", sigv4::uri_encode(bucket, false)),
+            Addressing::Path => {
+                format!("/{}", sigv4::uri_encode(bucket, false))
+            }
         };
         let prefix = config.prefix.map(BlobPath::new).transpose()?;
         Ok(Self(Arc::new(Inner {
@@ -288,7 +311,11 @@ impl S3Store {
 
     /// The non-atomic `IfMatch` check for buckets without conditional
     /// deletes: fails unless the current etag is `want`.
-    async fn check_then(&self, path: &BlobPath, want: &Etag) -> StoreResult<()> {
+    async fn check_then(
+        &self,
+        path: &BlobPath,
+        want: &Etag,
+    ) -> StoreResult<()> {
         let current = self.current(path).await?;
         if current.as_ref() == Some(want) {
             Ok(())
@@ -301,14 +328,20 @@ impl S3Store {
     }
 
     /// Maps a `DeleteObject` response.
-    async fn deleted(&self, path: &BlobPath, response: Response) -> StoreResult<()> {
+    async fn deleted(
+        &self,
+        path: &BlobPath,
+        response: Response,
+    ) -> StoreResult<()> {
         match response.status() {
             s if s.is_success() => Ok(()),
             StatusCode::NOT_FOUND => Err(StoreError::PreconditionFailed {
                 path: path.clone(),
                 current: None,
             }),
-            StatusCode::PRECONDITION_FAILED | StatusCode::CONFLICT => Err(self.changed(path).await),
+            StatusCode::PRECONDITION_FAILED | StatusCode::CONFLICT => {
+                Err(self.changed(path).await)
+            }
             _ => Err(error(path, response).await),
         }
     }
@@ -338,7 +371,9 @@ impl Inner {
     /// minutes of clock skew S3 accepts.
     async fn send(&self, call: Call<'_>) -> StoreResult<Response> {
         let uri = match call.key {
-            Some(key) => format!("{}/{}", self.bucket_path, sigv4::uri_encode(key, true)),
+            Some(key) => {
+                format!("{}/{}", self.bucket_path, sigv4::uri_encode(key, true))
+            }
             None if self.bucket_path.is_empty() => "/".to_owned(),
             None => self.bucket_path.clone(),
         };
@@ -381,17 +416,22 @@ impl Inner {
         self.http
             .send(|| {
                 // reqwest derives `Host` from the URL; it matches `self.host`.
-                let builder = headers.iter().filter(|(n, _)| *n != "host").fold(
-                    self.http.client().request(call.method.clone(), &url),
-                    |b, (n, v)| b.header(*n, *v),
-                );
+                let builder =
+                    headers.iter().filter(|(n, _)| *n != "host").fold(
+                        self.http.client().request(call.method.clone(), &url),
+                        |b, (n, v)| b.header(*n, *v),
+                    );
                 builder.header(AUTHORIZATION, &auth).body(call.body.clone())
             })
             .await
     }
 
     /// Fetches one `ListObjectsV2` page under `prefix`.
-    async fn page(&self, prefix: &str, token: Option<&str>) -> StoreResult<list::Page> {
+    async fn page(
+        &self,
+        prefix: &str,
+        token: Option<&str>,
+    ) -> StoreResult<list::Page> {
         let mut query = vec![
             ("list-type", "2"),
             ("prefix", prefix),
@@ -410,7 +450,10 @@ impl Inner {
         let response = self.send(call).await?;
         let status = response.status();
         let body = response.text().await.map_err(|e| {
-            StoreError::Backend(format!("s3: reading listing: {}", e.without_url()))
+            StoreError::Backend(format!(
+                "s3: reading listing: {}",
+                e.without_url()
+            ))
         })?;
         if !status.is_success() {
             let excerpt = body.get(..body.len().min(300)).unwrap_or(&body);
@@ -419,14 +462,17 @@ impl Inner {
                 excerpt.trim()
             )));
         }
-        list::parse(&body).map_err(|e| StoreError::Backend(format!("s3: bad listing: {e}")))
+        list::parse(&body)
+            .map_err(|e| StoreError::Backend(format!("s3: bad listing: {e}")))
     }
 
     /// Maps a listed key back to a blob path: `None` for keys outside the
     /// prefix, temporary files and keys that are not valid [`BlobPath`]s.
     fn blob_path(&self, key: &str) -> Option<BlobPath> {
         let rel = match &self.prefix {
-            Some(prefix) => key.strip_prefix(prefix.as_str())?.strip_prefix('/')?,
+            Some(prefix) => {
+                key.strip_prefix(prefix.as_str())?.strip_prefix('/')?
+            }
             None => key,
         };
         // `BlobPath::new` also rejects the temp prefix, but say so here
@@ -438,7 +484,10 @@ impl Inner {
             return None;
         }
         BlobPath::new(rel)
-            .inspect_err(|e| tracing::debug!(error = %e, "skipping object with an invalid key"))
+            .inspect_err(|e| {
+                tracing::debug!(error = %e, "skipping object with \
+                an invalid key")
+            })
             .ok()
     }
 }
@@ -454,15 +503,24 @@ enum Cursor {
 /// `None`, from `Content-Length`. `modified` is `Last-Modified`, else the
 /// response `Date` (`PutObject` sends no `Last-Modified`; S3 stamps the
 /// object with the request time, which `Date` approximates).
-fn meta_from(path: &BlobPath, headers: &HeaderMap, size: Option<u64>) -> StoreResult<BlobMeta> {
+fn meta_from(
+    path: &BlobPath,
+    headers: &HeaderMap,
+    size: Option<u64>,
+) -> StoreResult<BlobMeta> {
     let text = |name| headers.get(name).and_then(|v| v.to_str().ok());
-    let etag = text(ETAG)
-        .ok_or_else(|| StoreError::Backend(format!("s3: response for {path} has no ETag")))?;
+    let etag = text(ETAG).ok_or_else(|| {
+        StoreError::Backend(format!("s3: response for {path} has no ETag"))
+    })?;
     let size = match size {
         Some(size) => size,
         None => text(CONTENT_LENGTH)
             .and_then(|v| v.parse().ok())
-            .ok_or_else(|| StoreError::Backend(format!("s3: response for {path} has no size")))?,
+            .ok_or_else(|| {
+                StoreError::Backend(format!(
+                    "s3: response for {path} has no size"
+                ))
+            })?,
     };
     let modified = text(LAST_MODIFIED)
         .or_else(|| text(DATE))
@@ -494,10 +552,12 @@ impl BlobStore for S3Store {
             return Err(error(path, response).await);
         }
         let headers = response.headers().clone();
-        let bytes = response
-            .bytes()
-            .await
-            .map_err(|e| StoreError::Backend(format!("s3: reading {path}: {}", e.without_url())))?;
+        let bytes = response.bytes().await.map_err(|e| {
+            StoreError::Backend(format!(
+                "s3: reading {path}: {}",
+                e.without_url()
+            ))
+        })?;
         let meta = meta_from(path, &headers, Some(bytes.len() as u64))?;
         Ok(Blob { bytes, meta })
     }
@@ -512,7 +572,11 @@ impl BlobStore for S3Store {
         meta_from(path, response.headers(), None)
     }
 
-    #[instrument(skip(self, bytes), fields(backend = "s3", path = %path, size = bytes.len()), err)]
+    #[instrument(
+        skip(self, bytes),
+        fields(backend = "s3", path = %path, size = bytes.len()),
+        err
+    )]
     async fn put(
         &self,
         path: &BlobPath,
@@ -526,7 +590,9 @@ impl BlobStore for S3Store {
         let call = match &condition {
             Precondition::None => call,
             Precondition::IfAbsent => call.header("if-none-match", "*"),
-            Precondition::IfMatch(etag) => call.header("if-match", etag.as_str()),
+            Precondition::IfMatch(etag) => {
+                call.header("if-match", etag.as_str())
+            }
         };
         let response = self.0.send(call).await?;
         let status = response.status();
@@ -538,14 +604,18 @@ impl BlobStore for S3Store {
             StatusCode::PRECONDITION_FAILED | StatusCode::CONFLICT
         );
         match condition {
-            Precondition::IfAbsent if refused => Err(StoreError::AlreadyExists(path.clone())),
+            Precondition::IfAbsent if refused => {
+                Err(StoreError::AlreadyExists(path.clone()))
+            }
             Precondition::IfMatch(_) if status == StatusCode::NOT_FOUND => {
                 Err(StoreError::PreconditionFailed {
                     path: path.clone(),
                     current: None,
                 })
             }
-            Precondition::IfMatch(_) if refused => Err(self.changed(path).await),
+            Precondition::IfMatch(_) if refused => {
+                Err(self.changed(path).await)
+            }
             _ => Err(error(path, response).await),
         }
     }
@@ -565,7 +635,11 @@ impl BlobStore for S3Store {
     /// [`StoreError::NotFound`] / [`StoreError::AlreadyExists`]. If the
     /// object vanishes between the two requests the delete still succeeds.
     #[instrument(skip(self), fields(backend = "s3", path = %path), err)]
-    async fn delete(&self, path: &BlobPath, condition: Precondition) -> StoreResult<()> {
+    async fn delete(
+        &self,
+        path: &BlobPath,
+        condition: Precondition,
+    ) -> StoreResult<()> {
         let key = self.key(path);
         let call = Call::object(Method::DELETE, &key);
         let call = match condition {
@@ -577,17 +651,21 @@ impl BlobStore for S3Store {
                 let _ = self.head(path).await?;
                 return Err(StoreError::AlreadyExists(path.clone()));
             }
-            Precondition::IfMatch(etag) if self.0.no_conditional_delete.load(Ordering::Relaxed) => {
+            Precondition::IfMatch(etag)
+                if self.0.no_conditional_delete.load(Ordering::Relaxed) =>
+            {
                 self.check_then(path, &etag).await?;
                 call
             }
             Precondition::IfMatch(etag) => {
-                let response = self.0.send(call.header("if-match", etag.as_str())).await?;
+                let response =
+                    self.0.send(call.header("if-match", etag.as_str())).await?;
                 if response.status() != StatusCode::NOT_IMPLEMENTED {
                     return self.deleted(path, response).await;
                 }
                 tracing::info!(
-                    "bucket rejects If-Match on DeleteObject; checking with HEAD instead"
+                    "bucket rejects If-Match on DeleteObject; checking with \
+                        HEAD instead"
                 );
                 self.0.no_conditional_delete.store(true, Ordering::Relaxed);
                 self.check_then(path, &etag).await?;
@@ -609,8 +687,16 @@ impl BlobStore for S3Store {
     /// returned, so a concurrent edit is never lost. If the process dies
     /// or the delete fails otherwise, both blobs remain with the same
     /// content: the watcher reports that as `Duplicated`.
-    #[instrument(skip(self), fields(backend = "s3", from = %from, to = %to), err)]
-    async fn rename(&self, from: &BlobPath, to: &BlobPath) -> StoreResult<BlobMeta> {
+    #[instrument(
+        skip(self),
+        fields(backend = "s3", from = %from, to = %to),
+        err
+    )]
+    async fn rename(
+        &self,
+        from: &BlobPath,
+        to: &BlobPath,
+    ) -> StoreResult<BlobMeta> {
         let source = self.get(from).await?;
         let moved = self.put(to, source.bytes, Precondition::IfAbsent).await?;
         match self
@@ -623,7 +709,8 @@ impl BlobStore for S3Store {
                     .delete(to, Precondition::IfMatch(moved.etag.clone()))
                     .await;
                 if let Err(undo) = undo {
-                    tracing::warn!(error = %undo, "could not remove the copy of a changed source");
+                    tracing::warn!(error = %undo, "could not remove the copy \
+                        of a changed source");
                 }
                 Err(e)
             }
@@ -631,11 +718,17 @@ impl BlobStore for S3Store {
         }
     }
 
-    fn list(&self, dir: Option<&BlobPath>) -> BoxStream<'static, StoreResult<BlobEntry>> {
+    fn list(
+        &self,
+        dir: Option<&BlobPath>,
+    ) -> BoxStream<'static, StoreResult<BlobEntry>> {
         let inner = Arc::clone(&self.0);
         let dir = dir.cloned();
-        let span =
-            tracing::info_span!("list", backend = "s3", dir = ?dir.as_ref().map(BlobPath::as_str));
+        let span = tracing::info_span!(
+            "list",
+            backend = "s3",
+            dir = ?dir.as_ref().map(BlobPath::as_str)
+        );
         // Listing `<key of dir>` without a trailing slash also finds a blob
         // stored at `dir` itself; siblings such as `dir-2/` are filtered out.
         let prefix = match (&dir, &inner.prefix) {
@@ -644,7 +737,8 @@ impl BlobStore for S3Store {
             (None, None) => String::new(),
         };
         futures::stream::unfold(Cursor::Start, move |cursor| {
-            let (inner, prefix, dir) = (Arc::clone(&inner), prefix.clone(), dir.clone());
+            let (inner, prefix, dir) =
+                (Arc::clone(&inner), prefix.clone(), dir.clone());
             async move {
                 let token = match cursor {
                     Cursor::Start => None,
@@ -661,7 +755,8 @@ impl BlobStore for S3Store {
                     .flatten()
                     .filter_map(|o| {
                         let path = inner.blob_path(&o.key)?;
-                        let inside = dir.as_ref().is_none_or(|d| path.starts_with(d));
+                        let inside =
+                            dir.as_ref().is_none_or(|d| path.starts_with(d));
                         inside.then_some(Ok(BlobEntry {
                             path,
                             size: o.size,
@@ -682,7 +777,11 @@ impl BlobStore for S3Store {
 mod tests {
     use super::*;
 
-    fn config(endpoint: &str, addressing: Addressing, prefix: Option<&str>) -> S3Config {
+    fn config(
+        endpoint: &str,
+        addressing: Addressing,
+        prefix: Option<&str>,
+    ) -> S3Config {
         S3Config {
             endpoint: endpoint.into(),
             region: "us-east-1".into(),
@@ -761,10 +860,11 @@ mod tests {
 
     #[test]
     fn env_errors_name_the_variable_but_not_secrets() {
-        let message = |env: &[(&str, &str)]| match S3Config::from_vars(vars(env)) {
-            Err(e) => e.to_string(),
-            Ok(c) => format!("unexpected success: {c:?}"),
-        };
+        let message =
+            |env: &[(&str, &str)]| match S3Config::from_vars(vars(env)) {
+                Err(e) => e.to_string(),
+                Ok(c) => format!("unexpected success: {c:?}"),
+            };
         let url = ("VELLUM_BLOB_URL", "s3://notes");
         let id = ("AWS_ACCESS_KEY_ID", "AKID");
         let secret = ("AWS_SECRET_ACCESS_KEY", "s3cr3t-value");
@@ -802,7 +902,11 @@ mod tests {
         assert_eq!(s.0.origin, "https://notes.s3.eu-west-1.amazonaws.com");
         assert_eq!(s.0.host, "notes.s3.eu-west-1.amazonaws.com");
         assert_eq!(s.0.bucket_path, "");
-        let s = S3Store::new(config("http://127.0.0.1:4566", Addressing::Path, None))?;
+        let s = S3Store::new(config(
+            "http://127.0.0.1:4566",
+            Addressing::Path,
+            None,
+        ))?;
         assert_eq!(s.0.origin, "http://127.0.0.1:4566");
         assert_eq!(s.0.host, "127.0.0.1:4566");
         assert_eq!(s.0.bucket_path, "/notes");
@@ -811,7 +915,8 @@ mod tests {
 
     #[test]
     fn keys_carry_the_prefix() -> StoreResult<()> {
-        let s = S3Store::new(config("http://h", Addressing::Path, Some("team/a")))?;
+        let s =
+            S3Store::new(config("http://h", Addressing::Path, Some("team/a")))?;
         let path = BlobPath::new("x/Notes – ü.md")?;
         assert_eq!(s.key(&path), "team/a/x/Notes – ü.md");
         assert_eq!(s.0.blob_path("team/a/x/Notes – ü.md"), Some(path));
@@ -823,7 +928,9 @@ mod tests {
 
     #[test]
     fn rejects_bad_configuration() {
-        for endpoint in ["ftp://h", "http://h/path", "http://user:pw@h", "not a url"] {
+        for endpoint in
+            ["ftp://h", "http://h/path", "http://user:pw@h", "not a url"]
+        {
             let got = S3Store::new(config(endpoint, Addressing::Path, None));
             assert!(got.is_err(), "{endpoint}");
         }
@@ -841,7 +948,9 @@ mod tests {
     fn debug_output_hides_secrets() -> StoreResult<()> {
         let s = S3Store::new(config("http://h", Addressing::Path, None))?;
         let debug = format!("{s:?}");
-        assert!(!debug.contains("very-secret") && !debug.contains("session-secret"));
+        assert!(
+            !debug.contains("very-secret") && !debug.contains("session-secret")
+        );
         Ok(())
     }
 

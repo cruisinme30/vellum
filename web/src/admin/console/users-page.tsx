@@ -8,12 +8,21 @@ import { failureText } from "../../data/failure";
 import { useLoaded } from "../../data/use-loaded";
 import { useT } from "../../i18n/i18n";
 
-import { formText, type AdminConsoleApi, type UserChange, type UserView } from "./api";
+import {
+  formText,
+  type AdminConsoleApi,
+  type UserChange,
+  type UserView,
+} from "./api";
 import { AdminScreen } from "./context";
 import { SignInHelp } from "./sign-in-help";
 import type { Submit } from "./space-panel";
 
-const DAY = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" });
+const DAY = new Intl.DateTimeFormat("en", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
 
 /** The form's new account; an empty password makes a single sign-on account. */
 export function newUserFromForm(data: FormData) {
@@ -58,7 +67,11 @@ function CreateUserForm({
       });
   };
   return (
-    <form className="vl-admin-form" aria-labelledby={`${id}-title`} onSubmit={submit}>
+    <form
+      className="vl-admin-form"
+      aria-labelledby={`${id}-title`}
+      onSubmit={submit}
+    >
       <h2 id={`${id}-title`}>{t("admin-users-add")}</h2>
       <label>
         {t("admin-users-name")}
@@ -105,7 +118,8 @@ interface RowProperties {
   readonly busy: boolean;
   readonly onChange: (change: UserChange) => void;
   /** Sign-in help (issue #523); absent without the sign-in API. */
-  readonly onSignInHelp?: ((help: "reset-factors" | "sign-out") => void) | undefined;
+  readonly onSignInHelp?:
+    ((help: "reset-factors" | "sign-out") => void) | undefined;
 }
 
 /** Blocking ends every session, so it asks once more first. */
@@ -139,10 +153,17 @@ function ConfirmBlock({
 }
 
 /** What an admin can do to another account. */
-function RowActions({ user, self, busy, onChange, onSignInHelp }: RowProperties) {
+function RowActions({
+  user,
+  self,
+  busy,
+  onChange,
+  onSignInHelp,
+}: RowProperties) {
   const t = useT();
   const [confirmBlock, setConfirmBlock] = useState(false);
-  if (self) return <span className="vl-muted">{t("admin-users-self-note")}</span>;
+  if (self)
+    return <span className="vl-muted">{t("admin-users-self-note")}</span>;
   if (confirmBlock) {
     return (
       <ConfirmBlock
@@ -161,9 +182,12 @@ function RowActions({ user, self, busy, onChange, onSignInHelp }: RowProperties)
         type="button"
         className="vl-text-button"
         disabled={busy}
-        aria-label={t(user.admin ? "admin-users-demote-label" : "admin-users-promote-label", {
-          name: user.name,
-        })}
+        aria-label={t(
+          user.admin ? "admin-users-demote-label" : "admin-users-promote-label",
+          {
+            name: user.name,
+          },
+        )}
         onClick={() => {
           onChange({ admin: !user.admin });
         }}
@@ -194,9 +218,14 @@ function RowActions({ user, self, busy, onChange, onSignInHelp }: RowProperties)
         type="button"
         className="vl-text-button"
         disabled={busy}
-        aria-label={t(user.disabled ? "admin-users-unblock-label" : "admin-users-block-label", {
-          name: user.name,
-        })}
+        aria-label={t(
+          user.disabled
+            ? "admin-users-unblock-label"
+            : "admin-users-block-label",
+          {
+            name: user.name,
+          },
+        )}
         onClick={() => {
           if (user.disabled) {
             onChange({ disabled: false });
@@ -226,18 +255,30 @@ function UserRow(properties: RowProperties) {
         <div className="vl-muted">@{user.handle}</div>
       </th>
       <td>{user.email}</td>
-      <td>{user.admin ? t("admin-users-role-admin") : t("admin-users-role-member")}</td>
+      <td>
+        {user.admin
+          ? t("admin-users-role-admin")
+          : t("admin-users-role-member")}
+      </td>
       <td>
         {user.disabled ? (
-          <span className="vl-admin-badge vl-admin-badge-off">{t("admin-users-blocked")}</span>
+          <span className="vl-admin-badge vl-admin-badge-off">
+            {t("admin-users-blocked")}
+          </span>
         ) : (
           t("admin-users-active")
         )}
       </td>
       <td>
-        {user.hasPassword ? t("admin-users-by-password") : t("admin-users-by-sso")}
-        {user.secondFactor === true && <div className="vl-muted">{t("admin-users-with-2fa")}</div>}
-        {user.breakGlass === true && <div className="vl-muted">{t("admin-users-break-glass")}</div>}
+        {user.hasPassword
+          ? t("admin-users-by-password")
+          : t("admin-users-by-sso")}
+        {user.secondFactor === true && (
+          <div className="vl-muted">{t("admin-users-with-2fa")}</div>
+        )}
+        {user.breakGlass === true && (
+          <div className="vl-muted">{t("admin-users-break-glass")}</div>
+        )}
       </td>
       <td>{DAY.format(new Date(user.createdAt))}</td>
       <td>
@@ -251,7 +292,8 @@ function UserRow(properties: RowProperties) {
 function ChangeNotice({
   notice,
 }: {
-  readonly notice: { readonly ok: boolean; readonly message: string } | undefined;
+  readonly notice:
+    { readonly ok: boolean; readonly message: string } | undefined;
 }) {
   return (
     <>
@@ -276,7 +318,9 @@ function Users({ api }: { readonly api: AdminConsoleApi }) {
 
   // A change answers with the account as it now is, so the table keeps its
   // place; only a new account reloads it.
-  const [changed, setChanged] = useState<Readonly<Record<string, UserView>>>({});
+  const [changed, setChanged] = useState<Readonly<Record<string, UserView>>>(
+    {},
+  );
   const change = (user: UserView, next: UserChange) => {
     setBusy(user.id);
     setNotice(undefined);
@@ -285,7 +329,10 @@ function Users({ api }: { readonly api: AdminConsoleApi }) {
       .then(
         (updated) => {
           setChanged((before) => ({ ...before, [updated.id]: updated }));
-          setNotice({ ok: true, message: t("admin-users-updated", { name: updated.name }) });
+          setNotice({
+            ok: true,
+            message: t("admin-users-updated", { name: updated.name }),
+          });
         },
         (error: unknown) => {
           setNotice({ ok: false, message: failureText(error) });
@@ -307,12 +354,21 @@ function Users({ api }: { readonly api: AdminConsoleApi }) {
               ? signIn.signOutEverywhere(user.id).then((sessions) => {
                   setNotice({
                     ok: true,
-                    message: t("admin-users-signed-out", { name: user.name, count: sessions }),
+                    message: t("admin-users-signed-out", {
+                      name: user.name,
+                      count: sessions,
+                    }),
                   });
                 })
               : signIn.resetFactors(user.id).then((updated) => {
-                  setChanged((before) => ({ ...before, [updated.id]: updated }));
-                  setNotice({ ok: true, message: t("admin-users-2fa-reset", { name: user.name }) });
+                  setChanged((before) => ({
+                    ...before,
+                    [updated.id]: updated,
+                  }));
+                  setNotice({
+                    ok: true,
+                    message: t("admin-users-2fa-reset", { name: user.name }),
+                  });
                 });
           work
             .catch((error: unknown) => {
@@ -323,12 +379,16 @@ function Users({ api }: { readonly api: AdminConsoleApi }) {
             });
         };
   const users =
-    loaded.state === "ready" ? loaded.value.map((user) => changed[user.id] ?? user) : [];
+    loaded.state === "ready"
+      ? loaded.value.map((user) => changed[user.id] ?? user)
+      : [];
 
   return (
     <>
       <ChangeNotice notice={notice} />
-      {loaded.state === "loading" && <p className="vl-muted">{t("admin-loading")}</p>}
+      {loaded.state === "loading" && (
+        <p className="vl-muted">{t("admin-loading")}</p>
+      )}
       {loaded.state === "failed" && (
         <p className="vl-field-error" role="alert">
           {loaded.message}
@@ -337,7 +397,9 @@ function Users({ api }: { readonly api: AdminConsoleApi }) {
       {loaded.state === "ready" && (
         <div className="vl-admin-scroll">
           <table className="vl-admin-table">
-            <caption>{t("admin-users-caption", { count: users.length })}</caption>
+            <caption>
+              {t("admin-users-caption", { count: users.length })}
+            </caption>
             <thead>
               <tr>
                 <th scope="col">{t("admin-users-name")}</th>
@@ -378,7 +440,10 @@ function Users({ api }: { readonly api: AdminConsoleApi }) {
         <CreateUserForm
           api={api}
           onCreated={(user) => {
-            setNotice({ ok: true, message: t("admin-users-created-notice", { name: user.name }) });
+            setNotice({
+              ok: true,
+              message: t("admin-users-created-notice", { name: user.name }),
+            });
             setChanged({});
             setReload((n) => n + 1);
           }}
@@ -388,7 +453,10 @@ function Users({ api }: { readonly api: AdminConsoleApi }) {
   );
 }
 
-/** Admin → Users: every account, who administers, who is blocked, and new accounts. */
+/**
+ * Admin → Users: every account, who administers, who is blocked, and new
+ * accounts.
+ */
 export function UsersPage() {
   const t = useT();
   return (

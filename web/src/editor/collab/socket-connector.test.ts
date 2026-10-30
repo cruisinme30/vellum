@@ -14,7 +14,9 @@ const text = (session: CollabSession) => session.doc.getText("t").toJSON();
 
 let room: FakeRoom;
 const sessions: CollabSession[] = [];
-const open = (options: { random?: () => number; doneTimeoutMs?: number } = {}) => {
+const open = (
+  options: { random?: () => number; doneTimeoutMs?: number } = {},
+) => {
   const session = createSocketConnector({
     origin: "https://vellum.northstar.dev",
     socket: room.factory,
@@ -41,11 +43,15 @@ describe("collabUrl", () => {
     expect(collabUrl("https://vellum.northstar.dev", "s1", "d1")).toBe(
       "wss://vellum.northstar.dev/collab/s1/d1",
     );
-    expect(collabUrl("http://localhost:5173", "s1", "d1")).toBe("ws://localhost:5173/collab/s1/d1");
+    expect(collabUrl("http://localhost:5173", "s1", "d1")).toBe(
+      "ws://localhost:5173/collab/s1/d1",
+    );
   });
 
   it("keeps IDs inside their path segments", () => {
-    expect(collabUrl("https://a.dev", "../x", "y?z")).toBe("wss://a.dev/collab/..%2Fx/y%3Fz");
+    expect(collabUrl("https://a.dev", "../x", "y?z")).toBe(
+      "wss://a.dev/collab/..%2Fx/y%3Fz",
+    );
   });
 });
 
@@ -55,7 +61,9 @@ describe("socket connector", () => {
     const session = open();
     expect(session.live?.getSnapshot().status).toBe("connecting");
     await session.ready;
-    expect(room.urls).toEqual(["wss://vellum.northstar.dev/collab/01JSPACE/01JPAGE"]);
+    expect(room.urls).toEqual([
+      "wss://vellum.northstar.dev/collab/01JSPACE/01JPAGE",
+    ]);
     expect(room.last.binaryType).toBe("arraybuffer");
     expect(text(session)).toBe("from the server");
     expect(session.live?.getSnapshot().status).toBe("online");
@@ -80,7 +88,9 @@ describe("socket connector", () => {
       document_.getText("t").insert(0, "x");
     });
     expect(text(session)).toBe("x");
-    expect(room.received.filter((m) => m.type === "update")).toHaveLength(before);
+    expect(room.received.filter((m) => m.type === "update")).toHaveLength(
+      before,
+    );
   });
 
   it("may write once the server lists this editor as a writer", async () => {
@@ -143,7 +153,9 @@ describe("socket connector", () => {
     await vi.advanceTimersByTimeAsync(0);
     await session.ready;
     const statuses: string[] = [];
-    session.live?.subscribe(() => statuses.push(session.live?.getSnapshot().status ?? ""));
+    session.live?.subscribe(() =>
+      statuses.push(session.live?.getSnapshot().status ?? ""),
+    );
 
     room.last.drop();
     expect(session.live?.getSnapshot().status).toBe("offline");
@@ -186,7 +198,8 @@ describe("socket connector", () => {
     const session = open();
     await vi.advanceTimersByTimeAsync(0);
     await session.ready;
-    const clock = () => room.awareness.meta.get(session.doc.clientID)?.clock ?? -1;
+    const clock = () =>
+      room.awareness.meta.get(session.doc.clientID)?.clock ?? -1;
     const first = clock();
     expect(first).toBeGreaterThan(0);
     room.last.drop();
@@ -204,7 +217,10 @@ describe("socket connector", () => {
     room.last.drop(4403);
     await vi.advanceTimersByTimeAsync(60_000);
     expect(room.sockets).toHaveLength(1);
-    expect(session.live?.getSnapshot()).toMatchObject({ status: "revoked", canWrite: false });
+    expect(session.live?.getSnapshot()).toMatchObject({
+      status: "revoked",
+      canWrite: false,
+    });
   });
 
   it("forgets other editors' carets when the socket drops", async () => {
@@ -213,7 +229,10 @@ describe("socket connector", () => {
     const other = new Awareness(new Y.Doc());
     other.setLocalState({ user: { name: "Lee" } });
     room.last.deliver([
-      { type: "awareness", update: encodeAwarenessUpdate(other, [other.clientID]) },
+      {
+        type: "awareness",
+        update: encodeAwarenessUpdate(other, [other.clientID]),
+      },
     ]);
     expect(session.awareness.getStates().has(other.clientID)).toBe(true);
     room.last.drop();
@@ -226,8 +245,12 @@ describe("socket connector", () => {
     await session.ready;
     room.last.deliverRaw(Uint8Array.from([0, 0, 9]).buffer);
     room.last.deliverRaw("hello");
-    room.last.deliver([{ type: "custom", tag: MSG_PEERS, payload: Uint8Array.from([9]) }]);
-    room.last.deliver([{ type: "custom", tag: 120, payload: Uint8Array.from([1]) }]);
+    room.last.deliver([
+      { type: "custom", tag: MSG_PEERS, payload: Uint8Array.from([9]) },
+    ]);
+    room.last.deliver([
+      { type: "custom", tag: 120, payload: Uint8Array.from([1]) },
+    ]);
     room.edit((document_) => {
       document_.getText("t").insert(0, "still fine");
     });
@@ -240,7 +263,9 @@ describe("socket connector", () => {
     await session.ready;
     const before = room.received.filter((m) => m.type === "awareness").length;
     room.last.deliver([{ type: "awareness-query" }]);
-    expect(room.received.filter((m) => m.type === "awareness")).toHaveLength(before + 1);
+    expect(room.received.filter((m) => m.type === "awareness")).toHaveLength(
+      before + 1,
+    );
   });
 
   it("treats an auth denial as revoked", async () => {
@@ -258,12 +283,16 @@ describe("socket connector", () => {
     await vi.advanceTimersByTimeAsync(0);
     await session.ready;
     const socket = room.last;
-    const awarenessBefore = room.received.filter((m) => m.type === "awareness").length;
+    const awarenessBefore = room.received.filter(
+      (m) => m.type === "awareness",
+    ).length;
     sessions.splice(0);
     session.destroy();
     expect(socket.closedWith).toBe(1000);
     // The caret's removal went out before the close.
-    expect(room.received.filter((m) => m.type === "awareness")).toHaveLength(awarenessBefore + 1);
+    expect(room.received.filter((m) => m.type === "awareness")).toHaveLength(
+      awarenessBefore + 1,
+    );
     socket.drop(1000);
     await vi.advanceTimersByTimeAsync(60_000);
     expect(room.sockets).toHaveLength(1);

@@ -44,12 +44,14 @@ pub use trace_id::{ParseError, SpanId, TraceId, TraceParent};
 /// other threads that hit the same callsites without one can otherwise
 /// leave them cached as uninteresting.
 #[cfg(test)]
-pub(crate) static TRACING_TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+pub(crate) static TRACING_TEST_LOCK: tokio::sync::Mutex<()> =
+    tokio::sync::Mutex::const_new(());
 
 /// The recording layer with default limits, writing into `store`.
 ///
 /// Install it next to the kernel's telemetry layers:
-/// `vellum_kernel::telemetry::init_with(&config, Some(Box::new(recorder_layer(store))))`.
+/// `vellum_kernel::telemetry::init_with(&config,
+/// Some(Box::new(recorder_layer(store))))`.
 #[must_use]
 pub fn recorder_layer(store: Arc<TraceStore>) -> RequestRecorder {
     RequestRecorder::new(store, RecorderConfig::default())

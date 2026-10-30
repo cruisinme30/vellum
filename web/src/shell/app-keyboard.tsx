@@ -14,7 +14,11 @@ import { searchTitles } from "../data/search";
 import { useWorkspace } from "../data/workspace-context";
 import type { PageFinder } from "../keyboard/command-menu";
 import { KeyboardRoot } from "../keyboard/keyboard-root";
-import { APP_DESTINATIONS, workCommands, type Destination } from "../keyboard/work-commands";
+import {
+  APP_DESTINATIONS,
+  workCommands,
+  type Destination,
+} from "../keyboard/work-commands";
 import { useQuickAdd } from "../work/quick-add";
 
 /** Where the app's `G` chords go. */

@@ -46,7 +46,10 @@ const DEFAULT_USER = "01M6409GN2EYWS8Z7NFQQ3JNWZ";
  * and answers Done.
  */
 export function fakeRoom(
-  options: { paragraph?: string; fences?: readonly { lang: string; source: string }[] } = {},
+  options: {
+    paragraph?: string;
+    fences?: readonly { lang: string; source: string }[];
+  } = {},
 ): FakeRoom {
   const room = new Y.Doc();
   if (options.paragraph !== undefined) {
@@ -73,7 +76,11 @@ export function fakeRoom(
     type: "custom",
     tag: MSG_PEERS,
     payload: encodePeers(
-      [...clients].map(([clientId, { user, canWrite }]) => ({ clientId, user, canWrite })),
+      [...clients].map(([clientId, { user, canWrite }]) => ({
+        clientId,
+        user,
+        canWrite,
+      })),
     ),
   });
 
@@ -121,7 +128,10 @@ export function fakeRoom(
             switch (message.type) {
               case "sync-step-1": {
                 self.send([
-                  { type: "sync-step-2", update: Y.encodeStateAsUpdate(room, message.stateVector) },
+                  {
+                    type: "sync-step-2",
+                    update: Y.encodeStateAsUpdate(room, message.stateVector),
+                  },
                 ]);
                 break;
               }
@@ -135,7 +145,8 @@ export function fakeRoom(
               }
               case "awareness": {
                 // The first number of an awareness update is its count, then
-                // each entry starts with its client ID; one entry is enough here.
+                // each entry starts with its client ID; one entry is enough
+                // here.
                 const id = readClientId(message.update);
                 if (id !== undefined && !clients.has(id)) {
                   clients.set(id, { user, canWrite });
@@ -150,7 +161,13 @@ export function fakeRoom(
               case "custom": {
                 if (message.tag === MSG_DONE) {
                   dones += 1;
-                  self.send([{ type: "custom", tag: MSG_DONE, payload: new Uint8Array() }]);
+                  self.send([
+                    {
+                      type: "custom",
+                      tag: MSG_DONE,
+                      payload: new Uint8Array(),
+                    },
+                  ]);
                 }
                 break;
               }

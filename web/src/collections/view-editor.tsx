@@ -9,13 +9,27 @@ import { messageOf, useCollections } from "./context";
 import { FormError, SidePanel } from "./side-panel";
 import type { CollectionInfo, PropertyInfo, ViewInfo, ViewKind } from "./types";
 
-const KINDS: readonly ViewKind[] = ["table", "board", "gallery", "calendar", "timeline", "list"];
+const KINDS: readonly ViewKind[] = [
+  "table",
+  "board",
+  "gallery",
+  "calendar",
+  "timeline",
+  "list",
+];
 
 /** Shows `est > 1` as `Estimate > 1`: views store keys, people read names. */
-export function withNames(line: string, properties: readonly PropertyInfo[]): string {
+export function withNames(
+  line: string,
+  properties: readonly PropertyInfo[],
+): string {
   const trimmed = line.trim();
-  const property = properties.find((p) => trimmed === p.key || trimmed.startsWith(`${p.key} `));
-  return property ? `${property.name}${trimmed.slice(property.key.length)}` : trimmed;
+  const property = properties.find(
+    (p) => trimmed === p.key || trimmed.startsWith(`${p.key} `),
+  );
+  return property
+    ? `${property.name}${trimmed.slice(property.key.length)}`
+    : trimmed;
 }
 
 const lines = (text: string) =>
@@ -36,9 +50,18 @@ interface Draft {
   limit: string;
 }
 
-const BLANK: ViewInfo = { name: "", kind: "table", filters: [], sorts: [], hidden: [] };
+const BLANK: ViewInfo = {
+  name: "",
+  kind: "table",
+  filters: [],
+  sorts: [],
+  hidden: [],
+};
 
-function draftOf(view: ViewInfo = BLANK, properties: readonly PropertyInfo[]): Draft {
+function draftOf(
+  view: ViewInfo = BLANK,
+  properties: readonly PropertyInfo[],
+): Draft {
   const named = (items: readonly string[]) =>
     items.map((item) => withNames(item, properties)).join("\n");
   return {
@@ -55,7 +78,8 @@ function draftOf(view: ViewInfo = BLANK, properties: readonly PropertyInfo[]): D
 }
 
 /** `{ [key]: value }`, or nothing for an empty value. */
-const optional = (key: string, value: string) => (value === "" ? {} : { [key]: value });
+const optional = (key: string, value: string) =>
+  value === "" ? {} : { [key]: value };
 
 function PropertySelect({
   label,
@@ -114,9 +138,19 @@ export function ViewEditor({
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => {
     setDraft((d) => ({ ...d, [key]: value }));
   };
-  const dates = info.properties.filter((p) => p.type === "date" || p.type === "created");
+  const dates = info.properties.filter(
+    (p) => p.type === "date" || p.type === "created",
+  );
   const groupable = info.properties.filter((p) =>
-    ["select", "multi", "person", "checkbox", "relation", "text", "date"].includes(p.type),
+    [
+      "select",
+      "multi",
+      "person",
+      "checkbox",
+      "relation",
+      "text",
+      "date",
+    ].includes(p.type),
   );
   const hideable = info.properties.filter((p) => p.type !== "title");
   const timed = draft.kind === "calendar" || draft.kind === "timeline";
@@ -149,7 +183,9 @@ export function ViewEditor({
         store.saveView({
           collection_id: info.id,
           view: view?.name ?? name,
-          ...(view !== undefined && name !== view.name ? { rename_to: name } : {}),
+          ...(view !== undefined && name !== view.name
+            ? { rename_to: name }
+            : {}),
           kind: draft.kind,
           filter: lines(draft.filters),
           sort: lines(draft.sorts),
@@ -157,7 +193,9 @@ export function ViewEditor({
           ...optional("group", draft.group),
           ...(timed ? optional("date", draft.date) : {}),
           ...(draft.kind === "timeline" ? optional("end", draft.end) : {}),
-          ...(draft.limit.trim() !== "" && Number.isInteger(limit) && limit > 0 ? { limit } : {}),
+          ...(draft.limit.trim() !== "" && Number.isInteger(limit) && limit > 0
+            ? { limit }
+            : {}),
         }),
       () => {
         onSaved(name);
@@ -176,7 +214,11 @@ export function ViewEditor({
 
   return (
     <SidePanel
-      title={view ? t("collection-edit-view", { view: view.name }) : t("collection-new-view")}
+      title={
+        view
+          ? t("collection-edit-view", { view: view.name })
+          : t("collection-new-view")
+      }
       onClose={onClose}
     >
       <form

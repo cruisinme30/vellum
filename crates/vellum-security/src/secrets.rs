@@ -146,7 +146,9 @@ impl Chars {
             Self::Alnum => c.is_ascii_alphanumeric(),
             Self::AlnumUnderscore => c.is_ascii_alphanumeric() || c == b'_',
             Self::AlnumDash => c.is_ascii_alphanumeric() || c == b'-',
-            Self::AlnumDashUnderscore => c.is_ascii_alphanumeric() || c == b'-' || c == b'_',
+            Self::AlnumDashUnderscore => {
+                c.is_ascii_alphanumeric() || c == b'-' || c == b'_'
+            }
         }
     }
 }
@@ -286,7 +288,8 @@ pub fn scan(text: &str) -> Vec<Finding> {
                 finding.column = line
                     .get(..finding.range.start)
                     .map_or(1, |head| head.chars().count() + 1);
-                finding.range = offset + finding.range.start..offset + finding.range.end;
+                finding.range =
+                    offset + finding.range.start..offset + finding.range.end;
             }
         }
         offset += line.len();
@@ -303,7 +306,12 @@ pub fn scan(text: &str) -> Vec<Finding> {
     findings
 }
 
-fn push(findings: &mut Vec<Finding>, rule: Rule, line: &str, range: Range<usize>) {
+fn push(
+    findings: &mut Vec<Finding>,
+    rule: Rule,
+    line: &str,
+    range: Range<usize>,
+) {
     let secret = line.get(range.clone()).unwrap_or_default();
     let head: String = secret.chars().take(4).collect();
     findings.push(Finding {

@@ -22,7 +22,10 @@ export type ScanSecrets = (text: string) => Promise<SecretScanResult>;
 const SCAN_DELAY_MS = 1500;
 
 /** The page's text, one line per text block, and where each block starts. */
-export function pageText(document_: ProseNode): { text: string; starts: number[] } {
+export function pageText(document_: ProseNode): {
+  text: string;
+  starts: number[];
+} {
   const lines: string[] = [];
   const starts: number[] = [];
   document_.descendants((node, pos) => {
@@ -48,7 +51,9 @@ function findingRange(
   if (to > document_.content.size) return undefined;
   const head = finding.redacted.split("…")[0] ?? "";
   const found = document_.textBetween(from, to);
-  return found.length === finding.length && found.startsWith(head) ? { from, to } : undefined;
+  return found.length === finding.length && found.startsWith(head)
+    ? { from, to }
+    : undefined;
 }
 
 /** A finding's identity, to remember the ones dismissed. */
@@ -63,7 +68,10 @@ export function SecretsBanner({
   readonly scan: ScanSecrets;
 }) {
   const t = useT();
-  const [result, setResult] = useState<{ scan: SecretScanResult; starts: number[] }>();
+  const [result, setResult] = useState<{
+    scan: SecretScanResult;
+    starts: number[];
+  }>();
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
 
   useEffect(() => {
@@ -94,11 +102,22 @@ export function SecretsBanner({
     };
   }, [editor, scan]);
 
-  const shown = (result?.scan.findings ?? []).filter((f) => !dismissed.has(keyOf(f)));
-  if (result === undefined || shown.length === 0 || result.scan.policy === "off") return;
+  const shown = (result?.scan.findings ?? []).filter(
+    (f) => !dismissed.has(keyOf(f)),
+  );
+  if (
+    result === undefined ||
+    shown.length === 0 ||
+    result.scan.policy === "off"
+  )
+    return;
   const blocked = result.scan.policy === "block";
   return (
-    <div className="vl-secrets-banner" role="alert" data-policy={result.scan.policy}>
+    <div
+      className="vl-secrets-banner"
+      role="alert"
+      data-policy={result.scan.policy}
+    >
       <p>{t(blocked ? "secrets-blocked" : "secrets-warning")}</p>
       <ul>
         {shown.map((finding) => {

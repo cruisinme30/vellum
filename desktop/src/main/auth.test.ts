@@ -7,7 +7,13 @@ import { describe, expect, it, vi } from "vitest";
 
 import { memoryDisk } from "../test-support/memory-disk.js";
 
-import { CLIENT_ID, Session, TokenError, createPkce, discover } from "./auth.js";
+import {
+  CLIENT_ID,
+  Session,
+  TokenError,
+  createPkce,
+  discover,
+} from "./auth.js";
 import type { Fetch } from "./fetch.js";
 import type { Redirect } from "./loopback.js";
 import { TokenStore, type Vault } from "./token-store.js";
@@ -37,7 +43,12 @@ function fakeServer(
   const calls: Call[] = [];
   let issued = 0;
   const fetcher: Fetch = (url, init) => {
-    calls.push({ url, body: new URLSearchParams(typeof init?.body === "string" ? init.body : "") });
+    calls.push({
+      url,
+      body: new URLSearchParams(
+        typeof init?.body === "string" ? init.body : "",
+      ),
+    });
     if (url.endsWith("/.well-known/oauth-authorization-server")) {
       return Promise.resolve(
         options.metadata === undefined
@@ -48,7 +59,9 @@ function fakeServer(
     if (url.endsWith("/token")) {
       issued += 1;
       if (options.tokenStatus !== undefined)
-        return Promise.resolve(new Response(undefined, { status: options.tokenStatus }));
+        return Promise.resolve(
+          new Response(undefined, { status: options.tokenStatus }),
+        );
       return Promise.resolve(
         Response.json({
           access_token: `at${String(issued)}`,
@@ -69,8 +82,15 @@ function fakeServer(
   return { fetcher, calls };
 }
 
-function redirect(code = "code1", close: () => void = vi.fn<() => void>()): Redirect {
-  return { uri: "http://127.0.0.1:5555/callback", code: Promise.resolve(code), close };
+function redirect(
+  code = "code1",
+  close: () => void = vi.fn<() => void>(),
+): Redirect {
+  return {
+    uri: "http://127.0.0.1:5555/callback",
+    code: Promise.resolve(code),
+    close,
+  };
 }
 
 const noToken: Fetch = (url) =>
@@ -91,14 +111,21 @@ const fullMetadata = {
 
 describe("auth", () => {
   it("derives an S256 challenge from the verifier", () => {
-    const { verifier, challenge } = createPkce((size) => new Uint8Array(size).fill(7));
+    const { verifier, challenge } = createPkce((size) =>
+      new Uint8Array(size).fill(7),
+    );
     expect(verifier).toHaveLength(43);
-    expect(challenge).toBe(createHash("sha256").update(verifier).digest("base64url"));
+    expect(challenge).toBe(
+      createHash("sha256").update(verifier).digest("base64url"),
+    );
   });
 
   it("ignores endpoints on other origins", async () => {
     const { fetcher } = fakeServer({
-      metadata: { token_endpoint: "https://evil.example/token", authorization_endpoint: 5 },
+      metadata: {
+        token_endpoint: "https://evil.example/token",
+        authorization_endpoint: 5,
+      },
     });
     const endpoints = await discover(server, fetcher);
     expect(endpoints.token).toBe(`${server}/oauth/token`);
@@ -155,7 +182,9 @@ describe("auth", () => {
         now: () => 0,
         listen: () => Promise.resolve(redirect()),
       });
-      expect(await session.signIn()).toEqual({ account: "vellum.northstar.dev" });
+      expect(await session.signIn()).toEqual({
+        account: "vellum.northstar.dev",
+      });
     }
     const failing = fakeServer({ metadata: fullMetadata });
     const session = new Session(server, new TokenStore(vault, memoryDisk()), {
@@ -186,93 +215,102 @@ describe("auth", () => {
     await expect(session.signIn()).rejects.toThrow(/token endpoint/);
   });
 
-  it("refreshes once for concurrent callers and keeps the old refresh token if none is returned", async () => {
-    const store = new TokenStore(vault, memoryDisk());
-    await store.save({
-      server,
-      account: "ana",
-      accessToken: "old",
-      refreshToken: "rt0",
-      expiresAt: 30_000,
-    });
-    const { fetcher, calls } = fakeServer();
-    const session = new Session(server, store, {
-      fetch: fetcher,
-      openBrowser: () => Promise.resolve(),
-      now: () => 0,
-    });
-    expect(await Promise.all([session.accessToken(), session.accessToken()])).toEqual([
-      "at1",
-      "at1",
-    ]);
-    expect(calls.filter((call) => call.url.endsWith("/token"))).toHaveLength(1);
-    const refreshed = await store.load();
-    expect(refreshed?.account).toBe("ana");
-
-    await store.save({
-      server,
-      account: "ana",
-      accessToken: "old",
-      refreshToken: "rt0",
-      expiresAt: 0,
-    });
-    const bare: Fetch = (url) =>
-      Promise.resolve(
-        url.endsWith("/token")
-          ? Response.json({ access_token: "fresh" })
-          : new Response(undefined, { status: 404 }),
+  it(
+    "refreshes once for concurrent callers and keeps the old refresh token " +
+      "if none is returned",
+    async () => {
+      const store = new TokenStore(vault, memoryDisk());
+      await store.save({
+        server,
+        account: "ana",
+        accessToken: "old",
+        refreshToken: "rt0",
+        expiresAt: 30_000,
+      });
+      const { fetcher, calls } = fakeServer();
+      const session = new Session(server, store, {
+        fetch: fetcher,
+        openBrowser: () => Promise.resolve(),
+        now: () => 0,
+      });
+      expect(
+        await Promise.all([session.accessToken(), session.accessToken()]),
+      ).toEqual(["at1", "at1"]);
+      expect(calls.filter((call) => call.url.endsWith("/token"))).toHaveLength(
+        1,
       );
-    const plain = new Session(server, store, {
-      fetch: bare,
-      openBrowser: () => Promise.resolve(),
-      now: () => 0,
-    });
-    expect(await plain.accessToken()).toBe("fresh");
-    const kept = await store.load();
-    expect(kept?.refreshToken).toBe("rt0");
-  });
+      const refreshed = await store.load();
+      expect(refreshed?.account).toBe("ana");
 
-  it("signs out when the refresh grant is refused, and surfaces other failures", async () => {
-    const store = new TokenStore(vault, memoryDisk());
-    await store.save({
-      server,
-      account: "ana",
-      accessToken: "old",
-      refreshToken: "rt0",
-      expiresAt: 0,
-    });
-    const refused = new Session(server, store, {
-      fetch: fakeServer({ tokenStatus: 400 }).fetcher,
-      openBrowser: () => Promise.resolve(),
-      now: () => 0,
-    });
-    expect(await refused.accessToken()).toBeUndefined();
-    expect(await store.load()).toBeUndefined();
+      await store.save({
+        server,
+        account: "ana",
+        accessToken: "old",
+        refreshToken: "rt0",
+        expiresAt: 0,
+      });
+      const bare: Fetch = (url) =>
+        Promise.resolve(
+          url.endsWith("/token")
+            ? Response.json({ access_token: "fresh" })
+            : new Response(undefined, { status: 404 }),
+        );
+      const plain = new Session(server, store, {
+        fetch: bare,
+        openBrowser: () => Promise.resolve(),
+        now: () => 0,
+      });
+      expect(await plain.accessToken()).toBe("fresh");
+      const kept = await store.load();
+      expect(kept?.refreshToken).toBe("rt0");
+    },
+  );
 
-    await store.save({
-      server,
-      account: "ana",
-      accessToken: "old",
-      refreshToken: "rt0",
-      expiresAt: 0,
-    });
-    const down = new Session(server, store, {
-      fetch: fakeServer({ tokenStatus: 503 }).fetcher,
-      openBrowser: () => Promise.resolve(),
-      now: () => 0,
-    });
-    await expect(down.accessToken()).rejects.toBeInstanceOf(TokenError);
+  it(
+    "signs out when the refresh grant is refused, and surfaces other " +
+      "failures",
+    async () => {
+      const store = new TokenStore(vault, memoryDisk());
+      await store.save({
+        server,
+        account: "ana",
+        accessToken: "old",
+        refreshToken: "rt0",
+        expiresAt: 0,
+      });
+      const refused = new Session(server, store, {
+        fetch: fakeServer({ tokenStatus: 400 }).fetcher,
+        openBrowser: () => Promise.resolve(),
+        now: () => 0,
+      });
+      expect(await refused.accessToken()).toBeUndefined();
+      expect(await store.load()).toBeUndefined();
 
-    await store.save({
-      server,
-      account: "ana",
-      accessToken: "old",
-      refreshToken: undefined,
-      expiresAt: 0,
-    });
-    expect(await down.accessToken()).toBeUndefined();
-    expect(await store.load()).toBeUndefined();
-  });
+      await store.save({
+        server,
+        account: "ana",
+        accessToken: "old",
+        refreshToken: "rt0",
+        expiresAt: 0,
+      });
+      const down = new Session(server, store, {
+        fetch: fakeServer({ tokenStatus: 503 }).fetcher,
+        openBrowser: () => Promise.resolve(),
+        now: () => 0,
+      });
+      await expect(down.accessToken()).rejects.toBeInstanceOf(TokenError);
+
+      await store.save({
+        server,
+        account: "ana",
+        accessToken: "old",
+        refreshToken: undefined,
+        expiresAt: 0,
+      });
+      expect(await down.accessToken()).toBeUndefined();
+      expect(await store.load()).toBeUndefined();
+    },
+  );
 
   it("ignores tokens for another server", async () => {
     const store = new TokenStore(vault, memoryDisk());
@@ -306,12 +344,16 @@ describe("auth", () => {
       openBrowser: () => Promise.resolve(),
       now: () => 0,
     }).signOut();
-    expect(revoking.calls.find((call) => call.url.endsWith("/revoke"))?.body.get("token")).toBe(
-      "rt9",
-    );
+    expect(
+      revoking.calls
+        .find((call) => call.url.endsWith("/revoke"))
+        ?.body.get("token"),
+    ).toBe("rt9");
     expect(await store.load()).toBeUndefined();
 
-    const silent = fakeServer({ metadata: { token_endpoint: `${server}/oauth/token` } });
+    const silent = fakeServer({
+      metadata: { token_endpoint: `${server}/oauth/token` },
+    });
     await store.save({
       server,
       account: "ana",
@@ -324,7 +366,9 @@ describe("auth", () => {
       openBrowser: () => Promise.resolve(),
       now: () => 0,
     }).signOut();
-    expect(silent.calls.some((call) => call.url.endsWith("/revoke"))).toBe(false);
+    expect(silent.calls.some((call) => call.url.endsWith("/revoke"))).toBe(
+      false,
+    );
 
     await store.save({
       server,

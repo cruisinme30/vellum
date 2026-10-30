@@ -63,7 +63,10 @@ proptest! {
     #[test]
     fn mapped_v6_matches_v4(bits in any::<u32>()) {
         let v4 = Ipv4Addr::from(bits);
-        prop_assert_eq!(is_public(IpAddr::V6(v4.to_ipv6_mapped())), is_public(IpAddr::V4(v4)));
+        prop_assert_eq!(
+            is_public(IpAddr::V6(v4.to_ipv6_mapped())),
+            is_public(IpAddr::V4(v4))
+        );
     }
 
     #[test]
@@ -71,7 +74,22 @@ proptest! {
         let [_, b, c, d] = host.to_be_bytes();
         prop_assert!(!is_public(IpAddr::V4(Ipv4Addr::new(10, b, c, d))));
         prop_assert!(!is_public(IpAddr::V4(Ipv4Addr::new(127, b, c, d))));
-        prop_assert!(!is_public(IpAddr::V6(Ipv6Addr::new(0xfe80, 0, 0, 0, u16::from(b), 0, 0, u16::from(d)))));
+        prop_assert!(
+            !is_public(
+                IpAddr::V6(
+                    Ipv6Addr::new(
+                        0xfe80,
+                        0,
+                        0,
+                        0,
+                        u16::from(b),
+                        0,
+                        0,
+                        u16::from(d)
+                    )
+                )
+            )
+        );
     }
 }
 
@@ -116,7 +134,10 @@ fn url_rules() {
         "x.localhost.",
     ] {
         assert!(
-            matches!(check(&format!("http://{host}/")), Err(SsrfError::Host(_))),
+            matches!(
+                check(&format!("http://{host}/")),
+                Err(SsrfError::Host(_))
+            ),
             "{host}"
         );
     }
@@ -153,7 +174,9 @@ fn trusting_localhost(port: u16) -> UrlPolicy {
 
 #[tokio::test]
 async fn loopback_is_refused_unless_trusted() {
-    let port = serve("HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\nok".to_owned()).await;
+    let port =
+        serve("HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\nok".to_owned())
+            .await;
     let strict = SafeClient::new(UrlPolicy::default()).unwrap();
     let url = format!("http://127.0.0.1:{port}/");
     assert!(matches!(strict.get(&url).await, Err(SsrfError::Address(_))));
@@ -169,7 +192,9 @@ async fn loopback_is_refused_unless_trusted() {
 #[tokio::test]
 async fn user_urls_cannot_reach_trusted_hosts() {
     // #270: a trusted host used to be exempt from every rule, port included.
-    let port = serve("HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\nok".to_owned()).await;
+    let port =
+        serve("HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\nok".to_owned())
+            .await;
     let client = SafeClient::new(trusting_localhost(port)).unwrap();
     for url in [
         format!("http://localhost:{port}/"),
@@ -206,9 +231,12 @@ async fn redirects_never_lead_to_a_trusted_host() {
     // An external page answering `302 Location: http://kroki/...` must not
     // reach the sidecar. Simulated with a trusted service that redirects to
     // another trusted URL: the redirect hop is checked as user input.
-    let target = serve("HTTP/1.1 200 OK\r\ncontent-length: 6\r\n\r\nsecret".to_owned()).await;
+    let target =
+        serve("HTTP/1.1 200 OK\r\ncontent-length: 6\r\n\r\nsecret".to_owned())
+            .await;
     let port = serve(format!(
-        "HTTP/1.1 302 Found\r\nlocation: http://localhost:{target}/\r\ncontent-length: 0\r\n\r\n"
+        "HTTP/1.1 302 Found\r\nlocation: http://localhost:{target}/\r\n\
+            content-length: 0\r\n\r\n"
     ))
     .await;
     let mut policy = trusting_localhost(port);
@@ -242,8 +270,11 @@ async fn redirects_to_internal_addresses_are_refused() {
 
 #[tokio::test]
 async fn oversized_bodies_are_cut_off() {
-    let port =
-        serve("HTTP/1.1 200 OK\r\ncontent-length: 64\r\n\r\n".to_owned() + &"x".repeat(64)).await;
+    let port = serve(
+        "HTTP/1.1 200 OK\r\ncontent-length: 64\r\n\r\n".to_owned()
+            + &"x".repeat(64),
+    )
+    .await;
     let client = SafeClient::new(trusting_localhost(port)).unwrap();
     let err = client
         .get_trusted_bytes(&format!("http://localhost:{port}/"))
@@ -255,7 +286,8 @@ async fn oversized_bodies_are_cut_off() {
 #[tokio::test]
 async fn a_trusted_address_and_a_form_post_reach_a_configured_provider() {
     let port = serve(
-        "HTTP/1.1 400 Bad Request\r\ncontent-length: 25\r\n\r\n{\"error\":\"invalid_grant\"}"
+        "HTTP/1.1 400 Bad Request\r\ncontent-length: 25\r\n\r\n\
+            {\"error\":\"invalid_grant\"}"
             .to_owned(),
     )
     .await;
@@ -277,7 +309,8 @@ async fn a_trusted_address_and_a_form_post_reach_a_configured_provider() {
 #[tokio::test]
 async fn a_form_post_never_follows_a_redirect() {
     let port = serve(
-        "HTTP/1.1 307 Temporary Redirect\r\nlocation: http://169.254.169.254/\r\ncontent-length: 0\r\n\r\n"
+        "HTTP/1.1 307 Temporary Redirect\r\n\
+            location: http://169.254.169.254/\r\ncontent-length: 0\r\n\r\n"
             .to_owned(),
     )
     .await;

@@ -25,7 +25,8 @@ export interface HistoryPanelProperties {
   readonly onClose: () => void;
 }
 
-const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
+const errorText = (error: unknown) =>
+  error instanceof Error ? error.message : String(error);
 
 const DATE = new Intl.DateTimeFormat("en", {
   month: "short",
@@ -97,7 +98,9 @@ function VersionList({
               onSelect(version.id === selected ? undefined : version.id);
             }}
           >
-            <time dateTime={version.savedAt.toISOString()}>{DATE.format(version.savedAt)}</time>
+            <time dateTime={version.savedAt.toISOString()}>
+              {DATE.format(version.savedAt)}
+            </time>
             <span className="vl-version-meta">
               {t(authorKey(version.author, meId))} · {formatSize(version.size)}
               {version.id === newest ? ` · ${t("history-current")}` : ""}
@@ -110,7 +113,11 @@ function VersionList({
 }
 
 /** Asks before a restore, then runs it. */
-function RestoreButton({ onRestore }: { readonly onRestore: () => Promise<void> }) {
+function RestoreButton({
+  onRestore,
+}: {
+  readonly onRestore: () => Promise<void>;
+}) {
   const t = useT();
   const [confirming, setConfirming] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -174,7 +181,10 @@ function VersionPreview({
   readonly onRestore: (version: PageVersion) => Promise<void>;
 }) {
   const t = useT();
-  const text = useLoaded(() => history.read(pageId, version.id), [history, pageId, version.id]);
+  const text = useLoaded(
+    () => history.read(pageId, version.id),
+    [history, pageId, version.id],
+  );
   return (
     <section className="vl-version-preview" aria-label={t("history-preview")}>
       {text.state !== "ready" && <LoadState loaded={text} />}
@@ -189,8 +199,14 @@ function VersionPreview({
   );
 }
 
-/** Focus moves into the panel when it opens and back when it closes; Escape closes it. */
-function useDialogFocus(panel: RefObject<HTMLDivElement | null>, onClose: () => void) {
+/**
+ * Focus moves into the panel when it opens and back when it closes; Escape
+ * closes it.
+ */
+function useDialogFocus(
+  panel: RefObject<HTMLDivElement | null>,
+  onClose: () => void,
+) {
   const close = useRef(onClose);
   useEffect(() => {
     close.current = onClose;
@@ -232,9 +248,15 @@ export function HistoryPanel({
   const panel = useRef<HTMLDivElement>(null);
   useDialogFocus(panel, onClose);
   const [reload, setReload] = useState(0);
-  const versions = useLoaded(() => history.list(pageId), [history, pageId, reload]);
+  const versions = useLoaded(
+    () => history.list(pageId),
+    [history, pageId, reload],
+  );
   const [selected, setSelected] = useState<string>();
-  const [notice, setNotice] = useState<{ kind: "done" | "failed"; message: string }>();
+  const [notice, setNotice] = useState<{
+    kind: "done" | "failed";
+    message: string;
+  }>();
 
   const list = versions.state === "ready" ? versions.value : [];
   const chosen = list.find((version) => version.id === selected);
@@ -287,7 +309,12 @@ export function HistoryPanel({
       )}
       {versions.state !== "ready" && <LoadState loaded={versions} />}
       {versions.state === "ready" && (
-        <VersionList versions={list} selected={selected} meId={meId} onSelect={setSelected} />
+        <VersionList
+          versions={list}
+          selected={selected}
+          meId={meId}
+          onSelect={setSelected}
+        />
       )}
       {chosen !== undefined && (
         <VersionPreview

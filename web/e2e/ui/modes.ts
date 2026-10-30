@@ -39,13 +39,16 @@ const onDocument = (body: string): string =>
     observer.observe(document, { childList: true });
   })();`;
 
-// A constructed style sheet: CSSOM, so a strict style-src CSP does not block it.
+// A constructed style sheet: CSSOM, so a strict style-src CSP does not block
+// it.
 const addStyle = (css: string): string =>
   onDocument(
     `const sheet = new CSSStyleSheet(); sheet.replaceSync(${JSON.stringify(css)}); document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];`,
   );
 
-/** The theme contract: `<html data-theme="…">`, read by the app at start (D124). */
+/**
+ * The theme contract: `<html data-theme="…">`, read by the app at start (D124).
+ */
 const theme = (name: string, scheme: "light" | "dark"): Mode => ({
   name: `theme-${name}`,
   appOnly: true,
@@ -53,12 +56,16 @@ const theme = (name: string, scheme: "light" | "dark"): Mode => ({
     await page.emulateMedia({ colorScheme: scheme });
     await initScript(
       page,
-      onDocument(`document.documentElement.dataset.theme = ${JSON.stringify(name)};`),
+      onDocument(
+        `document.documentElement.dataset.theme = ${JSON.stringify(name)};`,
+      ),
     );
   },
 });
 
-/** Browser zoom: the same CSS layout as a viewport divided by the zoom factor. */
+/**
+ * Browser zoom: the same CSS layout as a viewport divided by the zoom factor.
+ */
 const zoom = (percent: number): Mode => ({
   name: `zoom-${String(percent)}`,
   apply: async (page) => {
@@ -72,12 +79,18 @@ const zoom = (percent: number): Mode => ({
   },
 });
 
-// Long words, combining marks, CJK, Arabic, emoji with skin tones and ZWJ, and an unbroken URL.
+// Long words, combining marks, CJK, Arabic, emoji with skin tones and ZWJ, and
+// an unbroken URL.
 const STRESS =
-  " Ünïcödé façade 中文字符测试 العربية עברית 🧑🏽‍💻👩‍👩‍👧 Donaudampfschifffahrtsgesellschaftskapitän https://northstar.dev/a/very/long/path/without/any/break/points/at/all";
+  " Ünïcödé façade 中文字符测试 العربية עברית 🧑🏽‍💻👩‍👩‍👧 " +
+  "Donaudampfschifffahrtsgesellschaftskapitän " +
+  "https://northstar.dev/a/very/long/path/without/any/break/points/at/all";
 
 const ALL_MODES: readonly Mode[] = [
-  { name: "light", apply: (page) => page.emulateMedia({ colorScheme: "light" }) },
+  {
+    name: "light",
+    apply: (page) => page.emulateMedia({ colorScheme: "light" }),
+  },
   { name: "dark", apply: (page) => page.emulateMedia({ colorScheme: "dark" }) },
   theme("light", "light"),
   theme("dark", "dark"),
@@ -87,7 +100,8 @@ const ALL_MODES: readonly Mode[] = [
   {
     name: "forced-colors",
     chromiumOnly: true,
-    apply: (page) => page.emulateMedia({ forcedColors: "active", contrast: "more" }),
+    apply: (page) =>
+      page.emulateMedia({ forcedColors: "active", contrast: "more" }),
   },
   zoom(150),
   zoom(200),
@@ -95,7 +109,8 @@ const ALL_MODES: readonly Mode[] = [
   {
     name: "text-200",
     // Text-only zoom: the root font size doubles, boxes sized in px do not.
-    apply: (page) => initScript(page, addStyle("html { font-size: 200% !important; }")),
+    apply: (page) =>
+      initScript(page, addStyle("html { font-size: 200% !important; }")),
   },
   {
     name: "text-spacing",
@@ -104,7 +119,10 @@ const ALL_MODES: readonly Mode[] = [
       initScript(
         page,
         addStyle(
-          "* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; font-family: OpenDyslexic, 'Comic Sans MS', Verdana, sans-serif !important; } p { margin-bottom: 2em !important; }",
+          "* { line-height: 1.5 !important; letter-spacing: 0.12em " +
+            "!important; word-spacing: 0.16em !important; font-family: " +
+            "OpenDyslexic, 'Comic Sans MS', Verdana, sans-serif " +
+            "!important; } p { margin-bottom: 2em !important; }",
         ),
       ),
   },
@@ -113,14 +131,21 @@ const ALL_MODES: readonly Mode[] = [
     apply: (page) =>
       initScript(
         page,
-        onDocument(`document.documentElement.dir = "rtl"; document.documentElement.lang = "ar";`),
+        onDocument(
+          `document.documentElement.dir = "rtl"; ` +
+            `document.documentElement.lang = "ar";`,
+        ),
       ),
   },
-  { name: "reduced-motion", apply: (page) => page.emulateMedia({ reducedMotion: "reduce" }) },
+  {
+    name: "reduced-motion",
+    apply: (page) => page.emulateMedia({ reducedMotion: "reduce" }),
+  },
   {
     name: "stress",
     skipAxe: true,
-    // Lengthens text as the parser adds it, so the page never paints the short copy.
+    // Lengthens text as the parser adds it, so the page never paints the short
+    // copy.
     apply: (page) =>
       initScript(
         page,
@@ -152,4 +177,6 @@ const ALL_MODES: readonly Mode[] = [
  */
 const wanted = process.env["UI_MODES"]?.split(",").map((name) => name.trim());
 export const MODES: readonly Mode[] =
-  wanted === undefined ? ALL_MODES : ALL_MODES.filter((mode) => wanted.includes(mode.name));
+  wanted === undefined
+    ? ALL_MODES
+    : ALL_MODES.filter((mode) => wanted.includes(mode.name));

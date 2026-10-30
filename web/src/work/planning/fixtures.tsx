@@ -12,7 +12,14 @@ import { vi, type Mock } from "vitest";
 import { ServerApisProvider } from "../../data/server-apis";
 import { I18nProvider } from "../../i18n/i18n";
 
-import type { FormOut, InsightsOut, IssueOut, PlanningApi, ProjectOut, TeamOut } from "./api";
+import type {
+  FormOut,
+  InsightsOut,
+  IssueOut,
+  PlanningApi,
+  ProjectOut,
+  TeamOut,
+} from "./api";
 
 const TEAM: TeamOut = {
   id: "t1",
@@ -29,7 +36,11 @@ const TEAM: TeamOut = {
   archived: false,
 };
 
-function project(id: string, title: string, extra: Partial<ProjectOut> = {}): ProjectOut {
+function project(
+  id: string,
+  title: string,
+  extra: Partial<ProjectOut> = {},
+): ProjectOut {
   return {
     id,
     title,
@@ -49,7 +60,11 @@ function project(id: string, title: string, extra: Partial<ProjectOut> = {}): Pr
   };
 }
 
-export function issue(key: string, title: string, extra: Partial<IssueOut> = {}): IssueOut {
+export function issue(
+  key: string,
+  title: string,
+  extra: Partial<IssueOut> = {},
+): IssueOut {
   return {
     id: `id-${key}`,
     key,
@@ -74,7 +89,9 @@ export const GATEWAY = project("p1", "Gateway replay", {
   lead: "mara",
   target_date: "2026-12-01",
   update_due: true,
-  milestones: [{ id: "m1", name: "Beta", issues: 2, completed_issues: 1, percent: 50 }],
+  milestones: [
+    { id: "m1", name: "Beta", issues: 2, completed_issues: 1, percent: 50 },
+  ],
 });
 
 const FORM: FormOut = {
@@ -114,14 +131,24 @@ const FORM: FormOut = {
 export const NONE = null;
 
 const INSIGHTS: InsightsOut = {
-  overall: { count: 12, p50_hours: 30, p85_hours: 96, p95_hours: 120, mean_hours: 40 },
+  overall: {
+    count: 12,
+    p50_hours: 30,
+    p85_hours: 96,
+    p95_hours: 120,
+    mean_hours: 40,
+  },
   buckets: [
     {
       key: "ENG",
       overall: { count: 9, p50_hours: 20, p85_hours: 72 },
       series: [],
     },
-    { key: NONE, overall: { count: 3, p50_hours: 50, p85_hours: 100 }, series: [] },
+    {
+      key: NONE,
+      overall: { count: 3, p50_hours: 50, p85_hours: 100 },
+      series: [],
+    },
   ],
 };
 
@@ -132,7 +159,10 @@ export function fakeApi(overrides: Partial<FakeApi> = {}): FakeApi {
   const api: FakeApi = {
     teams: vi.fn(() => Promise.resolve([TEAM])),
     projects: vi.fn(() =>
-      Promise.resolve([GATEWAY, project("p2", "Old docs", { status: "completed", percent: 100 })]),
+      Promise.resolve([
+        GATEWAY,
+        project("p2", "Old docs", { status: "completed", percent: 100 }),
+      ]),
     ),
     project: vi.fn(() => Promise.resolve(GATEWAY)),
     createProject: vi.fn((p) => Promise.resolve(project("p3", p.title))),
@@ -178,17 +208,30 @@ export function fakeApi(overrides: Partial<FakeApi> = {}): FakeApi {
     createInitiative: vi.fn(() => Promise.reject(new Error("unused"))),
     templates: vi.fn(() =>
       Promise.resolve([
-        { name: "Bug", labels: ["bug"], priority: 2, body: "Steps to reproduce:", repeat: "1w" },
+        {
+          name: "Bug",
+          labels: ["bug"],
+          priority: 2,
+          body: "Steps to reproduce:",
+          repeat: "1w",
+        },
       ]),
     ),
     recurring: vi.fn(() =>
       Promise.resolve([
-        issue("ENG-4", "Rotate the on-call pager", { due: "2026-11-02", repeat: "1w" }),
+        issue("ENG-4", "Rotate the on-call pager", {
+          due: "2026-11-02",
+          repeat: "1w",
+        }),
       ]),
     ),
     setRepeat: vi.fn((key, repeat, due) =>
       Promise.resolve(
-        issue(key, "Rotate the on-call pager", due === undefined ? { repeat } : { due, repeat }),
+        issue(
+          key,
+          "Rotate the on-call pager",
+          due === undefined ? { repeat } : { due, repeat },
+        ),
       ),
     ),
     createIssue: vi.fn((draft) => Promise.resolve(issue("ENG-9", draft.title))),
@@ -220,7 +263,11 @@ export function fakeApi(overrides: Partial<FakeApi> = {}): FakeApi {
   return api;
 }
 
-export function renderAt(path: string, api: PlanningApi | undefined, routes: ReactNode) {
+export function renderAt(
+  path: string,
+  api: PlanningApi | undefined,
+  routes: ReactNode,
+) {
   const user = userEvent.setup();
   render(
     <I18nProvider>

@@ -288,7 +288,8 @@ const MATH_ATTRIBUTES: &[&str] = &[
 
 /// Presentation attributes that may carry a `var()` colour; those move into
 /// `style`, because CSS variables only work in CSS.
-const COLOUR_ATTRIBUTES: &[&str] = &["fill", "stroke", "stop-color", "flood-color", "color"];
+const COLOUR_ATTRIBUTES: &[&str] =
+    &["fill", "stroke", "stop-color", "flood-color", "color"];
 
 /// Sanitises an SVG or MathML island and scopes its ids and CSS under
 /// `prefix` (which must be a valid id fragment, such as `f3`).
@@ -302,8 +303,8 @@ pub fn sanitize_island(src: &str, prefix: &str) -> Result<String, IslandError> {
         allow_dtd: false,
         ..ParsingOptions::default()
     };
-    let doc =
-        Document::parse_with_options(src, options).map_err(|e| IslandError::Xml(e.to_string()))?;
+    let doc = Document::parse_with_options(src, options)
+        .map_err(|e| IslandError::Xml(e.to_string()))?;
     let root = doc.root_element();
     let root_name = root.tag_name().name();
     let (elements, attributes) = match root_name {
@@ -370,7 +371,9 @@ impl Writer<'_> {
         for a in node.attributes() {
             let attr_name = a.name();
             let value = a.value();
-            if attr_name.starts_with("on") || !self.attributes.contains(&attr_name) {
+            if attr_name.starts_with("on")
+                || !self.attributes.contains(&attr_name)
+            {
                 continue;
             }
             match attr_name {
@@ -384,7 +387,9 @@ impl Writer<'_> {
                 }
                 "href" => {
                     // Only in-island fragment references survive.
-                    if let Some(target) = value.strip_prefix('#').filter(|t| self.ids.contains(t)) {
+                    if let Some(target) =
+                        value.strip_prefix('#').filter(|t| self.ids.contains(t))
+                    {
                         let v = format!("#{}-{target}", self.prefix);
                         html::push_attr(&mut self.out, "href", &v);
                     }
@@ -396,7 +401,11 @@ impl Writer<'_> {
                         .map(|t| format!("{}-{t}", self.prefix))
                         .collect();
                     if !refs.is_empty() {
-                        html::push_attr(&mut self.out, attr_name, &refs.join(" "));
+                        html::push_attr(
+                            &mut self.out,
+                            attr_name,
+                            &refs.join(" "),
+                        );
                     }
                 }
                 "style" => {
@@ -404,7 +413,9 @@ impl Writer<'_> {
                     let rewritten = self.rewrite_refs(&filtered);
                     style.push_str(&rewritten);
                 }
-                _ if COLOUR_ATTRIBUTES.contains(&attr_name) && value.contains("var(") => {
+                _ if COLOUR_ATTRIBUTES.contains(&attr_name)
+                    && value.contains("var(") =>
+                {
                     if is_safe_value(value) {
                         style.push_str(attr_name);
                         style.push(':');
@@ -452,7 +463,9 @@ impl Writer<'_> {
         for child in node.children() {
             match child.node_type() {
                 NodeType::Element => self.element(child, false),
-                NodeType::Text => html::text(&mut self.out, child.text().unwrap_or_default()),
+                NodeType::Text => {
+                    html::text(&mut self.out, child.text().unwrap_or_default())
+                }
                 NodeType::Root | NodeType::Comment | NodeType::PI => {}
             }
         }
@@ -511,13 +524,18 @@ impl Writer<'_> {
                 rest = rest.get(end + 1..).unwrap_or_default();
                 continue;
             }
-            let Some(close) = rest.get(body_start..).and_then(|r| r.find('}')) else {
+            let Some(close) = rest.get(body_start..).and_then(|r| r.find('}'))
+            else {
                 break;
             };
-            let body = rest.get(body_start..body_start + close).unwrap_or_default();
+            let body =
+                rest.get(body_start..body_start + close).unwrap_or_default();
             rest = rest.get(body_start + close + 1..).unwrap_or_default();
             let decls = self.rewrite_refs(&filter_declarations(body));
-            if decls.is_empty() || selectors.is_empty() || !is_safe_selector(selectors) {
+            if decls.is_empty()
+                || selectors.is_empty()
+                || !is_safe_selector(selectors)
+            {
                 continue;
             }
             let scoped: Vec<String> = selectors
@@ -625,7 +643,12 @@ pub fn filter_declarations(decls: &str) -> String {
         let value = value.trim();
         let blocked_prop = matches!(
             prop.as_str(),
-            "position" | "behavior" | "-moz-binding" | "content" | "cursor" | "z-index"
+            "position"
+                | "behavior"
+                | "-moz-binding"
+                | "content"
+                | "cursor"
+                | "z-index"
         );
         if prop.is_empty()
             || blocked_prop
@@ -676,9 +699,12 @@ mod tests {
 
     #[test]
     fn keeps_drawing_elements_and_prefixes_ids() {
-        let out = clean(
-            r##"<svg xmlns="http://www.w3.org/2000/svg" id="m" viewBox="0 0 10 10"><defs><marker id="arrow"><path d="M0 0L5 5"/></marker></defs><path d="M1 1" marker-end="url(#arrow)"/><use href="#arrow"/></svg>"##,
-        );
+        let out = clean(concat!(
+            r##"<svg xmlns="http://www.w3.org/2000/svg" id="m" "##,
+            r##"viewBox="0 0 10 10"><defs><marker id="arrow"><path "##,
+            r##"d="M0 0L5 5"/></marker></defs><path d="M1 1" "##,
+            r##"marker-end="url(#arrow)"/><use href="#arrow"/></svg>"##,
+        ));
         assert!(
             out.starts_with("<svg viewBox=\"0 0 10 10\" id=\"f1-root\""),
             "{out}"
@@ -690,9 +716,15 @@ mod tests {
 
     #[test]
     fn removes_scripts_handlers_and_external_links() {
-        let out = clean(
-            r#"<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><script>alert(1)</script><a xlink:href="javascript:alert(1)"><rect onload="alert(1)" width="5"/></a><image href="https://evil.example/x.png"/><use href="https://evil.example/s.svg#a"/><foreignObject><iframe src="x"/><div>ok</div></foreignObject></svg>"#,
-        );
+        let out = clean(concat!(
+            r#"<svg xmlns="http://www.w3.org/2000/svg" "#,
+            r#"xmlns:xlink="http://www.w3.org/1999/xlink"><script>alert(1"#,
+            r#")</script><a xlink:href="javascript:alert(1)"><rect "#,
+            r#"onload="alert(1)" width="5"/></a><image "#,
+            r#"href="https://evil.example/x.png"/><use "#,
+            r#"href="https://evil.example/s.svg#a"/><foreignObject><ifram"#,
+            r#"e src="x"/><div>ok</div></foreignObject></svg>"#,
+        ));
         assert!(!out.contains("script"), "{out}");
         assert!(!out.contains("alert"), "{out}");
         assert!(!out.contains("evil"), "{out}");
@@ -703,14 +735,22 @@ mod tests {
 
     #[test]
     fn filters_and_scopes_css() {
-        let out = clean(
-            r#"<svg xmlns="http://www.w3.org/2000/svg" id="mermaid-1"><style>@import url(https://evil.example/x.css); #mermaid-1 .node rect{fill:#fff;stroke:var(--vl-outline)} body{background:url(https://evil.example/t)} .label{color:red;position:fixed} @media print{svg{display:none}}</style><rect class="node"/></svg>"#,
-        );
+        let out = clean(concat!(
+            r#"<svg xmlns="http://www.w3.org/2000/svg" "#,
+            r#"id="mermaid-1"><style>@import "#,
+            r#"url(https://evil.example/x.css); #mermaid-1 .node "#,
+            r#"rect{fill:#fff;stroke:var(--vl-outline)} "#,
+            r#"body{background:url(https://evil.example/t)} "#,
+            r#".label{color:red;position:fixed} @media "#,
+            r#"print{svg{display:none}}</style><rect class="node"/></svg>"#,
+        ));
         assert!(!out.contains("evil"), "{out}");
         assert!(!out.contains('@'), "{out}");
         assert!(!out.contains("position"), "{out}");
         assert!(
-            out.contains("#f1-root .node rect{fill:#fff;stroke:var(--vl-outline);}"),
+            out.contains(
+                "#f1-root .node rect{fill:#fff;stroke:var(--vl-outline);}"
+            ),
             "{out}"
         );
         assert!(out.contains("#f1-root .label{color:red;}"), "{out}");
@@ -718,18 +758,24 @@ mod tests {
 
     #[test]
     fn moves_var_colours_into_style() {
-        let out = clean(
-            r##"<svg xmlns="http://www.w3.org/2000/svg"><rect fill="var(--vl-chart-1)" stroke="#000"/></svg>"##,
-        );
+        let out = clean(concat!(
+            r##"<svg xmlns="http://www.w3.org/2000/svg"><rect "##,
+            r##"fill="var(--vl-chart-1)" stroke="#000"/></svg>"##,
+        ));
         assert!(
-            out.contains(r##"<rect stroke="#000" style="fill:var(--vl-chart-1);">"##),
+            out.contains(
+                r##"<rect stroke="#000" style="fill:var(--vl-chart-1);">"##
+            ),
             "{out}"
         );
     }
 
     #[test]
     fn rejects_dtds_and_foreign_roots() {
-        let xxe = r#"<?xml version="1.0"?><!DOCTYPE svg [<!ENTITY x SYSTEM "file:///etc/passwd">]><svg>&x;</svg>"#;
+        let xxe = concat!(
+            r#"<?xml version="1.0"?><!DOCTYPE svg [<!ENTITY x SYSTEM "#,
+            r#""file:///etc/passwd">]><svg>&x;</svg>"#,
+        );
         assert!(matches!(
             sanitize_island(xxe, "f"),
             Err(IslandError::Xml(_))
@@ -746,12 +792,18 @@ mod tests {
 
     #[test]
     fn keeps_mathml() {
-        let out = clean(
-            r#"<math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><msub><mi>F</mi><mn>1</mn></msub><annotation encoding="application/x-tex">F_1</annotation></math>"#,
-        );
+        let out = clean(concat!(
+            r#"<math xmlns="http://www.w3.org/1998/Math/MathML" "#,
+            r#"display="block"><msub><mi>F</mi><mn>1</mn></msub><annotati"#,
+            r#"on encoding="application/x-tex">F_1</annotation></math>"#,
+        ));
         assert_eq!(
             out,
-            r#"<math display="block" id="f1-root" xmlns="http://www.w3.org/1998/Math/MathML"><msub><mi>F</mi><mn>1</mn></msub></math>"#
+            concat!(
+                r#"<math display="block" id="f1-root" "#,
+                r#"xmlns="http://www.w3.org/1998/Math/MathML"><msub><mi>F</mi"#,
+                r#"><mn>1</mn></msub></math>"#,
+            )
         );
     }
 }

@@ -23,8 +23,10 @@ function fakeDarkQuery(initial: boolean) {
   const listeners = new Set<() => void>();
   const list = {
     matches: initial,
-    addEventListener: (_type: string, listener: () => void) => listeners.add(listener),
-    removeEventListener: (_type: string, listener: () => void) => listeners.delete(listener),
+    addEventListener: (_type: string, listener: () => void) =>
+      listeners.add(listener),
+    removeEventListener: (_type: string, listener: () => void) =>
+      listeners.delete(listener),
   };
   vi.stubGlobal("matchMedia", () => list);
   return {
@@ -38,7 +40,10 @@ function fakeDarkQuery(initial: boolean) {
   };
 }
 
-/** Removes matchMedia, as on an engine without it; returns the step that puts it back. */
+/**
+ * Removes matchMedia, as on an engine without it; returns the step that puts it
+ * back.
+ */
 function removeMatchMedia() {
   const original = Object.getOwnPropertyDescriptor(globalThis, "matchMedia");
   Reflect.deleteProperty(globalThis, "matchMedia");
@@ -79,7 +84,9 @@ describe("AppearanceProvider", () => {
     });
     expect(result.current.appearance.theme).toBe("sepia");
     expect(document.documentElement.dataset["theme"]).toBe("sepia");
-    expect(JSON.parse(localStorage.getItem("vellum.appearance") ?? "{}")).toMatchObject({
+    expect(
+      JSON.parse(localStorage.getItem("vellum.appearance") ?? "{}"),
+    ).toMatchObject({
       theme: "sepia",
     });
   });
@@ -98,7 +105,10 @@ describe("AppearanceProvider", () => {
 
   it("works without matchMedia or localStorage", () => {
     const restoreMatchMedia = removeMatchMedia();
-    const original = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+    const original = Object.getOwnPropertyDescriptor(
+      globalThis,
+      "localStorage",
+    );
     Object.defineProperty(globalThis, "localStorage", {
       configurable: true,
       get() {
@@ -129,30 +139,34 @@ describe("the organisation's look", () => {
       siteTheme: "auto",
     });
     const withOrg = ({ children }: { readonly children: ReactNode }) => (
-      <AppearanceProvider organisation={organisation}>{children}</AppearanceProvider>
+      <AppearanceProvider organisation={organisation}>
+        {children}
+      </AppearanceProvider>
     );
     const { result } = renderHook(() => useAppearance(), { wrapper: withOrg });
     await waitFor(() => {
       expect(result.current.organisation?.exportTheme).toBe("sepia");
     });
-    expect(document.documentElement.style.getPropertyValue("--md-primary")).toBe(
-      buildScheme("light", "#b02020")["primary"],
-    );
+    expect(
+      document.documentElement.style.getPropertyValue("--md-primary"),
+    ).toBe(buildScheme("light", "#b02020")["primary"]);
   });
 
   it("keeps Vellum's seed when the organisation's look cannot load", async () => {
     const organisation = vi.fn().mockRejectedValue(new Error("offline"));
     const withOrg = ({ children }: { readonly children: ReactNode }) => (
-      <AppearanceProvider organisation={organisation}>{children}</AppearanceProvider>
+      <AppearanceProvider organisation={organisation}>
+        {children}
+      </AppearanceProvider>
     );
     const { result } = renderHook(() => useAppearance(), { wrapper: withOrg });
     await waitFor(() => {
       expect(organisation).toHaveBeenCalled();
     });
     expect(result.current.organisation).toBeUndefined();
-    expect(document.documentElement.style.getPropertyValue("--md-primary")).toBe(
-      buildScheme("light")["primary"],
-    );
+    expect(
+      document.documentElement.style.getPropertyValue("--md-primary"),
+    ).toBe(buildScheme("light")["primary"]);
   });
 });
 
@@ -172,7 +186,9 @@ describe("server rendering", () => {
 describe("useAppearance", () => {
   it("throws outside a provider", () => {
     const silence = vi.spyOn(console, "error").mockImplementation(quiet);
-    expect(() => renderHook(() => useAppearance())).toThrow(/needs an AppearanceProvider/);
+    expect(() => renderHook(() => useAppearance())).toThrow(
+      /needs an AppearanceProvider/,
+    );
     silence.mockRestore();
   });
 });

@@ -20,7 +20,18 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 /// A permission carried by a token.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+)]
 pub enum Scope {
     /// Read and search everything the user can see.
     #[serde(rename = "read")]
@@ -73,7 +84,9 @@ impl Scope {
         match self {
             Self::Read => &[Self::Read],
             Self::WriteDraft => &[Self::WriteDraft, Self::Read],
-            Self::WriteDirect => &[Self::WriteDirect, Self::WriteDraft, Self::Read],
+            Self::WriteDirect => {
+                &[Self::WriteDirect, Self::WriteDraft, Self::Read]
+            }
             Self::Work => &[Self::Work, Self::Read],
             Self::Admin => &Self::ALL,
         }
@@ -242,7 +255,8 @@ pub fn admit(
 pub fn canonical_resource(uri: &str) -> String {
     let uri = uri.split('#').next().unwrap_or_default();
     let (scheme, rest) = uri.split_once("://").unwrap_or(("", uri));
-    let (authority, path) = rest.find('/').map_or((rest, ""), |i| rest.split_at(i));
+    let (authority, path) =
+        rest.find('/').map_or((rest, ""), |i| rest.split_at(i));
     let path = path.trim_end_matches('/');
     format!(
         "{}://{}{}",
@@ -255,7 +269,8 @@ pub fn canonical_resource(uri: &str) -> String {
 /// Where this resource server lives and who issues its tokens.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResourceConfig {
-    /// Public base URL of the deployment, such as `https://vellum.northstar.dev`.
+    /// Public base URL of the deployment, such as
+    /// `https://vellum.northstar.dev`.
     pub base_url: String,
     /// Issuer identifier of the authorization server (the identity service).
     pub issuer: String,
@@ -265,7 +280,10 @@ impl ResourceConfig {
     /// The canonical URI of the MCP endpoint, the RFC 8707 resource.
     #[must_use]
     pub fn resource(&self) -> String {
-        canonical_resource(&format!("{}/mcp", self.base_url.trim_end_matches('/')))
+        canonical_resource(&format!(
+            "{}/mcp",
+            self.base_url.trim_end_matches('/')
+        ))
     }
 
     /// The URL of the Protected Resource Metadata document.
@@ -289,14 +307,18 @@ impl ResourceConfig {
             "scopes_supported": ["read", "write:draft", "work"],
             "bearer_methods_supported": ["header"],
             "resource_name": "Vellum",
-            "resource_documentation": format!("{}/help/ai-and-mcp", self.base_url.trim_end_matches('/')),
+            "resource_documentation": format!(
+                "{}/help/ai-and-mcp",
+                self.base_url.trim_end_matches('/')
+            ),
         })
     }
 
     /// `WWW-Authenticate` for a missing or invalid token (HTTP 401).
     #[must_use]
     pub fn unauthorized_challenge(&self, error: Option<&TokenError>) -> String {
-        let mut parts = vec![format!("resource_metadata=\"{}\"", self.metadata_url())];
+        let mut parts =
+            vec![format!("resource_metadata=\"{}\"", self.metadata_url())];
         parts.push("scope=\"read write:draft work\"".to_owned());
         if let Some(e) = error {
             parts.push("error=\"invalid_token\"".to_owned());
@@ -310,7 +332,9 @@ impl ResourceConfig {
     pub fn insufficient_scope_challenge(&self, needed: &[Scope]) -> String {
         let names: Vec<&str> = needed.iter().map(|s| s.as_str()).collect();
         format!(
-            "Bearer error=\"insufficient_scope\", scope=\"{}\", resource_metadata=\"{}\", error_description=\"This operation needs the {} scope\"",
+            "Bearer error=\"insufficient_scope\", scope=\"{}\", \
+                resource_metadata=\"{}\", error_description=\"This operation \
+                needs the {} scope\"",
             names.join(" "),
             self.metadata_url(),
             names.join(" and ")
@@ -351,7 +375,10 @@ mod tests {
     fn audience_must_match_the_endpoint() {
         let now = SystemTime::now();
         let resource = "https://vellum.northstar.dev/mcp";
-        assert!(admit(token("HTTPS://Vellum.northstar.dev/mcp/"), resource, now).is_ok());
+        assert!(
+            admit(token("HTTPS://Vellum.northstar.dev/mcp/"), resource, now)
+                .is_ok()
+        );
         assert_eq!(
             admit(token("https://other.example/mcp"), resource, now).err(),
             Some(TokenError::Invalid)

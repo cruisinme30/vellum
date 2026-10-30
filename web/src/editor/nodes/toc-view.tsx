@@ -18,15 +18,25 @@ export interface TocEntry {
 export function headingsAfter(editor: Editor, from: number): TocEntry[] {
   const out: TocEntry[] = [];
   editor.state.doc.descendants((node, pos) => {
-    if (node.type.name === "heading" && pos > from && node.textContent.trim() !== "") {
-      out.push({ level: Number(node.attrs["level"]), text: node.textContent, pos });
+    if (
+      node.type.name === "heading" &&
+      pos > from &&
+      node.textContent.trim() !== ""
+    ) {
+      out.push({
+        level: Number(node.attrs["level"]),
+        text: node.textContent,
+        pos,
+      });
     }
     return node.isBlock && node.type.name !== "heading";
   });
   return out;
 }
 
-/** `::: toc`: links to the headings below it, kept current as the page changes. */
+/**
+ * `::: toc`: links to the headings below it, kept current as the page changes.
+ */
 export function TocView({ editor, getPos }: ReactNodeViewProps) {
   const t = useT();
   const read = () => headingsAfter(editor, getPos() ?? 0);

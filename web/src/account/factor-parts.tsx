@@ -12,7 +12,10 @@ import { QrCode } from "./qr-code";
 
 type Submit = NonNullable<ComponentProps<"form">["onSubmit"]>;
 
-/** A one-time code field: digits, filled in by the phone's keyboard or a password manager. */
+/**
+ * A one-time code field: digits, filled in by the phone's keyboard or a
+ * password manager.
+ */
 export function CodeField({
   id,
   label,
@@ -48,7 +51,9 @@ export function CodeField({
   );
 }
 
-/** Setting up an authenticator app: scan or type the secret, then enter a code. */
+/**
+ * Setting up an authenticator app: scan or type the secret, then enter a code.
+ */
 export function TotpSetupPanel({
   setup,
   busy,
@@ -70,13 +75,18 @@ export function TotpSetupPanel({
     onConfirm(code);
   };
   return (
-    <form className="vl-admin-form vl-account-totp" onSubmit={submit} aria-busy={busy}>
+    <form
+      className="vl-admin-form vl-account-totp"
+      onSubmit={submit}
+      aria-busy={busy}
+    >
       <ol className="vl-account-steps">
         <li>{t("factors-totp-scan")}</li>
         <li>
           <QrCode rows={setup.qr} label={t("factors-totp-qr")} />
           <p className="vl-muted">
-            {t("factors-totp-manual")} <code className="vl-account-secret">{setup.secret}</code>
+            {t("factors-totp-manual")}{" "}
+            <code className="vl-account-secret">{setup.secret}</code>
           </p>
           <p>
             <a href={setup.uri}>{t("factors-totp-open")}</a>
@@ -125,7 +135,8 @@ export function RecoveryCodesPanel({
   return (
     <div className="vl-admin-secret" role="region" aria-labelledby={id}>
       <p id={id}>
-        <strong>{t("factors-recovery-title")}</strong> {t("factors-recovery-hint")}
+        <strong>{t("factors-recovery-title")}</strong>{" "}
+        {t("factors-recovery-hint")}
       </p>
       <ul className="vl-account-recovery" data-testid="recovery-codes">
         {codes.map((code) => (

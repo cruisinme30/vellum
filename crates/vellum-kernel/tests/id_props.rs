@@ -36,7 +36,10 @@ proptest! {
         prop_assert_eq!(serde_json::from_str::<DocId>(&json).ok(), Some(id));
         let block = BlockId::from_u64(block);
         let json = serde_json::to_string(&block).unwrap_or_default();
-        prop_assert_eq!(serde_json::from_str::<Option<BlockId>>(&json).ok(), Some(block));
+        prop_assert_eq!(
+            serde_json::from_str::<Option<BlockId>>(&json).ok(),
+            Some(block)
+        );
     }
 
     #[test]
@@ -66,7 +69,8 @@ fn generated_ids_are_unique_and_ordered() {
 
 #[test]
 fn json_schemas_describe_the_text_forms() {
-    let doc = serde_json::to_value(schemars::schema_for!(DocId)).unwrap_or_default();
+    let doc =
+        serde_json::to_value(schemars::schema_for!(DocId)).unwrap_or_default();
     assert_eq!(
         doc.pointer("/format").and_then(|v| v.as_str()),
         Some("ulid")
@@ -76,7 +80,8 @@ fn json_schemas_describe_the_text_forms() {
         .and_then(|v| v.as_str())
         .unwrap_or_default();
     assert!(pattern.starts_with("^[0-7]"));
-    let block = serde_json::to_value(schemars::schema_for!(BlockId)).unwrap_or_default();
+    let block = serde_json::to_value(schemars::schema_for!(BlockId))
+        .unwrap_or_default();
     assert_eq!(
         block.pointer("/type").and_then(|v| v.as_str()),
         Some("string")

@@ -28,7 +28,9 @@ fn adf_inline(node: &Value, out: &mut String) {
                         "em" => format!("*{t}*"),
                         "strike" => format!("~~{t}~~"),
                         "code" => format!("`{t}`"),
-                        "link" => format!("[{t}]({})", text(mark, "/attrs/href")),
+                        "link" => {
+                            format!("[{t}]({})", text(mark, "/attrs/href"))
+                        }
                         _ => t,
                     };
                 }
@@ -81,7 +83,11 @@ fn adf_block(node: &Value, out: &mut String) {
                     } else {
                         "-".to_owned()
                     };
-                    let _ = writeln!(out, "{marker} {}", body.trim().replace('\n', "\n  "));
+                    let _ = writeln!(
+                        out,
+                        "{marker} {}",
+                        body.trim().replace('\n', "\n  ")
+                    );
                 }
             }
             out.push('\n');
@@ -129,9 +135,8 @@ fn category(fields: &Value) -> Option<StateCategory> {
     match text(fields, "/status/statusCategory/key") {
         "done" => Some(match resolution.as_str() {
             "duplicate" => StateCategory::Duplicate,
-            "won't do" | "won't fix" | "cannot reproduce" | "declined" | "incomplete" => {
-                StateCategory::Canceled
-            }
+            "won't do" | "won't fix" | "cannot reproduce" | "declined"
+            | "incomplete" => StateCategory::Canceled,
             _ => StateCategory::Completed,
         }),
         "indeterminate" => Some(StateCategory::Started),
@@ -184,14 +189,19 @@ fn relations(fields: &Value) -> Vec<(Relation, String)> {
 /// # Errors
 ///
 /// [`ImportError::Unreadable`] if the JSON has no `issues` array.
-pub fn read(json: &str, estimate_field: Option<&str>) -> Result<Export, ImportError> {
-    let value: Value =
-        serde_json::from_str(json).map_err(|e| ImportError::Unreadable(e.to_string()))?;
+pub fn read(
+    json: &str,
+    estimate_field: Option<&str>,
+) -> Result<Export, ImportError> {
+    let value: Value = serde_json::from_str(json)
+        .map_err(|e| ImportError::Unreadable(e.to_string()))?;
     let issues = value
         .get("issues")
         .or(Some(&value))
         .and_then(Value::as_array)
-        .ok_or_else(|| ImportError::Unreadable("expected an `issues` array".to_owned()))?;
+        .ok_or_else(|| {
+            ImportError::Unreadable("expected an `issues` array".to_owned())
+        })?;
     let mut export = Export::default();
     for issue in issues {
         let key = text(issue, "/key").to_owned();
@@ -207,16 +217,18 @@ pub fn read(json: &str, estimate_field: Option<&str>) -> Result<Export, ImportEr
             Some(doc @ Value::Object(_)) => adf_to_markdown(doc),
             _ => String::new(),
         };
-        let parent_is_epic =
-            text(fields, "/parent/fields/issuetype/name").eq_ignore_ascii_case("epic");
+        let parent_is_epic = text(fields, "/parent/fields/issuetype/name")
+            .eq_ignore_ascii_case("epic");
         let (parent, project) = if parent_is_epic {
             (
                 None,
-                Some(text(fields, "/parent/fields/summary").to_owned()).filter(|s| !s.is_empty()),
+                Some(text(fields, "/parent/fields/summary").to_owned())
+                    .filter(|s| !s.is_empty()),
             )
         } else {
             (
-                Some(text(fields, "/parent/key").to_owned()).filter(|s| !s.is_empty()),
+                Some(text(fields, "/parent/key").to_owned())
+                    .filter(|s| !s.is_empty()),
                 None,
             )
         };
@@ -245,17 +257,21 @@ pub fn read(json: &str, estimate_field: Option<&str>) -> Result<Export, ImportEr
             state_name: text(fields, "/status/name").to_owned(),
             category,
             priority: Priority::parse(text(fields, "/priority/name")),
-            estimate: estimate_field.and_then(|f| fields.get(f)).and_then(|v| {
-                v.as_f64()
-                    .map(|n| n.to_string())
-                    .or_else(|| v.as_str().map(str::to_owned))
-            }),
+            estimate: estimate_field.and_then(|f| fields.get(f)).and_then(
+                |v| {
+                    v.as_f64()
+                        .map(|n| n.to_string())
+                        .or_else(|| v.as_str().map(str::to_owned))
+                },
+            ),
             labels,
             assignee: person(fields, "assignee"),
-            creator: person(fields, "reporter").or_else(|| person(fields, "creator")),
+            creator: person(fields, "reporter")
+                .or_else(|| person(fields, "creator")),
             project,
             created_at: timestamp(text(fields, "/created")),
-            completed_at: resolved.filter(|_| category == Some(StateCategory::Completed)),
+            completed_at: resolved
+                .filter(|_| category == Some(StateCategory::Completed)),
             canceled_at: resolved.filter(|_| {
                 matches!(
                     category,
@@ -279,19 +295,49 @@ mod tests {
     #[test]
     fn adf_converts_to_markdown() {
         let doc = json!({"type": "doc", "version": 1, "content": [
-            {"type": "heading", "attrs": {"level": 2}, "content": [{"type": "text", "text": "Steps"}]},
+            {
+                "type": "heading",
+                "attrs": {"level": 2},
+                "content": [{"type": "text", "text": "Steps"}]
+            },
             {"type": "orderedList", "content": [
                 {"type": "listItem", "content": [{"type": "paragraph", "content": [
-                    {"type": "text", "text": "Open "}, {"type": "text", "text": "Export", "marks": [{"type": "strong"}]}]}]},
+                    {
+                        "type": "text",
+                        "text": "Open "
+                    }, {
+                        "type": "text",
+                        "text": "Export",
+                        "marks": [{"type": "strong"}]
+                    }]}]},
                 {"type": "listItem", "content": [{"type": "paragraph", "content": [
-                    {"type": "text", "text": "docs", "marks": [{"type": "link", "attrs": {"href": "https://northstar.dev"}}]}]}]}
+                    {
+                        "type": "text",
+                        "text": "docs",
+                        "marks": [{
+                            "type": "link",
+                            "attrs": {"href": "https://northstar.dev"}
+                        }]
+                    }]}]}
             ]},
-            {"type": "panel", "attrs": {"panelType": "warning"}, "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Slow"}]}]},
-            {"type": "codeBlock", "attrs": {"language": "rust"}, "content": [{"type": "text", "text": "fn main() {}"}]}
+            {
+                "type": "panel",
+                "attrs": {"panelType": "warning"},
+                "content": [{
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "Slow"}]
+                }]
+            },
+            {
+                "type": "codeBlock",
+                "attrs": {"language": "rust"},
+                "content": [{"type": "text", "text": "fn main() {}"}]
+            }
         ]});
         assert_eq!(
             adf_to_markdown(&doc),
-            "## Steps\n\n1. Open **Export**\n2. [docs](https://northstar.dev)\n\n::: warn\n\nSlow\n\n:::\n\n```rust\nfn main() {}\n```"
+            "## Steps\n\n1. Open **Export**\n2. [docs](https://northstar.dev)\n\
+                \n::: warn\n\nSlow\n\n:::\n\n```rust\nfn main() {}\n```"
         );
     }
 
@@ -301,21 +347,54 @@ mod tests {
             {"key": "PROJ-7", "fields": {
                 "summary": "Login loop", "description": "h2. Wiki text",
                 "status": {"name": "Done", "statusCategory": {"key": "done"}},
-                "resolution": {"name": "Won't Do"}, "resolutiondate": "2026-03-01T10:00:00.000+0000",
-                "priority": {"name": "Highest"}, "labels": ["auth"], "issuetype": {"name": "Bug"},
-                "assignee": {"emailAddress": "bo@northstar.dev", "displayName": "Bo"},
-                "reporter": {"displayName": "Ada"}, "created": "2026-02-01T10:00:00.000+0000",
+                "resolution": {"name": "Won't Do"}, "resolutiondate": "2026-03-\
+                    01T10:00:00.000+0000",
+                "priority": {
+                    "name": "Highest"
+                }, "labels": ["auth"], "issuetype": {"name": "Bug"},
+                "assignee": {
+                    "emailAddress": "bo@northstar.dev",
+                    "displayName": "Bo"
+                },
+                "reporter": {"displayName": "Ada"}, "created": "2026-02-01T10:0\
+                    0:00.000+0000",
                 "duedate": "2026-03-15", "customfield_10016": 5.0,
-                "parent": {"key": "PROJ-1", "fields": {"summary": "Auth revamp", "issuetype": {"name": "Epic"}}},
+                "parent": {
+                    "key": "PROJ-1",
+                    "fields": {
+                        "summary": "Auth revamp",
+                        "issuetype": {"name": "Epic"}
+                    }
+                },
                 "issuelinks": [
-                    {"type": {"name": "Blocks"}, "outwardIssue": {"key": "PROJ-9"}},
-                    {"type": {"name": "Blocks"}, "inwardIssue": {"key": "PROJ-3"}},
-                    {"type": {"name": "Duplicate"}, "inwardIssue": {"key": "PROJ-4"}},
-                    {"type": {"name": "Relates"}, "outwardIssue": {"key": "PROJ-5"}}
+                    {
+                        "type": {"name": "Blocks"},
+                        "outwardIssue": {"key": "PROJ-9"}
+                    },
+                    {
+                        "type": {"name": "Blocks"},
+                        "inwardIssue": {"key": "PROJ-3"}
+                    },
+                    {
+                        "type": {"name": "Duplicate"},
+                        "inwardIssue": {"key": "PROJ-4"}
+                    },
+                    {
+                        "type": {"name": "Relates"},
+                        "outwardIssue": {"key": "PROJ-5"}
+                    }
                 ]
             }},
-            {"key": "PROJ-8", "fields": {"summary": "Sub", "status": {"name": "Backlog", "statusCategory": {"key": "new"}},
-                                         "parent": {"key": "PROJ-7", "fields": {"issuetype": {"name": "Bug"}}}}},
+            {"key": "PROJ-8", "fields": {"summary": "Sub", "status": {
+                "name": "Backlog",
+                "statusCategory": {"key": "new"}
+            },
+                                         "parent": {
+                                             "key": "PROJ-7",
+                                             "fields": {
+                                                 "issuetype": {"name": "Bug"}
+                                             }
+                                         }}},
             {"key": "PROJ-10"}
         ]});
         let export = read(&json.to_string(), Some("customfield_10016"))?;

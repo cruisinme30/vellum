@@ -31,7 +31,8 @@ pub fn to_mathml(tex: &str) -> Result<String, String> {
         xml: true,
         ..RenderConfig::default()
     };
-    push_mathml(&mut out, events.into_iter(), config).map_err(|e| e.to_string())?;
+    push_mathml(&mut out, events.into_iter(), config)
+        .map_err(|e| e.to_string())?;
     Ok(out)
 }
 

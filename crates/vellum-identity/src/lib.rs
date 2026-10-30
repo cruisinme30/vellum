@@ -52,8 +52,8 @@ pub mod xmldsig;
 
 pub use groups::{GroupMembers, GroupsService};
 pub use identity::{
-    BREAK_GLASS_EMAIL, Identity, IdentityConfig, NewSession, PeopleCounts, Resolved, TokenInfo,
-    UserView,
+    BREAK_GLASS_EMAIL, Identity, IdentityConfig, NewSession, PeopleCounts,
+    Resolved, TokenInfo, UserView,
 };
 pub use oauth::{ClientMetadataFetcher, DESKTOP_CLIENT_ID, NoMetadataFetch};
 pub use service::IdentityService;

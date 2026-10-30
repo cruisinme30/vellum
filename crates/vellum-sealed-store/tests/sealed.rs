@@ -9,7 +9,9 @@ use std::sync::Arc;
 use bytes::Bytes;
 use vellum_crypto::{KekId, LocalKeyring, SecretKey, is_envelope, kek_of};
 use vellum_sealed_store::{PrefixPolicy, Sealed};
-use vellum_store::{BlobPath, BlobStore, LocalStore, Precondition, conformance};
+use vellum_store::{
+    BlobPath, BlobStore, LocalStore, Precondition, conformance,
+};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -21,7 +23,10 @@ async fn sealed(
     dir: &std::path::Path,
     keys: LocalKeyring,
     policy: PrefixPolicy,
-) -> Result<Sealed<LocalStore, LocalKeyring, PrefixPolicy>, Box<dyn std::error::Error>> {
+) -> Result<
+    Sealed<LocalStore, LocalKeyring, PrefixPolicy>,
+    Box<dyn std::error::Error>,
+> {
     Ok(Sealed::new(
         LocalStore::open(dir).await?,
         Arc::new(keys),
@@ -32,13 +37,16 @@ async fn sealed(
 #[tokio::test(flavor = "multi_thread")]
 async fn sealed_store_conforms() -> TestResult {
     let dir = tempfile::tempdir()?;
-    let store = sealed(dir.path(), keyring("kek-1")?, PrefixPolicy::encrypt_all()).await?;
+    let store =
+        sealed(dir.path(), keyring("kek-1")?, PrefixPolicy::encrypt_all())
+            .await?;
     conformance::run_all(&store).await?;
 
     let mut plain = PrefixPolicy::encrypt_all();
     plain.set(BlobPath::new("conformance")?, true);
     let dir = tempfile::tempdir()?;
-    conformance::run_all(&sealed(dir.path(), keyring("kek-1")?, plain).await?).await?;
+    conformance::run_all(&sealed(dir.path(), keyring("kek-1")?, plain).await?)
+        .await?;
     Ok(())
 }
 
@@ -48,7 +56,9 @@ async fn disk_holds_ciphertext_except_in_plaintext_spaces() -> TestResult {
     let mut policy = PrefixPolicy::encrypt_all();
     policy.set(BlobPath::new("public")?, true);
     let store = sealed(dir.path(), keyring("kek-1")?, policy).await?;
-    let doc = Bytes::from_static(b"---\ntitle: Northstar plan\nvellum: 1\n---\n# Plan\n");
+    let doc = Bytes::from_static(
+        b"---\ntitle: Northstar plan\nvellum: 1\n---\n# Plan\n",
+    );
 
     for rel in ["eng/plan.md", "public/plan.md"] {
         let meta = store
@@ -87,7 +97,8 @@ async fn reseal_migrates_a_space_between_modes() -> TestResult {
     assert_eq!(on_disk()?, doc);
 
     // Switched to encrypted: still readable before and after the reseal.
-    let store = sealed(dir.path(), ring()?, PrefixPolicy::encrypt_all()).await?;
+    let store =
+        sealed(dir.path(), ring()?, PrefixPolicy::encrypt_all()).await?;
     assert_eq!(store.get(&path).await?.bytes, doc);
     assert!(store.reseal(&path).await?);
     assert!(!store.reseal(&path).await?, "already in the wanted form");

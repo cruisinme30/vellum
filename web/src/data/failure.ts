@@ -14,7 +14,9 @@ export interface Diagnostic {
   readonly at: Date;
 }
 
-/** Failures shown recently, by the text the person sees; oldest dropped first. */
+/**
+ * Failures shown recently, by the text the person sees; oldest dropped first.
+ */
 const RECENT = new Map<string, Diagnostic>();
 const KEEP = 50;
 
@@ -30,7 +32,10 @@ export function diagnosticOf(error: unknown): Diagnostic {
       at: error.at,
     };
   }
-  return { message: error instanceof Error ? error.message : String(error), at: new Date() };
+  return {
+    message: error instanceof Error ? error.message : String(error),
+    at: new Date(),
+  };
 }
 
 /** A failure as one line for the person, with the request ID to quote. */
@@ -50,7 +55,10 @@ export function failureText(error: unknown): string {
   return text;
 }
 
-/** The diagnostic for a failure line {@link failureText} produced, if it is recent. */
+/**
+ * The diagnostic for a failure line {@link failureText} produced, if it is
+ * recent.
+ */
 export function recentDiagnostic(text: string): Diagnostic | undefined {
   return RECENT.get(text);
 }
@@ -60,7 +68,11 @@ export function recentDiagnostic(text: string): Diagnostic | undefined {
  * route and the time, plus where in the app it happened. It holds no page
  * content and no credentials, so it is safe to paste into a support ticket.
  */
-export function diagnosticText(diagnostic: Diagnostic, where: string, app = "web"): string {
+export function diagnosticText(
+  diagnostic: Diagnostic,
+  where: string,
+  app = "web",
+): string {
   const lines = [
     "Vellum diagnostic",
     `Message: ${diagnostic.message}`,
@@ -68,9 +80,16 @@ export function diagnosticText(diagnostic: Diagnostic, where: string, app = "web
     `Route: ${diagnostic.route ?? "unknown"}`,
   ];
   if (diagnostic.code !== undefined || diagnostic.status !== undefined) {
-    const status = diagnostic.status === undefined ? "" : ` (HTTP ${String(diagnostic.status)})`;
+    const status =
+      diagnostic.status === undefined
+        ? ""
+        : ` (HTTP ${String(diagnostic.status)})`;
     lines.push(`Error: ${diagnostic.code ?? "unknown"}${status}`);
   }
-  lines.push(`Time: ${diagnostic.at.toISOString()}`, `Screen: ${where}`, `Client: ${app}`);
+  lines.push(
+    `Time: ${diagnostic.at.toISOString()}`,
+    `Screen: ${where}`,
+    `Client: ${app}`,
+  );
   return lines.join("\n");
 }

@@ -26,7 +26,10 @@ test.use({
 });
 // eslint-disable-next-line no-empty-pattern -- Playwright needs the fixtures object
 test.beforeEach(({}, testInfo) => {
-  test.skip(!testInfo.project.name.endsWith("-laptop"), "runs at laptop size only");
+  test.skip(
+    !testInfo.project.name.endsWith("-laptop"),
+    "runs at laptop size only",
+  );
 });
 
 interface Fixture {
@@ -39,7 +42,10 @@ interface Fixture {
 }
 
 const FIXTURE = JSON.parse(
-  readFileSync(new URL("support/render-fixture.gen.json", import.meta.url), "utf8"),
+  readFileSync(
+    new URL("support/render-fixture.gen.json", import.meta.url),
+    "utf8",
+  ),
 ) as Fixture;
 
 const PAGE = "01M6400000PAGE00ROADMAP001";
@@ -50,7 +56,10 @@ const THEMES = [
   ["sepia", "light"],
   ["dim", "dark"],
 ] as const;
-/** The blocks issue #522 asks to see drawn, by the class the renderer gives them. */
+/**
+ * The blocks issue #522 asks to see drawn, by the class the renderer gives
+ * them.
+ */
 const DRAWN = [
   ".vl-chart svg",
   ".vl-timeline",
@@ -72,7 +81,10 @@ async function fakeRenderer(page: Page, failBlock?: string) {
     if (seed === null) return route.fulfill({ json: FIXTURE.stylesheet });
     return `#${seed}` === FIXTURE.accent
       ? route.fulfill({ json: FIXTURE.stylesheet_accent })
-      : route.fulfill({ status: 400, json: { code: "invalid_input", message: "unknown seed" } });
+      : route.fulfill({
+          status: 400,
+          json: { code: "invalid_input", message: "unknown seed" },
+        });
   });
   await page.route(`**/api/v1/pages/${PAGE}/render`, (route) => {
     counts.page += 1;
@@ -95,7 +107,10 @@ async function fakeRenderer(page: Page, failBlock?: string) {
     }
     const drawn = FIXTURE.blocks[lang];
     return drawn === undefined
-      ? route.fulfill({ status: 404, json: { code: "not_found", message: "no fixture" } })
+      ? route.fulfill({
+          status: 404,
+          json: { code: "not_found", message: "no fixture" },
+        })
       : route.fulfill({ json: drawn });
   });
   return counts;
@@ -108,18 +123,33 @@ async function expectNoOverflow(page: Page, selector: string) {
     return [...root.querySelectorAll("*")]
       .filter((element) => {
         // Children of a block that scrolls on its own are fine.
-        const scroller = element.parentElement?.closest(".vl-figure, .vl-board, .vl-table-wrap");
-        if (scroller !== null && scroller !== undefined && root.contains(scroller)) return false;
+        const scroller = element.parentElement?.closest(
+          ".vl-figure, .vl-board, .vl-table-wrap",
+        );
+        if (
+          scroller !== null &&
+          scroller !== undefined &&
+          root.contains(scroller)
+        )
+          return false;
         const box = element.getBoundingClientRect();
-        return box.width > 0 && (box.left < bounds.left - 1 || box.right > bounds.right + 1);
+        return (
+          box.width > 0 &&
+          (box.left < bounds.left - 1 || box.right > bounds.right + 1)
+        );
       })
-      .map((element) => `${element.tagName}.${element.getAttribute("class") ?? ""}`);
+      .map(
+        (element) =>
+          `${element.tagName}.${element.getAttribute("class") ?? ""}`,
+      );
   });
   expect(sticking).toEqual([]);
 }
 
 for (const [theme, scheme] of THEMES) {
-  test(`the reading view draws every block in the ${theme} theme`, async ({ page }, testInfo) => {
+  test(`the reading view draws every block in the ${theme} theme`, async ({
+    page,
+  }, testInfo) => {
     await page.emulateMedia({ colorScheme: scheme });
     await page.addInitScript(
       `new MutationObserver((_, o) => { if (document.documentElement) { document.documentElement.dataset.theme = ${JSON.stringify(theme)}; o.disconnect(); } }).observe(document, { childList: true });`,
@@ -129,7 +159,9 @@ for (const [theme, scheme] of THEMES) {
     await fakeRenderer(page);
     await page.goto(`/p/${PAGE}?view=read`);
     const reading = page.getByRole("region", { name: "Rendered page" });
-    await expect(reading.getByRole("heading", { name: "Every block" })).toBeVisible();
+    await expect(
+      reading.getByRole("heading", { name: "Every block" }),
+    ).toBeVisible();
     for (const selector of DRAWN) {
       await expect(reading.locator(selector).first(), selector).toBeVisible();
     }
@@ -151,7 +183,9 @@ for (const [theme, scheme] of THEMES) {
   });
 }
 
-test("a theme change re-themes drawn blocks without asking the server again", async ({ page }) => {
+test("a theme change re-themes drawn blocks without asking the server again", async ({
+  page,
+}) => {
   await signedIn(page);
   await fakeCollab(page);
   const counts = await fakeRenderer(page);
@@ -199,18 +233,26 @@ test("a custom accent colour tints drawn blocks (D302)", async ({ page }) => {
   expect(axe.violations).toEqual([]);
 });
 
-test("calculators in the reading view recompute as a slider moves", async ({ page }) => {
+test("calculators in the reading view recompute as a slider moves", async ({
+  page,
+}) => {
   await signedIn(page);
   await fakeCollab(page);
   await fakeRenderer(page);
   await page.goto(`/p/${PAGE}?view=read`);
   const calculator = page.locator(".vl-reading .vl-calculator");
-  await expect(calculator.locator(".vl-calc-result output")).toHaveText(/1,200/);
+  await expect(calculator.locator(".vl-calc-result output")).toHaveText(
+    /1,200/,
+  );
   await calculator.getByLabel("Units").fill("250");
-  await expect(calculator.locator(".vl-calc-result output")).toHaveText(/3,000/);
+  await expect(calculator.locator(".vl-calc-result output")).toHaveText(
+    /3,000/,
+  );
 });
 
-test("the editor shows server-drawn blocks, with their source a click away", async ({ page }) => {
+test("the editor shows server-drawn blocks, with their source a click away", async ({
+  page,
+}) => {
   await signedIn(page);
   const mermaid = "flowchart LR\n  A[Request] --> B{Allowed?}\n";
   await fakeCollab(page, {
@@ -222,9 +264,13 @@ test("the editor shows server-drawn blocks, with their source a click away", asy
   const counts = await fakeRenderer(page);
   await page.goto(`/p/${PAGE}`);
   const mermaidBlock = page.locator('.vl-fence[data-lang="mermaid"]');
-  await expect(mermaidBlock.locator(".vl-fence-render .vl-diagram svg")).toBeVisible();
   await expect(
-    page.locator('.vl-fence[data-lang="timeline"] .vl-fence-render .vl-timeline'),
+    mermaidBlock.locator(".vl-fence-render .vl-diagram svg"),
+  ).toBeVisible();
+  await expect(
+    page.locator(
+      '.vl-fence[data-lang="timeline"] .vl-fence-render .vl-timeline',
+    ),
   ).toBeVisible();
   expect(counts.block).toBeGreaterThanOrEqual(2);
 
@@ -257,11 +303,14 @@ test("a block the server cannot draw says why, with Copy diagnostic", async ({
   await page.goto(`/p/${PAGE}`);
   const block = page.locator('.vl-fence[data-lang="roadmap"]');
   await expect(block.getByRole("alert")).toContainText(
-    "The block could not be drawn: The renderer is busy. (request req-render-1)",
+    "The block could not be drawn: The renderer is busy. (request " +
+      "req-render-1)",
   );
   await block.getByRole("button", { name: "Copy diagnostic" }).click();
   // Copied where the clipboard is allowed; shown to copy by hand elsewhere.
-  const copied = block.getByRole("status").filter({ hasText: "Diagnostic copied" });
+  const copied = block
+    .getByRole("status")
+    .filter({ hasText: "Diagnostic copied" });
   const manual = block.getByRole("textbox", { name: "Diagnostic to copy" });
   await expect(copied.or(manual)).toBeVisible();
   if (browserName === "chromium") {

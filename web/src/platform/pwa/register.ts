@@ -37,7 +37,8 @@ export async function registerServiceWorker(
   options: RegisterOptions = {},
 ): Promise<WorkerHandle | undefined> {
   const container =
-    options.container ?? (globalThis.navigator as Navigator | undefined)?.serviceWorker;
+    options.container ??
+    (globalThis.navigator as Navigator | undefined)?.serviceWorker;
   if (container === undefined) return undefined;
   const reload =
     options.reload ??
@@ -49,7 +50,10 @@ export async function registerServiceWorker(
   // resolves to nothing; without this check the app crashed (D285).
   let registered: unknown;
   try {
-    registered = await container.register("/sw.js", { scope: "/", updateViaCache: "none" });
+    registered = await container.register("/sw.js", {
+      scope: "/",
+      updateViaCache: "none",
+    });
   } catch {
     registered = undefined;
   }
@@ -58,7 +62,8 @@ export async function registerServiceWorker(
     return undefined;
   }
   const registration = registered as ServiceWorkerRegistration;
-  let updateReady = registration.waiting !== null && container.controller !== null;
+  let updateReady =
+    registration.waiting !== null && container.controller !== null;
   const announce = () => {
     updateReady = true;
     options.onUpdateReady?.();
@@ -74,7 +79,11 @@ export async function registerServiceWorker(
       // `clients.claim()` made it the controller, and treating that as an
       // update reloaded the page during its first load.
       const controller = container.controller;
-      if (installing.state === "installed" && controller !== null && controller !== installing) {
+      if (
+        installing.state === "installed" &&
+        controller !== null &&
+        controller !== installing
+      ) {
         announce();
       }
     });

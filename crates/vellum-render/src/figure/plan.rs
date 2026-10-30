@@ -7,14 +7,18 @@
 use std::collections::HashMap;
 use std::fmt::Write as _;
 
-use super::svg::{CARD, Drawing, GRID, INK, MUTED, OUTLINE, Svg, fit, series_colour, text_width};
+use super::svg::{
+    CARD, Drawing, GRID, INK, MUTED, OUTLINE, Svg, fit, series_colour,
+    text_width,
+};
 use crate::html::num;
 use vellum_format::blocks::{Architecture, BoardColumn, TimelineItem};
 
 use crate::model::{Risk, Roadmap, days_from_iso, year_month};
 
 const MONTHS: [&str; 12] = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct",
+    "Nov", "Dec",
 ];
 
 fn month_name(m: i64) -> &'static str {
@@ -65,7 +69,8 @@ pub fn roadmap(r: &Roadmap) -> Drawing {
         .unwrap_or(12);
     let mut i = 0;
     loop {
-        let first = days_from_iso(&format!("{y:04}-{m:02}-01")).unwrap_or(r.start);
+        let first =
+            days_from_iso(&format!("{y:04}-{m:02}-01")).unwrap_or(r.start);
         if first > r.end {
             break;
         }
@@ -124,7 +129,15 @@ pub fn roadmap(r: &Roadmap) -> Drawing {
         } else {
             let x0 = x_of(row.start);
             let x1 = x_of(row.end).max(x0 + 4.0);
-            svg.rect(x0, cy - 9.0, x1 - x0, 18.0, 6.0, &colour, Some(&row.name));
+            svg.rect(
+                x0,
+                cy - 9.0,
+                x1 - x0,
+                18.0,
+                6.0,
+                &colour,
+                Some(&row.name),
+            );
         }
     }
     let alt = format!(
@@ -204,7 +217,9 @@ pub fn risk_matrix(risks: &[Risk]) -> Drawing {
         true,
     );
     svg.raw(&format!(
-        "<text x=\"14\" y=\"{}\" font-size=\"12\" font-weight=\"600\" text-anchor=\"middle\" transform=\"rotate(-90 14 {})\" style=\"fill:{MUTED}\">Likelihood</text>",
+        "<text x=\"14\" y=\"{}\" font-size=\"12\" font-weight=\"600\" \
+            text-anchor=\"middle\" transform=\"rotate(-90 14 {})\" \
+            style=\"fill:{MUTED}\">Likelihood</text>",
         num(top + ch * 2.5),
         num(top + ch * 2.5)
     ));
@@ -212,8 +227,14 @@ pub fn risk_matrix(risks: &[Risk]) -> Drawing {
     let mut per_cell: HashMap<(u8, u8), usize> = HashMap::new();
     for (n, risk) in risks.iter().enumerate() {
         let slot = per_cell.entry((risk.likelihood, risk.impact)).or_insert(0);
-        let cx = left + f64::from(risk.impact - 1) * cw + 18.0 + (*slot % 4) as f64 * 22.0;
-        let cy = top + f64::from(5 - risk.likelihood) * ch + 16.0 + (*slot / 4) as f64 * 20.0;
+        let cx = left
+            + f64::from(risk.impact - 1) * cw
+            + 18.0
+            + (*slot % 4) as f64 * 22.0;
+        let cy = top
+            + f64::from(5 - risk.likelihood) * ch
+            + 16.0
+            + (*slot / 4) as f64 * 20.0;
         *slot += 1;
         let tip = format!(
             "{}. {} (likelihood {}, impact {})",
@@ -302,7 +323,8 @@ pub fn timeline(items: &[TimelineItem]) -> Drawing {
 pub fn board(columns: &[BoardColumn]) -> Drawing {
     let col_w = 180.0;
     let gap = 12.0;
-    let tallest = columns.iter().map(|c| c.cards.len()).max().unwrap_or(0) as f64;
+    let tallest =
+        columns.iter().map(|c| c.cards.len()).max().unwrap_or(0) as f64;
     let width = (col_w + gap) * columns.len().max(1) as f64 + gap;
     let height = 48.0 + tallest * 52.0 + 12.0;
     let mut svg = Svg::new(width, height, "Board");
@@ -370,11 +392,20 @@ pub fn architecture(a: &Architecture) -> Drawing {
     let width = a
         .lanes
         .iter()
-        .map(|lane| lane_label + 16.0 + lane.items.iter().map(|i| box_w(i) + gap).sum::<f64>())
+        .map(|lane| {
+            lane_label
+                + 16.0
+                + lane.items.iter().map(|i| box_w(i) + gap).sum::<f64>()
+        })
         .fold(640.0, f64::max);
     let height = 12.0 + (lane_h + 10.0) * a.lanes.len().max(1) as f64;
     let mut svg = Svg::new(width, height, "Architecture diagram");
-    svg.raw("<defs><marker id=\"arrow\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\"><path d=\"M0 0L10 5L0 10Z\" style=\"fill:var(--vl-on-surface-variant)\"/></marker></defs>");
+    svg.raw(
+        "<defs><marker id=\"arrow\" viewBox=\"0 0 10 10\" refX=\"9\" \
+        refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" \
+        orient=\"auto-start-reverse\"><path d=\"M0 0L10 5L0 10Z\" \
+        style=\"fill:var(--vl-on-surface-variant)\"/></marker></defs>",
+    );
     let mut pos: HashMap<&str, (f64, f64, f64)> = HashMap::new();
     for (i, lane) in a.lanes.iter().enumerate() {
         let (name, items) = (&lane.name, &lane.items);
@@ -456,7 +487,9 @@ pub fn architecture(a: &Architecture) -> Drawing {
             .map(|l| format!(": {l}"))
             .unwrap_or_default();
         svg.raw(&format!(
-            "<path d=\"{d}\" marker-end=\"url(#arrow)\" style=\"fill:none;stroke:{MUTED};stroke-width:1.5\"><title>{} → {}{}</title></path>",
+            "<path d=\"{d}\" marker-end=\"url(#arrow)\" \
+                style=\"fill:none;stroke:{MUTED};stroke-width:1.5\"><title>{} \
+                → {}{}</title></path>",
             crate::html::escape(from),
             crate::html::escape(to),
             crate::html::escape(&label)
@@ -488,7 +521,10 @@ mod tests {
     fn roadmap_draws_bars_and_milestones() {
         let Data::Roadmap(r) = model::fence_data(
             "roadmap",
-            "range: 2026-11-01 .. 2027-06-30\nDiscovery | 2026-11-01 | 2026-12-15\nBuild | 2026-12-01 | 2027-04-30\nLaunch | 2027-05-15 | milestone\n",
+            "range: 2026-11-01 .. 2027-06-30\n\
+                Discovery | 2026-11-01 | 2026-12-15\n\
+                Build | 2026-12-01 | 2027-04-30\n\
+                Launch | 2027-05-15 | milestone\n",
         ) else {
             panic!()
         };
@@ -504,7 +540,8 @@ mod tests {
     fn risk_matrix_numbers_risks() {
         let Data::RiskMatrix(m) = model::fence_data(
             "risk-matrix",
-            "PDF export slips | likelihood 3 | impact 4\nDrive quota | likelihood 2 | impact 2\n",
+            "PDF export slips | likelihood 3 | impact 4\n\
+                Drive quota | likelihood 2 | impact 2\n",
         ) else {
             panic!()
         };
@@ -521,7 +558,9 @@ mod tests {
     fn architecture_connects_boxes() {
         let Data::Architecture(a) = model::fence_data(
             "architecture",
-            "Clients: Web app, Mobile app\nServices: API, Worker\nData: Postgres\nWeb app -> API\nMobile app -> API\nAPI -> Postgres: reads\nAPI -> Worker\n",
+            "Clients: Web app, Mobile app\nServices: API, Worker\n\
+                Data: Postgres\nWeb app -> API\nMobile app -> API\n\
+                API -> Postgres: reads\nAPI -> Worker\n",
         ) else {
             panic!()
         };
@@ -533,12 +572,15 @@ mod tests {
 
     #[test]
     fn timeline_and_board_draw() {
-        let Data::Timeline(t) = model::fence_data("timeline", "Oct 6 | Design approved | Scope\n")
+        let Data::Timeline(t) =
+            model::fence_data("timeline", "Oct 6 | Design approved | Scope\n")
         else {
             panic!()
         };
         assert!(timeline(&t.items).svg.contains("Design approved"));
-        let Data::Board(b) = model::fence_data("board", "## To do\n- First [P1]\n") else {
+        let Data::Board(b) =
+            model::fence_data("board", "## To do\n- First [P1]\n")
+        else {
             panic!()
         };
         assert!(board(&b.columns).svg.contains("P1"));

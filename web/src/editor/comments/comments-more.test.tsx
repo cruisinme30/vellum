@@ -6,7 +6,12 @@ import userEvent from "@testing-library/user-event";
 import type { Editor } from "@tiptap/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { CreatedIssue, IssueOut, TeamOut, ThreadOut } from "../../api/api.gen";
+import type {
+  CreatedIssue,
+  IssueOut,
+  TeamOut,
+  ThreadOut,
+} from "../../api/api.gen";
 import { I18nProvider } from "../../i18n/i18n";
 import type { WorkApi } from "../../work/api";
 import { createTestEditor } from "../test-editor";
@@ -32,7 +37,9 @@ afterEach(() => {
   editors = [];
 });
 
-function editorWith(html = `<p data-block-id="${BLOCK}">Ship the beta</p><p>Tail</p>`) {
+function editorWith(
+  html = `<p data-block-id="${BLOCK}">Ship the beta</p><p>Tail</p>`,
+) {
   const editor = createTestEditor({ content: html });
   editors.push(editor);
   return editor;
@@ -42,20 +49,32 @@ describe("comments in memory", () => {
   it("lists a page's threads with its block threads, or one block's", async () => {
     const api = createMemoryCommentsApi("priya", CLOCK);
     await api.startThread({ target: "page-1", body: "On the page" });
-    await api.startThread({ target: `page-1#${BLOCK}`, body: "On a block", quote: "beta" });
-    await api.startThread({ target: `page-1#${OTHER}`, body: "Elsewhere", assignTo: "sam" });
+    await api.startThread({
+      target: `page-1#${BLOCK}`,
+      body: "On a block",
+      quote: "beta",
+    });
+    await api.startThread({
+      target: `page-1#${OTHER}`,
+      body: "Elsewhere",
+      assignTo: "sam",
+    });
     await api.startThread({ target: "ENG-7", body: "On an issue" });
     expect(await api.threads("page-1")).toHaveLength(3);
     const one = await api.threads(`page-1#${BLOCK}`);
     expect(one.map((t) => t.quote)).toEqual(["beta"]);
     const issue = await api.threads("ENG-7");
     expect(issue[0]?.target).toEqual({ issue: "ENG-7" });
-    expect(api.all().find((t) => t.target.block === OTHER)?.assignee).toBe("sam");
+    expect(api.all().find((t) => t.target.block === OTHER)?.assignee).toBe(
+      "sam",
+    );
   });
 
   it("replies, edits, deletes, reacts, resolves and assigns", async () => {
     const api = createMemoryCommentsApi("priya");
-    const thread = await must(api.startThread({ target: "page-1", body: "First" }));
+    const thread = await must(
+      api.startThread({ target: "page-1", body: "First" }),
+    );
     const first = thread.comments[0]?.id ?? "";
     const replied = await must(api.reply(first, "Second"));
     expect(replied.comments.map((c) => c.body)).toEqual(["First", "Second"]);
@@ -67,9 +86,14 @@ describe("comments in memory", () => {
     const second = replied.comments[1]?.id ?? "";
     await api.react(second, "👍", true);
     let reacted = await must(api.react(second, "🎉", true));
-    expect(reacted.comments[1]?.reactions.map((r) => r.emoji)).toEqual(["👍", "🎉"]);
+    expect(reacted.comments[1]?.reactions.map((r) => r.emoji)).toEqual([
+      "👍",
+      "🎉",
+    ]);
     reacted = await must(api.react(second, "👍", false));
-    expect(reacted.comments[1]?.reactions).toEqual([{ emoji: "🎉", by: ["priya"] }]);
+    expect(reacted.comments[1]?.reactions).toEqual([
+      { emoji: "🎉", by: ["priya"] },
+    ]);
     // The first comment is untouched by reactions on the second.
     expect(reacted.comments[0]?.reactions).toEqual([]);
 
@@ -86,8 +110,12 @@ describe("comments in memory", () => {
 
   it("refuses unknown comments and threads", async () => {
     const api = createMemoryCommentsApi("priya");
-    await expect(api.reply("nope", "x")).rejects.toThrow("unknown comment nope");
-    await expect(api.resolve("nope", true)).rejects.toThrow("unknown thread nope");
+    await expect(api.reply("nope", "x")).rejects.toThrow(
+      "unknown comment nope",
+    );
+    await expect(api.resolve("nope", true)).rejects.toThrow(
+      "unknown thread nope",
+    );
   });
 });
 
@@ -126,10 +154,15 @@ describe("comments panel", () => {
     const api = createMemoryCommentsApi("priya", CLOCK);
     const start = vi.spyOn(api, "startThread");
     const { user, onClose } = renderPanel(api, { me: "priya" });
-    expect(await screen.findByText("No open threads on this page.")).toBeDefined();
+    expect(
+      await screen.findByText("No open threads on this page."),
+    ).toBeDefined();
     expect(screen.getByText("New thread on this page")).toBeDefined();
 
-    await user.type(screen.getByRole("textbox", { name: "Comment" }), "Who owns this?");
+    await user.type(
+      screen.getByRole("textbox", { name: "Comment" }),
+      "Who owns this?",
+    );
     await user.type(screen.getByRole("textbox", { name: "Assign to" }), "@sam");
     await user.click(screen.getByRole("button", { name: "Comment" }));
     expect(start).toHaveBeenCalledWith({
@@ -143,7 +176,10 @@ describe("comments panel", () => {
 
     await user.click(screen.getByRole("button", { name: "Unassign" }));
     expect(await screen.findByText("Not assigned")).toBeDefined();
-    await user.type(screen.getByRole("textbox", { name: "Assign this thread to" }), "@ada");
+    await user.type(
+      screen.getByRole("textbox", { name: "Assign this thread to" }),
+      "@ada",
+    );
     await user.click(screen.getByRole("button", { name: "Assign" }));
     expect(await screen.findByText("Assigned to @ada")).toBeDefined();
 
@@ -151,15 +187,20 @@ describe("comments panel", () => {
     await user.click(screen.getByRole("button", { name: "Reply" }));
     expect(await screen.findByText("I do.")).toBeDefined();
 
-    const reactions = screen.getAllByRole("group", { name: "Reactions" })[0] ?? document.body;
+    const reactions =
+      screen.getAllByRole("group", { name: "Reactions" })[0] ?? document.body;
     await user.click(within(reactions).getByRole("button", { name: "👍 (0)" }));
     const on = await screen.findByRole("button", { name: "👍 (1)" });
     expect(on.getAttribute("aria-pressed")).toBe("true");
     await user.click(on);
-    expect(await screen.findAllByRole("button", { name: "👍 (0)" })).toHaveLength(2);
+    expect(
+      await screen.findAllByRole("button", { name: "👍 (0)" }),
+    ).toHaveLength(2);
 
     await user.click(screen.getByRole("button", { name: "Resolve" }));
-    expect(await screen.findByText("No open threads on this page.")).toBeDefined();
+    expect(
+      await screen.findByText("No open threads on this page."),
+    ).toBeDefined();
     await user.click(screen.getByRole("button", { name: "Resolved" }));
     expect(await screen.findByText(/resolved by @priya/u)).toBeDefined();
     await user.click(screen.getByRole("button", { name: "Reopen" }));
@@ -171,11 +212,19 @@ describe("comments panel", () => {
 
   it("starts a thread on a quote, and shows its block in the page", async () => {
     const api = createMemoryCommentsApi("priya", CLOCK);
-    const { user, editor } = renderPanel(api, { blockId: BLOCK, quote: "beta" });
+    const { user, editor } = renderPanel(api, {
+      blockId: BLOCK,
+      quote: "beta",
+    });
     expect(await screen.findByText("New thread on “beta”")).toBeDefined();
-    await user.type(screen.getByRole("textbox", { name: "Comment" }), "Which beta?");
+    await user.type(
+      screen.getByRole("textbox", { name: "Comment" }),
+      "Which beta?",
+    );
     await user.click(screen.getByRole("button", { name: "Comment" }));
-    expect(await screen.findByText("beta", { selector: "blockquote" })).toBeDefined();
+    expect(
+      await screen.findByText("beta", { selector: "blockquote" }),
+    ).toBeDefined();
     await user.click(screen.getByRole("button", { name: "Show in page" }));
     expect(editor.state.selection.$from.parent.attrs["blockId"]).toBe(BLOCK);
   });
@@ -184,7 +233,9 @@ describe("comments panel", () => {
     const api = createMemoryCommentsApi("priya");
     vi.spyOn(api, "startThread").mockRejectedValue(new Error("Not allowed."));
     const { user } = renderPanel(api, { blockId: BLOCK });
-    expect(await screen.findByText("New thread on the block at the cursor")).toBeDefined();
+    expect(
+      await screen.findByText("New thread on the block at the cursor"),
+    ).toBeDefined();
     await user.type(screen.getByRole("textbox", { name: "Comment" }), "Hi");
     await user.click(screen.getByRole("button", { name: "Comment" }));
     const alert = await screen.findByRole("alert");
@@ -196,7 +247,9 @@ describe("comments panel", () => {
     await api.startThread({ target: `page-1#${OTHER}`, body: "Lost block" });
     const { user, editor } = renderPanel(api);
     const before = editor.state.selection.from;
-    await user.click(await screen.findByRole("button", { name: "Show in page" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Show in page" }),
+    );
     expect(editor.state.selection.from).toBe(before);
   });
 });
@@ -249,60 +302,89 @@ describe("file an issue", () => {
   });
 
   it("says when teams fail to load, or there are none", async () => {
-    renderFileIssue(workWith({ teams: () => Promise.reject(new Error("No teams API.")) }), {
-      quote: "",
-    });
+    renderFileIssue(
+      workWith({ teams: () => Promise.reject(new Error("No teams API.")) }),
+      {
+        quote: "",
+      },
+    );
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("No teams API.");
   });
 
   it("asks for a team first when there are none", async () => {
-    renderFileIssue(workWith({ teams: () => Promise.resolve([]) }), { quote: "" });
-    expect(await screen.findByText("Create a team in Work first.")).toBeDefined();
+    renderFileIssue(workWith({ teams: () => Promise.resolve([]) }), {
+      quote: "",
+    });
+    expect(
+      await screen.findByText("Create a team in Work first."),
+    ).toBeDefined();
   });
 
-  it("files from a caret, falling back to the issue key, without a chip when read-only", async () => {
-    const fileIssue = vi.fn<WorkApi["fileIssue"]>((issue) =>
-      Promise.resolve({ issue: { key: "ENG-9", title: issue.title } as IssueOut } as CreatedIssue),
-    );
-    const { user, editor, onClose, onFiled } = renderFileIssue(
-      workWith({ fileIssue }),
-      { quote: "" },
-      false,
-    );
-    await user.type(await screen.findByRole("textbox", { name: "Title" }), "Loose end");
-    await user.click(screen.getByRole("button", { name: "Create issue" }));
-    await waitFor(() => {
-      expect(onClose).toHaveBeenCalled();
-    });
-    expect(fileIssue).toHaveBeenCalledWith({ team: "ENG", title: "Loose end" });
-    expect(onFiled).toHaveBeenCalledWith("ENG-9");
-    expect(editor.getHTML()).not.toContain("ENG-9");
-  });
+  it(
+    "files from a caret, falling back to the issue key, without a chip when " +
+      "read-only",
+    async () => {
+      const fileIssue = vi.fn<WorkApi["fileIssue"]>((issue) =>
+        Promise.resolve({
+          issue: { key: "ENG-9", title: issue.title } as IssueOut,
+        } as CreatedIssue),
+      );
+      const { user, editor, onClose, onFiled } = renderFileIssue(
+        workWith({ fileIssue }),
+        { quote: "" },
+        false,
+      );
+      await user.type(
+        await screen.findByRole("textbox", { name: "Title" }),
+        "Loose end",
+      );
+      await user.click(screen.getByRole("button", { name: "Create issue" }));
+      await waitFor(() => {
+        expect(onClose).toHaveBeenCalled();
+      });
+      expect(fileIssue).toHaveBeenCalledWith({
+        team: "ENG",
+        title: "Loose end",
+      });
+      expect(onFiled).toHaveBeenCalledWith("ENG-9");
+      expect(editor.getHTML()).not.toContain("ENG-9");
+    },
+  );
 
   it("writes the chip after the selection when its block is gone", async () => {
     const { user, editor, onFiled } = renderFileIssue(workWith({}), {
       blockId: OTHER,
       quote: "Tail",
     });
-    await user.click(await screen.findByRole("button", { name: "Create issue" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Create issue" }),
+    );
     await waitFor(() => {
       expect(onFiled).toHaveBeenCalledWith("ENG-9");
     });
-    expect(editor.getJSON().content.some((n) => JSON.stringify(n).includes("ENG-9"))).toBe(true);
+    expect(
+      editor.getJSON().content.some((n) => JSON.stringify(n).includes("ENG-9")),
+    ).toBe(true);
   });
 
   it("shows a failed create and lets you try again", async () => {
     const { user, onClose } = renderFileIssue(
-      workWith({ fileIssue: () => Promise.reject(new Error("Team is archived.")) }),
+      workWith({
+        fileIssue: () => Promise.reject(new Error("Team is archived.")),
+      }),
       { blockId: BLOCK, quote: "Ship the beta" },
     );
-    await user.click(await screen.findByRole("button", { name: "Create issue" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Create issue" }),
+    );
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("Team is archived.");
-    expect(screen.getByRole("button", { name: "Create issue" }).hasAttribute("disabled")).toBe(
-      false,
-    );
+    expect(
+      screen
+        .getByRole("button", { name: "Create issue" })
+        .hasAttribute("disabled"),
+    ).toBe(false);
     expect(onClose).not.toHaveBeenCalled();
   });
 });

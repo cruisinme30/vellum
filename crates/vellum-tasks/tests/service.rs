@@ -16,8 +16,12 @@ use std::sync::{Arc, Mutex};
 
 use jiff::Timestamp;
 use jiff::tz::TimeZone;
-use vellum_contracts::{BoxFuture, CredentialKind, Principal, Scope, ScopeSet, Service};
-use vellum_kernel::{CommentId, DocId, Error, ErrorKind, ShareTokenHash, UserId};
+use vellum_contracts::{
+    BoxFuture, CredentialKind, Principal, Scope, ScopeSet, Service,
+};
+use vellum_kernel::{
+    CommentId, DocId, Error, ErrorKind, ShareTokenHash, UserId,
+};
 use vellum_tasks::lists;
 use vellum_tasks::model::{Origin, Task};
 use vellum_tasks::port::{Document, Profile, SecretKind, Workspace};
@@ -25,9 +29,9 @@ use vellum_tasks::projection::FileContext;
 use vellum_tasks::raw::{RECIPIENT_HEADER, RawRequest, RawResponse};
 use vellum_tasks::schedule::NoticeKind;
 use vellum_tasks::service::{
-    BucketName, CompleteInput, Config, CreateInput, CreateListInput, ImportFrom, ImportInput,
-    MemberInput, MentionRef, MoveInput, MyWorkView, NoInput, ParseInput, TaskRef, TasksService,
-    UpdateInput,
+    BucketName, CompleteInput, Config, CreateInput, CreateListInput,
+    ImportFrom, ImportInput, MemberInput, MentionRef, MoveInput, MyWorkView,
+    NoInput, ParseInput, TaskRef, TasksService, UpdateInput,
 };
 use vellum_tasks::settings::{MyWorkSettingsInput, Preferences};
 
@@ -95,12 +99,16 @@ impl Workspace for Mem {
             user,
             handle: "ana".into(),
             display_name: "Ana".into(),
-            time_zone: preferences.zone_or(&TimeZone::get("Europe/London").unwrap()),
+            time_zone: preferences
+                .zone_or(&TimeZone::get("Europe/London").unwrap()),
             preferences,
         }))
     }
 
-    fn task_files(&self, _user: UserId) -> BoxFuture<'_, Result<Vec<Document>, Error>> {
+    fn task_files(
+        &self,
+        _user: UserId,
+    ) -> BoxFuture<'_, Result<Vec<Document>, Error>> {
         let state = self.state.lock().unwrap();
         ready(Ok(state
             .files
@@ -109,11 +117,18 @@ impl Workspace for Mem {
             .collect()))
     }
 
-    fn assigned(&self, _user: UserId) -> BoxFuture<'_, Result<Vec<Task>, Error>> {
+    fn assigned(
+        &self,
+        _user: UserId,
+    ) -> BoxFuture<'_, Result<Vec<Task>, Error>> {
         ready(Ok(Vec::new()))
     }
 
-    fn read(&self, _user: UserId, doc: DocId) -> BoxFuture<'_, Result<Document, Error>> {
+    fn read(
+        &self,
+        _user: UserId,
+        doc: DocId,
+    ) -> BoxFuture<'_, Result<Document, Error>> {
         let state = self.state.lock().unwrap();
         ready(
             state
@@ -254,9 +269,10 @@ fn fixture() -> Fixture {
         mail_domain: "northstar.dev".into(),
         slack_signing_secret: None,
     };
-    let service = TasksService::new(mem.clone(), config).with_clock(Arc::new(|| {
-        "2026-11-03T10:00:00Z".parse::<Timestamp>().unwrap()
-    }));
+    let service =
+        TasksService::new(mem.clone(), config).with_clock(Arc::new(|| {
+            "2026-11-03T10:00:00Z".parse::<Timestamp>().unwrap()
+        }));
     Fixture {
         user,
         mem,
@@ -538,7 +554,10 @@ async fn tasks_complete_move_update_and_delete() {
         .await
         .unwrap();
     let inbox = f.file("tasks/ana/inbox.md");
-    assert!(!inbox.contains("report") && !inbox.contains(&child.id[child.id.len() - 12..]));
+    assert!(
+        !inbox.contains("report")
+            && !inbox.contains(&child.id[child.id.len() - 12..])
+    );
     let gone = f.service.delete(f.user, TaskRef { task: id }).await;
     assert_eq!(gone.unwrap_err().kind(), ErrorKind::NotFound);
     let issue = f
@@ -725,8 +744,10 @@ async fn caldav_round_trip() {
     let etag = header(&get, "ETag").unwrap().to_owned();
 
     // A new task from the client keeps its UID.
-    let todo = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Test//EN\r\nBEGIN:VTODO\r\nUID:abc-123\r\n\
-DTSTAMP:20261103T100000Z\r\nSUMMARY:From the phone\r\nDUE;VALUE=DATE:20261110\r\nEND:VTODO\r\nEND:VCALENDAR\r\n";
+    let todo = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Test//EN\r\n\
+BEGIN:VTODO\r\nUID:abc-123\r\nDTSTAMP:20261103T100000Z\r\n\
+SUMMARY:From the phone\r\nDUE;VALUE=DATE:20261110\r\nEND:VTODO\r\n\
+END:VCALENDAR\r\n";
     let put = f
         .raw(
             "PUT",
@@ -737,10 +758,9 @@ DTSTAMP:20261103T100000Z\r\nSUMMARY:From the phone\r\nDUE;VALUE=DATE:20261110\r\
         .await;
     assert_eq!(put.status, 201, "{}", body(&put));
     assert!(header(&put, "ETag").is_some());
-    assert!(
-        f.file("tasks/ana/inbox.md")
-            .contains("- [ ] From the phone {due=2026-11-10 src=caldav:abc-123} ^blk-")
-    );
+    assert!(f.file("tasks/ana/inbox.md").contains(
+        "- [ ] From the phone {due=2026-11-10 src=caldav:abc-123} ^blk-"
+    ));
     let again = f
         .raw(
             "PUT",
@@ -770,7 +790,11 @@ DTSTAMP:20261103T100000Z\r\nSUMMARY:From the phone\r\nDUE;VALUE=DATE:20261110\r\
         "{inbox}"
     );
 
-    let report = r#"<?xml version="1.0"?><D:sync-collection xmlns:D="DAV:"><D:sync-token/><D:prop><D:getetag/></D:prop></D:sync-collection>"#;
+    let report = concat!(
+        r#"<?xml version="1.0"?><D:sync-collection "#,
+        r#"xmlns:D="DAV:"><D:sync-token/><D:prop><D:getetag/></D:prop></D:syn"#,
+        r#"c-collection>"#,
+    );
     let sync = f.raw("REPORT", &list_path, &[], report).await;
     assert_eq!(sync.status, 207);
     assert!(body(&sync).contains("abc-123.ics"));
@@ -826,9 +850,12 @@ async fn email_capture_goes_to_the_inbox_once() {
         .await
         .unwrap()
         .value;
-    assert!(address.starts_with("tasks+") && address.ends_with("@northstar.dev"));
-    let message = "From: Ann <ann@northstar.dev>\r\nTo: x\r\nSubject: Fwd: Renew domain friday\r\n\
-Message-ID: <m1@northstar.dev>\r\nContent-Type: text/plain\r\n\r\nIt expires soon.\r\n";
+    assert!(
+        address.starts_with("tasks+") && address.ends_with("@northstar.dev")
+    );
+    let message = "From: Ann <ann@northstar.dev>\r\nTo: x\r\n\
+Subject: Fwd: Renew domain friday\r\nMessage-ID: <m1@northstar.dev>\r\n\
+Content-Type: text/plain\r\n\r\nIt expires soon.\r\n";
     let post = f
         .raw(
             "POST",
@@ -923,14 +950,18 @@ impl FakeCalendar {
             if let Some(local) = at["dateTime"].as_str()
                 && let Ok(local) = local.parse::<jiff::civil::DateTime>()
             {
-                let zoned = local.to_zoned(TimeZone::get(&zone).unwrap()).unwrap();
-                at["dateTime"] = zoned.strftime("%Y-%m-%dT%H:%M:%S%:z").to_string().into();
+                let zoned =
+                    local.to_zoned(TimeZone::get(&zone).unwrap()).unwrap();
+                at["dateTime"] =
+                    zoned.strftime("%Y-%m-%dT%H:%M:%S%:z").to_string().into();
             }
         }
     }
 
     fn merge(target: &mut serde_json::Value, patch: &serde_json::Value) {
-        if let (Some(target), Some(patch)) = (target.as_object_mut(), patch.as_object()) {
+        if let (Some(target), Some(patch)) =
+            (target.as_object_mut(), patch.as_object())
+        {
             for (k, v) in patch {
                 let _ = target.insert(k.clone(), v.clone());
             }
@@ -946,11 +977,9 @@ impl FakeGoogle {
     /// The person edits the calendar directly.
     fn user_edit(&self, id: &str, change: &serde_json::Value) {
         let mut state = self.state.lock().unwrap();
-        let mut event = state
-            .events
-            .get(id)
-            .cloned()
-            .unwrap_or_else(|| serde_json::json!({"id": id, "status": "confirmed"}));
+        let mut event = state.events.get(id).cloned().unwrap_or_else(
+            || serde_json::json!({"id": id, "status": "confirmed"}),
+        );
         FakeCalendar::merge(&mut event, change);
         FakeCalendar::offset_form(&mut event);
         let _ = state.events.insert(id.to_owned(), event);
@@ -1040,7 +1069,10 @@ impl vellum_tasks::google::GoogleCalendar for FakeGoogle {
     ) -> BoxFuture<'_, Result<(), Error>> {
         let mut state = self.state.lock().unwrap();
         let Some(mut current) = state.events.get(&event).cloned() else {
-            return ready(Err(Error::new(ErrorKind::NotFound, "no such event")));
+            return ready(Err(Error::new(
+                ErrorKind::NotFound,
+                "no such event",
+            )));
         };
         FakeCalendar::merge(&mut current, &body);
         FakeCalendar::offset_form(&mut current);
@@ -1077,7 +1109,8 @@ impl vellum_tasks::google::GoogleLinks for MemLinks {
     fn link(
         &self,
         user: UserId,
-    ) -> BoxFuture<'_, Result<Option<vellum_tasks::google::GoogleLink>, Error>> {
+    ) -> BoxFuture<'_, Result<Option<vellum_tasks::google::GoogleLink>, Error>>
+    {
         ready(Ok(self.0.lock().unwrap().get(&user).cloned()))
     }
 
@@ -1140,8 +1173,13 @@ async fn time_blocks_sync_with_google_calendar_both_ways() {
         .await
         .unwrap()
         .value;
-    assert!(url.starts_with("https://accounts.google.com/o/oauth2/v2/auth?client_id=client-1&"));
-    assert!(url.contains("calendar.app.created") && url.contains("code_challenge_method=S256"));
+    assert!(url.starts_with(
+        "https://accounts.google.com/o/oauth2/v2/auth?client_id=client-1&"
+    ));
+    assert!(
+        url.contains("calendar.app.created")
+            && url.contains("code_challenge_method=S256")
+    );
     let state = query_value(&url, "state");
     let expired = f
         .raw(
@@ -1226,8 +1264,10 @@ async fn time_blocks_sync_with_google_calendar_both_ways() {
     google.user_edit(
         "e1",
         &serde_json::json!({
-            "start": {"dateTime": "2026-11-03T16:00:00", "timeZone": "Europe/London"},
-            "end": {"dateTime": "2026-11-03T17:00:00", "timeZone": "Europe/London"},
+            "start": {"dateTime": "2026-11-03T16:00:00", "timeZone": "Europe/Lo\
+                ndon"},
+            "end": {"dateTime": "2026-11-03T17:00:00", "timeZone": "Europe/Lond\
+                on"},
         }),
     );
     assert_eq!(sync().await.unwrap().moved, 1);
@@ -1257,17 +1297,24 @@ async fn time_blocks_sync_with_google_calendar_both_ways() {
         "g7",
         &serde_json::json!({
             "summary": "Dentist",
-            "start": {"dateTime": "2026-11-04T09:00:00", "timeZone": "Europe/London"},
-            "end": {"dateTime": "2026-11-04T09:45:00", "timeZone": "Europe/London"},
+            "start": {"dateTime": "2026-11-04T09:00:00", "timeZone": "Europe/Lo\
+                ndon"},
+            "end": {"dateTime": "2026-11-04T09:45:00", "timeZone": "Europe/Lond\
+                on"},
         }),
     );
     assert_eq!(sync().await.unwrap().adopted, 1);
     let inbox = f.file("tasks/ana/inbox.md");
     assert!(
-        inbox.contains("- [ ] Dentist {block=2026-11-04T09:00/45 src=gcal:g7 gcal=g7}"),
+        inbox.contains(
+            "- [ ] Dentist {block=2026-11-04T09:00/45 src=gcal:g7 gcal=g7}"
+        ),
         "{inbox}"
     );
-    assert!(google.event("g7")["extendedProperties"]["private"]["vellumTask"].is_string());
+    assert!(
+        google.event("g7")["extendedProperties"]["private"]["vellumTask"]
+            .is_string()
+    );
 
     // Deleting the event in Google unblocks the task; it stays.
     google.user_edit("e1", &serde_json::json!({"status": "cancelled"}));

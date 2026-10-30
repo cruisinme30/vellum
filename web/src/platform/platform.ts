@@ -33,7 +33,10 @@ export interface DesktopBridge {
   /** System-browser sign-in (OAuth 2.1 + PKCE, loopback redirect). */
   signIn(): Promise<{ readonly account: string }>;
   signOut(): Promise<void>;
-  /** A fresh access token for `Authorization: Bearer`, or undefined when signed out. */
+  /**
+   * A fresh access token for `Authorization: Bearer`, or undefined when signed
+   * out.
+   */
   accessToken(): Promise<string | undefined>;
   openExternal(url: string): Promise<void>;
   notify(notice: Notice): Promise<void>;
@@ -47,12 +50,20 @@ export interface DesktopBridge {
   readonly privateSpaces?: PrivateSpacesBridge;
 }
 
-/** Private-space actions the desktop app runs with the bundled `vellum` binary. */
+/**
+ * Private-space actions the desktop app runs with the bundled `vellum` binary.
+ */
 interface PrivateSpacesBridge {
   /** This device's public key and fingerprint, created on first use. */
-  deviceKey(): Promise<{ readonly publicKey: string; readonly fingerprint: string }>;
+  deviceKey(): Promise<{
+    readonly publicKey: string;
+    readonly fingerprint: string;
+  }>;
   /** Enrols this device in a space for the signed-in account. */
-  enrol(spaceId: string, label?: string): Promise<{ readonly lines: readonly string[] }>;
+  enrol(
+    spaceId: string,
+    label?: string,
+  ): Promise<{ readonly lines: readonly string[] }>;
   /**
    * Seals the space's pages to its current keys (readable ones too). Keys
    * new since this device last sealed must be listed in `trust`.
@@ -66,7 +77,9 @@ interface PrivateSpacesBridge {
 /** What screens may ask of the shell. */
 export interface Platform {
   readonly kind: PlatformKind;
-  /** Desktop features: whole-space offline copies and private-space search/MCP. */
+  /**
+   * Desktop features: whole-space offline copies and private-space search/MCP.
+   */
   readonly desktop: DesktopBridge | undefined;
   /** Opens a link outside the app (system browser on desktop). */
   openExternal(url: string): void;
@@ -75,7 +88,9 @@ export interface Platform {
 }
 
 /** Reads the bridge the desktop preload script installed, if any. */
-export function desktopBridge(scope: object = globalThis): DesktopBridge | undefined {
+export function desktopBridge(
+  scope: object = globalThis,
+): DesktopBridge | undefined {
   const candidate = (scope as { vellumDesktop?: unknown }).vellumDesktop;
   return typeof candidate === "object" && candidate !== null
     ? (candidate as DesktopBridge)
@@ -105,10 +120,17 @@ export function createPlatform(scope: object = globalThis): Platform {
       globalThis.open(url, "_blank", "noopener,noreferrer");
     },
     async notify(notice) {
-      if (!("Notification" in globalThis) || Notification.permission !== "granted") return false;
+      if (
+        !("Notification" in globalThis) ||
+        Notification.permission !== "granted"
+      )
+        return false;
       const registration = await navigator.serviceWorker.getRegistration();
       if (registration === undefined) return false;
-      await registration.showNotification(notice.title, { body: notice.body, data: notice.url });
+      await registration.showNotification(notice.title, {
+        body: notice.body,
+        data: notice.url,
+      });
       return true;
     },
   };
@@ -135,6 +157,8 @@ export async function startPlatform(
   // forever. Offline start-up must not wait on that prompt.
   void storage?.persist().catch(() => false);
   return registerServiceWorker(
-    options.onUpdateReady === undefined ? {} : { onUpdateReady: options.onUpdateReady },
+    options.onUpdateReady === undefined
+      ? {}
+      : { onUpdateReady: options.onUpdateReady },
   );
 }

@@ -33,7 +33,9 @@ use std::ops::Range;
 use jiff::ToSpan as _;
 use jiff::civil::{Date, DateTime, Time, Weekday};
 
-use crate::model::{Due, Priority, RecurFrom, Recurrence, Reminder, TaskFields, When};
+use crate::model::{
+    Due, Priority, RecurFrom, Recurrence, Reminder, TaskFields, When,
+};
 use crate::projection::next_weekday;
 use crate::recur::{ByDay, Freq, RRule};
 use crate::telemetry;
@@ -217,7 +219,8 @@ fn ordinal(key: &str) -> Option<i8> {
         "fourth" => Some(4),
         "last" => Some(-1),
         _ => {
-            let suffixed = ["st", "nd", "rd", "th"].iter().any(|s| key.ends_with(s));
+            let suffixed =
+                ["st", "nd", "rd", "th"].iter().any(|s| key.ends_with(s));
             if suffixed { day_number(key) } else { None }
         }
     }
@@ -315,8 +318,12 @@ impl Parser<'_> {
     fn add(&self, n: u32, unit: Unit) -> Option<DateHit> {
         let n = i64::from(n);
         match unit {
-            Unit::Minute => self.now.checked_add(n.minutes()).ok().map(DateHit::Moment),
-            Unit::Hour => self.now.checked_add(n.hours()).ok().map(DateHit::Moment),
+            Unit::Minute => {
+                self.now.checked_add(n.minutes()).ok().map(DateHit::Moment)
+            }
+            Unit::Hour => {
+                self.now.checked_add(n.hours()).ok().map(DateHit::Moment)
+            }
             Unit::Day => self
                 .today()
                 .checked_add(n.days())
@@ -378,7 +385,9 @@ impl Parser<'_> {
         let hit = match key {
             "today" | "tod" => (1, day(today)),
             "tonight" => (1, DateHit::Day(today, Some(When::Evening))),
-            "tomorrow" | "tmr" | "tmrw" | "tomorow" => (1, day(today.checked_add(1.day()).ok()?)),
+            "tomorrow" | "tmr" | "tmrw" | "tomorow" => {
+                (1, day(today.checked_add(1.day()).ok()?))
+            }
             "this" => match self.key(i + 1)? {
                 "evening" => (2, DateHit::Day(today, Some(When::Evening))),
                 "weekend" => (2, day(self.weekend(false))),
@@ -387,13 +396,18 @@ impl Parser<'_> {
             "weekend" if prefixed => (1, day(self.weekend(false))),
             "next" => match self.key(i + 1)? {
                 "week" => (2, day(next_weekday(today, Weekday::Monday))),
-                "month" => (2, day(today.first_of_month().checked_add(1.month()).ok()?)),
+                "month" => (
+                    2,
+                    day(today.first_of_month().checked_add(1.month()).ok()?),
+                ),
                 "year" => (2, day(Date::new(today.year() + 1, 1, 1).ok()?)),
                 "weekend" => (2, day(self.weekend(true))),
                 other => (2, day(next_weekday(today, weekday(other, true)?))),
             },
             "in" => {
-                if let Some((n, unit)) = self.key(i + 1).and_then(compact_duration) {
+                if let Some((n, unit)) =
+                    self.key(i + 1).and_then(compact_duration)
+                {
                     (2, self.add(n, unit)?)
                 } else {
                     let n = self.key(i + 1).and_then(number)?;
@@ -445,7 +459,10 @@ impl Parser<'_> {
             saturday
         };
         if next {
-            next_weekday(this.checked_add(1.day()).unwrap_or(this), Weekday::Saturday)
+            next_weekday(
+                this.checked_add(1.day()).unwrap_or(this),
+                Weekday::Saturday,
+            )
         } else {
             this
         }
@@ -466,7 +483,8 @@ impl Parser<'_> {
             "midnight" => return Some((1, Time::constant(23, 59, 0, 0))),
             _ => {}
         }
-        let (body, meridiem, used) = if let Some(body) = key.strip_suffix("am") {
+        let (body, meridiem, used) = if let Some(body) = key.strip_suffix("am")
+        {
             (body, Some(false), 1)
         } else if let Some(body) = key.strip_suffix("pm") {
             (body, Some(true), 1)
@@ -479,12 +497,16 @@ impl Parser<'_> {
             }
         };
         let (hour, minute) = match body.split_once(':') {
-            Some((h, m)) if m.len() == 2 => (h.parse::<i8>().ok()?, m.parse::<i8>().ok()?),
+            Some((h, m)) if m.len() == 2 => {
+                (h.parse::<i8>().ok()?, m.parse::<i8>().ok()?)
+            }
             Some(_) => return None,
             None => (body.parse::<i8>().ok()?, 0),
         };
         let hour = match meridiem {
-            Some(pm) if (1..=12).contains(&hour) => hour % 12 + if pm { 12 } else { 0 },
+            Some(pm) if (1..=12).contains(&hour) => {
+                hour % 12 + if pm { 12 } else { 0 }
+            }
             Some(_) => return None,
             None => hour,
         };
@@ -501,7 +523,9 @@ impl Parser<'_> {
             }
             i += 1;
             let joined = matches!(self.key(i), Some("and" | "&"));
-            if joined && self.key(i + 1).and_then(|k| weekday(k, true)).is_some() {
+            if joined
+                && self.key(i + 1).and_then(|k| weekday(k, true)).is_some()
+            {
                 i += 1;
             }
         }
@@ -518,8 +542,12 @@ impl Parser<'_> {
         match key {
             "daily" => return Some((1, schedule(simple_rule(Freq::Daily)))),
             "weekly" => return Some((1, schedule(simple_rule(Freq::Weekly)))),
-            "monthly" => return Some((1, schedule(simple_rule(Freq::Monthly)))),
-            "yearly" | "annually" => return Some((1, schedule(simple_rule(Freq::Yearly)))),
+            "monthly" => {
+                return Some((1, schedule(simple_rule(Freq::Monthly))));
+            }
+            "yearly" | "annually" => {
+                return Some((1, schedule(simple_rule(Freq::Yearly))));
+            }
             "every" | "every!" => {}
             _ => return None,
         }
@@ -541,15 +569,17 @@ impl Parser<'_> {
         if let Some(freq) = unit(next).and_then(freq_of) {
             return Some((1, simple_rule(freq)));
         }
-        let (used, interval, freq) = if let Some((n, u)) = compact_duration(next) {
-            (1, n, freq_of(u)?)
-        } else if next == "other" {
-            (2, 2, self.key(i + 1).and_then(unit).and_then(freq_of)?)
-        } else {
-            let n = number(next)
-                .filter(|_| next.bytes().all(|b| b.is_ascii_digit()) || next.len() > 2)?;
-            (2, n, self.key(i + 1).and_then(unit).and_then(freq_of)?)
-        };
+        let (used, interval, freq) =
+            if let Some((n, u)) = compact_duration(next) {
+                (1, n, freq_of(u)?)
+            } else if next == "other" {
+                (2, 2, self.key(i + 1).and_then(unit).and_then(freq_of)?)
+            } else {
+                let n = number(next).filter(|_| {
+                    next.bytes().all(|b| b.is_ascii_digit()) || next.len() > 2
+                })?;
+                (2, n, self.key(i + 1).and_then(unit).and_then(freq_of)?)
+            };
         let mut rule = simple_rule(freq);
         rule.interval = interval;
         Some((used, rule))
@@ -597,7 +627,9 @@ impl Parser<'_> {
     fn every_ordinal(&self, i: usize) -> Option<(usize, RRule)> {
         if let Some(nth) = self.key(i).and_then(ordinal) {
             let mut rule = simple_rule(Freq::Monthly);
-            if let Some(weekday) = self.key(i + 1).and_then(|k| weekday(k, true)) {
+            if let Some(weekday) =
+                self.key(i + 1).and_then(|k| weekday(k, true))
+            {
                 rule.by_day = vec![ByDay {
                     nth: Some(nth),
                     weekday,
@@ -605,7 +637,10 @@ impl Parser<'_> {
                 return Some((2, rule));
             }
             rule.by_month_day = vec![nth];
-            return Some((1 + usize::from(self.key(i + 1) == Some("day")), rule));
+            return Some((
+                1 + usize::from(self.key(i + 1) == Some("day")),
+                rule,
+            ));
         }
         let (used, date) = self.month_day(i)?;
         let mut rule = simple_rule(Freq::Yearly);
@@ -614,8 +649,13 @@ impl Parser<'_> {
         Some((used, rule))
     }
 
-    /// A reminder phrase at `i`: `remind [me] 15m before`, `remind [me] at 9am`.
-    fn reminder(&self, i: usize, due: Option<Date>) -> Option<(usize, Reminder)> {
+    /// A reminder phrase at `i`: `remind [me] 15m before`, `remind [me] at
+    /// 9am`.
+    fn reminder(
+        &self,
+        i: usize,
+        due: Option<Date>,
+    ) -> Option<(usize, Reminder)> {
         if self.key(i)? != "remind" {
             return None;
         }
@@ -627,15 +667,16 @@ impl Parser<'_> {
             let day = due.unwrap_or_else(|| self.today());
             return Some((1 + me + used, Reminder::At(day.to_datetime(time))));
         }
-        let (n, u, used) = if let Some((n, u)) = self.key(j).and_then(compact_duration) {
-            (n, u, 1)
-        } else {
-            (
-                self.key(j).and_then(number)?,
-                self.key(j + 1).and_then(unit)?,
-                2,
-            )
-        };
+        let (n, u, used) =
+            if let Some((n, u)) = self.key(j).and_then(compact_duration) {
+                (n, u, 1)
+            } else {
+                (
+                    self.key(j).and_then(number)?,
+                    self.key(j + 1).and_then(unit)?,
+                    2,
+                )
+            };
         if self.key(j + used) != Some("before") {
             return None;
         }
@@ -722,7 +763,8 @@ impl Run<'_> {
             "by" | "due" | "on" | "before" => TokenKind::Due,
             _ => return None,
         };
-        let skip = usize::from(key == "due" && self.parser.key(i + 1) == Some("on"));
+        let skip =
+            usize::from(key == "due" && self.parser.key(i + 1) == Some("on"));
         let free = match kind {
             TokenKind::Start => self.state.start.is_none(),
             _ => !self.has_due(),
@@ -738,7 +780,9 @@ impl Run<'_> {
                 state.start = Some(d);
                 state.when = state.when.or(when);
             }
-            (TokenKind::Start, DateHit::Moment(m)) => state.start = Some(m.date()),
+            (TokenKind::Start, DateHit::Moment(m)) => {
+                state.start = Some(m.date())
+            }
             (_, DateHit::Day(d, when)) => {
                 state.due_day = Some(d);
                 state.when = state.when.or(when);
@@ -789,7 +833,8 @@ impl Run<'_> {
         let (mut used, time) = self.parser.time(i)?;
         self.state.due_time = Some(time);
         if !self.has_due()
-            && let Some((d_used, DateHit::Day(d, when))) = self.parser.date(i + used, false)
+            && let Some((d_used, DateHit::Day(d, when))) =
+                self.parser.date(i + used, false)
         {
             self.state.due_day = Some(d);
             self.state.when = self.state.when.or(when);
@@ -828,9 +873,9 @@ impl Run<'_> {
                 .strip_prefix(prefix)?
                 .trim_end_matches([',', ';', '.', '?', '!']);
             (!name.is_empty()
-                && name
-                    .chars()
-                    .all(|c| c.is_alphanumeric() || matches!(c, '-' | '_' | '.' | '/')))
+                && name.chars().all(|c| {
+                    c.is_alphanumeric() || matches!(c, '-' | '_' | '.' | '/')
+                }))
             .then(|| name.to_owned())
         };
         if self.out.list.is_none()
@@ -863,7 +908,8 @@ impl Run<'_> {
 /// Parses one quick-add line. `now` is the owner's local date and time.
 #[must_use]
 pub fn parse(input: &str, now: DateTime) -> QuickAdd {
-    let _span = tracing::debug_span!("tasks.quick_add", len = input.len()).entered();
+    let _span =
+        tracing::debug_span!("tasks.quick_add", len = input.len()).entered();
     let words = words(input);
     let mut run = Run {
         parser: Parser { words: &words, now },
@@ -881,7 +927,8 @@ pub fn parse(input: &str, now: DateTime) -> QuickAdd {
             Some((used, kind)) => {
                 let used = used.max(1);
                 let start = words.get(i).map_or(0, |w| w.start);
-                let end = words.get(i + used - 1).map_or(input.len(), |w| w.end);
+                let end =
+                    words.get(i + used - 1).map_or(input.len(), |w| w.end);
                 run.out.tokens.push(Token {
                     span: start..end,
                     kind,
@@ -894,7 +941,9 @@ pub fn parse(input: &str, now: DateTime) -> QuickAdd {
     let Run { mut out, state, .. } = run;
     finish(&mut out, state, now);
     out.title = title(input, &out.tokens);
-    telemetry::record_quick_add(out.fields.due.is_some() || out.fields.start.is_some());
+    telemetry::record_quick_add(
+        out.fields.due.is_some() || out.fields.start.is_some(),
+    );
     out
 }
 
@@ -910,7 +959,9 @@ fn finish(out: &mut QuickAdd, state: State, now: DateTime) {
     }
     out.fields.due = match (state.due_moment, due_day, state.due_time) {
         (Some(moment), _, _) => Some(Due::DateTime(moment)),
-        (None, Some(day), Some(time)) => Some(Due::DateTime(day.to_datetime(time))),
+        (None, Some(day), Some(time)) => {
+            Some(Due::DateTime(day.to_datetime(time)))
+        }
         (None, Some(day), None) => Some(Due::Date(day)),
         (None, None, Some(time)) => {
             // A time alone means the next time the clock shows it.
@@ -1003,7 +1054,8 @@ mod tests {
 
     #[test]
     fn the_prd_examples() {
-        let q = parse("Ship deck every weekday 9am #work @focus p1 +ann", now());
+        let q =
+            parse("Ship deck every weekday 9am #work @focus p1 +ann", now());
         assert_eq!(q.title, "Ship deck");
         let rec = q.fields.recurrence.unwrap();
         assert_eq!(rec.rule.to_string(), "FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR");

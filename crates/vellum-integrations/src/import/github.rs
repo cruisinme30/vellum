@@ -21,11 +21,11 @@ use crate::model::StateCategory;
 ///
 /// [`ImportError::Unreadable`] if the JSON is not an array.
 pub fn read(json: &str, repo: &str) -> Result<Export, ImportError> {
-    let value: Value =
-        serde_json::from_str(json).map_err(|e| ImportError::Unreadable(e.to_string()))?;
-    let list = value
-        .as_array()
-        .ok_or_else(|| ImportError::Unreadable("expected a JSON array of issues".to_owned()))?;
+    let value: Value = serde_json::from_str(json)
+        .map_err(|e| ImportError::Unreadable(e.to_string()))?;
+    let list = value.as_array().ok_or_else(|| {
+        ImportError::Unreadable("expected a JSON array of issues".to_owned())
+    })?;
     let mut export = Export::default();
     for issue in list {
         if issue.get("pull_request").is_some() {
@@ -70,7 +70,9 @@ pub fn read(json: &str, repo: &str) -> Result<Export, ImportError> {
                 .and_then(Value::as_array)
                 .into_iter()
                 .flatten()
-                .map(|l| l.as_str().unwrap_or_else(|| text(l, "/name")).to_owned())
+                .map(|l| {
+                    l.as_str().unwrap_or_else(|| text(l, "/name")).to_owned()
+                })
                 .filter(|l| !l.is_empty())
                 .collect(),
             assignee: issue
@@ -79,11 +81,15 @@ pub fn read(json: &str, repo: &str) -> Result<Export, ImportError> {
                 .and_then(|a| a.first())
                 .map(|a| text(a, "/login").to_owned())
                 .filter(|l| !l.is_empty()),
-            creator: Some(text(issue, "/user/login").to_owned()).filter(|l| !l.is_empty()),
-            project: Some(text(issue, "/milestone/title").to_owned()).filter(|m| !m.is_empty()),
+            creator: Some(text(issue, "/user/login").to_owned())
+                .filter(|l| !l.is_empty()),
+            project: Some(text(issue, "/milestone/title").to_owned())
+                .filter(|m| !m.is_empty()),
             created_at: timestamp(text(issue, "/created_at")),
-            completed_at: closed_at.filter(|_| category == StateCategory::Completed),
-            canceled_at: closed_at.filter(|_| category != StateCategory::Completed),
+            completed_at: closed_at
+                .filter(|_| category == StateCategory::Completed),
+            canceled_at: closed_at
+                .filter(|_| category != StateCategory::Completed),
             started_at: None,
             due: None,
             parent,
@@ -102,9 +108,16 @@ mod tests {
     fn reads_issues_and_skips_pull_requests() -> Result<(), ImportError> {
         let json = json!([
             {"number": 3, "title": "Crash on start", "body": "Steps…", "state": "closed", "state_reason": "not_planned",
-             "labels": [{"name": "bug"}, "p1"], "assignees": [{"login": "adap"}], "user": {"login": "bo"},
-             "milestone": {"title": "1.0"}, "created_at": "2026-01-01T00:00:00Z", "closed_at": "2026-01-02T00:00:00Z",
-             "parent_issue_url": "https://api.github.com/repos/northstar/api/issues/1"},
+             "labels": [
+                 {"name": "bug"},
+                 "p1"
+             ], "assignees": [{"login": "adap"}], "user": {"login": "bo"},
+             "milestone": {
+                 "title": "1.0"
+             }, "created_at": "2026-01-01T00:00:00Z", "closed_at": "2026-01-02T\
+                 00:00:00Z",
+             "parent_issue_url": "https://api.github.com/repos/northstar/api/is\
+                 sues/1"},
             {"number": 4, "title": "A PR", "state": "open", "pull_request": {}},
             {"number": 5, "title": "Idea", "state": "open", "assignees": []}
         ]);

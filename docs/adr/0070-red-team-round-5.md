@@ -19,15 +19,15 @@ vellum: 1
 
 ## Context
 
-Round 5 of the red team (ADR 0030) read the features that landed or
-queued on 2026-10-29: uploads and export/import in `vellum serve`, admin
-users, spaces and groups with re-authentication, bring-your-own-model
-assist, saved Work views, MCP in serve, books publishing and themes.
-Six findings came out of it, share links included, each fixed with a regression test. Two let
-one user act on another's data (an import taking over page IDs, a public
-site copying a book's snapshots), one skipped the admin re-auth check,
-and three were abuse of the server's resources: two by any signed-in
-user, and one, guessing share-link passwords, by anyone holding a link.
+Round 5 of the red team (ADR 0030) read the features that landed or queued on
+2026-10-29: uploads and export/import in `vellum serve`, admin users, spaces and
+groups with re-authentication, bring-your-own-model assist, saved Work views,
+MCP in serve, books publishing and themes. Six findings came out of it, share
+links included, each fixed with a regression test. Two let one user act on
+another's data (an import taking over page IDs, a public site copying a book's
+snapshots), one skipped the admin re-auth check, and three were abuse of the
+server's resources: two by any signed-in user, and one, guessing share-link
+passwords, by anyone holding a link.
 
 ## Decisions
 

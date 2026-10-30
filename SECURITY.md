@@ -26,9 +26,10 @@ latest minor release receives security fixes.
 
 ## Disclosure
 
-We follow coordinated disclosure. We aim to ship a fix within 90 days of
-your report, and we publish the advisory, with a CVE where one applies, on
-the day the fix is released: <https://github.com/cruisinme30/vellum/security/advisories>.
+We follow coordinated disclosure. We aim to ship a fix within 90 days of your
+report, and we publish the advisory, with a CVE where one applies, on the day
+the fix is released:
+<https://github.com/cruisinme30/vellum/security/advisories>.
 
 ## How Vellum is secured
 

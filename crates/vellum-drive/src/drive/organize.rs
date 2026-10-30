@@ -31,15 +31,27 @@ impl Drive {
     ///
     /// # Errors
     /// `NotFound`, `PermissionDenied`, `Invalid` for an empty title.
-    #[tracing::instrument(name = "drive.rename", skip_all, fields(node = %id), err)]
-    pub async fn rename(&self, actor: &Actor, id: ObjectId, title: &str) -> DriveResult<Node> {
+    #[tracing::instrument(
+        name = "drive.rename",
+        skip_all,
+        fields(node = %id),
+        err
+    )]
+    pub async fn rename(
+        &self,
+        actor: &Actor,
+        id: ObjectId,
+        title: &str,
+    ) -> DriveResult<Node> {
         self.observe("rename", async {
             let node = self.live_node(id).await?;
             self.authorize(actor, node.space, node.id, Permission::Edit)
                 .await?;
             let title = title.trim();
             if title.is_empty() {
-                return Err(DriveError::Invalid("a title cannot be empty".into()));
+                return Err(DriveError::Invalid(
+                    "a title cannot be empty".into(),
+                ));
             }
             if title == node.title {
                 return Ok(node);
@@ -55,7 +67,8 @@ impl Drive {
                 }
                 NodeKind::Shortcut => {
                     let (_, blob) = self.read_text(&node.path).await?;
-                    let mut file: ShortcutFile = from_yaml(&node.path, &blob.bytes)?;
+                    let mut file: ShortcutFile =
+                        from_yaml(&node.path, &blob.bytes)?;
                     title.clone_into(&mut file.title);
                     let _ = self.put_file(&node.path, to_yaml(&file)?).await?;
                     self.retitle(actor, node, title).await
@@ -64,7 +77,10 @@ impl Drive {
                     let file = layout::id_file(node.kind, &node.path)?;
                     let (text, _) = self.read_text(&file).await?;
                     let _ = self
-                        .put_file(&file, frontmatter::set(&text, "title", title))
+                        .put_file(
+                            &file,
+                            frontmatter::set(&text, "title", title),
+                        )
                         .await?;
                     self.retitle(actor, node, title).await
                 }
@@ -82,10 +98,9 @@ impl Drive {
         node: Node,
         title: &str,
     ) -> DriveResult<Node> {
-        let dir = node
-            .path
-            .parent()
-            .ok_or_else(|| DriveError::Invalid("a node cannot live at the store root".into()))?;
+        let dir = node.path.parent().ok_or_else(|| {
+            DriveError::Invalid("a node cannot live at the store root".into())
+        })?;
         let path = self
             .free_path(&dir, node.kind, title, Some(&node.path))
             .await?;
@@ -119,7 +134,12 @@ impl Drive {
     /// # Errors
     /// `NotFound`, `PermissionDenied`, `Invalid` (into itself, not a
     /// folder), `QuotaExceeded` in the destination.
-    #[tracing::instrument(name = "drive.move", skip_all, fields(node = %id), err)]
+    #[tracing::instrument(
+        name = "drive.move",
+        skip_all,
+        fields(node = %id),
+        err
+    )]
     pub async fn move_node(
         &self,
         actor: &Actor,
@@ -131,12 +151,13 @@ impl Drive {
             let node = self.live_node(id).await?;
             let from_space = self.space(node.space).await?;
             let to_space = self.space(space).await?;
-            let permission =
-                if from_space.id != to_space.id && from_space.kind == SpaceKind::SharedDrive {
-                    Permission::Manage
-                } else {
-                    Permission::Edit
-                };
+            let permission = if from_space.id != to_space.id
+                && from_space.kind == SpaceKind::SharedDrive
+            {
+                Permission::Manage
+            } else {
+                Permission::Edit
+            };
             let _ = self.authorize_subtree(actor, &node, permission).await?;
             self.authorize(
                 actor,
@@ -158,9 +179,11 @@ impl Drive {
                 let bytes = self.subtree_bytes(&node).await?;
                 self.ensure_quota(&to_space, bytes).await?;
             }
-            let path = self.free_path(&dir, node.kind, &node.title, None).await?;
+            let path =
+                self.free_path(&dir, node.kind, &node.title, None).await?;
             let from = node.path.to_string();
-            let moved = self.relocate(&node, &to_space, parent, path, None).await?;
+            let moved =
+                self.relocate(&node, &to_space, parent, path, None).await?;
             let after = moved
                 .first()
                 .map(|(_, after)| after.clone())
@@ -193,7 +216,12 @@ impl Drive {
     ///
     /// # Errors
     /// `NotFound`, `PermissionDenied`, `Invalid`, `QuotaExceeded`.
-    #[tracing::instrument(name = "drive.copy", skip_all, fields(node = %id), err)]
+    #[tracing::instrument(
+        name = "drive.copy",
+        skip_all,
+        fields(node = %id),
+        err
+    )]
     pub async fn copy_node(
         &self,
         actor: &Actor,
@@ -220,9 +248,11 @@ impl Drive {
                 ));
             }
             let files = self.copy_sources(actor, &node).await?;
-            let total: u64 = files.iter().map(|(_, bytes)| bytes.len() as u64).sum();
+            let total: u64 =
+                files.iter().map(|(_, bytes)| bytes.len() as u64).sum();
             self.ensure_quota(&to_space, total).await?;
-            let dest = self.free_path(&dir, node.kind, &node.title, None).await?;
+            let dest =
+                self.free_path(&dir, node.kind, &node.title, None).await?;
 
             // Map every ID found to a fresh one.
             let mut ids = HashMap::new();
@@ -233,17 +263,21 @@ impl Drive {
                     } else {
                         frontmatter::get(&text, "id")
                     };
-                    if let Some(id) = id.filter(|id| id.parse::<ObjectId>().is_ok()) {
-                        let _ = ids
-                            .entry(id)
-                            .or_insert_with(|| ObjectId::generate().to_string());
+                    if let Some(id) =
+                        id.filter(|id| id.parse::<ObjectId>().is_ok())
+                    {
+                        let _ = ids.entry(id).or_insert_with(|| {
+                            ObjectId::generate().to_string()
+                        });
                     }
                 }
             }
             for (path, bytes) in files {
-                let target = layout::rebase_member(node.kind, &path, &node.path, &dest)?;
-                let bytes = text_of(&path, &bytes)
-                    .map_or(bytes, |text| Bytes::from(links::replace_ids(&text, &ids)));
+                let target =
+                    layout::rebase_member(node.kind, &path, &node.path, &dest)?;
+                let bytes = text_of(&path, &bytes).map_or(bytes, |text| {
+                    Bytes::from(links::replace_ids(&text, &ids))
+                });
                 let _ = self
                     .store
                     .put(&target, bytes, Precondition::IfAbsent)
@@ -262,7 +296,9 @@ impl Drive {
                 .iter()
                 .find(|n| n.path == dest)
                 .cloned()
-                .ok_or_else(|| DriveError::Invalid("the copy could not be indexed".into()))?;
+                .ok_or_else(|| {
+                    DriveError::Invalid("the copy could not be indexed".into())
+                })?;
             if let Some(user) = Self::user_of(actor) {
                 self.access.grant_owner(user, top.space, top.id).await?;
             }
@@ -291,13 +327,9 @@ impl Drive {
     pub(super) async fn subtree(&self, node: &Node) -> DriveResult<Vec<Node>> {
         let mut out = vec![node.clone()];
         if let Some(dir) = self.children_dir(node.kind, &node.path).await? {
-            out.extend(
-                self.index
-                    .nodes(node.space)
-                    .await?
-                    .into_iter()
-                    .filter(|n| n.is_live() && n.id != node.id && n.path.starts_with(&dir)),
-            );
+            out.extend(self.index.nodes(node.space).await?.into_iter().filter(
+                |n| n.is_live() && n.id != node.id && n.path.starts_with(&dir),
+            ));
         }
         Ok(out)
     }
@@ -327,7 +359,9 @@ impl Drive {
         let mut hidden = Vec::new();
         let mut books = Vec::new();
         for member in self.subtree(node).await? {
-            if member.id != node.id && !self.may(actor, &member, Permission::View).await? {
+            if member.id != node.id
+                && !self.may(actor, &member, Permission::View).await?
+            {
                 hidden.push(member.path);
             } else if member.kind == NodeKind::Book {
                 books.push(member);
@@ -350,11 +384,13 @@ impl Drive {
             let mut blobs = vec![(node.path.clone(), node.size)];
             // A page's nested pages travel with it (D168).
             if let Some(dir) = self.children_dir(node.kind, &node.path).await? {
-                blobs.extend(self.blobs_under(&dir).await?.into_iter().filter(|(p, _)| {
-                    !p.file_name().contains(".vellum-tmp")
-                        && vellum_store::layout::Kind::of(p).is_content()
-                        && !hidden.iter().any(|h| p.starts_with(h))
-                }));
+                blobs.extend(self.blobs_under(&dir).await?.into_iter().filter(
+                    |(p, _)| {
+                        !p.file_name().contains(".vellum-tmp")
+                            && vellum_store::layout::Kind::of(p).is_content()
+                            && !hidden.iter().any(|h| p.starts_with(h))
+                    },
+                ));
             }
             blobs
         };
@@ -365,7 +401,8 @@ impl Drive {
         let mut views = Vec::with_capacity(books.len());
         for book in books {
             let view = self.book_view(actor, &book).await?;
-            files.extend(view.files.iter().map(|(p, b)| (p.clone(), b.clone())));
+            files
+                .extend(view.files.iter().map(|(p, b)| (p.clone(), b.clone())));
             views.push((book.path, view));
         }
         for (path, _) in blobs {
@@ -398,13 +435,20 @@ impl Drive {
         let mut moved = Vec::with_capacity(members.len());
         for before in members {
             let mut after = before.clone();
-            after.path = layout::rebase_member(node.kind, &before.path, &node.path, &path)?;
+            after.path = layout::rebase_member(
+                node.kind,
+                &before.path,
+                &node.path,
+                &path,
+            )?;
             after.space = space.id;
             if before.id == node.id {
                 after.parent = parent;
                 after.modified = now;
                 after.title = match (title, node.kind) {
-                    (Some(title), NodeKind::Page | NodeKind::Shortcut) => title.to_owned(),
+                    (Some(title), NodeKind::Page | NodeKind::Shortcut) => {
+                        title.to_owned()
+                    }
                     (Some(title), _) => {
                         let name = layout::title_from_path(node.kind, &path);
                         if name == layout::stem(title) {
@@ -431,7 +475,11 @@ impl Drive {
     /// Rewrites relative links and wikilinks broken by `moved`:
     /// links inside moved pages that point elsewhere, and links in other
     /// pages that point at moved or renamed pages.
-    pub(super) async fn fix_links(&self, actor: &Actor, moved: &Moved) -> DriveResult<()> {
+    pub(super) async fn fix_links(
+        &self,
+        actor: &Actor,
+        moved: &Moved,
+    ) -> DriveResult<()> {
         let paths: HashMap<BlobPath, BlobPath> = moved
             .iter()
             .map(|(before, after)| (before.path.clone(), after.path.clone()))
@@ -445,11 +493,13 @@ impl Drive {
                     .await?
                     .is_empty();
                 if !still_taken {
-                    let _ = titles.insert(before.title.clone(), after.title.clone());
+                    let _ = titles
+                        .insert(before.title.clone(), after.title.clone());
                 }
             }
         }
-        let moved_ids: HashSet<ObjectId> = moved.iter().map(|(_, n)| n.id).collect();
+        let moved_ids: HashSet<ObjectId> =
+            moved.iter().map(|(_, n)| n.id).collect();
 
         // Links inside moved pages, and inside moved books and collections.
         for (before, after) in moved {
@@ -464,7 +514,8 @@ impl Drive {
             }
             match after.kind {
                 NodeKind::Page => {
-                    let (old_dir, new_dir) = (before.path.parent(), after.path.parent());
+                    let (old_dir, new_dir) =
+                        (before.path.parent(), after.path.parent());
                     let paths = paths.clone();
                     let _ = self
                         .relink(actor, after.clone(), move |text| {
@@ -479,7 +530,8 @@ impl Drive {
                         .await?;
                 }
                 NodeKind::Book | NodeKind::Collection => {
-                    self.relink_inner(&before.path, &after.path, &paths).await?;
+                    self.relink_inner(&before.path, &after.path, &paths)
+                        .await?;
                 }
                 NodeKind::Folder | NodeKind::Shortcut => {}
             }
@@ -506,7 +558,13 @@ impl Drive {
             let (paths, titles) = (paths.clone(), titles.clone());
             let _ = self
                 .relink(actor, node, move |text| {
-                    relink_text(text, dir.as_ref(), dir.as_ref(), &paths, &titles)
+                    relink_text(
+                        text,
+                        dir.as_ref(),
+                        dir.as_ref(),
+                        &paths,
+                        &titles,
+                    )
                 })
                 .await?;
         }
@@ -627,7 +685,8 @@ mod tests {
     #[test]
     fn relinks_moved_pages_and_their_targets() {
         let paths = HashMap::from([(p("d/a/Plan.md"), p("d/b/c/Plan.md"))]);
-        // A page that moved from d/a to d/b/c, linking to a sibling that stayed.
+        // A page that moved from d/a to d/b/c, linking to a sibling that
+        // stayed.
         let out = relink_text(
             "[s](Other.md) [p](Plan.md)",
             Some(&p("d/a")),

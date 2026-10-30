@@ -98,9 +98,9 @@ fn invalid(message: impl Into<String>) -> Error {
 /// Looks up an IANA zone name such as `Europe/Berlin` or `UTC`.
 fn zone(name: &str) -> Result<TimeZone, Error> {
     let known = name.len() <= MAX_ZONE
-        && name
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '/' | '_' | '-' | '+'));
+        && name.chars().all(|c| {
+            c.is_ascii_alphanumeric() || matches!(c, '/' | '_' | '-' | '+')
+        });
     let found = known.then(|| TimeZone::get(name).ok()).flatten();
     found.ok_or_else(|| invalid(format!("unknown time zone \"{name}\"")))
 }
@@ -169,7 +169,10 @@ impl MyWorkSettingsView {
         let input = prefs.to_input();
         Self {
             time_zone: input.time_zone,
-            effective_time_zone: effective.iana_name().unwrap_or("UTC").to_owned(),
+            effective_time_zone: effective
+                .iana_name()
+                .unwrap_or("UTC")
+                .to_owned(),
             day_starts_at: input.day_starts_at,
             digest_at: input.digest_at,
         }
@@ -180,7 +183,11 @@ impl MyWorkSettingsView {
 mod tests {
     use super::*;
 
-    fn input(zone: Option<&str>, day: &str, digest: Option<&str>) -> MyWorkSettingsInput {
+    fn input(
+        zone: Option<&str>,
+        day: &str,
+        digest: Option<&str>,
+    ) -> MyWorkSettingsInput {
         MyWorkSettingsInput {
             time_zone: zone.map(str::to_owned),
             day_starts_at: day.to_owned(),
@@ -195,13 +202,16 @@ mod tests {
         assert_eq!(prefs.day_starts_at, Time::constant(8, 30, 0, 0));
         assert_eq!(prefs.digest_at, None);
         assert_eq!(prefs.to_input(), given);
-        let view = MyWorkSettingsView::new(&prefs, &prefs.zone_or(&TimeZone::UTC));
+        let view =
+            MyWorkSettingsView::new(&prefs, &prefs.zone_or(&TimeZone::UTC));
         assert_eq!(view.effective_time_zone, "America/New_York");
     }
 
     #[test]
     fn no_zone_follows_the_server() {
-        let prefs = Preferences::parse(&input(Some(" "), "09:00", Some("07:30"))).unwrap();
+        let prefs =
+            Preferences::parse(&input(Some(" "), "09:00", Some("07:30")))
+                .unwrap();
         assert_eq!(prefs.time_zone, None);
         let server = TimeZone::get("Asia/Kolkata").unwrap();
         assert_eq!(prefs.zone_or(&server), server);
@@ -221,10 +231,12 @@ mod tests {
             "Europe/Berlin;rm",
             &"A".repeat(80),
         ] {
-            let err = Preferences::parse(&input(Some(zone), "09:00", None)).unwrap_err();
+            let err = Preferences::parse(&input(Some(zone), "09:00", None))
+                .unwrap_err();
             assert_eq!(err.kind(), ErrorKind::InvalidInput, "{zone:?}");
         }
-        for time in ["9", "24:00", "09:60", "9:5", "-1:00", "09:00:00", "ab:cd"] {
+        for time in ["9", "24:00", "09:60", "9:5", "-1:00", "09:00:00", "ab:cd"]
+        {
             assert!(
                 Preferences::parse(&input(None, time, None)).is_err(),
                 "{time}"
@@ -234,6 +246,8 @@ mod tests {
                 "{time}"
             );
         }
-        assert!(Preferences::parse(&input(None, "7:05", Some("23:59"))).is_ok());
+        assert!(
+            Preferences::parse(&input(None, "7:05", Some("23:59"))).is_ok()
+        );
     }
 }

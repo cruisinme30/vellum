@@ -53,18 +53,20 @@ pub use backend::{Change, IndexEntry, Scope, SearchBackend};
 pub use drive_feed::{DriveFeed, DriveSource, FeedConfig, Start};
 pub use error::{Result, SearchError};
 pub use indexer::{
-    DocumentSource, Indexer, IndexerConfig, Progress, rebuild, rebuild_with_progress, reindex,
-    reindex_with_progress,
+    DocumentSource, Indexer, IndexerConfig, Progress, rebuild,
+    rebuild_with_progress, reindex, reindex_with_progress,
 };
 pub use meili_index::{MeiliBackend, MeiliConfig};
 pub use model::{
-    BlockKind, DocKind, Filters, Fragment, IndexBlock, IndexDocument, SearchHit, SearchPage,
-    SearchQuery, StoredBlock, TitleHit,
+    BlockKind, DocKind, Filters, Fragment, IndexBlock, IndexDocument,
+    SearchHit, SearchPage, SearchQuery, StoredBlock, TitleHit,
 };
 #[cfg(feature = "onnx")]
 pub use onnx::{OnnxConfig, OnnxEmbedder};
 pub use postgres_index::PostgresBackend;
 pub use service::{Context, SearchService, Tuning, Update};
 pub use sharded::Sharded;
-pub use tantivy_index::{IndexKey, Location, Opened, TantivyBackend, TantivyConfig};
+pub use tantivy_index::{
+    IndexKey, Location, Opened, TantivyBackend, TantivyConfig,
+};
 pub use vector::Embedder;

@@ -103,14 +103,19 @@ pub async fn save(
                     etag: None,
                 };
             }
-            Err(StoreError::PreconditionFailed { .. } | StoreError::AlreadyExists(_)) => {
+            Err(
+                StoreError::PreconditionFailed { .. }
+                | StoreError::AlreadyExists(_),
+            ) => {
                 let theirs = match store.get(path).await {
                     Ok(theirs) => theirs,
                     Err(StoreError::NotFound(_)) => continue,
                     Err(e) => return Err(e),
                 };
                 let kind = MergeKind::for_path(path);
-                let Some(text) = three_way(kind, &base.bytes, &ours, &theirs.bytes) else {
+                let Some(text) =
+                    three_way(kind, &base.bytes, &ours, &theirs.bytes)
+                else {
                     let copy = write_copy(store, path, &ours, writer).await?;
                     record("conflicted");
                     return Ok(Saved::Conflicted {
@@ -138,7 +143,12 @@ fn record(outcome: &str) {
 
 /// Merges the three versions; `None` is a conflict. Binary content only
 /// merges when one side left it unchanged.
-pub fn three_way(kind: MergeKind, base: &[u8], ours: &Bytes, theirs: &Bytes) -> Option<Bytes> {
+pub fn three_way(
+    kind: MergeKind,
+    base: &[u8],
+    ours: &Bytes,
+    theirs: &Bytes,
+) -> Option<Bytes> {
     if ours == theirs || base == theirs.as_ref() {
         return Some(ours.clone());
     }
@@ -183,7 +193,12 @@ async fn write_copy(
 ///
 /// # Errors
 /// Returns [`StoreError::InvalidPath`] if the name becomes invalid.
-pub fn conflict_path(path: &BlobPath, date: &str, user: &str, n: usize) -> StoreResult<BlobPath> {
+pub fn conflict_path(
+    path: &BlobPath,
+    date: &str,
+    user: &str,
+    n: usize,
+) -> StoreResult<BlobPath> {
     let name = path.file_name();
     let (stem, ext) = match name.rsplit_once('.') {
         Some((stem, ext)) if !stem.is_empty() => (stem, format!(".{ext}")),
@@ -216,8 +231,16 @@ mod tests {
             "drives/users/alice/Q3 plan (conflict 2026-10-29 alice).md"
         );
         let second = conflict_path(&p, "2026-10-29", "a/b", 2)?;
-        assert_eq!(second.file_name(), "Q3 plan (conflict 2026-10-29 a-b 2).md");
-        let bare = conflict_path(&BlobPath::new(".vellum-folder")?, "2026-10-29", "bo", 1)?;
+        assert_eq!(
+            second.file_name(),
+            "Q3 plan (conflict 2026-10-29 a-b 2).md"
+        );
+        let bare = conflict_path(
+            &BlobPath::new(".vellum-folder")?,
+            "2026-10-29",
+            "bo",
+            1,
+        )?;
         assert_eq!(bare.as_str(), ".vellum-folder (conflict 2026-10-29 bo)");
         Ok(())
     }

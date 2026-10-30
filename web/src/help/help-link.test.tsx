@@ -37,7 +37,9 @@ describe("contextual help", () => {
 
   it("keeps the heading's name to the title alone", () => {
     renderWithProviders(<ViewTitle title="Data" help="collection.create" />);
-    expect(screen.getByRole("heading", { level: 1, name: "Data" })).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Data" }),
+    ).toBeTruthy();
     expect(screen.getByRole("link", { name: "Help: Data" })).toBeTruthy();
   });
 });

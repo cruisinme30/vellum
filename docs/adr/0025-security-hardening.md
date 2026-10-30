@@ -12,8 +12,12 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D103, D104, D105, D296, D301
-- Issues: [#60](https://github.com/cruisinme30/vellum/issues/60) (outbound fetches), [#61](https://github.com/cruisinme30/vellum/issues/61) (uploads),
-  [#62](https://github.com/cruisinme30/vellum/issues/62) (secret scanning), [#527](https://github.com/cruisinme30/vellum/issues/527) (secret scanning on save), [#186](https://github.com/cruisinme30/vellum/issues/186) (E2E private spaces)
+- Issues: [#60](https://github.com/cruisinme30/vellum/issues/60) (outbound
+  fetches), [#61](https://github.com/cruisinme30/vellum/issues/61) (uploads),
+  [#62](https://github.com/cruisinme30/vellum/issues/62) (secret scanning),
+  [#527](https://github.com/cruisinme30/vellum/issues/527) (secret scanning on
+  save), [#186](https://github.com/cruisinme30/vellum/issues/186) (E2E private
+  spaces)
 - Pull requests: #221
 
 :::

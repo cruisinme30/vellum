@@ -85,7 +85,8 @@ impl DriveChanges {
 
     async fn horizon(&self) -> Result<Position> {
         let system = self.index.backend().otel_system();
-        let sql = "SELECT horizon_txid, horizon_seq FROM drive_change_meta WHERE id = 1";
+        let sql = "SELECT horizon_txid, horizon_seq FROM drive_change_meta \
+            WHERE id = 1";
         let (txid, seq): (i64, i64) = match self.index.pool() {
             IndexPool::Sqlite(pool) => {
                 traced(
@@ -120,8 +121,9 @@ impl DriveChanges {
                     system,
                     "changes.head",
                     sqlx::query_scalar(
-                        "SELECT MAX(COALESCE((SELECT MAX(seq) FROM drive_changes), 0), \
-                         horizon_seq) FROM drive_change_meta WHERE id = 1",
+                        "SELECT MAX(COALESCE((SELECT MAX(seq) FROM \
+                         drive_changes), 0), horizon_seq) FROM \
+                         drive_change_meta WHERE id = 1",
                     )
                     .fetch_one(pool),
                 )
@@ -133,7 +135,9 @@ impl DriveChanges {
                     system,
                     "changes.head",
                     sqlx::query_scalar(
-                        "SELECT pg_snapshot_xmin(pg_current_snapshot())::text::bigint",
+                        "SELECT \
+                            pg_snapshot_xmin(pg_current_snapshot())::text::bigi\
+                            nt",
                     )
                     .fetch_one(pool),
                 )
@@ -163,8 +167,8 @@ impl DriveChanges {
                     system,
                     "changes.read",
                     sqlx::query_as(
-                        "SELECT txid, seq, node_id FROM drive_changes WHERE seq > $1 \
-                         ORDER BY seq LIMIT $2",
+                        "SELECT txid, seq, node_id FROM drive_changes WHERE \
+                         seq > $1 ORDER BY seq LIMIT $2",
                     )
                     .bind(after.seq)
                     .bind(limit_n)
@@ -219,8 +223,9 @@ impl DriveChanges {
         let system = self.index.backend().otel_system();
         let newest = "SELECT txid, seq FROM drive_changes WHERE at_ms < $1 \
                       ORDER BY txid DESC, seq DESC LIMIT 1";
-        let raise = "UPDATE drive_change_meta SET horizon_txid = $1, horizon_seq = $2 \
-                     WHERE id = 1 AND (horizon_txid < $1 OR (horizon_txid = $1 AND horizon_seq < $2))";
+        let raise = "UPDATE drive_change_meta SET horizon_txid = $1, \
+                     horizon_seq = $2 WHERE id = 1 AND (horizon_txid < $1 OR \
+                     (horizon_txid = $1 AND horizon_seq < $2))";
         let delete = "DELETE FROM drive_changes WHERE (txid, seq) <= ($1, $2)";
         macro_rules! run {
             ($pool:expr) => {{
@@ -228,7 +233,9 @@ impl DriveChanges {
                 let top: Option<(i64, i64)> = traced(
                     system,
                     "changes.prune_top",
-                    sqlx::query_as(newest).bind(before).fetch_optional(&mut *tx),
+                    sqlx::query_as(newest)
+                        .bind(before)
+                        .fetch_optional(&mut *tx),
                 )
                 .await?;
                 let Some((txid, seq)) = top else {

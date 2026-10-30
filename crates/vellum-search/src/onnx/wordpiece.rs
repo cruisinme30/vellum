@@ -7,7 +7,8 @@
 use std::collections::HashMap;
 
 use tantivy::tokenizer::{
-    AsciiFoldingFilter, LowerCaser, TextAnalyzer, TokenStream, WhitespaceTokenizer,
+    AsciiFoldingFilter, LowerCaser, TextAnalyzer, TokenStream,
+    WhitespaceTokenizer,
 };
 
 use crate::error::{Result, SearchError};
@@ -50,10 +51,9 @@ impl WordPiece {
             })
             .collect();
         let special = |name: &str| {
-            vocab
-                .get(name)
-                .copied()
-                .ok_or_else(|| SearchError::Embedding(format!("vocabulary has no {name}")))
+            vocab.get(name).copied().ok_or_else(|| {
+                SearchError::Embedding(format!("vocabulary has no {name}"))
+            })
         };
         Ok(Self {
             unk: special("[UNK]")?,
@@ -95,7 +95,8 @@ impl WordPiece {
             let mut end = chars.len();
             let mut found = None;
             while start < end {
-                let piece: String = chars.get(start..end).unwrap_or_default().iter().collect();
+                let piece: String =
+                    chars.get(start..end).unwrap_or_default().iter().collect();
                 let key = if start > 0 {
                     format!("##{piece}")
                 } else {
@@ -152,7 +153,10 @@ fn basic_words(text: &str) -> Vec<String> {
 
 const fn is_punctuation(c: char) -> bool {
     c.is_ascii_punctuation()
-        || matches!(c, '\u{2000}'..='\u{206F}' | '\u{3000}'..='\u{303F}' | '\u{FF00}'..='\u{FF0F}')
+        || matches!(
+            c,
+            '\u{2000}'..='\u{206F}' | '\u{3000}'..='\u{303F}' | '\u{FF00}'..='\u{FF0F}'
+        )
 }
 
 const fn is_cjk(c: char) -> bool {
@@ -167,8 +171,8 @@ const fn is_cjk(c: char) -> bool {
 mod tests {
     use super::*;
 
-    const VOCAB: &str =
-        "[PAD]\n[UNK]\n[CLS]\n[SEP]\nthe\nnorth\n##star\ngate\n##way\n,\ncafe\n日\n本";
+    const VOCAB: &str = "[PAD]\n[UNK]\n[CLS]\n[SEP]\nthe\nnorth\n##star\ngate\n\
+        ##way\n,\ncafe\n日\n本";
 
     #[test]
     fn splits_words_into_pieces_with_specials() {

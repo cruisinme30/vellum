@@ -18,13 +18,19 @@ import type {
 const segment = encodeURIComponent;
 const ROOT = "/api/v1/collections";
 const collection = (id: string) => `${ROOT}/${segment(id)}`;
-const row = (id: string, rowId: string) => `${collection(id)}/rows/${segment(rowId)}`;
-const view = (id: string, name: string) => `${collection(id)}/views/${segment(name)}`;
-const property = (id: string, key: string) => `${collection(id)}/properties/${segment(key)}`;
+const row = (id: string, rowId: string) =>
+  `${collection(id)}/rows/${segment(rowId)}`;
+const view = (id: string, name: string) =>
+  `${collection(id)}/views/${segment(name)}`;
+const property = (id: string, key: string) =>
+  `${collection(id)}/properties/${segment(key)}`;
 
 /** How often open views reload while the tab is visible. */
 export const REFRESH_MS = 30_000;
-/** Reloads closer together than this are skipped (focus and visibility fire together). */
+/**
+ * Reloads closer together than this are skipped (focus and visibility fire
+ * together).
+ */
 const MIN_GAP_MS = 2000;
 
 /** Where the adapter learns that the tab is in view; tests pass fakes. */
@@ -87,19 +93,46 @@ export function createHttpCollectionsStore(
     info: (id) => http.get<CollectionInfo>(collection(id)),
     query: ({ collection_id, ...rest }) =>
       http.get<ViewResult>(`${collection(collection_id)}/query`, rest),
-    getRow: ({ collection_id, row_id }) => http.get<RowDetail>(row(collection_id, row_id)),
+    getRow: ({ collection_id, row_id }) =>
+      http.get<RowDetail>(row(collection_id, row_id)),
     createRow: async (input) =>
       changed(
-        await http.send<RowWritten>("POST", `${collection(input.collection_id)}/rows`, input),
+        await http.send<RowWritten>(
+          "POST",
+          `${collection(input.collection_id)}/rows`,
+          input,
+        ),
       ),
     updateRow: async (input) =>
-      changed(await http.send<RowWritten>("PATCH", row(input.collection_id, input.row_id), input)),
+      changed(
+        await http.send<RowWritten>(
+          "PATCH",
+          row(input.collection_id, input.row_id),
+          input,
+        ),
+      ),
     deleteRow: async (key) =>
-      changed(await http.send<RowWritten>("DELETE", row(key.collection_id, key.row_id))),
+      changed(
+        await http.send<RowWritten>(
+          "DELETE",
+          row(key.collection_id, key.row_id),
+        ),
+      ),
     saveView: async (input) =>
-      changed(await http.send<CollectionInfo>("PUT", view(input.collection_id, input.view), input)),
+      changed(
+        await http.send<CollectionInfo>(
+          "PUT",
+          view(input.collection_id, input.view),
+          input,
+        ),
+      ),
     deleteView: async (key) =>
-      changed(await http.send<CollectionInfo>("DELETE", view(key.collection_id, key.view))),
+      changed(
+        await http.send<CollectionInfo>(
+          "DELETE",
+          view(key.collection_id, key.view),
+        ),
+      ),
     addProperty: async (input) =>
       changed(
         await http.send<CollectionInfo>(
@@ -110,10 +143,19 @@ export function createHttpCollectionsStore(
       ),
     updateProperty: async (input) =>
       changed(
-        await http.send<CollectionInfo>("PATCH", property(input.collection_id, input.key), input),
+        await http.send<CollectionInfo>(
+          "PATCH",
+          property(input.collection_id, input.key),
+          input,
+        ),
       ),
     deleteProperty: async (key) =>
-      changed(await http.send<CollectionInfo>("DELETE", property(key.collection_id, key.key))),
+      changed(
+        await http.send<CollectionInfo>(
+          "DELETE",
+          property(key.collection_id, key.key),
+        ),
+      ),
     exportCsv: ({ collection_id, ...rest }) =>
       http.get<CsvExport>(`${collection(collection_id)}/csv`, rest),
     importCsv: async (input) => {

@@ -19,7 +19,8 @@ import {
 import { ReauthPrompt } from "./reauth-prompt";
 import { SessionProvider } from "./session";
 
-const stale = () => new ApiError("unauthenticated", REAUTHENTICATION_REQUIRED, { status: 401 });
+const stale = () =>
+  new ApiError("unauthenticated", REAUTHENTICATION_REQUIRED, { status: 401 });
 
 function fakeHttp(answers: (() => Promise<unknown>)[]) {
   const send = vi.fn(() => {
@@ -33,7 +34,10 @@ function fakeHttp(answers: (() => Promise<unknown>)[]) {
 describe("withReauth", () => {
   it("asks once and runs the request again", async () => {
     const gate = createReauthGate();
-    const { http, send } = fakeHttp([() => Promise.reject(stale()), () => Promise.resolve("ok")]);
+    const { http, send } = fakeHttp([
+      () => Promise.reject(stale()),
+      () => Promise.resolve("ok"),
+    ]);
     const call = withReauth(http, gate).send("POST", "/api/v1/admin/users", {});
     await waitFor(() => {
       expect(gate.pending()).toBe(true);
@@ -54,18 +58,27 @@ describe("withReauth", () => {
     await expect(call).rejects.toSatisfy(needsReauth);
   });
 
-  it("shares one prompt between waiting requests and leaves other errors alone", async () => {
-    const gate = createReauthGate();
-    const request = vi.spyOn(gate, "request");
-    expect(gate.request()).toBe(gate.request());
-    gate.settle(true);
-    request.mockClear();
-    const { http } = fakeHttp([
-      () => Promise.reject(new ApiError("unauthenticated", "sign in to continue")),
-    ]);
-    await expect(withReauth(http, gate).get("/x")).rejects.toThrow("sign in to continue");
-    expect(request).not.toHaveBeenCalled();
-  });
+  it(
+    "shares one prompt between waiting requests and leaves other errors " +
+      "alone",
+    async () => {
+      const gate = createReauthGate();
+      const request = vi.spyOn(gate, "request");
+      expect(gate.request()).toBe(gate.request());
+      gate.settle(true);
+      request.mockClear();
+      const { http } = fakeHttp([
+        () =>
+          Promise.reject(
+            new ApiError("unauthenticated", "sign in to continue"),
+          ),
+      ]);
+      await expect(withReauth(http, gate).get("/x")).rejects.toThrow(
+        "sign in to continue",
+      );
+      expect(request).not.toHaveBeenCalled();
+    },
+  );
 
   it("sends single sign-on back to the page", () => {
     expect(ssoReauthUrl("/auth/sso/start", "/admin/users")).toBe(
@@ -77,7 +90,12 @@ describe("withReauth", () => {
 function renderPrompt(status: Partial<AuthStatus>, http: Http) {
   const gate = createReauthGate();
   const auth = { status: vi.fn() } as unknown as AuthApi;
-  const full: AuthStatus = { needsSetup: false, credential: "session", scopes: [], ...status };
+  const full: AuthStatus = {
+    needsSetup: false,
+    credential: "session",
+    scopes: [],
+    ...status,
+  };
   render(
     <I18nProvider>
       <SessionProvider auth={auth} initial={full}>
@@ -100,7 +118,10 @@ describe("the re-authentication dialog", () => {
   it("takes the password again and lets the action run", async () => {
     const user = userEvent.setup();
     const { http, send } = fakeHttp([
-      () => Promise.reject(new ApiError("unauthenticated", "wrong password", { status: 401 })),
+      () =>
+        Promise.reject(
+          new ApiError("unauthenticated", "wrong password", { status: 401 }),
+        ),
       () => Promise.resolve(),
     ]);
     const gate = renderPrompt({ user: { ...ADMIN, hasPassword: true } }, http);
@@ -108,7 +129,9 @@ describe("the re-authentication dialog", () => {
     act(() => {
       answer = gate.request();
     });
-    const dialog = await screen.findByRole("dialog", { name: "Confirm it's you" });
+    const dialog = await screen.findByRole("dialog", {
+      name: "Confirm it's you",
+    });
     expect(dialog).toBeDefined();
     const password = screen.getByLabelText("Password");
     expect(document.activeElement).toBe(password);
@@ -133,8 +156,15 @@ describe("the re-authentication dialog", () => {
     const user = userEvent.setup();
     const { http, send } = fakeHttp([
       () =>
-        Promise.reject(new ApiError("unauthenticated", "second factor required", { status: 401 })),
-      () => Promise.reject(new ApiError("unauthenticated", "the code is wrong", { status: 401 })),
+        Promise.reject(
+          new ApiError("unauthenticated", "second factor required", {
+            status: 401,
+          }),
+        ),
+      () =>
+        Promise.reject(
+          new ApiError("unauthenticated", "the code is wrong", { status: 401 }),
+        ),
       () => Promise.resolve(),
     ]);
     const gate = renderPrompt({ user: { ...ADMIN, hasPassword: true } }, http);
@@ -142,15 +172,23 @@ describe("the re-authentication dialog", () => {
     act(() => {
       answer = gate.request();
     });
-    await user.type(await screen.findByLabelText("Password"), "correct horse battery");
+    await user.type(
+      await screen.findByLabelText("Password"),
+      "correct horse battery",
+    );
     await user.click(screen.getByRole("button", { name: "Confirm" }));
-    const code = await screen.findByLabelText("Code from your app, or a recovery code");
+    const code = await screen.findByLabelText(
+      "Code from your app, or a recovery code",
+    );
     expect(screen.queryByRole("alert")).toBeNull();
     await user.type(code, "000000");
     await user.click(screen.getByRole("button", { name: "Confirm" }));
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("the code is wrong");
-    await user.type(screen.getByLabelText("Code from your app, or a recovery code"), "123456");
+    await user.type(
+      screen.getByLabelText("Code from your app, or a recovery code"),
+      "123456",
+    );
     await user.click(screen.getByRole("button", { name: "Confirm" }));
     await expect(answer).resolves.toBe(true);
     expect(send).toHaveBeenLastCalledWith("POST", "/auth/reauthenticate", {
@@ -159,24 +197,30 @@ describe("the re-authentication dialog", () => {
     });
   });
 
-  it("offers single sign-on to an account without a password, and Escape cancels", async () => {
-    const user = userEvent.setup();
-    const { http } = fakeHttp([]);
-    const gate = renderPrompt(
-      {
-        user: { ...ADMIN, hasPassword: false },
-        sso: { name: "Northstar SSO", startUrl: "/auth/sso/start" },
-      },
-      http,
-    );
-    let answer: Promise<boolean> | undefined;
-    act(() => {
-      answer = gate.request();
-    });
-    const link = await screen.findByRole("link", { name: "Continue with Northstar SSO" });
-    expect(link.getAttribute("href")).toContain("reauth=1");
-    expect(screen.queryByLabelText("Password")).toBeNull();
-    await user.keyboard("{Escape}");
-    await expect(answer).resolves.toBe(false);
-  });
+  it(
+    "offers single sign-on to an account without a password, and Escape " +
+      "cancels",
+    async () => {
+      const user = userEvent.setup();
+      const { http } = fakeHttp([]);
+      const gate = renderPrompt(
+        {
+          user: { ...ADMIN, hasPassword: false },
+          sso: { name: "Northstar SSO", startUrl: "/auth/sso/start" },
+        },
+        http,
+      );
+      let answer: Promise<boolean> | undefined;
+      act(() => {
+        answer = gate.request();
+      });
+      const link = await screen.findByRole("link", {
+        name: "Continue with Northstar SSO",
+      });
+      expect(link.getAttribute("href")).toContain("reauth=1");
+      expect(screen.queryByLabelText("Password")).toBeNull();
+      await user.keyboard("{Escape}");
+      await expect(answer).resolves.toBe(false);
+    },
+  );
 });

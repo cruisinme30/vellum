@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-// Conditional skips say why in their message: a browser or setup lacks the feature.
+// Conditional skips say why in their message: a browser or setup lacks the
+// feature.
 /* eslint-disable sonarjs/no-skipped-tests */
 
 import { expect, test } from "./fixtures";
@@ -35,7 +36,10 @@ for (const target of TARGETS) {
           "Chromium-only media feature",
         );
         const problems = await auditTarget(page, target, mode, testInfo);
-        const { fresh, known } = triage(problems, `${target.name} › ${mode.name}`);
+        const { fresh, known } = triage(
+          problems,
+          `${target.name} › ${mode.name}`,
+        );
         for (const description of known)
           testInfo.annotations.push({ type: "known issue", description });
         expect(describe(fresh)).toEqual([]);

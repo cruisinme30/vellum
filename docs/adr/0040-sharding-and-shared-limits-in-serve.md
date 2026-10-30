@@ -19,13 +19,13 @@ vellum: 1
 
 ## Context
 
-With several replicas behind one Service ([ADR 0037](0037-running-several-replicas.md)),
-the gateway's rate limiter lived in each replica's memory, so a caller
-spread over N replicas got N times the configured allowance (#440). Live
-editing makes it worse the other way round: a replica that forwards
-editors to the room's owner sends all of them from its one address. This
-record covers the limits and the shard routing in serve (#436) that the
-same umbrella asks for (#432): the chart could already run one database
+With several replicas behind one Service ([ADR
+0037](0037-running-several-replicas.md)), the gateway's rate limiter lived in
+each replica's memory, so a caller spread over N replicas got N times the
+configured allowance (#440). Live editing makes it worse the other way round: a
+replica that forwards editors to the room's owner sends all of them from its one
+address. This record covers the limits and the shard routing in serve (#436)
+that the same umbrella asks for (#432): the chart could already run one database
 per shard, but `vellum serve` put every space on the first.
 
 ## Decisions

@@ -119,7 +119,8 @@ fn split_lines(source: &str) -> Vec<Line> {
     let mut start = 0;
     let mut fence: Option<(char, usize)> = None;
     let mut math = false;
-    let mut front_matter = source.starts_with("---\n") || source.starts_with("---\r\n");
+    let mut front_matter =
+        source.starts_with("---\n") || source.starts_with("---\r\n");
     let mut first = true;
     while start < source.len() {
         let next = source
@@ -149,7 +150,8 @@ fn split_lines(source: &str) -> Vec<Line> {
             if let Some(marker) = fence_marker(trimmed) {
                 fence = Some(marker);
                 literal = true;
-            } else if trimmed == "$$" || (trimmed.starts_with("$$") && !trimmed[2..].contains("$$"))
+            } else if trimmed == "$$"
+                || (trimmed.starts_with("$$") && !trimmed[2..].contains("$$"))
             {
                 math = true;
                 literal = true;
@@ -196,7 +198,8 @@ fn list_line(source: &str, line: &Line) -> Option<ListLine> {
         _ => return None,
     };
     let after_marker = rest.get(marker_len..)?;
-    let spaces = after_marker.len() - after_marker.trim_start_matches([' ', '\t']).len();
+    let spaces =
+        after_marker.len() - after_marker.trim_start_matches([' ', '\t']).len();
     if spaces == 0 && !after_marker.is_empty() {
         return None;
     }
@@ -204,7 +207,9 @@ fn list_line(source: &str, line: &Line) -> Option<ListLine> {
     let body = source.get(body_offset..line.end)?;
     let check = match body.as_bytes() {
         [b'[', c @ (b' ' | b'x' | b'X'), b']', rest @ ..]
-            if rest.is_empty() || rest.first() == Some(&b' ') || rest.first() == Some(&b'\t') =>
+            if rest.is_empty()
+                || rest.first() == Some(&b' ')
+                || rest.first() == Some(&b'\t') =>
         {
             Some((body_offset + 1, *c != b' '))
         }
@@ -226,11 +231,18 @@ pub fn mentions(text: &str) -> Vec<String> {
     let mut found: Vec<String> = Vec::new();
     let mut previous: Option<char> = None;
     for (index, c) in text.char_indices() {
-        if c == '@' && !previous.is_some_and(|p| p.is_alphanumeric() || p == '@') {
+        if c == '@'
+            && !previous.is_some_and(|p| p.is_alphanumeric() || p == '@')
+        {
             let rest = text.get(index + 1..).unwrap_or_default();
-            let handle: String = rest.chars().take_while(|c| is_handle_char(*c)).collect();
-            let handle = handle.trim_end_matches(['.', '-']).to_ascii_lowercase();
-            if !handle.is_empty() && handle != "today" && !found.contains(&handle) {
+            let handle: String =
+                rest.chars().take_while(|c| is_handle_char(*c)).collect();
+            let handle =
+                handle.trim_end_matches(['.', '-']).to_ascii_lowercase();
+            if !handle.is_empty()
+                && handle != "today"
+                && !found.contains(&handle)
+            {
                 found.push(handle);
             }
         }
@@ -275,7 +287,8 @@ fn split_tail(text: &str) -> Tail {
     let body = text.get(..end).unwrap_or_default();
     if let Some(pos) = body.rfind('^') {
         let candidate = body.get(pos + 1..).unwrap_or_default();
-        let standalone = pos == 0 || body.get(..pos).is_some_and(|b| b.ends_with([' ', '\t']));
+        let standalone = pos == 0
+            || body.get(..pos).is_some_and(|b| b.ends_with([' ', '\t']));
         if standalone && let Ok(id) = candidate.parse::<BlockId>() {
             block = Some(id);
             end = body.get(..pos).unwrap_or_default().trim_end().len();
@@ -346,16 +359,18 @@ impl Checklist {
                 continue;
             };
             let tail_start = (check + 2).min(line.end);
-            let tail_text = source.get(tail_start..line.end).unwrap_or_default();
+            let tail_text =
+                source.get(tail_start..line.end).unwrap_or_default();
             let tail = split_tail(tail_text);
             let title = tail_text
                 .get(tail.title.clone())
                 .unwrap_or_default()
                 .to_owned();
-            let (mut fields, field_error) = match TaskFields::from_attrs(&tail.attrs) {
-                Ok(fields) => (fields, None),
-                Err(error) => (TaskFields::default(), Some(error)),
-            };
+            let (mut fields, field_error) =
+                match TaskFields::from_attrs(&tail.attrs) {
+                    Ok(fields) => (fields, None),
+                    Err(error) => (TaskFields::default(), Some(error)),
+                };
             if fields.due.is_none() && tail.attrs.get("due").is_none() {
                 fields.due = first_inline_date(&title).map(Due::Date);
             }
@@ -383,7 +398,8 @@ impl Checklist {
                 continue;
             };
             let indent = item.indent;
-            let mut end = lines.get(line_index).map_or(item.subtree.end, |l| l.next);
+            let mut end =
+                lines.get(line_index).map_or(item.subtree.end, |l| l.next);
             for line in lines.iter().skip(line_index + 1) {
                 if line.blank {
                     continue;
@@ -498,9 +514,18 @@ fn rewrite(patch: &mut Patch, item: &Item, title: &str, fields: &TaskFields) {
 
 /// Moves a repeating item's fields to the next occurrence, or returns
 /// `None` when the series is over.
-fn advance(fields: &TaskFields, recurrence: &Recurrence, completed_on: Date) -> Option<TaskFields> {
+fn advance(
+    fields: &TaskFields,
+    recurrence: &Recurrence,
+    completed_on: Date,
+) -> Option<TaskFields> {
     let anchor = fields.due.map(Due::date).or(fields.start)?;
-    let next = next_occurrence(&recurrence.rule, recurrence.from, anchor, completed_on)?;
+    let next = next_occurrence(
+        &recurrence.rule,
+        recurrence.from,
+        anchor,
+        completed_on,
+    )?;
     let shift = anchor.until(next.date).ok()?;
     let mut fields = fields.clone();
     fields.due = fields.due.map(|due| due.on(next.date));
@@ -612,13 +637,14 @@ pub fn settle(source: &str, now: &Zoned) -> Option<String> {
     let list = Checklist::parse(source);
     let mut patch = Patch::default();
     for item in list.items.iter().filter(|i| i.checked) {
-        let recurring = item.fields.recurrence.as_ref().and_then(|recurrence| {
-            let completed_on = item.fields.done.map_or_else(
-                || now.date(),
-                |t| t.to_zoned(now.time_zone().clone()).date(),
-            );
-            advance(&item.fields, recurrence, completed_on)
-        });
+        let recurring =
+            item.fields.recurrence.as_ref().and_then(|recurrence| {
+                let completed_on = item.fields.done.map_or_else(
+                    || now.date(),
+                    |t| t.to_zoned(now.time_zone().clone()).date(),
+                );
+                advance(&item.fields, recurrence, completed_on)
+            });
         if let Some(fields) = recurring {
             patch.replace(item.check..item.check + 1, " ");
             rewrite(&mut patch, item, &item.title, &fields);
@@ -716,7 +742,8 @@ pub fn append(
             .rfind(|i| i.parent.is_none())
             .map_or((source.len(), 0), |i| (i.subtree.end, i.indent)),
     };
-    let mut line = render_item(indent, fields.done.is_some(), title, fields, block);
+    let mut line =
+        render_item(indent, fields.done.is_some(), title, fields, block);
     line.push('\n');
     let mut patch = Patch::default();
     let before = source.get(..at).unwrap_or_default();
@@ -733,7 +760,8 @@ pub fn append(
 pub fn ensure_block_ids(source: &str) -> Option<String> {
     let list = Checklist::parse(source);
     let mut patch = Patch::default();
-    let mut taken: Vec<BlockId> = list.items.iter().filter_map(|i| i.block).collect();
+    let mut taken: Vec<BlockId> =
+        list.items.iter().filter_map(|i| i.block).collect();
     for item in list.items.iter().filter(|i| i.block.is_none()) {
         let mut id = BlockId::generate();
         while taken.contains(&id) {
@@ -783,7 +811,8 @@ title: Launch
     #[test]
     fn finds_items_parents_and_fields() {
         let list = Checklist::parse(DOC);
-        let titles: Vec<&str> = list.items.iter().map(|i| i.title.as_str()).collect();
+        let titles: Vec<&str> =
+            list.items.iter().map(|i| i.title.as_str()).collect();
         assert_eq!(
             titles,
             [
@@ -817,7 +846,8 @@ title: Launch
         let at: Timestamp = "2026-11-03T08:00:00Z".parse().unwrap();
         let out = set_checked(DOC, block("blk-7f3a9k2m"), true, at).unwrap();
         assert!(out.contains(
-            "- [x] Review the PRD @Alice 2026-11-03 {done=2026-11-03T08:00:00Z} ^blk-7f3a9k2m\n"
+            "- [x] Review the PRD @Alice 2026-11-03 \
+                {done=2026-11-03T08:00:00Z} ^blk-7f3a9k2m\n"
         ));
         assert_eq!(out.len(), DOC.len() + " {done=2026-11-03T08:00:00Z}".len());
         let back = set_checked(&out, block("blk-7f3a9k2m"), false, at).unwrap();
@@ -831,7 +861,8 @@ title: Launch
     #[test]
     fn completing_a_repeating_item_moves_it() {
         let now: Zoned = "2026-11-02T11:00[Europe/London]".parse().unwrap();
-        let (out, done) = complete(DOC, block("blk-5e6f7g8h"), &now, false).unwrap();
+        let (out, done) =
+            complete(DOC, block("blk-5e6f7g8h"), &now, false).unwrap();
         assert_eq!(
             done,
             Completion::Rescheduled {
@@ -839,20 +870,28 @@ title: Launch
             }
         );
         assert!(out.contains(
-            "- [ ] Weekly sync {due=2026-11-09T10:00 rrule=FREQ=WEEKLY;BYDAY=MO} ^blk-5e6f7g8h\n"
+            "- [ ] Weekly sync {due=2026-11-09T10:00 \
+                rrule=FREQ=WEEKLY;BYDAY=MO} ^blk-5e6f7g8h\n"
         ));
     }
 
     #[test]
     fn completing_with_cascade_ticks_subtasks() {
         let now: Zoned = "2026-11-03T09:00[UTC]".parse().unwrap();
-        let (out, done) = complete(DOC, block("blk-7f3a9k2m"), &now, true).unwrap();
+        let (out, done) =
+            complete(DOC, block("blk-7f3a9k2m"), &now, true).unwrap();
         assert_eq!(done, Completion::Done);
         let list = Checklist::parse(&out);
-        assert!(list.items[0].checked && list.items[1].checked && list.items[2].checked);
+        assert!(
+            list.items[0].checked
+                && list.items[1].checked
+                && list.items[2].checked
+        );
         // The earlier completion time of a done subtask is kept.
         assert!(out.contains("Read section 2 {done=2026-11-02T09:12:00Z}"));
-        assert!(out.contains("Comment on risks {p=1 done=2026-11-03T09:00:00Z}"));
+        assert!(
+            out.contains("Comment on risks {p=1 done=2026-11-03T09:00:00Z}")
+        );
     }
 
     #[test]
@@ -861,7 +900,11 @@ title: Launch
         let now: Zoned = "2026-11-02T12:00[UTC]".parse().unwrap();
         let out = settle(&ticked, &now).unwrap();
         assert!(out.contains("- [ ] Weekly sync {due=2026-11-09T10:00"));
-        assert!(out.contains("1. [X] Numbered and done {done=2026-11-02T12:00:00Z}"));
+        assert!(
+            out.contains(
+                "1. [X] Numbered and done {done=2026-11-02T12:00:00Z}"
+            )
+        );
         assert_eq!(settle(&out, &now), None);
     }
 
@@ -878,7 +921,9 @@ title: Launch
             &fields,
         )
         .unwrap();
-        assert!(out.contains("- [ ] Review the PRD @alice 2026-11-03 ^blk-7f3a9k2m\n"));
+        assert!(out.contains(
+            "- [ ] Review the PRD @alice 2026-11-03 ^blk-7f3a9k2m\n"
+        ));
 
         let out = append(
             DOC,
@@ -888,7 +933,9 @@ title: Launch
             block("blk-bbbbbbbb"),
         )
         .unwrap();
-        assert!(out.contains("^blk-1a2b3c4d\n  - [ ] New subtask ^blk-bbbbbbbb\n- [ ] Weekly"));
+        assert!(out.contains(
+            "^blk-1a2b3c4d\n  - [ ] New subtask ^blk-bbbbbbbb\n- [ ] Weekly"
+        ));
         let out = append(
             "No list yet",
             None,
@@ -915,7 +962,10 @@ title: Launch
             mentions("ping @bob, @Ann.Lee and me@northstar.dev @today"),
             ["bob", "ann.lee"]
         );
-        assert_eq!(first_inline_date("by 2026-11-03."), Some(date(2026, 11, 3)));
+        assert_eq!(
+            first_inline_date("by 2026-11-03."),
+            Some(date(2026, 11, 3))
+        );
         assert_eq!(first_inline_date("v2026-11-03 or 2026-13-01"), None);
         let tail = split_tail("Title {bad span} {p=2} ^blk-7f3a9k2m");
         assert_eq!(tail.attrs.get("p"), Some("2"));

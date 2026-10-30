@@ -29,7 +29,9 @@ export function destinations(
   item: NodeView,
   mode: PlaceMode,
 ): Destination[] {
-  const parents = new Map(containers.map((node) => [node.id, node.parent_id ?? undefined]));
+  const parents = new Map(
+    containers.map((node) => [node.id, node.parent_id ?? undefined]),
+  );
   const depthOf = (node: NodeView) => {
     let depth = 0;
     let parent = node.parent_id ?? undefined;
@@ -55,7 +57,12 @@ export function destinations(
 const TOP = "";
 
 /** Moves or copies an item, or makes a shortcut to it, at `to`. */
-function placeItem(api: DriveApi, mode: PlaceMode, id: string, to: Place): Promise<NodeView> {
+function placeItem(
+  api: DriveApi,
+  mode: PlaceMode,
+  id: string,
+  to: Place,
+): Promise<NodeView> {
   switch (mode) {
     case "move": {
       return api.move(id, to);
@@ -86,7 +93,11 @@ function FolderChoice({
 }) {
   const t = useT();
   const id = useId();
-  const loaded = useLoaded(() => api.containers(spaceId), [api, spaceId], failureText);
+  const loaded = useLoaded(
+    () => api.containers(spaceId),
+    [api, spaceId],
+    failureText,
+  );
   if (loaded.state === "failed") {
     return (
       <p className="vl-field-error" role="alert">
@@ -95,7 +106,10 @@ function FolderChoice({
       </p>
     );
   }
-  const list = loaded.state === "ready" ? destinations(loaded.value.items, item, mode) : [];
+  const list =
+    loaded.state === "ready"
+      ? destinations(loaded.value.items, item, mode)
+      : [];
   return (
     <>
       <label htmlFor={id}>{t("drive-place-folder")}</label>
@@ -197,7 +211,9 @@ export function PlaceDialog({
         aria-labelledby={headingId}
         onSubmit={(event) => void submit(event)}
       >
-        <h2 id={headingId}>{t(`drive-${mode}-title`, { title: item.title })}</h2>
+        <h2 id={headingId}>
+          {t(`drive-${mode}-title`, { title: item.title })}
+        </h2>
         <label htmlFor={spaceSelect}>{t("drive-place-space")}</label>
         <select
           id={spaceSelect}
@@ -234,7 +250,11 @@ export function PlaceDialog({
           <button type="button" className="vl-text-button" onClick={onClose}>
             {t("drive-cancel")}
           </button>
-          <button type="submit" className="vl-filled-button" disabled={busy || spaceId === ""}>
+          <button
+            type="submit"
+            className="vl-filled-button"
+            disabled={busy || spaceId === ""}
+          >
             {t(`drive-${mode}`)}
           </button>
         </div>

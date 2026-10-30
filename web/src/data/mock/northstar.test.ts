@@ -7,7 +7,12 @@ import { describe, expect, it } from "vitest";
 import { isBlockId } from "../../editor/block-id";
 import { buildTree } from "../tree";
 
-import { createNorthstarStore, NORTHSTAR, NORTHSTAR_PEOPLE, PAGE } from "./northstar";
+import {
+  createNorthstarStore,
+  NORTHSTAR,
+  NORTHSTAR_PEOPLE,
+  PAGE,
+} from "./northstar";
 
 const alphabetical = (a: string, b: string) => a.localeCompare(b);
 
@@ -61,7 +66,10 @@ describe("the Northstar demo", () => {
     const [engineering] = snapshot.spaces;
     const tree = buildTree(snapshot.pages, engineering?.id ?? "");
     const home = tree.find((node) => node.page.id === PAGE.engHome);
-    expect(home?.children.map((node) => node.page.id)).toEqual([PAGE.gateway, PAGE.onCall]);
+    expect(home?.children.map((node) => node.page.id)).toEqual([
+      PAGE.gateway,
+      PAGE.onCall,
+    ]);
   });
 
   it("finds pages by body text", async () => {

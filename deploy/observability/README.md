@@ -6,10 +6,10 @@ SPDX-License-Identifier: AGPL-3.0-only
 # Observability
 
 Vellum explains itself without any of this: Admin → Requests shows the last
-10,000 requests as waterfalls, Admin → Routes shows rate, errors and
-latency per route against its budget, Admin → Usage counts people, pages,
-storage and activity, and `vellum profile` draws a flame graph. This folder
-is for running Vellum next to a metrics and tracing stack. Decision record: ADR 0021.
+10,000 requests as waterfalls, Admin → Routes shows rate, errors and latency per
+route against its budget, Admin → Usage counts people, pages, storage and
+activity, and `vellum profile` draws a flame graph. This folder is for running
+Vellum next to a metrics and tracing stack. Decision record: ADR 0021.
 
 | File | What it does |
 | --- | --- |

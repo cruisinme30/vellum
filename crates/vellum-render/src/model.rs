@@ -14,7 +14,9 @@ pub fn parse_number(s: &str) -> Option<f64> {
     let cleaned: String = s
         .trim()
         .chars()
-        .filter(|c| !matches!(c, ',' | '_' | '%' | '$' | '€' | '£' | ' ' | '\u{a0}'))
+        .filter(|c| {
+            !matches!(c, ',' | '_' | '%' | '$' | '€' | '£' | ' ' | '\u{a0}')
+        })
         .collect();
     cleaned.parse::<f64>().ok().filter(|v| v.is_finite())
 }
@@ -182,11 +184,10 @@ pub fn roadmap(r: &data::Roadmap) -> Result<Roadmap, String> {
         .as_deref()
         .and_then(days_from_iso)
         .unwrap_or_else(|| rows.iter().map(|r| r.start).min().unwrap_or(0));
-    let end = r
-        .end
-        .as_deref()
-        .and_then(days_from_iso)
-        .unwrap_or_else(|| rows.iter().map(|r| r.end).max().unwrap_or(start));
+    let end =
+        r.end.as_deref().and_then(days_from_iso).unwrap_or_else(|| {
+            rows.iter().map(|r| r.end).max().unwrap_or(start)
+        });
     Ok(Roadmap {
         start,
         end: end.max(start + 1),
@@ -200,7 +201,8 @@ pub fn roadmap(r: &data::Roadmap) -> Result<Roadmap, String> {
 ///
 /// Returns a message for unknown names, bad syntax or division by zero.
 pub fn evaluate(formula: &str, vars: &[(String, f64)]) -> Result<f64, String> {
-    let tokens: Vec<char> = formula.chars().filter(|c| !c.is_whitespace()).collect();
+    let tokens: Vec<char> =
+        formula.chars().filter(|c| !c.is_whitespace()).collect();
     let mut p = Eval {
         tokens: &tokens,
         pos: 0,
@@ -280,7 +282,10 @@ impl Eval<'_> {
             }
             Some(c) if c.is_ascii_digit() || c == '.' => {
                 let start = self.pos;
-                while self.peek().is_some_and(|c| c.is_ascii_digit() || c == '.') {
+                while self
+                    .peek()
+                    .is_some_and(|c| c.is_ascii_digit() || c == '.')
+                {
                     self.pos += 1;
                 }
                 let s: String = self
@@ -293,7 +298,10 @@ impl Eval<'_> {
             }
             Some(c) if c.is_alphabetic() || c == '_' => {
                 let start = self.pos;
-                while self.peek().is_some_and(|c| c.is_alphanumeric() || c == '_') {
+                while self
+                    .peek()
+                    .is_some_and(|c| c.is_alphanumeric() || c == '_')
+                {
                     self.pos += 1;
                 }
                 let name: String = self
@@ -338,16 +346,17 @@ mod tests {
     #[test]
     fn chart_views() {
         let data::Data::Chart(c) = read(
-            "```chart\ntitle: T\ntype: grouped\nlabels: [X, Y]\nBefore: [4, 6]\nAfter: [7, 8]\n```\n",
+            "```chart\ntitle: T\ntype: grouped\nlabels: [X, Y]\n\
+                Before: [4, 6]\nAfter: [7, 8]\n```\n",
         ) else {
             panic!()
         };
         let v = chart(&c).unwrap();
         assert!(v.legend);
         assert_eq!(v.series.len(), 2);
-        let data::Data::Chart(s) =
-            read("```chart\ntype: scatter\nlabels: [1, 2.5]\nvalues: [3, 4]\n```\n")
-        else {
+        let data::Data::Chart(s) = read(
+            "```chart\ntype: scatter\nlabels: [1, 2.5]\nvalues: [3, 4]\n```\n",
+        ) else {
             panic!()
         };
         assert_eq!(chart(&s).unwrap().series[0].xs, [1.0, 2.5]);
@@ -360,7 +369,9 @@ mod tests {
     #[test]
     fn roadmap_view() {
         let data::Data::Roadmap(r) = read(
-            "```roadmap\nrange: 2026-11-01 .. 2027-06-30\nDiscovery | 2026-11-01 | 2026-12-15\nLaunch | 2027-05-15 | milestone\n```\n",
+            "```roadmap\nrange: 2026-11-01 .. 2027-06-30\n\
+                Discovery | 2026-11-01 | 2026-12-15\n\
+                Launch | 2027-05-15 | milestone\n```\n",
         ) else {
             panic!()
         };

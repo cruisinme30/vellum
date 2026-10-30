@@ -19,7 +19,9 @@ use std::time::Duration;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use vellum_contracts::{BoxFuture, HttpMethod, Operation, RequestContext, Scope, Service};
+use vellum_contracts::{
+    BoxFuture, HttpMethod, Operation, RequestContext, Scope, Service,
+};
 use vellum_kernel::{Error, ErrorKind, ObjectId, Timestamp, UserId};
 
 use crate::identity::{Identity, UserView};
@@ -40,7 +42,10 @@ const MAX_LIMIT: usize = 100;
 /// Who belongs to which group: the permission engine's membership tuples.
 pub trait GroupMembers: Send + Sync + std::fmt::Debug {
     /// The people directly in `group`.
-    fn members(&self, group: ObjectId) -> BoxFuture<'_, Result<BTreeSet<UserId>, Error>>;
+    fn members(
+        &self,
+        group: ObjectId,
+    ) -> BoxFuture<'_, Result<BTreeSet<UserId>, Error>>;
     /// Adds and removes people; spaces granting to the group follow at once.
     fn change<'a>(
         &'a self,
@@ -76,7 +81,10 @@ impl From<&Group> for GroupView {
 
 fn check_name(name: &str) -> Result<String, Error> {
     let name = name.trim();
-    if name.is_empty() || name.chars().count() > MAX_NAME || name.chars().any(char::is_control) {
+    if name.is_empty()
+        || name.chars().count() > MAX_NAME
+        || name.chars().any(char::is_control)
+    {
         return Err(Error::new(
             ErrorKind::InvalidInput,
             format!("a group name has 1 to {MAX_NAME} characters"),
@@ -90,7 +98,9 @@ fn check_description(text: &str) -> Result<String, Error> {
     if text.chars().count() > MAX_DESCRIPTION {
         return Err(Error::new(
             ErrorKind::InvalidInput,
-            format!("a group description has at most {MAX_DESCRIPTION} characters"),
+            format!(
+                "a group description has at most {MAX_DESCRIPTION} characters"
+            ),
         ));
     }
     Ok(text.to_owned())
@@ -155,7 +165,11 @@ impl Identity {
     ///
     /// [`ErrorKind::InvalidInput`] for a bad name or description, and
     /// [`ErrorKind::Conflict`] when another group has the name.
-    pub fn create_group(&self, name: &str, description: &str) -> Result<GroupView, Error> {
+    pub fn create_group(
+        &self,
+        name: &str,
+        description: &str,
+    ) -> Result<GroupView, Error> {
         let group = Group {
             id: ObjectId::generate(),
             name: check_name(name)?,
@@ -198,7 +212,8 @@ impl Identity {
                     "another group has this name",
                 ));
             }
-            let group = s.groups.get_mut(&id.to_string()).ok_or_else(not_found)?;
+            let group =
+                s.groups.get_mut(&id.to_string()).ok_or_else(not_found)?;
             if let Some(name) = name {
                 group.name = name;
             }
@@ -310,7 +325,10 @@ impl GroupsService {
     /// engine, as when only printing the API) membership calls answer
     /// "unavailable".
     #[must_use]
-    pub fn new(identity: Arc<Identity>, members: Option<Arc<dyn GroupMembers>>) -> Self {
+    pub fn new(
+        identity: Arc<Identity>,
+        members: Option<Arc<dyn GroupMembers>>,
+    ) -> Self {
         Self { identity, members }
     }
 
@@ -323,7 +341,10 @@ impl GroupsService {
         })
     }
 
-    async fn members_view(&self, id: ObjectId) -> Result<GroupMembersView, Error> {
+    async fn members_view(
+        &self,
+        id: ObjectId,
+    ) -> Result<GroupMembersView, Error> {
         let group = self.identity.group(id)?;
         let ids = self.port()?.members(id).await?;
         let mut members: Vec<UserView> = ids
@@ -334,14 +355,20 @@ impl GroupsService {
         Ok(GroupMembersView { group, members })
     }
 
-    async fn change_members(&self, input: ChangeMembers) -> Result<GroupMembersView, Error> {
+    async fn change_members(
+        &self,
+        input: ChangeMembers,
+    ) -> Result<GroupMembersView, Error> {
         let _ = self.identity.group(input.id)?;
         for user in &input.add {
             let found = self.identity.user(*user)?;
             if found.disabled {
                 return Err(Error::new(
                     ErrorKind::InvalidInput,
-                    format!("{} is blocked and cannot join a group", found.name),
+                    format!(
+                        "{} is blocked and cannot join a group",
+                        found.name
+                    ),
                 ));
             }
         }
@@ -356,7 +383,8 @@ impl GroupsService {
         // Members go first, so access through the group ends even if the
         // record could not be removed; a retry finishes the job.
         if let Some(port) = &self.members {
-            let everyone: Vec<UserId> = port.members(id).await?.into_iter().collect();
+            let everyone: Vec<UserId> =
+                port.members(id).await?.into_iter().collect();
             if !everyone.is_empty() {
                 port.change(id, &[], &everyone).await?;
             }

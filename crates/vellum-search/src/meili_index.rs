@@ -86,7 +86,11 @@ struct Record {
     modified: i64,
     ancestors: Vec<String>,
     trashed: bool,
-    #[serde(rename = "_vectors", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "_vectors",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     vectors: Option<Value>,
 }
 
@@ -122,8 +126,12 @@ fn quote(value: &str) -> String {
     format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
-fn any_of<T: ToString>(field: &str, values: impl IntoIterator<Item = T>) -> String {
-    let quoted: Vec<String> = values.into_iter().map(|v| quote(&v.to_string())).collect();
+fn any_of<T: ToString>(
+    field: &str,
+    values: impl IntoIterator<Item = T>,
+) -> String {
+    let quoted: Vec<String> =
+        values.into_iter().map(|v| quote(&v.to_string())).collect();
     format!("{field} IN [{}]", quoted.join(", "))
 }
 
@@ -196,13 +204,15 @@ fn records(entry: &IndexEntry, with_vectors: bool) -> Vec<Record> {
 }
 
 fn parse<T: std::str::FromStr>(text: &str, what: &str) -> Result<T> {
-    text.parse()
-        .map_err(|_| SearchError::Corrupt(format!("bad `{what}` from Meilisearch")))
+    text.parse().map_err(|_| {
+        SearchError::Corrupt(format!("bad `{what}` from Meilisearch"))
+    })
 }
 
 fn stored(r: &Record) -> Result<StoredBlock> {
     let block = |raw: u64| {
-        BlockId::from_u64(raw).ok_or_else(|| SearchError::Corrupt("block id out of range".into()))
+        BlockId::from_u64(raw)
+            .ok_or_else(|| SearchError::Corrupt("block id out of range".into()))
     };
     Ok(StoredBlock {
         space: parse(&r.space, "space")?,
@@ -226,7 +236,8 @@ fn stored(r: &Record) -> Result<StoredBlock> {
 /// The stored vector of a record, if any.
 fn stored_vector(r: &Record) -> Option<Vec<f32>> {
     let embeddings = r.vectors.as_ref()?.get(EMBEDDER)?;
-    // Retrieved vectors come back as {"embeddings": [[…]], "regenerate": false}.
+    // Retrieved vectors come back as {"embeddings": [[…]], "regenerate":
+    // false}.
     let first = embeddings
         .get("embeddings")
         .and_then(|e| e.get(0))
@@ -236,7 +247,8 @@ fn stored_vector(r: &Record) -> Option<Vec<f32>> {
         .iter()
         .map(|x| {
             x.as_f64().map(|f| {
-                #[allow(clippy::cast_possible_truncation)] // stored as f32 originally
+                #[allow(clippy::cast_possible_truncation)]
+                // stored as f32 originally
                 let v = f as f32;
                 v
             })
@@ -259,16 +271,30 @@ impl MeiliBackend {
             .send(
                 reqwest::Method::POST,
                 "/indexes",
-                Some(&json!({ "uid": backend.config.index, "primaryKey": "id" })),
+                Some(
+                    &json!({ "uid": backend.config.index, "primaryKey": "id" }),
+                ),
             )
             .await?;
-        // An existing index fails the task with `index_already_exists`; that is fine.
+        // An existing index fails the task with `index_already_exists`; that is
+        // fine.
         if let Ok(task) = serde_json::from_value::<Enqueued>(created) {
             let _ = backend.wait(task.task_uid).await;
         }
         let mut settings = json!({
             "searchableAttributes": ["title", "headings", "body"],
-            "filterableAttributes": ["rec", "space", "doc", "block", "section", "doc_kind", "owner", "modified", "ancestors", "trashed"],
+            "filterableAttributes": [
+                "rec",
+                "space",
+                "doc",
+                "block",
+                "section",
+                "doc_kind",
+                "owner",
+                "modified",
+                "ancestors",
+                "trashed"
+            ],
             "sortableAttributes": ["position"],
             "displayedAttributes": ["*"],
         });
@@ -277,7 +303,12 @@ impl MeiliBackend {
         {
             let _ = object.insert(
                 "embedders".into(),
-                json!({ EMBEDDER: { "source": "userProvided", "dimensions": dimensions } }),
+                json!({
+                    EMBEDDER: {
+                        "source": "userProvided",
+                        "dimensions": dimensions
+                    }
+                }),
             );
         }
         let path = format!("/indexes/{}/settings", backend.config.index);
@@ -341,7 +372,9 @@ impl MeiliBackend {
                         .map_or_else(|| task.status.clone(), |e| e.message);
                     return Err(meili(message));
                 }
-                _ if start.elapsed() > TASK_TIMEOUT => return Err(meili("indexing timed out")),
+                _ if start.elapsed() > TASK_TIMEOUT => {
+                    return Err(meili("indexing timed out"));
+                }
                 _ => {
                     tokio::time::sleep(pause).await;
                     pause = (pause * 2).min(Duration::from_millis(250));
@@ -352,16 +385,22 @@ impl MeiliBackend {
 
     async fn search(&self, body: &Value) -> Result<Vec<Record>> {
         let path = format!("/indexes/{}/search", self.config.index);
-        let hits: Hits =
-            serde_json::from_value(self.send(reqwest::Method::POST, &path, Some(body)).await?)
-                .map_err(meili)?;
+        let hits: Hits = serde_json::from_value(
+            self.send(reqwest::Method::POST, &path, Some(body)).await?,
+        )
+        .map_err(meili)?;
         Ok(hits.hits)
     }
 
-    async fn documents(&self, filter: &str, limit: usize) -> Result<Vec<Record>> {
+    async fn documents(
+        &self,
+        filter: &str,
+        limit: usize,
+    ) -> Result<Vec<Record>> {
         let path = format!("/indexes/{}/documents/fetch", self.config.index);
         let body = json!({ "filter": filter, "limit": limit });
-        let hits: Value = self.send(reqwest::Method::POST, &path, Some(&body)).await?;
+        let hits: Value =
+            self.send(reqwest::Method::POST, &path, Some(&body)).await?;
         let results = hits
             .get("results")
             .cloned()
@@ -384,7 +423,8 @@ impl SearchBackend for MeiliBackend {
         let with_vectors = self.config.dimensions.is_some();
         let mut touched = Vec::new();
         let mut adds = Vec::new();
-        let mut last: std::collections::HashMap<DocId, &Change> = std::collections::HashMap::new();
+        let mut last: std::collections::HashMap<DocId, &Change> =
+            std::collections::HashMap::new();
         for change in changes {
             let doc = match change {
                 Change::Remove(doc) => *doc,
@@ -467,7 +507,8 @@ impl SearchBackend for MeiliBackend {
             let Some(stored_v) = stored_vector(&record) else {
                 continue;
             };
-            let similarity: f32 = stored_v.iter().zip(vector).map(|(a, b)| a * b).sum();
+            let similarity: f32 =
+                stored_v.iter().zip(vector).map(|(a, b)| a * b).sum();
             if similarity >= min_similarity {
                 scored.push((similarity, stored(&record)?));
             }
@@ -476,7 +517,12 @@ impl SearchBackend for MeiliBackend {
         Ok(scored.into_iter().map(|(_, block)| block).collect())
     }
 
-    async fn titles(&self, text: &str, scope: Scope<'_>, limit: usize) -> Result<Vec<TitleHit>> {
+    async fn titles(
+        &self,
+        text: &str,
+        scope: Scope<'_>,
+        limit: usize,
+    ) -> Result<Vec<TitleHit>> {
         let body = json!({
             "q": text,
             "filter": filter("d", scope),
@@ -499,7 +545,11 @@ impl SearchBackend for MeiliBackend {
             .collect()
     }
 
-    async fn block(&self, doc: DocId, block: BlockId) -> Result<Option<StoredBlock>> {
+    async fn block(
+        &self,
+        doc: DocId,
+        block: BlockId,
+    ) -> Result<Option<StoredBlock>> {
         let filter = format!(
             "rec = \"b\" AND doc = {} AND block = {}",
             quote(&doc.to_string()),
@@ -512,8 +562,13 @@ impl SearchBackend for MeiliBackend {
             .transpose()
     }
 
-    async fn section(&self, doc: DocId, section: Option<BlockId>) -> Result<Vec<StoredBlock>> {
-        let key = section.map_or_else(|| NO_SECTION.to_owned(), |s| s.as_u64().to_string());
+    async fn section(
+        &self,
+        doc: DocId,
+        section: Option<BlockId>,
+    ) -> Result<Vec<StoredBlock>> {
+        let key = section
+            .map_or_else(|| NO_SECTION.to_owned(), |s| s.as_u64().to_string());
         let filter = format!(
             "rec = \"b\" AND doc = {} AND section = {}",
             quote(&doc.to_string()),
@@ -553,7 +608,10 @@ mod tests {
         };
         let f = filter("b", scope);
         assert!(f.starts_with("rec = \"b\" AND space IN [\""));
-        assert!(f.contains("AND trashed = false AND doc_kind IN [\"issue\"] AND modified 1 TO 2"));
+        assert!(f.contains(
+            "AND trashed = false AND doc_kind IN [\"issue\"] \
+            AND modified 1 TO 2"
+        ));
         assert!(f.ends_with(&format!("ancestors = \"{}\"", corpus.runbooks)));
         assert_eq!(quote("a\"b\\"), "\"a\\\"b\\\\\"");
     }
@@ -575,9 +633,12 @@ mod tests {
         assert_eq!(block.section, entry.doc.blocks[2].section);
         assert_eq!(stored_vector(&recs[3]), Some(vec![0.5; 4]));
         let retrieved = Record {
-            vectors: Some(
-                json!({ EMBEDDER: { "embeddings": [[0.25, 0.75]], "regenerate": false } }),
-            ),
+            vectors: Some(json!({
+                EMBEDDER: {
+                    "embeddings": [[0.25, 0.75]],
+                    "regenerate": false
+                }
+            })),
             ..recs[3].clone()
         };
         assert_eq!(stored_vector(&retrieved), Some(vec![0.25, 0.75]));

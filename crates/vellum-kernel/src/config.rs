@@ -118,12 +118,15 @@ impl Config {
     ///
     /// # Errors
     ///
-    /// Returns [`ConfigError`] if the file cannot be read or any value is invalid.
+    /// Returns [`ConfigError`] if the file cannot be read or any value is
+    /// invalid.
     pub fn load(path: Option<&Path>) -> Result<Self, ConfigError> {
         let from_env = std::env::var_os("VELLUM_CONFIG").map(PathBuf::from);
         let text = match path.map(Path::to_path_buf).or(from_env) {
             Some(path) => {
-                let _span = tracing::info_span!("config.read", path = %path.display()).entered();
+                let _span =
+                    tracing::info_span!("config.read", path = %path.display())
+                        .entered();
                 Some(
                     std::fs::read_to_string(&path)
                         .map_err(|source| ConfigError::Read { path, source })?,
@@ -143,7 +146,8 @@ impl Config {
         file: Option<&str>,
         lookup: impl Fn(&str) -> Option<String>,
     ) -> Result<Self, ConfigError> {
-        let file: FileLayer = file.map(toml::from_str).transpose()?.unwrap_or_default();
+        let file: FileLayer =
+            file.map(toml::from_str).transpose()?.unwrap_or_default();
         let var = |key: &str| lookup(key).filter(|v| !v.trim().is_empty());
         let defaults = Self::default();
         let config = Self {
@@ -152,9 +156,11 @@ impl Config {
                 .or(file.data_dir)
                 .unwrap_or(defaults.data_dir),
             bind: match var("VELLUM_BIND") {
-                Some(v) => v
-                    .parse()
-                    .map_err(|e: std::net::AddrParseError| invalid("VELLUM_BIND", e))?,
+                Some(v) => {
+                    v.parse().map_err(|e: std::net::AddrParseError| {
+                        invalid("VELLUM_BIND", e)
+                    })?
+                }
                 None => file.bind.unwrap_or(defaults.bind),
             },
             public_url: var("VELLUM_PUBLIC_URL").or(file.public_url),
@@ -172,10 +178,14 @@ impl Config {
         if let Some(url) = &self.public_url
             && !(url.starts_with("https://") || url.starts_with("http://"))
         {
-            return Err(invalid("public_url", "must start with http:// or https://"));
+            return Err(invalid(
+                "public_url",
+                "must start with http:// or https://",
+            ));
         }
         if let Some(url) = &self.database_url
-            && !(url.starts_with("postgres://") || url.starts_with("postgresql://"))
+            && !(url.starts_with("postgres://")
+                || url.starts_with("postgresql://"))
         {
             return Err(invalid("database_url", "must be a postgres:// URL"));
         }
@@ -212,7 +222,10 @@ fn invalid(key: &'static str, reason: impl std::fmt::Display) -> ConfigError {
 mod tests {
     use super::*;
 
-    fn load(file: Option<&str>, vars: &[(&str, &str)]) -> Result<Config, ConfigError> {
+    fn load(
+        file: Option<&str>,
+        vars: &[(&str, &str)],
+    ) -> Result<Config, ConfigError> {
         Config::from_sources(file, |key| {
             vars.iter()
                 .find(|(k, _)| *k == key)
@@ -227,7 +240,8 @@ mod tests {
 
     #[test]
     fn env_overrides_file() {
-        let file = "data_dir = \"/srv/northstar\"\nbind = \"0.0.0.0:80\"\nprofile = \"team\"\n\
+        let file = "data_dir = \"/srv/northstar\"\nbind = \"0.0.0.0:80\"\n\
+                    profile = \"team\"\n\
                     database_url = \"postgres://db/vellum\"\n";
         let c = load(
             Some(file),
@@ -275,7 +289,8 @@ mod tests {
 
     #[test]
     fn missing_file_is_a_read_error() {
-        let err = Config::load(Some(Path::new("/nonexistent/vellum.toml"))).unwrap_err();
+        let err = Config::load(Some(Path::new("/nonexistent/vellum.toml")))
+            .unwrap_err();
         assert!(matches!(err, ConfigError::Read { .. }));
     }
 }

@@ -17,7 +17,12 @@ interface MoveMenuProperties {
 }
 
 /** A card's "Move to…" menu: the keyboard way to change its column. */
-export function MoveMenu({ title, targets, current, onMove }: MoveMenuProperties) {
+export function MoveMenu({
+  title,
+  targets,
+  current,
+  onMove,
+}: MoveMenuProperties) {
   const t = useT();
   const id = useId();
   const [open, setOpen] = useState(false);
@@ -43,11 +48,17 @@ export function MoveMenu({ title, targets, current, onMove }: MoveMenuProperties
   };
   const onKeyDown = (event: KeyboardEvent) => {
     event.stopPropagation();
-    const items = [...(menu.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])];
-    const at = items.indexOf(document.activeElement as HTMLElement);
-    const target = { ArrowDown: at + 1, ArrowUp: at - 1, Home: 0, End: items.length - 1 }[
-      event.key
+    const items = [
+      ...(menu.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ??
+        []),
     ];
+    const at = items.indexOf(document.activeElement as HTMLElement);
+    const target = {
+      ArrowDown: at + 1,
+      ArrowUp: at - 1,
+      Home: 0,
+      End: items.length - 1,
+    }[event.key];
     if (target !== undefined) {
       event.preventDefault();
       items[(target + items.length) % items.length]?.focus();
@@ -56,7 +67,9 @@ export function MoveMenu({ title, targets, current, onMove }: MoveMenuProperties
       close();
     } else if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      const to = Number((document.activeElement as HTMLElement | null)?.dataset["to"] ?? -1);
+      const to = Number(
+        (document.activeElement as HTMLElement | null)?.dataset["to"] ?? -1,
+      );
       if (to >= 0) {
         pick(to);
       }
@@ -93,9 +106,9 @@ export function MoveMenu({ title, targets, current, onMove }: MoveMenuProperties
             }
           }}
           onClick={(event) => {
-            const to = (event.target as HTMLElement).closest<HTMLElement>("[data-to]")?.dataset[
-              "to"
-            ];
+            const to = (event.target as HTMLElement).closest<HTMLElement>(
+              "[data-to]",
+            )?.dataset["to"];
             if (to !== undefined) {
               pick(Number(to));
             }

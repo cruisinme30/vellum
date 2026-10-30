@@ -18,6 +18,10 @@ export function createHttpOrganisationAppearance(
 ): () => Promise<OrganisationAppearance> {
   return async () => {
     const value = await http.get<AppearanceResponse>("/api/v1/appearance");
-    return { seed: value.seed, exportTheme: value.export_theme, siteTheme: value.site_theme };
+    return {
+      seed: value.seed,
+      exportTheme: value.export_theme,
+      siteTheme: value.site_theme,
+    };
   };
 }

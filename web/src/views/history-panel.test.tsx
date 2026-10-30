@@ -27,12 +27,16 @@ const NEW: PageVersion = {
 function fakeHistory() {
   let versions = [NEW, OLD];
   const restore = vi.fn<PageHistory["restore"]>(() => {
-    versions = [{ ...OLD, id: "v3", savedAt: new Date("2026-10-29T11:00:00Z") }, ...versions];
+    versions = [
+      { ...OLD, id: "v3", savedAt: new Date("2026-10-29T11:00:00Z") },
+      ...versions,
+    ];
     return Promise.resolve();
   });
   const history: PageHistory = {
     list: () => Promise.resolve(versions),
-    read: (_page, id) => Promise.resolve(id === "v1" ? "# Plan\n\nThe first draft\n" : undefined),
+    read: (_page, id) =>
+      Promise.resolve(id === "v1" ? "# Plan\n\nThe first draft\n" : undefined),
     restore,
   };
   return { history, restore };
@@ -68,10 +72,14 @@ describe("version history", () => {
   it("shows a version's text and restores it after saving the editor first", async () => {
     const saveFirst = vi.fn(() => Promise.resolve(true));
     const { restore, user } = renderPanel({ saveFirst });
-    await user.click(await screen.findByRole("button", { name: /Edited outside Vellum/ }));
+    await user.click(
+      await screen.findByRole("button", { name: /Edited outside Vellum/ }),
+    );
     expect(await screen.findByText(/The first draft/)).toBeTruthy();
 
-    await user.click(screen.getByRole("button", { name: "Restore this version" }));
+    await user.click(
+      screen.getByRole("button", { name: "Restore this version" }),
+    );
     await user.click(screen.getByRole("button", { name: "Restore" }));
     await waitFor(() => {
       expect(restore).toHaveBeenCalledWith("page-1", "v1");
@@ -83,9 +91,15 @@ describe("version history", () => {
   });
 
   it("restores nothing when the editor's changes could not be saved", async () => {
-    const { restore, user } = renderPanel({ saveFirst: () => Promise.resolve(false) });
-    await user.click(await screen.findByRole("button", { name: /Edited outside Vellum/ }));
-    await user.click(await screen.findByRole("button", { name: "Restore this version" }));
+    const { restore, user } = renderPanel({
+      saveFirst: () => Promise.resolve(false),
+    });
+    await user.click(
+      await screen.findByRole("button", { name: /Edited outside Vellum/ }),
+    );
+    await user.click(
+      await screen.findByRole("button", { name: "Restore this version" }),
+    );
     await user.click(screen.getByRole("button", { name: "Restore" }));
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("could not be saved");
@@ -94,9 +108,13 @@ describe("version history", () => {
 
   it("offers no restore for the current version or to viewers", async () => {
     const { user } = renderPanel({ canRestore: false });
-    await user.click(await screen.findByRole("button", { name: /Edited outside Vellum/ }));
+    await user.click(
+      await screen.findByRole("button", { name: /Edited outside Vellum/ }),
+    );
     expect(await screen.findByText(/The first draft/)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Restore this version" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Restore this version" }),
+    ).toBeNull();
 
     await user.click(screen.getByRole("button", { name: /current/ }));
     expect(await screen.findByText(/not text/)).toBeTruthy();

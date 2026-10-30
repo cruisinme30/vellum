@@ -39,5 +39,10 @@ pub trait SpaceAccess: Send + Sync + fmt::Debug {
     /// # Errors
     ///
     /// The authorization service cannot be reached.
-    async fn allowed(&self, user: UserId, space: SpaceId, need: Need) -> Result<bool, Error>;
+    async fn allowed(
+        &self,
+        user: UserId,
+        space: SpaceId,
+        need: Need,
+    ) -> Result<bool, Error>;
 }

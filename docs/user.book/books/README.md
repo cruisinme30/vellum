@@ -83,9 +83,9 @@ limit to six in **Book settings**.
 
 ## Section permissions {#permissions}
 
-A section inherits the book's access. In **Section access** a book
-manager can narrow access to a section (as `user:` or `group:` IDs),
-name its owners and name the reviewers who must approve changes to it. Readers who cannot see a
+A section inherits the book's access. In **Section access** a book manager can
+narrow access to a section (as `user:` or `group:` IDs), name its owners and
+name the reviewers who must approve changes to it. Readers who cannot see a
 section see the rest of the book, numbered without it.
 
 ## History and snapshots {#history}

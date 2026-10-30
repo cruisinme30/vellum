@@ -42,7 +42,8 @@ fn error_response(error: &Error, id: Option<Extension<RequestId>>) -> Response {
     let id = id.map_or_else(RequestId::generate, |Extension(id)| id);
     let status = StatusCode::from_u16(ApiError::status(error.kind()))
         .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
-    let mut response = (status, Json(ApiError::from_error(error, id))).into_response();
+    let mut response =
+        (status, Json(ApiError::from_error(error, id))).into_response();
     if error.kind() == ErrorKind::RateLimited
         && let Some(secs) = error
             .message()
@@ -62,7 +63,9 @@ fn no_store(mut response: Response) -> Response {
     response
 }
 
-fn client_ip(info: Option<&Extension<ConnectInfo<SocketAddr>>>) -> Option<IpAddr> {
+fn client_ip(
+    info: Option<&Extension<ConnectInfo<SocketAddr>>>,
+) -> Option<IpAddr> {
     info.map(|Extension(ConnectInfo(addr))| addr.ip())
 }
 
@@ -85,7 +88,11 @@ pub fn cookie<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
         .map(|(_, v)| v)
 }
 
-fn session_cookie(identity: &Identity, value: &str, max_age: Duration) -> HeaderValue {
+fn session_cookie(
+    identity: &Identity,
+    value: &str,
+    max_age: Duration,
+) -> HeaderValue {
     let config = identity.config();
     let secure = if config.https { "; Secure" } else { "" };
     let text = format!(
@@ -93,17 +100,22 @@ fn session_cookie(identity: &Identity, value: &str, max_age: Duration) -> Header
         config.cookie_name(),
         max_age.as_secs()
     );
-    HeaderValue::from_str(&text).unwrap_or_else(|_| HeaderValue::from_static(""))
+    HeaderValue::from_str(&text)
+        .unwrap_or_else(|_| HeaderValue::from_static(""))
 }
 
 fn signed_in(identity: &Identity, session: &NewSession) -> Response {
     let max_age = Duration::from_millis(
-        u64::try_from(session.session.expires_at.unix_ms() - session.session.created_at.unix_ms())
-            .unwrap_or(0),
+        u64::try_from(
+            session.session.expires_at.unix_ms()
+                - session.session.created_at.unix_ms(),
+        )
+        .unwrap_or(0),
     );
     let user = identity.user(session.session.user).ok();
     let mut response =
-        Json(json!({ "user": user, "sessionId": session.session.id })).into_response();
+        Json(json!({ "user": user, "sessionId": session.session.id }))
+            .into_response();
     let _ = response.headers_mut().insert(
         header::SET_COOKIE,
         session_cookie(identity, &session.secret, max_age),
@@ -129,7 +141,12 @@ async fn sign_in(
     let agent = user_agent(&headers).map(str::to_owned);
     // Argon2 is deliberately slow: keep it off the async workers.
     let result = tokio::task::spawn_blocking(move || {
-        worker.sign_in_password(&input.email, &input.password, ip, agent.as_deref())
+        worker.sign_in_password(
+            &input.email,
+            &input.password,
+            ip,
+            agent.as_deref(),
+        )
     })
     .await
     .unwrap_or_else(|e| Err(Error::new(ErrorKind::Internal, e.to_string())));
@@ -139,7 +156,9 @@ async fn sign_in(
         Ok(SignIn::Verify(ticket)) => {
             no_store(Json(json!({ "secondFactor": ticket })).into_response())
         }
-        Ok(SignIn::Enrol(ticket)) => no_store(Json(json!({ "enrol": ticket })).into_response()),
+        Ok(SignIn::Enrol(ticket)) => {
+            no_store(Json(json!({ "enrol": ticket })).into_response())
+        }
         Err(e) => error_response(&e, id),
     }
 }
@@ -163,7 +182,11 @@ async fn sign_in_verify(
         code: input.code,
         passkey: input.passkey,
     };
-    match identity.verify_sign_in(&input.ticket, &proof, client_ip(info.as_ref())) {
+    match identity.verify_sign_in(
+        &input.ticket,
+        &proof,
+        client_ip(info.as_ref()),
+    ) {
         Ok(session) => signed_in(&identity, &session),
         Err(e) => error_response(&e, id),
     }
@@ -182,7 +205,9 @@ async fn sign_in_passkey_options(
     Json(input): Json<TicketOnly>,
 ) -> Response {
     match identity.ticket_passkey_options(&input.ticket) {
-        Ok(options) => no_store(Json(json!({ "options": options })).into_response()),
+        Ok(options) => {
+            no_store(Json(json!({ "options": options })).into_response())
+        }
         Err(e) => error_response(&e, id),
     }
 }
@@ -235,8 +260,12 @@ async fn sign_in_enrol(
             let mut response = signed_in(&identity, &session);
             let user = identity.user(session.session.user).ok();
             *response.body_mut() = axum::body::Body::from(
-                json!({ "user": user, "sessionId": session.session.id, "recoveryCodes": codes })
-                    .to_string(),
+                json!({
+                    "user": user,
+                    "sessionId": session.session.id,
+                    "recoveryCodes": codes
+                })
+                .to_string(),
             );
             response
         }
@@ -282,7 +311,9 @@ async fn reauthenticate(
     headers: HeaderMap,
     Json(input): Json<Reauthenticate>,
 ) -> Response {
-    let Some(value) = cookie(&headers, identity.config().cookie_name()).map(str::to_owned) else {
+    let Some(value) =
+        cookie(&headers, identity.config().cookie_name()).map(str::to_owned)
+    else {
         return error_response(
             &Error::new(ErrorKind::Unauthenticated, "sign in to continue"),
             id,
@@ -295,7 +326,13 @@ async fn reauthenticate(
             code: input.code,
             passkey: input.passkey,
         };
-        worker.reauthenticate(&value, &input.password, &proof, input.ticket.as_deref(), ip)
+        worker.reauthenticate(
+            &value,
+            &input.password,
+            &proof,
+            input.ticket.as_deref(),
+            ip,
+        )
     })
     .await
     .unwrap_or_else(|e| Err(Error::new(ErrorKind::Internal, e.to_string())));
@@ -341,7 +378,8 @@ async fn change_password(
         Ok(u) => u,
         Err(e) => return error_response(&e, id),
     };
-    let keep = cookie(&headers, identity.config().cookie_name()).map(str::to_owned);
+    let keep =
+        cookie(&headers, identity.config().cookie_name()).map(str::to_owned);
     let worker = Arc::clone(&identity);
     let result = tokio::task::spawn_blocking(move || {
         worker.change_password(
@@ -371,7 +409,11 @@ async fn break_glass(
     headers: HeaderMap,
     Json(input): Json<BreakGlass>,
 ) -> Response {
-    match identity.redeem_break_glass(&input.code, client_ip(info.as_ref()), user_agent(&headers)) {
+    match identity.redeem_break_glass(
+        &input.code,
+        client_ip(info.as_ref()),
+        user_agent(&headers),
+    ) {
         Ok(session) => signed_in(&identity, &session),
         Err(e) => error_response(&e, id),
     }
@@ -407,7 +449,11 @@ async fn consent(
 /// Where the provider sends the browser back, under the `/auth` mount.
 pub const SSO_CALLBACK_PATH: &str = "/auth/sso/callback";
 
-fn sso_state_cookie(identity: &Identity, value: &str, max_age: Duration) -> HeaderValue {
+fn sso_state_cookie(
+    identity: &Identity,
+    value: &str,
+    max_age: Duration,
+) -> HeaderValue {
     let config = identity.config();
     let (name, secure) = if config.https {
         ("__Host-vellum_sso", "; Secure")
@@ -418,7 +464,8 @@ fn sso_state_cookie(identity: &Identity, value: &str, max_age: Duration) -> Head
         "{name}={value}; Path=/; HttpOnly; SameSite=Lax; Max-Age={}{secure}",
         max_age.as_secs()
     );
-    HeaderValue::from_str(&text).unwrap_or_else(|_| HeaderValue::from_static(""))
+    HeaderValue::from_str(&text)
+        .unwrap_or_else(|_| HeaderValue::from_static(""))
 }
 
 const fn sso_state_name(identity: &Identity) -> &'static str {
@@ -434,7 +481,8 @@ fn sso_failed(message: &str) -> Response {
         StatusCode::FORBIDDEN,
         "Single sign-on failed",
         &format!(
-            "<h1>Single sign-on failed</h1><p>{}</p><p><a href=\"{SIGN_IN_PATH}\">Back to sign-in</a></p>",
+            "<h1>Single sign-on failed</h1><p>{}</p><p><a \
+                href=\"{SIGN_IN_PATH}\">Back to sign-in</a></p>",
             escape(message)
         ),
     )
@@ -450,16 +498,22 @@ struct SsoStartQuery {
 }
 
 /// Sends the browser to the provider's sign-in page.
-async fn sso_start(State(identity): Shared, Query(query): Query<SsoStartQuery>) -> Response {
+async fn sso_start(
+    State(identity): Shared,
+    Query(query): Query<SsoStartQuery>,
+) -> Response {
     let reauth = query
         .reauth
         .as_deref()
         .is_some_and(|v| matches!(v, "1" | "true"));
-    let chosen = query
-        .provider
-        .clone()
-        .filter(|p| !p.is_empty())
-        .or_else(|| identity.sign_in_buttons().into_iter().next().map(|b| b.id));
+    let chosen =
+        query
+            .provider
+            .clone()
+            .filter(|p| !p.is_empty())
+            .or_else(|| {
+                identity.sign_in_buttons().into_iter().next().map(|b| b.id)
+            });
     if let Some(id) = chosen.as_deref()
         && identity.is_saml_provider(id)
     {
@@ -469,7 +523,8 @@ async fn sso_start(State(identity): Shared, Query(query): Query<SsoStartQuery>) 
         Ok(found) => found,
         Err(e) => return sso_failed(e.message()),
     };
-    let redirect_uri = format!("{}{SSO_CALLBACK_PATH}", identity.config().base());
+    let redirect_uri =
+        format!("{}{SSO_CALLBACK_PATH}", identity.config().base());
     match sso
         .start(&redirect_uri, query.next.as_deref(), reauth)
         .await
@@ -507,7 +562,8 @@ async fn sso_callback(
 ) -> Response {
     // The state cookie names the provider the sign-in started with.
     let pending = cookie(&headers, sso_state_name(&identity));
-    let (provider, cookie_state) = match pending.and_then(|p| p.split_once('.')) {
+    let (provider, cookie_state) = match pending.and_then(|p| p.split_once('.'))
+    {
         Some((provider, state)) => (Some(provider), Some(state)),
         None => (None, None),
     };
@@ -528,13 +584,22 @@ async fn sso_callback(
             sso_failed(&format!("The sign-in provider said: {detail}"))
         }
         (None, Some(code), Some(state)) => {
-            let redirect_uri = format!("{}{SSO_CALLBACK_PATH}", identity.config().base());
+            let redirect_uri =
+                format!("{}{SSO_CALLBACK_PATH}", identity.config().base());
             match sso.finish(&redirect_uri, state, code, cookie_state).await {
                 Ok(done) => {
-                    match identity.sso_sign_in_with(&sso, &done.identity, user_agent(&headers)) {
+                    match identity.sso_sign_in_with(
+                        &sso,
+                        &done.identity,
+                        user_agent(&headers),
+                    ) {
                         Ok(session) => {
-                            // A sign-in in this browser replaces its old session.
-                            if let Some(old) = cookie(&headers, identity.config().cookie_name()) {
+                            // A sign-in in this browser replaces its old
+                            // session.
+                            if let Some(old) = cookie(
+                                &headers,
+                                identity.config().cookie_name(),
+                            ) {
                                 let _ = identity.sign_out(old);
                             }
                             let max_age = Duration::from_millis(
@@ -544,10 +609,15 @@ async fn sso_callback(
                                 )
                                 .unwrap_or(0),
                             );
-                            let mut ok = Redirect::to(&done.next).into_response();
+                            let mut ok =
+                                Redirect::to(&done.next).into_response();
                             let _ = ok.headers_mut().append(
                                 header::SET_COOKIE,
-                                session_cookie(&identity, &session.secret, max_age),
+                                session_cookie(
+                                    &identity,
+                                    &session.secret,
+                                    max_age,
+                                ),
                             );
                             ok
                         }
@@ -555,7 +625,11 @@ async fn sso_callback(
                     }
                 }
                 Err(e) => {
-                    tracing::info!(event = "identity.sso_failed", error = %e, "single sign-on failed");
+                    tracing::info!(
+                        event = "identity.sso_failed",
+                        error = %e,
+                        "single sign-on failed"
+                    );
                     sso_failed(e.message())
                 }
             }
@@ -580,7 +654,11 @@ const fn saml_cookie_name(identity: &Identity) -> &'static str {
 /// The relay state cookie. Providers post responses cross-site, so over
 /// HTTPS it is `SameSite=None` (the relay state it holds is a one-time
 /// secret, so this only binds the sign-in to the browser that began it).
-fn saml_cookie(identity: &Identity, value: &str, max_age: Duration) -> HeaderValue {
+fn saml_cookie(
+    identity: &Identity,
+    value: &str,
+    max_age: Duration,
+) -> HeaderValue {
     let attributes = if identity.config().https {
         "; SameSite=None; Secure"
     } else {
@@ -591,10 +669,16 @@ fn saml_cookie(identity: &Identity, value: &str, max_age: Duration) -> HeaderVal
         saml_cookie_name(identity),
         max_age.as_secs()
     );
-    HeaderValue::from_str(&text).unwrap_or_else(|_| HeaderValue::from_static(""))
+    HeaderValue::from_str(&text)
+        .unwrap_or_else(|_| HeaderValue::from_static(""))
 }
 
-fn saml_start(identity: &Identity, provider: &str, next: Option<&str>, force: bool) -> Response {
+fn saml_start(
+    identity: &Identity,
+    provider: &str,
+    next: Option<&str>,
+    force: bool,
+) -> Response {
     match identity.saml_start(provider, next, force) {
         Ok(started) => {
             let mut response = Redirect::to(&started.url).into_response();
@@ -636,7 +720,8 @@ async fn saml_acs(
         Ok((session, next)) => {
             let max_age = Duration::from_millis(
                 u64::try_from(
-                    session.session.expires_at.unix_ms() - session.session.created_at.unix_ms(),
+                    session.session.expires_at.unix_ms()
+                        - session.session.created_at.unix_ms(),
                 )
                 .unwrap_or(0),
             );
@@ -658,7 +743,8 @@ async fn saml_acs(
 
 /// Vellum's SAML service provider metadata.
 async fn saml_metadata(State(identity): Shared) -> Response {
-    let mut response = crate::saml::sp_metadata(&identity.saml_service()).into_response();
+    let mut response =
+        crate::saml::sp_metadata(&identity.saml_service()).into_response();
     let _ = response.headers_mut().insert(
         header::CONTENT_TYPE,
         HeaderValue::from_static("application/samlmetadata+xml"),
@@ -714,10 +800,11 @@ fn escape(text: &str) -> String {
 
 fn page(status: StatusCode, title: &str, body: &str) -> Response {
     let html = format!(
-        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">\
-         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\
-         <meta name=\"robots\" content=\"noindex\"><title>{}</title></head>\
-         <body><main>{body}</main></body></html>",
+        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta \
+         name=\"viewport\" content=\"width=device-width, \
+         initial-scale=1\"><meta name=\"robots\" \
+         content=\"noindex\"><title>{}</title></head><body><main>{body}</main><\
+         /body></html>",
         escape(title)
     );
     let mut response = (status, html).into_response();
@@ -757,7 +844,9 @@ async fn authorize(
         return Redirect::to(&target).into_response();
     };
     match identity.authorize(user, &request).await {
-        Authorize::Redirect(url) => no_store(Redirect::to(&url).into_response()),
+        Authorize::Redirect(url) => {
+            no_store(Redirect::to(&url).into_response())
+        }
         Authorize::Fail(message) => page(
             StatusCode::BAD_REQUEST,
             "Cannot connect this app",
@@ -767,25 +856,28 @@ async fn authorize(
             ),
         ),
         Authorize::Consent(view) => {
-            let scopes = view.scopes.iter().fold(String::new(), |mut out, s| {
-                out.push_str("<li>");
-                out.push_str(&escape(scope_description(*s)));
-                out.push_str("</li>");
-                out
-            });
+            let scopes =
+                view.scopes.iter().fold(String::new(), |mut out, s| {
+                    out.push_str("<li>");
+                    out.push_str(&escape(scope_description(*s)));
+                    out.push_str("</li>");
+                    out
+                });
             page(
                 StatusCode::OK,
                 "Connect an app",
                 &format!(
-                    "<h1>Allow {name} to use your Vellum account?</h1>\
-                     <p><strong>{name}</strong> ({client}) will be able to:</p><ul>{scopes}</ul>\
-                     <p>You will be sent back to <strong>{host}</strong>. You can disconnect it \
-                     at any time in your settings.</p>\
-                     <form id=\"consent\" data-consent=\"{consent}\">\
-                     <button type=\"submit\" name=\"decision\" value=\"approve\">Allow</button> \
-                     <button type=\"submit\" name=\"decision\" value=\"deny\">Cancel</button></form>\
-                     <p id=\"error\" role=\"alert\"></p>\
-                     <script src=\"/oauth/consent.js\"></script>",
+                    "<h1>Allow {name} to use your Vellum \
+                     account?</h1><p><strong>{name}</strong> ({client}) will \
+                     be able to:</p><ul>{scopes}</ul><p>You will be sent back \
+                     to <strong>{host}</strong>. You can disconnect it at any \
+                     time in your settings.</p><form id=\"consent\" \
+                     data-consent=\"{consent}\"><button type=\"submit\" \
+                     name=\"decision\" value=\"approve\">Allow</button> \
+                     <button type=\"submit\" name=\"decision\" \
+                     value=\"deny\">Cancel</button></form><p id=\"error\" \
+                     role=\"alert\"></p><script \
+                     src=\"/oauth/consent.js\"></script>",
                     name = escape(&view.client_name),
                     client = escape(&view.client_id),
                     host = escape(&view.redirect_host),
@@ -844,7 +936,10 @@ fn oauth_json<T: serde::Serialize>(status: StatusCode, body: &T) -> Response {
     response
 }
 
-async fn token(State(identity): Shared, Form(request): Form<TokenRequest>) -> Response {
+async fn token(
+    State(identity): Shared,
+    Form(request): Form<TokenRequest>,
+) -> Response {
     match identity.token(&request) {
         Ok(tokens) => oauth_json(StatusCode::OK, &tokens),
         Err(e) => oauth_json(StatusCode::BAD_REQUEST, &e),
@@ -856,12 +951,18 @@ struct Revoke {
     token: String,
 }
 
-async fn revoke(State(identity): Shared, Form(request): Form<Revoke>) -> Response {
+async fn revoke(
+    State(identity): Shared,
+    Form(request): Form<Revoke>,
+) -> Response {
     match identity.revoke(&request.token) {
         Ok(()) => StatusCode::OK.into_response(),
         Err(e) => oauth_json(
             StatusCode::SERVICE_UNAVAILABLE,
-            &json!({ "error": "temporarily_unavailable", "error_description": e.message() }),
+            &json!({
+                "error": "temporarily_unavailable",
+                "error_description": e.message()
+            }),
         ),
     }
 }
@@ -877,7 +978,10 @@ async fn userinfo(State(identity): Shared, headers: HeaderMap) -> Response {
         Err(e) => {
             let mut response = oauth_json(
                 StatusCode::UNAUTHORIZED,
-                &json!({ "error": "invalid_token", "error_description": e.message() }),
+                &json!({
+                    "error": "invalid_token",
+                    "error_description": e.message()
+                }),
             );
             let _ = response.headers_mut().insert(
                 header::WWW_AUTHENTICATE,

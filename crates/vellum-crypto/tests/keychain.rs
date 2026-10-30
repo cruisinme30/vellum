@@ -7,8 +7,8 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use vellum_crypto::{
-    CryptoError, KekId, KeyProvider, SecretStore, keyring_from_store, load_or_create_kek, open,
-    rewrap, rotate_in_store, seal,
+    CryptoError, KekId, KeyProvider, SecretStore, keyring_from_store,
+    load_or_create_kek, open, rewrap, rotate_in_store, seal,
 };
 use zeroize::Zeroizing;
 
@@ -16,7 +16,10 @@ use zeroize::Zeroizing;
 struct MemoryStore(Mutex<HashMap<String, Vec<u8>>>);
 
 impl SecretStore for MemoryStore {
-    fn load(&self, name: &str) -> Result<Option<Zeroizing<Vec<u8>>>, CryptoError> {
+    fn load(
+        &self,
+        name: &str,
+    ) -> Result<Option<Zeroizing<Vec<u8>>>, CryptoError> {
         let map = self
             .0
             .lock()
@@ -55,9 +58,11 @@ async fn rotate_then_restart_reads_old_and_new() -> Result<(), CryptoError> {
     let sealed = seal(&ring, b"northstar").await?;
 
     rotate_in_store(&store, &mut ring, new.clone())?;
-    let rewrapped = rewrap(&ring, &sealed).await?.ok_or(CryptoError::Decrypt)?;
+    let rewrapped =
+        rewrap(&ring, &sealed).await?.ok_or(CryptoError::Decrypt)?;
 
-    let restarted = keyring_from_store(&store, &new, std::slice::from_ref(&old))?;
+    let restarted =
+        keyring_from_store(&store, &new, std::slice::from_ref(&old))?;
     assert_eq!(restarted.current_kek(), new);
     assert_eq!(open(&restarted, &sealed).await?, b"northstar");
     assert_eq!(open(&restarted, &rewrapped).await?, b"northstar");

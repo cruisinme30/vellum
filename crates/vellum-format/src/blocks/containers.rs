@@ -49,14 +49,16 @@ impl Stats {
         let mut stats = Self::default();
         for (n, content) in items(container, &mut problems) {
             let mut parts = split(content, " · ").into_iter();
-            let (Some(value), Some(label)) = (parts.next(), parts.next()) else {
+            let (Some(value), Some(label)) = (parts.next(), parts.next())
+            else {
                 problems.add(n, "expected `- value · label · delta`");
                 continue;
             };
-            let (delta, trend) = parts.next().map_or((None, None), |mut delta| {
-                let trend = take_trend(&mut delta);
-                (Some(delta), trend)
-            });
+            let (delta, trend) =
+                parts.next().map_or((None, None), |mut delta| {
+                    let trend = take_trend(&mut delta);
+                    (Some(delta), trend)
+                });
             stats.items.push(Stat {
                 value,
                 label,
@@ -141,7 +143,9 @@ impl Progress {
         for (n, content) in items(container, &mut problems) {
             let mut parts = split(content, " · ");
             let percent = match parts.pop().as_deref() {
-                Some([Inline::Text { text }]) => super::number(text.trim_end_matches('%')),
+                Some([Inline::Text { text }]) => {
+                    super::number(text.trim_end_matches('%'))
+                }
                 _ => None,
             };
             match (percent, parts.is_empty()) {
@@ -183,8 +187,13 @@ impl Cards {
         for (_, mut content) in items(container, &mut problems) {
             let icon = match content.first_mut() {
                 Some(Inline::Text { text }) => {
-                    let icon: String = text.chars().take_while(|c| !c.is_whitespace()).collect();
-                    if icon.chars().any(char::is_alphanumeric) || icon.is_empty() {
+                    let icon: String = text
+                        .chars()
+                        .take_while(|c| !c.is_whitespace())
+                        .collect();
+                    if icon.chars().any(char::is_alphanumeric)
+                        || icon.is_empty()
+                    {
                         None
                     } else {
                         *text = text
@@ -271,7 +280,8 @@ impl Tabs {
                     if let Some(tab) = tabs.tabs.last_mut() {
                         tab.blocks.push(other.clone());
                     } else {
-                        problems.add(0, "content before the first `##` tab title");
+                        problems
+                            .add(0, "content before the first `##` tab title");
                         tabs.tabs.push(Tab {
                             title: Vec::new(),
                             blocks: vec![other.clone()],
@@ -285,7 +295,10 @@ impl Tabs {
 }
 
 /// The first paragraph of each list item in the container, numbered from 1.
-fn items(container: &Container, problems: &mut Problems) -> Vec<(usize, Vec<Inline>)> {
+fn items(
+    container: &Container,
+    problems: &mut Problems,
+) -> Vec<(usize, Vec<Inline>)> {
     let mut out = Vec::new();
     for block in container.sections.iter().flatten() {
         match block {
@@ -293,7 +306,9 @@ fn items(container: &Container, problems: &mut Problems) -> Vec<(usize, Vec<Inli
                 for item in &list.items {
                     let n = out.len() + 1;
                     match item.blocks.first() {
-                        Some(Block::Paragraph { content, .. }) => out.push((n, content.clone())),
+                        Some(Block::Paragraph { content, .. }) => {
+                            out.push((n, content.clone()))
+                        }
                         _ => problems.add(n, "list item has no text"),
                     }
                 }
@@ -311,7 +326,9 @@ fn split(content: Vec<Inline>, separator: &str) -> Vec<Vec<Inline>> {
         match inline {
             Inline::Text { text } => {
                 let mut pieces = text.split(separator);
-                if let (Some(first), Some(part)) = (pieces.next(), parts.last_mut()) {
+                if let (Some(first), Some(part)) =
+                    (pieces.next(), parts.last_mut())
+                {
                     part.push(Inline::Text {
                         text: first.to_owned(),
                     });
@@ -332,7 +349,10 @@ fn split(content: Vec<Inline>, separator: &str) -> Vec<Vec<Inline>> {
     parts.into_iter().map(trim).collect()
 }
 
-fn split_once(content: Vec<Inline>, separator: &str) -> Option<(Vec<Inline>, Vec<Inline>)> {
+fn split_once(
+    content: Vec<Inline>,
+    separator: &str,
+) -> Option<(Vec<Inline>, Vec<Inline>)> {
     let mut parts = split(content, separator).into_iter();
     let first = parts.next()?;
     let rest: Vec<Vec<Inline>> = parts.collect();

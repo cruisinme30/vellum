@@ -9,13 +9,16 @@ use vellum_books::path::ChapterPath;
 use vellum_books::summary::{Chapter, Item, Summary};
 
 fn title() -> impl Strategy<Value = String> {
-    "[A-Za-z0-9 ·§*_`\\[\\]<>&!#~|$()-]{1,24}".prop_filter("non-blank", |t| !t.trim().is_empty())
+    "[A-Za-z0-9 ·§*_`\\[\\]<>&!#~|$()-]{1,24}"
+        .prop_filter("non-blank", |t| !t.trim().is_empty())
 }
 
 fn path() -> impl Strategy<Value = Option<ChapterPath>> {
     prop_oneof![
         1 => Just(None),
-        4 => "[a-z]{1,8}(/[a-z]{1,8}){0,2}( [a-z]{1,4})?".prop_map(|p| ChapterPath::parse(&format!("{p}.md")).ok()),
+        4 => "[a-z]{1,8}(/[a-z]{1,8}){0,2}( [a-z]{1,4})?".prop_map(
+            |p| ChapterPath::parse(&format!("{p}.md")).ok()
+        ),
     ]
 }
 
@@ -50,13 +53,18 @@ fn summary() -> impl Strategy<Value = Summary> {
         prop_oneof![
             4 => chapter(2).prop_map(Item::Chapter),
             1 => Just(Item::Separator),
-            1 => title().prop_map(|t| Item::Part(t.split_whitespace().collect::<Vec<_>>().join(" "))),
+            1 => title().prop_map(
+                |t| Item::Part(
+                    t.split_whitespace().collect::<Vec<_>>().join(" ")
+                )
+            ),
         ],
         0..5,
     );
     (proptest::option::of(title()), flat(), numbered, flat()).prop_map(
         |(title, prefix, numbered, suffix)| Summary {
-            title: title.map(|t| t.split_whitespace().collect::<Vec<_>>().join(" ")),
+            title: title
+                .map(|t| t.split_whitespace().collect::<Vec<_>>().join(" ")),
             prefix,
             numbered,
             suffix,
@@ -93,7 +101,9 @@ fn normalise(summary: &Summary) -> Option<Summary> {
         return None;
     }
     // Separators before anything numbered belong to the prefix.
-    if !summary.numbered.is_empty() && matches!(summary.numbered.first(), Some(Item::Separator)) {
+    if !summary.numbered.is_empty()
+        && matches!(summary.numbered.first(), Some(Item::Separator))
+    {
         return None;
     }
     if summary
@@ -117,7 +127,9 @@ proptest! {
         prop_assume!(normalised.is_some());
         let Some(expected) = normalised else { return Ok(()); };
         let text = expected.to_markdown();
-        let parsed = Summary::parse(&text).map_err(|e| TestCaseError::fail(format!("{e}\n{text}")))?;
+        let parsed = Summary::parse(
+            &text
+        ).map_err(|e| TestCaseError::fail(format!("{e}\n{text}")))?;
         prop_assert_eq!(&parsed, &expected, "{}", text);
         prop_assert_eq!(parsed.to_markdown(), text);
     }

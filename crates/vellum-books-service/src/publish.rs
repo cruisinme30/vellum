@@ -46,12 +46,18 @@ pub fn url(book: BookId) -> String {
 /// # Errors
 ///
 /// An invalid path (never for a located book).
-pub fn folder(dir: &BlobPath, format: PublishFormat) -> Result<BlobPath, Error> {
+pub fn folder(
+    dir: &BlobPath,
+    format: PublishFormat,
+) -> Result<BlobPath, Error> {
     dir.join(&format!("{DIR}/{}", name(format)))
         .map_err(store_error)
 }
 
-fn record_path(dir: &BlobPath, format: PublishFormat) -> Result<BlobPath, Error> {
+fn record_path(
+    dir: &BlobPath,
+    format: PublishFormat,
+) -> Result<BlobPath, Error> {
     dir.join(&format!("{DIR}/{}.json", name(format)))
         .map_err(store_error)
 }
@@ -108,7 +114,10 @@ pub async fn write(
             Ok(blob) if blob.meta.size <= MAX_FILE_BYTES * 4 => blob,
             // A missing or oversized asset is a broken image, not a
             // failed publication.
-            Ok(_) | Err(StoreError::NotFound(_) | StoreError::InvalidPath { .. }) => continue,
+            Ok(_)
+            | Err(StoreError::NotFound(_) | StoreError::InvalidPath { .. }) => {
+                continue;
+            }
             Err(e) => return Err(store_error(e)),
         };
         let path = out
@@ -136,8 +145,9 @@ pub async fn write(
     }
     record.files = written.len();
     record.folder = out.as_str().to_owned();
-    let json = serde_json::to_vec_pretty(&record)
-        .map_err(|e| Error::new(ErrorKind::Internal, "publication record").with_source(e))?;
+    let json = serde_json::to_vec_pretty(&record).map_err(|e| {
+        Error::new(ErrorKind::Internal, "publication record").with_source(e)
+    })?;
     let _ = store
         .put(
             &record_path(dir, record.format)?,
@@ -184,7 +194,9 @@ pub async fn public_file(
     };
     match store.get(&path).await {
         Ok(blob) => Ok(Some(blob.bytes)),
-        Err(StoreError::NotFound(_) | StoreError::InvalidPath { .. }) => Ok(None),
+        Err(StoreError::NotFound(_) | StoreError::InvalidPath { .. }) => {
+            Ok(None)
+        }
         Err(e) => Err(store_error(e)),
     }
 }

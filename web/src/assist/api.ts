@@ -17,16 +17,25 @@ export interface AssistApi {
   ask(model: ModelSettings, question: string, space?: string): Promise<Answer>;
   draft(
     model: ModelSettings,
-    input: { templatePageId: string; title: string; instructions: string; parent?: string },
+    input: {
+      templatePageId: string;
+      title: string;
+      instructions: string;
+      parent?: string;
+    },
   ): Promise<Draft>;
 }
 
 /** The assistant over a Vellum server. */
 export function createHttpAssistApi(http: Http): AssistApi {
   return {
-    test: (model) => http.send<TestResult>("POST", "/api/v1/assist/test", { model }),
+    test: (model) =>
+      http.send<TestResult>("POST", "/api/v1/assist/test", { model }),
     summarize: (model, pageId) =>
-      http.send<Answer>("POST", "/api/v1/assist/summarize", { model, page_id: pageId }),
+      http.send<Answer>("POST", "/api/v1/assist/summarize", {
+        model,
+        page_id: pageId,
+      }),
     ask: (model, question, space) =>
       http.send<Answer>("POST", "/api/v1/assist/ask", {
         model,
@@ -70,7 +79,9 @@ export interface ConnectionReport {
 /** The admin page's MCP routes. */
 export interface McpSetupApi {
   snippets(): Promise<Snippet[]>;
-  /** Runs the check with `token`, sent once as a bearer token and never stored. */
+  /**
+   * Runs the check with `token`, sent once as a bearer token and never stored.
+   */
   testConnection(token: string): Promise<ConnectionReport>;
 }
 
@@ -83,9 +94,13 @@ async function readJson<T>(response: Response): Promise<T> {
     } catch {
       // Not JSON.
     }
-    throw new ApiError(response.status === 404 ? "not_found" : "unavailable", message, {
-      status: response.status,
-    });
+    throw new ApiError(
+      response.status === 404 ? "not_found" : "unavailable",
+      message,
+      {
+        status: response.status,
+      },
+    );
   }
   return (await response.json()) as T;
 }
@@ -96,7 +111,9 @@ export function createHttpMcpSetupApi(
 ): McpSetupApi {
   return {
     async snippets() {
-      const response = await doFetch("/mcp/setup", { credentials: "same-origin" });
+      const response = await doFetch("/mcp/setup", {
+        credentials: "same-origin",
+      });
       const body = await readJson<{ snippets: Snippet[] }>(response);
       return body.snippets;
     },

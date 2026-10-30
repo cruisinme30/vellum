@@ -36,7 +36,8 @@ const fn id(value: ObjectId) -> Uuid {
 
 /// What the shared tables should hold for these nodes.
 fn expected(spaces: &[Uuid], nodes: &[Node]) -> (Closure, Folders, Documents) {
-    let by_id: HashMap<ObjectId, &Node> = nodes.iter().map(|n| (n.id, n)).collect();
+    let by_id: HashMap<ObjectId, &Node> =
+        nodes.iter().map(|n| (n.id, n)).collect();
     let tree_parent = |n: &Node| {
         n.trash
             .as_ref()
@@ -70,7 +71,10 @@ fn expected(spaces: &[Uuid], nodes: &[Node]) -> (Closure, Folders, Documents) {
         let row = (id(node.space.into()), live_folder(node.parent));
         if node.kind == NodeKind::Folder {
             if node.is_live() {
-                let _ = folders.insert(id(node.id), (row.0, row.1, node.path.as_str().to_owned()));
+                let _ = folders.insert(
+                    id(node.id),
+                    (row.0, row.1, node.path.as_str().to_owned()),
+                );
             }
         } else {
             let _ = documents.insert(
@@ -91,18 +95,24 @@ macro_rules! read_shared {
     ($pool:expr) => {{
         let pool = $pool;
         let closure: Vec<(Uuid, Uuid, Uuid, i32)> = sqlx::query_as(
-            "SELECT space_id, ancestor_id, descendant_id, depth FROM page_ancestors",
+            "SELECT space_id, ancestor_id, descendant_id, depth FROM \
+                page_ancestors",
         )
         .fetch_all(pool)
         .await?;
-        let folders: Vec<(Uuid, Uuid, Option<Uuid>, String)> =
-            sqlx::query_as("SELECT folder_id, space_id, parent_id, path FROM folders")
-                .fetch_all(pool)
-                .await?;
+        let folders: Vec<(Uuid, Uuid, Option<Uuid>, String)> = sqlx::query_as(
+            "SELECT folder_id, space_id, parent_id, path FROM \
+                folders",
+        )
+        .fetch_all(pool)
+        .await?;
         let documents: Vec<(Uuid, Uuid, Option<Uuid>, String, Option<i64>)> =
-            sqlx::query_as("SELECT doc_id, space_id, folder_id, path, trashed_at FROM documents")
-                .fetch_all(pool)
-                .await?;
+            sqlx::query_as(
+                "SELECT doc_id, space_id, folder_id, path, \
+                trashed_at FROM documents",
+            )
+            .fetch_all(pool)
+            .await?;
         (
             closure.into_iter().collect::<Closure>(),
             folders
@@ -119,7 +129,10 @@ macro_rules! read_shared {
 
 async fn shared(
     db: &Index,
-) -> Result<(Closure, Folders, Documents), Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<
+    (Closure, Folders, Documents),
+    Box<dyn std::error::Error + Send + Sync>,
+> {
     Ok(match db.pool() {
         IndexPool::Sqlite(pool) => read_shared!(pool),
         IndexPool::Postgres(pool) => read_shared!(pool),
@@ -146,7 +159,8 @@ async fn assert_in_step(index: &SqlIndex, step: &str) -> TestResult {
         .map(|s| id(s.id.into()))
         .collect();
     let (closure, folders, documents) = shared(index.db()).await?;
-    let (want_closure, want_folders, want_documents) = expected(&spaces, &nodes);
+    let (want_closure, want_folders, want_documents) =
+        expected(&spaces, &nodes);
     assert_eq!(closure, want_closure, "page_ancestors after {step}");
     assert_eq!(folders, want_folders, "folders after {step}");
     assert_eq!(documents, want_documents, "documents after {step}");
@@ -163,7 +177,13 @@ async fn shared_tables_follow_the_drive(db: Index) -> TestResult {
     let alice = Actor::User { user: alice_id };
 
     let eng = drive
-        .create_space(&alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .create_space(
+            &alice,
+            SpaceKind::SharedDrive,
+            "eng",
+            "Engineering",
+            None,
+        )
         .await?;
     let ops = drive
         .create_space(&alice, SpaceKind::SharedDrive, "ops", "Operations", None)
@@ -227,7 +247,11 @@ async fn shared_tables_follow_the_drive(db: Index) -> TestResult {
 #[tokio::test]
 async fn shared_tables_follow_the_drive_on_sqlite() -> TestResult {
     let dir = tempfile::tempdir()?;
-    let db = Index::open(&IndexConfig::sqlite(dir.path().join("index.sqlite"), None)).await?;
+    let db = Index::open(&IndexConfig::sqlite(
+        dir.path().join("index.sqlite"),
+        None,
+    ))
+    .await?;
     shared_tables_follow_the_drive(db).await
 }
 
@@ -237,7 +261,10 @@ async fn shared_tables_follow_the_drive_on_postgres() -> TestResult {
         Postgres::default().with_tag("17-alpine").start().await?;
     let port = container.get_host_port_ipv4(5432).await?;
     let url = format!("postgres://postgres:postgres@127.0.0.1:{port}/postgres");
-    shared_tables_follow_the_drive(Index::open(&IndexConfig::postgres(url)).await?).await
+    shared_tables_follow_the_drive(
+        Index::open(&IndexConfig::postgres(url)).await?,
+    )
+    .await
 }
 
 /// Admin → Usage reads these totals: live items by kind, the trash, bytes
@@ -254,7 +281,13 @@ async fn totals_count_the_drive(index: Arc<dyn DriveIndex>) -> TestResult {
     assert_eq!(empty, vellum_drive::DriveTotals::default());
 
     let eng = drive
-        .create_space(&alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .create_space(
+            &alice,
+            SpaceKind::SharedDrive,
+            "eng",
+            "Engineering",
+            None,
+        )
         .await?;
     let folder = drive.create_folder(&alice, eng.id, None, "Specs").await?;
     let _ = drive
@@ -280,7 +313,8 @@ async fn totals_count_the_drive(index: Arc<dyn DriveIndex>) -> TestResult {
     assert_eq!(totals.events_1d, totals.events_7d);
 
     // A week and a day later, nothing is recent any more.
-    let later = vellum_kernel::Timestamp::from_unix_ms(now.unix_ms() + 8 * 86_400_000)?;
+    let later =
+        vellum_kernel::Timestamp::from_unix_ms(now.unix_ms() + 8 * 86_400_000)?;
     let later = index.totals(later).await?;
     assert_eq!((later.events_1d, later.events_7d), (0, 0));
     assert_eq!(later.pages, 1);
@@ -290,13 +324,18 @@ async fn totals_count_the_drive(index: Arc<dyn DriveIndex>) -> TestResult {
 #[tokio::test]
 async fn totals_count_the_drive_on_sqlite() -> TestResult {
     let dir = tempfile::tempdir()?;
-    let db = Index::open(&IndexConfig::sqlite(dir.path().join("index.sqlite"), None)).await?;
+    let db = Index::open(&IndexConfig::sqlite(
+        dir.path().join("index.sqlite"),
+        None,
+    ))
+    .await?;
     totals_count_the_drive(Arc::new(SqlIndex::new(db))).await
 }
 
 #[tokio::test]
 async fn totals_count_the_drive_in_memory() -> TestResult {
-    totals_count_the_drive(Arc::new(vellum_drive::memory::MemoryIndex::new())).await
+    totals_count_the_drive(Arc::new(vellum_drive::memory::MemoryIndex::new()))
+        .await
 }
 
 #[tokio::test]
@@ -318,12 +357,15 @@ async fn spaces_on_two_shards_keep_each_shard_in_step() -> TestResult {
     use vellum_drive::sharded::ShardedIndex;
 
     let dir = tempfile::tempdir()?;
-    let db = |name: &str| IndexConfig::sqlite(dir.path().join(format!("{name}.sqlite")), None);
+    let db = |name: &str| {
+        IndexConfig::sqlite(dir.path().join(format!("{name}.sqlite")), None)
+    };
     let config = ShardsConfig {
         main: db("main"),
         shards: vec![("eu".into(), db("eu")), ("us".into(), db("us"))],
     };
-    let router = Arc::new(ShardRouter::open(Shards::open(&config).await?).await?);
+    let router =
+        Arc::new(ShardRouter::open(Shards::open(&config).await?).await?);
     let files = tempfile::tempdir()?;
     let store = Arc::new(LocalStore::open(files.path()).await?);
     let index = Arc::new(ShardedIndex::new(router));
@@ -333,7 +375,13 @@ async fn spaces_on_two_shards_keep_each_shard_in_step() -> TestResult {
     let alice = Actor::User { user: alice_id };
 
     let eng = drive
-        .create_space(&alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .create_space(
+            &alice,
+            SpaceKind::SharedDrive,
+            "eng",
+            "Engineering",
+            None,
+        )
         .await?;
     let ops = drive
         .create_space(&alice, SpaceKind::SharedDrive, "ops", "Operations", None)

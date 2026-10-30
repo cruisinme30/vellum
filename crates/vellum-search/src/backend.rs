@@ -29,7 +29,8 @@ pub struct IndexEntry {
 #[derive(Debug, Clone, PartialEq)]
 #[expect(
     clippy::large_enum_variant,
-    reason = "batches are short-lived and mostly upserts; boxing would only add allocations"
+    reason = "batches are short-lived and mostly upserts; boxing would only \
+        add allocations"
 )]
 pub enum Change {
     /// Insert or replace a document and all its blocks.
@@ -52,7 +53,8 @@ pub struct Scope<'a> {
 /// A search engine behind the search service.
 #[async_trait]
 pub trait SearchBackend: Send + Sync {
-    /// A short name for spans and metrics: `tantivy`, `postgres`, `meilisearch`.
+    /// A short name for spans and metrics: `tantivy`, `postgres`,
+    /// `meilisearch`.
     fn name(&self) -> &'static str;
 
     /// Applies a batch atomically where the engine allows, and makes it
@@ -63,8 +65,12 @@ pub trait SearchBackend: Send + Sync {
     async fn clear(&self) -> Result<()>;
 
     /// Blocks matching `text` in scope, best first.
-    async fn lexical(&self, text: &str, scope: Scope<'_>, limit: usize)
-    -> Result<Vec<StoredBlock>>;
+    async fn lexical(
+        &self,
+        text: &str,
+        scope: Scope<'_>,
+        limit: usize,
+    ) -> Result<Vec<StoredBlock>>;
 
     /// Blocks nearest to `vector` in scope with cosine similarity of at
     /// least `min_similarity`, best first; empty when no vectors are stored.
@@ -77,12 +83,25 @@ pub trait SearchBackend: Send + Sync {
     ) -> Result<Vec<StoredBlock>>;
 
     /// Documents whose title matches `text`, the last word as a prefix.
-    async fn titles(&self, text: &str, scope: Scope<'_>, limit: usize) -> Result<Vec<TitleHit>>;
+    async fn titles(
+        &self,
+        text: &str,
+        scope: Scope<'_>,
+        limit: usize,
+    ) -> Result<Vec<TitleHit>>;
 
     /// A stored block.
-    async fn block(&self, doc: DocId, block: BlockId) -> Result<Option<StoredBlock>>;
+    async fn block(
+        &self,
+        doc: DocId,
+        block: BlockId,
+    ) -> Result<Option<StoredBlock>>;
 
     /// Every block of a document's section, in reading order. `None` is the
     /// part before the first heading.
-    async fn section(&self, doc: DocId, section: Option<BlockId>) -> Result<Vec<StoredBlock>>;
+    async fn section(
+        &self,
+        doc: DocId,
+        section: Option<BlockId>,
+    ) -> Result<Vec<StoredBlock>>;
 }

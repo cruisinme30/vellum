@@ -19,22 +19,34 @@ import {
   type TemplateForm,
 } from "./template-file";
 
-function Facts({ template, file }: { readonly template: Template; readonly file: TeamFile }) {
+function Facts({
+  template,
+  file,
+}: {
+  readonly template: Template;
+  readonly file: TeamFile;
+}) {
   const t = useT();
-  const status = file.workflow.statuses.find((each) => each.key === template.state);
+  const status = file.workflow.statuses.find(
+    (each) => each.key === template.state,
+  );
   const facts = [
-    template.title !== undefined && t("tpl-fact-title", { title: template.title }),
+    template.title !== undefined &&
+      t("tpl-fact-title", { title: template.title }),
     status !== undefined && t("tpl-fact-status", { status: status.name }),
     template.priority !== undefined &&
       t("tpl-fact-priority", { priority: t(priorityId(template.priority)) }),
     template.estimate !== undefined &&
       t("tpl-fact-estimate", { estimate: String(template.estimate) }),
-    template.assignee !== undefined && t("tpl-fact-assignee", { assignee: template.assignee }),
+    template.assignee !== undefined &&
+      t("tpl-fact-assignee", { assignee: template.assignee }),
     (template.labels ?? []).length > 0 &&
       t("tpl-fact-labels", { labels: (template.labels ?? []).join(", ") }),
-    template.repeat !== undefined && t("plan-template-repeat", { repeat: template.repeat }),
+    template.repeat !== undefined &&
+      t("plan-template-repeat", { repeat: template.repeat }),
   ].filter((fact): fact is string => typeof fact === "string");
-  if (facts.length === 0) return <p className="vl-muted">{t("tpl-no-defaults")}</p>;
+  if (facts.length === 0)
+    return <p className="vl-muted">{t("tpl-no-defaults")}</p>;
   return (
     <ul className="vl-tpl-facts">
       {facts.map((fact) => (
@@ -138,7 +150,11 @@ export function TemplateEditor({
   return (
     <form
       className="vl-tpl-editor"
-      aria-label={before === undefined ? t("tpl-new") : t("tpl-edit-named", { name: before.name })}
+      aria-label={
+        before === undefined
+          ? t("tpl-new")
+          : t("tpl-edit-named", { name: before.name })
+      }
       onSubmit={submit}
       noValidate
     >
@@ -147,7 +163,9 @@ export function TemplateEditor({
         {field("title", t("tpl-title"), "input", t("tpl-title-hint"))}
         {select("state", t("tpl-status"), [
           ["", t("tpl-status-default")],
-          ...file.workflow.statuses.map((status) => [status.key, status.name] as const),
+          ...file.workflow.statuses.map(
+            (status) => [status.key, status.name] as const,
+          ),
         ])}
         {select("priority", t("plan-priority"), [
           ["", t("tpl-priority-unset")],
@@ -167,13 +185,20 @@ export function TemplateEditor({
           ),
         ])}
       </div>
-      {form.repeat !== "" && <p className="vl-muted">{t("plan-repeat-hint")}</p>}
+      {form.repeat !== "" && (
+        <p className="vl-muted">{t("plan-repeat-hint")}</p>
+      )}
       {field("body", t("tpl-body"), "textarea", t("tpl-body-hint"))}
       <div className="vl-settings-save">
         <button type="submit" className="vl-filled-button" disabled={busy}>
           {busy ? t("team-settings-saving") : t("tpl-save")}
         </button>
-        <button type="button" className="vl-text-button" disabled={busy} onClick={onCancel}>
+        <button
+          type="button"
+          className="vl-text-button"
+          disabled={busy}
+          onClick={onCancel}
+        >
           {t("work-cancel")}
         </button>
         {shown !== undefined && (
@@ -257,7 +282,11 @@ export function TemplateRow({
             ↓
           </button>
           {confirming ? (
-            <span className="vl-tpl-confirm" role="group" aria-label={t("tpl-remove-confirm")}>
+            <span
+              className="vl-tpl-confirm"
+              role="group"
+              aria-label={t("tpl-remove-confirm")}
+            >
               <button
                 type="button"
                 className="vl-text-button vl-danger"

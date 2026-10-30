@@ -73,8 +73,8 @@ fn add_months(from: Date, months: u32) -> Date {
     let year = from
         .year()
         .saturating_add(i32::try_from(index / 12).unwrap_or(0));
-    let month =
-        Month::try_from(u8::try_from(index % 12 + 1).unwrap_or(1)).unwrap_or(Month::January);
+    let month = Month::try_from(u8::try_from(index % 12 + 1).unwrap_or(1))
+        .unwrap_or(Month::January);
     let day = from.day().min(month.length(year));
     Date::from_calendar_date(year, month, day).unwrap_or(from)
 }
@@ -162,9 +162,11 @@ mod tests {
 
     #[test]
     fn catches_up_with_one_step() {
-        let next = r("1w").next_on_or_after(date!(2026 - 09 - 01), date!(2026 - 10 - 29));
+        let next = r("1w")
+            .next_on_or_after(date!(2026 - 09 - 01), date!(2026 - 10 - 29));
         assert_eq!(next, date!(2026 - 11 - 03));
-        let next = r("1d").next_on_or_after(date!(2026 - 10 - 28), date!(2026 - 10 - 29));
+        let next = r("1d")
+            .next_on_or_after(date!(2026 - 10 - 28), date!(2026 - 10 - 29));
         assert_eq!(next, date!(2026 - 10 - 29));
     }
 

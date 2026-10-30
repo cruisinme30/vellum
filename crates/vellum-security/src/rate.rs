@@ -34,7 +34,11 @@ pub fn client_bucket(ip: IpAddr) -> IpAddr {
     match ip {
         IpAddr::V4(_) => ip,
         IpAddr::V6(v6) => v6.to_ipv4_mapped().map_or_else(
-            || IpAddr::V6(Ipv6Addr::from(u128::from(v6) & !((1_u128 << 64) - 1))),
+            || {
+                IpAddr::V6(Ipv6Addr::from(
+                    u128::from(v6) & !((1_u128 << 64) - 1),
+                ))
+            },
             IpAddr::V4,
         ),
     }
@@ -212,9 +216,12 @@ impl<K: Eq + Hash + Clone> Lockout<K> {
     /// Forgets keys whose lockout ended more than `max` ago; if the table
     /// is still full, drops the half that unlocks soonest.
     fn evict(&self, state: &mut HashMap<K, (u32, Instant)>, now: Instant) {
-        state.retain(|_, (_, until)| until.checked_add(self.max).is_none_or(|t| t > now));
+        state.retain(|_, (_, until)| {
+            until.checked_add(self.max).is_none_or(|t| t > now)
+        });
         if state.len() >= self.max_keys {
-            let mut untils: Vec<Instant> = state.values().map(|(_, until)| *until).collect();
+            let mut untils: Vec<Instant> =
+                state.values().map(|(_, until)| *until).collect();
             untils.sort_unstable();
             if let Some(&cutoff) = untils.get(untils.len() / 2) {
                 state.retain(|_, (_, until)| *until > cutoff);

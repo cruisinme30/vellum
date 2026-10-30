@@ -9,7 +9,10 @@ import { renderApp, renderWithProviders } from "../test/render-app";
 
 import { NotificationsProvider, type NotificationServices } from "./context";
 import type { PushDevice } from "./device";
-import { NotificationSettingsView, snoozeActive } from "./notification-settings";
+import {
+  NotificationSettingsView,
+  snoozeActive,
+} from "./notification-settings";
 import {
   createMockNotificationPreferencesStore,
   DEFAULT_PREFERENCES,
@@ -40,14 +43,22 @@ function fakeDevice(overrides: Partial<PushDevice> = {}): PushDevice {
 describe("the notification settings screen", () => {
   it("opens from the inbox and shows the Northstar demo", async () => {
     const { user, location } = renderApp("/inbox");
-    await user.click(screen.getByRole("link", { name: "Notification settings" }));
+    await user.click(
+      screen.getByRole("link", { name: "Notification settings" }),
+    );
     expect(location()).toBe("/settings/notifications");
-    expect(await screen.findByRole("heading", { level: 1, name: "Notifications" })).toBeDefined();
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Notifications" }),
+    ).toBeDefined();
     // The demo gets comments by push and has two muted issues.
     expect(
-      screen.getByRole("checkbox", { name: "Push for Comments on things you follow" }),
+      screen.getByRole("checkbox", {
+        name: "Push for Comments on things you follow",
+      }),
     ).toHaveProperty("checked", true);
-    expect(screen.getByRole("button", { name: "Unmute ENG-142" })).toBeDefined();
+    expect(
+      screen.getByRole("button", { name: "Unmute ENG-142" }),
+    ).toBeDefined();
     expect(screen.getByText(/the demo can't send them/)).toBeDefined();
   });
 
@@ -56,7 +67,9 @@ describe("the notification settings screen", () => {
     const save = vi.spyOn(store, "save");
     const { user } = renderSettings({ store });
 
-    const email = await screen.findByRole("checkbox", { name: "Email for Mentions" });
+    const email = await screen.findByRole("checkbox", {
+      name: "Email for Mentions",
+    });
     const saveButton = screen.getByRole("button", { name: "Save" });
     expect(saveButton).toHaveProperty("disabled", true);
 
@@ -65,7 +78,10 @@ describe("the notification settings screen", () => {
     await user.selectOptions(screen.getByLabelText("Send email after"), "30");
     await user.click(screen.getByRole("button", { name: "1 day" }));
     expect(screen.getByText(/^Snoozed until/)).toBeDefined();
-    await user.type(screen.getByLabelText("Issue key or page ID"), "  ENG-7{Enter}");
+    await user.type(
+      screen.getByLabelText("Issue key or page ID"),
+      "  ENG-7{Enter}",
+    );
     expect(screen.getByText("ENG-7")).toBeDefined();
 
     await user.click(saveButton);
@@ -97,7 +113,10 @@ describe("the notification settings screen", () => {
   });
 
   it("ignores blank and duplicate mutes", async () => {
-    const store = createMockNotificationPreferencesStore({ ...DEFAULT_PREFERENCES, muted: ["A"] });
+    const store = createMockNotificationPreferencesStore({
+      ...DEFAULT_PREFERENCES,
+      muted: ["A"],
+    });
     const { user } = renderSettings({ store });
     const field = await screen.findByLabelText("Issue key or page ID");
     await user.type(field, "A");
@@ -105,7 +124,10 @@ describe("the notification settings screen", () => {
     await user.clear(field);
     await user.type(field, "   {Enter}");
     expect(screen.getAllByRole("listitem")).toHaveLength(1);
-    expect(screen.getByRole("button", { name: "Save" })).toHaveProperty("disabled", true);
+    expect(screen.getByRole("button", { name: "Save" })).toHaveProperty(
+      "disabled",
+      true,
+    );
   });
 
   it("offers a delay the server set that is not in the list", async () => {
@@ -135,32 +157,43 @@ describe("the notification settings screen", () => {
       load: vi
         .fn()
         .mockRejectedValueOnce(
-          new ApiError("unavailable", "The server is busy.", { requestId: "01JR" }),
+          new ApiError("unavailable", "The server is busy.", {
+            requestId: "01JR",
+          }),
         )
         .mockResolvedValue(DEFAULT_PREFERENCES),
-      save: vi.fn().mockRejectedValue(new ApiError("invalid_input", "Too many mutes.")),
+      save: vi
+        .fn()
+        .mockRejectedValue(new ApiError("invalid_input", "Too many mutes.")),
     };
     const { user } = renderSettings({ store: failing });
     const loadAlert = await screen.findByRole("alert");
-    expect(loadAlert.textContent).toContain("The server is busy. (request 01JR)");
+    expect(loadAlert.textContent).toContain(
+      "The server is busy. (request 01JR)",
+    );
     await user.click(screen.getByRole("button", { name: "Try again" }));
-    await user.click(await screen.findByRole("checkbox", { name: "Push for Status changes" }));
+    await user.click(
+      await screen.findByRole("checkbox", { name: "Push for Status changes" }),
+    );
     await user.click(screen.getByRole("button", { name: "Save" }));
     const saveAlert = await screen.findByRole("alert");
     expect(saveAlert.textContent).toContain("Too many mutes.");
     // The edit is still there to save again.
-    expect(screen.getByRole("checkbox", { name: "Push for Status changes" })).toHaveProperty(
-      "checked",
-      true,
-    );
+    expect(
+      screen.getByRole("checkbox", { name: "Push for Status changes" }),
+    ).toHaveProperty("checked", true);
   });
 
   it("marks urgent kinds and labels every checkbox", async () => {
-    renderSettings({ store: createMockNotificationPreferencesStore(DEFAULT_PREFERENCES) });
+    renderSettings({
+      store: createMockNotificationPreferencesStore(DEFAULT_PREFERENCES),
+    });
     const table = await screen.findByRole("table");
     expect(within(table).getAllByRole("checkbox")).toHaveLength(33);
     expect(within(table).getAllByText("Urgent")).toHaveLength(2);
-    expect(within(table).getByRole("rowheader", { name: /SLA breached/ })).toBeDefined();
+    expect(
+      within(table).getByRole("rowheader", { name: /SLA breached/ }),
+    ).toBeDefined();
   });
 });
 
@@ -172,13 +205,19 @@ describe("push on this device", () => {
     const disable = vi.fn(() => Promise.resolve());
     const device = fakeDevice({ enable, disable });
     const { user } = renderSettings({ store, device });
-    expect(await screen.findByText("Push notifications are off for this browser.")).toBeDefined();
+    expect(
+      await screen.findByText("Push notifications are off for this browser."),
+    ).toBeDefined();
     await user.click(screen.getByRole("button", { name: "Turn on push" }));
     expect(enable).toHaveBeenCalledOnce();
-    expect(await screen.findByText("Push notifications are on for this browser.")).toBeDefined();
+    expect(
+      await screen.findByText("Push notifications are on for this browser."),
+    ).toBeDefined();
     await user.click(screen.getByRole("button", { name: "Turn off push" }));
     expect(disable).toHaveBeenCalledOnce();
-    expect(await screen.findByText("Push notifications are off for this browser.")).toBeDefined();
+    expect(
+      await screen.findByText("Push notifications are off for this browser."),
+    ).toBeDefined();
   });
 
   it("shows an error when push cannot be turned off", async () => {
@@ -188,15 +227,23 @@ describe("push on this device", () => {
       enable: () => Promise.resolve("denied"),
     });
     const { user } = renderSettings({ store, device });
-    await user.click(await screen.findByRole("button", { name: "Turn off push" }));
-    expect(await screen.findByText("Push couldn't be changed. Try again.")).toBeDefined();
+    await user.click(
+      await screen.findByRole("button", { name: "Turn off push" }),
+    );
+    expect(
+      await screen.findByText("Push couldn't be changed. Try again."),
+    ).toBeDefined();
   });
 
   it("says when permission is denied", async () => {
     const device = fakeDevice({ enable: () => Promise.resolve("denied") });
     const { user } = renderSettings({ store, device });
-    await user.click(await screen.findByRole("button", { name: "Turn on push" }));
-    expect(await screen.findByText(/This browser blocked notifications/)).toBeDefined();
+    await user.click(
+      await screen.findByRole("button", { name: "Turn on push" }),
+    );
+    expect(
+      await screen.findByText(/This browser blocked notifications/),
+    ).toBeDefined();
     expect(screen.getByRole("button", { name: "Turn on push" })).toBeDefined();
   });
 
@@ -205,13 +252,17 @@ describe("push on this device", () => {
       store,
       device: fakeDevice({ subscribed: () => Promise.reject(new Error("x")) }),
     });
-    expect(await screen.findByText("Push notifications are off for this browser.")).toBeDefined();
+    expect(
+      await screen.findByText("Push notifications are off for this browser."),
+    ).toBeDefined();
   });
 
   it("says when the browser cannot push", async () => {
     renderSettings({ store, device: fakeDevice({ supported: false }) });
     await waitFor(() => {
-      expect(screen.getByText(/can't receive push notifications/)).toBeDefined();
+      expect(
+        screen.getByText(/can't receive push notifications/),
+      ).toBeDefined();
     });
     expect(screen.queryByRole("button", { name: "Turn on push" })).toBeNull();
   });

@@ -8,7 +8,11 @@ import type { Fragment, PageMeta } from "../data/types";
 import { useT } from "../i18n/i18n";
 
 /** Text with its matched runs in `<mark>`. */
-export function Marked({ fragments }: { readonly fragments: readonly Fragment[] }) {
+export function Marked({
+  fragments,
+}: {
+  readonly fragments: readonly Fragment[];
+}) {
   return (
     <>
       {fragments.map((fragment, index) =>
@@ -61,13 +65,19 @@ export function PageList({
             </span>
             <span>
               <strong>
-                {page.title === "" ? t("page-untitled") : <Marked fragments={marks(page.title)} />}
+                {page.title === "" ? (
+                  t("page-untitled")
+                ) : (
+                  <Marked fragments={marks(page.title)} />
+                )}
               </strong>
               {snippet !== undefined && snippet !== "" && (
                 <small>
                   <Marked
                     fragments={
-                      fragments?.some((each) => each.hit) === true ? fragments : marks(snippet)
+                      fragments?.some((each) => each.hit) === true
+                        ? fragments
+                        : marks(snippet)
                     }
                   />
                 </small>

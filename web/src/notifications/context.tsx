@@ -9,11 +9,15 @@ import type { NotificationPreferencesStore } from "./preferences";
 /** What the notification settings screen talks to. */
 export interface NotificationServices {
   readonly store: NotificationPreferencesStore;
-  /** This browser's push; absent in demo mode, where no server can send pushes. */
+  /**
+   * This browser's push; absent in demo mode, where no server can send pushes.
+   */
   readonly device?: PushDevice | undefined;
 }
 
-const NotificationsContext = createContext<NotificationServices | undefined>(undefined);
+const NotificationsContext = createContext<NotificationServices | undefined>(
+  undefined,
+);
 
 /** Provides the notification services to the app. */
 export function NotificationsProvider({
@@ -23,14 +27,18 @@ export function NotificationsProvider({
   readonly services: NotificationServices;
   readonly children: ReactNode;
 }) {
-  return <NotificationsContext value={services}>{children}</NotificationsContext>;
+  return (
+    <NotificationsContext value={services}>{children}</NotificationsContext>
+  );
 }
 
 /** The notification services; throws outside a provider. */
 export function useNotificationServices(): NotificationServices {
   const services = use(NotificationsContext);
   if (!services) {
-    throw new Error("Vellum: useNotificationServices needs a NotificationsProvider");
+    throw new Error(
+      "Vellum: useNotificationServices needs a NotificationsProvider",
+    );
   }
   return services;
 }

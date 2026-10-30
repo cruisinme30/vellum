@@ -39,12 +39,21 @@ export type PropertyType =
   | "created";
 
 /** How a view lays out rows (`ViewKind`, snake_case). */
-export type ViewKind = "table" | "board" | "gallery" | "calendar" | "timeline" | "list";
+export type ViewKind =
+  "table" | "board" | "gallery" | "calendar" | "timeline" | "list";
 
 type NumberFormat = "plain" | "percent";
 
 export type Aggregation =
-  "count" | "sum" | "avg" | "min" | "max" | "checked" | "pct" | "unique" | "show";
+  | "count"
+  | "sum"
+  | "avg"
+  | "min"
+  | "max"
+  | "checked"
+  | "pct"
+  | "unique"
+  | "show";
 
 export interface SelectOption {
   readonly name: string;
@@ -114,7 +123,11 @@ export interface PropertyInfo {
   readonly computed: boolean;
   readonly options?: readonly SelectOption[];
   readonly relation?: { readonly to: string; readonly back?: string };
-  readonly rollup?: { readonly via: string; readonly prop: string; readonly agg: Aggregation };
+  readonly rollup?: {
+    readonly via: string;
+    readonly prop: string;
+    readonly agg: Aggregation;
+  };
   readonly formula?: string;
   readonly format?: NumberFormat;
 }
@@ -170,7 +183,10 @@ export interface Column {
   readonly editable: boolean;
 }
 
-/** `CellView`: `value` is absent only when the cell has an error; empty is `{"type": "empty"}`. */
+/**
+ * `CellView`: `value` is absent only when the cell has an error; empty is
+ * `{"type": "empty"}`.
+ */
 export interface CellView {
   readonly value?: Value;
   /** The value as text, as the server formats it. */
@@ -194,7 +210,8 @@ export interface RowView {
 
 /**
  * `Group`: `value` is null for the "No …" group and for the single group of an
- * ungrouped view (label ""); tell them apart by the view having a group property.
+ * ungrouped view (label ""); tell them apart by the view having a group
+ * property.
  */
 export interface Group {
   readonly value: Value | null;
@@ -216,14 +233,18 @@ export interface ViewResult {
 }
 
 /** `CellValue`, externally tagged. */
-export type CellValue = { readonly value: Value } | { readonly error: CellError };
+export type CellValue =
+  { readonly value: Value } | { readonly error: CellError };
 
 /** `RowDetail`: one row with every value, stored and computed. */
 export interface RowDetail {
   readonly collectionId: string;
   readonly path: string;
   readonly title: string;
-  readonly row: { readonly id: string; readonly cells: Readonly<Record<string, CellValue>> };
+  readonly row: {
+    readonly id: string;
+    readonly cells: Readonly<Record<string, CellValue>>;
+  };
   readonly body: string;
 }
 
@@ -253,7 +274,9 @@ export interface SaveViewInput {
   readonly view: string;
   readonly rename_to?: string;
   readonly kind?: ViewKind;
-  /** Filters in `schema.yaml` text (`Status is Done`), all of which must match. */
+  /**
+   * Filters in `schema.yaml` text (`Status is Done`), all of which must match.
+   */
   readonly filter?: readonly string[];
   /** Sort keys (`Due desc`), most significant first. */
   readonly sort?: readonly string[];

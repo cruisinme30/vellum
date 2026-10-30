@@ -116,7 +116,8 @@ mod tests {
 
     #[test]
     fn quoting_and_line_breaks() -> Result<(), ImportError> {
-        let text = "\u{feff}a,b,c\r\n1,\"two, \"\"2\"\"\",\"multi\nline\"\r\n\r\n4,,6";
+        let text =
+            "\u{feff}a,b,c\r\n1,\"two, \"\"2\"\"\",\"multi\nline\"\r\n\r\n4,,6";
         let parsed = rows(text)?;
         assert_eq!(
             parsed,

@@ -44,7 +44,11 @@ fn key_table_stays_bounded() {
 
 proptest! {
     #[test]
-    fn never_more_than_burst_plus_refill(burst in 1_u32..20, period_ms in 10_u64..10_000, gaps in proptest::collection::vec(0_u64..500, 1..200)) {
+    fn never_more_than_burst_plus_refill(
+        burst in 1_u32..20,
+        period_ms in 10_u64..10_000,
+        gaps in proptest::collection::vec(0_u64..500, 1..200)
+    ) {
         let period = Duration::from_millis(period_ms);
         let limiter = RateLimiter::new(Quota::new(burst, period).unwrap(), 10);
         let t0 = Instant::now();
@@ -57,8 +61,11 @@ proptest! {
             }
         }
         let elapsed = (now - t0).as_secs_f64();
-        let bound = f64::from(burst) + elapsed * f64::from(burst) / period.as_secs_f64() + 1.0;
-        prop_assert!(f64::from(allowed) <= bound, "allowed {allowed} > bound {bound}");
+        let bound = f64::from(
+            burst
+        ) + elapsed * f64::from(burst) / period.as_secs_f64() + 1.0;
+        prop_assert!(f64::from(allowed) <= bound, "allowed {allowed} > bound \
+            {bound}");
     }
 }
 
@@ -103,7 +110,8 @@ fn ipv6_clients_count_by_their_slash_64() {
     assert_eq!(client_bucket(ip("::ffff:203.0.113.7")), ip("203.0.113.7"));
 
     // A limiter keyed by bucket stops a client rotating its addresses.
-    let limiter = RateLimiter::new(Quota::new(3, Duration::from_mins(1)).unwrap(), 1000);
+    let limiter =
+        RateLimiter::new(Quota::new(3, Duration::from_mins(1)).unwrap(), 1000);
     let now = Instant::now();
     let refused = (0..50_u16)
         .map(|n| client_bucket(ip(&format!("2001:db8:1:2::{n:x}"))))

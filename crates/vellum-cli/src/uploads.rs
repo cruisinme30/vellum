@@ -119,7 +119,11 @@ impl Budget {
     ///
     /// [`ErrorKind::Unavailable`] when the person has [`PER_USER`]
     /// uploads in flight or the budget is spent.
-    pub fn reserve(self: &Arc<Self>, user: UserId, length: u64) -> Result<Reservation, Error> {
+    pub fn reserve(
+        self: &Arc<Self>,
+        user: UserId,
+        length: u64,
+    ) -> Result<Reservation, Error> {
         let busy = || {
             Error::new(
                 ErrorKind::Unavailable,
@@ -130,17 +134,20 @@ impl Budget {
             .unwrap_or(u32::MAX)
             .min(self.total_kib.max(1));
         {
-            let mut active = self.active.lock().unwrap_or_else(PoisonError::into_inner);
+            let mut active =
+                self.active.lock().unwrap_or_else(PoisonError::into_inner);
             let n = active.entry(user).or_insert(0);
             if *n >= self.per_user {
                 return Err(Error::new(
                     ErrorKind::Unavailable,
-                    "you have too many uploads in progress; wait for one to finish",
+                    "you have too many uploads in progress; wait for one to \
+                        finish",
                 ));
             }
             *n += 1;
         }
-        let Ok(permit) = Arc::clone(&self.kib).try_acquire_many_owned(kib) else {
+        let Ok(permit) = Arc::clone(&self.kib).try_acquire_many_owned(kib)
+        else {
             self.release(user);
             return Err(busy());
         };
@@ -153,7 +160,8 @@ impl Budget {
 
     /// Gives back one of `user`'s upload slots.
     fn release(&self, user: UserId) {
-        let mut active = self.active.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut active =
+            self.active.lock().unwrap_or_else(PoisonError::into_inner);
         if let Some(n) = active.get_mut(&user) {
             *n = n.saturating_sub(1);
             if *n == 0 {
@@ -294,11 +302,15 @@ async fn store<S: Scanner>(
     let at = |e: Error| (id, e);
     let actor = caller(&request, Scope::WriteDirect).map_err(at)?;
     let page = parse_page(page_id).map_err(at)?;
-    let name = url::form_urlencoded::parse(request.uri().query().unwrap_or_default().as_bytes())
-        .find(|(k, _)| k == "name")
-        .map(|(_, v)| v.into_owned())
-        .filter(|v| !v.is_empty())
-        .ok_or_else(|| at(invalid("say the file's name in the `name` query parameter")))?;
+    let name = url::form_urlencoded::parse(
+        request.uri().query().unwrap_or_default().as_bytes(),
+    )
+    .find(|(k, _)| k == "name")
+    .map(|(_, v)| v.into_owned())
+    .filter(|v| !v.is_empty())
+    .ok_or_else(|| {
+        at(invalid("say the file's name in the `name` query parameter"))
+    })?;
     let _ = uploads
         .drive
         .attachment_page(&actor, page, true)
@@ -308,7 +320,8 @@ async fn store<S: Scanner>(
         return Err(at(invalid("uploads need a signed-in person")));
     };
     let _reserved =
-        reserve_body(&uploads.budget, &request, user, uploads.policy.max_bytes).map_err(at)?;
+        reserve_body(&uploads.budget, &request, user, uploads.policy.max_bytes)
+            .map_err(at)?;
     let bytes = axum::body::to_bytes(request.into_body(), usize::MAX)
         .await
         .map_err(|_| at(invalid("the upload did not arrive whole")))?;
@@ -325,7 +338,13 @@ async fn store<S: Scanner>(
         .attach(&actor, page, &cleaned.file_name, Bytes::from(cleaned.bytes))
         .await
         .map_err(|e| at(e.into()))?;
-    tracing::info!(page = %page, name = %file.name, size = file.size, kind = ?cleaned.kind, "file uploaded");
+    tracing::info!(
+        page = %page,
+        name = %file.name,
+        size = file.size,
+        kind = ?cleaned.kind,
+        "file uploaded"
+    );
     Ok(json(
         StatusCode::CREATED,
         &FileView::new(&file, Some(cleaned.kind.mime())),
@@ -402,7 +421,8 @@ async fn remove<S: Scanner + 'static>(
 /// The file's bytes with headers that keep a browser from running them.
 fn download(file: &Attachment, bytes: Bytes) -> Response {
     let kind = upload::sniff(&bytes);
-    let media_type = kind.map_or("application/octet-stream", upload::Kind::mime);
+    let media_type =
+        kind.map_or("application/octet-stream", upload::Kind::mime);
     let disposition = if kind.is_some_and(upload::Kind::inline) {
         "inline"
     } else {
@@ -463,7 +483,9 @@ pub fn refused(error: &UploadError) -> Error {
     };
     let message = match error {
         // The scanner's address and reply stay in the logs.
-        UploadError::ScannerUnavailable(_) => "the virus scanner is unavailable; try again".into(),
+        UploadError::ScannerUnavailable(_) => {
+            "the virus scanner is unavailable; try again".into()
+        }
         other => other.to_string(),
     };
     tracing::info!(error = %error, "upload refused");
@@ -475,7 +497,9 @@ pub fn refused(error: &UploadError) -> Error {
 const fn status_for(error: &UploadError) -> StatusCode {
     match error {
         UploadError::TooLarge(_) => StatusCode::PAYLOAD_TOO_LARGE,
-        UploadError::Unknown | UploadError::Mismatch(_) => StatusCode::UNSUPPORTED_MEDIA_TYPE,
+        UploadError::Unknown | UploadError::Mismatch(_) => {
+            StatusCode::UNSUPPORTED_MEDIA_TYPE
+        }
         UploadError::ScannerUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
         _ => StatusCode::UNPROCESSABLE_ENTITY,
     }
@@ -533,7 +557,9 @@ pub fn json(status: StatusCode, body: &impl Serialize) -> Response {
 pub fn encode(name: &str) -> String {
     let mut out = String::with_capacity(name.len());
     for byte in name.bytes() {
-        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~') {
+        if byte.is_ascii_alphanumeric()
+            || matches!(byte, b'-' | b'.' | b'_' | b'~')
+        {
             out.push(char::from(byte));
         } else {
             let _ = write!(out, "%{byte:02X}");

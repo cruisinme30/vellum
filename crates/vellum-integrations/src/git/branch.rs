@@ -80,7 +80,12 @@ fn handle(user: &str) -> String {
 /// key is never cut, because automation finds the issue by it.
 #[must_use]
 #[allow(clippy::literal_string_with_formatting_args)]
-pub fn branch_name(format: &str, user: &str, key: &IssueKey, title: &str) -> String {
+pub fn branch_name(
+    format: &str,
+    user: &str,
+    key: &IssueKey,
+    title: &str,
+) -> String {
     let format = if format.contains("{key}") || format.contains("{number}") {
         format
     } else {
@@ -145,7 +150,8 @@ mod tests {
             DEFAULT_FORMAT,
             "ada",
             &key(),
-            "Investigate intermittent failures in the nightly export pipeline for large books",
+            "Investigate intermittent failures in the nightly export pipeline \
+                for large books",
         );
         assert!(name.len() <= MAX_LEN, "{name}");
         assert!(name.starts_with("ada/eng-142-investigate"));

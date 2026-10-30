@@ -6,7 +6,11 @@ import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { body, callout, h, p, toc } from "../content";
-import { createTestEditor, detachedViewProperties, renderEditor } from "../test-editor";
+import {
+  createTestEditor,
+  detachedViewProperties,
+  renderEditor,
+} from "../test-editor";
 
 import { headingsAfter, TocView } from "./toc-view";
 
@@ -37,14 +41,19 @@ describe("TocView", () => {
 
   it("explains itself when there is no heading below", async () => {
     await renderEditor(body(toc(), p("just text")));
-    expect(screen.getByText("Headings below this block appear here.")).toBeDefined();
+    expect(
+      screen.getByText("Headings below this block appear here."),
+    ).toBeDefined();
     expect(entries()).toEqual([]);
   });
 
   it("follows edits to the page", async () => {
     const { editor } = await renderEditor(body(toc(), h(2, "Old")));
     act(() => {
-      editor.commands.insertContentAt(editor.state.doc.content.size, h(2, "New"));
+      editor.commands.insertContentAt(
+        editor.state.doc.content.size,
+        h(2, "New"),
+      );
     });
     expect(entries()).toEqual([
       ["2", "Old"],
@@ -54,7 +63,9 @@ describe("TocView", () => {
 
   it("moves the cursor into a heading when its entry is clicked", async () => {
     const user = userEvent.setup();
-    const { editor } = await renderEditor(body(toc(), p("intro"), h(2, "Target")));
+    const { editor } = await renderEditor(
+      body(toc(), p("intro"), h(2, "Target")),
+    );
     await user.click(screen.getByRole("button", { name: "Target" }));
     expect(editor.state.selection.$from.parent.textContent).toBe("Target");
   });
@@ -68,7 +79,9 @@ describe("TocView", () => {
 
 describe("TocView outside the document", () => {
   it("lists the headings from the top of the page when it has no position", () => {
-    const editor = createTestEditor({ content: body(p("x"), h(2, "Top"), toc(), h(2, "Below")) });
+    const editor = createTestEditor({
+      content: body(p("x"), h(2, "Top"), toc(), h(2, "Below")),
+    });
     const node = editor.state.doc.child(2);
     render(<TocView {...detachedViewProperties(editor, node)} />);
     expect(entries()).toEqual([
@@ -85,9 +98,14 @@ describe("TocView outside the document", () => {
 
 describe("headingsAfter", () => {
   it("returns headings after a position with their level and position", () => {
-    const editor = createTestEditor({ content: body(h(1, "A"), p("b"), h(2, "C")) });
+    const editor = createTestEditor({
+      content: body(h(1, "A"), p("b"), h(2, "C")),
+    });
     expect(headingsAfter(editor, 0)).toEqual([{ level: 2, text: "C", pos: 6 }]);
-    expect(headingsAfter(editor, -1).map((entry) => entry.text)).toEqual(["A", "C"]);
+    expect(headingsAfter(editor, -1).map((entry) => entry.text)).toEqual([
+      "A",
+      "C",
+    ]);
     editor.destroy();
   });
 });

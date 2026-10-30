@@ -58,12 +58,16 @@ fn docker(args: &[&str]) -> Result<String, String> {
 
 /// Starts `LocalStack` with a bucket named `bucket`, or returns `None` when
 /// docker is unavailable outside CI.
-async fn localstack(bucket: &str) -> Result<Option<LocalStack>, Box<dyn std::error::Error>> {
+async fn localstack(
+    bucket: &str,
+) -> Result<Option<LocalStack>, Box<dyn std::error::Error>> {
     if let Err(e) = docker(&["info", "--format", "{{.ServerVersion}}"]) {
         if std::env::var_os("CI").is_some() {
             return Err(format!("docker is required in CI: {e}").into());
         }
-        eprintln!("note: skipping the S3 conformance test, docker is unavailable: {e}");
+        eprintln!(
+            "note: skipping the S3 conformance test, docker is unavailable: {e}"
+        );
         return Ok(None);
     }
     let id = docker(&[
@@ -82,7 +86,8 @@ async fn localstack(bucket: &str) -> Result<Option<LocalStack>, Box<dyn std::err
     };
     let port = docker(&["port", &stack.id, "4566/tcp"])?;
     let port = port.lines().next().unwrap_or_default();
-    stack.endpoint = endpoint(port, std::env::var("TESTCONTAINERS_HOST_OVERRIDE").ok());
+    stack.endpoint =
+        endpoint(port, std::env::var("TESTCONTAINERS_HOST_OVERRIDE").ok());
     wait_for_s3(&stack.endpoint).await?;
     let _ = docker(&[
         "exec",
@@ -137,7 +142,9 @@ async fn wait_for_s3(endpoint: &str) -> Result<(), Box<dyn std::error::Error>> {
             return Ok(());
         }
         if Instant::now() > deadline {
-            return Err("LocalStack S3 did not become available within 120 s".into());
+            return Err(
+                "LocalStack S3 did not become available within 120 s".into()
+            );
         }
         tokio::time::sleep(Duration::from_millis(500)).await;
     }
@@ -185,20 +192,28 @@ async fn s3_store_conforms() -> TestResult {
     }
 
     conformance::run_all(&store(&stack, "bare", None)?).await?;
-    conformance::run_all(&Metered::new(store(&stack, "metered", None)?)).await?;
+    conformance::run_all(&Metered::new(store(&stack, "metered", None)?))
+        .await?;
 
     // Under a prefix, and with a neighbour prefix that must stay invisible.
     let outside = store(&stack, "prefixed", Some("other"))?;
     let _ = outside
         .put(
-            &BlobPath::new("conformance/list_is_recursive_and_scoped/d/stray.md")?,
+            &BlobPath::new(
+                "conformance/list_is_recursive_and_scoped/d/stray.md",
+            )?,
             Bytes::from_static(b"x"),
             Precondition::None,
         )
         .await?;
     let prefixed = store(&stack, "prefixed", Some("team/one"))?;
     conformance::run_all(&prefixed).await?;
-    conformance::run_all(&Metered::new(store(&stack, "prefixed", Some("team/two"))?)).await?;
+    conformance::run_all(&Metered::new(store(
+        &stack,
+        "prefixed",
+        Some("team/two"),
+    )?))
+    .await?;
     let mine: Vec<_> = prefixed.list(None).try_collect().await?;
     assert!(
         mine.iter()
@@ -211,7 +226,9 @@ async fn s3_store_conforms() -> TestResult {
 }
 
 /// Keys that need escaping survive a put, a listing and a get.
-async fn odd_keys_round_trip_through_listings(stack: &LocalStack) -> TestResult {
+async fn odd_keys_round_trip_through_listings(
+    stack: &LocalStack,
+) -> TestResult {
     let store = store(stack, "odd", Some("p"))?;
     let names = [
         "a b+c.md",

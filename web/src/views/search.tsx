@@ -25,7 +25,10 @@ function searchStatus(
 /** The ages the "Modified" filter offers, in days. */
 const AGES = [7, 30, 365] as const;
 
-/** Reads the filters from the URL: `owner=me`, `modified=<days>`, `starred=1`, `space=<id>`. */
+/**
+ * Reads the filters from the URL: `owner=me`, `modified=<days>`, `starred=1`,
+ * `space=<id>`.
+ */
 function filtersOf(parameters: URLSearchParams): SearchFilters {
   const days = Number(parameters.get("modified"));
   const space = parameters.get("space") ?? "";
@@ -37,7 +40,10 @@ function filtersOf(parameters: URLSearchParams): SearchFilters {
   };
 }
 
-/** The filter bar under the search box (R-DR-9): owner, modified, location, starred. */
+/**
+ * The filter bar under the search box (R-DR-9): owner, modified, location,
+ * starred.
+ */
 function SearchFilterBar({
   parameters,
   onChange,
@@ -108,7 +114,9 @@ function SearchFilterBar({
   );
 }
 
-/** Search across page titles and bodies; the query and filters live in the URL. */
+/**
+ * Search across page titles and bodies; the query and filters live in the URL.
+ */
 export function SearchView() {
   const t = useT();
   const id = useId();
@@ -149,13 +157,19 @@ export function SearchView() {
       </p>
       {assist !== undefined && (
         <p>
-          <Link to={query === "" ? "/ask" : `/ask?q=${encodeURIComponent(query)}`}>
+          <Link
+            to={query === "" ? "/ask" : `/ask?q=${encodeURIComponent(query)}`}
+          >
             {t("assist-ask-link")}
           </Link>
         </p>
       )}
       {query !== "" && hits !== undefined && (
-        <PageList items={hits} query={query} empty={t("search-empty", { query })} />
+        <PageList
+          items={hits}
+          query={query}
+          empty={t("search-empty", { query })}
+        />
       )}
     </div>
   );

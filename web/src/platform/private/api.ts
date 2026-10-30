@@ -31,12 +31,16 @@ const segment = encodeURIComponent;
 export function createHttpPrivateSpacesApi(http: Http): PrivateSpacesApi {
   return {
     async spaces() {
-      const { spaces } = await http.get<SpaceList>("/api/v1/drive/shared-drives");
+      const { spaces } = await http.get<SpaceList>(
+        "/api/v1/drive/shared-drives",
+      );
       const withKeys = await Promise.all(
         spaces.map(async (space) => ({
           id: space.id,
           name: space.name,
-          keys: await http.get<SpaceKeys>(`/api/v1/spaces/${segment(space.id)}/e2e/keys`),
+          keys: await http.get<SpaceKeys>(
+            `/api/v1/spaces/${segment(space.id)}/e2e/keys`,
+          ),
         })),
       );
       return withKeys.toSorted((a, b) => a.name.localeCompare(b.name));

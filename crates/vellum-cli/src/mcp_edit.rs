@@ -75,7 +75,8 @@ pub fn apply(
     let parsed = vellum_format::parse(markdown).document;
     if citable(&parsed) != ids.len() {
         return Err(WorkspaceError::Conflict(
-            "the page changed while the edit was prepared; read it again".into(),
+            "the page changed while the edit was prepared; read it again"
+                .into(),
         ));
     }
     let index: HashMap<&str, usize> = ids
@@ -97,7 +98,8 @@ pub fn apply(
                 plan.replace = Some(blocks_of(markdown)?);
             }
             BlockEdit::Delete { block_id } => {
-                plan_of(&mut plans, &index, block_id)?.replace = Some(Vec::new());
+                plan_of(&mut plans, &index, block_id)?.replace =
+                    Some(Vec::new());
             }
             BlockEdit::Insert {
                 after: None,
@@ -122,10 +124,15 @@ pub fn apply(
             Block::List(list) => {
                 out.open(list);
                 for item in &list.items {
-                    let plan = plans.get_mut(k).map(std::mem::take).unwrap_or_default();
+                    let plan = plans
+                        .get_mut(k)
+                        .map(std::mem::take)
+                        .unwrap_or_default();
                     match plan.replace {
                         None => out.item(item.clone()),
-                        Some(blocks) => blocks.into_iter().for_each(|b| out.push(b)),
+                        Some(blocks) => {
+                            blocks.into_iter().for_each(|b| out.push(b))
+                        }
                     }
                     plan.after.into_iter().for_each(|b| out.push(b));
                     k += 1;
@@ -134,10 +141,13 @@ pub fn apply(
             }
             Block::ThematicBreak => out.push(block.clone()),
             _ => {
-                let plan = plans.get_mut(k).map(std::mem::take).unwrap_or_default();
+                let plan =
+                    plans.get_mut(k).map(std::mem::take).unwrap_or_default();
                 match plan.replace {
                     None => out.push(block.clone()),
-                    Some(blocks) => blocks.into_iter().for_each(|b| out.push(b)),
+                    Some(blocks) => {
+                        blocks.into_iter().for_each(|b| out.push(b))
+                    }
                 }
                 plan.after.into_iter().for_each(|b| out.push(b));
                 k += 1;
@@ -211,7 +221,9 @@ impl Builder {
 mod tests {
     use super::*;
 
-    const PAGE: &str = "---\nid: 01JBQ8Y4ZK6V3W2N5R7T9X1C41\ntitle: Launch plan\nvellum: 1\n---\n\n## Goals ^blk-gxa20001\n\nShip on 2026-11-24. ^blk-shp20001\n\n- one\n- two\n- three\n";
+    const PAGE: &str = "---\nid: 01JBQ8Y4ZK6V3W2N5R7T9X1C41\n\
+        title: Launch plan\nvellum: 1\n---\n\n## Goals ^blk-gxa20001\n\n\
+        Ship on 2026-11-24. ^blk-shp20001\n\n- one\n- two\n- three\n";
 
     fn ids() -> Vec<String> {
         let doc = vellum_private::read_document(
@@ -255,7 +267,9 @@ mod tests {
             "{out}"
         );
         assert!(
-            out.contains("## Goals ^blk-gxa20001\n\nOwner: Priya.\n\nShip on 2026-12-01."),
+            out.contains(
+                "## Goals ^blk-gxa20001\n\nOwner: Priya.\n\nShip on 2026-12-01."
+            ),
             "{out}"
         );
         assert!(out.contains("- one\n- three\n- four"), "{out}");

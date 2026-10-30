@@ -55,15 +55,17 @@ fn system_time(t: vellum_kernel::Timestamp) -> SystemTime {
 #[async_trait]
 impl TokenVerifier for IdentityTokens {
     async fn verify(&self, token: &str) -> Result<VerifiedToken, TokenError> {
-        let info = self
-            .identity
-            .verify_token(token)
-            .map_err(|e| match e.kind() {
-                ErrorKind::Unavailable | ErrorKind::Internal | ErrorKind::Timeout => {
-                    TokenError::Unavailable(e.message().to_owned())
-                }
-                _ => TokenError::Invalid,
-            })?;
+        let info =
+            self.identity
+                .verify_token(token)
+                .map_err(|e| match e.kind() {
+                    ErrorKind::Unavailable
+                    | ErrorKind::Internal
+                    | ErrorKind::Timeout => {
+                        TokenError::Unavailable(e.message().to_owned())
+                    }
+                    _ => TokenError::Invalid,
+                })?;
         let audience = if info.audience.is_empty() {
             vec![self.resource.clone()]
         } else {
@@ -196,8 +198,12 @@ fn meaning(change: &Change) -> Meaning {
                 return Meaning::Nothing;
             };
             match Kind::of(&path) {
-                Kind::BookManifest { .. } | Kind::CollectionSchema { .. } => Meaning::List,
-                Kind::Issue { team, number } => Meaning::Issue(format!("{team}-{number}")),
+                Kind::BookManifest { .. } | Kind::CollectionSchema { .. } => {
+                    Meaning::List
+                }
+                Kind::Issue { team, number } => {
+                    Meaning::Issue(format!("{team}-{number}"))
+                }
                 Kind::Document => Meaning::Document(path),
                 _ => Meaning::Nothing,
             }
@@ -209,7 +215,10 @@ fn meaning(change: &Change) -> Meaning {
 impl Events {
     /// Events for documents found through `index` and `space_of`.
     #[must_use]
-    pub fn new(index: Arc<dyn DriveIndex>, space_of: vellum_collections::service::SpaceOf) -> Self {
+    pub fn new(
+        index: Arc<dyn DriveIndex>,
+        space_of: vellum_collections::service::SpaceOf,
+    ) -> Self {
         Self {
             notifier: Arc::new(OnceLock::new()),
             index,
@@ -238,7 +247,8 @@ impl Events {
                 match m {
                     Meaning::List => list = true,
                     Meaning::Issue(key) => {
-                        notifier.resource_updated(format!("vellum://issue/{key}"));
+                        notifier
+                            .resource_updated(format!("vellum://issue/{key}"));
                     }
                     Meaning::Document(path) => {
                         if let Some(uri) = me.document(&path).await {

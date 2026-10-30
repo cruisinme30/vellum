@@ -11,7 +11,12 @@ const IDLE = 1000;
 
 /** A live connection whose state and Done answers the test controls. */
 function fakeLive(initial: Partial<LiveState> = {}) {
-  let state: LiveState = { status: "online", canWrite: true, peers: new Map(), ...initial };
+  let state: LiveState = {
+    status: "online",
+    canWrite: true,
+    peers: new Map(),
+    ...initial,
+  };
   const listeners = new Set<() => void>();
   const answers: { resolve: () => void; reject: (error: Error) => void }[] = [];
   const done = vi.fn(

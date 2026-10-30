@@ -20,7 +20,9 @@ use crate::services::{Services, VERSION};
 async fn server(dir: &std::path::Path) -> (Services, Router) {
     let mut config = vellum_kernel::Config::default();
     config.data_dir = dir.to_path_buf();
-    let plaintext = |k: &str| (k == crate::workspace::PLAINTEXT_VAR).then(|| "1".to_owned());
+    let plaintext = |k: &str| {
+        (k == crate::workspace::PLAINTEXT_VAR).then(|| "1".to_owned())
+    };
     let services = Services::open(ORIGIN, Some(dir), None)
         .unwrap()
         .with_workspace(&config, plaintext)
@@ -97,7 +99,8 @@ async fn a_csv_becomes_a_collection_where_its_creator_may_edit() {
     )
     .await;
     assert_eq!(folder.status, StatusCode::OK, "{}", folder.text);
-    let nested = from_csv(&app, &w, "drives/shared/ops/Finance", "Budgets").await;
+    let nested =
+        from_csv(&app, &w, "drives/shared/ops/Finance", "Budgets").await;
     assert_eq!(nested.status, StatusCode::OK, "{}", nested.text);
 
     // Not in a folder that does not exist, nor outside every space.

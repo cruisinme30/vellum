@@ -14,7 +14,8 @@ use time::{Duration, OffsetDateTime};
 use vellum_work::filter::{Condition, Field, Op};
 use vellum_work::insights::{self, Interval, Measure, Pivot, Query};
 use vellum_work::{
-    Ctx, IssueId, IssuePatch, NewIssue, StatusKey, Team, TeamId, TeamKey, UserRef, WorkGraph,
+    Ctx, IssueId, IssuePatch, NewIssue, StatusKey, Team, TeamId, TeamKey,
+    UserRef, WorkGraph,
 };
 
 fn user(h: &str) -> UserRef {
@@ -41,7 +42,14 @@ const MON: OffsetDateTime = datetime!(2026-11-02 09:00 UTC);
 
 /// Issue `n` for `who`, created at MON + `created` hours, started after
 /// `wait` more hours and done after `work` more hours.
-fn worked(g: &mut WorkGraph, n: u32, who: &str, created: i64, wait: i64, work: i64) {
+fn worked(
+    g: &mut WorkGraph,
+    n: u32,
+    who: &str,
+    created: i64,
+    wait: i64,
+    work: i64,
+) {
     let t0 = MON + Duration::hours(created);
     let mut draft = NewIssue::new(id(n), tk("ENG"), "Work item");
     draft.assignee = Some(user(who));
@@ -93,15 +101,24 @@ fn query(measure: Measure, pivot: Pivot) -> Query {
 fn cycle_and_lead_time_by_assignee() {
     let g = northstar();
     let ctx = at(MON + Duration::weeks(3));
-    let cycle = insights::run(&g, &query(Measure::CycleTime, Pivot::Assignee), &ctx, None).unwrap();
+    let cycle = insights::run(
+        &g,
+        &query(Measure::CycleTime, Pivot::Assignee),
+        &ctx,
+        None,
+    )
+    .unwrap();
     assert_eq!(cycle.overall.count, 4);
     assert_eq!(cycle.overall.p50_hours, Some(10.0));
     assert_eq!(cycle.overall.p95_hours, Some(30.0));
-    let keys: Vec<Option<&str>> = cycle.buckets.iter().map(|b| b.key.as_deref()).collect();
+    let keys: Vec<Option<&str>> =
+        cycle.buckets.iter().map(|b| b.key.as_deref()).collect();
     assert_eq!(keys, [Some("dev"), Some("priya")]);
     assert_eq!(cycle.buckets[0].overall.mean_hours, Some(15.0));
 
-    let lead = insights::run(&g, &query(Measure::LeadTime, Pivot::None), &ctx, None).unwrap();
+    let lead =
+        insights::run(&g, &query(Measure::LeadTime, Pivot::None), &ctx, None)
+            .unwrap();
     // Lead time adds the wait before work started: 12, 24, 54 and 6 hours.
     assert_eq!(lead.overall.p50_hours, Some(12.0));
     assert_eq!(lead.overall.mean_hours, Some(24.0));
@@ -124,7 +141,13 @@ fn throughput_per_week_has_every_week() {
     );
     assert_eq!(r.overall.p50_hours, None, "counts have no percentiles");
 
-    let created = insights::run(&g, &query(Measure::Created, Pivot::None), &at(MON), None).unwrap();
+    let created = insights::run(
+        &g,
+        &query(Measure::Created, Pivot::None),
+        &at(MON),
+        None,
+    )
+    .unwrap();
     assert_eq!(created.overall.count, 5);
 }
 
@@ -150,9 +173,11 @@ fn filters_and_ranges_narrow_the_sample() {
     let mut q = query(Measure::CycleTime, Pivot::Label);
     q.filter = Condition::new(Field::Assignee, Op::Is, &["@me"]).into();
     let me = user("priya");
-    let r = insights::run(&g, &q, &at(MON + Duration::weeks(3)), Some(&me)).unwrap();
+    let r = insights::run(&g, &q, &at(MON + Duration::weeks(3)), Some(&me))
+        .unwrap();
     assert_eq!(r.overall.count, 2);
-    let keys: Vec<Option<&str>> = r.buckets.iter().map(|b| b.key.as_deref()).collect();
+    let keys: Vec<Option<&str>> =
+        r.buckets.iter().map(|b| b.key.as_deref()).collect();
     assert_eq!(keys, [None, Some("gateway")]);
 
     // The second week only.

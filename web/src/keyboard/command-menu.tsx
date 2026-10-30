@@ -1,7 +1,14 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
 
 import { highlight } from "../data/search";
 import { telemetry } from "../platform/telemetry";
@@ -33,7 +40,11 @@ export interface PageFinder {
 type Option =
   | { readonly kind: "page"; readonly key: string; readonly page: FoundPage }
   | { readonly kind: "text"; readonly key: string }
-  | { readonly kind: "command"; readonly key: string; readonly command: Command };
+  | {
+      readonly kind: "command";
+      readonly key: string;
+      readonly command: Command;
+    };
 
 /** Props of the command menu. */
 export interface CommandMenuProperties {
@@ -50,7 +61,10 @@ export interface CommandMenuProperties {
 const LIMIT = 50;
 
 /** Pages matching the query, timed against the 20 ms budget. */
-function findPages(pages: PageFinder | undefined, query: string): readonly FoundPage[] {
+function findPages(
+  pages: PageFinder | undefined,
+  query: string,
+): readonly FoundPage[] {
   if (pages === undefined || query.trim() === "") return [];
   const started = performance.now();
   const found = pages.match(query);
@@ -66,7 +80,13 @@ function findPages(pages: PageFinder | undefined, query: string): readonly Found
  * its list. Matching page titles come first, then "search every page for
  * …", then commands.
  */
-export function CommandMenu({ commands, pages, platform, onRun, onClose }: CommandMenuProperties) {
+export function CommandMenu({
+  commands,
+  pages,
+  platform,
+  onRun,
+  onClose,
+}: CommandMenuProperties) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const input = useRef<HTMLInputElement>(null);
@@ -78,7 +98,8 @@ export function CommandMenu({ commands, pages, platform, onRun, onClose }: Comma
       key: `page:${page.id}`,
       page,
     }));
-    if (pages !== undefined && query.trim() !== "") found.push({ kind: "text", key: "text" });
+    if (pages !== undefined && query.trim() !== "")
+      found.push({ kind: "text", key: "text" });
     for (const command of rankCommands(commands, query)) {
       found.push({ kind: "command", key: `command:${command.id}`, command });
     }
@@ -127,17 +148,30 @@ export function CommandMenu({ commands, pages, platform, onRun, onClose }: Comma
   };
 
   return (
-    <div className="command-menu" role="dialog" aria-modal="true" aria-label="Command menu">
+    <div
+      className="command-menu"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Command menu"
+    >
       <input
         ref={input}
         type="text"
         role="combobox"
-        aria-label={pages === undefined ? "Search commands" : "Search pages and commands"}
+        aria-label={
+          pages === undefined ? "Search commands" : "Search pages and commands"
+        }
         aria-expanded="true"
         aria-controls={listId}
-        aria-activedescendant={results.length > 0 ? `${optionId}-${String(current)}` : undefined}
+        aria-activedescendant={
+          results.length > 0 ? `${optionId}-${String(current)}` : undefined
+        }
         aria-autocomplete="list"
-        placeholder={pages === undefined ? "Type a command" : "Type a page title or a command"}
+        placeholder={
+          pages === undefined
+            ? "Type a command"
+            : "Type a page title or a command"
+        }
         value={query}
         onChange={(event) => {
           setQuery(event.target.value);
@@ -166,12 +200,17 @@ export function CommandMenu({ commands, pages, platform, onRun, onClose }: Comma
           </div>
         ))}
       </div>
-      {results.length === 0 ? <p role="status">Nothing matches “{query}”.</p> : undefined}
+      {results.length === 0 ? (
+        <p role="status">Nothing matches “{query}”.</p>
+      ) : undefined}
     </div>
   );
 }
 
-/** What one row shows: a page with its matched words marked, the full-text search, or a command. */
+/**
+ * What one row shows: a page with its matched words marked, the full-text
+ * search, or a command.
+ */
 function OptionRow({
   option,
   query,
@@ -187,7 +226,9 @@ function OptionRow({
         <>
           <span>
             <span aria-hidden="true">{option.page.icon ?? "📄"} </span>
-            <Marked fragments={highlight(option.page.title || "Untitled", query)} />
+            <Marked
+              fragments={highlight(option.page.title || "Untitled", query)}
+            />
           </span>
           <small>Page</small>
         </>

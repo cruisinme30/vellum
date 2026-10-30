@@ -43,7 +43,12 @@ export function ExportButton({
           <Icon name="download" />
         </button>
       ) : (
-        <button type="button" className="vl-text-button" aria-expanded={open} onClick={toggle}>
+        <button
+          type="button"
+          className="vl-text-button"
+          aria-expanded={open}
+          onClick={toggle}
+        >
           <Icon name="download" size={20} />
           {label}
         </button>

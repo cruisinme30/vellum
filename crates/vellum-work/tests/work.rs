@@ -3,7 +3,10 @@
 
 //! End-to-end rules of the Work graph, using the Northstar demo workspace.
 
-#![allow(clippy::unwrap_used, reason = "fixture helpers panic on bad test data")]
+#![allow(
+    clippy::unwrap_used,
+    reason = "fixture helpers panic on bad test data"
+)]
 
 use time::macros::{date, datetime};
 use time::{Date, OffsetDateTime};
@@ -12,11 +15,13 @@ use vellum_work::filter::{Condition, Field, Op};
 use vellum_work::label::Label;
 use vellum_work::my_issues::{Focus, Tab, my_issues};
 use vellum_work::triage::{RuleActions, TriageRule};
-use vellum_work::view::{GroupBy, Layout, OrderBy, ShowClosed, View, Visibility, run};
+use vellum_work::view::{
+    GroupBy, Layout, OrderBy, ShowClosed, View, Visibility, run,
+};
 use vellum_work::{
-    Category, Ctx, Cycle, Issue, IssueId, IssueKey, IssuePatch, NewIssue, Priority, Relation,
-    RelationKind, StatusKey, Team, TeamId, TeamKey, TriageAction, UserRef, ViewId, WorkError,
-    WorkEvent, WorkGraph,
+    Category, Ctx, Cycle, Issue, IssueId, IssueKey, IssuePatch, NewIssue,
+    Priority, Relation, RelationKind, StatusKey, Team, TeamId, TeamKey,
+    TriageAction, UserRef, ViewId, WorkError, WorkEvent, WorkGraph,
 };
 
 fn user(h: &str) -> UserRef {
@@ -132,14 +137,21 @@ fn intake_goes_to_triage_and_rules_route_it() {
     ));
 
     let changes = g
-        .create_issue(NewIssue::new(id(2), tk("ENG"), "pager fires nightly"), &c)
+        .create_issue(
+            NewIssue::new(id(2), tk("ENG"), "pager fires nightly"),
+            &c,
+        )
         .unwrap();
     let routed = g.issue(&id(2)).unwrap();
     assert_eq!(routed.key().to_string(), "OPS-1");
     assert_eq!(routed.priority, Priority::High);
-    assert!(
-        matches!(&changes.events[0], WorkEvent::IssueCreated { triage_rule: Some(r), .. } if r == "Ops pages")
-    );
+    assert!(matches!(
+        &changes.events[0],
+        WorkEvent::IssueCreated {
+            triage_rule: Some(r),
+            ..
+        } if r == "Ops pages"
+    ));
     // High priority starts a one-week SLA clock.
     assert_eq!(routed.sla.as_ref().unwrap().kind, "high-1w");
     assert!(
@@ -235,7 +247,10 @@ fn archived_teams_keep_their_issues_but_take_no_new_ones() {
             .is_err()
     );
     let outsider = ctx(datetime!(2026-10-29 09:00 UTC), Some("outsider"));
-    let routed = g.create_issue(NewIssue::new(id(3), tk("ENG"), "pager fires"), &outsider);
+    let routed = g.create_issue(
+        NewIssue::new(id(3), tk("ENG"), "pager fires"),
+        &outsider,
+    );
     assert!(matches!(routed, Err(WorkError::ArchivedTeam(_))));
     assert!(
         g.issue(&id(3)).is_none(),
@@ -380,13 +395,15 @@ fn state_changes_keep_lifecycle_and_sla_true() {
             .is_empty()
     );
     let orange = g.sla_tick(datetime!(2026-10-30 04:00 UTC));
-    assert!(
-        matches!(&orange.events[0], WorkEvent::SlaRisk { recipients, .. } if recipients.len() == 1)
-    );
+    assert!(matches!(
+        &orange.events[0],
+        WorkEvent::SlaRisk { recipients, .. } if recipients.len() == 1
+    ));
     let red = g.sla_tick(datetime!(2026-10-30 10:00 UTC));
-    assert!(
-        matches!(&red.events[0], WorkEvent::SlaRisk { recipients, .. } if recipients.len() == 2)
-    );
+    assert!(matches!(
+        &red.events[0],
+        WorkEvent::SlaRisk { recipients, .. } if recipients.len() == 2
+    ));
 
     let t1 = datetime!(2026-10-30 12:00 UTC);
     let changes = g.set_state(&i, key("done"), &ctx(t1, Some("dev"))).unwrap();
@@ -452,7 +469,8 @@ fn cycles_run_themselves() {
         &c,
     );
     let done = create(&mut g, 3, "Done", |d| d.state = Some(key("done")), &c);
-    let parked = create(&mut g, 4, "Parked", |d| d.cycle = Some(current.clone()), &c);
+    let parked =
+        create(&mut g, 4, "Parked", |d| d.cycle = Some(current.clone()), &c);
 
     let _ = g.record_burn_up(today);
     let point = *g.cycles(&tk("ENG"))[0].burn_up.last().unwrap();
@@ -466,7 +484,14 @@ fn cycles_run_themselves() {
     assert_eq!(g.issue(&todo).unwrap().cycle.as_ref(), Some(&next));
     assert_eq!(g.issue(&done).unwrap().cycle.as_ref(), Some(&current));
     assert_eq!(g.issue(&parked).unwrap().cycle, None);
-    assert!(changes.events.iter().any(|e| matches!(e, WorkEvent::CycleRolledOver { moved, removed, .. } if moved.len() == 2 && removed.len() == 1)));
+    assert!(changes.events.iter().any(|e| matches!(
+        e,
+        WorkEvent::CycleRolledOver {
+            moved,
+            removed,
+            ..
+        } if moved.len() == 2 && removed.len() == 1
+    )));
     assert_eq!(g.cycles(&tk("ENG")).len(), 5, "one more upcoming cycle");
     assert_eq!(g.velocity(&tk("ENG"), later), Some(1.0));
 }
@@ -530,7 +555,8 @@ fn views_group_filter_and_order() {
         &c,
         Some(&user("dev")),
     );
-    let columns: Vec<_> = board.iter().map(|grp| grp.key.clone().unwrap()).collect();
+    let columns: Vec<_> =
+        board.iter().map(|grp| grp.key.clone().unwrap()).collect();
     assert_eq!(columns.first().unwrap(), "triage");
     assert!(
         columns.contains(&"in-review".to_owned()),
@@ -644,7 +670,8 @@ fn my_issues_follow_focus_order() {
     let _other = create(&mut g, 8, "Not mine", |_| {}, &c);
 
     let list = my_issues(&g, &user("dev"), Tab::Assigned, &c, &[]);
-    let order: Vec<(Focus, IssueId)> = list.iter().map(|(f, i)| (*f, i.id)).collect();
+    let order: Vec<(Focus, IssueId)> =
+        list.iter().map(|(f, i)| (*f, i.id)).collect();
     assert_eq!(
         order,
         [
@@ -795,9 +822,13 @@ fn projects_report_progress_and_changes() {
 
     p.target_date = Some(date!(2027 - 01 - 15));
     let changed = g.upsert_project(p.clone()).unwrap();
-    assert!(
-        matches!(&changed.events[0], WorkEvent::ProjectChanged { changes, .. } if changes[0].contains("2027-01-15"))
-    );
+    assert!(matches!(
+        &changed.events[0],
+        WorkEvent::ProjectChanged {
+            changes,
+            ..
+        } if changes[0].contains("2027-01-15")
+    ));
     assert!(g.upsert_project(p).unwrap().events.is_empty());
 
     let wrong = {
@@ -815,7 +846,8 @@ fn projects_report_progress_and_changes() {
 fn a_repeating_issue_files_the_next_one_after_its_due_date() {
     let mut g = northstar();
     let at = datetime!(2026-10-01 09:00 UTC);
-    let mut draft = NewIssue::new(id(900), tk("ENG"), "Rotate the signing keys");
+    let mut draft =
+        NewIssue::new(id(900), tk("ENG"), "Rotate the signing keys");
     draft.assignee = Some(user("dev"));
     draft.labels = vec!["gateway".into()];
     draft.priority = Some(Priority::High);

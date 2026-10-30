@@ -7,7 +7,8 @@
 use bytes::Bytes;
 use futures::StreamExt;
 use vellum_store::{
-    BlobPath, BlobStore, LocalStore, Metered, Precondition, StoreError, conformance,
+    BlobPath, BlobStore, LocalStore, Metered, Precondition, StoreError,
+    conformance,
 };
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -22,7 +23,8 @@ async fn local_store_conforms() -> TestResult {
 #[tokio::test(flavor = "multi_thread")]
 async fn metered_local_store_conforms() -> TestResult {
     let dir = tempfile::tempdir()?;
-    conformance::run_all(&Metered::new(LocalStore::open(dir.path()).await?)).await?;
+    conformance::run_all(&Metered::new(LocalStore::open(dir.path()).await?))
+        .await?;
     Ok(())
 }
 

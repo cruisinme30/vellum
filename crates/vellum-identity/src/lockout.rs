@@ -47,12 +47,13 @@ impl Key<'_> {
             Self::Email(email) => format!("email:{email}"),
             Self::Ip(ip) => format!("ip:{}", client_bucket(ip)),
         };
-        Sha256::digest(text.as_bytes())
-            .iter()
-            .fold(String::with_capacity(64), |mut hex, b| {
+        Sha256::digest(text.as_bytes()).iter().fold(
+            String::with_capacity(64),
+            |mut hex, b| {
                 let _ = write!(hex, "{b:02x}");
                 hex
-            })
+            },
+        )
     }
 }
 
@@ -86,7 +87,12 @@ impl Lockouts {
     }
 
     /// Whether `key` may try now; otherwise how long until it may.
-    pub fn check(&self, store: &Store, key: Key<'_>, now: Instant) -> Result<(), Duration> {
+    pub fn check(
+        &self,
+        store: &Store,
+        key: Key<'_>,
+        now: Instant,
+    ) -> Result<(), Duration> {
         if store.is_shared() {
             let id = key.id();
             let until = store.read(|s| s.lockouts.get(&id).map(|a| a.until));

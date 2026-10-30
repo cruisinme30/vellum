@@ -11,9 +11,12 @@ inbox, plan a cycle and review it at the end.
 
 ## Set up
 
-1. Open **Team settings → Cycles** for ENG. Set two weeks, starting Monday, with three cycles created ahead.
-2. In **Team settings → Triage**, add a rule: issues with the label `security` get priority urgent and go to Sam.
-3. In **Team settings → SLAs**, keep the defaults: urgent 24 hours, high one week.
+1. Open **Team settings → Cycles** for ENG. Set two weeks, starting Monday, with
+   three cycles created ahead.
+2. In **Team settings → Triage**, add a rule: issues with the label `security`
+   get priority urgent and go to Sam.
+3. In **Team settings → SLAs**, keep the defaults: urgent 24 hours, high one
+   week.
 
 ## Triage
 

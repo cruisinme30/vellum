@@ -6,7 +6,10 @@ export interface Updater {
   autoDownload: boolean;
   autoInstallOnAppQuit: boolean;
   checkForUpdates(): Promise<unknown>;
-  on(event: "update-downloaded", listener: (info: { version: string }) => void): unknown;
+  on(
+    event: "update-downloaded",
+    listener: (info: { version: string }) => void,
+  ): unknown;
   on(event: "error", listener: (error: Error) => void): unknown;
 }
 

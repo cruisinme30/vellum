@@ -30,7 +30,10 @@ export interface Command {
   readonly id: string;
   /** What the command menu and the shortcut sheet show. */
   readonly title: string;
-  /** Bindings, as `parseBinding` reads them. A command may have none and still be in the menu. */
+  /**
+   * Bindings, as `parseBinding` reads them. A command may have none and still
+   * be in the menu.
+   */
   readonly keys: readonly string[];
   readonly scope: Scope;
   /** Extra words the command menu matches, such as "ticket" for new issue. */
@@ -59,7 +62,10 @@ export interface KeymapOptions {
   readonly now?: () => number;
 }
 
-/** Whether the event target takes typing, where plain keys must not run commands. */
+/**
+ * Whether the event target takes typing, where plain keys must not run
+ * commands.
+ */
 export function isEditable(target: unknown): boolean {
   if (typeof HTMLElement === "undefined" || !(target instanceof HTMLElement)) {
     return false;
@@ -75,7 +81,10 @@ export function isEditable(target: unknown): boolean {
 
 function key(binding: Binding): string {
   return binding
-    .map((s) => `${s.mod ? "m" : ""}${s.alt ? "a" : ""}${s.shift ? "s" : ""}:${s.key}`)
+    .map(
+      (s) =>
+        `${s.mod ? "m" : ""}${s.alt ? "a" : ""}${s.shift ? "s" : ""}:${s.key}`,
+    )
     .join(" ");
 }
 
@@ -123,19 +132,26 @@ export class Keymap {
             chord.command.scope === "global"),
       );
       if (clash) {
-        throw new Error(`${clash.command.id} takes the first key of ${chord.command.id}`);
+        throw new Error(
+          `${clash.command.id} takes the first key of ${chord.command.id}`,
+        );
       }
     }
   }
 
   /** The bindings of a command, for display. */
   bindingsOf(command: Command): Binding[] {
-    return this.#bound.filter((b) => b.command === command).map((b) => b.binding);
+    return this.#bound
+      .filter((b) => b.command === command)
+      .map((b) => b.binding);
   }
 
   /** Whether a chord is waiting for its second stroke. */
   get pending(): boolean {
-    return this.#pending !== undefined && this.#now() - this.#pending.at <= this.#timeout;
+    return (
+      this.#pending !== undefined &&
+      this.#now() - this.#pending.at <= this.#timeout
+    );
   }
 
   /** Forgets a half-typed chord. */
@@ -143,7 +159,10 @@ export class Keymap {
     this.#pending = undefined;
   }
 
-  #find(strokes: readonly Stroke[], active: ReadonlySet<Scope>): Command | undefined {
+  #find(
+    strokes: readonly Stroke[],
+    active: ReadonlySet<Scope>,
+  ): Command | undefined {
     for (const scope of SCOPES) {
       if (!active.has(scope)) {
         continue;
@@ -168,7 +187,10 @@ export class Keymap {
    * Turns a key event into a command. `active` holds the scopes in force
    * where the event happened; `global` should always be in it.
    */
-  dispatch(event: KeyLike & { readonly target?: unknown }, active: ReadonlySet<Scope>): Dispatch {
+  dispatch(
+    event: KeyLike & { readonly target?: unknown },
+    active: ReadonlySet<Scope>,
+  ): Dispatch {
     const stroke = strokeOf(event, this.options.platform);
     if (stroke === undefined) {
       return { kind: "none" };

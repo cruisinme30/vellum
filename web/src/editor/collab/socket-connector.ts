@@ -9,7 +9,12 @@ import {
 } from "y-protocols/awareness";
 import * as Y from "yjs";
 
-import type { CollabConnector, CollabSession, LiveConnection, LiveState } from "./provider";
+import type {
+  CollabConnector,
+  CollabSession,
+  LiveConnection,
+  LiveState,
+} from "./provider";
 import {
   decodeFrame,
   decodePeers,
@@ -20,7 +25,9 @@ import {
   type WireMessage,
 } from "./wire";
 
-/** The parts of a browser WebSocket the connector uses; injectable for tests. */
+/**
+ * The parts of a browser WebSocket the connector uses; injectable for tests.
+ */
 export interface SocketLike {
   binaryType: BinaryType;
   readonly readyState: number;
@@ -37,17 +44,25 @@ type SocketFactory = (url: string) => SocketLike;
 
 /** Options of {@link createSocketConnector}. */
 export interface SocketConnectorOptions {
-  /** The page origin the socket URL is built from; defaults to `location.origin`. */
+  /**
+   * The page origin the socket URL is built from; defaults to
+   * `location.origin`.
+   */
   readonly origin?: string;
   readonly socket?: SocketFactory;
-  /** A number in [0, 1) that spreads reconnects out; defaults to `Math.random`. */
+  /**
+   * A number in [0, 1) that spreads reconnects out; defaults to `Math.random`.
+   */
   readonly random?: () => number;
   /** How long Done waits for the server's answer. */
   readonly doneTimeoutMs?: number;
 }
 
 const OPEN = 1;
-/** The server's close code when the user's access was revoked (`CloseReason::Revoked`). */
+/**
+ * The server's close code when the user's access was revoked
+ * (`CloseReason::Revoked`).
+ */
 const CLOSE_REVOKED = 4403;
 const RETRY_FIRST_MS = 500;
 const RETRY_MAX_MS = 30_000;
@@ -55,8 +70,15 @@ const DONE_TIMEOUT_MS = 15_000;
 
 const REMOTE = Symbol("remote");
 
-/** The socket URL of a page's room: `/collab/{space_id}/{doc_id}` on the app's origin. */
-export function collabUrl(origin: string, spaceId: string, documentId: string): string {
+/**
+ * The socket URL of a page's room: `/collab/{space_id}/{doc_id}` on the app's
+ * origin.
+ */
+export function collabUrl(
+  origin: string,
+  spaceId: string,
+  documentId: string,
+): string {
   const url = new URL(
     `/collab/${encodeURIComponent(spaceId)}/${encodeURIComponent(documentId)}`,
     origin,
@@ -74,9 +96,12 @@ export function collabUrl(origin: string, spaceId: string, documentId: string): 
  * the document; the sync exchange on reconnect sends whatever the server
  * lacks, so nothing is queued by hand.
  */
-export function createSocketConnector(options: SocketConnectorOptions = {}): CollabConnector {
+export function createSocketConnector(
+  options: SocketConnectorOptions = {},
+): CollabConnector {
   const origin = options.origin ?? globalThis.location.origin;
-  const socketFor: SocketFactory = options.socket ?? ((url) => new WebSocket(url));
+  const socketFor: SocketFactory =
+    options.socket ?? ((url) => new WebSocket(url));
   const random = options.random ?? Math.random;
   const doneTimeoutMs = options.doneTimeoutMs ?? DONE_TIMEOUT_MS;
 
@@ -86,7 +111,11 @@ export function createSocketConnector(options: SocketConnectorOptions = {}): Col
       const document_ = new Y.Doc();
       const awareness = new Awareness(document_);
 
-      let state: LiveState = { status: "connecting", canWrite: undefined, peers: new Map() };
+      let state: LiveState = {
+        status: "connecting",
+        canWrite: undefined,
+        peers: new Map(),
+      };
       const listeners = new Set<() => void>();
       const setState = (next: Partial<LiveState>) => {
         state = { ...state, ...next };
@@ -99,7 +128,8 @@ export function createSocketConnector(options: SocketConnectorOptions = {}): Col
       let destroyed = false;
       let attempt = 0;
       let retry: ReturnType<typeof setTimeout> | undefined;
-      const waiting: { resolve: () => void; reject: (error: Error) => void }[] = [];
+      const waiting: { resolve: () => void; reject: (error: Error) => void }[] =
+        [];
       const failDone = (error: Error) => {
         for (const entry of waiting.splice(0)) {
           entry.reject(error);
@@ -133,7 +163,10 @@ export function createSocketConnector(options: SocketConnectorOptions = {}): Col
           // The server lists this editor once it has seen its awareness;
           // until then whether it may write is not known, and it stays
           // read-only.
-          setState({ peers, canWrite: peers.get(document_.clientID)?.canWrite });
+          setState({
+            peers,
+            canWrite: peers.get(document_.clientID)?.canWrite,
+          });
         } else if (tag === MSG_DONE) {
           waiting.shift()?.resolve();
         }
@@ -185,7 +218,9 @@ export function createSocketConnector(options: SocketConnectorOptions = {}): Col
       };
 
       const forgetPeers = () => {
-        const others = [...awareness.getStates().keys()].filter((id) => id !== document_.clientID);
+        const others = [...awareness.getStates().keys()].filter(
+          (id) => id !== document_.clientID,
+        );
         removeAwarenessStates(awareness, others, REMOTE);
       };
 
@@ -205,7 +240,12 @@ export function createSocketConnector(options: SocketConnectorOptions = {}): Col
         socket = current;
         current.addEventListener("open", () => {
           attempt = 0;
-          send([{ type: "sync-step-1", stateVector: Y.encodeStateVector(document_) }]);
+          send([
+            {
+              type: "sync-step-1",
+              stateVector: Y.encodeStateVector(document_),
+            },
+          ]);
           // Rewriting the presence state moves its clock on, and the update
           // handler sends it. Resending the same clock would not do: a fresh
           // state's clock 0, or the clock a room still holds from before a
@@ -269,14 +309,23 @@ export function createSocketConnector(options: SocketConnectorOptions = {}): Col
         }
       };
       const onAwareness = (
-        { added, updated, removed }: Record<"added" | "updated" | "removed", number[]>,
+        {
+          added,
+          updated,
+          removed,
+        }: Record<"added" | "updated" | "removed", number[]>,
         from: unknown,
       ) => {
         if (from === REMOTE) {
           return;
         }
         const changed = [...added, ...updated, ...removed];
-        send([{ type: "awareness", update: encodeAwarenessUpdate(awareness, changed) }]);
+        send([
+          {
+            type: "awareness",
+            update: encodeAwarenessUpdate(awareness, changed),
+          },
+        ]);
       };
       document_.on("update", onUpdate);
       awareness.on("update", onAwareness);
@@ -316,7 +365,9 @@ export function createSocketConnector(options: SocketConnectorOptions = {}): Col
               },
             };
             waiting.push(entry);
-            send([{ type: "custom", tag: MSG_DONE, payload: new Uint8Array() }]);
+            send([
+              { type: "custom", tag: MSG_DONE, payload: new Uint8Array() },
+            ]);
           });
         },
       };

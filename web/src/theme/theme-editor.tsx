@@ -17,13 +17,22 @@ import {
   type CustomTheme,
   type ThemeFileError,
 } from "./theme-file";
-import { contrastReport, THEMES, type ContrastResult, type ResolvedTheme } from "./themes";
+import {
+  contrastReport,
+  THEMES,
+  type ContrastResult,
+  type ResolvedTheme,
+} from "./themes";
 
-const BASES = THEMES.filter((theme): theme is ResolvedTheme => theme !== "system");
+const BASES = THEMES.filter(
+  (theme): theme is ResolvedTheme => theme !== "system",
+);
 
 /** Saves text as a file through a temporary link. */
 function download(name: string, text: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+  const url = URL.createObjectURL(
+    new Blob([text], { type: "application/json" }),
+  );
   const link = document.createElement("a");
   link.href = url;
   link.download = name;
@@ -49,12 +58,19 @@ function importMessage(t: Translate, error: ThemeFileError): string {
 const ratioText = (ratio: number) => (Math.floor(ratio * 100) / 100).toFixed(2);
 
 /** The contrast check of the draft: every rule, failures first. */
-function ContrastReport({ results }: { readonly results: readonly ContrastResult[] }) {
+function ContrastReport({
+  results,
+}: {
+  readonly results: readonly ContrastResult[];
+}) {
   const t = useT();
   const failures = results.filter((rule) => rule.ratio < rule.min);
   return (
     <div className="vl-contrast">
-      <p role="status" className={failures.length > 0 ? "vl-field-error" : "vl-muted"}>
+      <p
+        role="status"
+        className={failures.length > 0 ? "vl-field-error" : "vl-muted"}
+      >
         {failures.length === 0
           ? t("contrast-pass", { count: results.length })
           : t("contrast-fail", { count: failures.length })}
@@ -72,7 +88,9 @@ function ContrastReport({ results }: { readonly results: readonly ContrastResult
           </thead>
           <tbody>
             {results
-              .toSorted((a, b) => Number(a.ratio >= a.min) - Number(b.ratio >= b.min))
+              .toSorted(
+                (a, b) => Number(a.ratio >= a.min) - Number(b.ratio >= b.min),
+              )
               .map((rule) => {
                 const ok = rule.ratio >= rule.min;
                 return (
@@ -96,14 +114,24 @@ function ContrastReport({ results }: { readonly results: readonly ContrastResult
 function Preview({ draft }: { readonly draft: CustomTheme }) {
   const t = useT();
   const style = Object.fromEntries(
-    Object.entries(customScheme(draft)).map(([token, color]) => [`--md-${token}`, color]),
+    Object.entries(customScheme(draft)).map(([token, color]) => [
+      `--md-${token}`,
+      color,
+    ]),
   ) as CSSProperties;
   return (
-    <div className="vl-theme-preview" style={style} aria-label={t("theme-preview")} role="group">
+    <div
+      className="vl-theme-preview"
+      style={style}
+      aria-label={t("theme-preview")}
+      role="group"
+    >
       <p className="vl-theme-preview-title">{draft.name}</p>
       <p>{t("theme-preview-text")}</p>
       <p className="vl-theme-preview-muted">{t("theme-preview-muted")}</p>
-      <span className="vl-theme-preview-button">{t("theme-preview-button")}</span>
+      <span className="vl-theme-preview-button">
+        {t("theme-preview-button")}
+      </span>
       <p className="vl-theme-preview-callout">{t("theme-preview-callout")}</p>
     </div>
   );
@@ -128,7 +156,10 @@ function TokenInputs({
               type="color"
               value={scheme[token] ?? "#000000"}
               onChange={(event) => {
-                onChange({ ...draft, tokens: { ...draft.tokens, [token]: event.target.value } });
+                onChange({
+                  ...draft,
+                  tokens: { ...draft.tokens, [token]: event.target.value },
+                });
               }}
             />
             <code>{token}</code>
@@ -176,7 +207,8 @@ function StartFields({
         id={baseId}
         value={draft.base}
         onChange={(event) => {
-          const base = BASES.find((each) => each === event.target.value) ?? draft.base;
+          const base =
+            BASES.find((each) => each === event.target.value) ?? draft.base;
           // Overrides were picked for the old start; a new start begins clean.
           onChange({ ...draft, base, tokens: {} });
         }}
@@ -219,7 +251,9 @@ function useDraft(): [CustomTheme, (next: CustomTheme) => void] {
   return [draft, setDraft];
 }
 
-/** The theme editor (R-TH-2): build, check, import and export a custom theme. */
+/**
+ * The theme editor (R-TH-2): build, check, import and export a custom theme.
+ */
 export function ThemeEditor() {
   const t = useT();
   const { update } = useAppearance();
@@ -239,14 +273,20 @@ export function ThemeEditor() {
     const result = importTheme(await file.text());
     if (result.ok) {
       setDraft(result.theme);
-      setMessage({ ok: true, text: t("theme-import-done", { name: result.theme.name }) });
+      setMessage({
+        ok: true,
+        text: t("theme-import-done", { name: result.theme.name }),
+      });
     } else {
       setMessage({ ok: false, text: importMessage(t, result.error) });
     }
   };
 
   return (
-    <section aria-labelledby="vl-theme-editor" className="vl-appearance-section vl-theme-editor">
+    <section
+      aria-labelledby="vl-theme-editor"
+      className="vl-appearance-section vl-theme-editor"
+    >
       <h2 id="vl-theme-editor">{t("theme-editor-title")}</h2>
       <p className="vl-muted">{t("theme-editor-intro")}</p>
       <StartFields draft={draft} onChange={change} />
@@ -259,7 +299,10 @@ export function ThemeEditor() {
           className="vl-filled-button"
           disabled={failing || !named}
           onClick={() => {
-            update({ custom: { ...draft, name: draft.name.trim() }, theme: "custom" });
+            update({
+              custom: { ...draft, name: draft.name.trim() },
+              theme: "custom",
+            });
             setMessage({ ok: true, text: t("theme-applied") });
           }}
         >

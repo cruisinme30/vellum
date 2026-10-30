@@ -14,7 +14,8 @@ both run the same authorization and are audited the same way.
 
 - REST base: `/api/v1`, described at `/api/v1/openapi.json`
 - GraphQL: `/graphql`, with the schema at `/graphql/schema.graphql`
-- TypeScript client: generated from the OpenAPI document and published with each release
+- TypeScript client: generated from the OpenAPI document and published with each
+  release
 
 :::
 

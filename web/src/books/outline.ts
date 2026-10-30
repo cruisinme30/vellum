@@ -1,7 +1,9 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-/** The book's outline as rows, and where a drag or a key press moves a section. */
+/**
+ * The book's outline as rows, and where a drag or a key press moves a section.
+ */
 
 import type { Place, TocLine, TocNode } from "./api";
 
@@ -26,9 +28,12 @@ const movable = (node: TocNode): node is TocNode & { id: string } =>
   node.id != undefined && !node.draft;
 
 const heightOf = (node: TocNode): number =>
-  1 + Math.max(0, ...node.children.filter(isNode).map((child) => heightOf(child)));
+  1 +
+  Math.max(0, ...node.children.filter(isNode).map((child) => heightOf(child)));
 
-/** Every section in reading order. Parts and separators split top-level runs. */
+/**
+ * Every section in reading order. Parts and separators split top-level runs.
+ */
 export function outlineRows(lines: readonly TocLine[]): OutlineRow[] {
   const rows: OutlineRow[] = [];
   const walk = (nodes: readonly TocNode[], level: number, parent?: string) => {
@@ -60,7 +65,9 @@ export function outlineRows(lines: readonly TocLine[]): OutlineRow[] {
   return rows;
 }
 
-/** A keyboard move: up and down among siblings, in under the one above, or out. */
+/**
+ * A keyboard move: up and down among siblings, in under the one above, or out.
+ */
 export type OutlineMove = "up" | "down" | "indent" | "outdent";
 
 /**
@@ -80,22 +87,30 @@ export function placeFor(
   const after = row.siblings[row.index + 1];
   switch (move) {
     case "up": {
-      return before === undefined ? undefined : { at: "before", section: before };
+      return before === undefined
+        ? undefined
+        : { at: "before", section: before };
     }
     case "down": {
       return after === undefined ? undefined : { at: "after", section: after };
     }
     case "indent": {
-      if (before === undefined || row.level + row.height > maxDepth) return undefined;
+      if (before === undefined || row.level + row.height > maxDepth)
+        return undefined;
       return { at: "last_child_of", section: before };
     }
     case "outdent": {
-      return row.parent === undefined ? undefined : { at: "after", section: row.parent };
+      return row.parent === undefined
+        ? undefined
+        : { at: "after", section: row.parent };
     }
   }
 }
 
-/** Where a drop on `target` lands: its top quarter is before, its bottom quarter after, else inside. */
+/**
+ * Where a drop on `target` lands: its top quarter is before, its bottom quarter
+ * after, else inside.
+ */
 export function dropPlace(
   target: OutlineRow,
   dragged: OutlineRow,
@@ -111,11 +126,17 @@ export function dropPlace(
 }
 
 /** Whether `id` is `ancestor` or sits somewhere under it. */
-export function isWithin(rows: readonly OutlineRow[], id: string, ancestor: string): boolean {
+export function isWithin(
+  rows: readonly OutlineRow[],
+  id: string,
+  ancestor: string,
+): boolean {
   let current: string | undefined = id;
   while (current !== undefined) {
     if (current === ancestor) return true;
-    const parent: string | undefined = rows.find((r) => r.id === current)?.parent;
+    const parent: string | undefined = rows.find(
+      (r) => r.id === current,
+    )?.parent;
     current = parent;
   }
   return false;

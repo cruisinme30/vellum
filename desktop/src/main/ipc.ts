@@ -32,7 +32,9 @@ type Handler = (input: unknown) => Promise<unknown>;
  * Builds the IPC handlers. Every call is checked: it must come from an app
  * page, and its arguments are validated here rather than trusted.
  */
-export function bridgeHandlers(services: BridgeServices): ReadonlyMap<ChannelName, Handler> {
+export function bridgeHandlers(
+  services: BridgeServices,
+): ReadonlyMap<ChannelName, Handler> {
   return new Map<ChannelName, Handler>([
     [Channel.serverUrl, () => Promise.resolve(services.serverUrl())],
     [Channel.signIn, () => services.signIn()],
@@ -50,7 +52,9 @@ export function bridgeHandlers(services: BridgeServices): ReadonlyMap<ChannelNam
     [
       Channel.privateEnrol,
       (input) => {
-        const { spaceId, label } = (typeof input === "object" && input !== null ? input : {}) as {
+        const { spaceId, label } = (
+          typeof input === "object" && input !== null ? input : {}
+        ) as {
           spaceId?: unknown;
           label?: unknown;
         };
@@ -60,7 +64,9 @@ export function bridgeHandlers(services: BridgeServices): ReadonlyMap<ChannelNam
     [
       Channel.privateReseal,
       (input) => {
-        const { spaceId, trust } = (typeof input === "object" && input !== null ? input : {}) as {
+        const { spaceId, trust } = (
+          typeof input === "object" && input !== null ? input : {}
+        ) as {
           spaceId?: unknown;
           trust?: unknown;
         };
@@ -84,7 +90,8 @@ export async function dispatch(
   senderUrl: string,
   input?: unknown,
 ): Promise<unknown> {
-  if (!isAppUrl(senderUrl)) throw new Error("Vellum desktop calls are only allowed from app pages");
+  if (!isAppUrl(senderUrl))
+    throw new Error("Vellum desktop calls are only allowed from app pages");
   const handler = handlers.get(channel);
   if (handler === undefined) throw new Error(`Unknown channel ${channel}`);
   return handler(input);
@@ -96,10 +103,16 @@ export function parseNotice(input: unknown): Notice {
     throw new TypeError("A notification needs a title, body and url");
   const record = input as Record<string, unknown>;
   const { title, body, url } = record;
-  if (typeof title !== "string" || typeof body !== "string" || typeof url !== "string") {
+  if (
+    typeof title !== "string" ||
+    typeof body !== "string" ||
+    typeof url !== "string"
+  ) {
     throw new TypeError("A notification needs a title, body and url");
   }
   const target = new URL(url, APP_URL);
-  const path = isAppUrl(target.href) ? `${target.pathname}${target.search}` : "/inbox";
+  const path = isAppUrl(target.href)
+    ? `${target.pathname}${target.search}`
+    : "/inbox";
   return { title: title.slice(0, 200), body: body.slice(0, 1000), url: path };
 }

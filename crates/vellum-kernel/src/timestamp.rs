@@ -41,7 +41,8 @@ impl Timestamp {
     #[must_use]
     pub fn unix_ms(self) -> i64 {
         // Years are bounded to ±9999, so milliseconds always fit in i64.
-        i64::try_from(self.0.unix_timestamp_nanos() / 1_000_000).unwrap_or(i64::MAX)
+        i64::try_from(self.0.unix_timestamp_nanos() / 1_000_000)
+            .unwrap_or(i64::MAX)
     }
 
     fn truncate(t: OffsetDateTime) -> Self {
@@ -86,13 +87,18 @@ impl schemars::JsonSchema for Timestamp {
 }
 
 impl Serialize for Timestamp {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+    fn serialize<S: Serializer>(
+        &self,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
         serializer.collect_str(self)
     }
 }
 
 impl<'de> Deserialize<'de> for Timestamp {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+    fn deserialize<D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Self, D::Error> {
         let text = <std::borrow::Cow<'de, str>>::deserialize(deserializer)?;
         text.parse().map_err(serde::de::Error::custom)
     }

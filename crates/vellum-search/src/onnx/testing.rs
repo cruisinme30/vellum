@@ -13,15 +13,16 @@
 use prost::Message as _;
 use tract_onnx::pb::tensor_shape_proto::{Dimension, dimension};
 use tract_onnx::pb::{
-    GraphProto, ModelProto, NodeProto, OperatorSetIdProto, TensorProto, TensorShapeProto,
-    TypeProto, ValueInfoProto, type_proto,
+    GraphProto, ModelProto, NodeProto, OperatorSetIdProto, TensorProto,
+    TensorShapeProto, TypeProto, ValueInfoProto, type_proto,
 };
 
 use super::OnnxConfig;
 
 const FLOAT: i32 = 1;
 const INT64: i32 = 7;
-const VOCAB: &str = "[PAD]\n[UNK]\n[CLS]\n[SEP]\ngateway\ndeploy\nbudget\nrollout";
+const VOCAB: &str =
+    "[PAD]\n[UNK]\n[CLS]\n[SEP]\ngateway\ndeploy\nbudget\nrollout";
 const ROWS: usize = 8;
 /// The tiny model's vector size.
 pub const DIMS: usize = 4;
@@ -103,7 +104,10 @@ pub fn write_model(dir: &std::path::Path, with_types: bool) -> OnnxConfig {
             }],
             initializer: vec![TensorProto {
                 name: "table".into(),
-                dims: vec![i64::try_from(ROWS).unwrap(), i64::try_from(DIMS).unwrap()],
+                dims: vec![
+                    i64::try_from(ROWS).unwrap(),
+                    i64::try_from(DIMS).unwrap(),
+                ],
                 data_type: FLOAT,
                 float_data: table(),
                 ..TensorProto::default()
@@ -128,9 +132,10 @@ pub fn write_model(dir: &std::path::Path, with_types: bool) -> OnnxConfig {
     std::fs::write(&vocab_path, VOCAB).unwrap();
     std::fs::write(
         dir.join("config.json"),
-        format!(
-            r#"{{"_name_or_path": "tiny", "hidden_size": {DIMS}, "max_position_embeddings": 16}}"#
-        ),
+        format!(concat!(
+            r#"{{"_name_or_path": "tiny", "hidden_size": {DIMS}, "#,
+            r#""max_position_embeddings": 16}}"#,
+        )),
     )
     .unwrap();
     OnnxConfig {

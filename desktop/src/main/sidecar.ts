@@ -40,7 +40,10 @@ export interface Sidecar {
 
 const POLL_MS = 100;
 
-export async function startSidecar(options: SidecarOptions, deps: SidecarDeps): Promise<Sidecar> {
+export async function startSidecar(
+  options: SidecarOptions,
+  deps: SidecarDeps,
+): Promise<Sidecar> {
   const port = await deps.freePort();
   const url = `http://127.0.0.1:${String(port)}`;
   const child = deps.spawn(options.binary, ["serve"], {
@@ -56,7 +59,9 @@ export async function startSidecar(options: SidecarOptions, deps: SidecarDeps): 
   const deadline = deps.now() + (options.timeoutMs ?? 30_000);
   while (deps.now() < deadline) {
     if (exitCode !== undefined)
-      throw new Error(`The local Vellum server exited with code ${String(exitCode)}`);
+      throw new Error(
+        `The local Vellum server exited with code ${String(exitCode)}`,
+      );
     if (await ready(url, deps.fetch))
       return {
         url,

@@ -20,7 +20,10 @@ describe("SyncScheduler", () => {
 
   it("debounces local changes into one sync", async () => {
     const sync = vi.fn(() => Promise.resolve());
-    const scheduler = new SyncScheduler({ sync }, { debounceMs: 50, pollMs: 1000, random: one });
+    const scheduler = new SyncScheduler(
+      { sync },
+      { debounceMs: 50, pollMs: 1000, random: one },
+    );
     scheduler.changed();
     scheduler.changed();
     await vi.advanceTimersByTimeAsync(49);

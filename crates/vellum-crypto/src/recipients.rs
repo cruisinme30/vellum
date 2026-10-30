@@ -141,8 +141,15 @@ pub fn is_recipient_envelope(bytes: &[u8]) -> bool {
 /// # Errors
 /// [`CryptoError::Recipients`] for an empty or oversized recipient list or a
 /// degenerate public key; RNG or AEAD failures.
-#[tracing::instrument(name = "crypto.seal_for", skip_all, fields(bytes = plaintext.len(), recipients = recipients.len()))]
-pub fn seal_for(recipients: &[RecipientPublic], plaintext: &[u8]) -> Result<Vec<u8>, CryptoError> {
+#[tracing::instrument(
+    name = "crypto.seal_for",
+    skip_all,
+    fields(bytes = plaintext.len(), recipients = recipients.len())
+)]
+pub fn seal_for(
+    recipients: &[RecipientPublic],
+    plaintext: &[u8],
+) -> Result<Vec<u8>, CryptoError> {
     let mut unique: Vec<RecipientPublic> = Vec::with_capacity(recipients.len());
     for r in recipients {
         if !unique.contains(r) {
@@ -164,8 +171,15 @@ pub fn seal_for(recipients: &[RecipientPublic], plaintext: &[u8]) -> Result<Vec<
 /// [`CryptoError::Recipients`] if the key is not a recipient,
 /// [`CryptoError::Decrypt`] on tampering, [`CryptoError::Malformed`] for bad
 /// bytes.
-#[tracing::instrument(name = "crypto.open_as", skip_all, fields(bytes = sealed.len()))]
-pub fn open_as(secret: &RecipientSecret, sealed: &[u8]) -> Result<Vec<u8>, CryptoError> {
+#[tracing::instrument(
+    name = "crypto.open_as",
+    skip_all,
+    fields(bytes = sealed.len())
+)]
+pub fn open_as(
+    secret: &RecipientSecret,
+    sealed: &[u8],
+) -> Result<Vec<u8>, CryptoError> {
     let parsed = decode(sealed)?;
     let dek = unwrap_for(secret, &parsed.stanzas)?;
     aead::open(&dek, parsed.nonce, PAYLOAD_AAD, parsed.ciphertext)
@@ -198,7 +212,10 @@ pub fn add_recipient(
 /// # Errors
 /// [`CryptoError::Recipients`] if `member` is the last recipient;
 /// [`CryptoError::Malformed`] for bad bytes.
-pub fn remove_recipient(member: &RecipientPublic, sealed: &[u8]) -> Result<Vec<u8>, CryptoError> {
+pub fn remove_recipient(
+    member: &RecipientPublic,
+    sealed: &[u8],
+) -> Result<Vec<u8>, CryptoError> {
     let parsed = decode(sealed)?;
     let fingerprint = member.fingerprint();
     let stanzas: Vec<Stanza> = parsed
@@ -252,7 +269,10 @@ fn stanza_key(
     Ok(SecretKey::from_bytes(*kek))
 }
 
-fn wrap_to(recipient: &RecipientPublic, dek: &SecretKey) -> Result<Stanza, CryptoError> {
+fn wrap_to(
+    recipient: &RecipientPublic,
+    dek: &SecretKey,
+) -> Result<Stanza, CryptoError> {
     let ephemeral_secret = RecipientSecret::generate()?;
     let ephemeral = ephemeral_secret.public().0;
     let shared = MontgomeryPoint(recipient.0).mul_clamped(ephemeral_secret.0);
@@ -267,7 +287,10 @@ fn wrap_to(recipient: &RecipientPublic, dek: &SecretKey) -> Result<Stanza, Crypt
     })
 }
 
-fn unwrap_for(secret: &RecipientSecret, stanzas: &[Stanza]) -> Result<SecretKey, CryptoError> {
+fn unwrap_for(
+    secret: &RecipientSecret,
+    stanzas: &[Stanza],
+) -> Result<SecretKey, CryptoError> {
     let public = secret.public();
     let fingerprint = public.fingerprint();
     let stanza = stanzas
@@ -297,7 +320,9 @@ fn encode(
     }
     let count = u8::try_from(stanzas.len())
         .map_err(|_| CryptoError::Recipients("more than 255 recipients"))?;
-    let mut out = Vec::with_capacity(6 + stanzas.len() * STANZA_LEN + NONCE_LEN + ciphertext.len());
+    let mut out = Vec::with_capacity(
+        6 + stanzas.len() * STANZA_LEN + NONCE_LEN + ciphertext.len(),
+    );
     out.extend_from_slice(&MAGIC);
     out.push(VERSION);
     out.push(count);
@@ -351,7 +376,9 @@ fn decode(bytes: &[u8]) -> Result<Parsed<'_>, CryptoError> {
     })
 }
 
-fn split<const N: usize>(bytes: &[u8]) -> Result<(&[u8; N], &[u8]), CryptoError> {
+fn split<const N: usize>(
+    bytes: &[u8],
+) -> Result<(&[u8; N], &[u8]), CryptoError> {
     bytes
         .split_first_chunk::<N>()
         .ok_or(CryptoError::Malformed("truncated recipient"))

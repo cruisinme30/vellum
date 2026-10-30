@@ -5,7 +5,8 @@
 
 #![allow(
     clippy::significant_drop_tightening,
-    reason = "each command holds the state lock until its files are written, so commands never interleave"
+    reason = "each command holds the state lock until its files are written, \
+        so commands never interleave"
 )]
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -22,7 +23,9 @@ use tracing::{info, instrument, warn};
 use vellum_contracts::{Operation, RequestContext, Scope};
 use vellum_kernel::{CommentId, Error, ErrorKind, TeamId};
 use vellum_store::{BlobPath, BlobStore, Precondition, StoreError};
-use vellum_work::comment::{AuthoredBy, CommentChanges, Comments, NewComment, Target, Thread};
+use vellum_work::comment::{
+    AuthoredBy, CommentChanges, Comments, NewComment, Target, Thread,
+};
 use vellum_work::cycle::{Cycle, CycleKey};
 use vellum_work::doclink;
 use vellum_work::filter::Filter;
@@ -30,20 +33,23 @@ use vellum_work::my_issues::{Tab, my_issues};
 use vellum_work::project::Project;
 use vellum_work::view::{self, View, Visibility};
 use vellum_work::{
-    BlockRef, Changes, Ctx, Estimate, Issue, IssueId, IssuePatch, MilestoneId, NewIssue, Priority,
-    ProjectId, Relation, Repeat, StatusKey, Team, TeamKey, TriageAction, UserRef, ViewId,
-    WorkGraph,
+    BlockRef, Changes, Ctx, Estimate, Issue, IssueId, IssuePatch, MilestoneId,
+    NewIssue, Priority, ProjectId, Relation, Repeat, StatusKey, Team, TeamKey,
+    TriageAction, UserRef, ViewId, WorkGraph,
 };
 
 use crate::api::{
-    self, AddComment, AssignThread, AssignmentOut, AssignmentsOut, ChipOut, CommentRef,
-    CommentResult, CreateIssue, CreateTeam, CreatedIssue, CycleOut, CyclesOut, EditComment,
-    FocusedIssue, GroupOut, IssueGroups, IssueOut, IssueRef, ListComments, ListTeams, MoveIssue,
-    MyIssues, MyIssuesOut, NoInput, ProjectOut, ProjectRef, PutProject, PutTeam, QueryIssues,
-    React, ResolveThread, TeamOut, TeamRef, ThreadOut, ThreadsOut, TriageIssue, UpdateIssue,
-    invalid, parse_name,
+    self, AddComment, AssignThread, AssignmentOut, AssignmentsOut, ChipOut,
+    CommentRef, CommentResult, CreateIssue, CreateTeam, CreatedIssue, CycleOut,
+    CyclesOut, EditComment, FocusedIssue, GroupOut, IssueGroups, IssueOut,
+    IssueRef, ListComments, ListTeams, MoveIssue, MyIssues, MyIssuesOut,
+    NoInput, ProjectOut, ProjectRef, PutProject, PutTeam, QueryIssues, React,
+    ResolveThread, TeamOut, TeamRef, ThreadOut, ThreadsOut, TriageIssue,
+    UpdateIssue, invalid, parse_name,
 };
-use crate::api::{Done, ListViews, PutView, ViewIn, ViewOut, ViewRef, ViewsOut};
+use crate::api::{
+    Done, ListViews, PutView, ViewIn, ViewOut, ViewRef, ViewsOut,
+};
 use crate::journal::{self, CatchUp};
 use crate::ports::{Clock, Directory, EventSink};
 use crate::routes;
@@ -217,9 +223,11 @@ impl WorkService {
         let sla = st.graph.sla_tick(now);
         changes.issues.extend(sla.issues);
         changes.events.extend(sla.events);
-        let recur = st
-            .graph
-            .recur(now, |t| planning::team_today(t, now), IssueId::generate)?;
+        let recur = st.graph.recur(
+            now,
+            |t| planning::team_today(t, now),
+            IssueId::generate,
+        )?;
         changes.issues.extend(recur.issues);
         changes.teams.extend(recur.teams);
         changes.cycles.extend(recur.cycles);
@@ -241,9 +249,11 @@ impl WorkService {
             let now = self.clock.now();
             let mut st = self.write_state().await?;
             let backup = st.clone();
-            let changes =
-                st.graph
-                    .recur(now, |t| planning::team_today(t, now), IssueId::generate)?;
+            let changes = st.graph.recur(
+                now,
+                |t| planning::team_today(t, now),
+                IssueId::generate,
+            )?;
             self.commit(&mut st, backup, changes, None, Vec::new(), None)
                 .await
         })
@@ -274,7 +284,9 @@ impl WorkService {
     ///
     /// `unavailable` when the journal cannot be read, or another replica
     /// holds Work for longer than ten seconds.
-    pub(crate) async fn write_state(&self) -> Result<MutexGuard<'_, State>, Error> {
+    pub(crate) async fn write_state(
+        &self,
+    ) -> Result<MutexGuard<'_, State>, Error> {
         let mut st = self.state.lock().await;
         self.sync(&mut st, true).await?;
         st.checked = Some(Instant::now());
@@ -302,7 +314,8 @@ impl WorkService {
             CatchUp::Current => Ok(()),
             CatchUp::Paths { paths, rev } => {
                 let mut next = st.clone();
-                match apply_paths(self.store.as_ref(), &mut next, &paths).await {
+                match apply_paths(self.store.as_ref(), &mut next, &paths).await
+                {
                     Ok(()) => {
                         next.seen = rev;
                         *st = next;
@@ -376,7 +389,9 @@ impl WorkService {
             }
         }
         for (team, key) in &changes.cycles {
-            if let Some(c) = st.graph.cycles(team).iter().find(|c| c.key == *key) {
+            if let Some(c) =
+                st.graph.cycles(team).iter().find(|c| c.key == *key)
+            {
                 writes.push((c.path(), c.to_yaml()?));
             }
         }
@@ -391,7 +406,8 @@ impl WorkService {
             events.extend(cc.events);
         }
         events.extend(changes.events);
-        let mut paths: Vec<String> = writes.iter().map(|(p, _)| p.clone()).collect();
+        let mut paths: Vec<String> =
+            writes.iter().map(|(p, _)| p.clone()).collect();
         paths.extend(deletes.iter().cloned());
         if !paths.is_empty() {
             // Claim the next revision; losing the claim means another
@@ -406,12 +422,19 @@ impl WorkService {
                 }
             };
             let now = journal::now_ms();
-            if head.journal.rev != st.seen || head.journal.blocking(now).is_some() {
+            if head.journal.rev != st.seen
+                || head.journal.blocking(now).is_some()
+            {
                 *st = backup;
                 return Err(Error::new(ErrorKind::Conflict, RACE));
             }
             let claimed = head.journal.claim(paths, &self.writer, now);
-            let etag = match journal::write(self.store.as_ref(), &claimed, head.etag.as_ref()).await
+            let etag = match journal::write(
+                self.store.as_ref(),
+                &claimed,
+                head.etag.as_ref(),
+            )
+            .await
             {
                 Ok(Some(etag)) => etag,
                 Ok(None) => {
@@ -434,8 +457,13 @@ impl WorkService {
             .await
             {
                 Ok(Some(_)) => {}
-                Ok(None) => warn!(rev = claimed.rev, "a Work write outlived its lease"),
-                Err(e) => warn!(rev = claimed.rev, error = %e, "Work journal entry left pending"),
+                Ok(None) => {
+                    warn!(rev = claimed.rev, "a Work write outlived its lease")
+                }
+                Err(e) => {
+                    warn!(rev = claimed.rev, error = %e, "Work journal entry \
+                        left pending")
+                }
             }
             if let Err(e) = written {
                 *st = backup;
@@ -473,10 +501,9 @@ impl WorkService {
     }
 
     fn issue_id(graph: &WorkGraph, key: &str) -> Result<IssueId, Error> {
-        graph
-            .resolve(key)
-            .map(|i| i.id)
-            .ok_or_else(|| Error::new(ErrorKind::NotFound, format!("unknown issue {key}")))
+        graph.resolve(key).map(|i| i.id).ok_or_else(|| {
+            Error::new(ErrorKind::NotFound, format!("unknown issue {key}"))
+        })
     }
 
     fn team_key(graph: &WorkGraph, text: &str) -> Result<TeamKey, Error> {
@@ -508,13 +535,16 @@ impl WorkService {
         })
     }
 
-    pub(crate) async fn get_team(&self, _rc: RequestContext, i: TeamRef) -> Result<TeamOut, Error> {
+    pub(crate) async fn get_team(
+        &self,
+        _rc: RequestContext,
+        i: TeamRef,
+    ) -> Result<TeamOut, Error> {
         let st = self.read_state().await;
         let key = Self::team_key(&st.graph, &i.team)?;
-        st.graph
-            .team(&key)
-            .map(TeamOut::of)
-            .ok_or_else(|| Error::new(ErrorKind::NotFound, format!("unknown team {}", i.team)))
+        st.graph.team(&key).map(TeamOut::of).ok_or_else(|| {
+            Error::new(ErrorKind::NotFound, format!("unknown team {}", i.team))
+        })
     }
 
     pub(crate) async fn get_team_settings(
@@ -524,12 +554,12 @@ impl WorkService {
     ) -> Result<crate::api::TeamSettingsOut, Error> {
         let st = self.read_state().await;
         let key = Self::team_key(&st.graph, &i.team)?;
-        let team = st
-            .graph
-            .team(&key)
-            .ok_or_else(|| Error::new(ErrorKind::NotFound, format!("unknown team {}", i.team)))?;
-        let settings = serde_json::to_value(team)
-            .map_err(|e| Error::new(ErrorKind::Internal, format!("team {key}: {e}")))?;
+        let team = st.graph.team(&key).ok_or_else(|| {
+            Error::new(ErrorKind::NotFound, format!("unknown team {}", i.team))
+        })?;
+        let settings = serde_json::to_value(team).map_err(|e| {
+            Error::new(ErrorKind::Internal, format!("team {key}: {e}"))
+        })?;
         Ok(crate::api::TeamSettingsOut {
             settings,
             yaml: team.to_yaml()?,
@@ -565,8 +595,8 @@ impl WorkService {
             .transpose()?;
         let filter = match &i.filter {
             Some(text) => {
-                let f: Filter =
-                    serde_json::from_str(text).map_err(|e| invalid(&format!("filter: {e}")))?;
+                let f: Filter = serde_json::from_str(text)
+                    .map_err(|e| invalid(&format!("filter: {e}")))?;
                 f.check().map_err(|e| invalid(&format!("filter: {e}")))?;
                 f
             }
@@ -575,9 +605,9 @@ impl WorkService {
         let v = View {
             id: ViewId::generate(),
             name: "Query".to_owned(),
-            owner: me
-                .clone()
-                .unwrap_or_else(|| UserRef::parse("anonymous").unwrap_or_else(|_| unreachable!())),
+            owner: me.clone().unwrap_or_else(|| {
+                UserRef::parse("anonymous").unwrap_or_else(|_| unreachable!())
+            }),
             team,
             visibility: Visibility::Private,
             layout: i
@@ -682,7 +712,9 @@ impl WorkService {
             .as_deref()
             .map(|t| Self::team_key(&st.graph, t))
             .transpose()?;
-        let member_of = |key: &TeamKey| st.graph.team(key).is_some_and(|t| t.is_member(&me));
+        let member_of = |key: &TeamKey| {
+            st.graph.team(key).is_some_and(|t| t.is_member(&me))
+        };
         let mut views: Vec<&View> = st
             .views
             .values()
@@ -703,7 +735,11 @@ impl WorkService {
         self.save_view(rc, ViewId::generate(), i, true).await
     }
 
-    pub(crate) async fn put_view(&self, rc: RequestContext, i: PutView) -> Result<ViewOut, Error> {
+    pub(crate) async fn put_view(
+        &self,
+        rc: RequestContext,
+        i: PutView,
+    ) -> Result<ViewOut, Error> {
         let id = parse_id::<ViewId>("view_id", &i.view_id)?;
         self.save_view(rc, id, i.settings(), false).await
     }
@@ -743,9 +779,8 @@ impl WorkService {
             .map(|t| Self::team_key(&st.graph, t))
             .transpose()?;
         let filter = match i.filter.as_deref() {
-            Some(text) => {
-                serde_json::from_str(text).map_err(|e| invalid(&format!("filter: {e}")))?
-            }
+            Some(text) => serde_json::from_str(text)
+                .map_err(|e| invalid(&format!("filter: {e}")))?,
             None => Filter::default(),
         };
         let view = View {
@@ -753,12 +788,16 @@ impl WorkService {
             name: name.to_owned(),
             owner: me.clone(),
             team,
-            visibility: pick("visibility", i.visibility.as_deref())?.unwrap_or_default(),
+            visibility: pick("visibility", i.visibility.as_deref())?
+                .unwrap_or_default(),
             layout: pick("layout", i.layout.as_deref())?.unwrap_or_default(),
             filter,
-            group_by: pick("group_by", i.group_by.as_deref())?.unwrap_or_default(),
-            order_by: pick("order_by", i.order_by.as_deref())?.unwrap_or_default(),
-            show_closed: pick("show_closed", i.show_closed.as_deref())?.unwrap_or_default(),
+            group_by: pick("group_by", i.group_by.as_deref())?
+                .unwrap_or_default(),
+            order_by: pick("order_by", i.order_by.as_deref())?
+                .unwrap_or_default(),
+            show_closed: pick("show_closed", i.show_closed.as_deref())?
+                .unwrap_or_default(),
             show_sub_issues: i.show_sub_issues.unwrap_or(true),
         };
         view.check().map_err(Error::from)?;
@@ -777,7 +816,11 @@ impl WorkService {
         Ok(ViewOut::of(&view))
     }
 
-    pub(crate) async fn delete_view(&self, rc: RequestContext, i: ViewRef) -> Result<Done, Error> {
+    pub(crate) async fn delete_view(
+        &self,
+        rc: RequestContext,
+        i: ViewRef,
+    ) -> Result<Done, Error> {
         let me = self.actor(&rc).await?;
         let id = parse_id::<ViewId>("view_id", &i.view_id)?;
         let mut st = self.write_state().await?;
@@ -795,10 +838,16 @@ impl WorkService {
 
     /// The view, if `me` owns it. A view the caller cannot see is "not
     /// found", so IDs of private views do not leak.
-    fn own_view<'s>(st: &'s State, id: &ViewId, me: &UserRef) -> Result<&'s View, Error> {
-        let not_found = || Error::new(ErrorKind::NotFound, format!("view {id}"));
+    fn own_view<'s>(
+        st: &'s State,
+        id: &ViewId,
+        me: &UserRef,
+    ) -> Result<&'s View, Error> {
+        let not_found =
+            || Error::new(ErrorKind::NotFound, format!("view {id}"));
         let view = st.views.get(id).ok_or_else(not_found)?;
-        let member_of = |key: &TeamKey| st.graph.team(key).is_some_and(|t| t.is_member(me));
+        let member_of =
+            |key: &TeamKey| st.graph.team(key).is_some_and(|t| t.is_member(me));
         if !view.visible_to(me, member_of) {
             return Err(not_found());
         }
@@ -833,10 +882,9 @@ impl WorkService {
     ) -> Result<ProjectOut, Error> {
         let st = self.read_state().await;
         let id = parse_id::<ProjectId>("project_id", &i.project_id)?;
-        let p = st
-            .graph
-            .project(&id)
-            .ok_or_else(|| Error::new(ErrorKind::NotFound, format!("unknown project {id}")))?;
+        let p = st.graph.project(&id).ok_or_else(|| {
+            Error::new(ErrorKind::NotFound, format!("unknown project {id}"))
+        })?;
         Ok(planning::project_out(&st, p, self.clock.now().date()))
     }
 
@@ -903,7 +951,8 @@ impl WorkService {
         draft.state = i.state.as_deref().map(StatusKey::parse).transpose()?;
         draft.priority = i.priority.map(priority).transpose()?;
         draft.estimate = i.estimate.as_deref().map(estimate).transpose()?;
-        draft.assignee = i.assignee.as_deref().map(UserRef::parse).transpose()?;
+        draft.assignee =
+            i.assignee.as_deref().map(UserRef::parse).transpose()?;
         draft.labels = i.labels;
         draft.project = i
             .project
@@ -968,10 +1017,9 @@ impl WorkService {
             ctx.actor.as_ref(),
         )
         .await?;
-        let issue = st
-            .graph
-            .issue(&id)
-            .ok_or_else(|| Error::new(ErrorKind::Internal, "issue vanished".to_owned()))?;
+        let issue = st.graph.issue(&id).ok_or_else(|| {
+            Error::new(ErrorKind::Internal, "issue vanished".to_owned())
+        })?;
         Ok(CreatedIssue {
             chip: source.map(|at| ChipOut {
                 doc: at.doc.to_string(),
@@ -1069,9 +1117,9 @@ impl WorkService {
             "duplicate" => TriageAction::Duplicate {
                 of: Self::issue_id(
                     &st.graph,
-                    i.duplicate_of
-                        .as_deref()
-                        .ok_or_else(|| invalid("duplicate needs duplicate_of"))?,
+                    i.duplicate_of.as_deref().ok_or_else(|| {
+                        invalid("duplicate needs duplicate_of")
+                    })?,
                 )?,
             },
             "snooze" => TriageAction::Snooze {
@@ -1083,7 +1131,11 @@ impl WorkService {
                 )
                 .map_err(|_| invalid("until must be an RFC 3339 time"))?,
             },
-            other => return Err(invalid(&format!("unknown triage action {other:?}"))),
+            other => {
+                return Err(invalid(&format!(
+                    "unknown triage action {other:?}"
+                )));
+            }
         };
         let backup = st.clone();
         let changes = st.graph.triage(&id, &action, &ctx)?;
@@ -1099,7 +1151,12 @@ impl WorkService {
         self.issue_out(&st, &id, ctx.now)
     }
 
-    fn issue_out(&self, st: &State, id: &IssueId, now: OffsetDateTime) -> Result<IssueOut, Error> {
+    fn issue_out(
+        &self,
+        st: &State,
+        id: &IssueId,
+        now: OffsetDateTime,
+    ) -> Result<IssueOut, Error> {
         let _ = self;
         st.graph
             .issue(id)
@@ -1116,7 +1173,8 @@ impl WorkService {
     ) -> Result<TeamOut, Error> {
         let ctx = self.ctx(&rc).await?;
         let mut st = self.write_state().await?;
-        let mut team = Team::new(TeamId::generate(), TeamKey::parse(&i.key)?, &i.name)?;
+        let mut team =
+            Team::new(TeamId::generate(), TeamKey::parse(&i.key)?, &i.name)?;
         team.lead = i.lead.as_deref().map(UserRef::parse).transpose()?;
         team.members = i
             .members
@@ -1124,7 +1182,11 @@ impl WorkService {
             .map(|m| UserRef::parse(m))
             .collect::<Result<_, _>>()?;
         let backup = st.clone();
-        let changes = match add_team(&mut st.graph, team.clone(), self.clock.now().date()) {
+        let changes = match add_team(
+            &mut st.graph,
+            team.clone(),
+            self.clock.now().date(),
+        ) {
             Ok(c) => c,
             Err(e) => {
                 *st = backup;
@@ -1143,7 +1205,11 @@ impl WorkService {
         Ok(TeamOut::of(&team))
     }
 
-    pub(crate) async fn put_team(&self, rc: RequestContext, i: PutTeam) -> Result<TeamOut, Error> {
+    pub(crate) async fn put_team(
+        &self,
+        rc: RequestContext,
+        i: PutTeam,
+    ) -> Result<TeamOut, Error> {
         let ctx = self.ctx(&rc).await?;
         let mut st = self.write_state().await?;
         let key = Self::team_key(&st.graph, &i.team)?;
@@ -1151,7 +1217,8 @@ impl WorkService {
         let team = Team::from_yaml(&path, &i.yaml)?;
         if team.key != key {
             return Err(invalid(
-                "the file's key must match the team in the path; move issues to rename a team",
+                "the file's key must match the team in the path; move issues \
+                    to rename a team",
             ));
         }
         let backup = st.clone();
@@ -1262,7 +1329,9 @@ impl WorkService {
         };
         let thread_target = match (&target, reply_to) {
             (Some(t), _) => Some(t.clone()),
-            (None, Some(c)) => st.comments.thread_of(&c).map(|t| t.target.clone()),
+            (None, Some(c)) => {
+                st.comments.thread_of(&c).map(|t| t.target.clone())
+            }
             (None, None) => None,
         };
         // Followers of the target hear about every comment.
@@ -1334,11 +1403,17 @@ impl WorkService {
             .await
     }
 
-    pub(crate) async fn react(&self, rc: RequestContext, i: React) -> Result<CommentResult, Error> {
+    pub(crate) async fn react(
+        &self,
+        rc: RequestContext,
+        i: React,
+    ) -> Result<CommentResult, Error> {
         let ctx = self.ctx(&rc).await?;
         let id = parse_id::<CommentId>("comment_id", &i.comment_id)?;
-        self.comment_command(ctx, &id, |c, ctx| c.react(&id, &i.emoji, i.on, ctx))
-            .await
+        self.comment_command(ctx, &id, |c, ctx| {
+            c.react(&id, &i.emoji, i.on, ctx)
+        })
+        .await
     }
 
     pub(crate) async fn resolve_thread(
@@ -1398,12 +1473,17 @@ impl WorkService {
             ctx.actor.as_ref(),
         )
         .await?;
-        Ok(thread.map_or(CommentResult { thread: None }, |t| thread_result(&st, &t)))
+        Ok(thread
+            .map_or(CommentResult { thread: None }, |t| thread_result(&st, &t)))
     }
 }
 
 /// Adds a team and pre-creates its cycles.
-fn add_team(graph: &mut WorkGraph, team: Team, today: Date) -> vellum_work::Result<Changes> {
+fn add_team(
+    graph: &mut WorkGraph,
+    team: Team,
+    today: Date,
+) -> vellum_work::Result<Changes> {
     let key = team.key.clone();
     graph.insert_team(team)?;
     let mut changes = graph.ensure_cycles(today)?;
@@ -1535,8 +1615,9 @@ fn priority(n: u8) -> Result<Priority, Error> {
 }
 
 fn estimate(text: &str) -> Result<Estimate, Error> {
-    Estimate::from_text(text)
-        .ok_or_else(|| invalid(&format!("estimate {text:?} is not a number or size")))
+    Estimate::from_text(text).ok_or_else(|| {
+        invalid(&format!("estimate {text:?} is not a number or size"))
+    })
 }
 
 fn date(text: &str) -> Result<Date, Error> {
@@ -1570,7 +1651,8 @@ fn blob_path(path: &str) -> Result<BlobPath, Error> {
 fn store_error(e: StoreError) -> Error {
     let kind = match &e {
         StoreError::NotFound(_) => ErrorKind::NotFound,
-        StoreError::AlreadyExists(_) | StoreError::PreconditionFailed { .. } => ErrorKind::Conflict,
+        StoreError::AlreadyExists(_)
+        | StoreError::PreconditionFailed { .. } => ErrorKind::Conflict,
         StoreError::InvalidPath { .. } => ErrorKind::InvalidInput,
         _ => ErrorKind::Unavailable,
     };
@@ -1656,8 +1738,15 @@ async fn apply_paths(
                     let _ = state.views.insert(view.id, view);
                 }
             }
-            Kind::Team | Kind::Cycle | Kind::Project | Kind::Update | Kind::Initiative => {
-                return Err(Error::new(ErrorKind::Conflict, "team settings changed"));
+            Kind::Team
+            | Kind::Cycle
+            | Kind::Project
+            | Kind::Update
+            | Kind::Initiative => {
+                return Err(Error::new(
+                    ErrorKind::Conflict,
+                    "team settings changed",
+                ));
             }
             Kind::Other => {}
         }
@@ -1666,7 +1755,10 @@ async fn apply_paths(
 }
 
 /// A file's text, or `None` when it no longer exists.
-async fn read_text(store: &dyn BlobStore, path: &str) -> Result<Option<String>, Error> {
+async fn read_text(
+    store: &dyn BlobStore,
+    path: &str,
+) -> Result<Option<String>, Error> {
     match store.get(&blob_path(path)?).await {
         Ok(blob) => String::from_utf8(blob.bytes.to_vec())
             .map(Some)
@@ -1691,16 +1783,23 @@ async fn list(store: &dyn BlobStore, dir: &str) -> Result<Vec<String>, Error> {
 }
 
 /// Loads one file into `state`; `Ok(false)` for files Work does not own.
-async fn load_one(store: &dyn BlobStore, state: &mut State, path: &str) -> Result<bool, Error> {
+async fn load_one(
+    store: &dyn BlobStore,
+    state: &mut State,
+    path: &str,
+) -> Result<bool, Error> {
     let kind = classify(path);
     if kind == Kind::Other {
         return Ok(false);
     }
     let blob = store.get(&blob_path(path)?).await.map_err(store_error)?;
-    let text = std::str::from_utf8(&blob.bytes).map_err(|_| invalid("not UTF-8"))?;
+    let text =
+        std::str::from_utf8(&blob.bytes).map_err(|_| invalid("not UTF-8"))?;
     match kind {
         Kind::Team => state.graph.insert_team(Team::from_yaml(path, text)?)?,
-        Kind::Issue => state.graph.load_issue(Issue::from_markdown(path, text)?)?,
+        Kind::Issue => {
+            state.graph.load_issue(Issue::from_markdown(path, text)?)?
+        }
         Kind::Cycle => state.graph.load_cycle(Cycle::from_yaml(path, text)?)?,
         Kind::Project => {
             let p = Project::from_markdown(path, text)?;
@@ -1712,7 +1811,9 @@ async fn load_one(store: &dyn BlobStore, state: &mut State, path: &str) -> Resul
             let view = View::from_yaml(path, text)?;
             let _ = state.views.insert(view.id, view);
         }
-        Kind::Update | Kind::Initiative => state.planning.load(kind == Kind::Update, path, text)?,
+        Kind::Update | Kind::Initiative => {
+            state.planning.load(kind == Kind::Update, path, text)?
+        }
         Kind::Other => {}
     }
     Ok(true)

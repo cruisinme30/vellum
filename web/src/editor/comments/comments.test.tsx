@@ -12,7 +12,12 @@ import type { WorkApi } from "../../work/api";
 import { createLocalConnector } from "../collab/local-connector";
 import { body, h, p } from "../content";
 import { PageEditor } from "../page-editor";
-import { createTestEditor, memoryChannels, resolveGateway, settle } from "../test-editor";
+import {
+  createTestEditor,
+  memoryChannels,
+  resolveGateway,
+  settle,
+} from "../test-editor";
 
 import { anchorOf, targetOf } from "./anchor";
 import { proposedTitle } from "./file-issue";
@@ -92,7 +97,9 @@ function select(editor: Editor, text: string) {
   });
   if (!range) throw new Error(`no "${text}" in the page`);
   editor.view.dispatch(
-    editor.state.tr.setSelection(TextSelection.create(editor.state.doc, range.from, range.to)),
+    editor.state.tr.setSelection(
+      TextSelection.create(editor.state.doc, range.from, range.to),
+    ),
   );
 }
 
@@ -176,9 +183,14 @@ describe("comments panel", () => {
     expect(blockId).toMatch(/^blk-/);
     const panel = screen.getByRole("complementary", { name: "Comments" });
     expect(within(panel).getByText("New thread on “the beta”")).toBeDefined();
-    expect(within(panel).getByText("No open threads on this page.")).toBeDefined();
+    expect(
+      within(panel).getByText("No open threads on this page."),
+    ).toBeDefined();
 
-    await user.type(within(panel).getByRole("textbox", { name: "Comment" }), "Is May right?");
+    await user.type(
+      within(panel).getByRole("textbox", { name: "Comment" }),
+      "Is May right?",
+    );
     await user.click(within(panel).getByRole("button", { name: "Comment" }));
     await within(panel).findByText("Is May right?");
     expect(work.all()[0]?.target).toEqual({ doc: "page-1", block: blockId });
@@ -187,7 +199,10 @@ describe("comments panel", () => {
       expect(editor.view.dom.querySelectorAll(".vl-commented")).toHaveLength(1);
     });
 
-    await user.type(within(panel).getByRole("textbox", { name: "Reply" }), "Yes");
+    await user.type(
+      within(panel).getByRole("textbox", { name: "Reply" }),
+      "Yes",
+    );
     await user.click(within(panel).getByRole("button", { name: "Reply" }));
     await within(panel).findByText("Yes");
 
@@ -197,7 +212,10 @@ describe("comments panel", () => {
     const liked = await within(panel).findByRole("button", { name: "👍 (1)" });
     expect(liked.getAttribute("aria-pressed")).toBe("true");
 
-    await user.type(within(panel).getByRole("textbox", { name: "Assign this thread to" }), "@sam");
+    await user.type(
+      within(panel).getByRole("textbox", { name: "Assign this thread to" }),
+      "@sam",
+    );
     await user.click(within(panel).getByRole("button", { name: "Assign" }));
     await within(panel).findByText("Assigned to @sam");
 
@@ -212,8 +230,12 @@ describe("comments panel", () => {
     await user.click(within(panel).getByRole("button", { name: "Open" }));
     expect(within(panel).getByText("Is May right?")).toBeDefined();
 
-    await user.click(within(panel).getByRole("button", { name: "Close comments" }));
-    expect(screen.queryByRole("complementary", { name: "Comments" })).toBeNull();
+    await user.click(
+      within(panel).getByRole("button", { name: "Close comments" }),
+    );
+    expect(
+      screen.queryByRole("complementary", { name: "Comments" }),
+    ).toBeNull();
   });
 
   it("files an issue from the selection and writes its chip into the block", async () => {
@@ -221,12 +243,16 @@ describe("comments panel", () => {
     const work = fakeWork();
     const editor = await openEditor(work);
     select(editor, "Ship the beta");
-    await user.click(screen.getByRole("button", { name: "Create issue from selection" }));
+    await user.click(
+      screen.getByRole("button", { name: "Create issue from selection" }),
+    );
     const blockId = anchorOf(editor.state).blockId;
     const dialog = await screen.findByRole("dialog", { name: "Create issue" });
     const title = await within(dialog).findByRole("textbox", { name: "Title" });
     expect((title as HTMLInputElement).value).toBe("Ship the beta");
-    await user.click(within(dialog).getByRole("button", { name: "Create issue" }));
+    await user.click(
+      within(dialog).getByRole("button", { name: "Create issue" }),
+    );
     await waitFor(() => {
       expect(work.fileIssue).toHaveBeenCalledWith({
         team: "ENG",
@@ -236,9 +262,13 @@ describe("comments panel", () => {
       });
     });
     await waitFor(() => {
-      expect(editor.view.dom.querySelector(".vl-issue")?.textContent).toBe("ENG-42");
+      expect(editor.view.dom.querySelector(".vl-issue")?.textContent).toBe(
+        "ENG-42",
+      );
     });
-    expect(editor.state.doc.child(1).textContent).toContain("Ship the beta in May.");
+    expect(editor.state.doc.child(1).textContent).toContain(
+      "Ship the beta in May.",
+    );
     expect(screen.queryByRole("dialog", { name: "Create issue" })).toBeNull();
   });
 });

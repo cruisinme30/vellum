@@ -97,7 +97,8 @@ function query(filter: RequestFilter): string {
     parameters.set("min_duration_ms", String(filter.minDurationMs));
   if (filter.errorsOnly) parameters.set("errors_only", "true");
   if (filter.id) parameters.set("id", filter.id);
-  if (filter.before !== undefined) parameters.set("before", String(filter.before));
+  if (filter.before !== undefined)
+    parameters.set("before", String(filter.before));
   if (filter.limit !== undefined) parameters.set("limit", String(filter.limit));
   const text = parameters.toString();
   return text === "" ? "" : `?${text}`;
@@ -158,7 +159,10 @@ export async function fetchRoutes(
   minutes: number,
   doFetch: typeof fetch = globalThis.fetch.bind(globalThis),
 ): Promise<RoutesView> {
-  return (await getJson(doFetch, `${ROUTES_PATH}?minutes=${String(minutes)}`)) as RoutesView;
+  return (await getJson(
+    doFetch,
+    `${ROUTES_PATH}?minutes=${String(minutes)}`,
+  )) as RoutesView;
 }
 
 /** Recent requests, newest first. */
@@ -177,5 +181,8 @@ export async function fetchTrace(
   traceId: string,
   doFetch: typeof fetch = globalThis.fetch.bind(globalThis),
 ): Promise<Trace> {
-  return (await getJson(doFetch, `${REQUESTS_PATH}/${encodeURIComponent(traceId)}`)) as Trace;
+  return (await getJson(
+    doFetch,
+    `${REQUESTS_PATH}/${encodeURIComponent(traceId)}`,
+  )) as Trace;
 }

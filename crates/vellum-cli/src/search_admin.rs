@@ -139,7 +139,9 @@ impl SearchStatus {
         let status = Arc::clone(self);
         drop(tokio::spawn(async move {
             let mut tick = tokio::time::interval(FOLLOW_EVERY);
-            tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+            tick.set_missed_tick_behavior(
+                tokio::time::MissedTickBehavior::Delay,
+            );
             loop {
                 let _ = tick.tick().await;
                 status.apply_setting().await;
@@ -157,11 +159,17 @@ impl SearchStatus {
             Ok(versioned) => {
                 let on = versioned.settings.search.hybrid;
                 if on != self.service.hybrid() && self.embedder.is_some() {
-                    tracing::info!(on, "hybrid search turned {}", if on { "on" } else { "off" });
+                    tracing::info!(
+                        on,
+                        "hybrid search turned {}",
+                        if on { "on" } else { "off" }
+                    );
                 }
                 self.service.set_hybrid(on);
             }
-            Err(error) => tracing::warn!(%error, "search: admin settings unreadable"),
+            Err(error) => {
+                tracing::warn!(%error, "search: admin settings unreadable")
+            }
         }
     }
 
@@ -234,9 +242,9 @@ impl Service for SearchAdminService {
             )
             .summary("Search's engine, embedding model and background indexing")
             .description(
-                "Whether hybrid ranking is on, which local embedding model the server has \
-                 and whether it is in memory, and how far a rebuild or an embedding \
-                 backfill has got.",
+                "Whether hybrid ranking is on, which local embedding model the \
+                 server has and whether it is in memory, and how far a rebuild \
+                 or an embedding backfill has got.",
             ),
         ]
     }
@@ -246,11 +254,14 @@ impl Service for SearchAdminService {
 mod tests {
     use super::*;
 
-    fn service(dir: Option<&std::path::Path>) -> (SearchService, Option<OnnxEmbedder>) {
+    fn service(
+        dir: Option<&std::path::Path>,
+    ) -> (SearchService, Option<OnnxEmbedder>) {
         let status = crate::search::describe_status().unwrap();
         let mut service = status.service.clone();
-        let embedder =
-            dir.map(|dir| OnnxEmbedder::new(vellum_search::OnnxConfig::from_dir(dir).unwrap()));
+        let embedder = dir.map(|dir| {
+            OnnxEmbedder::new(vellum_search::OnnxConfig::from_dir(dir).unwrap())
+        });
         if let Some(e) = &embedder {
             service = service.with_embedder(Arc::new(e.clone()));
         }
@@ -261,13 +272,19 @@ mod tests {
     async fn the_status_names_the_model_and_counts_the_job() {
         let (keywords, _) = service(None);
         let plain = SearchStatus::new(keywords, None, None).view().await;
-        assert!(!plain.model_configured && !plain.hybrid && plain.model.is_none());
+        assert!(
+            !plain.model_configured && !plain.hybrid && plain.model.is_none()
+        );
         assert_eq!(plain.job, SearchJob::Idle);
 
         let dir = tempfile::tempdir().unwrap();
         let _ = vellum_search::onnx::testing::write_model(dir.path(), true);
         let (hybrid, embedder) = service(Some(dir.path()));
-        let status = SearchStatus::new(hybrid.clone(), embedder, Some(Duration::from_mins(15)));
+        let status = SearchStatus::new(
+            hybrid.clone(),
+            embedder,
+            Some(Duration::from_mins(15)),
+        );
         status.progress().start(40);
         status.set_job(SearchJob::Embedding, None);
         let view = status.view().await;

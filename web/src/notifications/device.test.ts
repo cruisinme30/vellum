@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createBrowserPushDevice } from "./device";
 
-// The Push API answers null for "no subscription"; the lint rules forbid the literal.
+// The Push API answers null for "no subscription"; the lint rules forbid the
+// literal.
 const NULL = JSON.parse("null") as null;
 
 afterEach(() => {
@@ -19,8 +20,12 @@ function stubBrowser(subscription: PushSubscription | null) {
     subscribe: vi.fn(),
   };
   vi.stubGlobal("PushManager", {});
-  vi.stubGlobal("Notification", { requestPermission: () => Promise.resolve("denied") });
-  vi.stubGlobal("navigator", { serviceWorker: { ready: Promise.resolve({ pushManager }) } });
+  vi.stubGlobal("Notification", {
+    requestPermission: () => Promise.resolve("denied"),
+  });
+  vi.stubGlobal("navigator", {
+    serviceWorker: { ready: Promise.resolve({ pushManager }) },
+  });
   return pushManager;
 }
 

@@ -25,7 +25,10 @@ use crate::safety;
 /// Most entries listed in `llms.txt` and the sitemap.
 const MAX_ENTRIES: usize = 5_000;
 
-async fn listings(ws: &dyn Workspace, actor: &Actor) -> Result<Vec<Listing>, WorkspaceError> {
+async fn listings(
+    ws: &dyn Workspace,
+    actor: &Actor,
+) -> Result<Vec<Listing>, WorkspaceError> {
     let mut out = Vec::new();
     let mut cursor = None;
     loop {
@@ -83,12 +86,18 @@ fn entry(l: &Listing) -> String {
 /// # Errors
 ///
 /// When the workspace cannot be listed.
-pub async fn llms_txt(ws: &dyn Workspace, actor: &Actor) -> Result<String, WorkspaceError> {
+pub async fn llms_txt(
+    ws: &dyn Workspace,
+    actor: &Actor,
+) -> Result<String, WorkspaceError> {
     let site = ws.site_info().await?;
     let items = listings(ws, actor).await?;
     let base = site.base_url.trim_end_matches('/');
     let mut out = format!(
-        "# {}\n\n> {}\n\nThis is a Vellum workspace. Every page is available as clean Markdown: add `?format=md` to its URL. Models can connect over MCP at {base}/mcp.\n\n",
+        "# {}\n\n> {}\n\n\
+            This is a Vellum workspace. Every page is available as clean \
+            Markdown: add `?format=md` to its URL. Models can connect over MCP \
+            at {base}/mcp.\n\n",
         one_line(&site.name),
         one_line(&site.summary)
     );
@@ -101,7 +110,9 @@ pub async fn llms_txt(ws: &dyn Workspace, actor: &Actor) -> Result<String, Works
     }
     let _ = write!(
         out,
-        "## Optional\n\n- [Markdown sitemap]({base}/sitemap.md): every page, grouped by space\n"
+        "## Optional\n\n\
+            - [Markdown sitemap]({base}/sitemap.md): every page, grouped by \
+            space\n"
     );
     Ok(out)
 }
@@ -111,7 +122,10 @@ pub async fn llms_txt(ws: &dyn Workspace, actor: &Actor) -> Result<String, Works
 /// # Errors
 ///
 /// When the workspace cannot be listed.
-pub async fn sitemap(ws: &dyn Workspace, actor: &Actor) -> Result<String, WorkspaceError> {
+pub async fn sitemap(
+    ws: &dyn Workspace,
+    actor: &Actor,
+) -> Result<String, WorkspaceError> {
     let site = ws.site_info().await?;
     let items = listings(ws, actor).await?;
     let mut out = format!(
@@ -136,10 +150,15 @@ fn actor_of(req: &Request) -> Actor {
         .unwrap_or(Actor::Anonymous)
 }
 
-fn markdown(body: String, content_type: &'static str, public: bool) -> Response {
+fn markdown(
+    body: String,
+    content_type: &'static str,
+    public: bool,
+) -> Response {
     let mut r = (StatusCode::OK, body).into_response();
     let h = r.headers_mut();
-    let _ = h.insert(header::CONTENT_TYPE, HeaderValue::from_static(content_type));
+    let _ =
+        h.insert(header::CONTENT_TYPE, HeaderValue::from_static(content_type));
     let _ = h.insert(
         header::VARY,
         HeaderValue::from_static("Cookie, Authorization"),
@@ -160,12 +179,17 @@ fn failure(e: &WorkspaceError) -> Response {
         WorkspaceError::NotFound(_) | WorkspaceError::Forbidden(_) => {
             StatusCode::NOT_FOUND.into_response()
         }
-        WorkspaceError::Unavailable(_) => StatusCode::SERVICE_UNAVAILABLE.into_response(),
+        WorkspaceError::Unavailable(_) => {
+            StatusCode::SERVICE_UNAVAILABLE.into_response()
+        }
         _ => StatusCode::BAD_REQUEST.into_response(),
     }
 }
 
-async fn llms_handler(State(ws): State<Arc<dyn Workspace>>, req: Request) -> Response {
+async fn llms_handler(
+    State(ws): State<Arc<dyn Workspace>>,
+    req: Request,
+) -> Response {
     let actor = actor_of(&req);
     let public = actor == Actor::Anonymous;
     match llms_txt(ws.as_ref(), &actor).await {
@@ -174,7 +198,10 @@ async fn llms_handler(State(ws): State<Arc<dyn Workspace>>, req: Request) -> Res
     }
 }
 
-async fn sitemap_handler(State(ws): State<Arc<dyn Workspace>>, req: Request) -> Response {
+async fn sitemap_handler(
+    State(ws): State<Arc<dyn Workspace>>,
+    req: Request,
+) -> Response {
     let actor = actor_of(&req);
     let public = actor == Actor::Anonymous;
     match sitemap(ws.as_ref(), &actor).await {
@@ -218,7 +245,11 @@ fn wants_markdown(req: &Request) -> bool {
 /// A GET with `?format=md` gets the page as Vellum Markdown (front matter
 /// included, invisible text stripped) instead of HTML. Mount it with
 /// `axum::middleware::from_fn_with_state(workspace, site::format_md)`.
-pub async fn format_md(State(ws): State<Arc<dyn Workspace>>, req: Request, next: Next) -> Response {
+pub async fn format_md(
+    State(ws): State<Arc<dyn Workspace>>,
+    req: Request,
+    next: Next,
+) -> Response {
     if !wants_markdown(&req) {
         return next.run(req).await;
     }

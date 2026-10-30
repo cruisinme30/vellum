@@ -25,7 +25,9 @@ export function NewPageView() {
     }
     created.current = true;
     void store.createPage({ spaceId, parentId: undefined }).then((page) => {
-      void navigate(page === undefined ? "/" : `/p/${page.id}`, { replace: true });
+      void navigate(page === undefined ? "/" : `/p/${page.id}`, {
+        replace: true,
+      });
     });
   }, [navigate, spaceId, store]);
 

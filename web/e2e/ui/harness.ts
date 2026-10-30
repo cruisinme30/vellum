@@ -27,10 +27,18 @@ function watchErrors(page: Page): Problem[] {
   const problems: Problem[] = [];
   page.on("console", (message) => {
     if (message.type() === "error")
-      problems.push({ rule: "console-error", target: "console", message: message.text() });
+      problems.push({
+        rule: "console-error",
+        target: "console",
+        message: message.text(),
+      });
   });
   page.on("pageerror", (error) => {
-    problems.push({ rule: "uncaught-exception", target: "window", message: error.message });
+    problems.push({
+      rule: "uncaught-exception",
+      target: "window",
+      message: error.message,
+    });
   });
   page.on("requestfailed", (request) => {
     // Browsers cancel a video source they won't play (WebKit and WebM) or
@@ -60,7 +68,9 @@ function watchErrors(page: Page): Problem[] {
   return problems;
 }
 
-/** Starts counting layout shifts before the page's first byte (Chromium only). */
+/**
+ * Starts counting layout shifts before the page's first byte (Chromium only).
+ */
 export async function watchLayoutShift(page: Page): Promise<void> {
   await page.addInitScript({
     content: `window.__vellumCls = 0;
@@ -83,19 +93,30 @@ export async function watchLayoutShift(page: Page): Promise<void> {
 }
 
 export async function layoutShift(page: Page): Promise<number> {
-  return page.evaluate(() => (globalThis as unknown as { __vellumCls?: number }).__vellumCls ?? 0);
+  return page.evaluate(
+    () => (globalThis as unknown as { __vellumCls?: number }).__vellumCls ?? 0,
+  );
 }
 
-/** Waits until the page is quiet: network idle, fonts loaded, two frames painted. */
+/**
+ * Waits until the page is quiet: network idle, fonts loaded, two frames
+ * painted.
+ */
 export async function settle(page: Page): Promise<void> {
   // Pages that poll never go idle, nor does WebKit while a looping video
-  // streams, so the wait is capped; the fonts and frames below still settle them.
-  await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch((error: unknown) => {
-    if (!(error instanceof Error && error.name === "TimeoutError")) throw error;
-  });
+  // streams, so the wait is capped; the fonts and frames below still settle
+  // them.
+  await page
+    .waitForLoadState("networkidle", { timeout: 10_000 })
+    .catch((error: unknown) => {
+      if (!(error instanceof Error && error.name === "TimeoutError"))
+        throw error;
+    });
   await page.evaluate(async () => {
     await document.fonts.ready;
-    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    await new Promise((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve)),
+    );
   });
 }
 
@@ -104,8 +125,14 @@ export async function settle(page: Page): Promise<void> {
  * them instead of inlining megabytes of base64. Very long pages (a book's
  * print page) are shot at viewport height.
  */
-async function attachEvidence(page: Page, testInfo: TestInfo, problems: Problem[]): Promise<void> {
-  const height = await page.evaluate(() => document.documentElement.scrollHeight);
+async function attachEvidence(
+  page: Page,
+  testInfo: TestInfo,
+  problems: Problem[],
+): Promise<void> {
+  const height = await page.evaluate(
+    () => document.documentElement.scrollHeight,
+  );
   const fullPage = height <= (page.viewportSize()?.height ?? 0) * 4;
   const screenshot = testInfo.outputPath("page.png");
   await page.screenshot({ path: screenshot, fullPage });
@@ -113,7 +140,10 @@ async function attachEvidence(page: Page, testInfo: TestInfo, problems: Problem[
   if (problems.length > 0) {
     const file = testInfo.outputPath("problems.json");
     await writeFile(file, JSON.stringify(problems, undefined, 2));
-    await testInfo.attach("problems", { path: file, contentType: "application/json" });
+    await testInfo.attach("problems", {
+      path: file,
+      contentType: "application/json",
+    });
   }
 }
 
@@ -122,7 +152,11 @@ async function attachEvidence(page: Page, testInfo: TestInfo, problems: Problem[
  * The stress mode lengthens every text, so there the button's name only
  * has to start with the words.
  */
-export async function openPanel(page: Page, target: Target, mode?: Mode): Promise<void> {
+export async function openPanel(
+  page: Page,
+  target: Target,
+  mode?: Mode,
+): Promise<void> {
   if (target.open === undefined) return;
   const name =
     mode?.name === "stress"
@@ -136,7 +170,9 @@ export async function openPanel(page: Page, target: Target, mode?: Mode): Promis
     .waitForFunction(
       () =>
         [...document.images].every(
-          (image) => image.complete || image.getBoundingClientRect().top > window.innerHeight,
+          (image) =>
+            image.complete ||
+            image.getBoundingClientRect().top > window.innerHeight,
         ),
       undefined,
       { timeout: 5000 },
@@ -168,7 +204,9 @@ export async function auditTarget(
   const cls = await layoutShift(page);
   if (cls > CLS_LIMIT) {
     const shifts = await page.evaluate(
-      () => (globalThis as unknown as { __vellumShifts?: string[] }).__vellumShifts ?? [],
+      () =>
+        (globalThis as unknown as { __vellumShifts?: string[] })
+          .__vellumShifts ?? [],
     );
     problems.push({
       rule: "layout-shift",
@@ -196,4 +234,6 @@ export async function auditTarget(
 
 /** One line per problem, for a readable assertion message. */
 export const describe = (problems: Problem[]): string[] =>
-  problems.map((problem) => `${problem.rule} @ ${problem.target}: ${problem.message}`);
+  problems.map(
+    (problem) => `${problem.rule} @ ${problem.target}: ${problem.message}`,
+  );

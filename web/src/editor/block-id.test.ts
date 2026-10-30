@@ -3,7 +3,12 @@
 
 import { describe, expect, it } from "vitest";
 
-import { formatBlockId, hashedBlockId, isBlockId, newBlockId } from "./block-id";
+import {
+  formatBlockId,
+  hashedBlockId,
+  isBlockId,
+  newBlockId,
+} from "./block-id";
 
 describe("formatBlockId", () => {
   it("writes the low 40 bits as eight Crockford characters", () => {

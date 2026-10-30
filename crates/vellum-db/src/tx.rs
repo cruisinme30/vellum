@@ -24,7 +24,9 @@ pub trait BeginWrite {
     /// Acquires a connection and begins a write transaction on it.
     fn begin_write(
         &self,
-    ) -> impl Future<Output = Result<Transaction<'static, Self::Database>, sqlx::Error>> + Send;
+    ) -> impl Future<
+        Output = Result<Transaction<'static, Self::Database>, sqlx::Error>,
+    > + Send;
 }
 
 impl BeginWrite for SqlitePool {
@@ -32,7 +34,8 @@ impl BeginWrite for SqlitePool {
 
     fn begin_write(
         &self,
-    ) -> impl Future<Output = Result<Transaction<'static, Sqlite>, sqlx::Error>> + Send {
+    ) -> impl Future<Output = Result<Transaction<'static, Sqlite>, sqlx::Error>> + Send
+    {
         self.begin_with("BEGIN IMMEDIATE")
     }
 }
@@ -42,7 +45,9 @@ impl BeginWrite for PgPool {
 
     fn begin_write(
         &self,
-    ) -> impl Future<Output = Result<Transaction<'static, Postgres>, sqlx::Error>> + Send {
+    ) -> impl Future<
+        Output = Result<Transaction<'static, Postgres>, sqlx::Error>,
+    > + Send {
         self.begin()
     }
 }

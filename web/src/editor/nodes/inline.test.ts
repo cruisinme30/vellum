@@ -45,11 +45,16 @@ describe("inline input rules", () => {
   });
 
   it("accepts group handles with slashes", () => {
-    expect(typed("@eng/platform ")).toEqual([mention("eng/platform"), { type: "text", text: " " }]);
+    expect(typed("@eng/platform ")).toEqual([
+      mention("eng/platform"),
+      { type: "text", text: " " },
+    ]);
   });
 
   it("leaves an e-mail address as text", () => {
-    expect(typed("mail a@b.c ")).toEqual([{ type: "text", text: "mail a@b.c " }]);
+    expect(typed("mail a@b.c ")).toEqual([
+      { type: "text", text: "mail a@b.c " },
+    ]);
   });
 
   it("turns @today into today's date chip, not a mention", () => {
@@ -69,7 +74,9 @@ describe("inline input rules", () => {
   });
 
   it("ignores impossible dates", () => {
-    expect(typed("2026-13-01 ")).toEqual([{ type: "text", text: "2026-13-01 " }]);
+    expect(typed("2026-13-01 ")).toEqual([
+      { type: "text", text: "2026-13-01 " },
+    ]);
   });
 
   it("turns an issue key into an issue chip", () => {
@@ -103,7 +110,9 @@ describe("inline input rules", () => {
   });
 
   it("does not take a lone dollar amount for math", () => {
-    expect(typed("costs $ 5 $")).toEqual([{ type: "text", text: "costs $ 5 $" }]);
+    expect(typed("costs $ 5 $")).toEqual([
+      { type: "text", text: "costs $ 5 $" },
+    ]);
   });
 });
 
@@ -122,7 +131,10 @@ describe("atomRule", () => {
         return [atomRule(/#1$/, type, () => ({ key: "ENG-1" }))];
       },
     });
-    const target = new Editor({ extensions: [StarterKit, IssueKey, shortcut], content: "<p></p>" });
+    const target = new Editor({
+      extensions: [StarterKit, IssueKey, shortcut],
+      content: "<p></p>",
+    });
     editor = target;
     target.commands.setTextSelection(1);
     typeText(target, "#1");
@@ -192,7 +204,9 @@ describe("inline chips in HTML and text", () => {
     const html = open(content).getHTML();
     const container = document.createElement("div");
     container.innerHTML = html;
-    const chips = [...container.querySelectorAll<HTMLElement>("[data-type]")].map((element) => [
+    const chips = [
+      ...container.querySelectorAll<HTMLElement>("[data-type]"),
+    ].map((element) => [
       element.tagName.toLowerCase(),
       element.dataset["type"],
       element.textContent,

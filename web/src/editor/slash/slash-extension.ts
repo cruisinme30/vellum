@@ -31,7 +31,8 @@ export function place(element: HTMLElement, rect: DOMRect | null | undefined) {
   element.style.position = "fixed";
   element.style.left = `${String(Math.max(8, Math.min(rect.left, globalThis.innerWidth - 328)))}px`;
   element.style.top = room < 240 ? "" : `${String(below)}px`;
-  element.style.bottom = room < 240 ? `${String(globalThis.innerHeight - rect.top + 6)}px` : "";
+  element.style.bottom =
+    room < 240 ? `${String(globalThis.innerHeight - rect.top + 6)}px` : "";
   element.style.zIndex = "40";
 }
 
@@ -76,7 +77,8 @@ export const SlashCommand = Extension.create<{ t: Translate }>({
           insertSlashItem(target, range, props);
         },
         render: () => {
-          let renderer: ReactRenderer<SlashMenuHandle, SlashMenuProperties> | undefined;
+          let renderer:
+            ReactRenderer<SlashMenuHandle, SlashMenuProperties> | undefined;
           const propertiesFor = (
             properties: SuggestionProps<SlashItem, SlashItem>,
           ): SlashMenuProperties => ({

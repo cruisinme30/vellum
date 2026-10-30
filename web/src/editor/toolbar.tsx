@@ -56,7 +56,9 @@ const ACTIONS: readonly Action[] = [
   },
 ];
 
-/** Arrow keys move focus between the toolbar's buttons, wrapping at the ends. */
+/**
+ * Arrow keys move focus between the toolbar's buttons, wrapping at the ends.
+ */
 const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
   const buttons = [...event.currentTarget.querySelectorAll("button")];
   const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
@@ -68,7 +70,10 @@ const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
   }
 };
 
-/** The formatting toolbar: one tab stop, arrow keys between buttons (WAI-ARIA toolbar). */
+/**
+ * The formatting toolbar: one tab stop, arrow keys between buttons (WAI-ARIA
+ * toolbar).
+ */
 export function Toolbar({
   editor,
   onSelectionTask,

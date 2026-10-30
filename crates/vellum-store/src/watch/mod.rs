@@ -125,7 +125,10 @@ pub struct Reconciler<S> {
 
 impl<S: BlobStore> Reconciler<S> {
     /// Starts from what the index already knows, as `(id, path, etag)`.
-    pub fn new(store: S, known: impl IntoIterator<Item = (ObjectId, BlobPath, Etag)>) -> Self {
+    pub fn new(
+        store: S,
+        known: impl IntoIterator<Item = (ObjectId, BlobPath, Etag)>,
+    ) -> Self {
         let meter = opentelemetry::global::meter("vellum");
         let changes = meter
             .u64_counter("vellum_store_watch_changes_total")
@@ -263,7 +266,11 @@ impl<S: BlobStore> Reconciler<S> {
         self.removals.iter().map(|(.., at)| *at).min()
     }
 
-    async fn touch(&mut self, path: BlobPath, now: Instant) -> StoreResult<Option<Change>> {
+    async fn touch(
+        &mut self,
+        path: BlobPath,
+        now: Instant,
+    ) -> StoreResult<Option<Change>> {
         let blob = match self.store.get(&path).await {
             Ok(blob) => blob,
             Err(StoreError::NotFound(_)) => {
@@ -315,7 +322,11 @@ impl<S: BlobStore> Reconciler<S> {
         Ok(Some(change))
     }
 
-    async fn still_has(&self, path: &BlobPath, id: ObjectId) -> StoreResult<bool> {
+    async fn still_has(
+        &self,
+        path: &BlobPath,
+        id: ObjectId,
+    ) -> StoreResult<bool> {
         match self.store.get(path).await {
             Ok(blob) => Ok(identity(path, &blob.bytes) == Some(id)),
             Err(StoreError::NotFound(_)) => Ok(false),

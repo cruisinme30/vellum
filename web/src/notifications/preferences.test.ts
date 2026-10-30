@@ -30,7 +30,10 @@ describe("defaults", () => {
     expect(defaultChannels("commented")).toEqual(["in_app", "email"]);
     expect(defaultChannels("pull_request")).toEqual(["in_app"]);
     expect(KINDS).toHaveLength(11);
-    expect(KINDS.filter((kind) => isUrgent(kind))).toEqual(["sla_breached", "reminder"]);
+    expect(KINDS.filter((kind) => isUrgent(kind))).toEqual([
+      "sla_breached",
+      "reminder",
+    ]);
   });
 });
 
@@ -44,18 +47,28 @@ describe("withChannel", () => {
   });
 
   it("keeps channels in table order and leaves other kinds alone", () => {
-    const start = { ...DEFAULT_PREFERENCES, channels: { commented: ["push"] as const } };
+    const start = {
+      ...DEFAULT_PREFERENCES,
+      channels: { commented: ["push"] as const },
+    };
     const next = withChannel(start, "state_changed", "push", true);
-    expect(next.channels).toEqual({ commented: ["push"], state_changed: ["in_app", "push"] });
-    expect(withChannel(next, "state_changed", "in_app", false).channels.state_changed).toEqual([
-      "push",
-    ]);
+    expect(next.channels).toEqual({
+      commented: ["push"],
+      state_changed: ["in_app", "push"],
+    });
+    expect(
+      withChannel(next, "state_changed", "in_app", false).channels
+        .state_changed,
+    ).toEqual(["push"]);
   });
 });
 
 describe("wire form", () => {
   const wire: PreferencesWire = {
-    channels: { mentioned: ["push", "in_app", "carrier_pigeon"], future_kind: ["email"] },
+    channels: {
+      mentioned: ["push", "in_app", "carrier_pigeon"],
+      future_kind: ["email"],
+    },
     email_delay_minutes: 5,
     muted: ["ENG-142", "ENG-142"],
     snoozed_until: NULL,
@@ -73,16 +86,26 @@ describe("wire form", () => {
   it("keeps only the kinds that differ from the defaults", () => {
     // The server lists every kind.
     const full: PreferencesWire = {
-      channels: { mentioned: ["in_app", "email", "push"], state_changed: ["in_app", "push"] },
+      channels: {
+        mentioned: ["in_app", "email", "push"],
+        state_changed: ["in_app", "push"],
+      },
       email_delay_minutes: 10,
       muted: [],
     };
-    expect(fromWire(full).channels).toEqual({ state_changed: ["in_app", "push"] });
+    expect(fromWire(full).channels).toEqual({
+      state_changed: ["in_app", "push"],
+    });
   });
 
   it("keeps the email delay within what the server accepts", () => {
-    expect(fromWire({ ...wire, email_delay_minutes: 5000 }).emailDelayMinutes).toBe(1440);
-    expect(toWire({ ...DEFAULT_PREFERENCES, emailDelayMinutes: -3 }).email_delay_minutes).toBe(0);
+    expect(
+      fromWire({ ...wire, email_delay_minutes: 5000 }).emailDelayMinutes,
+    ).toBe(1440);
+    expect(
+      toWire({ ...DEFAULT_PREFERENCES, emailDelayMinutes: -3 })
+        .email_delay_minutes,
+    ).toBe(0);
   });
 
   it("round-trips, leaving snoozed_until out when not snoozed", () => {
@@ -107,14 +130,19 @@ describe("stores", () => {
       snoozed_until: NULL,
     };
     const get = vi.fn(() => Promise.resolve(stored));
-    const send = vi.fn((_method: string, _path: string, body: unknown) => Promise.resolve(body));
+    const send = vi.fn((_method: string, _path: string, body: unknown) =>
+      Promise.resolve(body),
+    );
     const http = { get, send, forgetSession: vi.fn() } as unknown as Http;
     const store = createHttpNotificationPreferencesStore(http);
 
     expect(await store.load()).toEqual(fromWire(stored));
     expect(get).toHaveBeenCalledWith(PREFERENCES_PATH);
 
-    const saved = await store.save({ ...DEFAULT_PREFERENCES, emailDelayMinutes: 0 });
+    const saved = await store.save({
+      ...DEFAULT_PREFERENCES,
+      emailDelayMinutes: 0,
+    });
     expect(send).toHaveBeenCalledWith("PUT", PREFERENCES_PATH, {
       channels: {},
       email_delay_minutes: 0,

@@ -39,8 +39,9 @@ pub struct LogInfo {
 
 /// Persistence for clients and the change log.
 ///
-/// The log keeps the latest version of each record (keyed by space, collection and key) at the
-/// position of its last write, plus tombstones for deletes until pruned.
+/// The log keeps the latest version of each record (keyed by space, collection
+/// and key) at the position of its last write, plus tombstones for deletes
+/// until pruned.
 pub trait SyncStore: Send + Sync + 'static {
     /// The client's state, if it has pushed before.
     fn client(
@@ -58,7 +59,10 @@ pub trait SyncStore: Send + Sync + 'static {
     ) -> impl Future<Output = Result<(), Error>> + Send;
 
     /// Writes changes at new log positions, in order, atomically.
-    fn append(&self, changes: Vec<Change>) -> impl Future<Output = Result<(), Error>> + Send;
+    fn append(
+        &self,
+        changes: Vec<Change>,
+    ) -> impl Future<Output = Result<(), Error>> + Send;
 
     /// Up to `limit` records written after `after`, in log order. With
     /// `live_only`, tombstones are skipped (used to build a full snapshot).
@@ -86,7 +90,10 @@ pub struct AccessKey {
 pub trait ReadAccess: Send + Sync + 'static {
     /// The user's permission epoch: it changes whenever anything the user
     /// can read may have changed. A pull under a new epoch resets.
-    fn epoch(&self, user: UserId) -> impl Future<Output = Result<u64, Error>> + Send;
+    fn epoch(
+        &self,
+        user: UserId,
+    ) -> impl Future<Output = Result<u64, Error>> + Send;
 
     /// Which of `keys` the user may read, in one batched check.
     fn readable(

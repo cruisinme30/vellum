@@ -24,10 +24,23 @@ use jiff::Timestamp;
 use jiff::civil::Date;
 use serde::{Deserialize, Serialize};
 
-use crate::model::{IssueDraft, IssueKey, Priority, Source, StateCategory, WorkflowState};
+use crate::model::{
+    IssueDraft, IssueKey, Priority, Source, StateCategory, WorkflowState,
+};
 
 /// How two issues relate.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    Serialize,
+    Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Relation {
     /// This issue blocks the other.
@@ -156,7 +169,10 @@ fn match_member<'m>(who: &str, members: &'m [Member]) -> Option<&'m Member> {
     })
 }
 
-fn pick_state<'s>(issue: &ImportedIssue, states: &'s [WorkflowState]) -> Option<&'s WorkflowState> {
+fn pick_state<'s>(
+    issue: &ImportedIssue,
+    states: &'s [WorkflowState],
+) -> Option<&'s WorkflowState> {
     states
         .iter()
         .find(|s| s.name.eq_ignore_ascii_case(issue.state_name.trim()))
@@ -164,7 +180,9 @@ fn pick_state<'s>(issue: &ImportedIssue, states: &'s [WorkflowState]) -> Option<
             let category = issue.category.unwrap_or(StateCategory::Backlog);
             states.iter().find(|s| s.category == category)
         })
-        .or_else(|| states.iter().find(|s| s.category == StateCategory::Backlog))
+        .or_else(|| {
+            states.iter().find(|s| s.category == StateCategory::Backlog)
+        })
 }
 
 /// Maps an export onto `team`. `already` lists external IDs imported
@@ -190,7 +208,9 @@ pub fn plan(
             external_id: Some(issue.external_id.clone()),
             message,
         };
-        if already.contains(&issue.external_id) || !seen.insert(issue.external_id.clone()) {
+        if already.contains(&issue.external_id)
+            || !seen.insert(issue.external_id.clone())
+        {
             continue;
         }
         if issue.title.trim().is_empty() {
@@ -225,10 +245,10 @@ pub fn plan(
                 ))),
             }
         }
-        draft.reporter = issue
-            .creator
-            .as_deref()
-            .map(|who| match_member(who, members).map_or_else(|| who.to_owned(), |m| m.id.clone()));
+        draft.reporter = issue.creator.as_deref().map(|who| {
+            match_member(who, members)
+                .map_or_else(|| who.to_owned(), |m| m.id.clone())
+        });
         plan.create.push(Planned {
             draft,
             external_id: issue.external_id.clone(),
@@ -286,7 +306,9 @@ pub fn resolve_links(
             }
             found
         };
-        if let Some(parent) = issue.parent.as_deref().and_then(|p| resolve(p, "parent")) {
+        if let Some(parent) =
+            issue.parent.as_deref().and_then(|p| resolve(p, "parent"))
+        {
             links.push(Link::Parent {
                 child: from.clone(),
                 parent,
@@ -297,7 +319,9 @@ pub fn resolve_links(
                 // Store each relation once, from the side that blocks.
                 let (a, r, b) = match relation {
                     Relation::BlockedBy => (to, Relation::Blocks, from.clone()),
-                    Relation::Related if to < *from => (to, Relation::Related, from.clone()),
+                    Relation::Related if to < *from => {
+                        (to, Relation::Related, from.clone())
+                    }
                     _ => (from.clone(), *relation, to),
                 };
                 if seen.insert((a.clone(), r, b.clone())) {
@@ -325,8 +349,8 @@ pub fn timestamp(text: &str) -> Option<Timestamp> {
         return Some(ts);
     }
     // Jira: 2026-10-29T08:00:00.000+0000
-    if let Ok(zoned) =
-        jiff::fmt::strtime::parse("%Y-%m-%dT%H:%M:%S%.f%z", text).and_then(|t| t.to_timestamp())
+    if let Ok(zoned) = jiff::fmt::strtime::parse("%Y-%m-%dT%H:%M:%S%.f%z", text)
+        .and_then(|t| t.to_timestamp())
     {
         return Some(zoned);
     }
@@ -394,9 +418,11 @@ mod tests {
             issues: vec![a, b, c, issue("X-4", 40)],
             warnings: Vec::new(),
         };
-        let already: BTreeSet<String> = std::iter::once("X-4".to_owned()).collect();
+        let already: BTreeSet<String> =
+            std::iter::once("X-4".to_owned()).collect();
         let plan = plan("linear", &export, "ENG", &states, &members, &already);
-        let ids: Vec<&str> = plan.create.iter().map(|p| p.external_id.as_str()).collect();
+        let ids: Vec<&str> =
+            plan.create.iter().map(|p| p.external_id.as_str()).collect();
         assert_eq!(ids, ["X-1", "X-2"]);
         let first = plan.create.first().map(|p| &p.draft);
         assert_eq!(first.and_then(|d| d.state.as_deref()), Some("d"));
@@ -404,7 +430,8 @@ mod tests {
         let second = plan.create.get(1).map(|p| &p.draft);
         assert_eq!(second.and_then(|d| d.state.as_deref()), Some("r"));
         assert_eq!(second.and_then(|d| d.assignee.as_deref()), Some("u1"));
-        let messages: Vec<&str> = plan.warnings.iter().map(|w| w.message.as_str()).collect();
+        let messages: Vec<&str> =
+            plan.warnings.iter().map(|w| w.message.as_str()).collect();
         assert_eq!(
             messages,
             [

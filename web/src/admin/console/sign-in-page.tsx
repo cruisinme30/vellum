@@ -51,7 +51,11 @@ function SecondFactorForm({
       });
   };
   return (
-    <form className="vl-admin-form" aria-labelledby={`${id}-title`} onSubmit={submit}>
+    <form
+      className="vl-admin-form"
+      aria-labelledby={`${id}-title`}
+      onSubmit={submit}
+    >
       <h2 id={`${id}-title`}>{t("admin-sign-in-2fa")}</h2>
       <fieldset className="vl-admin-fieldset">
         <legend>{t("admin-sign-in-2fa-legend")}</legend>
@@ -92,7 +96,8 @@ function SignIn({ api }: { readonly api: AdminSignInApi }) {
   const [saved, setSaved] = useState<SignInView>();
   const [notice, setNotice] = useState<string>();
   const loaded = useLoaded(() => api.settings(), [api], failureText);
-  if (loaded.state === "loading") return <p className="vl-muted">{t("admin-loading")}</p>;
+  if (loaded.state === "loading")
+    return <p className="vl-muted">{t("admin-loading")}</p>;
   if (loaded.state === "failed") {
     return (
       <p className="vl-field-error" role="alert">
@@ -133,7 +138,9 @@ function SignIn({ api }: { readonly api: AdminSignInApi }) {
         <p className="vl-muted">
           {view.maxTokenDays === null || view.maxTokenDays === undefined
             ? t("admin-sign-in-tokens-uncapped")
-            : t("admin-sign-in-tokens-capped", { days: view.maxTokenDays })}{" "}
+            : t("admin-sign-in-tokens-capped", {
+                days: view.maxTokenDays,
+              })}{" "}
           <Link to="/admin/tokens">{t("admin-sign-in-tokens-link")}</Link>
         </p>
       </section>
@@ -147,7 +154,11 @@ export function SignInPage() {
   return (
     <AdminScreen title={t("admin-sign-in")} intro={t("admin-sign-in-intro")}>
       {(api) =>
-        api.signIn === undefined ? <p>{t("admin-needs-server")}</p> : <SignIn api={api.signIn} />
+        api.signIn === undefined ? (
+          <p>{t("admin-needs-server")}</p>
+        ) : (
+          <SignIn api={api.signIn} />
+        )
       }
     </AdminScreen>
   );

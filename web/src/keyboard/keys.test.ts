@@ -13,14 +13,28 @@ import {
 } from "./keys";
 
 function press(key: string, extra: Partial<KeyLike> = {}): KeyLike {
-  return { key, metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, ...extra };
+  return {
+    key,
+    metaKey: false,
+    ctrlKey: false,
+    altKey: false,
+    shiftKey: false,
+    ...extra,
+  };
 }
 
 describe("parseBinding", () => {
   it("reads modifiers, named keys and chords", () => {
-    expect(parseBinding("mod+k")).toEqual([{ key: "k", mod: true, alt: false, shift: false }]);
+    expect(parseBinding("mod+k")).toEqual([
+      { key: "k", mod: true, alt: false, shift: false },
+    ]);
     expect(parseBinding("g i")).toHaveLength(2);
-    expect(parseBinding("shift+C")[0]).toEqual({ key: "c", mod: false, alt: false, shift: true });
+    expect(parseBinding("shift+C")[0]).toEqual({
+      key: "c",
+      mod: false,
+      alt: false,
+      shift: true,
+    });
     expect(parseBinding("mod+plus")[0]?.key).toBe("+");
     expect(parseBinding("mod+shift+.")[0]).toEqual({
       key: ".",
@@ -58,8 +72,12 @@ describe("strokeOf", () => {
   });
 
   it("counts shift for letters but not for punctuation", () => {
-    expect(strokeOf(press("C", { shiftKey: true, code: "KeyC" }), "mac")?.shift).toBe(true);
-    expect(strokeOf(press("?", { shiftKey: true, code: "Slash" }), "mac")).toEqual({
+    expect(
+      strokeOf(press("C", { shiftKey: true, code: "KeyC" }), "mac")?.shift,
+    ).toBe(true);
+    expect(
+      strokeOf(press("?", { shiftKey: true, code: "Slash" }), "mac"),
+    ).toEqual({
       key: "?",
       mod: false,
       alt: false,
@@ -68,8 +86,13 @@ describe("strokeOf", () => {
   });
 
   it("reads punctuation from the physical key under mod", () => {
-    const stroke = strokeOf(press(">", { metaKey: true, shiftKey: true, code: "Period" }), "mac");
-    expect(stroke && sameStroke(stroke, parseBinding("mod+shift+.")[0] ?? stroke)).toBe(true);
+    const stroke = strokeOf(
+      press(">", { metaKey: true, shiftKey: true, code: "Period" }),
+      "mac",
+    );
+    expect(
+      stroke && sameStroke(stroke, parseBinding("mod+shift+.")[0] ?? stroke),
+    ).toBe(true);
   });
 
   it("names the space bar and other named keys", () => {
@@ -82,7 +105,9 @@ describe("formatBinding", () => {
   it("shows glyphs on a Mac and words elsewhere", () => {
     expect(formatBinding(parseBinding("mod+k"), "mac")).toBe("⌘K");
     expect(formatBinding(parseBinding("mod+k"), "other")).toBe("Ctrl+K");
-    expect(formatBinding(parseBinding("alt+shift+c"), "other")).toBe("Alt+Shift+C");
+    expect(formatBinding(parseBinding("alt+shift+c"), "other")).toBe(
+      "Alt+Shift+C",
+    );
     expect(formatBinding(parseBinding("mod+alt+shift+m"), "mac")).toBe("⌘⌥⇧M");
     expect(formatBinding(parseBinding("g i"), "mac")).toBe("G then I");
     expect(formatBinding(parseBinding("space"), "mac")).toBe("Space");
@@ -92,16 +117,23 @@ describe("formatBinding", () => {
 describe("currentPlatform", () => {
   it("detects Apple devices", () => {
     expect(currentPlatform({ platform: "MacIntel" })).toBe("mac");
-    expect(currentPlatform({ userAgent: "Mozilla/5.0 (iPad; CPU OS 18_0)" })).toBe("mac");
+    expect(
+      currentPlatform({ userAgent: "Mozilla/5.0 (iPad; CPU OS 18_0)" }),
+    ).toBe("mac");
     expect(currentPlatform({ platform: "Win32" })).toBe("other");
     expect(currentPlatform({})).toBe("other");
   });
 
   it("trusts the operating system over a Safari user agent on Linux", () => {
-    const safari = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15";
-    expect(currentPlatform({ platform: "Linux x86_64", userAgent: safari })).toBe("other");
+    const safari =
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15";
+    expect(
+      currentPlatform({ platform: "Linux x86_64", userAgent: safari }),
+    ).toBe("other");
     expect(currentPlatform({ platform: "", userAgent: safari })).toBe("mac");
-    expect(currentPlatform({ platform: "iPhone", userAgent: safari })).toBe("mac");
+    expect(currentPlatform({ platform: "iPhone", userAgent: safari })).toBe(
+      "mac",
+    );
     expect(["mac", "other"]).toContain(currentPlatform());
   });
 });

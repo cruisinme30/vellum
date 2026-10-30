@@ -30,15 +30,18 @@ pub mod sharing;
 pub mod sql;
 
 pub use drive::{
-    AdminSpace, Attachment, Drive, Filter, Imported, MAX_ATTACHMENTS, MAX_IMPORT_FILES,
-    MAX_TREE_ITEMS, MY_DRIVE_NAME, OP_SECONDS, OPS_TOTAL, SaveOutcome, Saved, Tree,
+    AdminSpace, Attachment, Drive, Filter, Imported, MAX_ATTACHMENTS,
+    MAX_IMPORT_FILES, MAX_TREE_ITEMS, MY_DRIVE_NAME, OP_SECONDS, OPS_TOTAL,
+    SaveOutcome, Saved, Tree,
 };
 pub use error::{DriveError, DriveResult};
 pub use model::{
-    Activity, ActivityKind, DriveTotals, Node, NodeKind, RetentionPolicy, ScanReport, Space,
-    SpaceKind, SpaceSettings, TrashState, Usage, VersionRecord,
+    Activity, ActivityKind, DriveTotals, Node, NodeKind, RetentionPolicy,
+    ScanReport, Space, SpaceKind, SpaceSettings, TrashState, Usage,
+    VersionRecord,
 };
 pub use ports::{
-    Access, Clock, ContentCheck, DriveIndex, Member, Permission, SpaceRole, SystemClock,
+    Access, Clock, ContentCheck, DriveIndex, Member, Permission, SpaceRole,
+    SystemClock,
 };
 pub use service::{DriveService, PageWrites};

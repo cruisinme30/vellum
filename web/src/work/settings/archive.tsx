@@ -41,11 +41,16 @@ export function ArchiveSection({
     );
   };
   return (
-    <section className="vl-settings-section vl-settings-archive" aria-labelledby={heading}>
+    <section
+      className="vl-settings-section vl-settings-archive"
+      aria-labelledby={heading}
+    >
       <h2 id={heading}>{t("team-settings-archive-heading")}</h2>
       {team.archived && (
         <>
-          <p role="status">{t("team-settings-archived-note", { name: team.name })}</p>
+          <p role="status">
+            {t("team-settings-archived-note", { name: team.name })}
+          </p>
           <button
             type="button"
             className="vl-filled-button"
@@ -61,7 +66,9 @@ export function ArchiveSection({
       {!team.archived && asking && (
         <div
           role="group"
-          aria-label={t("team-settings-archive-confirm-label", { name: team.name })}
+          aria-label={t("team-settings-archive-confirm-label", {
+            name: team.name,
+          })}
         >
           <p>{t("team-settings-archive-confirm", { name: team.name })}</p>
           <button

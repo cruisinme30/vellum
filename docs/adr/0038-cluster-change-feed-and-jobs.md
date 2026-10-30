@@ -19,17 +19,17 @@ vellum: 1
 
 ## Context
 
-With several replicas behind one Service ([ADR 0037](0037-running-several-replicas.md)),
-collections, the book list and the path-to-space list behind permission
-checks live in each replica's memory. Only the local file watcher cleared
-them, and the space list reloaded every 30 s, so a write on one replica
-stayed invisible on the others. The brief wants a change on one replica
-visible on all of them within a second (#438). Background work ran on
-every replica too: each pod rescanned the whole workspace at startup, the
-search feed swept every page each second, and the calendar sync ran N
-times (#439), while notification delivery waited for a queue (#63). This
-record collects the decisions that coordinate replicas through the shared
-index database.
+With several replicas behind one Service ([ADR
+0037](0037-running-several-replicas.md)), collections, the book list and the
+path-to-space list behind permission checks live in each replica's memory. Only
+the local file watcher cleared them, and the space list reloaded every 30 s, so
+a write on one replica stayed invisible on the others. The brief wants a change
+on one replica visible on all of them within a second (#438). Background work
+ran on every replica too: each pod rescanned the whole workspace at startup, the
+search feed swept every page each second, and the calendar sync ran N times
+(#439), while notification delivery waited for a queue (#63). This record
+collects the decisions that coordinate replicas through the shared index
+database.
 
 ## Decisions
 

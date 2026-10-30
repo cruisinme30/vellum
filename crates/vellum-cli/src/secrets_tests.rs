@@ -25,7 +25,9 @@ fn token() -> String {
 async fn server(dir: &std::path::Path) -> (Services, Router) {
     let mut config = vellum_kernel::Config::default();
     config.data_dir = dir.to_path_buf();
-    let plaintext = |k: &str| (k == crate::workspace::PLAINTEXT_VAR).then(|| "1".to_owned());
+    let plaintext = |k: &str| {
+        (k == crate::workspace::PLAINTEXT_VAR).then(|| "1".to_owned())
+    };
     let services = Services::open(ORIGIN, Some(dir), None)
         .unwrap()
         .with_workspace(&config, plaintext)
@@ -51,14 +53,20 @@ async fn server(dir: &std::path::Path) -> (Services, Router) {
 async fn set_policy(app: &Router, w: &World, policy: &str, allow: &[&str]) {
     let current = send(
         app,
-        finish(request("GET", "/api/v1/admin/settings").header(header::COOKIE, &w.cookie)),
+        finish(
+            request("GET", "/api/v1/admin/settings")
+                .header(header::COOKIE, &w.cookie),
+        ),
     )
     .await;
     assert_eq!(current.status, StatusCode::OK, "{}", current.text);
     let mut body = current.json();
     body["settings"]["security"]["secret_scanning"] = json!(policy);
     body["settings"]["security"]["secret_allow"] = json!(allow);
-    let update = json!({"expected_version": body["version"], "settings": body["settings"]});
+    let update = json!({
+        "expected_version": body["version"],
+        "settings": body["settings"]
+    });
     let mut put = w.post("/api/v1/admin/settings", &update);
     *put.method_mut() = http::Method::PUT;
     let saved = send(app, put).await;
@@ -70,7 +78,11 @@ async fn new_space(app: &Router, w: &World) -> String {
         app,
         w.post(
             "/api/v1/drive/spaces",
-            &json!({"kind": "shared_drive", "slug": "ops", "name": "Operations"}),
+            &json!({
+                "kind": "shared_drive",
+                "slug": "ops",
+                "name": "Operations"
+            }),
         ),
     )
     .await;
@@ -78,7 +90,13 @@ async fn new_space(app: &Router, w: &World) -> String {
     space.json()["id"].as_str().unwrap().to_owned()
 }
 
-async fn create(app: &Router, w: &World, space: &str, title: &str, body: &str) -> Reply {
+async fn create(
+    app: &Router,
+    w: &World,
+    space: &str,
+    title: &str,
+    body: &str,
+) -> Reply {
     send(
         app,
         w.post(
@@ -126,7 +144,10 @@ async fn scan(app: &Router, w: &World, text: &str) -> Value {
 async fn audit_text(app: &Router, w: &World) -> String {
     let reply = send(
         app,
-        finish(request("GET", "/api/v1/admin/audit").header(header::COOKIE, &w.cookie)),
+        finish(
+            request("GET", "/api/v1/admin/audit")
+                .header(header::COOKIE, &w.cookie),
+        ),
     )
     .await;
     assert_eq!(reply.status, StatusCode::OK, "{}", reply.text);
@@ -184,7 +205,8 @@ async fn secrets_warn_by_default_block_when_asked_and_never_leak() {
     )
     .await;
     assert!(
-        drafted.json()["result"]["isError"] == json!(true) || drafted.status.is_client_error(),
+        drafted.json()["result"]["isError"] == json!(true)
+            || drafted.status.is_client_error(),
         "{}",
         drafted.text
     );

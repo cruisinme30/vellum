@@ -12,7 +12,8 @@ vellum: 1
 - Date: `2026-10-29`
 - Status: accepted
 - Decisions: `D82`, `D83`, `D84`, `D247`, `D248`, `D249`
-- Issue: `#152` (with `#153`–`#156`, `#158`, `#159`, `#161`, `#162`, `#163`, `#442`, `#515`, `#101`)
+- Issue: `#152` (with `#153`–`#156`, `#158`, `#159`, `#161`, `#162`, `#163`,
+  `#442`, `#515`, `#101`)
 - Pull requests: `#243`
 
 :::
@@ -128,6 +129,6 @@ port.
 - Non-English quick-add is a follow-up.
 
 In the web app (D247-D249), a typed `T` still replaces a selection while
-editing; taking the plain key there would feel like a bug. Title search covers the
-pages in the person's spaces; shared-with-me items join when the tree
-holds them.
+editing; taking the plain key there would feel like a bug. Title search covers
+the pages in the person's spaces; shared-with-me items join when the tree holds
+them.

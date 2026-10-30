@@ -17,13 +17,18 @@ export function safeUrl(raw: string): string | undefined {
   }
   try {
     const url = new URL(value);
-    return url.protocol === "https:" || url.protocol === "http:" ? url.href : undefined;
+    return url.protocol === "https:" || url.protocol === "http:"
+      ? url.href
+      : undefined;
   } catch {
     return undefined;
   }
 }
 
-/** `vellum://attachment/{page}/{name}`: a file attached to a page (ADR 0039 D211). */
+/**
+ * `vellum://attachment/{page}/{name}`: a file attached to a page (ADR 0039
+ * D211).
+ */
 const ATTACHMENT_REF =
   /^vellum:\/\/attachment\/([0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26})\/([^\s/?#]+)$/;
 
@@ -38,7 +43,10 @@ export function attachmentUrl(raw: string): string | undefined {
   return `/api/v1/attachments/${page}/${name}`;
 }
 
-/** An image's source to put in the DOM: an attachment's download path, or a safe URL. */
+/**
+ * An image's source to put in the DOM: an attachment's download path, or a safe
+ * URL.
+ */
 export function mediaUrl(raw: string): string | undefined {
   return attachmentUrl(raw) ?? safeUrl(raw);
 }
@@ -49,20 +57,29 @@ export interface EmbedTarget {
   readonly src: string;
 }
 
-type Matcher = (url: URL, host: string, parts: readonly string[]) => EmbedTarget | undefined;
+type Matcher = (
+  url: URL,
+  host: string,
+  parts: readonly string[],
+) => EmbedTarget | undefined;
 
 const youtubeId = (url: URL, host: string, parts: readonly string[]) => {
   if (host === "youtu.be") {
     return parts[0];
   }
-  return host === "youtube.com" ? (url.searchParams.get("v") ?? undefined) : undefined;
+  return host === "youtube.com"
+    ? (url.searchParams.get("v") ?? undefined)
+    : undefined;
 };
 
 const MATCHERS: readonly Matcher[] = [
   (url, host, parts) => {
     const id = youtubeId(url, host, parts);
     return id !== undefined && /^[\w-]{6,}$/.test(id)
-      ? { provider: "YouTube", src: `https://www.youtube-nocookie.com/embed/${id}` }
+      ? {
+          provider: "YouTube",
+          src: `https://www.youtube-nocookie.com/embed/${id}`,
+        }
       : undefined;
   },
   (_url, host, [kind, id]) =>
@@ -70,19 +87,29 @@ const MATCHERS: readonly Matcher[] = [
       ? { provider: "Loom", src: `https://www.loom.com/embed/${id}` }
       : undefined,
   (url, host, [kind]) =>
-    host === "figma.com" && ["file", "design", "proto", "board"].includes(kind ?? "")
+    host === "figma.com" &&
+    ["file", "design", "proto", "board"].includes(kind ?? "")
       ? {
           provider: "Figma",
           src: `https://www.figma.com/embed?embed_host=vellum&url=${encodeURIComponent(url.href)}`,
         }
       : undefined,
   (_url, host, [user, kind, id]) =>
-    host === "codepen.io" && kind === "pen" && user !== undefined && id !== undefined
-      ? { provider: "CodePen", src: `https://codepen.io/${user}/embed/${id}?default-tab=result` }
+    host === "codepen.io" &&
+    kind === "pen" &&
+    user !== undefined &&
+    id !== undefined
+      ? {
+          provider: "CodePen",
+          src: `https://codepen.io/${user}/embed/${id}?default-tab=result`,
+        }
       : undefined,
   (_url, host, [user, id]) =>
     host === "gist.github.com" && user !== undefined && id !== undefined
-      ? { provider: "GitHub Gist", src: `https://gist.github.com/${user}/${id}.pibb` }
+      ? {
+          provider: "GitHub Gist",
+          src: `https://gist.github.com/${user}/${id}.pibb`,
+        }
       : undefined,
   (url, host, [maps, embed]) =>
     host === "google.com" && maps === "maps" && embed === "embed"

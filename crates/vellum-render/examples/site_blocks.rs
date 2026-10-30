@@ -59,15 +59,24 @@ fn main() -> ExitCode {
         let source = match std::fs::read_to_string(path) {
             Ok(source) => source,
             Err(error) => {
-                let _ = writeln!(stderr, "site_blocks: {}: {error}", path.display());
+                let _ = writeln!(
+                    stderr,
+                    "site_blocks: {}: {error}",
+                    path.display()
+                );
                 return ExitCode::FAILURE;
             }
         };
         let dir = path.parent().unwrap_or_else(|| Path::new("."));
-        let (page, count) = render_page(&renderer, &source, &|src| image_size(dir, src));
+        let (page, count) =
+            render_page(&renderer, &source, &|src| image_size(dir, src));
         if count > 0 {
             if let Err(error) = std::fs::write(path, page) {
-                let _ = writeln!(stderr, "site_blocks: {}: {error}", path.display());
+                let _ = writeln!(
+                    stderr,
+                    "site_blocks: {}: {error}",
+                    path.display()
+                );
                 return ExitCode::FAILURE;
             }
             blocks += count;
@@ -93,7 +102,8 @@ fn site_stylesheet() -> String {
 /// stylesheet sets the article's width and type, which the book already does.
 const SITE_CSS: &str = "
 .vl-render.vl-site-block { margin-block: 1.5em; }
-.vl-site-block > .vl-doc { background: transparent; font-family: inherit; font-size: inherit; }
+.vl-site-block > .vl-doc { background: transparent; font-family: inherit; \
+    font-size: inherit; }
 .vl-site-block > .vl-doc > :first-child { margin-block-start: 0; }
 .vl-site-block > .vl-doc > :last-child { margin-block-end: 0; }
 .vl-render.vl-site-block svg { max-width: 100%; height: auto; }
@@ -112,7 +122,11 @@ type ImageSize<'a> = &'a dyn Fn(&str) -> Option<(usize, usize)>;
 
 /// Renders the rich blocks of one page. Returns the new page and how many
 /// blocks were rendered. `size` gives the size of the page's own images.
-fn render_page(renderer: &Renderer, source: &str, size: ImageSize<'_>) -> (String, usize) {
+fn render_page(
+    renderer: &Renderer,
+    source: &str,
+    size: ImageSize<'_>,
+) -> (String, usize) {
     let (front, body) = split_front_matter(source);
     let mut out = String::from(front);
     let mut count = 0;
@@ -127,7 +141,8 @@ fn render_page(renderer: &Renderer, source: &str, size: ImageSize<'_>) -> (Strin
                     &RenderOptions::default(),
                 );
                 out.push('\n');
-                let html = size_images(&fix_links(&wrap_article(&page.html)), size);
+                let html =
+                    size_images(&fix_links(&wrap_article(&page.html)), size);
                 out.push_str(&one_line(&html));
                 out.push_str("\n\n");
                 count += 1;
@@ -425,7 +440,10 @@ mod tests {
     use super::*;
 
     fn renderer() -> Renderer {
-        Renderer::new(Figures::new(FigureConfig::default()).unwrap_or_else(|_| unreachable!()))
+        Renderer::new(
+            Figures::new(FigureConfig::default())
+                .unwrap_or_else(|_| unreachable!()),
+        )
     }
 
     fn kinds(body: &str) -> Vec<&'static str> {
@@ -440,13 +458,16 @@ mod tests {
 
     #[test]
     fn containers_and_figures_render_and_examples_stay_source() {
-        let body = "Intro\n\n::: tip\nHi\n:::\n\n````markdown\n::: tip\nHi\n:::\n````\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\n```rust\nfn main() {}\n```\n";
+        let body = "Intro\n\n::: tip\nHi\n:::\n\n````markdown\n::: tip\nHi\n\
+            :::\n````\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\n```rust\n\
+            fn main() {}\n```\n";
         assert_eq!(kinds(body), ["md", "block", "md", "block", "md"]);
     }
 
     #[test]
     fn nested_containers_close_at_their_own_colon_count() {
-        let body = ":::: columns\n::: column\nA\n:::\n::: column\nB\n:::\n::::\nafter\n";
+        let body = ":::: columns\n::: column\nA\n:::\n::: column\nB\n:::\n\
+            ::::\nafter\n";
         let parts = split(body);
         assert_eq!(parts.len(), 2);
         assert_eq!(parts.get(1), Some(&Part::Markdown("after\n".into())));
@@ -484,7 +505,8 @@ mod tests {
     fn a_page_renders_a_mermaid_diagram_to_svg() {
         let (page, count) = render_page(
             &renderer(),
-            "---\ntitle: T\n---\n# T\n\n```mermaid\nflowchart LR\n  A --> B\n```\n",
+            "---\ntitle: T\n---\n# T\n\n```mermaid\nflowchart LR\n  A --> B\n\
+                ```\n",
             &|_| None,
         );
         assert_eq!(count, 1);
@@ -495,14 +517,17 @@ mod tests {
 
     #[test]
     fn images_keep_their_space_before_they_load() {
-        let size = |src: &str| (src == "a.jpg" || src == "b.svg").then_some((800, 600));
+        let size = |src: &str| {
+            (src == "a.jpg" || src == "b.svg").then_some((800, 600))
+        };
         assert_eq!(
             size_images("<p><img src=\"a.jpg\" alt=\"A\"></p>", &size),
             "<p><img width=\"800\" height=\"600\" src=\"a.jpg\" alt=\"A\"></p>"
         );
         assert_eq!(
             size_images("<img src=\"b.svg\" width=\"80%\">", &size),
-            "<img style=\"aspect-ratio: 800 / 600\" src=\"b.svg\" width=\"80%\">"
+            "<img style=\"aspect-ratio: 800 / 600\" src=\"b.svg\" \
+                width=\"80%\">"
         );
         assert_eq!(
             size_images("<img src=\"https://x/c.png\">", &size),

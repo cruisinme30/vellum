@@ -61,7 +61,11 @@ function AskList({ api }: { readonly api: PlanningApi }) {
 export function AsksPage() {
   const t = useT();
   return (
-    <ServerScreen api="planning" title={t("plan-asks")} className="vl-work vl-plan">
+    <ServerScreen
+      api="planning"
+      title={t("plan-asks")}
+      className="vl-work vl-plan"
+    >
       {(api) => (
         <>
           <p className="vl-muted">{t("plan-asks-intro")}</p>
@@ -75,7 +79,14 @@ export function AsksPage() {
 function Answer({ field }: { readonly field: FormOut["fields"][number] }) {
   const t = useT();
   if (field.kind === "long_text") {
-    return <textarea name={field.key} rows={5} required={field.required} maxLength={16_384} />;
+    return (
+      <textarea
+        name={field.key}
+        rows={5}
+        required={field.required}
+        maxLength={16_384}
+      />
+    );
   }
   if (field.kind === "select") {
     return (
@@ -127,7 +138,10 @@ function AskForm({
       <div role="status">
         <p>{t("plan-ask-filed", { key: filed.key })}</p>
         <p>
-          <Link to={`/issues/${encodeURIComponent(filed.key)}`}>{t("plan-ask-open")}</Link> ·{" "}
+          <Link to={`/issues/${encodeURIComponent(filed.key)}`}>
+            {t("plan-ask-open")}
+          </Link>{" "}
+          ·{" "}
           <button
             type="button"
             className="vl-text-button"
@@ -143,11 +157,17 @@ function AskForm({
   }
   return (
     <form className="vl-plan-form vl-plan-ask" onSubmit={onSubmit}>
-      {form.description !== "" && <p className="vl-muted">{form.description}</p>}
+      {form.description !== "" && (
+        <p className="vl-muted">{form.description}</p>
+      )}
       {form.fields.map((field) => (
         <Field
           key={field.key}
-          label={field.required ? t("plan-ask-required", { label: field.label }) : field.label}
+          label={
+            field.required
+              ? t("plan-ask-required", { label: field.label })
+              : field.label
+          }
         >
           <Answer field={field} />
         </Field>
@@ -175,7 +195,8 @@ function Ask({
     <Ready loaded={loaded}>
       {(forms) => {
         const form = forms.find((f) => f.slug === slug);
-        if (form === undefined) return <p className="vl-field-error">{t("plan-ask-missing")}</p>;
+        if (form === undefined)
+          return <p className="vl-field-error">{t("plan-ask-missing")}</p>;
         return (
           <>
             <p className="vl-muted">

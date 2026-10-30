@@ -53,8 +53,13 @@ function fakeApi(linkSlack: WorkApi["linkSlack"]): WorkApi {
 describe("linking Slack from Save as task", () => {
   it("asks before linking, then confirms", async () => {
     const linkSlack = vi.fn(() => Promise.resolve());
-    const user = renderAt("/my-work?slack_link=T01.U01.99.abc", fakeApi(linkSlack));
-    expect(await screen.findByText(/Link the Slack account that sent you here/u)).toBeTruthy();
+    const user = renderAt(
+      "/my-work?slack_link=T01.U01.99.abc",
+      fakeApi(linkSlack),
+    );
+    expect(
+      await screen.findByText(/Link the Slack account that sent you here/u),
+    ).toBeTruthy();
     expect(linkSlack).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Link Slack" }));
     expect(linkSlack).toHaveBeenCalledWith("T01.U01.99.abc");
@@ -62,7 +67,9 @@ describe("linking Slack from Save as task", () => {
   });
 
   it("shows the server's refusal and can be dismissed", async () => {
-    const linkSlack = vi.fn(() => Promise.reject(new Error("this Slack link has expired")));
+    const linkSlack = vi.fn(() =>
+      Promise.reject(new Error("this Slack link has expired")),
+    );
     const user = renderAt("/my-work?slack_link=bad", fakeApi(linkSlack));
     await user.click(await screen.findByRole("button", { name: "Link Slack" }));
     const alert = await screen.findByRole("alert");

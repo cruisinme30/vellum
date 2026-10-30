@@ -84,14 +84,28 @@ export function priorityId(priority: number): string {
 export const HEALTHS: readonly string[] = HEALTH;
 
 /** A project's or initiative's health, as a coloured chip with text. */
-export function HealthChip({ health }: { readonly health: string | null | undefined }) {
+export function HealthChip({
+  health,
+}: {
+  readonly health: string | null | undefined;
+}) {
   const t = useT();
   const known: string = HEALTH.find((h) => h === health) ?? NO_HEALTH;
-  return <span className={`vl-health vl-health-${known}`}>{t(`plan-health-${known}`)}</span>;
+  return (
+    <span className={`vl-health vl-health-${known}`}>
+      {t(`plan-health-${known}`)}
+    </span>
+  );
 }
 
 /** A labelled progress bar: `percent` complete. */
-export function Progress({ percent, label }: { readonly percent: number; readonly label: string }) {
+export function Progress({
+  percent,
+  label,
+}: {
+  readonly percent: number;
+  readonly label: string;
+}) {
   const value = Math.max(0, Math.min(100, Math.round(percent)));
   return (
     <span className="vl-progress">

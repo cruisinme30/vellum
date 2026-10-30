@@ -17,7 +17,9 @@ use vellum_api::auth::{Authenticated, Authenticator, RequestMeta};
 use vellum_api::config::GatewayConfig;
 use vellum_api::gateway::{Gateway, GatewayBuilder};
 use vellum_authz::{Authz, MemoryStore};
-use vellum_contracts::{BoxFuture, CredentialKind, Principal, Scope, ScopeSet, Service};
+use vellum_contracts::{
+    BoxFuture, CredentialKind, Principal, Scope, ScopeSet, Service,
+};
 use vellum_drive::authz::AuthzAccess;
 use vellum_drive::memory::MemoryIndex;
 use vellum_drive::{Drive, DriveService};
@@ -47,18 +49,28 @@ impl Authenticator for Tokens {
             .unwrap_or_default();
         let signed_in_at = |id, scopes, at| {
             Ok(Authenticated {
-                principal: Principal::user(id, CredentialKind::ApiToken, scopes, at),
+                principal: Principal::user(
+                    id,
+                    CredentialKind::ApiToken,
+                    scopes,
+                    at,
+                ),
                 csrf_binding: None,
             })
         };
         let user = |id, scopes| signed_in_at(id, scopes, Timestamp::now());
-        let an_hour_ago = Timestamp::from_unix_ms(Timestamp::now().unix_ms() - 3_600_000)
-            .unwrap_or_else(|_| Timestamp::now());
+        let an_hour_ago =
+            Timestamp::from_unix_ms(Timestamp::now().unix_ms() - 3_600_000)
+                .unwrap_or_else(|_| Timestamp::now());
         let result = match header {
             "Bearer alice" => user(ALICE, ScopeSet::FULL),
             "Bearer bob" => user(BOB, ScopeSet::FULL),
-            "Bearer alice-read" => user(ALICE, ScopeSet::from_scopes([Scope::Read])),
-            "Bearer alice-stale" => signed_in_at(ALICE, ScopeSet::FULL, an_hour_ago),
+            "Bearer alice-read" => {
+                user(ALICE, ScopeSet::from_scopes([Scope::Read]))
+            }
+            "Bearer alice-stale" => {
+                signed_in_at(ALICE, ScopeSet::FULL, an_hour_ago)
+            }
             "" => Ok(Authenticated::anonymous()),
             _ => Err(Error::new(ErrorKind::Unauthenticated, "invalid token")),
         };
@@ -187,7 +199,11 @@ async fn admins_manage_spaces_over_rest() -> TestResult {
         "POST",
         "/api/v1/admin/spaces",
         "alice",
-        Some(json!({"slug": "ops", "name": "Operations", "owner_id": BOB.to_string()})),
+        Some(json!({
+            "slug": "ops",
+            "name": "Operations",
+            "owner_id": BOB.to_string()
+        })),
     )
     .await?;
     let space_id = field(&made, "/space/id");
@@ -206,7 +222,8 @@ async fn admins_manage_spaces_over_rest() -> TestResult {
     let listed = ok(&w, "GET", "/api/v1/admin/spaces", "alice", None).await?;
     assert_eq!(field(&listed, "/spaces/0/space/name"), "Operations");
 
-    let reader = call(&w, "GET", "/api/v1/admin/spaces", "alice-read", None).await?;
+    let reader =
+        call(&w, "GET", "/api/v1/admin/spaces", "alice-read", None).await?;
     assert_eq!(reader.status, StatusCode::FORBIDDEN, "{}", reader.text);
     let stale = call(
         &w,
@@ -229,7 +246,11 @@ async fn a_page_lives_through_rest() -> TestResult {
         "POST",
         "/api/v1/drive/spaces",
         "alice",
-        Some(json!({"kind": "shared_drive", "slug": "eng", "name": "Engineering"})),
+        Some(json!({
+            "kind": "shared_drive",
+            "slug": "eng",
+            "name": "Engineering"
+        })),
     )
     .await?;
     let space_id = field(&space, "/id");
@@ -247,7 +268,11 @@ async fn a_page_lives_through_rest() -> TestResult {
         "POST",
         &format!("/api/v1/drive/spaces/{space_id}/pages"),
         "alice",
-        Some(json!({"parent_id": folder_id, "title": "Roadmap", "body": "Q1: ship"})),
+        Some(json!({
+            "parent_id": folder_id,
+            "title": "Roadmap",
+            "body": "Q1: ship"
+        })),
     )
     .await?;
     let page_id = field(&page, "/id");
@@ -396,7 +421,11 @@ async fn the_drive_and_the_scope_both_decide() -> TestResult {
         "POST",
         "/api/v1/drive/spaces",
         "alice",
-        Some(json!({"kind": "shared_drive", "slug": "eng", "name": "Engineering"})),
+        Some(json!({
+            "kind": "shared_drive",
+            "slug": "eng",
+            "name": "Engineering"
+        })),
     )
     .await?;
     let space_id = field(&space, "/id");
@@ -478,7 +507,11 @@ async fn graphql_reads_and_writes_the_drive() -> TestResult {
         "POST",
         "/api/graphql",
         "alice",
-        gql(r#"mutation { driveCreateSpace(input: {kind: shared_drive, slug: "eng", name: "Engineering"}) { id name } }"#.to_owned()),
+        gql(concat!(
+            r#"mutation { driveCreateSpace(input: {kind: shared_drive, slug: "#,
+            r#""eng", name: "Engineering"}) { id name } }"#,
+        )
+        .to_owned()),
     )
     .await?;
     let space_id = field(&space, "/data/driveCreateSpace/id");
@@ -488,9 +521,11 @@ async fn graphql_reads_and_writes_the_drive() -> TestResult {
         "POST",
         "/api/graphql",
         "alice",
-        gql(format!(
-            r#"mutation {{ driveCreatePage(input: {{space_id: "{space_id}", title: "Notes", body: "hi"}}) {{ id title kind }} }}"#
-        )),
+        gql(format!(concat!(
+            r#"mutation {{ driveCreatePage(input: {{space_id: "#,
+            r#""{space_id}", title: "Notes", body: "hi"}}) {{ id title "#,
+            r#"kind }} }}"#,
+        ))),
     )
     .await?;
     let page_id = field(&page, "/data/driveCreatePage/id");
@@ -500,9 +535,10 @@ async fn graphql_reads_and_writes_the_drive() -> TestResult {
         "POST",
         "/api/graphql",
         "alice",
-        gql(format!(
-            r#"{{ driveRead(input: {{id: "{page_id}"}}) {{ content item {{ title }} }} }}"#
-        )),
+        gql(format!(concat!(
+            r#"{{ driveRead(input: {{id: "{page_id}"}}) {{ content item "#,
+            r#"{{ title }} }} }}"#,
+        ))),
     )
     .await?;
     assert!(

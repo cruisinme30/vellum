@@ -10,7 +10,9 @@
 //! hands its `issues` calls to [`LiveIssues::view`], or uses
 //! [`LiveIssues`] as the resolver when nothing else needs resolving.
 
-use vellum_render::resolve::{IssueCard, IssueGroup, IssueLayout, IssueView, IssuesAt, Resolver};
+use vellum_render::resolve::{
+    IssueCard, IssueGroup, IssueLayout, IssueView, IssuesAt, Resolver,
+};
 use vellum_work::{Priority, UserRef};
 
 use super::WorkService;
@@ -92,7 +94,11 @@ fn priority_name(n: u8) -> Option<String> {
 impl WorkService {
     /// Runs every `::: issues` block of `markdown` for `viewer`, ready for
     /// the page renderer to look up.
-    pub async fn live_issues(&self, markdown: &str, viewer: &UserRef) -> LiveIssues {
+    pub async fn live_issues(
+        &self,
+        markdown: &str,
+        viewer: &UserRef,
+    ) -> LiveIssues {
         LiveIssues {
             blocks: self.issue_embeds(markdown, viewer).await,
         }

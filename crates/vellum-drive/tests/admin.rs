@@ -16,7 +16,9 @@ use vellum_db::{Index, IndexConfig};
 use vellum_drive::authz::{AuthzAccess, TreeSync};
 use vellum_drive::memory::MemoryIndex;
 use vellum_drive::sql::SqlIndex;
-use vellum_drive::{Drive, DriveError, DriveIndex, Member, SpaceKind, SpaceRole};
+use vellum_drive::{
+    Drive, DriveError, DriveIndex, Member, SpaceKind, SpaceRole,
+};
 use vellum_kernel::{Actor, UserId};
 use vellum_store::LocalStore;
 
@@ -32,7 +34,11 @@ async fn admins_manage_spaces_in_memory() -> TestResult {
 #[tokio::test]
 async fn admins_manage_spaces_in_sqlite() -> TestResult {
     let dir = tempfile::tempdir()?;
-    let db = Index::open(&IndexConfig::sqlite(dir.path().join("index.sqlite"), None)).await?;
+    let db = Index::open(&IndexConfig::sqlite(
+        dir.path().join("index.sqlite"),
+        None,
+    ))
+    .await?;
     let authz = Arc::new(Authz::new(SqlStore::new(db.clone())));
     admins_manage_spaces(Arc::new(SqlIndex::new(db)), authz).await
 }

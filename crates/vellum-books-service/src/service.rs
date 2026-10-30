@@ -21,19 +21,22 @@ use vellum_books::subtree;
 use vellum_books::summary::Section;
 use vellum_books::{Book, NodeId, markdown};
 use vellum_contracts::{
-    BoxFuture, HttpMethod, Operation, Principal, Readiness, RequestContext, Scope, Service,
+    BoxFuture, HttpMethod, Operation, Principal, Readiness, RequestContext,
+    Scope, Service,
 };
 use vellum_kernel::{BookId, Error, ErrorKind, Timestamp};
 use vellum_store::{BlobPath, BlobStore, Precondition, StoreError};
 
 use crate::access::Access;
 use crate::api::{
-    AddSection, At, BookInfo, BookKey, BookList, BookSummary, CopySection, CreateSnapshot, Created,
-    DiffChanged, DiffInput, DiffMoved, DiffOutput, DiffSection, HistoryEntry, HistoryInput,
-    HistoryList, ListBooks, MergeSection, MoveSection, OutlineLine, PlaceInput, Publication,
-    PublicationList, Publish, PublishFormat, Region, Removed, RestoreOutline, SectionAccessInfo,
-    SectionDoc, SectionKey, SetSectionAccess, SnapshotInfo, SnapshotList, SplitSection, TocLine,
-    TocNode, TransferSection, UpdateSection,
+    AddSection, At, BookInfo, BookKey, BookList, BookSummary, CopySection,
+    CreateSnapshot, Created, DiffChanged, DiffInput, DiffMoved, DiffOutput,
+    DiffSection, HistoryEntry, HistoryInput, HistoryList, ListBooks,
+    MergeSection, MoveSection, OutlineLine, PlaceInput, Publication,
+    PublicationList, Publish, PublishFormat, Region, Removed, RestoreOutline,
+    SectionAccessInfo, SectionDoc, SectionKey, SetSectionAccess, SnapshotInfo,
+    SnapshotList, SplitSection, TocLine, TocNode, TransferSection,
+    UpdateSection,
 };
 use crate::files::{self, Loaded, book_error};
 use crate::history::{self, Record};
@@ -102,14 +105,17 @@ impl Opened {
     /// The table of contents without hidden sections. Numbers are the
     /// book's own, so every reader quotes the same ones (D145).
     fn toc(&self) -> Vec<TocLine> {
-        let hidden: BTreeSet<String> = self.hidden().iter().map(ToString::to_string).collect();
+        let hidden: BTreeSet<String> =
+            self.hidden().iter().map(ToString::to_string).collect();
         self.book()
             .toc()
             .items
             .iter()
             .map(TocLine::from)
             .filter_map(|line| match line {
-                TocLine::Chapter(node) => prune(node, &hidden).map(TocLine::Chapter),
+                TocLine::Chapter(node) => {
+                    prune(node, &hidden).map(TocLine::Chapter)
+                }
                 other => Some(other),
             })
             .collect()
@@ -128,10 +134,12 @@ impl Opened {
 
     fn place(&self, input: &PlaceInput) -> Result<Place, Error> {
         let target = || -> Result<NodeRef, Error> {
-            let raw = input
-                .section
-                .as_deref()
-                .ok_or_else(|| Error::new(ErrorKind::InvalidInput, "this place needs a section"))?;
+            let raw = input.section.as_deref().ok_or_else(|| {
+                Error::new(
+                    ErrorKind::InvalidInput,
+                    "this place needs a section",
+                )
+            })?;
             Ok(NodeRef::Id(self.section(raw)?))
         };
         let region = match input.region.unwrap_or(Region::Numbered) {
@@ -151,7 +159,9 @@ impl Opened {
 
     fn access_info(&self, id: &NodeId) -> Result<SectionAccessInfo, Error> {
         let access = self.book().access(id).map_err(book_error)?;
-        let list = |set: &BTreeSet<BookPrincipal>| set.iter().map(ToString::to_string).collect();
+        let list = |set: &BTreeSet<BookPrincipal>| {
+            set.iter().map(ToString::to_string).collect()
+        };
         let own = self
             .book()
             .manifest()
@@ -186,7 +196,9 @@ impl Opened {
             number: entry.number_label.clone(),
             path: book.path_of(id).map_err(book_error)?.as_str().to_owned(),
             markdown: book
-                .render_cross_refs_for(markdown::body(&source), |target| !hidden.contains(target)),
+                .render_cross_refs_for(markdown::body(&source), |target| {
+                    !hidden.contains(target)
+                }),
             source,
             restricted: book.access(id).map_err(book_error)?.is_restricted(),
             access: if self.sees_all() {
@@ -199,7 +211,10 @@ impl Opened {
 }
 
 /// The sections of `book` someone holding `principals` cannot see.
-fn hidden_in(book: &Book, principals: &BTreeSet<BookPrincipal>) -> BTreeSet<NodeId> {
+fn hidden_in(
+    book: &Book,
+    principals: &BTreeSet<BookPrincipal>,
+) -> BTreeSet<NodeId> {
     book.manifest()
         .nodes
         .keys()
@@ -259,7 +274,8 @@ fn observe<T>(
     async move {
         let started = Instant::now();
         let result = fut.await;
-        let ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
+        let ms =
+            u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
         tracing::info!(
             histogram.vellum.books.request_ms = ms,
             books.op = op,
@@ -299,7 +315,11 @@ impl BooksService {
     /// # Errors
     ///
     /// A store failure.
-    pub async fn public_file(&self, id: BookId, rel: &str) -> Result<Option<bytes::Bytes>, Error> {
+    pub async fn public_file(
+        &self,
+        id: BookId,
+        rel: &str,
+    ) -> Result<Option<bytes::Bytes>, Error> {
         let dir = match self.dir_of(id).await {
             Ok(dir) => dir,
             Err(e) if e.kind() == ErrorKind::NotFound => return Ok(None),
@@ -391,7 +411,13 @@ impl BooksService {
     /// Records a change to the manifest or summary in the book's history
     /// (D235). The edit is already saved, so a failure here is logged,
     /// not returned.
-    async fn record(&self, op: &str, principal: &Principal, loaded: &Loaded, before: &[String; 2]) {
+    async fn record(
+        &self,
+        op: &str,
+        principal: &Principal,
+        loaded: &Loaded,
+        before: &[String; 2],
+    ) {
         let Ok(after) = structure(&loaded.book) else {
             return;
         };
@@ -408,8 +434,11 @@ impl BooksService {
             summary,
             outline: history::outline(&loaded.book),
         };
-        if let Err(e) = history::append(self.store.as_ref(), &loaded.dir, &record).await {
-            tracing::warn!(error = %e, book.dir = %loaded.dir, "book history not recorded");
+        if let Err(e) =
+            history::append(self.store.as_ref(), &loaded.dir, &record).await
+        {
+            tracing::warn!(error = %e, book.dir = %loaded.dir, "book history \
+                not recorded");
         }
     }
 
@@ -420,18 +449,20 @@ impl BooksService {
             .as_str()
             .parse::<BookId>()
             .map_err(|_| not_found("book"))?;
-        let restrictions = Restrictions::of(&loaded.book).map_err(book_error)?;
+        let restrictions =
+            Restrictions::of(&loaded.book).map_err(book_error)?;
         let report = self
             .access
             .mirror(id, &loaded.dir, &restrictions)
             .await
             .map_err(|e| {
-                Error::new(
-                    ErrorKind::Unavailable,
-                    "the book was saved, but its section permissions could not be synced",
-                )
-                .with_source(e)
-            })?;
+            Error::new(
+                ErrorKind::Unavailable,
+                "the book was saved, but its section permissions could not \
+                        be synced",
+            )
+            .with_source(e)
+        })?;
         if report.skipped > 0 {
             tracing::debug!(
                 book = %id,
@@ -475,7 +506,8 @@ impl BooksService {
                 {
                     continue;
                 }
-                let Ok(loaded) = files::load(self.store.as_ref(), &dir).await else {
+                let Ok(loaded) = files::load(self.store.as_ref(), &dir).await
+                else {
                     continue;
                 };
                 books.push(BookSummary {
@@ -500,9 +532,14 @@ impl BooksService {
     /// # Errors
     ///
     /// `not_found` when it does not exist or the caller cannot open it.
-    pub async fn get(&self, ctx: &RequestContext, id: BookId) -> Result<BookInfo, Error> {
+    pub async fn get(
+        &self,
+        ctx: &RequestContext,
+        id: BookId,
+    ) -> Result<BookInfo, Error> {
         observe("get", async {
-            let opened = self.open(&ctx.principal, id, Permission::Read).await?;
+            let opened =
+                self.open(&ctx.principal, id, Permission::Read).await?;
             let book = opened.book();
             let manifest = book.manifest();
             Ok(BookInfo {
@@ -560,7 +597,12 @@ impl BooksService {
                         let place = o.place(&input.place)?;
                         o.loaded
                             .book
-                            .add_section(&place, &input.title, &input.body, &mut ids)
+                            .add_section(
+                                &place,
+                                &input.title,
+                                &input.body,
+                                &mut ids,
+                            )
                             .map_err(book_error)
                     },
                 )
@@ -645,7 +687,10 @@ impl BooksService {
                         if let Some(body) = &input.body {
                             let text = book.text(&id).map_err(book_error)?;
                             let start = markdown::split(text).body;
-                            let mut updated = text.get(..start).unwrap_or_default().to_owned();
+                            let mut updated = text
+                                .get(..start)
+                                .unwrap_or_default()
+                                .to_owned();
                             updated.push_str(body);
                             if !updated.ends_with('\n') {
                                 updated.push('\n');
@@ -688,7 +733,9 @@ impl BooksService {
                 Permission::Edit,
                 |o| {
                     let id = o.section(&key.section_id)?;
-                    for inner in o.book().subtree_ids(&id).map_err(book_error)? {
+                    for inner in
+                        o.book().subtree_ids(&id).map_err(book_error)?
+                    {
                         if !o.can_see(&inner)? {
                             return Err(Error::new(
                                 ErrorKind::PermissionDenied,
@@ -702,7 +749,10 @@ impl BooksService {
                         .remove_section(&NodeRef::Id(id))
                         .map_err(book_error)?;
                     Ok(Removed {
-                        removed: removed.iter().map(ToString::to_string).collect(),
+                        removed: removed
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect(),
                     })
                 },
             )
@@ -733,8 +783,11 @@ impl BooksService {
                     let id = o.section(&input.section_id)?;
                     let restrict = principals(&input.restrict_to)?;
                     let book = &mut o.loaded.book;
-                    book.set_restriction(&id, (!restrict.is_empty()).then_some(restrict))
-                        .map_err(book_error)?;
+                    book.set_restriction(
+                        &id,
+                        (!restrict.is_empty()).then_some(restrict),
+                    )
+                    .map_err(book_error)?;
                     book.set_owners(&id, principals(&input.owners)?)
                         .map_err(book_error)?;
                     book.set_reviewers(&id, principals(&input.reviewers)?)
@@ -762,8 +815,15 @@ impl BooksService {
                 .open(&ctx.principal, key.book_id, Permission::Read)
                 .await?;
             let mut snapshots = Vec::new();
-            for tag in files::tags(self.store.as_ref(), &opened.loaded.dir).await? {
-                let s = files::read_snapshot(self.store.as_ref(), &opened.loaded.dir, &tag).await?;
+            for tag in
+                files::tags(self.store.as_ref(), &opened.loaded.dir).await?
+            {
+                let s = files::read_snapshot(
+                    self.store.as_ref(),
+                    &opened.loaded.dir,
+                    &tag,
+                )
+                .await?;
                 snapshots.push(SnapshotInfo {
                     tag: s.tag,
                     message: s.message,
@@ -806,7 +866,8 @@ impl BooksService {
                 .map_err(|e| {
                     let mut error = book_error(e);
                     if existing.contains(&input.tag) {
-                        error = Error::new(ErrorKind::Conflict, error.to_string());
+                        error =
+                            Error::new(ErrorKind::Conflict, error.to_string());
                     }
                     error
                 })?;
@@ -826,21 +887,28 @@ impl BooksService {
     /// # Errors
     ///
     /// `not_found` for an unknown tag.
-    pub async fn diff(&self, ctx: &RequestContext, input: DiffInput) -> Result<DiffOutput, Error> {
+    pub async fn diff(
+        &self,
+        ctx: &RequestContext,
+        input: DiffInput,
+    ) -> Result<DiffOutput, Error> {
         observe("diff", async {
             let opened = self
                 .open(&ctx.principal, input.book_id, Permission::Read)
                 .await?;
             let dir = &opened.loaded.dir;
-            let old = files::read_snapshot(self.store.as_ref(), dir, &input.from)
-                .await?
-                .book()
-                .map_err(book_error)?;
-            let new = match &input.to {
-                Some(tag) => files::read_snapshot(self.store.as_ref(), dir, tag)
+            let old =
+                files::read_snapshot(self.store.as_ref(), dir, &input.from)
                     .await?
                     .book()
-                    .map_err(book_error)?,
+                    .map_err(book_error)?;
+            let new = match &input.to {
+                Some(tag) => {
+                    files::read_snapshot(self.store.as_ref(), dir, tag)
+                        .await?
+                        .book()
+                        .map_err(book_error)?
+                }
                 None => opened.book().clone(),
             };
             if opened.sees_all() {
@@ -860,7 +928,8 @@ impl BooksService {
                         .filter(|id| !current.contains(id)),
                 );
             }
-            let hidden: BTreeSet<String> = hidden.iter().map(ToString::to_string).collect();
+            let hidden: BTreeSet<String> =
+                hidden.iter().map(ToString::to_string).collect();
             let changes = snapshot::diff(&old, &new);
             Ok(output(changes, |id| !hidden.contains(id), false))
         })
@@ -901,7 +970,8 @@ fn restore(o: &mut Opened, outline: &[OutlineLine]) -> Result<usize, Error> {
             if !placed.contains(parent) {
                 continue;
             }
-            let parent = NodeId::parse(parent).map_err(|_| not_found("section"))?;
+            let parent =
+                NodeId::parse(parent).map_err(|_| not_found("section"))?;
             Place::FirstChildOf(NodeRef::Id(parent))
         } else {
             Place::Start(match line.region.as_str() {
@@ -940,7 +1010,9 @@ impl BooksService {
             let ids = history::ids(self.store.as_ref(), dir).await?;
             let mut entries = Vec::new();
             for id in ids.iter().rev().take(limit) {
-                let Ok(record) = history::read(self.store.as_ref(), dir, id).await else {
+                let Ok(record) =
+                    history::read(self.store.as_ref(), dir, id).await
+                else {
                     continue;
                 };
                 // Readers see only sections they can see now; a section
@@ -983,8 +1055,12 @@ impl BooksService {
             let opened = self
                 .open(&ctx.principal, input.book_id, Permission::Edit)
                 .await?;
-            let record =
-                history::read(self.store.as_ref(), &opened.loaded.dir, &input.entry).await?;
+            let record = history::read(
+                self.store.as_ref(),
+                &opened.loaded.dir,
+                &input.entry,
+            )
+            .await?;
             drop(opened);
             let _ = self
                 .edit(
@@ -1021,12 +1097,17 @@ impl BooksService {
                 |o| {
                     let id = o.section(&input.section_id)?;
                     all_visible(o, &id)?;
-                    let order = o.book().subtree_ids(&id).map_err(book_error)?;
+                    let order =
+                        o.book().subtree_ids(&id).map_err(book_error)?;
                     let place = o.place(&input.place)?;
                     let map = o
                         .loaded
                         .book
-                        .copy_section(&NodeRef::Id(id.clone()), &place, &mut ids)
+                        .copy_section(
+                            &NodeRef::Id(id.clone()),
+                            &place,
+                            &mut ids,
+                        )
                         .map_err(book_error)?;
                     Ok(created(input.book_id, &id, &order, &map))
                 },
@@ -1053,7 +1134,8 @@ impl BooksService {
             if input.to_book == input.book_id {
                 return Err(Error::new(
                     ErrorKind::InvalidInput,
-                    "the section is already in this book; move or copy it within the book",
+                    "the section is already in this book; move or copy it \
+                        within the book",
                 ));
             }
             let _one_at_a_time = self.writes.lock().await;
@@ -1064,7 +1146,8 @@ impl BooksService {
                 Permission::Edit
             };
             let mut source = self.open(p, input.book_id, need).await?;
-            let mut target = self.open(p, input.to_book, Permission::Edit).await?;
+            let mut target =
+                self.open(p, input.to_book, Permission::Edit).await?;
             let id = source.section(&input.section_id)?;
             all_visible(&source, &id)?;
             let order = source.book().subtree_ids(&id).map_err(book_error)?;
@@ -1100,8 +1183,13 @@ impl BooksService {
             self.mirror(&target.loaded).await?;
             if !input.copy {
                 let _ = source.loaded.save(self.store.as_ref()).await?;
-                self.record("transfer_section", p, &source.loaded, &source_before)
-                    .await;
+                self.record(
+                    "transfer_section",
+                    p,
+                    &source.loaded,
+                    &source_before,
+                )
+                .await;
                 self.mirror(&source.loaded).await?;
             }
             Ok(created(input.to_book, &id, &order, &transfer.ids))
@@ -1109,7 +1197,12 @@ impl BooksService {
         .await
     }
 
-    async fn copy_asset(&self, from: &BlobPath, to: &BlobPath, rel: &str) -> Result<(), Error> {
+    async fn copy_asset(
+        &self,
+        from: &BlobPath,
+        to: &BlobPath,
+        rel: &str,
+    ) -> Result<(), Error> {
         let (Ok(src), Ok(dst)) = (from.join(rel), to.join(rel)) else {
             return Ok(());
         };
@@ -1124,9 +1217,11 @@ impl BooksService {
             .await
         {
             // An image of the same name is already there: keep it.
-            Ok(_) | Err(StoreError::AlreadyExists(_) | StoreError::PreconditionFailed { .. }) => {
-                Ok(())
-            }
+            Ok(_)
+            | Err(
+                StoreError::AlreadyExists(_)
+                | StoreError::PreconditionFailed { .. },
+            ) => Ok(()),
             Err(e) => Err(files::store_error(e)),
         }
     }
@@ -1189,7 +1284,11 @@ impl BooksService {
                 |o| {
                     let id = o.section(&input.section_id)?;
                     all_visible(o, &id)?;
-                    let gone = o.loaded.book.merge_into_headings(&id).map_err(book_error)?;
+                    let gone = o
+                        .loaded
+                        .book
+                        .merge_into_headings(&id)
+                        .map_err(book_error)?;
                     Ok(Removed {
                         removed: gone.keys().map(ToString::to_string).collect(),
                     })
@@ -1226,7 +1325,9 @@ impl BooksService {
             };
             let book = opened.book();
             let site = match input.format {
-                PublishFormat::Site => book.to_static_site(&audience, self.renderer.as_ref()),
+                PublishFormat::Site => {
+                    book.to_static_site(&audience, self.renderer.as_ref())
+                }
                 PublishFormat::Mdbook => book.to_mdbook(&audience),
             }
             .map_err(book_error)?;
@@ -1240,7 +1341,13 @@ impl BooksService {
                 url: (public && input.format == PublishFormat::Site)
                     .then(|| publish::url(input.book_id)),
             };
-            publish::write(self.store.as_ref(), &opened.loaded.dir, &site, record).await
+            publish::write(
+                self.store.as_ref(),
+                &opened.loaded.dir,
+                &site,
+                record,
+            )
+            .await
         })
         .await
     }
@@ -1261,8 +1368,12 @@ impl BooksService {
                 .await?;
             let mut publications = Vec::new();
             for format in [PublishFormat::Site, PublishFormat::Mdbook] {
-                if let Some(p) =
-                    publish::current(self.store.as_ref(), &opened.loaded.dir, format).await?
+                if let Some(p) = publish::current(
+                    self.store.as_ref(),
+                    &opened.loaded.dir,
+                    format,
+                )
+                .await?
                 {
                     publications.push(p);
                 }
@@ -1288,7 +1399,11 @@ fn created(
     }
 }
 
-fn output(diff: BookDiff, keep: impl Fn(&str) -> bool, full: bool) -> DiffOutput {
+fn output(
+    diff: BookDiff,
+    keep: impl Fn(&str) -> bool,
+    full: bool,
+) -> DiffOutput {
     DiffOutput {
         added: diff
             .added
@@ -1340,7 +1455,14 @@ fn output(diff: BookDiff, keep: impl Fn(&str) -> bool, full: bool) -> DiffOutput
 }
 
 macro_rules! op {
-    ($service:expr, query $id:literal, $path:literal, $scope:expr, $method:ident, $summary:literal) => {{
+    (
+        $service:expr,
+        query $id:literal,
+        $path:literal,
+        $scope:expr,
+        $method:ident,
+        $summary:literal
+    ) => {{
         let s = Arc::clone(&$service);
         Operation::query($id, $path, $scope, move |ctx, input| {
             let s = Arc::clone(&s);
@@ -1348,22 +1470,43 @@ macro_rules! op {
         })
         .summary($summary)
     }};
-    ($service:expr, $verb:ident $id:literal, $path:literal, $scope:expr, $method:ident, $summary:literal) => {{
+    (
+        $service:expr,
+        $verb:ident $id:literal,
+        $path:literal,
+        $scope:expr,
+        $method:ident,
+        $summary:literal
+    ) => {{
         let s = Arc::clone(&$service);
-        Operation::mutation($id, HttpMethod::$verb, $path, $scope, move |ctx, input| {
-            let s = Arc::clone(&s);
-            async move { s.$method(&ctx, input).await }
-        })
+        Operation::mutation(
+            $id,
+            HttpMethod::$verb,
+            $path,
+            $scope,
+            move |ctx, input| {
+                let s = Arc::clone(&s);
+                async move { s.$method(&ctx, input).await }
+            },
+        )
         .summary($summary)
     }};
 }
 
 impl BooksService {
-    async fn get_op(&self, ctx: &RequestContext, key: BookKey) -> Result<BookInfo, Error> {
+    async fn get_op(
+        &self,
+        ctx: &RequestContext,
+        key: BookKey,
+    ) -> Result<BookInfo, Error> {
         self.get(ctx, key.book_id).await
     }
 
-    async fn list_op(&self, ctx: &RequestContext, _: ListBooks) -> Result<BookList, Error> {
+    async fn list_op(
+        &self,
+        ctx: &RequestContext,
+        _: ListBooks,
+    ) -> Result<BookList, Error> {
         self.list(ctx).await
     }
 }
@@ -1379,46 +1522,63 @@ impl Service for BooksService {
                 "List the books you can open"),
             op!(self, query "books.get", "/v1/books/{book_id}", Scope::Read, get_op,
                 "Get a book's settings and table of contents"),
-            op!(self, query "books.get_section", "/v1/books/{book_id}/sections/{section_id}",
-                Scope::Read, get_section, "Get one section with cross-references filled in"),
+            op!(self, query "books.get_section", "/v1/books/{book_id}/sections/\
+                {section_id}",
+                Scope::Read, get_section, "Get one section with \
+                    cross-references filled in"),
             op!(self, Post "books.add_section", "/v1/books/{book_id}/sections",
                 Scope::WriteDirect, add_section, "Add a section"),
-            op!(self, Post "books.move_section", "/v1/books/{book_id}/sections/{section_id}/move",
-                Scope::WriteDirect, move_section, "Move or nest a section with everything under it"),
-            op!(self, Patch "books.update_section", "/v1/books/{book_id}/sections/{section_id}",
-                Scope::WriteDirect, update_section, "Rename a section or replace its body"),
-            op!(self, Delete "books.remove_section", "/v1/books/{book_id}/sections/{section_id}",
-                Scope::WriteDirect, remove_section, "Remove a section with everything under it"),
+            op!(self, Post "books.move_section", "/v1/books/{book_id}/sections/\
+                {section_id}/move",
+                Scope::WriteDirect, move_section, "Move or nest a section with \
+                    everything under it"),
+            op!(self, Patch "books.update_section", "/v1/books/{book_id}/sectio\
+                ns/{section_id}",
+                Scope::WriteDirect, update_section, "Rename a section or \
+                    replace its body"),
+            op!(self, Delete "books.remove_section", "/v1/books/{book_id}/secti\
+                ons/{section_id}",
+                Scope::WriteDirect, remove_section, "Remove a section with \
+                    everything under it"),
             op!(self, Put "books.set_section_access",
                 "/v1/books/{book_id}/sections/{section_id}/access",
                 Scope::WriteDirect, set_section_access,
                 "Restrict a section and set its owners and reviewers"),
-            op!(self, query "books.list_snapshots", "/v1/books/{book_id}/snapshots", Scope::Read,
+            op!(self, query "books.list_snapshots", "/v1/books/{book_id}/snapsh\
+                ots", Scope::Read,
                 list_snapshots, "List a book's tagged snapshots"),
-            op!(self, Post "books.create_snapshot", "/v1/books/{book_id}/snapshots",
+            op!(self, Post "books.create_snapshot", "/v1/books/{book_id}/snapsh\
+                ots",
                 Scope::WriteDirect, create_snapshot, "Tag the current book"),
             op!(self, query "books.diff", "/v1/books/{book_id}/diff", Scope::Read, diff,
                 "Compare a snapshot with another snapshot or the current book"),
             op!(self, query "books.history", "/v1/books/{book_id}/history", Scope::Read, history,
                 "List the book's outline changes, newest first"),
-            op!(self, Post "books.restore_outline", "/v1/books/{book_id}/history/restore",
+            op!(self, Post "books.restore_outline", "/v1/books/{book_id}/histor\
+                y/restore",
                 Scope::WriteDirect, restore_outline,
                 "Put the sections back in an earlier order"),
-            op!(self, Post "books.copy_section", "/v1/books/{book_id}/sections/{section_id}/copy",
+            op!(self, Post "books.copy_section", "/v1/books/{book_id}/sections/\
+                {section_id}/copy",
                 Scope::WriteDirect, copy_section,
                 "Copy a section with everything under it within the book"),
             op!(self, Post "books.transfer_section",
                 "/v1/books/{book_id}/sections/{section_id}/transfer",
                 Scope::WriteDirect, transfer_section,
-                "Move or copy a section with everything under it into another book"),
-            op!(self, Post "books.split_section", "/v1/books/{book_id}/sections/{section_id}/split",
-                Scope::WriteDirect, split_section, "Turn a section's headings into sections"),
-            op!(self, Post "books.merge_section", "/v1/books/{book_id}/sections/{section_id}/merge",
+                "Move or copy a section with everything under it into another \
+                    book"),
+            op!(self, Post "books.split_section", "/v1/books/{book_id}/sections\
+                /{section_id}/split",
+                Scope::WriteDirect, split_section, "Turn a section's headings \
+                    into sections"),
+            op!(self, Post "books.merge_section", "/v1/books/{book_id}/sections\
+                /{section_id}/merge",
                 Scope::WriteDirect, merge_section,
                 "Fold a section's children back into it as headings"),
             op!(self, Post "books.publish", "/v1/books/{book_id}/publish", Scope::WriteDirect,
                 publish, "Publish the book as a static site or an mdBook tree"),
-            op!(self, query "books.publications", "/v1/books/{book_id}/publications", Scope::Read,
+            op!(self, query "books.publications", "/v1/books/{book_id}/publicat\
+                ions", Scope::Read,
                 publications, "List the book's current publications"),
         ]
     }
@@ -1430,7 +1590,9 @@ impl Service for BooksService {
         Box::pin(async move {
             match self.dirs().await {
                 Ok(_) => Readiness::Ready,
-                Err(e) => Readiness::Degraded(format!("books could not be listed: {e}")),
+                Err(e) => Readiness::Degraded(format!(
+                    "books could not be listed: {e}"
+                )),
             }
         })
     }

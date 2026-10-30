@@ -11,7 +11,9 @@ interface InstallPromptEvent extends Event {
 export interface Installer {
   /** True once the browser has offered installation. */
   readonly available: boolean;
-  /** Shows the browser's install dialog; resolves to whether it was accepted. */
+  /**
+   * Shows the browser's install dialog; resolves to whether it was accepted.
+   */
   prompt(): Promise<boolean>;
 }
 

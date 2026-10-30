@@ -22,14 +22,20 @@ describe("AppKeyboard", () => {
       </AppKeyboard>,
     );
     key("k", { ctrlKey: true });
-    const search = screen.getByRole("combobox", { name: "Search pages and commands" });
+    const search = screen.getByRole("combobox", {
+      name: "Search pages and commands",
+    });
     fireEvent.change(search, { target: { value: "gateway arch" } });
     const [first] = screen.getAllByRole("option");
     expect(first?.textContent).toContain("Gateway architecture");
-    const marks = [...(first?.querySelectorAll("mark") ?? [])].map((mark) => mark.textContent);
+    const marks = [...(first?.querySelectorAll("mark") ?? [])].map(
+      (mark) => mark.textContent,
+    );
     expect(marks).toEqual(["Gateway", "arch"]);
     fireEvent.keyDown(search, { key: "Enter" });
-    const gateway = store.getSnapshot().pages.find((page) => page.title === "Gateway architecture");
+    const gateway = store
+      .getSnapshot()
+      .pages.find((page) => page.title === "Gateway architecture");
     expect(location()).toBe(`/p/${gateway?.id ?? ""}`);
   });
 
@@ -43,7 +49,9 @@ describe("AppKeyboard", () => {
     const search = screen.getByRole("combobox");
     fireEvent.change(search, { target: { value: "rate limits" } });
     fireEvent.mouseDown(
-      screen.getByRole("option", { name: "Search every page for “rate limits”" }),
+      screen.getByRole("option", {
+        name: "Search every page for “rate limits”",
+      }),
     );
     expect(location()).toBe("/search?q=rate%20limits");
   });

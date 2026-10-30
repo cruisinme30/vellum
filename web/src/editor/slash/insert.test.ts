@@ -12,7 +12,10 @@ import { SLASH_ITEMS, type SlashItem } from "./items";
 import { formatToday } from "./today";
 
 let editor: Editor | undefined;
-/** An editor holding `before/query` with the cursor after it, and the range of `/query`. */
+/**
+ * An editor holding `before/query` with the cursor after it, and the range of
+ * `/query`.
+ */
 const open = (before = "", query = "/x") => {
   editor = createTestEditor({ content: body(p(`${before}${query}`)) });
   const from = 1 + before.length;
@@ -116,7 +119,9 @@ describe("insertSlashItem", () => {
 
   it("does nothing but remove the query for a node the schema lacks", () => {
     const { target, range } = open("a");
-    expect(insertSlashItem(target, range, { ...item("toc-0"), node: "nope" })).toBe(false);
+    expect(
+      insertSlashItem(target, range, { ...item("toc-0"), node: "nope" }),
+    ).toBe(false);
     expect(target.state.doc.textContent).toBe("a");
   });
 });

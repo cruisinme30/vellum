@@ -47,8 +47,13 @@ export interface LiveState {
    * is not taken for a read-only one.
    */
   readonly canWrite: boolean | undefined;
-  /** The signed-in user behind each awareness client ID, as the server vouches. */
-  readonly peers: ReadonlyMap<number, { readonly user: string; readonly canWrite: boolean }>;
+  /**
+   * The signed-in user behind each awareness client ID, as the server vouches.
+   */
+  readonly peers: ReadonlyMap<
+    number,
+    { readonly user: string; readonly canWrite: boolean }
+  >;
 }
 
 /** The server side of a session, readable with `useSyncExternalStore`. */

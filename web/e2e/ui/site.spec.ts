@@ -19,10 +19,16 @@ import { SITE_DIR, SITE_PORT } from "./targets";
  * sets work from the keyboard. Runs in every viewport project.
  */
 
-const built = existsSync(path.join(SITE_DIR, "docs", "developer", "index.html"));
-const url = (page: string): string => `http://127.0.0.1:${String(SITE_PORT)}/${page}`;
+const built = existsSync(
+  path.join(SITE_DIR, "docs", "developer", "index.html"),
+);
+const url = (page: string): string =>
+  `http://127.0.0.1:${String(SITE_PORT)}/${page}`;
 
-/** One page of each type: landing, docs home, a guide, a deep chapter, the decisions. */
+/**
+ * One page of each type: landing, docs home, a guide, a deep chapter, the
+ * decisions.
+ */
 const PAGES = [
   "index.html",
   "docs/index.html",
@@ -45,8 +51,12 @@ const bar = (page: Page): Promise<Bar> =>
     const header = document.querySelector<HTMLElement>("header.vellum-site");
     if (header === null) throw new Error("no site bar");
     const box = header.getBoundingClientRect();
-    const brand = header.querySelector(".vellum-brand")?.getBoundingClientRect();
-    const links = [...header.querySelectorAll<HTMLAnchorElement>(".vellum-nav a")];
+    const brand = header
+      .querySelector(".vellum-brand")
+      ?.getBoundingClientRect();
+    const links = [
+      ...header.querySelectorAll<HTMLAnchorElement>(".vellum-nav a"),
+    ];
     return {
       top: box.top,
       height: box.height,
@@ -60,15 +70,22 @@ const bar = (page: Page): Promise<Bar> =>
   });
 
 test.describe("site look", () => {
-  test.skip(!built, "needs the built site: run scripts/ci/build-site.sh and set UI_SITE_DIR");
+  test.skip(
+    !built,
+    "needs the built site: run scripts/ci/build-site.sh and set UI_SITE_DIR",
+  );
 
   for (const scheme of ["light", "dark"] as const) {
-    test(`every page type has the same site bar in ${scheme}`, async ({ page }) => {
+    test(`every page type has the same site bar in ${scheme}`, async ({
+      page,
+    }) => {
       await page.emulateMedia({ colorScheme: scheme });
       const bars: Bar[] = [];
       for (const target of PAGES) {
         await page.goto(url(target));
-        const theme = await page.evaluate(() => document.documentElement.dataset["theme"]);
+        const theme = await page.evaluate(
+          () => document.documentElement.dataset["theme"],
+        );
         expect(theme, `${target} theme`).toBe(scheme);
         bars.push(await bar(page));
       }
@@ -78,11 +95,17 @@ test.describe("site look", () => {
       for (const [index, other] of rest.entries()) {
         const name = PAGES[index + 1];
         expect(other.top, `${String(name)} bar top`).toBe(0);
-        expect(Math.abs(other.height - first.height), `${String(name)} bar height`).toBeLessThan(1);
-        expect(Math.abs(other.brandLeft - first.brandLeft), `${String(name)} brand`).toBeLessThan(
-          1,
+        expect(
+          Math.abs(other.height - first.height),
+          `${String(name)} bar height`,
+        ).toBeLessThan(1);
+        expect(
+          Math.abs(other.brandLeft - first.brandLeft),
+          `${String(name)} brand`,
+        ).toBeLessThan(1);
+        expect(other.background, `${String(name)} bar colour`).toBe(
+          first.background,
         );
-        expect(other.background, `${String(name)} bar colour`).toBe(first.background);
         expect(other.links, `${String(name)} links`).toEqual(first.links);
       }
       expect(bars.map((b) => b.current)).toEqual([
@@ -95,19 +118,27 @@ test.describe("site look", () => {
     });
   }
 
-  test("the bar never covers the guide's sidebar or page, and leaves no gap", async ({ page }) => {
+  test("the bar never covers the guide's sidebar or page, and leaves no gap", async ({
+    page,
+  }) => {
     await page.goto(url("docs/developer/architecture/index.html"));
-    const { barBottom, menuTop, sidebarTop, sidebarShown } = await page.evaluate(() => {
-      const header = document.querySelector("header.vellum-site")?.getBoundingClientRect();
-      const menu = document.querySelector("#mdbook-menu-bar")?.getBoundingClientRect();
-      const sidebar = document.querySelector("#mdbook-sidebar");
-      return {
-        barBottom: header?.bottom ?? 0,
-        menuTop: menu?.top ?? 0,
-        sidebarTop: sidebar?.getBoundingClientRect().top ?? 0,
-        sidebarShown: document.documentElement.classList.contains("sidebar-visible"),
-      };
-    });
+    const { barBottom, menuTop, sidebarTop, sidebarShown } =
+      await page.evaluate(() => {
+        const header = document
+          .querySelector("header.vellum-site")
+          ?.getBoundingClientRect();
+        const menu = document
+          .querySelector("#mdbook-menu-bar")
+          ?.getBoundingClientRect();
+        const sidebar = document.querySelector("#mdbook-sidebar");
+        return {
+          barBottom: header?.bottom ?? 0,
+          menuTop: menu?.top ?? 0,
+          sidebarTop: sidebar?.getBoundingClientRect().top ?? 0,
+          sidebarShown:
+            document.documentElement.classList.contains("sidebar-visible"),
+        };
+      });
     // The guide's own menu bar sits right under the site bar: not under
     // it, and with no empty strip between them.
     expect(menuTop).toBeGreaterThanOrEqual(barBottom - 1);
@@ -115,7 +146,9 @@ test.describe("site look", () => {
     if (sidebarShown) expect(sidebarTop).toBeGreaterThanOrEqual(barBottom - 1);
   });
 
-  test("diagrams are drawn, fit the page and follow the theme toggle", async ({ page }) => {
+  test("diagrams are drawn, fit the page and follow the theme toggle", async ({
+    page,
+  }) => {
     await page.emulateMedia({ colorScheme: "light" });
     await page.goto(url("docs/developer/architecture/data-flow.html"));
     await expect(page.locator("code.language-mermaid")).toHaveCount(0);
@@ -127,7 +160,8 @@ test.describe("site look", () => {
           const svg = block.querySelector("svg");
           return (
             svg !== null &&
-            svg.getBoundingClientRect().width > block.getBoundingClientRect().width + 1
+            svg.getBoundingClientRect().width >
+              block.getBoundingClientRect().width + 1
           );
         }).length,
     );
@@ -137,7 +171,9 @@ test.describe("site look", () => {
       page
         .locator(".vl-render")
         .first()
-        .evaluate((block) => getComputedStyle(block).getPropertyValue("--vl-surface").trim());
+        .evaluate((block) =>
+          getComputedStyle(block).getPropertyValue("--vl-surface").trim(),
+        );
     const light = await surface();
     await page.locator("header.vellum-site .theme-toggle").click();
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
@@ -148,7 +184,9 @@ test.describe("site look", () => {
     await page.goto(url("docs/user/writing/containers.html"));
     const callout = page.locator(".vl-callout-info").first();
     await expect(callout).toBeVisible();
-    const padding = await callout.evaluate((element) => getComputedStyle(element).paddingLeft);
+    const padding = await callout.evaluate(
+      (element) => getComputedStyle(element).paddingLeft,
+    );
     expect(Number.parseFloat(padding)).toBeGreaterThan(4);
   });
 

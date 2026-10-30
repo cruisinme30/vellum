@@ -91,7 +91,8 @@ pub fn check(crates: &[Crate]) -> Vec<String> {
             continue;
         };
         let Some(own_rank) = rank(own) else {
-            violations.push(format!("{} has unknown layer `{own}`", krate.name));
+            violations
+                .push(format!("{} has unknown layer `{own}`", krate.name));
             continue;
         };
         for dep in &krate.depends_on {
@@ -102,7 +103,8 @@ pub fn check(crates: &[Crate]) -> Vec<String> {
             match dep_layer.and_then(rank) {
                 Some(dep_rank) if dep_rank < own_rank => {}
                 _ => violations.push(format!(
-                    "{} ({own}) may not depend on {dep} ({}): only lower layers are allowed",
+                    "{} ({own}) may not depend on {dep} ({}): only lower \
+                        layers are allowed",
                     krate.name,
                     dep_layer.unwrap_or("no layer"),
                 )),
@@ -143,7 +145,9 @@ mod tests {
         ];
         let v = check(&crates);
         assert_eq!(v.len(), 1);
-        assert!(v[0].contains("pages (service) may not depend on collab (service)"));
+        assert!(
+            v[0].contains("pages (service) may not depend on collab (service)")
+        );
     }
 
     #[test]

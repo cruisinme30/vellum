@@ -63,15 +63,23 @@ pub trait Workspace: Send + Sync + 'static {
 
     /// The files whose checklists can hold the user's tasks: their Inbox
     /// and lists, lists shared with them, and documents that mention them.
-    fn task_files(&self, user: UserId) -> BoxFuture<'_, Result<Vec<Document>, Error>>;
+    fn task_files(
+        &self,
+        user: UserId,
+    ) -> BoxFuture<'_, Result<Vec<Document>, Error>>;
 
     /// Issues assigned to the user, comments that assign them, comments
     /// that mention them and that they have not answered or dismissed, and
     /// review requests, already projected as tasks (R-MW-1's union).
-    fn assigned(&self, user: UserId) -> BoxFuture<'_, Result<Vec<Task>, Error>>;
+    fn assigned(&self, user: UserId)
+    -> BoxFuture<'_, Result<Vec<Task>, Error>>;
 
     /// Reads a file the user can open.
-    fn read(&self, user: UserId, doc: DocId) -> BoxFuture<'_, Result<Document, Error>>;
+    fn read(
+        &self,
+        user: UserId,
+        doc: DocId,
+    ) -> BoxFuture<'_, Result<Document, Error>>;
 
     /// Replaces a file's text if it is still at `version`, returning the
     /// new version. A newer version fails with `conflict`.
@@ -130,15 +138,21 @@ pub trait Workspace: Send + Sync + 'static {
     ) -> BoxFuture<'_, Result<(), Error>>;
 
     /// Takes a mention out of the user's My Work without answering it.
-    fn dismiss_mention(&self, user: UserId, comment: CommentId)
-    -> BoxFuture<'_, Result<(), Error>>;
+    fn dismiss_mention(
+        &self,
+        user: UserId,
+        comment: CommentId,
+    ) -> BoxFuture<'_, Result<(), Error>>;
 
     /// Everyone whose reminders and digest the server sends.
     fn people(&self) -> BoxFuture<'_, Result<Vec<UserId>, Error>>;
 
     /// Whether the person with this handle is linked to a Slack user, so
     /// "Save as task" in Slack reaches their Inbox. `false` by default.
-    fn slack_linked(&self, handle: String) -> BoxFuture<'_, Result<bool, Error>> {
+    fn slack_linked(
+        &self,
+        handle: String,
+    ) -> BoxFuture<'_, Result<bool, Error>> {
         let _ = handle;
         Box::pin(async { Ok(false) })
     }
@@ -168,14 +182,21 @@ pub trait Workspace: Send + Sync + 'static {
     }
 
     /// Removes every Slack link of `user`; returns how many there were.
-    fn unlink_slack(&self, user: UserId) -> BoxFuture<'_, Result<usize, Error>> {
+    fn unlink_slack(
+        &self,
+        user: UserId,
+    ) -> BoxFuture<'_, Result<usize, Error>> {
         let _ = user;
         Box::pin(async { Ok(0) })
     }
 
     /// Posts a reply only the Slack user sees to a Slack `response_url`
     /// (always under `https://hooks.slack.com/`). Best effort.
-    fn slack_say(&self, response_url: String, text: String) -> BoxFuture<'_, ()> {
+    fn slack_say(
+        &self,
+        response_url: String,
+        text: String,
+    ) -> BoxFuture<'_, ()> {
         let _ = (response_url, text);
         Box::pin(async {})
     }

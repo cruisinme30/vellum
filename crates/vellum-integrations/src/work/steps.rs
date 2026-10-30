@@ -14,12 +14,13 @@
 use jiff::Timestamp;
 use vellum_work::issue::IssueLink;
 use vellum_work::{
-    Category, Changes, CommentChanges, Comments, Ctx, Estimate, IssueId, NewComment, NewIssue,
-    StatusKey, Target, TeamKey, UserRef, WorkGraph,
+    Category, Changes, CommentChanges, Comments, Ctx, Estimate, IssueId,
+    NewComment, NewIssue, StatusKey, Target, TeamKey, UserRef, WorkGraph,
 };
 
 use crate::model::{
-    IssueDraft, IssueKey, IssueSnapshot, Priority, Source, StateCategory, WorkError, WorkflowState,
+    IssueDraft, IssueKey, IssueSnapshot, Priority, Source, StateCategory,
+    WorkError, WorkflowState,
 };
 
 /// The issue `key` names, following aliases of moved issues.
@@ -27,7 +28,10 @@ use crate::model::{
 /// # Errors
 ///
 /// The issue's team or state is missing from the graph.
-pub fn snapshot(graph: &WorkGraph, key: &IssueKey) -> Result<Option<IssueSnapshot>, WorkError> {
+pub fn snapshot(
+    graph: &WorkGraph,
+    key: &IssueKey,
+) -> Result<Option<IssueSnapshot>, WorkError> {
     let Some(issue) = graph.resolve(&key.to_string()) else {
         return Ok(None);
     };
@@ -52,7 +56,10 @@ pub fn snapshot(graph: &WorkGraph, key: &IssueKey) -> Result<Option<IssueSnapsho
 /// # Errors
 ///
 /// [`WorkError::NotFound`] for an unknown team.
-pub fn states(graph: &WorkGraph, team: &str) -> Result<Vec<WorkflowState>, WorkError> {
+pub fn states(
+    graph: &WorkGraph,
+    team: &str,
+) -> Result<Vec<WorkflowState>, WorkError> {
     let key = team_key(team)?;
     let team = graph
         .team(&key)
@@ -88,7 +95,10 @@ pub fn git_mapping(
 /// # Errors
 ///
 /// [`WorkError::NotFound`] for an unknown issue.
-pub fn team_of(graph: &WorkGraph, key: &IssueKey) -> Result<TeamKey, WorkError> {
+pub fn team_of(
+    graph: &WorkGraph,
+    key: &IssueKey,
+) -> Result<TeamKey, WorkError> {
     find(graph, key).map(|(_, team)| team)
 }
 
@@ -127,15 +137,19 @@ pub fn create_issue(
             .find(|i| i.links.iter().any(|l| l.url == link.url))
     {
         let key = our_key(&existing.team, existing.number);
-        tracing::info!(issue = %key, source = %link.url, "intake already filed");
+        tracing::info!(
+            issue = %key,
+            source = %link.url,
+            "intake already filed"
+        );
         return Ok((key, None));
     }
     let id = IssueId::generate();
     let new = new_issue(graph, id, team, draft, source)?;
     let changes = graph.create_issue(new, ctx).map_err(engine)?;
-    let issue = graph
-        .issue(&id)
-        .ok_or_else(|| WorkError::Unavailable("created issue vanished".to_owned()))?;
+    let issue = graph.issue(&id).ok_or_else(|| {
+        WorkError::Unavailable("created issue vanished".to_owned())
+    })?;
     Ok((our_key(&issue.team, issue.number), Some(changes)))
 }
 
@@ -171,8 +185,12 @@ pub fn add_comment(
 /// # Errors
 ///
 /// An author that is not a valid handle.
-pub fn actor(author: Option<&str>, bot: &UserRef) -> Result<UserRef, WorkError> {
-    author.map_or_else(|| Ok(bot.clone()), |h| UserRef::parse(h).map_err(refused))
+pub fn actor(
+    author: Option<&str>,
+    bot: &UserRef,
+) -> Result<UserRef, WorkError> {
+    author
+        .map_or_else(|| Ok(bot.clone()), |h| UserRef::parse(h).map_err(refused))
 }
 
 /// Builds the engine's draft from ours.
@@ -185,7 +203,10 @@ fn new_issue(
 ) -> Result<NewIssue, WorkError> {
     let intake = matches!(
         draft.source,
-        Source::Slack { .. } | Source::Sentry { .. } | Source::Email { .. } | Source::Form { .. }
+        Source::Slack { .. }
+            | Source::Sentry { .. }
+            | Source::Email { .. }
+            | Source::Form { .. }
     );
     let mut new = NewIssue::new(id, team, &draft.title);
     new.body = draft.description;
@@ -201,7 +222,8 @@ fn new_issue(
             .chain(graph.workspace_labels())
             .any(|l| l.reference().eq_ignore_ascii_case(label))
     };
-    let labels: Vec<String> = draft.labels.into_iter().filter(|l| known(l)).collect();
+    let labels: Vec<String> =
+        draft.labels.into_iter().filter(|l| known(l)).collect();
     new.labels = labels;
     new.assignee = draft
         .assignee
@@ -213,7 +235,10 @@ fn new_issue(
     new.project = draft.project.as_deref().and_then(|p| {
         graph
             .projects()
-            .find(|project| project.id.to_string() == p || project.title.eq_ignore_ascii_case(p))
+            .find(|project| {
+                project.id.to_string() == p
+                    || project.title.eq_ignore_ascii_case(p)
+            })
             .map(|project| project.id)
     });
     new.due = draft.due.map(to_date).transpose()?;
@@ -268,7 +293,10 @@ fn source_link(source: &Source) -> Option<IssueLink> {
     })
 }
 
-fn find(graph: &WorkGraph, key: &IssueKey) -> Result<(IssueId, TeamKey), WorkError> {
+fn find(
+    graph: &WorkGraph,
+    key: &IssueKey,
+) -> Result<(IssueId, TeamKey), WorkError> {
     graph
         .resolve(&key.to_string())
         .map(|i| (i.id, i.team.clone()))
@@ -315,7 +343,9 @@ const fn priority(p: Priority) -> vellum_work::Priority {
 fn engine(error: vellum_work::WorkError) -> WorkError {
     match error {
         vellum_work::WorkError::UnknownIssue(what) => WorkError::NotFound(what),
-        vellum_work::WorkError::UnknownTeam(team) => WorkError::NotFound(team.to_string()),
+        vellum_work::WorkError::UnknownTeam(team) => {
+            WorkError::NotFound(team.to_string())
+        }
         other => WorkError::Refused(other.to_string()),
     }
 }
@@ -324,7 +354,9 @@ fn refused(error: impl std::fmt::Display) -> WorkError {
     WorkError::Refused(error.to_string())
 }
 
-pub(super) fn to_offset(ts: Timestamp) -> Result<time::OffsetDateTime, WorkError> {
+pub(super) fn to_offset(
+    ts: Timestamp,
+) -> Result<time::OffsetDateTime, WorkError> {
     time::OffsetDateTime::from_unix_timestamp_nanos(ts.as_nanosecond())
         .map_err(|e| WorkError::Refused(format!("timestamp out of range: {e}")))
 }
@@ -334,26 +366,35 @@ fn from_offset(at: time::OffsetDateTime) -> Result<Timestamp, WorkError> {
         .map_err(|e| WorkError::Refused(format!("timestamp out of range: {e}")))
 }
 
-pub(super) fn to_date(date: jiff::civil::Date) -> Result<time::Date, WorkError> {
-    let bad = |e: time::error::ComponentRange| WorkError::Refused(format!("bad date: {e}"));
+pub(super) fn to_date(
+    date: jiff::civil::Date,
+) -> Result<time::Date, WorkError> {
+    let bad = |e: time::error::ComponentRange| {
+        WorkError::Refused(format!("bad date: {e}"))
+    };
     let month = u8::try_from(date.month())
         .map_err(|_| WorkError::Refused("bad month".to_owned()))
         .and_then(|m| time::Month::try_from(m).map_err(bad))?;
-    let day = u8::try_from(date.day()).map_err(|_| WorkError::Refused("bad day".to_owned()))?;
-    time::Date::from_calendar_date(i32::from(date.year()), month, day).map_err(bad)
+    let day = u8::try_from(date.day())
+        .map_err(|_| WorkError::Refused("bad day".to_owned()))?;
+    time::Date::from_calendar_date(i32::from(date.year()), month, day)
+        .map_err(bad)
 }
 
 /// The issues an earlier import from `tracker` created, by source ID.
 #[must_use]
-pub fn imported(graph: &WorkGraph, tracker: &str) -> std::collections::BTreeMap<String, IssueKey> {
+pub fn imported(
+    graph: &WorkGraph,
+    tracker: &str,
+) -> std::collections::BTreeMap<String, IssueKey> {
     let prefix = format!("import:{tracker}/");
     graph
         .issues()
         .flat_map(|issue| {
             issue.links.iter().filter_map(|link| {
-                link.url
-                    .strip_prefix(&prefix)
-                    .map(|external| (external.to_owned(), our_key(&issue.team, issue.number)))
+                link.url.strip_prefix(&prefix).map(|external| {
+                    (external.to_owned(), our_key(&issue.team, issue.number))
+                })
             })
         })
         .collect()
@@ -370,7 +411,8 @@ pub fn import_plan(
     graph: &mut WorkGraph,
     plan: &crate::import::Plan,
     ctx: &Ctx,
-) -> Result<(std::collections::BTreeMap<String, IssueKey>, Changes), WorkError> {
+) -> Result<(std::collections::BTreeMap<String, IssueKey>, Changes), WorkError>
+{
     let mut keys = std::collections::BTreeMap::new();
     let mut all = Changes::default();
     for planned in &plan.create {

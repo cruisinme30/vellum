@@ -17,8 +17,8 @@ use vellum_drive::layout;
 use vellum_drive::memory::{MemoryAccess, MemoryIndex, Role};
 use vellum_drive::sql::SqlIndex;
 use vellum_drive::{
-    ActivityKind, Clock, Drive, DriveError, DriveIndex, Node, NodeKind, Saved, SpaceKind,
-    SpaceSettings,
+    ActivityKind, Clock, Drive, DriveError, DriveIndex, Node, NodeKind, Saved,
+    SpaceKind, SpaceSettings,
 };
 use vellum_kernel::{Actor, ObjectId, Timestamp, UserId};
 use vellum_store::{Base, BlobPath, BlobStore, LocalStore, Precondition};
@@ -38,7 +38,8 @@ impl ManualClock {
 
 impl Clock for ManualClock {
     fn now(&self) -> Timestamp {
-        Timestamp::from_unix_ms(self.0.load(Ordering::SeqCst)).unwrap_or_else(|_| Timestamp::now())
+        Timestamp::from_unix_ms(self.0.load(Ordering::SeqCst))
+            .unwrap_or_else(|_| Timestamp::now())
     }
 }
 
@@ -60,9 +61,12 @@ struct Databases {
 }
 
 impl Databases {
-    async fn new(kind: Kind) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+    async fn new(
+        kind: Kind,
+    ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let postgres = if matches!(kind, Kind::Postgres) {
-            let container = Postgres::default().with_tag("17-alpine").start().await?;
+            let container =
+                Postgres::default().with_tag("17-alpine").start().await?;
             let port = container.get_host_port_ipv4(5432).await?;
             Some((
                 container,
@@ -80,7 +84,10 @@ impl Databases {
     }
 
     /// A new, empty index.
-    async fn index(&self) -> Result<Arc<dyn DriveIndex>, Box<dyn std::error::Error + Send + Sync>> {
+    async fn index(
+        &self,
+    ) -> Result<Arc<dyn DriveIndex>, Box<dyn std::error::Error + Send + Sync>>
+    {
         let n = self.opened.fetch_add(1, Ordering::SeqCst);
         Ok(match (self.kind, &self.postgres) {
             (Kind::Memory, _) => Arc::new(MemoryIndex::new()),
@@ -91,20 +98,29 @@ impl Databases {
                 ))
             }
             (Kind::Postgres, Some((_, base))) => {
-                let admin = Index::open(&IndexConfig::postgres(format!("{base}/postgres"))).await?;
+                let admin = Index::open(&IndexConfig::postgres(format!(
+                    "{base}/postgres"
+                )))
+                .await?;
                 if let vellum_db::IndexPool::Postgres(pool) = admin.pool() {
-                    let _ = vellum_db::sqlx::query(vellum_db::sqlx::AssertSqlSafe(format!(
-                        "CREATE DATABASE drive_{n}"
-                    )))
-                    .execute(pool)
-                    .await?;
+                    let _ =
+                        vellum_db::sqlx::query(vellum_db::sqlx::AssertSqlSafe(
+                            format!("CREATE DATABASE drive_{n}"),
+                        ))
+                        .execute(pool)
+                        .await?;
                 }
                 admin.close().await;
                 Arc::new(SqlIndex::new(
-                    Index::open(&IndexConfig::postgres(format!("{base}/drive_{n}"))).await?,
+                    Index::open(&IndexConfig::postgres(format!(
+                        "{base}/drive_{n}"
+                    )))
+                    .await?,
                 ))
             }
-            (Kind::Postgres, None) => return Err("no Postgres container".into()),
+            (Kind::Postgres, None) => {
+                return Err("no Postgres container".into());
+            }
         })
     }
 }
@@ -123,14 +139,21 @@ struct World {
     bob_id: UserId,
 }
 
-async fn world(kind: Kind) -> Result<World, Box<dyn std::error::Error + Send + Sync>> {
+async fn world(
+    kind: Kind,
+) -> Result<World, Box<dyn std::error::Error + Send + Sync>> {
     let dir = tempfile::tempdir()?;
     let databases = Databases::new(kind).await?;
     let store = Arc::new(LocalStore::open(dir.path()).await?);
     let index = databases.index().await?;
     let access = Arc::new(MemoryAccess::new(index.clone()));
     let clock = Arc::new(ManualClock(AtomicI64::new(1_790_000_000_000)));
-    let drive = Drive::with_clock(store.clone(), index.clone(), access.clone(), clock.clone());
+    let drive = Drive::with_clock(
+        store.clone(),
+        index.clone(),
+        access.clone(),
+        clock.clone(),
+    );
     let (alice_id, bob_id) = (UserId::generate(), UserId::generate());
     Ok(World {
         dir,
@@ -148,13 +171,19 @@ async fn world(kind: Kind) -> Result<World, Box<dyn std::error::Error + Send + S
 }
 
 impl World {
-    async fn text(&self, node: &Node) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    async fn text(
+        &self,
+        node: &Node,
+    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         Ok(String::from_utf8(
             self.store.get(&node.path).await?.bytes.to_vec(),
         )?)
     }
 
-    async fn node(&self, id: ObjectId) -> Result<Node, Box<dyn std::error::Error + Send + Sync>> {
+    async fn node(
+        &self,
+        id: ObjectId,
+    ) -> Result<Node, Box<dyn std::error::Error + Send + Sync>> {
         Ok(self.index.node(id).await?.ok_or("missing node")?)
     }
 
@@ -163,7 +192,10 @@ impl World {
         actor: &Actor,
         node: &Node,
         f: impl FnOnce(String) -> String,
-    ) -> Result<vellum_drive::SaveOutcome, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<
+        vellum_drive::SaveOutcome,
+        Box<dyn std::error::Error + Send + Sync>,
+    > {
         let blob = self.store.get(&node.path).await?;
         let text = String::from_utf8(blob.bytes.to_vec())?;
         let base = Base {
@@ -181,7 +213,13 @@ async fn pages_live_in_real_folders(kind: Kind) -> TestResult {
     let w = world(kind).await?;
     let eng = w
         .drive
-        .create_space(&w.alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .create_space(
+            &w.alice,
+            SpaceKind::SharedDrive,
+            "eng",
+            "Engineering",
+            None,
+        )
         .await?;
     assert_eq!(eng.root.as_str(), "drives/shared/eng");
     let specs = w
@@ -313,11 +351,19 @@ async fn my_drive_and_shared_with_me(kind: Kind) -> TestResult {
     Ok(())
 }
 
-async fn renaming_rewrites_links_and_backlinks_follow(kind: Kind) -> TestResult {
+async fn renaming_rewrites_links_and_backlinks_follow(
+    kind: Kind,
+) -> TestResult {
     let w = world(kind).await?;
     let eng = w
         .drive
-        .create_space(&w.alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .create_space(
+            &w.alice,
+            SpaceKind::SharedDrive,
+            "eng",
+            "Engineering",
+            None,
+        )
         .await?;
     let specs = w
         .drive
@@ -328,7 +374,8 @@ async fn renaming_rewrites_links_and_backlinks_follow(kind: Kind) -> TestResult 
         .create_page(&w.alice, eng.id, Some(specs.id), "Plan", "# Plan\n")
         .await?;
     let body = format!(
-        "See [[Plan]], [the plan](Specs/Plan.md#goals) and [by id](vellum://doc/{}).\n",
+        "See [[Plan]], [the plan](Specs/Plan.md#goals) and [by \
+            id](vellum://doc/{}).\n",
         target.id
     );
     let source = w
@@ -367,18 +414,26 @@ async fn renaming_rewrites_links_and_backlinks_follow(kind: Kind) -> TestResult 
     );
 
     let feed = w.drive.activity(&w.alice, specs.id, 50).await?;
-    assert!(
-        feed.iter()
-            .any(|a| matches!(&a.kind, ActivityKind::Renamed { to, .. } if to == "Plan v3"))
-    );
+    assert!(feed.iter().any(|a| matches!(
+        &a.kind,
+        ActivityKind::Renamed { to, .. } if to == "Plan v3"
+    )));
     Ok(())
 }
 
-async fn moving_keeps_explicit_grants_and_fixes_relative_links(kind: Kind) -> TestResult {
+async fn moving_keeps_explicit_grants_and_fixes_relative_links(
+    kind: Kind,
+) -> TestResult {
     let w = world(kind).await?;
     let eng = w
         .drive
-        .create_space(&w.alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .create_space(
+            &w.alice,
+            SpaceKind::SharedDrive,
+            "eng",
+            "Engineering",
+            None,
+        )
         .await?;
     let a = w.drive.create_folder(&w.alice, eng.id, None, "A").await?;
     let b = w.drive.create_folder(&w.alice, eng.id, None, "B").await?;
@@ -388,14 +443,21 @@ async fn moving_keeps_explicit_grants_and_fixes_relative_links(kind: Kind) -> Te
         .await?;
     let page = w
         .drive
-        .create_page(&w.alice, eng.id, Some(a.id), "Moving", "[s](Sibling.md)\n")
+        .create_page(
+            &w.alice,
+            eng.id,
+            Some(a.id),
+            "Moving",
+            "[s](Sibling.md)\n",
+        )
         .await?;
     let linker = w
         .drive
         .create_page(&w.alice, eng.id, None, "Linker", "[m](A/Moving.md)\n")
         .await?;
 
-    // Bob can see A (inherited by the page) and has an explicit grant on the page.
+    // Bob can see A (inherited by the page) and has an explicit grant on the
+    // page.
     w.access.grant(w.bob_id, a.id, Role::Viewer);
     w.access.grant(w.bob_id, page.id, Role::Editor);
 
@@ -440,7 +502,13 @@ async fn copies_get_fresh_ids_and_internal_links(kind: Kind) -> TestResult {
     let w = world(kind).await?;
     let eng = w
         .drive
-        .create_space(&w.alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .create_space(
+            &w.alice,
+            SpaceKind::SharedDrive,
+            "eng",
+            "Engineering",
+            None,
+        )
         .await?;
     let folder = w.drive.create_folder(&w.alice, eng.id, None, "Kit").await?;
     let one = w
@@ -492,7 +560,13 @@ async fn trash_cascades_and_restores_exactly(kind: Kind) -> TestResult {
     let w = world(kind).await?;
     let eng = w
         .drive
-        .create_space(&w.alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .create_space(
+            &w.alice,
+            SpaceKind::SharedDrive,
+            "eng",
+            "Engineering",
+            None,
+        )
         .await?;
     let folder = w.drive.create_folder(&w.alice, eng.id, None, "Old").await?;
     let early = w
@@ -561,7 +635,13 @@ async fn shortcuts_never_grant_access(kind: Kind) -> TestResult {
     let w = world(kind).await?;
     let eng = w
         .drive
-        .create_space(&w.alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .create_space(
+            &w.alice,
+            SpaceKind::SharedDrive,
+            "eng",
+            "Engineering",
+            None,
+        )
         .await?;
     let secret = w
         .drive
@@ -597,7 +677,13 @@ async fn quotas_and_version_retention(kind: Kind) -> TestResult {
     let w = world(kind).await?;
     let eng = w
         .drive
-        .create_space(&w.alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .create_space(
+            &w.alice,
+            SpaceKind::SharedDrive,
+            "eng",
+            "Engineering",
+            None,
+        )
         .await?;
     let page = w
         .drive
@@ -651,11 +737,19 @@ async fn quotas_and_version_retention(kind: Kind) -> TestResult {
     Ok(())
 }
 
-async fn concurrent_edits_merge_or_make_a_conflict_copy(kind: Kind) -> TestResult {
+async fn concurrent_edits_merge_or_make_a_conflict_copy(
+    kind: Kind,
+) -> TestResult {
     let w = world(kind).await?;
     let eng = w
         .drive
-        .create_space(&w.alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .create_space(
+            &w.alice,
+            SpaceKind::SharedDrive,
+            "eng",
+            "Engineering",
+            None,
+        )
         .await?;
     let page = w
         .drive
@@ -704,7 +798,13 @@ async fn the_index_rebuilds_from_files(kind: Kind) -> TestResult {
     let w = world(kind).await?;
     let eng = w
         .drive
-        .create_space(&w.alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .create_space(
+            &w.alice,
+            SpaceKind::SharedDrive,
+            "eng",
+            "Engineering",
+            None,
+        )
         .await?;
     let folder = w
         .drive
@@ -725,7 +825,8 @@ async fn the_index_rebuilds_from_files(kind: Kind) -> TestResult {
     let _ = w.drive.trash(&w.alice, gone.id).await?;
 
     // Renamed outside Vellum: identity follows the ID.
-    let outside = BlobPath::new("drives/shared/eng/Specs/Renamed in Finder.md")?;
+    let outside =
+        BlobPath::new("drives/shared/eng/Specs/Renamed in Finder.md")?;
     let _ = w.store.rename(&page.path, &outside).await?;
     // Copied outside Vellum: the duplicate ID is replaced.
     let dup = BlobPath::new("drives/shared/eng/Index copy.md")?;
@@ -756,11 +857,19 @@ async fn the_index_rebuilds_from_files(kind: Kind) -> TestResult {
     Ok(())
 }
 
-async fn external_edits_and_renames_come_in_through_the_watcher(kind: Kind) -> TestResult {
+async fn external_edits_and_renames_come_in_through_the_watcher(
+    kind: Kind,
+) -> TestResult {
     let w = world(kind).await?;
     let eng = w
         .drive
-        .create_space(&w.alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .create_space(
+            &w.alice,
+            SpaceKind::SharedDrive,
+            "eng",
+            "Engineering",
+            None,
+        )
         .await?;
     let folder = w
         .drive
@@ -821,7 +930,13 @@ async fn pages_nest_under_pages(kind: Kind) -> TestResult {
     let w = world(kind).await?;
     let eng = w
         .drive
-        .create_space(&w.alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .create_space(
+            &w.alice,
+            SpaceKind::SharedDrive,
+            "eng",
+            "Engineering",
+            None,
+        )
         .await?;
     let plan = w
         .drive
@@ -916,11 +1031,19 @@ async fn pages_nest_under_pages(kind: Kind) -> TestResult {
     Ok(())
 }
 
-async fn siblings_keep_their_order_and_the_tree_comes_whole(kind: Kind) -> TestResult {
+async fn siblings_keep_their_order_and_the_tree_comes_whole(
+    kind: Kind,
+) -> TestResult {
     let w = world(kind).await?;
     let eng = w
         .drive
-        .create_space(&w.alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .create_space(
+            &w.alice,
+            SpaceKind::SharedDrive,
+            "eng",
+            "Engineering",
+            None,
+        )
         .await?;
     let apple = w.drive.create_page(&w.alice, eng.id, None, "A", "").await?;
     let berry = w.drive.create_page(&w.alice, eng.id, None, "B", "").await?;
@@ -1035,11 +1158,23 @@ async fn scheduled_retention_covers_every_space(kind: Kind) -> TestResult {
     let w = world(kind).await?;
     let eng = w
         .drive
-        .create_space(&w.alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .create_space(
+            &w.alice,
+            SpaceKind::SharedDrive,
+            "eng",
+            "Engineering",
+            None,
+        )
         .await?;
     let ops = w
         .drive
-        .create_space(&w.alice, SpaceKind::SharedDrive, "ops", "Operations", None)
+        .create_space(
+            &w.alice,
+            SpaceKind::SharedDrive,
+            "ops",
+            "Operations",
+            None,
+        )
         .await?;
     let mut tight = SpaceSettings::default();
     tight.retention.keep_all_days = 15;
@@ -1057,10 +1192,12 @@ async fn scheduled_retention_covers_every_space(kind: Kind) -> TestResult {
     for n in 2..=4 {
         w.clock.advance_days(10);
         for page in &mut pages {
-            *page = w.edit(&w.alice, page, |t| format!("{t}v{n}\n")).await?.node;
+            *page =
+                w.edit(&w.alice, page, |t| format!("{t}v{n}\n")).await?.node;
         }
     }
-    let [eng_page, ops_page] = <[Node; 2]>::try_from(pages).map_err(|_| "two pages")?;
+    let [eng_page, ops_page] =
+        <[Node; 2]>::try_from(pages).map_err(|_| "two pages")?;
     // Ages 0, 10, 20 and 30 days in each space. Engineering keeps the two
     // under 15 days; Operations keeps everything by default.
     assert_eq!(w.drive.prune_all_versions().await?, 2);
@@ -1087,7 +1224,13 @@ async fn files_travel_with_their_page(kind: Kind) -> TestResult {
     let w = world(kind).await?;
     let eng = w
         .drive
-        .create_space(&w.alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .create_space(
+            &w.alice,
+            SpaceKind::SharedDrive,
+            "eng",
+            "Engineering",
+            None,
+        )
         .await?;
     let plan = w
         .drive

@@ -12,7 +12,9 @@ use std::sync::Arc;
 use time::macros::datetime;
 use vellum_kernel::{Error, ErrorKind};
 use vellum_store::LocalStore;
-use vellum_work::{Changes, IssueId, NewIssue, Team, TeamKey, UserRef, WorkEvent};
+use vellum_work::{
+    Changes, IssueId, NewIssue, Team, TeamKey, UserRef, WorkEvent,
+};
 use vellum_work_service::{EventLog, FixedClock, StaticDirectory, WorkService};
 
 async fn open(dir: &std::path::Path) -> (WorkService, Arc<EventLog>) {
@@ -54,8 +56,10 @@ async fn a_bot_command_is_written_announced_or_rolled_back() {
     let id = IssueId::generate();
     let key = svc
         .transact(bot.clone(), |graph, _, ctx| {
-            let changes =
-                graph.create_issue(NewIssue::new(id, eng.clone(), "Build fails on main"), ctx)?;
+            let changes = graph.create_issue(
+                NewIssue::new(id, eng.clone(), "Build fails on main"),
+                ctx,
+            )?;
             let key = graph
                 .issue(&id)
                 .map(|i| i.key().to_string())
@@ -76,8 +80,14 @@ async fn a_bot_command_is_written_announced_or_rolled_back() {
     let other = IssueId::generate();
     let failed = svc
         .transact(bot.clone(), |graph, _, ctx| {
-            let _ = graph.create_issue(NewIssue::new(other, eng.clone(), "Half done"), ctx)?;
-            Err::<(Changes, _, ()), _>(Error::new(ErrorKind::InvalidInput, "stop".to_owned()))
+            let _ = graph.create_issue(
+                NewIssue::new(other, eng.clone(), "Half done"),
+                ctx,
+            )?;
+            Err::<(Changes, _, ()), _>(Error::new(
+                ErrorKind::InvalidInput,
+                "stop".to_owned(),
+            ))
         })
         .await;
     assert_eq!(failed.map_err(|e| e.kind()), Err(ErrorKind::InvalidInput));

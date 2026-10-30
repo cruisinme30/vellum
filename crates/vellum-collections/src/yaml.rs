@@ -123,7 +123,10 @@ impl IntoIterator for Mapping {
 }
 
 impl Serialize for Yaml {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+    fn serialize<S: Serializer>(
+        &self,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
         match self {
             Self::Null => serializer.serialize_unit(),
             Self::Bool(b) => serializer.serialize_bool(*b),
@@ -143,7 +146,10 @@ impl Serialize for Yaml {
 }
 
 impl Serialize for Mapping {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+    fn serialize<S: Serializer>(
+        &self,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
         let mut map = serializer.serialize_map(Some(self.0.len()))?;
         for (k, v) in &self.0 {
             map.serialize_entry(k, v)?;
@@ -205,7 +211,10 @@ impl<'de> Visitor<'de> for YamlVisitor {
         Yaml::deserialize(d)
     }
 
-    fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Yaml, A::Error> {
+    fn visit_seq<A: SeqAccess<'de>>(
+        self,
+        mut seq: A,
+    ) -> Result<Yaml, A::Error> {
         let mut items = Vec::new();
         while let Some(v) = seq.next_element()? {
             items.push(v);
@@ -213,7 +222,10 @@ impl<'de> Visitor<'de> for YamlVisitor {
         Ok(Yaml::Seq(items))
     }
 
-    fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Yaml, A::Error> {
+    fn visit_map<A: MapAccess<'de>>(
+        self,
+        mut map: A,
+    ) -> Result<Yaml, A::Error> {
         let mut out = Mapping::new();
         while let Some((k, v)) = map.next_entry::<Yaml, Yaml>()? {
             out.insert(k.key_text(), v);
@@ -233,7 +245,9 @@ impl<'de> Deserialize<'de> for Yaml {
 /// # Errors
 ///
 /// Returns the parser's message.
-pub fn from_str<T: serde::de::DeserializeOwned>(text: &str) -> Result<T, String> {
+pub fn from_str<T: serde::de::DeserializeOwned>(
+    text: &str,
+) -> Result<T, String> {
     serde_saphyr::from_str(text).map_err(|e| e.to_string())
 }
 
@@ -256,7 +270,8 @@ mod tests {
 
     #[test]
     fn keeps_order_and_types() {
-        let y: Yaml = from_str("b: 1\na: [x, 2.5, true, ~]\nc: {d: e}\n").unwrap();
+        let y: Yaml =
+            from_str("b: 1\na: [x, 2.5, true, ~]\nc: {d: e}\n").unwrap();
         let Yaml::Map(m) = &y else {
             panic!("not a map")
         };

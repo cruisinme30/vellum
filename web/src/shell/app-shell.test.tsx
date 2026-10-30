@@ -18,18 +18,24 @@ afterEach(() => {
 });
 
 describe("AppShell", () => {
-  it("shows a banner while the server is degraded and hides it when it recovers", () => {
-    renderApp("/");
-    expect(screen.queryByTestId("service-banner")).toBeNull();
-    act(() => {
-      serviceHealth.report(503, 1);
-    });
-    expect(screen.getByRole("status").textContent).toContain("Part of Vellum is unavailable");
-    act(() => {
-      serviceHealth.report(200);
-    });
-    expect(screen.queryByTestId("service-banner")).toBeNull();
-  });
+  it(
+    "shows a banner while the server is degraded and hides it when it " +
+      "recovers",
+    () => {
+      renderApp("/");
+      expect(screen.queryByTestId("service-banner")).toBeNull();
+      act(() => {
+        serviceHealth.report(503, 1);
+      });
+      expect(screen.getByRole("status").textContent).toContain(
+        "Part of Vellum is unavailable",
+      );
+      act(() => {
+        serviceHealth.report(200);
+      });
+      expect(screen.queryByTestId("service-banner")).toBeNull();
+    },
+  );
 
   it("has a skip link to the main area", () => {
     renderApp("/");
@@ -39,11 +45,15 @@ describe("AppShell", () => {
 
   it("keeps the sidebar open on wide windows when a page opens", async () => {
     const { user, location } = renderApp("/help");
-    await user.click(screen.getByRole("treeitem", { name: "Launch checklist" }));
+    await user.click(
+      screen.getByRole("treeitem", { name: "Launch checklist" }),
+    );
     expect(location()).toBe(`/p/${PAGE.launch}`);
     expect(screen.getByRole("complementary", { name: "Pages" })).toBeDefined();
     expect(
-      screen.getByRole("treeitem", { name: "Launch checklist" }).getAttribute("aria-current"),
+      screen
+        .getByRole("treeitem", { name: "Launch checklist" })
+        .getAttribute("aria-current"),
     ).toBe("page");
   });
 
@@ -51,7 +61,11 @@ describe("AppShell", () => {
     const { user, store, location } = renderApp(`/p/${PAGE.launch}`);
     await user.click(screen.getByRole("button", { name: "New" }));
     const created = store.getSnapshot().pages.at(-1);
-    expect(created).toMatchObject({ spaceId: PRODUCT, parentId: undefined, title: "" });
+    expect(created).toMatchObject({
+      spaceId: PRODUCT,
+      parentId: undefined,
+      title: "",
+    });
     await waitFor(() => {
       expect(location()).toBe(`/p/${created?.id ?? ""}`);
     });
@@ -60,7 +74,9 @@ describe("AppShell", () => {
   it("creates a page in the first space elsewhere", async () => {
     const { user, store } = renderApp("/help");
     await user.click(screen.getByRole("button", { name: "New" }));
-    expect(store.getSnapshot().pages.at(-1)?.spaceId).toBe("01JB3K0000SPACE0ENG0000001");
+    expect(store.getSnapshot().pages.at(-1)?.spaceId).toBe(
+      "01JB3K0000SPACE0ENG0000001",
+    );
   });
 });
 
@@ -85,7 +101,9 @@ describe("AppShell on medium windows", () => {
     const { user, location } = renderApp("/help");
     await user.click(screen.getByRole("button", { name: "Show pages" }));
     const tree = screen.getByRole("tree", { name: "Handbook pages" });
-    await user.click(within(tree).getByRole("treeitem", { name: "Team directory" }));
+    await user.click(
+      within(tree).getByRole("treeitem", { name: "Team directory" }),
+    );
     expect(location()).toBe(`/p/${PAGE.directory}`);
     expect(screen.queryByRole("complementary", { name: "Pages" })).toBeNull();
   });

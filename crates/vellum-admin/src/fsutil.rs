@@ -24,7 +24,8 @@ pub async fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
         .file_name()
         .and_then(|n| n.to_str())
         .ok_or_else(|| Error::new(ErrorKind::Internal, "invalid file name"))?;
-    let tmp = path.with_file_name(format!(".{name}.tmp-{}", std::process::id()));
+    let tmp =
+        path.with_file_name(format!(".{name}.tmp-{}", std::process::id()));
     let mut file = tokio::fs::File::create(&tmp)
         .await
         .map_err(io("cannot create a temporary file"))?;

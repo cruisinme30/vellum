@@ -19,15 +19,15 @@ vellum: 1
 
 ## Context
 
-Round 6 of the red team ([ADR 0030](0030-red-team.md)) attacked develop
-after batch #540 brought the day's work together: `vellum serve` wiring,
-sharing, uploads and imports, AI and MCP, and sign-in with SAML, SCIM and
-second factors ([ADR 0069](0069-sign-in-methods-second-factors-and-provisioning.md)).
-Five findings came out of it, each fixed with a regression test. Two let
-an identity provider, or whoever holds the provisioning token, reach
-accounts it should not, one let a signed-in editor exhaust the server's
-memory, one let a remembered provider sign-in pass the admin re-auth
-check, and one kept MCP notifications flowing after access ended.
+Round 6 of the red team ([ADR 0030](0030-red-team.md)) attacked develop after
+batch #540 brought the day's work together: `vellum serve` wiring, sharing,
+uploads and imports, AI and MCP, and sign-in with SAML, SCIM and second factors
+([ADR 0069](0069-sign-in-methods-second-factors-and-provisioning.md)). Five
+findings came out of it, each fixed with a regression test. Two let an identity
+provider, or whoever holds the provisioning token, reach accounts it should not,
+one let a signed-in editor exhaust the server's memory, one let a remembered
+provider sign-in pass the admin re-auth check, and one kept MCP notifications
+flowing after access ended.
 
 Checked and found sound: the SAML signature checks (one reference to
 the signed element's own ID, unique IDs, no DTD, claims read only from

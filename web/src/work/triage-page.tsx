@@ -167,7 +167,12 @@ function Decide({
           {mode === "duplicate" && (
             <label>
               {t("work-triage-of")}
-              <input name="of" autoComplete="off" required placeholder={`${team.key}-1`} />
+              <input
+                name="of"
+                autoComplete="off"
+                required
+                placeholder={`${team.key}-1`}
+              />
             </label>
           )}
           {mode === "snooze" && (
@@ -196,14 +201,26 @@ function Decide({
   );
 }
 
-function Inbox({ api, team }: { readonly api: WorkApi; readonly team: TeamOut }) {
+function Inbox({
+  api,
+  team,
+}: {
+  readonly api: WorkApi;
+  readonly team: TeamOut;
+}) {
   const t = useT();
   const [version, setVersion] = useState(0);
   const [announce, setAnnounce] = useState("");
   useWorkKeys(team.key);
-  const loaded = useLoaded(() => api.inbox(team.key), [api, team.key, version], failureText);
+  const loaded = useLoaded(
+    () => api.inbox(team.key),
+    [api, team.key, version],
+    failureText,
+  );
   if (!team.triage) {
-    return <p className="vl-muted">{t("work-triage-off", { team: team.name })}</p>;
+    return (
+      <p className="vl-muted">{t("work-triage-off", { team: team.name })}</p>
+    );
   }
   return (
     <>
@@ -218,13 +235,18 @@ function Inbox({ api, team }: { readonly api: WorkApi; readonly team: TeamOut })
             <ul className="vl-triage-list">
               {issues.map((issue) => (
                 <li key={issue.id} className="vl-triage-item">
-                  <Link to={`/issues/${encodeURIComponent(issue.key)}`} data-issue={issue.key}>
+                  <Link
+                    to={`/issues/${encodeURIComponent(issue.key)}`}
+                    data-issue={issue.key}
+                  >
                     <span className="vl-issue-key">{issue.key}</span>
                     <span className="vl-issue-title">{issue.title}</span>
                     <IssueChips issue={issue} />
                   </Link>
                   {issue.creator !== undefined && issue.creator !== null && (
-                    <p className="vl-muted">{t("work-triage-from", { person: issue.creator })}</p>
+                    <p className="vl-muted">
+                      {t("work-triage-from", { person: issue.creator })}
+                    </p>
                   )}
                   <Decide
                     api={api}
@@ -254,7 +276,8 @@ function TriageForTeams({
 }) {
   const t = useT();
   const team = useTeam(teams);
-  if (team === undefined) return <p className="vl-muted">{t("issues-no-teams")}</p>;
+  if (team === undefined)
+    return <p className="vl-muted">{t("issues-no-teams")}</p>;
   return (
     <>
       <div className="vl-work-filters">
@@ -267,7 +290,11 @@ function TriageForTeams({
 
 function TriageLoader({ api }: { readonly api: WorkApi }) {
   const loaded = useLoaded(() => api.teams(), [api], failureText);
-  return <Ready loaded={loaded}>{(teams) => <TriageForTeams api={api} teams={teams} />}</Ready>;
+  return (
+    <Ready loaded={loaded}>
+      {(teams) => <TriageForTeams api={api} teams={teams} />}
+    </Ready>
+  );
 }
 
 /** The triage inbox screen. */

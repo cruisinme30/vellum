@@ -11,7 +11,10 @@ import { nodeSpec, tiptapAttributes } from "../schema/spec";
  * content, styled by `vl-<name>`. Containers whose body is ordinary
  * Markdown (callouts, columns, stats, facts…) need nothing more.
  */
-export function genericNode(name: NodeName, extra: Record<string, string> = {}) {
+export function genericNode(
+  name: NodeName,
+  extra: Record<string, string> = {},
+) {
   const spec = nodeSpec(name);
   return Node.create({
     name: spec.name,

@@ -8,15 +8,23 @@ import { describeError } from "../views/sign-in";
 
 import type { NotificationServices } from "./context";
 
-type DeviceState = "checking" | "on" | "off" | "denied" | "unsupported" | "demo";
+type DeviceState =
+  "checking" | "on" | "off" | "denied" | "unsupported" | "demo";
 
 function initialState(device: NotificationServices["device"]): DeviceState {
   if (device === undefined) return "demo";
   return device.supported ? "checking" : "unsupported";
 }
 
-/** Push on this browser: separate from the per-kind settings, which follow the person. */
-export function ThisDevice({ device }: { readonly device: NotificationServices["device"] }) {
+/**
+ * Push on this browser: separate from the per-kind settings, which follow the
+ * person.
+ */
+export function ThisDevice({
+  device,
+}: {
+  readonly device: NotificationServices["device"];
+}) {
   const t = useT();
   const [state, setState] = useState<DeviceState>(() => initialState(device));
   const [busy, setBusy] = useState(false);

@@ -57,8 +57,12 @@ superscript  = "^" , text , "^" ;
 
 ::: facts
 
-- Containers: `info`, `warn`, `good`, `crit`, `tip`, `note`, `details`, `columns`, `tabs`, `toc`, `stats`, `facts`, `cards`, `steps`, `progress`, `link`, `embed`, `pages`
-- Fences: `chart`, `timeline`, `roadmap`, `risk-matrix`, `board`, `table`, `architecture`, `mermaid`, `d2`, `plantuml`, `graphviz`, `excalidraw`, `drawio`, `calculator`, `image`, `collection`, `math`
+- Containers: `info`, `warn`, `good`, `crit`, `tip`, `note`, `details`,
+  `columns`, `tabs`, `toc`, `stats`, `facts`, `cards`, `steps`, `progress`,
+  `link`, `embed`, `pages`
+- Fences: `chart`, `timeline`, `roadmap`, `risk-matrix`, `board`, `table`,
+  `architecture`, `mermaid`, `d2`, `plantuml`, `graphviz`, `excalidraw`,
+  `drawio`, `calculator`, `image`, `collection`, `math`
 
 :::
 

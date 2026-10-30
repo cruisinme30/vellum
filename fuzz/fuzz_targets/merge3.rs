@@ -18,7 +18,11 @@ struct Input<'a> {
 }
 
 fuzz_target!(|input: Input<'_>| {
-    let kind = if input.manifest { MergeKind::Manifest } else { MergeKind::Text };
+    let kind = if input.manifest {
+        MergeKind::Manifest
+    } else {
+        MergeKind::Text
+    };
     let _ = merge3(kind, input.base, input.ours, input.theirs);
     assert_eq!(
         merge3(kind, input.base, input.base, input.theirs),

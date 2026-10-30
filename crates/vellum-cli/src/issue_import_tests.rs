@@ -18,7 +18,9 @@ use vellum_security::upload::{Scanner, UploadError, UploadPolicy};
 use vellum_store::BlobStore;
 use vellum_store::LocalStore;
 use vellum_work::{Changes, Team, TeamKey, UserRef};
-use vellum_work_service::{EventLog, StaticDirectory, SystemClock, WorkService};
+use vellum_work_service::{
+    EventLog, StaticDirectory, SystemClock, WorkService,
+};
 
 use crate::issue_import::{PREFIX, router};
 
@@ -52,7 +54,8 @@ struct World {
 impl World {
     async fn new() -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let dir = tempfile::tempdir()?;
-        let store: Arc<dyn BlobStore> = Arc::new(LocalStore::open(dir.path()).await?);
+        let store: Arc<dyn BlobStore> =
+            Arc::new(LocalStore::open(dir.path()).await?);
         let (work, _) = WorkService::open(
             store,
             Arc::new(StaticDirectory::new()),
@@ -136,14 +139,16 @@ async fn call(app: &Router, request: Request<Body>) -> (StatusCode, Value) {
     )
 }
 
-const QUERY: &str = "tracker=github&team=ENG&repo=northstar/app&name=issues.json";
+const QUERY: &str =
+    "tracker=github&team=ENG&repo=northstar/app&name=issues.json";
 
 #[tokio::test]
 async fn github_issues_import_once_and_skip_on_rerun() -> TestResult {
     let w = World::new().await?;
     let app = w.app(w.admin, &Scope::ALL);
 
-    let (status, plan) = call(&app, post(&format!("{QUERY}&dry_run=true"), ISSUES)).await;
+    let (status, plan) =
+        call(&app, post(&format!("{QUERY}&dry_run=true"), ISSUES)).await;
     assert_eq!(status, StatusCode::OK, "{plan}");
     assert_eq!(plan["created"], 2, "{plan}");
     let count = w.work.read(|graph, _| graph.issues().count()).await;
@@ -170,15 +175,19 @@ async fn github_issues_import_once_and_skip_on_rerun() -> TestResult {
 #[tokio::test]
 async fn only_admins_with_the_work_scope_import() -> TestResult {
     let w = World::new().await?;
-    let (status, _) = call(&w.app(w.member, &Scope::ALL), post(QUERY, ISSUES)).await;
+    let (status, _) =
+        call(&w.app(w.member, &Scope::ALL), post(QUERY, ISSUES)).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
-    let (status, _) = call(&w.app(w.admin, &[Scope::Read]), post(QUERY, ISSUES)).await;
+    let (status, _) =
+        call(&w.app(w.admin, &[Scope::Read]), post(QUERY, ISSUES)).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
 
     let app = w.app(w.admin, &Scope::ALL);
-    let (status, _) = call(&app, post("tracker=asana&team=ENG&name=a.json", ISSUES)).await;
+    let (status, _) =
+        call(&app, post("tracker=asana&team=ENG&name=a.json", ISSUES)).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
-    let (status, _) = call(&app, post("tracker=github&team=ENG&name=a.json", ISSUES)).await;
+    let (status, _) =
+        call(&app, post("tracker=github&team=ENG&name=a.json", ISSUES)).await;
     assert_eq!(status, StatusCode::BAD_REQUEST, "GitHub needs a repo");
     let (status, _) = call(&app, post(QUERY, "not json")).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);

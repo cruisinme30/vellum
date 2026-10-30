@@ -13,12 +13,17 @@ proptest! {
     fn hash_hex_round_trips(bytes in any::<[u8; 32]>()) {
         let hash = ShareTokenHash::from_bytes(bytes);
         prop_assert_eq!(hash.to_string().parse::<ShareTokenHash>(), Ok(hash));
-        prop_assert_eq!(hash.to_string().to_uppercase().parse::<ShareTokenHash>(), Ok(hash));
+        prop_assert_eq!(
+            hash.to_string().to_uppercase().parse::<ShareTokenHash>(),
+            Ok(hash)
+        );
     }
 
     #[test]
     fn valid_token_text_parses_and_verifies(text in "[0-9A-Za-z]{22}") {
-        let token: ShareToken = text.parse().map_err(|e: ShareTokenError| TestCaseError::fail(e.to_string()))?;
+        let token: ShareToken = text.parse().map_err(
+            |e: ShareTokenError| TestCaseError::fail(e.to_string())
+        )?;
         prop_assert_eq!(token.expose(), text.as_str());
         prop_assert!(token.hash().verify(&token));
     }
@@ -31,7 +36,8 @@ proptest! {
 }
 
 #[test]
-fn generated_tokens_use_the_whole_alphabet_and_do_not_repeat() -> Result<(), ShareTokenError> {
+fn generated_tokens_use_the_whole_alphabet_and_do_not_repeat()
+-> Result<(), ShareTokenError> {
     let mut seen_chars = HashSet::new();
     let mut seen_tokens = HashSet::new();
     for _ in 0..2_000 {

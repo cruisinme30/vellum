@@ -30,12 +30,19 @@ export function proposedTitle(quote: string): string {
  * Writes an issue chip at the end of the block the issue was filed from,
  * or after the selection when that block is gone.
  */
-function insertIssueChip(editor: Editor, key: string, blockId: string | undefined) {
+function insertIssueChip(
+  editor: Editor,
+  key: string,
+  blockId: string | undefined,
+) {
   const chip = [
     { type: "text", text: " " },
     { type: "issueKey", attrs: { key } },
   ];
-  const pos = blockId === undefined ? undefined : blockPosition(editor.state.doc, blockId);
+  const pos =
+    blockId === undefined
+      ? undefined
+      : blockPosition(editor.state.doc, blockId);
   const block = pos === undefined ? undefined : editor.state.doc.nodeAt(pos);
   const end =
     block?.isTextblock === true && pos !== undefined
@@ -102,7 +109,11 @@ export function FileIssue({
       );
   };
   return (
-    <Popover label={t("file-issue-title")} onClose={onClose} className="vl-file-issue-popover">
+    <Popover
+      label={t("file-issue-title")}
+      onClose={onClose}
+      className="vl-file-issue-popover"
+    >
       <form className="vl-file-issue" onSubmit={submit}>
         <h2>{t("file-issue-title")}</h2>
         {teams.state === "loading" && (
@@ -133,7 +144,11 @@ export function FileIssue({
             </label>
             <label>
               {t("file-issue-name")}
-              <input name="title" required defaultValue={proposedTitle(anchor.quote)} />
+              <input
+                name="title"
+                required
+                defaultValue={proposedTitle(anchor.quote)}
+              />
             </label>
             <button type="submit" className="vl-filled-button" disabled={busy}>
               {t("file-issue-create")}

@@ -24,7 +24,8 @@ fn inputs(dir: &Path, out: &mut Vec<PathBuf>) {
     let Ok(entries) = fs::read_dir(dir) else {
         return;
     };
-    let mut paths: Vec<PathBuf> = entries.filter_map(Result::ok).map(|e| e.path()).collect();
+    let mut paths: Vec<PathBuf> =
+        entries.filter_map(Result::ok).map(|e| e.path()).collect();
     paths.sort();
     for path in paths {
         let name = path
@@ -88,14 +89,21 @@ fn golden_corpus_round_trips() {
             .to_string();
         let expected_ast = fs::read_to_string(&ast_path).unwrap_or_default();
         if ast != expected_ast {
-            failures.push(format!("{name}: AST differs from {}", ast_path.display()));
+            failures.push(format!(
+                "{name}: AST differs from {}",
+                ast_path.display()
+            ));
         }
-        let expected = fs::read_to_string(&canonical_path).unwrap_or_else(|_| source.clone());
+        let expected = fs::read_to_string(&canonical_path)
+            .unwrap_or_else(|_| source.clone());
         if canonical != expected {
-            failures.push(format!("{name}: canonical form differs:\n{canonical}"));
+            failures
+                .push(format!("{name}: canonical form differs:\n{canonical}"));
         }
         if parse(&canonical).document != parsed.document {
-            failures.push(format!("{name}: canonical form parses to a different tree"));
+            failures.push(format!(
+                "{name}: canonical form parses to a different tree"
+            ));
         }
     }
     assert!(

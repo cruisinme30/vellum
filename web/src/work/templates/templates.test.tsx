@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-/* eslint-disable @typescript-eslint/unbound-method -- the APIs' methods are vi.fn mocks */
+/* eslint-disable @typescript-eslint/unbound-method --
+   the APIs' methods are vi.fn mocks */
 
 import { render, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
@@ -101,10 +102,12 @@ describe("template file", () => {
     // A new project drops the old project's milestone.
     const moved_ = templateOf({ ...formOf(HANDOFF), project: "p2" }, HANDOFF);
     expect(moved_.milestone).toBeUndefined();
-    expect(templateOf({ ...formOf(), name: " Chore ", estimate: "m" })).toEqual({
-      name: "Chore",
-      estimate: "M",
-    });
+    expect(templateOf({ ...formOf(), name: " Chore ", estimate: "m" })).toEqual(
+      {
+        name: "Chore",
+        estimate: "M",
+      },
+    );
   });
 
   it("names what is wrong with a form", () => {
@@ -113,9 +116,15 @@ describe("template file", () => {
     expect(problemOf({ ...ok, name: " " }, [])).toBe("tpl-error-name");
     expect(problemOf(ok, ["bug REPORT"])).toBe("tpl-error-name-taken");
     expect(problemOf({ ...ok, repeat: "9y" }, [])).toBe("tpl-error-repeat");
-    expect(problemOf({ ...ok, estimate: "lots" }, [])).toBe("tpl-error-estimate");
-    expect(problemOf({ ...ok, assignee: "@-x" }, [])).toBe("tpl-error-assignee");
-    expect(problemOf({ ...ok, name: "x".repeat(81) }, [])).toBe("tpl-error-name-long");
+    expect(problemOf({ ...ok, estimate: "lots" }, [])).toBe(
+      "tpl-error-estimate",
+    );
+    expect(problemOf({ ...ok, assignee: "@-x" }, [])).toBe(
+      "tpl-error-assignee",
+    );
+    expect(problemOf({ ...ok, name: "x".repeat(81) }, [])).toBe(
+      "tpl-error-name-long",
+    );
   });
 
   it("copies and moves", () => {
@@ -127,7 +136,9 @@ describe("template file", () => {
 
 describe("planning API for repeats", () => {
   it("asks for repeating issues and sets a repeat with its due date", async () => {
-    const get = vi.fn(() => Promise.resolve({ groups: [{ issues: [issue("ENG-4", "Rotate")] }] }));
+    const get = vi.fn(() =>
+      Promise.resolve({ groups: [{ issues: [issue("ENG-4", "Rotate")] }] }),
+    );
     const send = vi.fn(() => Promise.resolve(issue("ENG-4", "Rotate")));
     const api = createHttpPlanningApi({ get, send } as unknown as Http);
     const found = await api.recurring("ENG");
@@ -145,7 +156,11 @@ describe("planning API for repeats", () => {
       repeat: "2w",
     });
     await api.setRepeat("ENG-4", "");
-    expect(send).toHaveBeenLastCalledWith("PATCH", "/api/v1/work/issues/ENG-4", { repeat: "" });
+    expect(send).toHaveBeenLastCalledWith(
+      "PATCH",
+      "/api/v1/work/issues/ENG-4",
+      { repeat: "" },
+    );
   });
 });
 
@@ -165,18 +180,36 @@ describe("templates screen", () => {
 
   it("creates a template and saves the whole team file", async () => {
     const work = fakeApi({ teamSettings: vi.fn(() => Promise.resolve(FILE)) });
-    const planning = fakePlanning({ projects: vi.fn(() => Promise.resolve([GATEWAY])) });
+    const planning = fakePlanning({
+      projects: vi.fn(() => Promise.resolve([GATEWAY])),
+    });
     const user = renderScreen("/issues/templates", work, planning);
-    await user.click(await screen.findByRole("button", { name: "New template" }));
+    await user.click(
+      await screen.findByRole("button", { name: "New template" }),
+    );
     const form = screen.getByRole("form", { name: "New template" });
-    await user.type(within(form).getByLabelText("Template name"), "Release checklist");
-    await user.selectOptions(within(form).getByLabelText("Starting status"), "next");
+    await user.type(
+      within(form).getByLabelText("Template name"),
+      "Release checklist",
+    );
+    await user.selectOptions(
+      within(form).getByLabelText("Starting status"),
+      "next",
+    );
     await user.selectOptions(within(form).getByLabelText("Priority"), "1");
     await user.selectOptions(within(form).getByLabelText("Project"), "p1");
     await user.selectOptions(within(form).getByLabelText("Repeat"), "2w");
-    await user.type(within(form).getByLabelText("Labels, separated by commas"), "release, web");
-    await user.type(within(form).getByLabelText("Description"), "Tag the build");
-    await user.click(within(form).getByRole("button", { name: "Save template" }));
+    await user.type(
+      within(form).getByLabelText("Labels, separated by commas"),
+      "release, web",
+    );
+    await user.type(
+      within(form).getByLabelText("Description"),
+      "Tag the build",
+    );
+    await user.click(
+      within(form).getByRole("button", { name: "Save template" }),
+    );
     await waitFor(() => {
       expect(work.saveTeamSettings).toHaveBeenCalled();
     });
@@ -196,35 +229,49 @@ describe("templates screen", () => {
         body: "Tag the build",
       },
     ]);
-    expect(await screen.findByText("Saved template Release checklist.")).toBeDefined();
+    expect(
+      await screen.findByText("Saved template Release checklist."),
+    ).toBeDefined();
   });
 
   it("refuses a duplicate name before saving", async () => {
     const work = fakeApi({ teamSettings: vi.fn(() => Promise.resolve(FILE)) });
     const user = renderScreen("/issues/templates", work, fakePlanning());
-    await user.click(await screen.findByRole("button", { name: "New template" }));
+    await user.click(
+      await screen.findByRole("button", { name: "New template" }),
+    );
     const form = screen.getByRole("form", { name: "New template" });
     await user.type(within(form).getByLabelText("Template name"), "bug report");
-    await user.click(within(form).getByRole("button", { name: "Save template" }));
+    await user.click(
+      within(form).getByRole("button", { name: "Save template" }),
+    );
     const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toContain("Another template already has this name.");
+    expect(alert.textContent).toContain(
+      "Another template already has this name.",
+    );
     expect(work.saveTeamSettings).not.toHaveBeenCalled();
   });
 
   it("edits, duplicates, reorders and removes", async () => {
     const work = fakeApi({ teamSettings: vi.fn(() => Promise.resolve(FILE)) });
     const user = renderScreen("/issues/templates", work, fakePlanning());
-    await user.click(await screen.findByRole("button", { name: "Edit Bug report" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Edit Bug report" }),
+    );
     const form = screen.getByRole("form", { name: "Edit template Bug report" });
     const title = within(form).getByLabelText("Title");
     await user.clear(title);
     await user.type(title, "Defect:");
-    await user.click(within(form).getByRole("button", { name: "Save template" }));
+    await user.click(
+      within(form).getByRole("button", { name: "Save template" }),
+    );
     await waitFor(() => {
       expect(savedTemplates(work)?.[0]).toEqual({ ...BUG, title: "Defect:" });
     });
 
-    await user.click(await screen.findByRole("button", { name: "Duplicate Bug report" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Duplicate Bug report" }),
+    );
     await waitFor(() => {
       expect(savedTemplates(work)?.map((each) => each.name)).toEqual([
         "Bug report",
@@ -233,7 +280,9 @@ describe("templates screen", () => {
       ]);
     });
 
-    await user.click(await screen.findByRole("button", { name: "Move On-call handoff up" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Move On-call handoff up" }),
+    );
     await waitFor(() => {
       expect(savedTemplates(work)?.map((each) => each.name)).toEqual([
         "On-call handoff",
@@ -241,7 +290,9 @@ describe("templates screen", () => {
       ]);
     });
 
-    await user.click(await screen.findByRole("button", { name: "Remove Bug report" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Remove Bug report" }),
+    );
     await user.click(screen.getByRole("button", { name: "Remove Bug report" }));
     await waitFor(() => {
       expect(savedTemplates(work)).toEqual([HANDOFF]);
@@ -251,12 +302,18 @@ describe("templates screen", () => {
   it("shows the server's refusal and keeps the editor open", async () => {
     const work = fakeApi({
       teamSettings: vi.fn(() => Promise.resolve(FILE)),
-      saveTeamSettings: vi.fn(() => Promise.reject(new Error("unknown status gone"))),
+      saveTeamSettings: vi.fn(() =>
+        Promise.reject(new Error("unknown status gone")),
+      ),
     });
     const user = renderScreen("/issues/templates", work, fakePlanning());
-    await user.click(await screen.findByRole("button", { name: "Edit Bug report" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Edit Bug report" }),
+    );
     const form = screen.getByRole("form", { name: "Edit template Bug report" });
-    await user.click(within(form).getByRole("button", { name: "Save template" }));
+    await user.click(
+      within(form).getByRole("button", { name: "Save template" }),
+    );
     const alert = await within(form).findByRole("alert");
     expect(alert.textContent).toContain("unknown status gone");
   });
@@ -288,9 +345,14 @@ describe("templates screen", () => {
     const user = renderScreen("/issues/templates", work, planning);
     expect(await screen.findByRole("link", { name: "ENG-4" })).toBeDefined();
     expect(screen.getByText("Due 2026-11-02")).toBeDefined();
-    await user.selectOptions(screen.getByLabelText("How often ENG-4 repeats"), "1m");
+    await user.selectOptions(
+      screen.getByLabelText("How often ENG-4 repeats"),
+      "1m",
+    );
     expect(planning.setRepeat).toHaveBeenCalledWith("ENG-4", "1m");
-    await user.click(await screen.findByRole("button", { name: "Stop repeating ENG-4" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Stop repeating ENG-4" }),
+    );
     expect(planning.setRepeat).toHaveBeenLastCalledWith("ENG-4", "");
     expect(await screen.findByText("ENG-4 no longer repeats.")).toBeDefined();
   });
@@ -298,7 +360,9 @@ describe("templates screen", () => {
 
 describe("issue page repeat", () => {
   it("sets a due date and a repeat together", async () => {
-    const work = fakeApi({ issue: vi.fn(() => Promise.resolve(issue("ENG-9", "Rotate"))) });
+    const work = fakeApi({
+      issue: vi.fn(() => Promise.resolve(issue("ENG-9", "Rotate"))),
+    });
     const planning = fakePlanning();
     const user = renderScreen("/issues/ENG-9", work, planning);
     const form = await screen.findByRole("form", { name: "Repeat" });
@@ -312,14 +376,22 @@ describe("issue page repeat", () => {
     await user.type(within(form).getByLabelText("Due date"), "2026-11-02");
     await user.click(save);
     await waitFor(() => {
-      expect(planning.setRepeat).toHaveBeenCalledWith("ENG-9", "2w", "2026-11-02");
+      expect(planning.setRepeat).toHaveBeenCalledWith(
+        "ENG-9",
+        "2w",
+        "2026-11-02",
+      );
     });
   });
 
   it("only shows the repeat without a server's planning API", async () => {
     const work = fakeApi({
       issue: vi.fn(() =>
-        Promise.resolve({ ...issue("ENG-9", "Rotate"), due: "2026-11-02", repeat: "1w" }),
+        Promise.resolve({
+          ...issue("ENG-9", "Rotate"),
+          due: "2026-11-02",
+          repeat: "1w",
+        }),
       ),
     });
     renderScreen("/issues/ENG-9", work);

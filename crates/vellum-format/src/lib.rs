@@ -23,8 +23,8 @@ mod serialize;
 mod settle;
 
 pub use ast::{
-    Alignment, Attributes, Block, Container, ContainerKind, Document, Fence, FenceKind, Inline,
-    List, ListItem, Table,
+    Alignment, Attributes, Block, Container, ContainerKind, Document, Fence,
+    FenceKind, Inline, List, ListItem, Table,
 };
 pub use convert::plain_text;
 pub use diagnostic::{Diagnostic, DiagnosticCode};

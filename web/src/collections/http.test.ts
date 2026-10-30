@@ -9,7 +9,9 @@ import { createHttpCollectionsStore, REFRESH_MS, type Freshness } from "./http";
 
 function fakeHttp() {
   const http = {
-    get: vi.fn((path: string, query?: unknown) => Promise.resolve({ path, query })),
+    get: vi.fn((path: string, query?: unknown) =>
+      Promise.resolve({ path, query }),
+    ),
     send: vi.fn((method: string, path: string, body?: unknown) =>
       Promise.resolve({ method, path, body }),
     ),
@@ -24,12 +26,19 @@ describe("the HTTP collections store", () => {
     const store = createHttpCollectionsStore(http, {});
     await store.list();
     await store.info("C 1");
-    await store.query({ collection_id: "C1", view: "Board", filter: ["status is Done"] });
+    await store.query({
+      collection_id: "C1",
+      view: "Board",
+      filter: ["status is Done"],
+    });
     await store.getRow({ collection_id: "C1", row_id: "R/1" });
     expect(http.get.mock.calls).toEqual([
       ["/api/v1/collections"],
       ["/api/v1/collections/C%201"],
-      ["/api/v1/collections/C1/query", { view: "Board", filter: ["status is Done"] }],
+      [
+        "/api/v1/collections/C1/query",
+        { view: "Board", filter: ["status is Done"] },
+      ],
       ["/api/v1/collections/C1/rows/R%2F1"],
     ]);
   });
@@ -39,9 +48,16 @@ describe("the HTTP collections store", () => {
     const store = createHttpCollectionsStore(http, {});
     const listener = vi.fn();
     const stop = store.subscribe(listener);
-    const create = { collection_id: "C1", values: { name: { type: "text", value: "A" } } } as const;
+    const create = {
+      collection_id: "C1",
+      values: { name: { type: "text", value: "A" } },
+    } as const;
     await store.createRow(create);
-    const update = { collection_id: "C1", row_id: "R1", body: "Notes" } as const;
+    const update = {
+      collection_id: "C1",
+      row_id: "R1",
+      body: "Notes",
+    } as const;
     await store.updateRow(update);
     expect(http.send.mock.calls).toEqual([
       ["POST", "/api/v1/collections/C1/rows", create],
@@ -59,9 +75,9 @@ describe("the HTTP collections store", () => {
     const store = createHttpCollectionsStore(http, {});
     const listener = vi.fn();
     store.subscribe(listener);
-    await expect(store.updateRow({ collection_id: "C1", row_id: "R1" })).rejects.toThrow(
-      "conflict",
-    );
+    await expect(
+      store.updateRow({ collection_id: "C1", row_id: "R1" }),
+    ).rejects.toThrow("conflict");
     expect(listener).not.toHaveBeenCalled();
   });
 });
@@ -71,12 +87,27 @@ describe("the HTTP collections store's other operations", () => {
     const http = fakeHttp();
     const store = createHttpCollectionsStore(http, {});
     await store.deleteRow({ collection_id: "C1", row_id: "R 1" });
-    await store.saveView({ collection_id: "C1", view: "By owner", kind: "board", group: "owner" });
+    await store.saveView({
+      collection_id: "C1",
+      view: "By owner",
+      kind: "board",
+      group: "owner",
+    });
     await store.deleteView({ collection_id: "C1", view: "Old/one" });
-    await store.addProperty({ collection_id: "C1", name: "Stage", type: "select" });
-    await store.updateProperty({ collection_id: "C1", key: "stage", name: "Phase" });
+    await store.addProperty({
+      collection_id: "C1",
+      name: "Stage",
+      type: "select",
+    });
+    await store.updateProperty({
+      collection_id: "C1",
+      key: "stage",
+      name: "Phase",
+    });
     await store.deleteProperty({ collection_id: "C1", key: "stage" });
-    expect(http.send.mock.calls.map(([method, path]) => `${method} ${path}`)).toEqual([
+    expect(
+      http.send.mock.calls.map(([method, path]) => `${method} ${path}`),
+    ).toEqual([
       "DELETE /api/v1/collections/C1/rows/R%201",
       "PUT /api/v1/collections/C1/views/By%20owner",
       "DELETE /api/v1/collections/C1/views/Old%2Fone",
@@ -101,23 +132,38 @@ describe("the HTTP collections store's other operations", () => {
   it("tells views to reload after a CSV import writes, not after a dry run", async () => {
     const http = fakeHttp();
     let written = false;
-    http.send.mockImplementation((method: string, path: string, body?: unknown) =>
-      Promise.resolve({ method, path, body, written }),
+    http.send.mockImplementation(
+      (method: string, path: string, body?: unknown) =>
+        Promise.resolve({ method, path, body, written }),
     );
     const store = createHttpCollectionsStore(http, {});
     const listener = vi.fn();
     store.subscribe(listener);
-    await store.importCsv({ collection_id: "C1", csv: "Name\nA", dry_run: true });
-    await store.createFromCsv({ folder: "drives/x", title: "T", csv: "Name\n", dry_run: true });
+    await store.importCsv({
+      collection_id: "C1",
+      csv: "Name\nA",
+      dry_run: true,
+    });
+    await store.createFromCsv({
+      folder: "drives/x",
+      title: "T",
+      csv: "Name\n",
+      dry_run: true,
+    });
     expect(listener).not.toHaveBeenCalled();
     written = true;
     await store.importCsv({ collection_id: "C1", csv: "Name\nA" });
-    await store.createFromCsv({ folder: "drives/x", title: "T", csv: "Name\n" });
+    await store.createFromCsv({
+      folder: "drives/x",
+      title: "T",
+      csv: "Name\n",
+    });
     expect(listener).toHaveBeenCalledTimes(2);
-    expect(http.send.mock.calls.map(([method, path]) => `${method} ${path}`).slice(-2)).toEqual([
-      "POST /api/v1/collections/C1/csv",
-      "POST /api/v1/collections",
-    ]);
+    expect(
+      http.send.mock.calls
+        .map(([method, path]) => `${method} ${path}`)
+        .slice(-2),
+    ).toEqual(["POST /api/v1/collections/C1/csv", "POST /api/v1/collections"]);
   });
 });
 
@@ -170,10 +216,9 @@ describe("keeping views fresh", () => {
     const store = createHttpCollectionsStore(fakeHttp(), p.freshness);
     const listener = vi.fn();
     const stop = store.subscribe(listener);
-    expect([...p.handlers.keys()].toSorted((a, b) => a.localeCompare(b))).toEqual([
-      "focus",
-      "visibilitychange",
-    ]);
+    expect(
+      [...p.handlers.keys()].toSorted((a, b) => a.localeCompare(b)),
+    ).toEqual(["focus", "visibilitychange"]);
 
     p.tick(REFRESH_MS);
     expect(listener).toHaveBeenCalledTimes(1);

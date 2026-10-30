@@ -18,7 +18,8 @@ import type {
 } from "./types";
 import { parseInput, text } from "./value";
 
-const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+const same = (a: string, b: string) =>
+  a.trim().toLowerCase() === b.trim().toLowerCase();
 
 /** Turns a view input's names into keys, as `schema.yaml` stores them. */
 function keyOf(collection: MockCollection, nameOrKey: string): string {
@@ -30,7 +31,10 @@ function keyOf(collection: MockCollection, nameOrKey: string): string {
 }
 
 /** Adds, replaces or renames a view, like `collections.save_view`. */
-export function saveView(collection: MockCollection, input: SaveViewInput): MockCollection {
+export function saveView(
+  collection: MockCollection,
+  input: SaveViewInput,
+): MockCollection {
   const name = (input.rename_to ?? input.view).trim();
   if (name === "") {
     throw new Error("a view name needs 1 to 100 printable characters");
@@ -39,8 +43,13 @@ export function saveView(collection: MockCollection, input: SaveViewInput): Mock
   if (collection.views.some((v, index) => index !== at && same(v.name, name))) {
     throw new Error(`a view named ${JSON.stringify(name)} already exists`);
   }
-  const optional = (key: "group" | "date" | "end", value: string | undefined) =>
-    value === undefined || value === "" ? {} : { [key]: keyOf(collection, value) };
+  const optional = (
+    key: "group" | "date" | "end",
+    value: string | undefined,
+  ) =>
+    value === undefined || value === ""
+      ? {}
+      : { [key]: keyOf(collection, value) };
   const view: ViewInfo = {
     name,
     kind: input.kind ?? "table",
@@ -60,7 +69,10 @@ export function saveView(collection: MockCollection, input: SaveViewInput): Mock
 }
 
 /** Removes a view, like `collections.delete_view`. */
-export function deleteView(collection: MockCollection, name: string): MockCollection {
+export function deleteView(
+  collection: MockCollection,
+  name: string,
+): MockCollection {
   const views = collection.views.filter((v) => !same(v.name, name));
   if (views.length === collection.views.length) {
     throw new Error(`no view named ${JSON.stringify(name)}`);
@@ -68,13 +80,21 @@ export function deleteView(collection: MockCollection, name: string): MockCollec
   return { ...collection, views };
 }
 
-function checkName(collection: MockCollection, name: string, except?: string): string {
+function checkName(
+  collection: MockCollection,
+  name: string,
+  except?: string,
+): string {
   const trimmed = name.trim();
   if (trimmed === "") {
     throw new Error("a property name needs 1 to 100 printable characters");
   }
-  if (collection.properties.some((p) => p.key !== except && same(p.name, trimmed))) {
-    throw new Error(`a property named ${JSON.stringify(trimmed)} already exists`);
+  if (
+    collection.properties.some((p) => p.key !== except && same(p.name, trimmed))
+  ) {
+    throw new Error(
+      `a property named ${JSON.stringify(trimmed)} already exists`,
+    );
   }
   return trimmed;
 }
@@ -89,7 +109,8 @@ function newKey(collection: MockCollection, name: string): string {
   }
   while (slug.endsWith("_")) slug = slug.slice(0, -1);
   if (slug !== "" && !/[a-z]/.test(slug.charAt(0))) slug = `c${slug}`;
-  const base = slug.slice(0, 28) || `col_${String(collection.properties.length + 1)}`;
+  const base =
+    slug.slice(0, 28) || `col_${String(collection.properties.length + 1)}`;
   const taken = new Set([
     ...collection.properties.map((p) => p.key),
     "id",
@@ -107,10 +128,14 @@ function newKey(collection: MockCollection, name: string): string {
 }
 
 /** Adds a property at the end, like `collections.add_property`. */
-export function addProperty(collection: MockCollection, input: AddPropertyInput): MockCollection {
+export function addProperty(
+  collection: MockCollection,
+  input: AddPropertyInput,
+): MockCollection {
   const name = checkName(collection, input.name);
   const computed = ["formula", "rollup", "created"].includes(input.type);
-  const via = input.via === undefined ? undefined : resolve(collection, input.via);
+  const via =
+    input.via === undefined ? undefined : resolve(collection, input.via);
   const property: PropertyInfo = {
     key: newKey(collection, name),
     name,
@@ -120,7 +145,9 @@ export function addProperty(collection: MockCollection, input: AddPropertyInput)
     ...(input.formula === undefined ? {} : { formula: input.formula }),
     ...(input.format === undefined ? {} : { format: input.format }),
     ...(via && input.prop !== undefined
-      ? { rollup: { via: via.key, prop: input.prop, agg: input.agg ?? "count" } }
+      ? {
+          rollup: { via: via.key, prop: input.prop, agg: input.agg ?? "count" },
+        }
       : {}),
   };
   return { ...collection, properties: [...collection.properties, property] };
@@ -153,7 +180,10 @@ export function addRelation(
     computed: false,
     relation: { to: target.id, back: "" },
   };
-  const withForward = { ...target, properties: [...target.properties, ...(same ? [forward] : [])] };
+  const withForward = {
+    ...target,
+    properties: [...target.properties, ...(same ? [forward] : [])],
+  };
   const backKey = newKey(withForward, backName);
   const back: PropertyInfo = {
     key: backKey,
@@ -164,7 +194,10 @@ export function addRelation(
   };
   const linked = { ...forward, relation: { to: target.id, back: backKey } };
   if (same) {
-    const both = { ...source, properties: [...source.properties, linked, back] };
+    const both = {
+      ...source,
+      properties: [...source.properties, linked, back],
+    };
     return [both, both];
   }
   return [
@@ -183,7 +216,10 @@ function renameIn(formula: string, from: string, to: string): string {
     .join("");
 }
 
-/** Renames a property or changes its options, like `collections.update_property`. */
+/**
+ * Renames a property or changes its options, like
+ * `collections.update_property`.
+ */
 export function updateProperty(
   collection: MockCollection,
   input: UpdatePropertyInput,
@@ -192,8 +228,14 @@ export function updateProperty(
   if (!old) {
     throw new Error(`no property with key ${JSON.stringify(input.key)}`);
   }
-  const name = input.name === undefined ? old.name : checkName(collection, input.name, old.key);
-  if (input.type !== undefined && (old.type === "title" || old.type === "relation")) {
+  const name =
+    input.name === undefined
+      ? old.name
+      : checkName(collection, input.name, old.key);
+  if (
+    input.type !== undefined &&
+    (old.type === "title" || old.type === "relation")
+  ) {
     throw new Error(
       `${old.name} cannot become a ${input.type}: titles and relations keep their type`,
     );
@@ -218,7 +260,10 @@ export function updateProperty(
 }
 
 /** Removes a property and the view settings that use it. */
-export function deleteProperty(collection: MockCollection, key: string): MockCollection {
+export function deleteProperty(
+  collection: MockCollection,
+  key: string,
+): MockCollection {
   const property = collection.properties.find((p) => p.key === key);
   if (!property) {
     throw new Error(`no property with key ${JSON.stringify(key)}`);
@@ -229,7 +274,8 @@ export function deleteProperty(collection: MockCollection, key: string): MockCol
   const uses = (filter: string) =>
     filter.trim().toLowerCase().startsWith(property.key) ||
     filter.trim().toLowerCase().startsWith(property.name.toLowerCase());
-  const keep = (value: string | undefined) => (value === key ? undefined : value);
+  const keep = (value: string | undefined) =>
+    value === key ? undefined : value;
   const views = collection.views.map((v): ViewInfo => {
     const group = keep(v.group);
     const date = keep(v.date);
@@ -284,7 +330,10 @@ function readCell(input: string, start: number): [cell: string, end: number] {
   return [cell, index];
 }
 
-/** Splits CSV text into rows of cells; quoted cells may hold commas, quotes and newlines. */
+/**
+ * Splits CSV text into rows of cells; quoted cells may hold commas, quotes and
+ * newlines.
+ */
 export function parseCsv(input: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
@@ -305,7 +354,9 @@ export function parseCsv(input: string): string[][] {
 
 /** One CSV line; cells that need it are quoted. */
 export function csvLine(cells: readonly string[]): string {
-  return cells.map((c) => (/[",\r\n]/.test(c) ? `"${c.replaceAll('"', '""')}"` : c)).join(",");
+  return cells
+    .map((c) => (/[",\r\n]/.test(c) ? `"${c.replaceAll('"', '""')}"` : c))
+    .join(",");
 }
 
 /** A view result as CSV: the column names, then each row's shown text. */
@@ -392,12 +443,16 @@ export function collectionFromCsv(
     id,
     title,
     path: `${trimSlashes(folder)}/${title}.collection`,
-    properties: [{ key: "name", name: titleName, type: "title", computed: false }],
+    properties: [
+      { key: "name", name: titleName, type: "title", computed: false },
+    ],
     views: [{ name: "All", kind: "table", filters: [], sorts: [], hidden: [] }],
     formulas: {},
   };
   for (const [index, h] of header.slice(1).entries()) {
-    const cells = lines.map((l) => (l[index + 1] ?? "").trim()).filter((c) => c !== "");
+    const cells = lines
+      .map((l) => (l[index + 1] ?? "").trim())
+      .filter((c) => c !== "");
     collection = addProperty(collection, {
       collection_id: id,
       name: h.trim() === "" ? `Column ${String(index + 2)}` : h,
@@ -421,7 +476,8 @@ function fenceFields(fence: string): Map<string, string[]> {
   return fields;
 }
 
-const field = (name: string, value: unknown) => (value === undefined ? {} : { [name]: value });
+const field = (name: string, value: unknown) =>
+  value === undefined ? {} : { [name]: value };
 
 /** Reads a `collection` block's body into a query. */
 export function embedQuery(fence: string): QueryInput {

@@ -55,7 +55,8 @@ const FRAME_PREFIXES: &[&str] = &[
 /// True when `src` is an embed URL this module produces.
 #[must_use]
 pub fn is_allowed_frame_src(src: &str) -> bool {
-    FRAME_PREFIXES.iter().any(|p| src.starts_with(p)) && !src.contains(['"', '<', '>', ' ', '\\'])
+    FRAME_PREFIXES.iter().any(|p| src.starts_with(p))
+        && !src.contains(['"', '<', '>', ' ', '\\'])
 }
 
 /// Splits `https://host/path?query` into its host and the rest.
@@ -135,20 +136,27 @@ pub fn frame_src(url: &str) -> Option<(Provider, String)> {
         }
         "vimeo.com" => {
             let id = first(path)?;
-            (id.chars().all(|c| c.is_ascii_digit()) && !id.is_empty()).then(|| {
-                (
-                    Provider::Vimeo,
-                    format!("https://player.vimeo.com/video/{id}"),
-                )
-            })
+            (id.chars().all(|c| c.is_ascii_digit()) && !id.is_empty()).then(
+                || {
+                    (
+                        Provider::Vimeo,
+                        format!("https://player.vimeo.com/video/{id}"),
+                    )
+                },
+            )
         }
         "loom.com" => {
             let id = path.strip_prefix("/share/").and_then(first)?;
-            is_token(&id).then(|| (Provider::Loom, format!("https://www.loom.com/embed/{id}")))
+            is_token(&id).then(|| {
+                (Provider::Loom, format!("https://www.loom.com/embed/{id}"))
+            })
         }
         "figma.com" => {
             let kind = first(path)?;
-            matches!(kind.as_str(), "file" | "design" | "proto" | "board").then(|| {
+            matches!(
+                kind.as_str(),
+                "file" | "design" | "proto" | "board"
+            ).then(|| {
                 let target = format!(
                     "https://www.figma.com{}",
                     path.split('#').next().unwrap_or_default()
@@ -172,12 +180,16 @@ pub fn frame_src(url: &str) -> Option<(Provider, String)> {
             let user = parts.next()?;
             let kind = parts.next()?;
             let id = parts.next()?.split(['?', '#']).next()?;
-            (is_token(user) && matches!(kind, "pen" | "embed") && is_token(id)).then(|| {
-                (
-                    Provider::CodePen,
-                    format!("https://codepen.io/{user}/embed/{id}?default-tab=result"),
-                )
-            })
+            (is_token(user) && matches!(kind, "pen" | "embed") && is_token(id))
+                .then(|| {
+                    (
+                        Provider::CodePen,
+                        format!(
+                            "https://codepen.io/{user}/embed/{id}?default-tab=r\
+                        esult"
+                        ),
+                    )
+                })
         }
         _ => None,
     }
@@ -216,11 +228,12 @@ mod tests {
             assert_eq!(src, expected);
             assert!(is_allowed_frame_src(&src));
         }
-        let (p, src) = frame_src("https://www.figma.com/design/KEY/Name").unwrap();
+        let (p, src) =
+            frame_src("https://www.figma.com/design/KEY/Name").unwrap();
         assert_eq!(p, Provider::Figma);
-        assert!(
-            src.starts_with("https://www.figma.com/embed?embed_host=vellum&url=https%3A%2F%2F")
-        );
+        assert!(src.starts_with(
+            "https://www.figma.com/embed?embed_host=vellum&url=https%3A%2F%2F"
+        ));
     }
 
     #[test]

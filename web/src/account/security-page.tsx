@@ -15,7 +15,11 @@ import type { AccountApi, FactorAdded, FactorsView, TotpSetup } from "./api";
 import { RecoveryCodesPanel, TotpSetupPanel } from "./factor-parts";
 import { createPasskey, passkeysSupported } from "./webauthn";
 
-const DAY = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" });
+const DAY = new Intl.DateTimeFormat("en", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
 
 type Notice = { readonly ok: boolean; readonly message: string } | undefined;
 
@@ -54,7 +58,8 @@ function AddPasskeyForm({
         setBusy(false);
       });
   };
-  if (!passkeysSupported()) return <p className="vl-muted">{t("factors-passkey-unsupported")}</p>;
+  if (!passkeysSupported())
+    return <p className="vl-muted">{t("factors-passkey-unsupported")}</p>;
   return (
     <form className="vl-admin-form" onSubmit={submit} aria-busy={busy}>
       <label htmlFor={`${id}-name`}>{t("factors-passkey-name")}</label>
@@ -187,7 +192,13 @@ function TotpSection({
   );
 }
 
-function Factors({ api, initial }: { readonly api: AccountApi; readonly initial: FactorsView }) {
+function Factors({
+  api,
+  initial,
+}: {
+  readonly api: AccountApi;
+  readonly initial: FactorsView;
+}) {
   const t = useT();
   const [factors, setFactors] = useState(initial);
   const [codes, setCodes] = useState<readonly string[]>();
@@ -221,7 +232,9 @@ function Factors({ api, initial }: { readonly api: AccountApi; readonly initial:
           {notice.message}
         </p>
       )}
-      {factors.required && <p className="vl-account-required">{t("factors-required")}</p>}
+      {factors.required && (
+        <p className="vl-account-required">{t("factors-required")}</p>
+      )}
       {codes !== undefined && (
         <RecoveryCodesPanel
           codes={codes}
@@ -255,7 +268,11 @@ function Factors({ api, initial }: { readonly api: AccountApi; readonly initial:
         {factors.passkeys.length > 0 && (
           <div className="vl-admin-scroll">
             <table className="vl-admin-table">
-              <caption>{t("factors-passkeys-caption", { count: factors.passkeys.length })}</caption>
+              <caption>
+                {t("factors-passkeys-caption", {
+                  count: factors.passkeys.length,
+                })}
+              </caption>
               <thead>
                 <tr>
                   <th scope="col">{t("tokens-name")}</th>
@@ -270,7 +287,8 @@ function Factors({ api, initial }: { readonly api: AccountApi; readonly initial:
                     <th scope="row">{passkey.name}</th>
                     <td>{DAY.format(new Date(passkey.createdAt))}</td>
                     <td>
-                      {passkey.lastUsedAt === null || passkey.lastUsedAt === undefined
+                      {passkey.lastUsedAt === null ||
+                      passkey.lastUsedAt === undefined
                         ? t("tokens-never-used")
                         : DAY.format(new Date(passkey.lastUsedAt))}
                     </td>
@@ -279,13 +297,17 @@ function Factors({ api, initial }: { readonly api: AccountApi; readonly initial:
                         type="button"
                         className="vl-text-button"
                         disabled={busy}
-                        aria-label={t("factors-passkey-remove-label", { name: passkey.name })}
+                        aria-label={t("factors-passkey-remove-label", {
+                          name: passkey.name,
+                        })}
                         onClick={() => {
                           run(api.removePasskey(passkey.id), (next) => {
                             setFactors(next);
                             setNotice({
                               ok: true,
-                              message: t("factors-passkey-removed", { name: passkey.name }),
+                              message: t("factors-passkey-removed", {
+                                name: passkey.name,
+                              }),
                             });
                           });
                         }}
@@ -337,10 +359,17 @@ function Factors({ api, initial }: { readonly api: AccountApi; readonly initial:
 
 function Security({ api }: { readonly api: AccountApi }) {
   const loaded = useLoaded(() => api.factors(), [api], failureText);
-  return <Ready loaded={loaded}>{(factors) => <Factors api={api} initial={factors} />}</Ready>;
+  return (
+    <Ready loaded={loaded}>
+      {(factors) => <Factors api={api} initial={factors} />}
+    </Ready>
+  );
 }
 
-/** `/settings/security`: two-step verification with an app, passkeys and recovery codes. */
+/**
+ * `/settings/security`: two-step verification with an app, passkeys and
+ * recovery codes.
+ */
 export function SecurityPage() {
   const t = useT();
   return (

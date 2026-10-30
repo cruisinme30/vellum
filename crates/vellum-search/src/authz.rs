@@ -31,11 +31,16 @@ fn failed(error: &vellum_authz::Error) -> SearchError {
 #[async_trait]
 impl<S: AuthzStore + 'static> ReadAccess for Authz<S> {
     async fn readable_spaces(&self, who: &Principal) -> Result<Vec<SpaceId>> {
-        let spaces = self.spaces(principal(*who)).await.map_err(|e| failed(&e))?;
+        let spaces =
+            self.spaces(principal(*who)).await.map_err(|e| failed(&e))?;
         Ok(spaces.into_iter().map(SpaceId::from).collect())
     }
 
-    async fn filter_readable(&self, who: &Principal, docs: &[DocId]) -> Result<HashSet<DocId>> {
+    async fn filter_readable(
+        &self,
+        who: &Principal,
+        docs: &[DocId],
+    ) -> Result<HashSet<DocId>> {
         if docs.is_empty() {
             return Ok(HashSet::new());
         }
@@ -53,7 +58,9 @@ mod tests {
     use std::collections::BTreeMap;
     use std::sync::Arc;
 
-    use vellum_authz::{Actor, Change, MemoryStore, Object, Relation, Subject, Tuple};
+    use vellum_authz::{
+        Actor, Change, MemoryStore, Object, Relation, Subject, Tuple,
+    };
     use vellum_kernel::{ShareId, UserId};
 
     use super::*;
@@ -66,12 +73,15 @@ mod tests {
     /// an in-memory authorization store, and nobody granted anything.
     fn authz(corpus: &Corpus) -> Arc<Authz<MemoryStore>> {
         let store = MemoryStore::new();
-        let mut trees: BTreeMap<SpaceId, BTreeMap<Id, Option<Id>>> = BTreeMap::new();
+        let mut trees: BTreeMap<SpaceId, BTreeMap<Id, Option<Id>>> =
+            BTreeMap::new();
         for doc in corpus.documents() {
             let tree = trees.entry(doc.space).or_default();
             let mut parent = None;
             let space = doc.space.as_u128();
-            for ancestor in doc.ancestors.iter().filter(|a| a.as_u128() != space) {
+            for ancestor in
+                doc.ancestors.iter().filter(|a| a.as_u128() != space)
+            {
                 let id = Id(ancestor.as_u128());
                 let _ = tree.insert(id, parent);
                 parent = Some(id);
@@ -84,15 +94,21 @@ mod tests {
         Arc::new(Authz::new(store))
     }
 
-    async fn service(corpus: &Corpus, access: Arc<Authz<MemoryStore>>) -> SearchService {
+    async fn service(
+        corpus: &Corpus,
+        access: Arc<Authz<MemoryStore>>,
+    ) -> SearchService {
         let (backend, _) = TantivyBackend::open(&TantivyConfig {
             location: Location::Memory,
             key: None,
             model: None,
         })
         .unwrap();
-        let service =
-            SearchService::new(Arc::new(backend), access, Arc::new(StaticStars::default()));
+        let service = SearchService::new(
+            Arc::new(backend),
+            access,
+            Arc::new(StaticStars::default()),
+        );
         service
             .write(corpus.documents().into_iter().map(Update::Upsert).collect())
             .await

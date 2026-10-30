@@ -34,7 +34,10 @@ impl Notify {
         if result.is_ok()
             && let Some(peer) = self.peer
         {
-            let frame = protocol::encode(&[yrs::sync::Message::Custom(MSG_DONE, Vec::new())]);
+            let frame = protocol::encode(&[yrs::sync::Message::Custom(
+                MSG_DONE,
+                Vec::new(),
+            )]);
             let _full_or_gone = peer.try_send(Outbound::Frame(frame.into()));
         }
         if let Some(reply) = self.reply {
@@ -103,7 +106,12 @@ impl Writer {
             }
         }
         if !self.backlog.is_empty() {
-            error!(room = %self.room, updates = self.backlog.len(), "room closed with unwritten updates; editors still hold them and resend on reconnect");
+            error!(
+                room = %self.room,
+                updates = self.backlog.len(),
+                "room closed with unwritten updates; editors still hold them \
+                    and resend on reconnect"
+            );
         }
     }
 
@@ -118,12 +126,19 @@ impl Writer {
                 return;
             }
         };
-        let span = info_span!("collab.persist", room = %self.room, bytes = merged.len(), updates = self.backlog.len(), seq = tracing::field::Empty);
+        let span = info_span!(
+            "collab.persist",
+            room = %self.room,
+            bytes = merged.len(),
+            updates = self.backlog.len(),
+            seq = tracing::field::Empty
+        );
         let deps = Arc::clone(&self.deps);
         let room = self.room;
-        let result = retry(&deps, "append", || deps.store.append(room, merged.clone()))
-            .instrument(span.clone())
-            .await;
+        let result =
+            retry(&deps, "append", || deps.store.append(room, merged.clone()))
+                .instrument(span.clone())
+                .await;
         match result {
             Ok(seq) => {
                 let _span = span.record("seq", seq);
@@ -131,7 +146,8 @@ impl Writer {
                 self.backlog.clear();
             }
             Err(err) => {
-                error!(room = %self.room, %err, "update log unavailable; keeping the batch for the next write");
+                error!(room = %self.room, %err, "update log unavailable; \
+                    keeping the batch for the next write");
                 self.backlog = vec![merged];
             }
         }
@@ -139,8 +155,12 @@ impl Writer {
 
     async fn write_version(&self, version: MarkdownVersion) -> Result<()> {
         let reason = version.reason.as_str();
-        let span =
-            info_span!("collab.version", room = %self.room, reason, bytes = version.markdown.len());
+        let span = info_span!(
+            "collab.version",
+            room = %self.room,
+            reason,
+            bytes = version.markdown.len()
+        );
         let deps = Arc::clone(&self.deps);
         let room = self.room;
         let result = retry(&deps, "version", || {
@@ -149,8 +169,13 @@ impl Writer {
         .instrument(span)
         .await;
         match &result {
-            Ok(()) => self.deps.metrics.versions.add(1, &label("reason", reason)),
-            Err(err) => error!(room = %self.room, %err, "cannot write the Markdown version"),
+            Ok(()) => {
+                self.deps.metrics.versions.add(1, &label("reason", reason))
+            }
+            Err(err) => {
+                error!(room = %self.room, %err, "cannot write the Markdown \
+                    version")
+            }
         }
         result
     }
@@ -178,7 +203,8 @@ impl Writer {
         .instrument(span)
         .await;
         if let Err(err) = result {
-            warn!(room = %self.room, %err, "log compaction failed; the log stays longer");
+            warn!(room = %self.room, %err, "log compaction failed; the log \
+                stays longer");
         }
     }
 }
@@ -186,15 +212,22 @@ impl Writer {
 fn merge(updates: &[Vec<u8>]) -> Result<Vec<u8>> {
     match updates {
         [single] => Ok(single.clone()),
-        _ => yrs::merge_updates_v1(updates.iter().map(Vec::as_slice)).map_err(|err| {
-            Error::new(ErrorKind::Internal, "cannot merge document updates").with_source(err)
-        }),
+        _ => yrs::merge_updates_v1(updates.iter().map(Vec::as_slice)).map_err(
+            |err| {
+                Error::new(ErrorKind::Internal, "cannot merge document updates")
+                    .with_source(err)
+            },
+        ),
     }
 }
 
 /// Runs a storage call with exponential back-off while it fails with a
 /// retryable error.
-async fn retry<T, F, Fut>(deps: &Deps, op: &'static str, mut call: F) -> Result<T>
+async fn retry<T, F, Fut>(
+    deps: &Deps,
+    op: &'static str,
+    mut call: F,
+) -> Result<T>
 where
     F: FnMut() -> Fut,
     Fut: Future<Output = Result<T>>,
@@ -211,7 +244,9 @@ where
             Err(err) => {
                 deps.metrics.persist_errors.add(1, &label("op", op));
                 attempt += 1;
-                if attempt >= deps.config.persist_attempts || !err.kind().is_retryable() {
+                if attempt >= deps.config.persist_attempts
+                    || !err.kind().is_retryable()
+                {
                     return Err(err);
                 }
                 warn!(%err, attempt, op, "storage write failed; retrying");

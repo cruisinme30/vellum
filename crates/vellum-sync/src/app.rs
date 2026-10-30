@@ -11,9 +11,12 @@ use vellum_kernel::{Error, ErrorKind, RequestId, UserId};
 
 use crate::cursor::Cursor;
 use crate::domain::{
-    Change, ClientId, PullRequest, PullResponse, PushRequest, PushResponse, Record, Rejected,
+    Change, ClientId, PullRequest, PullResponse, PushRequest, PushResponse,
+    Record, Rejected,
 };
-use crate::ports::{AccessKey, MutationContext, ReadAccess, ServerMutator, SyncStore};
+use crate::ports::{
+    AccessKey, MutationContext, ReadAccess, ServerMutator, SyncStore,
+};
 
 /// Most mutations accepted in one push.
 pub const MAX_PUSH: usize = 500;
@@ -42,7 +45,11 @@ impl Mutators {
     ///
     /// `Conflict` when the name is taken: two services must never answer
     /// the same mutation.
-    pub fn register(&mut self, name: &str, mutator: Arc<dyn ServerMutator>) -> Result<(), Error> {
+    pub fn register(
+        &mut self,
+        name: &str,
+        mutator: Arc<dyn ServerMutator>,
+    ) -> Result<(), Error> {
         if self.by_name.contains_key(name) {
             return Err(Error::new(
                 ErrorKind::Conflict,
@@ -89,7 +96,10 @@ impl<'a> Pushing<'a> {
     /// Claims the client, or refuses with a retryable error while another
     /// push for it runs. Running both would apply its mutations twice:
     /// each would read the same last processed ID before either advanced it.
-    fn claim(pushing: &'a Mutex<BTreeSet<ClientId>>, client: &ClientId) -> Result<Self, Error> {
+    fn claim(
+        pushing: &'a Mutex<BTreeSet<ClientId>>,
+        client: &ClientId,
+    ) -> Result<Self, Error> {
         let claimed = pushing
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
@@ -172,7 +182,11 @@ impl<S: SyncStore, A: ReadAccess> Sync<S, A> {
         request_id: RequestId,
         request: PushRequest,
     ) -> Result<PushResponse, Error> {
-        let span = info_span!("sync.push", client = %request.client_id, mutations = request.mutations.len());
+        let span = info_span!(
+            "sync.push",
+            client = %request.client_id,
+            mutations = request.mutations.len()
+        );
         async move {
             if request.mutations.len() > MAX_PUSH {
                 return Err(Error::new(
@@ -204,7 +218,9 @@ impl<S: SyncStore, A: ReadAccess> Sync<S, A> {
             let already = self.bound_client(user, &request).await?;
             let mut last = already;
             let mut rejected = Vec::new();
-            for mutation in request.mutations.into_iter().filter(|m| m.id > already) {
+            for mutation in
+                request.mutations.into_iter().filter(|m| m.id > already)
+            {
                 let context = MutationContext {
                     user,
                     client: request.client_id.clone(),
@@ -238,7 +254,11 @@ impl<S: SyncStore, A: ReadAccess> Sync<S, A> {
     }
 
     /// The client's last processed mutation, after checking it is this user's.
-    async fn bound_client(&self, user: UserId, request: &PushRequest) -> Result<u64, Error> {
+    async fn bound_client(
+        &self,
+        user: UserId,
+        request: &PushRequest,
+    ) -> Result<u64, Error> {
         match self.store.client(&request.client_id).await? {
             Some(state) if state.user != user => Err(foreign_client()),
             Some(state) => Ok(state.last_mutation_id),
@@ -299,15 +319,25 @@ impl<S: SyncStore, A: ReadAccess> Sync<S, A> {
     ///
     /// `PermissionDenied` when the client belongs to another user, and
     /// store or permission-check failures.
-    pub async fn pull(&self, user: UserId, request: PullRequest) -> Result<PullResponse, Error> {
-        let span =
-            info_span!("sync.pull", client = %request.client_id, reset = tracing::field::Empty);
+    pub async fn pull(
+        &self,
+        user: UserId,
+        request: PullRequest,
+    ) -> Result<PullResponse, Error> {
+        let span = info_span!(
+            "sync.pull",
+            client = %request.client_id,
+            reset = tracing::field::Empty
+        );
         async move {
-            let last_mutation_id = match self.store.client(&request.client_id).await? {
-                Some(state) if state.user != user => return Err(foreign_client()),
-                Some(state) => state.last_mutation_id,
-                None => 0,
-            };
+            let last_mutation_id =
+                match self.store.client(&request.client_id).await? {
+                    Some(state) if state.user != user => {
+                        return Err(foreign_client());
+                    }
+                    Some(state) => state.last_mutation_id,
+                    None => 0,
+                };
             let info = self.store.info().await?;
             let access_epoch = self.access.epoch(user).await?;
             let resume = Cursor::parse(&request.cursor).filter(|cursor| {
@@ -319,7 +349,8 @@ impl<S: SyncStore, A: ReadAccess> Sync<S, A> {
             let reset = resume.is_none();
             let _ = tracing::Span::current().record("reset", reset);
             let after = resume.map_or(0, |cursor| cursor.seq);
-            let mut records = self.store.read(after, PULL_PAGE + 1, reset).await?;
+            let mut records =
+                self.store.read(after, PULL_PAGE + 1, reset).await?;
             let more = records.len() > PULL_PAGE;
             records.truncate(PULL_PAGE);
             let seq = records.last().map_or(after, |record| record.seq);

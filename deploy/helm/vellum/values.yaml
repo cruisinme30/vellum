@@ -63,7 +63,8 @@ encryption:
 # The key that signs CSRF tokens, shared by every replica. Leave name empty
 # and the chart creates <release>-csrf with a random key, kept across
 # upgrades. To manage it yourself:
-#   kubectl create secret generic vellum-csrf --from-literal=key="$(openssl rand -base64 32)"
+# kubectl create secret generic vellum-csrf --from-literal=key="$(openssl rand
+# -base64 32)"
 csrf:
   secret:
     name: ""
@@ -72,7 +73,8 @@ csrf:
 # The key replicas sign forwarded live-editing joins with, shared by every
 # replica. Leave name empty and the chart creates <release>-cluster with a
 # random key, kept across upgrades. To manage it yourself:
-#   kubectl create secret generic vellum-cluster --from-literal=key="$(openssl rand -base64 48)"
+# kubectl create secret generic vellum-cluster --from-literal=key="$(openssl
+# rand -base64 48)"
 cluster:
   secret:
     name: ""

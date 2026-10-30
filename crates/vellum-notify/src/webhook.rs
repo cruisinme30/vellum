@@ -25,7 +25,8 @@ pub const EVENT_HEADER: &str = "Vellum-Event";
 /// The header carrying the delivery ID, stable across retries.
 pub const DELIVERY_HEADER: &str = "Vellum-Delivery";
 /// The user agent of every webhook request.
-pub const USER_AGENT: &str = concat!("Vellum-Webhook/", env!("CARGO_PKG_VERSION"));
+pub const USER_AGENT: &str =
+    concat!("Vellum-Webhook/", env!("CARGO_PKG_VERSION"));
 
 /// Which teams a subscription hears about.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -62,7 +63,11 @@ impl Subscription {
     /// subscription that wants the resource. `private_teams` lists the keys
     /// of private teams, which only an explicit [`TeamScope::Only`] covers.
     #[must_use]
-    pub fn matches(&self, event: &WebhookEvent, private_teams: &BTreeSet<String>) -> bool {
+    pub fn matches(
+        &self,
+        event: &WebhookEvent,
+        private_teams: &BTreeSet<String>,
+    ) -> bool {
         if !self.enabled || !self.event_types.contains(&event.event_type) {
             return false;
         }
@@ -187,9 +192,12 @@ mod tests {
     fn subscription(teams: TeamScope) -> Subscription {
         Subscription {
             id: "hook1".to_owned(),
-            url: Url::parse("https://hooks.northstar.dev/v").unwrap_or_else(|_| unreachable!()),
+            url: Url::parse("https://hooks.northstar.dev/v")
+                .unwrap_or_else(|_| unreachable!()),
             secrets: vec![WebhookSecret::from_bytes([3; 32])],
-            event_types: [EventType::Issue, EventType::User].into_iter().collect(),
+            event_types: [EventType::Issue, EventType::User]
+                .into_iter()
+                .collect(),
             teams,
             enabled: true,
         }
@@ -211,27 +219,35 @@ mod tests {
 
     #[test]
     fn matching_respects_types_teams_and_privacy() {
-        let private: BTreeSet<String> = std::iter::once("SEC".to_owned()).collect();
+        let private: BTreeSet<String> =
+            std::iter::once("SEC".to_owned()).collect();
         let all = subscription(TeamScope::AllPublic);
         assert!(all.matches(&event(EventType::Issue, Some("ENG")), &private));
         assert!(!all.matches(&event(EventType::Issue, Some("SEC")), &private));
         assert!(!all.matches(&event(EventType::Cycle, Some("ENG")), &private));
         assert!(all.matches(&event(EventType::User, None), &private));
 
-        let only = subscription(TeamScope::Only(std::iter::once("SEC".to_owned()).collect()));
+        let only = subscription(TeamScope::Only(
+            std::iter::once("SEC".to_owned()).collect(),
+        ));
         assert!(only.matches(&event(EventType::Issue, Some("SEC")), &private));
         assert!(!only.matches(&event(EventType::Issue, Some("ENG")), &private));
 
         let mut paused = subscription(TeamScope::AllPublic);
         paused.enabled = false;
-        assert!(!paused.matches(&event(EventType::Issue, Some("ENG")), &private));
+        assert!(
+            !paused.matches(&event(EventType::Issue, Some("ENG")), &private)
+        );
     }
 
     #[test]
-    fn prepared_request_is_signed_over_the_body() -> Result<(), serde_json::Error> {
+    fn prepared_request_is_signed_over_the_body()
+    -> Result<(), serde_json::Error> {
         let sub = subscription(TeamScope::AllPublic);
-        let now = Timestamp::from_second(1_800_000_000).unwrap_or(Timestamp::UNIX_EPOCH);
-        let request = prepare(&event(EventType::Issue, Some("ENG")), &sub, now)?;
+        let now = Timestamp::from_second(1_800_000_000)
+            .unwrap_or(Timestamp::UNIX_EPOCH);
+        let request =
+            prepare(&event(EventType::Issue, Some("ENG")), &sub, now)?;
         assert_eq!(request.delivery_id, "evt1.hook1");
         assert_eq!(request.header("vellum-event"), Some("issue"));
         let header = request.header(SIGNATURE_HEADER).unwrap_or_default();

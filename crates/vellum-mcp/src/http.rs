@@ -24,8 +24,8 @@ use serde_json::{Value, json};
 
 use crate::auth::{self, Principal, ResourceConfig, TokenError, TokenVerifier};
 use crate::protocol::{
-    Incoming, LEGACY_PROTOCOL_VERSION, META_PROTOCOL_VERSION, Outgoing, PROTOCOL_VERSION, RpcError,
-    SUPPORTED_VERSIONS,
+    Incoming, LEGACY_PROTOCOL_VERSION, META_PROTOCOL_VERSION, Outgoing,
+    PROTOCOL_VERSION, RpcError, SUPPORTED_VERSIONS,
 };
 use crate::server::{Listener, McpServer, Reply, RequestCtx};
 use crate::setup;
@@ -83,16 +83,21 @@ impl McpHttp {
     /// # Errors
     ///
     /// `None` when no token was sent; otherwise the token error.
-    pub async fn authenticate(&self, headers: &HeaderMap) -> Result<Principal, Option<TokenError>> {
+    pub async fn authenticate(
+        &self,
+        headers: &HeaderMap,
+    ) -> Result<Principal, Option<TokenError>> {
         let value = headers
             .get(header::AUTHORIZATION)
             .and_then(|v| v.to_str().ok())
             .ok_or(None)?;
-        let (scheme, token) = value.split_once(' ').ok_or(Some(TokenError::Invalid))?;
+        let (scheme, token) =
+            value.split_once(' ').ok_or(Some(TokenError::Invalid))?;
         if !scheme.eq_ignore_ascii_case("bearer") || token.trim().is_empty() {
             return Err(Some(TokenError::Invalid));
         }
-        let verified = self.verifier.verify(token.trim()).await.map_err(Some)?;
+        let verified =
+            self.verifier.verify(token.trim()).await.map_err(Some)?;
         auth::admit(
             verified,
             &self.config.resource.resource(),
@@ -174,7 +179,11 @@ pub fn request_id(headers: &HeaderMap) -> String {
     if let Some(id) = headers
         .get("x-request-id")
         .and_then(|v| v.to_str().ok())
-        .filter(|v| !v.is_empty() && v.len() <= 128 && v.bytes().all(|b| b.is_ascii_graphic()))
+        .filter(|v| {
+            !v.is_empty()
+                && v.len() <= 128
+                && v.bytes().all(|b| b.is_ascii_graphic())
+        })
     {
         return id.to_owned();
     }
@@ -231,7 +240,9 @@ fn validate_headers(
                 v.to_str().map(str::to_owned).map_err(|_| {
                     (
                         StatusCode::BAD_REQUEST,
-                        RpcError::header_mismatch(format!("{name} has invalid characters")),
+                        RpcError::header_mismatch(format!(
+                            "{name} has invalid characters"
+                        )),
                     )
                 })
             })
@@ -264,7 +275,8 @@ fn validate_headers(
         return Err((
             StatusCode::BAD_REQUEST,
             RpcError::header_mismatch(format!(
-                "MCP-Protocol-Version header value '{version}' does not match body value '{bv}'"
+                "MCP-Protocol-Version header value '{version}' does not match \
+                    body value '{bv}'"
             )),
         ));
     }
@@ -277,7 +289,8 @@ fn validate_headers(
             return Err((
                 StatusCode::BAD_REQUEST,
                 RpcError::header_mismatch(format!(
-                    "Mcp-Method header value '{m}' does not match body value '{}'",
+                    "Mcp-Method header value '{m}' does not match body value \
+                        '{}'",
                     msg.method
                 )),
             ));
@@ -302,14 +315,17 @@ fn validate_headers(
                 return Err((
                     StatusCode::BAD_REQUEST,
                     RpcError::header_mismatch(format!(
-                        "Mcp-Name header value '{h}' does not match body value '{body_value}'"
+                        "Mcp-Name header value '{h}' does not match body value \
+                            '{body_value}'"
                     )),
                 ));
             }
             Some(None) => {
                 return Err((
                     StatusCode::BAD_REQUEST,
-                    RpcError::header_mismatch("Mcp-Name header is not valid base64"),
+                    RpcError::header_mismatch(
+                        "Mcp-Name header is not valid base64",
+                    ),
                 ));
             }
             None => {
@@ -328,11 +344,17 @@ fn accepts(headers: &HeaderMap) -> bool {
         .get(header::ACCEPT)
         .and_then(|v| v.to_str().ok())
         .is_none_or(|a| {
-            a.contains("application/json") || a.contains("text/event-stream") || a.contains("*/*")
+            a.contains("application/json")
+                || a.contains("text/event-stream")
+                || a.contains("*/*")
         })
 }
 
-fn with_common(mut r: Response, request_id: &str, started: Instant) -> Response {
+fn with_common(
+    mut r: Response,
+    request_id: &str,
+    started: Instant,
+) -> Response {
     let h = r.headers_mut();
     if let Ok(v) = HeaderValue::from_str(request_id) {
         let _ = h.insert("x-request-id", v);
@@ -361,7 +383,8 @@ async fn post_inner(
     body: &[u8],
     request_id: &str,
 ) -> Response {
-    if let Some(origin) = headers.get(header::ORIGIN).and_then(|v| v.to_str().ok())
+    if let Some(origin) =
+        headers.get(header::ORIGIN).and_then(|v| v.to_str().ok())
         && !state.origin_allowed(origin)
     {
         return error_response(
@@ -378,13 +401,15 @@ async fn post_inner(
                 None,
                 RpcError::new(
                     crate::protocol::code::UNAUTHENTICATED,
-                    e.as_ref()
-                        .map_or_else(|| "authentication required".to_owned(), ToString::to_string),
+                    e.as_ref().map_or_else(
+                        || "authentication required".to_owned(),
+                        ToString::to_string,
+                    ),
                 ),
             );
-            if let Ok(v) =
-                HeaderValue::from_str(&state.config.resource.unauthorized_challenge(e.as_ref()))
-            {
+            if let Ok(v) = HeaderValue::from_str(
+                &state.config.resource.unauthorized_challenge(e.as_ref()),
+            ) {
                 let _ = r.headers_mut().insert(header::WWW_AUTHENTICATE, v);
             }
             return r;
@@ -394,14 +419,19 @@ async fn post_inner(
         return error_response(
             StatusCode::NOT_ACCEPTABLE,
             None,
-            RpcError::invalid_request("Accept must allow application/json and text/event-stream"),
+            RpcError::invalid_request(
+                "Accept must allow application/json and text/event-stream",
+            ),
         );
     }
     let Ok(text) = std::str::from_utf8(body) else {
         return error_response(
             StatusCode::BAD_REQUEST,
             None,
-            RpcError::new(crate::protocol::code::PARSE_ERROR, "body is not UTF-8"),
+            RpcError::new(
+                crate::protocol::code::PARSE_ERROR,
+                "body is not UTF-8",
+            ),
         );
     };
     let msg = match Incoming::parse(text) {
@@ -418,9 +448,10 @@ async fn post_inner(
         fallback_version: version,
     };
     match state.server.handle(msg, &ctx).await {
-        Reply::Result { id, result } => {
-            json_response(StatusCode::OK, &Outgoing::Result { id, result }.to_value())
-        }
+        Reply::Result { id, result } => json_response(
+            StatusCode::OK,
+            &Outgoing::Result { id, result }.to_value(),
+        ),
         Reply::Accepted => StatusCode::ACCEPTED.into_response(),
         Reply::Error {
             id,
@@ -429,11 +460,15 @@ async fn post_inner(
             challenge,
             retry_after,
         } => {
-            let code = StatusCode::from_u16(status).unwrap_or(StatusCode::BAD_REQUEST);
+            let code =
+                StatusCode::from_u16(status).unwrap_or(StatusCode::BAD_REQUEST);
             let mut r = error_response(code, id, error);
             if let Some(scopes) = challenge
                 && let Ok(v) = HeaderValue::from_str(
-                    &state.config.resource.insufficient_scope_challenge(&scopes),
+                    &state
+                        .config
+                        .resource
+                        .insufficient_scope_challenge(&scopes),
                 )
             {
                 let _ = r.headers_mut().insert(header::WWW_AUTHENTICATE, v);
@@ -446,7 +481,9 @@ async fn post_inner(
             }
             r
         }
-        Reply::Listen(listener) => sse(listener, Arc::clone(state), headers.clone()),
+        Reply::Listen(listener) => {
+            sse(listener, Arc::clone(state), headers.clone())
+        }
     }
 }
 
@@ -463,46 +500,62 @@ enum Phase {
 /// The listen stream. Its token is checked again at every keep-alive and
 /// before each notification, and the stream closes once the token no
 /// longer verifies (revoked, expired, account blocked): RT-047.
-fn sse(listener: Listener, state: Arc<McpHttp>, headers: HeaderMap) -> Response {
+fn sse(
+    listener: Listener,
+    state: Arc<McpHttp>,
+    headers: HeaderMap,
+) -> Response {
     let keep_alive = state.config.keep_alive;
     let still_valid = move || {
         let state = Arc::clone(&state);
         let headers = headers.clone();
         async move { state.authenticate(&headers).await.is_ok() }
     };
-    let stream = futures_util::stream::unfold(Phase::Ack(listener), move |phase| {
-        let still_valid = still_valid.clone();
-        async move {
-            match phase {
-                Phase::Ack(l) => Some((
-                    Ok::<_, Infallible>(event(&l.acknowledgement())),
-                    Phase::Open(l),
-                )),
-                Phase::Open(mut l) => {
-                    let next = tokio::select! {
-                        next = l.next() => Some(next),
-                        () = tokio::time::sleep(keep_alive) => None,
-                    };
-                    if !still_valid().await {
-                        return Some((Ok(event(&l.closing())), Phase::Done));
+    let stream =
+        futures_util::stream::unfold(Phase::Ack(listener), move |phase| {
+            let still_valid = still_valid.clone();
+            async move {
+                match phase {
+                    Phase::Ack(l) => Some((
+                        Ok::<_, Infallible>(event(&l.acknowledgement())),
+                        Phase::Open(l),
+                    )),
+                    Phase::Open(mut l) => {
+                        let next = tokio::select! {
+                            next = l.next() => Some(next),
+                            () = tokio::time::sleep(keep_alive) => None,
+                        };
+                        if !still_valid().await {
+                            return Some((
+                                Ok(event(&l.closing())),
+                                Phase::Done,
+                            ));
+                        }
+                        match next {
+                            Some(Some(n)) => {
+                                Some((Ok(event(&n)), Phase::Open(l)))
+                            }
+                            Some(None) => {
+                                Some((Ok(event(&l.closing())), Phase::Done))
+                            }
+                            None => Some((
+                                Ok(Bytes::from_static(b":\n\n")),
+                                Phase::Open(l),
+                            )),
+                        }
                     }
-                    match next {
-                        Some(Some(n)) => Some((Ok(event(&n)), Phase::Open(l))),
-                        Some(None) => Some((Ok(event(&l.closing())), Phase::Done)),
-                        None => Some((Ok(Bytes::from_static(b":\n\n")), Phase::Open(l))),
-                    }
+                    Phase::Done => None,
                 }
-                Phase::Done => None,
             }
-        }
-    });
+        });
     let mut r = Response::new(Body::from_stream(stream));
     let h = r.headers_mut();
     let _ = h.insert(
         header::CONTENT_TYPE,
         HeaderValue::from_static("text/event-stream"),
     );
-    let _ = h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    let _ =
+        h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     let _ = h.insert("x-accel-buffering", HeaderValue::from_static("no"));
     r
 }
@@ -522,7 +575,8 @@ pub fn request_body(id: i64, method: &str, mut params: Value) -> Value {
             json!({
                 META_PROTOCOL_VERSION: PROTOCOL_VERSION,
                 "io.modelcontextprotocol/clientCapabilities": {},
-                "io.modelcontextprotocol/clientInfo": { "name": "vellum-test-connection", "version": env!("CARGO_PKG_VERSION") }
+                "io.modelcontextprotocol/clientInfo": { "name": "vellum-test-co\
+                    nnection", "version": env!("CARGO_PKG_VERSION") }
             }),
         );
     }

@@ -17,7 +17,10 @@ test.use({
 });
 // eslint-disable-next-line no-empty-pattern -- Playwright needs the fixtures object
 test.beforeEach(({}, testInfo) => {
-  test.skip(!testInfo.project.name.endsWith("-laptop"), "runs at laptop size only");
+  test.skip(
+    !testInfo.project.name.endsWith("-laptop"),
+    "runs at laptop size only",
+  );
 });
 
 const CSV = [
@@ -38,7 +41,9 @@ const task = (id: string, title: string) => ({
   subtasks: [],
 });
 
-test("imports a Todoist CSV from My Work settings and shows the tasks", async ({ page }) => {
+test("imports a Todoist CSV from My Work settings and shows the tasks", async ({
+  page,
+}) => {
   await signedIn(page);
   let imported = false;
   await page.route("**/api/v1/my-work/connections", (route) =>
@@ -52,10 +57,15 @@ test("imports a Todoist CSV from My Work settings and shows the tasks", async ({
     }),
   );
   await page.route("**/api/v1/tasks/import", async (route) => {
-    const body = route.request().postDataJSON() as { from: string; project?: string };
+    const body = route.request().postDataJSON() as {
+      from: string;
+      project?: string;
+    };
     expect(body).toMatchObject({ from: "todoist", project: "Ops" });
     imported = true;
-    await route.fulfill({ json: { lists: [{ doc: "01M64LIST", title: "Ops", added: 2 }] } });
+    await route.fulfill({
+      json: { lists: [{ doc: "01M64LIST", title: "Ops", added: 2 }] },
+    });
   });
   await page.route("**/api/v1/my-work", (route) =>
     route.fulfill({
@@ -86,10 +96,12 @@ test("imports a Todoist CSV from My Work settings and shows the tasks", async ({
   );
 
   await page.goto("/my-work/settings");
-  await expect(page.getByRole("heading", { level: 1, name: "My Work settings" })).toBeVisible();
-  await expect(page.getByRole("textbox", { name: "CalDAV account URL" })).toHaveValue(
-    "https://vellum.northstar.dev/dav/calendars/priya/",
-  );
+  await expect(
+    page.getByRole("heading", { level: 1, name: "My Work settings" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("textbox", { name: "CalDAV account URL" }),
+  ).toHaveValue("https://vellum.northstar.dev/dav/calendars/priya/");
   const axe = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
     .analyze();
@@ -102,7 +114,9 @@ test("imports a Todoist CSV from My Work settings and shows the tasks", async ({
     buffer: Buffer.from(CSV),
   });
   await expect(page.getByText("ops.csv holds 2 tasks.")).toBeVisible();
-  await page.getByRole("textbox", { name: "List name for this project" }).fill("Ops");
+  await page
+    .getByRole("textbox", { name: "List name for this project" })
+    .fill("Ops");
   await page.getByRole("button", { name: "Import", exact: true }).click();
   await expect(page.getByText("Ops: 2 tasks added")).toBeVisible();
 

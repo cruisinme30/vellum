@@ -103,7 +103,11 @@ impl BlobStore for LocalStore {
             .await
     }
 
-    #[instrument(skip(self, bytes), fields(backend = "local", path = %path, size = bytes.len()), err)]
+    #[instrument(
+        skip(self, bytes),
+        fields(backend = "local", path = %path, size = bytes.len()),
+        err
+    )]
     async fn put(
         &self,
         path: &BlobPath,
@@ -115,7 +119,11 @@ impl BlobStore for LocalStore {
     }
 
     #[instrument(skip(self), fields(backend = "local", path = %path), err)]
-    async fn delete(&self, path: &BlobPath, cond: Precondition) -> StoreResult<()> {
+    async fn delete(
+        &self,
+        path: &BlobPath,
+        cond: Precondition,
+    ) -> StoreResult<()> {
         let path = path.clone();
         self.run(move |root| {
             let _guard = root.lock(&[&path]);
@@ -126,32 +134,49 @@ impl BlobStore for LocalStore {
         .await
     }
 
-    #[instrument(skip(self), fields(backend = "local", from = %from, to = %to), err)]
-    async fn rename(&self, from: &BlobPath, to: &BlobPath) -> StoreResult<BlobMeta> {
+    #[instrument(
+        skip(self),
+        fields(backend = "local", from = %from, to = %to),
+        err
+    )]
+    async fn rename(
+        &self,
+        from: &BlobPath,
+        to: &BlobPath,
+    ) -> StoreResult<BlobMeta> {
         let (from, to) = (from.clone(), to.clone());
         self.run(move |root| root.rename(&from, &to)).await
     }
 
-    fn list(&self, dir: Option<&BlobPath>) -> BoxStream<'static, StoreResult<BlobEntry>> {
+    fn list(
+        &self,
+        dir: Option<&BlobPath>,
+    ) -> BoxStream<'static, StoreResult<BlobEntry>> {
         let root = Arc::clone(&self.0);
         let dir = dir.cloned();
-        let span = tracing::info_span!("list", backend = "local", dir = ?dir.as_ref().map(BlobPath::as_str));
+        let span = tracing::info_span!(
+            "list",
+            backend = "local",
+            dir = ?dir.as_ref().map(BlobPath::as_str)
+        );
         futures::stream::once(async move {
             let (tx, rx) = tokio::sync::mpsc::channel(256);
             drop(tokio::task::spawn_blocking(move || {
                 span.in_scope(|| {
                     // Resolve like a read, so a symlinked parent folder
                     // cannot make the walk start outside the root (#272).
-                    match dir
-                        .as_ref()
-                        .map_or_else(|| Ok(root.dir.clone()), |d| root.resolve(d))
-                    {
+                    match dir.as_ref().map_or_else(
+                        || Ok(root.dir.clone()),
+                        |d| root.resolve(d),
+                    ) {
                         Ok(start) => walk(&root.dir, &start, &tx),
                         Err(e) => drop(tx.blocking_send(Err(e))),
                     }
                 });
             }));
-            futures::stream::unfold(rx, |mut rx| async { rx.recv().await.map(|i| (i, rx)) })
+            futures::stream::unfold(rx, |mut rx| async {
+                rx.recv().await.map(|i| (i, rx))
+            })
         })
         .flatten()
         .boxed()
@@ -183,10 +208,13 @@ impl Root {
 
     /// Locks the stripes guarding `paths`, in a fixed order to avoid deadlock.
     fn lock(&self, paths: &[&BlobPath]) -> Vec<std::sync::MutexGuard<'_, ()>> {
-        let stripes: std::collections::BTreeSet<usize> = paths.iter().map(|p| stripe(p)).collect();
+        let stripes: std::collections::BTreeSet<usize> =
+            paths.iter().map(|p| stripe(p)).collect();
         let locks = stripes.into_iter().filter_map(|i| self.locks.get(i));
         locks
-            .map(|m| m.lock().unwrap_or_else(std::sync::PoisonError::into_inner))
+            .map(|m| {
+                m.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+            })
             .collect()
     }
 
@@ -203,7 +231,11 @@ impl Root {
         meta(path, &f, file, finish(hasher))
     }
 
-    fn check(path: &BlobPath, file: &Path, cond: &Precondition) -> StoreResult<()> {
+    fn check(
+        path: &BlobPath,
+        file: &Path,
+        cond: &Precondition,
+    ) -> StoreResult<()> {
         let current = match Self::head(path, file) {
             Ok(m) => Some(m.etag),
             Err(StoreError::NotFound(_)) => None,
@@ -223,7 +255,12 @@ impl Root {
         }
     }
 
-    fn put(&self, path: &BlobPath, bytes: &[u8], cond: &Precondition) -> StoreResult<BlobMeta> {
+    fn put(
+        &self,
+        path: &BlobPath,
+        bytes: &[u8],
+        cond: &Precondition,
+    ) -> StoreResult<BlobMeta> {
         let _guard = self.lock(&[path]);
         let file = self.resolve(path)?;
         let dir = file.parent().unwrap_or(&self.dir).to_path_buf();
@@ -233,7 +270,9 @@ impl Root {
         let placed = if *cond == Precondition::IfAbsent {
             // A hard link fails atomically if the target appeared meanwhile.
             fs::hard_link(&tmp, &file).map_err(|e| match e.kind() {
-                ErrorKind::AlreadyExists => StoreError::AlreadyExists(path.clone()),
+                ErrorKind::AlreadyExists => {
+                    StoreError::AlreadyExists(path.clone())
+                }
                 _ => io(&file, e),
             })
         } else {
@@ -264,7 +303,8 @@ impl Root {
                 if fs::exists(&dst).at(&dst)? {
                     return Err(StoreError::AlreadyExists(to.clone()));
                 }
-                fs::rename(&src, &dst).map_err(|e| not_found_or_io(from, &src, e))?;
+                fs::rename(&src, &dst)
+                    .map_err(|e| not_found_or_io(from, &src, e))?;
             }
         }
         sync_dir(&dir)?;
@@ -291,7 +331,8 @@ fn walk(root: &Path, start: &Path, tx: &Sender) {
             // A repository's own directory is never content (#272).
         } else if meta.is_dir() {
             match fs::read_dir(&next) {
-                Ok(entries) => stack.extend(entries.filter_map(Result::ok).map(|e| e.path())),
+                Ok(entries) => stack
+                    .extend(entries.filter_map(Result::ok).map(|e| e.path())),
                 Err(e) => return drop(tx.blocking_send(Err(io(&next, e)))),
             }
         } else if meta.is_file()
@@ -312,7 +353,8 @@ fn walk(root: &Path, start: &Path, tx: &Sender) {
 
 fn to_blob_path(root: &Path, file: &Path) -> Option<BlobPath> {
     let rel = file.strip_prefix(root).ok()?;
-    let parts: Option<Vec<&str>> = rel.components().map(|c| c.as_os_str().to_str()).collect();
+    let parts: Option<Vec<&str>> =
+        rel.components().map(|c| c.as_os_str().to_str()).collect();
     let joined = parts?.join("/");
     if joined
         .rsplit('/')
@@ -322,7 +364,13 @@ fn to_blob_path(root: &Path, file: &Path) -> Option<BlobPath> {
     {
         return None;
     }
-    let skip = |e: &StoreError| tracing::warn!(file = %file.display(), error = %e, "skipping file");
+    let skip = |e: &StoreError| {
+        tracing::warn!(
+            file = %file.display(),
+            error = %e,
+            "skipping file"
+        )
+    };
     BlobPath::new(joined).inspect_err(skip).ok()
 }
 
@@ -335,8 +383,8 @@ fn stripe(path: &BlobPath) -> usize {
 fn write_temp(dir: &Path, bytes: &[u8]) -> StoreResult<PathBuf> {
     let n = TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
     let tmp = dir.join(format!("{TEMP_PREFIX}{}-{n}", std::process::id()));
-    let written =
-        File::create(&tmp).and_then(|mut f| f.write_all(bytes).and_then(|()| f.sync_all()));
+    let written = File::create(&tmp)
+        .and_then(|mut f| f.write_all(bytes).and_then(|()| f.sync_all()));
     if written.is_err() {
         let _ = fs::remove_file(&tmp);
     }
@@ -361,7 +409,12 @@ fn open_file(path: &BlobPath, file: &Path) -> StoreResult<File> {
     }
 }
 
-fn meta(path: &BlobPath, f: &File, file: &Path, etag: Etag) -> StoreResult<BlobMeta> {
+fn meta(
+    path: &BlobPath,
+    f: &File,
+    file: &Path,
+    etag: Etag,
+) -> StoreResult<BlobMeta> {
     let m = f.metadata().at(file)?;
     let modified = m.modified().at(file)?;
     Ok(BlobMeta {
@@ -384,10 +437,16 @@ async fn blocking<T: Send + 'static>(
     op: impl FnOnce() -> StoreResult<T> + Send + 'static,
 ) -> StoreResult<T> {
     let joined = tokio::task::spawn_blocking(op).await;
-    joined.map_err(|e| StoreError::Backend(format!("blocking task failed: {e}")))?
+    joined.map_err(|e| {
+        StoreError::Backend(format!("blocking task failed: {e}"))
+    })?
 }
 
-fn not_found_or_io(path: &BlobPath, file: &Path, e: std::io::Error) -> StoreError {
+fn not_found_or_io(
+    path: &BlobPath,
+    file: &Path,
+    e: std::io::Error,
+) -> StoreError {
     if e.kind() == ErrorKind::NotFound {
         StoreError::NotFound(path.clone())
     } else {

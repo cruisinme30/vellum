@@ -1,7 +1,14 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { BrowserRouter, Route, Routes } from "react-router";
 
 import type { AccountApi } from "./account/api";
@@ -55,7 +62,10 @@ import { DriveSettingsPage } from "./drive/settings-page";
 import { TrashPage } from "./drive/trash-page";
 import type { CollabConnector } from "./editor/collab/provider";
 import { I18nProvider, useT } from "./i18n/i18n";
-import { NotificationsProvider, type NotificationServices } from "./notifications/context";
+import {
+  NotificationsProvider,
+  type NotificationServices,
+} from "./notifications/context";
 import { NotificationSettingsView } from "./notifications/notification-settings";
 import { createMockNotificationPreferencesStore } from "./notifications/preferences";
 import type { DirectoryApi } from "./people/directory";
@@ -65,7 +75,10 @@ import type { RenderApi } from "./render/api";
 import type { SharingApi } from "./sharing/api";
 import { AppKeyboard } from "./shell/app-keyboard";
 import { AppShell } from "./shell/app-shell";
-import { AppearanceProvider, type OrganisationAppearance } from "./theme/appearance-context";
+import {
+  AppearanceProvider,
+  type OrganisationAppearance,
+} from "./theme/appearance-context";
 import { AppearancePage } from "./theme/appearance-page";
 import type { TransferApi } from "./transfer/api";
 import { ImportScreen } from "./transfer/import-screen";
@@ -134,7 +147,10 @@ export function AppRoutes() {
         <Route path="search" element={<SearchView />} />
         <Route path="favorites" element={<FavoritesView />} />
         <Route path="inbox" element={<InboxView />} />
-        <Route path="settings/notifications" element={<NotificationSettingsView />} />
+        <Route
+          path="settings/notifications"
+          element={<NotificationSettingsView />}
+        />
         <Route path="settings/appearance" element={<AppearancePage />} />
         <Route path="settings/private-spaces" element={<PrivateSpacesView />} />
         <Route path="settings/api-tokens" element={<ApiTokensPage />} />
@@ -172,7 +188,10 @@ export function AppRoutes() {
         <Route path="drive/s/:spaceId" element={<SpacePage />} />
         <Route path="drive/s/:spaceId/f/:folderId" element={<SpacePage />} />
         <Route path="drive/s/:spaceId/trash" element={<TrashPage />} />
-        <Route path="drive/s/:spaceId/settings" element={<DriveSettingsPage />} />
+        <Route
+          path="drive/s/:spaceId/settings"
+          element={<DriveSettingsPage />}
+        />
         <Route path="data" element={<CollectionsIndexView />} />
         <Route path="data/:collectionId" element={<CollectionView />} />
         <Route path="help" element={<HelpView />} />
@@ -210,7 +229,9 @@ export interface AppServices {
   readonly admin?: AdminConsoleApi | undefined;
   /** My Work and issues, from a Vellum server; absent in demo mode. */
   readonly work?: WorkApi | undefined;
-  /** My Work's calendar feed, CalDAV, capture and imports; absent in demo mode. */
+  /**
+   * My Work's calendar feed, CalDAV, capture and imports; absent in demo mode.
+   */
   readonly connections?: ConnectionsApi | undefined;
   /** Books, from a Vellum server; absent in demo mode. */
   readonly books?: BooksApi | undefined;
@@ -238,7 +259,8 @@ export interface AppServices {
   readonly transfer?: TransferApi | undefined;
   readonly collections: CollectionsStore;
   /** Present when a Vellum server answered; absent in demo mode. */
-  readonly session?: { readonly auth: AuthApi; readonly status: AuthStatus } | undefined;
+  readonly session?:
+    { readonly auth: AuthApi; readonly status: AuthStatus } | undefined;
   /** Notification settings; the Northstar demo's when absent. */
   readonly notifications?: NotificationServices | undefined;
   /** Loads the organisation's seed colour and themes; absent in demo mode. */
@@ -247,7 +269,8 @@ export interface AppServices {
    * Asks the person to confirm who they are when an action needs a recent
    * sign-in (D241); `http` is the client without the retry. Server only.
    */
-  readonly reauth?: { readonly gate: ReauthGate; readonly http: Http } | undefined;
+  readonly reauth?:
+    { readonly gate: ReauthGate; readonly http: Http } | undefined;
 }
 
 /**
@@ -377,7 +400,9 @@ export function AppProviders({
           <WorkspaceProvider store={store} collab={collab} history={history}>
             <SignedInUser>
               <CollectionsProvider store={collections}>
-                <NotificationsProvider services={notifications ?? demoNotifications}>
+                <NotificationsProvider
+                  services={notifications ?? demoNotifications}
+                >
                   <AdminConsoleProvider api={admin}>
                     <ServerApisProvider apis={serverApis}>
                       {children}

@@ -18,7 +18,9 @@ use crate::team::TeamKey;
 use crate::workflow::Category;
 
 /// How a view lays issues out.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Layout {
     /// Rows, grouped into sections.
@@ -29,7 +31,9 @@ pub enum Layout {
 }
 
 /// The field issues are grouped by.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum GroupBy {
     /// One group per status, in workflow order.
@@ -52,7 +56,9 @@ pub enum GroupBy {
 }
 
 /// The order of issues within a group.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum OrderBy {
     /// Urgent first, then most recently updated.
@@ -71,7 +77,9 @@ pub enum OrderBy {
 }
 
 /// Which closed issues a view shows.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum ShowClosed {
     /// Every closed issue.
@@ -86,7 +94,9 @@ pub enum ShowClosed {
 }
 
 /// Who can open a saved view.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Visibility {
     /// Only the owner.
@@ -161,11 +171,17 @@ impl View {
     /// Whether `user` may open the view; `member_of` says whether the user
     /// belongs to a team.
     #[must_use]
-    pub fn visible_to(&self, user: &UserRef, member_of: impl Fn(&TeamKey) -> bool) -> bool {
+    pub fn visible_to(
+        &self,
+        user: &UserRef,
+        member_of: impl Fn(&TeamKey) -> bool,
+    ) -> bool {
         match self.visibility {
             Visibility::Private => &self.owner == user,
             Visibility::Workspace => true,
-            Visibility::Team => &self.owner == user || self.team.as_ref().is_some_and(member_of),
+            Visibility::Team => {
+                &self.owner == user || self.team.as_ref().is_some_and(member_of)
+            }
         }
     }
 
@@ -182,10 +198,11 @@ impl View {
     /// Returns [`WorkError::File`] for bad YAML, or what [`View::check`]
     /// finds.
     pub fn from_yaml(path: &str, text: &str) -> Result<Self, WorkError> {
-        let view: Self = serde_saphyr::from_str(text).map_err(|e| WorkError::File {
-            path: path.to_owned(),
-            reason: e.to_string(),
-        })?;
+        let view: Self =
+            serde_saphyr::from_str(text).map_err(|e| WorkError::File {
+                path: path.to_owned(),
+                reason: e.to_string(),
+            })?;
         view.check()?;
         Ok(view)
     }
@@ -216,7 +233,12 @@ pub struct Group {
 /// Runs a view for a viewer. Board views of a single team list every
 /// status (or priority) column, even when empty.
 #[must_use]
-pub fn run(view: &View, graph: &WorkGraph, ctx: &Ctx, me: Option<&UserRef>) -> Vec<Group> {
+pub fn run(
+    view: &View,
+    graph: &WorkGraph,
+    ctx: &Ctx,
+    me: Option<&UserRef>,
+) -> Vec<Group> {
     let ectx = graph.eval_context(ctx, me);
     let closed_since = match view.show_closed {
         ShowClosed::All => None,
@@ -279,9 +301,15 @@ fn fixed_columns(view: &View, graph: &WorkGraph) -> Vec<(u32, String)> {
                     .board_order()
                     .into_iter()
                     .filter(|s| {
-                        s.category != Category::Duplicate || view.show_closed == ShowClosed::All
+                        s.category != Category::Duplicate
+                            || view.show_closed == ShowClosed::All
                     })
-                    .map(|s| (status_rank(t.workflow.position(&s.key)), s.key.to_string()))
+                    .map(|s| {
+                        (
+                            status_rank(t.workflow.position(&s.key)),
+                            s.key.to_string(),
+                        )
+                    })
                     .collect()
             })
             .unwrap_or_default(),
@@ -300,8 +328,14 @@ fn status_rank(position: Option<(Category, usize)>) -> u32 {
     })
 }
 
-fn group_keys(by: GroupBy, issue: &Issue, graph: &WorkGraph) -> Vec<(u32, Option<String>)> {
-    let named = |v: Option<String>| v.map_or_else(|| vec![(LAST, None)], |v| vec![(0, Some(v))]);
+fn group_keys(
+    by: GroupBy,
+    issue: &Issue,
+    graph: &WorkGraph,
+) -> Vec<(u32, Option<String>)> {
+    let named = |v: Option<String>| {
+        v.map_or_else(|| vec![(LAST, None)], |v| vec![(0, Some(v))])
+    };
     match by {
         GroupBy::Status => {
             let pos = graph
@@ -313,7 +347,9 @@ fn group_keys(by: GroupBy, issue: &Issue, graph: &WorkGraph) -> Vec<(u32, Option
             u32::from(issue.priority.rank()),
             Some(issue.priority.name().to_owned()),
         )],
-        GroupBy::Assignee => named(issue.assignee.as_ref().map(ToString::to_string)),
+        GroupBy::Assignee => {
+            named(issue.assignee.as_ref().map(ToString::to_string))
+        }
         GroupBy::Project => named(issue.project.as_ref().map(|p| {
             graph
                 .project(p)
@@ -322,7 +358,9 @@ fn group_keys(by: GroupBy, issue: &Issue, graph: &WorkGraph) -> Vec<(u32, Option
         GroupBy::Cycle => named(issue.cycle.as_ref().map(ToString::to_string)),
         GroupBy::Team => vec![(0, Some(issue.team.to_string()))],
         GroupBy::Label if issue.labels.is_empty() => vec![(LAST, None)],
-        GroupBy::Label => issue.labels.iter().map(|l| (0, Some(l.clone()))).collect(),
+        GroupBy::Label => {
+            issue.labels.iter().map(|l| (0, Some(l.clone()))).collect()
+        }
         GroupBy::None => vec![(0, None)],
     }
 }
@@ -344,7 +382,9 @@ pub fn sort(issues: &mut [&Issue], order: OrderBy) {
                 .estimate
                 .map(super::scale::Estimate::points)
                 .cmp(&a.estimate.map(super::scale::Estimate::points)),
-            OrderBy::Title => a.title.to_lowercase().cmp(&b.title.to_lowercase()),
+            OrderBy::Title => {
+                a.title.to_lowercase().cmp(&b.title.to_lowercase())
+            }
         };
         primary
             .then_with(|| b.updated_at.cmp(&a.updated_at))
@@ -384,7 +424,8 @@ mod tests {
             show_sub_issues: false,
         };
         let text = view.to_yaml().unwrap_or_else(|e| panic!("{e}"));
-        let back = View::from_yaml(&view.path(), &text).unwrap_or_else(|e| panic!("{e}"));
+        let back = View::from_yaml(&view.path(), &text)
+            .unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(back, view);
         let path = view.path();
         assert!(path.starts_with("views/"));
@@ -398,7 +439,8 @@ mod tests {
 
     #[test]
     fn a_team_view_without_a_team_is_refused() {
-        let text = "id: 01JBV0000000000000000000AA\nname: x\nowner: dev\nvisibility: team\n";
+        let text = "id: 01JBV0000000000000000000AA\nname: x\nowner: dev\n\
+            visibility: team\n";
         assert!(View::from_yaml("views/x.yaml", text).is_err());
     }
 }

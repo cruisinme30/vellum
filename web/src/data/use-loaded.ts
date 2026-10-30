@@ -9,7 +9,8 @@ export type Loaded<T> =
   | { readonly state: "failed"; readonly message: string }
   | { readonly state: "ready"; readonly value: T };
 
-const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
+const errorText = (error: unknown) =>
+  error instanceof Error ? error.message : String(error);
 
 /**
  * Loads a promise's answer into state, again whenever `keys` change; until
@@ -21,7 +22,10 @@ export function useLoaded<T>(
   keys: readonly unknown[],
   describe: (error: unknown) => string = errorText,
 ): Loaded<T> {
-  const [loaded, setLoaded] = useState<{ keys: readonly unknown[]; value: Loaded<T> }>();
+  const [loaded, setLoaded] = useState<{
+    keys: readonly unknown[];
+    value: Loaded<T>;
+  }>();
   useEffect(() => {
     let current = true;
     load().then(
@@ -29,7 +33,11 @@ export function useLoaded<T>(
         if (current) setLoaded({ keys, value: { state: "ready", value } });
       },
       (error: unknown) => {
-        if (current) setLoaded({ keys, value: { state: "failed", message: describe(error) } });
+        if (current)
+          setLoaded({
+            keys,
+            value: { state: "failed", message: describe(error) },
+          });
       },
     );
     return () => {

@@ -8,7 +8,9 @@ import { embedTarget, safeUrl } from "./urls";
 describe("safeUrl", () => {
   it("keeps http(s) URLs, normalised", () => {
     expect(safeUrl(" https://example.com ")).toBe("https://example.com/");
-    expect(safeUrl("http://example.com/a?b=c")).toBe("http://example.com/a?b=c");
+    expect(safeUrl("http://example.com/a?b=c")).toBe(
+      "http://example.com/a?b=c",
+    );
   });
 
   it("keeps workspace-relative paths as written", () => {
@@ -41,7 +43,11 @@ describe("embedTarget", () => {
       "YouTube",
       "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ",
     ],
-    ["https://www.loom.com/share/abc123", "Loom", "https://www.loom.com/embed/abc123"],
+    [
+      "https://www.loom.com/share/abc123",
+      "Loom",
+      "https://www.loom.com/embed/abc123",
+    ],
     [
       "https://www.figma.com/design/KEY/Name",
       "Figma",

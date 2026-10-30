@@ -6,11 +6,18 @@ use std::io::{Cursor, Write as _};
 use zip::write::SimpleFileOptions;
 
 use super::*;
-use crate::flow::{Asset, Flow, Item, Layout, Media, Node, Span, Table as FlowTable, TableStyle};
+use crate::flow::{
+    Asset, Flow, Item, Layout, Media, Node, Span, Table as FlowTable,
+    TableStyle,
+};
 
 /// Imports without a collections engine; `tests/import.rs` covers the
 /// collections it builds.
-fn import(source: Source, name: &str, bytes: &[u8]) -> Result<ImportSet, ImportError> {
+fn import(
+    source: Source,
+    name: &str,
+    bytes: &[u8],
+) -> Result<ImportSet, ImportError> {
     super::import(source, name, bytes, &NoCollections)
 }
 
@@ -39,8 +46,8 @@ fn paths(set: &ImportSet) -> Vec<&str> {
     set.files.iter().map(|f| f.path.as_str()).collect()
 }
 
-const PNG: &[u8] =
-    b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR\0\0\0\x01\0\0\0\x01\x08\x06\0\0\0\x1f\x15\xc4\x89";
+const PNG: &[u8] = b"\x89PNG\r\n\x1a\n\
+        \0\0\0\rIHDR\0\0\0\x01\0\0\0\x01\x08\x06\0\0\0\x1f\x15\xc4\x89";
 
 #[test]
 fn markdown_folders_get_ids_and_id_links() {
@@ -50,7 +57,8 @@ fn markdown_folders_get_ids_and_id_links() {
         &zip_of(&[
             (
                 "Wiki/Home.md",
-                b"# Home\n\nSee [restart](Runbooks/Restart%20gateway.md#steps), \
+                b"# Home\n\n\
+                  See [restart](Runbooks/Restart%20gateway.md#steps), \
                   ![diagram](assets/diagram.png) and [missing](Nope.md).\n",
             ),
             (
@@ -140,7 +148,8 @@ fn notion_databases_without_an_engine_stay_csv_and_pages() {
         row.replace(' ', "%20")
     );
     let csv = "Name,Status,Estimate\nRotate keys,Done,3\nAudit logs,Todo,5\n";
-    let row_text = "# Rotate keys\n\nStatus: Done\nEstimate: 3\n\nRotate the signing keys.\n";
+    let row_text = "# Rotate keys\n\nStatus: Done\nEstimate: 3\n\n\
+        Rotate the signing keys.\n";
     let set = import(
         Source::Notion,
         "notion.zip",
@@ -214,7 +223,9 @@ fn confluence_spaces_keep_their_page_tree() {
         "{home}"
     );
     assert!(
-        home.contains(&format!("[the restart page](vellum://doc/{restart_id})")),
+        home.contains(&format!(
+            "[the restart page](vellum://doc/{restart_id})"
+        )),
         "{home}"
     );
     assert!(
@@ -286,7 +297,9 @@ fn word_round_trips_through_the_writer() {
                                 items: vec![Item {
                                     check: None,
                                     blocks: vec![Node::Paragraph {
-                                        spans: vec![Span::plain("Watch the error rate")],
+                                        spans: vec![Span::plain(
+                                            "Watch the error rate",
+                                        )],
                                         anchor: None,
                                     }],
                                 }],
@@ -325,13 +338,17 @@ fn word_round_trips_through_the_writer() {
             height: Some(1),
         }],
     };
-    let bytes = crate::docx::write(&flow, &crate::docx::DocxOptions::default()).unwrap();
+    let bytes = crate::docx::write(&flow, &crate::docx::DocxOptions::default())
+        .unwrap();
     let set = import(Source::Word, "Gateway runbook.docx", &bytes).unwrap();
     let (_, text) = page(&set, "Gateway runbook.md");
     assert!(text.contains("title: Gateway\n"), "{text}");
     assert!(text.contains("# Gateway\n"), "{text}");
     assert!(
-        text.contains("Read the **runbook** at [northstar.dev](https://northstar.dev/runbook)."),
+        text.contains(
+            "Read the **runbook** at \
+            [northstar.dev](https://northstar.dev/runbook)."
+        ),
         "{text}"
     );
     assert!(
@@ -345,9 +362,8 @@ fn word_round_trips_through_the_writer() {
         "{text}"
     );
     assert!(
-        set.files
-            .iter()
-            .any(|f| f.kind == FileKind::Asset && f.path.starts_with("Gateway runbook assets/")),
+        set.files.iter().any(|f| f.kind == FileKind::Asset
+            && f.path.starts_with("Gateway runbook assets/")),
         "{:?}",
         paths(&set)
     );

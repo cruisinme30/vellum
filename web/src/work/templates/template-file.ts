@@ -31,7 +31,10 @@ const REPEATS = ["1d", "1w", "2w", "1m", "3m"] as const;
 /** The longest name a template may have. */
 const MAX_NAME = 80;
 
-/** Whether `text` is a repeat the server accepts: 1 to 366 days, weeks or months. */
+/**
+ * Whether `text` is a repeat the server accepts: 1 to 366 days, weeks or
+ * months.
+ */
 export function isRepeat(text: string): boolean {
   const match = /^(\d{1,3})[dwm]$/i.exec(text);
   if (match === null) return false;
@@ -71,7 +74,8 @@ export interface TemplateForm {
 /** A form filled in from a template, for editing. */
 export function formOf(template?: Template): TemplateForm {
   const given: Template = template ?? { name: "" };
-  const text = (value: string | number | undefined) => (value === undefined ? "" : String(value));
+  const text = (value: string | number | undefined) =>
+    value === undefined ? "" : String(value);
   return {
     name: given.name,
     title: text(given.title),
@@ -104,20 +108,28 @@ export function templateOf(form: TemplateForm, before?: Template): Template {
     ["assignee", form.assignee.trim().replace(/^@/, "").toLowerCase()],
     ["labels", labels],
     ["project", form.project],
-    ["milestone", form.project === (before?.project ?? "") ? before?.milestone : undefined],
+    [
+      "milestone",
+      form.project === (before?.project ?? "") ? before?.milestone : undefined,
+    ],
     ["repeat", form.repeat.trim().toLowerCase()],
     ["body", form.body],
   ];
   return Object.fromEntries(
     entries.filter(
       ([, value]) =>
-        value !== undefined && value !== "" && !(Array.isArray(value) && value.length === 0),
+        value !== undefined &&
+        value !== "" &&
+        !(Array.isArray(value) && value.length === 0),
     ),
   ) as unknown as Template;
 }
 
 /** What is wrong with a form, as a message id, or undefined when it is fine. */
-export function problemOf(form: TemplateForm, otherNames: readonly string[]): string | undefined {
+export function problemOf(
+  form: TemplateForm,
+  otherNames: readonly string[],
+): string | undefined {
   const name = form.name.trim();
   if (name === "") return "tpl-error-name";
   if (name.length > MAX_NAME) return "tpl-error-name-long";

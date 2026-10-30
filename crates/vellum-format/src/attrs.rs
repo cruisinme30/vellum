@@ -78,7 +78,9 @@ pub fn parse(input: &str) -> Option<Attributes> {
     }
 }
 
-fn bare(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> Option<String> {
+fn bare(
+    chars: &mut std::iter::Peekable<std::str::Chars<'_>>,
+) -> Option<String> {
     let mut value = String::new();
     while let Some(c) = chars.next_if(|c| is_bare(*c)) {
         value.push(c);
@@ -86,7 +88,9 @@ fn bare(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> Option<String> 
     (!value.is_empty()).then_some(value)
 }
 
-fn quoted(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> Option<String> {
+fn quoted(
+    chars: &mut std::iter::Peekable<std::str::Chars<'_>>,
+) -> Option<String> {
     let mut value = String::new();
     loop {
         match chars.next()? {
@@ -131,7 +135,8 @@ mod tests {
 
     #[test]
     fn parses_id_classes_and_pairs() {
-        let attrs = parse(r#"{#intro .wide .dark owner="Priya S." k=v}"#).unwrap();
+        let attrs =
+            parse(r#"{#intro .wide .dark owner="Priya S." k=v}"#).unwrap();
         assert_eq!(attrs.id.as_deref(), Some("intro"));
         assert_eq!(attrs.classes, ["wide", "dark"]);
         assert_eq!(
@@ -161,7 +166,8 @@ mod tests {
 
     #[test]
     fn splits_trailing_block_only_after_whitespace() {
-        let (rest, attrs) = split_trailing(r#"Why it fails {#why title="a } b"}  "#);
+        let (rest, attrs) =
+            split_trailing(r#"Why it fails {#why title="a } b"}  "#);
         assert_eq!(rest, "Why it fails");
         assert_eq!(attrs.id.as_deref(), Some("why"));
         let (rest, attrs) = split_trailing("set{x}");

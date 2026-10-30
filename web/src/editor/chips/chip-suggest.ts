@@ -9,7 +9,11 @@ import { Suggestion, type SuggestionProps } from "@tiptap/suggestion";
 import type { Translate } from "../../i18n/i18n";
 import type { SlashItem } from "../slash/items";
 import { place } from "../slash/slash-extension";
-import { SlashMenu, type SlashMenuHandle, type SlashMenuProperties } from "../slash/slash-menu";
+import {
+  SlashMenu,
+  type SlashMenuHandle,
+  type SlashMenuProperties,
+} from "../slash/slash-menu";
 
 import { linkItems, mentionItems, type ChipSources } from "./items";
 
@@ -33,7 +37,10 @@ interface MenuOptions {
 }
 
 /** The floating listbox, shared by both menus; focus stays in the text. */
-function menuRenderer(editor: Editor, { t, listId, labelKey, emptyKey }: MenuOptions) {
+function menuRenderer(
+  editor: Editor,
+  { t, listId, labelKey, emptyKey }: MenuOptions,
+) {
   const setA11y = (open: boolean, active?: string) => {
     const dom = editor.view.dom;
     dom.setAttribute("aria-expanded", String(open));
@@ -43,7 +50,8 @@ function menuRenderer(editor: Editor, { t, listId, labelKey, emptyKey }: MenuOpt
     else dom.removeAttribute("aria-activedescendant");
   };
   return () => {
-    let renderer: ReactRenderer<SlashMenuHandle, SlashMenuProperties> | undefined;
+    let renderer:
+      ReactRenderer<SlashMenuHandle, SlashMenuProperties> | undefined;
     const propertiesFor = (
       properties: SuggestionProps<SlashItem, SlashItem>,
     ): SlashMenuProperties => ({

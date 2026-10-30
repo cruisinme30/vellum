@@ -21,9 +21,12 @@ use vellum_assist::sources::{Created, DraftPage, Hit, Page};
 use vellum_assist::{AssistService, HttpModel, Sources};
 use vellum_contracts::{Principal, Scope, Service};
 use vellum_kernel::{Error, ErrorKind};
-use vellum_mcp::auth::{Principal as McpPrincipal, Scope as McpScope, ScopeSet as McpScopes};
+use vellum_mcp::auth::{
+    Principal as McpPrincipal, Scope as McpScope, ScopeSet as McpScopes,
+};
 use vellum_mcp::ports::{
-    Actor, Attribution, NewPage, SearchQuery, Workspace, WorkspaceError, WriteMode,
+    Actor, Attribution, NewPage, SearchQuery, Workspace, WorkspaceError,
+    WriteMode,
 };
 
 /// The client name the MCP layer records for assistant calls.
@@ -123,7 +126,11 @@ impl Sources for McpSources {
         })
     }
 
-    async fn create_draft(&self, who: &Principal, page: DraftPage) -> Result<Created, Error> {
+    async fn create_draft(
+        &self,
+        who: &Principal,
+        page: DraftPage,
+    ) -> Result<Created, Error> {
         let user = who.require_user()?.to_string();
         let receipt = self
             .workspace
@@ -230,7 +237,8 @@ mod tests {
         })?;
         assert!(off.is_none());
         let on = service(Arc::clone(&memory), |k| {
-            (k == "VELLUM_AI_ENDPOINTS").then(|| "http://ollama:11434/v1".to_owned())
+            (k == "VELLUM_AI_ENDPOINTS")
+                .then(|| "http://ollama:11434/v1".to_owned())
         })?;
         assert_eq!(on.map(|s| s.name()), Some("assist"));
         let bad = service(memory, |k| {

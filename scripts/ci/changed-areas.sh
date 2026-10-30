@@ -2,9 +2,9 @@
 # SPDX-FileCopyrightText: 2026 The Vellum contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 #
-# Decides which parts of the Fast suite a change needs (ADR 0035, D139).
-# Reads changed paths on standard input, one per line, and prints
-# "rust=", "web=", "desktop=" and "ui=" lines, each true or false. The Fast suite workflow and
+# Decides which parts of the Fast suite a change needs (ADR 0035, D139). Reads
+# changed paths on standard input, one per line, and prints "rust=", "web=",
+# "desktop=" and "ui=" lines, each true or false. The Fast suite workflow and
 # `cargo xtask fast` both use it, so they skip the same jobs.
 #
 # Rust is skipped only when every path is documentation that no crate

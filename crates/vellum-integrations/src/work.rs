@@ -22,10 +22,14 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use jiff::Timestamp;
 use jiff::tz::TimeZone;
 use tracing::{Instrument as _, info_span};
-use vellum_work::{Changes, CommentChanges, Comments, Ctx, TeamKey, UserRef, WorkGraph};
+use vellum_work::{
+    Changes, CommentChanges, Comments, Ctx, TeamKey, UserRef, WorkGraph,
+};
 
 use self::steps::{to_date, to_offset};
-use crate::model::{IssueDraft, IssueKey, IssueSnapshot, WorkCommands, WorkError, WorkflowState};
+use crate::model::{
+    IssueDraft, IssueKey, IssueSnapshot, WorkCommands, WorkError, WorkflowState,
+};
 
 /// What one command changed, for the sink to persist and publish.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -46,7 +50,10 @@ pub struct Commit {
 /// memory matches what is on disk.
 pub trait CommitSink: Send + Sync {
     /// Writes and publishes one commit.
-    fn commit(&self, commit: Commit) -> impl Future<Output = Result<(), WorkError>> + Send;
+    fn commit(
+        &self,
+        commit: Commit,
+    ) -> impl Future<Output = Result<(), WorkError>> + Send;
 }
 
 /// [`WorkCommands`] over a shared [`WorkGraph`] and comment store.
@@ -84,9 +91,9 @@ impl<S: CommitSink> GraphWork<S> {
     }
 
     fn graph(&self) -> Result<MutexGuard<'_, WorkGraph>, WorkError> {
-        self.graph
-            .lock()
-            .map_err(|_| WorkError::Unavailable("work graph lock poisoned".to_owned()))
+        self.graph.lock().map_err(|_| {
+            WorkError::Unavailable("work graph lock poisoned".to_owned())
+        })
     }
 
     /// Runs `f` with the engine locked; the lock is released before any
@@ -99,14 +106,19 @@ impl<S: CommitSink> GraphWork<S> {
     }
 
     fn comment_store(&self) -> Result<MutexGuard<'_, Comments>, WorkError> {
-        self.comments
-            .lock()
-            .map_err(|_| WorkError::Unavailable("comment store lock poisoned".to_owned()))
+        self.comments.lock().map_err(|_| {
+            WorkError::Unavailable("comment store lock poisoned".to_owned())
+        })
     }
 
     /// The command context: now, today in the team's time zone, and the
     /// acting user.
-    fn ctx(&self, graph: &WorkGraph, team: &TeamKey, actor: UserRef) -> Result<Ctx, WorkError> {
+    fn ctx(
+        &self,
+        graph: &WorkGraph,
+        team: &TeamKey,
+        actor: UserRef,
+    ) -> Result<Ctx, WorkError> {
         let now = (self.clock)();
         let tz = graph
             .team(team)
@@ -128,11 +140,17 @@ impl<S: CommitSink> GraphWork<S> {
 }
 
 impl<S: CommitSink> WorkCommands for GraphWork<S> {
-    async fn issue(&self, key: &IssueKey) -> Result<Option<IssueSnapshot>, WorkError> {
+    async fn issue(
+        &self,
+        key: &IssueKey,
+    ) -> Result<Option<IssueSnapshot>, WorkError> {
         self.with_graph(|graph| steps::snapshot(graph, key))
     }
 
-    async fn states(&self, team: &str) -> Result<Vec<WorkflowState>, WorkError> {
+    async fn states(
+        &self,
+        team: &str,
+    ) -> Result<Vec<WorkflowState>, WorkError> {
         self.with_graph(|graph| steps::states(graph, team))
     }
 
@@ -142,7 +160,12 @@ impl<S: CommitSink> WorkCommands for GraphWork<S> {
         state_id: &str,
         reason: &str,
     ) -> Result<(), WorkError> {
-        let span = info_span!("work.set_state", issue = %key, state = state_id, reason);
+        let span = info_span!(
+            "work.set_state",
+            issue = %key,
+            state = state_id,
+            reason
+        );
         async {
             let changes = self.with_graph(|graph| {
                 let team = steps::team_of(graph, key)?;
@@ -160,16 +183,23 @@ impl<S: CommitSink> WorkCommands for GraphWork<S> {
         .await
     }
 
-    async fn create_issue(&self, draft: IssueDraft) -> Result<IssueKey, WorkError> {
-        let span =
-            info_span!("work.create_issue", team = %draft.team, issue = tracing::field::Empty);
+    async fn create_issue(
+        &self,
+        draft: IssueDraft,
+    ) -> Result<IssueKey, WorkError> {
+        let span = info_span!(
+            "work.create_issue",
+            team = %draft.team,
+            issue = tracing::field::Empty
+        );
         async {
             let team = steps::team_key(&draft.team)?;
             let (key, changes) = self.with_graph(|graph| {
                 let ctx = self.ctx(graph, &team, self.bot.clone())?;
                 steps::create_issue(graph, draft, &ctx)
             })?;
-            let _ = tracing::Span::current().record("issue", tracing::field::display(&key));
+            let _ = tracing::Span::current()
+                .record("issue", tracing::field::display(&key));
             if let Some(changes) = changes {
                 self.commit(Commit {
                     changes,
@@ -196,7 +226,13 @@ impl<S: CommitSink> WorkCommands for GraphWork<S> {
             let (comments, changes) = self.with_graph(|graph| {
                 let team = steps::team_of(graph, key)?;
                 let ctx = self.ctx(graph, &team, actor)?;
-                steps::add_comment(graph, &mut *self.comment_store()?, key, body, &ctx)
+                steps::add_comment(
+                    graph,
+                    &mut *self.comment_store()?,
+                    key,
+                    body,
+                    &ctx,
+                )
             })?;
             self.commit(Commit {
                 changes,

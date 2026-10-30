@@ -33,7 +33,10 @@ const BOOK: BookInfo = {
   toc: [
     { kind: "part", title: "Start" },
     node("", "Draft", { draft: true }),
-    node("s1", "Welcome", { number: "1", children: [node("s2", "Setup", { number: "1.1" })] }),
+    node("s1", "Welcome", {
+      number: "1",
+      children: [node("s2", "Setup", { number: "1.1" })],
+    }),
     { kind: "separator" },
   ],
 };
@@ -41,7 +44,9 @@ const BOOK: BookInfo = {
 /** Only the reading operations; a reader never reaches the others. */
 function fakeApi(): BooksApi {
   const reading: Pick<BooksApi, "list" | "book" | "section"> = {
-    list: vi.fn(() => Promise.resolve([{ id: "b1", title: "Handbook", path: "handbook.book" }])),
+    list: vi.fn(() =>
+      Promise.resolve([{ id: "b1", title: "Handbook", path: "handbook.book" }]),
+    ),
     book: vi.fn(() => Promise.resolve(BOOK)),
     section: vi.fn((_book: string, section: string) =>
       Promise.resolve({
@@ -53,7 +58,10 @@ function fakeApi(): BooksApi {
         path: "x.md",
         restricted: false,
         source: "x",
-        markdown: section === "s1" ? "# Welcome\n\nHello **team**." : "Run `vellum serve`.",
+        markdown:
+          section === "s1"
+            ? "# Welcome\n\nHello **team**."
+            : "Run `vellum serve`.",
       }),
     ),
   };
@@ -98,9 +106,13 @@ describe("books", () => {
     const user = renderAt("/books", api);
     await user.click(await screen.findByRole("link", { name: "Handbook" }));
 
-    expect(await screen.findByRole("heading", { level: 1, name: "Handbook" })).toBeDefined();
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Handbook" }),
+    ).toBeDefined();
     const article = await screen.findByRole("article");
-    expect(within(article).getByRole("heading", { level: 2 }).textContent).toBe("1 Welcome");
+    expect(within(article).getByRole("heading", { level: 2 }).textContent).toBe(
+      "1 Welcome",
+    );
     // The section's own title heading is not repeated.
     expect(within(article).getAllByRole("heading")).toHaveLength(1);
     expect(within(article).getByText("team").tagName).toBe("STRONG");
@@ -111,13 +123,17 @@ describe("books", () => {
     const code = await screen.findByText("vellum serve");
     expect(code.tagName).toBe("CODE");
     expect(
-      within(contents).getByRole("link", { name: "1.1 Setup" }).getAttribute("aria-current"),
+      within(contents)
+        .getByRole("link", { name: "1.1 Setup" })
+        .getAttribute("aria-current"),
     ).toBe("page");
   });
 
   it("finds the first readable section", () => {
     expect(firstSection(BOOK.toc)).toBe("s1");
-    expect(firstSection([node("", "Empty", { children: [node("deep", "Deep")] })])).toBe("deep");
+    expect(
+      firstSection([node("", "Empty", { children: [node("deep", "Deep")] })]),
+    ).toBe("deep");
     expect(firstSection([])).toBeUndefined();
   });
 
@@ -156,11 +172,15 @@ describe("markdown reader", () => {
     expect(container.querySelector("h3")?.textContent).toBe("Steps");
     expect(container.querySelectorAll("ol li")).toHaveLength(2);
     expect(container.querySelector("ol em")?.textContent).toBe("Two");
-    expect(container.querySelector("a")?.getAttribute("href")).toBe("https://vellum.dev");
+    expect(container.querySelector("a")?.getAttribute("href")).toBe(
+      "https://vellum.dev",
+    );
     expect(container.querySelectorAll("a")).toHaveLength(1);
     expect(container.querySelector("blockquote")?.textContent).toBe("quoted");
     expect(container.querySelector("hr")).not.toBeNull();
-    expect(container.querySelector("pre code")?.textContent).toBe("<script>x</script>");
+    expect(container.querySelector("pre code")?.textContent).toBe(
+      "<script>x</script>",
+    );
     expect(container.querySelector("script")).toBeNull();
     expect(container.querySelector("b")).toBeNull();
   });

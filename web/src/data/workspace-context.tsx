@@ -27,14 +27,20 @@ interface Services {
 
 const ServicesContext = createContext<Services | undefined>(undefined);
 
-/** Provides the workspace store, the collab connector and page history to the app. */
+/**
+ * Provides the workspace store, the collab connector and page history to the
+ * app.
+ */
 export function WorkspaceProvider({
   store,
   collab,
   history,
   children,
 }: Services & { readonly children: ReactNode }) {
-  const services = useMemo(() => ({ store, collab, history }), [store, collab, history]);
+  const services = useMemo(
+    () => ({ store, collab, history }),
+    [store, collab, history],
+  );
   return <ServicesContext value={services}>{children}</ServicesContext>;
 }
 
@@ -50,7 +56,10 @@ export function useServices(): Services {
 /** The current workspace snapshot; re-renders when it changes. */
 export function useWorkspace(): WorkspaceSnapshot {
   const { store } = useServices();
-  const subscribe = useCallback((listener: () => void) => store.subscribe(listener), [store]);
+  const subscribe = useCallback(
+    (listener: () => void) => store.subscribe(listener),
+    [store],
+  );
   const snapshot = useCallback(() => store.getSnapshot(), [store]);
   return useSyncExternalStore(subscribe, snapshot);
 }
@@ -72,7 +81,8 @@ export function useSearch(
   const [answer, setAnswer] = useState<{ key: string; hits: SearchHit[] }>();
   useEffect(() => {
     let current = true;
-    const asked = kind === "search" ? store.search(text, filters) : store.mentions(text);
+    const asked =
+      kind === "search" ? store.search(text, filters) : store.mentions(text);
     void asked.then((hits) => {
       if (current) setAnswer({ key, hits });
     });

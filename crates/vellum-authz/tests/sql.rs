@@ -24,8 +24,8 @@ use testcontainers_modules::postgres::Postgres;
 use testcontainers_modules::testcontainers::runners::AsyncRunner as _;
 use testcontainers_modules::testcontainers::{ContainerAsync, ImageExt as _};
 use vellum_authz::{
-    Actor, Authz, AuthzStore, Change, Id, MemoryStore, Object, Permission, Principal, Relation,
-    SqlStore, StoreError, Subject, Tuple,
+    Actor, Authz, AuthzStore, Change, Id, MemoryStore, Object, Permission,
+    Principal, Relation, SqlStore, StoreError, Subject, Tuple,
 };
 use vellum_db::sqlx::types::Uuid;
 use vellum_db::{Index, IndexConfig, IndexPool, sqlx};
@@ -64,23 +64,26 @@ async fn seed(index: &Index, parents: &BTreeMap<Id, Option<Id>>) {
         ($pool:expr) => {{
             let mut tx = $pool.begin().await.unwrap();
             let _ = sqlx::query(
-                "INSERT INTO spaces (space_id, kind, slug, root_path, name, indexed_at) \
-                 VALUES ($1, 'shared_drive', 'eng', 'drives/shared/eng', 'Engineering', 0) \
-                 ON CONFLICT (space_id) DO NOTHING",
+                "INSERT INTO spaces (space_id, kind, slug, root_path, name, \
+                 indexed_at) VALUES ($1, 'shared_drive', 'eng', \
+                 'drives/shared/eng', 'Engineering', 0) ON CONFLICT (space_id) \
+                 DO NOTHING",
             )
             .bind(uuid(SPACE))
             .execute(&mut *tx)
             .await
             .unwrap();
-            let _ = sqlx::query("DELETE FROM page_ancestors WHERE space_id = $1")
+            let _ = sqlx::query(
+                "DELETE FROM page_ancestors WHERE space_id = $1"
+            )
                 .bind(uuid(SPACE))
                 .execute(&mut *tx)
                 .await
                 .unwrap();
             for (ancestor, descendant, depth) in &rows {
                 let _ = sqlx::query(
-                    "INSERT INTO page_ancestors (space_id, ancestor_id, descendant_id, depth) \
-                     VALUES ($1, $2, $3, $4)",
+                    "INSERT INTO page_ancestors (space_id, ancestor_id, \
+                     descendant_id, depth) VALUES ($1, $2, $3, $4)",
                 )
                 .bind(uuid(SPACE))
                 .bind(uuid(*ancestor))
@@ -138,21 +141,24 @@ fn subject() -> impl Strategy<Value = Subject> {
 
 fn case() -> impl Strategy<Value = Case> {
     (2_usize..8).prop_flat_map(|n| {
-        let parents = prop::collection::vec(prop::option::of(any::<prop::sample::Index>()), n)
-            .prop_map(|picks| {
-                picks
-                    .into_iter()
-                    .enumerate()
-                    .map(|(i, pick)| {
-                        let parent = if i == 0 {
-                            None
-                        } else {
-                            pick.map(|ix| node(ix.index(i)))
-                        };
-                        (node(i), parent)
-                    })
-                    .collect::<BTreeMap<_, _>>()
-            });
+        let parents = prop::collection::vec(
+            prop::option::of(any::<prop::sample::Index>()),
+            n,
+        )
+        .prop_map(|picks| {
+            picks
+                .into_iter()
+                .enumerate()
+                .map(|(i, pick)| {
+                    let parent = if i == 0 {
+                        None
+                    } else {
+                        pick.map(|ix| node(ix.index(i)))
+                    };
+                    (node(i), parent)
+                })
+                .collect::<BTreeMap<_, _>>()
+        });
         let object = prop_oneof![
             1 => Just(Object::Space(SPACE)),
             4 => (0..n).prop_map(|i| Object::Node(node(i))),
@@ -171,8 +177,8 @@ fn case() -> impl Strategy<Value = Case> {
             });
         let restrict = (0..n).prop_map(|i| Change::Restrict(node(i)));
         let change = prop_oneof![5 => grant, 1 => restrict];
-        let member =
-            (1..=USERS, prop::option::weighted(0.3, 1_001_i64..3_000)).prop_map(|(u, e)| Tuple {
+        let member = (1..=USERS, prop::option::weighted(0.3, 1_001_i64..3_000))
+            .prop_map(|(u, e)| Tuple {
                 expires_at: e,
                 ..Tuple::member(GROUP, Subject::User(Id(u)))
             });
@@ -192,7 +198,8 @@ fn case() -> impl Strategy<Value = Case> {
 }
 
 fn principals() -> Vec<Principal> {
-    let mut out: Vec<Principal> = (1..=USERS + 1).map(|u| Principal::User(Id(u))).collect();
+    let mut out: Vec<Principal> =
+        (1..=USERS + 1).map(|u| Principal::User(Id(u))).collect();
     out.push(Principal::ShareLink(Id(70)));
     out
 }
@@ -265,9 +272,17 @@ async fn run(index: &Index, case: &Case) -> Result<(), TestCaseError> {
                     .await
                     .unwrap();
                 let b = sql.check(SPACE, p, o, Permission::Read).await.unwrap();
-                prop_assert_eq!(a.relation, b.relation, "{:?} on {} at {}", p, o, t);
+                prop_assert_eq!(
+                    a.relation,
+                    b.relation,
+                    "{:?} on {} at {}",
+                    p,
+                    o,
+                    t
+                );
             }
-            for perm in [Permission::Read, Permission::Edit, Permission::Manage] {
+            for perm in [Permission::Read, Permission::Edit, Permission::Manage]
+            {
                 let mut a = reference.accessible(SPACE, p, perm).await.unwrap();
                 let mut b = sql.accessible(SPACE, p, perm).await.unwrap();
                 a.sort();
@@ -288,7 +303,9 @@ async fn run(index: &Index, case: &Case) -> Result<(), TestCaseError> {
     clock.store(9_000, Ordering::SeqCst);
     let _ = reference.sweep_expired(SPACE).await.unwrap();
     let _ = sql.sweep_expired(SPACE).await.unwrap();
-    let tuples = |g: vellum_authz::SpaceGraph| g.tuples.into_iter().collect::<BTreeSet<_>>();
+    let tuples = |g: vellum_authz::SpaceGraph| {
+        g.tuples.into_iter().collect::<BTreeSet<_>>()
+    };
     prop_assert_eq!(
         tuples(reference.store().load_space(SPACE).await.unwrap()),
         tuples(sql.store().load_space(SPACE).await.unwrap())
@@ -313,7 +330,9 @@ impl<S: AuthzStore> DirWriter for S {
         &self,
         members: Vec<Tuple>,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + '_>> {
-        Box::pin(async move { self.write_directory(members, vec![]).await.unwrap() })
+        Box::pin(
+            async move { self.write_directory(members, vec![]).await.unwrap() },
+        )
     }
 }
 
@@ -351,17 +370,20 @@ fn postgres_matches_the_reference() {
         .unwrap();
     // Keeps a runtime in scope if a failing case unwinds past the container.
     let _context = rt.enter();
-    let (container, index): (ContainerAsync<Postgres>, Index) = rt.block_on(async {
-        let container = Postgres::default()
-            .with_tag("17-alpine")
-            .start()
-            .await
-            .unwrap();
-        let port = container.get_host_port_ipv4(5432).await.unwrap();
-        let url = format!("postgres://postgres:postgres@127.0.0.1:{port}/postgres");
-        let index = Index::open(&IndexConfig::postgres(url)).await.unwrap();
-        (container, index)
-    });
+    let (container, index): (ContainerAsync<Postgres>, Index) =
+        rt.block_on(async {
+            let container = Postgres::default()
+                .with_tag("17-alpine")
+                .start()
+                .await
+                .unwrap();
+            let port = container.get_host_port_ipv4(5432).await.unwrap();
+            let url = format!(
+                "postgres://postgres:postgres@127.0.0.1:{port}/postgres"
+            );
+            let index = Index::open(&IndexConfig::postgres(url)).await.unwrap();
+            (container, index)
+        });
     differential(&index, &rt, 24);
     // The container must be removed inside the runtime: dropping it outside
     // one panics.
@@ -374,9 +396,12 @@ fn postgres_matches_the_reference() {
 #[tokio::test]
 async fn unknown_spaces_and_stale_epochs_are_reported() {
     let dir = tempfile::tempdir().unwrap();
-    let index = Index::open(&IndexConfig::sqlite(dir.path().join("index.sqlite"), None))
-        .await
-        .unwrap();
+    let index = Index::open(&IndexConfig::sqlite(
+        dir.path().join("index.sqlite"),
+        None,
+    ))
+    .await
+    .unwrap();
     let store = SqlStore::new(index.clone());
     assert!(matches!(
         store.load_space(SPACE).await,

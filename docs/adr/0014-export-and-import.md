@@ -52,9 +52,9 @@ cross-references.
 
 ### D71: our own Word writer instead of a library
 
-- Word files are written by a small OOXML writer in the crate, with
-  real heading and list styles, a table-of-contents field, `PAGEREF` cross-references,
-  SVG images (with a PNG fallback) and equations as Office Math.
+- Word files are written by a small OOXML writer in the crate, with real heading
+  and list styles, a table-of-contents field, `PAGEREF` cross-references, SVG
+  images (with a PNG fallback) and equations as Office Math.
 - Google Docs export uploads that Word file to Drive with conversion, so
   Google Docs and Word share one code path.
 - Why: `docx-rs` pinned `zip` 8 with open advisories and supports

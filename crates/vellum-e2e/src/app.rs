@@ -18,9 +18,9 @@ use vellum_store::layout::{FOLDER_META, SYSTEM_DIR};
 use vellum_store::{BlobPath, BlobStore, Etag, Precondition, StoreError};
 
 use crate::api::{
-    DeleteObject, Deleted, DeviceKeyInfo, EnrolDevice, GetObject, ListObjects, MAX_ENVELOPE_BYTES,
-    MAX_LABEL_CHARS, ObjectInfo, ObjectList, PutObject, RevokeDevice, Revoked, SealedObject,
-    SpaceKeys, Stored,
+    DeleteObject, Deleted, DeviceKeyInfo, EnrolDevice, GetObject, ListObjects,
+    MAX_ENVELOPE_BYTES, MAX_LABEL_CHARS, ObjectInfo, ObjectList, PutObject,
+    RevokeDevice, Revoked, SealedObject, SpaceKeys, Stored,
 };
 use crate::guard::PrivateRoots;
 use crate::keys::{Entry, KEYS_DIR, KeyFile, keys_path, parse_key};
@@ -59,7 +59,10 @@ impl E2e {
     /// The service over `store` (the same store the drive uses) and
     /// `access`.
     #[must_use]
-    pub fn new(store: Arc<dyn BlobStore>, access: Arc<dyn SpaceAccess>) -> Self {
+    pub fn new(
+        store: Arc<dyn BlobStore>,
+        access: Arc<dyn SpaceAccess>,
+    ) -> Self {
         Self {
             store,
             access,
@@ -81,15 +84,23 @@ impl E2e {
     /// # Errors
     ///
     /// The store or the space index cannot be read.
-    #[tracing::instrument(name = "e2e.refresh_roots", skip(self), err(level = "warn"))]
+    #[tracing::instrument(
+        name = "e2e.refresh_roots",
+        skip(self),
+        err(level = "warn")
+    )]
     pub async fn refresh_roots(&self) -> Result<usize, Error> {
-        let dir = BlobPath::new(format!("{SYSTEM_DIR}/{KEYS_DIR}"))
-            .map_err(|e| Error::new(ErrorKind::Internal, "bad key list folder").with_source(e))?;
-        let entries: Vec<_> = match self.store.list(Some(&dir)).try_collect().await {
-            Ok(entries) => entries,
-            Err(StoreError::NotFound(_)) => Vec::new(),
-            Err(e) => return Err(store_error(e)),
-        };
+        let dir =
+            BlobPath::new(format!("{SYSTEM_DIR}/{KEYS_DIR}")).map_err(|e| {
+                Error::new(ErrorKind::Internal, "bad key list folder")
+                    .with_source(e)
+            })?;
+        let entries: Vec<_> =
+            match self.store.list(Some(&dir)).try_collect().await {
+                Ok(entries) => entries,
+                Err(StoreError::NotFound(_)) => Vec::new(),
+                Err(e) => return Err(store_error(e)),
+            };
         let mut roots = BTreeSet::new();
         for entry in entries {
             let Some(space) = entry
@@ -147,8 +158,11 @@ impl E2e {
         match self.store.get(&keys_path(space)?).await {
             Ok(blob) => {
                 let text = std::str::from_utf8(&blob.bytes).map_err(|e| {
-                    Error::new(ErrorKind::Internal, "the space's key list is not text")
-                        .with_source(e)
+                    Error::new(
+                        ErrorKind::Internal,
+                        "the space's key list is not text",
+                    )
+                    .with_source(e)
                 })?;
                 Ok(Loaded {
                     file: KeyFile::parse(text)?,
@@ -171,17 +185,25 @@ impl E2e {
         file: &KeyFile,
         etag: Option<Etag>,
     ) -> Result<Option<Etag>, Error> {
-        let condition = etag.map_or(Precondition::IfAbsent, Precondition::IfMatch);
+        let condition =
+            etag.map_or(Precondition::IfAbsent, Precondition::IfMatch);
         let path = keys_path(space)?;
         let bytes = Bytes::from(file.render()?);
         match self.store.put(&path, bytes, condition).await {
             Ok(meta) => Ok(Some(meta.etag)),
-            Err(StoreError::PreconditionFailed { .. } | StoreError::AlreadyExists(_)) => Ok(None),
+            Err(
+                StoreError::PreconditionFailed { .. }
+                | StoreError::AlreadyExists(_),
+            ) => Ok(None),
             Err(e) => Err(store_error(e)),
         }
     }
 
-    fn keys_of(space: SpaceId, loaded: &Loaded, caller: UserId) -> Result<SpaceKeys, Error> {
+    fn keys_of(
+        space: SpaceId,
+        loaded: &Loaded,
+        caller: UserId,
+    ) -> Result<SpaceKeys, Error> {
         Ok(SpaceKeys {
             space_id: space,
             version: loaded
@@ -204,7 +226,11 @@ impl E2e {
     ///
     /// `not_found` for a space the caller cannot see.
     #[tracing::instrument(name = "e2e.keys", skip(self), err(level = "debug"))]
-    pub async fn keys(&self, user: UserId, space: SpaceId) -> Result<SpaceKeys, Error> {
+    pub async fn keys(
+        &self,
+        user: UserId,
+        space: SpaceId,
+    ) -> Result<SpaceKeys, Error> {
         let _root = self.space_root(user, space, Need::View).await?;
         let loaded = self.load(space).await?;
         Self::keys_of(space, &loaded, user)
@@ -219,8 +245,17 @@ impl E2e {
     /// `invalid_input` for a bad key or label, `permission_denied` for a
     /// first key from a non-manager, `conflict` for a duplicate or a full
     /// list.
-    #[tracing::instrument(name = "e2e.enrol", skip(self, request), fields(space = %request.space_id), err(level = "debug"))]
-    pub async fn enrol(&self, user: UserId, request: EnrolDevice) -> Result<DeviceKeyInfo, Error> {
+    #[tracing::instrument(
+        name = "e2e.enrol",
+        skip(self, request),
+        fields(space = %request.space_id),
+        err(level = "debug")
+    )]
+    pub async fn enrol(
+        &self,
+        user: UserId,
+        request: EnrolDevice,
+    ) -> Result<DeviceKeyInfo, Error> {
         let space = request.space_id;
         let key = parse_key(&request.public_key)?;
         let label = clean_label(&request.label)?;
@@ -263,27 +298,40 @@ impl E2e {
     ///
     /// `not_found` for an unknown key, `permission_denied` for another
     /// member's key without manage access, `conflict` for the last key.
-    #[tracing::instrument(name = "e2e.revoke", skip(self, request), fields(space = %request.space_id), err(level = "debug"))]
-    pub async fn revoke(&self, user: UserId, request: RevokeDevice) -> Result<Revoked, Error> {
+    #[tracing::instrument(
+        name = "e2e.revoke",
+        skip(self, request),
+        fields(space = %request.space_id),
+        err(level = "debug")
+    )]
+    pub async fn revoke(
+        &self,
+        user: UserId,
+        request: RevokeDevice,
+    ) -> Result<Revoked, Error> {
         let space = request.space_id;
         let wanted = request.fingerprint.trim().to_ascii_lowercase();
         let _root = self.space_root(user, space, Need::View).await?;
         for _ in 0..KEY_WRITE_ATTEMPTS {
             let mut loaded = self.load(space).await?;
-            let Some(index) = loaded
-                .file
-                .keys
-                .iter()
-                .position(|e| e.info(user).is_ok_and(|i| i.fingerprint == wanted))
-            else {
-                return Err(Error::new(ErrorKind::NotFound, "no such device key"));
+            let Some(index) = loaded.file.keys.iter().position(|e| {
+                e.info(user).is_ok_and(|i| i.fingerprint == wanted)
+            }) else {
+                return Err(Error::new(
+                    ErrorKind::NotFound,
+                    "no such device key",
+                ));
             };
             let mut registry = loaded.file.registry(space)?;
             let entry = loaded.file.keys.remove(index);
             if entry.user != user {
                 let _root = self.space_root(user, space, Need::Manage).await?;
             }
-            let _removed = registry.revoke_device(space, entry.user, entry.device_key()?)?;
+            let _removed = registry.revoke_device(
+                space,
+                entry.user,
+                entry.device_key()?,
+            )?;
             if self.save(space, &loaded.file, loaded.etag).await?.is_some() {
                 tracing::info!(
                     space = %space,
@@ -307,8 +355,17 @@ impl E2e {
     /// # Errors
     ///
     /// `not_found` for a space the caller cannot see; store failures.
-    #[tracing::instrument(name = "e2e.objects", skip(self, request), fields(space = %request.space_id), err(level = "debug"))]
-    pub async fn objects(&self, user: UserId, request: ListObjects) -> Result<ObjectList, Error> {
+    #[tracing::instrument(
+        name = "e2e.objects",
+        skip(self, request),
+        fields(space = %request.space_id),
+        err(level = "debug")
+    )]
+    pub async fn objects(
+        &self,
+        user: UserId,
+        request: ListObjects,
+    ) -> Result<ObjectList, Error> {
         let root = self.space_root(user, request.space_id, Need::View).await?;
         let limit = request
             .limit
@@ -350,8 +407,17 @@ impl E2e {
     ///
     /// `not_found` for a missing object, `conflict` for an object that is
     /// not end-to-end encrypted.
-    #[tracing::instrument(name = "e2e.get", skip(self, request), fields(space = %request.space_id), err(level = "debug"))]
-    pub async fn get(&self, user: UserId, request: GetObject) -> Result<SealedObject, Error> {
+    #[tracing::instrument(
+        name = "e2e.get",
+        skip(self, request),
+        fields(space = %request.space_id),
+        err(level = "debug")
+    )]
+    pub async fn get(
+        &self,
+        user: UserId,
+        request: GetObject,
+    ) -> Result<SealedObject, Error> {
         // Readable pages go only to members who may convert them (D209).
         let need = if request.plaintext {
             Need::Edit
@@ -365,7 +431,8 @@ impl E2e {
         if !sealed && rel != FOLDER_META && !request.plaintext {
             return Err(Error::new(
                 ErrorKind::Conflict,
-                "this object is not end-to-end encrypted; open it through the drive",
+                "this object is not end-to-end encrypted; open it through the \
+                    drive",
             ));
         }
         Ok(SealedObject {
@@ -384,17 +451,26 @@ impl E2e {
     /// `invalid_input` for bad base64, a non-envelope or an oversized one;
     /// `conflict` when the recipients do not match the key list, the space
     /// is not private, or the object changed since `if_match`.
-    #[tracing::instrument(name = "e2e.put", skip(self, request), fields(space = %request.space_id), err(level = "debug"))]
-    pub async fn put(&self, user: UserId, request: PutObject) -> Result<Stored, Error> {
+    #[tracing::instrument(
+        name = "e2e.put",
+        skip(self, request),
+        fields(space = %request.space_id),
+        err(level = "debug")
+    )]
+    pub async fn put(
+        &self,
+        user: UserId,
+        request: PutObject,
+    ) -> Result<Stored, Error> {
         let space = request.space_id;
         let root = self.space_root(user, space, Need::Edit).await?;
         let (path, rel) = object_path(&root, &request.path)?;
         if request.envelope.len() > MAX_ENVELOPE_BYTES.div_ceil(3) * 4 {
             return Err(too_large());
         }
-        let bytes = STANDARD
-            .decode(request.envelope.trim())
-            .map_err(|_| Error::new(ErrorKind::InvalidInput, "envelope is not base64"))?;
+        let bytes = STANDARD.decode(request.envelope.trim()).map_err(|_| {
+            Error::new(ErrorKind::InvalidInput, "envelope is not base64")
+        })?;
         if bytes.len() > MAX_ENVELOPE_BYTES {
             return Err(too_large());
         }
@@ -405,7 +481,9 @@ impl E2e {
             ));
         }
         let mut sealed_to = recipients_of(&bytes)
-            .map_err(|_| Error::new(ErrorKind::InvalidInput, "the envelope is damaged"))?
+            .map_err(|_| {
+                Error::new(ErrorKind::InvalidInput, "the envelope is damaged")
+            })?
             .iter()
             .map(vellum_crypto::recipients::Fingerprint::to_bytes)
             .collect::<Vec<_>>();
@@ -429,7 +507,8 @@ impl E2e {
             );
             return Err(Error::new(
                 ErrorKind::Conflict,
-                "the envelope is not sealed to the space's current keys; fetch them and reseal",
+                "the envelope is not sealed to the space's current keys; fetch \
+                    them and reseal",
             ));
         }
         let condition = request.if_match.map_or(Precondition::IfAbsent, |e| {
@@ -440,7 +519,12 @@ impl E2e {
             .put(&path, Bytes::from(bytes), condition)
             .await
             .map_err(store_error)?;
-        tracing::info!(space = %space, user = %user, monotonic_counter.vellum.e2e.objects_stored = 1_u64, "sealed object stored");
+        tracing::info!(
+            space = %space,
+            user = %user,
+            monotonic_counter.vellum.e2e.objects_stored = 1_u64,
+            "sealed object stored"
+        );
         Ok(Stored {
             path: rel,
             etag: meta.etag.as_str().to_owned(),
@@ -452,15 +536,25 @@ impl E2e {
     /// # Errors
     ///
     /// `not_found` for a missing object; `conflict` when it changed.
-    #[tracing::instrument(name = "e2e.delete", skip(self, request), fields(space = %request.space_id), err(level = "debug"))]
-    pub async fn delete(&self, user: UserId, request: DeleteObject) -> Result<Deleted, Error> {
+    #[tracing::instrument(
+        name = "e2e.delete",
+        skip(self, request),
+        fields(space = %request.space_id),
+        err(level = "debug")
+    )]
+    pub async fn delete(
+        &self,
+        user: UserId,
+        request: DeleteObject,
+    ) -> Result<Deleted, Error> {
         let root = self.space_root(user, request.space_id, Need::Edit).await?;
         let (path, rel) = object_path(&root, &request.path)?;
         let current = self.store.get(&path).await.map_err(store_error)?;
         if !is_recipient_envelope(&current.bytes) {
             return Err(Error::new(
                 ErrorKind::Conflict,
-                "this object is not end-to-end encrypted; delete it through the drive",
+                "this object is not end-to-end encrypted; delete it through \
+                    the drive",
             ));
         }
         self.store
@@ -472,9 +566,15 @@ impl E2e {
 }
 
 /// `path` inside the space folder, checked; with its clean relative form.
-fn object_path(root: &BlobPath, path: &str) -> Result<(BlobPath, String), Error> {
-    let bad = |reason: &str| Error::new(ErrorKind::InvalidInput, format!("path: {reason}"));
-    let rel = BlobPath::new(path.trim_matches('/')).map_err(|_| bad("not a valid path"))?;
+fn object_path(
+    root: &BlobPath,
+    path: &str,
+) -> Result<(BlobPath, String), Error> {
+    let bad = |reason: &str| {
+        Error::new(ErrorKind::InvalidInput, format!("path: {reason}"))
+    };
+    let rel = BlobPath::new(path.trim_matches('/'))
+        .map_err(|_| bad("not a valid path"))?;
     if rel.segments().any(|s| s == SYSTEM_DIR) {
         return Err(bad("Vellum's own files are not served here"));
     }
@@ -539,7 +639,9 @@ fn too_large() -> Error {
 
 fn store_error(error: StoreError) -> Error {
     match error {
-        StoreError::NotFound(_) => Error::new(ErrorKind::NotFound, "no such object"),
+        StoreError::NotFound(_) => {
+            Error::new(ErrorKind::NotFound, "no such object")
+        }
         StoreError::AlreadyExists(_) => {
             Error::new(ErrorKind::Conflict, "the object already exists")
         }
@@ -547,7 +649,10 @@ fn store_error(error: StoreError) -> Error {
             ErrorKind::Conflict,
             "the object changed; fetch it and try again",
         ),
-        StoreError::InvalidPath { .. } => Error::new(ErrorKind::InvalidInput, "not a valid path"),
-        other => Error::new(ErrorKind::Unavailable, "the blob store failed").with_source(other),
+        StoreError::InvalidPath { .. } => {
+            Error::new(ErrorKind::InvalidInput, "not a valid path")
+        }
+        other => Error::new(ErrorKind::Unavailable, "the blob store failed")
+            .with_source(other),
     }
 }

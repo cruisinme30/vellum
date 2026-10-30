@@ -7,7 +7,10 @@ import { useCallback, useSyncExternalStore } from "react";
 export const COMPACT = "(max-width: 599.98px)";
 export const MEDIUM = "(max-width: 1023.98px)";
 
-/** A media query list, or `undefined` where the platform has none (tests, old engines). */
+/**
+ * A media query list, or `undefined` where the platform has none (tests, old
+ * engines).
+ */
 export function mediaQuery(query: string): MediaQueryList | undefined {
   return "matchMedia" in globalThis ? globalThis.matchMedia(query) : undefined;
 }

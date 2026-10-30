@@ -26,7 +26,9 @@ pub static PAGES: &[Page] = &[
         path: "deploy/single-binary.md",
         id: "01M63CFE5ZPFWFG98RXPQTMKGT",
         title: "Single binary",
-        markdown: include_str!("../../../docs/admin.book/deploy/single-binary.md"),
+        markdown: include_str!(
+            "../../../docs/admin.book/deploy/single-binary.md"
+        ),
     },
     Page {
         book: Book::Admin,
@@ -68,7 +70,9 @@ pub static PAGES: &[Page] = &[
         path: "configure/identity.md",
         id: "01M63CFE61A85MTD76GSEW6GB7",
         title: "Sign-in, SSO and SCIM",
-        markdown: include_str!("../../../docs/admin.book/configure/identity.md"),
+        markdown: include_str!(
+            "../../../docs/admin.book/configure/identity.md"
+        ),
     },
     Page {
         book: Book::Admin,
@@ -82,7 +86,9 @@ pub static PAGES: &[Page] = &[
         path: "configure/integrations.md",
         id: "01M63CFE61SYK94HT651XPNK20",
         title: "Integrations",
-        markdown: include_str!("../../../docs/admin.book/configure/integrations.md"),
+        markdown: include_str!(
+            "../../../docs/admin.book/configure/integrations.md"
+        ),
     },
     Page {
         book: Book::Admin,
@@ -96,7 +102,9 @@ pub static PAGES: &[Page] = &[
         path: "security/encryption.md",
         id: "01M63CFE61MH3QDCDGEYXK3X8P",
         title: "Encryption and keys",
-        markdown: include_str!("../../../docs/admin.book/security/encryption.md"),
+        markdown: include_str!(
+            "../../../docs/admin.book/security/encryption.md"
+        ),
     },
     Page {
         book: Book::Admin,
@@ -124,7 +132,9 @@ pub static PAGES: &[Page] = &[
         path: "operate/observability.md",
         id: "01M63CFE62SKYAP32V5TPN2P58",
         title: "Observability",
-        markdown: include_str!("../../../docs/admin.book/operate/observability.md"),
+        markdown: include_str!(
+            "../../../docs/admin.book/operate/observability.md"
+        ),
     },
     Page {
         book: Book::Admin,
@@ -145,7 +155,9 @@ pub static PAGES: &[Page] = &[
         path: "operate/troubleshooting.md",
         id: "01M63CFE622VGV774X6YCXDYCP",
         title: "Troubleshooting",
-        markdown: include_str!("../../../docs/admin.book/operate/troubleshooting.md"),
+        markdown: include_str!(
+            "../../../docs/admin.book/operate/troubleshooting.md"
+        ),
     },
     Page {
         book: Book::Admin,
@@ -166,42 +178,54 @@ pub static PAGES: &[Page] = &[
         path: "architecture/README.md",
         id: "01M63CFE63ZFX97JHBJ4SFCAYS",
         title: "Architecture",
-        markdown: include_str!("../../../docs/developer.book/architecture/README.md"),
+        markdown: include_str!(
+            "../../../docs/developer.book/architecture/README.md"
+        ),
     },
     Page {
         book: Book::Developer,
         path: "architecture/crates.md",
         id: "01M63CFE64BJ2G7XH5ZGSJ7T8R",
         title: "Crate map and layers",
-        markdown: include_str!("../../../docs/developer.book/architecture/crates.md"),
+        markdown: include_str!(
+            "../../../docs/developer.book/architecture/crates.md"
+        ),
     },
     Page {
         book: Book::Developer,
         path: "architecture/data-flow.md",
         id: "01M63CFE64R1N91EY461P6BRTF",
         title: "Read and write paths",
-        markdown: include_str!("../../../docs/developer.book/architecture/data-flow.md"),
+        markdown: include_str!(
+            "../../../docs/developer.book/architecture/data-flow.md"
+        ),
     },
     Page {
         book: Book::Developer,
         path: "dialect/README.md",
         id: "01M63CFE64ZRPDA1PGS1AMF6GK",
         title: "Vellum Markdown grammar",
-        markdown: include_str!("../../../docs/developer.book/dialect/README.md"),
+        markdown: include_str!(
+            "../../../docs/developer.book/dialect/README.md"
+        ),
     },
     Page {
         book: Book::Developer,
         path: "dialect/block-model.md",
         id: "01M63CFE64ZMZJHT10X2CF9FJX",
         title: "The block model",
-        markdown: include_str!("../../../docs/developer.book/dialect/block-model.md"),
+        markdown: include_str!(
+            "../../../docs/developer.book/dialect/block-model.md"
+        ),
     },
     Page {
         book: Book::Developer,
         path: "dialect/corpus.md",
         id: "01M63CFE6597AEJEXQFBJ1VETP",
         title: "The golden corpus",
-        markdown: include_str!("../../../docs/developer.book/dialect/corpus.md"),
+        markdown: include_str!(
+            "../../../docs/developer.book/dialect/corpus.md"
+        ),
     },
     Page {
         book: Book::Developer,
@@ -229,42 +253,54 @@ pub static PAGES: &[Page] = &[
         path: "extending/storage-adapter.md",
         id: "01M63CFE668Q6YQ8SXHWXWBQCG",
         title: "Writing a storage adapter",
-        markdown: include_str!("../../../docs/developer.book/extending/storage-adapter.md"),
+        markdown: include_str!(
+            "../../../docs/developer.book/extending/storage-adapter.md"
+        ),
     },
     Page {
         book: Book::Developer,
         path: "extending/blocks.md",
         id: "01M63CFE66BW169QP9T1MJWF2B",
         title: "Writing a block",
-        markdown: include_str!("../../../docs/developer.book/extending/blocks.md"),
+        markdown: include_str!(
+            "../../../docs/developer.book/extending/blocks.md"
+        ),
     },
     Page {
         book: Book::Developer,
         path: "contributing/README.md",
         id: "01M63CFE66526T2MPAZ2NY485F",
         title: "Contributing",
-        markdown: include_str!("../../../docs/developer.book/contributing/README.md"),
+        markdown: include_str!(
+            "../../../docs/developer.book/contributing/README.md"
+        ),
     },
     Page {
         book: Book::Developer,
         path: "contributing/standards.md",
         id: "01M63CFE669ES7E5ECEZ0VCM61",
         title: "Engineering standards",
-        markdown: include_str!("../../../docs/developer.book/contributing/standards.md"),
+        markdown: include_str!(
+            "../../../docs/developer.book/contributing/standards.md"
+        ),
     },
     Page {
         book: Book::Developer,
         path: "contributing/help-books.md",
         id: "01M63CFE66RJXGYW4SR9CQQRYC",
         title: "Maintaining the help books",
-        markdown: include_str!("../../../docs/developer.book/contributing/help-books.md"),
+        markdown: include_str!(
+            "../../../docs/developer.book/contributing/help-books.md"
+        ),
     },
     Page {
         book: Book::Developer,
         path: "contributing/videos.md",
         id: "01M64VT4GZD6NQYK0CHP3X5KWC",
         title: "Video storyboard",
-        markdown: include_str!("../../../docs/developer.book/contributing/videos.md"),
+        markdown: include_str!(
+            "../../../docs/developer.book/contributing/videos.md"
+        ),
     },
     Page {
         book: Book::User,
@@ -362,7 +398,9 @@ pub static PAGES: &[Page] = &[
         path: "writing/interactive.md",
         id: "01M63CFE69ZGB3H7PKY85FNHEE",
         title: "Interactive blocks",
-        markdown: include_str!("../../../docs/user.book/writing/interactive.md"),
+        markdown: include_str!(
+            "../../../docs/user.book/writing/interactive.md"
+        ),
     },
     Page {
         book: Book::User,
@@ -523,7 +561,9 @@ pub static PAGES: &[Page] = &[
         path: "drive/external-edits.md",
         id: "01M63CFE6EC3A4987TVBN7YPWC",
         title: "External edits and Git",
-        markdown: include_str!("../../../docs/user.book/drive/external-edits.md"),
+        markdown: include_str!(
+            "../../../docs/user.book/drive/external-edits.md"
+        ),
     },
     Page {
         book: Book::User,
@@ -551,84 +591,108 @@ pub static PAGES: &[Page] = &[
         path: "cookbook/meeting-notes.md",
         id: "01M63CFE6FA6D69FAA5YXV3RES",
         title: "Meeting notes with action items",
-        markdown: include_str!("../../../docs/user.book/cookbook/meeting-notes.md"),
+        markdown: include_str!(
+            "../../../docs/user.book/cookbook/meeting-notes.md"
+        ),
     },
     Page {
         book: Book::User,
         path: "cookbook/personal-tasks.md",
         id: "01M63CFE6F2CWRYV53K5GJGAHP",
         title: "A personal task list",
-        markdown: include_str!("../../../docs/user.book/cookbook/personal-tasks.md"),
+        markdown: include_str!(
+            "../../../docs/user.book/cookbook/personal-tasks.md"
+        ),
     },
     Page {
         book: Book::User,
         path: "cookbook/status-page.md",
         id: "01M63CFE6FK1VH1H0A6T3AHZYM",
         title: "A weekly status page",
-        markdown: include_str!("../../../docs/user.book/cookbook/status-page.md"),
+        markdown: include_str!(
+            "../../../docs/user.book/cookbook/status-page.md"
+        ),
     },
     Page {
         book: Book::User,
         path: "cookbook/requirements-tracker.md",
         id: "01M63CFE6FECTX40YFDXFNMDJN",
         title: "A requirements tracker",
-        markdown: include_str!("../../../docs/user.book/cookbook/requirements-tracker.md"),
+        markdown: include_str!(
+            "../../../docs/user.book/cookbook/requirements-tracker.md"
+        ),
     },
     Page {
         book: Book::User,
         path: "cookbook/running-a-cycle.md",
         id: "01M63CFE6FVPMCB1RY71ZX8ZCM",
         title: "Running a cycle",
-        markdown: include_str!("../../../docs/user.book/cookbook/running-a-cycle.md"),
+        markdown: include_str!(
+            "../../../docs/user.book/cookbook/running-a-cycle.md"
+        ),
     },
     Page {
         book: Book::User,
         path: "cookbook/export-chapter.md",
         id: "01M63CFE6F5K9DXREV3WGTFV95",
         title: "Exporting a chapter as PDF",
-        markdown: include_str!("../../../docs/user.book/cookbook/export-chapter.md"),
+        markdown: include_str!(
+            "../../../docs/user.book/cookbook/export-chapter.md"
+        ),
     },
     Page {
         book: Book::User,
         path: "cookbook/prd-with-issues.md",
         id: "01M63CFE6FJKC6SYVC2573N2TF",
         title: "A PRD with live issue chips",
-        markdown: include_str!("../../../docs/user.book/cookbook/prd-with-issues.md"),
+        markdown: include_str!(
+            "../../../docs/user.book/cookbook/prd-with-issues.md"
+        ),
     },
     Page {
         book: Book::User,
         path: "cookbook/on-call-runbook.md",
         id: "01M63CFE6GX4QTGS9C8P9SS09N",
         title: "An on-call runbook with a calculator",
-        markdown: include_str!("../../../docs/user.book/cookbook/on-call-runbook.md"),
+        markdown: include_str!(
+            "../../../docs/user.book/cookbook/on-call-runbook.md"
+        ),
     },
     Page {
         book: Book::User,
         path: "cookbook/quarterly-review.md",
         id: "01M63CFE6GJS1RY6ECPE79TGSK",
         title: "A quarterly review book",
-        markdown: include_str!("../../../docs/user.book/cookbook/quarterly-review.md"),
+        markdown: include_str!(
+            "../../../docs/user.book/cookbook/quarterly-review.md"
+        ),
     },
     Page {
         book: Book::User,
         path: "cookbook/release-notes-mcp.md",
         id: "01M63CFE6GPKC1SA40WNMM5EYV",
         title: "Release notes from an MCP prompt",
-        markdown: include_str!("../../../docs/user.book/cookbook/release-notes-mcp.md"),
+        markdown: include_str!(
+            "../../../docs/user.book/cookbook/release-notes-mcp.md"
+        ),
     },
     Page {
         book: Book::User,
         path: "cookbook/private-research-wiki.md",
         id: "01M63CFE6GHMBHHQ9VRGTC42YZ",
         title: "A private research wiki",
-        markdown: include_str!("../../../docs/user.book/cookbook/private-research-wiki.md"),
+        markdown: include_str!(
+            "../../../docs/user.book/cookbook/private-research-wiki.md"
+        ),
     },
     Page {
         book: Book::User,
         path: "cookbook/docs-as-code.md",
         id: "01M63CFE6GPPNCPQZH35TH584M",
         title: "Docs as code with Git and mdBook",
-        markdown: include_str!("../../../docs/user.book/cookbook/docs-as-code.md"),
+        markdown: include_str!(
+            "../../../docs/user.book/cookbook/docs-as-code.md"
+        ),
     },
     Page {
         book: Book::User,
@@ -665,12 +729,16 @@ pub static ASSETS: &[Asset] = &[
     Asset {
         book: Book::User,
         path: "my-work/assets/mywork.jpg",
-        bytes: include_bytes!("../../../docs/user.book/my-work/assets/mywork.jpg"),
+        bytes: include_bytes!(
+            "../../../docs/user.book/my-work/assets/mywork.jpg"
+        ),
     },
     Asset {
         book: Book::User,
         path: "start/assets/editor.jpg",
-        bytes: include_bytes!("../../../docs/user.book/start/assets/editor.jpg"),
+        bytes: include_bytes!(
+            "../../../docs/user.book/start/assets/editor.jpg"
+        ),
     },
     Asset {
         book: Book::User,
@@ -680,12 +748,16 @@ pub static ASSETS: &[Asset] = &[
     Asset {
         book: Book::User,
         path: "writing/assets/request-path-dark.svg",
-        bytes: include_bytes!("../../../docs/user.book/writing/assets/request-path-dark.svg"),
+        bytes: include_bytes!(
+            "../../../docs/user.book/writing/assets/request-path-dark.svg"
+        ),
     },
     Asset {
         book: Book::User,
         path: "writing/assets/request-path.svg",
-        bytes: include_bytes!("../../../docs/user.book/writing/assets/request-path.svg"),
+        bytes: include_bytes!(
+            "../../../docs/user.book/writing/assets/request-path.svg"
+        ),
     },
 ];
 
@@ -710,12 +782,21 @@ pub static ANCHORS: &[(&str, &str)] = &[
     ("editor.callouts", "user/writing/containers.md#callouts"),
     ("editor.charts", "user/writing/charts.md#options"),
     ("editor.data-tables", "user/writing/charts.md#data-tables"),
-    ("editor.calculator", "user/writing/interactive.md#calculator"),
+    (
+        "editor.calculator",
+        "user/writing/interactive.md#calculator",
+    ),
     ("editor.embeds", "user/writing/media.md#embeds"),
     ("editor.rendering", "user/writing/rendering.md#exports"),
-    ("editor.diagrams", "user/diagrams/README.md#how-diagrams-render"),
+    (
+        "editor.diagrams",
+        "user/diagrams/README.md#how-diagrams-render",
+    ),
     ("editor.mermaid", "user/diagrams/mermaid.md"),
-    ("editor.diagram-errors", "user/diagrams/errors.md#common-mistakes"),
+    (
+        "editor.diagram-errors",
+        "user/diagrams/errors.md#common-mistakes",
+    ),
     ("theme.panel", "user/start/editor.md#themes"),
     ("shortcuts.global", "user/start/shortcuts.md#global"),
     ("shortcuts.editor", "user/start/shortcuts.md#editor"),
@@ -726,7 +807,10 @@ pub static ANCHORS: &[(&str, &str)] = &[
     ("app.private-spaces", "user/start/desktop.md#private-spaces"),
     ("collection.create", "user/data/README.md#create"),
     ("collection.csv", "user/data/README.md#csv"),
-    ("collection.properties", "user/data/properties.md#property-types"),
+    (
+        "collection.properties",
+        "user/data/properties.md#property-types",
+    ),
     ("collection.relations", "user/data/properties.md#relations"),
     ("collection.rollups", "user/data/properties.md#rollups"),
     ("collection.formulas", "user/data/formulas.md#the-language"),
@@ -737,7 +821,10 @@ pub static ANCHORS: &[(&str, &str)] = &[
     ("book.permissions", "user/books/README.md#permissions"),
     ("book.history", "user/books/README.md#history"),
     ("book.numbering", "user/books/numbering.md#numbering"),
-    ("book.cross-references", "user/books/numbering.md#cross-references"),
+    (
+        "book.cross-references",
+        "user/books/numbering.md#cross-references",
+    ),
     ("book.move", "user/books/numbering.md#move"),
     ("book.export", "user/books/publishing.md#export"),
     ("book.publish", "user/books/publishing.md#publish"),

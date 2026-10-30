@@ -46,7 +46,10 @@ pub trait ReadAccess: Send + Sync {
     ///
     /// A coarse pre-filter: it may include spaces with only some readable
     /// documents, never spaces with none.
-    async fn readable_spaces(&self, principal: &Principal) -> Result<Vec<SpaceId>>;
+    async fn readable_spaces(
+        &self,
+        principal: &Principal,
+    ) -> Result<Vec<SpaceId>>;
 
     /// The subset of `docs` the principal can read: the exact check.
     async fn filter_readable(

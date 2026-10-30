@@ -7,8 +7,8 @@
 use std::sync::Arc;
 
 use vellum_authz::{
-    Actor as AuthzActor, Authz, AuthzStore, Change, Id, MemoryStore, Object, Relation, SqlStore,
-    Subject, Tuple, TupleRelation,
+    Actor as AuthzActor, Authz, AuthzStore, Change, Id, MemoryStore, Object,
+    Relation, SqlStore, Subject, Tuple, TupleRelation,
 };
 use vellum_db::{Index, IndexConfig};
 use vellum_drive::authz::{AuthzAccess, TreeSync};
@@ -46,7 +46,11 @@ async fn the_drive_runs_on_rebac() -> TestResult {
 #[tokio::test]
 async fn the_drive_runs_on_rebac_with_the_sqlite_index() -> TestResult {
     let dir = tempfile::tempdir()?;
-    let db = Index::open(&IndexConfig::sqlite(dir.path().join("index.sqlite"), None)).await?;
+    let db = Index::open(&IndexConfig::sqlite(
+        dir.path().join("index.sqlite"),
+        None,
+    ))
+    .await?;
     let authz = Arc::new(Authz::new(MemoryStore::new()));
     the_drive_runs_on_rebac_with(Arc::new(SqlIndex::new(db)), authz).await
 }
@@ -56,7 +60,11 @@ async fn the_drive_runs_on_rebac_with_the_sqlite_index() -> TestResult {
 #[tokio::test]
 async fn the_drive_runs_on_rebac_all_in_sqlite() -> TestResult {
     let dir = tempfile::tempdir()?;
-    let db = Index::open(&IndexConfig::sqlite(dir.path().join("index.sqlite"), None)).await?;
+    let db = Index::open(&IndexConfig::sqlite(
+        dir.path().join("index.sqlite"),
+        None,
+    ))
+    .await?;
     let authz = Arc::new(Authz::new(SqlStore::new(db.clone())));
     the_drive_runs_on_rebac_with(Arc::new(SqlIndex::new(db)), authz).await
 }
@@ -67,17 +75,20 @@ async fn the_drive_runs_on_rebac_all_in_sqlite() -> TestResult {
 async fn the_drive_runs_on_rebac_over_two_shards() -> TestResult {
     use vellum_db::{ShardRouter, ShardedIndex, ShardsConfig};
     let dir = tempfile::tempdir()?;
-    let db = |name: &str| IndexConfig::sqlite(dir.path().join(format!("{name}.sqlite")), None);
+    let db = |name: &str| {
+        IndexConfig::sqlite(dir.path().join(format!("{name}.sqlite")), None)
+    };
     let config = ShardsConfig {
         main: db("main"),
         shards: vec![("eu".into(), db("eu")), ("us".into(), db("us"))],
     };
-    let router = Arc::new(ShardRouter::open(ShardedIndex::open(&config).await?).await?);
+    let router =
+        Arc::new(ShardRouter::open(ShardedIndex::open(&config).await?).await?);
     // Fill the home shard first, so the space under test lands on "us".
     let _ = router.place(ObjectId::generate()).await?;
-    let authz = Arc::new(Authz::new(vellum_authz::ShardedStore::new(Arc::clone(
-        &router,
-    ))));
+    let authz = Arc::new(Authz::new(vellum_authz::ShardedStore::new(
+        Arc::clone(&router),
+    )));
     let index = Arc::new(vellum_drive::sharded::ShardedIndex::new(router));
     the_drive_runs_on_rebac_with(index, authz).await
 }
@@ -91,10 +102,17 @@ async fn the_drive_runs_on_rebac_with<S: AuthzStore + TreeSync + 'static>(
     let access = Arc::new(AuthzAccess::new(authz.clone(), index.clone()));
     let drive = Drive::new(store, index, access);
     let (alice_id, bob_id) = (UserId::generate(), UserId::generate());
-    let (alice, bob) = (Actor::User { user: alice_id }, Actor::User { user: bob_id });
+    let (alice, bob) =
+        (Actor::User { user: alice_id }, Actor::User { user: bob_id });
 
     let eng = drive
-        .create_space(&alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .create_space(
+            &alice,
+            SpaceKind::SharedDrive,
+            "eng",
+            "Engineering",
+            None,
+        )
         .await?;
     let a = drive.create_folder(&alice, eng.id, None, "A").await?;
     let b = drive.create_folder(&alice, eng.id, None, "B").await?;
@@ -172,10 +190,17 @@ async fn copies_leave_restricted_parts_behind() -> TestResult {
     let access = Arc::new(AuthzAccess::new(authz.clone(), index.clone()));
     let drive = Drive::new(store, index, access);
     let (alice_id, bob_id) = (UserId::generate(), UserId::generate());
-    let (alice, bob) = (Actor::User { user: alice_id }, Actor::User { user: bob_id });
+    let (alice, bob) =
+        (Actor::User { user: alice_id }, Actor::User { user: bob_id });
 
     let eng = drive
-        .create_space(&alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .create_space(
+            &alice,
+            SpaceKind::SharedDrive,
+            "eng",
+            "Engineering",
+            None,
+        )
         .await?;
     let team = drive.create_folder(&alice, eng.id, None, "Team").await?;
     let hr = drive
@@ -232,7 +257,8 @@ async fn copies_leave_restricted_parts_behind() -> TestResult {
 /// moves. Without it, an editor of a folder could trash or move a page
 /// restricted away from them.
 #[tokio::test]
-async fn folders_move_and_trash_only_with_rights_on_all_of_them() -> TestResult {
+async fn folders_move_and_trash_only_with_rights_on_all_of_them() -> TestResult
+{
     let dir = tempfile::tempdir()?;
     let store = Arc::new(LocalStore::open(dir.path()).await?);
     let index = Arc::new(MemoryIndex::new());
@@ -240,10 +266,17 @@ async fn folders_move_and_trash_only_with_rights_on_all_of_them() -> TestResult 
     let access = Arc::new(AuthzAccess::new(authz.clone(), index.clone()));
     let drive = Drive::new(store, index, access);
     let (alice_id, bob_id) = (UserId::generate(), UserId::generate());
-    let (alice, bob) = (Actor::User { user: alice_id }, Actor::User { user: bob_id });
+    let (alice, bob) =
+        (Actor::User { user: alice_id }, Actor::User { user: bob_id });
 
     let eng = drive
-        .create_space(&alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .create_space(
+            &alice,
+            SpaceKind::SharedDrive,
+            "eng",
+            "Engineering",
+            None,
+        )
         .await?;
     let team = drive.create_folder(&alice, eng.id, None, "Team").await?;
     let archive = drive.create_folder(&alice, eng.id, None, "Archive").await?;
@@ -258,7 +291,11 @@ async fn folders_move_and_trash_only_with_rights_on_all_of_them() -> TestResult 
             space_id(eng.id),
             AuthzActor::User(Id(alice_id.as_u128())),
             &[
-                grant(Object::Space(space_id(eng.id)), Relation::Editor, bob_id),
+                grant(
+                    Object::Space(space_id(eng.id)),
+                    Relation::Editor,
+                    bob_id,
+                ),
                 Change::Restrict(Id(review.id.as_u128())),
             ],
         )

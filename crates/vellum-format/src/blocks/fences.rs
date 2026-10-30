@@ -114,7 +114,8 @@ impl Chart {
         let mut slices: Vec<(String, f64)> = Vec::new();
         for (n, line) in lines(fence) {
             let Some((key, value)) = line.split_once(':') else {
-                problems.add(n, format!("expected `key: value`, found `{line}`"));
+                problems
+                    .add(n, format!("expected `key: value`, found `{line}`"));
                 continue;
             };
             let value = value.trim();
@@ -122,13 +123,18 @@ impl Chart {
                 "title" => value.clone_into(&mut chart.title),
                 "type" => match ChartKind::from_word(value) {
                     Some(kind) => chart.kind = kind,
-                    None => problems.add(n, format!("unknown chart type `{value}`; using bar")),
+                    None => problems.add(
+                        n,
+                        format!("unknown chart type `{value}`; using bar"),
+                    ),
                 },
                 "labels" => chart.labels = list(value),
                 "unit" => chart.unit = Some(value.to_owned()),
                 "ymin" => chart.ymin = number(value),
                 "ymax" => chart.ymax = number(value),
-                "legend" => chart.legend = Some(matches!(value, "true" | "yes" | "on")),
+                "legend" => {
+                    chart.legend = Some(matches!(value, "true" | "yes" | "on"))
+                }
                 "colors" | "colours" => chart.colors = list(value),
                 "source" => chart.source = Some(value.to_owned()),
                 key if value.starts_with('[') => {
@@ -142,7 +148,8 @@ impl Chart {
                 }
                 key => match number(value) {
                     Some(v) => slices.push((key.to_owned(), v)),
-                    None => problems.add(n, format!("`{key}` needs a number or a [list]")),
+                    None => problems
+                        .add(n, format!("`{key}` needs a number or a [list]")),
                 },
             }
         }
@@ -155,7 +162,9 @@ impl Chart {
             });
         }
         for series in &chart.series {
-            if !chart.labels.is_empty() && series.values.len() != chart.labels.len() {
+            if !chart.labels.is_empty()
+                && series.values.len() != chart.labels.len()
+            {
                 problems.add(
                     0,
                     format!(
@@ -220,12 +229,16 @@ impl Timeline {
                     title: (*title).to_owned(),
                     detail: None,
                 }),
-                [when, title, detail @ ..] => timeline.items.push(TimelineItem {
-                    when: (*when).to_owned(),
-                    title: (*title).to_owned(),
-                    detail: Some(detail.join(" | ")).filter(|d| !d.is_empty()),
-                }),
-                _ => problems.add(n, format!("expected `when | title`, found `{line}`")),
+                [when, title, detail @ ..] => {
+                    timeline.items.push(TimelineItem {
+                        when: (*when).to_owned(),
+                        title: (*title).to_owned(),
+                        detail: Some(detail.join(" | "))
+                            .filter(|d| !d.is_empty()),
+                    })
+                }
+                _ => problems
+                    .add(n, format!("expected `when | title`, found `{line}`")),
             }
         }
         problems.done(timeline)
@@ -273,7 +286,9 @@ impl Roadmap {
                         roadmap.start = date(a.trim(), n, &mut problems);
                         roadmap.end = date(b.trim(), n, &mut problems);
                     }
-                    None => problems.add(n, "expected `range: <start> .. <end>`"),
+                    None => {
+                        problems.add(n, "expected `range: <start> .. <end>`")
+                    }
                 }
                 continue;
             }
@@ -288,9 +303,10 @@ impl Roadmap {
                     }
                 }
                 [name, start, end] => {
-                    if let (Some(start), Some(end)) =
-                        (date(start, n, &mut problems), date(end, n, &mut problems))
-                    {
+                    if let (Some(start), Some(end)) = (
+                        date(start, n, &mut problems),
+                        date(end, n, &mut problems),
+                    ) {
                         roadmap.rows.push(RoadmapRow {
                             name: (*name).to_owned(),
                             start,
@@ -298,7 +314,10 @@ impl Roadmap {
                         });
                     }
                 }
-                _ => problems.add(n, format!("expected `name | start | end`, found `{line}`")),
+                _ => problems.add(
+                    n,
+                    format!("expected `name | start | end`, found `{line}`"),
+                ),
             }
         }
         problems.done(roadmap)
@@ -355,14 +374,17 @@ impl RiskMatrix {
                 }
             }
             match (parts.first(), likelihood, impact) {
-                (Some(title), Some(likelihood), Some(impact)) if !title.is_empty() => {
+                (Some(title), Some(likelihood), Some(impact))
+                    if !title.is_empty() =>
+                {
                     matrix.risks.push(Risk {
                         title: (*title).to_owned(),
                         likelihood,
                         impact,
                     });
                 }
-                _ => problems.add(n, "expected `title | likelihood 1-5 | impact 1-5`"),
+                _ => problems
+                    .add(n, "expected `title | likelihood 1-5 | impact 1-5`"),
             }
         }
         problems.done(matrix)
@@ -408,7 +430,10 @@ impl Board {
                 });
             } else if let Some(card) = line.strip_prefix("- ") {
                 let card = card.trim();
-                let (text, tag) = match card.strip_suffix(']').and_then(|c| c.rsplit_once('[')) {
+                let (text, tag) = match card
+                    .strip_suffix(']')
+                    .and_then(|c| c.rsplit_once('['))
+                {
                     Some((text, tag)) if !text.trim().is_empty() => {
                         (text.trim(), Some(tag.trim().to_owned()))
                     }
@@ -419,7 +444,8 @@ impl Board {
                         text: text.to_owned(),
                         tag,
                     }),
-                    None => problems.add(n, "a card needs a `## Column` line above it"),
+                    None => problems
+                        .add(n, "a card needs a `## Column` line above it"),
                 }
             } else {
                 problems.add(
@@ -477,7 +503,11 @@ impl DataTable {
             if row.len() != table.header.len() {
                 problems.add(
                     n,
-                    format!("{} cells for {} columns", row.len(), table.header.len()),
+                    format!(
+                        "{} cells for {} columns",
+                        row.len(),
+                        table.header.len()
+                    ),
                 );
                 row.resize(table.header.len(), String::new());
             }
@@ -500,7 +530,9 @@ fn csv_row(line: &str) -> Vec<String> {
                 let _ = chars.next();
             }
             '"' => quoted = !quoted,
-            ',' if !quoted => cells.push(std::mem::take(&mut cell).trim().to_owned()),
+            ',' if !quoted => {
+                cells.push(std::mem::take(&mut cell).trim().to_owned())
+            }
             c => cell.push(c),
         }
     }
@@ -562,11 +594,14 @@ impl Architecture {
             } else {
                 problems.add(
                     n,
-                    format!("expected `Lane: a, b` or `a -> b`, found `{line}`"),
+                    format!(
+                        "expected `Lane: a, b` or `a -> b`, found `{line}`"
+                    ),
                 );
             }
         }
-        let known: Vec<&String> = arch.lanes.iter().flat_map(|l| &l.items).collect();
+        let known: Vec<&String> =
+            arch.lanes.iter().flat_map(|l| &l.items).collect();
         for arrow in &arch.arrows {
             for end in [&arrow.from, &arrow.to] {
                 if !known.contains(&end) {
@@ -630,11 +665,15 @@ impl Calculator {
         let mut calc = Self::default();
         for (n, line) in lines(fence) {
             let Some((key, rest)) = line.split_once(':') else {
-                problems.add(n, format!("expected `key: Label = value`, found `{line}`"));
+                problems.add(
+                    n,
+                    format!("expected `key: Label = value`, found `{line}`"),
+                );
                 continue;
             };
             let (label, rhs) = rest.split_once('=').unwrap_or(("", rest));
-            let (key, label, rhs) = (key.trim().to_owned(), label.trim(), rhs.trim());
+            let (key, label, rhs) =
+                (key.trim().to_owned(), label.trim(), rhs.trim());
             let label = if label.is_empty() {
                 key.clone()
             } else {
@@ -654,7 +693,8 @@ impl Calculator {
                     step: None,
                 };
                 if let Some(range) = range {
-                    let (bounds, step) = range.split_once("step").unwrap_or((range, ""));
+                    let (bounds, step) =
+                        range.split_once("step").unwrap_or((range, ""));
                     if let Some((min, max)) = bounds.split_once("..") {
                         input.min = number(min);
                         input.max = number(max);
@@ -684,14 +724,17 @@ impl Calculator {
 /// follows whitespace, and the formula before it must not end in an
 /// operator.
 fn split_unit(rhs: &str) -> (&str, Option<String>) {
-    let Some((formula, unit)) = rhs.strip_suffix(')').and_then(|r| r.rsplit_once('(')) else {
+    let Some((formula, unit)) =
+        rhs.strip_suffix(')').and_then(|r| r.rsplit_once('('))
+    else {
         return (rhs, None);
     };
     let trimmed = formula.trim_end();
     let is_unit = !trimmed.is_empty()
         && formula.ends_with(char::is_whitespace)
         && !trimmed.ends_with([
-            '+', '-', '*', '/', '^', '%', '(', ',', '=', '<', '>', '&', '|', '!',
+            '+', '-', '*', '/', '^', '%', '(', ',', '=', '<', '>', '&', '|',
+            '!',
         ])
         && !unit.trim().is_empty();
     if is_unit {
@@ -702,7 +745,11 @@ fn split_unit(rhs: &str) -> (&str, Option<String>) {
 }
 
 /// Reads `key: value` lines into `set`, reporting unknown keys.
-fn key_values(fence: &Fence, problems: &mut Problems, mut set: impl FnMut(&str, String) -> bool) {
+fn key_values(
+    fence: &Fence,
+    problems: &mut Problems,
+    mut set: impl FnMut(&str, String) -> bool,
+) {
     for (n, line) in lines(fence) {
         match line.split_once(':') {
             Some((key, value)) => {
@@ -710,7 +757,8 @@ fn key_values(fence: &Fence, problems: &mut Problems, mut set: impl FnMut(&str, 
                     problems.add(n, format!("unknown key `{}`", key.trim()));
                 }
             }
-            None => problems.add(n, format!("expected `key: value`, found `{line}`")),
+            None => problems
+                .add(n, format!("expected `key: value`, found `{line}`")),
         }
     }
 }

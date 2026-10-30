@@ -10,7 +10,8 @@ use vellum_format::{Block, Inline};
 pub fn inlines_mut(blocks: &mut [Block], f: &mut impl FnMut(&mut Vec<Inline>)) {
     for block in blocks {
         match block {
-            Block::Paragraph { content, .. } | Block::Heading { content, .. } => {
+            Block::Paragraph { content, .. }
+            | Block::Heading { content, .. } => {
                 walk_inlines(content, f);
             }
             Block::BlockQuote { blocks, .. } => inlines_mut(blocks, f),
@@ -38,7 +39,10 @@ pub fn inlines_mut(blocks: &mut [Block], f: &mut impl FnMut(&mut Vec<Inline>)) {
     }
 }
 
-fn walk_inlines(inlines: &mut Vec<Inline>, f: &mut impl FnMut(&mut Vec<Inline>)) {
+fn walk_inlines(
+    inlines: &mut Vec<Inline>,
+    f: &mut impl FnMut(&mut Vec<Inline>),
+) {
     for inline in inlines.iter_mut() {
         match inline {
             Inline::Emphasis { content }
@@ -62,9 +66,9 @@ pub fn is_external(url: &str) -> bool {
         || url.starts_with("//")
         || url.split_once(':').is_some_and(|(scheme, _)| {
             !scheme.is_empty()
-                && scheme
-                    .chars()
-                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.'))
+                && scheme.chars().all(|c| {
+                    c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.')
+                })
                 && scheme.len() > 1
         })
 }
@@ -74,7 +78,9 @@ pub fn is_external(url: &str) -> bool {
 pub fn split(url: &str) -> (String, Option<String>) {
     let url = url.trim().trim_start_matches('<').trim_end_matches('>');
     let (rest, fragment) = match url.split_once('#') {
-        Some((rest, fragment)) => (rest, Some(fragment.to_owned()).filter(|f| !f.is_empty())),
+        Some((rest, fragment)) => {
+            (rest, Some(fragment.to_owned()).filter(|f| !f.is_empty()))
+        }
         None => (url, None),
     };
     let rest = rest.split_once('?').map_or(rest, |(path, _)| path);

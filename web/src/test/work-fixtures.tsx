@@ -12,7 +12,15 @@ import { vi } from "vitest";
 import { ServerApisProvider } from "../data/server-apis";
 import { I18nProvider } from "../i18n/i18n";
 import { KeyboardRoot } from "../keyboard/keyboard-root";
-import type { CycleOut, GroupOut, IssueOut, NewTeam, TeamOut, ViewOut, WorkApi } from "../work/api";
+import type {
+  CycleOut,
+  GroupOut,
+  IssueOut,
+  NewTeam,
+  TeamOut,
+  ViewOut,
+  WorkApi,
+} from "../work/api";
 import type { TeamFile } from "../work/settings/team-file";
 
 // eslint-disable-next-line unicorn/no-null -- the API's "none"
@@ -72,7 +80,11 @@ export const TEAM_FILE: TeamFile = {
   labels: [{ name: "gateway" }],
 };
 
-export function issue(key: string, title: string, extra: Partial<IssueOut> = {}): IssueOut {
+export function issue(
+  key: string,
+  title: string,
+  extra: Partial<IssueOut> = {},
+): IssueOut {
   return {
     id: `id-${key}`,
     key,
@@ -154,7 +166,9 @@ export function fakeApi(overrides: Partial<WorkApi> = {}): WorkApi {
     issue: unused,
     createIssue: unused,
     fileIssue: unused,
-    setState: vi.fn((key: string, state: string) => Promise.resolve(issue(key, "x", { state }))),
+    setState: vi.fn((key: string, state: string) =>
+      Promise.resolve(issue(key, "x", { state })),
+    ),
     setPriority: vi.fn((key: string, priority: number) =>
       Promise.resolve(issue(key, "x", { priority })),
     ),
@@ -191,7 +205,9 @@ export function fakeApi(overrides: Partial<WorkApi> = {}): WorkApi {
 
 function Where() {
   const location = useLocation();
-  return <output data-testid="where">{`${location.pathname}${location.search}`}</output>;
+  return (
+    <output data-testid="where">{`${location.pathname}${location.search}`}</output>
+  );
 }
 
 export function renderAt(path: string, api: WorkApi, routes: ReactNode) {
@@ -211,4 +227,5 @@ export function renderAt(path: string, api: WorkApi, routes: ReactNode) {
   return user;
 }
 
-export const where = () => decodeURIComponent(screen.getByTestId("where").textContent);
+export const where = () =>
+  decodeURIComponent(screen.getByTestId("where").textContent);

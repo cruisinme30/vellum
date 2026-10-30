@@ -15,7 +15,9 @@
 /** One file of the app shell. Hashed file names need no revision. */
 export interface PrecacheEntry {
   readonly url: string;
-  /** Content hash for files whose name does not change, such as `/index.html`. */
+  /**
+   * Content hash for files whose name does not change, such as `/index.html`.
+   */
   readonly revision?: string;
 }
 
@@ -29,20 +31,37 @@ export interface ShellManifest {
 const PREFIX = "vellum-shell-";
 
 /** Paths that always go to the network: APIs, sign-in and well-known files. */
-const NETWORK_ONLY = ["/api/", "/mcp", "/auth/", "/oauth/", "/.well-known/", "/healthz", "/readyz"];
+const NETWORK_ONLY = [
+  "/api/",
+  "/mcp",
+  "/auth/",
+  "/oauth/",
+  "/.well-known/",
+  "/healthz",
+  "/readyz",
+];
 
 /** The cache that holds this version of the shell. */
 export function shellCacheName(manifest: ShellManifest): string {
   return `${PREFIX}${manifest.version}`;
 }
 
-/** The URL a precache entry is stored under (revisioned entries get a query). */
+/**
+ * The URL a precache entry is stored under (revisioned entries get a query).
+ */
 export function entryKey(entry: PrecacheEntry): string {
-  return entry.revision === undefined ? entry.url : `${entry.url}?__rev=${entry.revision}`;
+  return entry.revision === undefined
+    ? entry.url
+    : `${entry.url}?__rev=${entry.revision}`;
 }
 
-/** Downloads the whole shell. Fails (and the install with it) if any file fails. */
-export async function installShell(caches: CacheStorage, manifest: ShellManifest): Promise<void> {
+/**
+ * Downloads the whole shell. Fails (and the install with it) if any file fails.
+ */
+export async function installShell(
+  caches: CacheStorage,
+  manifest: ShellManifest,
+): Promise<void> {
   const cache = await caches.open(shellCacheName(manifest));
   await cache.addAll(manifest.entries.map((entry) => entryKey(entry)));
 }
@@ -54,7 +73,9 @@ export async function activateShell(
 ): Promise<string[]> {
   const current = shellCacheName(manifest);
   const names = await caches.keys();
-  const stale = names.filter((name) => name.startsWith(PREFIX) && name !== current);
+  const stale = names.filter(
+    (name) => name.startsWith(PREFIX) && name !== current,
+  );
   await Promise.all(stale.map((name) => caches.delete(name)));
   return stale;
 }
@@ -73,12 +94,20 @@ export type Route =
   | { readonly kind: "precache"; readonly key: string };
 
 /** Decides how to answer a request. */
-export function route(request: RouteRequest, origin: string, manifest: ShellManifest): Route {
+export function route(
+  request: RouteRequest,
+  origin: string,
+  manifest: ShellManifest,
+): Route {
   const url = new URL(request.url);
-  if (request.method !== "GET" || url.origin !== origin) return { kind: "network" };
-  if (NETWORK_ONLY.some((prefix) => url.pathname.startsWith(prefix))) return { kind: "network" };
+  if (request.method !== "GET" || url.origin !== origin)
+    return { kind: "network" };
+  if (NETWORK_ONLY.some((prefix) => url.pathname.startsWith(prefix)))
+    return { kind: "network" };
   if (request.mode === "navigate") return { kind: "shell" };
-  const entry = manifest.entries.find((candidate) => candidate.url === url.pathname);
+  const entry = manifest.entries.find(
+    (candidate) => candidate.url === url.pathname,
+  );
   if (entry === undefined) return { kind: "network" };
   return { kind: "precache", key: entryKey(entry) };
 }
@@ -104,7 +133,8 @@ export async function respond(
 ): Promise<Response | undefined> {
   const decision = route(request, context.origin, context.manifest);
   if (decision.kind === "network") return undefined;
-  const key = decision.kind === "shell" ? shellKey(context.manifest) : decision.key;
+  const key =
+    decision.kind === "shell" ? shellKey(context.manifest) : decision.key;
   if (key === undefined) return undefined;
   const cache = await context.caches.open(shellCacheName(context.manifest));
   const hit = await cache.match(key);
@@ -131,11 +161,15 @@ function text(value: unknown): string | undefined {
  * generic notice, because browsers penalise pushes that show nothing.
  * Links to another origin are replaced by the inbox.
  */
-export function readPush(payload: string | undefined, origin: string): PushNotice {
+export function readPush(
+  payload: string | undefined,
+  origin: string,
+): PushNotice {
   let data: Record<string, unknown> = {};
   try {
     const parsed: unknown = JSON.parse(payload ?? "{}");
-    if (typeof parsed === "object" && parsed !== null) data = parsed as Record<string, unknown>;
+    if (typeof parsed === "object" && parsed !== null)
+      data = parsed as Record<string, unknown>;
   } catch {
     // Fall through to the generic notice.
   }
@@ -143,7 +177,8 @@ export function readPush(payload: string | undefined, origin: string): PushNotic
   const raw = text(data["url"]);
   if (raw !== undefined) {
     const parsed = new URL(raw, origin);
-    if (parsed.origin === origin) url = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    if (parsed.origin === origin)
+      url = `${parsed.pathname}${parsed.search}${parsed.hash}`;
   }
   return {
     title: text(data["title"]) ?? "Vellum",
@@ -176,7 +211,10 @@ export async function openNotice(
   path: string,
 ): Promise<void> {
   const target = new URL(path, origin).href;
-  const windows = await clients.matchAll({ type: "window", includeUncontrolled: true });
+  const windows = await clients.matchAll({
+    type: "window",
+    includeUncontrolled: true,
+  });
   const exact = windows.find((client) => client.url === target);
   if (exact !== undefined) {
     await exact.focus();

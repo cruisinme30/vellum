@@ -20,7 +20,10 @@ test.use({
 });
 // eslint-disable-next-line no-empty-pattern -- Playwright needs the fixtures object
 test.beforeEach(({}, testInfo) => {
-  test.skip(!testInfo.project.name.endsWith("-laptop"), "runs at laptop size only");
+  test.skip(
+    !testInfo.project.name.endsWith("-laptop"),
+    "runs at laptop size only",
+  );
 });
 
 const ISSUES = "/data/01JB3KD0COLL0ISSUES0000001";
@@ -62,7 +65,9 @@ for (const [name, path, button, dialog] of [
   ["CSV import panel", ISSUES, "Import CSV", "Import into Issues"],
   ["new collection panel", "/data", "New collection", "New collection"],
 ] as const) {
-  test(`the ${name} has no WCAG 2.2 AA violations and fits the screen`, async ({ page }) => {
+  test(`the ${name} has no WCAG 2.2 AA violations and fits the screen`, async ({
+    page,
+  }) => {
     await page.goto(path);
     await page.getByRole("button", { name: button, exact: true }).click();
     const panel = page.getByRole("dialog", { name: dialog });
@@ -109,23 +114,31 @@ test("a table cell is edited from the keyboard", async ({ page }) => {
 
   await page.keyboard.press("ArrowLeft");
   await page.keyboard.press("F2");
-  const input = grid.getByRole("textbox", { name: "Issue of Trace sampling knobs" });
+  const input = grid.getByRole("textbox", {
+    name: "Issue of Trace sampling knobs",
+  });
   await expect(input).toBeFocused();
   await input.fill("Trace sampling controls");
   await page.keyboard.press("Enter");
-  await expect(grid.getByRole("gridcell", { name: /Trace sampling controls/ })).toBeFocused();
+  await expect(
+    grid.getByRole("gridcell", { name: /Trace sampling controls/ }),
+  ).toBeFocused();
 
   await page.keyboard.press("F2");
   await page.keyboard.type(" (draft)");
   await page.keyboard.press("Escape");
-  await expect(grid.getByRole("gridcell", { name: /Trace sampling controls$/ })).toBeVisible();
+  await expect(
+    grid.getByRole("gridcell", { name: /Trace sampling controls$/ }),
+  ).toBeVisible();
 });
 
 test("a board card is moved from the keyboard", async ({ page }) => {
   await page.goto(`${ISSUES}?view=Board`);
   const review = page.getByRole("region", { name: /^In review/ });
   const done = page.getByRole("region", { name: /^Done/ });
-  const card = page.getByRole("button", { name: /^Gateway returns 502 on cold start/ });
+  const card = page.getByRole("button", {
+    name: /^Gateway returns 502 on cold start/,
+  });
   await expect(review).toContainText("Gateway returns 502 on cold start");
 
   await card.focus();
@@ -139,10 +152,14 @@ test("a board card is moved from the keyboard", async ({ page }) => {
   // The Move to menu is the other keyboard path.
   await page.keyboard.press("Tab");
   await expect(
-    page.getByRole("button", { name: "Move Gateway returns 502 on cold start" }),
+    page.getByRole("button", {
+      name: "Move Gateway returns 502 on cold start",
+    }),
   ).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("menuitem", { name: "Move to Backlog" })).toBeFocused();
+  await expect(
+    page.getByRole("menuitem", { name: "Move to Backlog" }),
+  ).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("region", { name: /^Backlog/ })).toContainText(
     "Gateway returns 502 on cold start",

@@ -11,10 +11,13 @@
 
 type Variables = ReadonlyMap<string, number>;
 
-const isDigit = (c: string | undefined) => c !== undefined && c >= "0" && c <= "9";
+const isDigit = (c: string | undefined) =>
+  c !== undefined && c >= "0" && c <= "9";
 const isNumberChar = (c: string | undefined) => isDigit(c) || c === ".";
-const isNameStart = (c: string | undefined) => c !== undefined && /^[\p{L}_]$/u.test(c);
-const isNameChar = (c: string | undefined) => c !== undefined && /^[\p{L}\p{N}_]$/u.test(c);
+const isNameStart = (c: string | undefined) =>
+  c !== undefined && /^[\p{L}_]$/u.test(c);
+const isNameChar = (c: string | undefined) =>
+  c !== undefined && /^[\p{L}\p{N}_]$/u.test(c);
 
 /** One pass over a formula, mirroring the Rust parser's recursive descent. */
 class Formula {
@@ -63,7 +66,11 @@ class Formula {
 
   private term(): number {
     let v = this.factor();
-    for (let op = this.peek(); op !== undefined && "*/%×÷".includes(op); op = this.peek()) {
+    for (
+      let op = this.peek();
+      op !== undefined && "*/%×÷".includes(op);
+      op = this.peek()
+    ) {
       this.pos += 1;
       v = combine(v, op, this.factor());
     }
@@ -115,7 +122,9 @@ function parseNumber(text: string): number {
   return Number(text);
 }
 
-/** Evaluates `+ - * / % ( )` over numbers and named inputs; throws on bad input. */
+/**
+ * Evaluates `+ - * / % ( )` over numbers and named inputs; throws on bad input.
+ */
 export function evaluate(formula: string, variables: Variables): number {
   return new Formula(formula, variables).value();
 }
@@ -141,7 +150,10 @@ function group(digits: string): string {
   return out;
 }
 
-/** `vellum_render::figure::chart::format_value`: thousands separators and a unit. */
+/**
+ * `vellum_render::figure::chart::format_value`: thousands separators and a
+ * unit.
+ */
 export function formatValue(v: number, unit: string): string {
   const s = plain(Math.round(v * 100) / 100);
   const point = s.indexOf(".");
@@ -156,13 +168,17 @@ export function formatValue(v: number, unit: string): string {
 /** Recomputes one calculator's results from its sliders. */
 function recompute(calculator: Element) {
   const variables = new Map<string, number>();
-  for (const input of calculator.querySelectorAll<HTMLInputElement>("input[data-key]")) {
+  for (const input of calculator.querySelectorAll<HTMLInputElement>(
+    "input[data-key]",
+  )) {
     const key = input.dataset["key"] ?? "";
     variables.set(key, Number(input.value));
     const shown = input.parentElement?.querySelector("output");
     if (shown) shown.textContent = plain(Number(input.value));
   }
-  for (const result of calculator.querySelectorAll<HTMLElement>(".vl-calc-result")) {
+  for (const result of calculator.querySelectorAll<HTMLElement>(
+    ".vl-calc-result",
+  )) {
     const output = result.querySelector("output");
     if (!output) continue;
     try {
@@ -176,7 +192,9 @@ function recompute(calculator: Element) {
   }
 }
 
-/** Wires every calculator under `root`; returns a function that unwires them. */
+/**
+ * Wires every calculator under `root`; returns a function that unwires them.
+ */
 export function hydrateCalculators(root: HTMLElement): () => void {
   const onInput = (event: Event) => {
     const target = event.target;

@@ -35,7 +35,8 @@ pub const MAX_FILES: usize = 20_000;
 pub fn store_error(e: StoreError) -> Error {
     let kind = match &e {
         StoreError::NotFound(_) => ErrorKind::NotFound,
-        StoreError::AlreadyExists(_) | StoreError::PreconditionFailed { .. } => ErrorKind::Conflict,
+        StoreError::AlreadyExists(_)
+        | StoreError::PreconditionFailed { .. } => ErrorKind::Conflict,
         StoreError::InvalidPath { .. } => ErrorKind::InvalidInput,
         _ => ErrorKind::Unavailable,
     };
@@ -52,9 +53,9 @@ pub fn store_error(e: StoreError) -> Error {
 pub fn book_error(e: BookError) -> Error {
     let kind = match &e {
         BookError::UnknownNode(_) => ErrorKind::NotFound,
-        BookError::Snapshot(_) | BookError::Render { .. } | BookError::Io { .. } => {
-            ErrorKind::Internal
-        }
+        BookError::Snapshot(_)
+        | BookError::Render { .. }
+        | BookError::Io { .. } => ErrorKind::Internal,
         _ => ErrorKind::InvalidInput,
     };
     let message = e.to_string();
@@ -75,7 +76,10 @@ fn record(op: &'static str, started: Instant, files: usize) {
 #[must_use]
 pub fn fresh_ids() -> impl IdSource {
     let mut fallback = SequentialIds::default();
-    move || NodeId::parse(&ObjectId::generate().to_string()).unwrap_or_else(|_| fallback.next_id())
+    move || {
+        NodeId::parse(&ObjectId::generate().to_string())
+            .unwrap_or_else(|_| fallback.next_id())
+    }
 }
 
 /// `path` relative to `dir`, if it lies beneath it.
@@ -85,7 +89,10 @@ fn relative<'a>(dir: &BlobPath, path: &'a BlobPath) -> Option<&'a str> {
         .and_then(|rest| rest.strip_prefix('/'))
 }
 
-async fn read_text(store: &dyn BlobStore, path: &BlobPath) -> Result<(String, Etag), Error> {
+async fn read_text(
+    store: &dyn BlobStore,
+    path: &BlobPath,
+) -> Result<(String, Etag), Error> {
     let blob = store.get(path).await.map_err(store_error)?;
     Ok((
         String::from_utf8_lossy(&blob.bytes).into_owned(),
@@ -99,15 +106,20 @@ async fn read_text(store: &dyn BlobStore, path: &BlobPath) -> Result<(String, Et
 /// # Errors
 ///
 /// When the store cannot be listed.
-pub async fn locate(store: &dyn BlobStore) -> Result<BTreeMap<BookId, BlobPath>, Error> {
+pub async fn locate(
+    store: &dyn BlobStore,
+) -> Result<BTreeMap<BookId, BlobPath>, Error> {
     let started = Instant::now();
-    let entries: Vec<_> = store.list(None).try_collect().await.map_err(store_error)?;
+    let entries: Vec<_> =
+        store.list(None).try_collect().await.map_err(store_error)?;
     let mut out = BTreeMap::new();
     for entry in entries {
         let Kind::BookManifest { book } = Kind::of(&entry.path) else {
             continue;
         };
-        if entry.path.file_name() != manifest::FILE_NAME || entry.size > MAX_FILE_BYTES {
+        if entry.path.file_name() != manifest::FILE_NAME
+            || entry.size > MAX_FILE_BYTES
+        {
             continue;
         }
         let Ok((text, _)) = read_text(store, &entry.path).await else {
@@ -119,7 +131,8 @@ pub async fn locate(store: &dyn BlobStore) -> Result<BTreeMap<BookId, BlobPath>,
         {
             let _ = out.insert(id, book);
         } else {
-            tracing::warn!(book.dir = %book, "book.yaml has no valid id; skipped");
+            tracing::warn!(book.dir = %book, "book.yaml has no valid id; \
+                skipped");
         }
     }
     record("locate", started, out.len());
@@ -156,7 +169,10 @@ fn is_book_text(relative: &str) -> bool {
 ///
 /// `not_found` without `book.yaml` or `SUMMARY.md`, `invalid_input` for
 /// a malformed book, or a store failure.
-pub async fn load(store: &dyn BlobStore, dir: &BlobPath) -> Result<Loaded, Error> {
+pub async fn load(
+    store: &dyn BlobStore,
+    dir: &BlobPath,
+) -> Result<Loaded, Error> {
     let started = Instant::now();
     let entries: Vec<_> = store
         .list(Some(dir))
@@ -186,7 +202,9 @@ pub async fn load(store: &dyn BlobStore, dir: &BlobPath) -> Result<Loaded, Error
             Err(e) => return Err(e),
         }
     }
-    let missing = |name: &str| Error::new(ErrorKind::NotFound, format!("the book has no {name}"));
+    let missing = |name: &str| {
+        Error::new(ErrorKind::NotFound, format!("the book has no {name}"))
+    };
     let manifest = read
         .get(manifest::FILE_NAME)
         .ok_or_else(|| missing(manifest::FILE_NAME))?
@@ -232,7 +250,10 @@ impl Loaded {
     /// # Errors
     ///
     /// `conflict` when a file changed meanwhile, or a store failure.
-    pub async fn save(&mut self, store: &dyn BlobStore) -> Result<usize, Error> {
+    pub async fn save(
+        &mut self,
+        store: &dyn BlobStore,
+    ) -> Result<usize, Error> {
         let started = Instant::now();
         let mut writes: Vec<(String, String)> = self
             .book
@@ -310,7 +331,10 @@ impl Loaded {
 /// # Errors
 ///
 /// When the store cannot be listed.
-pub async fn tags(store: &dyn BlobStore, dir: &BlobPath) -> Result<BTreeSet<String>, Error> {
+pub async fn tags(
+    store: &dyn BlobStore,
+    dir: &BlobPath,
+) -> Result<BTreeSet<String>, Error> {
     let snapshots = dir.join(snapshot::DIR).map_err(store_error)?;
     let entries: Vec<_> = store
         .list(Some(&snapshots))
@@ -341,7 +365,9 @@ pub async fn read_snapshot(
         .join(&snapshot::file_name(tag).map_err(book_error)?)
         .map_err(store_error)?;
     let meta = store.head(&path).await.map_err(|e| match e {
-        StoreError::NotFound(_) => Error::new(ErrorKind::NotFound, format!("no snapshot {tag:?}")),
+        StoreError::NotFound(_) => {
+            Error::new(ErrorKind::NotFound, format!("no snapshot {tag:?}"))
+        }
         other => store_error(other),
     })?;
     if meta.size > MAX_FILE_BYTES * 8 {
@@ -376,10 +402,16 @@ pub async fn write_snapshot(
         .await
     {
         Ok(_) => {}
-        Err(StoreError::AlreadyExists(_) | StoreError::PreconditionFailed { .. }) => {
+        Err(
+            StoreError::AlreadyExists(_)
+            | StoreError::PreconditionFailed { .. },
+        ) => {
             return Err(Error::new(
                 ErrorKind::Conflict,
-                format!("snapshot {:?} exists; tags are immutable", snapshot.tag),
+                format!(
+                    "snapshot {:?} exists; tags are immutable",
+                    snapshot.tag
+                ),
             ));
         }
         Err(e) => return Err(store_error(e)),

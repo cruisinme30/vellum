@@ -95,11 +95,20 @@ function SettingsForm({
       </datalist>
       <label>
         {t("my-work-settings-day")}
-        <input name="day_starts_at" type="time" required defaultValue={settings.day_starts_at} />
+        <input
+          name="day_starts_at"
+          type="time"
+          required
+          defaultValue={settings.day_starts_at}
+        />
       </label>
       <label>
         {t("my-work-settings-digest")}
-        <input name="digest_at" type="time" defaultValue={settings.digest_at ?? ""} />
+        <input
+          name="digest_at"
+          type="time"
+          defaultValue={settings.digest_at ?? ""}
+        />
       </label>
       <p className="vl-muted">{t("my-work-settings-digest-hint")}</p>
       <button type="submit" className="vl-filled-button">
@@ -130,7 +139,9 @@ export function Settings({
     <details className="vl-work-settings-panel">
       <summary>{t("my-work-settings")}</summary>
       <Ready loaded={loaded}>
-        {(settings) => <SettingsForm api={api} settings={settings} onSaved={onSaved} />}
+        {(settings) => (
+          <SettingsForm api={api} settings={settings} onSaved={onSaved} />
+        )}
       </Ready>
     </details>
   );

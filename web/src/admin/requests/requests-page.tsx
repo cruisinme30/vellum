@@ -32,12 +32,19 @@ function current<K, T>(keyed: Keyed<K, T>, key: K): Load<T> {
 
 function failure(error: unknown): { state: "failed"; message: string } {
   if (error instanceof AdminApiError) {
-    return { state: "failed", message: `${error.message} (request ${error.requestId})` };
+    return {
+      state: "failed",
+      message: `${error.message} (request ${error.requestId})`,
+    };
   }
   return { state: "failed", message: String(error) };
 }
 
-function Filters({ onApply }: { readonly onApply: (filter: RequestFilter) => void }) {
+function Filters({
+  onApply,
+}: {
+  readonly onApply: (filter: RequestFilter) => void;
+}) {
   const submit: NonNullable<ComponentProps<"form">["onSubmit"]> = (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -54,7 +61,11 @@ function Filters({ onApply }: { readonly onApply: (filter: RequestFilter) => voi
     });
   };
   return (
-    <form className="vl-requests__filters" onSubmit={submit} aria-label="Filter requests">
+    <form
+      className="vl-requests__filters"
+      onSubmit={submit}
+      aria-label="Filter requests"
+    >
       <label>
         Route <input name="route" placeholder="/api/v1/pages/{page_id}" />
       </label>
@@ -85,10 +96,16 @@ function RequestTable({
     return <p>No requests match. The buffer keeps the most recent 10,000.</p>;
   }
   return (
-    // The table scrolls sideways when large text or zoom makes it wider than a phone,
-    // so the scroller takes keyboard focus (WCAG 2.1.1, axe scrollable-region-focusable).
-    // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- see above
-    <div className="vl-requests__scroll" role="region" aria-label="Requests table" tabIndex={0}>
+    // The table scrolls sideways when large text or zoom makes it wider than a
+    // phone, so the scroller takes keyboard focus (WCAG 2.1.1, axe
+    // scrollable-region-focusable).
+    <div
+      className="vl-requests__scroll"
+      role="region"
+      aria-label="Requests table"
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+      tabIndex={0}
+    >
       <table className="vl-requests__table">
         <caption>Recent requests, newest first</caption>
         <thead>
@@ -177,12 +194,20 @@ export function RequestsPage({ fetcher }: { readonly fetcher?: typeof fetch }) {
       <h1>Requests</h1>
       <Filters onApply={setFilter} />
       {rows.state === "loading" && <p role="status">Loading requests…</p>}
-      {rows.state === "failed" && <p role="alert">Could not load requests: {rows.message}</p>}
+      {rows.state === "failed" && (
+        <p role="alert">Could not load requests: {rows.message}</p>
+      )}
       {rows.state === "ready" && (
-        <RequestTable rows={rows.value} selected={selected} onSelect={setSelected} />
+        <RequestTable
+          rows={rows.value}
+          selected={selected}
+          onSelect={setSelected}
+        />
       )}
       {detail?.state === "loading" && <p role="status">Loading trace…</p>}
-      {detail?.state === "failed" && <p role="alert">Could not load the trace: {detail.message}</p>}
+      {detail?.state === "failed" && (
+        <p role="alert">Could not load the trace: {detail.message}</p>
+      )}
       {detail?.state === "ready" && <Waterfall trace={detail.value} />}
     </section>
   );

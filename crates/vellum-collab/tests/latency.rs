@@ -42,11 +42,13 @@ async fn keystrokes_reach_peers_fast() {
                 }
                 // Wait for the update frame, then apply it.
                 loop {
-                    let next =
-                        tokio::time::timeout(Duration::from_secs(2), editor.connection.recv())
-                            .await
-                            .expect("a frame in time")
-                            .expect("open");
+                    let next = tokio::time::timeout(
+                        Duration::from_secs(2),
+                        editor.connection.recv(),
+                    )
+                    .await
+                    .expect("a frame in time")
+                    .expect("open");
                     // A sync (0) update (2) frame is the keystroke.
                     if let Outbound::Frame(frame) = next
                         && frame.starts_with(&[0, 2])

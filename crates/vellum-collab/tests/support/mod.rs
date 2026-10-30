@@ -16,12 +16,14 @@ use vellum_collab::memory::{MemoryFiles, MemoryUpdateStore};
 use vellum_collab::protocol::{self, MSG_DONE, MSG_PEERS, PeerEntry};
 use vellum_collab::tree::{self, CONTENT_FIELD};
 use vellum_collab::{
-    Access, CollabConfig, Connection, DocTree, Element, Hub, JoinRequest, MarkdownCodec, Node,
-    Outbound, RoomKey, TextRun,
+    Access, CollabConfig, Connection, DocTree, Element, Hub, JoinRequest,
+    MarkdownCodec, Node, Outbound, RoomKey, TextRun,
 };
 use vellum_kernel::{DocId, Error, ErrorKind, Result, SpaceId, UserId};
 use yrs::sync::{Message, SyncMessage};
-use yrs::types::xml::{XmlElementPrelim, XmlFragment as _, XmlOut, XmlTextPrelim};
+use yrs::types::xml::{
+    XmlElementPrelim, XmlFragment as _, XmlOut, XmlTextPrelim,
+};
 use yrs::updates::decoder::Decode as _;
 use yrs::{Any, Doc, ReadTxn as _, Text as _, Transact as _, Update};
 
@@ -65,7 +67,8 @@ impl MarkdownCodec for TestCodec {
         {
             for line in head.lines() {
                 if let Some((key, value)) = line.split_once(": ") {
-                    let _previous = meta.insert(key.to_owned(), Any::from(value.to_owned()));
+                    let _previous = meta
+                        .insert(key.to_owned(), Any::from(value.to_owned()));
                 }
             }
             body = tail;
@@ -84,7 +87,9 @@ fn block_markdown(node: &Node) -> Result<String> {
         "paragraph" => Ok(inline),
         "heading" => {
             let level = match element.attrs.get("level") {
-                Some(Any::Number(n)) => usize::try_from(n.as_i64().unwrap_or(1)).unwrap_or(1),
+                Some(Any::Number(n)) => {
+                    usize::try_from(n.as_i64().unwrap_or(1)).unwrap_or(1)
+                }
                 _ => 1,
             };
             Ok(format!("{} {inline}", "#".repeat(level.clamp(1, 6))))
@@ -118,7 +123,8 @@ fn inline_markdown(children: &[Node]) -> String {
 fn parse_block(block: &str) -> Node {
     let hashes = block.chars().take_while(|c| *c == '#').count();
     if (1..=6).contains(&hashes)
-        && let Some(text) = block.get(hashes..).and_then(|rest| rest.strip_prefix(' '))
+        && let Some(text) =
+            block.get(hashes..).and_then(|rest| rest.strip_prefix(' '))
     {
         return Node::Element(
             Element::new("heading", vec![Node::Text(parse_inline(text))])
@@ -164,7 +170,8 @@ pub struct Fixture {
 pub fn fixture(config: CollabConfig) -> Fixture {
     let store = Arc::new(MemoryUpdateStore::new());
     let files = Arc::new(MemoryFiles::new());
-    let hub = Hub::new(store.clone(), files.clone(), Arc::new(TestCodec), config);
+    let hub =
+        Hub::new(store.clone(), files.clone(), Arc::new(TestCodec), config);
     Fixture { hub, store, files }
 }
 
@@ -195,7 +202,8 @@ pub const WAIT: Duration = Duration::from_secs(5);
 
 impl Editor {
     pub async fn join(hub: &Hub, room: RoomKey, access: Access) -> Self {
-        Self::join_with(hub, room, access, UserId::generate(), tree::new_doc()).await
+        Self::join_with(hub, room, access, UserId::generate(), tree::new_doc())
+            .await
     }
 
     pub async fn join_with(
@@ -238,13 +246,18 @@ impl Editor {
     }
 
     /// Applies whatever the room sent, waiting up to `WAIT` for `until`.
-    pub async fn pump_until(&mut self, mut until: impl FnMut(&Self) -> bool) -> bool {
+    pub async fn pump_until(
+        &mut self,
+        mut until: impl FnMut(&Self) -> bool,
+    ) -> bool {
         let deadline = tokio::time::Instant::now() + WAIT;
         loop {
             if until(self) {
                 return true;
             }
-            let Ok(next) = tokio::time::timeout_at(deadline, self.connection.recv()).await else {
+            let Ok(next) =
+                tokio::time::timeout_at(deadline, self.connection.recv()).await
+            else {
                 return until(self);
             };
             match next {
@@ -260,8 +273,11 @@ impl Editor {
 
     /// Applies frames that are already queued, without waiting.
     pub async fn pump(&mut self) {
-        while let Ok(Some(next)) =
-            tokio::time::timeout(Duration::from_millis(20), self.connection.recv()).await
+        while let Ok(Some(next)) = tokio::time::timeout(
+            Duration::from_millis(20),
+            self.connection.recv(),
+        )
+        .await
         {
             match next {
                 Outbound::Frame(frame) => self.on_frame(&frame).await,
@@ -277,17 +293,27 @@ impl Editor {
         for message in protocol::decode(frame).expect("frame") {
             match message {
                 Message::Sync(SyncMessage::SyncStep1(state_vector)) => {
-                    let update = self.doc.transact().encode_state_as_update_v1(&state_vector);
+                    let update = self
+                        .doc
+                        .transact()
+                        .encode_state_as_update_v1(&state_vector);
                     self.send(&[Message::Sync(SyncMessage::SyncStep2(update))])
                         .await;
                 }
-                Message::Sync(SyncMessage::SyncStep2(update) | SyncMessage::Update(update)) => {
+                Message::Sync(
+                    SyncMessage::SyncStep2(update)
+                    | SyncMessage::Update(update),
+                ) => {
                     let update = Update::decode_v1(&update).expect("update");
-                    self.doc.transact_mut().apply_update(update).expect("apply");
+                    self.doc
+                        .transact_mut()
+                        .apply_update(update)
+                        .expect("apply");
                 }
                 Message::Custom(MSG_DONE, _) => self.dones += 1,
                 Message::Custom(MSG_PEERS, payload) => {
-                    self.peers = protocol::decode_peers(&payload).expect("peers");
+                    self.peers =
+                        protocol::decode_peers(&payload).expect("peers");
                 }
                 Message::Awareness(update) => self.awareness.push(update),
                 _ => {}
@@ -317,11 +343,13 @@ impl Editor {
 pub fn type_into(doc: &Doc, index: u32, text: &str) {
     let content = doc.get_or_insert_xml_fragment(CONTENT_FIELD);
     let mut txn = doc.transact_mut();
-    let block = if let Some(XmlOut::Element(element)) = content.get(&txn, index) {
+    let block = if let Some(XmlOut::Element(element)) = content.get(&txn, index)
+    {
         element
     } else {
         let at = content.len(&txn);
-        let element = content.insert(&mut txn, at, XmlElementPrelim::empty("paragraph"));
+        let element =
+            content.insert(&mut txn, at, XmlElementPrelim::empty("paragraph"));
         let _text = element.insert(&mut txn, 0, XmlTextPrelim::new(""));
         element
     };
@@ -337,7 +365,8 @@ pub fn add_paragraph(doc: &Doc, text: &str) {
     let content = doc.get_or_insert_xml_fragment(CONTENT_FIELD);
     let mut txn = doc.transact_mut();
     let at = content.len(&txn);
-    let element = content.insert(&mut txn, at, XmlElementPrelim::empty("paragraph"));
+    let element =
+        content.insert(&mut txn, at, XmlElementPrelim::empty("paragraph"));
     let target = element.insert(&mut txn, 0, XmlTextPrelim::new(""));
     target.insert(&mut txn, 0, text);
     drop(txn);

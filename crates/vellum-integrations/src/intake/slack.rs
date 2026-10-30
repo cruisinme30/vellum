@@ -43,14 +43,19 @@ pub fn verify(
 ) -> Result<(), InboundError> {
     let ts = timestamp.ok_or(InboundError::Unauthenticated)?.trim();
     let seconds: i64 = ts.parse().map_err(|_| InboundError::Unauthenticated)?;
-    let sent = Timestamp::from_second(seconds).map_err(|_| InboundError::Unauthenticated)?;
+    let sent = Timestamp::from_second(seconds)
+        .map_err(|_| InboundError::Unauthenticated)?;
     if now.duration_since(sent).abs() > SignedDuration::from_mins(5) {
         return Err(InboundError::Unauthenticated);
     }
     let hex = signature
         .and_then(|s| s.trim().strip_prefix("v0="))
         .ok_or(InboundError::Unauthenticated)?;
-    if mac::verify_hex(signing_secret, &[b"v0:", ts.as_bytes(), b":", body], hex) {
+    if mac::verify_hex(
+        signing_secret,
+        &[b"v0:", ts.as_bytes(), b":", body],
+        hex,
+    ) {
         Ok(())
     } else {
         Err(InboundError::Unauthenticated)
@@ -95,9 +100,12 @@ pub fn parse(body: &[u8]) -> Result<SlackRequest, InboundError> {
     }
     let field = |name: &str| fields.get(name).cloned().unwrap_or_default();
     if let Some(payload) = fields.get("payload") {
-        let json: Value = serde_json::from_str(payload).map_err(InboundError::malformed)?;
+        let json: Value =
+            serde_json::from_str(payload).map_err(InboundError::malformed)?;
         if text(&json, "/type") != "message_action" {
-            return Err(InboundError::malformed("unsupported interaction type"));
+            return Err(InboundError::malformed(
+                "unsupported interaction type",
+            ));
         }
         let domain = text(&json, "/team/domain");
         let channel = text(&json, "/channel/id");
@@ -105,7 +113,9 @@ pub fn parse(body: &[u8]) -> Result<SlackRequest, InboundError> {
         return Ok(SlackRequest::MessageAction {
             text: text(&json, "/message/text").to_owned(),
             user_id: text(&json, "/user/id").to_owned(),
-            permalink: format!("https://{domain}.slack.com/archives/{channel}/p{ts}"),
+            permalink: format!(
+                "https://{domain}.slack.com/archives/{channel}/p{ts}"
+            ),
             response_url: text(&json, "/response_url").to_owned(),
         });
     }
@@ -138,10 +148,16 @@ pub fn to_draft(
                 let _ = words.remove(0);
             }
             let team = named.unwrap_or_else(|| routing.default_team.clone());
-            let mut draft = IssueDraft::new(team, String::new(), Source::Slack { permalink: None });
+            let mut draft = IssueDraft::new(
+                team,
+                String::new(),
+                Source::Slack { permalink: None },
+            );
             let mut title = Vec::new();
             for word in words {
-                if let Some(label) = word.strip_prefix('#').filter(|l| !l.is_empty()) {
+                if let Some(label) =
+                    word.strip_prefix('#').filter(|l| !l.is_empty())
+                {
                     let _ = draft.labels.insert(label.to_owned());
                 } else if word.len() == 2
                     && word.starts_with(['p', 'P'])
@@ -195,9 +211,17 @@ mod tests {
     fn verifies_signed_requests() {
         // The example from Slack's "Verifying requests" guide.
         let secret = b"8f742231b10e8888abcd99yyyzzz85a5";
-        let body = b"token=xyzz0WbapA4vBCDEFasx0q6G&team_id=T1DC2JH3J&team_domain=testteamnow&channel_id=G8PSS9T3V&channel_name=foobar&user_id=U2CERLKJA&user_name=roadrunner&command=%2Fwebhook-collect&text=&response_url=https%3A%2F%2Fhooks.slack.com%2Fcommands%2FT1DC2JH3J%2F397700885554%2F96rGlfmibIGlgcZRskXaIFfN&trigger_id=398738663015.47445629121.803a0bc887a14d10d2c447fce8b6703c";
-        let signature = "v0=a2114d57b48eac39b9ad189dd8316235a7b4a8d21a10bd27519666489c69b503";
-        let now = Timestamp::from_second(1_531_420_618).unwrap_or(Timestamp::UNIX_EPOCH);
+        let body =
+            b"token=xyzz0WbapA4vBCDEFasx0q6G&team_id=T1DC2JH3J&team_doma\
+            in=testteamnow&channel_id=G8PSS9T3V&channel_name=foobar&user_id=U2C\
+            ERLKJA&user_name=roadrunner&command=%2Fwebhook-collect&text=&respon\
+            se_url=https%3A%2F%2Fhooks.slack.com%2Fcommands%2FT1DC2JH3J%2F39770\
+            0885554%2F96rGlfmibIGlgcZRskXaIFfN&trigger_id=398738663015.47445629\
+            121.803a0bc887a14d10d2c447fce8b6703c";
+        let signature = "v0=a2114d57b48eac39b9ad189dd8316235a7b4a8d21a10bd27519\
+            666489c69b503";
+        let now = Timestamp::from_second(1_531_420_618)
+            .unwrap_or(Timestamp::UNIX_EPOCH);
         assert_eq!(
             verify(secret, Some("1531420618"), Some(signature), body, now),
             Ok(())
@@ -212,7 +236,8 @@ mod tests {
             ),
             Err(InboundError::Unauthenticated)
         );
-        let later = Timestamp::from_second(1_531_421_000).unwrap_or(Timestamp::UNIX_EPOCH);
+        let later = Timestamp::from_second(1_531_421_000)
+            .unwrap_or(Timestamp::UNIX_EPOCH);
         assert_eq!(
             verify(secret, Some("1531420618"), Some(signature), body, later),
             Err(InboundError::Unauthenticated)
@@ -222,7 +247,9 @@ mod tests {
 
     #[test]
     fn slash_command_to_draft() -> Result<(), InboundError> {
-        let body = b"command=%2Fvellum&text=ops+Disk+full+on+db-2+p1+%23infra+%23pager&user_id=U1&response_url=https%3A%2F%2Fhooks.slack.com%2Fx";
+        let body =
+            b"command=%2Fvellum&text=ops+Disk+full+on+db-2+p1+%23infra+%\
+            23pager&user_id=U1&response_url=https%3A%2F%2Fhooks.slack.com%2Fx";
         let request = parse(body)?;
         let draft = to_draft(&request, &routing(), Some("ada".to_owned()))
             .ok_or_else(|| InboundError::malformed("no draft"))?;
@@ -247,13 +274,18 @@ mod tests {
             "team": {"domain": "northstar"},
             "channel": {"id": "C024BE91L"},
             "user": {"id": "U1"},
-            "message": {"text": "Checkout is throwing 500s\nsince the deploy", "ts": "1700000000.000100"},
+            "message": {
+                "text": "Checkout is throwing 500s\nsince the deploy",
+                "ts": "1700000000.000100"
+            },
             "response_url": "https://hooks.slack.com/app/x"
         });
         let body = format!(
             "payload={}",
-            url::form_urlencoded::byte_serialize(payload.to_string().as_bytes())
-                .collect::<String>()
+            url::form_urlencoded::byte_serialize(
+                payload.to_string().as_bytes()
+            )
+            .collect::<String>()
         );
         let request = parse(body.as_bytes())?;
         let draft = to_draft(&request, &routing(), None)
@@ -265,11 +297,14 @@ mod tests {
             draft.source,
             Source::Slack {
                 permalink: Some(
-                    "https://northstar.slack.com/archives/C024BE91L/p1700000000000100".to_owned()
+                    "https://northstar.slack.com/archives/C024BE91L/p1700000000\
+                        000100".to_owned()
                 )
             }
         );
-        assert!(parse(b"payload=%7B%22type%22%3A%22view_submission%22%7D").is_err());
+        assert!(
+            parse(b"payload=%7B%22type%22%3A%22view_submission%22%7D").is_err()
+        );
         assert!(parse(b"text=hi").is_err());
         Ok(())
     }

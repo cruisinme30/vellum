@@ -42,15 +42,15 @@ const MAX_DEPTH: i32 = 64;
 
 const LIST: &str = "SELECT node_id FROM drive_nodes WHERE kind = 'page'";
 
-const NODE: &str = "SELECT space_id, kind, path, title, modified_at, created_by, trash \
-                    FROM drive_nodes WHERE node_id = $1";
+const NODE: &str = "SELECT space_id, kind, path, title, modified_at, \
+                    created_by, trash FROM drive_nodes WHERE node_id = $1";
 
 const ANCESTORS: &str = "WITH RECURSIVE up (node_id, parent, kind, depth) AS ( \
-         SELECT node_id, tree_parent_id, kind, 0 FROM drive_nodes WHERE node_id = $1 \
-         UNION ALL \
-         SELECT n.node_id, n.tree_parent_id, n.kind, up.depth + 1 \
-         FROM drive_nodes n JOIN up ON n.node_id = up.parent WHERE up.depth < $2 \
-     ) SELECT node_id, kind FROM up WHERE depth > 0 ORDER BY depth DESC";
+         SELECT node_id, tree_parent_id, kind, 0 FROM drive_nodes WHERE \
+         node_id = $1 UNION ALL SELECT n.node_id, n.tree_parent_id, n.kind, \
+         up.depth + 1 FROM drive_nodes n JOIN up ON n.node_id = up.parent \
+         WHERE up.depth < $2 ) SELECT node_id, kind FROM up WHERE depth > 0 \
+         ORDER BY depth DESC";
 
 fn failed(op: &str, error: &sqlx::Error) -> SearchError {
     SearchError::Source(format!("{op}: {error}"))
@@ -64,8 +64,12 @@ fn unsupported() -> SearchError {
 macro_rules! fetch {
     ($index:expr, $op:literal, $method:ident, $query:expr) => {
         match $index.pool() {
-            IndexPool::Sqlite(pool) => traced("sqlite", $op, $query.$method(pool)).await,
-            IndexPool::Postgres(pool) => traced("postgresql", $op, $query.$method(pool)).await,
+            IndexPool::Sqlite(pool) => {
+                traced("sqlite", $op, $query.$method(pool)).await
+            }
+            IndexPool::Postgres(pool) => {
+                traced("postgresql", $op, $query.$method(pool)).await
+            }
             _ => return Err(unsupported()),
         }
         .map_err(|e| failed($op, &e))?
@@ -120,7 +124,8 @@ impl DriveSource {
     }
 
     async fn text(&self, path: &str) -> Result<String> {
-        let path = BlobPath::new(path).map_err(|e| SearchError::Source(e.to_string()))?;
+        let path = BlobPath::new(path)
+            .map_err(|e| SearchError::Source(e.to_string()))?;
         match self.store.get(&path).await {
             Ok(blob) => Ok(String::from_utf8_lossy(&blob.bytes).into_owned()),
             // The row is ahead of the file (a move in flight); index the
@@ -143,7 +148,8 @@ impl DocumentSource for DriveSource {
             fetch_optional,
             sqlx::query_as(NODE).bind(node)
         );
-        let Some((space, kind, path, title, modified, created_by, trash)) = row else {
+        let Some((space, kind, path, title, modified, created_by, trash)) = row
+        else {
             return Ok(None);
         };
         if kind != "page" {
@@ -242,11 +248,16 @@ impl DriveFeed {
     /// embedded engine). The task ends when the indexer stops; abort the
     /// handle to stop it sooner.
     #[must_use]
-    pub fn spawn(index: Arc<Index>, indexer: Indexer, config: FeedConfig) -> JoinHandle<()> {
+    pub fn spawn(
+        index: Arc<Index>,
+        indexer: Indexer,
+        config: FeedConfig,
+    ) -> JoinHandle<()> {
         tokio::spawn(async move {
             let log = DriveChanges::new((*index).clone());
             let mut at = None;
-            follow(&index, &log, &indexer, config, &mut at, |_| async { true }).await;
+            follow(&index, &log, &indexer, config, &mut at, |_| async { true })
+                .await;
         })
     }
 
@@ -266,24 +277,30 @@ impl DriveFeed {
         let leases = Leases::new((*index).clone());
         let me = holder.to_owned();
         singleton(leases, SHARED_FEED, holder, SHARED_TTL, move || {
-            let (index, indexer, me) = (Arc::clone(&index), indexer.clone(), me.clone());
+            let (index, indexer, me) =
+                (Arc::clone(&index), indexer.clone(), me.clone());
             async move {
                 let cursors = Cursors::new((*index).clone());
                 let log = DriveChanges::new((*index).clone());
                 let mut at = match cursors.get(SHARED_FEED).await {
                     Ok(saved) => saved.map(Position::from_pair),
                     Err(error) => {
-                        tracing::warn!(%error, "search feed could not read its position");
+                        tracing::warn!(%error, "search feed could not read its \
+                            position");
                         return;
                     }
                 };
                 let save = |pos: Position| {
                     let (cursors, me) = (cursors.clone(), me.clone());
                     async move {
-                        match cursors.set(SHARED_FEED, pos.pair(), SHARED_FEED, &me).await {
+                        match cursors
+                            .set(SHARED_FEED, pos.pair(), SHARED_FEED, &me)
+                            .await
+                        {
                             Ok(saved) => saved,
                             Err(error) => {
-                                tracing::warn!(%error, "search feed could not save its position");
+                                tracing::warn!(%error, "search feed could not \
+                                    save its position");
                                 true
                             }
                         }
@@ -315,13 +332,15 @@ async fn follow<S, F>(
         let _ = tick.tick().await;
         // Drain the backlog, then wait for the next tick.
         loop {
-            let (touched, next, more) = match pass(index, log, config, *at).await {
-                Ok(step) => step,
-                Err(error) => {
-                    tracing::warn!(%error, "search feed could not read the drive");
-                    break;
-                }
-            };
+            let (touched, next, more) =
+                match pass(index, log, config, *at).await {
+                    Ok(step) => step,
+                    Err(error) => {
+                        tracing::warn!(%error, "search feed could not read the \
+                        drive");
+                        break;
+                    }
+                };
             for doc in &touched {
                 if indexer.touch(*doc).await.is_err() {
                     return;
@@ -364,7 +383,9 @@ async fn pass(
     };
     let batch = log.read(at, PAGE).await.map_err(|e| source_error(&e))?;
     if batch.reset {
-        tracing::warn!("search feed fell behind the pruned change log; queueing every page");
+        tracing::warn!(
+            "search feed fell behind the pruned change log; queueing every page"
+        );
         return Ok((all_pages(index).await?, batch.next, false));
     }
     let more = batch.pages.len() >= PAGE;
@@ -379,7 +400,8 @@ async fn pass(
 }
 
 async fn all_pages(index: &Index) -> Result<Vec<DocId>> {
-    let rows: Vec<(Uuid,)> = fetch!(index, "search.feed.list", fetch_all, sqlx::query_as(LIST));
+    let rows: Vec<(Uuid,)> =
+        fetch!(index, "search.feed.list", fetch_all, sqlx::query_as(LIST));
     Ok(rows
         .into_iter()
         .map(|(id,)| DocId::from_u128(id.as_u128()))
@@ -415,11 +437,15 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path().join("files");
         let index = Arc::new(
-            Index::open(&IndexConfig::sqlite(dir.path().join("index.db"), None))
-                .await
-                .unwrap(),
+            Index::open(&IndexConfig::sqlite(
+                dir.path().join("index.db"),
+                None,
+            ))
+            .await
+            .unwrap(),
         );
-        let store: Arc<dyn BlobStore> = Arc::new(LocalStore::open(&root).await.unwrap());
+        let store: Arc<dyn BlobStore> =
+            Arc::new(LocalStore::open(&root).await.unwrap());
         let source = DriveSource::new(Arc::clone(&index), store);
         Fixture {
             _dir: dir,
@@ -436,11 +462,17 @@ mod tests {
         pool
     }
 
-    async fn node(index: &Index, id: u128, kind: &str, parent: Option<u128>, path: &str) {
+    async fn node(
+        index: &Index,
+        id: u128,
+        kind: &str,
+        parent: Option<u128>,
+        path: &str,
+    ) {
         let _ = sqlx::query(
-            "INSERT INTO drive_nodes (space_id, node_id, kind, parent_id, tree_parent_id, \
-             path, title, byte_size, modified_at, created_by, trash) \
-             VALUES ($1, $2, $3, $4, $4, $5, $6, 0, 1000, $7, NULL)",
+            "INSERT INTO drive_nodes (space_id, node_id, kind, parent_id, \
+             tree_parent_id, path, title, byte_size, modified_at, created_by, \
+             trash) VALUES ($1, $2, $3, $4, $4, $5, $6, 0, 1000, $7, NULL)",
         )
         .bind(uuid(SPACE))
         .bind(uuid(id))
@@ -495,10 +527,14 @@ mod tests {
             ]
         );
         assert!(!doc.trashed);
-        let texts: Vec<_> = doc.blocks.iter().map(|b| b.text.as_str()).collect();
+        let texts: Vec<_> =
+            doc.blocks.iter().map(|b| b.text.as_str()).collect();
         assert_eq!(texts, vec!["Launch", "Ship on Friday."]);
 
-        assert_eq!(f.source.list().await.unwrap(), vec![DocId::from_u128(PAGE)]);
+        assert_eq!(
+            f.source.list().await.unwrap(),
+            vec![DocId::from_u128(PAGE)]
+        );
     }
 
     #[tokio::test]
@@ -508,7 +544,10 @@ mod tests {
         node(&f.index, BOOK, "book", Some(FOLDER), "eng/guide").await;
         node(&f.index, CHAPTER, "page", Some(BOOK), "eng/guide/one.md").await;
 
-        assert_eq!(f.source.load(DocId::from_u128(FOLDER)).await.unwrap(), None);
+        assert_eq!(
+            f.source.load(DocId::from_u128(FOLDER)).await.unwrap(),
+            None
+        );
         assert_eq!(f.source.load(DocId::from_u128(0x99)).await.unwrap(), None);
 
         // No file yet: the title is still searchable.

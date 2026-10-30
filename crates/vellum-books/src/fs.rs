@@ -115,9 +115,13 @@ fn record(op: &'static str, started: Instant, files: usize) {
 ///
 /// Returns an error when `book.yaml` or `SUMMARY.md` is missing or
 /// malformed, a chapter path is unsafe, or a file cannot be read.
-pub fn load_dir(dir: &Path, ids: &mut dyn IdSource) -> Result<(Book, Vec<Repair>)> {
+pub fn load_dir(
+    dir: &Path,
+    ids: &mut dyn IdSource,
+) -> Result<(Book, Vec<Repair>)> {
     let started = Instant::now();
-    let _span = tracing::info_span!("books.load", books.dir = %dir.display()).entered();
+    let _span =
+        tracing::info_span!("books.load", books.dir = %dir.display()).entered();
     let manifest = read_required(&safe_join(dir, manifest::FILE_NAME)?)?;
     let summary = read_required(&safe_join(dir, summary::FILE_NAME)?)?;
     let mut failure: Option<BookError> = None;
@@ -135,7 +139,10 @@ pub fn load_dir(dir: &Path, ids: &mut dyn IdSource) -> Result<(Book, Vec<Repair>
         return Err(error);
     }
     if !loaded.1.is_empty() {
-        tracing::info!(books.repairs = loaded.1.len(), "repaired outside edits");
+        tracing::info!(
+            books.repairs = loaded.1.len(),
+            "repaired outside edits"
+        );
     }
     record("load", started, loaded.0.files().len());
     Ok(loaded)
@@ -165,15 +172,20 @@ pub struct SaveReport {
 /// Returns an error when a path is unsafe or a file cannot be written.
 pub fn save_dir(book: &mut Book, dir: &Path) -> Result<SaveReport> {
     let started = Instant::now();
-    let _span = tracing::info_span!("books.save", books.dir = %dir.display(), book.id = %book.id())
-        .entered();
+    let _span = tracing::info_span!(
+        "books.save",
+        books.dir = %dir.display(),
+        book.id = %book.id()
+    )
+    .entered();
     let mut report = SaveReport::default();
-    let write = |relative: &str, text: &str, report: &mut SaveReport| -> Result<()> {
-        if write_atomic(&safe_join(dir, relative)?, text)? {
-            report.written.push(relative.to_owned());
-        }
-        Ok(())
-    };
+    let write =
+        |relative: &str, text: &str, report: &mut SaveReport| -> Result<()> {
+            if write_atomic(&safe_join(dir, relative)?, text)? {
+                report.written.push(relative.to_owned());
+            }
+            Ok(())
+        };
     for (path, text) in book.files() {
         write(path.as_str(), text, &mut report)?;
     }
@@ -224,7 +236,9 @@ fn remove_empty_parents(root: &Path, file: &Path) {
 /// Returns [`BookError::Tag`] when the tag exists, or an I/O error.
 pub fn write_snapshot(dir: &Path, snapshot: &Snapshot) -> Result<()> {
     let started = Instant::now();
-    let _span = tracing::info_span!("books.snapshot.write", books.tag = %snapshot.tag).entered();
+    let _span =
+        tracing::info_span!("books.snapshot.write", books.tag = %snapshot.tag)
+            .entered();
     let path = safe_join(dir, &snapshot::file_name(&snapshot.tag)?)?;
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| io_error(parent, e))?;
@@ -244,7 +258,8 @@ pub fn write_snapshot(dir: &Path, snapshot: &Snapshot) -> Result<()> {
         }
         Err(e) => return Err(io_error(&path, e)),
     };
-    io::Write::write_all(&mut file, json.as_bytes()).map_err(|e| io_error(&path, e))?;
+    io::Write::write_all(&mut file, json.as_bytes())
+        .map_err(|e| io_error(&path, e))?;
     file.sync_all().map_err(|e| io_error(&path, e))?;
     record("snapshot.write", started, 1);
     Ok(())
@@ -258,7 +273,8 @@ pub fn write_snapshot(dir: &Path, snapshot: &Snapshot) -> Result<()> {
 /// not a valid snapshot.
 pub fn read_snapshot(dir: &Path, tag: &str) -> Result<Snapshot> {
     let started = Instant::now();
-    let _span = tracing::info_span!("books.snapshot.read", books.tag = %tag).entered();
+    let _span =
+        tracing::info_span!("books.snapshot.read", books.tag = %tag).entered();
     let text = read_required(&safe_join(dir, &snapshot::file_name(tag)?)?)?;
     let snapshot = Snapshot::from_json(&text)?;
     record("snapshot.read", started, 1);
@@ -274,7 +290,9 @@ pub fn list_tags(dir: &Path) -> Result<BTreeSet<String>> {
     let path = safe_join(dir, snapshot::DIR)?;
     let entries = match std::fs::read_dir(&path) {
         Ok(entries) => entries,
-        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(BTreeSet::new()),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {
+            return Ok(BTreeSet::new());
+        }
         Err(e) => return Err(io_error(&path, e)),
     };
     let mut tags = BTreeSet::new();
@@ -297,7 +315,9 @@ pub fn list_tags(dir: &Path) -> Result<BTreeSet<String>> {
 /// Returns an error when a path is unsafe or a file cannot be written.
 pub fn write_site(out: &Path, site: &Site) -> Result<()> {
     let started = Instant::now();
-    let _span = tracing::info_span!("books.site.write", books.out = %out.display()).entered();
+    let _span =
+        tracing::info_span!("books.site.write", books.out = %out.display())
+            .entered();
     for (relative, text) in &site.files {
         let _ = write_atomic(&safe_join(out, relative)?, text)?;
     }
@@ -347,7 +367,8 @@ mod tests {
                 .contains(&"architecture/services.md".to_owned())
         );
         assert!(dir.join("book.toml").exists());
-        let (loaded, repairs) = load_dir(&dir, &mut SequentialIds::default()).unwrap();
+        let (loaded, repairs) =
+            load_dir(&dir, &mut SequentialIds::default()).unwrap();
         assert!(repairs.is_empty(), "{repairs:?}");
         assert_eq!(loaded, book);
 

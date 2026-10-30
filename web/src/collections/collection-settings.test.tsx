@@ -28,7 +28,9 @@ async function openIssues(path = ISSUES) {
 
 describe("view settings", () => {
   it("shows stored keys as property names", () => {
-    const properties = [{ key: "est", name: "Estimate", type: "number", computed: false }] as const;
+    const properties = [
+      { key: "est", name: "Estimate", type: "number", computed: false },
+    ] as const;
     expect(withNames("est > 1", properties)).toBe("Estimate > 1");
     expect(withNames("est", properties)).toBe("Estimate");
     expect(withNames("estimate desc", properties)).toBe("estimate desc");
@@ -42,7 +44,10 @@ describe("view settings", () => {
     expect(document.activeElement).toBe(within(panel).getByLabelText("Name"));
     await user.type(within(panel).getByLabelText("Name"), "Done work");
     await user.selectOptions(within(panel).getByLabelText("Layout"), "list");
-    await user.type(within(panel).getByLabelText("Filters, one per line"), "Status is Done");
+    await user.type(
+      within(panel).getByLabelText("Filters, one per line"),
+      "Status is Done",
+    );
     await user.click(within(panel).getByRole("checkbox", { name: "Link" }));
     await user.click(within(panel).getByRole("button", { name: "Save" }));
     expect(save).toHaveBeenCalledWith(
@@ -62,18 +67,27 @@ describe("view settings", () => {
   });
 
   it("edits the open view, says why a save fails, and deletes it", async () => {
-    const { user, location, collections } = await openIssues(`${ISSUES}?view=Open`);
+    const { user, location, collections } = await openIssues(
+      `${ISSUES}?view=Open`,
+    );
     await user.click(screen.getByRole("button", { name: "Edit view" }));
     const panel = screen.getByRole("dialog", { name: "Edit “Open”" });
-    expect(within(panel).getByLabelText<HTMLTextAreaElement>("Filters, one per line").value).toBe(
-      "Status is not Done",
+    expect(
+      within(panel).getByLabelText<HTMLTextAreaElement>("Filters, one per line")
+        .value,
+    ).toBe("Status is not Done");
+    vi.spyOn(collections, "saveView").mockRejectedValueOnce(
+      new Error("no property Nope"),
     );
-    vi.spyOn(collections, "saveView").mockRejectedValueOnce(new Error("no property Nope"));
     await user.click(within(panel).getByRole("button", { name: "Save" }));
     const found = await within(panel).findByRole("alert");
     expect(found.textContent).toBe("no property Nope");
-    await user.click(within(panel).getByRole("button", { name: "Delete view" }));
-    await user.click(within(panel).getByRole("button", { name: /Press again to confirm/ }));
+    await user.click(
+      within(panel).getByRole("button", { name: "Delete view" }),
+    );
+    await user.click(
+      within(panel).getByRole("button", { name: /Press again to confirm/ }),
+    );
     await waitFor(() => {
       expect(screen.queryByRole("tab", { name: "Open" })).toBeNull();
     });
@@ -102,7 +116,10 @@ describe("property settings", () => {
     const add = within(panel).getByRole("form", { name: "Add property" });
     await user.type(within(add).getByLabelText("Name"), "Priority");
     await user.selectOptions(within(add).getByLabelText("Type"), "select");
-    await user.type(within(add).getByLabelText("Options, separated by commas"), "P0, P1, P0");
+    await user.type(
+      within(add).getByLabelText("Options, separated by commas"),
+      "P0, P1, P0",
+    );
     await user.click(within(add).getByRole("button", { name: "Add property" }));
     const field = await within(panel).findByDisplayValue("Priority");
     const found = await collections.info(COLLECTION.issues);
@@ -115,18 +132,26 @@ describe("property settings", () => {
     await user.type(field, "Urgency{Enter}");
     expect(await within(panel).findByDisplayValue("Urgency")).toBeDefined();
 
-    await user.click(within(panel).getByRole("button", { name: "Delete Link" }));
-    await user.click(within(panel).getByRole("button", { name: /Delete Link\? Press again/ }));
+    await user.click(
+      within(panel).getByRole("button", { name: "Delete Link" }),
+    );
+    await user.click(
+      within(panel).getByRole("button", { name: /Delete Link\? Press again/ }),
+    );
     await waitFor(() => {
       expect(within(panel).queryByDisplayValue("Link")).toBeNull();
     });
-    expect(within(panel).queryByRole("button", { name: "Delete Issue" })).toBeNull();
+    expect(
+      within(panel).queryByRole("button", { name: "Delete Issue" }),
+    ).toBeNull();
   });
 
   it("shows the server's reason when a change is refused", async () => {
     const { user, collections } = await openIssues();
     vi.spyOn(collections, "updateProperty").mockRejectedValueOnce(
-      new Error('cannot rename "Estimate": Points left uses it; change it first'),
+      new Error(
+        'cannot rename "Estimate": Points left uses it; change it first',
+      ),
     );
     await user.click(screen.getByRole("button", { name: "Properties" }));
     const panel = screen.getByRole("dialog", { name: "Properties" });
@@ -143,10 +168,17 @@ describe("types, relations and rollups", () => {
     await user.click(screen.getByRole("button", { name: "Properties" }));
     const panel = screen.getByRole("dialog", { name: "Properties" });
     const link = within(panel).getByRole("form", { name: "Link" });
-    expect(within(link).getByLabelText<HTMLSelectElement>("Type").value).toBe("url");
+    expect(within(link).getByLabelText<HTMLSelectElement>("Type").value).toBe(
+      "url",
+    );
     await user.selectOptions(within(link).getByLabelText("Type"), "select");
-    expect(within(link).getByText(/keeps every value in the files/)).toBeDefined();
-    await user.type(within(link).getByLabelText("Options, separated by commas"), "Docs, Spec");
+    expect(
+      within(link).getByText(/keeps every value in the files/),
+    ).toBeDefined();
+    await user.type(
+      within(link).getByLabelText("Options, separated by commas"),
+      "Docs, Spec",
+    );
     const update = vi.spyOn(collections, "updateProperty");
     await user.click(within(link).getByRole("button", { name: "Save" }));
     expect(update).toHaveBeenCalledWith({
@@ -171,7 +203,10 @@ describe("types, relations and rollups", () => {
     const target = within(add).getByLabelText("Links to");
     await within(target).findByRole("option", { name: "Releases" });
     await user.selectOptions(target, "Releases");
-    await user.type(within(add).getByLabelText("Name in the linked collection"), "Shipped work");
+    await user.type(
+      within(add).getByLabelText("Name in the linked collection"),
+      "Shipped work",
+    );
     await user.click(within(add).getByRole("button", { name: "Add property" }));
     expect(await within(panel).findByDisplayValue("Shipped in")).toBeDefined();
     const releases = await collections.info(COLLECTION.releases);
@@ -179,7 +214,10 @@ describe("types, relations and rollups", () => {
 
     await user.type(within(add).getByLabelText("Name"), "Ship dates");
     await user.selectOptions(within(add).getByLabelText("Type"), "rollup");
-    await user.selectOptions(within(add).getByLabelText("Relation"), "Shipped in");
+    await user.selectOptions(
+      within(add).getByLabelText("Relation"),
+      "Shipped in",
+    );
     const property = within(add).getByLabelText("Property of the linked rows");
     await within(property).findByRole("option", { name: "Ships" });
     await user.selectOptions(property, "Ships");
@@ -187,18 +225,32 @@ describe("types, relations and rollups", () => {
     await user.click(within(add).getByRole("button", { name: "Add property" }));
     expect(await within(panel).findByDisplayValue("Ship dates")).toBeDefined();
     const issues = await collections.info(COLLECTION.issues);
-    expect(issues.properties.at(-1)?.rollup).toMatchObject({ prop: "ships", agg: "max" });
+    expect(issues.properties.at(-1)?.rollup).toMatchObject({
+      prop: "ships",
+      agg: "max",
+    });
 
     const row = within(panel).getByRole("form", { name: "Release" });
-    await user.click(within(row).getByRole("button", { name: "Delete Release" }));
-    expect(within(row).getByRole("button", { name: /from both collections/ })).toBeDefined();
+    await user.click(
+      within(row).getByRole("button", { name: "Delete Release" }),
+    );
+    expect(
+      within(row).getByRole("button", { name: /from both collections/ }),
+    ).toBeDefined();
   });
 
   it("says a rollup needs a relation first", async () => {
     const collections = createMockCollectionsStore();
-    const { user } = renderApp(`/data/${COLLECTION.releases}`, undefined, collections);
+    const { user } = renderApp(
+      `/data/${COLLECTION.releases}`,
+      undefined,
+      collections,
+    );
     await screen.findByRole("heading", { level: 1, name: "Releases" });
-    await collections.deleteProperty({ collection_id: COLLECTION.releases, key: "issues" });
+    await collections.deleteProperty({
+      collection_id: COLLECTION.releases,
+      key: "issues",
+    });
     await user.click(screen.getByRole("button", { name: "Properties" }));
     const add = screen.getByRole("form", { name: "Add property" });
     await user.selectOptions(within(add).getByLabelText("Type"), "rollup");
@@ -236,13 +288,19 @@ describe("rows and CSV", () => {
     if (!first) throw new Error("no rows");
     await user.click(first);
     const panel = await screen.findByRole("dialog");
-    await user.click(await within(panel).findByRole("button", { name: "Delete row" }));
-    await user.click(within(panel).getByRole("button", { name: /Press again to confirm/ }));
+    await user.click(
+      await within(panel).findByRole("button", { name: "Delete row" }),
+    );
+    await user.click(
+      within(panel).getByRole("button", { name: /Press again to confirm/ }),
+    );
     await waitFor(() => {
       expect(screen.queryByRole("dialog")).toBeNull();
     });
     await waitFor(() => {
-      expect(within(screen.getByRole("grid")).getAllByRole("row")).toHaveLength(before - 1);
+      expect(within(screen.getByRole("grid")).getAllByRole("row")).toHaveLength(
+        before - 1,
+      );
     });
   });
 
@@ -252,12 +310,15 @@ describe("rows and CSV", () => {
     const panel = screen.getByRole("dialog", { name: "Import into Issues" });
     const check = within(panel).getByRole("button", { name: "Check" });
     expect(check).toHaveProperty("disabled", true);
-    const file = new File(["Issue,Mood\nFrom a file,calm\n"], "rows.csv", { type: "text/csv" });
+    const file = new File(["Issue,Mood\nFrom a file,calm\n"], "rows.csv", {
+      type: "text/csv",
+    });
     await user.upload(within(panel).getByLabelText("CSV file"), file);
     await waitFor(() => {
-      expect(within(panel).getByLabelText<HTMLTextAreaElement>("Or paste CSV text").value).toMatch(
-        /From a file/,
-      );
+      expect(
+        within(panel).getByLabelText<HTMLTextAreaElement>("Or paste CSV text")
+          .value,
+      ).toMatch(/From a file/);
     });
     await user.click(check);
     const found = await within(panel).findByText("One row would be added.");
@@ -265,14 +326,18 @@ describe("rows and CSV", () => {
     expect(within(panel).getByText("Ignored columns: Mood")).toBeDefined();
     await user.click(within(panel).getByRole("button", { name: "Import" }));
     expect(await within(panel).findByText("Added one row.")).toBeDefined();
-    expect(await within(screen.getByRole("grid")).findByText("From a file")).toBeDefined();
+    expect(
+      await within(screen.getByRole("grid")).findByText("From a file"),
+    ).toBeDefined();
   });
 
   it("exports the open view as a CSV download", async () => {
     const created = vi.fn(() => "blob:issues");
     const revoked = vi.fn();
     Object.assign(URL, { createObjectURL: created, revokeObjectURL: revoked });
-    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockReturnValue();
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockReturnValue();
     const { user } = await openIssues(`${ISSUES}?view=Open`);
     await user.click(screen.getByRole("button", { name: "Export CSV" }));
     await waitFor(() => {
@@ -294,12 +359,14 @@ describe("new collections", () => {
     await screen.findByRole("link", { name: /^Issues/ });
     await user.click(screen.getByRole("button", { name: "New collection" }));
     const panel = screen.getByRole("dialog", { name: "New collection" });
-    expect(within(panel).getByLabelText<HTMLInputElement>("Drive folder").value).toBe(
-      "engineering",
-    );
+    expect(
+      within(panel).getByLabelText<HTMLInputElement>("Drive folder").value,
+    ).toBe("engineering");
     await user.type(within(panel).getByLabelText("Title"), "Hosts");
     await user.click(within(panel).getByRole("button", { name: "Create" }));
-    expect(await screen.findByRole("heading", { level: 1, name: "Hosts" })).toBeDefined();
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Hosts" }),
+    ).toBeDefined();
     expect(location()).toMatch(/^\/data\/\w+$/);
   });
 
@@ -327,7 +394,9 @@ describe("collection blocks in the editor", () => {
     );
     const figure = await screen.findByRole("figure");
     expect(figure.textContent).toMatch(/^Issues, Open: \d+ rows/);
-    expect(within(figure).getAllByRole("columnheader")[0]?.textContent).toBe("Issue");
+    expect(within(figure).getAllByRole("columnheader")[0]?.textContent).toBe(
+      "Issue",
+    );
     rerender(
       <I18nProvider>
         <CollectionsProvider store={store}>
@@ -352,6 +421,8 @@ describe("collection blocks in the editor", () => {
         <EmbedPreviewForTest fence="id: x" />
       </I18nProvider>,
     );
-    expect(screen.getByText(/drawn when Vellum runs with a server/)).toBeDefined();
+    expect(
+      screen.getByText(/drawn when Vellum runs with a server/),
+    ).toBeDefined();
   });
 });

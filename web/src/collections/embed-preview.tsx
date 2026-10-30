@@ -61,7 +61,10 @@ export function CollectionEmbedPreview({ fence }: { readonly fence: string }) {
     };
   }, [store, fence, version]);
 
-  if (!store) return <p className="vl-muted">{t("fence-rendered", { lang: "collection" })}</p>;
+  if (!store)
+    return (
+      <p className="vl-muted">{t("fence-rendered", { lang: "collection" })}</p>
+    );
   if (!hasId(fence)) {
     return <p className="vl-muted">{t("fence-collection-needs-id")}</p>;
   }
@@ -80,7 +83,11 @@ export function CollectionEmbedPreview({ fence }: { readonly fence: string }) {
   return (
     <figure className="vl-embed-preview">
       <figcaption>
-        {t("fence-collection-caption", { title, view: result.view, total: result.total })}
+        {t("fence-collection-caption", {
+          title,
+          view: result.view,
+          total: result.total,
+        })}
       </figcaption>
       <table className="vl-table">
         <thead>
@@ -96,7 +103,9 @@ export function CollectionEmbedPreview({ fence }: { readonly fence: string }) {
           {rows.slice(0, PREVIEW_ROWS).map((row) => (
             <tr key={row.id}>
               {row.cells.map((cell, index) => (
-                <td key={result.columns[index]?.key ?? index}>{cell.display}</td>
+                <td key={result.columns[index]?.key ?? index}>
+                  {cell.display}
+                </td>
               ))}
             </tr>
           ))}

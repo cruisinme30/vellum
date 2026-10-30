@@ -29,7 +29,11 @@ import {
 
 type Path = readonly number[];
 
-function replaceAt(group: Group, path: Path, next: FilterNode | undefined): Group {
+function replaceAt(
+  group: Group,
+  path: Path,
+  next: FilterNode | undefined,
+): Group {
   const [head, ...rest] = path;
   if (head === undefined) return group;
   const children = [...group.children];
@@ -100,7 +104,10 @@ function ConditionRow({
             value={text}
             onChange={(event) => {
               setText(event.target.value);
-              onChange({ ...condition, values: splitValues(event.target.value) });
+              onChange({
+                ...condition,
+                values: splitValues(event.target.value),
+              });
             }}
           />
           {suggestions.length > 0 && (
@@ -137,13 +144,20 @@ function GroupEditor({
     onChange(path, { ...group, children: [...group.children, node] });
   };
   return (
-    <fieldset className={nested ? "vl-filter-group vl-filter-nested" : "vl-filter-group"}>
+    <fieldset
+      className={
+        nested ? "vl-filter-group vl-filter-nested" : "vl-filter-group"
+      }
+    >
       <legend>
         <select
           aria-label={t("work-filter-join")}
           value={group.join}
           onChange={(event) => {
-            onChange(path, { ...group, join: event.target.value === "or" ? "or" : "and" });
+            onChange(path, {
+              ...group,
+              join: event.target.value === "or" ? "or" : "and",
+            });
           }}
         >
           <option value="and">{t("work-filter-all")}</option>
@@ -167,7 +181,13 @@ function GroupEditor({
             />
           ) : (
             <li key={child.key}>
-              <GroupEditor group={child} path={at} statuses={statuses} nested onChange={onChange} />
+              <GroupEditor
+                group={child}
+                path={at}
+                statuses={statuses}
+                nested
+                onChange={onChange}
+              />
               <button
                 type="button"
                 className="vl-text-button"
@@ -196,7 +216,9 @@ function GroupEditor({
             type="button"
             className="vl-text-button"
             onClick={() => {
-              add(newGroup(group.join === "and" ? "or" : "and", [newCondition()]));
+              add(
+                newGroup(group.join === "and" ? "or" : "and", [newCondition()]),
+              );
             }}
           >
             {t("work-filter-add-group")}

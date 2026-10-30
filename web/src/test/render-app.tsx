@@ -13,7 +13,10 @@ import { createMockCollectionsStore } from "../collections/mock";
 import type { CollectionsStore } from "../collections/store";
 import { createNorthstarStore } from "../data/mock/northstar";
 import type { WorkspaceStore } from "../data/store";
-import { createLocalConnector, type ChannelFactory } from "../editor/collab/local-connector";
+import {
+  createLocalConnector,
+  type ChannelFactory,
+} from "../editor/collab/local-connector";
 
 const noop = () => {
   // A stub method.
@@ -61,7 +64,12 @@ export function renderWithProviders(
   const collab = createTestCollab();
   const user = userEvent.setup();
   const result = render(
-    <AppProviders store={store} collab={collab} collections={collections} session={session}>
+    <AppProviders
+      store={store}
+      collab={collab}
+      collections={collections}
+      session={session}
+    >
       <MemoryRouter initialEntries={[path]}>
         {element}
         <LocationProbe />
@@ -77,7 +85,9 @@ export function renderWithProviders(
   };
 }
 
-/** Renders every route of the app at a path, by default on the Northstar demo. */
+/**
+ * Renders every route of the app at a path, by default on the Northstar demo.
+ */
 export function renderApp(
   path = "/",
   store?: WorkspaceStore,

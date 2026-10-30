@@ -99,7 +99,11 @@ impl RateLimiter {
     /// # Errors
     ///
     /// Returns how long to wait before the next call is allowed.
-    pub fn check_at(&self, token_id: &str, now: Instant) -> Result<(), Duration> {
+    pub fn check_at(
+        &self,
+        token_id: &str,
+        now: Instant,
+    ) -> Result<(), Duration> {
         // The quota is always valid (both parts are clamped above zero);
         // if it were not, fail closed.
         self.local
@@ -164,8 +168,10 @@ mod tests {
             per_minute: 600,
         };
         // Two replicas, each with its own burst allowance, one table.
-        let a = RateLimiter::new(limit).with_shared(Arc::clone(&table) as Arc<dyn SharedLimit>);
-        let b = RateLimiter::new(limit).with_shared(Arc::clone(&table) as Arc<dyn SharedLimit>);
+        let a = RateLimiter::new(limit)
+            .with_shared(Arc::clone(&table) as Arc<dyn SharedLimit>);
+        let b = RateLimiter::new(limit)
+            .with_shared(Arc::clone(&table) as Arc<dyn SharedLimit>);
         let t0 = Instant::now();
         assert!(a.check_at("tok", t0).is_ok());
         assert!(b.check_at("tok", t0).is_ok());

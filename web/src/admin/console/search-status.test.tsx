@@ -36,28 +36,36 @@ afterEach(() => {
 });
 
 describe("search status", () => {
-  it("names the model and shows the backfill's progress, checking again while it runs", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    const load = vi
-      .fn<() => Promise<SearchStatusView>>()
-      .mockResolvedValueOnce(HYBRID)
-      .mockResolvedValue({ ...HYBRID, loaded: true, job: "done", done: 512 });
-    show(load);
-    expect(await screen.findByText(/all-MiniLM-L6-v2/)).toBeDefined();
-    expect(screen.getByText(/ranked by meaning and words/)).toBeDefined();
-    expect(screen.getByText(/dropped after .?15.? minutes unused/)).toBeDefined();
-    const bar = screen.getByRole("progressbar", { name: "Indexing progress" });
-    expect(bar.getAttribute("value")).toBe("128");
-    expect(bar.getAttribute("max")).toBe("512");
+  it(
+    "names the model and shows the backfill's progress, checking again " +
+      "while it runs",
+    async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const load = vi
+        .fn<() => Promise<SearchStatusView>>()
+        .mockResolvedValueOnce(HYBRID)
+        .mockResolvedValue({ ...HYBRID, loaded: true, job: "done", done: 512 });
+      show(load);
+      expect(await screen.findByText(/all-MiniLM-L6-v2/)).toBeDefined();
+      expect(screen.getByText(/ranked by meaning and words/)).toBeDefined();
+      expect(
+        screen.getByText(/dropped after .?15.? minutes unused/),
+      ).toBeDefined();
+      const bar = screen.getByRole("progressbar", {
+        name: "Indexing progress",
+      });
+      expect(bar.getAttribute("value")).toBe("128");
+      expect(bar.getAttribute("max")).toBe("512");
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(3000);
-    });
-    expect(await screen.findByText(/Indexing finished/)).toBeDefined();
-    expect(screen.getByText("The model is in memory.")).toBeDefined();
-    expect(screen.queryByRole("progressbar")).toBeNull();
-    expect(load).toHaveBeenCalledTimes(2);
-  });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3000);
+      });
+      expect(await screen.findByText(/Indexing finished/)).toBeDefined();
+      expect(screen.getByText("The model is in memory.")).toBeDefined();
+      expect(screen.queryByRole("progressbar")).toBeNull();
+      expect(load).toHaveBeenCalledTimes(2);
+    },
+  );
 
   it("says how to add a model when there is none, and checks again on request", async () => {
     const load = vi.fn(() =>
@@ -79,8 +87,17 @@ describe("search status", () => {
   });
 
   it("shows why indexing stopped, and a failed read", async () => {
-    show(() => Promise.resolve({ ...HYBRID, hybrid: false, job: "failed", error: "disk full" }));
-    expect(await screen.findByText(/Indexing stopped: .?disk full/)).toBeDefined();
+    show(() =>
+      Promise.resolve({
+        ...HYBRID,
+        hybrid: false,
+        job: "failed",
+        error: "disk full",
+      }),
+    );
+    expect(
+      await screen.findByText(/Indexing stopped: .?disk full/),
+    ).toBeDefined();
     expect(screen.getByText(/Ranking by meaning is turned off/)).toBeDefined();
   });
 

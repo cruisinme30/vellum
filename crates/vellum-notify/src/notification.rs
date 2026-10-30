@@ -22,7 +22,18 @@ use jiff::{SignedDuration, Timestamp};
 use serde::{Deserialize, Serialize};
 
 /// A delivery channel to a person.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    Serialize,
+    Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Channel {
     /// The in-app inbox.
@@ -34,7 +45,18 @@ pub enum Channel {
 }
 
 /// What happened, from the recipient's point of view.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    Serialize,
+    Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum NotificationKind {
     /// An issue was assigned to you.
@@ -85,9 +107,15 @@ impl NotificationKind {
             | Self::Mentioned
             | Self::SlaBreached
             | Self::ReviewRequested
-            | Self::Reminder => &[Channel::InApp, Channel::Email, Channel::Push],
-            Self::SlaHighRisk | Self::TriageNew => &[Channel::InApp, Channel::Push],
-            Self::Commented | Self::ProjectUpdate => &[Channel::InApp, Channel::Email],
+            | Self::Reminder => {
+                &[Channel::InApp, Channel::Email, Channel::Push]
+            }
+            Self::SlaHighRisk | Self::TriageNew => {
+                &[Channel::InApp, Channel::Push]
+            }
+            Self::Commented | Self::ProjectUpdate => {
+                &[Channel::InApp, Channel::Email]
+            }
             Self::StateChanged | Self::PullRequest => &[Channel::InApp],
         };
         channels.iter().copied().collect()
@@ -187,7 +215,10 @@ pub struct Planned {
 
 /// Plans the deliveries of `notification` to `recipients`.
 #[must_use]
-pub fn plan(notification: &Notification, recipients: &[Recipient]) -> Vec<Planned> {
+pub fn plan(
+    notification: &Notification,
+    recipients: &[Recipient],
+) -> Vec<Planned> {
     let mut seen = BTreeSet::new();
     let mut planned = Vec::new();
     for recipient in recipients {
@@ -258,7 +289,8 @@ mod tests {
 
     #[test]
     fn assignment_goes_everywhere_with_delayed_email() {
-        let planned = plan(&note(NotificationKind::IssueAssigned), &[person("bo")]);
+        let planned =
+            plan(&note(NotificationKind::IssueAssigned), &[person("bo")]);
         let by_channel: BTreeMap<Channel, &Planned> =
             planned.iter().map(|p| (p.channel, p)).collect();
         assert_eq!(by_channel.len(), 3);
@@ -299,7 +331,9 @@ mod tests {
             .is_empty()
         );
         // Urgent kinds pierce a mute.
-        assert!(!plan(&note(NotificationKind::SlaBreached), &[muted]).is_empty());
+        assert!(
+            !plan(&note(NotificationKind::SlaBreached), &[muted]).is_empty()
+        );
 
         let mut snoozed = person("cy");
         snoozed.preferences.snoozed_until = Some(at(60));
@@ -321,7 +355,9 @@ mod tests {
             .preferences
             .channels
             .insert(NotificationKind::IssueAssigned, BTreeSet::new());
-        assert!(plan(&note(NotificationKind::IssueAssigned), &[quiet]).is_empty());
+        assert!(
+            plan(&note(NotificationKind::IssueAssigned), &[quiet]).is_empty()
+        );
         for kind in NotificationKind::ALL {
             assert!(
                 kind.default_channels().contains(&Channel::InApp),

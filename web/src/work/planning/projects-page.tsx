@@ -10,9 +10,23 @@ import { useLoaded } from "../../data/use-loaded";
 import { useT } from "../../i18n/i18n";
 
 import type { PlanningApi, ProjectOut, TeamOut } from "./api";
-import { Failure, Field, HealthChip, Progress, day, text, useSubmit } from "./shared";
+import {
+  Failure,
+  Field,
+  HealthChip,
+  Progress,
+  day,
+  text,
+  useSubmit,
+} from "./shared";
 
-const STATUSES = ["backlog", "planned", "in-progress", "completed", "canceled"] as const;
+const STATUSES = [
+  "backlog",
+  "planned",
+  "in-progress",
+  "completed",
+  "canceled",
+] as const;
 
 function NewProject({
   api,
@@ -40,7 +54,8 @@ function NewProject({
       void navigate(`/projects/${encodeURIComponent(project.id)}`);
     },
   );
-  if (teams.length === 0) return <p className="vl-muted">{t("issues-no-teams")}</p>;
+  if (teams.length === 0)
+    return <p className="vl-muted">{t("issues-no-teams")}</p>;
   return (
     <details className="vl-plan-new">
       <summary>{t("plan-project-new")}</summary>
@@ -111,7 +126,8 @@ export function ProjectRow({ project }: { readonly project: ProjectOut }) {
 /** Whether a project passes the status filter (`active`, `all` or a status). */
 export function inStatus(project: ProjectOut, status: string): boolean {
   if (status === "all") return true;
-  if (status === "active") return project.status === "planned" || project.status === "in-progress";
+  if (status === "active")
+    return project.status === "planned" || project.status === "in-progress";
   return project.status === status;
 }
 
@@ -172,20 +188,33 @@ function Projects({
 function ProjectsForApi({ api }: { readonly api: PlanningApi }) {
   const loaded = useLoaded(
     async () => {
-      const [projects, teams] = await Promise.all([api.projects(), api.teams()]);
+      const [projects, teams] = await Promise.all([
+        api.projects(),
+        api.teams(),
+      ]);
       return { projects, teams };
     },
     [api],
     failureText,
   );
-  return <Ready loaded={loaded}>{(found) => <Projects api={api} {...found} />}</Ready>;
+  return (
+    <Ready loaded={loaded}>
+      {(found) => <Projects api={api} {...found} />}
+    </Ready>
+  );
 }
 
-/** Projects: every project with health and progress, and a form for a new one. */
+/**
+ * Projects: every project with health and progress, and a form for a new one.
+ */
 export function ProjectsPage() {
   const t = useT();
   return (
-    <ServerScreen api="planning" title={t("plan-projects")} className="vl-work vl-plan">
+    <ServerScreen
+      api="planning"
+      title={t("plan-projects")}
+      className="vl-work vl-plan"
+    >
       {(api) => <ProjectsForApi api={api} />}
     </ServerScreen>
   );

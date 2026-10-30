@@ -25,7 +25,9 @@ export const field = (form: HTMLFormElement, name: string) => {
 };
 
 /** Handles a form whose action resolves on success, resetting it then. */
-export function submitWith(action: (form: HTMLFormElement) => Promise<unknown> | undefined) {
+export function submitWith(
+  action: (form: HTMLFormElement) => Promise<unknown> | undefined,
+) {
   const submit: Submit = (event) => {
     event.preventDefault();
     const form = event.currentTarget;
@@ -47,7 +49,11 @@ interface ThreadProperties {
   readonly active: boolean;
   readonly onReveal: (block: string) => void;
   readonly onReply: (commentId: string, body: string) => Promise<unknown>;
-  readonly onReact: (commentId: string, emoji: string, on: boolean) => Promise<unknown>;
+  readonly onReact: (
+    commentId: string,
+    emoji: string,
+    on: boolean,
+  ) => Promise<unknown>;
   readonly onResolve: (resolved: boolean) => Promise<unknown>;
   readonly onAssign: (assignee?: string) => Promise<unknown>;
 }
@@ -85,7 +91,12 @@ export function Thread({
       )}
       <ol className="vl-comment-list">
         {comments.map((comment) => (
-          <Comment key={comment.id} comment={comment} me={me} onReact={onReact} />
+          <Comment
+            key={comment.id}
+            comment={comment}
+            me={me}
+            onReact={onReact}
+          />
         ))}
       </ol>
       <ThreadMeta thread={thread} />
@@ -178,7 +189,11 @@ function ThreadActions({
   );
 }
 
-function AssignForm({ onAssign }: { readonly onAssign: (assignee?: string) => Promise<unknown> }) {
+function AssignForm({
+  onAssign,
+}: {
+  readonly onAssign: (assignee?: string) => Promise<unknown>;
+}) {
   const t = useT();
   return (
     <form
@@ -189,7 +204,9 @@ function AssignForm({ onAssign }: { readonly onAssign: (assignee?: string) => Pr
       })}
     >
       <label>
-        <span className="vl-visually-hidden">{t("comments-assign-thread")}</span>
+        <span className="vl-visually-hidden">
+          {t("comments-assign-thread")}
+        </span>
         <input name="assignee" placeholder="@handle" autoComplete="off" />
       </label>
       <button type="submit" className="vl-text-button">
@@ -206,12 +223,18 @@ function Comment({
 }: {
   readonly comment: CommentOut;
   readonly me: string | undefined;
-  readonly onReact: (commentId: string, emoji: string, on: boolean) => Promise<unknown>;
+  readonly onReact: (
+    commentId: string,
+    emoji: string,
+    on: boolean,
+  ) => Promise<unknown>;
 }) {
   const t = useT();
   const reacted = (emoji: string) =>
     me !== undefined &&
-    comment.reactions.some((reaction) => reaction.emoji === emoji && reaction.by.includes(me));
+    comment.reactions.some(
+      (reaction) => reaction.emoji === emoji && reaction.by.includes(me),
+    );
   const counts = new Map(comment.reactions.map((r) => [r.emoji, r.by.length]));
   const emojis = [...new Set([...QUICK_REACTIONS, ...counts.keys()])];
   return (
@@ -222,11 +245,17 @@ function Comment({
           when: TIME.format(new Date(comment.created_at)),
         })}
         {comment.by_model && (
-          <span className="vl-chip vl-model-badge">{t("comments-by-model")}</span>
+          <span className="vl-chip vl-model-badge">
+            {t("comments-by-model")}
+          </span>
         )}
       </p>
       <p className="vl-comment-body">{comment.body}</p>
-      <div className="vl-reactions" role="group" aria-label={t("comments-reactions")}>
+      <div
+        className="vl-reactions"
+        role="group"
+        aria-label={t("comments-reactions")}
+      >
         {emojis.map((emoji) => {
           const count = counts.get(emoji) ?? 0;
           const on = reacted(emoji);

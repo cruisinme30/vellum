@@ -29,10 +29,17 @@ export function isSafeExternal(url: string): boolean {
   );
 }
 
-const allowedPermissions = new Set(["notifications", "clipboard-sanitized-write", "fullscreen"]);
+const allowedPermissions = new Set([
+  "notifications",
+  "clipboard-sanitized-write",
+  "fullscreen",
+]);
 
 /** Grants a permission only to app pages, and only from a short list. */
-export function allowPermission(permission: string, requestingUrl: string): boolean {
+export function allowPermission(
+  permission: string,
+  requestingUrl: string,
+): boolean {
   return allowedPermissions.has(permission) && isAppUrl(requestingUrl);
 }
 
@@ -75,7 +82,10 @@ interface WindowPreferences {
 }
 
 /** `webPreferences` for every app window. */
-export function webPreferences(preload: string, version: string): WindowPreferences {
+export function webPreferences(
+  preload: string,
+  version: string,
+): WindowPreferences {
   return {
     preload,
     sandbox: true,

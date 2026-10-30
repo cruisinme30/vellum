@@ -35,11 +35,17 @@ export interface RenderApi {
 /** Most blocks kept per tab; an edit that returns to an old text is instant. */
 const BLOCK_CACHE = 200;
 
-/** The render API over the app's HTTP client, with a small cache of drawn blocks. */
+/**
+ * The render API over the app's HTTP client, with a small cache of drawn
+ * blocks.
+ */
 export function createHttpRenderApi(http: Http): RenderApi {
   const blocks = new Map<string, Promise<RenderedBlockView>>();
   return {
-    page: (id) => http.get<RenderedPageView>(`/api/v1/pages/${encodeURIComponent(id)}/render`),
+    page: (id) =>
+      http.get<RenderedPageView>(
+        `/api/v1/pages/${encodeURIComponent(id)}/render`,
+      ),
     block(input) {
       const key = JSON.stringify([input.lang, input.args ?? "", input.source]);
       const known = blocks.get(key);
@@ -49,9 +55,14 @@ export function createHttpRenderApi(http: Http): RenderApi {
         blocks.set(key, known);
         return known;
       }
-      const drawn = http.send<RenderedBlockView>("POST", "/api/v1/render/block", input);
+      const drawn = http.send<RenderedBlockView>(
+        "POST",
+        "/api/v1/render/block",
+        input,
+      );
       blocks.set(key, drawn);
-      // A failure is not kept: the next edit, or the diagram server coming back, retries.
+      // A failure is not kept: the next edit, or the diagram server coming
+      // back, retries.
       void drawn.catch(() => {
         if (blocks.get(key) === drawn) blocks.delete(key);
       });

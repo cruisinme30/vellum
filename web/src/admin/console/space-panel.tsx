@@ -14,7 +14,13 @@ import {
   type UserView,
 } from "./api";
 
-const ROLES: readonly SpaceRoleView[] = ["viewer", "commenter", "editor", "manager", "owner"];
+const ROLES: readonly SpaceRoleView[] = [
+  "viewer",
+  "commenter",
+  "editor",
+  "manager",
+  "owner",
+];
 const MIB = 1024 * 1024;
 
 /** A form's submit handler. */
@@ -24,7 +30,10 @@ export type Submit = NonNullable<ComponentProps<"form">["onSubmit"]>;
  * The space's settings from the form: the quota in MiB (empty for no
  * limit) and trash days; the version retention is kept as it was.
  */
-export function settingsFromSpaceForm(base: SettingsView, data: FormData): SettingsView {
+export function settingsFromSpaceForm(
+  base: SettingsView,
+  data: FormData,
+): SettingsView {
   const quota = formText(data, "quota");
   const trash = formText(data, "trash_days");
   const next: SettingsView = {
@@ -37,11 +46,20 @@ export function settingsFromSpaceForm(base: SettingsView, data: FormData): Setti
   return next;
 }
 
-/** Runs a change and shows how it went; `fresh` reloads the whole list after. */
-export type Run = (task: () => Promise<AdminSpaceView>, done: string, fresh?: boolean) => void;
+/**
+ * Runs a change and shows how it went; `fresh` reloads the whole list after.
+ */
+export type Run = (
+  task: () => Promise<AdminSpaceView>,
+  done: string,
+  fresh?: boolean,
+) => void;
 
 /** A person's name, or their ID when the account is gone. */
-export function nameOf(users: readonly UserView[], id: string | null = ""): string {
+export function nameOf(
+  users: readonly UserView[],
+  id: string | null = "",
+): string {
   const key = id ?? "";
   return users.find((user) => user.id === key)?.name ?? key;
 }
@@ -86,13 +104,20 @@ function SettingsForm({
           min={1}
           step="any"
           defaultValue={
-            typeof settings.quota_bytes === "number" ? String(settings.quota_bytes / MIB) : ""
+            typeof settings.quota_bytes === "number"
+              ? String(settings.quota_bytes / MIB)
+              : ""
           }
         />
       </label>
       <label>
         {t("admin-spaces-trash-days")}
-        <input name="trash_days" type="number" min={1} defaultValue={String(settings.trash_days)} />
+        <input
+          name="trash_days"
+          type="number"
+          min={1}
+          defaultValue={String(settings.trash_days)}
+        />
       </label>
       <div className="vl-admin-actions">
         <button type="submit" className="vl-filled-button" disabled={busy}>
@@ -123,7 +148,8 @@ function Members({
     return <p className="vl-muted">{t("admin-spaces-my-drive-note")}</p>;
   }
   const outsiders = users.filter(
-    (user) => !user.disabled && !space.members.some((m) => m.user_id === user.id),
+    (user) =>
+      !user.disabled && !space.members.some((m) => m.user_id === user.id),
   );
   const add: Submit = (event) => {
     event.preventDefault();
@@ -139,7 +165,9 @@ function Members({
   return (
     <>
       <table className="vl-admin-table">
-        <caption>{t("admin-spaces-members-caption", { name: space.space.name })}</caption>
+        <caption>
+          {t("admin-spaces-members-caption", { name: space.space.name })}
+        </caption>
         <thead>
           <tr>
             <th scope="col">{t("admin-spaces-member")}</th>
@@ -195,7 +223,11 @@ function Members({
         </tbody>
       </table>
       {outsiders.length > 0 && (
-        <form className="vl-admin-filters" aria-labelledby={`${id}-add`} onSubmit={add}>
+        <form
+          className="vl-admin-filters"
+          aria-labelledby={`${id}-add`}
+          onSubmit={add}
+        >
           <h3 id={`${id}-add`} className="vl-visually-hidden">
             {t("admin-spaces-add-member")}
           </h3>

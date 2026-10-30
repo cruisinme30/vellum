@@ -4,9 +4,12 @@
 import type { Disk } from "../main/settings.js";
 
 /** An in-memory `Disk`, optionally starting with some text. */
-export function memoryDisk(initial?: string): Disk & { bytes: Uint8Array | undefined } {
+export function memoryDisk(
+  initial?: string,
+): Disk & { bytes: Uint8Array | undefined } {
   const disk: Disk & { bytes: Uint8Array | undefined } = {
-    bytes: initial === undefined ? undefined : new TextEncoder().encode(initial),
+    bytes:
+      initial === undefined ? undefined : new TextEncoder().encode(initial),
     read: () => Promise.resolve(disk.bytes),
     write: (bytes: Uint8Array) => {
       disk.bytes = bytes;

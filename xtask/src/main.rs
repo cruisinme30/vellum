@@ -45,9 +45,9 @@ mod pr_check;
 mod relock;
 mod schema;
 
-const USAGE: &str = "usage: cargo xtask <fast | pr-check | install-hooks | relock | boundaries | adr | \
-                     help [check|write] | budgets | installers | perf-gate | \
-                     schema [--check]>";
+const USAGE: &str = "usage: cargo xtask <fast | pr-check | install-hooks | \
+                     relock | boundaries | adr | help [check|write] | budgets \
+                     | installers | perf-gate | schema [--check]>";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -72,7 +72,10 @@ fn main() -> ExitCode {
     match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(message) => {
-            #[expect(clippy::print_stderr, reason = "xtask reports to the terminal")]
+            #[expect(
+                clippy::print_stderr,
+                reason = "xtask reports to the terminal"
+            )]
             {
                 eprintln!("{message}");
             }

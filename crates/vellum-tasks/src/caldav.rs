@@ -125,7 +125,8 @@ impl DavError {
         };
         Some(format!(
             "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n\
-             <D:error xmlns:D=\"DAV:\" xmlns:C=\"{NS_CALDAV}\">{condition}</D:error>\n"
+             <D:error xmlns:D=\"DAV:\" \
+             xmlns:C=\"{NS_CALDAV}\">{condition}</D:error>\n"
         ))
     }
 }
@@ -152,7 +153,9 @@ fn decode_segment(segment: &str) -> Option<String> {
 pub fn encode_segment(segment: &str) -> String {
     let mut out = String::with_capacity(segment.len());
     for b in segment.bytes() {
-        if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_' | b'~' | b'@') {
+        if b.is_ascii_alphanumeric()
+            || matches!(b, b'-' | b'.' | b'_' | b'~' | b'@')
+        {
             out.push(char::from(b));
         } else {
             let _ = write!(out, "%{b:02X}");
@@ -195,8 +198,12 @@ pub fn parse_path(path: &str) -> Option<Resource> {
 pub fn href(resource: &Resource) -> String {
     match resource {
         Resource::Root => format!("{PREFIX}/"),
-        Resource::Principal { user } => format!("{PREFIX}/principals/{}/", encode_segment(user)),
-        Resource::Home { user } => format!("{PREFIX}/calendars/{}/", encode_segment(user)),
+        Resource::Principal { user } => {
+            format!("{PREFIX}/principals/{}/", encode_segment(user))
+        }
+        Resource::Home { user } => {
+            format!("{PREFIX}/calendars/{}/", encode_segment(user))
+        }
         Resource::List { user, list } => format!(
             "{PREFIX}/calendars/{}/{}/",
             encode_segment(user),
@@ -319,9 +326,12 @@ fn scan_xml(body: &str) -> Result<XmlScan, DavError> {
                 if scan.root.is_none() {
                     scan.root = Some(name.clone());
                 }
-                let parent = path.last().map(|p| (p.ns.as_str(), p.name.as_str()));
+                let parent =
+                    path.last().map(|p| (p.ns.as_str(), p.name.as_str()));
                 match (ns.as_str(), local.as_str(), parent) {
-                    (_, _, Some((NS_DAV, "prop"))) => scan.props.push(name.clone()),
+                    (_, _, Some((NS_DAV, "prop"))) => {
+                        scan.props.push(name.clone())
+                    }
                     (NS_DAV, "allprop", _) => scan.allprop = true,
                     (NS_DAV, "propname", _) => scan.propname = true,
                     (NS_CALDAV, "prop-filter", _) => {
@@ -329,7 +339,9 @@ fn scan_xml(body: &str) -> Result<XmlScan, DavError> {
                             .try_get_attribute("name")
                             .ok()
                             .flatten()
-                            .and_then(|a| a.normalized_value(XmlVersion::Implicit1_0).ok())
+                            .and_then(|a| {
+                                a.normalized_value(XmlVersion::Implicit1_0).ok()
+                            })
                             .map(|v| v.to_ascii_uppercase());
                     }
                     (NS_CALDAV, "is-not-defined", _) => {
@@ -342,7 +354,9 @@ fn scan_xml(body: &str) -> Result<XmlScan, DavError> {
                             .try_get_attribute("negate-condition")
                             .ok()
                             .flatten()
-                            .and_then(|a| a.normalized_value(XmlVersion::Implicit1_0).ok())
+                            .and_then(|a| {
+                                a.normalized_value(XmlVersion::Implicit1_0).ok()
+                            })
                             .is_some_and(|v| v == "yes");
                         if negated && prop_filter.as_deref() == Some("STATUS") {
                             scan.open_only = true;
@@ -459,7 +473,8 @@ pub fn check_preconditions(
 ) -> Result<(), DavError> {
     let matches = |header: &str| {
         header.trim() == "*"
-            || current.is_some_and(|etag| header.split(',').any(|h| h.trim() == etag))
+            || current
+                .is_some_and(|etag| header.split(',').any(|h| h.trim() == etag))
     };
     if let Some(header) = if_match
         && (current.is_none() || !matches(header))
@@ -538,7 +553,10 @@ pub fn sync_token(list: &ListInfo) -> String {
 /// # Errors
 ///
 /// Returns [`DavError::InvalidSyncToken`] for any token but the current.
-pub fn check_sync_token(list: &ListInfo, token: Option<&str>) -> Result<bool, DavError> {
+pub fn check_sync_token(
+    list: &ListInfo,
+    token: Option<&str>,
+) -> Result<bool, DavError> {
     match token {
         None => Ok(false),
         Some(token) if token == sync_token(list) => Ok(true),
@@ -583,13 +601,19 @@ impl Multistatus {
     pub fn new() -> Self {
         Self {
             body: format!(
-                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<D:multistatus xmlns:D=\"DAV:\" \
-                 xmlns:C=\"{NS_CALDAV}\" xmlns:CS=\"{NS_CS}\" xmlns:A=\"{NS_APPLE}\">\n"
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n\
+                 <D:multistatus xmlns:D=\"DAV:\" xmlns:C=\"{NS_CALDAV}\" \
+                 xmlns:CS=\"{NS_CS}\" xmlns:A=\"{NS_APPLE}\">\n"
             ),
         }
     }
 
-    fn response(&mut self, href: &str, request: &PropRequest, known: &[(PropName, Value)]) {
+    fn response(
+        &mut self,
+        href: &str,
+        request: &PropRequest,
+        known: &[(PropName, Value)],
+    ) {
         let _ = write!(
             self.body,
             "<D:response><D:href>{}</D:href>",
@@ -597,30 +621,34 @@ impl Multistatus {
         );
         let mut found = String::new();
         let mut missing = String::new();
-        let write_name = |out: &mut String, name: &PropName| match prefix_of(&name.ns) {
-            Some(prefix) => {
-                let _ = write!(out, "<{prefix}:{}/>", name.name);
-            }
-            None => {
-                let _ = write!(
-                    out,
-                    "<X:{} xmlns:X=\"{}\"/>",
-                    name.name,
-                    xml_escape(&name.ns)
-                );
-            }
-        };
+        let write_name =
+            |out: &mut String, name: &PropName| match prefix_of(&name.ns) {
+                Some(prefix) => {
+                    let _ = write!(out, "<{prefix}:{}/>", name.name);
+                }
+                None => {
+                    let _ = write!(
+                        out,
+                        "<X:{} xmlns:X=\"{}\"/>",
+                        name.name,
+                        xml_escape(&name.ns)
+                    );
+                }
+            };
         let write_value = |out: &mut String, name: &PropName, value: &Value| {
             let prefix = prefix_of(&name.ns).unwrap_or("D");
             let inner = match value {
                 Value::Xml(xml) => xml.clone(),
                 Value::Text(text) => xml_escape(text),
             };
-            let _ = write!(out, "<{prefix}:{0}>{inner}</{prefix}:{0}>", name.name);
+            let _ =
+                write!(out, "<{prefix}:{0}>{inner}</{prefix}:{0}>", name.name);
         };
         match request {
             PropRequest::All => {
-                for (name, value) in known.iter().filter(|(n, _)| n.name != "calendar-data") {
+                for (name, value) in
+                    known.iter().filter(|(n, _)| n.name != "calendar-data")
+                {
                     write_value(&mut found, name, value);
                 }
             }
@@ -632,7 +660,9 @@ impl Multistatus {
             PropRequest::Props(wanted) => {
                 for name in wanted {
                     match known.iter().find(|(n, _)| n == name) {
-                        Some((name, value)) => write_value(&mut found, name, value),
+                        Some((name, value)) => {
+                            write_value(&mut found, name, value)
+                        }
                         None => write_name(&mut missing, name),
                     }
                 }
@@ -641,13 +671,15 @@ impl Multistatus {
         if !found.is_empty() {
             let _ = write!(
                 self.body,
-                "<D:propstat><D:prop>{found}</D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat>"
+                "<D:propstat><D:prop>{found}</D:prop><D:status>HTTP/1.1 200 \
+                    OK</D:status></D:propstat>"
             );
         }
         if !missing.is_empty() {
             let _ = write!(
                 self.body,
-                "<D:propstat><D:prop>{missing}</D:prop><D:status>HTTP/1.1 404 Not Found</D:status></D:propstat>"
+                "<D:propstat><D:prop>{missing}</D:prop><D:status>HTTP/1.1 404 \
+                    Not Found</D:status></D:propstat>"
             );
         }
         self.body.push_str("</D:response>\n");
@@ -658,20 +690,28 @@ impl Multistatus {
     pub fn not_found(&mut self, href: &str) {
         let _ = writeln!(
             self.body,
-            "<D:response><D:href>{}</D:href><D:status>HTTP/1.1 404 Not Found</D:status></D:response>",
+            "<D:response><D:href>{}</D:href><D:status>HTTP/1.1 404 Not \
+                Found</D:status></D:response>",
             xml_escape(href)
         );
     }
 
     /// Adds the root or principal resource.
-    pub fn principal(&mut self, path: &str, user: &str, display_name: &str, request: &PropRequest) {
+    pub fn principal(
+        &mut self,
+        path: &str,
+        user: &str,
+        display_name: &str,
+        request: &PropRequest,
+    ) {
         let principal = href(&Resource::Principal {
             user: user.to_owned(),
         });
         let home = href(&Resource::Home {
             user: user.to_owned(),
         });
-        let link = |h: &str| Value::Xml(format!("<D:href>{}</D:href>", xml_escape(h)));
+        let link =
+            |h: &str| Value::Xml(format!("<D:href>{}</D:href>", xml_escape(h)));
         let resourcetype = if path == href(&Resource::Root) {
             "<D:collection/>"
         } else {
@@ -711,7 +751,10 @@ impl Multistatus {
             ),
             (
                 PropName::new(NS_DAV, "current-user-principal"),
-                Value::Xml(format!("<D:href>{}</D:href>", xml_escape(&principal))),
+                Value::Xml(format!(
+                    "<D:href>{}</D:href>",
+                    xml_escape(&principal)
+                )),
             ),
         ];
         self.response(&path, request, &known);
@@ -731,7 +774,10 @@ impl Multistatus {
                 PropName::new(NS_DAV, "resourcetype"),
                 Value::Xml("<D:collection/><C:calendar/>".into()),
             ),
-            (PropName::new(NS_DAV, "displayname"), Value::Text(list.title.clone())),
+            (
+                PropName::new(NS_DAV, "displayname"),
+                Value::Text(list.title.clone())
+            ),
             (
                 PropName::new(NS_CALDAV, "supported-calendar-component-set"),
                 Value::Xml("<C:comp name=\"VTODO\"/>".into()),
@@ -739,25 +785,36 @@ impl Multistatus {
             (
                 PropName::new(NS_DAV, "supported-report-set"),
                 Value::Xml(
-                    "<D:supported-report><D:report><C:calendar-query/></D:report></D:supported-report>\
-                     <D:supported-report><D:report><C:calendar-multiget/></D:report></D:supported-report>\
-                     <D:supported-report><D:report><D:sync-collection/></D:report></D:supported-report>"
+                    "<D:supported-report><D:report><C:calendar-query/></D:repor\
+                     t></D:supported-report><D:supported-report><D:report><C:ca\
+                     lendar-multiget/></D:report></D:supported-report><D:suppor\
+                     ted-report><D:report><D:sync-collection/></D:report></D:su\
+                     pported-report>"
                         .into(),
                 ),
             ),
             (
                 PropName::new(NS_DAV, "current-user-privilege-set"),
                 Value::Xml(
-                    "<D:privilege><D:read/></D:privilege><D:privilege><D:write/></D:privilege>"
+                    "<D:privilege><D:read/></D:privilege><D:privilege><D:write/\
+                        ></D:privilege>"
                         .into(),
                 ),
             ),
             (
                 PropName::new(NS_DAV, "owner"),
-                Value::Xml(format!("<D:href>{}</D:href>", xml_escape(&principal))),
+                Value::Xml(
+                    format!("<D:href>{}</D:href>", xml_escape(&principal))
+                ),
             ),
-            (PropName::new(NS_CS, "getctag"), Value::Text(list.version.to_string())),
-            (PropName::new(NS_DAV, "sync-token"), Value::Text(sync_token(list))),
+            (
+                PropName::new(NS_CS, "getctag"),
+                Value::Text(list.version.to_string())
+            ),
+            (
+                PropName::new(NS_DAV, "sync-token"),
+                Value::Text(sync_token(list))
+            ),
         ];
         if let Some(color) = &list.color {
             known.push((
@@ -769,7 +826,13 @@ impl Multistatus {
     }
 
     /// Adds a task object.
-    pub fn object(&mut self, user: &str, list: &str, object: &Object, request: &PropRequest) {
+    pub fn object(
+        &mut self,
+        user: &str,
+        list: &str,
+        object: &Object,
+        request: &PropRequest,
+    ) {
         let path = href(&Resource::Object {
             user: user.to_owned(),
             list: list.to_owned(),
@@ -786,7 +849,9 @@ impl Multistatus {
             ),
             (
                 PropName::new(NS_DAV, "getcontenttype"),
-                Value::Text("text/calendar; charset=utf-8; component=VTODO".into()),
+                Value::Text(
+                    "text/calendar; charset=utf-8; component=VTODO".into(),
+                ),
             ),
             (
                 PropName::new(NS_CALDAV, "calendar-data"),
@@ -868,7 +933,8 @@ mod tests {
 <d:propfind xmlns:d="DAV:" xmlns:cs="http://calendarserver.org/ns/">
   <d:prop><d:displayname/><cs:getctag/><x:unknown xmlns:x="urn:x"/></d:prop>
 </d:propfind>"#;
-        let PropRequest::Props(props) = parse_propfind(propfind).unwrap() else {
+        let PropRequest::Props(props) = parse_propfind(propfind).unwrap()
+        else {
             panic!("expected props");
         };
         assert_eq!(props.len(), 3);
@@ -893,7 +959,8 @@ mod tests {
   <D:prop><D:getetag/><C:calendar-data/></D:prop>
   <D:href>/dav/calendars/ann/l/a.ics</D:href><D:href>/dav/calendars/ann/l/b&amp;c.ics</D:href>
 </C:calendar-multiget>"#;
-        let Report::Multiget { hrefs, .. } = parse_report(multiget).unwrap() else {
+        let Report::Multiget { hrefs, .. } = parse_report(multiget).unwrap()
+        else {
             panic!("expected multiget");
         };
         assert_eq!(
@@ -906,12 +973,17 @@ mod tests {
         assert_eq!(
             parse_report(sync).unwrap(),
             Report::Sync {
-                props: PropRequest::Props(vec![PropName::new(NS_DAV, "getetag")]),
+                props: PropRequest::Props(vec![PropName::new(
+                    NS_DAV, "getetag"
+                )]),
                 token: Some("tok".into())
             }
         );
         assert!(parse_report("<d:other xmlns:d=\"DAV:\"/>").is_err());
-        assert!(parse_report("<unclosed").is_err() || parse_report("<unclosed").is_ok());
+        assert!(
+            parse_report("<unclosed").is_err()
+                || parse_report("<unclosed").is_ok()
+        );
         assert!(parse_propfind("<a><b></a>").is_err());
     }
 
@@ -960,16 +1032,14 @@ mod tests {
         ms.sync_token(&list);
         let body = ms.finish();
         assert!(body.contains("<D:href>/dav/calendars/ann/errands/</D:href>"));
-        assert!(
-            body.contains(
-                "<D:displayname>Errands &amp; co</D:displayname><CS:getctag>7</CS:getctag>"
-            )
-        );
-        assert!(
-            body.contains(
-                "<X:unknown xmlns:X=\"urn:x\"/></D:prop><D:status>HTTP/1.1 404 Not Found"
-            )
-        );
+        assert!(body.contains(
+            "<D:displayname>Errands &amp; \
+                    co</D:displayname><CS:getctag>7</CS:getctag>"
+        ));
+        assert!(body.contains(
+            "<X:unknown xmlns:X=\"urn:x\"/></D:prop><D:status>HTTP/1.1 404 \
+                    Not Found"
+        ));
         assert!(body.contains(&format!(
             "<D:getetag>{}</D:getetag>",
             xml_escape(&etag(&object.ical))
@@ -978,9 +1048,9 @@ mod tests {
             !body.contains("calendar-data"),
             "allprop leaves out calendar-data"
         );
-        assert!(
-            body.contains("<D:sync-token>https://vellum.invalid/sync/errands/7</D:sync-token>")
-        );
+        assert!(body.contains(
+            "<D:sync-token>https://vellum.invalid/sync/errands/7</D:sync-token>"
+        ));
         assert_eq!(check_sync_token(&list, Some(&sync_token(&list))), Ok(true));
         assert_eq!(check_sync_token(&list, None), Ok(false));
         assert_eq!(
@@ -1004,17 +1074,27 @@ mod tests {
             "/dav/",
             "ann",
             "Ann",
-            &PropRequest::Props(vec![PropName::new(NS_DAV, "current-user-principal")]),
+            &PropRequest::Props(vec![PropName::new(
+                NS_DAV,
+                "current-user-principal",
+            )]),
         );
         ms.principal(
             "/dav/principals/ann/",
             "ann",
             "Ann",
-            &PropRequest::Props(vec![PropName::new(NS_CALDAV, "calendar-home-set")]),
+            &PropRequest::Props(vec![PropName::new(
+                NS_CALDAV,
+                "calendar-home-set",
+            )]),
         );
         ms.home("ann", &PropRequest::All);
         let body = ms.finish();
-        assert!(body.contains("<D:current-user-principal><D:href>/dav/principals/ann/</D:href>"));
-        assert!(body.contains("<C:calendar-home-set><D:href>/dav/calendars/ann/</D:href>"));
+        assert!(body.contains(
+            "<D:current-user-principal><D:href>/dav/principals/ann/</D:href>"
+        ));
+        assert!(body.contains(
+            "<C:calendar-home-set><D:href>/dav/calendars/ann/</D:href>"
+        ));
     }
 }

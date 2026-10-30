@@ -2,12 +2,12 @@
 # SPDX-FileCopyrightText: 2026 The Vellum contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 #
-# The weekly chaos test (ADR 0022, D96) on a kind cluster that already runs
-# the Zalando Postgres Operator and Chaos Mesh, with the images vellum:ci
-# and vellum-minio:ci loaded. Under load, it kills a Vellum node, a Kroki
-# pod and the Postgres primary, cuts the servers off the bucket and slows
-# the database (D255), then asserts that the SLO thresholds held and that every acknowledged write
-# can be read back.
+# The weekly chaos test (ADR 0022, D96) on a kind cluster that already runs the
+# Zalando Postgres Operator and Chaos Mesh, with the images vellum:ci and
+# vellum-minio:ci loaded. Under load, it kills a Vellum node, a Kroki pod and
+# the Postgres primary, cuts the servers off the bucket and slows the database
+# (D255), then asserts that the SLO thresholds held and that every acknowledged
+# write can be read back.
 #
 #   deploy/chaos/run.sh
 set -euo pipefail

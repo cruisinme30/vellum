@@ -4,16 +4,17 @@
 //! Importing issues from Linear, Jira and GitHub Issues (#151), mounted
 //! at [`PREFIX`] with the upload body limit.
 //!
-//! `POST ?tracker=linear|jira|github&team=ENG[&repo=owner/name]&name=…[&dry_run=true]`
-//! takes the tracker's export as the body: Linear's CSV, Jira search
-//! results as JSON, or GitHub's issue list as JSON. The file goes through
+//! `POST
+//! ?tracker=linear|jira|github&team=ENG[&repo=owner/name]&name=…[&dry_run=true]`
+//! takes the tracker's export as the body: Linear's CSV, Jira search results as
+//! JSON, or GitHub's issue list as JSON. The file goes through
 //! [`upload::check`] like any upload. The importers in
-//! `vellum_integrations::import` read it and plan it onto the team:
-//! states by name then category, people by email, name or handle. A dry
-//! run answers the plan; otherwise the issues are created oldest first in
-//! one Work transaction, as the caller, and parents and relations are set
-//! in a second one. Issues imported before (matched by their source link)
-//! are skipped, so an import can be run again.
+//! `vellum_integrations::import` read it and plan it onto the team: states by
+//! name then category, people by email, name or handle. A dry run answers the
+//! plan; otherwise the issues are created oldest first in one Work transaction,
+//! as the caller, and parents and relations are set in a second one. Issues
+//! imported before (matched by their source link) are skipped, so an import can
+//! be run again.
 //!
 //! Only workspace admins with the `work` scope may import: an import
 //! creates many issues and attributes them to other people.
@@ -117,9 +118,11 @@ async fn import_issues<S: Scanner + 'static>(
         }
         let handle = UserRef::parse(&me.handle).map_err(|_| forbidden())?;
         let query: std::collections::HashMap<String, String> =
-            url::form_urlencoded::parse(request.uri().query().unwrap_or_default().as_bytes())
-                .into_owned()
-                .collect();
+            url::form_urlencoded::parse(
+                request.uri().query().unwrap_or_default().as_bytes(),
+            )
+            .into_owned()
+            .collect();
         let tracker = query.get("tracker").cloned().unwrap_or_default();
         if !matches!(tracker.as_str(), "linear" | "jira" | "github") {
             return Err(invalid("tracker must be linear, jira or github"));
@@ -137,7 +140,9 @@ async fn import_issues<S: Scanner + 'static>(
             .get("name")
             .filter(|n| !n.is_empty())
             .cloned()
-            .ok_or_else(|| invalid("say the file's name in the `name` query parameter"))?;
+            .ok_or_else(|| {
+                invalid("say the file's name in the `name` query parameter")
+            })?;
         let dry_run = query.get("dry_run").is_some_and(|v| v == "true");
         // RT-045: the body is held in memory, so reserve it first.
         let _reserved = crate::uploads::reserve_body(
@@ -176,7 +181,10 @@ async fn import_issues<S: Scanner + 'static>(
         .await
     }
     .await;
-    result.map_or_else(|e| respond(id, e), |report| json(status(&report), &report))
+    result.map_or_else(
+        |e| respond(id, e),
+        |report| json(status(&report), &report),
+    )
 }
 
 const fn status(report: &ImportReport) -> StatusCode {
@@ -223,7 +231,9 @@ async fn run(
     dry_run: bool,
 ) -> Result<ImportReport, Error> {
     let (states, earlier) = work
-        .read(|graph, _| (steps::states(graph, team), steps::imported(graph, tracker)))
+        .read(|graph, _| {
+            (steps::states(graph, team), steps::imported(graph, tracker))
+        })
         .await;
     let states = states.map_err(|e| work_error(&e))?;
     let already: BTreeSet<String> = earlier.keys().cloned().collect();
@@ -249,8 +259,8 @@ async fn run(
     }
     let created = work
         .transact(actor.clone(), |graph, _, ctx| {
-            let (keys, changes) =
-                steps::import_plan(graph, &plan, ctx).map_err(|e| work_error(&e))?;
+            let (keys, changes) = steps::import_plan(graph, &plan, ctx)
+                .map_err(|e| work_error(&e))?;
             Ok((changes, None, keys))
         })
         .await?;
@@ -260,7 +270,8 @@ async fn run(
     report.warnings.extend(warnings);
     if !links.is_empty() {
         work.transact(actor, |graph, _, ctx| {
-            let changes = steps::apply_links(graph, &links, ctx).map_err(|e| work_error(&e))?;
+            let changes = steps::apply_links(graph, &links, ctx)
+                .map_err(|e| work_error(&e))?;
             Ok((changes, None, ()))
         })
         .await?;
@@ -289,8 +300,14 @@ fn forbidden() -> Error {
 
 fn work_error(e: &WorkError) -> Error {
     match e {
-        WorkError::NotFound(what) => Error::new(ErrorKind::NotFound, format!("not found: {what}")),
-        WorkError::Refused(why) => Error::new(ErrorKind::InvalidInput, why.clone()),
-        WorkError::Unavailable(why) => Error::new(ErrorKind::Unavailable, why.clone()),
+        WorkError::NotFound(what) => {
+            Error::new(ErrorKind::NotFound, format!("not found: {what}"))
+        }
+        WorkError::Refused(why) => {
+            Error::new(ErrorKind::InvalidInput, why.clone())
+        }
+        WorkError::Unavailable(why) => {
+            Error::new(ErrorKind::Unavailable, why.clone())
+        }
     }
 }

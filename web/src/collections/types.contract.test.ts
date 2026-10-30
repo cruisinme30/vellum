@@ -31,17 +31,23 @@ type Loose<T> = T extends string
     ? Loose<U>[]
     : T extends object
       ? {
-          -readonly [K in keyof T as null extends T[K] ? never : K]: Loose<T[K]> | Absent<T[K]>;
+          -readonly [K in keyof T as null extends T[K] ? never : K]:
+            Loose<T[K]> | Absent<T[K]>;
         } & {
-          // `Option<T>` is optional in the schema, though the server sends `null`.
-          -readonly [K in keyof T as null extends T[K] ? K : never]?: Loose<T[K]> | null;
+          // `Option<T>` is optional in the schema, though the server sends
+          // `null`.
+          -readonly [K in keyof T as null extends T[K] ? K : never]?: Loose<
+            T[K]
+          > | null;
         }
       : T;
 type Absent<V> = undefined extends V ? null : never;
 /** Whether every `A` is a `B`. */
 type Fits<A, B> = [A] extends [B] ? true : false;
 type In<M extends keyof CollectionsStore> = Parameters<CollectionsStore[M]>[0];
-type Out<M extends keyof CollectionsStore> = Loose<Awaited<ReturnType<CollectionsStore[M]>>>;
+type Out<M extends keyof CollectionsStore> = Loose<
+  Awaited<ReturnType<CollectionsStore[M]>>
+>;
 
 describe("collections types against the generated client", () => {
   it("send what the server accepts", () => {
@@ -67,10 +73,16 @@ describe("collections types against the generated client", () => {
       Fits<Writable<In<"addProperty">>, Op<"collections.add_property">["input"]>
     >().toEqualTypeOf<true>();
     expectTypeOf<
-      Fits<Writable<In<"updateProperty">>, Op<"collections.update_property">["input"]>
+      Fits<
+        Writable<In<"updateProperty">>,
+        Op<"collections.update_property">["input"]
+      >
     >().toEqualTypeOf<true>();
     expectTypeOf<
-      Fits<Writable<In<"deleteProperty">>, Op<"collections.delete_property">["input"]>
+      Fits<
+        Writable<In<"deleteProperty">>,
+        Op<"collections.delete_property">["input"]
+      >
     >().toEqualTypeOf<true>();
     expectTypeOf<
       Fits<Writable<In<"exportCsv">>, Op<"collections.export_csv">["input"]>
@@ -79,15 +91,26 @@ describe("collections types against the generated client", () => {
       Fits<Writable<In<"importCsv">>, Op<"collections.import_csv">["input"]>
     >().toEqualTypeOf<true>();
     expectTypeOf<
-      Fits<Writable<In<"createFromCsv">>, Op<"collections.create_from_csv">["input"]>
+      Fits<
+        Writable<In<"createFromCsv">>,
+        Op<"collections.create_from_csv">["input"]
+      >
     >().toEqualTypeOf<true>();
   });
 
   it("read what the server returns", () => {
-    expectTypeOf<Fits<Op<"collections.list">["output"], Out<"list">>>().toEqualTypeOf<true>();
-    expectTypeOf<Fits<Op<"collections.get">["output"], Out<"info">>>().toEqualTypeOf<true>();
-    expectTypeOf<Fits<Op<"collections.query">["output"], Out<"query">>>().toEqualTypeOf<true>();
-    expectTypeOf<Fits<Op<"collections.get_row">["output"], Out<"getRow">>>().toEqualTypeOf<true>();
+    expectTypeOf<
+      Fits<Op<"collections.list">["output"], Out<"list">>
+    >().toEqualTypeOf<true>();
+    expectTypeOf<
+      Fits<Op<"collections.get">["output"], Out<"info">>
+    >().toEqualTypeOf<true>();
+    expectTypeOf<
+      Fits<Op<"collections.query">["output"], Out<"query">>
+    >().toEqualTypeOf<true>();
+    expectTypeOf<
+      Fits<Op<"collections.get_row">["output"], Out<"getRow">>
+    >().toEqualTypeOf<true>();
     expectTypeOf<
       Fits<Op<"collections.create_row">["output"], Out<"createRow">>
     >().toEqualTypeOf<true>();
@@ -109,6 +132,8 @@ describe("collections types against the generated client", () => {
     expectTypeOf<
       Fits<Op<"collections.create_from_csv">["output"], Out<"createFromCsv">>
     >().toEqualTypeOf<true>();
-    expectTypeOf<Fits<Op<"collections.embed">["output"], Out<"embed">>>().toEqualTypeOf<true>();
+    expectTypeOf<
+      Fits<Op<"collections.embed">["output"], Out<"embed">>
+    >().toEqualTypeOf<true>();
   });
 });

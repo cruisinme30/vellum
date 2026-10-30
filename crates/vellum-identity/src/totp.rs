@@ -82,16 +82,25 @@ pub fn code(secret: &[u8], step: u64) -> String {
 /// The step a presented code matches, if any: within the drift of `now`,
 /// and later than `after` (the last step accepted).
 #[must_use]
-pub fn verify(secret: &[u8], presented: &str, now_step: u64, after: Option<u64>) -> Option<u64> {
-    let presented: String = presented.chars().filter(|c| !c.is_whitespace()).collect();
+pub fn verify(
+    secret: &[u8],
+    presented: &str,
+    now_step: u64,
+    after: Option<u64>,
+) -> Option<u64> {
+    let presented: String =
+        presented.chars().filter(|c| !c.is_whitespace()).collect();
     if presented.len() != 6 || !presented.bytes().all(|b| b.is_ascii_digit()) {
         return None;
     }
     let mut found = None;
     // Every candidate is computed and compared, so timing says nothing
     // about which step matched.
-    for step in now_step.saturating_sub(DRIFT)..=now_step.saturating_add(DRIFT) {
-        let matches = bool::from(code(secret, step).as_bytes().ct_eq(presented.as_bytes()));
+    for step in now_step.saturating_sub(DRIFT)..=now_step.saturating_add(DRIFT)
+    {
+        let matches = bool::from(
+            code(secret, step).as_bytes().ct_eq(presented.as_bytes()),
+        );
         if matches && after.is_none_or(|last| step > last) && found.is_none() {
             found = Some(step);
         }
@@ -152,7 +161,11 @@ mod tests {
 
     #[test]
     fn the_link_names_the_account_and_secret() {
-        let link = uri(b"12345678901234567890", "Vellum", "priya@northstar.dev");
-        assert!(link.starts_with("otpauth://totp/Vellum%3Apriya%40northstar.dev?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&issuer=Vellum"));
+        let link =
+            uri(b"12345678901234567890", "Vellum", "priya@northstar.dev");
+        assert!(link.starts_with(
+            "otpauth://totp/Vellum%3Apriya%40northstar.dev\
+            ?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&issuer=Vellum"
+        ));
     }
 }

@@ -20,7 +20,9 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use axum::Router;
-use axum::extract::ws::{CloseFrame, Message as WsMessage, WebSocket, WebSocketUpgrade};
+use axum::extract::ws::{
+    CloseFrame, Message as WsMessage, WebSocket, WebSocketUpgrade,
+};
 use axum::extract::{Path, State};
 use axum::http::request::Parts;
 use axum::http::{HeaderMap, StatusCode, Uri};
@@ -52,7 +54,11 @@ pub trait Authorizer: Send + Sync + 'static {
     ///
     /// [`ErrorKind::Unauthenticated`], [`ErrorKind::PermissionDenied`] or
     /// [`ErrorKind::NotFound`] to refuse; any other kind is a failure.
-    async fn authorize(&self, request: &Parts, room: RoomKey) -> Result<(UserId, Access)>;
+    async fn authorize(
+        &self,
+        request: &Parts,
+        room: RoomKey,
+    ) -> Result<(UserId, Access)>;
 
     /// Checks an open connection again, with the upgrade request it was
     /// admitted on. The connection is closed as revoked unless this
@@ -62,7 +68,11 @@ pub trait Authorizer: Send + Sync + 'static {
     /// # Errors
     ///
     /// As [`Self::authorize`]; any error ends the connection.
-    async fn recheck(&self, request: &Parts, room: RoomKey) -> Result<(UserId, Access)> {
+    async fn recheck(
+        &self,
+        request: &Parts,
+        room: RoomKey,
+    ) -> Result<(UserId, Access)> {
         self.authorize(request, room).await
     }
 }
@@ -111,7 +121,8 @@ async fn upgrade(
     ws: WebSocketUpgrade,
     parts: Parts,
 ) -> Response {
-    let (Ok(space), Ok(doc)) = (space.parse::<SpaceId>(), doc.parse::<DocId>()) else {
+    let (Ok(space), Ok(doc)) = (space.parse::<SpaceId>(), doc.parse::<DocId>())
+    else {
         return (StatusCode::NOT_FOUND, "document not found").into_response();
     };
     let room = RoomKey { space, doc };
@@ -124,12 +135,21 @@ async fn upgrade(
     let (user, access, from_peer) = match (&state.cluster, forwarded) {
         (Some(cluster), Some(header)) => match cluster.verify(&header, room) {
             Some((user, access)) => (user, access, true),
-            None => return (StatusCode::FORBIDDEN, "bad forwarded join").into_response(),
+            None => {
+                return (StatusCode::FORBIDDEN, "bad forwarded join")
+                    .into_response();
+            }
         },
-        (None, Some(_)) => return (StatusCode::FORBIDDEN, "bad forwarded join").into_response(),
+        (None, Some(_)) => {
+            return (StatusCode::FORBIDDEN, "bad forwarded join")
+                .into_response();
+        }
         (_, None) => match state.authorizer.authorize(&parts, room).await {
             Ok((user, access)) => (user, access, false),
-            Err(err) => return (status_of(err.kind()), err.message().to_owned()).into_response(),
+            Err(err) => {
+                return (status_of(err.kind()), err.message().to_owned())
+                    .into_response();
+            }
         },
     };
     let request = JoinRequest {
@@ -170,9 +190,13 @@ async fn upgrade(
                 origin,
                 owner,
             };
-            ws.on_upgrade(move |socket| forward(socket, hop, hub, request, recheck))
+            ws.on_upgrade(move |socket| {
+                forward(socket, hop, hub, request, recheck)
+            })
         }
-        _ => ws.on_upgrade(move |socket| serve_checked(socket, hub, request, recheck)),
+        _ => ws.on_upgrade(move |socket| {
+            serve_checked(socket, hub, request, recheck)
+        }),
     }
 }
 
@@ -194,7 +218,11 @@ async fn forward(
     recheck: Option<Recheck>,
 ) {
     use tokio_tungstenite::tungstenite::client::IntoClientRequest as _;
-    let span = info_span!("collab.forward", room = %request.room, owner = %hop.owner.name);
+    let span = info_span!(
+        "collab.forward",
+        room = %request.room,
+        owner = %hop.owner.name
+    );
     if let Some(trace) = request.traceparent {
         trace.parent(&span);
     }
@@ -209,9 +237,15 @@ async fn forward(
             );
         }
         if let Some(trace) = request.traceparent {
-            let _ = headers.insert("traceparent", trace.to_string().parse().ok()?);
+            let _ =
+                headers.insert("traceparent", trace.to_string().parse().ok()?);
         }
-        match tokio::time::timeout(FORWARD_CONNECT, tokio_tungstenite::connect_async(call)).await {
+        match tokio::time::timeout(
+            FORWARD_CONNECT,
+            tokio_tungstenite::connect_async(call),
+        )
+        .await
+        {
             Ok(Ok((stream, _))) => Some(stream),
             Ok(Err(err)) => {
                 warn!(%err, "room owner unreachable; serving the room here");
@@ -268,7 +302,9 @@ async fn relay<S>(
                 if kept.is_none() || kept != before {
                     let _closed = up_tx.send(Up::Close(None)).await;
                     let reason = CloseReason::Revoked;
-                    let _closed = client_tx.send(close(reason.code(), reason.as_str())).await;
+                    let _closed = client_tx.send(
+                        close(reason.code(), reason.as_str())
+                    ).await;
                     break;
                 }
             }
@@ -284,7 +320,9 @@ async fn relay<S>(
                     }
                 };
                 if up_tx.send(out).await.is_err() {
-                    let _closed = client_tx.send(close(CloseReason::Shutdown.code(), "room closed")).await;
+                    let _closed = client_tx.send(
+                        close(CloseReason::Shutdown.code(), "room closed")
+                    ).await;
                     break;
                 }
             }
@@ -300,11 +338,15 @@ async fn relay<S>(
                             code: f.code.into(),
                             reason: f.reason.as_str().into(),
                         });
-                        let _closed = client_tx.send(WsMessage::Close(frame)).await;
+                        let _closed = client_tx.send(
+                            WsMessage::Close(frame)
+                        ).await;
                         break;
                     }
                     Some(Err(_)) | None => {
-                        let _closed = client_tx.send(close(CloseReason::Shutdown.code(), "room closed")).await;
+                        let _closed = client_tx.send(
+                            close(CloseReason::Shutdown.code(), "room closed")
+                        ).await;
                         break;
                     }
                 };
@@ -403,7 +445,9 @@ impl Watch {
 const fn is_refusal(kind: ErrorKind) -> bool {
     matches!(
         kind,
-        ErrorKind::Unauthenticated | ErrorKind::PermissionDenied | ErrorKind::NotFound
+        ErrorKind::Unauthenticated
+            | ErrorKind::PermissionDenied
+            | ErrorKind::NotFound
     )
 }
 
@@ -422,14 +466,23 @@ async fn serve_checked(
     request: JoinRequest,
     recheck: Option<Recheck>,
 ) {
-    let span = info_span!("collab.connection", room = %request.room, user = %request.user);
+    let span = info_span!(
+        "collab.connection",
+        room = %request.room,
+        user = %request.user
+    );
     if let Some(trace) = request.traceparent {
         trace.parent(&span);
     }
     bridge(socket, hub, request, recheck).instrument(span).await;
 }
 
-async fn bridge(socket: WebSocket, hub: Hub, request: JoinRequest, recheck: Option<Recheck>) {
+async fn bridge(
+    socket: WebSocket,
+    hub: Hub,
+    request: JoinRequest,
+    recheck: Option<Recheck>,
+) {
     let mut watch = Watch {
         hub: hub.clone(),
         room: request.room,
@@ -456,12 +509,19 @@ async fn bridge(socket: WebSocket, hub: Hub, request: JoinRequest, recheck: Opti
                 match incoming {
                     Some(Ok(WsMessage::Binary(frame))) => {
                         if sender.send(frame.to_vec()).await.is_err() {
-                            let _closed = sink.send(close(CloseReason::Shutdown.code(), "room closed")).await;
+                            let _closed = sink.send(
+                                close(
+                                    CloseReason::Shutdown.code(),
+                                    "room closed"
+                                )
+                            ).await;
                             break;
                         }
                     }
                     Some(Ok(WsMessage::Text(_))) => {
-                        let _closed = sink.send(close(1003, "binary frames only")).await;
+                        let _closed = sink.send(
+                            close(1003, "binary frames only")
+                        ).await;
                         break;
                     }
                     Some(Ok(WsMessage::Ping(_) | WsMessage::Pong(_))) => {}
@@ -475,18 +535,24 @@ async fn bridge(socket: WebSocket, hub: Hub, request: JoinRequest, recheck: Opti
                     }
                 }
                 Some(Outbound::Close(reason)) => {
-                    let _closed = sink.send(close(reason.code(), reason.as_str())).await;
+                    let _closed = sink.send(
+                        close(reason.code(), reason.as_str())
+                    ).await;
                     break;
                 }
                 None => {
-                    let _closed = sink.send(close(CloseReason::Shutdown.code(), "room closed")).await;
+                    let _closed = sink.send(
+                        close(CloseReason::Shutdown.code(), "room closed")
+                    ).await;
                     break;
                 }
             },
             _ = check.tick(), if watch.recheck.is_some() => {
                 if watch.run().await.is_none() {
                     let reason = CloseReason::Revoked;
-                    let _closed = sink.send(close(reason.code(), reason.as_str())).await;
+                    let _closed = sink.send(
+                        close(reason.code(), reason.as_str())
+                    ).await;
                     break;
                 }
             }
@@ -494,7 +560,9 @@ async fn bridge(socket: WebSocket, hub: Hub, request: JoinRequest, recheck: Opti
                 if last_heard.elapsed() > DEAD_AFTER {
                     break;
                 }
-                if sink.send(WsMessage::Ping(Vec::new().into())).await.is_err() {
+                if sink.send(
+                    WsMessage::Ping(Vec::new().into())
+                ).await.is_err() {
                     break;
                 }
             }
@@ -513,7 +581,8 @@ fn close(code: u16, reason: &'static str) -> WsMessage {
 mod tests {
     use super::*;
 
-    const SAMPLE: &str = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
+    const SAMPLE: &str =
+        "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
 
     #[test]
     fn reads_traceparent_from_header_then_query() {
@@ -538,6 +607,8 @@ mod tests {
                 .as_deref(),
             Some(other)
         );
-        assert!(traceparent(&HeaderMap::new(), &Uri::from_static("/s/d")).is_none());
+        assert!(
+            traceparent(&HeaderMap::new(), &Uri::from_static("/s/d")).is_none()
+        );
     }
 }

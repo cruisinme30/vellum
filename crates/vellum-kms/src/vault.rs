@@ -72,8 +72,11 @@ impl VaultTransit {
     /// [`CryptoError::Provider`] if `VAULT_ADDR` or `VAULT_TOKEN` is missing,
     /// or any error of [`VaultTransit::new`].
     pub fn from_env(mount: &str, key: &str) -> Result<Self, CryptoError> {
-        let var = |name: &str| std::env::var(name).ok().filter(|v| !v.is_empty());
-        let missing = |name: &str| CryptoError::Provider(format!("{BACKEND}: {name} is not set"));
+        let var =
+            |name: &str| std::env::var(name).ok().filter(|v| !v.is_empty());
+        let missing = |name: &str| {
+            CryptoError::Provider(format!("{BACKEND}: {name} is not set"))
+        };
         let addr = var("VAULT_ADDR").ok_or_else(|| missing("VAULT_ADDR"))?;
         let token = var("VAULT_TOKEN").ok_or_else(|| missing("VAULT_TOKEN"))?;
         let provider = Self::new(addr, token, mount, key)?;
@@ -115,7 +118,11 @@ impl KeyProvider for VaultTransit {
         self.current.clone()
     }
 
-    #[tracing::instrument(name = "kms.wrap", skip_all, fields(backend = BACKEND, kek_id = %self.current))]
+    #[tracing::instrument(
+        name = "kms.wrap",
+        skip_all,
+        fields(backend = BACKEND, kek_id = %self.current)
+    )]
     async fn wrap(&self, dek: &SecretKey) -> Result<WrappedDek, CryptoError> {
         let started = Instant::now();
         let result = async {
@@ -125,7 +132,8 @@ impl KeyProvider for VaultTransit {
                 "associated_data": b64(http::aad(&self.current).as_bytes()),
             });
             let response = self.call("encrypt", &self.current, &body).await?;
-            let ciphertext = http::string_at(BACKEND, &response, "/data/ciphertext")?;
+            let ciphertext =
+                http::string_at(BACKEND, &response, "/data/ciphertext")?;
             Ok(WrappedDek {
                 kek_id: self.current.clone(),
                 blob: ciphertext.as_bytes().to_vec(),
@@ -135,12 +143,21 @@ impl KeyProvider for VaultTransit {
         http::record(BACKEND, "wrap", started, result)
     }
 
-    #[tracing::instrument(name = "kms.unwrap", skip_all, fields(backend = BACKEND, kek_id = %wrapped.kek_id))]
-    async fn unwrap(&self, wrapped: &WrappedDek) -> Result<SecretKey, CryptoError> {
+    #[tracing::instrument(
+        name = "kms.unwrap",
+        skip_all,
+        fields(backend = BACKEND, kek_id = %wrapped.kek_id)
+    )]
+    async fn unwrap(
+        &self,
+        wrapped: &WrappedDek,
+    ) -> Result<SecretKey, CryptoError> {
         let started = Instant::now();
         let result = async {
-            let ciphertext = std::str::from_utf8(&wrapped.blob)
-                .map_err(|_| CryptoError::Malformed("vault ciphertext is not text"))?;
+            let ciphertext =
+                std::str::from_utf8(&wrapped.blob).map_err(|_| {
+                    CryptoError::Malformed("vault ciphertext is not text")
+                })?;
             let body = json!({
                 "ciphertext": ciphertext,
                 "associated_data": b64(http::aad(&wrapped.kek_id).as_bytes()),
@@ -169,7 +186,9 @@ fn parse(id: &KekId) -> Result<(&str, &str), CryptoError> {
     id.as_str()
         .strip_prefix(PREFIX)
         .and_then(|rest| rest.rsplit_once('/'))
-        .filter(|(mount, key)| http::safe_segment(mount, &['/']) && http::safe_segment(key, &[]))
+        .filter(|(mount, key)| {
+            http::safe_segment(mount, &['/']) && http::safe_segment(key, &[])
+        })
         .ok_or_else(|| CryptoError::UnknownKek(id.clone()))
 }
 

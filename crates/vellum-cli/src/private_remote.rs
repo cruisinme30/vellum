@@ -25,12 +25,17 @@ use base64::engine::general_purpose::STANDARD;
 use bytes::Bytes;
 use futures::stream::{self, BoxStream, StreamExt as _};
 use serde::de::DeserializeOwned;
-use vellum_crypto::recipients::{RecipientPublic, is_recipient_envelope, recipients_of, seal_for};
-use vellum_e2e::{DeviceKeyInfo, ObjectInfo, ObjectList, SealedObject, SpaceKeys, Stored};
+use vellum_crypto::recipients::{
+    RecipientPublic, is_recipient_envelope, recipients_of, seal_for,
+};
+use vellum_e2e::{
+    DeviceKeyInfo, ObjectInfo, ObjectList, SealedObject, SpaceKeys, Stored,
+};
 use vellum_kernel::SpaceId;
 use vellum_private::DeviceIdentity;
 use vellum_store::{
-    Blob, BlobEntry, BlobMeta, BlobPath, BlobStore, Etag, Precondition, StoreError, StoreResult,
+    Blob, BlobEntry, BlobMeta, BlobPath, BlobStore, Etag, Precondition,
+    StoreError, StoreResult,
 };
 
 use crate::pins::Pins;
@@ -112,7 +117,8 @@ impl E2eClient {
     /// The URL is not http(s), or plain http to a host other than this
     /// machine, or the token is empty.
     pub fn new(server: &str, token: &str) -> Result<Self, String> {
-        let base = url::Url::parse(server.trim()).map_err(|e| format!("--server: {e}"))?;
+        let base = url::Url::parse(server.trim())
+            .map_err(|e| format!("--server: {e}"))?;
         let local = matches!(
             base.host_str(),
             Some("localhost" | "127.0.0.1" | "[::1]" | "::1")
@@ -123,7 +129,9 @@ impl E2eClient {
             _ => return Err("--server must be an https:// URL".into()),
         }
         if token.trim().is_empty() {
-            return Err(format!("set {TOKEN_VAR} to an API token for this server"));
+            return Err(format!(
+                "set {TOKEN_VAR} to an API token for this server"
+            ));
         }
         let http = reqwest::Client::builder()
             .timeout(TIMEOUT)
@@ -177,7 +185,9 @@ impl E2eClient {
             message: body
                 .get("message")
                 .and_then(serde_json::Value::as_str)
-                .unwrap_or_else(|| status.canonical_reason().unwrap_or("failed"))
+                .unwrap_or_else(|| {
+                    status.canonical_reason().unwrap_or("failed")
+                })
                 .to_owned(),
         })
     }
@@ -202,7 +212,8 @@ impl E2eClient {
         public_key: &str,
         label: &str,
     ) -> Result<DeviceKeyInfo, ApiFailure> {
-        let body = serde_json::json!({ "public_key": public_key, "label": label });
+        let body =
+            serde_json::json!({ "public_key": public_key, "label": label });
         self.send(self.http.post(self.url(space, "keys")?).json(&body))
             .await
     }
@@ -212,7 +223,10 @@ impl E2eClient {
     /// # Errors
     ///
     /// The server refused or could not be reached.
-    pub async fn objects(&self, space: SpaceId) -> Result<Vec<ObjectInfo>, ApiFailure> {
+    pub async fn objects(
+        &self,
+        space: SpaceId,
+    ) -> Result<Vec<ObjectInfo>, ApiFailure> {
         let mut all = Vec::new();
         let mut after: Option<String> = None;
         loop {
@@ -234,7 +248,11 @@ impl E2eClient {
     /// # Errors
     ///
     /// The server refused, could not be reached, or sent bad base64.
-    pub async fn get(&self, space: SpaceId, path: &str) -> Result<(Vec<u8>, String), ApiFailure> {
+    pub async fn get(
+        &self,
+        space: SpaceId,
+        path: &str,
+    ) -> Result<(Vec<u8>, String), ApiFailure> {
         let object = self.fetch(space, path, false).await?;
         Ok((object.bytes, object.etag))
     }
@@ -258,11 +276,12 @@ impl E2eClient {
             let _ = url.query_pairs_mut().append_pair("plaintext", "true");
         }
         let object: SealedObject = self.send(self.http.get(url)).await?;
-        let bytes = STANDARD.decode(object.envelope).map_err(|_| ApiFailure {
-            status: 0,
-            code: "internal".into(),
-            message: "the server sent bad base64".into(),
-        })?;
+        let bytes =
+            STANDARD.decode(object.envelope).map_err(|_| ApiFailure {
+                status: 0,
+                code: "internal".into(),
+                message: "the server sent bad base64".into(),
+            })?;
         Ok(Fetched {
             bytes,
             etag: object.etag,
@@ -310,7 +329,11 @@ pub async fn enrol(
         .enrol(space, &identity.public_hex(), label)
         .await
         .map_err(|e| e.to_string())?;
-    tracing::info!(space = %space, fingerprint = %enrolled.fingerprint, "device enrolled");
+    tracing::info!(
+        space = %space,
+        fingerprint = %enrolled.fingerprint,
+        "device enrolled"
+    );
     // A device joining a space trusts the keys it finds there, its own
     // included; any key that appears later needs trusting by hand.
     let server = client.server();
@@ -370,7 +393,9 @@ pub async fn reseal(
 ) -> Result<ResealReport, String> {
     let keys = client.keys(space).await.map_err(|e| e.to_string())?;
     if keys.keys.is_empty() {
-        return Err("this space has no device keys; enrol a device first".into());
+        return Err(
+            "this space has no device keys; enrol a device first".into()
+        );
     }
     let server = client.server();
     let pinned = pins.load(&server, space)?;
@@ -418,7 +443,8 @@ pub async fn reseal(
             fetched.bytes
         };
         let was_sealed = fetched.sealed;
-        let sealed = seal_for(&recipients, &plain).map_err(|e| format!("{}: {e}", object.path))?;
+        let sealed = seal_for(&recipients, &plain)
+            .map_err(|e| format!("{}: {e}", object.path))?;
         match client
             .put(space, &object.path, &sealed, Some(&fetched.etag))
             .await
@@ -429,7 +455,8 @@ pub async fn reseal(
             Err(e) => return Err(e.to_string()),
         }
     }
-    let trusted: BTreeSet<String> = keys.keys.into_iter().map(|k| k.fingerprint).collect();
+    let trusted: BTreeSet<String> =
+        keys.keys.into_iter().map(|k| k.fingerprint).collect();
     pins.save(&server, space, &trusted)?;
     tracing::info!(
         space = %space,
@@ -451,13 +478,18 @@ fn check_trust(
 ) -> Result<(), String> {
     let untrusted: Vec<&DeviceKeyInfo> = keys
         .iter()
-        .filter(|k| !pinned.contains(&k.fingerprint) && !trust.contains(&k.fingerprint))
+        .filter(|k| {
+            !pinned.contains(&k.fingerprint) && !trust.contains(&k.fingerprint)
+        })
         .collect();
     if !untrusted.is_empty() {
-        let fingerprints: Vec<&str> = untrusted.iter().map(|k| k.fingerprint.as_str()).collect();
-        let labels: Vec<&str> = untrusted.iter().map(|k| k.label.as_str()).collect();
+        let fingerprints: Vec<&str> =
+            untrusted.iter().map(|k| k.fingerprint.as_str()).collect();
+        let labels: Vec<&str> =
+            untrusted.iter().map(|k| k.label.as_str()).collect();
         return Err(format!(
-            "{UNTRUSTED}{} ({}); compare each fingerprint with its owner, then run again with --trust <fingerprint>",
+            "{UNTRUSTED}{} ({}); compare each fingerprint with its owner, then \
+                run again with --trust <fingerprint>",
             fingerprints.join(","),
             labels.join(", ")
         ));
@@ -466,13 +498,17 @@ fn check_trust(
 }
 
 /// The space's keys as recipients, each checked against its fingerprint.
-fn recipients_from(keys: &[DeviceKeyInfo]) -> Result<Vec<RecipientPublic>, String> {
+fn recipients_from(
+    keys: &[DeviceKeyInfo],
+) -> Result<Vec<RecipientPublic>, String> {
     keys.iter()
         .map(|k| {
             let bytes: [u8; 32] = hex::decode(&k.public_key)
                 .ok()
                 .and_then(|b| b.try_into().ok())
-                .ok_or_else(|| format!("the server sent a malformed key for {}", k.label))?;
+                .ok_or_else(|| {
+                    format!("the server sent a malformed key for {}", k.label)
+                })?;
             let public = RecipientPublic::from_bytes(bytes);
             if hex::encode(public.fingerprint().to_bytes()) != k.fingerprint {
                 return Err(format!(
@@ -525,7 +561,9 @@ fn read_only() -> StoreError {
 fn system_time(at: vellum_kernel::Timestamp) -> SystemTime {
     u64::try_from(at.unix_ms())
         .ok()
-        .and_then(|ms| SystemTime::UNIX_EPOCH.checked_add(Duration::from_millis(ms)))
+        .and_then(|ms| {
+            SystemTime::UNIX_EPOCH.checked_add(Duration::from_millis(ms))
+        })
         .unwrap_or(SystemTime::UNIX_EPOCH)
 }
 
@@ -557,7 +595,12 @@ impl BlobStore for RemoteSpaces {
         Ok(self.get(path).await?.meta)
     }
 
-    async fn put(&self, _: &BlobPath, _: Bytes, _: Precondition) -> StoreResult<BlobMeta> {
+    async fn put(
+        &self,
+        _: &BlobPath,
+        _: Bytes,
+        _: Precondition,
+    ) -> StoreResult<BlobMeta> {
         Err(read_only())
     }
 
@@ -565,11 +608,18 @@ impl BlobStore for RemoteSpaces {
         Err(read_only())
     }
 
-    async fn rename(&self, _: &BlobPath, _: &BlobPath) -> StoreResult<BlobMeta> {
+    async fn rename(
+        &self,
+        _: &BlobPath,
+        _: &BlobPath,
+    ) -> StoreResult<BlobMeta> {
         Err(read_only())
     }
 
-    fn list(&self, dir: Option<&BlobPath>) -> BoxStream<'static, StoreResult<BlobEntry>> {
+    fn list(
+        &self,
+        dir: Option<&BlobPath>,
+    ) -> BoxStream<'static, StoreResult<BlobEntry>> {
         let client = self.client.clone();
         let dir = dir.cloned();
         stream::once(async move {
@@ -579,7 +629,9 @@ impl BlobStore for RemoteSpaces {
                 ))];
             };
             let (space, prefix) = match dir.as_str().split_once('/') {
-                Some((space, prefix)) => (space.to_owned(), format!("{prefix}/")),
+                Some((space, prefix)) => {
+                    (space.to_owned(), format!("{prefix}/"))
+                }
                 None => (dir.as_str().to_owned(), String::new()),
             };
             let Ok(space) = space.parse::<SpaceId>() else {

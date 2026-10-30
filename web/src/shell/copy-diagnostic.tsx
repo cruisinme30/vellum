@@ -3,7 +3,11 @@
 
 import { useState } from "react";
 
-import { diagnosticText, recentDiagnostic, type Diagnostic } from "../data/failure";
+import {
+  diagnosticText,
+  recentDiagnostic,
+  type Diagnostic,
+} from "../data/failure";
 import { useT } from "../i18n/i18n";
 
 import { Icon } from "./icon";
@@ -22,7 +26,9 @@ export function CopyDiagnostic({
   readonly diagnostic?: Diagnostic | undefined;
 }) {
   const t = useT();
-  const [state, setState] = useState<"idle" | "copied" | { manual: string }>("idle");
+  const [state, setState] = useState<"idle" | "copied" | { manual: string }>(
+    "idle",
+  );
   const found =
     diagnostic ??
     (message === undefined

@@ -25,20 +25,26 @@ impl Cluster {
     /// A throwaway Postgres, or the server at `VELLUM_TEST_POSTGRES`
     /// (`postgres://user:pass@host:port`) when it is set.
     async fn start() -> Result<Self, Box<dyn std::error::Error>> {
-        let (container, base) = if let Ok(base) = std::env::var("VELLUM_TEST_POSTGRES") {
+        let (container, base) = if let Ok(base) =
+            std::env::var("VELLUM_TEST_POSTGRES")
+        {
             (None, base)
         } else {
-            let container = Postgres::default().with_tag("17-alpine").start().await?;
+            let container =
+                Postgres::default().with_tag("17-alpine").start().await?;
             let port = container.get_host_port_ipv4(5432).await?;
             let base = format!("postgres://postgres:postgres@127.0.0.1:{port}");
             (Some(container), base)
         };
         let suffix = format!("_{}", ObjectId::generate().as_uuid().simple());
-        let mut conn = PgConnection::connect(&format!("{base}/postgres")).await?;
+        let mut conn =
+            PgConnection::connect(&format!("{base}/postgres")).await?;
         for db in ["main", "eu", "us"] {
-            let _ = sqlx::query(sqlx::AssertSqlSafe(format!("CREATE DATABASE {db}{suffix}")))
-                .execute(&mut conn)
-                .await?;
+            let _ = sqlx::query(sqlx::AssertSqlSafe(format!(
+                "CREATE DATABASE {db}{suffix}"
+            )))
+            .execute(&mut conn)
+            .await?;
         }
         Ok(Self {
             _container: container,
@@ -74,7 +80,8 @@ impl Cluster {
     }
 }
 
-const ALL_SPACES: [&str; 3] = ["drives/shared/engineering", "tasks/ada", "teams/ENG"];
+const ALL_SPACES: [&str; 3] =
+    ["drives/shared/engineering", "tasks/ada", "teams/ENG"];
 
 #[tokio::test]
 async fn new_spaces_go_home_and_moved_spaces_follow_the_map() {
@@ -188,7 +195,8 @@ async fn a_moved_space_takes_all_its_rows_along() {
     let mut eu = PgConnection::connect(&cluster.url("eu")).await.unwrap();
     let _ = sqlx::query(
         "INSERT INTO user_doc_state (space_id, user_id, doc_id, starred_at) \
-         SELECT space_id, gen_random_uuid(), doc_id, 1 FROM documents WHERE space_id = $1",
+         SELECT space_id, gen_random_uuid(), doc_id, 1 FROM documents WHERE \
+         space_id = $1",
     )
     .bind(fx.eng_space.as_uuid())
     .execute(&mut eu)

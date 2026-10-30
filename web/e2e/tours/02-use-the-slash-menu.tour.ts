@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-// Video 2 of 10: use the slash menu (docs/user.book/start/README.md#slash-menu).
+// Video 2 of 10: use the slash menu
+// (docs/user.book/start/README.md#slash-menu).
 
 import { expect, test } from "./tour";
 
@@ -15,13 +16,23 @@ test("use the slash menu", async ({ page, tour }) => {
     await page.keyboard.press("End");
     await page.keyboard.press("Enter");
   });
-  await tour.scene("Type a slash, then a few letters to filter the blocks.", async () => {
-    await page.keyboard.type("/callout", { delay: 120 });
-    await expect(page.getByRole("listbox", { name: "Blocks" })).toBeVisible();
-  });
-  await tour.scene("Press Enter to insert the highlighted block, then type.", async () => {
-    await page.keyboard.press("Enter");
-    await page.keyboard.type("Freeze the gateway config on 10 November.", { delay: 40 });
-    await expect(editor.getByRole("note").last()).toContainText("Freeze the gateway config");
-  });
+  await tour.scene(
+    "Type a slash, then a few letters to filter the blocks.",
+    async () => {
+      await page.keyboard.type("/callout", { delay: 120 });
+      await expect(page.getByRole("listbox", { name: "Blocks" })).toBeVisible();
+    },
+  );
+  await tour.scene(
+    "Press Enter to insert the highlighted block, then type.",
+    async () => {
+      await page.keyboard.press("Enter");
+      await page.keyboard.type("Freeze the gateway config on 10 November.", {
+        delay: 40,
+      });
+      await expect(editor.getByRole("note").last()).toContainText(
+        "Freeze the gateway config",
+      );
+    },
+  );
 });

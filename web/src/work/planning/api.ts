@@ -81,7 +81,11 @@ export interface PlanningApi {
   projects(): Promise<ProjectOut[]>;
   project(id: string): Promise<ProjectOut>;
   createProject(project: NewProject): Promise<ProjectOut>;
-  addMilestone(project: string, name: string, targetDate?: string): Promise<ProjectOut>;
+  addMilestone(
+    project: string,
+    name: string,
+    targetDate?: string,
+  ): Promise<ProjectOut>;
   /** A project's issues, open and recently closed, most important first. */
   projectIssues(project: string): Promise<IssueOut[]>;
   setMilestone(issue: string, milestone: string): Promise<IssueOut>;
@@ -101,7 +105,11 @@ export interface PlanningApi {
   createIssue(draft: IssueDraft): Promise<IssueOut>;
   insights(question: InsightsQuestion): Promise<InsightsOut>;
   forms(team: string): Promise<FormOut[]>;
-  submitForm(team: string, slug: string, answers: Record<string, string>): Promise<IssueOut>;
+  submitForm(
+    team: string,
+    slug: string,
+    answers: Record<string, string>,
+  ): Promise<IssueOut>;
   /** The issue's triage brief, with any suggestion waiting for a person. */
   brief(issue: string): Promise<BriefOut>;
   acceptSuggestion(issue: string): Promise<IssueOut>;
@@ -117,7 +125,8 @@ const issue = (key: string) => `${WORK}/issues/${segment(key)}`;
 function compact<T extends object>(value: T): Partial<T> {
   return Object.fromEntries(
     Object.entries(value).filter(
-      ([, v]) => v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0),
+      ([, v]) =>
+        v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0),
     ),
   ) as Partial<T>;
 }
@@ -134,11 +143,20 @@ export function createHttpPlanningApi(http: Http): PlanningApi {
       return found.projects;
     },
     project: (id) => http.get<ProjectOut>(project(id)),
-    createProject: (draft) => http.send<ProjectOut>("POST", `${WORK}/projects`, compact(draft)),
+    createProject: (draft) =>
+      http.send<ProjectOut>("POST", `${WORK}/projects`, compact(draft)),
     addMilestone: (id, name, target_date) =>
-      http.send<ProjectOut>("POST", `${project(id)}/milestones`, compact({ name, target_date })),
+      http.send<ProjectOut>(
+        "POST",
+        `${project(id)}/milestones`,
+        compact({ name, target_date }),
+      ),
     async projectIssues(id) {
-      const filter = JSON.stringify({ field: "project", op: "is", values: [id] });
+      const filter = JSON.stringify({
+        field: "project",
+        op: "is",
+        values: [id],
+      });
       const found = await http.get<IssueGroups>(`${WORK}/issues`, {
         filter,
         group_by: "none",
@@ -147,7 +165,8 @@ export function createHttpPlanningApi(http: Http): PlanningApi {
       });
       return found.groups.flatMap((group) => group.issues);
     },
-    setMilestone: (key, milestone) => http.send<IssueOut>("PATCH", issue(key), { milestone }),
+    setMilestone: (key, milestone) =>
+      http.send<IssueOut>("PATCH", issue(key), { milestone }),
     async recurring(team) {
       const filter = JSON.stringify({ field: "repeat", op: "is_not_empty" });
       const found = await http.get<IssueGroups>(`${WORK}/issues`, {
@@ -160,7 +179,11 @@ export function createHttpPlanningApi(http: Http): PlanningApi {
       return found.groups.flatMap((group) => group.issues);
     },
     setRepeat: (key, repeat, due) =>
-      http.send<IssueOut>("PATCH", issue(key), due === undefined ? { repeat } : { due, repeat }),
+      http.send<IssueOut>(
+        "PATCH",
+        issue(key),
+        due === undefined ? { repeat } : { due, repeat },
+      ),
     async updates(id) {
       const found = await http.get<UpdatesOut>(`${project(id)}/updates`);
       return found.updates;
@@ -172,28 +195,45 @@ export function createHttpPlanningApi(http: Http): PlanningApi {
       return found.initiatives;
     },
     createInitiative: (initiative) =>
-      http.send<InitiativeOut>("POST", `${WORK}/initiatives`, compact(initiative)),
+      http.send<InitiativeOut>(
+        "POST",
+        `${WORK}/initiatives`,
+        compact(initiative),
+      ),
     async templates(team) {
-      const found = await http.get<TemplatesOut>(`${WORK}/teams/${segment(team)}/templates`);
+      const found = await http.get<TemplatesOut>(
+        `${WORK}/teams/${segment(team)}/templates`,
+      );
       return found.templates;
     },
     async createIssue(draft) {
-      const created = await http.send<CreatedIssue>("POST", `${WORK}/issues`, compact(draft));
+      const created = await http.send<CreatedIssue>(
+        "POST",
+        `${WORK}/issues`,
+        compact(draft),
+      );
       return created.issue;
     },
     insights: (q) => http.get<InsightsOut>(`${WORK}/insights`, compact(q)),
     async forms(team) {
-      const found = await http.get<FormsOut>(`${WORK}/teams/${segment(team)}/forms`);
+      const found = await http.get<FormsOut>(
+        `${WORK}/teams/${segment(team)}/forms`,
+      );
       return found.forms;
     },
     submitForm: (team, slug, answers) =>
-      http.send<IssueOut>("POST", `${WORK}/teams/${segment(team)}/forms/${segment(slug)}`, {
-        answers,
-      }),
+      http.send<IssueOut>(
+        "POST",
+        `${WORK}/teams/${segment(team)}/forms/${segment(slug)}`,
+        {
+          answers,
+        },
+      ),
     brief: (key) => http.get<BriefOut>(`${issue(key)}/triage/brief`),
     acceptSuggestion: (key) =>
       http.send<IssueOut>("POST", `${issue(key)}/triage/suggestion/accept`, {}),
-    dismissSuggestion: (key) => http.send<IssueOut>("DELETE", `${issue(key)}/triage/suggestion`),
+    dismissSuggestion: (key) =>
+      http.send<IssueOut>("DELETE", `${issue(key)}/triage/suggestion`),
   };
 }
 

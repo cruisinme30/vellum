@@ -22,7 +22,8 @@ use vellum_security::upload::{
 };
 use zip::write::SimpleFileOptions;
 
-const EICAR: &[u8] = b"X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*";
+const EICAR: &[u8] =
+    b"X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*";
 
 fn zip_of(name: &str, data: &[u8], method: zip::CompressionMethod) -> Vec<u8> {
     let mut out = zip::ZipWriter::new(Cursor::new(Vec::new()));
@@ -78,7 +79,8 @@ fn zip_bombs_are_refused_before_the_scan() {
     // The total counts nested archives too.
     let mut policy = UploadPolicy::default();
     policy.max_expanded_bytes = 4 * 1024 * 1024;
-    let text: Vec<u8> = (0..6 * 1024 * 1024_u32).map(|i| (i % 251) as u8).collect();
+    let text: Vec<u8> =
+        (0..6 * 1024 * 1024_u32).map(|i| (i % 251) as u8).collect();
     let err = policy
         .clean("big.zip", deflated("inner.zip", &deflated("t.bin", &text)))
         .unwrap_err();
@@ -198,7 +200,8 @@ async fn scans_in_flight_are_bounded() {
     // clamd's count is exact: no client gives up while clamd still holds
     // its connection.
     let peak = Arc::new(AtomicUsize::new(0));
-    let address = slow_clamd(Duration::from_millis(100), Arc::clone(&peak)).await;
+    let address =
+        slow_clamd(Duration::from_millis(100), Arc::clone(&peak)).await;
     let clamd = Clamd::with_in_flight(address, Duration::from_mins(1), 2);
     let scans: Vec<_> = (0..12)
         .map(|_| {
@@ -255,9 +258,10 @@ async fn check_runs_the_scanner_on_what_is_stored() {
         Duration::from_secs(5),
     );
     let policy = UploadPolicy::default();
-    let err = check(policy, Some(&clamd), "eicar.txt".to_owned(), EICAR.to_vec())
-        .await
-        .unwrap_err();
+    let err =
+        check(policy, Some(&clamd), "eicar.txt".to_owned(), EICAR.to_vec())
+            .await
+            .unwrap_err();
     assert!(matches!(err, UploadError::Infected(_)), "{err:?}");
     let ok = check(
         policy,

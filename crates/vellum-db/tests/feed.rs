@@ -9,9 +9,12 @@ use vellum_db::feed::{Change, Feed};
 use vellum_db::{Index, IndexConfig};
 
 async fn feed(dir: &tempfile::TempDir) -> Feed {
-    let index = Index::open(&IndexConfig::sqlite(dir.path().join("index.sqlite"), None))
-        .await
-        .unwrap();
+    let index = Index::open(&IndexConfig::sqlite(
+        dir.path().join("index.sqlite"),
+        None,
+    ))
+    .await
+    .unwrap();
     Feed::new(index)
 }
 

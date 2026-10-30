@@ -43,10 +43,18 @@ const SETTINGS = {
   last_number: 40,
   workflow: {
     default: "todo",
-    statuses: [...TEAM.statuses, { key: "duplicate", name: "Duplicate", category: "duplicate" }],
+    statuses: [
+      ...TEAM.statuses,
+      { key: "duplicate", name: "Duplicate", category: "duplicate" },
+    ],
   },
   estimates: { scale: "fibonacci", allow_zero: false, unestimated_points: 1 },
-  cycles: { duration_weeks: 2, start_day: "monday", cooldown_weeks: 0, upcoming: 3 },
+  cycles: {
+    duration_weeks: 2,
+    start_day: "monday",
+    cooldown_weeks: 0,
+    upcoming: 3,
+  },
   triage: true,
   triage_rules: [
     {
@@ -68,10 +76,18 @@ const SETTINGS = {
         when: { field: "priority", op: "is", values: ["urgent"] },
         within_hours: 24,
       },
-      { name: "High", when: { field: "priority", op: "is", values: ["high"] }, within_hours: 168 },
+      {
+        name: "High",
+        when: { field: "priority", op: "is", values: ["high"] },
+        within_hours: 168,
+      },
     ],
   },
-  git: { branch_pushed: "in-progress", pr_opened: "in-review", pr_merged: "done" },
+  git: {
+    branch_pushed: "in-progress",
+    pr_opened: "in-review",
+    pr_merged: "done",
+  },
   // Templates and recurring issues (#144).
   templates: [
     {
@@ -131,7 +147,8 @@ const TITLES = [
   "Burn-up chart skips weekends in the Pacific zone",
   "Slash menu clipped at 200 % zoom",
   "Export to Word drops table captions",
-  "A very long issue title that keeps going to check that cards wrap their text instead of overflowing the column on narrow phones",
+  "A very long issue title that keeps going to check that cards wrap their " +
+    "text instead of overflowing the column on narrow phones",
 ];
 
 function issue(n: number, state: string, category: string) {
@@ -169,14 +186,21 @@ const BOARD = TEAM.statuses
     issues:
       status.key === "canceled"
         ? []
-        : [0, 1].map((row) => issue(column * 2 + row + 10, status.key, status.category)),
+        : [0, 1].map((row) =>
+            issue(column * 2 + row + 10, status.key, status.category),
+          ),
   }));
 
 const INBOX = [1, 2, 3].map((n) => issue(n, "triage", "triage"));
 
 /** Open repeating issues, as the templates screen asks for them. */
 const RECURRING = [
-  { ...issue(30, "todo", "unstarted"), title: "On-call handoff", due: "2026-11-02", repeat: "1w" },
+  {
+    ...issue(30, "todo", "unstarted"),
+    title: "On-call handoff",
+    due: "2026-11-02",
+    repeat: "1w",
+  },
   {
     ...issue(31, "backlog", "backlog"),
     title: "Monthly dependency audit",
@@ -224,7 +248,11 @@ const CYCLES = {
       starts_on: "2026-10-26",
       ends_on: "2026-11-09",
       completed_points: 8,
-      burn_up: [0, 1, 2, 3, 4].map((n) => ({ date: day(n), scope: 20 + n, completed: n * 2 })),
+      burn_up: [0, 1, 2, 3, 4].map((n) => ({
+        date: day(n),
+        scope: 20 + n,
+        completed: n * 2,
+      })),
     },
     {
       key: "2026-C23",
@@ -261,9 +289,12 @@ const json = (body: unknown) => ({ json: body });
 export async function workRoutes(context: BrowserContext): Promise<void> {
   await context.route("**/api/v1/drive/**", (route) => {
     const path = new URL(route.request().url()).pathname;
-    if (path.endsWith("/my-drive")) return route.fulfill(json({ space: SPACE }));
-    if (path.endsWith("/shared-drives")) return route.fulfill(json({ spaces: [] }));
-    if (path.endsWith("/tree")) return route.fulfill(json({ items: [], truncated: false }));
+    if (path.endsWith("/my-drive"))
+      return route.fulfill(json({ space: SPACE }));
+    if (path.endsWith("/shared-drives"))
+      return route.fulfill(json({ spaces: [] }));
+    if (path.endsWith("/tree"))
+      return route.fulfill(json({ items: [], truncated: false }));
     return route.fulfill(json({ items: [] }));
   });
   await context.route("**/api/v1/work/**", (route) => {
@@ -271,15 +302,27 @@ export async function workRoutes(context: BrowserContext): Promise<void> {
     const path = url.pathname.replace(/^\/api\/v1\/work/, "");
     if (path === "/teams") return route.fulfill(json({ teams: [TEAM] }));
     if (path === "/views") return route.fulfill(json({ views: VIEWS }));
-    if (path === "/issues" && url.searchParams.get("filter")?.includes('"repeat"'))
-      return route.fulfill(json({ groups: [{ key: undefined, issues: RECURRING }] }));
+    if (
+      path === "/issues" &&
+      url.searchParams.get("filter")?.includes('"repeat"')
+    )
+      return route.fulfill(
+        json({ groups: [{ key: undefined, issues: RECURRING }] }),
+      );
     if (path === "/issues") return route.fulfill(json({ groups: BOARD }));
-    if (path === "/projects") return route.fulfill(json({ projects: PROJECTS }));
+    if (path === "/projects")
+      return route.fulfill(json({ projects: PROJECTS }));
     if (path.endsWith("/inbox"))
-      return route.fulfill(json({ groups: [{ key: undefined, issues: INBOX }] }));
+      return route.fulfill(
+        json({ groups: [{ key: undefined, issues: INBOX }] }),
+      );
     if (path.endsWith("/cycles")) return route.fulfill(json(CYCLES));
-    if (path.endsWith("/settings")) return route.fulfill(json({ settings: SETTINGS, yaml: "" }));
+    if (path.endsWith("/settings"))
+      return route.fulfill(json({ settings: SETTINGS, yaml: "" }));
     if (path === "/me/issues") return route.fulfill(json(MINE));
-    return route.fulfill({ status: 404, json: { code: "not_found", message: path } });
+    return route.fulfill({
+      status: 404,
+      json: { code: "not_found", message: path },
+    });
   });
 }

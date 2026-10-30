@@ -181,11 +181,11 @@ macro_rules! each {
     };
 }
 
-const ENQUEUE: &str = "INSERT INTO jobs (queue, kind, payload, idem_key, state, attempts, \
-     max_attempts, run_at_ms, traceparent, created_ms, updated_ms) \
-     VALUES ($1, $2, $3, $4, 'ready', 0, $5, $6, $7, $8, $8) \
-     ON CONFLICT (queue, idem_key) \
-     WHERE idem_key IS NOT NULL AND state IN ('ready', 'running') DO NOTHING RETURNING id";
+const ENQUEUE: &str = "INSERT INTO jobs (queue, kind, payload, idem_key, \
+     state, attempts, max_attempts, run_at_ms, traceparent, created_ms, \
+     updated_ms) VALUES ($1, $2, $3, $4, 'ready', 0, $5, $6, $7, $8, $8) ON \
+     CONFLICT (queue, idem_key) WHERE idem_key IS NOT NULL AND state IN \
+     ('ready', 'running') DO NOTHING RETURNING id";
 
 /// Claims due jobs. `$lock` is empty on SQLite, which has one writer, so
 /// the subquery and update are atomic; Postgres skips rows another claim
@@ -193,12 +193,14 @@ const ENQUEUE: &str = "INSERT INTO jobs (queue, kind, payload, idem_key, state, 
 macro_rules! claim_sql {
     ($lock:literal) => {
         concat!(
-            "UPDATE jobs SET state = 'running', attempts = attempts + 1, worker = $2, \
-             lease_until_ms = $3, updated_ms = $4 WHERE id IN ( \
-             SELECT id FROM jobs WHERE queue = $1 AND ((state = 'ready' AND run_at_ms <= $4) \
-             OR (state = 'running' AND lease_until_ms < $4)) ORDER BY run_at_ms, id LIMIT $5 ",
+            "UPDATE jobs SET state = 'running', attempts = attempts + 1, \
+             worker = $2, lease_until_ms = $3, updated_ms = $4 WHERE id IN ( \
+             SELECT id FROM jobs WHERE queue = $1 AND ((state = 'ready' AND \
+             run_at_ms <= $4) OR (state = 'running' AND lease_until_ms < $4)) \
+             ORDER BY run_at_ms, id LIMIT $5 ",
             $lock,
-            ") RETURNING id, queue, kind, payload, attempts, max_attempts, traceparent"
+            ") RETURNING id, queue, kind, payload, attempts, max_attempts, \
+                traceparent"
         )
     };
 }
@@ -306,7 +308,10 @@ impl Queue {
             }),
             // Another replica enqueued the same key meanwhile.
             (None, Some(key)) => {
-                let id = self.open_by_key(&new.queue, key).await?.unwrap_or_default();
+                let id = self
+                    .open_by_key(&new.queue, key)
+                    .await?
+                    .unwrap_or_default();
                 Ok(Enqueued {
                     id,
                     duplicate: true,
@@ -367,10 +372,11 @@ impl Queue {
             system,
             "jobs.expire",
             sqlx::query(
-                "UPDATE jobs SET state = 'failed', worker = NULL, lease_until_ms = NULL, \
-                 last_error = 'the worker stopped during the last attempt', updated_ms = $2 \
-                 WHERE queue = $1 AND state = 'running' AND lease_until_ms < $2 \
-                 AND attempts >= max_attempts",
+                "UPDATE jobs SET state = 'failed', worker = NULL, \
+                 lease_until_ms = NULL, last_error = 'the worker stopped \
+                 during the last attempt', updated_ms = $2 WHERE queue = $1 \
+                 AND state = 'running' AND lease_until_ms < $2 AND attempts >= \
+                 max_attempts",
             )
             .bind(queue)
             .bind(now)
@@ -423,9 +429,9 @@ impl Queue {
             system,
             "jobs.complete",
             sqlx::query(
-                "UPDATE jobs SET state = 'done', worker = NULL, lease_until_ms = NULL, \
-                 last_error = NULL, updated_ms = $3 \
-                 WHERE id = $1 AND worker = $2 AND state = 'running'",
+                "UPDATE jobs SET state = 'done', worker = NULL, lease_until_ms \
+                 = NULL, last_error = NULL, updated_ms = $3 WHERE id = $1 AND \
+                 worker = $2 AND state = 'running'",
             )
             .bind(id)
             .bind(worker)
@@ -457,10 +463,11 @@ impl Queue {
             system,
             "jobs.fail",
             sqlx::query(
-                "UPDATE jobs SET state = CASE WHEN $5 OR attempts >= max_attempts \
-                 THEN 'failed' ELSE 'ready' END, \
-                 run_at_ms = $3, worker = NULL, lease_until_ms = NULL, last_error = $4, \
-                 updated_ms = $6 WHERE id = $1 AND worker = $2 AND state = 'running'",
+                "UPDATE jobs SET state = CASE WHEN $5 OR attempts >= \
+                 max_attempts THEN 'failed' ELSE 'ready' END, run_at_ms = $3, \
+                 worker = NULL, lease_until_ms = NULL, last_error = $4, \
+                 updated_ms = $6 WHERE id = $1 AND worker = $2 AND state = \
+                 'running'",
             )
             .bind(id)
             .bind(worker)
@@ -480,7 +487,12 @@ impl Queue {
     ///
     /// # Errors
     /// When the database is unreachable.
-    pub async fn extend(&self, id: i64, worker: &str, lease: Duration) -> Result<bool> {
+    pub async fn extend(
+        &self,
+        id: i64,
+        worker: &str,
+        lease: Duration,
+    ) -> Result<bool> {
         let until = now_ms().saturating_add(ms(lease));
         let kept = each!(self.index, pool, system => traced(
             system,
@@ -507,7 +519,8 @@ impl Queue {
         let rows: Vec<(String, i64)> = each!(self.index, pool, system => traced(
             system,
             "jobs.counts",
-            sqlx::query_as("SELECT state, COUNT(*) FROM jobs WHERE queue = $1 GROUP BY state")
+            sqlx::query_as("SELECT state, COUNT(*) FROM jobs WHERE queue = $1 \
+                GROUP BY state")
                 .bind(queue)
                 .fetch_all(pool),
         )
@@ -530,16 +543,22 @@ impl Queue {
     ///
     /// # Errors
     /// When the database is unreachable.
-    pub async fn status(&self, id: i64) -> Result<Option<(State, u32, Option<String>)>> {
+    pub async fn status(
+        &self,
+        id: i64,
+    ) -> Result<Option<(State, u32, Option<String>)>> {
         let row: Option<(String, i64, Option<String>)> = each!(self.index, pool, system => traced(
             system,
             "jobs.status",
-            sqlx::query_as("SELECT state, attempts, last_error FROM jobs WHERE id = $1")
+            sqlx::query_as("SELECT state, attempts, last_error FROM jobs WHERE \
+                id = $1")
                 .bind(id)
                 .fetch_optional(pool),
         )
         .await?);
-        Ok(row.map(|(s, a, e)| (State::parse(&s), u32::try_from(a).unwrap_or_default(), e)))
+        Ok(row.map(|(s, a, e)| {
+            (State::parse(&s), u32::try_from(a).unwrap_or_default(), e)
+        }))
     }
 
     /// Deletes jobs that finished or failed more than `older_than` ago.
@@ -551,7 +570,8 @@ impl Queue {
         Ok(each!(self.index, pool, system => traced(
             system,
             "jobs.prune",
-            sqlx::query("DELETE FROM jobs WHERE state IN ('done', 'failed') AND updated_ms <= $1")
+            sqlx::query("DELETE FROM jobs WHERE state IN ('done', 'failed') \
+                AND updated_ms <= $1")
                 .bind(before)
                 .execute(pool),
         )
@@ -649,10 +669,12 @@ impl Worker {
                 let claimed = if free == 0 {
                     Vec::new()
                 } else {
-                    match queue.claim(&name, &worker, free, config.lease).await {
+                    match queue.claim(&name, &worker, free, config.lease).await
+                    {
                         Ok(jobs) => jobs,
                         Err(error) => {
-                            tracing::warn!(%error, queue = %name, "cannot claim jobs");
+                            tracing::warn!(%error, queue = %name, "cannot \
+                                claim jobs");
                             Vec::new()
                         }
                     }
@@ -704,13 +726,19 @@ async fn attempt(
     let outcome = loop {
         tokio::select! {
             outcome = &mut run => break outcome,
-            _ = renew.tick() => match queue.extend(job.id, &worker, config.lease).await {
+            _ = renew.tick() => match queue.extend(
+                job.id,
+                &worker,
+                config.lease
+            ).await {
                 Ok(true) => {}
                 Ok(false) => {
-                    tracing::warn!("lost the job's lease; another worker runs it");
+                    tracing::warn!("lost the job's lease; another worker runs \
+                        it");
                     return;
                 }
-                Err(error) => tracing::warn!(%error, "cannot extend the job's lease"),
+                Err(error) => tracing::warn!(%error, "cannot extend the job's \
+                    lease"),
             },
         }
     };
@@ -727,7 +755,9 @@ async fn attempt(
         (Outcome::Retry(error) | Outcome::Fail(error), Ok(true)) => {
             tracing::warn!(%error, "job attempt failed");
         }
-        (_, Ok(false)) => tracing::warn!("job outcome not recorded: the lease was lost"),
+        (_, Ok(false)) => {
+            tracing::warn!("job outcome not recorded: the lease was lost")
+        }
         (_, Err(error)) => tracing::warn!(%error, "job outcome not recorded"),
     }
 }

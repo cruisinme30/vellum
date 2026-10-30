@@ -28,7 +28,10 @@ export interface SlashData {
 export interface NodeData {
   readonly name: string;
   readonly doc: string;
-  /** `tiptap`: a stock Tiptap extension; `generic`: built from this data; `custom`: hand written. */
+  /**
+   * `tiptap`: a stock Tiptap extension; `generic`: built from this data;
+   * `custom`: hand written.
+   */
   readonly impl: "tiptap" | "generic" | "custom";
   readonly group: string;
   readonly content: string;

@@ -15,8 +15,10 @@ fn round_trips(src: &str) {
 
 #[test]
 fn task_attributes_become_a_field() {
-    let doc =
-        parse("- [ ] Call @priya {due=\"2026-11-02\" priority=high} ^blk-a1b2c3d4\n").document;
+    let doc = parse(
+        "- [ ] Call @priya {due=\"2026-11-02\" priority=high} ^blk-a1b2c3d4\n",
+    )
+    .document;
     let Some(Block::List(list)) = doc.blocks.first() else {
         panic!("not a list: {doc:?}");
     };
@@ -40,7 +42,8 @@ fn task_attributes_become_a_field() {
     );
     assert_eq!(
         serialize(&doc),
-        "- [ ] Call @priya {due=\"2026-11-02\" priority=\"high\"} ^blk-a1b2c3d4\n"
+        "- [ ] Call @priya {due=\"2026-11-02\" priority=\"high\"} \
+            ^blk-a1b2c3d4\n"
     );
 }
 
@@ -59,8 +62,9 @@ fn task_attribute_edge_cases_round_trip() {
 
 #[test]
 fn ids_survive_on_every_block_type() {
-    let src = "> Quote\n\n^blk-a0000001\n\n| a |\n| - |\n| 1 |\n\n^blk-a0000002\n\n\
-               ```rust ^blk-a0000003\nfn main() {}\n```\n\n$$ ^blk-a0000004\nx\n$$\n\n\
+    let src = "> Quote\n\n^blk-a0000001\n\n| a |\n| - |\n| 1 |\n\n\
+               ^blk-a0000002\n\n```rust ^blk-a0000003\nfn main() {}\n```\n\n\
+               $$ ^blk-a0000004\nx\n$$\n\n\
                ::: details Why ^blk-a0000005 {.wide}\n\nBody\n\n:::\n";
     let doc = parse(src).document;
     let ids: Vec<String> = doc

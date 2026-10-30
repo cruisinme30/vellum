@@ -13,7 +13,9 @@
 
 use std::sync::Arc;
 
-use vellum_contracts::{BoxFuture, HttpMethod, Operation, Readiness, Scope, Service};
+use vellum_contracts::{
+    BoxFuture, HttpMethod, Operation, Readiness, Scope, Service,
+};
 
 use crate::app::Sync as Engine;
 use crate::domain::{PullRequest, PushRequest};
@@ -42,8 +44,9 @@ impl<S: SyncStore, A: ReadAccess> Service for Engine<S, A> {
         )
         .summary("Send a device's pending changes")
         .description(
-            "Applies the device's queued mutations in order, each at most once. \
-             The response says which ones are processed and which were refused.",
+            "Applies the device's queued mutations in order, each at most \
+             once. The response says which ones are processed and which were \
+             refused.",
         );
         let engine = self;
         let pull = Operation::query(
@@ -61,9 +64,9 @@ impl<S: SyncStore, A: ReadAccess> Service for Engine<S, A> {
         )
         .summary("Fetch changes since the device's last pull")
         .description(
-            "Returns the records the signed-in person can read that changed since the cursor. \
-             When `reset` is true the device drops its copy first; when `more` is true it \
-             pulls again at once.",
+            "Returns the records the signed-in person can read that changed \
+             since the cursor. When `reset` is true the device drops its copy \
+             first; when `more` is true it pulls again at once.",
         );
         vec![push, pull]
     }
@@ -72,7 +75,9 @@ impl<S: SyncStore, A: ReadAccess> Service for Engine<S, A> {
         Box::pin(async move {
             match self.store().info().await {
                 Ok(_) => Readiness::Ready,
-                Err(err) => Readiness::NotReady(format!("the sync log is unreachable: {err}")),
+                Err(err) => Readiness::NotReady(format!(
+                    "the sync log is unreachable: {err}"
+                )),
             }
         })
     }

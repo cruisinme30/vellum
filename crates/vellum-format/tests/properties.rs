@@ -135,14 +135,16 @@ fn line() -> impl Strategy<Value = String> {
         "- [ ] Ship {due=\"2026-11-02\"} ^blk-b0000006",
         "^blk-b0000007",
     ]);
-    (prefix, prop::collection::vec(token(), 0..8)).prop_map(|(prefix, tokens)| {
-        let gap = if prefix.is_empty() || prefix.ends_with(' ') {
-            ""
-        } else {
-            " "
-        };
-        format!("{prefix}{gap}{}", tokens.join(" "))
-    })
+    (prefix, prop::collection::vec(token(), 0..8)).prop_map(
+        |(prefix, tokens)| {
+            let gap = if prefix.is_empty() || prefix.ends_with(' ') {
+                ""
+            } else {
+                " "
+            };
+            format!("{prefix}{gap}{}", tokens.join(" "))
+        },
+    )
 }
 
 fn document() -> impl Strategy<Value = String> {
@@ -157,7 +159,13 @@ fn document() -> impl Strategy<Value = String> {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig { cases: 2000, failure_persistence: None, ..ProptestConfig::default() })]
+    #![proptest_config(
+        ProptestConfig {
+            cases: 2000,
+            failure_persistence: None,
+            ..ProptestConfig::default()
+        }
+    )]
 
     #[test]
     fn parse_never_panics(src in any::<String>()) {
@@ -218,6 +226,11 @@ proptest! {
             }],
         };
         let canonical = serialize(&doc);
-        prop_assert_eq!(parse(&canonical).document, doc, "canonical form:\n{}", canonical);
+        prop_assert_eq!(
+            parse(&canonical).document,
+            doc,
+            "canonical form:\n{}",
+            canonical
+        );
     }
 }

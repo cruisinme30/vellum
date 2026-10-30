@@ -60,7 +60,9 @@ export interface DriveApi {
   readonly list: (spaceId: string, parentId?: string) => Promise<NodeView[]>;
   readonly get: (id: string) => Promise<NodeView>;
   /** The folders and pages of a space, for choosing a destination. */
-  readonly containers: (spaceId: string) => Promise<{ items: NodeView[]; truncated: boolean }>;
+  readonly containers: (
+    spaceId: string,
+  ) => Promise<{ items: NodeView[]; truncated: boolean }>;
   readonly trashList: (spaceId: string) => Promise<NodeView[]>;
   readonly activity: (id: string) => Promise<ActivityView[]>;
   readonly backlinks: (id: string) => Promise<NodeView[]>;
@@ -102,11 +104,18 @@ const space = (id: string) => `${DRIVE}/spaces/${segment(id)}`;
 /** The most items one destination tree asks for; the server's own cap. */
 const TREE_LIMIT = 10_000;
 
-/** A `YYYY-MM-DD` day as the start of that day in the person's zone, as RFC 3339. */
+/**
+ * A `YYYY-MM-DD` day as the start of that day in the person's zone, as RFC
+ * 3339.
+ */
 function startOf(day: string, plusDays = 0): string | undefined {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
   if (match === null) return undefined;
-  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]) + plusDays);
+  const date = new Date(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3]) + plusDays,
+  );
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 
@@ -115,16 +124,24 @@ export function findQuery(filters: Filters): Query {
   const title = filters.title?.trim();
   return {
     title: title === "" ? undefined : title,
-    kinds: filters.kinds === undefined || filters.kinds.length === 0 ? undefined : filters.kinds,
-    modified_after: filters.after === undefined ? undefined : startOf(filters.after),
-    modified_before: filters.before === undefined ? undefined : startOf(filters.before, 1),
+    kinds:
+      filters.kinds === undefined || filters.kinds.length === 0
+        ? undefined
+        : filters.kinds,
+    modified_after:
+      filters.after === undefined ? undefined : startOf(filters.after),
+    modified_before:
+      filters.before === undefined ? undefined : startOf(filters.before, 1),
     location: filters.location === "" ? undefined : filters.location,
     starred: filters.starred === true ? true : undefined,
     limit: 200,
   } satisfies Partial<Record<keyof FindInput, unknown>>;
 }
 
-const placeBody = (to: Place) => ({ space_id: to.spaceId, parent_id: to.parentId });
+const placeBody = (to: Place) => ({
+  space_id: to.spaceId,
+  parent_id: to.parentId,
+});
 
 /** The drive over a Vellum server. */
 export function createHttpDriveApi(http: Http): DriveApi {
@@ -134,7 +151,9 @@ export function createHttpDriveApi(http: Http): DriveApi {
   };
   return {
     scanSecrets: (text) =>
-      http.send<SecretScanResult>("POST", "/api/v1/security/secrets/scan", { text }),
+      http.send<SecretScanResult>("POST", "/api/v1/security/secrets/scan", {
+        text,
+      }),
     async myDrive() {
       const found = await http.get<MyDrive>(`${DRIVE}/my-drive`);
       return found.space ?? undefined;
@@ -146,29 +165,40 @@ export function createHttpDriveApi(http: Http): DriveApi {
     sharedWithMe: () => items(`${DRIVE}/shared-with-me`),
     starred: () => items(`${DRIVE}/starred`),
     async recent() {
-      const found = await http.get<RecentList>(`${DRIVE}/recent`, { limit: 50 });
+      const found = await http.get<RecentList>(`${DRIVE}/recent`, {
+        limit: 50,
+      });
       return found.items.map((entry) => entry.item);
     },
-    list: (spaceId, parentId) => items(`${space(spaceId)}/items`, { parent_id: parentId }),
+    list: (spaceId, parentId) =>
+      items(`${space(spaceId)}/items`, { parent_id: parentId }),
     get: (id) => http.get<NodeView>(item(id)),
     async containers(spaceId) {
-      const tree = await http.get<TreeView>(`${space(spaceId)}/tree`, { limit: TREE_LIMIT });
+      const tree = await http.get<TreeView>(`${space(spaceId)}/tree`, {
+        limit: TREE_LIMIT,
+      });
       return {
-        items: tree.items.filter((node) => node.kind === "folder" || node.kind === "page"),
+        items: tree.items.filter(
+          (node) => node.kind === "folder" || node.kind === "page",
+        ),
         truncated: tree.truncated,
       };
     },
     trashList: (spaceId) => items(`${space(spaceId)}/trash`),
     async activity(id) {
-      const found = await http.get<ActivityList>(`${item(id)}/activity`, { limit: 50 });
+      const found = await http.get<ActivityList>(`${item(id)}/activity`, {
+        limit: 50,
+      });
       return found.events;
     },
     backlinks: (id) => items(`${item(id)}/backlinks`),
     usage: (spaceId) => http.get<UsageView>(`${space(spaceId)}/usage`),
     find: (filters) => items(`${DRIVE}/search`, findQuery(filters)),
     target: (id) => http.get<NodeView>(`${item(id)}/target`),
-    move: (id, to) => http.send<NodeView>("POST", `${item(id)}/move`, placeBody(to)),
-    copy: (id, to) => http.send<NodeView>("POST", `${item(id)}/copy`, placeBody(to)),
+    move: (id, to) =>
+      http.send<NodeView>("POST", `${item(id)}/move`, placeBody(to)),
+    copy: (id, to) =>
+      http.send<NodeView>("POST", `${item(id)}/copy`, placeBody(to)),
     shortcut: (targetId, to) =>
       http.send<NodeView>("POST", `${space(to.spaceId)}/shortcuts`, {
         parent_id: to.parentId,
@@ -189,13 +219,20 @@ export function createHttpDriveApi(http: Http): DriveApi {
       await http.send("DELETE", item(id));
     },
     async emptyTrash(spaceId) {
-      const removed = await http.send<Removed>("DELETE", `${space(spaceId)}/trash`);
+      const removed = await http.send<Removed>(
+        "DELETE",
+        `${space(spaceId)}/trash`,
+      );
       return removed.removed;
     },
     updateSpace: (spaceId, name, settings) =>
       http.send<SpaceView>("PATCH", space(spaceId), { name, settings }),
     async pruneVersions(spaceId) {
-      const removed = await http.send<Removed>("POST", `${space(spaceId)}/prune-versions`, {});
+      const removed = await http.send<Removed>(
+        "POST",
+        `${space(spaceId)}/prune-versions`,
+        {},
+      );
       return removed.removed;
     },
   };

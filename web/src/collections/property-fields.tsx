@@ -32,7 +32,10 @@ export const RETYPE_TARGETS: readonly RetypeTarget[] = [
   "created",
 ];
 
-export const NEW_TYPES: readonly NewPropertyType[] = [...RETYPE_TARGETS, "relation"];
+export const NEW_TYPES: readonly NewPropertyType[] = [
+  ...RETYPE_TARGETS,
+  "relation",
+];
 
 const AGGREGATIONS: readonly Aggregation[] = [
   "count",
@@ -47,8 +50,13 @@ const AGGREGATIONS: readonly Aggregation[] = [
 ];
 
 /** `Draft, Live` → options, keeping the colours of options that stay. */
-function optionsOf(text: string, old: readonly SelectOption[] = []): SelectOption[] {
-  const names = [...new Set(text.split(",").map((s) => s.trim()))].filter((s) => s !== "");
+function optionsOf(
+  text: string,
+  old: readonly SelectOption[] = [],
+): SelectOption[] {
+  const names = [...new Set(text.split(",").map((s) => s.trim()))].filter(
+    (s) => s !== "",
+  );
   return names.map((name) => old.find((o) => o.name === name) ?? { name });
 }
 
@@ -66,7 +74,12 @@ export interface Extras {
   readonly backName: string;
 }
 
-const BLANK: PropertyInfo = { key: "", name: "", type: "text", computed: false };
+const BLANK: PropertyInfo = {
+  key: "",
+  name: "",
+  type: "text",
+  computed: false,
+};
 
 export function extrasOf(property: PropertyInfo = BLANK): Extras {
   const rollup = property.rollup ?? { via: "", prop: "", agg: "count" };
@@ -81,10 +94,17 @@ export function extrasOf(property: PropertyInfo = BLANK): Extras {
   };
 }
 
-export type SetExtra = <K extends keyof Extras>(key: K, value: Extras[K]) => void;
+export type SetExtra = <K extends keyof Extras>(
+  key: K,
+  value: Extras[K],
+) => void;
 
 /** What the server needs to know about a type's settings. */
-export function settingsFor(type: string, extras: Extras, old?: readonly SelectOption[]) {
+export function settingsFor(
+  type: string,
+  extras: Extras,
+  old?: readonly SelectOption[],
+) {
   switch (type) {
     case "select":
     case "multi": {
@@ -113,7 +133,10 @@ function relationSettings(extras: Extras) {
 /** What the rollup fields show before a relation is picked. */
 const NO_TARGET: Pick<CollectionInfo, "properties"> = { properties: [] };
 
-/** Pick a relation, a property of the collection it links to, and how to combine it. */
+/**
+ * Pick a relation, a property of the collection it links to, and how to combine
+ * it.
+ */
 function RollupFields({
   info,
   extras,

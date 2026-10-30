@@ -94,15 +94,21 @@ impl IntoResponse for Fault {
     fn into_response(self) -> Response {
         match self {
             Self::Api(summary) => {
-                let tag = summary.split('/').next().unwrap_or_default().to_owned();
-                let body = json!({ "error_summary": summary, "error": { ".tag": tag } });
+                let tag =
+                    summary.split('/').next().unwrap_or_default().to_owned();
+                let body = json!({
+                    "error_summary": summary,
+                    "error": { ".tag": tag }
+                });
                 (StatusCode::CONFLICT, axum::Json(body)).into_response()
             }
             Self::BadRequest(message) => {
                 let text = format!("Error in call to API function: {message}");
                 (StatusCode::BAD_REQUEST, text).into_response()
             }
-            Self::UnknownEndpoint => (StatusCode::NOT_FOUND, "Unknown endpoint").into_response(),
+            Self::UnknownEndpoint => {
+                (StatusCode::NOT_FOUND, "Unknown endpoint").into_response()
+            }
         }
     }
 }
@@ -228,17 +234,21 @@ fn handle(
             | "files/upload_session/finish"
     );
     let arg = if content {
-        let raw = api_arg.ok_or_else(|| bad_request("missing Dropbox-API-Arg"))?;
+        let raw =
+            api_arg.ok_or_else(|| bad_request("missing Dropbox-API-Arg"))?;
         if !raw.iter().all(|b| b.is_ascii() && *b != 0x7f) {
             return Err(bad_request(
-                "Dropbox-API-Arg must be ASCII; escape other characters as \\uXXXX",
+                "Dropbox-API-Arg must be ASCII; escape other characters as \
+                    \\uXXXX",
             ));
         }
         if endpoint != "files/download"
             && headers.get(header::CONTENT_TYPE).map(HeaderValue::as_bytes)
                 != Some(b"application/octet-stream")
         {
-            return Err(bad_request("Content-Type must be application/octet-stream"));
+            return Err(bad_request(
+                "Content-Type must be application/octet-stream",
+            ));
         }
         parse(raw)?
     } else {
@@ -251,12 +261,16 @@ fn handle(
         "files/get_metadata" => data.get_metadata(&arg).map(ok_json),
         "files/upload" => data.commit(&arg, body.clone()).map(ok_json),
         "files/upload_session/start" => Ok(ok_json(data.start(body))),
-        "files/upload_session/append_v2" => data.append(&arg, body).map(ok_json),
+        "files/upload_session/append_v2" => {
+            data.append(&arg, body).map(ok_json)
+        }
         "files/upload_session/finish" => data.finish(&arg, body).map(ok_json),
         "files/delete_v2" => data.delete(&arg).map(ok_json),
         "files/move_v2" => data.move_file(&arg).map(ok_json),
         "files/list_folder" => data.list_folder(&arg, page_limit).map(ok_json),
-        "files/list_folder/continue" => data.list_continue(&arg, page_limit).map(ok_json),
+        "files/list_folder/continue" => {
+            data.list_continue(&arg, page_limit).map(ok_json)
+        }
         _ => Err(Fault::UnknownEndpoint),
     }
 }
@@ -281,9 +295,9 @@ impl Data {
 
     /// An ancestor of `lower` that is a file, if any.
     fn file_ancestor(&self, lower: &str) -> bool {
-        lower
-            .match_indices('/')
-            .any(|(i, _)| lower.get(..i).is_some_and(|a| self.files.contains_key(a)))
+        lower.match_indices('/').any(|(i, _)| {
+            lower.get(..i).is_some_and(|a| self.files.contains_key(a))
+        })
     }
 
     fn download(&self, arg: &Value) -> Reply {
@@ -304,7 +318,9 @@ impl Data {
                 )
                     .into_response())
             }
-            None if self.is_folder(&lower) => Err(api_error("path/not_file/..")),
+            None if self.is_folder(&lower) => {
+                Err(api_error("path/not_file/.."))
+            }
             None => Err(api_error("path/not_found/...")),
         }
     }
@@ -355,7 +371,8 @@ impl Data {
                 return Err(api_error("path/conflict/file/..."));
             }
             "update" => {
-                let want = mode.get("update").and_then(Value::as_str).unwrap_or("");
+                let want =
+                    mode.get("update").and_then(Value::as_str).unwrap_or("");
                 match &existing {
                     Some(f) if f.rev == want => {}
                     None if !strict => {}
@@ -390,7 +407,10 @@ impl Data {
         json!({ "session_id": id })
     }
 
-    fn session(&mut self, cursor: Option<&Value>) -> Result<(String, &mut Vec<u8>), Fault> {
+    fn session(
+        &mut self,
+        cursor: Option<&Value>,
+    ) -> Result<(String, &mut Vec<u8>), Fault> {
         let cursor = cursor.ok_or_else(|| bad_request("missing cursor"))?;
         let id = cursor
             .get("session_id")
@@ -484,7 +504,8 @@ impl Data {
         for key in moved {
             if let Some(mut f) = self.files.remove(&key) {
                 let rest = key.get(prefix.len()..).unwrap_or_default();
-                let tail = f.display.rsplit('/').next().unwrap_or_default().to_owned();
+                let tail =
+                    f.display.rsplit('/').next().unwrap_or_default().to_owned();
                 let mid = rest.rsplit_once('/').map_or("", |(m, _)| m);
                 f.display = if mid.is_empty() {
                     format!("{to_display}/{tail}")
@@ -497,7 +518,11 @@ impl Data {
         Ok(json!({ "metadata": folder_json(&to) }))
     }
 
-    fn list_folder(&mut self, arg: &Value, page_limit: usize) -> Result<Value, Fault> {
+    fn list_folder(
+        &mut self,
+        arg: &Value,
+        page_limit: usize,
+    ) -> Result<Value, Fault> {
         let lower = path_arg(arg, "path")?;
         if self.files.contains_key(&lower) {
             return Err(api_error("path/not_folder/.."));
@@ -530,7 +555,10 @@ impl Data {
             };
             let depth = rest.matches('/').count();
             if !recursive && depth > 0 {
-                let _ = folders.insert(format!("{prefix}{}", rest.split('/').next().unwrap_or("")));
+                let _ = folders.insert(format!(
+                    "{prefix}{}",
+                    rest.split('/').next().unwrap_or("")
+                ));
                 continue;
             }
             // Implied folders on the way down, each listed once.
@@ -548,7 +576,11 @@ impl Data {
         self.page(&id, limit.max(1))
     }
 
-    fn list_continue(&mut self, arg: &Value, page_limit: usize) -> Result<Value, Fault> {
+    fn list_continue(
+        &mut self,
+        arg: &Value,
+        page_limit: usize,
+    ) -> Result<Value, Fault> {
         let cursor = arg
             .get("cursor")
             .and_then(Value::as_str)
@@ -573,7 +605,8 @@ impl Data {
 }
 
 fn parse(raw: &[u8]) -> Result<Value, Fault> {
-    serde_json::from_slice(raw).map_err(|e| bad_request(&format!("bad JSON argument: {e}")))
+    serde_json::from_slice(raw)
+        .map_err(|e| bad_request(&format!("bad JSON argument: {e}")))
 }
 
 /// The lower-cased path in `arg[key]`: `""` for the root, else `/...`.

@@ -4,11 +4,12 @@
 //! The tantivy schema and the mapping between records and documents.
 
 use tantivy::schema::{
-    BytesOptions, FAST, Field, INDEXED, IndexRecordOption, NumericOptions, STORED, STRING, Schema,
-    TextFieldIndexing, TextOptions, Value,
+    BytesOptions, FAST, Field, INDEXED, IndexRecordOption, NumericOptions,
+    STORED, STRING, Schema, TextFieldIndexing, TextOptions, Value,
 };
 use tantivy::tokenizer::{
-    AsciiFoldingFilter, LowerCaser, RemoveLongFilter, SimpleTokenizer, TextAnalyzer, TokenStream,
+    AsciiFoldingFilter, LowerCaser, RemoveLongFilter, SimpleTokenizer,
+    TextAnalyzer, TokenStream,
 };
 use tantivy::{Index, TantivyDocument};
 use vellum_kernel::{BlockId, DocId, SpaceId};
@@ -74,7 +75,8 @@ pub fn build() -> (Schema, Fields) {
         space: b.add_text_field("space", STRING | STORED),
         doc: b.add_text_field("doc", STRING | STORED),
         block: b.add_u64_field("block", INDEXED | STORED),
-        position: b.add_u64_field("position", NumericOptions::default().set_stored()),
+        position: b
+            .add_u64_field("position", NumericOptions::default().set_stored()),
         section: b.add_u64_field("section", INDEXED | STORED),
         doc_kind: b.add_text_field("doc_kind", STRING | STORED),
         block_kind: b.add_text_field("block_kind", STRING | STORED),
@@ -123,9 +125,9 @@ impl Fields {
     /// Looks the fields up in an existing index's schema.
     pub fn resolve(schema: &Schema) -> Result<Self> {
         let get = |name: &str| {
-            schema
-                .get_field(name)
-                .map_err(|_| SearchError::Corrupt(format!("index has no `{name}` field")))
+            schema.get_field(name).map_err(|_| {
+                SearchError::Corrupt(format!("index has no `{name}` field"))
+            })
         };
         Ok(Self {
             rec: get("rec")?,
@@ -172,7 +174,10 @@ fn common(f: &Fields, entry: &IndexEntry, rec: &str) -> TantivyDocument {
 }
 
 /// The tantivy documents for one index entry: a title record and one per block.
-pub fn documents(f: &Fields, entry: &IndexEntry) -> Result<Vec<TantivyDocument>> {
+pub fn documents(
+    f: &Fields,
+    entry: &IndexEntry,
+) -> Result<Vec<TantivyDocument>> {
     if let Some(vectors) = &entry.vectors
         && vectors.len() != entry.doc.blocks.len()
     {
@@ -196,7 +201,8 @@ pub fn documents(f: &Fields, entry: &IndexEntry) -> Result<Vec<TantivyDocument>>
             d.add_text(f.headings, heading);
         }
         d.add_text(f.body, &block.text);
-        if let Some(v) = entry.vectors.as_ref().and_then(|vs| vs.get(position)) {
+        if let Some(v) = entry.vectors.as_ref().and_then(|vs| vs.get(position))
+        {
             d.add_bytes(f.vec, &vector::quantise(v));
         }
         out.push(d);
@@ -204,7 +210,11 @@ pub fn documents(f: &Fields, entry: &IndexEntry) -> Result<Vec<TantivyDocument>>
     Ok(out)
 }
 
-fn str_field<'a>(d: &'a TantivyDocument, field: Field, name: &str) -> Result<&'a str> {
+fn str_field<'a>(
+    d: &'a TantivyDocument,
+    field: Field,
+    name: &str,
+) -> Result<&'a str> {
     d.get_first(field)
         .and_then(|v| v.as_str())
         .ok_or_else(|| SearchError::Corrupt(format!("record has no `{name}`")))
@@ -227,19 +237,25 @@ pub fn read_block(f: &Fields, d: &TantivyDocument) -> Result<StoredBlock> {
         .ok_or_else(|| SearchError::Corrupt("block id out of range".into()))?;
     let section = match u64_field(d, f.section, "section")? {
         NO_SECTION => None,
-        raw => Some(
-            BlockId::from_u64(raw)
-                .ok_or_else(|| SearchError::Corrupt("section id out of range".into()))?,
-        ),
+        raw => Some(BlockId::from_u64(raw).ok_or_else(|| {
+            SearchError::Corrupt("section id out of range".into())
+        })?),
     };
     Ok(StoredBlock {
         space: parse::<SpaceId>(str_field(d, f.space, "space")?, "space")?,
         doc: parse::<DocId>(str_field(d, f.doc, "doc")?, "doc")?,
         block,
-        position: u32::try_from(u64_field(d, f.position, "position")?).unwrap_or(u32::MAX),
+        position: u32::try_from(u64_field(d, f.position, "position")?)
+            .unwrap_or(u32::MAX),
         section,
-        doc_kind: parse::<DocKind>(str_field(d, f.doc_kind, "doc_kind")?, "doc_kind")?,
-        block_kind: parse::<BlockKind>(str_field(d, f.block_kind, "block_kind")?, "block_kind")?,
+        doc_kind: parse::<DocKind>(
+            str_field(d, f.doc_kind, "doc_kind")?,
+            "doc_kind",
+        )?,
+        block_kind: parse::<BlockKind>(
+            str_field(d, f.block_kind, "block_kind")?,
+            "block_kind",
+        )?,
         title: str_field(d, f.title, "title")?.to_owned(),
         path: str_field(d, f.path, "path")?.to_owned(),
         heading_path: d
@@ -255,7 +271,10 @@ pub fn read_title(f: &Fields, d: &TantivyDocument) -> Result<TitleHit> {
     Ok(TitleHit {
         space: parse::<SpaceId>(str_field(d, f.space, "space")?, "space")?,
         doc: parse::<DocId>(str_field(d, f.doc, "doc")?, "doc")?,
-        kind: parse::<DocKind>(str_field(d, f.doc_kind, "doc_kind")?, "doc_kind")?,
+        kind: parse::<DocKind>(
+            str_field(d, f.doc_kind, "doc_kind")?,
+            "doc_kind",
+        )?,
         title: str_field(d, f.title, "title")?.to_owned(),
         path: str_field(d, f.path, "path")?.to_owned(),
     })

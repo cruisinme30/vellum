@@ -29,7 +29,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::model::{Id, Object, Principal, Relation, Subject, Tuple, TupleRelation};
+use crate::model::{
+    Id, Object, Principal, Relation, Subject, Tuple, TupleRelation,
+};
 
 /// "Never expires" as a validity time.
 pub const FOREVER: i64 = i64::MAX;
@@ -174,7 +176,9 @@ impl SpaceGraph {
         let mut stack = vec![root];
         while let Some(node) = stack.pop() {
             if self.parents.contains_key(&node) && out.insert(node) {
-                stack.extend(children.get(&Some(node)).into_iter().flatten().copied());
+                stack.extend(
+                    children.get(&Some(node)).into_iter().flatten().copied(),
+                );
             }
         }
         out
@@ -203,7 +207,8 @@ impl Directory {
     pub fn new(tuples: &[Tuple], now_ms: i64) -> Self {
         let mut members: BTreeMap<Id, BTreeMap<Subject, i64>> = BTreeMap::new();
         for t in tuples {
-            if let (Object::Group(group), TupleRelation::Member) = (t.object, t.relation)
+            if let (Object::Group(group), TupleRelation::Member) =
+                (t.object, t.relation)
                 && t.is_live(now_ms)
             {
                 let slot = members
@@ -268,10 +273,12 @@ impl Directory {
         loop {
             let before = out.len();
             for (&g, subjects) in &self.members {
-                if subjects
-                    .keys()
-                    .any(|s| matches!(s, Subject::Group(inner) if out.contains(inner)))
-                {
+                if subjects.keys().any(|s| {
+                    matches!(
+                        s,
+                        Subject::Group(inner) if out.contains(inner)
+                    )
+                }) {
                     let _ = out.insert(g);
                 }
             }
@@ -382,7 +389,9 @@ pub fn materialise(
             (Object::Node(n), TupleRelation::Restricted) => {
                 let _ = restricted.insert(n);
             }
-            (object, TupleRelation::Role(_)) => on_object.entry(object).or_default().push(t),
+            (object, TupleRelation::Role(_)) => {
+                on_object.entry(object).or_default().push(t)
+            }
             _ => {}
         }
     }
@@ -434,7 +443,9 @@ pub fn materialise(
         }
         let _ = nodes.insert(node, access);
     }
-    if let Some((&node, _)) = graph.parents.iter().find(|(n, _)| !nodes.contains_key(n)) {
+    if let Some((&node, _)) =
+        graph.parents.iter().find(|(n, _)| !nodes.contains_key(n))
+    {
         return Err(GraphError::Cycle(node));
     }
     Ok(Materialised { space, nodes })
@@ -449,7 +460,10 @@ fn prune(mut access: Access, now_ms: i64) -> Access {
 /// next delete something. Sweeps only collect garbage; access is already
 /// exact without them.
 #[must_use]
-pub fn next_expiry<'a>(tuples: impl IntoIterator<Item = &'a Tuple>, now_ms: i64) -> Option<i64> {
+pub fn next_expiry<'a>(
+    tuples: impl IntoIterator<Item = &'a Tuple>,
+    now_ms: i64,
+) -> Option<i64> {
     tuples
         .into_iter()
         .filter_map(|t| t.expires_at)
@@ -465,7 +479,10 @@ mod tests {
     const ALICE: Principal = Principal::User(Id(1));
     const BOB: Principal = Principal::User(Id(2));
 
-    fn graph(parents: &[(u128, Option<u128>)], tuples: Vec<Tuple>) -> SpaceGraph {
+    fn graph(
+        parents: &[(u128, Option<u128>)],
+        tuples: Vec<Tuple>,
+    ) -> SpaceGraph {
         SpaceGraph {
             space: SPACE,
             epoch: 0,
@@ -501,7 +518,11 @@ mod tests {
         let g = graph(
             &[(1, None), (2, Some(1)), (3, Some(2))],
             vec![
-                Tuple::role(Object::Space(SPACE), Relation::Manager, ALICE.into()),
+                Tuple::role(
+                    Object::Space(SPACE),
+                    Relation::Manager,
+                    ALICE.into(),
+                ),
                 Tuple::role(Object::Space(SPACE), Relation::Editor, BOB.into()),
                 Tuple::restricted(Id(2)),
             ],
@@ -530,7 +551,8 @@ mod tests {
 
     #[test]
     fn subtree_and_containing_groups() {
-        let g = graph(&[(1, None), (2, Some(1)), (3, Some(2)), (4, None)], vec![]);
+        let g =
+            graph(&[(1, None), (2, Some(1)), (3, Some(2)), (4, None)], vec![]);
         assert_eq!(g.subtree(Id(2)), BTreeSet::from([Id(2), Id(3)]));
         assert!(g.subtree(Id(99)).is_empty());
         let d = Directory::new(
@@ -547,8 +569,8 @@ mod tests {
 
     #[test]
     fn levels_rows_and_paths() {
-        let l =
-            Levels::granting(Relation::Editor, 50).or(Levels::granting(Relation::Viewer, FOREVER));
+        let l = Levels::granting(Relation::Editor, 50)
+            .or(Levels::granting(Relation::Viewer, FOREVER));
         assert_eq!(l.at(10), Some(Relation::Editor));
         assert_eq!(l.at(50), Some(Relation::Viewer));
         assert_eq!(
@@ -557,8 +579,8 @@ mod tests {
         );
         assert_eq!(l.rows(60), vec![(Relation::Viewer, None)]);
         assert!(Levels::granting(Relation::Owner, 5).is_dead(5));
-        // alice is in 10 via 11 until 30 (11 ⊂ 10 until 30, alice ⊂ 11 until 90),
-        // and directly until 20: the best path wins.
+        // alice is in 10 via 11 until 30 (11 ⊂ 10 until 30, alice ⊂ 11 until
+        // 90), and directly until 20: the best path wins.
         let d = Directory::new(
             &[
                 Tuple::member(Id(10), Subject::Group(Id(11))).expiring(30),
@@ -573,7 +595,8 @@ mod tests {
 
     #[test]
     fn next_expiry_ignores_past_and_permanent() {
-        let t = Tuple::role(Object::Space(SPACE), Relation::Viewer, ALICE.into());
+        let t =
+            Tuple::role(Object::Space(SPACE), Relation::Viewer, ALICE.into());
         let ts = [t, t.expiring(5), t.expiring(50), t.expiring(20)];
         assert_eq!(next_expiry(&ts, 10), Some(20));
         assert_eq!(next_expiry(&ts, 60), None);

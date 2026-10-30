@@ -12,7 +12,8 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D49, D50, D51, D244, D245, D246
-- Issue: #73, #75, #76, #77, #80, #81, #82, #83, #96, #408, #427 (and the server side of #79)
+- Issue: #73, #75, #76, #77, #80, #81, #82, #83, #96, #408, #427 (and the server
+  side of #79)
 - Pull request: #241 (and the live issue views that follow it); themes and
   accessibility land in the integration batch that closes #80, #82, #83, #96
 

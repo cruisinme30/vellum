@@ -19,11 +19,20 @@ describe("planning API", () => {
       Promise.resolve(
         path.endsWith("/issues")
           ? { groups: [{ issues: [issue("ENG-1", "a")] }] }
-          : { projects: [], updates: [], initiatives: [], templates: [], forms: [], teams: [] },
+          : {
+              projects: [],
+              updates: [],
+              initiatives: [],
+              templates: [],
+              forms: [],
+              teams: [],
+            },
       ),
     );
     const send = vi.fn((_method: string, path: string) =>
-      Promise.resolve(path.endsWith("/issues") ? { issue: issue("ENG-2", "b") } : {}),
+      Promise.resolve(
+        path.endsWith("/issues") ? { issue: issue("ENG-2", "b") } : {},
+      ),
     );
     const http = { get, send, forgetSession: vi.fn() } as unknown as Http;
     const api = createHttpPlanningApi(http);
@@ -37,19 +46,32 @@ describe("planning API", () => {
     });
     await api.updates("p 1");
     expect(get).toHaveBeenLastCalledWith("/api/v1/work/projects/p%201/updates");
-    await api.createIssue({ team: "ENG", title: "b", labels: [], due: "", repeat: "1w" });
+    await api.createIssue({
+      team: "ENG",
+      title: "b",
+      labels: [],
+      due: "",
+      repeat: "1w",
+    });
     expect(send).toHaveBeenLastCalledWith("POST", "/api/v1/work/issues", {
       team: "ENG",
       title: "b",
       repeat: "1w",
     });
     await api.postUpdate("p1", "on-track", "Good");
-    expect(send).toHaveBeenLastCalledWith("POST", "/api/v1/work/projects/p1/updates", {
-      health: "on-track",
-      body: "Good",
-    });
+    expect(send).toHaveBeenLastCalledWith(
+      "POST",
+      "/api/v1/work/projects/p1/updates",
+      {
+        health: "on-track",
+        body: "Good",
+      },
+    );
     await api.dismissSuggestion("ENG-3");
-    expect(send).toHaveBeenLastCalledWith("DELETE", "/api/v1/work/issues/ENG-3/triage/suggestion");
+    expect(send).toHaveBeenLastCalledWith(
+      "DELETE",
+      "/api/v1/work/issues/ENG-3/triage/suggestion",
+    );
   });
 });
 
@@ -65,10 +87,9 @@ describe("projects", () => {
     expect(row).not.toBeNull();
     const scoped = within(row as HTMLElement);
     expect(scoped.getByText("At risk")).toBeTruthy();
-    expect(scoped.getByRole("progressbar", { name: "Progress of Gateway replay" })).toHaveProperty(
-      "value",
-      25,
-    );
+    expect(
+      scoped.getByRole("progressbar", { name: "Progress of Gateway replay" }),
+    ).toHaveProperty("value", 25);
     expect(scoped.getByText(/update due/)).toBeTruthy();
     expect(screen.queryByText("Old docs")).toBeNull();
     await user.selectOptions(screen.getByLabelText("Show"), "completed");
@@ -114,20 +135,30 @@ describe("projects", () => {
       api,
       <Route path="/projects/:projectId" element={<ProjectPage />} />,
     );
-    expect(await screen.findByRole("heading", { name: "Gateway replay", level: 1 })).toBeTruthy();
-    expect(screen.getByText("An update is due. Say how the project is going.")).toBeTruthy();
-    expect(screen.getByRole("progressbar", { name: "Progress of Beta" })).toHaveProperty(
-      "value",
-      50,
-    );
+    expect(
+      await screen.findByRole("heading", { name: "Gateway replay", level: 1 }),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("An update is due. Say how the project is going."),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("progressbar", { name: "Progress of Beta" }),
+    ).toHaveProperty("value", 50);
     expect(await screen.findByText("Replay is slow.")).toBeTruthy();
     expect(screen.getByText(/Target date moved/)).toBeTruthy();
 
     await user.click(screen.getByRole("radio", { name: "Off track" }));
-    await user.type(screen.getByLabelText(/What changed/), "Blocked on storage.");
+    await user.type(
+      screen.getByLabelText(/What changed/),
+      "Blocked on storage.",
+    );
     await user.click(screen.getByRole("button", { name: "Post update" }));
     await waitFor(() => {
-      expect(api.postUpdate).toHaveBeenCalledWith("p1", "off-track", "Blocked on storage.");
+      expect(api.postUpdate).toHaveBeenCalledWith(
+        "p1",
+        "off-track",
+        "Blocked on storage.",
+      );
     });
 
     await user.type(screen.getByLabelText("Milestone"), "GA");
@@ -136,13 +167,16 @@ describe("projects", () => {
       expect(api.addMilestone).toHaveBeenCalledWith("p1", "GA", "");
     });
 
-    await user.selectOptions(await screen.findByLabelText("Milestone of ENG-1"), "");
+    await user.selectOptions(
+      await screen.findByLabelText("Milestone of ENG-1"),
+      "",
+    );
     await waitFor(() => {
       expect(api.setMilestone).toHaveBeenCalledWith("ENG-1", "");
     });
-    expect(screen.getByRole("link", { name: "New issue" }).getAttribute("href")).toBe(
-      "/issues/new?team=ENG&project=p1",
-    );
+    expect(
+      screen.getByRole("link", { name: "New issue" }).getAttribute("href"),
+    ).toBe("/issues/new?team=ENG&project=p1");
   });
 
   it("rolls initiatives up", async () => {
@@ -158,7 +192,11 @@ describe("projects", () => {
   });
 
   it("needs a server", () => {
-    renderAt("/projects", undefined, <Route path="/projects" element={<ProjectsPage />} />);
+    renderAt(
+      "/projects",
+      undefined,
+      <Route path="/projects" element={<ProjectsPage />} />,
+    );
     expect(screen.getByText(/needs a Vellum server/i)).toBeTruthy();
   });
 });

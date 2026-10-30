@@ -73,18 +73,42 @@ export type Op =
   | "lte"
   | "gte";
 
-const DATES = new Set<Field>(["due", "created", "updated", "started", "completed"]);
+const DATES = new Set<Field>([
+  "due",
+  "created",
+  "updated",
+  "started",
+  "completed",
+]);
 const TEXTS = new Set<Field>(["title", "text"]);
 
 /** The operators that suit a field, the first being the default. */
 export function opsFor(field: Field): readonly Op[] {
   if (DATES.has(field))
-    return ["before", "after", "on_or_before", "on_or_after", "is_empty", "is_not_empty"];
+    return [
+      "before",
+      "after",
+      "on_or_before",
+      "on_or_after",
+      "is_empty",
+      "is_not_empty",
+    ];
   if (TEXTS.has(field)) return ["contains", "not_contains"];
   if (field === "estimate")
-    return ["is", "is_not", "lt", "gt", "lte", "gte", "is_empty", "is_not_empty"];
-  if (field === "blocked" || field === "sla" || field === "category") return ["is", "is_not"];
-  if (field === "label") return ["is", "is_not", "includes_all", "is_empty", "is_not_empty"];
+    return [
+      "is",
+      "is_not",
+      "lt",
+      "gt",
+      "lte",
+      "gte",
+      "is_empty",
+      "is_not_empty",
+    ];
+  if (field === "blocked" || field === "sla" || field === "category")
+    return ["is", "is_not"];
+  if (field === "label")
+    return ["is", "is_not", "includes_all", "is_empty", "is_not_empty"];
   return ["is", "is_not", "is_empty", "is_not_empty"];
 }
 
@@ -94,13 +118,24 @@ export function takesValues(op: Op): boolean {
 }
 
 /** Suggested values for a field; free text is allowed too. */
-export function suggestionsFor(field: Field, statuses: readonly string[]): readonly string[] {
+export function suggestionsFor(
+  field: Field,
+  statuses: readonly string[],
+): readonly string[] {
   switch (field) {
     case "priority": {
       return ["urgent", "high", "normal", "low", "none"];
     }
     case "category": {
-      return ["triage", "backlog", "unstarted", "started", "completed", "canceled", "duplicate"];
+      return [
+        "triage",
+        "backlog",
+        "unstarted",
+        "started",
+        "completed",
+        "canceled",
+        "duplicate",
+      ];
     }
     case "sla": {
       return ["gray", "yellow", "orange", "red"];
@@ -123,7 +158,9 @@ export function suggestionsFor(field: Field, statuses: readonly string[]): reado
       return ["1d", "1w", "2w", "1m"];
     }
     default: {
-      return DATES.has(field) ? ["@today", "@today-7d", "@today+7d", "@today+2w"] : [];
+      return DATES.has(field)
+        ? ["@today", "@today-7d", "@today+7d", "@today+2w"]
+        : [];
     }
   }
 }
@@ -148,18 +185,30 @@ export function newCondition(field: Field = "assignee"): Condition {
 }
 
 /** A new group. */
-export function newGroup(join: "and" | "or", children: readonly FilterNode[] = []): Group {
+export function newGroup(
+  join: "and" | "or",
+  children: readonly FilterNode[] = [],
+): Group {
   return { kind: "group", key: rowKey(), join, children };
 }
 
 /** The empty filter: every issue. */
-export const EVERYTHING: Group = { kind: "group", key: "root", join: "and", children: [] };
+export const EVERYTHING: Group = {
+  kind: "group",
+  key: "root",
+  join: "and",
+  children: [],
+};
 
 type Json = Record<string, unknown>;
 
 function toJson(node: FilterNode): Json {
   if (node.kind === "condition") {
-    return { field: node.field, op: node.op, values: takesValues(node.op) ? node.values : [] };
+    return {
+      field: node.field,
+      op: node.op,
+      values: takesValues(node.op) ? node.values : [],
+    };
   }
   return { [node.join]: node.children.map((child) => toJson(child)) };
 }
@@ -169,7 +218,9 @@ function complete(node: FilterNode): FilterNode | undefined {
   if (node.kind === "condition") {
     return takesValues(node.op) && node.values.length === 0 ? undefined : node;
   }
-  const children = node.children.map((child) => complete(child)).filter((c) => c !== undefined);
+  const children = node.children
+    .map((child) => complete(child))
+    .filter((c) => c !== undefined);
   return children.length === 0 ? undefined : { ...node, children };
 }
 
@@ -199,8 +250,16 @@ function fromJson(value: unknown): FilterNode | undefined {
     typeof op === "string" &&
     opsFor(field as Field).includes(op as Op)
   ) {
-    const list = Array.isArray(values) ? values.filter((v) => typeof v === "string") : [];
-    return { kind: "condition", key: rowKey(), field: field as Field, op: op as Op, values: list };
+    const list = Array.isArray(values)
+      ? values.filter((v) => typeof v === "string")
+      : [];
+    return {
+      kind: "condition",
+      key: rowKey(),
+      field: field as Field,
+      op: op as Op,
+      values: list,
+    };
   }
   return undefined;
 }
@@ -211,7 +270,8 @@ function fromJson(value: unknown): FilterNode | undefined {
  * (such as `not`).
  */
 export function parse(text: string | undefined | null): Group | undefined {
-  if (text === undefined || text === null || text.trim() === "") return EVERYTHING;
+  if (text === undefined || text === null || text.trim() === "")
+    return EVERYTHING;
   let value: unknown;
   try {
     value = JSON.parse(text);

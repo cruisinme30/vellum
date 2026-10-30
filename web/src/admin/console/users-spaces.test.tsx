@@ -77,10 +77,19 @@ function fakeApi(overrides: Partial<AdminConsoleApi> = {}) {
     Promise.resolve({ ...(id === PRIYA.id ? PRIYA : MARCO), ...change }),
   );
   const createUser = vi.fn<AdminConsoleApi["createUser"]>((input) =>
-    Promise.resolve({ ...MARCO, id: "new", name: input.name, email: input.email }),
+    Promise.resolve({
+      ...MARCO,
+      id: "new",
+      name: input.name,
+      email: input.email,
+    }),
   );
-  const createSpace = vi.fn<AdminConsoleApi["createSpace"]>(() => Promise.resolve(ENG));
-  const setMember = vi.fn<AdminConsoleApi["setMember"]>(() => Promise.resolve(ENG));
+  const createSpace = vi.fn<AdminConsoleApi["createSpace"]>(() =>
+    Promise.resolve(ENG),
+  );
+  const setMember = vi.fn<AdminConsoleApi["setMember"]>(() =>
+    Promise.resolve(ENG),
+  );
   const api: AdminConsoleApi = {
     audit: unused,
     verifyAudit: unused,
@@ -124,13 +133,21 @@ describe("admin users and spaces API", () => {
   it("calls the admin routes", async () => {
     const get = vi.fn(() => Promise.resolve({ spaces: [ENG] }));
     const send = vi.fn(() => Promise.resolve(ENG));
-    const api = createHttpAdminConsoleApi({ get, send, forgetSession: vi.fn() } as unknown as Http);
+    const api = createHttpAdminConsoleApi({
+      get,
+      send,
+      forgetSession: vi.fn(),
+    } as unknown as Http);
     expect(await api.spaces()).toEqual([ENG]);
     expect(get).toHaveBeenCalledWith("/api/v1/admin/spaces");
     await api.updateUser(MARCO.id, { disabled: true });
-    expect(send).toHaveBeenLastCalledWith("PATCH", `/api/v1/admin/users/${MARCO.id}`, {
-      disabled: true,
-    });
+    expect(send).toHaveBeenLastCalledWith(
+      "PATCH",
+      `/api/v1/admin/users/${MARCO.id}`,
+      {
+        disabled: true,
+      },
+    );
     await api.setMember(ENG.space.id, MARCO.id, undefined);
     expect(send).toHaveBeenLastCalledWith(
       "PUT",
@@ -148,7 +165,9 @@ describe("users page", () => {
     const marco = within(table).getByRole("row", { name: /Marco Ruiz/ });
     expect(within(marco).getByText("Single sign-on")).toBeDefined();
 
-    await user.click(within(marco).getByRole("button", { name: "Block Marco Ruiz" }));
+    await user.click(
+      within(marco).getByRole("button", { name: "Block Marco Ruiz" }),
+    );
     expect(updateUser).not.toHaveBeenCalled();
     await user.click(within(marco).getByRole("button", { name: "Block" }));
     await waitFor(() => {
@@ -156,15 +175,23 @@ describe("users page", () => {
     });
     expect(await screen.findByText("Marco Ruiz updated.")).toBeDefined();
 
-    await user.click(screen.getByRole("button", { name: "Remove admin: Priya Shah" }));
+    await user.click(
+      screen.getByRole("button", { name: "Remove admin: Priya Shah" }),
+    );
     expect(updateUser).toHaveBeenLastCalledWith(PRIYA.id, { admin: false });
   });
 
   it("adds a person, with no password for single sign-on", async () => {
     const { api, createUser } = fakeApi();
     const user = renderWith(api, <UsersPage />);
-    await user.type(await screen.findByRole("textbox", { name: "Name" }), "Ana Lima");
-    await user.type(screen.getByRole("textbox", { name: "Email" }), "ana@northstar.dev");
+    await user.type(
+      await screen.findByRole("textbox", { name: "Name" }),
+      "Ana Lima",
+    );
+    await user.type(
+      screen.getByRole("textbox", { name: "Email" }),
+      "ana@northstar.dev",
+    );
     await user.click(screen.getByRole("button", { name: "Add person" }));
     await waitFor(() => {
       expect(createUser).toHaveBeenCalledWith({
@@ -181,7 +208,9 @@ describe("users page", () => {
       updateUser: () => Promise.reject(new Error("x")),
     });
     const user = renderWith(api, <UsersPage />);
-    await user.click(await screen.findByRole("button", { name: "Make admin: Marco Ruiz" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Make admin: Marco Ruiz" }),
+    );
     expect(await screen.findByRole("alert")).toBeDefined();
   });
 
@@ -197,7 +226,10 @@ describe("users page", () => {
     });
     data.set("password", "correct horse battery");
     data.set("admin", "on");
-    expect(newUserFromForm(data)).toMatchObject({ password: "correct horse battery", admin: true });
+    expect(newUserFromForm(data)).toMatchObject({
+      password: "correct horse battery",
+      admin: true,
+    });
   });
 
   it("explains itself in demo mode", () => {
@@ -215,8 +247,12 @@ describe("spaces page", () => {
     expect(within(eng).getByText("2.0 MB of 10.0 MB")).toBeDefined();
     expect(within(eng).getByText("Priya Shah")).toBeDefined();
 
-    await user.click(within(eng).getByRole("button", { name: "Manage Engineering" }));
-    const panel = screen.getByRole("region", { name: /Settings and members of Engineering/ });
+    await user.click(
+      within(eng).getByRole("button", { name: "Manage Engineering" }),
+    );
+    const panel = screen.getByRole("region", {
+      name: /Settings and members of Engineering/,
+    });
     await user.selectOptions(
       within(panel).getByRole("combobox", { name: "Role of Priya Shah" }),
       "manager",
@@ -225,17 +261,26 @@ describe("spaces page", () => {
       expect(setMember).toHaveBeenCalledWith(ENG.space.id, PRIYA.id, "manager");
     });
 
-    await user.selectOptions(within(panel).getByRole("combobox", { name: "Person" }), MARCO.id);
+    await user.selectOptions(
+      within(panel).getByRole("combobox", { name: "Person" }),
+      MARCO.id,
+    );
     await user.click(within(panel).getByRole("button", { name: "Add member" }));
     await waitFor(() => {
-      expect(setMember).toHaveBeenLastCalledWith(ENG.space.id, MARCO.id, "editor");
+      expect(setMember).toHaveBeenLastCalledWith(
+        ENG.space.id,
+        MARCO.id,
+        "editor",
+      );
     });
   });
 
   it("keeps a My Drive's members to its owner", async () => {
     const { api } = fakeApi();
     const user = renderWith(api, <SpacesPage />);
-    await user.click(await screen.findByRole("button", { name: "Manage My Drive" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Manage My Drive" }),
+    );
     expect(screen.getByText(/A My Drive belongs to its owner/)).toBeDefined();
     expect(screen.queryByRole("button", { name: "Add member" })).toBeNull();
   });
@@ -243,14 +288,23 @@ describe("spaces page", () => {
   it("creates a shared drive with a folder name made from its name", async () => {
     const { api, createSpace } = fakeApi();
     const user = renderWith(api, <SpacesPage />);
-    const form = await screen.findByRole("form", { name: "Create a shared drive" });
-    await user.type(within(form).getByRole("textbox", { name: "Name" }), "Field Ops");
-    expect(within(form).getByRole("textbox", { name: /Folder name/ })).toHaveProperty(
-      "value",
-      "field-ops",
+    const form = await screen.findByRole("form", {
+      name: "Create a shared drive",
+    });
+    await user.type(
+      within(form).getByRole("textbox", { name: "Name" }),
+      "Field Ops",
     );
-    await user.selectOptions(within(form).getByRole("combobox", { name: "Owner" }), MARCO.id);
-    await user.click(within(form).getByRole("button", { name: "Create a shared drive" }));
+    expect(
+      within(form).getByRole("textbox", { name: /Folder name/ }),
+    ).toHaveProperty("value", "field-ops");
+    await user.selectOptions(
+      within(form).getByRole("combobox", { name: "Owner" }),
+      MARCO.id,
+    );
+    await user.click(
+      within(form).getByRole("button", { name: "Create a shared drive" }),
+    );
     await waitFor(() => {
       expect(createSpace).toHaveBeenCalledWith({
         name: "Field Ops",
@@ -264,7 +318,10 @@ describe("spaces page", () => {
     const data = new FormData();
     data.set("quota", "");
     data.set("trash_days", "14");
-    expect(settingsFromSpaceForm(SETTINGS, data)).toEqual({ ...RETENTION, trash_days: 14 });
+    expect(settingsFromSpaceForm(SETTINGS, data)).toEqual({
+      ...RETENTION,
+      trash_days: 14,
+    });
     data.set("quota", "1.5");
     expect(settingsFromSpaceForm(SETTINGS, data).quota_bytes).toBe(1_572_864);
   });

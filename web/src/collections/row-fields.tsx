@@ -6,7 +6,13 @@ import { useId, useState } from "react";
 import { useT } from "../i18n/i18n";
 
 import { Chips } from "./cell-content";
-import { choiceLabels, choiceValue, isChoice, isMultiple, useChoices } from "./editing";
+import {
+  choiceLabels,
+  choiceValue,
+  isChoice,
+  isMultiple,
+  useChoices,
+} from "./editing";
 import { OptionPicker } from "./option-picker";
 import type { CellValue, PropertyInfo, Value } from "./types";
 import {
@@ -27,7 +33,13 @@ interface FieldProperties {
   readonly onSave: (value: Value) => Promise<string | undefined>;
 }
 
-function FieldError({ id, error }: { readonly id: string; readonly error: string | undefined }) {
+function FieldError({
+  id,
+  error,
+}: {
+  readonly id: string;
+  readonly error: string | undefined;
+}) {
   return error === undefined ? undefined : (
     <span id={id} className="vl-field-error" role="alert">
       {error}
@@ -159,7 +171,10 @@ function CheckField({ property, value, onSave }: FieldProperties) {
 }
 
 /** A computed value as text, as the server formats it. */
-function computedText(property: PropertyInfo, value: Value | undefined): string {
+function computedText(
+  property: PropertyInfo,
+  value: Value | undefined,
+): string {
   if (value?.type === "number" && property.format === "percent") {
     return `${formatNumber(Math.round(value.value * 100))}%`;
   }
@@ -180,12 +195,15 @@ export function RowField({
   const labelId = useId();
   const value = cellValue(cell);
   if (property.computed) {
-    const problem = cell !== undefined && "error" in cell ? cell.error.message : undefined;
+    const problem =
+      cell !== undefined && "error" in cell ? cell.error.message : undefined;
     return (
       <div className="vl-field vl-row-field">
         <span id={labelId}>{property.name}</span>
         <output aria-labelledby={labelId} className="vl-row-computed">
-          {problem === undefined ? computedText(property, value) : `⚠ ${problem}`}
+          {problem === undefined
+            ? computedText(property, value)
+            : `⚠ ${problem}`}
         </output>
         <span className="vl-visually-hidden">{t("collection-computed")}</span>
       </div>
@@ -198,6 +216,11 @@ export function RowField({
     return <ChoiceField property={property} value={value} onSave={onSave} />;
   }
   return (
-    <InputField key={JSON.stringify(value)} property={property} value={value} onSave={onSave} />
+    <InputField
+      key={JSON.stringify(value)}
+      property={property}
+      value={value}
+      onSave={onSave}
+    />
   );
 }

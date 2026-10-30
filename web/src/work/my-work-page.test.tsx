@@ -9,7 +9,11 @@ import type { MyWorkView, TaskView, WorkApi } from "./api";
 import { MyWorkPage } from "./my-work-page";
 import { fakeApi, renderAt } from "./test-work";
 
-function task(id: string, title: string, extra: Partial<TaskView> = {}): TaskView {
+function task(
+  id: string,
+  title: string,
+  extra: Partial<TaskView> = {},
+): TaskView {
   return {
     id,
     title,
@@ -30,7 +34,10 @@ const VIEW: MyWorkView = {
     {
       bucket: "inbox",
       tasks: [
-        task("mention.p1", "see the launch notes", { kind: "mention", doc: "Launch Plan" }),
+        task("mention.p1", "see the launch notes", {
+          kind: "mention",
+          doc: "Launch Plan",
+        }),
         task("mention.p2", "a stray mention", { kind: "mention" }),
       ],
     },
@@ -49,10 +56,18 @@ const VIEW: MyWorkView = {
 const TASK_DRAG = "application/x-vellum-task";
 
 function transfer(types: string[], data: string) {
-  return { types, getData: () => data, setData: vi.fn(), dropEffect: "none", effectAllowed: "all" };
+  return {
+    types,
+    getData: () => data,
+    setData: vi.fn(),
+    dropEffect: "none",
+    effectAllowed: "all",
+  };
 }
 
-/** The nearest `selector` around `element`; fails the test when there is none. */
+/**
+ * The nearest `selector` around `element`; fails the test when there is none.
+ */
 function around(element: Element, selector: string): HTMLElement {
   const found = element.closest<HTMLElement>(selector);
   if (found === null) throw new Error(`no ${selector}`);
@@ -66,17 +81,27 @@ function sectionOf(name: string): HTMLElement {
 
 function renderPage(overrides: Partial<WorkApi> = {}) {
   const fake = fakeApi({ myWork: () => Promise.resolve(VIEW), ...overrides });
-  const user = renderAt("/my-work", fake.api, <Route path="my-work" element={<MyWorkPage />} />);
+  const user = renderAt(
+    "/my-work",
+    fake.api,
+    <Route path="my-work" element={<MyWorkPage />} />,
+  );
   return { ...fake, user };
 }
 
 describe("My Work rows", () => {
-  it("links a page mention to its page and shows a mention with no source plainly", async () => {
-    renderPage();
-    const link = await screen.findByRole("link", { name: "Open page" });
-    expect(link.getAttribute("href")).toBe("/p/Launch%20Plan");
-    expect(screen.getByText("a stray mention").closest("li")?.querySelector("a")).toBeNull();
-  });
+  it(
+    "links a page mention to its page and shows a mention with no source " +
+      "plainly",
+    async () => {
+      renderPage();
+      const link = await screen.findByRole("link", { name: "Open page" });
+      expect(link.getAttribute("href")).toBe("/p/Launch%20Plan");
+      expect(
+        screen.getByText("a stray mention").closest("li")?.querySelector("a"),
+      ).toBeNull();
+    },
+  );
 
   it("marks overdue tasks, names their list and heads a day by its date", async () => {
     renderPage();
@@ -90,14 +115,20 @@ describe("My Work rows", () => {
     renderPage();
     const row = around(await screen.findByText("Paid rent"), "li");
     expect(row.getAttribute("draggable")).toBe("false");
-    expect(screen.queryByRole("combobox", { name: "Move “Paid rent”" })).toBeNull();
+    expect(
+      screen.queryByRole("combobox", { name: "Move “Paid rent”" }),
+    ).toBeNull();
     fireEvent.dragStart(row, { dataTransfer: transfer([TASK_DRAG], "D3.b1") });
-    expect(screen.queryByRole("list", { name: "Drop the task on a day or bucket" })).toBeNull();
+    expect(
+      screen.queryByRole("list", { name: "Drop the task on a day or bucket" }),
+    ).toBeNull();
   });
 
   it("ignores the Move menu's placeholder", async () => {
     const { move } = renderPage();
-    const menu = await screen.findByRole("combobox", { name: "Move “Renew passport”" });
+    const menu = await screen.findByRole("combobox", {
+      name: "Move “Renew passport”",
+    });
     fireEvent.change(menu, { target: { value: "" } });
     expect(move).not.toHaveBeenCalled();
   });
@@ -130,9 +161,13 @@ describe("My Work rows", () => {
   });
 
   it("shows why a move failed", async () => {
-    const move = vi.fn<WorkApi["move"]>(() => Promise.reject(new Error("Locked")));
+    const move = vi.fn<WorkApi["move"]>(() =>
+      Promise.reject(new Error("Locked")),
+    );
     renderPage({ move });
-    const menu = await screen.findByRole("combobox", { name: "Move “Renew passport”" });
+    const menu = await screen.findByRole("combobox", {
+      name: "Move “Renew passport”",
+    });
     fireEvent.change(menu, { target: { value: "someday" } });
     await waitFor(() => {
       expect(screen.getByRole("alert").textContent).toContain("Locked");
@@ -141,7 +176,8 @@ describe("My Work rows", () => {
 
   it("says when there is nothing to do", async () => {
     renderPage({
-      myWork: () => Promise.resolve({ open: 0, today: "2026-10-29", sections: [] }),
+      myWork: () =>
+        Promise.resolve({ open: 0, today: "2026-10-29", sections: [] }),
     });
     expect(await screen.findByText(/nothing/i)).toBeDefined();
   });

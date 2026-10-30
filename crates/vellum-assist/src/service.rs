@@ -9,7 +9,9 @@ use std::time::Duration;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use vellum_contracts::{HttpMethod, Operation, Principal, RequestContext, Scope, Service};
+use vellum_contracts::{
+    HttpMethod, Operation, Principal, RequestContext, Scope, Service,
+};
 use vellum_kernel::{Error, ErrorKind};
 
 use crate::model::{ModelClient, ModelSettings, Prompt};
@@ -172,7 +174,11 @@ impl AssistService {
     /// # Errors
     ///
     /// Invalid settings only; a failed call is reported in the result.
-    pub async fn test(&self, who: &Principal, input: TestInput) -> Result<TestResult, Error> {
+    pub async fn test(
+        &self,
+        who: &Principal,
+        input: TestInput,
+    ) -> Result<TestResult, Error> {
         let _ = who.require_user()?;
         input.model.validate()?;
         let prompt = Prompt {
@@ -197,7 +203,11 @@ impl AssistService {
     /// # Errors
     ///
     /// `not_found` for a page the user cannot read, and the model's errors.
-    pub async fn summarize(&self, who: &Principal, input: SummarizeInput) -> Result<Answer, Error> {
+    pub async fn summarize(
+        &self,
+        who: &Principal,
+        input: SummarizeInput,
+    ) -> Result<Answer, Error> {
         let _ = who.require_user()?;
         input.model.validate()?;
         let page = self.sources.page(who, input.page_id.trim()).await?;
@@ -217,7 +227,11 @@ impl AssistService {
     /// # Errors
     ///
     /// Invalid input, search failures and the model's errors.
-    pub async fn ask(&self, who: &Principal, input: AskInput) -> Result<Answer, Error> {
+    pub async fn ask(
+        &self,
+        who: &Principal,
+        input: AskInput,
+    ) -> Result<Answer, Error> {
         let _ = who.require_user()?;
         input.model.validate()?;
         let question = text("question", &input.question)?;
@@ -229,7 +243,9 @@ impl AssistService {
         let hits = self.sources.search(who, &question, space, ASK_HITS).await?;
         if hits.is_empty() {
             return Ok(Answer {
-                text: "Nothing you can see in this workspace matches that question, so there is nothing to answer from.".into(),
+                text: "Nothing you can see in this workspace matches that \
+                    question, so there is nothing to answer from."
+                    .into(),
                 citations: Vec::new(),
                 truncated: false,
                 model: input.model.model.trim().to_owned(),
@@ -267,7 +283,11 @@ impl AssistService {
     ///
     /// Invalid input, an unreadable template, the model's errors, and
     /// `permission_denied` where the user cannot create pages.
-    pub async fn draft(&self, who: &Principal, input: DraftInput) -> Result<Draft, Error> {
+    pub async fn draft(
+        &self,
+        who: &Principal,
+        input: DraftInput,
+    ) -> Result<Draft, Error> {
         let _ = who.require_user()?;
         who.require_scope(Scope::WriteDraft)?;
         input.model.validate()?;
@@ -354,10 +374,21 @@ impl Service for AssistService {
             }
         };
         vec![
-            Operation::mutation("assist.test", HttpMethod::Post, "/v1/assist/test", Scope::Read, test)
-                .summary("Check that your own model answers")
-                .description("Sends a one-line prompt to the model in the settings. The API key is used for this call only and never stored.")
-                .budget(ANSWER_BUDGET),
+            Operation::mutation(
+                "assist.test",
+                HttpMethod::Post,
+                "/v1/assist/te\
+                st",
+                Scope::Read,
+                test,
+            )
+            .summary("Check that your own model answers")
+            .description(
+                "Sends a one-line prompt to the model in the \
+                    settings. The API key is used for this call only and never \
+                    stored.",
+            )
+            .budget(ANSWER_BUDGET),
             Operation::mutation(
                 "assist.summarize",
                 HttpMethod::Post,
@@ -366,12 +397,29 @@ impl Service for AssistService {
                 summarize,
             )
             .summary("Summarise a page with your own model")
-            .description("Reads the page as you and sends it to the model in the settings, with your key. Vellum runs no model and keeps no key.")
+            .description(
+                "Reads the page as you and sends it to the model in \
+                the settings, with your key. Vellum runs no model and keeps no \
+                key.",
+            )
             .budget(ANSWER_BUDGET),
-            Operation::mutation("assist.ask", HttpMethod::Post, "/v1/assist/ask", Scope::Read, ask)
-                .summary("Ask this space, answered with citations by your own model")
-                .description("Searches what you can read, quotes the best blocks to the model, and returns its answer with links to the blocks it cites.")
-                .budget(ANSWER_BUDGET),
+            Operation::mutation(
+                "assist.ask",
+                HttpMethod::Post,
+                "/v1/assist/ask",
+                Scope::Read,
+                ask,
+            )
+            .summary(
+                "Ask this space, answered with citations by your own \
+                    model",
+            )
+            .description(
+                "Searches what you can read, quotes the best \
+                    blocks to the model, and returns its answer with links to \
+                    the blocks it cites.",
+            )
+            .budget(ANSWER_BUDGET),
             Operation::mutation(
                 "assist.draft",
                 HttpMethod::Post,
@@ -380,7 +428,10 @@ impl Service for AssistService {
                 draft,
             )
             .summary("Draft a page from a template with your own model")
-            .description("Writes a page that follows the template's structure and saves it as a draft for you to review.")
+            .description(
+                "Writes a page that follows the template's structure \
+                and saves it as a draft for you to review.",
+            )
             .budget(DRAFT_BUDGET),
         ]
     }

@@ -20,7 +20,13 @@ import { SearchStatusPanel } from "./search-status";
 
 /** One editable setting: where it lives, and how the form shows it. */
 interface Field {
-  readonly group: "telemetry" | "observability" | "backups" | "security" | "search" | "appearance";
+  readonly group:
+    | "telemetry"
+    | "observability"
+    | "backups"
+    | "security"
+    | "search"
+    | "appearance";
   readonly key: string;
   readonly kind: "number" | "text" | "toggle" | "color" | "select" | "lines";
   /** Smallest allowed number. */
@@ -31,7 +37,10 @@ interface Field {
   readonly optionLabels?: "theme" | "secret-scanning";
 }
 
-/** The secret-scanning policies the server accepts (vellum-admin `SecretScanning`). */
+/**
+ * The secret-scanning policies the server accepts (vellum-admin
+ * `SecretScanning`).
+ */
 const SECRET_SCANNING = ["off", "warn", "block"] as const;
 
 /** The label id of one option of a select. */
@@ -40,14 +49,34 @@ const optionLabel = (field: Field, option: string) =>
     ? `admin-secret-scanning-${option}`
     : `admin-theme-${option}`;
 
-/** The theme ids the server accepts (vellum-admin `EXPORT_THEMES`, `SITE_THEMES`). */
+/**
+ * The theme ids the server accepts (vellum-admin `EXPORT_THEMES`,
+ * `SITE_THEMES`).
+ */
 export const EXPORT_THEMES = ["light", "high-contrast", "sepia"] as const;
-export const SITE_THEMES = ["auto", "light", "dark", "high-contrast", "sepia", "dim"] as const;
+export const SITE_THEMES = [
+  "auto",
+  "light",
+  "dark",
+  "high-contrast",
+  "sepia",
+  "dim",
+] as const;
 
 const FIELDS: readonly Field[] = [
   { group: "appearance", key: "seed", kind: "color" },
-  { group: "appearance", key: "export_theme", kind: "select", options: EXPORT_THEMES },
-  { group: "appearance", key: "site_theme", kind: "select", options: SITE_THEMES },
+  {
+    group: "appearance",
+    key: "export_theme",
+    kind: "select",
+    options: EXPORT_THEMES,
+  },
+  {
+    group: "appearance",
+    key: "site_theme",
+    kind: "select",
+    options: SITE_THEMES,
+  },
   { group: "backups", key: "enabled", kind: "toggle" },
   { group: "backups", key: "interval_hours", kind: "number", min: 1 },
   { group: "backups", key: "keep", kind: "number", min: 1 },
@@ -65,7 +94,12 @@ const FIELDS: readonly Field[] = [
   { group: "security", key: "secret_allow", kind: "lines" },
   { group: "search", key: "hybrid", kind: "toggle" },
   { group: "observability", key: "slow_request_ms", kind: "number", min: 1 },
-  { group: "observability", key: "trace_buffer_capacity", kind: "number", min: 1 },
+  {
+    group: "observability",
+    key: "trace_buffer_capacity",
+    kind: "number",
+    min: 1,
+  },
   { group: "observability", key: "trace_buffer_mib", kind: "number", min: 1 },
   { group: "telemetry", key: "enabled", kind: "toggle" },
   { group: "telemetry", key: "endpoint", kind: "text" },
@@ -89,8 +123,11 @@ const groupOf = (settings: AdminSettings, group: Field["group"]): Group =>
 /** The form's text for one field. */
 function shownText(settings: AdminSettings, field: Field): string {
   const value = groupOf(settings, field.group)[field.key];
-  if (Array.isArray(value)) return value.filter((v) => typeof v === "string").join("\n");
-  return typeof value === "number" || typeof value === "string" ? String(value) : "";
+  if (Array.isArray(value))
+    return value.filter((v) => typeof v === "string").join("\n");
+  return typeof value === "number" || typeof value === "string"
+    ? String(value)
+    : "";
 }
 
 /** Marks a field the form leaves as it was. */
@@ -127,7 +164,10 @@ function fieldValue(field: Field, data: FormData, name: string): unknown {
  * The settings from the form. Fields the form does not show (route
  * budgets, the installation ID) are kept as they were read.
  */
-export function settingsFromForm(base: AdminSettings, data: FormData): AdminSettings {
+export function settingsFromForm(
+  base: AdminSettings,
+  data: FormData,
+): AdminSettings {
   const next: Record<string, unknown> = {
     ...base,
     organisation: formText(data, "organisation"),
@@ -153,7 +193,9 @@ function FieldInput({
 }) {
   const t = useT();
   const name = `${field.group}.${field.key}`;
-  const label = t(`admin-setting-${field.group}-${field.key.replaceAll("_", "-")}`);
+  const label = t(
+    `admin-setting-${field.group}-${field.key.replaceAll("_", "-")}`,
+  );
   if (field.kind === "toggle") {
     return (
       <label className="vl-admin-toggle">
@@ -184,7 +226,11 @@ function FieldInput({
     return (
       <label>
         {label}
-        <textarea name={name} rows={3} defaultValue={shownText(settings, field)} />
+        <textarea
+          name={name}
+          rows={3}
+          defaultValue={shownText(settings, field)}
+        />
       </label>
     );
   }
@@ -192,7 +238,11 @@ function FieldInput({
     return (
       <label>
         {label}
-        <input name={name} type="color" defaultValue={shownText(settings, field) || "#4f5b92"} />
+        <input
+          name={name}
+          type="color"
+          defaultValue={shownText(settings, field) || "#4f5b92"}
+        />
       </label>
     );
   }
@@ -210,7 +260,13 @@ function FieldInput({
   );
 }
 
-function Fieldset({ title, children }: { readonly title: string; readonly children: ReactNode }) {
+function Fieldset({
+  title,
+  children,
+}: {
+  readonly title: string;
+  readonly children: ReactNode;
+}) {
   return (
     <fieldset className="vl-admin-fieldset">
       <legend>{title}</legend>
@@ -231,11 +287,18 @@ function SettingsForm({
   const t = useT();
   const [current, setCurrent] = useState(initial);
   const [saving, setSaving] = useState(false);
-  const [result, setResult] = useState<{ ok: boolean; message: string; conflict?: boolean }>();
+  const [result, setResult] = useState<{
+    ok: boolean;
+    message: string;
+    conflict?: boolean;
+  }>();
 
   const submit: NonNullable<ComponentProps<"form">["onSubmit"]> = (event) => {
     event.preventDefault();
-    const settings = settingsFromForm(current.settings, new FormData(event.currentTarget));
+    const settings = settingsFromForm(
+      current.settings,
+      new FormData(event.currentTarget),
+    );
     setSaving(true);
     setResult(undefined);
     api
@@ -248,7 +311,11 @@ function SettingsForm({
         (error: unknown) => {
           setResult(
             isConflict(error)
-              ? { ok: false, message: t("admin-settings-conflict"), conflict: true }
+              ? {
+                  ok: false,
+                  message: t("admin-settings-conflict"),
+                  conflict: true,
+                }
               : { ok: false, message: failureText(error) },
           );
         },
@@ -262,15 +329,25 @@ function SettingsForm({
     <form className="vl-admin-form" onSubmit={submit}>
       <label>
         {t("admin-setting-organisation")}
-        <input name="organisation" defaultValue={current.settings.organisation ?? ""} />
+        <input
+          name="organisation"
+          defaultValue={current.settings.organisation ?? ""}
+        />
       </label>
       {GROUPS.map((group) => (
         <Fieldset key={group} title={t(`admin-settings-${group}`)}>
           {FIELDS.filter((field) => field.group === group).map((field) => (
-            <FieldInput key={field.key} settings={current.settings} field={field} />
+            <FieldInput
+              key={field.key}
+              settings={current.settings}
+              field={field}
+            />
           ))}
           {group === "search" && api.searchStatus && (
-            <SearchStatusPanel load={api.searchStatus} refreshKey={current.version} />
+            <SearchStatusPanel
+              load={api.searchStatus}
+              refreshKey={current.version}
+            />
           )}
         </Fieldset>
       ))}
@@ -278,7 +355,9 @@ function SettingsForm({
         <button type="submit" className="vl-filled-button" disabled={saving}>
           {saving ? t("admin-saving") : t("admin-save")}
         </button>
-        <div role="status">{result?.ok === true && <p>{result.message}</p>}</div>
+        <div role="status">
+          {result?.ok === true && <p>{result.message}</p>}
+        </div>
       </div>
       {result?.ok === false && (
         <div className="vl-field-error" role="alert">
@@ -322,7 +401,10 @@ function SettingsLoader({ api }: { readonly api: AdminConsoleApi }) {
   );
 }
 
-/** Admin → Settings: appearance, backups, sessions, search, observability and telemetry. */
+/**
+ * Admin → Settings: appearance, backups, sessions, search, observability and
+ * telemetry.
+ */
 export function SettingsPage() {
   const t = useT();
   return (

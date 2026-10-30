@@ -22,7 +22,10 @@ test.use({
 });
 // eslint-disable-next-line no-empty-pattern -- Playwright needs the fixtures object
 test.beforeEach(({}, testInfo) => {
-  test.skip(!testInfo.project.name.endsWith("-laptop"), "runs at laptop size only");
+  test.skip(
+    !testInfo.project.name.endsWith("-laptop"),
+    "runs at laptop size only",
+  );
 });
 
 const PAGE = "01M6400000PAGE00ROADMAP001";
@@ -58,15 +61,23 @@ async function fakeScanner(page: Page, policy: "warn" | "block") {
   return scanned;
 }
 
-test("a likely secret shows a banner that names it, and Remove takes it out", async ({ page }) => {
+test("a likely secret shows a banner that names it, and Remove takes it out", async ({
+  page,
+}) => {
   await signedIn(page);
-  const room = await fakeCollab(page, { paragraph: `The deploy bot pushes with ${TOKEN}.` });
+  const room = await fakeCollab(page, {
+    paragraph: `The deploy bot pushes with ${TOKEN}.`,
+  });
   const scanned = await fakeScanner(page, "warn");
   await page.goto(`/p/${PAGE}`);
 
-  const banner = page.getByRole("alert").filter({ hasText: "looks like it holds a secret" });
+  const banner = page
+    .getByRole("alert")
+    .filter({ hasText: "looks like it holds a secret" });
   await expect(banner).toBeVisible();
-  await expect(banner).toContainText(/GitHub token on line \D?1\D? \(ghp_…\(40\)\)/u);
+  await expect(banner).toContainText(
+    /GitHub token on line \D?1\D? \(ghp_…\(40\)\)/u,
+  );
   // Only the redacted preview is ever shown, never the token itself.
   await expect(banner).not.toContainText(TOKEN);
   expect(scanned.some((text) => text.includes(TOKEN))).toBe(true);
@@ -81,13 +92,17 @@ test("a likely secret shows a banner that names it, and Remove takes it out", as
   await expect(banner).toBeHidden();
 });
 
-test("It's not a secret hides the warning for that finding", async ({ page }) => {
+test("It's not a secret hides the warning for that finding", async ({
+  page,
+}) => {
   await signedIn(page);
   const room = await fakeCollab(page, { paragraph: `Example key: ${TOKEN}` });
   await fakeScanner(page, "warn");
   await page.goto(`/p/${PAGE}`);
 
-  const banner = page.getByRole("alert").filter({ hasText: "looks like it holds a secret" });
+  const banner = page
+    .getByRole("alert")
+    .filter({ hasText: "looks like it holds a secret" });
   await expect(banner).toBeVisible();
   await banner.getByRole("button", { name: "It's not a secret" }).click();
   await expect(banner).toBeHidden();
@@ -95,18 +110,24 @@ test("It's not a secret hides the warning for that finding", async ({ page }) =>
   expect(room.text()).toBe(`Example key: ${TOKEN}`);
 });
 
-test("under the block policy the banner says the page can't be saved", async ({ page }) => {
+test("under the block policy the banner says the page can't be saved", async ({
+  page,
+}) => {
   await signedIn(page);
   await fakeCollab(page, { paragraph: `Token: ${TOKEN}` });
   await fakeScanner(page, "block");
   await page.goto(`/p/${PAGE}`);
 
-  const banner = page.getByRole("alert").filter({ hasText: "can't be saved until you remove it" });
+  const banner = page
+    .getByRole("alert")
+    .filter({ hasText: "can't be saved until you remove it" });
   await expect(banner).toBeVisible();
   await expect(banner).toHaveAttribute("data-policy", "block");
   await expect(banner.getByRole("button", { name: "Remove" })).toBeVisible();
   // A blocked secret cannot be waved through from the editor.
-  await expect(banner.getByRole("button", { name: "It's not a secret" })).toHaveCount(0);
+  await expect(
+    banner.getByRole("button", { name: "It's not a secret" }),
+  ).toHaveCount(0);
 });
 
 test("a page with no likely secret shows no banner", async ({ page }) => {

@@ -69,7 +69,12 @@ impl Drive {
     /// # Errors
     /// As [`Self::attachment_page`], plus `Invalid` for a bad name or a
     /// full page, `QuotaExceeded`.
-    #[tracing::instrument(name = "drive.attach", skip_all, fields(page = %page, bytes = bytes.len()), err)]
+    #[tracing::instrument(
+        name = "drive.attach",
+        skip_all,
+        fields(page = %page, bytes = bytes.len()),
+        err
+    )]
     pub async fn attach(
         &self,
         actor: &Actor,
@@ -90,7 +95,8 @@ impl Drive {
             let candidates = names(name)?;
             // A text file is checked like page text (secret scanning, D301).
             if std::str::from_utf8(&bytes).is_ok() {
-                let path = file_path(&dir, name).unwrap_or_else(|_| dir.clone());
+                let path =
+                    file_path(&dir, name).unwrap_or_else(|_| dir.clone());
                 self.check_content(actor, node.space, &path, &bytes).await?;
             }
             for candidate in candidates.take(MAX_ATTACHMENTS + 1) {
@@ -120,7 +126,11 @@ impl Drive {
     ///
     /// # Errors
     /// As [`Self::attachment_page`].
-    pub async fn attachments(&self, actor: &Actor, page: ObjectId) -> DriveResult<Vec<Attachment>> {
+    pub async fn attachments(
+        &self,
+        actor: &Actor,
+        page: ObjectId,
+    ) -> DriveResult<Vec<Attachment>> {
         self.observe("attachments", async {
             let node = self.attachment_page(actor, page, false).await?;
             let dir = self.files_dir(&node).await?;
@@ -177,8 +187,18 @@ impl Drive {
     /// # Errors
     /// As [`Self::attachment_page`]; `NotFound` when the page has no such
     /// file.
-    #[tracing::instrument(name = "drive.detach", skip_all, fields(page = %page), err)]
-    pub async fn detach(&self, actor: &Actor, page: ObjectId, name: &str) -> DriveResult<()> {
+    #[tracing::instrument(
+        name = "drive.detach",
+        skip_all,
+        fields(page = %page),
+        err
+    )]
+    pub async fn detach(
+        &self,
+        actor: &Actor,
+        page: ObjectId,
+        name: &str,
+    ) -> DriveResult<()> {
         self.observe("detach", async {
             let node = self.attachment_page(actor, page, true).await?;
             let path = file_path(&self.files_dir(&node).await?, name)?;
@@ -195,17 +215,20 @@ impl Drive {
     async fn files_dir(&self, page: &Node) -> DriveResult<BlobPath> {
         // A folder made outside Vellum can take the page's directory
         // (D168); its files then have nowhere to go.
-        let dir = self
-            .children_dir(page.kind, &page.path)
-            .await?
-            .ok_or_else(|| DriveError::Invalid("this page cannot hold files".into()))?;
+        let dir = self.children_dir(page.kind, &page.path).await?.ok_or_else(
+            || DriveError::Invalid("this page cannot hold files".into()),
+        )?;
         Ok(dir.join(ATTACHMENTS_DIR)?)
     }
 
     /// Fails when `bytes` more would take the space past its quota. The
     /// index does not count uploaded files, so they are added up from the
     /// store, and only for a space that has a quota.
-    async fn ensure_file_quota(&self, space: &Space, bytes: u64) -> DriveResult<()> {
+    async fn ensure_file_quota(
+        &self,
+        space: &Space,
+        bytes: u64,
+    ) -> DriveResult<()> {
         let Some(quota) = space.settings.quota_bytes else {
             return Ok(());
         };
@@ -231,7 +254,8 @@ impl Drive {
 /// The path of the file `name` in `dir`, refusing anything that is not a
 /// plain file name.
 fn file_path(dir: &BlobPath, name: &str) -> DriveResult<BlobPath> {
-    let bad = || DriveError::Invalid(format!("{name:?} is not a valid file name"));
+    let bad =
+        || DriveError::Invalid(format!("{name:?} is not a valid file name"));
     if name.is_empty() || name.starts_with('.') || name.contains(['/', '\\']) {
         return Err(bad());
     }
@@ -252,7 +276,9 @@ fn names(name: &str) -> DriveResult<impl Iterator<Item = String>> {
         )));
     }
     let (stem, ext) = match name.rsplit_once('.') {
-        Some((stem, ext)) if !stem.is_empty() => (stem.to_owned(), format!(".{ext}")),
+        Some((stem, ext)) if !stem.is_empty() => {
+            (stem.to_owned(), format!(".{ext}"))
+        }
         _ => (name.to_owned(), String::new()),
     };
     let first = std::iter::once(name.to_owned());
@@ -289,7 +315,8 @@ mod tests {
 
     #[test]
     fn only_plain_names_are_files() {
-        let dir = BlobPath::new("d/Plan/.attachments").unwrap_or_else(|e| unreachable!("{e}"));
+        let dir = BlobPath::new("d/Plan/.attachments")
+            .unwrap_or_else(|e| unreachable!("{e}"));
         assert!(file_path(&dir, "chart.png").is_ok());
         for bad in ["", ".env", "../Plan.md", "a/b.png", "a\\b.png", "CON"] {
             assert!(file_path(&dir, bad).is_err(), "{bad:?}");

@@ -12,8 +12,10 @@ Upcoming, repeats what repeats and shows on your calendar.
 ## Steps
 
 1. Open **My Work** and select **New list**. Call it "Ops".
-2. Press `Q` and type `Renew TLS certificates tomorrow 3pm p2 #ops`. Watch the date, priority and list light up, then press `Enter`.
-3. Add `Check backup restore every! 2 weeks #ops`. Because of the `!`, the next one is due two weeks after you tick this one.
+2. Press `Q` and type `Renew TLS certificates tomorrow 3pm p2 #ops`. Watch the
+   date, priority and list light up, then press `Enter`.
+3. Add `Check backup restore every! 2 weeks #ops`. Because of the `!`, the next
+   one is due two weeks after you tick this one.
 4. Add `Standup notes every weekday 9am #ops`.
 5. Open **⋯ → Calendar feed** and subscribe to the link in your calendar.
 

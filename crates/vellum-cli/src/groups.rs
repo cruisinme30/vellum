@@ -41,13 +41,19 @@ const fn user(id: UserId) -> Subject {
 }
 
 impl<S: AuthzStore + 'static> GroupMembers for AuthzGroups<S> {
-    fn members(&self, group: ObjectId) -> BoxFuture<'_, Result<BTreeSet<UserId>, Error>> {
+    fn members(
+        &self,
+        group: ObjectId,
+    ) -> BoxFuture<'_, Result<BTreeSet<UserId>, Error>> {
         Box::pin(async move {
-            let tuples = self.0.store().load_directory().await.map_err(unavailable)?;
+            let tuples =
+                self.0.store().load_directory().await.map_err(unavailable)?;
             let target = Object::Group(Id(group.as_u128()));
             Ok(tuples
                 .into_iter()
-                .filter(|t| t.object == target && t.relation == TupleRelation::Member)
+                .filter(|t| {
+                    t.object == target && t.relation == TupleRelation::Member
+                })
                 .filter_map(|t| match t.subject {
                     Subject::User(id) => Some(UserId::from_u128(id.0)),
                     _ => None,
@@ -64,7 +70,8 @@ impl<S: AuthzStore + 'static> GroupMembers for AuthzGroups<S> {
     ) -> BoxFuture<'a, Result<(), Error>> {
         Box::pin(async move {
             let add: Vec<Subject> = add.iter().copied().map(user).collect();
-            let remove: Vec<Subject> = remove.iter().copied().map(user).collect();
+            let remove: Vec<Subject> =
+                remove.iter().copied().map(user).collect();
             self.0
                 .update_group(Id(group.as_u128()), &add, &remove)
                 .await
@@ -83,7 +90,8 @@ mod tests {
     async fn members_round_trip_through_the_engine() {
         let authz = Arc::new(Authz::new(MemoryStore::new()));
         let groups = AuthzGroups(Arc::clone(&authz));
-        let (group, priya, marco) = (ObjectId::generate(), UserId::generate(), UserId::generate());
+        let (group, priya, marco) =
+            (ObjectId::generate(), UserId::generate(), UserId::generate());
         groups.change(group, &[priya, marco], &[]).await.unwrap();
         groups.change(group, &[], &[marco]).await.unwrap();
         assert_eq!(

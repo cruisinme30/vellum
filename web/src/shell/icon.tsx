@@ -29,7 +29,13 @@ export function hasIcon(name: string): boolean {
 }
 
 /** A decorative icon; the control that holds it carries the accessible name. */
-export function Icon({ name, size = 24 }: { readonly name: string; readonly size?: number }) {
+export function Icon({
+  name,
+  size = 24,
+}: {
+  readonly name: string;
+  readonly size?: number;
+}) {
   return (
     <svg
       className="vl-icon"

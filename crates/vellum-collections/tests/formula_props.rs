@@ -5,14 +5,18 @@
 //! printing then parsing gives the same tree, and evaluation is total.
 
 use proptest::prelude::*;
-use vellum_collections::formula::{BinOp, Env, Expr, Func, Node, Span, UnOp, parse};
+use vellum_collections::formula::{
+    BinOp, Env, Expr, Func, Node, Span, UnOp, parse,
+};
 use vellum_collections::{DateValue, Value};
 
 /// Removes spans so trees compare by structure.
 fn strip(node: &Node) -> Node {
     let expr = match &node.expr {
         Expr::Unary(op, e) => Expr::Unary(*op, Box::new(strip(e))),
-        Expr::Binary(op, l, r) => Expr::Binary(*op, Box::new(strip(l)), Box::new(strip(r))),
+        Expr::Binary(op, l, r) => {
+            Expr::Binary(*op, Box::new(strip(l)), Box::new(strip(r)))
+        }
         Expr::Call(f, args) => Expr::Call(*f, args.iter().map(strip).collect()),
         other => other.clone(),
     };
@@ -95,7 +99,8 @@ fn value() -> impl Strategy<Value = Value> {
         "[a-zA-Z ]{0,8}".prop_map(Value::Text),
         any::<bool>().prop_map(Value::Bool),
         (2000i32..2100, 1u8..=12, 1u8..=28)
-            .prop_filter_map("date", |(y, m, d)| DateValue::ymd(y, m, d).map(Value::Date)),
+            .prop_filter_map("date", |(y, m, d)| DateValue::ymd(y, m, d)
+                .map(Value::Date)),
     ];
     prop_oneof![
         4 => scalar.clone(),
@@ -129,7 +134,8 @@ proptest! {
     }
 
     #[test]
-    fn parser_never_panics_on_formula_like_text(src in "[a-z0-9 ()\",.+*/%<>=!\\-]{0,40}") {
+    fn parser_never_panics_on_formula_like_text(src in "[a-z0-9 \
+        ()\",.+*/%<>=!\\-]{0,40}") {
         let _ = parse(&src);
     }
 
@@ -139,7 +145,12 @@ proptest! {
         let parsed = parse(&printed);
         prop_assert!(parsed.is_ok(), "{printed:?} did not parse: {parsed:?}");
         if let Ok(parsed) = parsed {
-            prop_assert_eq!(strip(&parsed), strip(&t), "printed as {}", printed);
+            prop_assert_eq!(
+                strip(&parsed),
+                strip(&t),
+                "printed as {}",
+                printed
+            );
         }
     }
 
@@ -149,7 +160,10 @@ proptest! {
         vals in prop::collection::vec(value(), 3),
     ) {
         let schema = vellum_collections::Schema::from_yaml(
-            "id: 01JBQ8Y4ZK6V3W2N5R7T9X1C3E\nproperties:\n  - {key: t, name: T, type: title}\n  - {key: a, name: A, type: text}\n  - {key: b, name: B, type: text}\n  - {key: c, name: Due date, type: text}\n",
+            "id: 01JBQ8Y4ZK6V3W2N5R7T9X1C3E\n\
+                properties:\n  - {key: t, name: T, type: title}\n  - {key: a, \
+                name: A, type: text}\n  - {key: b, name: B, type: text}\n  - \
+                {key: c, name: Due date, type: text}\n",
         );
         prop_assert!(schema.is_ok());
         if let Ok(schema) = schema {
@@ -171,12 +185,20 @@ proptest! {
     fn addition_commutes(a in -1e9f64..1e9, b in -1e9f64..1e9) {
         let mut env = Fixed(vec![Value::Number(a), Value::Number(b)]);
         let schema = vellum_collections::Schema::from_yaml(
-            "id: 01JBQ8Y4ZK6V3W2N5R7T9X1C3E\nproperties:\n  - {key: t, name: T, type: title}\n  - {key: a, name: A, type: number}\n  - {key: b, name: B, type: number}\n",
+            "id: 01JBQ8Y4ZK6V3W2N5R7T9X1C3E\n\
+                properties:\n  - {key: t, name: T, type: title}\n  - {key: a, \
+                name: A, type: number}\n  - {key: b, name: B, type: number}\n",
         );
         prop_assert!(schema.is_ok());
         if let Ok(schema) = schema {
-            let ab = vellum_collections::formula::compile("A + B", &schema).map(|f| f.eval(&mut env));
-            let ba = vellum_collections::formula::compile("B + A", &schema).map(|f| f.eval(&mut env));
+            let ab = vellum_collections::formula::compile(
+                "A + B",
+                &schema
+            ).map(|f| f.eval(&mut env));
+            let ba = vellum_collections::formula::compile(
+                "B + A",
+                &schema
+            ).map(|f| f.eval(&mut env));
             prop_assert_eq!(ab, ba);
         }
     }

@@ -17,16 +17,22 @@ use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 use vellum_contracts::{
-    BoxFuture, CredentialKind, Operation, Principal, RequestContext, Scope, ScopeSet, Service,
+    BoxFuture, CredentialKind, Operation, Principal, RequestContext, Scope,
+    ScopeSet, Service,
 };
-use vellum_identity::{GroupMembers, GroupsService, Identity, IdentityConfig, Store};
+use vellum_identity::{
+    GroupMembers, GroupsService, Identity, IdentityConfig, Store,
+};
 use vellum_kernel::{Error, ErrorKind, ObjectId, RequestId, Timestamp, UserId};
 
 #[derive(Debug, Default)]
 struct Members(Mutex<BTreeMap<ObjectId, BTreeSet<UserId>>>);
 
 impl GroupMembers for Members {
-    fn members(&self, group: ObjectId) -> BoxFuture<'_, Result<BTreeSet<UserId>, Error>> {
+    fn members(
+        &self,
+        group: ObjectId,
+    ) -> BoxFuture<'_, Result<BTreeSet<UserId>, Error>> {
         let found = self
             .0
             .lock()
@@ -76,7 +82,9 @@ struct World {
 impl World {
     fn new() -> Self {
         let identity = Arc::new(Identity::new(
-            IdentityConfig::new("https://vellum.northstar.dev".parse().unwrap()),
+            IdentityConfig::new(
+                "https://vellum.northstar.dev".parse().unwrap(),
+            ),
             Store::memory(),
         ));
         let members = Arc::new(Members::default());

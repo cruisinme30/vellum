@@ -65,7 +65,9 @@ pub fn instants(task: &Task, settings: &Settings) -> Vec<Timestamp> {
         .filter_map(|reminder| {
             let local = match reminder {
                 Reminder::At(moment) => *moment,
-                Reminder::Relative(offset) => anchor?.checked_add(*offset).ok()?,
+                Reminder::Relative(offset) => {
+                    anchor?.checked_add(*offset).ok()?
+                }
             };
             local
                 .to_zoned(settings.time_zone.clone())
@@ -83,7 +85,9 @@ pub fn due_between(
     until: Timestamp,
     settings: &Settings,
 ) -> Vec<DueReminder> {
-    let _span = tracing::debug_span!("tasks.reminders_due", tasks = tasks.len()).entered();
+    let _span =
+        tracing::debug_span!("tasks.reminders_due", tasks = tasks.len())
+            .entered();
     let mut out: Vec<DueReminder> = tasks
         .iter()
         .filter(|t| !t.done)
@@ -132,7 +136,9 @@ fn link(task: &Task) -> String {
         Source::Checklist { doc, .. } | Source::Comment { doc, .. } => {
             format!("[{title}](vellum://doc/{doc})")
         }
-        Source::Mention { doc: Some(doc), .. } => format!("[{title}](vellum://doc/{doc})"),
+        Source::Mention { doc: Some(doc), .. } => {
+            format!("[{title}](vellum://doc/{doc})")
+        }
         Source::Issue { key, .. }
         | Source::Mention {
             issue: Some(key), ..
@@ -151,7 +157,9 @@ fn line(out: &mut String, entry: &Entry, today: Date) {
     if let Some(due) = entry.task.fields.due {
         if entry.overdue {
             let _ = write!(text, " (due {})", short_date(due.date()));
-        } else if let Some(moment) = due.datetime().filter(|m| m.date() == today) {
+        } else if let Some(moment) =
+            due.datetime().filter(|m| m.date() == today)
+        {
             let _ = write!(text, " ({})", moment.strftime("%H:%M"));
         }
     }
@@ -162,9 +170,12 @@ fn line(out: &mut String, entry: &Entry, today: Date) {
 /// to do today, nothing overdue and nothing in the Inbox.
 #[must_use]
 pub fn digest(view: &MyWork, today: Date) -> Option<String> {
-    let overdue: Vec<&Entry> = view.today.iter().filter(|e| e.overdue).collect();
-    let today_only: Vec<&Entry> = view.today.iter().filter(|e| !e.overdue).collect();
-    if view.today.is_empty() && view.evening.is_empty() && view.inbox.is_empty() {
+    let overdue: Vec<&Entry> =
+        view.today.iter().filter(|e| e.overdue).collect();
+    let today_only: Vec<&Entry> =
+        view.today.iter().filter(|e| !e.overdue).collect();
+    if view.today.is_empty() && view.evening.is_empty() && view.inbox.is_empty()
+    {
         return None;
     }
     let mut out = String::new();
@@ -177,7 +188,8 @@ pub fn digest(view: &MyWork, today: Date) -> Option<String> {
         .sum();
     let _ = writeln!(
         out,
-        "{} today, {} overdue, {} this evening, {} in the next seven days, {} in the Inbox.\n",
+        "{} today, {} overdue, {} this evening, {} in the next seven days, {} \
+            in the Inbox.\n",
         today_only.len(),
         overdue.len(),
         view.evening.len(),
@@ -308,7 +320,11 @@ mod tests {
             today,
         );
         let text = digest(&view, today).unwrap();
-        assert!(text.starts_with("# My Work for Tuesday 3 November\n\n1 today, 1 overdue, 1 this evening, 1 in the next seven days, 0 in the Inbox.\n"));
+        assert!(text.starts_with(
+            "# My Work for Tuesday 3 November\n\n\
+            1 today, 1 overdue, 1 this evening, 1 in the next seven days, 0 in \
+            the Inbox.\n"
+        ));
         assert!(text.contains("## Overdue\n\n- [Pay invoice](vellum://doc/"));
         assert!(text.contains(") (due Sun 1 Nov)\n"));
         assert!(text.contains(") (15:00)\n"));

@@ -22,7 +22,9 @@ export const PUBLISHED_DOCS = "https://cruisinme30.github.io/vellum/docs/";
  * folder's `README.md` is its `index.html`. */
 export function publishedUrl(topic: HelpTopic): string {
   const [path = "", anchor] = HELP_TOPICS[topic].split("#");
-  const page = path.replace(/(^|\/)README\.md$/, "$1index.html").replace(/\.md$/, ".html");
+  const page = path
+    .replace(/(^|\/)README\.md$/, "$1index.html")
+    .replace(/\.md$/, ".html");
   const fragment = anchor === undefined ? "" : "#" + anchor;
   return PUBLISHED_DOCS + page + fragment;
 }
@@ -33,7 +35,13 @@ export function serverUrl(topic: HelpTopic): string {
 }
 
 /** The `?` link for `topic`; `label` names what it explains. */
-export function HelpLink({ topic, label }: { readonly topic: HelpTopic; readonly label: string }) {
+export function HelpLink({
+  topic,
+  label,
+}: {
+  readonly topic: HelpTopic;
+  readonly label: string;
+}) {
   const t = useT();
   const session = useSession();
   const name = t("help-link", { topic: label });

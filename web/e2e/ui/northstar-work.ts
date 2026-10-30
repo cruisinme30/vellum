@@ -76,13 +76,21 @@ const issue = (
 });
 
 export const ISSUES: IssueOut[] = [
-  issue(12, "Sign-in page loops when the session cookie expires", "in_progress", "started", 1, {
-    assignee: "priya",
-    labels: ["bug"],
-    due: "2026-10-31",
-    description:
-      "After the cookie expires, the sign-in page redirects to itself.\n\n1. Sign in\n2. Wait an hour\n3. Reload",
-  }),
+  issue(
+    12,
+    "Sign-in page loops when the session cookie expires",
+    "in_progress",
+    "started",
+    1,
+    {
+      assignee: "priya",
+      labels: ["bug"],
+      due: "2026-10-31",
+      description:
+        "After the cookie expires, the sign-in page redirects to " +
+        "itself.\n\n1. Sign in\n2. Wait an hour\n3. Reload",
+    },
+  ),
   issue(14, "Board view: drag cards between columns", "todo", "unstarted", 2, {
     assignee: "sam",
     labels: ["feature"],
@@ -90,7 +98,8 @@ export const ISSUES: IssueOut[] = [
   }),
   issue(
     15,
-    "Export a book as PDF with a table of contents, numbered sections and cross-references",
+    "Export a book as PDF with a table of contents, numbered sections and " +
+      "cross-references",
     "todo",
     "unstarted",
     3,
@@ -125,13 +134,23 @@ export const MY_WORK: MyWorkView = {
       tasks: [
         task("t1", "Review the 1.0 launch checklist", "checklist", {
           doc: "P1",
-          fields: { labels: ["launch"], remind: [], priority: 1, due: "2026-10-29" },
+          fields: {
+            labels: ["launch"],
+            remind: [],
+            priority: 1,
+            due: "2026-10-29",
+          },
         }),
-        task("t2", "Sign-in page loops when the session cookie expires", "issue", {
-          issue_key: "ENG-12",
-          overdue: true,
-          fields: { labels: [], remind: [], due: "2026-10-28" },
-        }),
+        task(
+          "t2",
+          "Sign-in page loops when the session cookie expires",
+          "issue",
+          {
+            issue_key: "ENG-12",
+            overdue: true,
+            fields: { labels: [], remind: [], due: "2026-10-28" },
+          },
+        ),
         task("mention.c1", "Sam mentioned you in Roadmap 2027", "mention", {
           mentioned_by: "sam",
           doc: "P1",
@@ -147,7 +166,9 @@ export const MY_WORK: MyWorkView = {
       bucket: "anytime",
       tasks: [
         task("t4", "Read the security self-assessment", "checklist", {
-          subtasks: [task("t4a", "Section 3: sessions", "checklist", { done: true })],
+          subtasks: [
+            task("t4a", "Section 3: sessions", "checklist", { done: true }),
+          ],
         }),
       ],
     },

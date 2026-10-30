@@ -38,7 +38,11 @@ export function monthWeeks(month: string): string[][] {
   const weekday = (new Date(timeOf(month)).getUTCDay() + 6) % 7;
   const end = addMonths(month, 1);
   const weeks: string[][] = [];
-  for (let start = addDays(month, -weekday); start < end; start = addDays(start, 7)) {
+  for (
+    let start = addDays(month, -weekday);
+    start < end;
+    start = addDays(start, 7)
+  ) {
     weeks.push(Array.from({ length: 7 }, (_, index) => addDays(start, index)));
   }
   return weeks;
@@ -52,11 +56,17 @@ export function today(now = new Date()): string {
 const formatters = new Map<string, Intl.DateTimeFormat>();
 
 /** Formats a day for people, in the browser's language. */
-export function formatDay(day: string, options: Intl.DateTimeFormatOptions): string {
+export function formatDay(
+  day: string,
+  options: Intl.DateTimeFormatOptions,
+): string {
   const key = JSON.stringify(options);
   let formatter = formatters.get(key);
   if (!formatter) {
-    formatter = new Intl.DateTimeFormat(undefined, { ...options, timeZone: "UTC" });
+    formatter = new Intl.DateTimeFormat(undefined, {
+      ...options,
+      timeZone: "UTC",
+    });
     formatters.set(key, formatter);
   }
   return formatter.format(new Date(timeOf(day)));

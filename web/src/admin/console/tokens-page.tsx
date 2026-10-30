@@ -12,10 +12,16 @@ import "../../account/account.css";
 import type { AdminTokensApi, AdminTokenView, TokenPolicy } from "./api";
 import { AdminScreen } from "./context";
 
-const DAY = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" });
+const DAY = new Intl.DateTimeFormat("en", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
 
 function when(value: string | null | undefined, fallback: string): string {
-  return value === null || value === undefined ? fallback : DAY.format(new Date(value));
+  return value === null || value === undefined
+    ? fallback
+    : DAY.format(new Date(value));
 }
 
 /** The cap on new tokens' expiry: a number of days, or none. */
@@ -32,7 +38,9 @@ function CapForm({
   const id = useId();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
-  const [capped, setCapped] = useState(policy.maxDays !== null && policy.maxDays !== undefined);
+  const [capped, setCapped] = useState(
+    policy.maxDays !== null && policy.maxDays !== undefined,
+  );
   const submit: NonNullable<ComponentProps<"form">["onSubmit"]> = (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -49,7 +57,11 @@ function CapForm({
       });
   };
   return (
-    <form className="vl-admin-form" aria-labelledby={`${id}-title`} onSubmit={submit}>
+    <form
+      className="vl-admin-form"
+      aria-labelledby={`${id}-title`}
+      onSubmit={submit}
+    >
       <h2 id={`${id}-title`}>{t("admin-tokens-cap-title")}</h2>
       <label className="vl-admin-toggle">
         <input
@@ -121,7 +133,12 @@ function Row({
       <td>
         {confirm ? (
           <div className="vl-admin-row-actions">
-            <span>{t("admin-tokens-revoke-confirm", { name: token.token.name, owner })}</span>
+            <span>
+              {t("admin-tokens-revoke-confirm", {
+                name: token.token.name,
+                owner,
+              })}
+            </span>
             <button
               type="button"
               className="vl-filled-button"
@@ -148,7 +165,10 @@ function Row({
             type="button"
             className="vl-text-button"
             disabled={busy}
-            aria-label={t("admin-tokens-revoke-label", { name: token.token.name, owner })}
+            aria-label={t("admin-tokens-revoke-label", {
+              name: token.token.name,
+              owner,
+            })}
             onClick={() => {
               setConfirm(true);
             }}
@@ -181,7 +201,10 @@ function Tokens({ api }: { readonly api: AdminTokensApi }) {
       .revoke(token.token.id)
       .then(
         () => {
-          setNotice({ ok: true, message: t("tokens-revoked", { name: token.token.name }) });
+          setNotice({
+            ok: true,
+            message: t("tokens-revoked", { name: token.token.name }),
+          });
           setReload((n) => n + 1);
         },
         (error: unknown) => {
@@ -200,7 +223,9 @@ function Tokens({ api }: { readonly api: AdminTokensApi }) {
           {notice.message}
         </p>
       )}
-      {loaded.state === "loading" && <p className="vl-muted">{t("admin-loading")}</p>}
+      {loaded.state === "loading" && (
+        <p className="vl-muted">{t("admin-loading")}</p>
+      )}
       {loaded.state === "failed" && (
         <p className="vl-field-error" role="alert">
           {loaded.message}
@@ -213,7 +238,9 @@ function Tokens({ api }: { readonly api: AdminTokensApi }) {
           ) : (
             <div className="vl-admin-scroll">
               <table className="vl-admin-table">
-                <caption>{t("tokens-caption", { count: loaded.value.tokens.length })}</caption>
+                <caption>
+                  {t("tokens-caption", { count: loaded.value.tokens.length })}
+                </caption>
                 <thead>
                   <tr>
                     <th scope="col">{t("tokens-name")}</th>
@@ -264,7 +291,11 @@ export function AdminTokensPage() {
   return (
     <AdminScreen title={t("admin-tokens")} intro={t("admin-tokens-intro")}>
       {(api) =>
-        api.tokens === undefined ? <p>{t("admin-needs-server")}</p> : <Tokens api={api.tokens} />
+        api.tokens === undefined ? (
+          <p>{t("admin-needs-server")}</p>
+        ) : (
+          <Tokens api={api.tokens} />
+        )
       }
     </AdminScreen>
   );

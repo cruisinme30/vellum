@@ -41,7 +41,8 @@ export interface ReauthGate {
 }
 
 export function createReauthGate(): ReauthGate {
-  let waiting: { promise: Promise<boolean>; resolve: (ok: boolean) => void } | undefined;
+  let waiting:
+    { promise: Promise<boolean>; resolve: (ok: boolean) => void } | undefined;
   const listeners = new Set<() => void>();
   const notify = () => {
     for (const listener of listeners) listener();
@@ -92,17 +93,22 @@ export function withReauth(http: Http, gate: ReauthGate): Http {
     get: (path, query) => retry(() => http.get(path, query)),
     send: (method, path, body) => retry(() => http.send(method, path, body)),
     blob: (path, query) => retry(() => http.blob(path, query)),
-    upload: (path, query, body, type) => retry(() => http.upload(path, query, body, type)),
+    upload: (path, query, body, type) =>
+      retry(() => http.upload(path, query, body, type)),
     forgetSession: () => {
       http.forgetSession();
     },
   };
 }
 
-/** The server's answer when the person has a second factor and sent none (D290). */
+/**
+ * The server's answer when the person has a second factor and sent none (D290).
+ */
 const SECOND_FACTOR_REQUIRED = "second factor required";
 
-/** Whether re-authentication needs a code or passkey as well as the password. */
+/**
+ * Whether re-authentication needs a code or passkey as well as the password.
+ */
 export function needsSecondFactor(error: unknown): boolean {
   return error instanceof ApiError && error.message === SECOND_FACTOR_REQUIRED;
 }
@@ -115,7 +121,9 @@ export interface ReauthFactor {
   readonly ticket?: string;
 }
 
-/** Proves the password again; the session counts as a fresh sign-in after it. */
+/**
+ * Proves the password again; the session counts as a fresh sign-in after it.
+ */
 export async function reauthenticate(
   http: Http,
   password: string,

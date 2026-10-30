@@ -25,8 +25,9 @@ const FORMAT: u32 = 1;
 ///
 /// Never in practice: a space ID is always a valid file name.
 pub fn keys_path(space: SpaceId) -> Result<BlobPath, Error> {
-    BlobPath::new(format!("{SYSTEM_DIR}/{KEYS_DIR}/{space}.yaml"))
-        .map_err(|e| Error::new(ErrorKind::Internal, "bad key list path").with_source(e))
+    BlobPath::new(format!("{SYSTEM_DIR}/{KEYS_DIR}/{space}.yaml")).map_err(
+        |e| Error::new(ErrorKind::Internal, "bad key list path").with_source(e),
+    )
 }
 
 /// The file.
@@ -48,8 +49,12 @@ pub struct Entry {
 
 impl Entry {
     pub fn device_key(&self) -> Result<DeviceKey, Error> {
-        parse_key(&self.key)
-            .map_err(|_| Error::new(ErrorKind::Internal, "the space's key list holds a bad key"))
+        parse_key(&self.key).map_err(|_| {
+            Error::new(
+                ErrorKind::Internal,
+                "the space's key list holds a bad key",
+            )
+        })
     }
 
     pub fn info(&self, caller: UserId) -> Result<DeviceKeyInfo, Error> {
@@ -75,7 +80,11 @@ impl KeyFile {
 
     pub fn parse(text: &str) -> Result<Self, Error> {
         let file: Self = serde_saphyr::from_str(text).map_err(|e| {
-            Error::new(ErrorKind::Internal, "the space's key list cannot be read").with_source(e)
+            Error::new(
+                ErrorKind::Internal,
+                "the space's key list cannot be read",
+            )
+            .with_source(e)
         })?;
         if file.vellum != FORMAT {
             return Err(Error::new(
@@ -88,11 +97,14 @@ impl KeyFile {
 
     pub fn render(&self) -> Result<String, Error> {
         let body = serde_saphyr::to_string(self).map_err(|e| {
-            Error::new(ErrorKind::Internal, "cannot write the key list").with_source(e)
+            Error::new(ErrorKind::Internal, "cannot write the key list")
+                .with_source(e)
         })?;
         Ok(format!(
-            "# Public keys of the devices this end-to-end encrypted space is sealed to.\n\
-             # Managed by Vellum (ADR 0043); edit through `vellum private` or the API.\n{body}"
+            "# Public keys of the devices this end-to-end encrypted space is \
+             sealed to.\n\
+             # Managed by Vellum (ADR 0043); edit through `vellum private` or \
+             the API.\n{body}"
         ))
     }
 
@@ -122,7 +134,8 @@ pub fn parse_key(text: &str) -> Result<DeviceKey, Error> {
     let invalid = || {
         Error::new(
             ErrorKind::InvalidInput,
-            "public_key must be 64 hex digits, as `vellum private key` prints it",
+            "public_key must be 64 hex digits, as `vellum private key` prints \
+                it",
         )
     };
     let bytes = hex::decode(text.trim()).map_err(|_| invalid())?;

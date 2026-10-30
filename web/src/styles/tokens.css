@@ -29,7 +29,8 @@
   --md-scrim: #000000;
 
   --vl-font: "Roboto", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --vl-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  --vl-mono:
+    ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
   --vl-radius-s: 8px;
   --vl-radius-m: 16px;
   --vl-radius-l: 28px;
@@ -94,7 +95,8 @@
 }
 
 :root[data-font="dyslexic"] {
-  --vl-font: "OpenDyslexic", "Atkinson Hyperlegible", "Roboto", system-ui, sans-serif;
+  --vl-font:
+    "OpenDyslexic", "Atkinson Hyperlegible", "Roboto", system-ui, sans-serif;
 
   /* OpenDyslexic reads best with a little more room between lines and words. */
   line-height: 1.7;

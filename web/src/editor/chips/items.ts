@@ -32,7 +32,10 @@ export interface IssueStatus {
  */
 export interface ChipSources {
   readonly people: () => readonly ChipPerson[];
-  readonly pages: () => readonly { readonly id: string; readonly title: string }[];
+  readonly pages: () => readonly {
+    readonly id: string;
+    readonly title: string;
+  }[];
   /** Issues matching a query; absent in demo mode. */
   readonly issues?: (query: string) => Promise<readonly ChipIssue[]>;
   /** An issue's live status for its chip; absent in demo mode. */
@@ -73,9 +76,20 @@ const item = (
   section: string,
   icon: string,
   attributes: Record<string, string>,
-): SlashItem => ({ id, node, title, description, section, icon, attrs: attributes, keywords: [] });
+): SlashItem => ({
+  id,
+  node,
+  title,
+  description,
+  section,
+  icon,
+  attrs: attributes,
+  keywords: [],
+});
 
-/** Date entries for `@`: today, tomorrow, next Monday, and a typed `YYYY-MM-DD`. */
+/**
+ * Date entries for `@`: today, tomorrow, next Monday, and a typed `YYYY-MM-DD`.
+ */
 export function dateItems(query: string, t: Translate, now: Date): SlashItem[] {
   const section = t("chips-dates");
   const choices: [string, string, string][] = [
@@ -96,10 +110,20 @@ export function dateItems(query: string, t: Translate, now: Date): SlashItem[] {
         { date },
       ),
     );
-  const typed = /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/.exec(query.trim());
+  const typed = /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/.exec(
+    query.trim(),
+  );
   if (typed) {
     found.unshift(
-      item("date", `date-${typed[0]}`, typed[0], "", section, "calendar_today", { date: typed[0] }),
+      item(
+        "date",
+        `date-${typed[0]}`,
+        typed[0],
+        "",
+        section,
+        "calendar_today",
+        { date: typed[0] },
+      ),
     );
   }
   return found;

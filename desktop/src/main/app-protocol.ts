@@ -37,13 +37,22 @@ const contentTypes: Readonly<Record<string, string>> = {
 };
 
 /** Request headers the page may not set on proxied calls. */
-const strippedHeaders = ["authorization", "cookie", "host", "origin", "referer"];
+const strippedHeaders = [
+  "authorization",
+  "cookie",
+  "host",
+  "origin",
+  "referer",
+];
 
 /**
  * Maps a URL path to a file under `webRoot`, or undefined if it would
  * escape it. Paths without an extension are app routes and get `index.html`.
  */
-export function resolveAsset(webRoot: string, pathname: string): string | undefined {
+export function resolveAsset(
+  webRoot: string,
+  pathname: string,
+): string | undefined {
   let decoded: string;
   try {
     decoded = decodeURIComponent(pathname);
@@ -53,7 +62,10 @@ export function resolveAsset(webRoot: string, pathname: string): string | undefi
   if (decoded.includes("\0") || decoded.includes("\\")) return undefined;
   const relative = path.posix.normalize(decoded).replace(/^\/+/, "");
   if (relative.startsWith("..")) return undefined;
-  const file = relative === "" || path.posix.extname(relative) === "" ? "index.html" : relative;
+  const file =
+    relative === "" || path.posix.extname(relative) === ""
+      ? "index.html"
+      : relative;
   const root = path.resolve(webRoot);
   const resolved = path.resolve(root, file);
   return resolved.startsWith(root + path.sep) ? resolved : undefined;
@@ -81,10 +93,17 @@ export async function handleAppRequest(
     headers.set("content-security-policy", options.csp());
     headers.set("cache-control", "no-cache");
   }
-  return new Response(request.method === "HEAD" ? undefined : new Uint8Array(body), { headers });
+  return new Response(
+    request.method === "HEAD" ? undefined : new Uint8Array(body),
+    { headers },
+  );
 }
 
-async function proxy(request: Request, url: URL, options: ProtocolOptions): Promise<Response> {
+async function proxy(
+  request: Request,
+  url: URL,
+  options: ProtocolOptions,
+): Promise<Response> {
   const target = new URL(`${url.pathname}${url.search}`, options.server());
   const headers = new Headers(request.headers);
   for (const name of strippedHeaders) headers.delete(name);
@@ -108,7 +127,12 @@ async function proxy(request: Request, url: URL, options: ProtocolOptions): Prom
   } catch {
     // Offline or the server is down: the sync layer treats 503 as retryable.
     return Response.json(
-      { error: { code: "unavailable", message: "The Vellum server cannot be reached" } },
+      {
+        error: {
+          code: "unavailable",
+          message: "The Vellum server cannot be reached",
+        },
+      },
       { status: 503 },
     );
   }

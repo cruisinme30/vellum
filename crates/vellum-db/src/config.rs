@@ -41,7 +41,8 @@ impl fmt::Debug for IndexKey {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum IndexConfig {
-    /// Zero-config single-binary profile: a SQLite file, normally `.vellum/index.sqlite`.
+    /// Zero-config single-binary profile: a SQLite file, normally
+    /// `.vellum/index.sqlite`.
     Sqlite {
         /// Path of the database file; created if missing.
         path: PathBuf,

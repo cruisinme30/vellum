@@ -27,7 +27,10 @@ export function PageFilesProvider({
   readonly children: ReactNode;
 }) {
   const api = useServerApi("attachments");
-  const value = useMemo(() => (api === undefined ? undefined : { api, pageId }), [api, pageId]);
+  const value = useMemo(
+    () => (api === undefined ? undefined : { api, pageId }),
+    [api, pageId],
+  );
   return <PageFilesContext value={value}>{children}</PageFilesContext>;
 }
 

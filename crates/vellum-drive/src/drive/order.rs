@@ -61,13 +61,15 @@ impl Drive {
     async fn stored_order(&self, dir: &BlobPath) -> DriveResult<Vec<ObjectId>> {
         let path = dir.join(layout::ORDER_FILE)?;
         match self.store.get(&path).await {
-            Ok(blob) => Ok(from_yaml::<OrderFile>(&path, &blob.bytes).map_or_else(
-                |err| {
-                    tracing::warn!(%path, error = %err, "ignoring an unreadable order file");
-                    Vec::new()
-                },
-                |f| f.order,
-            )),
+            Ok(blob) => Ok(from_yaml::<OrderFile>(&path, &blob.bytes)
+                .map_or_else(
+                    |err| {
+                        tracing::warn!(%path, error = %err, "ignoring an \
+                        unreadable order file");
+                        Vec::new()
+                    },
+                    |f| f.order,
+                )),
             Err(StoreError::NotFound(_)) => Ok(Vec::new()),
             Err(err) => Err(err.into()),
         }
@@ -100,12 +102,14 @@ impl Drive {
             Some(p) => Some(self.live_node(p).await?),
             None => None,
         };
-        let Some(dir) = self.container_dir(space, holder.as_ref()).await? else {
+        let Some(dir) = self.container_dir(space, holder.as_ref()).await?
+        else {
             return Ok(());
         };
         let mut siblings = self.index.children(space.id, parent).await?;
         self.sort_siblings(Some(&dir), &mut siblings).await?;
-        let mut order: Vec<ObjectId> = siblings.iter().map(|n| n.id).filter(|n| *n != id).collect();
+        let mut order: Vec<ObjectId> =
+            siblings.iter().map(|n| n.id).filter(|n| *n != id).collect();
         order.insert(index.min(order.len()), id);
         let _ = self
             .put_file(
@@ -121,8 +125,18 @@ impl Drive {
     ///
     /// # Errors
     /// `NotFound`, `PermissionDenied` without edit rights on the parent.
-    #[tracing::instrument(name = "drive.reorder", skip_all, fields(node = %id), err)]
-    pub async fn reorder(&self, actor: &Actor, id: ObjectId, index: usize) -> DriveResult<Node> {
+    #[tracing::instrument(
+        name = "drive.reorder",
+        skip_all,
+        fields(node = %id),
+        err
+    )]
+    pub async fn reorder(
+        &self,
+        actor: &Actor,
+        id: ObjectId,
+        index: usize,
+    ) -> DriveResult<Node> {
         self.observe("reorder", async {
             let node = self.live_node(id).await?;
             let space = self.space(node.space).await?;
@@ -147,7 +161,12 @@ impl Drive {
     /// # Errors
     /// `SpaceNotFound`, `NotFound`, `Invalid` for a root that holds
     /// nothing, `PermissionDenied`.
-    #[tracing::instrument(name = "drive.tree", skip_all, fields(space = %space), err)]
+    #[tracing::instrument(
+        name = "drive.tree",
+        skip_all,
+        fields(space = %space),
+        err
+    )]
     pub async fn tree(
         &self,
         actor: &Actor,
@@ -176,7 +195,8 @@ impl Drive {
                 Permission::View,
             )
             .await?;
-            let mut children: HashMap<Option<ObjectId>, Vec<Node>> = HashMap::new();
+            let mut children: HashMap<Option<ObjectId>, Vec<Node>> =
+                HashMap::new();
             for node in self.index.nodes(space.id).await? {
                 if node.is_live() {
                     children.entry(node.parent).or_default().push(node);
@@ -208,7 +228,10 @@ impl Drive {
                 }
                 let deeper = depth.is_none_or(|d| level < d);
                 let below = if deeper && children.contains_key(&Some(node.id)) {
-                    Some(self.ordered(&space, Some(&node), &mut children).await?)
+                    Some(
+                        self.ordered(&space, Some(&node), &mut children)
+                            .await?,
+                    )
                 } else {
                     None
                 };
@@ -229,7 +252,8 @@ impl Drive {
         parent: Option<&Node>,
         children: &mut HashMap<Option<ObjectId>, Vec<Node>>,
     ) -> DriveResult<Vec<Node>> {
-        let mut items = children.remove(&parent.map(|n| n.id)).unwrap_or_default();
+        let mut items =
+            children.remove(&parent.map(|n| n.id)).unwrap_or_default();
         let dir = self.container_dir(space, parent).await?;
         self.sort_siblings(dir.as_ref(), &mut items).await?;
         items.reverse();
@@ -240,7 +264,8 @@ impl Drive {
 /// Sorts items by their place in `order`; the rest follow, folders first,
 /// then by title.
 fn sort_by_order(items: &mut [Node], order: &[ObjectId]) {
-    let rank: HashMap<ObjectId, usize> = order.iter().enumerate().map(|(i, id)| (*id, i)).collect();
+    let rank: HashMap<ObjectId, usize> =
+        order.iter().enumerate().map(|(i, id)| (*id, i)).collect();
     items.sort_by(|a, b| {
         let (ra, rb) = (rank.get(&a.id), rank.get(&b.id));
         match (ra, rb) {
@@ -249,7 +274,9 @@ fn sort_by_order(items: &mut [Node], order: &[ObjectId]) {
             (None, Some(_)) => std::cmp::Ordering::Greater,
             (None, None) => (a.kind != NodeKind::Folder)
                 .cmp(&(b.kind != NodeKind::Folder))
-                .then_with(|| a.title.to_lowercase().cmp(&b.title.to_lowercase()))
+                .then_with(|| {
+                    a.title.to_lowercase().cmp(&b.title.to_lowercase())
+                })
                 .then_with(|| a.id.cmp(&b.id)),
         }
     });

@@ -53,9 +53,10 @@ impl SearchError {
     pub const fn kind(&self) -> ErrorKind {
         match self {
             Self::Invalid(_) | Self::Query(_) => ErrorKind::InvalidInput,
-            Self::Meilisearch(_) | Self::Postgres(_) | Self::Access(_) | Self::Source(_) => {
-                ErrorKind::Unavailable
-            }
+            Self::Meilisearch(_)
+            | Self::Postgres(_)
+            | Self::Access(_)
+            | Self::Source(_) => ErrorKind::Unavailable,
             Self::Tantivy(_)
             | Self::Migrate(_)
             | Self::Embedding(_)
@@ -72,9 +73,15 @@ impl From<SearchError> for Error {
         // can name internals, so they travel as the source for logs only.
         let kind = error.kind();
         let message = match &error {
-            SearchError::Invalid(message) => format!("invalid search: {message}"),
-            SearchError::Query(_) => "the search query could not be parsed".to_owned(),
-            _ if kind == ErrorKind::Unavailable => "search is unavailable".to_owned(),
+            SearchError::Invalid(message) => {
+                format!("invalid search: {message}")
+            }
+            SearchError::Query(_) => {
+                "the search query could not be parsed".to_owned()
+            }
+            _ if kind == ErrorKind::Unavailable => {
+                "search is unavailable".to_owned()
+            }
             _ => "search failed".to_owned(),
         };
         Self::new(kind, message).with_source(error)

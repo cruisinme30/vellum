@@ -24,17 +24,21 @@ use std::time::{Duration, Instant};
 use async_trait::async_trait;
 use bytes::Bytes;
 use serde_json::{Map, Value, json};
-use vellum_contracts::{CredentialKind, Operation, RequestContext, ScopeSet, Service};
+use vellum_contracts::{
+    CredentialKind, Operation, RequestContext, ScopeSet, Service,
+};
 use vellum_drive::{Drive, DriveIndex, Filter, NodeKind, Saved, Space};
 use vellum_kernel::{
-    Actor as Who, Error, ErrorKind, ObjectId, RequestId, SpaceId, Timestamp, UserId,
+    Actor as Who, Error, ErrorKind, ObjectId, RequestId, SpaceId, Timestamp,
+    UserId,
 };
 use vellum_mcp::auth::Principal;
 use vellum_mcp::ports::{
-    Actor, Attribution, Block, BlockSelector, Change, ChangePage, CollectionQuery, Document,
-    EditProposal, ExportArtifact, ExportRequest, Issue, IssueUpdate, Listing, ListingPage,
-    NewComment, NewIssue, NewPage, NewTask, OutlineNode, RowPage, RowUpsert, SearchHit,
-    SearchQuery, SiteInfo, Template, Workspace, WorkspaceError, WriteMode, WriteReceipt,
+    Actor, Attribution, Block, BlockSelector, Change, ChangePage,
+    CollectionQuery, Document, EditProposal, ExportArtifact, ExportRequest,
+    Issue, IssueUpdate, Listing, ListingPage, NewComment, NewIssue, NewPage,
+    NewTask, OutlineNode, RowPage, RowUpsert, SearchHit, SearchQuery, SiteInfo,
+    Template, Workspace, WorkspaceError, WriteMode, WriteReceipt,
 };
 use vellum_private::PrivateDoc;
 use vellum_store::Base;
@@ -105,7 +109,9 @@ impl Caller {
             .user_id
             .parse()
             .map_err(|_| WorkspaceError::NotFound("unknown user".into()))?;
-        let scopes = ScopeSet::from_scopes(p.scopes.iter().filter_map(|s| s.as_str().parse().ok()));
+        let scopes = ScopeSet::from_scopes(
+            p.scopes.iter().filter_map(|s| s.as_str().parse().ok()),
+        );
         Ok(Self {
             user,
             principal: vellum_contracts::Principal::user(
@@ -128,7 +134,9 @@ impl Caller {
 /// A failed read: what the caller may not see does not exist.
 fn read_err(what: &str) -> impl Fn(Error) -> WorkspaceError + '_ {
     move |e| match e.kind() {
-        ErrorKind::NotFound | ErrorKind::PermissionDenied | ErrorKind::Unauthenticated => {
+        ErrorKind::NotFound
+        | ErrorKind::PermissionDenied
+        | ErrorKind::Unauthenticated => {
             WorkspaceError::NotFound(what.to_owned())
         }
         _ => write_error(&e),
@@ -241,7 +249,9 @@ fn nest(flat: Vec<OutlineNode>) -> Vec<OutlineNode> {
 fn filter_text(filter: &Value) -> Result<String, WorkspaceError> {
     let property = text(filter, "property");
     if property.is_empty() {
-        return Err(WorkspaceError::Invalid("a filter needs a property".into()));
+        return Err(WorkspaceError::Invalid(
+            "a filter needs a property".into(),
+        ));
     }
     let op = match text(filter, "op").as_str() {
         "" | "eq" | "is" | "=" => "=",
@@ -253,7 +263,9 @@ fn filter_text(filter: &Value) -> Result<String, WorkspaceError> {
         "gt" | ">" => ">",
         "gte" | ">=" => ">=",
         "empty" | "is_empty" => return Ok(format!("\"{property}\" is empty")),
-        "not_empty" | "is_not_empty" => return Ok(format!("\"{property}\" is not empty")),
+        "not_empty" | "is_not_empty" => {
+            return Ok(format!("\"{property}\" is not empty"));
+        }
         other => {
             return Err(WorkspaceError::Invalid(format!(
                 "unknown filter op {other}"
@@ -325,7 +337,8 @@ pub type Exporter = Arc<
             vellum_contracts::Principal,
             ExportWhat,
             String,
-        ) -> vellum_contracts::BoxFuture<'static, Result<ExportFile, Error>>
+        )
+            -> vellum_contracts::BoxFuture<'static, Result<ExportFile, Error>>
         + Send
         + Sync,
 >;
@@ -377,25 +390,40 @@ impl ServeWorkspace {
     fn export_url(&self, what: &ExportWhat, format: &str) -> String {
         match what {
             ExportWhat::Page(id) => {
-                format!("{}/api/v1/export/pages/{id}?format={format}", self.base_url)
+                format!(
+                    "{}/api/v1/export/pages/{id}?format={format}",
+                    self.base_url
+                )
             }
             ExportWhat::Book { id, section: None } => {
-                format!("{}/api/v1/export/books/{id}?format={format}", self.base_url)
+                format!(
+                    "{}/api/v1/export/books/{id}?format={format}",
+                    self.base_url
+                )
             }
             ExportWhat::Book {
                 id,
                 section: Some(section),
             } => format!(
-                "{}/api/v1/export/books/{id}?format={format}&scope=subtree&section={section}",
+                "{}/api/v1/export/books/{id}?format={format}&scope=subtree&sect\
+                    ion={section}",
                 self.base_url
             ),
         }
     }
 
     /// Runs one service operation as `caller`.
-    async fn call(&self, caller: &Caller, id: &str, input: Value) -> Result<Value, Error> {
+    async fn call(
+        &self,
+        caller: &Caller,
+        id: &str,
+        input: Value,
+    ) -> Result<Value, Error> {
         let op = self.ops.get(id).ok_or_else(|| {
-            Error::new(ErrorKind::Unavailable, format!("{id} is not served here"))
+            Error::new(
+                ErrorKind::Unavailable,
+                format!("{id} is not served here"),
+            )
         })?;
         let ctx = RequestContext {
             request_id: RequestId::generate(),
@@ -411,19 +439,28 @@ impl ServeWorkspace {
     }
 
     /// The spaces the caller can open: their My Drive and shared drives.
-    async fn spaces(&self, caller: &Caller) -> Result<Vec<Space>, WorkspaceError> {
+    async fn spaces(
+        &self,
+        caller: &Caller,
+    ) -> Result<Vec<Space>, WorkspaceError> {
         let mut spaces = self
             .drive
             .shared_drives(caller.user)
             .await
             .map_err(write_err)?;
-        if let Some(mine) = self.drive.my_drive(caller.user).await.map_err(write_err)? {
+        if let Some(mine) =
+            self.drive.my_drive(caller.user).await.map_err(write_err)?
+        {
             spaces.insert(0, mine);
         }
         Ok(spaces)
     }
 
-    async fn space_by_slug(&self, caller: &Caller, slug: &str) -> Result<Space, WorkspaceError> {
+    async fn space_by_slug(
+        &self,
+        caller: &Caller,
+        slug: &str,
+    ) -> Result<Space, WorkspaceError> {
         self.spaces(caller)
             .await?
             .into_iter()
@@ -454,7 +491,9 @@ impl ServeWorkspace {
             .await
             .map_err(|e| read_err(id)(e.into()))?;
         if node.kind != NodeKind::Page {
-            return Err(WorkspaceError::NotFound(format!("{id} is not a page")));
+            return Err(WorkspaceError::NotFound(format!(
+                "{id} is not a page"
+            )));
         }
         let markdown = String::from_utf8_lossy(&blob.bytes).into_owned();
         let doc = vellum_private::read_document(
@@ -502,10 +541,18 @@ impl ServeWorkspace {
             .map_err(write_err)?;
         let mut fields = vec![("status", "draft".to_owned())];
         fields.extend(front);
-        let pairs: Vec<(&str, &str)> = fields.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        let pairs: Vec<(&str, &str)> =
+            fields.iter().map(|(k, v)| (*k, v.as_str())).collect();
         let node = self
             .drive
-            .create_page_with(&caller.model(), mine.id, None, title, body, &pairs)
+            .create_page_with(
+                &caller.model(),
+                mine.id,
+                None,
+                title,
+                body,
+                &pairs,
+            )
             .await
             .map_err(write_err)?;
         Ok(self.receipt(&node.id.to_string(), WriteMode::Draft))
@@ -552,7 +599,9 @@ impl ServeWorkspace {
                 .and_then(Value::as_u64)
                 .unwrap_or_default(),
         );
-        for field in ["assignee", "project", "cycle", "parent", "due", "estimate"] {
+        for field in
+            ["assignee", "project", "cycle", "parent", "due", "estimate"]
+        {
             let value = text(out, field);
             if !value.is_empty() {
                 let _ = writeln!(front, "{field}: {value}");
@@ -573,7 +622,11 @@ impl ServeWorkspace {
         }
     }
 
-    async fn view(&self, caller: &Caller, input: Value) -> Result<Value, WorkspaceError> {
+    async fn view(
+        &self,
+        caller: &Caller,
+        input: Value,
+    ) -> Result<Value, WorkspaceError> {
         let id = text(&input, "collection_id");
         self.call(caller, "collections.query", input)
             .await
@@ -583,7 +636,11 @@ impl ServeWorkspace {
             })
     }
 
-    async fn book_toc(&self, caller: &Caller, id: &str) -> Result<Value, WorkspaceError> {
+    async fn book_toc(
+        &self,
+        caller: &Caller,
+        id: &str,
+    ) -> Result<Value, WorkspaceError> {
         self.call(caller, "books.get", json!({ "book_id": id }))
             .await
             .map_err(read_err(id))
@@ -629,7 +686,9 @@ impl ServeWorkspace {
                 .map_err(write_err)?;
             out.extend(pages.into_iter().map(|p| (template_name(&p.title), p)));
         }
-        out.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.title.cmp(&b.1.title)));
+        out.sort_by(|a, b| {
+            a.0.cmp(&b.0).then_with(|| a.1.title.cmp(&b.1.title))
+        });
         out.dedup_by(|a, b| a.0 == b.0);
         Ok(out)
     }
@@ -656,8 +715,12 @@ impl ServeWorkspace {
         let mut titles: BTreeMap<ObjectId, Option<String>> = BTreeMap::new();
         let mut out = Vec::with_capacity(all.len());
         for a in all {
-            if let std::collections::btree_map::Entry::Vacant(slot) = titles.entry(a.node) {
-                let _ = slot.insert(self.drive.get(&who, a.node).await.ok().map(|n| n.title));
+            if let std::collections::btree_map::Entry::Vacant(slot) =
+                titles.entry(a.node)
+            {
+                let _ = slot.insert(
+                    self.drive.get(&who, a.node).await.ok().map(|n| n.title),
+                );
             }
             // Items the caller cannot see (or that are gone) are skipped.
             let Some(Some(title)) = titles.get(&a.node).cloned() else {
@@ -829,7 +892,8 @@ fn table(columns: &[String], rows: &[Value]) -> String {
         " --- |".repeat(columns.len())
     );
     for row in rows {
-        let cells: Vec<String> = columns.iter().map(|c| cell(row.get(c))).collect();
+        let cells: Vec<String> =
+            columns.iter().map(|c| cell(row.get(c))).collect();
         let _ = writeln!(out, "| {} |", cells.join(" | "));
     }
     out
@@ -843,7 +907,8 @@ impl Workspace for ServeWorkspace {
         query: SearchQuery,
     ) -> Result<Vec<SearchHit>, WorkspaceError> {
         let caller = Caller::of(actor)?;
-        let mut input = json!({ "q": query.query, "limit": query.limit.clamp(1, 100) });
+        let mut input =
+            json!({ "q": query.query, "limit": query.limit.clamp(1, 100) });
         if let Some(slug) = &query.space {
             put(
                 &mut input,
@@ -898,12 +963,20 @@ impl Workspace for ServeWorkspace {
             .collect())
     }
 
-    async fn get_doc(&self, actor: &Actor, id: &str) -> Result<Document, WorkspaceError> {
+    async fn get_doc(
+        &self,
+        actor: &Actor,
+        id: &str,
+    ) -> Result<Document, WorkspaceError> {
         let caller = Caller::of(actor)?;
         Ok(self.read_page(&caller, id).await?.0)
     }
 
-    async fn get_doc_by_path(&self, actor: &Actor, path: &str) -> Result<Document, WorkspaceError> {
+    async fn get_doc_by_path(
+        &self,
+        actor: &Actor,
+        path: &str,
+    ) -> Result<Document, WorkspaceError> {
         let caller = Caller::of(actor)?;
         let not_found = || WorkspaceError::NotFound(path.to_owned());
         // The app's own page URL, `/p/{id}`.
@@ -957,8 +1030,13 @@ impl Workspace for ServeWorkspace {
                     .map(|b| OutlineNode {
                         id: b.id,
                         number: None,
-                        title: b.heading_path.last().cloned().unwrap_or_default(),
-                        depth: u8::try_from(b.heading_path.len()).unwrap_or(u8::MAX),
+                        title: b
+                            .heading_path
+                            .last()
+                            .cloned()
+                            .unwrap_or_default(),
+                        depth: u8::try_from(b.heading_path.len())
+                            .unwrap_or(u8::MAX),
                         children: Vec::new(),
                     })
                     .collect(),
@@ -970,7 +1048,11 @@ impl Workspace for ServeWorkspace {
         }
     }
 
-    async fn get_book(&self, actor: &Actor, id: &str) -> Result<Document, WorkspaceError> {
+    async fn get_book(
+        &self,
+        actor: &Actor,
+        id: &str,
+    ) -> Result<Document, WorkspaceError> {
         let caller = Caller::of(actor)?;
         let info = self.book_toc(&caller, id).await?;
         Ok(Document {
@@ -984,7 +1066,11 @@ impl Workspace for ServeWorkspace {
         })
     }
 
-    async fn space_tree(&self, actor: &Actor, slug: &str) -> Result<Document, WorkspaceError> {
+    async fn space_tree(
+        &self,
+        actor: &Actor,
+        slug: &str,
+    ) -> Result<Document, WorkspaceError> {
         let caller = Caller::of(actor)?;
         let space = self.space_by_slug(&caller, slug).await?;
         let tree = self
@@ -998,7 +1084,8 @@ impl Workspace for ServeWorkspace {
             )
             .await
             .map_err(|e| read_err(slug)(e.into()))?;
-        let mut children: HashMap<Option<ObjectId>, Vec<&vellum_drive::Node>> = HashMap::new();
+        let mut children: HashMap<Option<ObjectId>, Vec<&vellum_drive::Node>> =
+            HashMap::new();
         for node in &tree.items {
             children.entry(node.parent).or_default().push(node);
         }
@@ -1012,8 +1099,12 @@ impl Workspace for ServeWorkspace {
             .collect();
         while let Some((depth, node)) = stack.pop() {
             let line = match node.kind {
-                NodeKind::Page => format!("[{}](vellum://doc/{})", node.title, node.id),
-                NodeKind::Book => format!("[{}](vellum://book/{})", node.title, node.id),
+                NodeKind::Page => {
+                    format!("[{}](vellum://doc/{})", node.title, node.id)
+                }
+                NodeKind::Book => {
+                    format!("[{}](vellum://book/{})", node.title, node.id)
+                }
                 NodeKind::Collection => {
                     format!("[{}](vellum://collection/{})", node.title, node.id)
                 }
@@ -1025,7 +1116,9 @@ impl Workspace for ServeWorkspace {
             }
         }
         if tree.truncated {
-            out.push_str("\n(The tree is longer than this; search to find the rest.)\n");
+            out.push_str(
+                "\n(The tree is longer than this; search to find the rest.)\n",
+            );
         }
         Ok(Document {
             id: space.id.to_string(),
@@ -1058,7 +1151,8 @@ impl Workspace for ServeWorkspace {
         if let Some(template) = &page.template {
             fields.push(("template", template.clone()));
         }
-        let pairs: Vec<(&str, &str)> = fields.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        let pairs: Vec<(&str, &str)> =
+            fields.iter().map(|(k, v)| (*k, v.as_str())).collect();
         let node = self
             .drive
             .create_page_with(
@@ -1094,7 +1188,8 @@ impl Workspace for ServeWorkspace {
                 doc.version
             )));
         }
-        let ids: Vec<String> = parsed.blocks.iter().map(|b| b.id.to_string()).collect();
+        let ids: Vec<String> =
+            parsed.blocks.iter().map(|b| b.id.to_string()).collect();
         let edited = crate::mcp_edit::apply(&doc.markdown, &ids, &edit.edits)?;
         if mode == WriteMode::Draft {
             let mut front = vec![
@@ -1121,15 +1216,22 @@ impl Workspace for ServeWorkspace {
             .await
             .map_err(write_err)?;
         match outcome.saved {
-            Saved::Conflicted { copy } => Err(WorkspaceError::Conflict(format!(
-                "someone changed the same blocks; the edit was saved as a copy, {}",
-                self.page_url(copy.id)
-            ))),
+            Saved::Conflicted { copy } => {
+                Err(WorkspaceError::Conflict(format!(
+                    "someone changed the same blocks; the edit was saved as a \
+                        copy, {}",
+                    self.page_url(copy.id)
+                )))
+            }
             _ => Ok(self.receipt(&doc.id, WriteMode::Direct)),
         }
     }
 
-    async fn get_issue(&self, actor: &Actor, key: &str) -> Result<Issue, WorkspaceError> {
+    async fn get_issue(
+        &self,
+        actor: &Actor,
+        key: &str,
+    ) -> Result<Issue, WorkspaceError> {
         let caller = Caller::of(actor)?;
         let out = self
             .call(&caller, "work.get_issue", json!({ "key": key }))
@@ -1237,7 +1339,8 @@ impl Workspace for ServeWorkspace {
         let caller = Caller::of(actor)?;
         let mut line = task.title.clone();
         if let Some(assignee) = &task.assignee {
-            let _ = write!(line, " +{}", assignee.trim_start_matches(['@', '+']));
+            let _ =
+                write!(line, " +{}", assignee.trim_start_matches(['@', '+']));
         }
         let out = self
             .call(
@@ -1253,7 +1356,11 @@ impl Workspace for ServeWorkspace {
                 .call(
                     &caller,
                     "tasks.update",
-                    json!({ "task": id, "start": task.start_date, "due": task.due }),
+                    json!({
+                        "task": id,
+                        "start": task.start_date,
+                        "due": task.due
+                    }),
                 )
                 .await
                 .map_err(|e| write_error(&e))?;
@@ -1354,28 +1461,43 @@ impl Workspace for ServeWorkspace {
                 )
                 .await
                 .map_err(read_err(&collection))?;
-            let rows = serde_json::to_string_pretty(&upsert.rows).unwrap_or_default();
-            let mut front = vec![("draft_of", format!("collection:{collection}"))];
+            let rows =
+                serde_json::to_string_pretty(&upsert.rows).unwrap_or_default();
+            let mut front =
+                vec![("draft_of", format!("collection:{collection}"))];
             front.extend(attribution(&by));
             let title = format!("Proposed rows: {}", text(&info, "title"));
             let body = format!(
-                "Rows proposed for [{}](vellum://collection/{collection}): rows with an `id` change that row, the others are new.\n\n```json\n{rows}\n```\n",
+                "Rows proposed for [{}](vellum://collection/{collection}): \
+                    rows with an `id` change that row, the others are new.\n\n\
+                    ```json\n{rows}\n```\n",
                 text(&info, "title")
             );
             return self.draft(&caller, &title, &body, front).await;
         }
         for row in upsert.rows {
             let Value::Object(mut values) = row else {
-                return Err(WorkspaceError::Invalid("each row is an object".into()));
+                return Err(WorkspaceError::Invalid(
+                    "each row is an object".into(),
+                ));
             };
             let id = values.remove("id");
             let body = values.remove("body");
             let input = match id {
                 Some(id) => {
-                    json!({ "collection_id": collection, "row_id": id, "values": values, "body": body })
+                    json!({
+                        "collection_id": collection,
+                        "row_id": id,
+                        "values": values,
+                        "body": body
+                    })
                 }
                 None => {
-                    json!({ "collection_id": collection, "values": values, "body": body.unwrap_or_else(|| json!("")) })
+                    json!({
+                        "collection_id": collection,
+                        "values": values,
+                        "body": body.unwrap_or_else(|| json!(""))
+                    })
                 }
             };
             let op = if input.get("row_id").is_some() {
@@ -1399,7 +1521,9 @@ impl Workspace for ServeWorkspace {
         let caller = Caller::of(actor)?;
         let Some(exporter) = self.exporter.get() else {
             return Err(WorkspaceError::Unavailable(
-                "export is not offered over MCP on this server yet; read the page with get_doc instead".into(),
+                "export is not offered over MCP on this server yet; read the \
+                    page with get_doc instead"
+                    .into(),
             ));
         };
         if !matches!(request.format.as_str(), "pdf" | "docx" | "md") {
@@ -1521,7 +1645,9 @@ impl Workspace for ServeWorkspace {
                 });
             }
         }
-        if let Ok(list) = self.call(&caller, "collections.list", json!({})).await {
+        if let Ok(list) =
+            self.call(&caller, "collections.list", json!({})).await
+        {
             for c in list
                 .get("collections")
                 .and_then(Value::as_array)
@@ -1542,7 +1668,10 @@ impl Workspace for ServeWorkspace {
         Ok(ListingPage { items, next_cursor })
     }
 
-    async fn list_templates(&self, actor: &Actor) -> Result<Vec<Template>, WorkspaceError> {
+    async fn list_templates(
+        &self,
+        actor: &Actor,
+    ) -> Result<Vec<Template>, WorkspaceError> {
         let Ok(caller) = Caller::of(actor) else {
             return Ok(Vec::new());
         };
@@ -1558,7 +1687,11 @@ impl Workspace for ServeWorkspace {
             .collect())
     }
 
-    async fn get_template(&self, actor: &Actor, name: &str) -> Result<String, WorkspaceError> {
+    async fn get_template(
+        &self,
+        actor: &Actor,
+        name: &str,
+    ) -> Result<String, WorkspaceError> {
         let caller = Caller::of(actor)?;
         let wanted = template_name(name);
         let (_, node) = self
@@ -1574,7 +1707,9 @@ impl Workspace for ServeWorkspace {
     async fn site_info(&self) -> Result<SiteInfo, WorkspaceError> {
         Ok(SiteInfo {
             name: "Vellum".into(),
-            summary: "A Vellum workspace: documents, books, collections, issues and tasks, each a Markdown file.".into(),
+            summary: "A Vellum workspace: documents, books, collections, \
+                issues and tasks, each a Markdown file."
+                .into(),
             base_url: self.base_url.clone(),
         })
     }
@@ -1608,14 +1743,21 @@ mod tests {
     #[test]
     fn filters_and_sorts_become_view_text() {
         assert_eq!(
-            filter_text(&json!({ "property": "Status", "op": "neq", "value": "Done" })).unwrap(),
+            filter_text(
+                &json!({ "property": "Status", "op": "neq", "value": "Done" })
+            )
+            .unwrap(),
             "\"Status\" != Done"
         );
         assert_eq!(
-            filter_text(&json!({ "property": "Owner", "op": "empty" })).unwrap(),
+            filter_text(&json!({ "property": "Owner", "op": "empty" }))
+                .unwrap(),
             "\"Owner\" is empty"
         );
-        assert!(filter_text(&json!({ "property": "x", "op": "drop table" })).is_err());
+        assert!(
+            filter_text(&json!({ "property": "x", "op": "drop table" }))
+                .is_err()
+        );
         assert!(filter_text(&json!({ "op": "eq" })).is_err());
         assert_eq!(
             sort_text(&json!({ "property": "Due", "direction": "DESC" })),
@@ -1648,7 +1790,10 @@ mod tests {
     fn view_rows_flatten_to_named_columns() {
         let result = json!({
             "title": "Roadmap",
-            "columns": [{ "key": "title", "name": "Name" }, { "key": "s", "name": "Status" }],
+            "columns": [
+                { "key": "title", "name": "Name" },
+                { "key": "s", "name": "Status" }
+            ],
             "groups": [{ "rows": [{ "id": "r1", "title": "Ship", "cells": [
                 { "display": "Ship" }, { "value": "Done", "display": "Done" }
             ] }] }]
@@ -1664,12 +1809,22 @@ mod tests {
     fn books_render_as_nested_lists() {
         let info = json!({ "title": "Handbook", "toc": [
             { "kind": "chapter", "id": "01JD0000000000000000000001", "title": "Intro", "number": "1", "depth": 1,
-              "children": [{ "id": null, "title": "Why", "number": "1.1", "depth": 2, "children": [] }] },
+              "children": [{
+                  "id": null,
+                  "title": "Why",
+                  "number": "1.1",
+                  "depth": 2,
+                  "children": []
+              }] },
             { "kind": "part", "title": "Reference" },
         ]});
         let md = book_markdown(&info);
         assert!(
-            md.contains("- [1 Intro](vellum://doc/01JD0000000000000000000001)\n  - 1.1 Why\n"),
+            md.contains(
+                "- [1 \
+                Intro](vellum://doc/01JD0000000000000000000001)\n  - 1.1 \
+                Why\n"
+            ),
             "{md}"
         );
         assert!(md.contains("## Reference"));

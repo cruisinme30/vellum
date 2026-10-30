@@ -42,7 +42,9 @@ pub enum FieldKind {
 }
 
 /// Where a field's answer goes on the issue.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum MapsTo {
     /// Only into the description's answer list.
@@ -116,7 +118,10 @@ impl IntakeForm {
             ));
         }
         if self.fields.is_empty() {
-            return Err(format!("form {}: needs at least one field", self.slug));
+            return Err(format!(
+                "form {}: needs at least one field",
+                self.slug
+            ));
         }
         let mut keys = BTreeSet::new();
         for f in &self.fields {
@@ -193,7 +198,9 @@ impl IntakeForm {
                 return Err(invalid(&f.key, "is longer than 16 KiB"));
             }
             match &f.kind {
-                FieldKind::Select { options } if !options.iter().any(|o| o == answer) => {
+                FieldKind::Select { options }
+                    if !options.iter().any(|o| o == answer) =>
+                {
                     return Err(invalid(&f.key, "is not one of the choices"));
                 }
                 FieldKind::Email if !looks_like_email(answer) => {
@@ -207,10 +214,10 @@ impl IntakeForm {
             match f.maps_to {
                 MapsTo::Title => title = Some(answer.to_owned()),
                 MapsTo::Priority => {
-                    priority = Some(
-                        priority_named(answer)
-                            .ok_or_else(|| invalid(&f.key, "is not a priority"))?,
-                    );
+                    priority =
+                        Some(priority_named(answer).ok_or_else(|| {
+                            invalid(&f.key, "is not a priority")
+                        })?);
                 }
                 MapsTo::Label => labels.push(answer.to_owned()),
                 MapsTo::Description => {}
@@ -260,7 +267,10 @@ impl IntakeForm {
 
 fn looks_like_email(text: &str) -> bool {
     text.split_once('@').is_some_and(|(user, host)| {
-        !user.is_empty() && host.contains('.') && !host.starts_with('.') && !host.ends_with('.')
+        !user.is_empty()
+            && host.contains('.')
+            && !host.starts_with('.')
+            && !host.ends_with('.')
     }) && !text.chars().any(char::is_whitespace)
 }
 
@@ -401,11 +411,10 @@ mod tests {
         assert_eq!(draft.priority, Some(Priority::High));
         assert_eq!(draft.labels, ["access"]);
         assert!(draft.intake);
-        assert!(
-            draft
-                .body
-                .starts_with("Submitted through the **Request access** form by sam@northstar.dev.")
-        );
+        assert!(draft.body.starts_with(
+            "Submitted through the **Request access** form by \
+                    sam@northstar.dev."
+        ));
         assert!(
             draft
                 .body

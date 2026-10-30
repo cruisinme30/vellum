@@ -1,7 +1,9 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-/** Export (`/api/v1/export`) and import (`/api/v1/import`) over a Vellum server. */
+/**
+ * Export (`/api/v1/export`) and import (`/api/v1/import`) over a Vellum server.
+ */
 
 import type { Http } from "../api/http";
 
@@ -35,7 +37,13 @@ interface ExportPreview {
 
 /** Where an import comes from. */
 export type ImportSource =
-  "notion" | "confluence" | "docx" | "markdown" | "obsidian" | "outline" | "docmost";
+  | "notion"
+  | "confluence"
+  | "docx"
+  | "markdown"
+  | "obsidian"
+  | "outline"
+  | "docmost";
 
 export interface ImportResult {
   readonly folder_id: string;
@@ -56,14 +64,21 @@ export interface IssueImportReport {
   readonly links: number;
   readonly read: number;
   readonly keys: readonly (readonly [string, string])[];
-  readonly warnings: readonly { readonly external_id?: string | null; readonly message: string }[];
+  readonly warnings: readonly {
+    readonly external_id?: string | null;
+    readonly message: string;
+  }[];
   readonly dry_run: boolean;
 }
 
 /** The export and import operations the web app uses. */
 export interface TransferApi {
   preview(target: ExportTarget, paper: Paper): Promise<ExportPreview>;
-  download(target: ExportTarget, format: ExportFormat, paper: Paper): Promise<Blob>;
+  download(
+    target: ExportTarget,
+    format: ExportFormat,
+    paper: Paper,
+  ): Promise<Blob>;
   importFile(
     file: File,
     into: {
@@ -102,13 +117,21 @@ function exportQuery(target: ExportTarget, format: string, paper: Paper) {
 export function createHttpTransferApi(http: Http): TransferApi {
   return {
     preview: (target, paper) =>
-      http.get<ExportPreview>(exportPath(target), exportQuery(target, "preview", paper)),
+      http.get<ExportPreview>(
+        exportPath(target),
+        exportQuery(target, "preview", paper),
+      ),
     download: (target, format, paper) =>
       http.blob(exportPath(target), exportQuery(target, format, paper)),
     importFile: (file, into) =>
       http.upload<ImportResult>(
         "/api/v1/import",
-        { space: into.space, parent: into.parent, source: into.source, name: file.name },
+        {
+          space: into.space,
+          parent: into.parent,
+          source: into.source,
+          name: file.name,
+        },
         file,
         file.type === "" ? "application/octet-stream" : file.type,
       ),
@@ -128,7 +151,9 @@ export function createHttpTransferApi(http: Http): TransferApi {
   };
 }
 
-/** A file name for an export: the title without characters file systems refuse. */
+/**
+ * A file name for an export: the title without characters file systems refuse.
+ */
 export function exportFileName(title: string, format: ExportFormat): string {
   const refused = String.raw`/\:*?"<>|`;
   let clean = "";

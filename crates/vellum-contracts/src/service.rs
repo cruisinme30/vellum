@@ -167,7 +167,11 @@ impl RequestContext {
 /// The type-erased handler behind an [`Operation`].
 pub trait Handler: Send + Sync + 'static {
     /// Runs the operation on JSON input and returns JSON output.
-    fn call(&self, ctx: RequestContext, input: Value) -> BoxFuture<'static, Result<Value, Error>>;
+    fn call(
+        &self,
+        ctx: RequestContext,
+        input: Value,
+    ) -> BoxFuture<'static, Result<Value, Error>>;
 }
 
 struct TypedHandler<F, I, O> {
@@ -182,7 +186,11 @@ where
     I: DeserializeOwned + Send + 'static,
     O: Serialize + Send + 'static,
 {
-    fn call(&self, ctx: RequestContext, input: Value) -> BoxFuture<'static, Result<Value, Error>> {
+    fn call(
+        &self,
+        ctx: RequestContext,
+        input: Value,
+    ) -> BoxFuture<'static, Result<Value, Error>> {
         let parsed = serde_json::from_value::<I>(input);
         match parsed {
             Err(err) => Box::pin(std::future::ready(Err(Error::new(
@@ -194,8 +202,11 @@ where
                 Box::pin(async move {
                     let output = fut.await?;
                     serde_json::to_value(output).map_err(|err| {
-                        Error::new(ErrorKind::Internal, "could not encode the response")
-                            .with_source(err)
+                        Error::new(
+                            ErrorKind::Internal,
+                            "could not encode the response",
+                        )
+                        .with_source(err)
                     })
                 })
             }
@@ -475,7 +486,10 @@ impl Operation {
     /// window). The composition root uses it to audit admin actions
     /// (ADR 0021, D243).
     #[must_use]
-    pub fn wrap(mut self, wrap: impl FnOnce(Arc<dyn Handler>) -> Arc<dyn Handler>) -> Self {
+    pub fn wrap(
+        mut self,
+        wrap: impl FnOnce(Arc<dyn Handler>) -> Arc<dyn Handler>,
+    ) -> Self {
         self.handler = wrap(self.handler);
         self
     }
@@ -502,7 +516,8 @@ impl Operation {
         let mut segments = self.id.split('.');
         if segments.next() != Some(service) || !valid_id(self.id) {
             return bad(format!(
-                "operation `{}` must be `{service}.<name>` in snake_case segments",
+                "operation `{}` must be `{service}.<name>` in snake_case \
+                    segments",
                 self.id
             ));
         }
@@ -515,14 +530,18 @@ impl Operation {
         if self.kind == OperationKind::Query && self.method != HttpMethod::Get {
             return bad(format!("query `{}` must use GET", self.id));
         }
-        if self.kind == OperationKind::Mutation && self.method == HttpMethod::Get {
+        if self.kind == OperationKind::Mutation
+            && self.method == HttpMethod::Get
+        {
             return bad(format!("mutation `{}` must not use GET", self.id));
         }
-        let properties = self.input.get("properties").and_then(Value::as_object);
+        let properties =
+            self.input.get("properties").and_then(Value::as_object);
         for param in self.path_params() {
             if !properties.is_some_and(|p| p.contains_key(param)) {
                 return bad(format!(
-                    "operation `{}` path parameter `{param}` is not a field of its input",
+                    "operation `{}` path parameter `{param}` is not a field of \
+                        its input",
                     self.id
                 ));
             }
@@ -537,7 +556,9 @@ fn valid_id(id: &str) -> bool {
         && segments.iter().all(|seg| {
             let mut chars = seg.chars();
             chars.next().is_some_and(|c| c.is_ascii_lowercase())
-                && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+                && chars.all(|c| {
+                    c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'
+                })
         })
 }
 
@@ -572,11 +593,16 @@ mod tests {
     }
 
     fn op(id: &'static str, path: &'static str) -> Operation {
-        Operation::query(id, path, Scope::Read, |_ctx, input: Input| async move {
-            Ok(Output {
-                total: input.count * 2,
-            })
-        })
+        Operation::query(
+            id,
+            path,
+            Scope::Read,
+            |_ctx, input: Input| async move {
+                Ok(Output {
+                    total: input.count * 2,
+                })
+            },
+        )
     }
 
     fn ctx() -> RequestContext {
@@ -643,7 +669,10 @@ mod tests {
             .allow_anonymous()
             .budget(Duration::from_millis(50))
             .deprecated();
-        assert_eq!(op.path_params().collect::<Vec<_>>(), ["space_id", "doc_id"]);
+        assert_eq!(
+            op.path_params().collect::<Vec<_>>(),
+            ["space_id", "doc_id"]
+        );
         assert_eq!(op.summary_text(), "Counts");
         assert_eq!(op.fresh_auth_window(), Some(Duration::from_mins(5)));
         assert_eq!(op.time_budget(), Duration::from_millis(50));

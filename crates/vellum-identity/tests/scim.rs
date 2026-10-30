@@ -32,7 +32,10 @@ const PASSWORD: &str = "correct horse battery staple";
 struct Members(Mutex<BTreeMap<ObjectId, BTreeSet<UserId>>>);
 
 impl GroupMembers for Members {
-    fn members(&self, group: ObjectId) -> BoxFuture<'_, Result<BTreeSet<UserId>, Error>> {
+    fn members(
+        &self,
+        group: ObjectId,
+    ) -> BoxFuture<'_, Result<BTreeSet<UserId>, Error>> {
         let found = self
             .0
             .lock()
@@ -70,7 +73,8 @@ struct Fixture {
 
 fn fixture() -> Fixture {
     let url = Url::parse("https://vellum.northstar.dev").unwrap();
-    let identity = Arc::new(Identity::new(IdentityConfig::new(url), Store::memory()));
+    let identity =
+        Arc::new(Identity::new(IdentityConfig::new(url), Store::memory()));
     let _ = identity
         .setup("priya@northstar.dev", "Priya", PASSWORD)
         .unwrap();
@@ -98,7 +102,8 @@ impl Fixture {
     ) -> (StatusCode, Value) {
         let mut request = Request::builder().method(method).uri(path);
         if let Some(token) = token {
-            request = request.header(header::AUTHORIZATION, format!("Bearer {token}"));
+            request = request
+                .header(header::AUTHORIZATION, format!("Bearer {token}"));
         }
         let request = match body {
             Some(body) => request
@@ -124,7 +129,12 @@ impl Fixture {
         (status, json)
     }
 
-    async fn call(&self, method: &str, path: &str, body: Option<Value>) -> (StatusCode, Value) {
+    async fn call(
+        &self,
+        method: &str,
+        path: &str,
+        body: Option<Value>,
+    ) -> (StatusCode, Value) {
         self.call_with(Some(&self.token.clone()), method, path, body)
             .await
     }
@@ -136,7 +146,11 @@ fn sam() -> Value {
         "userName": "Sam@Northstar.dev",
         "externalId": "00u-sam",
         "name": { "givenName": "Sam", "familyName": "Okafor" },
-        "emails": [{ "value": "sam@northstar.dev", "primary": true, "type": "work" }],
+        "emails": [{
+            "value": "sam@northstar.dev",
+            "primary": true,
+            "type": "work"
+        }],
         "active": true,
         "roles": [{ "value": "admin" }],
     })
@@ -172,10 +186,12 @@ async fn only_the_current_scim_token_works() {
     assert!(new.scim.enabled);
     let (status, _) = f.call("GET", "/Users", None).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
-    let (status, _) = f.call_with(Some(&new.token), "GET", "/Users", None).await;
+    let (status, _) =
+        f.call_with(Some(&new.token), "GET", "/Users", None).await;
     assert_eq!(status, StatusCode::OK);
     assert!(!f.identity.revoke_scim_token().unwrap().enabled);
-    let (status, _) = f.call_with(Some(&new.token), "GET", "/Users", None).await;
+    let (status, _) =
+        f.call_with(Some(&new.token), "GET", "/Users", None).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
     // The token is never shown again.
     let shown = serde_json::to_string(&f.identity.sign_in_settings()).unwrap();
@@ -232,12 +248,17 @@ async fn providers_create_find_change_and_block_people() {
     let patch = json!({
         "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
         "Operations": [
-            { "op": "Replace", "path": "displayName", "value": "Samuel Okafor" },
+            {
+                "op": "Replace",
+                "path": "displayName",
+                "value": "Samuel Okafor"
+            },
             { "op": "Replace", "path": "active", "value": "False" },
             { "op": "Add", "path": "title", "value": "Engineer" },
         ],
     });
-    let (status, patched) = f.call("PATCH", &format!("/Users/{id}"), Some(patch)).await;
+    let (status, patched) =
+        f.call("PATCH", &format!("/Users/{id}"), Some(patch)).await;
     assert_eq!(status, StatusCode::OK, "{patched}");
     assert_eq!(patched["active"], false);
     assert_eq!(patched["displayName"], "Samuel Okafor");
@@ -247,7 +268,8 @@ async fn providers_create_find_change_and_block_people() {
     // Okta replaces the whole resource to reactivate.
     let mut back = sam();
     back["active"] = json!(true);
-    let (status, replaced) = f.call("PUT", &format!("/Users/{id}"), Some(back)).await;
+    let (status, replaced) =
+        f.call("PUT", &format!("/Users/{id}"), Some(back)).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(replaced["active"], true);
 
@@ -265,7 +287,9 @@ async fn break_glass_admins_are_out_of_reach() {
     let f = fixture();
     let priya = f.identity.users()[0].clone();
     let _ = f.identity.set_break_glass(priya.id, true).unwrap();
-    let off = json!({ "Operations": [{ "op": "replace", "path": "active", "value": false }] });
+    let off = json!({
+        "Operations": [{ "op": "replace", "path": "active", "value": false }]
+    });
     let (status, _) = f
         .call("PATCH", &format!("/Users/{}", priya.id), Some(off.clone()))
         .await;
@@ -299,7 +323,11 @@ async fn groups_are_admin_groups_with_engine_members() {
         .call(
             "POST",
             "/Groups",
-            Some(json!({ "displayName": "Engineering", "externalId": "g-eng", "members": [{ "value": sam_id }] })),
+            Some(json!({
+                "displayName": "Engineering",
+                "externalId": "g-eng",
+                "members": [{ "value": sam_id }]
+            })),
         )
         .await;
     assert_eq!(status, StatusCode::CREATED, "{group}");
@@ -320,7 +348,11 @@ async fn groups_are_admin_groups_with_engine_members() {
 
     // Add Priya, remove Sam (Entra's filter path), rename.
     let patch = json!({ "Operations": [
-        { "op": "add", "path": "members", "value": [{ "value": priya.id.to_string() }] },
+        {
+            "op": "add",
+            "path": "members",
+            "value": [{ "value": priya.id.to_string() }]
+        },
         { "op": "remove", "path": format!("members[value eq \"{sam_id}\"]") },
         { "op": "replace", "value": { "displayName": "Platform" } },
     ]});
@@ -329,18 +361,27 @@ async fn groups_are_admin_groups_with_engine_members() {
         .await;
     assert_eq!(status, StatusCode::OK, "{patched}");
     assert_eq!(patched["displayName"], "Platform");
-    let members: BTreeSet<UserId> = f.members.0.lock().unwrap()[&object].clone();
+    let members: BTreeSet<UserId> =
+        f.members.0.lock().unwrap()[&object].clone();
     assert_eq!(members, BTreeSet::from([priya.id]));
 
     // Unknown people cannot be added.
-    let bad = json!({ "Operations": [{ "op": "add", "path": "members", "value": [{ "value": UserId::generate().to_string() }] }] });
-    let (status, _) = f.call("PATCH", &format!("/Groups/{gid}"), Some(bad)).await;
+    let bad = json!({
+        "Operations": [{
+            "op": "add",
+            "path": "members",
+            "value": [{ "value": UserId::generate().to_string() }]
+        }]
+    });
+    let (status, _) =
+        f.call("PATCH", &format!("/Groups/{gid}"), Some(bad)).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 
     let (_, listed) = f
         .call(
             "GET",
-            "/Groups?filter=displayName%20eq%20%22platform%22&excludedAttributes=members",
+            "/Groups?filter=displayName%20eq%20%22platform%22&excludedAttribute\
+                s=members",
             None,
         )
         .await;

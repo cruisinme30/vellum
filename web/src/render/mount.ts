@@ -12,7 +12,10 @@
  */
 
 /** Adds a constructed stylesheet to the document; returns its removal. */
-export function adoptCss(css: string, document_: Document = document): () => void {
+export function adoptCss(
+  css: string,
+  document_: Document = document,
+): () => void {
   const Sheet = document_.defaultView?.CSSStyleSheet;
   if (
     Sheet !== undefined &&
@@ -23,7 +26,9 @@ export function adoptCss(css: string, document_: Document = document): () => voi
     sheet.replaceSync(css);
     document_.adoptedStyleSheets = [...document_.adoptedStyleSheets, sheet];
     return () => {
-      document_.adoptedStyleSheets = document_.adoptedStyleSheets.filter((s) => s !== sheet);
+      document_.adoptedStyleSheets = document_.adoptedStyleSheets.filter(
+        (s) => s !== sheet,
+      );
     };
   }
   // No constructed stylesheets (old engines, the unit-test DOM).
@@ -52,7 +57,9 @@ export function mountRendered(root: HTMLElement, html: string): () => void {
     sheets.push(style.textContent);
     style.remove();
   }
-  const nodes = [...parsed.body.childNodes].map((node) => document_.importNode(node, true));
+  const nodes = [...parsed.body.childNodes].map((node) =>
+    document_.importNode(node, true),
+  );
   root.replaceChildren(...nodes);
   // The imported copies are new elements: re-apply styles by position.
   const imported = root.querySelectorAll("*");
@@ -65,7 +72,9 @@ export function mountRendered(root: HTMLElement, html: string): () => void {
       (copy as HTMLElement).style.cssText = value;
     }
   }
-  const removals = sheets.filter((css) => css.trim() !== "").map((css) => adoptCss(css, document_));
+  const removals = sheets
+    .filter((css) => css.trim() !== "")
+    .map((css) => adoptCss(css, document_));
   return () => {
     for (const remove of removals) remove();
   };

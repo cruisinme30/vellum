@@ -11,7 +11,9 @@
 use std::sync::LazyLock;
 use std::time::Duration;
 
-use merman::{OperationControl, RenderOutput, RenderRequest, Renderer, SvgRequest};
+use merman::{
+    OperationControl, RenderOutput, RenderRequest, Renderer, SvgRequest,
+};
 
 use crate::theme::{BuiltinTheme, Theme};
 
@@ -143,16 +145,19 @@ fn retheme(svg: &str, reverse: &[(String, &str)]) -> String {
     while i < bytes.len() {
         if bytes.get(i) == Some(&b'#') {
             let hex = svg.get(i + 1..i + 7);
-            let boundary = bytes
-                .get(i + 7)
-                .is_none_or(|b| !b.is_ascii_alphanumeric() && *b != b'-' && *b != b'_');
+            let boundary = bytes.get(i + 7).is_none_or(|b| {
+                !b.is_ascii_alphanumeric() && *b != b'-' && *b != b'_'
+            });
             let prev = if i == 0 { None } else { bytes.get(i - 1) };
-            let is_ref = prev == Some(&b'(') || svg.get(i.saturating_sub(6)..i) == Some("href=\"");
-            if let Some(hex) =
-                hex.filter(|h| boundary && !is_ref && h.bytes().all(|b| b.is_ascii_hexdigit()))
-            {
+            let is_ref = prev == Some(&b'(')
+                || svg.get(i.saturating_sub(6)..i) == Some("href=\"");
+            if let Some(hex) = hex.filter(|h| {
+                boundary && !is_ref && h.bytes().all(|b| b.is_ascii_hexdigit())
+            }) {
                 let lower = format!("#{}", hex.to_ascii_lowercase());
-                if let Some((_, token)) = reverse.iter().find(|(h, _)| *h == lower) {
+                if let Some((_, token)) =
+                    reverse.iter().find(|(h, _)| *h == lower)
+                {
                     out.push_str(svg.get(last..i).unwrap_or_default());
                     out.push_str("var(--vl-");
                     out.push_str(token);
@@ -205,7 +210,8 @@ mod tests {
     #[test]
     fn renders_and_rethemes_a_flowchart() {
         let svg = render(
-            "flowchart LR\n  A[SDK client] --> B{Gateway}\n  B -->|allowed| C[Backend]\n  B -->|blocked| D[(Audit log)]\n",
+            "flowchart LR\n  A[SDK client] --> B{Gateway}\n  B -->|allowed| \
+                C[Backend]\n  B -->|blocked| D[(Audit log)]\n",
             DEADLINE,
         )
         .unwrap();
@@ -219,16 +225,19 @@ mod tests {
     #[test]
     fn renders_common_diagram_types() {
         for src in [
-            "sequenceDiagram\n  Browser->>Gateway: open page\n  Gateway-->>Browser: page\n",
+            "sequenceDiagram\n  Browser->>Gateway: open page\n  \
+                Gateway-->>Browser: page\n",
             "pie title Pets\n  \"Dogs\" : 386\n  \"Cats\" : 85\n",
             "stateDiagram-v2\n  [*] --> Draft\n  Draft --> Verified\n",
             "classDiagram\n  class Page {\n    +String title\n  }\n",
             "erDiagram\n  PAGE ||--o{ BLOCK : contains\n",
-            "gantt\n  dateFormat YYYY-MM-DD\n  section Build\n  Parser :a1, 2026-11-01, 30d\n",
+            "gantt\n  dateFormat YYYY-MM-DD\n  section Build\n  Parser :a1, \
+                2026-11-01, 30d\n",
             "gitGraph\n  commit\n  branch develop\n  commit\n",
             "mindmap\n  root((Vellum))\n    Docs\n    Work\n",
         ] {
-            let svg = render(src, DEADLINE).unwrap_or_else(|e| panic!("{src}: {e}"));
+            let svg =
+                render(src, DEADLINE).unwrap_or_else(|e| panic!("{src}: {e}"));
             assert!(sanitize_island(&svg, "f").is_ok(), "{src}");
         }
     }
@@ -243,12 +252,20 @@ mod tests {
     fn retheme_leaves_references_alone() {
         let reverse = vec![("#abcdef".to_owned(), "primary")];
         let out = retheme(
-            r##"<p fill="#ABCDEF" style="stroke:#abcdef;" marker="url(#abcdef)" href="#abcdef"/><q fill="#abcdef0"/>"##,
+            concat!(
+                r##"<p fill="#ABCDEF" style="stroke:#abcdef;" "##,
+                r##"marker="url(#abcdef)" href="#abcdef"/><q "##,
+                r##"fill="#abcdef0"/>"##,
+            ),
             &reverse,
         );
         assert_eq!(
             out,
-            r##"<p fill="var(--vl-primary)" style="stroke:var(--vl-primary);" marker="url(#abcdef)" href="#abcdef"/><q fill="#abcdef0"/>"##
+            concat!(
+                r##"<p fill="var(--vl-primary)" "##,
+                r##"style="stroke:var(--vl-primary);" marker="url(#abcdef)" "##,
+                r##"href="#abcdef"/><q fill="#abcdef0"/>"##,
+            )
         );
     }
 }

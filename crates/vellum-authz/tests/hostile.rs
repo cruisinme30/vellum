@@ -12,8 +12,8 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
 
 use vellum_authz::{
-    Actor, Authz, AuthzStore as _, Change, Id, MemoryStore, Object, Permission, Principal,
-    Relation, Subject, Tuple,
+    Actor, Authz, AuthzStore as _, Change, Id, MemoryStore, Object, Permission,
+    Principal, Relation, Subject, Tuple,
 };
 
 const SPACE: Id = Id(0x5000);
@@ -30,11 +30,17 @@ fn setup() -> (Authz<MemoryStore>, Arc<AtomicI64>) {
     store
         .set_tree(SPACE, BTreeMap::from([(DOC, None)]))
         .unwrap();
-    let authz = Authz::with_clock(store, Arc::new(move || clock.load(Ordering::SeqCst)));
+    let authz = Authz::with_clock(
+        store,
+        Arc::new(move || clock.load(Ordering::SeqCst)),
+    );
     (authz, now)
 }
 
-async fn relation(authz: &Authz<MemoryStore>, who: Principal) -> Option<Relation> {
+async fn relation(
+    authz: &Authz<MemoryStore>,
+    who: Principal,
+) -> Option<Relation> {
     authz
         .check(SPACE, who, DOC, Permission::Read)
         .await
@@ -137,7 +143,8 @@ async fn expired_share_link_fails_closed_without_a_sweep() {
             SPACE,
             Actor::System,
             &[Change::Grant(
-                grant(Relation::Viewer, Subject::ShareLink(LINK)).expiring(2_000),
+                grant(Relation::Viewer, Subject::ShareLink(LINK))
+                    .expiring(2_000),
             )],
         )
         .await
@@ -156,7 +163,10 @@ async fn a_weaker_lasting_grant_survives_a_stronger_expiring_one() {
             SPACE,
             Actor::System,
             &[
-                Change::Grant(grant(Relation::Manager, Subject::User(USER)).expiring(2_000)),
+                Change::Grant(
+                    grant(Relation::Manager, Subject::User(USER))
+                        .expiring(2_000),
+                ),
                 Change::Grant(Tuple::role(
                     Object::Space(SPACE),
                     Relation::Viewer,

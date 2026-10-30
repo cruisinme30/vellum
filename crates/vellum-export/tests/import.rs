@@ -33,7 +33,8 @@ fn notion_databases_become_collections() {
         row.replace(' ', "%20")
     );
     let csv = "Name,Status,Estimate\nRotate keys,Done,3\nAudit logs,Todo,5\n";
-    let row_text = "# Rotate keys\n\nStatus: Done\nEstimate: 3\n\nRotate the signing keys.\n";
+    let row_text = "# Rotate keys\n\nStatus: Done\nEstimate: 3\n\n\
+        Rotate the signing keys.\n";
     let set = import(
         Source::Notion,
         "notion.zip",

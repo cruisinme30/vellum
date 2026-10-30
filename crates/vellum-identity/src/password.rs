@@ -26,8 +26,9 @@ const PASSES: u32 = 2;
 const LANES: u32 = 1;
 
 fn hasher() -> Result<Argon2<'static>, Error> {
-    let params = Params::new(MEMORY_KIB, PASSES, LANES, None)
-        .map_err(|e| Error::new(ErrorKind::Internal, format!("argon2 parameters: {e}")))?;
+    let params = Params::new(MEMORY_KIB, PASSES, LANES, None).map_err(|e| {
+        Error::new(ErrorKind::Internal, format!("argon2 parameters: {e}"))
+    })?;
     Ok(Argon2::new(Algorithm::Argon2id, Version::V0x13, params))
 }
 
@@ -59,8 +60,9 @@ pub fn check_policy(password: &str) -> Result<(), Error> {
 /// [`ErrorKind::Internal`] if the random source or hasher fails.
 pub fn hash(password: &str) -> Result<String, Error> {
     let mut salt = [0_u8; 16];
-    getrandom::fill(&mut salt)
-        .map_err(|e| Error::new(ErrorKind::Internal, format!("random source failed: {e}")))?;
+    getrandom::fill(&mut salt).map_err(|e| {
+        Error::new(ErrorKind::Internal, format!("random source failed: {e}"))
+    })?;
     let hashed: PasswordHash = hasher()?
         .hash_password_with_salt(password.as_bytes(), &salt)
         .map_err(|e| Error::new(ErrorKind::Internal, format!("argon2: {e}")))?;
@@ -77,7 +79,8 @@ pub fn verify(password: &str, stored: &str) -> bool {
     let Ok(parsed) = PasswordHash::new(stored) else {
         return false;
     };
-    hasher().is_ok_and(|h| h.verify_password(password.as_bytes(), &parsed).is_ok())
+    hasher()
+        .is_ok_and(|h| h.verify_password(password.as_bytes(), &parsed).is_ok())
 }
 
 /// Spends the same work as a real verification, so signing in with an
@@ -118,7 +121,8 @@ pub struct Gate {
 impl Default for Gate {
     /// Two checks per CPU, waiting at most half a second.
     fn default() -> Self {
-        let cpus = std::thread::available_parallelism().map_or(2, std::num::NonZero::get);
+        let cpus = std::thread::available_parallelism()
+            .map_or(2, std::num::NonZero::get);
         Self::new(
             cpus.saturating_mul(2).clamp(2, 64),
             Duration::from_millis(500),
@@ -145,7 +149,8 @@ impl Gate {
     /// [`ErrorKind::RateLimited`] when every slot stays taken for the wait.
     pub fn permit(&self) -> Result<Permit<'_>, Error> {
         let deadline = Instant::now() + self.wait;
-        let mut running = self.running.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut running =
+            self.running.lock().unwrap_or_else(PoisonError::into_inner);
         while *running >= self.cap {
             let left = deadline.saturating_duration_since(Instant::now());
             if left.is_zero() {
@@ -156,7 +161,8 @@ impl Gate {
                 );
                 return Err(Error::new(
                     ErrorKind::RateLimited,
-                    "the server is busy checking passwords; try again in a moment",
+                    "the server is busy checking passwords; try again in a \
+                        moment",
                 ));
             }
             running = self

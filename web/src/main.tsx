@@ -55,7 +55,9 @@ import { createHttpPlanningApi } from "./work/planning/api";
 
 // Demo pages keep their edits across reloads in the browser's local
 // database. With a server, the page's room on /collab is the store.
-const cache = lazyCache(async () => new DocumentCache(await openLocalDatabase("vellum-northstar")));
+const cache = lazyCache(
+  async () => new DocumentCache(await openLocalDatabase("vellum-northstar")),
+);
 
 const container = document.querySelector("#root");
 if (container === null) {
@@ -85,7 +87,11 @@ const http = withReauth(raw, gate);
 async function preloadFonts(): Promise<void> {
   try {
     await Promise.race([
-      Promise.all(["500 1em Roboto", "700 1em Roboto"].map((font) => document.fonts.load(font))),
+      Promise.all(
+        ["500 1em Roboto", "700 1em Roboto"].map((font) =>
+          document.fonts.load(font),
+        ),
+      ),
       new Promise((resolve) => setTimeout(resolve, 800)),
     ]);
   } catch {
@@ -109,7 +115,11 @@ root.render(
           ? createNorthstarStore()
           : createHttpWorkspaceStore(http, { user: status.user ?? undefined })
       }
-      collab={status === undefined ? createLocalConnector({ cache }) : createSocketConnector()}
+      collab={
+        status === undefined
+          ? createLocalConnector({ cache })
+          : createSocketConnector()
+      }
       history={status === undefined ? undefined : createHttpPageHistory(http)}
       admin={status === undefined ? undefined : createHttpAdminConsoleApi(http)}
       work={status === undefined ? undefined : createHttpWorkApi(http)}
@@ -118,23 +128,38 @@ root.render(
       directory={
         status === undefined
           ? undefined
-          : combineDirectories(createHttpDirectory(http), createHttpGroupDirectory(http))
+          : combineDirectories(
+              createHttpDirectory(http),
+              createHttpGroupDirectory(http),
+            )
       }
-      attachments={status === undefined ? undefined : createHttpAttachmentsApi(http)}
+      attachments={
+        status === undefined ? undefined : createHttpAttachmentsApi(http)
+      }
       sharing={status === undefined ? undefined : createHttpSharingApi(http)}
       planning={status === undefined ? undefined : createHttpPlanningApi(http)}
-      privateSpaces={status === undefined ? undefined : createHttpPrivateSpacesApi(http)}
+      privateSpaces={
+        status === undefined ? undefined : createHttpPrivateSpacesApi(http)
+      }
       render={status === undefined ? undefined : createHttpRenderApi(http)}
       account={status === undefined ? undefined : createHttpAccountApi(http)}
       assist={status === undefined ? undefined : createHttpAssistApi(http)}
       mcpSetup={status === undefined ? undefined : createHttpMcpSetupApi()}
-      connections={status === undefined ? undefined : createHttpConnectionsApi(http)}
+      connections={
+        status === undefined ? undefined : createHttpConnectionsApi(http)
+      }
       transfer={status === undefined ? undefined : createHttpTransferApi(http)}
       collections={
-        status === undefined ? createMockCollectionsStore() : createHttpCollectionsStore(http)
+        status === undefined
+          ? createMockCollectionsStore()
+          : createHttpCollectionsStore(http)
       }
       session={status === undefined ? undefined : { auth, status }}
-      appearance={status === undefined ? undefined : createHttpOrganisationAppearance(http)}
+      appearance={
+        status === undefined
+          ? undefined
+          : createHttpOrganisationAppearance(http)
+      }
       reauth={status === undefined ? undefined : { gate, http: raw }}
       notifications={
         status === undefined

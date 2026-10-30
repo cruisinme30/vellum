@@ -21,7 +21,9 @@ use crate::error::DriveResult;
 use crate::files::{FolderFile, ShortcutFile, TrashManifest, from_yaml};
 use crate::frontmatter;
 use crate::layout;
-use crate::model::{Node, NodeKind, ScanReport, Space, TrashState, VersionRecord};
+use crate::model::{
+    Node, NodeKind, ScanReport, Space, TrashState, VersionRecord,
+};
 
 /// Blob paths and sizes, sorted by path.
 type Blobs = BTreeMap<BlobPath, u64>;
@@ -45,14 +47,21 @@ impl Drive {
     pub async fn scan(&self) -> DriveResult<ScanReport> {
         self.observe("scan", async {
             let entries: Vec<_> = self.store.list(None).try_collect().await?;
-            let blobs: Blobs = entries.into_iter().map(|e| (e.path, e.size)).collect();
+            let blobs: Blobs =
+                entries.into_iter().map(|e| (e.path, e.size)).collect();
             let mut report = ScanReport::default();
             let spaces = self.scan_spaces(&blobs, &mut report).await?;
             let manifests = self.read_manifests(&blobs, &mut report).await;
             let mut seen_ids = HashSet::new();
             for space in &spaces {
-                self.scan_space(space, &blobs, &manifests, &mut seen_ids, &mut report)
-                    .await?;
+                self.scan_space(
+                    space,
+                    &blobs,
+                    &manifests,
+                    &mut seen_ids,
+                    &mut report,
+                )
+                .await?;
                 // Nodes found on disk inherit access like any other, so
                 // the permission engine needs the space's tree as scanned.
                 let ids: Vec<ObjectId> = self
@@ -89,14 +98,22 @@ impl Drive {
             let meta = self.store.head(dir).await?;
             let _ = blobs.insert(meta.path, meta.size);
             // A copied page brings the pages nested under it (D168).
-            if let Some(nested) = self.children_dir(NodeKind::Page, dir).await? {
+            if let Some(nested) = self.children_dir(NodeKind::Page, dir).await?
+            {
                 blobs.extend(self.blobs_under(&nested).await?);
             }
         }
         let mut seen: HashSet<ObjectId> = HashSet::new();
         let mut report = ScanReport::default();
         let mut found = self
-            .discover(space, &blobs, &HashSet::new(), &mut seen, true, &mut report)
+            .discover(
+                space,
+                &blobs,
+                &HashSet::new(),
+                &mut seen,
+                true,
+                &mut report,
+            )
             .await?;
         let mut holders = self.container_paths(space.id).await?;
         holders.extend(containers(found.iter().map(|(n, _)| n)));
@@ -119,7 +136,11 @@ impl Drive {
         Ok(out.into_iter().map(|(node, _)| node).collect())
     }
 
-    async fn scan_spaces(&self, blobs: &Blobs, report: &mut ScanReport) -> DriveResult<Vec<Space>> {
+    async fn scan_spaces(
+        &self,
+        blobs: &Blobs,
+        report: &mut ScanReport,
+    ) -> DriveResult<Vec<Space>> {
         let mut spaces = Vec::new();
         for path in blobs.keys() {
             if path.file_name() != layout::FOLDER_FILE {
@@ -132,7 +153,8 @@ impl Drive {
             let file: FolderFile = match self.read_yaml(path).await {
                 Ok(file) => file,
                 Err(err) => {
-                    tracing::warn!(%path, error = %err, "skipping unreadable space");
+                    tracing::warn!(%path, error = %err, "skipping unreadable \
+                        space");
                     report.skipped += 1;
                     continue;
                 }
@@ -184,7 +206,8 @@ impl Drive {
             match self.read_yaml::<TrashManifest>(path).await {
                 Ok(manifest) => out.push((entry, manifest)),
                 Err(err) => {
-                    tracing::warn!(%path, error = %err, "skipping unreadable trash manifest");
+                    tracing::warn!(%path, error = %err, "skipping unreadable \
+                        trash manifest");
                     report.skipped += 1;
                 }
             }
@@ -234,13 +257,17 @@ impl Drive {
             }
             self.index.put_node(node).await?;
         }
-        let mut live: HashSet<ObjectId> = found.iter().map(|(n, _)| n.id).collect();
+        let mut live: HashSet<ObjectId> =
+            found.iter().map(|(n, _)| n.id).collect();
 
-        for (entry, manifest) in manifests.iter().filter(|(_, m)| m.space == space.id) {
+        for (entry, manifest) in
+            manifests.iter().filter(|(_, m)| m.space == space.id)
+        {
             let Some(top) = manifest.members.first() else {
                 continue;
             };
-            let item = layout::trash_item(*entry, top.original_path.file_name())?;
+            let item =
+                layout::trash_item(*entry, top.original_path.file_name())?;
             for member in &manifest.members {
                 if live.contains(&member.id) {
                     continue;
@@ -320,7 +347,8 @@ impl Drive {
         // Files already indexed at their path go first, so when two files
         // share an ID the one that had it keeps it and the newcomer is
         // re-identified.
-        let (first, rest): (Vec<_>, Vec<_>) = blobs.iter().partition(|(p, _)| known.contains(*p));
+        let (first, rest): (Vec<_>, Vec<_>) =
+            blobs.iter().partition(|(p, _)| known.contains(*p));
         for (path, size) in first.into_iter().chain(rest) {
             if layout::is_state(path) || inside_unit(path, &space.root) {
                 continue;
@@ -339,7 +367,8 @@ impl Drive {
             let (id, title, target, text) = match read {
                 Ok(read) => read,
                 Err(err) => {
-                    tracing::warn!(%path, error = %err, "skipping unreadable file");
+                    tracing::warn!(%path, error = %err, "skipping unreadable \
+                        file");
                     report.skipped += 1;
                     continue;
                 }
@@ -414,8 +443,10 @@ impl Drive {
             }
             NodeKind::Book | NodeKind::Collection => {
                 let (text, _) = self.read_text(file).await?;
-                let id = frontmatter::get(&text, "id").and_then(|id| id.parse().ok());
-                let title = frontmatter::get(&text, "title").unwrap_or(fallback);
+                let id = frontmatter::get(&text, "id")
+                    .and_then(|id| id.parse().ok());
+                let title =
+                    frontmatter::get(&text, "title").unwrap_or(fallback);
                 let id = self
                     .claim_or_new(id, seen, file, report, &text, |text, id| {
                         Ok(frontmatter::set(text, "id", &id.to_string()))
@@ -425,15 +456,23 @@ impl Drive {
             }
             NodeKind::Page => {
                 let (text, _) = self.read_text(file).await?;
-                let original = frontmatter::get_md(&text, "id").and_then(|id| id.parse().ok());
+                let original = frontmatter::get_md(&text, "id")
+                    .and_then(|id| id.parse().ok());
                 let title = frontmatter::get_md(&text, "title")
                     .map(|t| t.trim().to_owned())
                     .filter(|t| !t.is_empty())
                     .unwrap_or(fallback);
                 let id = self
-                    .claim_or_new(original, seen, file, report, &text, |text, id| {
-                        Ok(frontmatter::set_md(text, "id", &id.to_string()))
-                    })
+                    .claim_or_new(
+                        original,
+                        seen,
+                        file,
+                        report,
+                        &text,
+                        |text, id| {
+                            Ok(frontmatter::set_md(text, "id", &id.to_string()))
+                        },
+                    )
                     .await?;
                 let text = if original == Some(id) {
                     text
@@ -450,7 +489,11 @@ impl Drive {
     /// someone else chose), an ID the index already holds anywhere is
     /// taken too: an imported file naming another person's page must not
     /// move that page's entry into the import (RT-037).
-    async fn free(&self, id: ObjectId, seen: &mut Taken<'_>) -> DriveResult<bool> {
+    async fn free(
+        &self,
+        id: ObjectId,
+        seen: &mut Taken<'_>,
+    ) -> DriveResult<bool> {
         if seen.fresh && self.index.node(id).await?.is_some() {
             return Ok(false);
         }
@@ -509,13 +552,20 @@ impl Drive {
     async fn scan_versions(&self, blobs: &Blobs) -> DriveResult<()> {
         for (path, size) in blobs {
             let mut parts = path.segments();
-            let (Some(layout::STATE_DIR), Some("versions"), Some(doc), Some(name), None) = (
+            let (
+                Some(layout::STATE_DIR),
+                Some("versions"),
+                Some(doc),
+                Some(name),
+                None,
+            ) = (
                 parts.next(),
                 parts.next(),
                 parts.next(),
                 parts.next(),
                 parts.next(),
-            ) else {
+            )
+            else {
                 continue;
             };
             let (Ok(doc), Some(Ok(version))) = (
@@ -547,12 +597,18 @@ impl Drive {
 
     /// The directories of a space's live folders and pages, for finding
     /// parents.
-    async fn container_paths(&self, space: SpaceId) -> DriveResult<HashMap<BlobPath, ObjectId>> {
+    async fn container_paths(
+        &self,
+        space: SpaceId,
+    ) -> DriveResult<HashMap<BlobPath, ObjectId>> {
         let nodes = self.index.nodes(space).await?;
         Ok(containers(nodes.iter().filter(|n| n.is_live())))
     }
 
-    async fn read_yaml<T: serde::de::DeserializeOwned>(&self, path: &BlobPath) -> DriveResult<T> {
+    async fn read_yaml<T: serde::de::DeserializeOwned>(
+        &self,
+        path: &BlobPath,
+    ) -> DriveResult<T> {
         let blob = self.store.get(path).await?;
         from_yaml(path, &blob.bytes)
     }
@@ -560,7 +616,9 @@ impl Drive {
 
 /// The directories that hold other nodes: each folder's own, and the one
 /// beside each page (D168). A folder wins over a page of the same name.
-fn containers<'a>(nodes: impl Iterator<Item = &'a Node>) -> HashMap<BlobPath, ObjectId> {
+fn containers<'a>(
+    nodes: impl Iterator<Item = &'a Node>,
+) -> HashMap<BlobPath, ObjectId> {
     let mut out = HashMap::new();
     let mut folders = Vec::new();
     for node in nodes {
@@ -579,7 +637,10 @@ fn containers<'a>(nodes: impl Iterator<Item = &'a Node>) -> HashMap<BlobPath, Ob
 }
 
 /// The nearest folder or page above `path`, if any.
-fn parent_of(path: &BlobPath, holders: &HashMap<BlobPath, ObjectId>) -> Option<ObjectId> {
+fn parent_of(
+    path: &BlobPath,
+    holders: &HashMap<BlobPath, ObjectId>,
+) -> Option<ObjectId> {
     let mut dir = path.parent();
     while let Some(d) = dir {
         if let Some(id) = holders.get(&d) {
@@ -598,7 +659,8 @@ fn inside_unit(path: &BlobPath, root: &BlobPath) -> bool {
             return false;
         }
         let name = d.file_name();
-        if name.ends_with(NodeKind::Book.suffix()) || name.ends_with(NodeKind::Collection.suffix())
+        if name.ends_with(NodeKind::Book.suffix())
+            || name.ends_with(NodeKind::Collection.suffix())
         {
             let manifest = path.parent().as_ref() == Some(&d)
                 && matches!(

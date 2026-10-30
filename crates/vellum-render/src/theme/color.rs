@@ -115,7 +115,9 @@ impl serde::Serialize for Color {
 }
 
 impl<'de> serde::Deserialize<'de> for Color {
-    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> Result<Self, D::Error> {
         let s = String::deserialize(d)?;
         s.parse().map_err(serde::de::Error::custom)
     }
@@ -125,7 +127,12 @@ impl<'de> serde::Deserialize<'de> for Color {
 /// `start` towards black on light backgrounds and towards white on dark ones.
 /// Falls back to pure black or white, which always reach 4.5:1 on one side.
 #[must_use]
-pub fn tone_for_contrast(palette: &TonalPalette, start: i32, bg: Color, ratio: f64) -> Color {
+pub fn tone_for_contrast(
+    palette: &TonalPalette,
+    start: i32,
+    bg: Color,
+    ratio: f64,
+) -> Color {
     let towards_dark = bg.luminance() > 0.18;
     let mut tone = start.clamp(0, 100);
     loop {
@@ -189,7 +196,9 @@ mod tests {
         let p = palette(260.0, 40.0);
         for bg in [Color::new(255, 255, 255), Color::new(0x12, 0x12, 0x14)] {
             for ratio in [3.0, 4.5, 7.0] {
-                assert!(tone_for_contrast(&p, 50, bg, ratio).contrast(bg) >= ratio);
+                assert!(
+                    tone_for_contrast(&p, 50, bg, ratio).contrast(bg) >= ratio
+                );
             }
         }
     }

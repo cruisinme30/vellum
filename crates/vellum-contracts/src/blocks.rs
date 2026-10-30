@@ -437,7 +437,8 @@ pub enum TableHeaderAlign {
 
 impl TableHeaderAlign {
     /// Every value, in schema order.
-    pub const ALL: [Self; 4] = [Self::None, Self::Left, Self::Center, Self::Right];
+    pub const ALL: [Self; 4] =
+        [Self::None, Self::Left, Self::Center, Self::Right];
 
     /// The name used in documents.
     #[must_use]
@@ -475,7 +476,8 @@ pub enum TableCellAlign {
 
 impl TableCellAlign {
     /// Every value, in schema order.
-    pub const ALL: [Self; 4] = [Self::None, Self::Left, Self::Center, Self::Right];
+    pub const ALL: [Self; 4] =
+        [Self::None, Self::Left, Self::Center, Self::Right];
 
     /// The name used in documents.
     #[must_use]

@@ -46,7 +46,8 @@ struct Writer {
     /// Whether a bare autolink may end the current content: false inside
     /// marks whose closing characters the autolink would swallow.
     bare_ok_at_end: bool,
-    /// The next sibling starts with `[`, so a trailing `!` would make it an image.
+    /// The next sibling starts with `[`, so a trailing `!` would make it an
+    /// image.
     bracket_next: bool,
     /// The first character of the enclosing mark's closing delimiter.
     closing: Option<char>,
@@ -92,7 +93,8 @@ impl Writer {
                 Some(Inline::SoftBreak | Inline::HardBreak) => true,
                 Some(Inline::Text { text }) => {
                     // The autolink extension leaves trailing punctuation out.
-                    let rest = text.trim_start_matches(['.', ',', ':', ';', '!', '?']);
+                    let rest =
+                        text.trim_start_matches(['.', ',', ':', ';', '!', '?']);
                     rest.is_empty() || rest.starts_with(char::is_whitespace)
                 }
                 Some(_) => false,
@@ -183,7 +185,9 @@ impl Writer {
                 self.out.push_str(handle);
             }
             Inline::IssueKey { key } => self.out.push_str(key),
-            Inline::Date { date } if date == "today" => self.out.push_str("@today"),
+            Inline::Date { date } if date == "today" => {
+                self.out.push_str("@today")
+            }
             Inline::Date { date } => self.out.push_str(date),
         }
     }
@@ -211,7 +215,12 @@ impl Writer {
     }
 
     /// Writes content that a delimiter starting with `closing` follows.
-    fn enclosed(&mut self, closing: char, mark: Option<MarkEdges>, write: impl FnOnce(&mut Self)) {
+    fn enclosed(
+        &mut self,
+        closing: char,
+        mark: Option<MarkEdges>,
+        write: impl FnOnce(&mut Self),
+    ) {
         let outer = (self.closing.replace(closing), self.mark);
         self.mark = mark;
         write(self);
@@ -234,7 +243,9 @@ impl Writer {
         let fence = "`".repeat(code_fence_len(code));
         let pad = code.starts_with('`')
             || code.ends_with('`')
-            || (code.starts_with(' ') && code.ends_with(' ') && !code.trim().is_empty());
+            || (code.starts_with(' ')
+                && code.ends_with(' ')
+                && !code.trim().is_empty());
         self.out.push_str(&fence);
         if pad {
             self.out.push(' ');
@@ -248,9 +259,11 @@ impl Writer {
 
     fn destination(&mut self, url: &str, title: &str) {
         self.out.push('(');
-        let pointy = url
-            .chars()
-            .any(|c| c.is_whitespace() || c.is_control() || matches!(c, '(' | ')' | '<' | '>'));
+        let pointy = url.chars().any(|c| {
+            c.is_whitespace()
+                || c.is_control()
+                || matches!(c, '(' | ')' | '<' | '>')
+        });
         if pointy {
             self.out.push('<');
             push_escaped(&mut self.out, url, &['<', '>', '\\']);
@@ -288,20 +301,22 @@ impl Writer {
                     !(prev.is_some_and(char::is_alphanumeric)
                         && next.is_some_and(char::is_alphanumeric))
                 }
-                '&' => next.is_some_and(|n| n == '#' || n.is_ascii_alphabetic()),
+                '&' => {
+                    next.is_some_and(|n| n == '#' || n.is_ascii_alphabetic())
+                }
                 '!' => next.is_none() && self.bracket_next,
                 '#' | '{' => self.place == Place::Heading,
                 // Break up what the autolink extension would turn into links.
                 ':' => chars.get(i + 1..i + 3) == Some(&['/', '/']),
                 '.' => {
                     i >= 3
-                        && chars
-                            .get(i - 3..i)
-                            .is_some_and(|w| w.iter().all(|c| c.eq_ignore_ascii_case(&'w')))
+                        && chars.get(i - 3..i).is_some_and(|w| {
+                            w.iter().all(|c| c.eq_ignore_ascii_case(&'w'))
+                        })
                 }
-                '@' => {
-                    prev.is_some_and(|p| p.is_alphanumeric() || matches!(p, '.' | '_' | '+' | '-'))
-                }
+                '@' => prev.is_some_and(|p| {
+                    p.is_alphanumeric() || matches!(p, '.' | '_' | '+' | '-')
+                }),
                 _ => false,
             } || (starts_line && Some(i) == marker_end)
                 || extras.contains(&i);
@@ -332,17 +347,21 @@ impl Writer {
             let c = run.first().copied().unwrap_or(' ');
             let escape = matches!(c, '~' | '=') && {
                 let at_edge = self.mark.is_some()
-                    && ((start == 0 && self.edge.0) || (end == chars.len() && self.edge.1));
+                    && ((start == 0 && self.edge.0)
+                        || (end == chars.len() && self.edge.1));
                 let delimiter = c == '~' || len >= 2 || at_edge;
                 let joins = (start == 0 && self.out.ends_with(c))
                     || (end == chars.len() && self.follow == Some(c));
-                let line_start = start == 0 && starts_line && self.place != Place::Cell;
+                let line_start =
+                    start == 0 && starts_line && self.place != Place::Cell;
                 let flanks = self.mark.is_some_and(|m| {
                     (start == 0
                         && self.edge.0
                         && !matches!(m.delimiter, '^' | '~')
                         && is_word(m.before))
-                        || (end == chars.len() && self.edge.1 && is_word(m.after))
+                        || (end == chars.len()
+                            && self.edge.1
+                            && is_word(m.after))
                 });
                 (delimiter && !flanks) || joins || line_start
             };
@@ -362,7 +381,9 @@ fn visible_first(inline: &Inline) -> char {
         },
         Inline::Strikethrough { content }
         | Inline::Subscript { content }
-        | Inline::Highlight { content } => content.first().map_or('\\', visible_first),
+        | Inline::Highlight { content } => {
+            content.first().map_or('\\', visible_first)
+        }
         Inline::SoftBreak => '\n',
         Inline::Link {
             url,
@@ -371,7 +392,9 @@ fn visible_first(inline: &Inline) -> char {
         } => bare_autolink(url, title, content)
             .and_then(|t| t.chars().next())
             .unwrap_or('['),
-        Inline::IssueKey { key: word } | Inline::Date { date: word } if word != "today" => {
+        Inline::IssueKey { key: word } | Inline::Date { date: word }
+            if word != "today" =>
+        {
             word.chars().next().unwrap_or('\\')
         }
         _ => '\\',
@@ -410,7 +433,8 @@ fn line_start_escape(chars: &[char]) -> Option<usize> {
         ':' if chars.get(1) == Some(&'-') => Some(0),
         '$' if chars.get(1) == Some(&'$') => Some(0),
         '0'..='9' => {
-            let digits = chars.iter().take_while(|c| c.is_ascii_digit()).count();
+            let digits =
+                chars.iter().take_while(|c| c.is_ascii_digit()).count();
             matches!(chars.get(digits), Some('.' | ')')).then_some(digits)
         }
         _ => None,
@@ -419,14 +443,18 @@ fn line_start_escape(chars: &[char]) -> Option<usize> {
 
 /// A link whose text is its own URL is written as `<url>` when that reads
 /// back the same way.
-fn autolink<'a>(url: &'a str, title: &str, content: &[Inline]) -> Option<&'a str> {
+fn autolink<'a>(
+    url: &'a str,
+    title: &str,
+    content: &[Inline],
+) -> Option<&'a str> {
     let [Inline::Text { text }] = content else {
         return None;
     };
     if !title.is_empty()
-        || url
-            .chars()
-            .any(|c| c.is_whitespace() || c.is_control() || matches!(c, '<' | '>' | '&'))
+        || url.chars().any(|c| {
+            c.is_whitespace() || c.is_control() || matches!(c, '<' | '>' | '&')
+        })
     {
         return None;
     }
@@ -449,9 +477,9 @@ fn is_commonmark_email(s: &str) -> bool {
         return false;
     };
     let local_ok = !local.is_empty()
-        && local
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || ".!#$%&'*+/=?^_`{|}~-".contains(c));
+        && local.chars().all(|c| {
+            c.is_ascii_alphanumeric() || ".!#$%&'*+/=?^_`{|}~-".contains(c)
+        });
     let label_ok = |l: &str| {
         (1..=63).contains(&l.len())
             && l.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
@@ -463,12 +491,18 @@ fn is_commonmark_email(s: &str) -> bool {
 
 /// A link the autolink extension made from bare text (`https://…`,
 /// `www.…`, an e-mail address) is written back bare when that is safe.
-fn bare_autolink<'a>(url: &str, title: &str, content: &'a [Inline]) -> Option<&'a str> {
+fn bare_autolink<'a>(
+    url: &str,
+    title: &str,
+    content: &'a [Inline],
+) -> Option<&'a str> {
     let [Inline::Text { text }] = content else {
         return None;
     };
-    let shape = ((text.starts_with("https://") || text.starts_with("http://")) && url == text)
-        || (text.starts_with("www.") && url.strip_prefix("http://") == Some(text))
+    let shape = ((text.starts_with("https://") || text.starts_with("http://"))
+        && url == text)
+        || (text.starts_with("www.")
+            && url.strip_prefix("http://") == Some(text))
         || (!text.contains(':') && url.strip_prefix("mailto:") == Some(text));
     let safe = text
         .chars()

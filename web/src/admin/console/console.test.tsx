@@ -22,7 +22,10 @@ import { AdminConsoleProvider } from "./context";
 import { settingsFromForm, SettingsPage } from "./settings-page";
 import { UsagePage } from "./usage-page";
 
-function record(seq: number, overrides: Partial<AuditRecord["event"]> = {}): AuditRecord {
+function record(
+  seq: number,
+  overrides: Partial<AuditRecord["event"]> = {},
+): AuditRecord {
   return {
     seq,
     at: "2026-10-29T09:00:00Z",
@@ -46,7 +49,12 @@ const SETTINGS: Versioned = {
     organisation: "Northstar",
     telemetry: { enabled: false, install_id: "abc", interval_hours: 24 },
     observability: { slow_request_ms: 500, budgets: { read_ms: 200 } },
-    backups: { enabled: true, interval_hours: 24, keep: 7, destination: "backups" },
+    backups: {
+      enabled: true,
+      interval_hours: 24,
+      keep: 7,
+      destination: "backups",
+    },
     security: { fresh_auth_minutes: 15, session_hours: 12 },
   },
 };
@@ -78,7 +86,9 @@ function fakeApi(overrides: Partial<AdminConsoleApi> = {}) {
   const audit = vi.fn<AdminConsoleApi["audit"]>(() =>
     Promise.resolve([record(2), record(1, { outcome: "denied" })]),
   );
-  const settings = vi.fn<AdminConsoleApi["settings"]>(() => Promise.resolve(SETTINGS));
+  const settings = vi.fn<AdminConsoleApi["settings"]>(() =>
+    Promise.resolve(SETTINGS),
+  );
   const saveSettings = vi.fn<AdminConsoleApi["saveSettings"]>((version, next) =>
     Promise.resolve({ version: version + 1, settings: next }),
   );
@@ -102,7 +112,9 @@ function fakeApi(overrides: Partial<AdminConsoleApi> = {}) {
     settings,
     saveSettings,
     state,
-    backups: vi.fn(() => Promise.resolve([{ name: "vellum-1.tar.age", size: 4096 }])),
+    backups: vi.fn(() =>
+      Promise.resolve([{ name: "vellum-1.tar.age", size: 4096 }]),
+    ),
     backUpNow: vi.fn(() =>
       Promise.resolve({
         name: "vellum-2.tar.age",
@@ -138,7 +150,9 @@ function fakeApi(overrides: Partial<AdminConsoleApi> = {}) {
     updateGroup: vi.fn(() => Promise.reject(new Error("not in this test"))),
     deleteGroup: vi.fn(() => Promise.reject(new Error("not in this test"))),
     groupMembers: vi.fn(() => Promise.reject(new Error("not in this test"))),
-    changeGroupMembers: vi.fn(() => Promise.reject(new Error("not in this test"))),
+    changeGroupMembers: vi.fn(() =>
+      Promise.reject(new Error("not in this test")),
+    ),
     ...overrides,
   };
   return { api, audit, settings, saveSettings, state };
@@ -160,9 +174,15 @@ describe("admin console API", () => {
       "/api/v1/admin/audit": { records: [] },
       "/api/v1/admin/audit/export": { jsonl: "x" },
     };
-    const get = vi.fn((path: string) => Promise.resolve(answers[path] ?? { backups: [] }));
+    const get = vi.fn((path: string) =>
+      Promise.resolve(answers[path] ?? { backups: [] }),
+    );
     const send = vi.fn(() => Promise.resolve({}));
-    const api = createHttpAdminConsoleApi({ get, send, forgetSession: vi.fn() } as unknown as Http);
+    const api = createHttpAdminConsoleApi({
+      get,
+      send,
+      forgetSession: vi.fn(),
+    } as unknown as Http);
     await api.audit({ action: "admin.backup", before: 10, limit: 50 });
     expect(get).toHaveBeenCalledWith("/api/v1/admin/audit", {
       action: "admin.backup",
@@ -176,11 +196,16 @@ describe("admin console API", () => {
       settings: { organisation: "N" },
     });
     await api.runDrill();
-    expect(send).toHaveBeenLastCalledWith("POST", "/api/v1/admin/backups/drill");
+    expect(send).toHaveBeenLastCalledWith(
+      "POST",
+      "/api/v1/admin/backups/drill",
+    );
     await api.usage(false);
     expect(get).toHaveBeenLastCalledWith("/api/v1/admin/usage", {});
     await api.usage(true);
-    expect(get).toHaveBeenLastCalledWith("/api/v1/admin/usage", { refresh: "true" });
+    expect(get).toHaveBeenLastCalledWith("/api/v1/admin/usage", {
+      refresh: "true",
+    });
   });
 });
 
@@ -190,13 +215,21 @@ describe("usage page", () => {
     const { api } = fakeApi({ usage });
     const user = renderWith(api, <UsagePage />);
     const people = await screen.findByRole("region", { name: "People" });
-    expect(within(people).getByText("Accounts").nextSibling?.textContent).toBe("12");
+    expect(within(people).getByText("Accounts").nextSibling?.textContent).toBe(
+      "12",
+    );
     const content = screen.getByRole("region", { name: "Content" });
-    expect(within(content).getByText("Pages").nextSibling?.textContent).toBe("1,250");
+    expect(within(content).getByText("Pages").nextSibling?.textContent).toBe(
+      "1,250",
+    );
     const storage = screen.getByRole("region", { name: "Storage" });
-    expect(within(storage).getByText("Total stored").nextSibling?.textContent).toBe("4.0 MB");
+    expect(
+      within(storage).getByText("Total stored").nextSibling?.textContent,
+    ).toBe("4.0 MB");
     const activity = screen.getByRole("region", { name: "Activity" });
-    expect(within(activity).getByText("Changes this week").nextSibling?.textContent).toBe("310");
+    expect(
+      within(activity).getByText("Changes this week").nextSibling?.textContent,
+    ).toBe("310");
     expect(screen.getByRole("status").textContent).toMatch(/^Counted /);
     expect(usage).toHaveBeenLastCalledWith(false);
     await user.click(screen.getByRole("button", { name: "Count now" }));
@@ -216,7 +249,9 @@ describe("usage page", () => {
   it("reports a failed count", async () => {
     const { api } = fakeApi({
       usage: vi.fn(() =>
-        Promise.reject(new ApiError("unavailable", "index down", { status: 503 })),
+        Promise.reject(
+          new ApiError("unavailable", "index down", { status: 503 }),
+        ),
       ),
     });
     renderWith(api, <UsagePage />);
@@ -234,12 +269,20 @@ describe("audit page", () => {
     expect(within(table).getByText("Denied")).toBeDefined();
 
     await user.click(screen.getByRole("button", { name: "Verify the log" }));
-    expect(await screen.findByText(/The log is intact: 2 records checked/)).toBeDefined();
+    expect(
+      await screen.findByText(/The log is intact: 2 records checked/),
+    ).toBeDefined();
 
-    await user.type(screen.getByRole("textbox", { name: "Action" }), "admin.backup");
+    await user.type(
+      screen.getByRole("textbox", { name: "Action" }),
+      "admin.backup",
+    );
     await user.click(screen.getByRole("button", { name: "Filter" }));
     await waitFor(() => {
-      expect(audit).toHaveBeenLastCalledWith({ action: "admin.backup", limit: 50 });
+      expect(audit).toHaveBeenLastCalledWith({
+        action: "admin.backup",
+        limit: 50,
+      });
     });
   });
 
@@ -250,40 +293,52 @@ describe("audit page", () => {
 });
 
 describe("settings page", () => {
-  it("saves the form against the version read, keeping fields it does not show", async () => {
-    const { api, saveSettings } = fakeApi();
-    const user = renderWith(api, <SettingsPage />);
-    const keep = await screen.findByRole("spinbutton", { name: "Backups to keep" });
-    await user.clear(keep);
-    await user.type(keep, "14");
-    await user.selectOptions(
-      screen.getByRole("combobox", { name: "Theme for exports (PDF, HTML, Word)" }),
-      "Sepia",
-    );
-    await user.click(screen.getByRole("button", { name: "Save" }));
-    expect(await screen.findByText("Settings saved.")).toBeDefined();
-    const [version, settings] = saveSettings.mock.calls[0] ?? [];
-    expect(version).toBe(3);
-    expect(settings?.backups?.keep).toBe(14);
-    expect(settings?.observability?.budgets).toEqual({ read_ms: 200 });
-    expect(settings?.telemetry?.install_id).toBe("abc");
-    expect(settings?.appearance).toEqual({
-      seed: "#4f5b92",
-      export_theme: "sepia",
-      site_theme: "auto",
-    });
-  });
+  it(
+    "saves the form against the version read, keeping fields it does not " +
+      "show",
+    async () => {
+      const { api, saveSettings } = fakeApi();
+      const user = renderWith(api, <SettingsPage />);
+      const keep = await screen.findByRole("spinbutton", {
+        name: "Backups to keep",
+      });
+      await user.clear(keep);
+      await user.type(keep, "14");
+      await user.selectOptions(
+        screen.getByRole("combobox", {
+          name: "Theme for exports (PDF, HTML, Word)",
+        }),
+        "Sepia",
+      );
+      await user.click(screen.getByRole("button", { name: "Save" }));
+      expect(await screen.findByText("Settings saved.")).toBeDefined();
+      const [version, settings] = saveSettings.mock.calls[0] ?? [];
+      expect(version).toBe(3);
+      expect(settings?.backups?.keep).toBe(14);
+      expect(settings?.observability?.budgets).toEqual({ read_ms: 200 });
+      expect(settings?.telemetry?.install_id).toBe("abc");
+      expect(settings?.appearance).toEqual({
+        seed: "#4f5b92",
+        export_theme: "sepia",
+        site_theme: "auto",
+      });
+    },
+  );
 
   it("says when another admin saved first", async () => {
     const { api, settings } = fakeApi({
       saveSettings: () =>
-        Promise.reject(new ApiError("conflict", "stale version", { status: 409 })),
+        Promise.reject(
+          new ApiError("conflict", "stale version", { status: 409 }),
+        ),
     });
     const user = renderWith(api, <SettingsPage />);
     await user.click(await screen.findByRole("button", { name: "Save" }));
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("Another admin saved");
-    await user.click(screen.getByRole("button", { name: "Load the latest settings" }));
+    await user.click(
+      screen.getByRole("button", { name: "Load the latest settings" }),
+    );
     await waitFor(() => {
       expect(settings).toHaveBeenCalledTimes(2);
     });
@@ -305,14 +360,19 @@ describe("settings page", () => {
     data.set("security.secret_allow", "jwt\n\n  AKIAIOSFODNN7EXAMPLE  \n");
     const settings = settingsFromForm(SETTINGS.settings, data);
     expect(settings.security?.secret_scanning).toBe("block");
-    expect(settings.security?.secret_allow).toEqual(["jwt", "AKIAIOSFODNN7EXAMPLE"]);
+    expect(settings.security?.secret_allow).toEqual([
+      "jwt",
+      "AKIAIOSFODNN7EXAMPLE",
+    ]);
   });
 
   it("reads the hybrid-ranking switch", () => {
     const on = new FormData();
     on.set("search.hybrid", "on");
     expect(settingsFromForm(SETTINGS.settings, on).search?.hybrid).toBe(true);
-    expect(settingsFromForm(SETTINGS.settings, new FormData()).search?.hybrid).toBe(false);
+    expect(
+      settingsFromForm(SETTINGS.settings, new FormData()).search?.hybrid,
+    ).toBe(false);
   });
 });
 
@@ -324,9 +384,15 @@ describe("backups page", () => {
     expect(screen.getByRole("table", { name: /Backups kept/ })).toBeDefined();
 
     await user.click(screen.getByRole("button", { name: "Back up now" }));
-    expect(await screen.findByText(/Backup vellum-2.tar.age written/)).toBeDefined();
-    await user.click(screen.getByRole("button", { name: "Run a restore drill" }));
-    expect(await screen.findByText(/The restore drill passed: 41 files/)).toBeDefined();
+    expect(
+      await screen.findByText(/Backup vellum-2.tar.age written/),
+    ).toBeDefined();
+    await user.click(
+      screen.getByRole("button", { name: "Run a restore drill" }),
+    );
+    expect(
+      await screen.findByText(/The restore drill passed: 41 files/),
+    ).toBeDefined();
     expect(state).toHaveBeenCalledTimes(3);
   });
 });

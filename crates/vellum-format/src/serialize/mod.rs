@@ -18,7 +18,11 @@ use inline::Place;
 
 /// Writes `document` as canonical Vellum Markdown.
 #[must_use]
-#[tracing::instrument(level = "debug", skip_all, fields(blocks = document.blocks.len()))]
+#[tracing::instrument(
+    level = "debug",
+    skip_all,
+    fields(blocks = document.blocks.len())
+)]
 pub fn serialize(document: &Document) -> String {
     let mut out = String::new();
     if let Some(fm) = &document.front_matter {
@@ -80,10 +84,14 @@ fn blocks(blocks: &[Block], pos: Pos, separator: &str) -> String {
         // two would be read as one.
         let adjacent = matches!(
             (previous, block),
-            (Some(Block::List(a)), Block::List(b)) if a.start.is_some() == b.start.is_some()
+            (
+                Some(Block::List(a)),
+                Block::List(b)
+            ) if a.start.is_some() == b.start.is_some()
         ) && !previous_alternate;
-        let alternate =
-            adjacent || (pos.after_dash && matches!(block, Block::List(l) if l.start.is_none()));
+        let alternate = adjacent
+            || (pos.after_dash
+                && matches!(block, Block::List(l) if l.start.is_none()));
         out.push_str(&self::block(block, pos, alternate));
         previous = Some(block);
         previous_alternate = alternate;
@@ -120,7 +128,9 @@ fn block(block: &Block, pos: Pos, alternate: bool) -> String {
             text.push('\n');
             text
         }
-        Block::ThematicBreak if pos.columns || pos.file_start || pos.nested => "***\n".to_owned(),
+        Block::ThematicBreak if pos.columns || pos.file_start || pos.nested => {
+            "***\n".to_owned()
+        }
         Block::ThematicBreak => "---\n".to_owned(),
         Block::BlockQuote { blocks: inner, id } => {
             let body = blocks(
@@ -143,7 +153,9 @@ fn block(block: &Block, pos: Pos, alternate: bool) -> String {
         }
         Block::List(list) => self::list(list, alternate),
         Block::Fence(fence) => self::fence(fence),
-        Block::Math { literal, id } if !pos.nested && !literal.lines().any(|l| l == "$$") => {
+        Block::Math { literal, id }
+            if !pos.nested && !literal.lines().any(|l| l == "$$") =>
+        {
             let mut open = "$$".to_owned();
             push_block_id(&mut open, id.as_ref());
             format!("{open}\n{literal}$$\n")
@@ -195,7 +207,8 @@ fn list(list: &List, alternate: bool) -> String {
             None if alternate => "*".to_owned(),
             None => "-".to_owned(),
             Some(start) => {
-                let n = start.saturating_add(u64::try_from(i).unwrap_or(u64::MAX));
+                let n =
+                    start.saturating_add(u64::try_from(i).unwrap_or(u64::MAX));
                 format!("{n}{}", if alternate { ')' } else { '.' })
             }
         };
@@ -225,7 +238,8 @@ fn list(list: &List, alternate: bool) -> String {
             }
             _ => blocks(&item.blocks, pos, separator),
         };
-        let paragraph_first = matches!(item.blocks.first(), Some(Block::Paragraph { .. }));
+        let paragraph_first =
+            matches!(item.blocks.first(), Some(Block::Paragraph { .. }));
         if body.is_empty() {
             out.push_str(&marker);
             out.push('\n');

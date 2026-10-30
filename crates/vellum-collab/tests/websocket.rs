@@ -111,7 +111,11 @@ const READ: u8 = 1;
 
 #[async_trait]
 impl Authorizer for Switch {
-    async fn authorize(&self, _request: &Parts, _room: RoomKey) -> Result<(UserId, Access)> {
+    async fn authorize(
+        &self,
+        _request: &Parts,
+        _room: RoomKey,
+    ) -> Result<(UserId, Access)> {
         match self.state.load(std::sync::atomic::Ordering::SeqCst) {
             WRITE => Ok((self.user, Access::Write)),
             READ => Ok((self.user, Access::Read)),
@@ -153,7 +157,8 @@ async fn a_revoked_editor_is_disconnected() {
     let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
     let mut code = None;
     loop {
-        let next = tokio::time::timeout_at(deadline, editor.socket.next()).await;
+        let next =
+            tokio::time::timeout_at(deadline, editor.socket.next()).await;
         match next {
             Ok(Some(Ok(WsMessage::Close(frame)))) => {
                 code = frame.map(|f| u16::from(f.code));

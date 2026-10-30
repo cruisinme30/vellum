@@ -11,7 +11,9 @@ use std::collections::BTreeSet;
 use std::future::Future;
 
 use crate::graph::SpaceGraph;
-use crate::model::{Id, Object, Principal, Relation, Subject, Tuple, TupleRelation};
+use crate::model::{
+    Id, Object, Principal, Relation, Subject, Tuple, TupleRelation,
+};
 
 /// The primary key of a tuple: everything but its expiry.
 pub type TupleKey = (Object, TupleRelation, Subject);
@@ -80,10 +82,15 @@ pub enum StoreError {
 /// request.
 pub trait AuthzStore: Send + Sync {
     /// The space's tree, tuples and current epoch.
-    fn load_space(&self, space: Id) -> impl Future<Output = Result<SpaceGraph, StoreError>> + Send;
+    fn load_space(
+        &self,
+        space: Id,
+    ) -> impl Future<Output = Result<SpaceGraph, StoreError>> + Send;
 
     /// Every group membership tuple (they live under [`Id::DIRECTORY`]).
-    fn load_directory(&self) -> impl Future<Output = Result<Vec<Tuple>, StoreError>> + Send;
+    fn load_directory(
+        &self,
+    ) -> impl Future<Output = Result<Vec<Tuple>, StoreError>> + Send;
 
     /// Inserts and deletes membership tuples.
     fn write_directory(
@@ -99,7 +106,10 @@ pub trait AuthzStore: Send + Sync {
     ) -> impl Future<Output = Result<Vec<Id>, StoreError>> + Send;
 
     /// Applies a commit atomically and returns the new epoch.
-    fn commit(&self, commit: Commit) -> impl Future<Output = Result<u64, StoreError>> + Send;
+    fn commit(
+        &self,
+        commit: Commit,
+    ) -> impl Future<Output = Result<u64, StoreError>> + Send;
 
     /// The principal's live rows on one object at `now_ms` (rows whose
     /// `valid_until` is unset or later), each with the epoch it was
@@ -142,5 +152,8 @@ pub trait AuthzStore: Send + Sync {
     ) -> impl Future<Output = Result<Vec<Id>, StoreError>> + Send;
 
     /// The space's current epoch.
-    fn epoch(&self, space: Id) -> impl Future<Output = Result<u64, StoreError>> + Send;
+    fn epoch(
+        &self,
+        space: Id,
+    ) -> impl Future<Output = Result<u64, StoreError>> + Send;
 }

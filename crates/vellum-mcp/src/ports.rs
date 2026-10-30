@@ -511,9 +511,17 @@ pub trait Workspace: Send + Sync {
         query: SearchQuery,
     ) -> Result<Vec<SearchHit>, WorkspaceError>;
     /// A page as Markdown with front matter.
-    async fn get_doc(&self, actor: &Actor, id: &str) -> Result<Document, WorkspaceError>;
+    async fn get_doc(
+        &self,
+        actor: &Actor,
+        id: &str,
+    ) -> Result<Document, WorkspaceError>;
     /// A page found by its app path, for `?format=md`.
-    async fn get_doc_by_path(&self, actor: &Actor, path: &str) -> Result<Document, WorkspaceError>;
+    async fn get_doc_by_path(
+        &self,
+        actor: &Actor,
+        path: &str,
+    ) -> Result<Document, WorkspaceError>;
     /// Selected blocks of a page.
     async fn get_blocks(
         &self,
@@ -528,9 +536,17 @@ pub trait Workspace: Send + Sync {
         id: &str,
     ) -> Result<Vec<OutlineNode>, WorkspaceError>;
     /// A book: `book.yaml`, `SUMMARY.md` and numbering, as Markdown.
-    async fn get_book(&self, actor: &Actor, id: &str) -> Result<Document, WorkspaceError>;
+    async fn get_book(
+        &self,
+        actor: &Actor,
+        id: &str,
+    ) -> Result<Document, WorkspaceError>;
     /// A space's tree as a Markdown nested list of links.
-    async fn space_tree(&self, actor: &Actor, slug: &str) -> Result<Document, WorkspaceError>;
+    async fn space_tree(
+        &self,
+        actor: &Actor,
+        slug: &str,
+    ) -> Result<Document, WorkspaceError>;
     /// Writes a new page.
     async fn create_page(
         &self,
@@ -548,7 +564,11 @@ pub trait Workspace: Send + Sync {
         by: Attribution,
     ) -> Result<WriteReceipt, WorkspaceError>;
     /// Reads an issue by key.
-    async fn get_issue(&self, actor: &Actor, key: &str) -> Result<Issue, WorkspaceError>;
+    async fn get_issue(
+        &self,
+        actor: &Actor,
+        key: &str,
+    ) -> Result<Issue, WorkspaceError>;
     /// Files an issue; model-filed issues land in the team's triage.
     async fn create_issue(
         &self,
@@ -621,9 +641,16 @@ pub trait Workspace: Send + Sync {
     ) -> Result<ListingPage, WorkspaceError>;
     /// A named page template's Markdown (for the `write-prd` prompt and the
     /// `get_template` tool).
-    async fn get_template(&self, actor: &Actor, name: &str) -> Result<String, WorkspaceError>;
+    async fn get_template(
+        &self,
+        actor: &Actor,
+        name: &str,
+    ) -> Result<String, WorkspaceError>;
     /// The page templates the actor can use, by name and title.
-    async fn list_templates(&self, _actor: &Actor) -> Result<Vec<Template>, WorkspaceError> {
+    async fn list_templates(
+        &self,
+        _actor: &Actor,
+    ) -> Result<Vec<Template>, WorkspaceError> {
         Ok(Vec::new())
     }
     /// Deployment facts for `llms.txt`.

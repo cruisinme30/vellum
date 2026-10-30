@@ -22,7 +22,17 @@ use serde::{Deserialize, Serialize};
 use vellum_kernel::{Result, Timestamp};
 
 /// The workspace's size and activity at one moment.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    JsonSchema,
+)]
 pub struct UsageCounts {
     /// When the counts were taken (Unix milliseconds); 0 before the first
     /// sample.
@@ -154,7 +164,10 @@ impl UsageSampler {
         match self.refresh().await {
             Ok(counts) => Ok(counts),
             Err(error) if latest.sampled_at_ms > 0 => {
-                tracing::warn!(%error, "usage counts are stale: counting failed");
+                tracing::warn!(
+                    %error,
+                    "usage counts are stale: counting failed"
+                );
                 Ok(latest)
             }
             Err(error) => Err(error),
@@ -255,7 +268,8 @@ const GAUGES: &[GaugeSpec] = &[
     GaugeSpec {
         name: "vellum.usage.items",
         unit: "{item}",
-        description: "Drive items, by kind; trashed items count once under trashed",
+        description: "Drive items, by kind; trashed items count once under \
+            trashed",
         read: |c| {
             vec![
                 (Some(("kind", "page")), c.pages),
@@ -366,7 +380,8 @@ mod tests {
             file_bytes: 99,
             ..UsageCounts::default()
         };
-        let points: Vec<Point> = GAUGES.iter().flat_map(|g| (g.read)(&counts)).collect();
+        let points: Vec<Point> =
+            GAUGES.iter().flat_map(|g| (g.read)(&counts)).collect();
         assert!(points.contains(&(Some(("state", "all")), 4)));
         assert!(points.contains(&(Some(("kind", "files")), 99)));
         let names: Vec<&str> = GAUGES.iter().map(|g| g.name).collect();

@@ -3,8 +3,8 @@
 
 //! Signing in through a SAML provider set in Admin → Sign-in.
 //!
-//! ADR 0069, D293. The protocol checks are in [`crate::saml`]; this keeps sign-ins
-//! in progress and used assertions in the replicated store, so any
+//! ADR 0069, D293. The protocol checks are in [`crate::saml`]; this keeps
+//! sign-ins in progress and used assertions in the replicated store, so any
 //! replica can finish a sign-in and none accepts an assertion twice.
 
 use std::time::Duration;
@@ -16,7 +16,9 @@ use subtle::ConstantTimeEq as _;
 use vellum_kernel::{Error, ErrorKind, Timestamp};
 
 use crate::identity::{Identity, NewSession, after};
-use crate::providers::{MetadataUrl, SamlMetadataView, check_issuer, may_create, may_link};
+use crate::providers::{
+    MetadataUrl, SamlMetadataView, check_issuer, may_create, may_link,
+};
 use crate::saml::{self, Expected, IdentityProvider, ServiceProvider};
 use crate::sso::{SsoIdentity, safe_next};
 use crate::store::{Protocol, Provider, SamlRequest};
@@ -96,10 +98,11 @@ impl Identity {
     #[must_use]
     pub fn is_saml_provider(&self, id: &str) -> bool {
         self.store().read(|s| {
-            s.sign_in
-                .providers
-                .iter()
-                .any(|p| p.id == id && p.enabled && matches!(p.protocol, Protocol::Saml { .. }))
+            s.sign_in.providers.iter().any(|p| {
+                p.id == id
+                    && p.enabled
+                    && matches!(p.protocol, Protocol::Saml { .. })
+            })
         })
     }
 
@@ -112,7 +115,12 @@ impl Identity {
                     .find(|p| p.id == id && p.enabled)
                     .cloned()
             })
-            .ok_or_else(|| Error::new(ErrorKind::NotFound, "this sign-in provider is not set up"))
+            .ok_or_else(|| {
+                Error::new(
+                    ErrorKind::NotFound,
+                    "this sign-in provider is not set up",
+                )
+            })
     }
 
     /// Starts a sign-in at the SAML provider `id`, returning afterwards
@@ -180,11 +188,13 @@ impl Identity {
         response: &str,
         user_agent: Option<&str>,
     ) -> Result<(NewSession, String), Error> {
-        let same_browser =
-            cookie.is_some_and(|c| bool::from(c.as_bytes().ct_eq(relay_state.as_bytes())));
+        let same_browser = cookie.is_some_and(|c| {
+            bool::from(c.as_bytes().ct_eq(relay_state.as_bytes()))
+        });
         if !same_browser {
             return Err(refused(
-                "this sign-in was started in another browser or has expired; start again",
+                "this sign-in was started in another browser or has expired; \
+                    start again",
             ));
         }
         let now = Timestamp::now();
@@ -192,7 +202,11 @@ impl Identity {
             .store()
             .write(|s| s.saml_requests.remove(&hashed(&[relay_state])))?
             .filter(|r| r.expires > now)
-            .ok_or_else(|| refused("this sign-in has expired or was already used; start again"))?;
+            .ok_or_else(|| {
+                refused(
+                    "this sign-in has expired or was already used; start again",
+                )
+            })?;
         let record = self.saml_record(&request.provider)?;
         let idp = identity_provider(&record)?;
         let sp = self.saml_service();
@@ -254,7 +268,10 @@ impl Identity {
     ///
     /// [`ErrorKind::InvalidInput`] for a bad URL or document, and
     /// [`ErrorKind::Unavailable`] when it cannot be fetched.
-    pub async fn read_saml_metadata(&self, input: &MetadataUrl) -> Result<SamlMetadataView, Error> {
+    pub async fn read_saml_metadata(
+        &self,
+        input: &MetadataUrl,
+    ) -> Result<SamlMetadataView, Error> {
         let url = check_issuer(&input.url)?;
         let factory = self.sso_http_factory().ok_or_else(|| {
             Error::new(

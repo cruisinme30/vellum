@@ -123,7 +123,9 @@ fn names_a_file(path: &str) -> bool {
 
 async fn serve(State(files): State<Arc<Files>>, request: Request) -> Response {
     if !matches!(*request.method(), Method::GET | Method::HEAD) {
-        let mut response = (StatusCode::METHOD_NOT_ALLOWED, "method not allowed").into_response();
+        let mut response =
+            (StatusCode::METHOD_NOT_ALLOWED, "method not allowed")
+                .into_response();
         let _ = response
             .headers_mut()
             .insert(header::ALLOW, HeaderValue::from_static("GET, HEAD"));

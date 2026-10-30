@@ -54,7 +54,10 @@ pub trait PublicSite: Send + Sync + 'static {
     ) -> BoxFuture<'_, Result<PublicPage, Error>>;
 
     /// Serves a page published to the public site.
-    fn published<'a>(&'a self, path: &'a str) -> BoxFuture<'a, Result<PublicPage, Error>>;
+    fn published<'a>(
+        &'a self,
+        path: &'a str,
+    ) -> BoxFuture<'a, Result<PublicPage, Error>>;
 }
 
 /// The public site when nothing is published: every path is not found.
@@ -67,11 +70,18 @@ impl PublicSite for NothingPublished {
         _token: ShareToken,
         _password: Option<String>,
     ) -> BoxFuture<'_, Result<PublicPage, Error>> {
-        Box::pin(async { Err(Error::new(ErrorKind::NotFound, "share link not found")) })
+        Box::pin(async {
+            Err(Error::new(ErrorKind::NotFound, "share link not found"))
+        })
     }
 
-    fn published<'a>(&'a self, _path: &'a str) -> BoxFuture<'a, Result<PublicPage, Error>> {
-        Box::pin(async { Err(Error::new(ErrorKind::NotFound, "page not found")) })
+    fn published<'a>(
+        &'a self,
+        _path: &'a str,
+    ) -> BoxFuture<'a, Result<PublicPage, Error>> {
+        Box::pin(async {
+            Err(Error::new(ErrorKind::NotFound, "page not found"))
+        })
     }
 }
 
@@ -90,10 +100,11 @@ fn escape(text: &str) -> String {
 
 fn document(title: &str, body: &str) -> String {
     format!(
-        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">\
-         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\
-         <meta name=\"robots\" content=\"noindex\"><title>{}</title></head>\
-         <body><main>{body}</main></body></html>",
+        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta \
+         name=\"viewport\" content=\"width=device-width, \
+         initial-scale=1\"><meta name=\"robots\" \
+         content=\"noindex\"><title>{}</title></head><body><main>{body}</main><\
+         /body></html>",
         escape(title)
     )
 }
@@ -107,15 +118,21 @@ fn password_form(retry: bool) -> String {
     document(
         "Password required",
         &format!(
-            "<h1>This page is protected</h1>{notice}\
-             <form method=\"post\"><label for=\"password\">Password</label> \
-             <input id=\"password\" name=\"password\" type=\"password\" autocomplete=\"current-password\" required autofocus> \
-             <button type=\"submit\">Open</button></form>"
+            "<h1>This page is protected</h1>{notice}<form \
+             method=\"post\"><label for=\"password\">Password</label> <input \
+             id=\"password\" name=\"password\" type=\"password\" \
+             autocomplete=\"current-password\" required autofocus> <button \
+             type=\"submit\">Open</button></form>"
         ),
     )
 }
 
-fn html_response(status: StatusCode, html: String, max_age: u32, shared: bool) -> Response {
+fn html_response(
+    status: StatusCode,
+    html: String,
+    max_age: u32,
+    shared: bool,
+) -> Response {
     let mut response = (status, html).into_response();
     let headers = response.headers_mut();
     let _ = headers.insert(
@@ -131,7 +148,8 @@ fn html_response(status: StatusCode, html: String, max_age: u32, shared: bool) -
         let _ = headers.insert(header::CACHE_CONTROL, value);
     }
     if shared {
-        // The token is in the URL: never leak it to linked sites, never index it.
+        // The token is in the URL: never leak it to linked sites, never index
+        // it.
         let _ = headers.insert(
             header::REFERRER_POLICY,
             HeaderValue::from_static("no-referrer"),
@@ -207,7 +225,10 @@ async fn unlock_share(
     render(result, true)
 }
 
-async fn published(State(site): State<Arc<dyn PublicSite>>, Path(path): Path<String>) -> Response {
+async fn published(
+    State(site): State<Arc<dyn PublicSite>>,
+    Path(path): Path<String>,
+) -> Response {
     render(site.published(&path).await, false)
 }
 
@@ -276,7 +297,10 @@ mod tests {
                 .and_then(|v| v.to_str().ok()),
             Some("public, max-age=600")
         );
-        let r = render(Err(Error::new(ErrorKind::Internal, "secret detail")), false);
+        let r = render(
+            Err(Error::new(ErrorKind::Internal, "secret detail")),
+            false,
+        );
         assert_eq!(r.status(), StatusCode::INTERNAL_SERVER_ERROR);
         let r = render(Ok(PublicPage::PasswordRequired { retry: true }), true);
         assert_eq!(r.status(), StatusCode::UNAUTHORIZED);

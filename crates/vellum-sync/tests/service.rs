@@ -16,13 +16,15 @@ use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 use vellum_contracts::{
-    CredentialKind, Operation, Principal, Readiness, RequestContext, Scope, ScopeSet, Service,
+    CredentialKind, Operation, Principal, Readiness, RequestContext, Scope,
+    ScopeSet, Service,
 };
 use vellum_db::{Index, IndexConfig};
 use vellum_kernel::{Error, ErrorKind, RequestId, SpaceId, Timestamp, UserId};
 use vellum_sync::ports::BoxFuture;
 use vellum_sync::{
-    AccessKey, Change, MutationContext, Mutators, ReadAccess, ServerMutator, SqlStore, Sync,
+    AccessKey, Change, MutationContext, Mutators, ReadAccess, ServerMutator,
+    SqlStore, Sync,
 };
 
 /// Everyone reads everything; the tests are about the seam, not authz.
@@ -76,10 +78,13 @@ fn person(user: UserId, scopes: &[Scope]) -> Principal {
     )
 }
 
-async fn operations(dir: &tempfile::TempDir) -> (Arc<Sync<SqlStore, Open>>, Vec<Operation>) {
-    let index = Index::open(&IndexConfig::sqlite(dir.path().join("i.sqlite"), None))
-        .await
-        .unwrap();
+async fn operations(
+    dir: &tempfile::TempDir,
+) -> (Arc<Sync<SqlStore, Open>>, Vec<Operation>) {
+    let index =
+        Index::open(&IndexConfig::sqlite(dir.path().join("i.sqlite"), None))
+            .await
+            .unwrap();
     let mut mutators = Mutators::new();
     mutators
         .register("issues.set", Arc::new(SetIssue(SpaceId::generate())))

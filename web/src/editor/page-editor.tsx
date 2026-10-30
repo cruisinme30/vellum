@@ -61,7 +61,10 @@ export interface PageEditorProperties {
   readonly idleSaveMs?: number;
   /** Extra controls in the editor's bar, before Done. */
   readonly actions?: ReactNode;
-  /** Told how to save the page now and whether it is editable; `undefined` once closed. */
+  /**
+   * Told how to save the page now and whether it is editable; `undefined` once
+   * closed.
+   */
   readonly onControls?: (controls?: EditorControls) => void;
   /**
    * Comments and issues, from a Vellum server; without it (demo mode) the
@@ -95,7 +98,10 @@ export interface EditorControls {
   readonly canWrite: boolean;
 }
 
-interface BoundProperties extends Omit<PageEditorProperties, "connector" | "spaceId"> {
+interface BoundProperties extends Omit<
+  PageEditorProperties,
+  "connector" | "spaceId"
+> {
   readonly session: CollabSession;
 }
 
@@ -113,7 +119,11 @@ const LOCAL: LiveConnection = {
   subscribe: () => unsubscribeNothing,
   done: () => Promise.resolve(),
 };
-const LOCAL_STATE: LiveState = { status: "online", canWrite: true, peers: new Map() };
+const LOCAL_STATE: LiveState = {
+  status: "online",
+  canWrite: true,
+  peers: new Map(),
+};
 
 /** The session's server state. */
 function useLive(live: LiveConnection = LOCAL): LiveState {
@@ -129,7 +139,9 @@ const SAVE_LABELS: Record<SaveStatus, string> = {
 
 /** Whether a key press is the save shortcut (Ctrl+S, or Cmd+S on a Mac). */
 const isSaveKey = (event: KeyboardEvent) =>
-  (event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "s";
+  (event.ctrlKey || event.metaKey) &&
+  !event.altKey &&
+  event.key.toLowerCase() === "s";
 
 /**
  * Where this editor's changes stand, and Done, which writes a version now.
@@ -143,7 +155,10 @@ function SaveControls({
 }: {
   readonly saver: Saver;
   readonly canSave: boolean;
-  /** Keeps the status's room, unshown, until the server says whether this person may write. */
+  /**
+   * Keeps the status's room, unshown, until the server says whether this person
+   * may write.
+   */
   readonly joining: boolean;
   readonly children?: ReactNode;
 }) {
@@ -191,7 +206,10 @@ function WorkActions({
 }: {
   readonly work: WorkApi;
   readonly editable: boolean;
-  /** Shows Create issue, disabled, until the server says whether this person may write. */
+  /**
+   * Shows Create issue, disabled, until the server says whether this person may
+   * write.
+   */
   readonly joining: boolean;
   readonly side: Side | undefined;
   readonly onToggle: (kind: Side["kind"]) => void;
@@ -375,7 +393,9 @@ function BoundEditor({
     setSide(undefined);
   }, []);
   const openSide = (kind: Side["kind"]) => {
-    setSide(side?.kind === kind ? undefined : { kind, anchor: ensureAnchor(editor) });
+    setSide(
+      side?.kind === kind ? undefined : { kind, anchor: ensureAnchor(editor) },
+    );
   };
   const workActions = work && (
     <WorkActions
@@ -395,7 +415,11 @@ function BoundEditor({
       <div className="vl-editor-bar">
         <Toolbar
           editor={editor}
-          onSelectionTask={toolbarTask(editor, editable || joining, onSelectionTask)}
+          onSelectionTask={toolbarTask(
+            editor,
+            editable || joining,
+            onSelectionTask,
+          )}
         />
         <SaveControls
           saver={saver}
@@ -403,7 +427,10 @@ function BoundEditor({
           joining={joining}
         >
           {workActions}
-          <PresenceBar awareness={session.awareness} live={session.live ? live : undefined} />
+          <PresenceBar
+            awareness={session.awareness}
+            live={session.live ? live : undefined}
+          />
           {actions}
         </SaveControls>
       </div>
@@ -429,9 +456,17 @@ function BoundEditor({
  * document is an effect so React's development double-mount never leaks
  * a session.
  */
-export function PageEditor({ connector, pageId, spaceId, ...rest }: PageEditorProperties) {
+export function PageEditor({
+  connector,
+  pageId,
+  spaceId,
+  ...rest
+}: PageEditorProperties) {
   const t = useT();
-  const [open, setOpen] = useState<{ pageId: string; session: CollabSession }>();
+  const [open, setOpen] = useState<{
+    pageId: string;
+    session: CollabSession;
+  }>();
   useEffect(() => {
     const session = connector.open(pageId, spaceId);
     let live = true;
@@ -452,5 +487,12 @@ export function PageEditor({ connector, pageId, spaceId, ...rest }: PageEditorPr
       </p>
     );
   }
-  return <BoundEditor key={pageId} pageId={pageId} session={open.session} {...rest} />;
+  return (
+    <BoundEditor
+      key={pageId}
+      pageId={pageId}
+      session={open.session}
+      {...rest}
+    />
+  );
 }

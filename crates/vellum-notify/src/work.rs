@@ -56,7 +56,11 @@ pub struct Addressed {
 
 /// The notifications `event` causes.
 #[must_use]
-pub fn notifications(event: &WorkEvent, lookup: &dyn IssueLookup, at: Timestamp) -> Vec<Addressed> {
+pub fn notifications(
+    event: &WorkEvent,
+    lookup: &dyn IssueLookup,
+    at: Timestamp,
+) -> Vec<Addressed> {
     let mut out = Vec::new();
     match event {
         WorkEvent::IssueCreated { issue, .. } => {
@@ -75,7 +79,9 @@ pub fn notifications(event: &WorkEvent, lookup: &dyn IssueLookup, at: Timestamp)
         WorkEvent::IssueStateChanged { issue, .. } => {
             let mut to: Vec<String> = lookup
                 .issue(issue.id)
-                .map(|i| i.subscribers.iter().map(ToString::to_string).collect())
+                .map(|i| {
+                    i.subscribers.iter().map(ToString::to_string).collect()
+                })
                 .unwrap_or_default();
             to.extend(issue.assignee.iter().map(ToString::to_string));
             to.sort();
@@ -100,7 +106,8 @@ pub fn notifications(event: &WorkEvent, lookup: &dyn IssueLookup, at: Timestamp)
             let kind = match risk {
                 vellum_work::sla::Risk::Red => NotificationKind::SlaBreached,
                 vellum_work::sla::Risk::Orange => NotificationKind::SlaHighRisk,
-                vellum_work::sla::Risk::Gray | vellum_work::sla::Risk::Yellow => return out,
+                vellum_work::sla::Risk::Gray
+                | vellum_work::sla::Risk::Yellow => return out,
             };
             let title = if kind == NotificationKind::SlaBreached {
                 format!("{} breached its SLA", issue.key)
@@ -108,7 +115,14 @@ pub fn notifications(event: &WorkEvent, lookup: &dyn IssueLookup, at: Timestamp)
                 format!("{} is close to breaching its SLA", issue.key)
             };
             out.push(Addressed {
-                notification: note(kind, issue, title, issue.title.clone(), None, at),
+                notification: note(
+                    kind,
+                    issue,
+                    title,
+                    issue.title.clone(),
+                    None,
+                    at,
+                ),
                 to: recipients.iter().map(ToString::to_string).collect(),
             });
         }
@@ -120,7 +134,9 @@ pub fn notifications(event: &WorkEvent, lookup: &dyn IssueLookup, at: Timestamp)
             ..
         } => {
             if let Some(info) = lookup.issue(*issue) {
-                out.extend(comment_notes(&info, comment, mentions, recipients, at));
+                out.extend(comment_notes(
+                    &info, comment, mentions, recipients, at,
+                ));
             }
         }
         _ => {}
@@ -180,7 +196,11 @@ fn comment_notes(
     out
 }
 
-fn assigned(issue: &IssueSnapshot, assignee: &UserRef, at: Timestamp) -> Addressed {
+fn assigned(
+    issue: &IssueSnapshot,
+    assignee: &UserRef,
+    at: Timestamp,
+) -> Addressed {
     Addressed {
         notification: note(
             NotificationKind::IssueAssigned,
@@ -247,8 +267,15 @@ pub fn webhook_events(
     at: Timestamp,
 ) -> Vec<WebhookEvent> {
     let issue_url = |key: &str| Some(format!("/issues/{key}"));
-    let snapshot = |issue: &IssueSnapshot| serde_json::to_value(issue).unwrap_or(Value::Null);
-    let make = |event_type, action, team: Option<String>, data: Value, from: Option<Value>, url| {
+    let snapshot = |issue: &IssueSnapshot| {
+        serde_json::to_value(issue).unwrap_or(Value::Null)
+    };
+    let make = |event_type,
+                action,
+                team: Option<String>,
+                data: Value,
+                from: Option<Value>,
+                url| {
         WebhookEvent {
             id: uuid::Uuid::now_v7().to_string(),
             event_type,
@@ -286,7 +313,8 @@ pub fn webhook_events(
             "issue": info.key,
         });
         if let (Some(c), Some(map)) = (comment, data.as_object_mut()) {
-            let _ = map.insert("author".to_owned(), json!(c.author.to_string()));
+            let _ =
+                map.insert("author".to_owned(), json!(c.author.to_string()));
             let _ = map.insert("body".to_owned(), json!(c.body));
             let _ = map.insert(
                 "created_at".to_owned(),
@@ -336,7 +364,11 @@ pub fn webhook_events(
             Some(json!({ "key": from.to_string() })),
         )),
         WorkEvent::IssueTriaged { issue, action } => {
-            let mut e = issue_event(issue, EventAction::Update, Some(json!({ "triage": null })));
+            let mut e = issue_event(
+                issue,
+                EventAction::Update,
+                Some(json!({ "triage": null })),
+            );
             if let Some(map) = e.data.as_object_mut() {
                 let _ = map.insert("triage".to_owned(), json!(action));
             }
@@ -394,7 +426,9 @@ pub fn webhook_events(
         }
         WorkEvent::SlaRisk { issue, risk, .. } => {
             let action = match risk {
-                vellum_work::sla::Risk::Orange => Some(EventAction::SlaHighRisk),
+                vellum_work::sla::Risk::Orange => {
+                    Some(EventAction::SlaHighRisk)
+                }
                 vellum_work::sla::Risk::Red => Some(EventAction::SlaBreached),
                 _ => None,
             };
@@ -455,7 +489,10 @@ pub fn webhook_events(
                 EventType::Label,
                 action,
                 team.as_ref().map(ToString::to_string),
-                json!({ "label": label, "team": team.as_ref().map(ToString::to_string) }),
+                json!({
+                    "label": label,
+                    "team": team.as_ref().map(ToString::to_string)
+                }),
                 None,
                 None,
             ))
@@ -508,7 +545,10 @@ mod tests {
     use std::collections::BTreeMap;
 
     use time::macros::datetime;
-    use vellum_work::{Comments, Ctx, IssuePatch, NewComment, NewIssue, Team, TeamKey, WorkGraph};
+    use vellum_work::{
+        Comments, Ctx, IssuePatch, NewComment, NewIssue, Team, TeamKey,
+        WorkGraph,
+    };
 
     use super::*;
 
@@ -539,10 +579,15 @@ mod tests {
     }
 
     /// Kind to recipients, for every notification of `events`.
-    fn sent(graph: &WorkGraph, events: &[WorkEvent]) -> BTreeMap<NotificationKind, Vec<String>> {
+    fn sent(
+        graph: &WorkGraph,
+        events: &[WorkEvent],
+    ) -> BTreeMap<NotificationKind, Vec<String>> {
         events
             .iter()
-            .flat_map(|e| notifications(e, &Graph(graph), Timestamp::UNIX_EPOCH))
+            .flat_map(|e| {
+                notifications(e, &Graph(graph), Timestamp::UNIX_EPOCH)
+            })
             .map(|a| (a.notification.kind, a.to))
             .collect()
     }
@@ -577,7 +622,8 @@ mod tests {
         };
         let reassigned = graph.update_issue(&id, patch, &ctx("ada")).unwrap();
         assert_eq!(
-            sent(&graph, &reassigned.events).get(&NotificationKind::IssueAssigned),
+            sent(&graph, &reassigned.events)
+                .get(&NotificationKind::IssueAssigned),
             Some(&vec!["cy".to_owned()])
         );
 
@@ -592,7 +638,9 @@ mod tests {
         let notes: Vec<Addressed> = added
             .events
             .iter()
-            .flat_map(|e| notifications(e, &Graph(&graph), Timestamp::UNIX_EPOCH))
+            .flat_map(|e| {
+                notifications(e, &Graph(&graph), Timestamp::UNIX_EPOCH)
+            })
             .collect();
         let mention = notes
             .iter()
@@ -645,7 +693,9 @@ mod tests {
         let hooks: Vec<WebhookEvent> = created
             .events
             .iter()
-            .flat_map(|e| webhook_events(e, &Graph(&graph), Timestamp::UNIX_EPOCH))
+            .flat_map(|e| {
+                webhook_events(e, &Graph(&graph), Timestamp::UNIX_EPOCH)
+            })
             .collect();
         let issue = hooks
             .iter()
@@ -665,7 +715,9 @@ mod tests {
         let update = updated
             .events
             .iter()
-            .flat_map(|e| webhook_events(e, &Graph(&graph), Timestamp::UNIX_EPOCH))
+            .flat_map(|e| {
+                webhook_events(e, &Graph(&graph), Timestamp::UNIX_EPOCH)
+            })
             .find(|e| e.event_type == EventType::Issue)
             .unwrap();
         assert_eq!(update.action, EventAction::Update);
@@ -686,7 +738,9 @@ mod tests {
         let sent: Vec<WebhookEvent> = on_issue
             .events
             .iter()
-            .flat_map(|e| webhook_events(e, &Graph(&graph), Timestamp::UNIX_EPOCH))
+            .flat_map(|e| {
+                webhook_events(e, &Graph(&graph), Timestamp::UNIX_EPOCH)
+            })
             .collect();
         assert_eq!(sent.len(), 1);
         assert_eq!(sent[0].event_type, EventType::Comment);
@@ -711,7 +765,11 @@ mod tests {
             on_doc
                 .events
                 .iter()
-                .flat_map(|e| webhook_events(e, &Graph(&graph), Timestamp::UNIX_EPOCH))
+                .flat_map(|e| webhook_events(
+                    e,
+                    &Graph(&graph),
+                    Timestamp::UNIX_EPOCH
+                ))
                 .next()
                 .is_none()
         );

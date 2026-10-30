@@ -15,10 +15,15 @@ use uuid::Uuid;
 use vellum_db::changes::{DriveChanges, Position};
 use vellum_db::{Index, IndexConfig, IndexPool};
 use vellum_kernel::{DocId, ObjectId, SpaceId};
-use vellum_search::{DocumentSource as _, DriveSource, PostgresBackend, conformance};
+use vellum_search::{
+    DocumentSource as _, DriveSource, PostgresBackend, conformance,
+};
 use vellum_store::{BlobStore, LocalStore};
 
-type Started = Result<(Option<ContainerAsync<Postgres>>, String), Box<dyn std::error::Error>>;
+type Started = Result<
+    (Option<ContainerAsync<Postgres>>, String),
+    Box<dyn std::error::Error>,
+>;
 
 /// A fresh database's URL: in a container, or a scratch database named
 /// `search_<tag>_<pid>` on the server named by `VELLUM_TEST_POSTGRES_URL`
@@ -35,9 +40,10 @@ async fn start(tag: &str) -> Started {
         )))
         .execute(&admin)
         .await?;
-        let _ = sqlx::query(sqlx::AssertSqlSafe(format!("CREATE DATABASE {name}")))
-            .execute(&admin)
-            .await?;
+        let _ =
+            sqlx::query(sqlx::AssertSqlSafe(format!("CREATE DATABASE {name}")))
+                .execute(&admin)
+                .await?;
         let base = url.rsplit_once('/').map_or(url.as_str(), |(base, _)| base);
         return Ok((None, format!("{base}/{name}")));
     }
@@ -72,7 +78,8 @@ async fn postgres_conforms_and_migrations_are_idempotent() {
 #[tokio::test]
 async fn drive_feed_reads_pages_from_postgres() {
     let (_container, url) = start("feed").await.unwrap();
-    let index = Arc::new(Index::open(&IndexConfig::postgres(url)).await.unwrap());
+    let index =
+        Arc::new(Index::open(&IndexConfig::postgres(url)).await.unwrap());
     let IndexPool::Postgres(pool) = index.pool() else {
         panic!("expected Postgres");
     };
@@ -82,9 +89,10 @@ async fn drive_feed_reads_pages_from_postgres() {
         (page, "page", Some(folder), "eng/launch.md"),
     ] {
         let _ = sqlx::query(
-            "INSERT INTO drive_nodes (space_id, node_id, kind, parent_id, tree_parent_id, \
-             path, title, byte_size, modified_at, created_by, trash) \
-             VALUES ($1, $2, $3, $4, $4, $5, 'Launch', 0, 1000, NULL, NULL)",
+            "INSERT INTO drive_nodes (space_id, node_id, kind, parent_id, \
+             tree_parent_id, path, title, byte_size, modified_at, created_by, \
+             trash) VALUES ($1, $2, $3, $4, $4, $5, 'Launch', 0, 1000, NULL, \
+             NULL)",
         )
         .bind(Uuid::from_u128(space))
         .bind(Uuid::from_u128(id))
@@ -97,8 +105,10 @@ async fn drive_feed_reads_pages_from_postgres() {
     }
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(dir.path().join("eng")).unwrap();
-    std::fs::write(dir.path().join("eng/launch.md"), "Ship on Friday.\n").unwrap();
-    let store: Arc<dyn BlobStore> = Arc::new(LocalStore::open(dir.path()).await.unwrap());
+    std::fs::write(dir.path().join("eng/launch.md"), "Ship on Friday.\n")
+        .unwrap();
+    let store: Arc<dyn BlobStore> =
+        Arc::new(LocalStore::open(dir.path()).await.unwrap());
     let source = DriveSource::new(Arc::clone(&index), store);
 
     let doc = DocId::from_u128(page);

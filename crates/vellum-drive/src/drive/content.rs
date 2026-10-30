@@ -47,8 +47,17 @@ impl Drive {
     ///
     /// # Errors
     /// `NotFound`, `PermissionDenied`, `Invalid` for folders.
-    #[tracing::instrument(name = "drive.read", skip_all, fields(node = %id), err)]
-    pub async fn read(&self, actor: &Actor, id: ObjectId) -> DriveResult<(Node, Blob)> {
+    #[tracing::instrument(
+        name = "drive.read",
+        skip_all,
+        fields(node = %id),
+        err
+    )]
+    pub async fn read(
+        &self,
+        actor: &Actor,
+        id: ObjectId,
+    ) -> DriveResult<(Node, Blob)> {
         self.observe("read", async {
             let node = self.live_node(id).await?;
             self.authorize(actor, node.space, node.id, Permission::View)
@@ -58,7 +67,9 @@ impl Drive {
             if node.kind == NodeKind::Book {
                 // The raw book.yaml names restricted sections and who may
                 // see them; hand back the reader's view of it instead.
-                if let Some(view) = self.book_view(actor, &node).await?.files.remove(&path) {
+                if let Some(view) =
+                    self.book_view(actor, &node).await?.files.remove(&path)
+                {
                     blob.meta.size = view.len() as u64;
                     blob.bytes = view;
                 }
@@ -80,7 +91,12 @@ impl Drive {
     /// # Errors
     /// `NotFound`, `PermissionDenied`, `Invalid` for non-pages,
     /// `QuotaExceeded`, or a store failure.
-    #[tracing::instrument(name = "drive.save", skip_all, fields(node = %id), err)]
+    #[tracing::instrument(
+        name = "drive.save",
+        skip_all,
+        fields(node = %id),
+        err
+    )]
     pub async fn save(
         &self,
         actor: &Actor,
@@ -101,8 +117,11 @@ impl Drive {
                 .await?;
             let space = self.space(node.space).await?;
             let size = content.len() as u64;
-            self.ensure_quota(&space, size.saturating_sub(node.size).saturating_add(size))
-                .await?;
+            self.ensure_quota(
+                &space,
+                size.saturating_sub(node.size).saturating_add(size),
+            )
+            .await?;
             self.store_save(actor, node, base, content).await
         })
         .await
@@ -143,7 +162,8 @@ impl Drive {
             vellum_store::Saved::Written(meta) => (meta, false),
             vellum_store::Saved::Merged(meta) => (meta, true),
             vellum_store::Saved::Conflicted { copy, .. } => {
-                let copy = self.index_conflict_copy(actor, &node, &copy.path).await?;
+                let copy =
+                    self.index_conflict_copy(actor, &node, &copy.path).await?;
                 return Ok(SaveOutcome {
                     node,
                     saved: Saved::Conflicted {
@@ -260,7 +280,8 @@ impl Drive {
     /// A fresh version ID stamped with the drive's clock, so retention
     /// ages versions by the same clock that decides "now".
     fn version_id(&self) -> VersionId {
-        let ms = u128::from(u64::try_from(self.clock.now().unix_ms()).unwrap_or(0));
+        let ms =
+            u128::from(u64::try_from(self.clock.now().unix_ms()).unwrap_or(0));
         let random = VersionId::generate().as_u128() & ((1_u128 << 80) - 1);
         VersionId::from_u128((ms << 80) | random)
     }
@@ -269,8 +290,17 @@ impl Drive {
     ///
     /// # Errors
     /// `NotFound`, `PermissionDenied`.
-    #[tracing::instrument(name = "drive.versions", skip_all, fields(node = %id), err)]
-    pub async fn versions(&self, actor: &Actor, id: ObjectId) -> DriveResult<Vec<VersionRecord>> {
+    #[tracing::instrument(
+        name = "drive.versions",
+        skip_all,
+        fields(node = %id),
+        err
+    )]
+    pub async fn versions(
+        &self,
+        actor: &Actor,
+        id: ObjectId,
+    ) -> DriveResult<Vec<VersionRecord>> {
         self.observe("versions", async {
             let node = self.live_node(id).await?;
             self.authorize(actor, node.space, node.id, Permission::View)
@@ -284,7 +314,12 @@ impl Drive {
     ///
     /// # Errors
     /// `NotFound`, `PermissionDenied`.
-    #[tracing::instrument(name = "drive.version_content", skip_all, fields(node = %id), err)]
+    #[tracing::instrument(
+        name = "drive.version_content",
+        skip_all,
+        fields(node = %id),
+        err
+    )]
     pub async fn version_content(
         &self,
         actor: &Actor,
@@ -298,7 +333,9 @@ impl Drive {
             let (content, _) = layout::version_paths(node.id, version)?;
             match self.store.get(&content).await {
                 Ok(blob) => Ok(blob.bytes),
-                Err(vellum_store::StoreError::NotFound(_)) => Err(DriveError::NotFound(id)),
+                Err(vellum_store::StoreError::NotFound(_)) => {
+                    Err(DriveError::NotFound(id))
+                }
                 Err(err) => Err(err.into()),
             }
         })
@@ -309,7 +346,12 @@ impl Drive {
     ///
     /// # Errors
     /// `NotFound`, `PermissionDenied`, `QuotaExceeded`.
-    #[tracing::instrument(name = "drive.restore_version", skip_all, fields(node = %id), err)]
+    #[tracing::instrument(
+        name = "drive.restore_version",
+        skip_all,
+        fields(node = %id),
+        err
+    )]
     pub async fn restore_version(
         &self,
         actor: &Actor,
@@ -318,7 +360,8 @@ impl Drive {
     ) -> DriveResult<SaveOutcome> {
         self.observe("restore_version", async {
             let old = self.version_content(actor, id, version).await?;
-            let current = self.store.get(&self.live_node(id).await?.path).await?;
+            let current =
+                self.store.get(&self.live_node(id).await?.path).await?;
             let base = Base {
                 bytes: current.bytes,
                 etag: Some(current.meta.etag),
@@ -340,12 +383,26 @@ impl Drive {
     ///
     /// # Errors
     /// `SpaceNotFound`, `PermissionDenied` for non-managers, store failures.
-    #[tracing::instrument(name = "drive.prune_versions", skip_all, fields(space = %space), err)]
-    pub async fn prune_versions(&self, actor: &Actor, space: SpaceId) -> DriveResult<usize> {
+    #[tracing::instrument(
+        name = "drive.prune_versions",
+        skip_all,
+        fields(space = %space),
+        err
+    )]
+    pub async fn prune_versions(
+        &self,
+        actor: &Actor,
+        space: SpaceId,
+    ) -> DriveResult<usize> {
         self.observe("prune_versions", async {
             let space = self.space(space).await?;
-            self.authorize(actor, space.id, space.node_id(), Permission::Manage)
-                .await?;
+            self.authorize(
+                actor,
+                space.id,
+                space.node_id(),
+                Permission::Manage,
+            )
+            .await?;
             self.prune_space(&space).await
         })
         .await
@@ -379,7 +436,9 @@ impl Drive {
                 continue;
             }
             let versions = self.index.versions(node.id).await?;
-            for version in retention::prunable(&versions, &space.settings.retention, now) {
+            for version in
+                retention::prunable(&versions, &space.settings.retention, now)
+            {
                 self.delete_version(node.id, version).await?;
                 pruned += 1;
             }
@@ -413,14 +472,19 @@ impl Drive {
     }
 
     /// Recomputes which nodes a page links to.
-    pub(super) async fn reindex_links(&self, node: &Node, text: &str) -> DriveResult<()> {
+    pub(super) async fn reindex_links(
+        &self,
+        node: &Node,
+        text: &str,
+    ) -> DriveResult<()> {
         let dir = node.path.parent();
         let mut targets = Vec::new();
         for link in links::scan(text) {
             match link.target {
                 Target::Id(id) => targets.push(id),
                 Target::Wiki(title) => {
-                    let mut found = self.index.by_title(node.space, &title).await?;
+                    let mut found =
+                        self.index.by_title(node.space, &title).await?;
                     found.sort_by_key(|n| n.id);
                     if let Some(first) = found.first() {
                         targets.push(first.id);
@@ -428,7 +492,8 @@ impl Drive {
                 }
                 Target::Relative(rel) => {
                     if let Some(path) = links::resolve(dir.as_ref(), &rel)
-                        && let Some(found) = self.index.node_at(node.space, &path).await?
+                        && let Some(found) =
+                            self.index.node_at(node.space, &path).await?
                     {
                         targets.push(found.id);
                     }

@@ -1,7 +1,14 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
 
 import { useT } from "../i18n/i18n";
 
@@ -69,7 +76,15 @@ interface ColumnProperties {
   readonly onMove: (row: RowView, to: number) => void;
 }
 
-function BoardColumn({ group, index, groups, movable, hintId, view, onMove }: ColumnProperties) {
+function BoardColumn({
+  group,
+  index,
+  groups,
+  movable,
+  hintId,
+  view,
+  onMove,
+}: ColumnProperties) {
   const t = useT();
   const headingId = useId();
   const onDrop = useCallback(
@@ -133,7 +148,12 @@ function BoardColumn({ group, index, groups, movable, hintId, view, onMove }: Co
               <span className="vl-card-title">
                 {row.title === "" ? t("page-untitled") : row.title}
               </span>
-              <CardFields info={view.info} result={view.result} row={row} skip={groupKey(view)} />
+              <CardFields
+                info={view.info}
+                result={view.result}
+                row={row}
+                skip={groupKey(view)}
+              />
             </div>
             {movable && (
               <MoveMenu
@@ -198,14 +218,17 @@ export function BoardView(view: ViewProperties) {
         return;
       }
       focusCard.current = { id: row.id, column: to };
-      void write(row.id, { [property.key]: groupValue(property.type, group.value) }).then(
-        (error) => {
-          if (error !== undefined) {
-            focusCard.current = undefined;
-          }
-          setStatus(error ?? t("collection-moved", { title: row.title, group: group.label }));
-        },
-      );
+      void write(row.id, {
+        [property.key]: groupValue(property.type, group.value),
+      }).then((error) => {
+        if (error !== undefined) {
+          focusCard.current = undefined;
+        }
+        setStatus(
+          error ??
+            t("collection-moved", { title: row.title, group: group.label }),
+        );
+      });
     },
     [result.groups, property, write, t],
   );

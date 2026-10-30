@@ -99,7 +99,8 @@ runs the same checks against each engine.
 
 ## Alternatives
 
-- **ACLs in the index**: every grant change re-indexes blocks, missing the one-second target.
+- **ACLs in the index**: every grant change re-indexes blocks, missing the
+  one-second target.
 - **Post-filter only**: ranks every space even when the caller reads one.
 - **External vector database**: ruled out by the brief.
 - **ONNX Runtime**: a native library per platform; tract is pure Rust.

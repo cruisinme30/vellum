@@ -115,9 +115,11 @@ impl CircuitBreaker {
                     State::Closed { failures }
                 }
             }
-            (State::HalfOpen { .. } | State::Open { .. }, false) => State::Open {
-                until: now + self.policy.cool_down,
-            },
+            (State::HalfOpen { .. } | State::Open { .. }, false) => {
+                State::Open {
+                    until: now + self.policy.cool_down,
+                }
+            }
         };
     }
 

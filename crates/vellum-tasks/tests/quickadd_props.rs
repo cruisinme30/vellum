@@ -65,7 +65,10 @@ const DATED: &[&str] = &[
 
 proptest! {
     #[test]
-    fn never_panics_and_tokens_are_well_formed(input in "\\PC{0,80}", now in now_strategy()) {
+    fn never_panics_and_tokens_are_well_formed(
+        input in "\\PC{0,80}",
+        now in now_strategy()
+    ) {
         let q = parse(&input, now);
         let mut last_end = 0;
         for token in &q.tokens {
@@ -96,17 +99,28 @@ proptest! {
         after in prop::collection::vec(prop::sample::select(PLAIN), 0..3),
         now in now_strategy(),
     ) {
-        let input = format!("{} {} {}", before.join(" "), phrase, after.join(" "));
+        let input = format!(
+            "{} {} {}",
+            before.join(" "),
+            phrase,
+            after.join(" ")
+        );
         let q = parse(&input, now);
         let due = q.fields.due.expect("a deadline");
         match due {
             Due::Date(day) => prop_assert!(day >= now.date()),
-            Due::DateTime(moment) => prop_assert!(moment >= now || moment.date() >= now.date()),
+            Due::DateTime(
+                moment
+            ) => prop_assert!(moment >= now || moment.date() >= now.date()),
         }
         prop_assert_eq!(q.tokens.len(), 1);
         prop_assert_eq!(q.tokens[0].kind, TokenKind::Due);
         prop_assert_eq!(input.get(q.tokens[0].span.clone()), Some(phrase));
-        let expected_title = format!("{} {}", before.join(" "), after.join(" "));
+        let expected_title = format!(
+            "{} {}",
+            before.join(" "),
+            after.join(" ")
+        );
         prop_assert_eq!(q.title, expected_title.trim());
     }
 
@@ -136,6 +150,9 @@ proptest! {
         prop_assert_eq!(q.list, Some(list));
         prop_assert_eq!(q.fields.labels, vec![label]);
         prop_assert_eq!(q.assignees, vec![person]);
-        prop_assert_eq!(q.fields.priority.map(vellum_tasks::model::Priority::level), Some(level));
+        prop_assert_eq!(
+            q.fields.priority.map(vellum_tasks::model::Priority::level),
+            Some(level)
+        );
     }
 }

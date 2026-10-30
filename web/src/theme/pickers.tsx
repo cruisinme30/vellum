@@ -10,12 +10,15 @@ import { useAppearance } from "./appearance-context";
 import { Choices } from "./choices";
 import { THEMES } from "./themes";
 
-/** The theme radio buttons, with the custom theme once there is one (R-TH-1). */
+/**
+ * The theme radio buttons, with the custom theme once there is one (R-TH-1).
+ */
 export function ThemePicker({ name }: { readonly name: string }) {
   const t = useT();
   const { appearance, update } = useAppearance();
   const { custom } = appearance;
-  const options: readonly ThemeChoice[] = custom === undefined ? THEMES : [...THEMES, "custom"];
+  const options: readonly ThemeChoice[] =
+    custom === undefined ? THEMES : [...THEMES, "custom"];
   return (
     <Choices
       legend={t("theme-legend")}
@@ -62,7 +65,9 @@ export function SeedPicker() {
           update({ seed: undefined });
         }}
       >
-        {organisation === undefined ? t("theme-seed-reset") : t("theme-seed-organisation")}
+        {organisation === undefined
+          ? t("theme-seed-reset")
+          : t("theme-seed-organisation")}
       </button>
     </div>
   );

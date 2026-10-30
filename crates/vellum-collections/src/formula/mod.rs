@@ -91,10 +91,9 @@ impl Formula {
     /// Returns the first runtime error, such as a type mismatch or a
     /// division by zero, with its position in the source.
     pub fn eval(&self, env: &mut dyn Env) -> Result<Value, FormulaError> {
-        let root = self
-            .root
-            .as_ref()
-            .ok_or_else(|| FormulaError::new("formula is not compiled", Span::default()))?;
+        let root = self.root.as_ref().ok_or_else(|| {
+            FormulaError::new("formula is not compiled", Span::default())
+        })?;
         eval::Eval::new(env).eval(root)
     }
 }
@@ -168,7 +167,8 @@ pub fn rename_references(
             spans.push(node.span);
         }
     });
-    let replacement = Node::new(Expr::Prop(new_name.to_owned()), Span::default()).to_string();
+    let replacement =
+        Node::new(Expr::Prop(new_name.to_owned()), Span::default()).to_string();
     let chars: Vec<char> = source.chars().collect();
     let mut out = String::with_capacity(source.len());
     let mut at = 0;
@@ -207,7 +207,9 @@ mod tests {
     #[test]
     fn renames_rewrite_only_that_property() {
         let s = schema();
-        let renamed = |src: &str| rename_references(src, &s, "est", "Story points").unwrap();
+        let renamed = |src: &str| {
+            rename_references(src, &s, "est", "Story points").unwrap()
+        };
         assert_eq!(
             renamed("round(Estimate * 0.5, 1)"),
             r#"round(prop("Story points") * 0.5, 1)"#
@@ -282,9 +284,10 @@ properties:
     fn cheat_sheet_examples() {
         assert_eq!(ok(r#"prop("Estimate") * (1 - Progress)"#), "5.6");
         assert_eq!(
-            ok(
-                r#"if(Status == "Done", "done", if(days(Target, now()) < 7, "due soon", "on track"))"#
-            ),
+            ok(concat!(
+                r#"if(Status == "Done", "done", if(days(Target, now()) < "#,
+                r#"7, "due soon", "on track"))"#,
+            )),
             "due soon"
         );
         assert_eq!(
@@ -292,7 +295,10 @@ properties:
             "5.3"
         );
         assert_eq!(ok("percent(1 - 3.9 / 16)"), "76%");
-        assert_eq!(ok(r#"concat(upper(Team), "-", format(Number))"#), "ENG-142");
+        assert_eq!(
+            ok(r#"concat(upper(Team), "-", format(Number))"#),
+            "ENG-142"
+        );
     }
 
     #[test]

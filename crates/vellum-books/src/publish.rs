@@ -152,7 +152,9 @@ impl Book {
         let mut view = self.clone();
         let hidden_paths: BTreeSet<ChapterPath> = hidden
             .iter()
-            .filter_map(|id| self.manifest.nodes.get(id).map(|e| e.path.clone()))
+            .filter_map(|id| {
+                self.manifest.nodes.get(id).map(|e| e.path.clone())
+            })
             .collect();
         for section in [Section::Prefix, Section::Numbered, Section::Suffix] {
             let items = view.summary.items_mut(section);
@@ -201,7 +203,8 @@ impl Book {
         } else {
             format!("# {}\n\n{body}", markdown::escape_link_text(&title))
         };
-        let chapter_paths: BTreeSet<&str> = self.files.keys().map(ChapterPath::as_str).collect();
+        let chapter_paths: BTreeSet<&str> =
+            self.files.keys().map(ChapterPath::as_str).collect();
         Ok(markdown::map_links(&page, |link, current| {
             if let Some((target, fragment)) = NodeId::from_uri(&link.dest) {
                 let cross_ref = current.is_some_and(is_cross_ref_text);
@@ -216,7 +219,8 @@ impl Book {
                         ..LinkEdit::default()
                     });
                 };
-                let mut href = path::relative(&page_dir, &page_path(target_path, flavour));
+                let mut href =
+                    path::relative(&page_dir, &page_path(target_path, flavour));
                 if let Some(fragment) = fragment {
                     href.push('#');
                     href.push_str(fragment);
@@ -244,7 +248,10 @@ impl Book {
                     return None;
                 }
                 let target_path = ChapterPath::parse(&resolved).ok()?;
-                let mut href = path::relative(&page_dir, &page_path(&target_path, flavour));
+                let mut href = path::relative(
+                    &page_dir,
+                    &page_path(&target_path, flavour),
+                );
                 if let Some(fragment) = fragment {
                     href.push('#');
                     href.push_str(fragment);
@@ -286,7 +293,9 @@ impl Book {
     /// Returns an error for an inconsistent book.
     pub fn to_mdbook(&self, audience: &Audience) -> Result<Site> {
         let started = Instant::now();
-        let _span = tracing::info_span!("books.publish.mdbook", book.id = %self.id()).entered();
+        let _span =
+            tracing::info_span!("books.publish.mdbook", book.id = %self.id())
+                .entered();
         let view = self.published_view(audience)?;
         let mut site = Site::default();
         let _ = site.files.insert(
@@ -297,7 +306,8 @@ impl Book {
             .files
             .insert("src/SUMMARY.md".to_owned(), view.summary_text());
         for (id, entry) in &view.manifest.nodes {
-            let page = view.published_page(id, Flavour::Markdown, &mut site.assets)?;
+            let page =
+                view.published_page(id, Flavour::Markdown, &mut site.assets)?;
             let _ = site.files.insert(format!("src/{}", entry.path), page);
         }
         record("mdbook", started, site.files.len());
@@ -310,26 +320,35 @@ impl Book {
     /// # Errors
     ///
     /// Returns [`BookError::Render`] when a page fails to render.
-    pub fn to_static_site(&self, audience: &Audience, renderer: &dyn Renderer) -> Result<Site> {
+    pub fn to_static_site(
+        &self,
+        audience: &Audience,
+        renderer: &dyn Renderer,
+    ) -> Result<Site> {
         let started = Instant::now();
-        let _span = tracing::info_span!("books.publish.site", book.id = %self.id()).entered();
+        let _span =
+            tracing::info_span!("books.publish.site", book.id = %self.id())
+                .entered();
         let view = self.published_view(audience)?;
         let toc = view.toc();
-        let order: Vec<&TocEntry> = toc.entries().into_iter().filter(|e| !e.draft).collect();
+        let order: Vec<&TocEntry> =
+            toc.entries().into_iter().filter(|e| !e.draft).collect();
         let mut site = Site::default();
         for (index, entry) in order.iter().enumerate() {
             let (Some(id), Some(path)) = (&entry.id, &entry.path) else {
                 continue;
             };
-            let markdown = view.published_page(id, Flavour::Html, &mut site.assets)?;
-            let html = renderer
-                .render(&markdown)
-                .map_err(|message| BookError::Render {
+            let markdown =
+                view.published_page(id, Flavour::Html, &mut site.assets)?;
+            let html = renderer.render(&markdown).map_err(|message| {
+                BookError::Render {
                     path: path.to_string(),
                     message,
-                })?;
+                }
+            })?;
             let out_path = page_path(path, Flavour::Html);
-            let previous = index.checked_sub(1).and_then(|i| order.get(i)).copied();
+            let previous =
+                index.checked_sub(1).and_then(|i| order.get(i)).copied();
             let next = order.get(index + 1).copied();
             let page = page_html(&toc, &out_path, entry, &html, previous, next);
             let _ = site.files.insert(out_path, page);
@@ -339,8 +358,8 @@ impl Book {
             let _ = site.files.insert("index.html".to_owned(), cover);
         }
         let _ = site.files.insert("style.css".to_owned(), STYLE.to_owned());
-        let toc_json =
-            serde_json::to_string_pretty(&toc).map_err(|e| BookError::Snapshot(e.to_string()))?;
+        let toc_json = serde_json::to_string_pretty(&toc)
+            .map_err(|e| BookError::Snapshot(e.to_string()))?;
         let _ = site.files.insert("toc.json".to_owned(), toc_json);
         record("site", started, site.files.len());
         Ok(site)
@@ -375,8 +394,9 @@ fn prune(chapter: &mut Chapter, hidden: &BTreeSet<ChapterPath>) {
 #[must_use]
 pub fn mdbook_toml(title: &str, src: &str, build_dir: &str) -> String {
     format!(
-        "# Generated by Vellum from book.yaml; edits are overwritten.\n\
-         [book]\ntitle = {}\nsrc = {}\n\n[build]\nbuild-dir = {}\ncreate-missing = false\n",
+        "# Generated by Vellum from book.yaml; edits are overwritten.\n[book]\n\
+         title = {}\nsrc = {}\n\n[build]\nbuild-dir = {}\n\
+         create-missing = false\n",
         toml_string(title),
         toml_string(src),
         toml_string(build_dir)
@@ -404,11 +424,19 @@ fn nav_html(toc: &Toc, current: &str) -> String {
     let mut out = String::from("<ol class=\"toc\">\n");
     for item in &toc.items {
         match item {
-            TocItem::Chapter(entry) => nav_entry(&mut out, entry, current, &root),
-            TocItem::Part { title } => {
-                let _ = writeln!(out, "<li class=\"part\">{}</li>", escape_html(title));
+            TocItem::Chapter(entry) => {
+                nav_entry(&mut out, entry, current, &root)
             }
-            TocItem::Separator => out.push_str("<li class=\"sep\" role=\"separator\"></li>\n"),
+            TocItem::Part { title } => {
+                let _ = writeln!(
+                    out,
+                    "<li class=\"part\">{}</li>",
+                    escape_html(title)
+                );
+            }
+            TocItem::Separator => {
+                out.push_str("<li class=\"sep\" role=\"separator\"></li>\n")
+            }
         }
     }
     out.push_str("</ol>\n");
@@ -462,11 +490,14 @@ fn root_prefix(page: &str) -> String {
 fn shell(toc: &Toc, current: &str, title: &str, main: &str) -> String {
     let root = root_prefix(current);
     format!(
-        "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
-         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
-         <meta name=\"generator\" content=\"Vellum\">\n\
-         <title>{title}</title>\n<link rel=\"stylesheet\" href=\"{root}style.css\">\n</head>\n<body>\n\
-         <nav class=\"sidebar\" aria-label=\"Contents\">\n<a class=\"book\" href=\"{root}index.html\">{book}</a>\n{nav}</nav>\n\
+        "<!doctype html>\n<html lang=\"en\">\n<head>\n\
+         <meta charset=\"utf-8\">\n\
+         <meta name=\"viewport\" content=\"width=device-width, \
+         initial-scale=1\">\n<meta name=\"generator\" content=\"Vellum\">\n\
+         <title>{title}</title>\n\
+         <link rel=\"stylesheet\" href=\"{root}style.css\">\n</head>\n<body>\n\
+         <nav class=\"sidebar\" aria-label=\"Contents\">\n\
+         <a class=\"book\" href=\"{root}index.html\">{book}</a>\n{nav}</nav>\n\
          <main>\n{main}</main>\n</body>\n</html>\n",
         title = escape_html(title),
         book = escape_html(&toc.title),
@@ -573,7 +604,8 @@ a { color: var(--primary); }
 /// (`.snapshots/`, `.history/`, `.published/`) and the manifest.
 #[must_use]
 pub fn is_book_data(path: &str) -> bool {
-    path == crate::manifest::FILE_NAME || path.split('/').any(|segment| segment.starts_with('.'))
+    path == crate::manifest::FILE_NAME
+        || path.split('/').any(|segment| segment.starts_with('.'))
 }
 
 #[cfg(test)]
@@ -595,8 +627,14 @@ mod tests {
         assert!(!view.contains(&id(4)) && !view.contains(&id(5)));
         assert!(!view.summary_text().contains("Architecture"));
         // Other files keep their paths.
-        assert_eq!(view.path_of(&id(3)).unwrap(), book.path_of(&id(3)).unwrap());
-        let members = Audience::Members(BTreeSet::from([Principal::parse("group:staff").unwrap()]));
+        assert_eq!(
+            view.path_of(&id(3)).unwrap(),
+            book.path_of(&id(3)).unwrap()
+        );
+        let members = Audience::Members(BTreeSet::from([Principal::parse(
+            "group:staff",
+        )
+        .unwrap()]));
         assert!(book.published_view(&members).unwrap().contains(&id(5)));
     }
 
@@ -630,7 +668,10 @@ mod tests {
             .unwrap();
         let services = site.files.get("architecture/services.html").unwrap();
         assert!(services.contains("href=\"../style.css\""));
-        assert!(services.contains("<title>§2.1 Services · Northstar handbook</title>"));
+        assert!(
+            services
+                .contains("<title>§2.1 Services · Northstar handbook</title>")
+        );
         assert!(services.contains("aria-current=\"page\""));
         assert!(services.contains("rel=\"prev\""));
         // Links between pages point at .html files; README becomes index.html.
@@ -641,7 +682,8 @@ mod tests {
         assert!(site.files.contains_key("toc.json"));
         // The draft is listed but not linked.
         assert!(services.contains(
-            "<span class=\"draft\"><span class=\"num\">1.2</span> Security training</span>"
+            "<span class=\"draft\"><span class=\"num\">1.2</span> Security \
+                training</span>"
         ));
         assert!(!services.contains("<script"));
     }
@@ -652,8 +694,8 @@ mod tests {
     #[test]
     fn book_data_is_never_published_as_an_asset() {
         let mut book = restricted();
-        let body =
-            "![](../.snapshots/v1.0.json) ![](../book.yaml) ![](../.history/x.json) ![](team.png)";
+        let body = "![](../.snapshots/v1.0.json) ![](../book.yaml) \
+            ![](../.history/x.json) ![](team.png)";
         book.set_text(
             &id(3),
             crate::markdown::new_chapter(&id(3), "Your first week", None, body),
@@ -683,7 +725,9 @@ mod tests {
         assert!(!plain.contains("<script>"));
         assert_eq!(
             mdbook_toml("A \"quoted\" title", "src", "book"),
-            "# Generated by Vellum from book.yaml; edits are overwritten.\n[book]\ntitle = \"A \\\"quoted\\\" title\"\nsrc = \"src\"\n\n[build]\nbuild-dir = \"book\"\ncreate-missing = false\n"
+            "# Generated by Vellum from book.yaml; edits are overwritten.\n\
+                [book]\ntitle = \"A \\\"quoted\\\" title\"\nsrc = \"src\"\n\n\
+                [build]\nbuild-dir = \"book\"\ncreate-missing = false\n"
         );
     }
 }

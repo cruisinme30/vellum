@@ -149,7 +149,9 @@ impl FieldVisitor<'_> {
             return;
         }
         let value = truncate(value, self.config.max_value_len);
-        if let Some(slot) = self.fields.iter_mut().find(|(k, _)| k == field.name()) {
+        if let Some(slot) =
+            self.fields.iter_mut().find(|(k, _)| k == field.name())
+        {
             slot.1 = value;
         } else if self.fields.len() < self.config.max_fields {
             self.fields.push((field.name().to_owned(), value));
@@ -162,7 +164,11 @@ impl Visit for FieldVisitor<'_> {
         self.put(field, value.to_owned());
     }
 
-    fn record_error(&mut self, field: &Field, value: &(dyn std::error::Error + 'static)) {
+    fn record_error(
+        &mut self,
+        field: &Field,
+        value: &(dyn std::error::Error + 'static),
+    ) {
         self.put(field, value.to_string());
     }
 
@@ -191,7 +197,12 @@ impl<S> Layer<S> for RequestRecorder
 where
     S: Subscriber + for<'a> LookupSpan<'a>,
 {
-    fn on_new_span(&self, attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, S>) {
+    fn on_new_span(
+        &self,
+        attrs: &Attributes<'_>,
+        id: &Id,
+        ctx: Context<'_, S>,
+    ) {
         let Some(span) = ctx.span(id) else { return };
         let now = Instant::now();
         let mut fields = Vec::new();
@@ -206,7 +217,9 @@ where
                     return;
                 }
                 let trace = Arc::new(TraceState {
-                    trace_id: Mutex::new(trace_id_from(&fields).unwrap_or_else(TraceId::random)),
+                    trace_id: Mutex::new(
+                        trace_id_from(&fields).unwrap_or_else(TraceId::random),
+                    ),
                     start: now,
                     started_at_ms: unix_ms(SystemTime::now()),
                     next_index: AtomicU32::new(1),
@@ -313,7 +326,9 @@ where
             parent: state.parent,
             name: span.metadata().name().to_owned(),
             target: span.metadata().target().to_owned(),
-            start_us: micros(state.start.saturating_duration_since(state.trace.start)),
+            start_us: micros(
+                state.start.saturating_duration_since(state.trace.start),
+            ),
             duration_us: micros(state.start.elapsed()),
             fields: state.fields,
             events: state.events,
@@ -358,7 +373,10 @@ mod tests {
     use crate::store::TraceQuery;
     use tracing_subscriber::layer::SubscriberExt as _;
 
-    fn with_recorder(config: RecorderConfig, f: impl FnOnce()) -> Arc<TraceStore> {
+    fn with_recorder(
+        config: RecorderConfig,
+        f: impl FnOnce(),
+    ) -> Arc<TraceStore> {
         let store = Arc::new(TraceStore::default());
         let recorder = RequestRecorder::new(Arc::clone(&store), config);
         assert!(Arc::ptr_eq(recorder.store(), &store));
@@ -385,7 +403,11 @@ mod tests {
             );
             {
                 let _r = root.enter();
-                let db = tracing::info_span!("db.query", db.statement = "SELECT 1", rows = 1_u64);
+                let db = tracing::info_span!(
+                    "db.query",
+                    db.statement = "SELECT 1",
+                    rows = 1_u64
+                );
                 let _d = db.enter();
                 tracing::info!(cache = "miss", "looked up");
                 let inner = tracing::info_span!("authz.check");
@@ -424,7 +446,8 @@ mod tests {
     #[test]
     fn ignores_foreign_roots_and_marks_errors() {
         let store = with_recorder(RecorderConfig::default(), || {
-            let foreign = tracing::info_span!(target: "hyper::pool", "checkout");
+            let foreign =
+                tracing::info_span!(target: "hyper::pool", "checkout");
             drop(foreign.enter());
             let root = tracing::info_span!(target: "vellum_jobs", "job.render");
             let _r = root.enter();
@@ -446,12 +469,19 @@ mod tests {
             ..RecorderConfig::default()
         };
         let store = with_recorder(config, || {
-            let root = tracing::info_span!(target: "vellum", "root", a = "abcdefgh", b = 1, c = 2);
+            let root = tracing::info_span!(
+                target: "vellum",
+                "root",
+                a = "abcdefgh",
+                b = 1,
+                c = 2
+            );
             let _r = root.enter();
             tracing::info!("one");
             tracing::info!("two");
             for _ in 0..5 {
-                let child = tracing::info_span!("child", otel.status_code = "ERROR");
+                let child =
+                    tracing::info_span!("child", otel.status_code = "ERROR");
                 drop(child.enter());
             }
         });
@@ -479,8 +509,13 @@ mod tests {
             let _ = root.record(TRACE_ID_FIELD, id.to_string());
             let _ = root.record("error", true);
             let err = std::io::Error::other("disk gone");
-            let child = tracing::info_span!(parent: &root, "io", cause = tracing::field::Empty);
-            let _ = child.record("cause", &err as &(dyn std::error::Error + 'static));
+            let child = tracing::info_span!(
+                parent: &root,
+                "io",
+                cause = tracing::field::Empty
+            );
+            let _ = child
+                .record("cause", &err as &(dyn std::error::Error + 'static));
             drop(child);
         });
         let trace = store.get(id).unwrap();

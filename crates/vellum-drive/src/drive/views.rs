@@ -22,12 +22,9 @@ impl Drive {
     #[tracing::instrument(name = "drive.my_drive", skip_all, err)]
     pub async fn my_drive(&self, user: UserId) -> DriveResult<Option<Space>> {
         self.observe("my_drive", async {
-            Ok(self
-                .index
-                .spaces()
-                .await?
-                .into_iter()
-                .find(|s| s.kind == SpaceKind::UserDrive && s.owner == Some(user)))
+            Ok(self.index.spaces().await?.into_iter().find(|s| {
+                s.kind == SpaceKind::UserDrive && s.owner == Some(user)
+            }))
         })
         .await
     }
@@ -66,7 +63,9 @@ impl Drive {
                 let Some(space) = self.index.space(id).await? else {
                     continue;
                 };
-                if space.kind != SpaceKind::UserDrive || space.owner == Some(user) {
+                if space.kind != SpaceKind::UserDrive
+                    || space.owner == Some(user)
+                {
                     continue;
                 }
                 let visible: HashSet<ObjectId> = self
@@ -76,8 +75,12 @@ impl Drive {
                     .into_iter()
                     .collect();
                 for node in self.index.nodes(space.id).await? {
-                    let parent_visible = node.parent.is_some_and(|p| visible.contains(&p));
-                    if node.is_live() && visible.contains(&node.id) && !parent_visible {
+                    let parent_visible =
+                        node.parent.is_some_and(|p| visible.contains(&p));
+                    if node.is_live()
+                        && visible.contains(&node.id)
+                        && !parent_visible
+                    {
                         out.push(node);
                     }
                 }
@@ -94,7 +97,12 @@ impl Drive {
     ///
     /// # Errors
     /// `SpaceNotFound`, `NotFound`, `PermissionDenied`.
-    #[tracing::instrument(name = "drive.list", skip_all, fields(space = %space), err)]
+    #[tracing::instrument(
+        name = "drive.list",
+        skip_all,
+        fields(space = %space),
+        err
+    )]
     pub async fn list(
         &self,
         actor: &Actor,
@@ -124,7 +132,12 @@ impl Drive {
     ///
     /// # Errors
     /// `NotFound`, `PermissionDenied`.
-    #[tracing::instrument(name = "drive.get", skip_all, fields(node = %id), err)]
+    #[tracing::instrument(
+        name = "drive.get",
+        skip_all,
+        fields(node = %id),
+        err
+    )]
     pub async fn get(&self, actor: &Actor, id: ObjectId) -> DriveResult<Node> {
         self.observe("get", async {
             let node = self.any_node(id).await?;
@@ -141,12 +154,26 @@ impl Drive {
     /// # Errors
     /// `NotFound` (also for a trashed target), `PermissionDenied`,
     /// `Invalid` if the node is not a shortcut.
-    #[tracing::instrument(name = "drive.resolve_shortcut", skip_all, fields(node = %id), err)]
-    pub async fn resolve_shortcut(&self, actor: &Actor, id: ObjectId) -> DriveResult<Node> {
+    #[tracing::instrument(
+        name = "drive.resolve_shortcut",
+        skip_all,
+        fields(node = %id),
+        err
+    )]
+    pub async fn resolve_shortcut(
+        &self,
+        actor: &Actor,
+        id: ObjectId,
+    ) -> DriveResult<Node> {
         self.observe("resolve_shortcut", async {
             let shortcut = self.live_node(id).await?;
-            self.authorize(actor, shortcut.space, shortcut.id, Permission::View)
-                .await?;
+            self.authorize(
+                actor,
+                shortcut.space,
+                shortcut.id,
+                Permission::View,
+            )
+            .await?;
             let target = shortcut
                 .target
                 .ok_or_else(|| DriveError::Invalid("not a shortcut".into()))?;
@@ -162,11 +189,22 @@ impl Drive {
     ///
     /// # Errors
     /// `NotFound`, `PermissionDenied`, `Invalid` without a person.
-    #[tracing::instrument(name = "drive.star", skip_all, fields(node = %id), err)]
-    pub async fn star(&self, actor: &Actor, id: ObjectId, starred: bool) -> DriveResult<()> {
+    #[tracing::instrument(
+        name = "drive.star",
+        skip_all,
+        fields(node = %id),
+        err
+    )]
+    pub async fn star(
+        &self,
+        actor: &Actor,
+        id: ObjectId,
+        starred: bool,
+    ) -> DriveResult<()> {
         self.observe("star", async {
-            let user = Self::user_of(actor)
-                .ok_or_else(|| DriveError::Invalid("only people star items".into()))?;
+            let user = Self::user_of(actor).ok_or_else(|| {
+                DriveError::Invalid("only people star items".into())
+            })?;
             let node = self.live_node(id).await?;
             self.authorize(actor, node.space, node.id, Permission::View)
                 .await?;
@@ -204,7 +242,11 @@ impl Drive {
     /// # Errors
     /// Index or authorization failures.
     #[tracing::instrument(name = "drive.recent", skip_all, err)]
-    pub async fn recent(&self, actor: &Actor, limit: usize) -> DriveResult<Vec<(Node, Timestamp)>> {
+    pub async fn recent(
+        &self,
+        actor: &Actor,
+        limit: usize,
+    ) -> DriveResult<Vec<(Node, Timestamp)>> {
         self.observe("recent", async {
             let Some(user) = Self::user_of(actor) else {
                 return Ok(Vec::new());
@@ -239,7 +281,12 @@ impl Drive {
     ///
     /// # Errors
     /// `NotFound`, `PermissionDenied`.
-    #[tracing::instrument(name = "drive.activity", skip_all, fields(node = %id), err)]
+    #[tracing::instrument(
+        name = "drive.activity",
+        skip_all,
+        fields(node = %id),
+        err
+    )]
     pub async fn activity(
         &self,
         actor: &Actor,
@@ -247,15 +294,16 @@ impl Drive {
         limit: usize,
     ) -> DriveResult<Vec<Activity>> {
         self.observe("activity", async {
-            let (space, node_id) = if let Some(node) = self.index.node(id).await? {
-                (node.space, node.id)
-            } else {
-                let space = self
-                    .space(id.into())
-                    .await
-                    .map_err(|_| DriveError::NotFound(id))?;
-                (space.id, space.node_id())
-            };
+            let (space, node_id) =
+                if let Some(node) = self.index.node(id).await? {
+                    (node.space, node.id)
+                } else {
+                    let space = self
+                        .space(id.into())
+                        .await
+                        .map_err(|_| DriveError::NotFound(id))?;
+                    (space.id, space.node_id())
+                };
             self.authorize(actor, space, node_id, Permission::View)
                 .await?;
             let mut out = Vec::new();
@@ -269,7 +317,9 @@ impl Drive {
                 }
                 let visible = entry.node == node_id
                     || match self.index.node(entry.node).await? {
-                        Some(node) => self.may(actor, &node, Permission::View).await?,
+                        Some(node) => {
+                            self.may(actor, &node, Permission::View).await?
+                        }
                         None => false,
                     };
                 if visible {
@@ -286,8 +336,17 @@ impl Drive {
     ///
     /// # Errors
     /// `NotFound`, `PermissionDenied`.
-    #[tracing::instrument(name = "drive.backlinks", skip_all, fields(node = %id), err)]
-    pub async fn backlinks(&self, actor: &Actor, id: ObjectId) -> DriveResult<Vec<Node>> {
+    #[tracing::instrument(
+        name = "drive.backlinks",
+        skip_all,
+        fields(node = %id),
+        err
+    )]
+    pub async fn backlinks(
+        &self,
+        actor: &Actor,
+        id: ObjectId,
+    ) -> DriveResult<Vec<Node>> {
         self.observe("backlinks", async {
             let node = self.live_node(id).await?;
             self.authorize(actor, node.space, node.id, Permission::View)
@@ -309,8 +368,17 @@ impl Drive {
     ///
     /// # Errors
     /// `SpaceNotFound`, `PermissionDenied`.
-    #[tracing::instrument(name = "drive.usage", skip_all, fields(space = %space), err)]
-    pub async fn usage(&self, actor: &Actor, space: SpaceId) -> DriveResult<Usage> {
+    #[tracing::instrument(
+        name = "drive.usage",
+        skip_all,
+        fields(space = %space),
+        err
+    )]
+    pub async fn usage(
+        &self,
+        actor: &Actor,
+        space: SpaceId,
+    ) -> DriveResult<Usage> {
         self.observe("usage", async {
             let space = self.space(space).await?;
             self.authorize(actor, space.id, space.node_id(), Permission::View)
@@ -324,7 +392,11 @@ impl Drive {
     }
 
     /// Keeps the nodes the caller may view.
-    async fn visible(&self, actor: &Actor, nodes: Vec<Node>) -> DriveResult<Vec<Node>> {
+    async fn visible(
+        &self,
+        actor: &Actor,
+        nodes: Vec<Node>,
+    ) -> DriveResult<Vec<Node>> {
         let mut out = Vec::with_capacity(nodes.len());
         for node in nodes {
             if self.may(actor, &node, Permission::View).await? {
@@ -378,10 +450,13 @@ impl Drive {
                     .map(|s| s.id)
                     .collect(),
             };
-            let starred: HashSet<ObjectId> = match (filter.starred, Self::user_of(actor)) {
-                (true, Some(user)) => self.index.starred(user).await?.into_iter().collect(),
-                _ => HashSet::new(),
-            };
+            let starred: HashSet<ObjectId> =
+                match (filter.starred, Self::user_of(actor)) {
+                    (true, Some(user)) => {
+                        self.index.starred(user).await?.into_iter().collect()
+                    }
+                    _ => HashSet::new(),
+                };
             let needle = filter.title.as_ref().map(|t| t.to_lowercase());
             let mut hits = Vec::new();
             for space in spaces {
@@ -398,17 +473,24 @@ impl Drive {
                     let keep = node.is_live()
                         && filter.location.is_none_or(|loc| {
                             loc.as_u128() == space.as_u128()
-                                || location
-                                    .as_ref()
-                                    .is_some_and(|p| node.path.starts_with(p) && node.id != loc)
+                                || location.as_ref().is_some_and(|p| {
+                                    node.path.starts_with(p) && node.id != loc
+                                })
                         })
-                        && needle
-                            .as_ref()
-                            .is_none_or(|n| node.title.to_lowercase().contains(n))
-                        && filter.owner.is_none_or(|o| node.created_by == Some(o))
-                        && filter.modified_after.is_none_or(|t| node.modified >= t)
-                        && filter.modified_before.is_none_or(|t| node.modified < t)
-                        && (filter.kinds.is_empty() || filter.kinds.contains(&node.kind))
+                        && needle.as_ref().is_none_or(|n| {
+                            node.title.to_lowercase().contains(n)
+                        })
+                        && filter
+                            .owner
+                            .is_none_or(|o| node.created_by == Some(o))
+                        && filter
+                            .modified_after
+                            .is_none_or(|t| node.modified >= t)
+                        && filter
+                            .modified_before
+                            .is_none_or(|t| node.modified < t)
+                        && (filter.kinds.is_empty()
+                            || filter.kinds.contains(&node.kind))
                         && (!filter.starred || starred.contains(&node.id));
                     if keep {
                         hits.push(node);

@@ -24,7 +24,11 @@ const running = (status: SearchStatusView) =>
 
 function JobLine({ status }: { readonly status: SearchStatusView }) {
   const t = useT();
-  const values = { done: status.done, total: status.total, error: status.error ?? "" };
+  const values = {
+    done: status.done,
+    total: status.total,
+    error: status.error ?? "",
+  };
   return (
     <>
       <p>{t(`admin-search-job-${status.job}`, values)}</p>
@@ -77,14 +81,19 @@ export function SearchStatusPanel({
   }, [load, refreshKey, tick]);
 
   return (
-    <section className="vl-admin-search-status" aria-label={t("admin-search-status")}>
+    <section
+      className="vl-admin-search-status"
+      aria-label={t("admin-search-status")}
+    >
       {failure !== undefined && (
         <p className="vl-field-error" role="alert">
           {failure}
         </p>
       )}
       {status === undefined ? (
-        failure === undefined && <p className="vl-muted">{t("admin-loading")}</p>
+        failure === undefined && (
+          <p className="vl-muted">{t("admin-loading")}</p>
+        )
       ) : (
         <div role="status">
           <p>{t("admin-search-engine", { engine: status.engine })}</p>
@@ -96,11 +105,19 @@ export function SearchStatusPanel({
                   dimensions: status.dimensions ?? 0,
                 })}
               </p>
-              <p>{t(status.hybrid ? "admin-search-hybrid-on" : "admin-search-hybrid-off")}</p>
+              <p>
+                {t(
+                  status.hybrid
+                    ? "admin-search-hybrid-on"
+                    : "admin-search-hybrid-off",
+                )}
+              </p>
               <p>
                 {status.loaded
                   ? t("admin-search-loaded")
-                  : t("admin-search-unloaded", { minutes: status.idle_minutes ?? 15 })}
+                  : t("admin-search-unloaded", {
+                      minutes: status.idle_minutes ?? 15,
+                    })}
               </p>
             </>
           ) : (

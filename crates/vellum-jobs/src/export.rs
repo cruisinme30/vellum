@@ -15,9 +15,12 @@ use time::{Date, Month};
 use vellum_collections::csv::import_new;
 use vellum_collections::formula::{self, Env};
 use vellum_collections::{
-    Collection, DateValue, Edit, NumberFormat, Property, PropertyType, Schema, Value, Workspace,
+    Collection, DateValue, Edit, NumberFormat, Property, PropertyType, Schema,
+    Value, Workspace,
 };
-use vellum_export::ports::{CalcValue, CollectionFiles, Collections, NewCollection};
+use vellum_export::ports::{
+    CalcValue, CollectionFiles, Collections, NewCollection,
+};
 use vellum_format::blocks::{Calculator, CalculatorOutput};
 use vellum_kernel::{CollectionId, DocId};
 
@@ -38,7 +41,10 @@ impl Collections for CollectionsEngine {
 /// An output's formula and unit. The format reads a trailing `(…)` as the
 /// unit, which also matches a formula that ends in a function call such as
 /// `round(x, 0)`; when the joined text is itself a formula, it is one.
-fn formula_and_unit(output: &CalculatorOutput, schema: &Schema) -> (String, Option<String>) {
+fn formula_and_unit(
+    output: &CalculatorOutput,
+    schema: &Schema,
+) -> (String, Option<String>) {
     if let Some(unit) = &output.unit {
         let joined = format!("{}({unit})", output.formula);
         if output.formula.ends_with(|c: char| c.is_alphanumeric())
@@ -83,9 +89,12 @@ fn outputs(calc: &Calculator, as_of: &str) -> Vec<CalcValue> {
                 .map_err(|e| e.message)
                 .and_then(|value| match value {
                     Value::Number(n) if n.is_finite() => Ok(n),
-                    other => Err(format!("`{source}` is not a number ({other:?})")),
+                    other => {
+                        Err(format!("`{source}` is not a number ({other:?})"))
+                    }
                 });
-            let stored = value.as_ref().map_or(Value::Empty, |n| Value::Number(*n));
+            let stored =
+                value.as_ref().map_or(Value::Empty, |n| Value::Number(*n));
             let _ = env.values.insert(output.key.clone(), stored);
             CalcValue { unit, value }
         })
@@ -119,7 +128,8 @@ fn parse_day(text: &str) -> Option<Date> {
 /// pages by title, ignoring case.
 fn create(table: &NewCollection) -> Result<CollectionFiles, String> {
     let id = CollectionId::generate();
-    let read = import_new(&table.csv, id, &table.title).map_err(|e| e.to_string())?;
+    let read =
+        import_new(&table.csv, id, &table.title).map_err(|e| e.to_string())?;
     let mut problems: Vec<String> = read
         .diagnostics
         .iter()
@@ -198,7 +208,8 @@ mod tests {
     fn outputs_use_inputs_and_earlier_outputs() {
         let calc = calc(
             "units: Units = 100 [0..1000 step 10]\nprice: Price = 12.5\n\
-             revenue: Revenue = units * price ($)\nnet: Net = round(revenue * 0.8, 0)\n",
+             revenue: Revenue = units * price ($)\n\
+             net: Net = round(revenue * 0.8, 0)\n",
         );
         assert_eq!(
             CollectionsEngine.calculate(&calc, "2026-10-29"),
@@ -236,7 +247,8 @@ mod tests {
                 }],
             })
             .unwrap();
-        let paths: Vec<&str> = built.files.iter().map(|(p, _)| p.as_str()).collect();
+        let paths: Vec<&str> =
+            built.files.iter().map(|(p, _)| p.as_str()).collect();
         assert!(paths.contains(&"schema.yaml"), "{paths:?}");
         assert_eq!(paths.iter().filter(|p| p.starts_with("rows/")).count(), 2);
         let shipped = built

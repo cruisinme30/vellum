@@ -9,7 +9,9 @@ use vellum_db::{IndexConfig, ShardRouter, ShardedIndex, ShardsConfig};
 use vellum_kernel::ObjectId;
 
 fn config(dir: &tempfile::TempDir) -> ShardsConfig {
-    let db = |name: &str| IndexConfig::sqlite(dir.path().join(format!("{name}.sqlite")), None);
+    let db = |name: &str| {
+        IndexConfig::sqlite(dir.path().join(format!("{name}.sqlite")), None)
+    };
     ShardsConfig {
         main: db("main"),
         shards: vec![("eu".into(), db("eu")), ("us".into(), db("us"))],
@@ -76,12 +78,14 @@ async fn spaces_written_before_sharding_stay_where_they_are() {
     let dir = tempfile::tempdir().unwrap();
     let sharded = ShardedIndex::open(&config(&dir)).await.unwrap();
     // A space already on "us" that the map does not know.
-    let vellum_db::IndexPool::Sqlite(pool) = sharded.shards()[1].index().pool() else {
+    let vellum_db::IndexPool::Sqlite(pool) = sharded.shards()[1].index().pool()
+    else {
         panic!("sqlite")
     };
     let _ = sqlx::query(
-        "INSERT INTO spaces (space_id, kind, slug, root_path, name, indexed_at) \
-         VALUES ($1, 'shared_drive', 'old', 'drives/shared/old', 'Old', 0)",
+        "INSERT INTO spaces (space_id, kind, slug, root_path, name, \
+         indexed_at) VALUES ($1, 'shared_drive', 'old', 'drives/shared/old', \
+         'Old', 0)",
     )
     .bind(space(9).as_uuid())
     .execute(pool)
@@ -95,9 +99,12 @@ async fn spaces_written_before_sharding_stay_where_they_are() {
 #[tokio::test]
 async fn one_database_keeps_every_space_at_home_without_a_map() {
     let dir = tempfile::tempdir().unwrap();
-    let index = vellum_db::Index::open(&IndexConfig::sqlite(dir.path().join("one.sqlite"), None))
-        .await
-        .unwrap();
+    let index = vellum_db::Index::open(&IndexConfig::sqlite(
+        dir.path().join("one.sqlite"),
+        None,
+    ))
+    .await
+    .unwrap();
     let sharded = ShardedIndex::single(index);
     let router = ShardRouter::open(sharded.clone()).await.unwrap();
     assert_eq!(router.place(space(1)).await.unwrap(), 0);

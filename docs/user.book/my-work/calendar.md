@@ -32,8 +32,10 @@ Notification settings**.
 
 ::: facts
 
-- Email: forward a message to your personal `tasks+…` address, from **Get a new address** in My Work's settings
-- Slack: use the message menu's **Save as task**; the first time, Slack shows a link that connects your account
+- Email: forward a message to your personal `tasks+…` address, from **Get a new
+  address** in My Work's settings
+- Slack: use the message menu's **Save as task**; the first time, Slack shows a
+  link that connects your account
 - Page: select text and press `⌘⌥↵`, or `T` on a page you can only read
 - Comment: assign the comment to someone
 

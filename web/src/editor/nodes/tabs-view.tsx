@@ -1,13 +1,19 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { NodeViewContent, NodeViewWrapper, type ReactNodeViewProps } from "@tiptap/react";
+import {
+  NodeViewContent,
+  NodeViewWrapper,
+  type ReactNodeViewProps,
+} from "@tiptap/react";
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 
 import { useT } from "../../i18n/i18n";
 import { Icon } from "../../shell/icon";
 
-/** `::: tabs`: an ARIA tab list over the `tab` children, which stay editable. */
+/**
+ * `::: tabs`: an ARIA tab list over the `tab` children, which stay editable.
+ */
 export function TabsView({ node, editor, getPos }: ReactNodeViewProps) {
   const t = useT();
   const prefix = useId();
@@ -22,7 +28,9 @@ export function TabsView({ node, editor, getPos }: ReactNodeViewProps) {
   const active = Math.min(chosen, titles.length - 1);
 
   useEffect(() => {
-    const panels = wrapper.current?.querySelectorAll<HTMLElement>(":scope .vl-tab-panels .vl-tab");
+    const panels = wrapper.current?.querySelectorAll<HTMLElement>(
+      ":scope .vl-tab-panels .vl-tab",
+    );
     for (const [index, panel] of [...(panels ?? [])].entries()) {
       panel.hidden = index !== active;
       panel.id = panelId(index);
@@ -33,7 +41,9 @@ export function TabsView({ node, editor, getPos }: ReactNodeViewProps) {
   const focusTab = (index: number) => {
     const next = (index + titles.length) % titles.length;
     setChosen(next);
-    wrapper.current?.querySelector<HTMLElement>("#" + CSS.escape(tabId(next)))?.focus();
+    wrapper.current
+      ?.querySelector<HTMLElement>("#" + CSS.escape(tabId(next)))
+      ?.focus();
   };
   const onKeyDown = (event: KeyboardEvent) => {
     const moves: Record<string, number> = {
@@ -68,7 +78,11 @@ export function TabsView({ node, editor, getPos }: ReactNodeViewProps) {
   return (
     <NodeViewWrapper className="vl-block vl-tabs" ref={wrapper}>
       <div className="vl-tab-list" contentEditable={false}>
-        <div className="vl-tab-strip" role="tablist" aria-label={t("tabs-label")}>
+        <div
+          className="vl-tab-strip"
+          role="tablist"
+          aria-label={t("tabs-label")}
+        >
           {titles.map((title, index) => (
             <button
               key={`${String(index)}-${title}`}
@@ -104,7 +118,11 @@ export function TabsView({ node, editor, getPos }: ReactNodeViewProps) {
 }
 
 /** One tab panel, with its title editable in place. */
-export function TabView({ node, updateAttributes, editor }: ReactNodeViewProps) {
+export function TabView({
+  node,
+  updateAttributes,
+  editor,
+}: ReactNodeViewProps) {
   const t = useT();
   return (
     <NodeViewWrapper className="vl-tab" role="tabpanel">

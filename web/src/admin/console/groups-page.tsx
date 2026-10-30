@@ -38,11 +38,20 @@ function GroupPanel({
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [changed, setChanged] = useState<GroupMembersView>();
-  const loaded = useLoaded(() => api.groupMembers(group.id), [api, group.id], failureText);
+  const loaded = useLoaded(
+    () => api.groupMembers(group.id),
+    [api, group.id],
+    failureText,
+  );
   const view = changed?.group.id === group.id ? changed : undefined;
-  const members = view?.members ?? (loaded.state === "ready" ? loaded.value.members : []);
+  const members =
+    view?.members ?? (loaded.state === "ready" ? loaded.value.members : []);
 
-  const run = <T,>(task: () => Promise<T>, done: string, after: (value: T) => void) => {
+  const run = <T,>(
+    task: () => Promise<T>,
+    done: string,
+    after: (value: T) => void,
+  ) => {
     setBusy(true);
     onNotice();
     task()
@@ -85,19 +94,33 @@ function GroupPanel({
       setChanged,
     );
   };
-  const outsiders = users.filter((u) => !u.disabled && !members.some((m) => m.id === u.id));
+  const outsiders = users.filter(
+    (u) => !u.disabled && !members.some((m) => m.id === u.id),
+  );
 
   return (
-    <section className="vl-admin-panel" aria-label={t("admin-groups-panel", { name: group.name })}>
+    <section
+      className="vl-admin-panel"
+      aria-label={t("admin-groups-panel", { name: group.name })}
+    >
       <h2>{group.name}</h2>
       <form className="vl-admin-form" onSubmit={save} key={group.id}>
         <label>
           {t("admin-groups-name")}
-          <input name="name" required maxLength={100} defaultValue={group.name} />
+          <input
+            name="name"
+            required
+            maxLength={100}
+            defaultValue={group.name}
+          />
         </label>
         <label>
           {t("admin-groups-description")}
-          <input name="description" maxLength={500} defaultValue={group.description} />
+          <input
+            name="description"
+            maxLength={500}
+            defaultValue={group.description}
+          />
         </label>
         <div className="vl-admin-actions">
           <button type="submit" className="vl-filled-button" disabled={busy}>
@@ -124,10 +147,13 @@ function GroupPanel({
                 type="button"
                 className="vl-text-button"
                 disabled={busy}
-                aria-label={t("admin-groups-remove-label", { name: member.name })}
+                aria-label={t("admin-groups-remove-label", {
+                  name: member.name,
+                })}
                 onClick={() => {
                   run(
-                    () => api.changeGroupMembers(group.id, { remove: [member.id] }),
+                    () =>
+                      api.changeGroupMembers(group.id, { remove: [member.id] }),
                     t("admin-groups-removed", { name: member.name }),
                     setChanged,
                   );
@@ -140,7 +166,11 @@ function GroupPanel({
         </ul>
       )}
       {outsiders.length > 0 && (
-        <form className="vl-admin-filters" aria-labelledby={`${id}-add`} onSubmit={add}>
+        <form
+          className="vl-admin-filters"
+          aria-labelledby={`${id}-add`}
+          onSubmit={add}
+        >
           <label>
             <span id={`${id}-add`}>{t("admin-groups-add")}</span>
             <select name="user" required defaultValue="">
@@ -166,7 +196,9 @@ function GroupPanel({
             role="group"
             aria-label={t("admin-groups-delete-confirm", { name: group.name })}
           >
-            <span>{t("admin-groups-delete-confirm", { name: group.name })}</span>
+            <span>
+              {t("admin-groups-delete-confirm", { name: group.name })}
+            </span>
             <button
               type="button"
               className="vl-filled-button"
@@ -233,7 +265,10 @@ function CreateGroupForm({
         (group) => {
           form.reset();
           onCreated(group);
-          onNotice({ ok: true, message: t("admin-groups-created", { name: group.name }) });
+          onNotice({
+            ok: true,
+            message: t("admin-groups-created", { name: group.name }),
+          });
         },
         (error: unknown) => {
           onNotice({ ok: false, message: failureText(error) });
@@ -244,7 +279,11 @@ function CreateGroupForm({
       });
   };
   return (
-    <form className="vl-admin-form" aria-labelledby={`${id}-title`} onSubmit={submit}>
+    <form
+      className="vl-admin-form"
+      aria-labelledby={`${id}-title`}
+      onSubmit={submit}
+    >
       <h2 id={`${id}-title`}>{t("admin-groups-create")}</h2>
       <label>
         {t("admin-groups-name")}
@@ -277,7 +316,9 @@ function Groups({ api }: { readonly api: AdminConsoleApi }) {
     failureText,
   );
   const current =
-    loaded.state === "ready" ? loaded.value.groups.find((g) => g.id === selected) : undefined;
+    loaded.state === "ready"
+      ? loaded.value.groups.find((g) => g.id === selected)
+      : undefined;
   return (
     <>
       <div role="status">{notice?.ok === true && <p>{notice.message}</p>}</div>
@@ -286,7 +327,9 @@ function Groups({ api }: { readonly api: AdminConsoleApi }) {
           {notice.message}
         </p>
       )}
-      {loaded.state === "loading" && <p className="vl-muted">{t("admin-loading")}</p>}
+      {loaded.state === "loading" && (
+        <p className="vl-muted">{t("admin-loading")}</p>
+      )}
       {loaded.state === "failed" && (
         <p className="vl-field-error" role="alert">
           {loaded.message}
@@ -300,7 +343,9 @@ function Groups({ api }: { readonly api: AdminConsoleApi }) {
             <div className="vl-admin-scroll">
               <table className="vl-admin-table">
                 <caption>
-                  {t("admin-groups-caption", { count: loaded.value.groups.length })}
+                  {t("admin-groups-caption", {
+                    count: loaded.value.groups.length,
+                  })}
                 </caption>
                 <thead>
                   <tr>
@@ -311,17 +356,24 @@ function Groups({ api }: { readonly api: AdminConsoleApi }) {
                 </thead>
                 <tbody>
                   {loaded.value.groups.map((group) => (
-                    <tr key={group.id} aria-current={group.id === selected || undefined}>
+                    <tr
+                      key={group.id}
+                      aria-current={group.id === selected || undefined}
+                    >
                       <th scope="row">{group.name}</th>
                       <td>{group.description}</td>
                       <td>
                         <button
                           type="button"
                           className="vl-text-button"
-                          aria-label={t("admin-spaces-manage-label", { name: group.name })}
+                          aria-label={t("admin-spaces-manage-label", {
+                            name: group.name,
+                          })}
                           aria-expanded={group.id === selected}
                           onClick={() => {
-                            setSelected(group.id === selected ? undefined : group.id);
+                            setSelected(
+                              group.id === selected ? undefined : group.id,
+                            );
                           }}
                         >
                           {t("admin-spaces-manage")}

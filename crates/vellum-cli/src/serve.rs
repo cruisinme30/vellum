@@ -92,24 +92,27 @@ pub struct Edge {
 /// # Errors
 ///
 /// `invalid_input` naming the variable that is wrong.
-pub fn edge(config: &Config, var: impl Fn(&str) -> Option<String>) -> Result<Edge, Error> {
+pub fn edge(
+    config: &Config,
+    var: impl Fn(&str) -> Option<String>,
+) -> Result<Edge, Error> {
     let app_origin = config
         .public_url
         .clone()
         .unwrap_or_else(|| format!("http://{}", config.bind));
     let mut gateway = GatewayConfig::new(app_origin, Vec::new());
-    gateway.public_origin =
-        var("VELLUM_PUBLIC_PAGES_URL").map(|u| u.trim_end_matches('/').to_owned());
+    gateway.public_origin = var("VELLUM_PUBLIC_PAGES_URL")
+        .map(|u| u.trim_end_matches('/').to_owned());
     gateway.embed_origins = list(var("VELLUM_EMBED_ORIGINS"));
     let tls = match var("VELLUM_TLS").as_deref().unwrap_or("off") {
         "off" => Tls::Off,
         "files" => Tls::Files {
-            cert: var("VELLUM_TLS_CERT")
-                .map(PathBuf::from)
-                .ok_or_else(|| invalid("VELLUM_TLS_CERT", "required when VELLUM_TLS=files"))?,
-            key: var("VELLUM_TLS_KEY")
-                .map(PathBuf::from)
-                .ok_or_else(|| invalid("VELLUM_TLS_KEY", "required when VELLUM_TLS=files"))?,
+            cert: var("VELLUM_TLS_CERT").map(PathBuf::from).ok_or_else(
+                || invalid("VELLUM_TLS_CERT", "required when VELLUM_TLS=files"),
+            )?,
+            key: var("VELLUM_TLS_KEY").map(PathBuf::from).ok_or_else(|| {
+                invalid("VELLUM_TLS_KEY", "required when VELLUM_TLS=files")
+            })?,
         },
         "acme" => {
             let mut domains = list(var("VELLUM_ACME_DOMAINS"));
@@ -238,13 +241,16 @@ pub fn key_file(data_dir: &Path, name: &str) -> Result<Vec<u8>, Error> {
         )
         .with_source(e)
     };
-    if let Some(existing) = std::fs::read(&path).ok().filter(|k| k.len() >= 32) {
+    if let Some(existing) = std::fs::read(&path).ok().filter(|k| k.len() >= 32)
+    {
         return Ok(existing);
     }
     std::fs::create_dir_all(&dir).map_err(io)?;
     let mut key = vec![0u8; 32];
-    getrandom::fill(&mut key)
-        .map_err(|e| Error::new(ErrorKind::Internal, "the random source failed").with_source(e))?;
+    getrandom::fill(&mut key).map_err(|e| {
+        Error::new(ErrorKind::Internal, "the random source failed")
+            .with_source(e)
+    })?;
     let mut options = std::fs::OpenOptions::new();
     let _ = options.write(true).create(true).truncate(true);
     #[cfg(unix)]
@@ -263,8 +269,12 @@ pub fn key_file(data_dir: &Path, name: &str) -> Result<Vec<u8>, Error> {
 /// # Errors
 ///
 /// An invalid operation or `GraphQL` schema.
-pub fn app_gateway(services: &services::Services, config: GatewayConfig) -> Result<Gateway, Error> {
-    let per_minute = u64::from(config.rate_per_second) * 60 + u64::from(config.rate_burst);
+pub fn app_gateway(
+    services: &services::Services,
+    config: GatewayConfig,
+) -> Result<Gateway, Error> {
+    let per_minute =
+        u64::from(config.rate_per_second) * 60 + u64::from(config.rate_burst);
     let mut builder = GatewayBuilder::new(config, services::VERSION);
     // With an index, the per-caller allowance holds across replicas (D173).
     if let Some(counts) = services.rate_counts() {
@@ -272,7 +282,9 @@ pub fn app_gateway(services: &services::Services, config: GatewayConfig) -> Resu
         limit.spawn_sync(counts.clone());
         builder = builder.shared_limit(limit);
     }
-    if let Some(exempt) = crate::limits::forwarded_joins(|k| std::env::var(k).ok()) {
+    if let Some(exempt) =
+        crate::limits::forwarded_joins(|k| std::env::var(k).ok())
+    {
         builder = builder.rate_exempt(exempt);
     }
     if let Some(site) = services.public_site() {
@@ -292,7 +304,9 @@ async fn shutdown_signal() {
     };
     #[cfg(unix)]
     let terminate = async {
-        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+        match tokio::signal::unix::signal(
+            tokio::signal::unix::SignalKind::terminate(),
+        ) {
             Ok(mut signal) => {
                 let _ = signal.recv().await;
             }
@@ -318,7 +332,8 @@ fn identity_store(config: &Config) -> Result<Store, Error> {
     let store = Store::shared(IndexConfig::postgres(url.clone()))?;
     if store.import_file(&config.data_dir)? {
         tracing::info!(
-            "imported identity.json into the database; the file is now identity.json.imported"
+            "imported identity.json into the database; the file is now \
+                identity.json.imported"
         );
     }
     Ok(store)
@@ -329,9 +344,13 @@ fn identity_store(config: &Config) -> Result<Store, Error> {
 /// # Errors
 ///
 /// Configuration, key-file, TLS or listener errors.
-pub fn run(config_path: Option<&Path>, observability: Observability) -> Result<(), Error> {
-    let config = Config::load(config_path)
-        .map_err(|e| Error::new(ErrorKind::InvalidInput, e.to_string()).with_source(e))?;
+pub fn run(
+    config_path: Option<&Path>,
+    observability: Observability,
+) -> Result<(), Error> {
+    let config = Config::load(config_path).map_err(|e| {
+        Error::new(ErrorKind::InvalidInput, e.to_string()).with_source(e)
+    })?;
     let Edge {
         mut gateway,
         serve: serve_config,
@@ -343,8 +362,9 @@ pub fn run(config_path: Option<&Path>, observability: Observability) -> Result<(
     }
     if csrf_key.is_none() && config.database_url.is_some() {
         tracing::warn!(
-            "VELLUM_CSRF_KEY is not set: each replica makes its own key, so forms \
-             fail when requests move between replicas; set it from a shared secret"
+            "VELLUM_CSRF_KEY is not set: each replica makes its own key, so \
+             forms fail when requests move between replicas; set it from a \
+             shared secret"
         );
     }
     gateway.csrf_key = match csrf_key {
@@ -355,23 +375,31 @@ pub fn run(config_path: Option<&Path>, observability: Observability) -> Result<(
         .enable_all()
         .build()
         .map_err(|e| {
-            Error::new(ErrorKind::Internal, "cannot start the async runtime").with_source(e)
+            Error::new(ErrorKind::Internal, "cannot start the async runtime")
+                .with_source(e)
         })?;
     let store = identity_store(&config)?;
     let app_origin = gateway.app_origin.clone();
     let sso = crate::identity::oidc_config(|k| std::env::var(k).ok())?;
     runtime.block_on(async move {
-        let services =
-            services::Services::open_with_store(&app_origin, Some(&config.data_dir), store, sso)?
-            .with_workspace(&config, |k| std::env::var(k).ok())
-            .await?
-            .with_scanner(scanner)
-            .with_admin(&config, observability, |k| std::env::var(k).ok())
-            .await?
-            .with_assist(|k| std::env::var(k).ok())?;
+        let services = services::Services::open_with_store(
+            &app_origin,
+            Some(&config.data_dir),
+            store,
+            sso,
+        )?
+        .with_workspace(&config, |k| std::env::var(k).ok())
+        .await?
+        .with_scanner(scanner)
+        .with_admin(&config, observability, |k| std::env::var(k).ok())
+        .await?
+        .with_assist(|k| std::env::var(k).ok())?;
         tracing::info!(services = ?services, "services ready");
         if !web::BUILT {
-            tracing::warn!("this binary was built without the web app; `/` shows a placeholder");
+            tracing::warn!(
+                "this binary was built without the web app; `/` \
+                shows a placeholder"
+            );
         }
         let gateway = app_gateway(&services, gateway)?;
         let databases = services.databases();
@@ -449,7 +477,9 @@ mod tests {
         assert_eq!(tls.serve.limits.max_connections_per_ip, PER_IP_CONNECTIONS);
         let set = edge_with(&[("VELLUM_MAX_CONNECTIONS_PER_IP", "32")])?;
         assert_eq!(set.serve.limits.max_connections_per_ip, 32);
-        assert!(edge_with(&[("VELLUM_MAX_CONNECTIONS_PER_IP", "many")]).is_err());
+        assert!(
+            edge_with(&[("VELLUM_MAX_CONNECTIONS_PER_IP", "many")]).is_err()
+        );
         Ok(())
     }
 
@@ -471,10 +501,18 @@ mod tests {
             Tls::Acme {
                 domains, contact, ..
             } => {
-                assert_eq!(domains, ["vellum.northstar.dev", "pages.northstar.dev"]);
+                assert_eq!(
+                    domains,
+                    ["vellum.northstar.dev", "pages.northstar.dev"]
+                );
                 assert_eq!(contact, ["mailto:ops@northstar.dev"]);
             }
-            other => return Err(Error::new(ErrorKind::Internal, format!("{other:?}"))),
+            other => {
+                return Err(Error::new(
+                    ErrorKind::Internal,
+                    format!("{other:?}"),
+                ));
+            }
         }
         assert!(e.gateway.https);
         assert_eq!(
@@ -509,11 +547,13 @@ mod tests {
 
     #[test]
     fn csrf_key_can_come_from_a_secret_file() -> Result<(), Error> {
-        let dir = std::env::temp_dir().join(format!("vellum-csrf-secret-{}", std::process::id()));
+        let dir = std::env::temp_dir()
+            .join(format!("vellum-csrf-secret-{}", std::process::id()));
         std::fs::create_dir_all(&dir).map_err(|e| invalid("dir", e))?;
         let path = dir.join("csrf");
         let key = STANDARD.encode([9u8; 32]);
-        std::fs::write(&path, format!("{key}\n")).map_err(|e| invalid("write", e))?;
+        std::fs::write(&path, format!("{key}\n"))
+            .map_err(|e| invalid("write", e))?;
         let path = path.display().to_string();
         let e = edge_with(&[("VELLUM_CSRF_KEY_FILE", path.as_str())])?;
         assert_eq!(e.csrf_key, Some(vec![9u8; 32]));
@@ -530,7 +570,8 @@ mod tests {
 
     #[test]
     fn csrf_key_file_is_created_once() -> Result<(), Error> {
-        let dir = std::env::temp_dir().join(format!("vellum-csrf-{}", std::process::id()));
+        let dir = std::env::temp_dir()
+            .join(format!("vellum-csrf-{}", std::process::id()));
         let first = csrf_key_file(&dir)?;
         let second = csrf_key_file(&dir)?;
         assert_eq!(first.len(), 32);

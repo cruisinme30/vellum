@@ -40,7 +40,10 @@ pub(crate) fn name_of<T: Serialize>(value: &T) -> String {
 }
 
 /// Reads an engine enum from its serde name.
-pub(crate) fn parse_name<T: DeserializeOwned>(field: &str, text: &str) -> Result<T, Error> {
+pub(crate) fn parse_name<T: DeserializeOwned>(
+    field: &str,
+    text: &str,
+) -> Result<T, Error> {
     serde_json::from_value(serde_json::Value::String(text.to_owned()))
         .map_err(|_| invalid(&format!("{field}: unknown value {text:?}")))
 }
@@ -224,7 +227,12 @@ pub struct SlaOut {
 }
 
 impl IssueOut {
-    pub(crate) fn of(issue: &Issue, graph: &WorkGraph, now: OffsetDateTime, full: bool) -> Self {
+    pub(crate) fn of(
+        issue: &Issue,
+        graph: &WorkGraph,
+        now: OffsetDateTime,
+        full: bool,
+    ) -> Self {
         let key_of = |id: &vellum_work::IssueId| {
             graph
                 .issue(id)
@@ -257,7 +265,11 @@ impl IssueOut {
                     issue: key_of(&r.issue),
                 })
                 .collect(),
-            subscribers: issue.subscribers.iter().map(ToString::to_string).collect(),
+            subscribers: issue
+                .subscribers
+                .iter()
+                .map(ToString::to_string)
+                .collect(),
             aliases: issue.aliases.iter().map(ToString::to_string).collect(),
             links: issue
                 .links
@@ -487,7 +499,11 @@ impl ProjectOut {
                 .milestones
                 .iter()
                 .map(|m| {
-                    let done = progress.milestones.get(&m.id).copied().unwrap_or_default();
+                    let done = progress
+                        .milestones
+                        .get(&m.id)
+                        .copied()
+                        .unwrap_or_default();
                     MilestoneOut {
                         id: m.id.to_string(),
                         name: m.name.clone(),
@@ -567,11 +583,10 @@ impl TargetOut {
     pub(crate) fn of(t: &Target, graph: &WorkGraph) -> Self {
         match t {
             Target::Issue { issue } => Self {
-                issue: Some(
-                    graph
-                        .issue(issue)
-                        .map_or_else(|| issue.to_string(), |i| i.key().to_string()),
-                ),
+                issue: Some(graph.issue(issue).map_or_else(
+                    || issue.to_string(),
+                    |i| i.key().to_string(),
+                )),
                 doc: None,
                 block: None,
             },
@@ -1007,7 +1022,8 @@ impl ViewOut {
             team: view.team.as_ref().map(ToString::to_string),
             visibility: name_of(&view.visibility),
             layout: name_of(&view.layout),
-            filter: serde_json::to_string(&view.filter).unwrap_or_else(|_| "{}".to_owned()),
+            filter: serde_json::to_string(&view.filter)
+                .unwrap_or_else(|_| "{}".to_owned()),
             group_by: name_of(&view.group_by),
             order_by: name_of(&view.order_by),
             show_closed: name_of(&view.show_closed),
@@ -1043,7 +1059,8 @@ pub struct ViewIn {
     pub layout: Option<String>,
     /// A Work filter as JSON text.
     pub filter: Option<String>,
-    /// status (default), assignee, priority, project, cycle, label, team or none.
+    /// status (default), assignee, priority, project, cycle, label, team or
+    /// none.
     pub group_by: Option<String>,
     /// priority (default), updated, created, due, estimate or title.
     pub order_by: Option<String>,
@@ -1068,7 +1085,8 @@ pub struct PutView {
     pub layout: Option<String>,
     /// A Work filter as JSON text.
     pub filter: Option<String>,
-    /// status (default), assignee, priority, project, cycle, label, team or none.
+    /// status (default), assignee, priority, project, cycle, label, team or
+    /// none.
     pub group_by: Option<String>,
     /// priority (default), updated, created, due, estimate or title.
     pub order_by: Option<String>,

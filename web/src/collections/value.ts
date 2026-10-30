@@ -9,7 +9,10 @@ export const text = (value: string): Value => ({ type: "text", value });
 export const number = (value: number): Value => ({ type: "number", value });
 export const bool = (value: boolean): Value => ({ type: "bool", value });
 export const date = (value: string): Value => ({ type: "date", value });
-export const list = (values: readonly Value[]): Value => ({ type: "list", value: values });
+export const list = (values: readonly Value[]): Value => ({
+  type: "list",
+  value: values,
+});
 
 /** Whether a value is blank: nothing, empty text or a list of blanks. */
 export function isEmpty(value: Value | undefined): boolean {
@@ -81,7 +84,9 @@ export function parseInput(type: PropertyType, raw: string): ParseResult {
   }
   if (type === "number") {
     const n = Number(input.replaceAll(",", ""));
-    return Number.isFinite(n) ? { value: number(n) } : { error: "collection-error-number" };
+    return Number.isFinite(n)
+      ? { value: number(n) }
+      : { error: "collection-error-number" };
   }
   if (type === "date") {
     return /^\d{4}-\d{2}-\d{2}$/.test(input) && !Number.isNaN(Date.parse(input))
@@ -96,7 +101,9 @@ export function parseInput(type: PropertyType, raw: string): ParseResult {
 
 /** The text an editor starts from. */
 export function inputText(value: Value | undefined): string {
-  return value?.type === "number" ? formatNumber(value.value) : dayOrPlain(value);
+  return value?.type === "number"
+    ? formatNumber(value.value)
+    : dayOrPlain(value);
 }
 
 function dayOrPlain(value: Value | undefined): string {

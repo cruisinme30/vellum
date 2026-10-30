@@ -21,7 +21,8 @@ use std::time::{Duration, Instant};
 use serde_json::{Value, json};
 use time::macros::datetime;
 use vellum_contracts::{
-    CredentialKind, Operation, Principal, RequestContext, Scope, ScopeSet, Service,
+    CredentialKind, Operation, Principal, RequestContext, Scope, ScopeSet,
+    Service,
 };
 use vellum_kernel::{ErrorKind, RequestId, Timestamp, UserId};
 use vellum_store::LocalStore;
@@ -37,7 +38,10 @@ struct World {
 
 const PEOPLE: [&str; 3] = ["mara", "dev", "priya"];
 
-async fn open(dir: tempfile::TempDir, users: Vec<(&'static str, UserId)>) -> (World, usize) {
+async fn open(
+    dir: tempfile::TempDir,
+    users: Vec<(&'static str, UserId)>,
+) -> (World, usize) {
     let store = Arc::new(LocalStore::open(dir.path()).await.unwrap());
     let mut directory = StaticDirectory::new();
     for (name, id) in &users {
@@ -112,7 +116,16 @@ impl World {
 
 async fn with_eng(w: &World) {
     let _ = w
-        .call("mara", "work.create_team", json!({"key": "ENG", "name": "Engineering", "lead": "mara", "members": ["dev", "priya"]}))
+        .call(
+            "mara",
+            "work.create_team",
+            json!({
+                "key": "ENG",
+                "name": "Engineering",
+                "lead": "mara",
+                "members": ["dev", "priya"]
+            }),
+        )
         .await;
 }
 
@@ -218,7 +231,10 @@ async fn issues_round_trip_through_the_api_and_the_disk() {
         .call(
             "priya",
             "work.query_issues",
-            json!({"filter": r#"{"field":"assignee","op":"is","values":["@me"]}"#, "group_by": "status"}),
+            json!({
+                "filter": r#"{"field":"assignee","op":"is","values":["@me"]}"#,
+                "group_by": "status"
+            }),
         )
         .await;
     let keys: Vec<&str> = mine["groups"]
@@ -306,7 +322,11 @@ async fn comments_assign_into_my_work_and_survive_a_restart() {
         .call(
             "priya",
             "work.add_comment",
-            json!({"target": "ENG-1", "body": "@dev can you size this?", "assign_to": "dev"}),
+            json!({
+                "target": "ENG-1",
+                "body": "@dev can you size this?",
+                "assign_to": "dev"
+            }),
         )
         .await;
     let thread = started["thread"]["id"].as_str().unwrap().to_owned();
@@ -354,7 +374,13 @@ async fn comments_assign_into_my_work_and_survive_a_restart() {
         "only the author edits"
     );
     let events = w.events.take();
-    assert!(events.iter().any(|e| matches!(e, WorkEvent::CommentAdded { recipients, .. } if recipients.contains(&UserRef::parse("dev").unwrap()))));
+    assert!(events.iter().any(|e| matches!(
+        e,
+        WorkEvent::CommentAdded {
+            recipients,
+            ..
+        } if recipients.contains(&UserRef::parse("dev").unwrap())
+    )));
 
     let (w, skipped) = w.reopen().await;
     assert_eq!(skipped, 0);
@@ -426,7 +452,9 @@ async fn callers_need_a_handle_and_bad_input_changes_nothing() {
         "refused input burned no number"
     );
 
-    let team = std::fs::read_to_string(w.dir.path().join("teams/ENG/team.yaml")).unwrap();
+    let team =
+        std::fs::read_to_string(w.dir.path().join("teams/ENG/team.yaml"))
+            .unwrap();
     let renamed = team.replace("key: ENG", "key: OPS");
     assert_eq!(
         w.call_as(
@@ -468,12 +496,15 @@ async fn archived_teams_leave_lists_and_take_no_new_issues() {
         .await;
     assert_eq!(kept["issue"]["key"], "OPS-1");
 
-    // Admin scope and a fresh sign-in, as every_operation_is_valid_and_unique checks.
+    // Admin scope and a fresh sign-in, as every_operation_is_valid_and_unique
+    // checks.
     let out = w
         .call("mara", "work.archive_team", json!({"team": "OPS"}))
         .await;
     assert_eq!(out["archived"], true);
-    let yaml = std::fs::read_to_string(w.dir.path().join("teams/OPS/team.yaml")).unwrap();
+    let yaml =
+        std::fs::read_to_string(w.dir.path().join("teams/OPS/team.yaml"))
+            .unwrap();
     assert!(yaml.contains("archived: true"), "{yaml}");
 
     // Gone from the default list, there when asked for.
@@ -491,8 +522,12 @@ async fn archived_teams_leave_lists_and_take_no_new_issues() {
     );
     assert_eq!(
         keys(
-            &w.call("dev", "work.list_teams", json!({"include_archived": true}))
-                .await
+            &w.call(
+                "dev",
+                "work.list_teams",
+                json!({"include_archived": true})
+            )
+            .await
         ),
         ["ENG", "OPS"]
     );
@@ -596,7 +631,11 @@ async fn forms_file_triage_issues_and_suggestions_wait_for_a_person() {
     let path = w.dir.path().join("teams/ENG/team.yaml");
     let mut yaml = std::fs::read_to_string(&path).unwrap();
     yaml.push_str(
-        "labels:\n- name: bug\n- name: gateway\nforms:\n- slug: bug\n  title: Report a bug\n  fields:\n  - key: summary\n    label: Summary\n    type: text\n    required: true\n    maps_to: title\n  - key: steps\n    label: Steps\n    type: long_text\n  labels: [bug]\n",
+        "labels:\n- name: bug\n- name: gateway\nforms:\n\
+            - slug: bug\n  title: Report a bug\n  fields:\n  - key: \
+            summary\n    label: Summary\n    type: text\n    required: \
+            true\n    maps_to: title\n  - key: steps\n    label: Steps\n    \
+            type: long_text\n  labels: [bug]\n",
     );
     let _ = w
         .call(
@@ -616,7 +655,14 @@ async fn forms_file_triage_issues_and_suggestions_wait_for_a_person() {
         .call(
             "dev",
             "work.submit_form",
-            json!({"team": "ENG", "slug": "bug", "answers": {"summary": "Gateway times out", "steps": "Upload 2 GB"}}),
+            json!({
+                "team": "ENG",
+                "slug": "bug",
+                "answers": {
+                    "summary": "Gateway times out",
+                    "steps": "Upload 2 GB"
+                }
+            }),
         )
         .await;
     assert_eq!(issue["title"], "Gateway times out");
@@ -627,7 +673,11 @@ async fn forms_file_triage_issues_and_suggestions_wait_for_a_person() {
         .call_as(
             w.principal("dev", ScopeSet::FULL),
             "work.submit_form",
-            json!({"team": "ENG", "slug": "bug", "answers": {"steps": "no summary"}}),
+            json!({
+                "team": "ENG",
+                "slug": "bug",
+                "answers": {"steps": "no summary"}
+            }),
         )
         .await;
     assert_eq!(refused, Err(ErrorKind::InvalidInput));
@@ -642,7 +692,14 @@ async fn forms_file_triage_issues_and_suggestions_wait_for_a_person() {
         .call(
             "priya",
             "work.suggest_triage",
-            json!({"key": key, "priority": 2, "labels": ["gateway"], "assignee": "priya", "reason": "Gateway timeouts are Priya's area", "model": "assistant"}),
+            json!({
+                "key": key,
+                "priority": 2,
+                "labels": ["gateway"],
+                "assignee": "priya",
+                "reason": "Gateway timeouts are Priya's area",
+                "model": "assistant"
+            }),
         )
         .await;
     assert_eq!(suggestion["assignee"], "priya");
@@ -675,12 +732,17 @@ async fn forms_file_triage_issues_and_suggestions_wait_for_a_person() {
         .await;
     assert_eq!(brief_after, Err(ErrorKind::Conflict));
 
-    // A dismissed suggestion leaves the issue in triage, and survives a restart as gone.
+    // A dismissed suggestion leaves the issue in triage, and survives a restart
+    // as gone.
     let other = w
         .call(
             "dev",
             "work.submit_form",
-            json!({"team": "ENG", "slug": "bug", "answers": {"summary": "Login is slow"}}),
+            json!({
+                "team": "ENG",
+                "slug": "bug",
+                "answers": {"summary": "Login is slow"}
+            }),
         )
         .await;
     let other_key = other["key"].as_str().unwrap().to_owned();
@@ -720,7 +782,12 @@ async fn insights_count_finished_work_by_team_and_refuse_bad_ranges() {
             .call(
                 "dev",
                 "work.create_issue",
-                json!({"team": "ENG", "title": title, "state": state, "assignee": "dev"}),
+                json!({
+                    "team": "ENG",
+                    "title": title,
+                    "state": state,
+                    "assignee": "dev"
+                }),
             )
             .await;
     }
@@ -728,7 +795,14 @@ async fn insights_count_finished_work_by_team_and_refuse_bad_ranges() {
         .call(
             "mara",
             "work.insights",
-            json!({"team": "ENG", "measure": "throughput", "pivot": "assignee", "from": "2026-10-26", "to": "2026-11-09", "interval": "week"}),
+            json!({
+                "team": "ENG",
+                "measure": "throughput",
+                "pivot": "assignee",
+                "from": "2026-10-26",
+                "to": "2026-11-09",
+                "interval": "week"
+            }),
         )
         .await;
     assert_eq!(answer["overall"]["count"], 2);
@@ -739,7 +813,8 @@ async fn insights_count_finished_work_by_team_and_refuse_bad_ranges() {
         .call(
             "mara",
             "work.insights",
-            json!({"measure": "created", "from": "2026-11-01", "to": "2026-11-03"}),
+            json!({"measure": "created", "from": "2026-11-01", "to": "2026-11-0\
+                3"}),
         )
         .await;
     assert_eq!(created["overall"]["count"], 3);
@@ -800,7 +875,10 @@ async fn events_name_who_made_the_change() {
 async fn saved_views_are_shared_by_visibility_and_survive_a_restart() {
     let w = world().await;
     with_eng(&w).await;
-    let filter = r#"{"or":[{"field":"priority","op":"is","values":["urgent"]},{"field":"assignee","op":"is","values":["@me"]}]}"#;
+    let filter = concat!(
+        r#"{"or":[{"field":"priority","op":"is","values":["urgent"]},{"field""#,
+        r#":"assignee","op":"is","values":["@me"]}]}"#,
+    );
     let team_view = w
         .call(
             "dev",
@@ -865,7 +943,8 @@ async fn saved_views_are_shared_by_visibility_and_survive_a_restart() {
         .call(
             "dev",
             "work.put_view",
-            json!({"view_id": team_id, "name": "Hot", "team": "ENG", "visibility": "team",
+            json!({"view_id": team_id, "name": "Hot", "team": "ENG", "visibilit\
+                y": "team",
                    "layout": "board", "group_by": "assignee", "filter": filter}),
         )
         .await;
@@ -879,14 +958,19 @@ async fn saved_views_are_shared_by_visibility_and_survive_a_restart() {
     let views = views["views"].as_array().unwrap();
     assert_eq!(views.len(), 2);
     assert_eq!(views[0]["name"], "Hot");
-    let back: Value = serde_json::from_str(views[0]["filter"].as_str().unwrap()).unwrap();
+    let back: Value =
+        serde_json::from_str(views[0]["filter"].as_str().unwrap()).unwrap();
     assert_eq!(back, serde_json::from_str::<Value>(filter).unwrap());
     // The stored filter runs as a query.
     let _ = w
         .call(
             "dev",
             "work.query_issues",
-            json!({"team": "ENG", "filter": views[0]["filter"], "group_by": "assignee"}),
+            json!({
+                "team": "ENG",
+                "filter": views[0]["filter"],
+                "group_by": "assignee"
+            }),
         )
         .await;
 
@@ -918,11 +1002,16 @@ async fn team_settings_round_trip_as_json_and_numbers_never_go_back() {
     let todo = statuses.iter_mut().find(|s| s["key"] == "todo").unwrap();
     todo["name"] = json!("Up next");
     statuses.push(json!({"key": "qa", "name": "QA", "category": "started"}));
-    settings["cycles"] = json!({"duration_weeks": 1, "start_day": "tuesday", "upcoming": 2});
+    settings["cycles"] =
+        json!({"duration_weeks": 1, "start_day": "tuesday", "upcoming": 2});
     settings["sla"]["rules"]
         .as_array_mut()
         .unwrap()
-        .push(json!({"name": "Low", "when": {"field": "priority", "op": "is", "values": ["low"]}, "within_hours": 240}));
+        .push(json!({
+            "name": "Low",
+            "when": {"field": "priority", "op": "is", "values": ["low"]},
+            "within_hours": 240
+        }));
     settings["git"] = json!({"pr_opened": "qa", "pr_merged": "done"});
     // A stale copy: an issue is filed between the read and the save.
     let _ = w

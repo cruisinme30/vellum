@@ -77,8 +77,11 @@ impl Book {
         let headings = markdown::headings(&text);
         let level = level
             .or_else(|| headings.iter().map(|h| h.level).min())
-            .ok_or_else(|| BookError::NotAllowed(format!("section {id} has no headings")))?;
-        let cuts: Vec<&HeadingRef> = headings.iter().filter(|h| h.level == level).collect();
+            .ok_or_else(|| {
+                BookError::NotAllowed(format!("section {id} has no headings"))
+            })?;
+        let cuts: Vec<&HeadingRef> =
+            headings.iter().filter(|h| h.level == level).collect();
         let Some(first) = cuts.first() else {
             return Err(BookError::NotAllowed(format!(
                 "section {id} has no level-{level} headings"
@@ -133,10 +136,11 @@ impl Book {
                 },
             );
             for sub in anchors {
-                let _ = redirects.entry(sub.clone()).or_insert_with(|| Redirect {
-                    id: new.clone(),
-                    anchor: Some(sub),
-                });
+                let _ =
+                    redirects.entry(sub.clone()).or_insert_with(|| Redirect {
+                        id: new.clone(),
+                        anchor: Some(sub),
+                    });
             }
             previous = Some(new.clone());
             new_ids.push(new);
@@ -158,7 +162,10 @@ impl Book {
     ///
     /// Returns an error when the section does not exist, has no children,
     /// or a heading would need a level deeper than 6.
-    pub fn merge_into_headings(&mut self, id: &NodeId) -> Result<BTreeMap<NodeId, Redirect>> {
+    pub fn merge_into_headings(
+        &mut self,
+        id: &NodeId,
+    ) -> Result<BTreeMap<NodeId, Redirect>> {
         let slot = self.slot_of(id)?;
         let chapter = self
             .summary
@@ -199,8 +206,14 @@ impl Book {
             } else {
                 format!("{} {{#{anchor}}}", child.name)
             };
-            let _ = write!(appended, "\n{}", markdown::heading_line(level, &heading));
-            if let Some(child_id) = child.location.as_ref().and_then(|p| self.id_at(p)) {
+            let _ = write!(
+                appended,
+                "\n{}",
+                markdown::heading_line(level, &heading)
+            );
+            if let Some(child_id) =
+                child.location.as_ref().and_then(|p| self.id_at(p))
+            {
                 let body = markdown::body(self.text(child_id)?);
                 let max_inner = markdown::headings(body)
                     .iter()
@@ -213,7 +226,8 @@ impl Book {
                         child.name
                     )));
                 }
-                let shifted = shift_headings(body, isize::try_from(depth).unwrap_or(0));
+                let shifted =
+                    shift_headings(body, isize::try_from(depth).unwrap_or(0));
                 let shifted = shifted.trim_matches('\n');
                 if !shifted.is_empty() {
                     appended.push('\n');
@@ -259,7 +273,8 @@ impl Book {
         let new_set: BTreeSet<NodeId> = new_ids.iter().cloned().collect();
         let paths: Vec<_> = self.files.keys().cloned().collect();
         for path in paths {
-            let in_piece = self.id_at(&path).is_some_and(|i| new_set.contains(i));
+            let in_piece =
+                self.id_at(&path).is_some_and(|i| new_set.contains(i));
             let Some(text) = self.files.get(&path) else {
                 continue;
             };
@@ -267,28 +282,29 @@ impl Book {
                 if link.kind == LinkKind::Image {
                     return None;
                 }
-                let redirect =
-                    if let Some(fragment) = link.dest.strip_prefix('#') {
-                        if in_piece {
-                            // Same-page links inside a new section: to the
-                            // section now holding the anchor, or back to the parent.
-                            return Some(LinkEdit {
-                                dest: Some(redirects.get(fragment).map_or_else(
-                                    || format!("{}#{fragment}", id.uri()),
-                                    Redirect::uri,
-                                )),
-                                ..LinkEdit::default()
-                            });
-                        }
-                        // Same-page links in the parent: only if the anchor moved.
-                        redirects.get(fragment)?
-                    } else {
-                        let (target, fragment) = NodeId::from_uri(&link.dest)?;
-                        if &target != id {
-                            return None;
-                        }
-                        redirects.get(fragment?)?
-                    };
+                let redirect = if let Some(fragment) =
+                    link.dest.strip_prefix('#')
+                {
+                    if in_piece {
+                        // Same-page links inside a new section: to the section
+                        // now holding the anchor, or back to the parent.
+                        return Some(LinkEdit {
+                            dest: Some(redirects.get(fragment).map_or_else(
+                                || format!("{}#{fragment}", id.uri()),
+                                Redirect::uri,
+                            )),
+                            ..LinkEdit::default()
+                        });
+                    }
+                    // Same-page links in the parent: only if the anchor moved.
+                    redirects.get(fragment)?
+                } else {
+                    let (target, fragment) = NodeId::from_uri(&link.dest)?;
+                    if &target != id {
+                        return None;
+                    }
+                    redirects.get(fragment?)?
+                };
                 Some(LinkEdit {
                     dest: Some(redirect.uri()),
                     ..LinkEdit::default()
@@ -308,8 +324,10 @@ impl Book {
             let updated = markdown::map_links(text, |link, _| {
                 let (target, fragment) = NodeId::from_uri(&link.dest)?;
                 let redirect: &Redirect = redirects.get(&target)?;
-                let dest = fragment
-                    .map_or_else(|| redirect.uri(), |f| format!("{}#{f}", redirect.id.uri()));
+                let dest = fragment.map_or_else(
+                    || redirect.uri(),
+                    |f| format!("{}#{f}", redirect.id.uri()),
+                );
                 Some(LinkEdit {
                     dest: Some(dest),
                     ..LinkEdit::default()
@@ -332,7 +350,8 @@ mod tests {
         let mut ids = SequentialIds::new("01JBK00004");
         let new = book.split_headings(&id(3), None, &mut ids).unwrap();
         assert_eq!(new.len(), 2);
-        let titles: Vec<_> = new.iter().map(|n| book.label_of(n).unwrap()).collect();
+        let titles: Vec<_> =
+            new.iter().map(|n| book.label_of(n).unwrap()).collect();
         assert_eq!(titles, ["§1.1.1 Day one", "§1.1.2 Day two"]);
         assert_eq!(
             book.path_of(&id(3)).unwrap().as_str(),

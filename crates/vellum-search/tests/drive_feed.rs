@@ -15,8 +15,9 @@ use vellum_kernel::{DocId, SpaceId, UserId};
 use vellum_search::conformance::{StaticAccess, StaticStars};
 use vellum_search::drive_feed::SHARED_FEED;
 use vellum_search::{
-    DriveFeed, DriveSource, FeedConfig, Indexer, IndexerConfig, Location, Principal, SearchQuery,
-    SearchService, Start, TantivyBackend, TantivyConfig,
+    DriveFeed, DriveSource, FeedConfig, Indexer, IndexerConfig, Location,
+    Principal, SearchQuery, SearchService, Start, TantivyBackend,
+    TantivyConfig,
 };
 use vellum_store::{BlobStore, LocalStore};
 
@@ -43,7 +44,11 @@ async fn titles(service: &SearchService, text: &str) -> Vec<String> {
 }
 
 /// Polls until `text` finds `want` hits, for at most five seconds.
-async fn eventually(service: &SearchService, text: &str, want: usize) -> Vec<String> {
+async fn eventually(
+    service: &SearchService,
+    text: &str,
+    want: usize,
+) -> Vec<String> {
     for _ in 0..250 {
         let found = titles(service, text).await;
         if found.len() == want {
@@ -58,8 +63,10 @@ async fn eventually(service: &SearchService, text: &str, want: usize) -> Vec<Str
 async fn saved_pages_flow_into_search() -> TestResult {
     let dir = tempfile::tempdir()?;
     let root = dir.path().join("files");
-    let index =
-        Arc::new(Index::open(&IndexConfig::sqlite(dir.path().join("index.db"), None)).await?);
+    let index = Arc::new(
+        Index::open(&IndexConfig::sqlite(dir.path().join("index.db"), None))
+            .await?,
+    );
     let store: Arc<dyn BlobStore> = Arc::new(LocalStore::open(&root).await?);
 
     let (backend, _) = TantivyBackend::open(&TantivyConfig {
@@ -79,7 +86,8 @@ async fn saved_pages_flow_into_search() -> TestResult {
         Arc::new(StaticStars::default()),
     );
     let source = Arc::new(DriveSource::new(Arc::clone(&index), store));
-    let (indexer, _task) = Indexer::spawn(service.clone(), source, IndexerConfig::default());
+    let (indexer, _task) =
+        Indexer::spawn(service.clone(), source, IndexerConfig::default());
     let feed = DriveFeed::spawn(
         Arc::clone(&index),
         indexer,
@@ -96,9 +104,10 @@ async fn saved_pages_flow_into_search() -> TestResult {
         "# Launch\n\nShip the rocket on Friday.\n",
     )?;
     let _ = sqlx::query(
-        "INSERT INTO drive_nodes (space_id, node_id, kind, parent_id, tree_parent_id, path, \
-         title, byte_size, modified_at, created_by, trash) \
-         VALUES ($1, $2, 'page', NULL, NULL, 'eng/launch.md', 'Launch plan', 40, 1000, $3, NULL)",
+        "INSERT INTO drive_nodes (space_id, node_id, kind, parent_id, \
+         tree_parent_id, path, title, byte_size, modified_at, created_by, \
+         trash) VALUES ($1, $2, 'page', NULL, NULL, 'eng/launch.md', 'Launch \
+         plan', 40, 1000, $3, NULL)",
     )
     .bind(Uuid::from_u128(SPACE))
     .bind(Uuid::from_u128(PAGE))
@@ -112,9 +121,11 @@ async fn saved_pages_flow_into_search() -> TestResult {
         root.join("eng/launch.md"),
         "# Launch\n\nShip the satellite instead.\n",
     )?;
-    let _ = sqlx::query("UPDATE drive_nodes SET modified_at = 2000, byte_size = 41")
-        .execute(pool(&index)?)
-        .await?;
+    let _ = sqlx::query(
+        "UPDATE drive_nodes SET modified_at = 2000, byte_size = 41",
+    )
+    .execute(pool(&index)?)
+    .await?;
     assert_eq!(
         eventually(&service, "satellite", 1).await,
         vec!["Launch plan"]
@@ -132,11 +143,14 @@ async fn saved_pages_flow_into_search() -> TestResult {
 }
 
 #[tokio::test]
-async fn the_shared_feed_saves_its_position_for_the_next_holder() -> TestResult {
+async fn the_shared_feed_saves_its_position_for_the_next_holder() -> TestResult
+{
     let dir = tempfile::tempdir()?;
     let root = dir.path().join("files");
-    let index =
-        Arc::new(Index::open(&IndexConfig::sqlite(dir.path().join("index.db"), None)).await?);
+    let index = Arc::new(
+        Index::open(&IndexConfig::sqlite(dir.path().join("index.db"), None))
+            .await?,
+    );
     let store: Arc<dyn BlobStore> = Arc::new(LocalStore::open(&root).await?);
     let (backend, _) = TantivyBackend::open(&TantivyConfig {
         location: Location::Memory,
@@ -155,19 +169,22 @@ async fn the_shared_feed_saves_its_position_for_the_next_holder() -> TestResult 
         Arc::new(StaticStars::default()),
     );
     let source = Arc::new(DriveSource::new(Arc::clone(&index), store));
-    let (indexer, _task) = Indexer::spawn(service.clone(), source, IndexerConfig::default());
+    let (indexer, _task) =
+        Indexer::spawn(service.clone(), source, IndexerConfig::default());
     let config = FeedConfig {
         interval: Duration::from_millis(20),
         start: Start::CatchUp,
     };
-    let feed = DriveFeed::spawn_shared(Arc::clone(&index), indexer, config, "pod-a");
+    let feed =
+        DriveFeed::spawn_shared(Arc::clone(&index), indexer, config, "pod-a");
 
     std::fs::create_dir_all(root.join("eng"))?;
     std::fs::write(root.join("eng/launch.md"), "Ship the rocket.\n")?;
     let _ = sqlx::query(
-        "INSERT INTO drive_nodes (space_id, node_id, kind, parent_id, tree_parent_id, path, \
-         title, byte_size, modified_at, created_by, trash) \
-         VALUES ($1, $2, 'page', NULL, NULL, 'eng/launch.md', 'Launch plan', 17, 1000, $3, NULL)",
+        "INSERT INTO drive_nodes (space_id, node_id, kind, parent_id, \
+         tree_parent_id, path, title, byte_size, modified_at, created_by, \
+         trash) VALUES ($1, $2, 'page', NULL, NULL, 'eng/launch.md', 'Launch \
+         plan', 17, 1000, $3, NULL)",
     )
     .bind(Uuid::from_u128(SPACE))
     .bind(Uuid::from_u128(PAGE))

@@ -100,7 +100,8 @@ use crate::{
 /// Drive API v3 base URL.
 pub const DEFAULT_API_BASE: &str = "https://www.googleapis.com/drive/v3";
 /// Drive API v3 upload base URL.
-pub const DEFAULT_UPLOAD_BASE: &str = "https://www.googleapis.com/upload/drive/v3";
+pub const DEFAULT_UPLOAD_BASE: &str =
+    "https://www.googleapis.com/upload/drive/v3";
 /// Uploads larger than this use a resumable session (5 `MiB`).
 pub const DEFAULT_RESUMABLE_THRESHOLD: usize = 5 * 1024 * 1024;
 /// Size of each resumable chunk (8 `MiB`, a multiple of 256 `KiB`).
@@ -144,7 +145,10 @@ impl GoogleDriveConfig {
     /// A configuration for the folder `root_folder_id`, with defaults for
     /// everything else.
     #[must_use]
-    pub fn new(root_folder_id: impl Into<String>, tokens: Arc<dyn TokenSource>) -> Self {
+    pub fn new(
+        root_folder_id: impl Into<String>,
+        tokens: Arc<dyn TokenSource>,
+    ) -> Self {
         Self {
             api_base: DEFAULT_API_BASE.to_owned(),
             upload_base: DEFAULT_UPLOAD_BASE.to_owned(),
@@ -213,7 +217,11 @@ fn native(path: &BlobPath, file: &DriveFile) -> StoreError {
 /// Applies `cond` to what is stored now, the way atomic backends do:
 /// `IfAbsent` fails on any file (native ones included), and `IfMatch`
 /// fails with the current etag, or `None` when nothing is there.
-fn check(path: &BlobPath, found: Option<&Found>, cond: &Precondition) -> StoreResult<()> {
+fn check(
+    path: &BlobPath,
+    found: Option<&Found>,
+    cond: &Precondition,
+) -> StoreResult<()> {
     if *cond == Precondition::IfAbsent && found.is_some() {
         return Err(StoreError::AlreadyExists(path.clone()));
     }
@@ -223,7 +231,8 @@ fn check(path: &BlobPath, found: Option<&Found>, cond: &Precondition) -> StoreRe
         return Err(native(path, &found.file));
     }
     if let Precondition::IfMatch(want) = cond {
-        let current: Option<Etag> = found.map(|f| f.file.etag(path)).transpose()?;
+        let current: Option<Etag> =
+            found.map(|f| f.file.etag(path)).transpose()?;
         if current.as_ref() != Some(want) {
             return Err(StoreError::PreconditionFailed {
                 path: path.clone(),
@@ -237,7 +246,9 @@ fn check(path: &BlobPath, found: Option<&Found>, cond: &Precondition) -> StoreRe
 impl Inner {
     /// The folder at `dir`, creating any missing folders on the way.
     async fn ensure_dirs(&self, dir: Option<&BlobPath>) -> StoreResult<String> {
-        if let (Some(id), _) = self.resolver.folder(&self.client, dir, false).await? {
+        if let (Some(id), _) =
+            self.resolver.folder(&self.client, dir, false).await?
+        {
             return Ok(id);
         }
         let Some(dir) = dir else {
@@ -255,7 +266,8 @@ impl Inner {
                 current = id;
                 continue;
             }
-            let existing = self.client.find(&current, name, Kind::Folder).await?;
+            let existing =
+                self.client.find(&current, name, Kind::Folder).await?;
             let folder = match pick(existing, &prefix) {
                 Some(folder) => folder,
                 None => self.create_folder(&current, name, &prefix).await?,
@@ -279,8 +291,15 @@ impl Inner {
         let twins = self.client.find(parent, name, Kind::Folder).await?;
         match pick(twins, prefix) {
             Some(oldest) if oldest.id != created.id => {
-                if let Err(e) = self.client.remove(&created.id, None, false).await {
-                    tracing::warn!(backend = BACKEND, folder = prefix, error = %e, "cannot remove duplicate folder");
+                if let Err(e) =
+                    self.client.remove(&created.id, None, false).await
+                {
+                    tracing::warn!(
+                        backend = BACKEND,
+                        folder = prefix,
+                        error = %e,
+                        "cannot remove duplicate folder"
+                    );
                 }
                 Ok(oldest)
             }
@@ -289,7 +308,11 @@ impl Inner {
     }
 
     /// Drops the cached id after the backend said `NotFound` for it.
-    fn forget_on_not_found<T>(&self, path: &BlobPath, result: StoreResult<T>) -> StoreResult<T> {
+    fn forget_on_not_found<T>(
+        &self,
+        path: &BlobPath,
+        result: StoreResult<T>,
+    ) -> StoreResult<T> {
         if matches!(result, Err(StoreError::NotFound(_))) {
             self.resolver.cache.invalidate_chain(path);
         }
@@ -317,7 +340,9 @@ impl Inner {
                 Ok(file) => return file.meta(path),
                 // Deleted since the check: an `IfMatch` writer has lost,
                 // anyone else creates the file afresh.
-                Err(StoreError::NotFound(_)) if matches!(cond, Precondition::IfMatch(_)) => {
+                Err(StoreError::NotFound(_))
+                    if matches!(cond, Precondition::IfMatch(_)) =>
+                {
                     return Err(StoreError::PreconditionFailed {
                         path: path.clone(),
                         current: None,
@@ -329,7 +354,8 @@ impl Inner {
         }
         let parent_path = path.parent();
         let mut parent = self.ensure_dirs(parent_path.as_ref()).await?;
-        let mut created = self.client.create_file(&parent, path, bytes.clone()).await;
+        let mut created =
+            self.client.create_file(&parent, path, bytes.clone()).await;
         if matches!(created, Err(StoreError::NotFound(_))) {
             // A cached folder vanished under us: walk again and retry once.
             self.resolver.cache.invalidate_chain(path);
@@ -355,7 +381,11 @@ impl Inner {
         file.meta(path)
     }
 
-    async fn delete(&self, path: &BlobPath, cond: &Precondition) -> StoreResult<()> {
+    async fn delete(
+        &self,
+        path: &BlobPath,
+        cond: &Precondition,
+    ) -> StoreResult<()> {
         let found = self.resolve(path).await?;
         check(path, found.as_ref(), cond)?;
         let found = found.ok_or_else(|| StoreError::NotFound(path.clone()))?;
@@ -367,7 +397,11 @@ impl Inner {
         self.forget_on_not_found(path, removed)
     }
 
-    async fn rename(&self, from: &BlobPath, to: &BlobPath) -> StoreResult<BlobMeta> {
+    async fn rename(
+        &self,
+        from: &BlobPath,
+        to: &BlobPath,
+    ) -> StoreResult<BlobMeta> {
         let src = self
             .resolve(from)
             .await?
@@ -431,7 +465,12 @@ impl Inner {
             };
             match pick(same, path.as_str()) {
                 Some(f) if f.is_native() => {
-                    tracing::debug!(backend = BACKEND, %path, mime = %f.mime_type, "skipping Google-native file");
+                    tracing::debug!(
+                        backend = BACKEND,
+                        %path,
+                        mime = %f.mime_type,
+                        "skipping Google-native file"
+                    );
                 }
                 Some(f) => entries.push(BlobEntry {
                     path,
@@ -454,23 +493,32 @@ impl Inner {
     }
 
     /// Where a listing starts: the folder at `dir`, or the file there.
-    async fn list_start(&self, dir: Option<&BlobPath>) -> StoreResult<ListStart> {
-        if let (Some(id), _) = self.resolver.folder(&self.client, dir, false).await? {
+    async fn list_start(
+        &self,
+        dir: Option<&BlobPath>,
+    ) -> StoreResult<ListStart> {
+        if let (Some(id), _) =
+            self.resolver.folder(&self.client, dir, false).await?
+        {
             return Ok(ListStart::Folder(id));
         }
         // A stale cached folder would hide a live one: retry uncached.
-        if let (Some(id), _) = self.resolver.folder(&self.client, dir, true).await? {
+        if let (Some(id), _) =
+            self.resolver.folder(&self.client, dir, true).await?
+        {
             return Ok(ListStart::Folder(id));
         }
         let Some(dir) = dir else {
             return Ok(ListStart::Nothing);
         };
         Ok(match self.resolve(dir).await? {
-            Some(found) if !found.file.is_native() => ListStart::File(BlobEntry {
-                path: dir.clone(),
-                size: found.file.size(),
-                modified: found.file.modified(),
-            }),
+            Some(found) if !found.file.is_native() => {
+                ListStart::File(BlobEntry {
+                    path: dir.clone(),
+                    size: found.file.size(),
+                    modified: found.file.modified(),
+                })
+            }
             _ => ListStart::Nothing,
         })
     }
@@ -498,7 +546,14 @@ fn child_path(prefix: Option<&BlobPath>, name: &str) -> Option<BlobPath> {
     }
     let joined = prefix.map_or_else(|| BlobPath::new(name), |p| p.join(name));
     joined
-        .inspect_err(|e| tracing::warn!(backend = BACKEND, name, error = %e, "skipping file"))
+        .inspect_err(|e| {
+            tracing::warn!(
+                backend = BACKEND,
+                name,
+                error = %e,
+                "skipping file"
+            )
+        })
         .ok()
 }
 
@@ -568,7 +623,11 @@ impl BlobStore for GoogleDriveStore {
         BACKEND
     }
 
-    #[tracing::instrument(skip(self), fields(backend = "gdrive", path = %path), err)]
+    #[tracing::instrument(
+        skip(self),
+        fields(backend = "gdrive", path = %path),
+        err
+    )]
     async fn get(&self, path: &BlobPath) -> StoreResult<Blob> {
         let inner = &self.0;
         let found = inner
@@ -592,7 +651,11 @@ impl BlobStore for GoogleDriveStore {
         Ok(Blob { bytes, meta })
     }
 
-    #[tracing::instrument(skip(self), fields(backend = "gdrive", path = %path), err)]
+    #[tracing::instrument(
+        skip(self),
+        fields(backend = "gdrive", path = %path),
+        err
+    )]
     async fn head(&self, path: &BlobPath) -> StoreResult<BlobMeta> {
         let found = self
             .0
@@ -605,7 +668,11 @@ impl BlobStore for GoogleDriveStore {
         found.file.meta(path)
     }
 
-    #[tracing::instrument(skip(self, bytes), fields(backend = "gdrive", path = %path, size = bytes.len()), err)]
+    #[tracing::instrument(
+        skip(self, bytes),
+        fields(backend = "gdrive", path = %path, size = bytes.len()),
+        err
+    )]
     async fn put(
         &self,
         path: &BlobPath,
@@ -615,19 +682,41 @@ impl BlobStore for GoogleDriveStore {
         self.0.put(path, bytes, &condition).await
     }
 
-    #[tracing::instrument(skip(self), fields(backend = "gdrive", path = %path), err)]
-    async fn delete(&self, path: &BlobPath, condition: Precondition) -> StoreResult<()> {
+    #[tracing::instrument(
+        skip(self),
+        fields(backend = "gdrive", path = %path),
+        err
+    )]
+    async fn delete(
+        &self,
+        path: &BlobPath,
+        condition: Precondition,
+    ) -> StoreResult<()> {
         self.0.delete(path, &condition).await
     }
 
-    #[tracing::instrument(skip(self), fields(backend = "gdrive", from = %from, to = %to), err)]
-    async fn rename(&self, from: &BlobPath, to: &BlobPath) -> StoreResult<BlobMeta> {
+    #[tracing::instrument(
+        skip(self),
+        fields(backend = "gdrive", from = %from, to = %to),
+        err
+    )]
+    async fn rename(
+        &self,
+        from: &BlobPath,
+        to: &BlobPath,
+    ) -> StoreResult<BlobMeta> {
         self.0.rename(from, to).await
     }
 
-    fn list(&self, dir: Option<&BlobPath>) -> BoxStream<'static, StoreResult<BlobEntry>> {
-        let span =
-            tracing::info_span!("list", backend = "gdrive", dir = ?dir.map(BlobPath::as_str));
+    fn list(
+        &self,
+        dir: Option<&BlobPath>,
+    ) -> BoxStream<'static, StoreResult<BlobEntry>> {
+        let span = tracing::info_span!(
+            "list",
+            backend = "gdrive",
+            dir = ?dir.map(BlobPath::as_str)
+        );
         let walk = Walk {
             inner: Arc::clone(&self.0),
             start: Some(Start(dir.cloned())),

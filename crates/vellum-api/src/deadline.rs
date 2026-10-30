@@ -88,7 +88,9 @@ where
             Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(e.into()))),
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => {
-                if whole.as_mut().poll(cx).is_ready() || gap.as_mut().poll(cx).is_ready() {
+                if whole.as_mut().poll(cx).is_ready()
+                    || gap.as_mut().poll(cx).is_ready()
+                {
                     tracing::info!(
                         event = "gateway.slow_body",
                         "cut off a request body that arrived too slowly"

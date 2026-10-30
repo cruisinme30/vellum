@@ -62,10 +62,17 @@ pub enum EmailError {
 /// Sends encoded messages (SMTP or a provider API, in the edge layer).
 pub trait MailTransport: Send + Sync {
     /// Sends one message to `to`.
-    fn send(&self, to: &str, message: &[u8]) -> impl Future<Output = Result<(), String>> + Send;
+    fn send(
+        &self,
+        to: &str,
+        message: &[u8],
+    ) -> impl Future<Output = Result<(), String>> + Send;
 }
 
-fn clean<'a>(value: &'a str, field: &'static str) -> Result<&'a str, EmailError> {
+fn clean<'a>(
+    value: &'a str,
+    field: &'static str,
+) -> Result<&'a str, EmailError> {
     if value.contains(['\r', '\n']) {
         Err(EmailError::InvalidHeader(field))
     } else {
@@ -73,10 +80,15 @@ fn clean<'a>(value: &'a str, field: &'static str) -> Result<&'a str, EmailError>
     }
 }
 
-fn address<'a>(value: &'a str, field: &'static str) -> Result<&'a str, EmailError> {
+fn address<'a>(
+    value: &'a str,
+    field: &'static str,
+) -> Result<&'a str, EmailError> {
     let value = clean(value, field)?;
     let valid = value.split_once('@').is_some_and(|(local, domain)| {
-        !local.is_empty() && domain.contains('.') && !value.contains([' ', '<', '>', ',', '"'])
+        !local.is_empty()
+            && domain.contains('.')
+            && !value.contains([' ', '<', '>', ',', '"'])
     });
     if valid {
         Ok(value)
@@ -94,7 +106,10 @@ fn encode_word(text: &str) -> String {
     }
 }
 
-fn mailbox(mailbox: &Mailbox, field: &'static str) -> Result<String, EmailError> {
+fn mailbox(
+    mailbox: &Mailbox,
+    field: &'static str,
+) -> Result<String, EmailError> {
     let addr = address(&mailbox.address, field)?;
     let name = clean(&mailbox.name, field)?;
     if name.is_empty() {
@@ -110,7 +125,8 @@ fn mailbox(mailbox: &Mailbox, field: &'static str) -> Result<String, EmailError>
 
 fn wrapped_base64(bytes: &[u8]) -> String {
     let encoded = b64(bytes);
-    let mut out = String::with_capacity(encoded.len() + encoded.len() / 76 * 2 + 2);
+    let mut out =
+        String::with_capacity(encoded.len() + encoded.len() / 76 * 2 + 2);
     let mut rest = encoded.as_str();
     while !rest.is_empty() {
         let (line, tail) = rest.split_at(rest.len().min(76));
@@ -136,15 +152,21 @@ impl EmailMessage {
         let thread = clean(&self.thread, "thread")?;
         let message_id = clean(&self.message_id, "message_id")?;
         let root = format!("<thread.{thread}@{domain}>");
-        let boundary = format!("vellum-{message_id}").replace(['@', '<', '>'], "-");
+        let boundary =
+            format!("vellum-{message_id}").replace(['@', '<', '>'], "-");
         let mut headers = vec![
             format!("From: {}", mailbox(&self.from, "from")?),
             format!("To: {}", mailbox(&self.to, "to")?),
-            format!("Subject: {}", encode_word(clean(&self.subject, "subject")?)),
+            format!(
+                "Subject: {}",
+                encode_word(clean(&self.subject, "subject")?)
+            ),
             format!(
                 "Date: {}",
-                jiff::fmt::rfc2822::to_string(&self.date.to_zoned(jiff::tz::TimeZone::UTC))
-                    .unwrap_or_default()
+                jiff::fmt::rfc2822::to_string(
+                    &self.date.to_zoned(jiff::tz::TimeZone::UTC)
+                )
+                .unwrap_or_default()
             ),
             format!("Message-ID: <{message_id}>"),
             format!("In-Reply-To: {root}"),
@@ -156,17 +178,25 @@ impl EmailMessage {
             "List-Unsubscribe-Post: List-Unsubscribe=One-Click".to_owned(),
             "Auto-Submitted: auto-generated".to_owned(),
             "MIME-Version: 1.0".to_owned(),
-            format!("Content-Type: multipart/alternative; boundary=\"{boundary}\""),
+            format!(
+                "Content-Type: multipart/alternative; boundary=\"{boundary}\""
+            ),
         ];
         if let Some(reply_to) = &self.reply_to {
-            headers.insert(2, format!("Reply-To: <{}>", address(reply_to, "reply_to")?));
+            headers.insert(
+                2,
+                format!("Reply-To: <{}>", address(reply_to, "reply_to")?),
+            );
         }
         let mut out = headers.join("\r\n");
         out.push_str("\r\n\r\n");
-        for (mime, body) in [("text/plain", &self.text), ("text/html", &self.html)] {
+        for (mime, body) in
+            [("text/plain", &self.text), ("text/html", &self.html)]
+        {
             let _ = write!(
                 out,
-                "--{boundary}\r\nContent-Type: {mime}; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n"
+                "--{boundary}\r\nContent-Type: {mime}; charset=utf-8\r\n\
+                    Content-Transfer-Encoding: base64\r\n\r\n"
             );
             out.push_str(&wrapped_base64(body.as_bytes()));
         }
@@ -204,12 +234,26 @@ mod tests {
     fn encodes_a_threaded_multipart_message() -> Result<(), EmailError> {
         let bytes = message().encode()?;
         let text = String::from_utf8(bytes).unwrap_or_default();
-        assert!(text.contains("From: \"Vellum\" <notifications@northstar.dev>\r\n"));
-        assert!(text.contains("To: =?UTF-8?B?Wm/DqyBQYXJr?= <zoe@northstar.dev>\r\n"));
-        assert!(text.contains("Reply-To: <reply+ENG-142.abc@northstar.dev>\r\n"));
+        assert!(
+            text.contains("From: \"Vellum\" <notifications@northstar.dev>\r\n")
+        );
+        assert!(
+            text.contains(
+                "To: =?UTF-8?B?Wm/DqyBQYXJr?= <zoe@northstar.dev>\r\n"
+            )
+        );
+        assert!(
+            text.contains("Reply-To: <reply+ENG-142.abc@northstar.dev>\r\n")
+        );
         assert!(text.contains("Date: Thu, 1 Jan 1970 00:00:00 +0000\r\n"));
-        assert!(text.contains("In-Reply-To: <thread.ENG-142@northstar.dev>\r\n"));
-        assert!(text.contains("List-Unsubscribe-Post: List-Unsubscribe=One-Click\r\n"));
+        assert!(
+            text.contains("In-Reply-To: <thread.ENG-142@northstar.dev>\r\n")
+        );
+        assert!(
+            text.contains(
+                "List-Unsubscribe-Post: List-Unsubscribe=One-Click\r\n"
+            )
+        );
         assert!(text.contains("Content-Type: text/html; charset=utf-8"));
         assert!(text.ends_with("--\r\n"));
         assert!(text.lines().all(|line| line.len() <= 998));

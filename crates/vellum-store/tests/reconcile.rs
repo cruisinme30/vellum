@@ -5,11 +5,14 @@
 //! copy; it never loses either side.
 
 use bytes::Bytes;
-use vellum_store::{Base, BlobPath, BlobStore, LocalStore, Precondition, Saved, Writer, save};
+use vellum_store::{
+    Base, BlobPath, BlobStore, LocalStore, Precondition, Saved, Writer, save,
+};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const V1: &str = "---\nid: 01JBQ0000000000000000000AA\n---\n# Plan\n\nShip in May.\nHire two.\n";
+const V1: &str = "---\nid: 01JBQ0000000000000000000AA\n---\n# Plan\n\n\
+    Ship in May.\nHire two.\n";
 
 fn rekey(bytes: &[u8]) -> Bytes {
     let text = String::from_utf8_lossy(bytes).replace("0000AA", "0000BB");
@@ -22,8 +25,10 @@ const ALICE: Writer<'static> = Writer {
     reidentify: &rekey,
 };
 
-async fn setup()
--> Result<(tempfile::TempDir, LocalStore, BlobPath, Base), Box<dyn std::error::Error>> {
+async fn setup() -> Result<
+    (tempfile::TempDir, LocalStore, BlobPath, Base),
+    Box<dyn std::error::Error>,
+> {
     let dir = tempfile::tempdir()?;
     let store = LocalStore::open(dir.path()).await?;
     let path = BlobPath::new("drives/users/alice/Plan.md")?;
@@ -37,7 +42,10 @@ async fn setup()
     Ok((dir, store, path, base))
 }
 
-async fn text(store: &LocalStore, path: &BlobPath) -> Result<String, Box<dyn std::error::Error>> {
+async fn text(
+    store: &LocalStore,
+    path: &BlobPath,
+) -> Result<String, Box<dyn std::error::Error>> {
     Ok(String::from_utf8(store.get(path).await?.bytes.to_vec())?)
 }
 
@@ -45,7 +53,8 @@ async fn text(store: &LocalStore, path: &BlobPath) -> Result<String, Box<dyn std
 async fn unchanged_blob_is_written() -> TestResult {
     let (_dir, store, path, base) = setup().await?;
     let ours = V1.replace("May", "June");
-    let saved = save(&store, &path, base, Bytes::from(ours.clone()), &ALICE).await?;
+    let saved =
+        save(&store, &path, base, Bytes::from(ours.clone()), &ALICE).await?;
     assert!(matches!(saved, Saved::Written(_)), "{saved:?}");
     assert_eq!(text(&store, &path).await?, ours);
     Ok(())
@@ -139,7 +148,8 @@ async fn edit_outranks_external_delete() -> TestResult {
     let (_dir, store, path, base) = setup().await?;
     store.delete(&path, Precondition::None).await?;
     let ours = V1.replace("May", "June");
-    let saved = save(&store, &path, base, Bytes::from(ours.clone()), &ALICE).await?;
+    let saved =
+        save(&store, &path, base, Bytes::from(ours.clone()), &ALICE).await?;
     assert!(matches!(saved, Saved::Written(_)), "{saved:?}");
     assert_eq!(text(&store, &path).await?, ours);
     Ok(())

@@ -90,7 +90,9 @@ export function RenderedHtml({
   return (
     <div
       ref={reference}
-      className={className === undefined ? RENDER_SCOPE : `${RENDER_SCOPE} ${className}`}
+      className={
+        className === undefined ? RENDER_SCOPE : `${RENDER_SCOPE} ${className}`
+      }
       aria-busy={busy || undefined}
       {...(label === undefined ? {} : { role: "region", "aria-label": label })}
     />

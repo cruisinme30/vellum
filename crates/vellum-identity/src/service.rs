@@ -14,7 +14,8 @@ use std::time::Duration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use vellum_contracts::{
-    BoxFuture, CredentialKind, HttpMethod, Operation, Readiness, RequestContext, Scope, Service,
+    BoxFuture, CredentialKind, HttpMethod, Operation, Readiness,
+    RequestContext, Scope, Service,
 };
 use vellum_kernel::{Error, ErrorKind, Timestamp, UserId};
 
@@ -378,12 +379,14 @@ impl Service for IdentityService {
             move |ctx: RequestContext, _: Empty| {
                 let id = Arc::clone(&id);
                 async move {
-                    let user = ctx.principal.user_id().and_then(|u| id.user(u).ok());
+                    let user =
+                        ctx.principal.user_id().and_then(|u| id.user(u).ok());
                     let buttons = id.sign_in_buttons();
                     Ok(AuthStatus {
                         needs_setup: id.needs_setup(),
                         user,
-                        credential: credential_name(ctx.principal.kind()).to_owned(),
+                        credential: credential_name(ctx.principal.kind())
+                            .to_owned(),
                         scopes: ctx.principal.scopes().iter().collect(),
                         sso: buttons.first().cloned(),
                         providers: buttons,
@@ -434,7 +437,10 @@ impl Service for IdentityService {
             move |ctx: RequestContext, input: ById| {
                 let id = Arc::clone(&id);
                 async move {
-                    id.revoke_session(ctx.principal.require_user()?, &input.id)?;
+                    id.revoke_session(
+                        ctx.principal.require_user()?,
+                        &input.id,
+                    )?;
                     Ok(done())
                 }
             }
@@ -477,7 +483,10 @@ impl Service for IdentityService {
             move |ctx: RequestContext, input: ById| {
                 let id = Arc::clone(&id);
                 async move {
-                    id.revoke_api_token(ctx.principal.require_user()?, &input.id)?;
+                    id.revoke_api_token(
+                        ctx.principal.require_user()?,
+                        &input.id,
+                    )?;
                     Ok(done())
                 }
             }
@@ -600,7 +609,8 @@ impl Service for IdentityService {
                 let id = Arc::clone(&id);
                 async move {
                     Ok(RecoveryCodes {
-                        recovery_codes: id.new_recovery_codes(require_session(&ctx)?)?,
+                        recovery_codes: id
+                            .new_recovery_codes(require_session(&ctx)?)?,
                     })
                 }
             }
@@ -660,7 +670,8 @@ impl Service for IdentityService {
                 let id = Arc::clone(&id);
                 async move {
                     let _ = ctx.principal.require_user()?;
-                    let limit = usize::from(input.limit.unwrap_or(8).clamp(1, 20));
+                    let limit =
+                        usize::from(input.limit.unwrap_or(8).clamp(1, 20));
                     let entries = id
                         .search_people(&input.q, limit)
                         .into_iter()
@@ -715,9 +726,16 @@ impl Service for IdentityService {
             }
         };
         vec![
-            Operation::query("identity.status", "/v1/auth/status", Scope::Read, status)
-                .allow_anonymous()
-                .summary("Who is signed in, and whether the workspace needs set-up"),
+            Operation::query(
+                "identity.status",
+                "/v1/auth/status",
+                Scope::Read,
+                status,
+            )
+            .allow_anonymous()
+            .summary(
+                "Who is signed in, and whether the workspace needs set-up",
+            ),
             Operation::mutation(
                 "identity.setup",
                 HttpMethod::Post,
@@ -750,8 +768,13 @@ impl Service for IdentityService {
                 revoke_session,
             )
             .summary("Sign out one of your browsers"),
-            Operation::query("identity.tokens", "/v1/me/tokens", Scope::Read, tokens)
-                .summary("List your API tokens"),
+            Operation::query(
+                "identity.tokens",
+                "/v1/me/tokens",
+                Scope::Read,
+                tokens,
+            )
+            .summary("List your API tokens"),
             Operation::mutation(
                 "identity.create_token",
                 HttpMethod::Post,
@@ -817,7 +840,9 @@ impl Service for IdentityService {
                 start_totp,
             )
             .fresh_auth(FRESH_AUTH)
-            .summary("Start adding an authenticator app; confirm it with a code"),
+            .summary(
+                "Start adding an authenticator app; confirm it with a code",
+            ),
             Operation::mutation(
                 "identity.confirm_totp",
                 HttpMethod::Post,
@@ -871,7 +896,9 @@ impl Service for IdentityService {
                 recovery_codes,
             )
             .fresh_auth(FRESH_AUTH)
-            .summary("Replace your recovery codes; the new ones are shown once"),
+            .summary(
+                "Replace your recovery codes; the new ones are shown once",
+            ),
             Operation::mutation(
                 "identity.admin_reset_factors",
                 HttpMethod::Post,
@@ -907,9 +934,14 @@ impl Service for IdentityService {
                 directory,
             )
             .summary("Find people to share with"),
-            Operation::query("identity.users", "/v1/admin/users", Scope::Admin, users)
-                .fresh_auth(FRESH_AUTH)
-                .summary("List every user"),
+            Operation::query(
+                "identity.users",
+                "/v1/admin/users",
+                Scope::Admin,
+                users,
+            )
+            .fresh_auth(FRESH_AUTH)
+            .summary("List every user"),
             Operation::mutation(
                 "identity.create_user",
                 HttpMethod::Post,

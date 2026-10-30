@@ -24,7 +24,8 @@ use std::time::{Duration, Instant};
 use async_trait::async_trait;
 use tokio::sync::Mutex;
 use tract_onnx::prelude::{
-    Framework as _, InferenceModelExt as _, IntoRunnable, TValue, Tensor, TypedRunnableModel, tvec,
+    Framework as _, InferenceModelExt as _, IntoRunnable, TValue, Tensor,
+    TypedRunnableModel, tvec,
 };
 
 pub use self::wordpiece::WordPiece;
@@ -81,28 +82,30 @@ impl OnnxConfig {
     /// A missing model, vocabulary or `config.json`, or one without
     /// `hidden_size`.
     pub fn from_dir(dir: &Path) -> Result<Self> {
-        let model = [dir.join("model.onnx"), dir.join("onnx").join("model.onnx")]
-            .into_iter()
-            .find(|p| p.is_file())
-            .ok_or_else(|| config_error(dir, "no model.onnx"))?;
+        let model =
+            [dir.join("model.onnx"), dir.join("onnx").join("model.onnx")]
+                .into_iter()
+                .find(|p| p.is_file())
+                .ok_or_else(|| config_error(dir, "no model.onnx"))?;
         let vocab = dir.join("vocab.txt");
         if !vocab.is_file() {
             return Err(config_error(dir, "no vocab.txt"));
         }
         let raw = std::fs::read_to_string(dir.join("config.json"))
             .map_err(|_| config_error(dir, "no config.json"))?;
-        let json: serde_json::Value =
-            serde_json::from_str(&raw).map_err(|e| config_error(dir, &e.to_string()))?;
+        let json: serde_json::Value = serde_json::from_str(&raw)
+            .map_err(|e| config_error(dir, &e.to_string()))?;
         let number = |key: &str| {
             json.get(key)
                 .and_then(serde_json::Value::as_u64)
                 .and_then(|n| usize::try_from(n).ok())
         };
-        let dimensions = number("hidden_size")
-            .filter(|d| *d > 0)
-            .ok_or_else(|| config_error(dir, "config.json has no hidden_size"))?;
-        let max_tokens =
-            number("max_position_embeddings").map_or(MAX_TOKENS, |n| n.min(MAX_TOKENS));
+        let dimensions =
+            number("hidden_size").filter(|d| *d > 0).ok_or_else(|| {
+                config_error(dir, "config.json has no hidden_size")
+            })?;
+        let max_tokens = number("max_position_embeddings")
+            .map_or(MAX_TOKENS, |n| n.min(MAX_TOKENS));
         let folder = dir
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
@@ -177,7 +180,8 @@ impl OnnxEmbedder {
             stale && slot.loaded.take().is_some()
         };
         if dropped {
-            tracing::info!(model = %self.config.model_id, "unloaded the idle embedding model");
+            tracing::info!(model = %self.config.model_id, "unloaded the idle \
+                embedding model");
         }
         dropped
     }
@@ -191,9 +195,10 @@ impl OnnxEmbedder {
             return Ok(loaded);
         }
         let config = Arc::clone(&self.config);
-        let loaded = tokio::task::spawn_blocking(move || load(&config).map(Arc::new))
-            .await
-            .map_err(model_error)??;
+        let loaded =
+            tokio::task::spawn_blocking(move || load(&config).map(Arc::new))
+                .await
+                .map_err(model_error)??;
         slot.loaded = Some(Arc::clone(&loaded));
         drop(slot);
         Ok(loaded)
@@ -206,14 +211,17 @@ impl OnnxEmbedder {
         let loaded = self.loaded().await?;
         let max_tokens = self.config.max_tokens;
         let dimensions = self.config.dimensions;
-        tokio::task::spawn_blocking(move || run(&loaded, &texts, max_tokens, dimensions))
-            .await
-            .map_err(model_error)?
+        tokio::task::spawn_blocking(move || {
+            run(&loaded, &texts, max_tokens, dimensions)
+        })
+        .await
+        .map_err(model_error)?
     }
 }
 
 fn load(config: &OnnxConfig) -> Result<Loaded> {
-    let vocab = WordPiece::from_vocab(&std::fs::read_to_string(&config.vocab)?)?;
+    let vocab =
+        WordPiece::from_vocab(&std::fs::read_to_string(&config.vocab)?)?;
     let model = tract_onnx::onnx()
         .model_for_path(&config.model)
         .map_err(model_error)?;
@@ -275,7 +283,9 @@ fn run(
         }
     }
     let types = vec![0_i64; batch * seq];
-    let tensor = |data: &[i64]| Tensor::from_shape(&[batch, seq], data).map_err(model_error);
+    let tensor = |data: &[i64]| {
+        Tensor::from_shape(&[batch, seq], data).map_err(model_error)
+    };
     let mut values = tvec![];
     for input in &loaded.inputs {
         let t = match input {
@@ -286,9 +296,9 @@ fn run(
         values.push(TValue::from(t));
     }
     let outputs = loaded.model.run(values).map_err(model_error)?;
-    let output = outputs
-        .first()
-        .ok_or_else(|| SearchError::Embedding("the model returned nothing".into()))?;
+    let output = outputs.first().ok_or_else(|| {
+        SearchError::Embedding("the model returned nothing".into())
+    })?;
     let view = output.to_plain_array_view::<f32>().map_err(model_error)?;
     let shape = view.shape().to_vec();
     let flat: Vec<f32> = view.iter().copied().collect();
@@ -305,10 +315,9 @@ fn run(
                     }
                     count += 1.0;
                     let start = (row * seq + col) * dimensions;
-                    for (acc, x) in pooled
-                        .iter_mut()
-                        .zip(flat.get(start..start + dimensions).unwrap_or_default())
-                    {
+                    for (acc, x) in pooled.iter_mut().zip(
+                        flat.get(start..start + dimensions).unwrap_or_default(),
+                    ) {
                         *acc += x;
                     }
                 }
@@ -331,7 +340,8 @@ fn run(
         }
         other => {
             return Err(SearchError::Embedding(format!(
-                "model output shape {other:?} does not match batch {batch} × {dimensions} dimensions"
+                "model output shape {other:?} does not match batch {batch} × \
+                    {dimensions} dimensions"
             )));
         }
     }

@@ -30,7 +30,11 @@ const SAVES: usize = 25;
 #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn concurrent_page_saves_never_hit_a_locked_database() -> TestResult {
     let dir = tempfile::tempdir()?;
-    let db = Index::open(&IndexConfig::sqlite(dir.path().join("index.sqlite"), None)).await?;
+    let db = Index::open(&IndexConfig::sqlite(
+        dir.path().join("index.sqlite"),
+        None,
+    ))
+    .await?;
     let store = Arc::new(LocalStore::open(dir.path().join("files")).await?);
     let index = Arc::new(SqlIndex::new(db));
     let access = Arc::new(MemoryAccess::new(index.clone()));
@@ -39,7 +43,13 @@ async fn concurrent_page_saves_never_hit_a_locked_database() -> TestResult {
         user: UserId::generate(),
     };
     let space = drive
-        .create_space(&alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .create_space(
+            &alice,
+            SpaceKind::SharedDrive,
+            "eng",
+            "Engineering",
+            None,
+        )
         .await?;
 
     let mut pages = Vec::with_capacity(WRITERS);
@@ -64,7 +74,9 @@ async fn concurrent_page_saves_never_hit_a_locked_database() -> TestResult {
                     etag: Some(blob.meta.etag.clone()),
                 };
                 let content = Bytes::from(format!("round {round}\n"));
-                if let Err(error) = drive.save(&alice, page.id, base, content).await {
+                if let Err(error) =
+                    drive.save(&alice, page.id, base, content).await
+                {
                     failures.push(error.to_string());
                 }
             }

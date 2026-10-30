@@ -10,7 +10,8 @@ use crate::{exports, services};
 /// Each `/api/v1/…` path in `routes.js`, with `${…}` as `{}` and any
 /// query string dropped.
 fn load_test_paths() -> Vec<String> {
-    let file = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../deploy/perf/k6/routes.js");
+    let file = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../deploy/perf/k6/routes.js");
     let text = std::fs::read_to_string(file).unwrap();
     let mut out = Vec::new();
     let mut rest = text.as_str();
@@ -43,9 +44,9 @@ fn every_load_test_route_is_served() {
         .collect();
     // Exports are plain HTTP routes, outside the OpenAPI document (D304).
     served.extend(
-        exports::EXPORT_ROUTES
-            .iter()
-            .map(|route| normalise(&format!("{}{route}", exports::EXPORT_PREFIX))),
+        exports::EXPORT_ROUTES.iter().map(|route| {
+            normalise(&format!("{}{route}", exports::EXPORT_PREFIX))
+        }),
     );
     let paths = load_test_paths();
     assert!(paths.len() >= 5, "found {paths:?}");
@@ -56,7 +57,8 @@ fn every_load_test_route_is_served() {
     for path in paths {
         assert!(
             served.contains(&path),
-            "deploy/perf/k6/routes.js drives {path}, which the server does not serve"
+            "deploy/perf/k6/routes.js drives {path}, which the server does not \
+                serve"
         );
     }
 }

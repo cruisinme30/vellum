@@ -61,11 +61,16 @@ impl AwsCredentials {
     /// # Errors
     /// [`CryptoError::Provider`] if either required variable is missing.
     pub fn from_env() -> Result<Self, CryptoError> {
-        let var = |name: &str| std::env::var(name).ok().filter(|v| !v.is_empty());
-        let missing = |name: &str| CryptoError::Provider(format!("{BACKEND}: {name} is not set"));
+        let var =
+            |name: &str| std::env::var(name).ok().filter(|v| !v.is_empty());
+        let missing = |name: &str| {
+            CryptoError::Provider(format!("{BACKEND}: {name} is not set"))
+        };
         Ok(Self::new(
-            var("AWS_ACCESS_KEY_ID").ok_or_else(|| missing("AWS_ACCESS_KEY_ID"))?,
-            var("AWS_SECRET_ACCESS_KEY").ok_or_else(|| missing("AWS_SECRET_ACCESS_KEY"))?,
+            var("AWS_ACCESS_KEY_ID")
+                .ok_or_else(|| missing("AWS_ACCESS_KEY_ID"))?,
+            var("AWS_SECRET_ACCESS_KEY")
+                .ok_or_else(|| missing("AWS_SECRET_ACCESS_KEY"))?,
             var("AWS_SESSION_TOKEN"),
         ))
     }
@@ -175,7 +180,11 @@ impl KeyProvider for AwsKms {
         self.current.clone()
     }
 
-    #[tracing::instrument(name = "kms.wrap", skip_all, fields(backend = BACKEND, kek_id = %self.current))]
+    #[tracing::instrument(
+        name = "kms.wrap",
+        skip_all,
+        fields(backend = BACKEND, kek_id = %self.current)
+    )]
     async fn wrap(&self, dek: &SecretKey) -> Result<WrappedDek, CryptoError> {
         let started = Instant::now();
         let result = async {
@@ -200,15 +209,24 @@ impl KeyProvider for AwsKms {
         http::record(BACKEND, "wrap", started, result)
     }
 
-    #[tracing::instrument(name = "kms.unwrap", skip_all, fields(backend = BACKEND, kek_id = %wrapped.kek_id))]
-    async fn unwrap(&self, wrapped: &WrappedDek) -> Result<SecretKey, CryptoError> {
+    #[tracing::instrument(
+        name = "kms.unwrap",
+        skip_all,
+        fields(backend = BACKEND, kek_id = %wrapped.kek_id)
+    )]
+    async fn unwrap(
+        &self,
+        wrapped: &WrappedDek,
+    ) -> Result<SecretKey, CryptoError> {
         let started = Instant::now();
         let result = async {
             let (region, key) = parse(&wrapped.kek_id)?;
             let body = json!({
                 "KeyId": key,
                 "CiphertextBlob": b64(&wrapped.blob),
-                "EncryptionContext": { CONTEXT_KEY: http::aad(&wrapped.kek_id) },
+                "EncryptionContext": {
+                    CONTEXT_KEY: http::aad(&wrapped.kek_id)
+                },
             });
             let response = self.call(region, "Decrypt", &body).await?;
             let plaintext = Zeroizing::new(unb64(
@@ -223,7 +241,9 @@ impl KeyProvider for AwsKms {
 }
 
 fn kek_id(region: &str, key_id: &str) -> Result<KekId, CryptoError> {
-    if !http::safe_segment(region, &[]) || !http::safe_segment(key_id, &[':', '/']) {
+    if !http::safe_segment(region, &[])
+        || !http::safe_segment(key_id, &[':', '/'])
+    {
         return Err(CryptoError::InvalidKekId);
     }
     KekId::new(format!("{PREFIX}{region}:{key_id}"))
@@ -235,7 +255,8 @@ fn parse(id: &KekId) -> Result<(&str, &str), CryptoError> {
         .strip_prefix(PREFIX)
         .and_then(|rest| rest.split_once(':'))
         .filter(|(region, key)| {
-            http::safe_segment(region, &[]) && http::safe_segment(key, &[':', '/'])
+            http::safe_segment(region, &[])
+                && http::safe_segment(key, &[':', '/'])
         })
         .ok_or_else(|| CryptoError::UnknownKek(id.clone()))
 }
@@ -246,7 +267,8 @@ mod tests {
 
     #[test]
     fn kek_ids_round_trip_through_parse() -> Result<(), CryptoError> {
-        let arn = "arn:aws:kms:eu-west-1:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab";
+        let arn = "arn:aws:kms:eu-west-1:111122223333:key/1234abcd-12ab-34cd-56\
+            ef-1234567890ab";
         let id = kek_id("eu-west-1", arn)?;
         assert_eq!(parse(&id)?, ("eu-west-1", arn));
         assert!(kek_id("eu west", "k").is_err());

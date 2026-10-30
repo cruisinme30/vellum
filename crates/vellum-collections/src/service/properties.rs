@@ -19,9 +19,12 @@ use vellum_kernel::{CollectionId, Error, ErrorKind};
 
 use super::state::State;
 use super::{
-    AddPropertyInput, CollectionInfo, CollectionsService, PropertyKey, UpdatePropertyInput,
+    AddPropertyInput, CollectionInfo, CollectionsService, PropertyKey,
+    UpdatePropertyInput,
 };
-use crate::schema::{Property, PropertySpec, PropertyType, Schema, SelectOption};
+use crate::schema::{
+    Property, PropertySpec, PropertyType, Schema, SelectOption,
+};
 
 /// Longest property name, in characters.
 pub const MAX_PROPERTY_NAME_CHARS: usize = 100;
@@ -47,13 +50,17 @@ fn property_name(name: &str) -> Result<String, Error> {
         || name.chars().any(char::is_control)
     {
         return Err(invalid(format!(
-            "a property name needs 1 to {MAX_PROPERTY_NAME_CHARS} printable characters"
+            "a property name needs 1 to {MAX_PROPERTY_NAME_CHARS} printable \
+                characters"
         )));
     }
     Ok(name.to_owned())
 }
 
-fn schema_mut(schemas: &mut Schemas, id: CollectionId) -> Result<&mut Schema, Error> {
+fn schema_mut(
+    schemas: &mut Schemas,
+    id: CollectionId,
+) -> Result<&mut Schema, Error> {
     schemas.get_mut(&id).ok_or_else(|| not_found(id))
 }
 
@@ -62,15 +69,23 @@ fn index_of(schema: &Schema, key: &str) -> Result<usize, Error> {
         .properties
         .iter()
         .position(|p| p.key == key)
-        .ok_or_else(|| Error::new(ErrorKind::NotFound, format!("no property with key {key:?}")))
+        .ok_or_else(|| {
+            Error::new(
+                ErrorKind::NotFound,
+                format!("no property with key {key:?}"),
+            )
+        })
 }
 
-fn name_taken(schema: &Schema, name: &str, except: Option<&str>) -> Result<(), Error> {
+fn name_taken(
+    schema: &Schema,
+    name: &str,
+    except: Option<&str>,
+) -> Result<(), Error> {
     let lower = name.to_lowercase();
-    let taken = schema
-        .properties
-        .iter()
-        .any(|p| Some(p.key.as_str()) != except && p.name.to_lowercase() == lower);
+    let taken = schema.properties.iter().any(|p| {
+        Some(p.key.as_str()) != except && p.name.to_lowercase() == lower
+    });
     if taken {
         return Err(Error::new(
             ErrorKind::Conflict,
@@ -81,8 +96,13 @@ fn name_taken(schema: &Schema, name: &str, except: Option<&str>) -> Result<(), E
 }
 
 /// A fresh key and a free name (suffixed if taken) for a paired property.
-fn free_key_and_name(schema: &Schema, name: &str, also: &[&Property]) -> (String, String) {
-    let mut keys: BTreeSet<String> = schema.properties.iter().map(|p| p.key.clone()).collect();
+fn free_key_and_name(
+    schema: &Schema,
+    name: &str,
+    also: &[&Property],
+) -> (String, String) {
+    let mut keys: BTreeSet<String> =
+        schema.properties.iter().map(|p| p.key.clone()).collect();
     let mut names: BTreeSet<String> = schema
         .properties
         .iter()
@@ -106,7 +126,9 @@ fn users_of(schema: &Schema, key: &str) -> Vec<String> {
         .iter()
         .filter(|p| p.key != key)
         .filter(|p| match &p.kind {
-            PropertyType::Formula { formula, .. } => formula.references().contains(key),
+            PropertyType::Formula { formula, .. } => {
+                formula.references().contains(key)
+            }
             PropertyType::Rollup { via, .. } => via == key,
             _ => false,
         })
@@ -144,10 +166,15 @@ fn rollup_keys(
     let PropertyType::Relation { to, .. } = relation.kind else {
         return Err(invalid(format!("{} is not a relation", relation.name)));
     };
-    let target = schemas
-        .get(&to)
-        .and_then(|t| t.resolve(prop))
-        .ok_or_else(|| invalid(format!("the linked collection has no property {prop:?}")))?;
+    let target =
+        schemas
+            .get(&to)
+            .and_then(|t| t.resolve(prop))
+            .ok_or_else(|| {
+                invalid(format!(
+                    "the linked collection has no property {prop:?}"
+                ))
+            })?;
     Ok((Some(relation.key.clone()), Some(target.key.clone())))
 }
 
@@ -159,9 +186,9 @@ fn add_relation(
     key: String,
     name: String,
 ) -> Result<(), Error> {
-    let to = input
-        .to
-        .ok_or_else(|| invalid("a relation needs the collection it links to"))?;
+    let to = input.to.ok_or_else(|| {
+        invalid("a relation needs the collection it links to")
+    })?;
     let source_title = schemas
         .get(&id)
         .map(|s| s.title.clone())
@@ -177,7 +204,8 @@ fn add_relation(
         kind: PropertyType::Relation { to, back: None },
     };
     let target = schemas.get(&to).ok_or_else(|| not_found(to))?;
-    let also: Vec<&Property> = if to == id { vec![&forward] } else { Vec::new() };
+    let also: Vec<&Property> =
+        if to == id { vec![&forward] } else { Vec::new() };
     let (back_key, back_name) = free_key_and_name(target, &wanted, &also);
     let back = Property {
         key: back_key.clone(),
@@ -217,12 +245,14 @@ fn add_property(
     if input.kind == "title" {
         return Err(invalid("a collection has exactly one title property"));
     }
-    let mut used: BTreeSet<String> = schema.properties.iter().map(|p| p.key.clone()).collect();
+    let mut used: BTreeSet<String> =
+        schema.properties.iter().map(|p| p.key.clone()).collect();
     let key = crate::csv::unique_key(&name, schema.properties.len(), &mut used);
     if input.kind == "relation" {
         return add_relation(schemas, id, input, key, name);
     }
-    let (via, prop) = rollup_keys(schemas, id, input.via.as_deref(), input.prop.as_deref())?;
+    let (via, prop) =
+        rollup_keys(schemas, id, input.via.as_deref(), input.prop.as_deref())?;
     let spec = PropertySpec {
         key: key.clone(),
         name: name.clone(),
@@ -244,7 +274,12 @@ fn add_property(
 }
 
 /// Renames the property at `at`, rewriting the formulas that name it.
-fn rename(schema: &mut Schema, at: usize, key: &str, name: &str) -> Result<(), Error> {
+fn rename(
+    schema: &mut Schema,
+    at: usize,
+    key: &str,
+    name: &str,
+) -> Result<(), Error> {
     let name = property_name(name)?;
     name_taken(schema, &name, Some(key))?;
     let before = schema.clone();
@@ -252,8 +287,13 @@ fn rename(schema: &mut Schema, at: usize, key: &str, name: &str) -> Result<(), E
         if let PropertyType::Formula { formula, .. } = &mut p.kind
             && formula.references().contains(key)
         {
-            let source = crate::formula::rename_references(formula.source(), &before, key, &name)
-                .map_err(|e| invalid(format!("{}: {}", p.name, e.message)))?;
+            let source = crate::formula::rename_references(
+                formula.source(),
+                &before,
+                key,
+                &name,
+            )
+            .map_err(|e| invalid(format!("{}: {}", p.name, e.message)))?;
             *formula = crate::formula::Formula::uncompiled(source);
         }
     }
@@ -268,7 +308,9 @@ fn clean_options(options: &[SelectOption]) -> Vec<SelectOption> {
     let mut seen = BTreeSet::new();
     options
         .iter()
-        .filter(|o| !o.name.trim().is_empty() && seen.insert(o.name.trim().to_owned()))
+        .filter(|o| {
+            !o.name.trim().is_empty() && seen.insert(o.name.trim().to_owned())
+        })
         .map(|o| SelectOption {
             name: o.name.trim().to_owned(),
             color: o.color.clone(),
@@ -284,7 +326,8 @@ fn retype(
     input: &UpdatePropertyInput,
     kind: &str,
 ) -> Result<(), Error> {
-    let (via, prop) = rollup_keys(schemas, id, input.via.as_deref(), input.prop.as_deref())?;
+    let (via, prop) =
+        rollup_keys(schemas, id, input.via.as_deref(), input.prop.as_deref())?;
     let schema = schema_mut(schemas, id)?;
     let Some(p) = schema.properties.get(at) else {
         return Err(Error::new(ErrorKind::NotFound, "no such property"));
@@ -297,7 +340,9 @@ fn retype(
         )));
     }
     let formula = match &p.kind {
-        PropertyType::Formula { formula, .. } => Some(formula.source().to_owned()),
+        PropertyType::Formula { formula, .. } => {
+            Some(formula.source().to_owned())
+        }
         _ => None,
     };
     let spec = PropertySpec {
@@ -322,7 +367,10 @@ fn retype(
 }
 
 /// Changes options, a formula or a number format in place.
-fn change_settings(p: &mut Property, input: &UpdatePropertyInput) -> Result<(), Error> {
+fn change_settings(
+    p: &mut Property,
+    input: &UpdatePropertyInput,
+) -> Result<(), Error> {
     let wrong = |field: &str, p: &Property| {
         invalid(format!(
             "{field} does not apply to {} ({} property)",
@@ -332,7 +380,8 @@ fn change_settings(p: &mut Property, input: &UpdatePropertyInput) -> Result<(), 
     };
     if let Some(new) = &input.options {
         match &mut p.kind {
-            PropertyType::Select { options } | PropertyType::Multi { options } => {
+            PropertyType::Select { options }
+            | PropertyType::Multi { options } => {
                 *options = clean_options(new);
             }
             _ => return Err(wrong("options", p)),
@@ -409,14 +458,20 @@ fn strip(schema: &mut Schema, key: &str) -> Result<(), Error> {
 }
 
 /// Removes a property; a two-way relation takes its pair with it.
-fn remove_property(schemas: &mut Schemas, id: CollectionId, key: &str) -> Result<(), Error> {
+fn remove_property(
+    schemas: &mut Schemas,
+    id: CollectionId,
+    key: &str,
+) -> Result<(), Error> {
     let schema = schema_mut(schemas, id)?;
     let p = schema
         .properties
         .get(index_of(schema, key)?)
         .ok_or_else(|| Error::new(ErrorKind::NotFound, "no such property"))?;
     let pair = match &p.kind {
-        PropertyType::Title => return Err(invalid("the title property cannot be removed")),
+        PropertyType::Title => {
+            return Err(invalid("the title property cannot be removed"));
+        }
         PropertyType::Relation { to, back: Some(b) } => Some((*to, b.clone())),
         _ => None,
     };
@@ -465,7 +520,11 @@ impl CollectionsService {
     where
         F: FnOnce(&mut Schemas) -> Result<Reparse, Error> + Send,
     {
-        let span = tracing::info_span!("collections.edit_schema", op, collection = %id);
+        let span = tracing::info_span!(
+            "collections.edit_schema",
+            op,
+            collection = %id
+        );
         async move {
             let mut guard = self.state.write().await;
             self.bump();
@@ -497,11 +556,14 @@ impl CollectionsService {
                 self.require_edit(state, &ctx.principal, *other, false)
                     .await?;
             }
-            let next: Vec<Schema> = changed.iter().filter_map(|c| after.remove(c)).collect();
+            let next: Vec<Schema> =
+                changed.iter().filter_map(|c| after.remove(c)).collect();
             state.ws.set_schemas(next)?;
             let mut written = Vec::new();
             for cid in &changed {
-                if let Err(e) = state.write_schema(self.store.as_ref(), *cid).await {
+                if let Err(e) =
+                    state.write_schema(self.store.as_ref(), *cid).await
+                {
                     crate::telemetry::wrote(op, false);
                     // Put back what was already written, so a pair stays whole.
                     let old: Vec<Schema> = changed
@@ -510,7 +572,9 @@ impl CollectionsService {
                         .collect();
                     if state.ws.set_schemas(old).is_ok() {
                         for done in &written {
-                            let _ = state.write_schema(self.store.as_ref(), *done).await;
+                            let _ = state
+                                .write_schema(self.store.as_ref(), *done)
+                                .await;
                         }
                     }
                     *guard = None;
@@ -523,12 +587,19 @@ impl CollectionsService {
                 .iter()
                 .filter_map(|c| state.folder(*c).ok().map(|f| f.path.clone()))
                 .collect();
-            if !dirs.is_empty() && state.reload(self.store.as_ref(), &dirs).await.is_err() {
+            if !dirs.is_empty()
+                && state.reload(self.store.as_ref(), &dirs).await.is_err()
+            {
                 *guard = Some(State::load(self.store.as_ref()).await?);
             }
             let info = guard
                 .as_ref()
-                .ok_or_else(|| Error::new(ErrorKind::Internal, "collections were not loaded"))
+                .ok_or_else(|| {
+                    Error::new(
+                        ErrorKind::Internal,
+                        "collections were not loaded",
+                    )
+                })
                 .and_then(|state| info_of(state, id));
             drop(guard);
             info
@@ -628,7 +699,9 @@ impl CollectionsService {
                 async move { s.update_property(&ctx, input).await }
             },
         )
-        .summary("Rename a property or change its type, options, formula or format");
+        .summary(
+            "Rename a property or change its type, options, formula or format",
+        );
         let s = Arc::clone(this);
         let delete = Operation::mutation(
             "collections.delete_property",

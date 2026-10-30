@@ -78,7 +78,8 @@ impl BlobPath {
     #[must_use]
     pub fn starts_with(&self, dir: &Self) -> bool {
         self.0 == dir.0
-            || (self.0.starts_with(&dir.0) && self.0.as_bytes().get(dir.0.len()) == Some(&b'/'))
+            || (self.0.starts_with(&dir.0)
+                && self.0.as_bytes().get(dir.0.len()) == Some(&b'/'))
     }
 }
 
@@ -96,9 +97,15 @@ fn violation(raw: &str) -> Option<&'static str> {
         match segment {
             "" => return Some("empty segment or leading/trailing slash"),
             "." | ".." => return Some("relative segment"),
-            s if s.starts_with(TEMP_PREFIX) => return Some("reserved temporary-file prefix"),
-            s if s.contains(':') => return Some("colon (drive prefix or NTFS stream)"),
-            s if s.ends_with(['.', ' ']) => return Some("segment ends in a dot or space"),
+            s if s.starts_with(TEMP_PREFIX) => {
+                return Some("reserved temporary-file prefix");
+            }
+            s if s.contains(':') => {
+                return Some("colon (drive prefix or NTFS stream)");
+            }
+            s if s.ends_with(['.', ' ']) => {
+                return Some("segment ends in a dot or space");
+            }
             s if is_windows_device(s) => return Some("Windows device name"),
             s if is_git_dir(s) => return Some("Git directory"),
             _ => {}
@@ -113,7 +120,10 @@ const WINDOWS_DEVICES: [&str; 4] = ["CON", "PRN", "AUX", "NUL"];
 fn is_windows_device(segment: &str) -> bool {
     let stem = segment.split('.').next().unwrap_or(segment).trim_end();
     let upper = stem.to_ascii_uppercase();
-    if WINDOWS_DEVICES.contains(&upper.as_str()) || upper == "CONIN$" || upper == "CONOUT$" {
+    if WINDOWS_DEVICES.contains(&upper.as_str())
+        || upper == "CONIN$"
+        || upper == "CONOUT$"
+    {
         return true;
     }
     // COM0-9 and LPT0-9, including the superscript digits Windows accepts.
@@ -188,7 +198,8 @@ mod tests {
             "a\\b",
             "a\0b",
             ".vellum-tmp-x",
-            // Windows: drive prefixes, streams, devices, trailing dots and spaces.
+            // Windows: drive prefixes, streams, devices, trailing dots and
+            // spaces.
             "C:/Windows/win.ini",
             "C:",
             "notes/a.md:secret",
@@ -246,7 +257,9 @@ mod tests {
         #[test]
         fn valid_paths_never_escape(raw in "[a-z./]{1,24}") {
             if let Ok(p) = BlobPath::new(raw) {
-                prop_assert!(p.segments().all(|s| !s.is_empty() && s != ".." && s != "."));
+                prop_assert!(
+                    p.segments().all(|s| !s.is_empty() && s != ".." && s != ".")
+                );
             }
         }
     }

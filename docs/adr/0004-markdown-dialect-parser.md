@@ -56,15 +56,14 @@ flowchart LR
   directly in the same mark is flattened, adjacent emphasis runs
   merge, and a list with one item and one block is tight. A block ID
   may stand alone as a paragraph (`- [ ] ^blk-…`).
-- `serialize(&Document)` writes one canonical text: `-` bullets and `.`
-  markers (alternating `*` and `)` for adjacent lists), backtick fences
-  sized to their content, `***` for rules where `---` would be
-  ambiguous, `*` for a bullet list that starts on a `-` item's line
-  (so `- * -` never reads as a rule), an empty `{}` after text that
-  would otherwise read as attributes, front matter keys in page order, blank lines inside
-  `:::` containers (so the output passes markdownlint), and minimal
-  escapes (a backslash is doubled only before punctuation).
-  `parse(serialize(d)) == d` for every parsed `d`.
+- `serialize(&Document)` writes one canonical text: `-` bullets and `.` markers
+  (alternating `*` and `)` for adjacent lists), backtick fences sized to their
+  content, `***` for rules where `---` would be ambiguous, `*` for a bullet list
+  that starts on a `-` item's line (so `- * -` never reads as a rule), an empty
+  `{}` after text that would otherwise read as attributes, front matter keys in
+  page order, blank lines inside `:::` containers (so the output passes
+  markdownlint), and minimal escapes (a backslash is doubled only before
+  punctuation). `parse(serialize(d)) == d` for every parsed `d`.
 
 ### D41: the directive pre-pass works on lines outside code
 
@@ -82,11 +81,11 @@ flowchart LR
 
 ### D42: Vellum inline extras are found in text, and are just text
 
-- `@handle`, `@today`, `YYYY-MM-DD` (a real calendar day), `KEY-123`
-  issue keys and a trailing block ID (a space, then `^blk-xxxxxxxx`)
-  are recognised in text runs after comrak, at word boundaries, and
-  never inside code or links. They are written back as plain text, so the rules cannot drift
-  between reading and writing.
+- `@handle`, `@today`, `YYYY-MM-DD` (a real calendar day), `KEY-123` issue keys
+  and a trailing block ID (a space, then `^blk-xxxxxxxx`) are recognised in text
+  runs after comrak, at word boundaries, and never inside code or links. They
+  are written back as plain text, so the rules cannot drift between reading and
+  writing.
 - An issue key is a candidate. Render resolves it against teams and
   falls back to plain text.
 - A backslash keeps one literal: `\@everyone`, `ENG\-1`, `2026\-11-24` and

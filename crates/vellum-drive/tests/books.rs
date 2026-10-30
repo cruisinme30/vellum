@@ -34,7 +34,9 @@ async fn put(store: &LocalStore, path: &str, text: &str) -> TestResult {
 }
 
 fn chapter(id: ObjectId, title: &str, body: &str) -> String {
-    format!("---\nid: {id}\ntitle: {title}\nvellum: 1\n---\n\n# {title}\n\n{body}\n")
+    format!(
+        "---\nid: {id}\ntitle: {title}\nvellum: 1\n---\n\n# {title}\n\n{body}\n"
+    )
 }
 
 /// Writes `Handbook.book` under `dir`: a public section, and an HR
@@ -51,8 +53,9 @@ async fn handbook(store: &LocalStore, dir: &str, hr: UserId) -> TestResult {
         store,
         &format!("{root}/book.yaml"),
         &format!(
-            "vellum: 1\nid: {book}\ntitle: Handbook\nnodes:\n  {public}:\n    path: public.md\n  \
-             {people}:\n    path: hr/README.md\n    restrict_to:\n      - user:{hr}\n  \
+            "vellum: 1\nid: {book}\ntitle: Handbook\n\
+             nodes:\n  {public}:\n    path: public.md\n  {people}:\n    path: \
+             hr/README.md\n    restrict_to:\n      - user:{hr}\n  \
              {salaries}:\n    path: hr/salaries.md\n"
         ),
     )
@@ -60,7 +63,8 @@ async fn handbook(store: &LocalStore, dir: &str, hr: UserId) -> TestResult {
     put(
         store,
         &format!("{root}/SUMMARY.md"),
-        "# Summary\n\n- [Public](public.md)\n- [People](hr/README.md)\n  - [Salaries](hr/salaries.md)\n",
+        "# Summary\n\n- [Public](public.md)\n\
+            - [People](hr/README.md)\n  - [Salaries](hr/salaries.md)\n",
     )
     .await?;
     put(
@@ -127,10 +131,17 @@ async fn copies_and_reads_leave_restricted_sections_behind() -> TestResult {
     let access = Arc::new(MemoryAccess::new(index.clone()));
     let drive = Drive::new(store.clone(), index.clone(), access.clone());
     let (alice_id, bob_id) = (UserId::generate(), UserId::generate());
-    let (alice, bob) = (Actor::User { user: alice_id }, Actor::User { user: bob_id });
+    let (alice, bob) =
+        (Actor::User { user: alice_id }, Actor::User { user: bob_id });
 
     let eng = drive
-        .create_space(&alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .create_space(
+            &alice,
+            SpaceKind::SharedDrive,
+            "eng",
+            "Engineering",
+            None,
+        )
         .await?;
     let docs = drive.create_folder(&alice, eng.id, None, "Docs").await?;
     handbook(&store, docs.path.as_str(), alice_id).await?;
@@ -217,8 +228,9 @@ async fn guide(store: &LocalStore, dir: &str, staff: ObjectId) -> TestResult {
         store,
         &format!("{root}/book.yaml"),
         &format!(
-            "vellum: 1\nid: {book}\ntitle: Guide\nnodes:\n  {public}:\n    path: public.md\n  \
-             {team}:\n    path: staff/README.md\n    restrict_to:\n      - group:{staff}\n"
+            "vellum: 1\nid: {book}\ntitle: Guide\n\
+             nodes:\n  {public}:\n    path: public.md\n  {team}:\n    path: \
+             staff/README.md\n    restrict_to:\n      - group:{staff}\n"
         ),
     )
     .await?;
@@ -287,12 +299,19 @@ async fn group_restricted_sections_reach_group_members() -> TestResult {
     let index = Arc::new(MemoryIndex::new());
     let access = Arc::new(MemoryAccess::new(index.clone()));
     let drive = Drive::new(store.clone(), index.clone(), access.clone());
-    let (alice_id, bob_id, dave_id) = (UserId::generate(), UserId::generate(), UserId::generate());
+    let (alice_id, bob_id, dave_id) =
+        (UserId::generate(), UserId::generate(), UserId::generate());
     let alice = Actor::User { user: alice_id };
     let staff = ObjectId::generate();
 
     let eng = drive
-        .create_space(&alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .create_space(
+            &alice,
+            SpaceKind::SharedDrive,
+            "eng",
+            "Engineering",
+            None,
+        )
         .await?;
     guide(&store, eng.root.as_str(), staff).await?;
     let _ = drive.scan().await?;
@@ -305,14 +324,16 @@ async fn group_restricted_sections_reach_group_members() -> TestResult {
     access.grant(bob_id, eng.id, Role::Viewer);
     access.grant(dave_id, eng.id, Role::Viewer);
     access.join(bob_id, staff);
-    group_sections_follow_membership(&drive, &store, &book, bob_id, dave_id).await
+    group_sections_follow_membership(&drive, &store, &book, bob_id, dave_id)
+        .await
 }
 
 #[tokio::test]
-async fn group_restricted_sections_follow_the_permission_engine() -> TestResult {
+async fn group_restricted_sections_follow_the_permission_engine() -> TestResult
+{
     use vellum_authz::{
-        Actor as AuthzActor, Authz, AuthzStore as _, Change, Id, MemoryStore, Object, Relation,
-        Subject, Tuple,
+        Actor as AuthzActor, Authz, AuthzStore as _, Change, Id, MemoryStore,
+        Object, Relation, Subject, Tuple,
     };
     use vellum_drive::authz::AuthzAccess;
 
@@ -322,12 +343,19 @@ async fn group_restricted_sections_follow_the_permission_engine() -> TestResult 
     let authz = Arc::new(Authz::new(MemoryStore::new()));
     let access = Arc::new(AuthzAccess::new(authz.clone(), index.clone()));
     let drive = Drive::new(store.clone(), index.clone(), access);
-    let (alice_id, bob_id, dave_id) = (UserId::generate(), UserId::generate(), UserId::generate());
+    let (alice_id, bob_id, dave_id) =
+        (UserId::generate(), UserId::generate(), UserId::generate());
     let alice = Actor::User { user: alice_id };
     let staff = ObjectId::generate();
 
     let eng = drive
-        .create_space(&alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .create_space(
+            &alice,
+            SpaceKind::SharedDrive,
+            "eng",
+            "Engineering",
+            None,
+        )
         .await?;
     guide(&store, eng.root.as_str(), staff).await?;
     let _ = drive.scan().await?;
@@ -359,5 +387,6 @@ async fn group_restricted_sections_follow_the_permission_engine() -> TestResult 
             vec![],
         )
         .await?;
-    group_sections_follow_membership(&drive, &store, &book, bob_id, dave_id).await
+    group_sections_follow_membership(&drive, &store, &book, bob_id, dave_id)
+        .await
 }

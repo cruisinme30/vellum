@@ -75,9 +75,9 @@ that person and shows in their My Work:
 - [ ] Send the launch checklist to legal @priya 2026-11-12
 ````
 
-Select text and press `⌘⌥↵` (or the task button in the toolbar) to
-turn it into a task. On a page you can only read, press `T`. Issues assigned to you
-appear in My Work too, without being copied.
+Select text and press `⌘⌥↵` (or the task button in the toolbar) to turn it into
+a task. On a page you can only read, press `T`. Issues assigned to you appear in
+My Work too, without being copied.
 
 ## Your day and time zone {#settings}
 

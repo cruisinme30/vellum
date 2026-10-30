@@ -26,8 +26,8 @@ pub use raster::rasterize_svg;
 
 use crate::error::ExportError;
 use crate::flow::{
-    Align, Asset, Cell, Flow, Item, Layout, Media, Node, Span, Stat, Style, Table, TableStyle,
-    Tone, plain_text,
+    Align, Asset, Cell, Flow, Item, Layout, Media, Node, Span, Stat, Style,
+    Table, TableStyle, Tone, plain_text,
 };
 use crate::math;
 use crate::metrics;
@@ -114,15 +114,25 @@ const EMU_PER_PX: f64 = 9_525.0;
 /// # Errors
 ///
 /// [`ExportError::Write`] when the package cannot be written.
-#[tracing::instrument(name = "export.docx", skip_all, fields(blocks = flow.blocks.len(), assets = flow.assets.len()))]
-pub fn write(flow: &Flow, options: &DocxOptions) -> Result<Vec<u8>, ExportError> {
+#[tracing::instrument(
+    name = "export.docx",
+    skip_all,
+    fields(blocks = flow.blocks.len(), assets = flow.assets.len())
+)]
+pub fn write(
+    flow: &Flow,
+    options: &DocxOptions,
+) -> Result<Vec<u8>, ExportError> {
     let started = Instant::now();
     let result = write_inner(flow, options);
     metrics::export_done("docx", started, result.as_ref().map(Vec::len));
     result
 }
 
-fn write_inner(flow: &Flow, options: &DocxOptions) -> Result<Vec<u8>, ExportError> {
+fn write_inner(
+    flow: &Flow,
+    options: &DocxOptions,
+) -> Result<Vec<u8>, ExportError> {
     let mut doc = Writer::new(flow, options);
     doc.document();
     doc.package()
@@ -184,7 +194,10 @@ impl<'a> Writer<'a> {
         let id = format!("rId{}", self.rels.len() + 1);
         self.rels.push((
             id.clone(),
-            format!("http://schemas.openxmlformats.org/officeDocument/2006/relationships/{kind}"),
+            format!(
+                "http://schemas.openxmlformats.org/officeDocument/2006/rela\
+                tionships/{kind}"
+            ),
             target.to_owned(),
             false,
         ));
@@ -198,7 +211,8 @@ impl<'a> Writer<'a> {
         let id = format!("rId{}", self.rels.len() + 1);
         self.rels.push((
             id.clone(),
-            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink"
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationship\
+                s/hyperlink"
                 .to_owned(),
             url.to_owned(),
             true,
@@ -261,9 +275,16 @@ impl<'a> Writer<'a> {
         let _ = write!(
             self.body,
             concat!(
-                r#"<w:sectPr><w:footerReference w:type="default" r:id="{footer}"/>"#,
+                concat!(
+                    r#"<w:sectPr><w:footerReference w:type="default" "#,
+                    r#"r:id="{footer}"/>"#,
+                ),
                 r#"<w:pgSz w:w="{w}" w:h="{h}"/>"#,
-                r#"<w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/>"#,
+                concat!(
+                    r#"<w:pgMar w:top="1440" w:right="1440" w:bottom="1440" "#,
+                    r#"w:left="1440" w:header="708" w:footer="708" "#,
+                    r#"w:gutter="0"/>"#,
+                ),
                 "</w:sectPr>"
             ),
             footer = footer,
@@ -271,13 +292,21 @@ impl<'a> Writer<'a> {
             h = height
         );
         let document = format!(
-            r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document {}><w:body>{}</w:body></w:document>"#,
+            concat!(
+                r#"<?xml version="1.0" encoding="UTF-8" "#,
+                r#"standalone="yes"?><w:document "#,
+                r#"{}><w:body>{}</w:body></w:document>"#,
+            ),
             parts::DOCUMENT_NAMESPACES,
             self.body
         );
         let mut rels = String::from(concat!(
             r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#,
-            r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">"#
+            concat!(
+                r#"<Relationships "#,
+                r#"xmlns="http://schemas.openxmlformats.org/package/2006/rela"#,
+                r#"tionships">"#,
+            )
         ));
         for (id, kind, target, external) in &self.rels {
             let _ = write!(
@@ -293,10 +322,13 @@ impl<'a> Writer<'a> {
         }
         rels.push_str("</Relationships>");
 
-        let media_types: Vec<Media> = self.media.iter().map(|m| m.media).collect();
+        let media_types: Vec<Media> =
+            self.media.iter().map(|m| m.media).collect();
         let mut zip = ZipWriter::new(Cursor::new(Vec::new()));
-        let deflate = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
-        let stored = SimpleFileOptions::default().compression_method(CompressionMethod::Stored);
+        let deflate = SimpleFileOptions::default()
+            .compression_method(CompressionMethod::Deflated);
+        let stored = SimpleFileOptions::default()
+            .compression_method(CompressionMethod::Stored);
         let put = |zip: &mut ZipWriter<Cursor<Vec<u8>>>,
                    name: &str,
                    bytes: &[u8],
@@ -387,7 +419,10 @@ impl<'a> Writer<'a> {
         let flow = self.flow;
         match flow.layout {
             Layout::Book => {
-                self.styled_paragraph("Title", &[Span::plain(flow.title.clone())]);
+                self.styled_paragraph(
+                    "Title",
+                    &[Span::plain(flow.title.clone())],
+                );
                 self.styled_paragraph(
                     "Subheading",
                     &[Span::plain(format!("As of {}", flow.as_of))],
@@ -395,7 +430,10 @@ impl<'a> Writer<'a> {
                 self.page_break();
             }
             Layout::Document if flow.show_title && !flow.title.is_empty() => {
-                self.styled_paragraph("Title", &[Span::plain(flow.title.clone())]);
+                self.styled_paragraph(
+                    "Title",
+                    &[Span::plain(flow.title.clone())],
+                );
             }
             Layout::Document => {}
         }
@@ -420,13 +458,19 @@ impl<'a> Writer<'a> {
             } => {
                 let mut runs = String::new();
                 if let Some(number) = number {
-                    self.runs(&[Span::plain(format!("{number}\u{a0}\u{a0}"))], &mut runs);
+                    self.runs(
+                        &[Span::plain(format!("{number}\u{a0}\u{a0}"))],
+                        &mut runs,
+                    );
                 }
                 self.runs(spans, &mut runs);
                 let runs = self.bookmarked(anchor.as_deref(), runs);
                 let _ = write!(
                     self.body,
-                    r#"<w:p><w:pPr><w:pStyle w:val="Heading{level}"/></w:pPr>{runs}</w:p>"#
+                    concat!(
+                        r#"<w:p><w:pPr><w:pStyle "#,
+                        r#"w:val="Heading{level}"/></w:pPr>{runs}</w:p>"#,
+                    )
                 );
             }
             Node::Paragraph { spans, anchor } => {
@@ -438,7 +482,9 @@ impl<'a> Writer<'a> {
             Node::Quote { blocks } => {
                 for block in blocks {
                     match block {
-                        Node::Paragraph { spans, .. } => self.styled_paragraph("Quote", spans),
+                        Node::Paragraph { spans, .. } => {
+                            self.styled_paragraph("Quote", spans)
+                        }
                         other => self.node(other, depth),
                     }
                 }
@@ -447,8 +493,14 @@ impl<'a> Writer<'a> {
             Node::Code { text, .. } => self.code(text),
             Node::Math { tex, .. } => self.math(tex),
             Node::Table(table) => self.table(table),
-            Node::Rule => self.body.push_str("<w:p><w:pPr><w:pBdr><w:bottom w:val=\"single\" w:sz=\"6\" w:space=\"1\" w:color=\"C5C6D0\"/></w:pBdr></w:pPr></w:p>"),
-            Node::Callout { tone, blocks } => self.callout(*tone, blocks, depth),
+            Node::Rule => self.body.push_str(
+                "<w:p><w:pPr><w:pBdr><w:bottom \
+                w:val=\"single\" w:sz=\"6\" w:space=\"1\" \
+                w:color=\"C5C6D0\"/></w:pBdr></w:pPr></w:p>",
+            ),
+            Node::Callout { tone, blocks } => {
+                self.callout(*tone, blocks, depth)
+            }
             Node::Titled { title, blocks } => {
                 self.styled_paragraph("Subheading", title);
                 self.blocks(blocks, depth);
@@ -456,7 +508,11 @@ impl<'a> Writer<'a> {
             Node::Columns { columns } => {
                 let width = content_width_twips(self.options.page);
                 let n = u32::try_from(columns.len().max(1)).unwrap_or(1);
-                self.table_open("VellumPlain", &vec![width / n; n as usize], false);
+                self.table_open(
+                    "VellumPlain",
+                    &vec![width / n; n as usize],
+                    false,
+                );
                 self.body.push_str("<w:tr>");
                 for column in columns {
                     self.cell_open(None, None);
@@ -473,7 +529,11 @@ impl<'a> Writer<'a> {
                 let per_row = cards.len().clamp(1, 3);
                 let width = content_width_twips(self.options.page);
                 let n = u32::try_from(per_row).unwrap_or(1);
-                self.table_open("VellumTable", &vec![width / n; per_row], false);
+                self.table_open(
+                    "VellumTable",
+                    &vec![width / n; per_row],
+                    false,
+                );
                 for row in cards.chunks(per_row) {
                     self.body.push_str("<w:tr>");
                     for card in row {
@@ -501,7 +561,11 @@ impl<'a> Writer<'a> {
             }
             Node::Progress { bars } => {
                 for bar in bars {
-                    let text = format!("{} — {}%", bar.label, crate::calc::display_number(bar.percent));
+                    let text = format!(
+                        "{} — {}%",
+                        bar.label,
+                        crate::calc::display_number(bar.percent)
+                    );
                     self.styled_paragraph("Normal", &[Span::plain(text)]);
                 }
             }
@@ -534,7 +598,10 @@ impl<'a> Writer<'a> {
             } => {
                 self.picture_paragraph(asset, alt, Some((*width, *height)));
                 if !caption.is_empty() {
-                    self.styled_paragraph("Caption", &[Span::plain(caption.clone())]);
+                    self.styled_paragraph(
+                        "Caption",
+                        &[Span::plain(caption.clone())],
+                    );
                 }
             }
             Node::Image {
@@ -544,7 +611,10 @@ impl<'a> Writer<'a> {
             } => {
                 self.picture_paragraph(asset, alt, None);
                 if !caption.is_empty() {
-                    self.styled_paragraph("Caption", &[Span::plain(caption.clone())]);
+                    self.styled_paragraph(
+                        "Caption",
+                        &[Span::plain(caption.clone())],
+                    );
                 }
             }
             Node::Toc { depth: toc_depth } => self.toc(*toc_depth),
@@ -557,9 +627,11 @@ impl<'a> Writer<'a> {
             Some(name) => {
                 let id = self.next_bookmark;
                 self.next_bookmark += 1;
-                format!(
-                    r#"<w:bookmarkStart w:id="{id}" w:name="{name}"/>{runs}<w:bookmarkEnd w:id="{id}"/>"#
-                )
+                format!(concat!(
+                    r#"<w:bookmarkStart w:id="{id}" "#,
+                    r#"w:name="{name}"/>{runs}<w:bookmarkEnd "#,
+                    r#"w:id="{id}"/>"#,
+                ))
             }
             None => runs,
         }
@@ -587,8 +659,9 @@ impl<'a> Writer<'a> {
 
     fn ensure_paragraph(&mut self, before: usize) {
         let added = self.body.get(before..).unwrap_or_default();
-        let has_paragraph =
-            added.contains("<w:p>") || added.contains("<w:p ") || added.contains("<w:p/>");
+        let has_paragraph = added.contains("<w:p>")
+            || added.contains("<w:p ")
+            || added.contains("<w:p/>");
         if !has_paragraph || added.ends_with("</w:tbl>") {
             self.body.push_str("<w:p/>");
         }
@@ -613,15 +686,30 @@ impl<'a> Writer<'a> {
                     Node::Paragraph { spans, anchor } if first => {
                         let mut runs = String::new();
                         if let Some(done) = item.check {
-                            self.runs(&[Span::plain(if done { "☑ " } else { "☐ " })], &mut runs);
+                            self.runs(
+                                &[Span::plain(if done {
+                                    "☑ "
+                                } else {
+                                    "☐ "
+                                })],
+                                &mut runs,
+                            );
                         }
                         self.runs(spans, &mut runs);
                         let runs = self.bookmarked(anchor.as_deref(), runs);
                         let _ = write!(
                             self.body,
                             concat!(
-                                r#"<w:p><w:pPr><w:pStyle w:val="ListParagraph"/>"#,
-                                r#"<w:numPr><w:ilvl w:val="{level}"/><w:numId w:val="{num}"/></w:numPr></w:pPr>{runs}</w:p>"#
+                                concat!(
+                                    r#"<w:p><w:pPr><w:pStyle "#,
+                                    r#"w:val="ListParagraph"/>"#,
+                                ),
+                                concat!(
+                                    r#"<w:numPr><w:ilvl "#,
+                                    r#"w:val="{level}"/><w:numId "#,
+                                    r#"w:val="{num}"/></w:numPr></w:pPr>{runs"#,
+                                    r#"}</w:p>"#,
+                                )
                             ),
                             level = level,
                             num = num,
@@ -633,11 +721,17 @@ impl<'a> Writer<'a> {
                         self.runs(spans, &mut runs);
                         let _ = write!(
                             self.body,
-                            r#"<w:p><w:pPr><w:pStyle w:val="ListParagraph"/><w:ind w:left="{}"/></w:pPr>{runs}</w:p>"#,
+                            concat!(
+                                r#"<w:p><w:pPr><w:pStyle "#,
+                                r#"w:val="ListParagraph"/><w:ind "#,
+                                r#"w:left="{}"/></w:pPr>{runs}</w:p>"#,
+                            ),
                             720 * (level + 1)
                         );
                     }
-                    Node::List { start, items } => self.list(*start, items, depth + 1),
+                    Node::List { start, items } => {
+                        self.list(*start, items, depth + 1)
+                    }
                     other => self.node(other, depth + 1),
                 }
                 first = false;
@@ -645,7 +739,12 @@ impl<'a> Writer<'a> {
             if item.blocks.is_empty() {
                 let _ = write!(
                     self.body,
-                    r#"<w:p><w:pPr><w:pStyle w:val="ListParagraph"/><w:numPr><w:ilvl w:val="{level}"/><w:numId w:val="{num}"/></w:numPr></w:pPr></w:p>"#
+                    concat!(
+                        r#"<w:p><w:pPr><w:pStyle "#,
+                        r#"w:val="ListParagraph"/><w:numPr><w:ilvl "#,
+                        r#"w:val="{level}"/><w:numId "#,
+                        r#"w:val="{num}"/></w:numPr></w:pPr></w:p>"#,
+                    )
                 );
             }
         }
@@ -675,7 +774,10 @@ impl<'a> Writer<'a> {
         if self.options.math == MathMode::Equation
             && let Ok(omml) = math::to_omml(tex)
         {
-            let _ = write!(self.body, "<w:p><m:oMathPara>{omml}</m:oMathPara></w:p>");
+            let _ = write!(
+                self.body,
+                "<w:p><m:oMathPara>{omml}</m:oMathPara></w:p>"
+            );
             return;
         }
         self.code(tex);
@@ -684,7 +786,13 @@ impl<'a> Writer<'a> {
     fn table_open(&mut self, style: &str, widths: &[u32], fixed: bool) {
         let _ = write!(
             self.body,
-            r#"<w:tbl><w:tblPr><w:tblStyle w:val="{style}"/><w:tblW w:w="5000" w:type="pct"/>{}<w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="0" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/></w:tblPr><w:tblGrid>"#,
+            concat!(
+                r#"<w:tbl><w:tblPr><w:tblStyle w:val="{style}"/><w:tblW "#,
+                r#"w:w="5000" w:type="pct"/>{}<w:tblLook w:val="04A0" "#,
+                r#"w:firstRow="1" w:lastRow="0" w:firstColumn="0" "#,
+                r#"w:lastColumn="0" w:noHBand="0" "#,
+                r#"w:noVBand="1"/></w:tblPr><w:tblGrid>"#,
+            ),
             if fixed {
                 r#"<w:tblLayout w:type="fixed"/>"#
             } else {
@@ -702,7 +810,10 @@ impl<'a> Writer<'a> {
         if let Some(color) = left_border {
             let _ = write!(
                 self.body,
-                r#"<w:tcBorders><w:left w:val="single" w:sz="24" w:space="0" w:color="{color}"/></w:tcBorders>"#
+                concat!(
+                    r#"<w:tcBorders><w:left w:val="single" w:sz="24" "#,
+                    r#"w:space="0" w:color="{color}"/></w:tcBorders>"#,
+                )
             );
         }
         if let Some(fill) = fill {
@@ -718,11 +829,12 @@ impl<'a> Writer<'a> {
         let columns = table.columns().max(1);
         let width = content_width_twips(self.options.page);
         let n = u32::try_from(columns).unwrap_or(1);
-        let widths: Vec<u32> = if table.style == TableStyle::Facts && columns == 2 {
-            vec![width * 35 / 100, width * 65 / 100]
-        } else {
-            vec![width / n; columns]
-        };
+        let widths: Vec<u32> =
+            if table.style == TableStyle::Facts && columns == 2 {
+                vec![width * 35 / 100, width * 65 / 100]
+            } else {
+                vec![width / n; columns]
+            };
         self.table_open("VellumTable", &widths, false);
         if !table.header.is_empty() {
             self.body.push_str("<w:tr><w:trPr><w:tblHeader/></w:trPr>");
@@ -755,7 +867,8 @@ impl<'a> Writer<'a> {
         self.cell_open(fill, None);
         let mut runs = String::new();
         self.runs(&cell.spans, &mut runs);
-        let _ = write!(self.body, "<w:p>{}{runs}</w:p></w:tc>", align_ppr(align));
+        let _ =
+            write!(self.body, "<w:p>{}{runs}</w:p></w:tc>", align_ppr(align));
     }
 
     fn callout(&mut self, tone: Tone, blocks: &[Node], depth: u32) {
@@ -764,7 +877,10 @@ impl<'a> Writer<'a> {
         self.body.push_str("<w:tr>");
         self.cell_open(Some(tone_bg(tone)), Some(tone_fg(tone)));
         let label = format!(
-            r#"<w:p><w:r><w:rPr><w:b/><w:color w:val="{}"/></w:rPr><w:t>{}</w:t></w:r></w:p>"#,
+            concat!(
+                r#"<w:p><w:r><w:rPr><w:b/><w:color "#,
+                r#"w:val="{}"/></w:rPr><w:t>{}</w:t></w:r></w:p>"#,
+            ),
             tone_fg(tone),
             tone.label()
         );
@@ -787,19 +903,31 @@ impl<'a> Writer<'a> {
                 self.cell_open(Some("F0F2F9"), None);
                 let _ = write!(
                     self.body,
-                    r#"<w:p><w:r><w:rPr><w:b/><w:sz w:val="32"/></w:rPr><w:t xml:space="preserve">{}</w:t></w:r></w:p>"#,
+                    concat!(
+                        r#"<w:p><w:r><w:rPr><w:b/><w:sz "#,
+                        r#"w:val="32"/></w:rPr><w:t "#,
+                        r#"xml:space="preserve">{}</w:t></w:r></w:p>"#,
+                    ),
                     xml(&tile.value)
                 );
                 let _ = write!(
                     self.body,
-                    r#"<w:p><w:r><w:rPr><w:color w:val="46464F"/></w:rPr><w:t xml:space="preserve">{}</w:t></w:r></w:p>"#,
+                    concat!(
+                        r#"<w:p><w:r><w:rPr><w:color "#,
+                        r#"w:val="46464F"/></w:rPr><w:t "#,
+                        r#"xml:space="preserve">{}</w:t></w:r></w:p>"#,
+                    ),
                     xml(&tile.label)
                 );
                 if !tile.delta.is_empty() {
                     let color = tile.trend.map_or("46464F", tone_fg);
                     let _ = write!(
                         self.body,
-                        r#"<w:p><w:r><w:rPr><w:color w:val="{color}"/></w:rPr><w:t xml:space="preserve">{}</w:t></w:r></w:p>"#,
+                        concat!(
+                            r#"<w:p><w:r><w:rPr><w:color "#,
+                            r#"w:val="{color}"/></w:rPr><w:t "#,
+                            r#"xml:space="preserve">{}</w:t></w:r></w:p>"#,
+                        ),
                         xml(&tile.delta)
                     );
                 }
@@ -818,14 +946,25 @@ impl<'a> Writer<'a> {
     /// A contents field Word refreshes on open, with entries already filled
     /// in for viewers that do not update fields.
     fn toc(&mut self, depth: u8) {
-        self.body.push_str("<w:p><w:pPr><w:pStyle w:val=\"TOCHeading\"/></w:pPr><w:r><w:t>Contents</w:t></w:r></w:p>");
+        self.body.push_str(
+            "<w:p><w:pPr><w:pStyle \
+            w:val=\"TOCHeading\"/></w:pPr><w:r><w:t>Contents</w:t></w:r></w:p\
+            >",
+        );
         let mut entries = Vec::new();
         collect_headings(&self.flow.blocks, depth, &mut entries);
         let _ = write!(
             self.body,
             concat!(
-                r#"<w:p><w:pPr><w:pStyle w:val="TOC1"/></w:pPr><w:r><w:fldChar w:fldCharType="begin" w:dirty="true"/></w:r>"#,
-                r#"<w:r><w:instrText xml:space="preserve"> TOC \o "1-{depth}" \h \z \u </w:instrText></w:r>"#,
+                concat!(
+                    r#"<w:p><w:pPr><w:pStyle "#,
+                    r#"w:val="TOC1"/></w:pPr><w:r><w:fldChar "#,
+                    r#"w:fldCharType="begin" w:dirty="true"/></w:r>"#,
+                ),
+                concat!(
+                    r#"<w:r><w:instrText xml:space="preserve"> TOC \o "#,
+                    r#""1-{depth}" \h \z \u </w:instrText></w:r>"#,
+                ),
                 r#"<w:r><w:fldChar w:fldCharType="separate"/></w:r></w:p>"#
             ),
             depth = depth.clamp(1, 6)
@@ -838,13 +977,20 @@ impl<'a> Writer<'a> {
                 .unwrap_or_default();
             let _ = write!(
                 self.body,
-                r#"<w:p><w:pPr><w:pStyle w:val="{style}"/></w:pPr><w:hyperlink w:anchor="{}" w:history="1"><w:r><w:t xml:space="preserve">{}</w:t></w:r></w:hyperlink></w:p>"#,
+                concat!(
+                    r#"<w:p><w:pPr><w:pStyle "#,
+                    r#"w:val="{style}"/></w:pPr><w:hyperlink w:anchor="{}" "#,
+                    r#"w:history="1"><w:r><w:t "#,
+                    r#"xml:space="preserve">{}</w:t></w:r></w:hyperlink></w:p"#,
+                    r#">"#,
+                ),
                 xml(&link),
                 xml(&text)
             );
         }
-        self.body
-            .push_str(r#"<w:p><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>"#);
+        self.body.push_str(
+            r#"<w:p><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>"#,
+        );
     }
 
     // ---- images -------------------------------------------------------
@@ -883,7 +1029,8 @@ impl<'a> Writer<'a> {
             };
             (png_rel, svg_rel)
         } else {
-            let path = format!("media/image{index}.{}", asset.media.extension());
+            let path =
+                format!("media/image{index}.{}", asset.media.extension());
             let rel = self.rel("image", &path);
             self.media.push(Media0 {
                 path,
@@ -899,9 +1046,12 @@ impl<'a> Writer<'a> {
     /// The drawing size in EMU: the figure size in points, or the image's
     /// pixel size, scaled down to the content width.
     fn extent(&self, asset: &Asset, points: Option<(f64, f64)>) -> (u64, u64) {
-        let max = f64::from(content_width_twips(self.options.page)) / 20.0 * EMU_PER_PT;
+        let max = f64::from(content_width_twips(self.options.page)) / 20.0
+            * EMU_PER_PT;
         let (w, h) = match points {
-            Some((w, h)) if w > 0.0 && h > 0.0 => (w * EMU_PER_PT, h * EMU_PER_PT),
+            Some((w, h)) if w > 0.0 && h > 0.0 => {
+                (w * EMU_PER_PT, h * EMU_PER_PT)
+            }
             _ => match (asset.width, asset.height) {
                 (Some(w), Some(h)) if w > 0 && h > 0 => {
                     (f64::from(w) * EMU_PER_PX, f64::from(h) * EMU_PER_PX)
@@ -925,20 +1075,50 @@ impl<'a> Writer<'a> {
         let id = self.next_drawing;
         self.next_drawing += 1;
         let svg_ext = svg_rel.map_or_else(String::new, |rel| {
-            format!(
-                r#"<a:extLst><a:ext uri="{{96DAC541-7B7A-43D3-8B79-37D633B846F1}}"><asvg:svgBlip r:embed="{rel}"/></a:ext></a:extLst>"#
-            )
+            format!(concat!(
+                r#"<a:extLst><a:ext "#,
+                r#"uri="{{96DAC541-7B7A-43D3-8B79-37D633B846F1}}"><asvg:s"#,
+                r#"vgBlip r:embed="{rel}"/></a:ext></a:extLst>"#,
+            ))
         });
         Some(format!(
             concat!(
-                r#"<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0">"#,
-                r#"<wp:extent cx="{cx}" cy="{cy}"/><wp:docPr id="{id}" name="Picture {id}" descr="{alt}"/>"#,
-                r#"<wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr>"#,
-                r#"<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">"#,
-                r#"<pic:pic><pic:nvPicPr><pic:cNvPr id="{id}" name="Picture {id}" descr="{alt}"/><pic:cNvPicPr/></pic:nvPicPr>"#,
-                r#"<pic:blipFill><a:blip r:embed="{png}">{svg}</a:blip><a:stretch><a:fillRect/></a:stretch></pic:blipFill>"#,
-                r#"<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="{cx}" cy="{cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>"#,
-                r#"</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>"#
+                concat!(
+                    r#"<w:r><w:drawing><wp:inline distT="0" distB="0" "#,
+                    r#"distL="0" distR="0">"#,
+                ),
+                concat!(
+                    r#"<wp:extent cx="{cx}" cy="{cy}"/><wp:docPr id="{id}" "#,
+                    r#"name="Picture {id}" descr="{alt}"/>"#,
+                ),
+                concat!(
+                    r#"<wp:cNvGraphicFramePr><a:graphicFrameLocks "#,
+                    r#"noChangeAspect="1"/></wp:cNvGraphicFramePr>"#,
+                ),
+                concat!(
+                    r#"<a:graphic><a:graphicData "#,
+                    r#"uri="http://schemas.openxmlformats.org/drawingml/2006/"#,
+                    r#"picture">"#,
+                ),
+                concat!(
+                    r#"<pic:pic><pic:nvPicPr><pic:cNvPr id="{id}" "#,
+                    r#"name="Picture {id}" "#,
+                    r#"descr="{alt}"/><pic:cNvPicPr/></pic:nvPicPr>"#,
+                ),
+                concat!(
+                    r#"<pic:blipFill><a:blip "#,
+                    r#"r:embed="{png}">{svg}</a:blip><a:stretch><a:fillRect/>"#,
+                    r#"</a:stretch></pic:blipFill>"#,
+                ),
+                concat!(
+                    r#"<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext "#,
+                    r#"cx="{cx}" cy="{cy}"/></a:xfrm><a:prstGeom "#,
+                    r#"prst="rect"><a:avLst/></a:prstGeom></pic:spPr>"#,
+                ),
+                concat!(
+                    r#"</pic:pic></a:graphicData></a:graphic></wp:inline></w:"#,
+                    r#"drawing></w:r>"#,
+                )
             ),
             cx = cx,
             cy = cy,
@@ -949,15 +1129,26 @@ impl<'a> Writer<'a> {
         ))
     }
 
-    fn picture_paragraph(&mut self, asset: &str, alt: &str, points: Option<(f64, f64)>) {
+    fn picture_paragraph(
+        &mut self,
+        asset: &str,
+        alt: &str,
+        points: Option<(f64, f64)>,
+    ) {
         match self.drawing(asset, alt, points) {
             Some(run) => {
                 let _ = write!(
                     self.body,
-                    r#"<w:p><w:pPr><w:keepNext/><w:jc w:val="center"/></w:pPr>{run}</w:p>"#
+                    concat!(
+                        r#"<w:p><w:pPr><w:keepNext/><w:jc "#,
+                        r#"w:val="center"/></w:pPr>{run}</w:p>"#,
+                    )
                 );
             }
-            None => self.styled_paragraph("Caption", &[Span::plain(format!("[Image: {alt}]"))]),
+            None => self.styled_paragraph(
+                "Caption",
+                &[Span::plain(format!("[Image: {alt}]"))],
+            ),
         }
     }
 
@@ -970,7 +1161,8 @@ impl<'a> Writer<'a> {
                 Span::Break => out.push_str("<w:r><w:br/></w:r>"),
                 Span::Link { url, spans } => self.link_runs(url, spans, out),
                 Span::Xref { anchor, text } => {
-                    let name = self.bookmarks.get(anchor).cloned().unwrap_or_default();
+                    let name =
+                        self.bookmarks.get(anchor).cloned().unwrap_or_default();
                     let _ = write!(
                         out,
                         r#"<w:hyperlink w:anchor="{}" w:history="1">"#,
@@ -982,18 +1174,30 @@ impl<'a> Writer<'a> {
                     let _ = write!(
                         out,
                         concat!(
-                            r#"<w:r><w:fldChar w:fldCharType="begin" w:dirty="true"/></w:r>"#,
-                            r#"<w:r><w:instrText xml:space="preserve"> PAGEREF {} \h </w:instrText></w:r>"#,
-                            r#"<w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>#</w:t></w:r>"#,
+                            concat!(
+                                r#"<w:r><w:fldChar w:fldCharType="begin" "#,
+                                r#"w:dirty="true"/></w:r>"#,
+                            ),
+                            concat!(
+                                r#"<w:r><w:instrText xml:space="preserve"> "#,
+                                r#"PAGEREF {} \h </w:instrText></w:r>"#,
+                            ),
+                            concat!(
+                                r#"<w:r><w:fldChar "#,
+                                r#"w:fldCharType="separate"/></w:r><w:r><w:t>"#,
+                                r#"#</w:t></w:r>"#,
+                            ),
                             r#"<w:r><w:fldChar w:fldCharType="end"/></w:r>"#
                         ),
                         xml(&name)
                     );
                 }
-                Span::Image { asset, alt } => match self.drawing(asset, alt, Some((12.0, 12.0))) {
-                    Some(run) => out.push_str(&run),
-                    None => text_run(alt, Style::default(), None, out),
-                },
+                Span::Image { asset, alt } => {
+                    match self.drawing(asset, alt, Some((12.0, 12.0))) {
+                        Some(run) => out.push_str(&run),
+                        None => text_run(alt, Style::default(), None, out),
+                    }
+                }
             }
         }
     }
@@ -1003,7 +1207,9 @@ impl<'a> Writer<'a> {
         let _ = write!(out, r#"<w:hyperlink r:id="{rel}" w:history="1">"#);
         for span in spans {
             match span {
-                Span::Text { text, style } => text_run(text, *style, Some("Hyperlink"), out),
+                Span::Text { text, style } => {
+                    text_run(text, *style, Some("Hyperlink"), out)
+                }
                 Span::Break => out.push_str("<w:r><w:br/></w:r>"),
                 other => {
                     let text = plain_text(std::slice::from_ref(other));
@@ -1028,7 +1234,12 @@ fn embolden(span: &Span) -> Span {
     }
 }
 
-fn text_run(text: &str, style: Style, char_style: Option<&str>, out: &mut String) {
+fn text_run(
+    text: &str,
+    style: Style,
+    char_style: Option<&str>,
+    out: &mut String,
+) {
     if text.is_empty() {
         return;
     }
@@ -1108,7 +1319,11 @@ fn emu(value: f64) -> u64 {
     }
 }
 
-fn collect_headings(nodes: &[Node], depth: u8, out: &mut Vec<(u8, String, Option<String>)>) {
+fn collect_headings(
+    nodes: &[Node],
+    depth: u8,
+    out: &mut Vec<(u8, String, Option<String>)>,
+) {
     for node in nodes {
         match node {
             Node::Heading {
@@ -1124,7 +1339,9 @@ fn collect_headings(nodes: &[Node], depth: u8, out: &mut Vec<(u8, String, Option
                 );
                 out.push((*level, text, anchor.clone()));
             }
-            Node::Callout { blocks, .. } | Node::Titled { blocks, .. } | Node::Quote { blocks } => {
+            Node::Callout { blocks, .. }
+            | Node::Titled { blocks, .. }
+            | Node::Quote { blocks } => {
                 collect_headings(blocks, depth, out);
             }
             _ => {}

@@ -19,7 +19,8 @@ import { ExportPanel, svgPageSize } from "./export-panel";
 import { IssueImportForm } from "./import-screen";
 
 const PAGE: ExportTarget = { kind: "page", id: "p 1", title: "Launch plan" };
-const SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>';
+const SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>';
 
 function fakeApi(overrides: Partial<TransferApi> = {}): TransferApi {
   return {
@@ -50,7 +51,13 @@ describe("transfer API", () => {
       paper: "letter",
     });
     await api.download(
-      { kind: "book", id: "b1", title: "Handbook", scope: "subtree", section: "s2" },
+      {
+        kind: "book",
+        id: "b1",
+        title: "Handbook",
+        scope: "subtree",
+        section: "s2",
+      },
       "docx",
       "a4",
     );
@@ -64,14 +71,21 @@ describe("transfer API", () => {
     await api.importFile(file, { space: "s1", source: "notion" });
     expect(upload).toHaveBeenCalledWith(
       "/api/v1/import",
-      { space: "s1", parent: undefined, source: "notion", name: "Team wiki.zip" },
+      {
+        space: "s1",
+        parent: undefined,
+        source: "notion",
+        name: "Team wiki.zip",
+      },
       file,
       "application/octet-stream",
     );
   });
 
   it("names files safely and guesses sources", () => {
-    expect(exportFileName("Q3 plan: v2/final", "pdf")).toBe("Q3 plan- v2-final.pdf");
+    expect(exportFileName("Q3 plan: v2/final", "pdf")).toBe(
+      "Q3 plan- v2-final.pdf",
+    );
     expect(exportFileName("  ", "md")).toBe("export.md");
     expect(guessSource("Report.DOCX")).toBe("docx");
     expect(guessSource("Notion-export-abc.zip")).toBe("notion");
@@ -94,8 +108,13 @@ describe("export panel", () => {
     const api = fakeApi({ download, preview });
     const createObjectURL = vi.fn(() => "blob:x");
     const revokeObjectURL = vi.fn();
-    vi.stubGlobal("URL", Object.assign(URL, { createObjectURL, revokeObjectURL }));
-    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(vi.fn());
+    vi.stubGlobal(
+      "URL",
+      Object.assign(URL, { createObjectURL, revokeObjectURL }),
+    );
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(vi.fn());
     render(
       <I18nProvider>
         <ExportPanel target={PAGE} api={api} onClose={vi.fn()} />
@@ -137,7 +156,9 @@ describe("export panel", () => {
 describe("preview page size", () => {
   it("reads the page's box, so a page has its height before it decodes", () => {
     expect(
-      svgPageSize('<svg class="typst-doc" viewBox="0 0 595.28 841.89" width="595.28pt">'),
+      svgPageSize(
+        '<svg class="typst-doc" viewBox="0 0 595.28 841.89" width="595.28pt">',
+      ),
     ).toEqual({ width: 595.28, height: 841.89 });
     expect(svgPageSize(SVG)).toEqual({ width: 10, height: 10 });
     expect(svgPageSize('<svg stroke-width="2"></svg>')).toBeUndefined();
@@ -166,7 +187,12 @@ describe("issue import", () => {
         links: 0,
         read: 3,
         keys: [],
-        warnings: [{ external_id: "northstar/app#7", message: "assignee left unassigned" }],
+        warnings: [
+          {
+            external_id: "northstar/app#7",
+            message: "assignee left unassigned",
+          },
+        ],
         dry_run: into.dryRun,
       }),
     );

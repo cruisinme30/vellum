@@ -14,11 +14,22 @@ import type {
   SectionDoc as SectionDocument,
   TeamsOut,
 } from "../../src/api/api.gen";
-import { MSG_PEERS, decodeFrame, encodeFrame, encodePeers } from "../../src/editor/collab/wire";
+import {
+  MSG_PEERS,
+  decodeFrame,
+  encodeFrame,
+  encodePeers,
+} from "../../src/editor/collab/wire";
 import type { PreferencesWire } from "../../src/notifications/preferences";
 
 import { driveAnswer } from "./drive-fixture";
-import { ADMIN_TOKENS, FACTORS, MY_TOKENS, SIGN_IN, TOKEN_POLICY } from "./northstar-account";
+import {
+  ADMIN_TOKENS,
+  FACTORS,
+  MY_TOKENS,
+  SIGN_IN,
+  TOKEN_POLICY,
+} from "./northstar-account";
 import {
   ADMIN_SETTINGS,
   ADMIN_SPACES,
@@ -43,7 +54,14 @@ import {
   TEMPLATES,
   UPDATES,
 } from "./northstar-planning";
-import { ISSUES, MY_WORK, MY_WORK_SETTINGS, TEAM, THREADS, USER } from "./northstar-work";
+import {
+  ISSUES,
+  MY_WORK,
+  MY_WORK_SETTINGS,
+  TEAM,
+  THREADS,
+  USER,
+} from "./northstar-work";
 
 export { LAUNCH_PROJECT } from "./northstar-planning";
 export { NORTHSTAR_NOW } from "./northstar-work";
@@ -60,7 +78,11 @@ export { NORTHSTAR_NOW } from "./northstar-work";
  */
 
 /** `GET /api/v1/appearance`: the organisation's seed colour and themes. */
-export const APPEARANCE = { seed: "#3b5bdb", export_theme: "default", site_theme: "default" };
+export const APPEARANCE = {
+  seed: "#3b5bdb",
+  export_theme: "default",
+  site_theme: "default",
+};
 
 export const HANDBOOK = "handbook";
 /** A page in Ada's drive (drive-fixture.ts). */
@@ -141,7 +163,8 @@ const SECTION: SectionDocument = {
   markdown: [
     "# Setting up your machine",
     "",
-    "Install the tools with `scripts/dev/install-tools.sh`, then follow the page for your system.",
+    "Install the tools with `scripts/dev/install-tools.sh`, then follow the " +
+      "page for your system.",
     "",
     "- [macOS](setup/mac.md)",
     "- [Linux](setup/linux.md)",
@@ -162,7 +185,10 @@ const PREFERENCES: PreferencesWire = {
 /** A Yjs update that changes nothing. */
 const EMPTY = Uint8Array.from([0, 0]);
 
-/** The first client ID in an awareness update (a count, then the ID, as varints). */
+/**
+ * The first client ID in an awareness update (a count, then the ID, as
+ * varints).
+ */
 function firstClient(update: Uint8Array): number {
   let offset = 0;
   const uint = () => {
@@ -190,10 +216,22 @@ const READS: readonly (readonly [RegExp, unknown])[] = [
   [
     /^\/task-lists$/,
     {
-      lists: [{ doc: "P1", inbox: true, members: [], open: 2, owner: "priya", title: "Inbox" }],
+      lists: [
+        {
+          doc: "P1",
+          inbox: true,
+          members: [],
+          open: 2,
+          owner: "priya",
+          title: "Inbox",
+        },
+      ],
     } satisfies ListsView,
   ],
-  [/^\/my-work\/google$/, { configured: false, connected: false } satisfies GoogleView],
+  [
+    /^\/my-work\/google$/,
+    { configured: false, connected: false } satisfies GoogleView,
+  ],
   [/^\/work\/teams$/, { teams: [TEAM] } satisfies TeamsOut],
   [/^\/work\/issues$/, { groups: [{ issues: ISSUES }] } satisfies IssueGroups],
   [/^\/work\/comments$/, THREADS],
@@ -214,7 +252,9 @@ const READS: readonly (readonly [RegExp, unknown])[] = [
   [/^\/admin\/sign-in$/, SIGN_IN],
   [
     /^\/books$/,
-    { books: [{ id: HANDBOOK, path: "handbook", title: BOOK.title }] } satisfies BookList,
+    {
+      books: [{ id: HANDBOOK, path: "handbook", title: BOOK.title }],
+    } satisfies BookList,
   ],
   [/^\/books\/[^/]+\/sections\/[^/]+$/, SECTION],
   [/^\/books\/[^/]+\/history$/, { entries: [] }],
@@ -241,7 +281,9 @@ const READS: readonly (readonly [RegExp, unknown])[] = [
   ],
   [
     /^\/admin\/backups$/,
-    { backups: [{ name: "vellum-2026-10-29T08-00.tar.zst", size: 812_000_000 }] },
+    {
+      backups: [{ name: "vellum-2026-10-29T08-00.tar.zst", size: 812_000_000 }],
+    },
   ],
   [/^\/admin\/audit$/, AUDIT],
   [/^\/admin\/requests$/, REQUESTS],
@@ -258,7 +300,8 @@ const READS: readonly (readonly [RegExp, unknown])[] = [
 function lookUp(path: string): unknown {
   if (path.startsWith("/drive/")) return driveAnswer(`/api/v1${path}`);
   const key = /^\/work\/issues\/([^/]+)$/.exec(path)?.[1];
-  if (key !== undefined) return ISSUES.find((candidate) => candidate.key === key);
+  if (key !== undefined)
+    return ISSUES.find((candidate) => candidate.key === key);
   const briefed = /^\/work\/issues\/([^/]+)\/triage\/brief$/.exec(path)?.[1];
   const issue = ISSUES.find((candidate) => candidate.key === briefed);
   if (issue !== undefined) {
@@ -268,7 +311,14 @@ function lookUp(path: string): unknown {
       body: "",
       team: TEAM.key,
       similar: [],
-      teams: [{ key: TEAM.key, name: TEAM.name, labels: TEAM.labels, people: ["priya"] }],
+      teams: [
+        {
+          key: TEAM.key,
+          name: TEAM.name,
+          labels: TEAM.labels,
+          people: ["priya"],
+        },
+      ],
     } satisfies BriefOut;
   }
   return undefined;
@@ -279,9 +329,13 @@ function answer(route: Route): Promise<void> {
   const url = new URL(request.url());
   if (request.method() !== "GET") return route.fulfill({ json: {} });
   const path = url.pathname.replace(/^\/api\/v1/, "");
-  const found = lookUp(path) ?? READS.find(([pattern]) => pattern.test(path))?.[1];
+  const found =
+    lookUp(path) ?? READS.find(([pattern]) => pattern.test(path))?.[1];
   if (found === undefined) {
-    return route.fulfill({ status: 404, json: { code: "not_found", message: path } });
+    return route.fulfill({
+      status: 404,
+      json: { code: "not_found", message: path },
+    });
   }
   return route.fulfill({ json: found });
 }
@@ -291,7 +345,12 @@ export async function northstarServer(context: BrowserContext): Promise<void> {
   await context.route("**/api/v1/**", answer);
   await context.route("**/api/v1/auth/status", (route) =>
     route.fulfill({
-      json: { needsSetup: false, credential: "session", scopes: ["read", "write"], user: USER },
+      json: {
+        needsSetup: false,
+        credential: "session",
+        scopes: ["read", "write"],
+        user: USER,
+      },
     }),
   );
   await context.route("**/mcp/setup", (route) =>
@@ -305,11 +364,19 @@ export async function northstarServer(context: BrowserContext): Promise<void> {
       if (typeof message === "string") return;
       for (const wire of decodeFrame(new Uint8Array(message))) {
         if (wire.type === "sync-step-1") {
-          socket.send(Buffer.from(encodeFrame([{ type: "sync-step-2", update: EMPTY }])));
+          socket.send(
+            Buffer.from(encodeFrame([{ type: "sync-step-2", update: EMPTY }])),
+          );
         } else if (wire.type === "awareness") {
           const clientId = firstClient(wire.update);
-          const payload = encodePeers([{ clientId, user: USER.id, canWrite: true }]);
-          socket.send(Buffer.from(encodeFrame([{ type: "custom", tag: MSG_PEERS, payload }])));
+          const payload = encodePeers([
+            { clientId, user: USER.id, canWrite: true },
+          ]);
+          socket.send(
+            Buffer.from(
+              encodeFrame([{ type: "custom", tag: MSG_PEERS, payload }]),
+            ),
+          );
         }
       }
     });

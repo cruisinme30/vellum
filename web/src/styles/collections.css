@@ -172,7 +172,10 @@
 
 .vl-grid-row {
   display: grid;
-  grid-template-columns: minmax(260px, 2fr) repeat(var(--vl-columns), minmax(150px, 1fr));
+  grid-template-columns: minmax(260px, 2fr) repeat(
+      var(--vl-columns),
+      minmax(150px, 1fr)
+    );
   border-bottom: 1px solid var(--md-outline-variant);
 }
 

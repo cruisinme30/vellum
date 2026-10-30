@@ -45,7 +45,10 @@ fn writer() -> Writer<'static> {
     }
 }
 
-fn git(dir: &Path, args: &[&str]) -> Result<String, Box<dyn std::error::Error>> {
+fn git(
+    dir: &Path,
+    args: &[&str],
+) -> Result<String, Box<dyn std::error::Error>> {
     let out = Command::new("git").arg("-C").arg(dir).args(args).output()?;
     if !out.status.success() {
         return Err(String::from_utf8_lossy(&out.stderr).into_owned().into());
@@ -54,7 +57,8 @@ fn git(dir: &Path, args: &[&str]) -> Result<String, Box<dyn std::error::Error>> 
 }
 
 /// A bare remote and two stores cloned from it, both at the same commit.
-async fn pair() -> Result<(tempfile::TempDir, GitStore, GitStore), Box<dyn std::error::Error>> {
+async fn pair()
+-> Result<(tempfile::TempDir, GitStore, GitStore), Box<dyn std::error::Error>> {
     let tmp = tempfile::tempdir()?;
     let remote = tmp.path().join("remote.git");
     let _ = git(
@@ -96,7 +100,10 @@ fn doc(body: &str) -> Bytes {
     Bytes::from(format!("---\nid: A\n---\n{body}"))
 }
 
-async fn read(store: &GitStore, path: &str) -> Result<String, Box<dyn std::error::Error>> {
+async fn read(
+    store: &GitStore,
+    path: &str,
+) -> Result<String, Box<dyn std::error::Error>> {
     let blob = store.get(&p(path)?).await?;
     Ok(String::from_utf8(blob.bytes.to_vec())?)
 }
@@ -188,7 +195,10 @@ async fn clashing_edits_keep_the_remote_and_copy_out_ours() -> TestResult {
     let synced = b.sync("ben", &writer()).await?;
     let copy = "Plan (conflict 2026-10-29 Ana).md";
     assert!(
-        matches!(&synced.conflicts[..], [(path, c)] if path.as_str() == "Plan.md" && c.as_str() == copy),
+        matches!(
+            &synced.conflicts[..],
+            [(path, c)] if path.as_str() == "Plan.md" && c.as_str() == copy
+        ),
         "{synced:?}"
     );
     assert_eq!(

@@ -64,7 +64,11 @@ pub fn request(method: &str, path: &str) -> http::request::Builder {
         .header(header::HOST, "localhost")
 }
 
-pub fn json_request(method: &str, path: &str, body: &Value) -> http::request::Builder {
+pub fn json_request(
+    method: &str,
+    path: &str,
+    body: &Value,
+) -> http::request::Builder {
     request(method, path)
         .header(header::CONTENT_TYPE, "application/json")
         .header(header::ORIGIN, ORIGIN)
@@ -101,7 +105,11 @@ pub async fn signed_in_admin(app: &Router) -> String {
         finish(json_request(
             "POST",
             "/api/v1/setup",
-            &json!({"email": "Priya@Northstar.dev", "name": "Priya", "password": "correct horse battery"}),
+            &json!({
+                "email": "Priya@Northstar.dev",
+                "name": "Priya",
+                "password": "correct horse battery"
+            }),
         )),
     )
     .await;
@@ -111,7 +119,8 @@ pub async fn signed_in_admin(app: &Router) -> String {
         finish(json_request(
             "POST",
             "/auth/sign-in",
-            &json!({"email": "priya@northstar.dev", "password": "correct horse battery"}),
+            &json!({"email": "priya@northstar.dev", "password": "correct horse \
+                battery"}),
         )),
     )
     .await;
@@ -128,7 +137,8 @@ pub async fn signed_in_admin(app: &Router) -> String {
 #[expect(clippy::too_many_lines, reason = "one end-to-end story")]
 async fn set_up_sign_in_and_manage_tokens() {
     let app = app(None);
-    let status = send(&app, finish(request("GET", "/api/v1/auth/status"))).await;
+    let status =
+        send(&app, finish(request("GET", "/api/v1/auth/status"))).await;
     assert_eq!(status.json()["needsSetup"], true, "{}", status.text);
     assert_eq!(status.json()["credential"], "anonymous");
 
@@ -138,7 +148,11 @@ async fn set_up_sign_in_and_manage_tokens() {
         finish(json_request(
             "POST",
             "/api/v1/setup",
-            &json!({"email": "eve@northstar.dev", "name": "Eve", "password": "correct horse battery"}),
+            &json!({
+                "email": "eve@northstar.dev",
+                "name": "Eve",
+                "password": "correct horse battery"
+            }),
         )),
     )
     .await;
@@ -149,7 +163,8 @@ async fn set_up_sign_in_and_manage_tokens() {
         finish(json_request(
             "POST",
             "/auth/sign-in",
-            &json!({"email": "priya@northstar.dev", "password": "wrong horse battery"}),
+            &json!({"email": "priya@northstar.dev", "password": "wrong horse \
+                battery"}),
         )),
     )
     .await;
@@ -157,7 +172,10 @@ async fn set_up_sign_in_and_manage_tokens() {
 
     let me = send(
         &app,
-        finish(request("GET", "/api/v1/auth/status").header(header::COOKIE, &cookie)),
+        finish(
+            request("GET", "/api/v1/auth/status")
+                .header(header::COOKIE, &cookie),
+        ),
     )
     .await;
     assert_eq!(me.json()["user"]["email"], "priya@northstar.dev");
@@ -167,7 +185,10 @@ async fn set_up_sign_in_and_manage_tokens() {
     let body = json!({"name": "CI", "scopes": ["read", "work"]});
     let refused = send(
         &app,
-        finish(json_request("POST", "/api/v1/me/tokens", &body).header(header::COOKIE, &cookie)),
+        finish(
+            json_request("POST", "/api/v1/me/tokens", &body)
+                .header(header::COOKIE, &cookie),
+        ),
     )
     .await;
     assert_eq!(refused.status, StatusCode::FORBIDDEN);
@@ -189,20 +210,27 @@ async fn set_up_sign_in_and_manage_tokens() {
     let bearer = format!("Bearer {token}");
     let status = send(
         &app,
-        finish(request("GET", "/api/v1/auth/status").header(header::AUTHORIZATION, &bearer)),
+        finish(
+            request("GET", "/api/v1/auth/status")
+                .header(header::AUTHORIZATION, &bearer),
+        ),
     )
     .await;
     assert_eq!(status.json()["credential"], "api_token");
     let admin = send(
         &app,
-        finish(request("GET", "/api/v1/admin/users").header(header::AUTHORIZATION, &bearer)),
+        finish(
+            request("GET", "/api/v1/admin/users")
+                .header(header::AUTHORIZATION, &bearer),
+        ),
     )
     .await;
     assert_eq!(admin.status, StatusCode::FORBIDDEN, "{}", admin.text);
     let mint = send(
         &app,
         finish(
-            json_request("POST", "/api/v1/me/tokens", &body).header(header::AUTHORIZATION, &bearer),
+            json_request("POST", "/api/v1/me/tokens", &body)
+                .header(header::AUTHORIZATION, &bearer),
         ),
     )
     .await;
@@ -214,7 +242,8 @@ async fn set_up_sign_in_and_manage_tokens() {
     let bogus = send(
         &app,
         finish(
-            request("GET", "/api/v1/auth/status").header(header::AUTHORIZATION, "Bearer vlm_nope"),
+            request("GET", "/api/v1/auth/status")
+                .header(header::AUTHORIZATION, "Bearer vlm_nope"),
         ),
     )
     .await;
@@ -223,7 +252,10 @@ async fn set_up_sign_in_and_manage_tokens() {
     // The administrator, freshly signed in, can list users.
     let users = send(
         &app,
-        finish(request("GET", "/api/v1/admin/users").header(header::COOKIE, &cookie)),
+        finish(
+            request("GET", "/api/v1/admin/users")
+                .header(header::COOKIE, &cookie),
+        ),
     )
     .await;
     assert_eq!(users.status, StatusCode::OK, "{}", users.text);
@@ -244,7 +276,10 @@ async fn set_up_sign_in_and_manage_tokens() {
     assert_eq!(revoked.status, StatusCode::OK, "{}", revoked.text);
     let after = send(
         &app,
-        finish(request("GET", "/api/v1/auth/status").header(header::AUTHORIZATION, &bearer)),
+        finish(
+            request("GET", "/api/v1/auth/status")
+                .header(header::AUTHORIZATION, &bearer),
+        ),
     )
     .await;
     assert_eq!(after.status, StatusCode::UNAUTHORIZED);
@@ -262,7 +297,10 @@ async fn set_up_sign_in_and_manage_tokens() {
     assert_eq!(out.status, StatusCode::NO_CONTENT, "{}", out.text);
     let stale = send(
         &app,
-        finish(request("GET", "/api/v1/auth/status").header(header::COOKIE, &cookie)),
+        finish(
+            request("GET", "/api/v1/auth/status")
+                .header(header::COOKIE, &cookie),
+        ),
     )
     .await;
     assert_eq!(stale.json()["credential"], "anonymous");
@@ -283,7 +321,8 @@ async fn repeated_failures_lock_the_address_out() {
             finish(json_request(
                 "POST",
                 "/auth/sign-in",
-                &json!({"email": "priya@northstar.dev", "password": "not the password"}),
+                &json!({"email": "priya@northstar.dev", "password": "not the \
+                    password"}),
             )),
         )
         .await
@@ -305,7 +344,8 @@ async fn repeated_failures_lock_the_address_out() {
 }
 
 fn pkce() -> (String, String) {
-    let verifier = "M25iVXpKU3puUjFaYWg3T1NDTDQtcW1ROUY5YXlwalNoc0hhakxifmZHag".to_owned();
+    let verifier =
+        "M25iVXpKU3puUjFaYWg3T1NDTDQtcW1ROUY5YXlwalNoc0hhakxifmZHag".to_owned();
     let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()));
     (verifier, challenge)
 }
@@ -445,7 +485,8 @@ async fn the_desktop_app_signs_in_with_oauth() {
         ),
     )
     .await;
-    let code = query(decided.json()["redirectTo"].as_str().unwrap())["code"].clone();
+    let code =
+        query(decided.json()["redirectTo"].as_str().unwrap())["code"].clone();
     let tokens = token_request(
         &app,
         &[
@@ -494,7 +535,8 @@ async fn the_desktop_app_signs_in_with_oauth() {
     )
     .await;
     assert_eq!(rotated.status, StatusCode::OK, "{}", rotated.text);
-    let new_access = rotated.json()["access_token"].as_str().unwrap().to_owned();
+    let new_access =
+        rotated.json()["access_token"].as_str().unwrap().to_owned();
 
     // Replaying the spent refresh token revokes the whole grant.
     let replay = token_request(
@@ -520,9 +562,14 @@ async fn the_desktop_app_signs_in_with_oauth() {
 
 #[tokio::test]
 async fn break_glass_opens_a_short_admin_session_once() {
-    let dir = std::env::temp_dir().join(format!("vellum-break-glass-{}", std::process::id()));
+    let dir = std::env::temp_dir()
+        .join(format!("vellum-break-glass-{}", std::process::id()));
     let app = app(Some(&dir));
-    let code = vellum_identity::Identity::issue_break_glass(&dir, Duration::from_mins(15)).unwrap();
+    let code = vellum_identity::Identity::issue_break_glass(
+        &dir,
+        Duration::from_mins(15),
+    )
+    .unwrap();
     let redeem = || {
         finish(json_request(
             "POST",
@@ -535,7 +582,10 @@ async fn break_glass_opens_a_short_admin_session_once() {
     let cookie = cookie_of(&first);
     let status = send(
         &app,
-        finish(request("GET", "/api/v1/auth/status").header(header::COOKIE, &cookie)),
+        finish(
+            request("GET", "/api/v1/auth/status")
+                .header(header::COOKIE, &cookie),
+        ),
     )
     .await;
     assert_eq!(status.json()["credential"], "break_glass");
@@ -590,10 +640,18 @@ async fn live_editing_is_mounted(app: &axum::Router) {
 
 /// The person has a My Drive without asking for one, and a space's whole
 /// tree comes in one request.
-async fn drive_extras(app: &axum::Router, cookie: &str, space_id: &str, page_id: &str) {
+async fn drive_extras(
+    app: &axum::Router,
+    cookie: &str,
+    space_id: &str,
+    page_id: &str,
+) {
     let mine = send(
         app,
-        finish(request("GET", "/api/v1/drive/my-drive").header(header::COOKIE, cookie)),
+        finish(
+            request("GET", "/api/v1/drive/my-drive")
+                .header(header::COOKIE, cookie),
+        ),
     )
     .await;
     assert_eq!(mine.status, StatusCode::OK, "{}", mine.text);
@@ -665,7 +723,8 @@ async fn workspace_services_answer_signed_in_users() {
         .unwrap()
         .with_workspace(&config, |k| {
             // Plain files, so the test can edit them like another editor.
-            (k == crate::workspace::PLAINTEXT_VAR || k == crate::at_rest::PLAINTEXT_VAR)
+            (k == crate::workspace::PLAINTEXT_VAR
+                || k == crate::at_rest::PLAINTEXT_VAR)
                 .then(|| "1".to_owned())
         })
         .await
@@ -713,7 +772,11 @@ async fn workspace_services_answer_signed_in_users() {
         &app,
         post(
             "/api/v1/drive/spaces",
-            json!({"kind": "shared_drive", "slug": "eng", "name": "Engineering"}),
+            json!({
+                "kind": "shared_drive",
+                "slug": "eng",
+                "name": "Engineering"
+            }),
         ),
     )
     .await;
@@ -739,11 +802,17 @@ async fn workspace_services_answer_signed_in_users() {
     // into it, so edit again until the watcher has seen the page.
     'edits: for attempt in 0..10 {
         let text = std::fs::read_to_string(&file).unwrap();
-        std::fs::write(&file, format!("{text}Edit {attempt} in another editor.\n")).unwrap();
+        std::fs::write(
+            &file,
+            format!("{text}Edit {attempt} in another editor.\n"),
+        )
+        .unwrap();
         for _ in 0..20 {
             let reply = send(
                 &app,
-                finish(request("GET", &versions).header(header::COOKIE, &cookie)),
+                finish(
+                    request("GET", &versions).header(header::COOKIE, &cookie),
+                ),
             )
             .await;
             seen = reply.text;
@@ -766,13 +835,17 @@ async fn workspace_services_answer_signed_in_users() {
 async fn the_pwa_registers_and_removes_a_browser_for_push() {
     let app = app(None);
     // Signed out, the key is not handed out.
-    let anonymous = send(&app, finish(request("GET", "/api/v1/push/vapid-key"))).await;
+    let anonymous =
+        send(&app, finish(request("GET", "/api/v1/push/vapid-key"))).await;
     assert_eq!(anonymous.status, StatusCode::UNAUTHORIZED);
 
     let cookie = signed_in_admin(&app).await;
     let key = send(
         &app,
-        finish(request("GET", "/api/v1/push/vapid-key").header(header::COOKIE, &cookie)),
+        finish(
+            request("GET", "/api/v1/push/vapid-key")
+                .header(header::COOKIE, &cookie),
+        ),
     )
     .await;
     assert_eq!(key.status, StatusCode::OK, "{}", key.text);
@@ -809,8 +882,12 @@ async fn the_pwa_registers_and_removes_a_browser_for_push() {
     .await;
     assert_eq!(again.json()["devices"], 1);
 
-    let plain = json!({"endpoint": "http://10.0.0.1/hook", "keys": subscription["keys"]});
-    let refused = send(&app, call("POST", "/api/v1/push/subscriptions", &plain)).await;
+    let plain = json!({
+        "endpoint": "http://10.0.0.1/hook",
+        "keys": subscription["keys"]
+    });
+    let refused =
+        send(&app, call("POST", "/api/v1/push/subscriptions", &plain)).await;
     assert_eq!(refused.status, StatusCode::BAD_REQUEST, "{}", refused.text);
 
     let query = serde_urlencoded::to_string([("endpoint", endpoint)]).unwrap();
@@ -828,7 +905,10 @@ async fn the_pwa_registers_and_removes_a_browser_for_push() {
 
     let prefs = send(
         &app,
-        finish(request("GET", "/api/v1/notifications/preferences").header(header::COOKIE, &cookie)),
+        finish(
+            request("GET", "/api/v1/notifications/preferences")
+                .header(header::COOKIE, &cookie),
+        ),
     )
     .await;
     assert_eq!(prefs.status, StatusCode::OK, "{}", prefs.text);
@@ -876,7 +956,11 @@ async fn a_mention_reaches_the_mentioned_persons_inbox() {
     for (path, body) in [
         (
             "/api/v1/admin/users",
-            json!({"email": "bo@northstar.dev", "name": "Bo", "password": "battery horse staple"}),
+            json!({
+                "email": "bo@northstar.dev",
+                "name": "Bo",
+                "password": "battery horse staple"
+            }),
         ),
         (
             "/api/v1/work/teams",
@@ -900,7 +984,8 @@ async fn a_mention_reaches_the_mentioned_persons_inbox() {
         finish(json_request(
             "POST",
             "/auth/sign-in",
-            &json!({"email": "bo@northstar.dev", "password": "battery horse staple"}),
+            &json!({"email": "bo@northstar.dev", "password": "battery horse \
+                staple"}),
         )),
     )
     .await;
@@ -912,7 +997,10 @@ async fn a_mention_reaches_the_mentioned_persons_inbox() {
     for _ in 0..50 {
         inbox = send(
             &app,
-            finish(request("GET", "/api/v1/notifications").header(header::COOKIE, &bo)),
+            finish(
+                request("GET", "/api/v1/notifications")
+                    .header(header::COOKIE, &bo),
+            ),
         )
         .await
         .json();
@@ -930,7 +1018,10 @@ async fn a_mention_reaches_the_mentioned_persons_inbox() {
     // The author is not told about their own comment.
     let own = send(
         &app,
-        finish(request("GET", "/api/v1/notifications").header(header::COOKIE, &priya)),
+        finish(
+            request("GET", "/api/v1/notifications")
+                .header(header::COOKIE, &priya),
+        ),
     )
     .await
     .json();
@@ -940,9 +1031,13 @@ async fn a_mention_reaches_the_mentioned_persons_inbox() {
     let read = send(
         &app,
         finish(
-            json_request("POST", "/api/v1/notifications/read", &json!({"all": true}))
-                .header(header::COOKIE, &bo)
-                .header("x-csrf-token", &bo_token),
+            json_request(
+                "POST",
+                "/api/v1/notifications/read",
+                &json!({"all": true}),
+            )
+            .header(header::COOKIE, &bo)
+            .header("x-csrf-token", &bo_token),
         ),
     )
     .await;
@@ -952,12 +1047,20 @@ async fn a_mention_reaches_the_mentioned_persons_inbox() {
 
 /// Searches as the cookie's owner until a hit mentions `want`, for up to
 /// ten seconds; returns the last reply.
-async fn search_until(app: &Router, cookie: &str, q: &str, want: &str) -> String {
+async fn search_until(
+    app: &Router,
+    cookie: &str,
+    q: &str,
+    want: &str,
+) -> String {
     let mut last = String::new();
     for _ in 0..100 {
         let reply = send(
             app,
-            finish(request("GET", &format!("/api/v1/search?q={q}")).header(header::COOKIE, cookie)),
+            finish(
+                request("GET", &format!("/api/v1/search?q={q}"))
+                    .header(header::COOKIE, cookie),
+            ),
         )
         .await;
         last = reply.text;

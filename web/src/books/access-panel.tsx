@@ -29,9 +29,13 @@ function AccessForm({
   const directory = useServerApi("directory");
   const { busy, error, run } = useAction();
   const [saved, setSaved] = useState(false);
-  const [restrictTo, setRestrictTo] = useState<string[]>(() => [...(access.own_restrict_to ?? [])]);
+  const [restrictTo, setRestrictTo] = useState<string[]>(() => [
+    ...(access.own_restrict_to ?? []),
+  ]);
   const [owners, setOwners] = useState<string[]>(() => [...access.owners]);
-  const [reviewers, setReviewers] = useState<string[]>(() => [...access.reviewers]);
+  const [reviewers, setReviewers] = useState<string[]>(() => [
+    ...access.reviewers,
+  ]);
   const changed =
     <T,>(set: (value: T) => void) =>
     (value: T) => {
@@ -101,8 +105,12 @@ export function AccessPanel({
   const inherited = access.restricted_by.filter((id) => id !== section.id);
   return (
     <section className="vl-book-panel" aria-labelledby="vl-book-access-title">
-      <h2 id="vl-book-access-title">{t("books-access-title", { title: section.title })}</h2>
-      {inherited.length > 0 && <p className="vl-muted">{t("books-access-inherited")}</p>}
+      <h2 id="vl-book-access-title">
+        {t("books-access-title", { title: section.title })}
+      </h2>
+      {inherited.length > 0 && (
+        <p className="vl-muted">{t("books-access-inherited")}</p>
+      )}
       {access.restrict_to != undefined && (
         <p className="vl-muted">
           {t("books-access-effective", { who: access.restrict_to.join(", ") })}

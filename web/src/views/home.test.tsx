@@ -18,7 +18,9 @@ const linkNames = (element: HTMLElement) =>
 
 function emptyWorkspace(store: WorkspaceStore) {
   act(() => {
-    for (const page of store.getSnapshot().pages.filter((p) => p.parentId === undefined)) {
+    for (const page of store
+      .getSnapshot()
+      .pages.filter((p) => p.parentId === undefined)) {
       store.trashPage(page.id);
     }
   });
@@ -27,7 +29,9 @@ function emptyWorkspace(store: WorkspaceStore) {
 describe("HomeView", () => {
   it("greets the user by first name", () => {
     renderWithProviders(<HomeView />);
-    expect(screen.getByRole("heading", { level: 1, name: "Good to see you, Priya" })).toBeDefined();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Good to see you, Priya" }),
+    ).toBeDefined();
   });
 
   it("lists the six most recently changed pages, newest first", () => {
@@ -46,7 +50,11 @@ describe("HomeView", () => {
     renderWithProviders(<HomeView />);
     const favorites = section("Favorites");
     expect(linkNames(favorites)).toHaveLength(3);
-    for (const name of ["Engineering home", "Platform roadmap 2027", "PRD: Policy simulator"]) {
+    for (const name of [
+      "Engineering home",
+      "Platform roadmap 2027",
+      "PRD: Policy simulator",
+    ]) {
       expect(within(favorites).getByRole("link", { name })).toBeDefined();
     }
     expect(
@@ -59,20 +67,28 @@ describe("HomeView", () => {
   it("says when there is nothing to show", () => {
     const { store } = renderWithProviders(<HomeView />);
     emptyWorkspace(store);
-    expect(within(section("Recently changed")).getByText("Nothing has changed yet.")).toBeDefined();
-    expect(within(section("Favorites")).getByText("Star a page to keep it here.")).toBeDefined();
+    expect(
+      within(section("Recently changed")).getByText("Nothing has changed yet."),
+    ).toBeDefined();
+    expect(
+      within(section("Favorites")).getByText("Star a page to keep it here."),
+    ).toBeDefined();
   });
 });
 
 describe("FavoritesView", () => {
   it("lists starred pages and follows changes", () => {
     const { store } = renderWithProviders(<FavoritesView />);
-    expect(screen.getByRole("heading", { level: 1, name: "Favorites" })).toBeDefined();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Favorites" }),
+    ).toBeDefined();
     expect(linkNames(document.body)).toHaveLength(3);
     act(() => {
       store.toggleStar(PAGE.launch);
     });
-    expect(screen.getByRole("link", { name: "Launch checklist" })).toBeDefined();
+    expect(
+      screen.getByRole("link", { name: "Launch checklist" }),
+    ).toBeDefined();
   });
 
   it("says how to add a favourite", () => {

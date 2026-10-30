@@ -71,7 +71,12 @@ export interface SlaRule {
   readonly within_hours: number;
 }
 
-export const SCALES = ["linear", "fibonacci", "exponential", "t-shirt"] as const;
+export const SCALES = [
+  "linear",
+  "fibonacci",
+  "exponential",
+  "t-shirt",
+] as const;
 
 export const GIT_MOMENTS = [
   "branch_pushed",
@@ -90,7 +95,10 @@ export interface TeamFile {
   readonly timezone?: string;
   readonly lead?: string;
   readonly members?: readonly string[];
-  readonly workflow: { readonly statuses: readonly Status[]; readonly default: string };
+  readonly workflow: {
+    readonly statuses: readonly Status[];
+    readonly default: string;
+  };
   readonly estimates?: {
     readonly scale?: string;
     readonly allow_zero?: boolean;
@@ -107,7 +115,9 @@ export interface TeamFile {
 
 /** `value` without the optional field `key`. */
 export function without<T extends object>(value: T, key: keyof T & string): T {
-  return Object.fromEntries(Object.entries(value).filter(([name]) => name !== key)) as T;
+  return Object.fromEntries(
+    Object.entries(value).filter(([name]) => name !== key),
+  ) as T;
 }
 
 /** A status key from its name: `In Review` → `in-review`. */
@@ -143,7 +153,11 @@ export function moveWithinCategory(
   const current = list[at];
   if (current === undefined) return list;
   let other = at + step;
-  while (other >= 0 && other < list.length && list[other]?.category !== current.category) {
+  while (
+    other >= 0 &&
+    other < list.length &&
+    list[other]?.category !== current.category
+  ) {
     other += step;
   }
   const swap = list[other];
@@ -157,6 +171,8 @@ export function moveWithinCategory(
 export function pruneGit(file: TeamFile): TeamFile {
   if (file.git === undefined) return file;
   const keys = new Set(file.workflow.statuses.map((status) => status.key));
-  const git = Object.fromEntries(Object.entries(file.git).filter(([, status]) => keys.has(status)));
+  const git = Object.fromEntries(
+    Object.entries(file.git).filter(([, status]) => keys.has(status)),
+  );
   return { ...file, git };
 }

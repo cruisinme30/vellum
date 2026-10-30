@@ -8,11 +8,16 @@ import { Decoration, DecorationSet } from "@tiptap/pm/view";
 
 import { isBlockId, newBlockId } from "../block-id";
 
-/** Where a new comment thread or issue points: a block and the selected text. */
+/**
+ * Where a new comment thread or issue points: a block and the selected text.
+ */
 export interface Anchor {
   /** The innermost block around the selection, when it has an ID yet. */
   readonly blockId: string | undefined;
-  /** The selected text, trimmed to {@link QUOTE_LIMIT} characters; empty for a caret. */
+  /**
+   * The selected text, trimmed to {@link QUOTE_LIMIT} characters; empty for a
+   * caret.
+   */
   readonly quote: string;
 }
 
@@ -35,7 +40,10 @@ export function anchorOf(state: EditorState): Anchor {
     const id: unknown = state.doc.nodeAt(from)?.attrs["blockId"];
     if (isBlockId(id)) blockId = id;
   }
-  const quote = state.doc.textBetween(from, to, " ").trim().slice(0, QUOTE_LIMIT);
+  const quote = state.doc
+    .textBetween(from, to, " ")
+    .trim()
+    .slice(0, QUOTE_LIMIT);
   return { blockId, quote };
 }
 
@@ -52,7 +60,11 @@ export function ensureAnchor(editor: Editor): Anchor {
     if ("blockId" in node.attrs) {
       const blockId = newBlockId();
       editor.view.dispatch(
-        editor.state.tr.setNodeAttribute($from.before(depth), "blockId", blockId),
+        editor.state.tr.setNodeAttribute(
+          $from.before(depth),
+          "blockId",
+          blockId,
+        ),
       );
       return { ...anchor, blockId };
     }
@@ -66,7 +78,10 @@ export function targetOf(documentId: string, blockId?: string): string {
 }
 
 /** The position of the block with this ID, if the document has it. */
-export function blockPosition(document: PmNode, blockId: string): number | undefined {
+export function blockPosition(
+  document: PmNode,
+  blockId: string,
+): number | undefined {
   let found: number | undefined;
   document.descendants((node, pos) => {
     if (found !== undefined) return false;
@@ -81,7 +96,11 @@ export function blockPosition(document: PmNode, blockId: string): number | undef
 
 const markersKey = new PluginKey<DecorationSet>("vellumCommentMarkers");
 
-function decorate(document: PmNode, blocks: ReadonlySet<string>, active?: string): DecorationSet {
+function decorate(
+  document: PmNode,
+  blocks: ReadonlySet<string>,
+  active?: string,
+): DecorationSet {
   if (blocks.size === 0) return DecorationSet.empty;
   const decorations: Decoration[] = [];
   document.descendants((node, pos) => {
@@ -89,7 +108,8 @@ function decorate(document: PmNode, blocks: ReadonlySet<string>, active?: string
     if (typeof id === "string" && blocks.has(id)) {
       decorations.push(
         Decoration.node(pos, pos + node.nodeSize, {
-          class: id === active ? "vl-commented vl-commented-active" : "vl-commented",
+          class:
+            id === active ? "vl-commented vl-commented-active" : "vl-commented",
         }),
       );
     }
@@ -124,7 +144,9 @@ export const CommentMarkers = Extension.create({
               current = meta;
               return decorate(tr.doc, meta.blocks, meta.active);
             }
-            return tr.docChanged ? decorate(tr.doc, current.blocks, current.active) : old;
+            return tr.docChanged
+              ? decorate(tr.doc, current.blocks, current.active)
+              : old;
           },
         },
         props: {
@@ -143,5 +165,7 @@ export function setCommentMarkers(
 ): void {
   if (editor.isDestroyed) return;
   const meta: MarkerMeta = { blocks, active };
-  editor.view.dispatch(editor.state.tr.setMeta(markersKey, meta).setMeta("addToHistory", false));
+  editor.view.dispatch(
+    editor.state.tr.setMeta(markersKey, meta).setMeta("addToHistory", false),
+  );
 }

@@ -73,10 +73,13 @@ impl Book {
                 continue;
             };
             if let Some(allowed) = &entry.restrict_to {
-                access.restrict_to = Some(access.restrict_to.take().map_or_else(
-                    || allowed.clone(),
-                    |current| current.intersection(allowed).cloned().collect(),
-                ));
+                access.restrict_to =
+                    Some(access.restrict_to.take().map_or_else(
+                        || allowed.clone(),
+                        |current| {
+                            current.intersection(allowed).cloned().collect()
+                        },
+                    ));
                 access.restricted_by.push(node.clone());
             }
             if !entry.owners.is_empty() {
@@ -94,7 +97,11 @@ impl Book {
     /// # Errors
     ///
     /// Returns [`BookError::UnknownNode`] when the book has no such section.
-    pub fn can_view(&self, id: &NodeId, principals: &BTreeSet<Principal>) -> Result<bool> {
+    pub fn can_view(
+        &self,
+        id: &NodeId,
+        principals: &BTreeSet<Principal>,
+    ) -> Result<bool> {
         Ok(self.access(id)?.permits(principals))
     }
 
@@ -120,7 +127,9 @@ impl Book {
     /// # Errors
     ///
     /// Returns an error only for an inconsistent book.
-    pub fn restrictions(&self) -> Result<BTreeMap<NodeId, BTreeSet<Principal>>> {
+    pub fn restrictions(
+        &self,
+    ) -> Result<BTreeMap<NodeId, BTreeSet<Principal>>> {
         let mut out = BTreeMap::new();
         for id in self.manifest.nodes.keys() {
             if let Some(allowed) = self.access(id)?.restrict_to {
@@ -180,7 +189,11 @@ impl Book {
     /// # Errors
     ///
     /// Returns [`BookError::UnknownNode`] for an unknown section.
-    pub fn set_owners(&mut self, id: &NodeId, owners: BTreeSet<Principal>) -> Result<()> {
+    pub fn set_owners(
+        &mut self,
+        id: &NodeId,
+        owners: BTreeSet<Principal>,
+    ) -> Result<()> {
         self.manifest
             .nodes
             .get_mut(id)
@@ -194,7 +207,11 @@ impl Book {
     /// # Errors
     ///
     /// Returns [`BookError::UnknownNode`] for an unknown section.
-    pub fn set_reviewers(&mut self, id: &NodeId, reviewers: BTreeSet<Principal>) -> Result<()> {
+    pub fn set_reviewers(
+        &mut self,
+        id: &NodeId,
+        reviewers: BTreeSet<Principal>,
+    ) -> Result<()> {
         self.manifest
             .nodes
             .get_mut(id)

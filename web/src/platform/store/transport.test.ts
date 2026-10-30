@@ -6,7 +6,9 @@ import { describe, expect, it, vi } from "vitest";
 import { httpTransport, parsePull, parsePush, SyncError } from "./transport";
 
 function respond(status: number, body: unknown) {
-  return vi.fn<typeof fetch>(() => Promise.resolve(Response.json(body, { status })));
+  return vi.fn<typeof fetch>(() =>
+    Promise.resolve(Response.json(body, { status })),
+  );
 }
 
 // The lint rules forbid the null literal; the network can still send it.
@@ -15,7 +17,10 @@ const NULL: unknown = JSON.parse("null");
 describe("httpTransport", () => {
   it("posts mutations with tracing headers and the session cookie", async () => {
     const fetchMock = respond(200, { lastMutationId: 3, rejected: [] });
-    const transport = httpTransport({ baseUrl: "https://northstar.dev", fetch: fetchMock });
+    const transport = httpTransport({
+      baseUrl: "https://northstar.dev",
+      fetch: fetchMock,
+    });
     const result = await transport.push({ clientId: "c", mutations: [] });
     expect(result).toEqual({ lastMutationId: 3, rejected: [] });
     const [url, init] = fetchMock.mock.calls[0] ?? [];
@@ -24,14 +29,19 @@ describe("httpTransport", () => {
     expect(init?.credentials).toBe("include");
     const headers = new Headers(init?.headers);
     expect(headers.get("content-type")).toBe("application/json");
-    expect(headers.get("traceparent")).toMatch(/^00-[\da-f]{32}-[\da-f]{16}-01$/);
+    expect(headers.get("traceparent")).toMatch(
+      /^00-[\da-f]{32}-[\da-f]{16}-01$/,
+    );
     expect(headers.get("x-request-id")).toMatch(/^[\da-f-]{36}$/);
   });
 
   it("pulls with the client ID and cursor in the query", async () => {
     const body = { cursor: "9", lastMutationId: 0, reset: false, patches: [] };
     const fetchMock = respond(200, body);
-    const transport = httpTransport({ baseUrl: "https://northstar.dev", fetch: fetchMock });
+    const transport = httpTransport({
+      baseUrl: "https://northstar.dev",
+      fetch: fetchMock,
+    });
     expect(await transport.pull("c 1", "8")).toEqual(body);
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
       "https://northstar.dev/api/v1/sync/pull?clientId=c+1&cursor=8",
@@ -44,17 +54,29 @@ describe("httpTransport", () => {
     [408, true],
     [403, false],
     [400, false],
-  ])("maps HTTP %i to a SyncError (retryable: %s)", async (status, retryable) => {
-    const transport = httpTransport({ baseUrl: "", fetch: respond(status, {}) });
-    const error = await transport.pull("c", "").catch((error_: unknown) => error_);
-    expect(error).toBeInstanceOf(SyncError);
-    expect(error).toMatchObject({ status, retryable });
-  });
+  ])(
+    "maps HTTP %i to a SyncError (retryable: %s)",
+    async (status, retryable) => {
+      const transport = httpTransport({
+        baseUrl: "",
+        fetch: respond(status, {}),
+      });
+      const error = await transport
+        .pull("c", "")
+        .catch((error_: unknown) => error_);
+      expect(error).toBeInstanceOf(SyncError);
+      expect(error).toMatchObject({ status, retryable });
+    },
+  );
 
   it("treats network failures as retryable", async () => {
-    const fetchMock = vi.fn<typeof fetch>(() => Promise.reject(new TypeError("offline")));
+    const fetchMock = vi.fn<typeof fetch>(() =>
+      Promise.reject(new TypeError("offline")),
+    );
     const transport = httpTransport({ baseUrl: "", fetch: fetchMock });
-    await expect(transport.push({ clientId: "c", mutations: [] })).rejects.toMatchObject({
+    await expect(
+      transport.push({ clientId: "c", mutations: [] }),
+    ).rejects.toMatchObject({
       status: 0,
       retryable: true,
     });
@@ -70,12 +92,15 @@ describe("httpTransport", () => {
 });
 
 describe("response checks", () => {
-  it.each([NULL, [], {}, { lastMutationId: "1", rejected: [] }, { lastMutationId: 1 }])(
-    "rejects the push body %j",
-    (body) => {
-      expect(() => parsePush(body)).toThrow(SyncError);
-    },
-  );
+  it.each([
+    NULL,
+    [],
+    {},
+    { lastMutationId: "1", rejected: [] },
+    { lastMutationId: 1 },
+  ])("rejects the push body %j", (body) => {
+    expect(() => parsePush(body)).toThrow(SyncError);
+  });
 
   it.each([
     NULL,

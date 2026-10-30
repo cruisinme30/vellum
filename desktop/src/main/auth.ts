@@ -41,23 +41,32 @@ export function createPkce(random: (size: number) => Uint8Array = randomBytes) {
 }
 
 /** Reads RFC 8414 metadata, falling back to Vellum's default paths. */
-export async function discover(server: string, fetcher: Fetch): Promise<Endpoints> {
+export async function discover(
+  server: string,
+  fetcher: Fetch,
+): Promise<Endpoints> {
   const fallback: Endpoints = {
     authorization: `${server}/oauth/authorize`,
     token: `${server}/oauth/token`,
     revocation: `${server}/oauth/revoke`,
     userinfo: `${server}/oauth/userinfo`,
   };
-  const response = await fetcher(`${server}/.well-known/oauth-authorization-server`, {
-    headers: { accept: "application/json" },
-  });
+  const response = await fetcher(
+    `${server}/.well-known/oauth-authorization-server`,
+    {
+      headers: { accept: "application/json" },
+    },
+  );
   if (!response.ok) return fallback;
   const metadata = (await response.json()) as Record<string, unknown>;
   return {
-    authorization: sameOrigin(server, metadata["authorization_endpoint"]) ?? fallback.authorization,
+    authorization:
+      sameOrigin(server, metadata["authorization_endpoint"]) ??
+      fallback.authorization,
     token: sameOrigin(server, metadata["token_endpoint"]) ?? fallback.token,
     revocation: sameOrigin(server, metadata["revocation_endpoint"]),
-    userinfo: sameOrigin(server, metadata["userinfo_endpoint"]) ?? fallback.userinfo,
+    userinfo:
+      sameOrigin(server, metadata["userinfo_endpoint"]) ?? fallback.userinfo,
   };
 }
 
@@ -104,7 +113,10 @@ export class Session {
     }
   }
 
-  /** Revokes the refresh token when the server supports it, then forgets both tokens. */
+  /**
+   * Revokes the refresh token when the server supports it, then forgets both
+   * tokens.
+   */
   async signOut(): Promise<void> {
     const tokens = await this.store.load();
     await this.store.clear();
@@ -121,11 +133,15 @@ export class Session {
     }
   }
 
-  /** A valid access token, refreshed if it is about to expire; undefined when signed out. */
+  /**
+   * A valid access token, refreshed if it is about to expire; undefined when
+   * signed out.
+   */
   async accessToken(): Promise<string | undefined> {
     const tokens = await this.store.load();
     if (tokens?.server !== this.server) return undefined;
-    if (tokens.expiresAt - REFRESH_MARGIN_MS > this.deps.now()) return tokens.accessToken;
+    if (tokens.expiresAt - REFRESH_MARGIN_MS > this.deps.now())
+      return tokens.accessToken;
     this.refreshing ??= this.refresh(tokens).finally(() => {
       this.refreshing = undefined;
     });
@@ -161,7 +177,10 @@ export class Session {
     }
   }
 
-  private async token(endpoints: Endpoints, body: Record<string, string>): Promise<Tokens> {
+  private async token(
+    endpoints: Endpoints,
+    body: Record<string, string>,
+  ): Promise<Tokens> {
     const response = await this.deps.fetch(
       endpoints.token,
       form({ ...body, client_id: CLIENT_ID }),
@@ -177,14 +196,22 @@ export class Session {
       account: "",
       accessToken,
       refreshToken: typeof refreshToken === "string" ? refreshToken : undefined,
-      expiresAt: this.deps.now() + (typeof expiresIn === "number" ? expiresIn : 3600) * 1000,
+      expiresAt:
+        this.deps.now() +
+        (typeof expiresIn === "number" ? expiresIn : 3600) * 1000,
     };
   }
 
-  private async account(endpoints: Endpoints, accessToken: string): Promise<string> {
+  private async account(
+    endpoints: Endpoints,
+    accessToken: string,
+  ): Promise<string> {
     const host = new URL(this.server).host;
     const response = await this.deps.fetch(endpoints.userinfo, {
-      headers: { authorization: `Bearer ${accessToken}`, accept: "application/json" },
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        accept: "application/json",
+      },
     });
     if (!response.ok) return host;
     const info = (await response.json()) as Record<string, unknown>;
@@ -204,7 +231,10 @@ export class TokenError extends Error {
 function form(body: Record<string, string>): RequestInit {
   return {
     method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" },
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+      accept: "application/json",
+    },
     body: new URLSearchParams(body).toString(),
   };
 }

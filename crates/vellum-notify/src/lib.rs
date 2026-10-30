@@ -13,11 +13,12 @@
 //! | Email | [`email`], [`mail`] (queue, unsubscribe) | [`email::MailTransport`] |
 //! | Web push | [`webpush`] | [`delivery::HttpTransport`] |
 //!
-//! [`service`] serves each person's push subscriptions and preferences
-//! through the gateway, and [`hooks`] the admin's webhook subscriptions. The rest of the crate is pure domain logic plus
-//! ports: it opens no sockets and reads no tables. Adapters in the edge layer supply the transports, and
-//! every delivery runs inside a `tracing` span so it appears in the trace
-//! of the write that caused it (ADR 0017).
+//! [`service`] serves each person's push subscriptions and preferences through
+//! the gateway, and [`hooks`] the admin's webhook subscriptions. The rest of
+//! the crate is pure domain logic plus ports: it opens no sockets and reads no
+//! tables. Adapters in the edge layer supply the transports, and every delivery
+//! runs inside a `tracing` span so it appears in the trace of the write that
+//! caused it (ADR 0017).
 
 pub mod delivery;
 pub mod dispatch;

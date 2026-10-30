@@ -11,11 +11,16 @@ use std::sync::Mutex;
 
 use jiff::Timestamp;
 use vellum_integrations::git::automation::{IssueLinks, Mapping};
-use vellum_integrations::git::event::{GitEvent, PrRef, Provider, PullRequestAction};
-use vellum_integrations::git::service::{LinkStore, Repository, Settings, apply};
+use vellum_integrations::git::event::{
+    GitEvent, PrRef, Provider, PullRequestAction,
+};
+use vellum_integrations::git::service::{
+    LinkStore, Repository, Settings, apply,
+};
 use vellum_integrations::git::{github, refs::RefKind};
 use vellum_integrations::model::{
-    IssueDraft, IssueKey, IssueSnapshot, StateCategory, WorkCommands, WorkError, WorkflowState,
+    IssueDraft, IssueKey, IssueSnapshot, StateCategory, WorkCommands,
+    WorkError, WorkflowState,
 };
 
 fn states() -> Vec<WorkflowState> {
@@ -73,11 +78,17 @@ impl Core {
 }
 
 impl WorkCommands for Core {
-    async fn issue(&self, key: &IssueKey) -> Result<Option<IssueSnapshot>, WorkError> {
+    async fn issue(
+        &self,
+        key: &IssueKey,
+    ) -> Result<Option<IssueSnapshot>, WorkError> {
         Ok(self.issues.lock().unwrap().get(key).cloned())
     }
 
-    async fn states(&self, _team: &str) -> Result<Vec<WorkflowState>, WorkError> {
+    async fn states(
+        &self,
+        _team: &str,
+    ) -> Result<Vec<WorkflowState>, WorkError> {
         Ok(states())
     }
 
@@ -96,7 +107,10 @@ impl WorkCommands for Core {
         Ok(())
     }
 
-    async fn create_issue(&self, _draft: IssueDraft) -> Result<IssueKey, WorkError> {
+    async fn create_issue(
+        &self,
+        _draft: IssueDraft,
+    ) -> Result<IssueKey, WorkError> {
         Err(WorkError::Refused("not used".to_owned()))
     }
 
@@ -109,7 +123,10 @@ impl WorkCommands for Core {
         Ok(())
     }
 
-    async fn git_mapping(&self, _team: &str) -> Result<Option<Mapping>, WorkError> {
+    async fn git_mapping(
+        &self,
+        _team: &str,
+    ) -> Result<Option<Mapping>, WorkError> {
         Ok(self.own.clone())
     }
 }
@@ -125,7 +142,11 @@ impl LinkStore for Core {
             .unwrap_or_default())
     }
 
-    async fn save(&self, key: &IssueKey, links: &IssueLinks) -> Result<(), WorkError> {
+    async fn save(
+        &self,
+        key: &IssueKey,
+        links: &IssueLinks,
+    ) -> Result<(), WorkError> {
         let _ = self
             .links
             .lock()
@@ -134,7 +155,10 @@ impl LinkStore for Core {
         Ok(())
     }
 
-    async fn issues_for_pr(&self, pr: &PrRef) -> Result<BTreeSet<IssueKey>, WorkError> {
+    async fn issues_for_pr(
+        &self,
+        pr: &PrRef,
+    ) -> Result<BTreeSet<IssueKey>, WorkError> {
         Ok(self
             .links
             .lock()
@@ -153,11 +177,20 @@ fn settings() -> Settings {
             repo: "northstar/api".to_owned(),
             teams: std::iter::once("ENG".to_owned()).collect(),
         }],
-        mappings: std::iter::once(("ENG".to_owned(), Mapping::default_for(&states()))).collect(),
+        mappings: std::iter::once((
+            "ENG".to_owned(),
+            Mapping::default_for(&states()),
+        ))
+        .collect(),
     }
 }
 
-fn pr(number: u64, action: PullRequestAction, title: &str, body: &str) -> GitEvent {
+fn pr(
+    number: u64,
+    action: PullRequestAction,
+    title: &str,
+    body: &str,
+) -> GitEvent {
     GitEvent::PullRequest {
         pr: PrRef {
             provider: Provider::GitHub,
@@ -254,14 +287,9 @@ async fn issue_completes_only_when_every_closing_pr_merges() {
     ))
     .await;
     assert_eq!(core.state("ENG-1"), "done");
-    assert!(
-        core.history
-            .lock()
-            .unwrap()
-            .iter()
-            .any(|h| h
-                .starts_with("ENG-1 -> done (GitHub northstar/api#11 no longer references it)"))
-    );
+    assert!(core.history.lock().unwrap().iter().any(|h| h.starts_with(
+        "ENG-1 -> done (GitHub northstar/api#11 no longer references it)"
+    )));
 }
 
 #[tokio::test]
@@ -276,7 +304,8 @@ async fn closing_unmerged_returns_the_issue_and_webhooks_parse() {
                          "merged": false, "head": {"ref": "speed"}}
     })
     .to_string();
-    let signature = format!("sha256={}", hmac_hex(b"hook-secret", body.as_bytes()));
+    let signature =
+        format!("sha256={}", hmac_hex(b"hook-secret", body.as_bytes()));
     github::verify(b"hook-secret", Some(&signature), body.as_bytes()).unwrap();
     let event = github::parse("pull_request", body.as_bytes())
         .unwrap()

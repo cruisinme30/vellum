@@ -34,7 +34,9 @@ describe("useQuery", () => {
     });
     store.mutate("createIssue", { key: "ENG-1", title: "a" });
     render(<IssueList store={store} />);
-    expect(screen.getAllByRole("listitem").map((item) => item.textContent)).toEqual(["ENG-1"]);
+    expect(
+      screen.getAllByRole("listitem").map((item) => item.textContent),
+    ).toEqual(["ENG-1"]);
     act(() => {
       store.mutate("createIssue", { key: "ENG-2", title: "b" });
     });

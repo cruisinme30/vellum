@@ -53,7 +53,8 @@ pub trait Membership: Send + Sync + 'static {
 }
 
 fn db_error(e: vellum_db::Error) -> Error {
-    Error::new(ErrorKind::Unavailable, "the replica list is unavailable").with_source(e)
+    Error::new(ErrorKind::Unavailable, "the replica list is unavailable")
+        .with_source(e)
 }
 
 #[async_trait]
@@ -212,7 +213,10 @@ impl Cluster {
         if let Ok(mut live) = self.live.write()
             && *live != nodes
         {
-            info!(nodes = ?nodes.iter().map(|n| &n.name).collect::<Vec<_>>(), "collab replicas changed");
+            info!(
+                nodes = ?nodes.iter().map(|n| &n.name).collect::<Vec<_>>(),
+                "collab replicas changed"
+            );
             *live = nodes;
         }
         Ok(())
@@ -240,14 +244,18 @@ impl Cluster {
     pub fn spawn(self: Arc<Self>, hub: Hub) -> JoinHandle<()> {
         tokio::spawn(async move {
             let mut every = tokio::time::interval(self.config.beat_every);
-            every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+            every.set_missed_tick_behavior(
+                tokio::time::MissedTickBehavior::Delay,
+            );
             loop {
                 let _ = every.tick().await;
                 match self.tick().await {
                     Ok(()) => {
                         let _ = self.rebalance(&hub).await;
                     }
-                    Err(error) => warn!(%error, "collab replica list not refreshed"),
+                    Err(error) => {
+                        warn!(%error, "collab replica list not refreshed")
+                    }
                 }
             }
         })
@@ -287,11 +295,20 @@ impl Cluster {
     /// The join a forwarded request carries, if its signature is good, it
     /// has not expired and it is for `room`.
     #[must_use]
-    pub fn verify(&self, header: &str, room: RoomKey) -> Option<(UserId, Access)> {
+    pub fn verify(
+        &self,
+        header: &str,
+        room: RoomKey,
+    ) -> Option<(UserId, Access)> {
         self.verify_at(header, room, now_ms())
     }
 
-    fn verify_at(&self, header: &str, room: RoomKey, now: u64) -> Option<(UserId, Access)> {
+    fn verify_at(
+        &self,
+        header: &str,
+        room: RoomKey,
+        now: u64,
+    ) -> Option<(UserId, Access)> {
         verify(&self.config.key, header, room, now)
     }
 }
@@ -315,13 +332,19 @@ pub fn is_signed_forward(key: &[u8], header: &str, path: &str) -> bool {
     let (Some(doc), Some(space)) = (parts.next(), parts.next()) else {
         return false;
     };
-    let (Ok(space), Ok(doc)) = (space.parse::<SpaceId>(), doc.parse::<DocId>()) else {
+    let (Ok(space), Ok(doc)) = (space.parse::<SpaceId>(), doc.parse::<DocId>())
+    else {
         return false;
     };
     verify(key, header, RoomKey { space, doc }, now_ms()).is_some()
 }
 
-fn verify(key: &[u8], header: &str, room: RoomKey, now: u64) -> Option<(UserId, Access)> {
+fn verify(
+    key: &[u8],
+    header: &str,
+    room: RoomKey,
+    now: u64,
+) -> Option<(UserId, Access)> {
     let (payload, mac) = header.rsplit_once('.')?;
     let expected = self::mac(key, payload);
     if !bool::from(subtle::ConstantTimeEq::ct_eq(
@@ -337,7 +360,9 @@ fn verify(key: &[u8], header: &str, room: RoomKey, now: u64) -> Option<(UserId, 
     if *version != "v1" || expires.parse::<u64>().ok()? < now {
         return None;
     }
-    if space.parse::<SpaceId>().ok()? != room.space || doc.parse::<DocId>().ok()? != room.doc {
+    if space.parse::<SpaceId>().ok()? != room.space
+        || doc.parse::<DocId>().ok()? != room.doc
+    {
         return None;
     }
     let access = match *access {
@@ -394,8 +419,8 @@ mod tests {
     }
 
     fn cluster(name: &str, members: &Arc<Fake>) -> Cluster {
-        let config =
-            ClusterConfig::new(node(name), vec![7; 32]).unwrap_or_else(|e| unreachable!("{e}"));
+        let config = ClusterConfig::new(node(name), vec![7; 32])
+            .unwrap_or_else(|e| unreachable!("{e}"));
         Cluster::new(config, Arc::clone(members) as Arc<dyn Membership>)
     }
 
@@ -460,7 +485,8 @@ mod tests {
         let tampered = header.replacen(".w.", ".r.", 1);
         assert_eq!(a.verify_at(&tampered, room(1), 2_000), None);
         let other = Cluster::new(
-            ClusterConfig::new(node("b"), vec![8; 32]).unwrap_or_else(|e| unreachable!("{e}")),
+            ClusterConfig::new(node("b"), vec![8; 32])
+                .unwrap_or_else(|e| unreachable!("{e}")),
             members,
         );
         assert_eq!(other.verify_at(&header, room(1), 2_000), None);

@@ -21,7 +21,8 @@ use bytes::Bytes;
 use fake::{FakeGraph, Limits, ROOT};
 use futures::TryStreamExt;
 use vellum_store::{
-    BlobPath, BlobStore, Metered, Precondition, StoreError, StoreResult, conformance,
+    BlobPath, BlobStore, Metered, Precondition, StoreError, StoreResult,
+    conformance,
     remote::{Secret, StaticToken, TokenSource, onedrive::OneDriveStore},
 };
 
@@ -119,7 +120,12 @@ async fn large_blobs_upload_in_chunks() -> TestResult {
         .put(&path, body.clone(), Precondition::IfMatch(put.etag))
         .await;
     assert!(
-        matches!(&stale, Err(StoreError::PreconditionFailed { current: Some(e), .. }) if *e == next.etag),
+        matches!(
+            &stale,
+            Err(
+                StoreError::PreconditionFailed { current: Some(e), .. }
+            ) if *e == next.etag
+        ),
         "{stale:?}"
     );
     assert_eq!(store.get(&path).await?.bytes, body.slice(1..));
@@ -198,7 +204,9 @@ impl TokenSource for Rotating {
 async fn rejected_tokens_are_refreshed_once() -> TestResult {
     let fake = FakeGraph::start(Limits::default()).await?;
     let tokens = Arc::new(Rotating::default());
-    let store = OneDriveStore::new(fake.config(Arc::clone(&tokens) as Arc<dyn TokenSource>))?;
+    let store = OneDriveStore::new(
+        fake.config(Arc::clone(&tokens) as Arc<dyn TokenSource>),
+    )?;
     let path = BlobPath::new("a.md")?;
 
     // `t0` is stale: one 401, one invalidation, then `t1` works.

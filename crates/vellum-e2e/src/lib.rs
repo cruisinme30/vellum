@@ -36,9 +36,9 @@ mod ports;
 mod service;
 
 pub use api::{
-    DeleteObject, Deleted, DeviceKeyInfo, EnrolDevice, GetObject, ListObjects, MAX_ENVELOPE_BYTES,
-    MAX_LABEL_CHARS, ObjectInfo, ObjectList, PutObject, RevokeDevice, Revoked, SealedObject,
-    SpaceKeys, SpaceRef, Stored,
+    DeleteObject, Deleted, DeviceKeyInfo, EnrolDevice, GetObject, ListObjects,
+    MAX_ENVELOPE_BYTES, MAX_LABEL_CHARS, ObjectInfo, ObjectList, PutObject,
+    RevokeDevice, Revoked, SealedObject, SpaceKeys, SpaceRef, Stored,
 };
 pub use app::E2e;
 pub use guard::{Guard, PrivateRoots, structural};

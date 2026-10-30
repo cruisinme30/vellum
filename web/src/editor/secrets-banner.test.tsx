@@ -17,7 +17,10 @@ const content = {
   type: "doc",
   content: [
     { type: "paragraph", content: [{ type: "text", text: "Deploys" }] },
-    { type: "paragraph", content: [{ type: "text", text: `The bot uses ${TOKEN} to push.` }] },
+    {
+      type: "paragraph",
+      content: [{ type: "text", text: `The bot uses ${TOKEN} to push.` }],
+    },
   ],
 };
 
@@ -48,7 +51,9 @@ function show(scan: ScanSecrets) {
 describe("SecretsBanner", () => {
   it("sends one line per block", () => {
     const editor = createTestEditor({ content });
-    expect(pageText(editor.state.doc).text).toBe(`Deploys\nThe bot uses ${TOKEN} to push.`);
+    expect(pageText(editor.state.doc).text).toBe(
+      `Deploys\nThe bot uses ${TOKEN} to push.`,
+    );
   });
 
   it("names the kind and line, never the secret, and removes it", async () => {
@@ -57,7 +62,9 @@ describe("SecretsBanner", () => {
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("GitHub token on line 2");
     expect(alert.textContent).not.toContain(TOKEN);
-    expect(scan).toHaveBeenCalledWith(`Deploys\nThe bot uses ${TOKEN} to push.`);
+    expect(scan).toHaveBeenCalledWith(
+      `Deploys\nThe bot uses ${TOKEN} to push.`,
+    );
     act(() => {
       fireEvent.click(screen.getByRole("button", { name: "Remove" }));
     });
@@ -69,7 +76,9 @@ describe("SecretsBanner", () => {
     show(vi.fn<ScanSecrets>().mockResolvedValue(answer("warn")));
     await screen.findByRole("alert");
     act(() => {
-      fireEvent.click(screen.getByRole("button", { name: "It's not a secret" }));
+      fireEvent.click(
+        screen.getByRole("button", { name: "It's not a secret" }),
+      );
     });
     expect(screen.queryByRole("alert")).toBeNull();
   });
@@ -78,11 +87,15 @@ describe("SecretsBanner", () => {
     show(vi.fn<ScanSecrets>().mockResolvedValue(answer("block")));
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("can't be saved");
-    expect(screen.queryByRole("button", { name: "It's not a secret" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "It's not a secret" }),
+    ).toBeNull();
   });
 
   it("shows nothing when the page is clean or the check fails", async () => {
-    const clean = vi.fn<ScanSecrets>().mockResolvedValue({ policy: "warn", findings: [] });
+    const clean = vi
+      .fn<ScanSecrets>()
+      .mockResolvedValue({ policy: "warn", findings: [] });
     show(clean);
     await vi.waitFor(() => {
       expect(clean).toHaveBeenCalled();

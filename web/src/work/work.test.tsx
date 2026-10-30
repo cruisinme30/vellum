@@ -27,7 +27,11 @@ import {
 import { IssuePage } from "./issue-page";
 import { IssuesPage } from "./issues-page";
 
-function task(id: string, title: string, extra: Partial<TaskView> = {}): TaskView {
+function task(
+  id: string,
+  title: string,
+  extra: Partial<TaskView> = {},
+): TaskView {
   return {
     id,
     title,
@@ -59,7 +63,11 @@ const TEAM: TeamOut = {
   archived: false,
 };
 
-function issue(key: string, title: string, extra: Partial<IssueOut> = {}): IssueOut {
+function issue(
+  key: string,
+  title: string,
+  extra: Partial<IssueOut> = {},
+): IssueOut {
   return {
     id: `id-${key}`,
     key,
@@ -101,8 +109,12 @@ const NONE = null;
 
 function fakeApi(overrides: Partial<WorkApi> = {}) {
   const myWork = vi.fn<WorkApi["myWork"]>(() => Promise.resolve(MY_WORK));
-  const addTask = vi.fn<WorkApi["addTask"]>((text) => Promise.resolve(task("new", text)));
-  const setDone = vi.fn<WorkApi["setDone"]>((id, done) => Promise.resolve(task(id, "x", { done })));
+  const addTask = vi.fn<WorkApi["addTask"]>((text) =>
+    Promise.resolve(task("new", text)),
+  );
+  const setDone = vi.fn<WorkApi["setDone"]>((id, done) =>
+    Promise.resolve(task(id, "x", { done })),
+  );
   const createIssue = vi.fn<WorkApi["createIssue"]>((created) =>
     Promise.resolve(issue("ENG-8", created.title)),
   );
@@ -110,7 +122,9 @@ function fakeApi(overrides: Partial<WorkApi> = {}) {
     Promise.resolve(issue(key, "Fix sign-in", { state })),
   );
   const addComment = vi.fn<WorkApi["addComment"]>(() => Promise.resolve());
-  const dismissMention = vi.fn<WorkApi["dismissMention"]>(() => Promise.resolve());
+  const dismissMention = vi.fn<WorkApi["dismissMention"]>(() =>
+    Promise.resolve(),
+  );
   const saveSettings = vi.fn<WorkApi["saveSettings"]>((input) =>
     Promise.resolve({
       time_zone: input.time_zone ?? NONE,
@@ -121,7 +135,8 @@ function fakeApi(overrides: Partial<WorkApi> = {}) {
   );
   const api: WorkApi = {
     ...createMemoryCommentsApi("ana"),
-    fileIssue: (created) => Promise.resolve({ issue: issue("ENG-9", created.title) }),
+    fileIssue: (created) =>
+      Promise.resolve({ issue: issue("ENG-9", created.title) }),
     myWork,
     addTask,
     setDone,
@@ -153,8 +168,10 @@ function fakeApi(overrides: Partial<WorkApi> = {}) {
         },
       ]),
     addComment,
-    setPriority: (key, priority) => Promise.resolve(issue(key, "Fix sign-in", { priority })),
-    queryIssues: () => Promise.resolve([{ key: NONE, issues: [issue("ENG-7", "Fix sign-in")] }]),
+    setPriority: (key, priority) =>
+      Promise.resolve(issue(key, "Fix sign-in", { priority })),
+    queryIssues: () =>
+      Promise.resolve([{ key: NONE, issues: [issue("ENG-7", "Fix sign-in")] }]),
     inbox: () => Promise.resolve([]),
     triage: (key) => Promise.resolve(issue(key, "x")),
     cycles: () => Promise.resolve({ cycles: [], velocity: NONE }),
@@ -225,24 +242,53 @@ describe("work API", () => {
     const get = vi.fn((path: string) =>
       Promise.resolve(
         path === "/api/v1/work/issues"
-          ? { groups: [{ issues: [issue("ENG-1", "a")] }, { issues: [issue("ENG-2", "b")] }] }
+          ? {
+              groups: [
+                { issues: [issue("ENG-1", "a")] },
+                { issues: [issue("ENG-2", "b")] },
+              ],
+            }
           : {
               threads: [
                 {
                   comments: [
-                    { id: "2", created_at: "2026-10-29T11:00:00Z", deleted: false },
-                    { id: "x", created_at: "2026-10-29T09:00:00Z", deleted: true },
+                    {
+                      id: "2",
+                      created_at: "2026-10-29T11:00:00Z",
+                      deleted: false,
+                    },
+                    {
+                      id: "x",
+                      created_at: "2026-10-29T09:00:00Z",
+                      deleted: true,
+                    },
                   ],
                 },
-                { comments: [{ id: "1", created_at: "2026-10-29T10:00:00Z", deleted: false }] },
+                {
+                  comments: [
+                    {
+                      id: "1",
+                      created_at: "2026-10-29T10:00:00Z",
+                      deleted: false,
+                    },
+                  ],
+                },
               ],
             },
       ),
     );
     const send = vi.fn((_method: string, path: string) =>
-      Promise.resolve(path.endsWith("/complete") ? { task: task("k1", "a", { done: true }) } : {}),
+      Promise.resolve(
+        path.endsWith("/complete")
+          ? { task: task("k1", "a", { done: true }) }
+          : {},
+      ),
     );
-    const api = createHttpWorkApi({ get, send, forgetSession: vi.fn() } as unknown as Http);
+    const api = createHttpWorkApi({
+      get,
+      send,
+      forgetSession: vi.fn(),
+    } as unknown as Http);
 
     const issues = await api.issues("ENG");
     expect(issues.map((each) => each.key)).toEqual(["ENG-1", "ENG-2"]);
@@ -254,25 +300,47 @@ describe("work API", () => {
     });
     const comments = await api.comments("ENG-1");
     expect(comments.map((each) => each.id)).toEqual(["1", "2"]);
-    expect(get).toHaveBeenLastCalledWith("/api/v1/work/comments", { target: "ENG-1" });
+    expect(get).toHaveBeenLastCalledWith("/api/v1/work/comments", {
+      target: "ENG-1",
+    });
 
     const completed = await api.setDone("k1", true);
     expect(completed.done).toBe(true);
-    expect(send).toHaveBeenLastCalledWith("POST", "/api/v1/tasks/k1/complete", {});
+    expect(send).toHaveBeenLastCalledWith(
+      "POST",
+      "/api/v1/tasks/k1/complete",
+      {},
+    );
     await api.setDone("k1", false);
-    expect(send).toHaveBeenLastCalledWith("POST", "/api/v1/tasks/k1/reopen", {});
+    expect(send).toHaveBeenLastCalledWith(
+      "POST",
+      "/api/v1/tasks/k1/reopen",
+      {},
+    );
     await api.dismissMention("mention.c9");
-    expect(send).toHaveBeenLastCalledWith("POST", "/api/v1/my-work/mentions/c9/dismiss", {});
-    await api.saveSettings({ time_zone: "Asia/Tokyo", day_starts_at: "09:00", digest_at: NONE });
+    expect(send).toHaveBeenLastCalledWith(
+      "POST",
+      "/api/v1/my-work/mentions/c9/dismiss",
+      {},
+    );
+    await api.saveSettings({
+      time_zone: "Asia/Tokyo",
+      day_starts_at: "09:00",
+      digest_at: NONE,
+    });
     expect(send).toHaveBeenLastCalledWith("PUT", "/api/v1/my-work/settings", {
       time_zone: "Asia/Tokyo",
       day_starts_at: "09:00",
       digest_at: NONE,
     });
     await api.setState("ENG-1", "done");
-    expect(send).toHaveBeenLastCalledWith("PATCH", "/api/v1/work/issues/ENG-1", {
-      state: "done",
-    });
+    expect(send).toHaveBeenLastCalledWith(
+      "PATCH",
+      "/api/v1/work/issues/ENG-1",
+      {
+        state: "done",
+      },
+    );
   });
 });
 
@@ -293,7 +361,10 @@ describe("issues", () => {
       "Add dark mode",
     );
     await user.click(screen.getByRole("button", { name: "Create issue" }));
-    expect(createIssue).toHaveBeenCalledWith({ team: "ENG", title: "Add dark mode" });
+    expect(createIssue).toHaveBeenCalledWith({
+      team: "ENG",
+      title: "Add dark mode",
+    });
     expect(await screen.findByText("opened")).toBeDefined();
   });
 
@@ -304,14 +375,22 @@ describe("issues", () => {
       api,
       <Route path="issues/:issueKey" element={<IssuePage />} />,
     );
-    expect(await screen.findByRole("heading", { level: 1, name: "Fix sign-in" })).toBeDefined();
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Fix sign-in" }),
+    ).toBeDefined();
     const comments = await screen.findByRole("list");
     expect(within(comments).getByText("Seen on Safari.")).toBeDefined();
 
-    await user.selectOptions(screen.getByRole("combobox", { name: "State" }), "done");
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "State" }),
+      "done",
+    );
     expect(setState).toHaveBeenCalledWith("ENG-7", "done");
 
-    await user.type(screen.getByRole("textbox", { name: "Add a comment" }), "Fixed in 1.0.1");
+    await user.type(
+      screen.getByRole("textbox", { name: "Add a comment" }),
+      "Fixed in 1.0.1",
+    );
     await user.click(screen.getByRole("button", { name: "Comment" }));
     expect(addComment).toHaveBeenCalledWith("ENG-7", "Fixed in 1.0.1");
   });
@@ -329,39 +408,59 @@ describe("issues", () => {
       </>,
       store,
     );
-    await user.click(await screen.findByRole("button", { name: "Create doc from issue" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Create doc from issue" }),
+    );
     expect(await screen.findByText("opened page")).toBeDefined();
     expect(createPage).toHaveBeenCalledWith(
-      expect.objectContaining({ title: "ENG-7 Fix sign-in", body: "Issue: ENG-7\n" }),
+      expect.objectContaining({
+        title: "ENG-7 Fix sign-in",
+        body: "Issue: ENG-7\n",
+      }),
     );
-    const created = store.getSnapshot().pages.find((page) => page.title === "ENG-7 Fix sign-in");
-    expect(created && store.seedFor(created.id)?.content?.[0]?.content?.[0]?.text).toBe(
-      "Issue: ENG-7",
-    );
+    const created = store
+      .getSnapshot()
+      .pages.find((page) => page.title === "ENG-7 Fix sign-in");
+    expect(
+      created && store.seedFor(created.id)?.content?.[0]?.content?.[0]?.text,
+    ).toBe("Issue: ENG-7");
   });
 
   it("keeps the create-doc button's place while the spaces load", async () => {
     const { api } = fakeApi();
     const base = createNorthstarStore();
     const loading = { ...base.getSnapshot(), spaces: [], loading: true };
-    const store: typeof base = Object.assign(Object.create(base) as typeof base, {
-      getSnapshot: () => loading,
-    });
+    const store: typeof base = Object.assign(
+      Object.create(base) as typeof base,
+      {
+        getSnapshot: () => loading,
+      },
+    );
     renderAt(
       "/issues/ENG-7",
       api,
       <Route path="issues/:issueKey" element={<IssuePage />} />,
       store,
     );
-    const button = await screen.findByRole("button", { name: "Create doc from issue" });
+    const button = await screen.findByRole("button", {
+      name: "Create doc from issue",
+    });
     expect((button as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("shows a failure with its message", async () => {
-    const { api } = fakeApi({ issue: () => Promise.reject(new Error("not found")) });
-    renderAt("/issues/ENG-9", api, <Route path="issues/:issueKey" element={<IssuePage />} />);
+    const { api } = fakeApi({
+      issue: () => Promise.reject(new Error("not found")),
+    });
+    renderAt(
+      "/issues/ENG-9",
+      api,
+      <Route path="issues/:issueKey" element={<IssuePage />} />,
+    );
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("not found");
-    expect(screen.getByRole("button", { name: "Copy diagnostic" })).toBeDefined();
+    expect(
+      screen.getByRole("button", { name: "Copy diagnostic" }),
+    ).toBeDefined();
   });
 });

@@ -29,8 +29,8 @@ use crate::backend::{Change, IndexEntry, Scope, SearchBackend};
 use crate::error::{Result, SearchError};
 use crate::fusion::{Ranked, fuse};
 use crate::model::{
-    Filters, IndexDocument, MAX_LIMIT, SearchHit, SearchPage, SearchQuery, StoredBlock, TitleHit,
-    citation,
+    Filters, IndexDocument, MAX_LIMIT, SearchHit, SearchPage, SearchQuery,
+    StoredBlock, TitleHit, citation,
 };
 use crate::telemetry::traced;
 use crate::text;
@@ -83,7 +83,9 @@ pub enum Update {
 }
 
 /// A block with its whole section: what "ask this space" and MCP quote.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
 pub struct Context {
     /// The block asked for.
     pub block: StoredBlock,
@@ -221,18 +223,27 @@ impl SearchService {
     }
 
     /// One vector list per document (or `None` each without an embedder).
-    async fn embed_documents(&self, docs: &[IndexDocument]) -> Result<Vec<Option<Vec<Vec<f32>>>>> {
+    async fn embed_documents(
+        &self,
+        docs: &[IndexDocument],
+    ) -> Result<Vec<Option<Vec<Vec<f32>>>>> {
         let Some(embedder) = &self.embedder else {
             return Ok(vec![None; docs.len()]);
         };
         let passages: Vec<String> = docs
             .iter()
-            .flat_map(|doc| doc.blocks.iter().map(move |block| passage(doc, block)))
+            .flat_map(|doc| {
+                doc.blocks.iter().map(move |block| passage(doc, block))
+            })
             .collect();
         let mut flat = Vec::with_capacity(passages.len());
         for batch in passages.chunks(EMBED_BATCH) {
-            let vectors =
-                traced("embedder", "embed_passages", embedder.embed_passages(batch)).await?;
+            let vectors = traced(
+                "embedder",
+                "embed_passages",
+                embedder.embed_passages(batch),
+            )
+            .await?;
             vector::check_shape(&vectors, batch.len(), embedder.dimensions())?;
             flat.extend(vectors);
         }
@@ -281,7 +292,11 @@ impl SearchService {
     /// # Errors
     /// [`SearchError::Invalid`] for an empty, overlong or too-deep query;
     /// authorization or backend failures otherwise.
-    pub async fn search(&self, principal: &Principal, query: &SearchQuery) -> Result<SearchPage> {
+    pub async fn search(
+        &self,
+        principal: &Principal,
+        query: &SearchQuery,
+    ) -> Result<SearchPage> {
         let span = tracing::info_span!(
             "search.query",
             search.engine = self.backend.name(),
@@ -306,7 +321,11 @@ impl SearchService {
         out
     }
 
-    async fn search_inner(&self, principal: &Principal, query: &SearchQuery) -> Result<SearchPage> {
+    async fn search_inner(
+        &self,
+        principal: &Principal,
+        query: &SearchQuery,
+    ) -> Result<SearchPage> {
         let text = validate(&query.text, query.offset)?;
         let limit = query.limit.clamp(1, MAX_LIMIT);
         let empty = SearchPage {
@@ -331,8 +350,8 @@ impl SearchService {
         let query_vector = self.embed_query(text).await;
         let hybrid = query_vector.is_some();
         let need = query.offset + limit + 1;
-        let mut candidates =
-            (need * 2).clamp(self.tuning.min_candidates, self.tuning.max_candidates);
+        let mut candidates = (need * 2)
+            .clamp(self.tuning.min_candidates, self.tuning.max_candidates);
         let engine = self.backend.name();
         let (visible, blocks) = loop {
             let lexical = traced(
@@ -346,21 +365,31 @@ impl SearchService {
                     traced(
                         engine,
                         "semantic",
-                        self.backend
-                            .semantic(v, self.tuning.min_similarity, scope, candidates),
+                        self.backend.semantic(
+                            v,
+                            self.tuning.min_similarity,
+                            scope,
+                            candidates,
+                        ),
                     )
                     .await?
                 }
                 None => Vec::new(),
             };
-            let exhausted = lexical.len() < candidates && semantic.len() < candidates;
-            let (visible, blocks) = self.fuse_and_check(principal, lexical, semantic).await?;
-            if visible.len() >= need || exhausted || candidates >= self.tuning.max_candidates {
+            let exhausted =
+                lexical.len() < candidates && semantic.len() < candidates;
+            let (visible, blocks) =
+                self.fuse_and_check(principal, lexical, semantic).await?;
+            if visible.len() >= need
+                || exhausted
+                || candidates >= self.tuning.max_candidates
+            {
                 break (visible, blocks);
             }
             candidates = (candidates * 4).min(self.tuning.max_candidates);
         };
-        let _ = tracing::Span::current().record("search.candidates", candidates);
+        let _ =
+            tracing::Span::current().record("search.candidates", candidates);
 
         let terms = text::query_terms(text);
         let has_more = visible.len() > query.offset + limit;
@@ -368,7 +397,9 @@ impl SearchService {
             .into_iter()
             .skip(query.offset)
             .take(limit)
-            .filter_map(|(key, score)| blocks.get(&key).map(|block| hit(block, score, &terms)))
+            .filter_map(|(key, score)| {
+                blocks.get(&key).map(|block| hit(block, score, &terms))
+            })
             .collect();
         Ok(SearchPage {
             hits,
@@ -384,17 +415,24 @@ impl SearchService {
             return None;
         }
         let embedder = self.embedder.as_ref()?;
-        match traced("embedder", "embed_query", embedder.embed_query(text)).await {
+        match traced("embedder", "embed_query", embedder.embed_query(text))
+            .await
+        {
             Ok(mut v) if v.len() == embedder.dimensions() => {
                 vector::normalise(&mut v);
                 Some(v)
             }
             Ok(_) => {
-                tracing::warn!("embedder returned the wrong dimensions; using BM25 only");
+                tracing::warn!(
+                    "embedder returned the wrong dimensions; using BM25 only"
+                );
                 None
             }
             Err(error) => {
-                tracing::warn!(%error, "query embedding failed; using BM25 only");
+                tracing::warn!(
+                    %error,
+                    "query embedding failed; using BM25 only"
+                );
                 None
             }
         }
@@ -418,11 +456,13 @@ impl SearchService {
             },
         ];
         let fused = fuse(&lists);
-        let mut blocks: HashMap<Key, StoredBlock> = HashMap::with_capacity(fused.len());
+        let mut blocks: HashMap<Key, StoredBlock> =
+            HashMap::with_capacity(fused.len());
         for block in lexical.into_iter().chain(semantic) {
             let _ = blocks.entry(key(&block)).or_insert(block);
         }
-        let mut docs: Vec<DocId> = fused.iter().map(|((doc, _), _)| *doc).collect();
+        let mut docs: Vec<DocId> =
+            fused.iter().map(|((doc, _), _)| *doc).collect();
         docs.sort_unstable();
         docs.dedup();
         let allowed = if docs.is_empty() {
@@ -463,7 +503,12 @@ impl SearchService {
         let engine = self.backend.name();
         let mut fetch = (limit * 3).max(self.tuning.min_candidates);
         loop {
-            let found = traced(engine, "titles", self.backend.titles(text, scope, fetch)).await?;
+            let found = traced(
+                engine,
+                "titles",
+                self.backend.titles(text, scope, fetch),
+            )
+            .await?;
             let exhausted = found.len() < fetch;
             let docs: Vec<DocId> = found.iter().map(|t| t.doc).collect();
             let allowed = if docs.is_empty() {
@@ -475,7 +520,10 @@ impl SearchService {
                 .into_iter()
                 .filter(|t| allowed.contains(&t.doc))
                 .collect();
-            if visible.len() >= limit || exhausted || fetch >= self.tuning.max_candidates {
+            if visible.len() >= limit
+                || exhausted
+                || fetch >= self.tuning.max_candidates
+            {
                 return Ok(visible.into_iter().take(limit).collect());
             }
             fetch = (fetch * 4).min(self.tuning.max_candidates);
@@ -500,10 +548,14 @@ impl SearchService {
             return Ok(None);
         }
         let engine = self.backend.name();
-        let Some(found) = traced(engine, "block", self.backend.block(doc, block)).await? else {
+        let Some(found) =
+            traced(engine, "block", self.backend.block(doc, block)).await?
+        else {
             return Ok(None);
         };
-        let section = traced(engine, "section", self.backend.section(doc, found.section)).await?;
+        let section =
+            traced(engine, "section", self.backend.section(doc, found.section))
+                .await?;
         Ok(Some(Context {
             citation: citation(doc, block),
             block: found,

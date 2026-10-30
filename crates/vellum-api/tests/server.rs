@@ -19,7 +19,9 @@ async fn exchange<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin>(
     mut stream: S,
     path: &str,
 ) -> std::io::Result<String> {
-    let request = format!("GET {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
+    let request = format!(
+        "GET {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+    );
     stream.write_all(request.as_bytes()).await?;
     let mut out = Vec::new();
     let _ = stream.read_to_end(&mut out).await?;
@@ -51,7 +53,10 @@ async fn start_with(
     Box<dyn std::error::Error>,
 > {
     start_gateway(
-        GatewayBuilder::new(GatewayConfig::new("http://localhost", vec![1; 32]), "test"),
+        GatewayBuilder::new(
+            GatewayConfig::new("http://localhost", vec![1; 32]),
+            "test",
+        ),
         tls,
         limits,
     )
@@ -106,8 +111,10 @@ async fn plain_http_and_graceful_shutdown() -> TestResult {
 
 #[tokio::test]
 async fn tls_files_negotiate_tls_1_3_only() -> TestResult {
-    let cert = rcgen::generate_simple_self_signed(vec!["localhost".to_owned()])?;
-    let dir = std::env::temp_dir().join(format!("vellum-tls-{}", std::process::id()));
+    let cert =
+        rcgen::generate_simple_self_signed(vec!["localhost".to_owned()])?;
+    let dir =
+        std::env::temp_dir().join(format!("vellum-tls-{}", std::process::id()));
     std::fs::create_dir_all(&dir)?;
     let (cert_path, key_path) = (dir.join("cert.pem"), dir.join("key.pem"));
     std::fs::write(&cert_path, cert.cert.pem())?;
@@ -122,10 +129,11 @@ async fn tls_files_negotiate_tls_1_3_only() -> TestResult {
     let mut roots = rustls::RootCertStore::empty();
     roots.add(CertificateDer::from(cert.cert.der().to_vec()))?;
     // A client that also offers TLS 1.2 still gets TLS 1.3.
-    let client = rustls::ClientConfig::builder_with_provider(Arc::clone(&provider))
-        .with_safe_default_protocol_versions()?
-        .with_root_certificates(roots.clone())
-        .with_no_client_auth();
+    let client =
+        rustls::ClientConfig::builder_with_provider(Arc::clone(&provider))
+            .with_safe_default_protocol_versions()?
+            .with_root_certificates(roots.clone())
+            .with_no_client_auth();
     let connector = tokio_rustls::TlsConnector::from(Arc::new(client));
     let stream = connector
         .connect(
@@ -223,8 +231,10 @@ async fn an_idle_keep_alive_connection_is_closed() -> TestResult {
 
 #[tokio::test]
 async fn a_stalled_tls_handshake_is_closed() -> TestResult {
-    let cert = rcgen::generate_simple_self_signed(vec!["localhost".to_owned()])?;
-    let dir = std::env::temp_dir().join(format!("vellum-tls-stall-{}", std::process::id()));
+    let cert =
+        rcgen::generate_simple_self_signed(vec!["localhost".to_owned()])?;
+    let dir = std::env::temp_dir()
+        .join(format!("vellum-tls-stall-{}", std::process::id()));
     std::fs::create_dir_all(&dir)?;
     let (cert_path, key_path) = (dir.join("cert.pem"), dir.join("key.pem"));
     std::fs::write(&cert_path, cert.cert.pem())?;
@@ -279,15 +289,21 @@ async fn start_echo(
 > {
     let echo = axum::Router::new().route(
         "/",
-        axum::routing::post(|body: axum::body::Bytes| async move { body.len().to_string() }),
+        axum::routing::post(|body: axum::body::Bytes| async move {
+            body.len().to_string()
+        }),
     );
-    let builder = GatewayBuilder::new(GatewayConfig::new("http://localhost", vec![1; 32]), "test")
-        .mount_cross_site("/echo", echo);
+    let builder = GatewayBuilder::new(
+        GatewayConfig::new("http://localhost", vec![1; 32]),
+        "test",
+    )
+    .mount_cross_site("/echo", echo);
     start_gateway(builder, Tls::Off, limits).await
 }
 
 const SLOW_POST: &[u8] =
-    b"POST /echo HTTP/1.1\r\nHost: x\r\nContent-Type: text/plain\r\nContent-Length: 100000\r\n\r\n";
+    b"POST /echo HTTP/1.1\r\nHost: x\r\nContent-Type: text/plain\r\n\
+        Content-Length: 100000\r\n\r\n";
 
 #[tokio::test]
 async fn a_body_that_stops_arriving_is_cut_off() -> TestResult {
@@ -316,7 +332,12 @@ async fn a_trickled_body_is_cut_off_at_the_deadline() -> TestResult {
         if slow.write_all(b"x").await.is_err() {
             break;
         }
-        match tokio::time::timeout(Duration::from_millis(100), slow.read(&mut buf)).await {
+        match tokio::time::timeout(
+            Duration::from_millis(100),
+            slow.read(&mut buf),
+        )
+        .await
+        {
             Ok(Ok(0) | Err(_)) => break,
             Ok(Ok(_)) => {
                 assert!(
@@ -340,7 +361,8 @@ async fn a_prompt_body_is_read_in_full() -> TestResult {
     fast.write_all(SLOW_POST).await?;
     fast.write_all(&body).await?;
     let mut buf = vec![0_u8; 4096];
-    let n = tokio::time::timeout(Duration::from_secs(3), fast.read(&mut buf)).await??;
+    let n = tokio::time::timeout(Duration::from_secs(3), fast.read(&mut buf))
+        .await??;
     let reply = String::from_utf8_lossy(&buf[..n]);
     assert!(reply.starts_with("HTTP/1.1 200"), "{reply}");
     assert!(reply.ends_with("100000"), "{reply}");
@@ -361,12 +383,16 @@ async fn idle_h2_closed_within(
     let deadline = tokio::time::Instant::now() + wait;
     loop {
         let mut head = [0_u8; 9];
-        match tokio::time::timeout_at(deadline, stream.read_exact(&mut head)).await {
+        match tokio::time::timeout_at(deadline, stream.read_exact(&mut head))
+            .await
+        {
             Err(_) => return Ok(false),
             Ok(Err(_)) => return Ok(true),
             Ok(Ok(_)) => {}
         }
-        let len = usize::from(head[0]) << 16 | usize::from(head[1]) << 8 | usize::from(head[2]);
+        let len = usize::from(head[0]) << 16
+            | usize::from(head[1]) << 8
+            | usize::from(head[2]);
         let mut payload = vec![0_u8; len];
         if stream.read_exact(&mut payload).await.is_err() {
             return Ok(true);
