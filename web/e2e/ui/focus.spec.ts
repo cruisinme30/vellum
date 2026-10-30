@@ -83,9 +83,20 @@ async function indicatorVisible(page: Page, stop: Stop): Promise<boolean> {
     const element = document.activeElement;
     (globalThis as unknown as { vellumFocus?: Element | null }).vellumFocus = element;
     if (element instanceof HTMLElement || element instanceof SVGElement) element.blur();
+    // Chromium with touch keeps a date input focused through blur(); park
+    // focus on an invisible probe instead, so the "blurred" shot is unfocused.
+    if (element !== null && document.activeElement === element) {
+      const probe = document.createElement("span");
+      probe.tabIndex = -1;
+      probe.style.cssText = "position:fixed;inset:0 auto auto 0;width:1px;height:1px;opacity:0";
+      probe.dataset["vellumProbe"] = "";
+      document.body.append(probe);
+      probe.focus({ preventScroll: true });
+    }
   });
   const blurred = await page.screenshot({ clip, animations: "disabled", caret: "hide" });
   await page.evaluate(() => {
+    for (const probe of document.querySelectorAll("[data-vellum-probe]")) probe.remove();
     const element = (globalThis as unknown as { vellumFocus?: Element | null }).vellumFocus;
     if (element instanceof HTMLElement || element instanceof SVGElement)
       element.focus({ preventScroll: true });

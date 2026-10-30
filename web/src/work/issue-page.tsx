@@ -161,13 +161,16 @@ function CreatePageFromIssue({ issue }: { readonly issue: IssueOut }) {
   const workspace = useWorkspace();
   const [busy, setBusy] = useState(false);
   const space = workspace.spaces[0];
-  if (space === undefined) return;
+  // While the spaces are still on their way the button waits, disabled, so
+  // it does not appear late and push the rest of the issue down.
+  if (space === undefined && workspace.loading !== true) return;
   return (
     <button
       type="button"
       className="vl-text-button"
-      disabled={busy}
+      disabled={busy || space === undefined}
       onClick={() => {
+        if (space === undefined) return;
         setBusy(true);
         void store
           .createPage({

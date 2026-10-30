@@ -340,6 +340,23 @@ describe("issues", () => {
     );
   });
 
+  it("keeps the create-doc button's place while the spaces load", async () => {
+    const { api } = fakeApi();
+    const base = createNorthstarStore();
+    const loading = { ...base.getSnapshot(), spaces: [], loading: true };
+    const store: typeof base = Object.assign(Object.create(base) as typeof base, {
+      getSnapshot: () => loading,
+    });
+    renderAt(
+      "/issues/ENG-7",
+      api,
+      <Route path="issues/:issueKey" element={<IssuePage />} />,
+      store,
+    );
+    const button = await screen.findByRole("button", { name: "Create doc from issue" });
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it("shows a failure with its message", async () => {
     const { api } = fakeApi({ issue: () => Promise.reject(new Error("not found")) });
     renderAt("/issues/ENG-9", api, <Route path="issues/:issueKey" element={<IssuePage />} />);

@@ -33,6 +33,22 @@ describe("My Work", () => {
     });
   });
 
+  it("holds the panels back until the buckets answer, so they do not jump down", async () => {
+    const answers: ((view: typeof MENTIONED) => void)[] = [];
+    const { api } = fakeApi({
+      myWork: () =>
+        new Promise((resolve) => {
+          answers.push(resolve);
+        }),
+    });
+    renderAt("/my-work", api, <Route path="my-work" element={<MyWorkPage />} />);
+    expect(await screen.findByRole("status")).toBeDefined();
+    expect(screen.queryByText("Lists")).toBeNull();
+    for (const answer of answers) answer(MENTIONED);
+    expect(await screen.findByText("Lists")).toBeDefined();
+    expect(screen.getByText("Google Calendar")).toBeDefined();
+  });
+
   it("shows who mentioned you and dismisses the mention", async () => {
     const { api, dismissMention } = fakeApi({ myWork: () => Promise.resolve(MENTIONED) });
     const user = renderAt("/my-work", api, <Route path="my-work" element={<MyWorkPage />} />);
