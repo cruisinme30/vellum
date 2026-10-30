@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { Keymap } from "./keymap";
 import { workCommands, type WorkActions } from "./work-commands";
 
-function everything(): Required<WorkActions> {
+function everything(): Required<Omit<WorkActions, "destinations">> {
   return {
     newIssue: vi.fn(),
     newIssueFromTemplate: vi.fn(),
@@ -56,5 +56,11 @@ describe("workCommands", () => {
     const inbox = workCommands(actions).find((c) => c.id === "go.my-work");
     inbox?.run();
     expect(actions.goTo).toHaveBeenCalledWith("my-work");
+  });
+
+  it("leaves out the G chords for screens the app does not have", () => {
+    const goTo = vi.fn();
+    const commands = workCommands({ goTo, destinations: ["inbox", "my-work"] });
+    expect(commands.map((command) => command.id)).toEqual(["go.inbox", "go.my-work"]);
   });
 });

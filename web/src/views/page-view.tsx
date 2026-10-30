@@ -17,6 +17,7 @@ import { useT } from "../i18n/i18n";
 import { useShare } from "../sharing/share-button";
 import { Icon } from "../shell/icon";
 import { issueChipStatus } from "../work/api";
+import { usePageTask } from "../work/quick-add";
 
 import { HistoryPanel } from "./history-panel";
 import { NotFoundView } from "./info";
@@ -155,6 +156,7 @@ export function PageView() {
   const chips = useChipSources();
   const pageFiles = usePageFilesPanel(pageId, pageHistory.controls?.canWrite ?? false);
   const page = workspace.pages.find((p) => p.id === pageId);
+  const onSelectionTask = usePageTask(page);
   const trail = useMemo(() => ancestors(workspace.pages, pageId), [workspace.pages, pageId]);
   const space = workspace.spaces.find((s) => s.id === page?.spaceId);
   const pages = workspace.pages;
@@ -264,6 +266,7 @@ export function PageView() {
                 me={workspace.me.handle}
                 chips={chips}
                 scanSecrets={drive?.scanSecrets}
+                onSelectionTask={onSelectionTask}
                 actions={
                   <>
                     {pageFiles.button}

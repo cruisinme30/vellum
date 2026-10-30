@@ -431,6 +431,53 @@
   font-size: 1rem;
 }
 
+.vl-search-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: end;
+  max-width: 720px;
+  margin: 12px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.vl-search-filters legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.vl-search-filters label {
+  display: grid;
+  gap: 2px;
+  font-size: 0.875rem;
+}
+
+.vl-search-filters label:has(input[type="checkbox"]) {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-height: 40px;
+}
+
+.vl-search-filters select {
+  min-height: 40px;
+  max-width: 100%;
+}
+
+/* Matched words in search results and the ⌘K menu. */
+.vl-page-list mark,
+.command-menu mark {
+  border-radius: 2px;
+  background: var(--md-primary-container, Mark);
+  color: var(--md-on-primary-container, MarkText);
+  font-weight: 600;
+}
+
 .vl-shortcuts div {
   display: grid;
   grid-template-columns: minmax(180px, 2fr) 3fr;

@@ -16,7 +16,7 @@ import type { CollabConnector } from "../editor/collab/provider";
 
 import type { PageHistory } from "./history";
 import type { WorkspaceSnapshot, WorkspaceStore } from "./store";
-import type { SearchHit } from "./types";
+import type { SearchFilters, SearchHit } from "./types";
 
 interface Services {
   readonly store: WorkspaceStore;
@@ -58,25 +58,27 @@ export function useWorkspace(): WorkspaceSnapshot {
 /**
  * The pages that match a search (`kind: "search"`) or mention a handle
  * (`kind: "mentions"`), asked again whenever the workspace changes;
- * `undefined` until the first answer for this text arrives.
+ * `undefined` until the first answer for this text arrives. Keep `filters`
+ * stable (memoised): a new object asks again.
  */
 export function useSearch(
   kind: "search" | "mentions",
   text: string,
+  filters?: SearchFilters,
 ): readonly SearchHit[] | undefined {
   const { store } = useServices();
   const workspace = useWorkspace();
-  const key = `${kind}:${text}`;
+  const key = `${kind}:${text}:${JSON.stringify(filters ?? {})}`;
   const [answer, setAnswer] = useState<{ key: string; hits: SearchHit[] }>();
   useEffect(() => {
     let current = true;
-    const asked = kind === "search" ? store.search(text) : store.mentions(text);
+    const asked = kind === "search" ? store.search(text, filters) : store.mentions(text);
     void asked.then((hits) => {
       if (current) setAnswer({ key, hits });
     });
     return () => {
       current = false;
     };
-  }, [store, kind, text, key, workspace]);
+  }, [store, kind, text, filters, key, workspace]);
   return answer?.key === key ? answer.hits : undefined;
 }

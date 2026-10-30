@@ -13,13 +13,19 @@ import type {
   CompleteView,
   CreatedIssue,
   CyclesOut,
+  GoogleView,
   GroupOut,
   IssueGroups,
   MyIssuesOut,
   IssueOut,
+  ListsView,
+  ListView,
   MyWorkSettingsInput,
   MyWorkSettingsView,
   MyWorkView,
+  ParseView,
+  SecretView,
+  SyncView,
   TaskView,
   TeamOut,
   TeamsOut,
@@ -94,12 +100,44 @@ export type TriageDecision =
 /** Which of my issues: assigned (in focus order), created, subscribed or recent activity. */
 export type MyIssuesTab = "assigned" | "created" | "subscribed" | "activity";
 
+/** Changes to a task; a field left out stays as it is. */
+interface TaskChanges {
+  readonly title?: string;
+  readonly block?: string;
+}
+
 /** The Work and My Work operations the web app uses. */
 export interface WorkApi extends CommentsApi {
   /** The signed-in person's tasks, in buckets. */
   myWork(): Promise<MyWorkView>;
-  /** Adds a task from quick-add text such as "Call Sam tomorrow !high". */
-  addTask(text: string): Promise<TaskView>;
+  /**
+   * Adds a task from quick-add text such as "Call Sam tomorrow 3pm p1".
+   * `list` is a list's document; the person's Inbox when absent.
+   */
+  addTask(text: string, list?: string): Promise<TaskView>;
+  /** What quick-add makes of a line, with the phrases to highlight (R-MW-3). */
+  parse(text: string): Promise<ParseView>;
+  /**
+   * Moves a task's start to a bucket (`inbox`, `today`, `evening`,
+   * `anytime`, `someday`) or a day (`YYYY-MM-DD`); its deadline stays.
+   */
+  move(task: string, to: string): Promise<TaskView>;
+  /**
+   * Changes a checklist task. `title` is kept as written, not parsed;
+   * `block` is a time block `YYYY-MM-DDTHH:MM/minutes` (R-MW-9), `""` clears it.
+   */
+  update(task: string, changes: TaskChanges): Promise<TaskView>;
+  /** The person's lists and the lists shared with them (R-MW-7). */
+  lists(): Promise<ListView[]>;
+  createList(title: string): Promise<ListView>;
+  /** Shares a list with a person, by handle, or stops sharing it. */
+  shareList(list: string, member: string, shared: boolean): Promise<ListView>;
+  /** Whether Google Calendar time-blocking is set up and connected. */
+  google(): Promise<GoogleView>;
+  /** Google's consent page to connect the calendar. */
+  connectGoogle(): Promise<string>;
+  syncGoogle(): Promise<SyncView>;
+  disconnectGoogle(): Promise<void>;
   /** Ticks or unticks a task. */
   setDone(task: string, done: boolean): Promise<TaskView>;
   /** Takes a mention (a task of kind `mention`) out of My Work. */
@@ -121,7 +159,8 @@ export interface WorkApi extends CommentsApi {
   setPriority(key: string, priority: number): Promise<IssueOut>;
   /** An issue's comments, oldest first, across its threads. */
   comments(key: string): Promise<CommentOut[]>;
-  addComment(key: string, body: string): Promise<void>;
+  /** Comments on an issue; `assignTo` gives the thread to that person as a task ("assign to"). */
+  addComment(key: string, body: string, assignTo?: string): Promise<void>;
   /**
    * Links the Slack account behind a code from Slack's "Save as task"
    * reply to the signed-in person (#163). Absent in demo mode.
@@ -168,7 +207,33 @@ export function createHttpWorkApi(http: Http): WorkApi {
     async linkSlack(code) {
       await http.send("POST", "/api/v1/my-work/slack-link", { code });
     },
-    addTask: (text) => http.send<TaskView>("POST", "/api/v1/tasks", { text }),
+    addTask: (text, list) =>
+      http.send<TaskView>("POST", "/api/v1/tasks", list === undefined ? { text } : { text, list }),
+    parse: (text) => http.get<ParseView>("/api/v1/tasks/parse", { text }),
+    move: (task, to) => http.send<TaskView>("POST", `/api/v1/tasks/${segment(task)}/move`, { to }),
+    update: (task, changes) =>
+      http.send<TaskView>("PATCH", `/api/v1/tasks/${segment(task)}`, changes),
+    async lists() {
+      const found = await http.get<ListsView>("/api/v1/task-lists");
+      return found.lists;
+    },
+    createList: (title) => http.send<ListView>("POST", "/api/v1/task-lists", { title }),
+    shareList(list, member, shared) {
+      const members = `/api/v1/task-lists/${segment(list)}/members`;
+      const handle = member.replace(/^@/, "");
+      return shared
+        ? http.send<ListView>("POST", members, { member: handle })
+        : http.send<ListView>("DELETE", `${members}/${segment(handle)}`);
+    },
+    google: () => http.get<GoogleView>("/api/v1/my-work/google"),
+    async connectGoogle() {
+      const consent = await http.send<SecretView>("POST", "/api/v1/my-work/google/connect", {});
+      return consent.value;
+    },
+    syncGoogle: () => http.send<SyncView>("POST", "/api/v1/my-work/google/sync", {}),
+    async disconnectGoogle() {
+      await http.send("DELETE", "/api/v1/my-work/google");
+    },
     async setDone(task, done) {
       const path = `/api/v1/tasks/${segment(task)}`;
       if (!done) return http.send<TaskView>("POST", `${path}/reopen`, {});
@@ -225,8 +290,13 @@ export function createHttpWorkApi(http: Http): WorkApi {
         .filter((comment) => !comment.deleted)
         .toSorted((a, b) => a.created_at.localeCompare(b.created_at));
     },
-    async addComment(key, body) {
-      await http.send("POST", `${WORK}/comments`, { target: key, body });
+    async addComment(key, body, assignTo) {
+      const assign = assignTo?.trim().replace(/^@/, "") ?? "";
+      await http.send(
+        "POST",
+        `${WORK}/comments`,
+        assign === "" ? { target: key, body } : { target: key, body, assign_to: assign },
+      );
     },
     async queryIssues(query) {
       const found = await http.get<IssueGroups>(`${WORK}/issues`, { ...query });
@@ -342,8 +412,12 @@ export type {
   CycleOut,
   CyclesOut,
   FocusedIssue,
+  GoogleView,
   GroupOut,
   IssueOut,
+  ListView,
+  ParseView,
+  SectionView,
   SlaOut,
   ViewIn,
   ViewOut,

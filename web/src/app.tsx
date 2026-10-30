@@ -51,7 +51,6 @@ import { DriveSettingsPage } from "./drive/settings-page";
 import { TrashPage } from "./drive/trash-page";
 import type { CollabConnector } from "./editor/collab/provider";
 import { I18nProvider, useT } from "./i18n/i18n";
-import { KeyboardRoot } from "./keyboard/keyboard-root";
 import { NotificationsProvider, type NotificationServices } from "./notifications/context";
 import { NotificationSettingsView } from "./notifications/notification-settings";
 import { createMockNotificationPreferencesStore } from "./notifications/preferences";
@@ -60,6 +59,7 @@ import type { PrivateSpacesApi } from "./platform/private/api";
 import { PrivateSpacesView } from "./platform/private/private-spaces-view";
 import type { RenderApi } from "./render/api";
 import type { SharingApi } from "./sharing/api";
+import { AppKeyboard } from "./shell/app-keyboard";
 import { AppShell } from "./shell/app-shell";
 import { AppearanceProvider, type OrganisationAppearance } from "./theme/appearance-context";
 import { AppearancePage } from "./theme/appearance-page";
@@ -74,6 +74,7 @@ import { IssuePage } from "./work/issue-page";
 import { IssuesPage } from "./work/issues-page";
 import { MyIssuesPage } from "./work/my-issues-page";
 import { MyWorkPage } from "./work/my-work-page";
+import { QuickAddProvider } from "./work/quick-add";
 import { TeamSettingsPage } from "./work/settings/team-settings-page";
 import { TriagePage } from "./work/triage-page";
 
@@ -324,11 +325,13 @@ export function AppProviders({
 export function App(services: AppServices) {
   return (
     <AppProviders {...services}>
-      <KeyboardRoot>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-      </KeyboardRoot>
+      <BrowserRouter>
+        <QuickAddProvider>
+          <AppKeyboard>
+            <AppRoutes />
+          </AppKeyboard>
+        </QuickAddProvider>
+      </BrowserRouter>
     </AppProviders>
   );
 }
