@@ -860,8 +860,14 @@ mod tests {
     #[test]
     fn the_last_changed_path_counts() {
         // `git diff` output is trimmed, so the last path has no newline.
-        let root = repo_root().expect("inside the repository");
-        let output = Command::new(root.join("scripts/ci/changed-areas.sh"))
+        // The root comes from Cargo, not git: in a container, git can
+        // refuse a mounted checkout or a worktree whose `.git` points to a
+        // host path.
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("xtask sits in the repository root");
+        let output = Command::new("bash")
+            .arg(root.join("scripts/ci/changed-areas.sh"))
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .spawn()
