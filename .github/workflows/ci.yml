@@ -241,9 +241,10 @@ jobs:
         run: pnpm audit
 
   ui:
-    # Two shards of four workers each: 334 tests took 7.3 minutes on one
-    # runner's default two workers (ADR 0049, D214).
-    name: UI layout (quick ${{ matrix.shard }}/2)
+    # Four shards of four workers each (ADR 0049, D214). 334 tests took
+    # 7.3 minutes on one runner; by 5:50 PM PT on 2026-10-29 there were
+    # 962, and two shards took 8 to 9 minutes each.
+    name: UI layout (quick ${{ matrix.shard }}/4)
     needs: changes
     if: needs.changes.outputs.ui == 'true'
     runs-on: ubuntu-24.04
@@ -251,7 +252,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3, 4]
     env:
       # Keep in step with site.yml.
       MDBOOK_VERSION: 0.5.4
@@ -287,7 +288,7 @@ jobs:
           UI_BROWSERS: chromium
           UI_VIEWPORTS: phone,laptop
           UI_SITE_DIR: ../_site
-        run: pnpm exec playwright test e2e/ui --shard=${{ matrix.shard }}/2 --workers=4
+        run: pnpm exec playwright test e2e/ui --shard=${{ matrix.shard }}/4 --workers=4
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
