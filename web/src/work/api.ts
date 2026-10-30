@@ -12,7 +12,10 @@ import type {
   CommentResult,
   CompleteView,
   CreatedIssue,
+  CyclesOut,
+  GroupOut,
   IssueGroups,
+  MyIssuesOut,
   IssueOut,
   MyWorkSettingsInput,
   MyWorkSettingsView,
@@ -22,6 +25,9 @@ import type {
   TeamsOut,
   ThreadOut,
   ThreadsOut,
+  ViewIn,
+  ViewOut,
+  ViewsOut,
 } from "../api/api.gen";
 import type { Http } from "../api/http";
 
@@ -65,6 +71,27 @@ export interface CommentsApi {
   assign(threadId: string, assignee: string | undefined): Promise<ThreadOut | undefined>;
 }
 
+/** How to list issues: the settings a view saves. */
+export interface IssueQuery {
+  readonly team?: string;
+  /** A Work filter tree as JSON text; absent for every issue. */
+  readonly filter?: string;
+  readonly group_by?: string;
+  readonly order_by?: string;
+  readonly show_closed?: string;
+  readonly layout?: string;
+}
+
+/** A triage decision on an issue in a team's inbox. */
+export type TriageDecision =
+  | { readonly action: "accept"; readonly state?: string }
+  | { readonly action: "decline"; readonly reason?: string }
+  | { readonly action: "duplicate"; readonly duplicate_of: string }
+  | { readonly action: "snooze"; readonly until: string };
+
+/** Which of my issues: assigned (in focus order), created, subscribed or recent activity. */
+export type MyIssuesTab = "assigned" | "created" | "subscribed" | "activity";
+
 /** The Work and My Work operations the web app uses. */
 export interface WorkApi extends CommentsApi {
   /** The signed-in person's tasks, in buckets. */
@@ -88,6 +115,8 @@ export interface WorkApi extends CommentsApi {
   /** Files an issue and says which chip to write where (from a page selection). */
   fileIssue(issue: NewIssue): Promise<CreatedIssue>;
   setState(key: string, state: string): Promise<IssueOut>;
+  /** Changes an issue's priority (0 none, 1 urgent … 4 low). */
+  setPriority(key: string, priority: number): Promise<IssueOut>;
   /** An issue's comments, oldest first, across its threads. */
   comments(key: string): Promise<CommentOut[]>;
   addComment(key: string, body: string): Promise<void>;
@@ -96,6 +125,19 @@ export interface WorkApi extends CommentsApi {
    * reply to the signed-in person (#163). Absent in demo mode.
    */
   linkSlack?(code: string): Promise<void>;
+  /** Issues in groups (columns on a board), as a view lays them out. */
+  queryIssues(query: IssueQuery): Promise<GroupOut[]>;
+  /** A team's triage inbox, oldest first, snoozed issues left out. */
+  inbox(team: string): Promise<IssueOut[]>;
+  triage(key: string, decision: TriageDecision): Promise<IssueOut>;
+  /** A team's cycles with burn-up points, and its velocity. */
+  cycles(team: string): Promise<CyclesOut>;
+  myIssues(tab: MyIssuesTab): Promise<MyIssuesOut>;
+  /** The saved views the person can open, for one team or all. */
+  views(team?: string): Promise<ViewOut[]>;
+  createView(view: ViewIn): Promise<ViewOut>;
+  updateView(id: string, view: ViewIn): Promise<ViewOut>;
+  deleteView(id: string): Promise<void>;
 }
 
 const WORK = "/api/v1/work";
@@ -159,6 +201,7 @@ export function createHttpWorkApi(http: Http): WorkApi {
     },
     fileIssue: (issue) => http.send<CreatedIssue>("POST", `${WORK}/issues`, issueBody(issue)),
     setState: (key, state) => http.send<IssueOut>("PATCH", issuePath(key), { state }),
+    setPriority: (key, priority) => http.send<IssueOut>("PATCH", issuePath(key), { priority }),
     async comments(key) {
       const list = await http.get<ThreadsOut>(`${WORK}/comments`, { target: key });
       return list.threads
@@ -168,6 +211,29 @@ export function createHttpWorkApi(http: Http): WorkApi {
     },
     async addComment(key, body) {
       await http.send("POST", `${WORK}/comments`, { target: key, body });
+    },
+    async queryIssues(query) {
+      const found = await http.get<IssueGroups>(`${WORK}/issues`, { ...query });
+      return found.groups;
+    },
+    async inbox(team) {
+      const found = await http.get<IssueGroups>(`${WORK}/teams/${segment(team)}/inbox`);
+      return found.groups.flatMap((group) => group.issues);
+    },
+    triage: (key, decision) => http.send<IssueOut>("POST", `${issuePath(key)}/triage`, decision),
+    cycles: (team) => http.get<CyclesOut>(`${WORK}/teams/${segment(team)}/cycles`),
+    myIssues: (tab) => http.get<MyIssuesOut>(`${WORK}/me/issues`, { tab }),
+    async views(team) {
+      const found = await http.get<ViewsOut>(
+        `${WORK}/views`,
+        team === undefined ? undefined : { team },
+      );
+      return found.views;
+    },
+    createView: (view) => http.send<ViewOut>("POST", `${WORK}/views`, view),
+    updateView: (id, view) => http.send<ViewOut>("PUT", `${WORK}/views/${segment(id)}`, view),
+    async deleteView(id) {
+      await http.send("DELETE", `${WORK}/views/${segment(id)}`);
     },
     async threads(target) {
       const list = await http.get<ThreadsOut>(`${WORK}/comments`, { target });
@@ -245,7 +311,14 @@ export function issueChipStatus(api: WorkApi): (key: string) => Promise<IssueChi
 
 export type {
   CommentOut,
+  CycleOut,
+  CyclesOut,
+  FocusedIssue,
+  GroupOut,
   IssueOut,
+  SlaOut,
+  ViewIn,
+  ViewOut,
   MyWorkSettingsView,
   MyWorkView,
   TaskView,

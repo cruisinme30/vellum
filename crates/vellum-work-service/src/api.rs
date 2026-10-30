@@ -878,3 +878,136 @@ pub struct AssignThread {
     /// Handle; unset or empty unassigns.
     pub assignee: Option<String>,
 }
+
+// ----- saved views -----
+
+/// A saved view.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct ViewOut {
+    /// The view ID.
+    pub id: String,
+    /// The name.
+    pub name: String,
+    /// Who made it; only they can change or delete it.
+    pub owner: String,
+    /// The team it is scoped to, or none for every team.
+    pub team: Option<String>,
+    /// `private`, `team` or `workspace`.
+    pub visibility: String,
+    /// `list` or `board`.
+    pub layout: String,
+    /// The filter as JSON text, in the shape `query_issues` takes.
+    pub filter: String,
+    /// status, assignee, priority, project, cycle, label, team or none.
+    pub group_by: String,
+    /// priority, updated, created, due, estimate or title.
+    pub order_by: String,
+    /// `all`, `past_week`, `past_month` or `none`.
+    pub show_closed: String,
+    /// Whether sub-issues show alongside their parents.
+    pub show_sub_issues: bool,
+}
+
+impl ViewOut {
+    pub(crate) fn of(view: &vellum_work::view::View) -> Self {
+        Self {
+            id: view.id.to_string(),
+            name: view.name.clone(),
+            owner: view.owner.to_string(),
+            team: view.team.as_ref().map(ToString::to_string),
+            visibility: name_of(&view.visibility),
+            layout: name_of(&view.layout),
+            filter: serde_json::to_string(&view.filter).unwrap_or_else(|_| "{}".to_owned()),
+            group_by: name_of(&view.group_by),
+            order_by: name_of(&view.order_by),
+            show_closed: name_of(&view.show_closed),
+            show_sub_issues: view.show_sub_issues,
+        }
+    }
+}
+
+/// The saved views the caller can open.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct ViewsOut {
+    /// Views, by name.
+    pub views: Vec<ViewOut>,
+}
+
+/// Which saved views to list.
+#[derive(Debug, Clone, Default, Deserialize, JsonSchema)]
+pub struct ListViews {
+    /// Only views scoped to this team, plus views that span every team.
+    pub team: Option<String>,
+}
+
+/// A saved view's settings.
+#[derive(Debug, Clone, Default, Deserialize, JsonSchema)]
+pub struct ViewIn {
+    /// The name, 1 to 120 characters.
+    pub name: String,
+    /// Scope the view to one team.
+    pub team: Option<String>,
+    /// `private` (default), `team` or `workspace`.
+    pub visibility: Option<String>,
+    /// `list` (default) or `board`.
+    pub layout: Option<String>,
+    /// A Work filter as JSON text.
+    pub filter: Option<String>,
+    /// status (default), assignee, priority, project, cycle, label, team or none.
+    pub group_by: Option<String>,
+    /// priority (default), updated, created, due, estimate or title.
+    pub order_by: Option<String>,
+    /// `all`, `past_week` (default), `past_month` or `none`.
+    pub show_closed: Option<String>,
+    /// Whether sub-issues show alongside their parents (default true).
+    pub show_sub_issues: Option<bool>,
+}
+
+/// Replace a saved view the caller owns.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct PutView {
+    /// The view ID.
+    pub view_id: String,
+    /// The name, 1 to 120 characters.
+    pub name: String,
+    /// Scope the view to one team.
+    pub team: Option<String>,
+    /// `private` (default), `team` or `workspace`.
+    pub visibility: Option<String>,
+    /// `list` (default) or `board`.
+    pub layout: Option<String>,
+    /// A Work filter as JSON text.
+    pub filter: Option<String>,
+    /// status (default), assignee, priority, project, cycle, label, team or none.
+    pub group_by: Option<String>,
+    /// priority (default), updated, created, due, estimate or title.
+    pub order_by: Option<String>,
+    /// `all`, `past_week` (default), `past_month` or `none`.
+    pub show_closed: Option<String>,
+    /// Whether sub-issues show alongside their parents (default true).
+    pub show_sub_issues: Option<bool>,
+}
+
+impl PutView {
+    /// The settings, without the ID.
+    pub(crate) fn settings(self) -> ViewIn {
+        ViewIn {
+            name: self.name,
+            team: self.team,
+            visibility: self.visibility,
+            layout: self.layout,
+            filter: self.filter,
+            group_by: self.group_by,
+            order_by: self.order_by,
+            show_closed: self.show_closed,
+            show_sub_issues: self.show_sub_issues,
+        }
+    }
+}
+
+/// A saved view by ID.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct ViewRef {
+    /// The view ID.
+    pub view_id: String,
+}

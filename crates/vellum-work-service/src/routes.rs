@@ -114,6 +114,22 @@ pub(crate) fn all(s: &Arc<WorkService>) -> Vec<Operation> {
             s.list_cycles(c, i).await
         })
         .summary("Lists a team's cycles with burn-up and velocity"),
+        // Saved views.
+        query(s, "work.list_views", "/v1/work/views", |s, c, i| async move { s.list_views(c, i).await })
+            .summary("Lists the saved views the caller can open"),
+        mutation(s, "work.create_view", Post, "/v1/work/views", Work, |s, c, i| async move {
+            s.create_view(c, i).await
+        })
+        .summary("Saves a view")
+        .description("Private views are the owner's; team views show to the team's members; workspace views to everyone."),
+        mutation(s, "work.put_view", Put, "/v1/work/views/{view_id}", Work, |s, c, i| async move {
+            s.put_view(c, i).await
+        })
+        .summary("Replaces a saved view the caller owns"),
+        mutation(s, "work.delete_view", Delete, "/v1/work/views/{view_id}", Work, |s, c, i| async move {
+            s.delete_view(c, i).await
+        })
+        .summary("Deletes a saved view the caller owns"),
         query(s, "work.insights", "/v1/work/insights", |s, c, i| async move { s.insights(c, i).await })
             .summary("Measures lead, cycle and triage time, throughput and intake")
             .description("Percentiles (p50, p85, p95) and means in hours over a date range, for all issues or a filter, optionally broken down by team, assignee, priority, label, project, cycle or estimate and split into weeks or months."),

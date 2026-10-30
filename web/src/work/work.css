@@ -193,3 +193,390 @@
   flex-wrap: wrap;
   gap: 8px;
 }
+
+/* Work views, triage and cycles (issue #504). */
+
+.vl-work-wide {
+  max-width: none;
+}
+
+.vl-work-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0 0 12px;
+  border-bottom: 1px solid var(--md-outline-variant);
+}
+
+.vl-work-tabs a {
+  padding: 10px 14px;
+  border-bottom: 2px solid transparent;
+  color: var(--md-on-surface-variant);
+  text-decoration: none;
+}
+
+.vl-work-tabs a[aria-current="page"] {
+  border-bottom-color: var(--md-primary);
+  color: var(--md-on-surface);
+  font-weight: 600;
+}
+
+.vl-work-toolbar,
+.vl-saved-views,
+.vl-triage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 12px;
+  margin: 8px 0 12px;
+}
+
+.vl-work-field {
+  display: inline-grid;
+  gap: 2px;
+  font-size: 0.875rem;
+}
+
+.vl-work-field select,
+.vl-filter select,
+.vl-filter input,
+.vl-work-add select {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--md-outline);
+  border-radius: 4px;
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+  font: inherit;
+}
+
+.vl-segmented {
+  display: inline-flex;
+  overflow: hidden;
+  margin: 0 0 8px;
+  border: 1px solid var(--md-outline);
+  border-radius: 20px;
+}
+
+.vl-segmented button {
+  min-height: 40px;
+  padding: 0 16px;
+  border: 0;
+  background: transparent;
+  color: var(--md-on-surface);
+  font: inherit;
+  cursor: pointer;
+}
+
+.vl-segmented button + button {
+  border-left: 1px solid var(--md-outline);
+}
+
+.vl-segmented button[aria-pressed="true"] {
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+.vl-filter {
+  margin: 0 0 12px;
+  padding: 12px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 12px;
+}
+
+.vl-filter-group {
+  min-width: 0;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 8px;
+}
+
+.vl-filter-list {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vl-filter-condition {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.vl-filter-condition input {
+  flex: 1 1 160px;
+}
+
+.vl-filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.vl-work-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+/* Chips keep the body text colour so they read in every theme; the
+   border and weight carry the emphasis. */
+.vl-work-chip {
+  display: inline-block;
+  max-width: 100%;
+  padding: 1px 8px;
+  border: 1px solid var(--md-outline);
+  border-radius: 10px;
+  color: var(--md-on-surface);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.vl-priority-urgent {
+  border-width: 2px;
+  border-color: var(--md-error);
+  font-weight: 600;
+}
+
+.vl-priority-high {
+  border-color: var(--md-primary);
+  font-weight: 600;
+}
+
+/* SLA risk: colour plus words, never colour alone. */
+.vl-sla-yellow {
+  border-width: 2px;
+  border-color: #c9a000;
+}
+
+.vl-sla-orange {
+  border-width: 2px;
+  border-color: #e07000;
+}
+
+.vl-sla-red {
+  border-width: 2px;
+  border-color: var(--md-error);
+  font-weight: 600;
+}
+
+.vl-results-list .vl-group {
+  margin: 0 0 12px;
+}
+
+.vl-group-heading {
+  margin: 12px 0 4px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.vl-results-board {
+  display: grid;
+  grid-auto-columns: minmax(240px, 1fr);
+  grid-auto-flow: column;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.vl-results-board .vl-group {
+  min-width: 0;
+  padding: 0 8px 8px;
+  border-radius: 12px;
+  background: var(--md-surface-container-low, var(--md-surface-container));
+}
+
+.vl-results-board .vl-group-over {
+  outline: 2px dashed var(--md-primary);
+}
+
+.vl-results-board .vl-issue-list {
+  min-height: 48px;
+}
+
+.vl-results-board .vl-issue-list a {
+  grid-template-columns: 1fr;
+  gap: 4px;
+  background: var(--md-surface);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--md-shadow, black) 20%, transparent);
+}
+
+.vl-results-board .vl-work-chips {
+  justify-content: flex-start;
+}
+
+.vl-results-board a[draggable="true"] {
+  cursor: grab;
+}
+
+.vl-work-statuses {
+  margin: 24px 0;
+}
+
+.vl-work-statuses summary {
+  min-height: 40px;
+  cursor: pointer;
+  line-height: 40px;
+}
+
+.vl-work-statuses dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 32px;
+}
+
+.vl-work-statuses dt {
+  font-weight: 600;
+}
+
+.vl-work-statuses dd {
+  display: flex;
+  gap: 6px;
+  margin: 2px 0;
+}
+
+.vl-triage-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vl-triage-item {
+  padding: 8px 12px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 12px;
+}
+
+.vl-triage-item > a {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: 12px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.vl-triage-item p {
+  margin: 4px 0;
+}
+
+.vl-work-stat {
+  font-size: 1.0625rem;
+}
+
+.vl-burn-up {
+  max-width: 640px;
+  margin: 12px 0 24px;
+}
+
+.vl-burn-up svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.vl-burn-grid {
+  stroke: var(--md-outline-variant);
+  stroke-width: 1;
+}
+
+.vl-burn-axis {
+  fill: var(--md-on-surface-variant);
+  font-size: 11px;
+}
+
+.vl-burn-scope,
+.vl-burn-completed {
+  fill: none;
+  stroke-width: 2;
+}
+
+.vl-burn-scope {
+  stroke: var(--md-outline);
+  stroke-dasharray: 6 4;
+}
+
+.vl-burn-completed {
+  stroke: var(--md-primary);
+}
+
+.vl-burn-dot {
+  fill: var(--md-primary);
+}
+
+.vl-burn-legend {
+  display: flex;
+  gap: 16px;
+  font-size: 0.875rem;
+}
+
+.vl-burn-key::before {
+  display: inline-block;
+  width: 18px;
+  margin-right: 6px;
+  border-top: 2px solid var(--md-primary);
+  content: "";
+  vertical-align: middle;
+}
+
+.vl-burn-key-scope::before {
+  border-top: 2px dashed var(--md-outline);
+}
+
+.vl-burn-table table,
+.vl-cycle-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.vl-burn-table th,
+.vl-burn-table td,
+.vl-cycle-table th,
+.vl-cycle-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--md-outline-variant);
+  text-align: start;
+}
+
+.vl-cycle-row-current {
+  background: var(--md-surface-container);
+}
+
+/* Chips sit on their own line under the title, so long text in either
+   never pushes the row wider than its column. */
+.vl-results .vl-issue-list a,
+.vl-work .vl-issue-list a[data-issue],
+.vl-triage-item > a {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.vl-issue-list a[data-issue] .vl-work-chips,
+.vl-triage-item .vl-work-chips {
+  grid-column: 1 / -1;
+  min-width: 0;
+  justify-content: flex-start;
+}
+
+.vl-work-chips:empty {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .vl-cycle-table {
+    display: block;
+    overflow-x: auto;
+  }
+}
