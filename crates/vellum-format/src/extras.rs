@@ -21,9 +21,15 @@ pub fn merge_text(inlines: Vec<Inline>) -> Vec<Inline> {
         match (out.last_mut(), inline) {
             (_, Inline::Text { text }) if text.is_empty() => {}
             (Some(Inline::Text { text: last }), Inline::Text { text }) => last.push_str(&text),
-            // `<em>a</em><em>b</em>` reads as `<em>ab</em>`.
+            // `<em>a</em><em>b</em>` reads as `<em>ab</em>`, and the
+            // delimiters of two adjacent marks of a kind would run together
+            // when written (`^a^^b^` is one superscript).
             (Some(Inline::Emphasis { content: last }), Inline::Emphasis { content })
-            | (Some(Inline::Strong { content: last }), Inline::Strong { content }) => {
+            | (Some(Inline::Strong { content: last }), Inline::Strong { content })
+            | (Some(Inline::Strikethrough { content: last }), Inline::Strikethrough { content })
+            | (Some(Inline::Highlight { content: last }), Inline::Highlight { content })
+            | (Some(Inline::Subscript { content: last }), Inline::Subscript { content })
+            | (Some(Inline::Superscript { content: last }), Inline::Superscript { content }) => {
                 last.extend(content);
                 *last = merge_text(std::mem::take(last));
             }
@@ -329,8 +335,10 @@ fn match_extra(rest: &str) -> Option<(usize, Inline)> {
     } else {
         return None;
     };
-    // The extra must end at a word boundary too.
-    let after = rest.get(len..)?;
+    // The extra must end at a word boundary too. A backslash does not make
+    // one: the canonical text escapes `@` after a word character, so
+    // `@ann\@x` must read as `@ann@x` does.
+    let after = rest.get(len..)?.trim_start_matches(ESCAPED);
     let mut tail = after.chars();
     let ends_cleanly = match tail.next() {
         Some(c) if c.is_alphanumeric() || c == '_' => false,

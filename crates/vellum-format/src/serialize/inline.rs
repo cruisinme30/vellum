@@ -25,8 +25,15 @@ pub fn write(inlines: &[Inline], place: Place) -> String {
         line_start: true,
         bare_ok_at_end: true,
         bracket_next: false,
+        closing: None,
+        follow: None,
+        mark: None,
+        edge: (false, false),
+        next_visible: '\n',
     };
-    w.inlines(inlines, None);
+    // Adjacent marks of a kind merge, as they do when read, so their
+    // delimiters never run together.
+    w.inlines(&crate::extras::merge_text(inlines.to_vec()), None);
     w.out
 }
 
@@ -40,6 +47,29 @@ struct Writer {
     bare_ok_at_end: bool,
     /// The next sibling starts with `[`, so a trailing `!` would make it an image.
     bracket_next: bool,
+    /// The first character of the enclosing mark's closing delimiter.
+    closing: Option<char>,
+    /// The first character written after the current inline, when it is a
+    /// delimiter character that a run of the same character would join.
+    follow: Option<char>,
+    /// The delimiters around the content being written, when it is a mark's.
+    mark: Option<MarkEdges>,
+    /// Whether the current inline is the first and the last of its content.
+    edge: (bool, bool),
+    /// The character the parser sees after the current inline.
+    next_visible: char,
+}
+
+/// What the parser sees around a mark's delimiters when it decides whether
+/// they open and close: `~` and `=` are passed over.
+#[derive(Clone, Copy)]
+struct MarkEdges {
+    /// The delimiter character.
+    delimiter: char,
+    /// The character before the opening delimiter.
+    before: char,
+    /// The character after the closing delimiter.
+    after: char,
 }
 
 impl Writer {
@@ -66,6 +96,11 @@ impl Writer {
                 inlines.get(i + 1),
                 Some(Inline::Link { .. } | Inline::WikiLink { .. })
             );
+            self.follow = inlines.get(i + 1).map_or(self.closing, opening_char);
+            self.next_visible = inlines
+                .get(i + 1)
+                .map_or_else(|| self.after_content(), visible_first);
+            self.edge = (i == 0, i + 1 == inlines.len());
             self.inline(inline, delim, bare_ok);
         }
     }
@@ -109,23 +144,26 @@ impl Writer {
                     self.out.push('>');
                 } else {
                     self.out.push('[');
-                    self.inlines(content, None);
+                    self.enclosed(']', None, |w| w.inlines(content, None));
                     self.out.push(']');
                     self.destination(url, title);
                 }
             }
             Inline::Image { url, title, alt } => {
                 self.out.push_str("![");
-                self.inlines(alt, None);
+                self.enclosed(']', None, |w| w.inlines(alt, None));
                 self.out.push(']');
                 self.destination(url, title);
             }
             Inline::WikiLink { target, label } => {
+                // Both parts are read with escapes and entities decoded,
+                // and end at a bracket or a bar.
+                let special = ['[', ']', '|', '\\'];
                 self.out.push_str("[[");
-                self.out.push_str(target);
+                push_escaped(&mut self.out, target, &special);
                 if let Some(label) = label {
                     self.out.push('|');
-                    self.out.push_str(label);
+                    push_escaped(&mut self.out, label, &special);
                 }
                 self.out.push_str("]]");
             }
@@ -140,17 +178,49 @@ impl Writer {
     }
 
     fn wrap(&mut self, mark: &str, content: &[Inline], emphasis: Option<char>) {
+        let delimiter = mark.chars().next().unwrap_or(' ');
+        let edges = MarkEdges {
+            delimiter,
+            before: self
+                .out
+                .trim_end_matches(['~', '='])
+                .chars()
+                .next_back()
+                .unwrap_or('\n'),
+            after: self.next_visible,
+        };
         self.out.push_str(mark);
         let outer = self.bare_ok_at_end;
         self.bare_ok_at_end = true;
-        self.inlines(content, emphasis);
+        self.enclosed(delimiter, Some(edges), |w| {
+            w.inlines(content, emphasis);
+        });
         self.bare_ok_at_end = outer;
         self.out.push_str(mark);
     }
 
+    /// Writes content that a delimiter starting with `closing` follows.
+    fn enclosed(&mut self, closing: char, mark: Option<MarkEdges>, write: impl FnOnce(&mut Self)) {
+        let outer = (self.closing.replace(closing), self.mark);
+        self.mark = mark;
+        write(self);
+        (self.closing, self.mark) = outer;
+    }
+
+    /// The character the parser sees after the last inline of the content
+    /// being written: the closing delimiter, or what follows it when that
+    /// is passed over.
+    const fn after_content(&self) -> char {
+        match (self.mark, self.closing) {
+            (Some(m), _) if matches!(m.delimiter, '~' | '=') => m.after,
+            (Some(m), _) => m.delimiter,
+            (None, Some(c)) => c,
+            (None, None) => '\n',
+        }
+    }
+
     fn code(&mut self, code: &str) {
-        let longest = longest_run(code, '`');
-        let fence = "`".repeat(longest + 1);
+        let fence = "`".repeat(code_fence_len(code));
         let pad = code.starts_with('`')
             || code.ends_with('`')
             || (code.starts_with(' ') && code.ends_with(' ') && !code.trim().is_empty());
@@ -187,6 +257,7 @@ impl Writer {
 
     fn text(&mut self, text: &str, starts_line: bool) {
         let chars: Vec<char> = text.chars().collect();
+        let runs = self.escaped_runs(&chars, starts_line);
         let extras = crate::extras::extra_escapes(text);
         let marker_end = if starts_line && self.place != Place::Cell {
             line_start_escape(&chars)
@@ -200,12 +271,12 @@ impl Writer {
                 // A backslash is literal unless it comes before ASCII
                 // punctuation or a line end; the next node is unknown here.
                 '\\' => next.is_none_or(|n| n.is_ascii_punctuation()),
-                '`' | '*' | '[' | ']' | '<' | '~' | '^' | '|' => true,
+                '`' | '*' | '[' | ']' | '<' | '^' | '|' => true,
+                '~' | '=' => runs.get(i).copied().unwrap_or(true),
                 '_' => {
                     !(prev.is_some_and(char::is_alphanumeric)
                         && next.is_some_and(char::is_alphanumeric))
                 }
-                '=' => prev == Some('=') || next == Some('='),
                 '&' => next.is_some_and(|n| n == '#' || n.is_ascii_alphabetic()),
                 '!' => next.is_none() && self.bracket_next,
                 '#' | '{' => self.place == Place::Heading,
@@ -228,6 +299,90 @@ impl Writer {
             }
             self.out.push(c);
         }
+    }
+}
+
+impl Writer {
+    /// Which `~` and `=` characters of `chars` to escape. A run of `~`, or
+    /// of two or more `=`, could be read as a delimiter, so it is escaped
+    /// whole. The parser also passes over these runs when it decides
+    /// whether a delimiter next to them opens or closes (`p*~x*` is
+    /// emphasis, `a ~~=~~ b` is not strikethrough), and a backslash stops
+    /// that. So a run that starts or ends a mark's content is escaped,
+    /// except where the backslash would keep the mark's delimiter from
+    /// opening or closing between word characters. A run is always escaped
+    /// where it would join a delimiter next to it or where it starts a line
+    /// (a fence, a setext underline).
+    fn escaped_runs(&self, chars: &[char], starts_line: bool) -> Vec<bool> {
+        let mut escaped = Vec::with_capacity(chars.len());
+        for run in chars.chunk_by(|a, b| a == b) {
+            let (start, len) = (escaped.len(), run.len());
+            let end = start + len;
+            let c = run.first().copied().unwrap_or(' ');
+            let escape = matches!(c, '~' | '=') && {
+                let at_edge = self.mark.is_some()
+                    && ((start == 0 && self.edge.0) || (end == chars.len() && self.edge.1));
+                let delimiter = c == '~' || len >= 2 || at_edge;
+                let joins = (start == 0 && self.out.ends_with(c))
+                    || (end == chars.len() && self.follow == Some(c));
+                let line_start = start == 0 && starts_line && self.place != Place::Cell;
+                let flanks = self.mark.is_some_and(|m| {
+                    (start == 0
+                        && self.edge.0
+                        && !matches!(m.delimiter, '^' | '~')
+                        && is_word(m.before))
+                        || (end == chars.len() && self.edge.1 && is_word(m.after))
+                });
+                (delimiter && !flanks) || joins || line_start
+            };
+            escaped.resize(end, escape);
+        }
+        escaped
+    }
+}
+
+/// The first character the parser sees for `inline` when it decides
+/// whether a delimiter before it closes; `\\` stands for any punctuation.
+fn visible_first(inline: &Inline) -> char {
+    match inline {
+        Inline::Text { text } => match text.chars().next() {
+            Some('~' | '=') | None => '\\',
+            Some(c) => c,
+        },
+        Inline::Strikethrough { content }
+        | Inline::Subscript { content }
+        | Inline::Highlight { content } => content.first().map_or('\\', visible_first),
+        Inline::SoftBreak => '\n',
+        Inline::Link {
+            url,
+            title,
+            content,
+        } => bare_autolink(url, title, content)
+            .and_then(|t| t.chars().next())
+            .unwrap_or('['),
+        Inline::IssueKey { key: word } | Inline::Date { date: word } if word != "today" => {
+            word.chars().next().unwrap_or('\\')
+        }
+        _ => '\\',
+    }
+}
+
+/// Neither white space nor punctuation, as the parser classes a character
+/// next to a delimiter.
+fn is_word(c: char) -> bool {
+    !c.is_whitespace()
+        && !c.is_ascii_punctuation()
+        && (c.is_ascii() || c.is_alphanumeric() || c.is_control())
+}
+
+/// The first character written for `inline`, when a run of `~` or `=`
+/// before it could join that character.
+fn opening_char(inline: &Inline) -> Option<char> {
+    match inline {
+        Inline::Strikethrough { .. } | Inline::Subscript { .. } => Some('~'),
+        Inline::Highlight { .. } => Some('='),
+        Inline::Text { text } => text.chars().next(),
+        _ => None,
     }
 }
 
@@ -311,8 +466,25 @@ fn bare_autolink<'a>(url: &str, title: &str, content: &'a [Inline]) -> Option<&'
     (title.is_empty() && shape && safe).then_some(text.as_str())
 }
 
-fn longest_run(s: &str, c: char) -> usize {
-    s.split(|x| x != c).map(str::len).max().unwrap_or(0)
+/// The parser reads code spans with fences of at most this many backticks.
+const MAX_CODE_FENCE: usize = 80;
+
+/// A backtick fence for `code`: one longer than its longest backtick run,
+/// or, when that is too long for the parser, the shortest length that is
+/// not a run in the code (a run of the fence's length would close it).
+fn code_fence_len(code: &str) -> usize {
+    let runs: Vec<usize> = code
+        .split(|c| c != '`')
+        .map(str::len)
+        .filter(|&n| n > 0)
+        .collect();
+    let longest = runs.iter().copied().max().unwrap_or(0);
+    if longest < MAX_CODE_FENCE {
+        return longest + 1;
+    }
+    (1..=MAX_CODE_FENCE)
+        .find(|n| !runs.contains(n))
+        .unwrap_or(MAX_CODE_FENCE)
 }
 
 /// Escapes a fence info string word, which is read with escapes and
