@@ -606,6 +606,17 @@ kbd {
 
 /* Phones: a bottom bar and a "More" sheet replace the rail and sidebar. */
 @media (max-width: 599.98px) {
+  /*
+   * The fixed bottom bar covers the bottom of the viewport, so a control
+   * scrolled into view there (by Tab or find-in-page) would sit under it
+   * (WCAG 2.4.11). Scrolling keeps that much room free: the bar's fixed
+   * parts (72px), its label line at up to 1.7 line-height (1.275rem) and
+   * 8px for the focus ring.
+   */
+  :root {
+    scroll-padding-block-end: calc(80px + 1.275rem + env(safe-area-inset-bottom, 0px));
+  }
+
   .vl-shell {
     grid-template-columns: 1fr;
   }
