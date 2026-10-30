@@ -672,3 +672,110 @@ async fn events_name_who_made_the_change() {
     let batches = w.events.take_batches();
     assert_eq!(batches[0].0, Some(UserRef::parse("priya").unwrap()));
 }
+
+#[tokio::test]
+async fn saved_views_are_shared_by_visibility_and_survive_a_restart() {
+    let w = world().await;
+    with_eng(&w).await;
+    let filter = r#"{"or":[{"field":"priority","op":"is","values":["urgent"]},{"field":"assignee","op":"is","values":["@me"]}]}"#;
+    let team_view = w
+        .call(
+            "dev",
+            "work.create_view",
+            json!({"name": "Urgent or mine", "team": "ENG", "visibility": "team",
+                   "layout": "board", "group_by": "assignee", "filter": filter}),
+        )
+        .await;
+    let team_id = team_view["id"].as_str().unwrap().to_owned();
+    assert_eq!(team_view["layout"], "board");
+    assert_eq!(team_view["owner"], "dev");
+    let private = w
+        .call("dev", "work.create_view", json!({"name": "Mine only"}))
+        .await;
+    let private_id = private["id"].as_str().unwrap().to_owned();
+
+    // A team member sees the team view, not dev's private one.
+    let seen = w.call("priya", "work.list_views", json!({})).await;
+    let names: Vec<&str> = seen["views"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(names, ["Urgent or mine"]);
+    // Only the owner changes a view; a hidden view is "not found".
+    let priya = w.principal("priya", ScopeSet::FULL);
+    assert_eq!(
+        w.call_as(
+            priya.clone(),
+            "work.put_view",
+            json!({"view_id": team_id, "name": "Mine"})
+        )
+        .await,
+        Err(ErrorKind::PermissionDenied)
+    );
+    assert_eq!(
+        w.call_as(
+            priya.clone(),
+            "work.delete_view",
+            json!({"view_id": private_id})
+        )
+        .await,
+        Err(ErrorKind::NotFound)
+    );
+    // Bad input is refused.
+    for bad in [
+        json!({"name": ""}),
+        json!({"name": "x", "visibility": "team"}),
+        json!({"name": "x", "layout": "grid"}),
+        json!({"name": "x", "filter": "{\"field\":\"nope\"}"}),
+    ] {
+        assert_eq!(
+            w.call_as(priya.clone(), "work.create_view", bad.clone())
+                .await,
+            Err(ErrorKind::InvalidInput),
+            "{bad}"
+        );
+    }
+
+    let renamed = w
+        .call(
+            "dev",
+            "work.put_view",
+            json!({"view_id": team_id, "name": "Hot", "team": "ENG", "visibility": "team",
+                   "layout": "board", "group_by": "assignee", "filter": filter}),
+        )
+        .await;
+    assert_eq!(renamed["name"], "Hot");
+
+    let (w, skipped) = w.reopen().await;
+    assert_eq!(skipped, 0);
+    let views = w
+        .call("dev", "work.list_views", json!({"team": "ENG"}))
+        .await;
+    let views = views["views"].as_array().unwrap();
+    assert_eq!(views.len(), 2);
+    assert_eq!(views[0]["name"], "Hot");
+    let back: Value = serde_json::from_str(views[0]["filter"].as_str().unwrap()).unwrap();
+    assert_eq!(back, serde_json::from_str::<Value>(filter).unwrap());
+    // The stored filter runs as a query.
+    let _ = w
+        .call(
+            "dev",
+            "work.query_issues",
+            json!({"team": "ENG", "filter": views[0]["filter"], "group_by": "assignee"}),
+        )
+        .await;
+
+    let _ = w
+        .call("dev", "work.delete_view", json!({"view_id": private_id}))
+        .await;
+    let left = w.call("dev", "work.list_views", json!({})).await;
+    assert_eq!(left["views"].as_array().unwrap().len(), 1);
+    assert!(
+        !w.dir
+            .path()
+            .join(format!("views/{private_id}.yaml"))
+            .exists()
+    );
+}

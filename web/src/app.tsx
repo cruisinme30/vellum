@@ -62,9 +62,12 @@ import { NewPageView } from "./views/new-page";
 import { InboxView, SearchView } from "./views/search";
 import { SetupView, SignInView } from "./views/sign-in";
 import type { WorkApi } from "./work/api";
+import { CyclesPage } from "./work/cycles-page";
 import { IssuePage } from "./work/issue-page";
 import { IssuesPage } from "./work/issues-page";
+import { MyIssuesPage } from "./work/my-issues-page";
 import { MyWorkPage } from "./work/my-work-page";
+import { TriagePage } from "./work/triage-page";
 
 // The editor is most of the bundle, so it loads with the first page opened.
 const PageView = lazy(async () => {
@@ -112,6 +115,9 @@ export function AppRoutes() {
         <Route path="new" element={<NewPageView />} />
         <Route path="my-work" element={<MyWorkPage />} />
         <Route path="issues" element={<IssuesPage />} />
+        <Route path="issues/mine" element={<MyIssuesPage />} />
+        <Route path="issues/triage" element={<TriagePage />} />
+        <Route path="issues/cycles" element={<CyclesPage />} />
         <Route path="issues/:issueKey" element={<IssuePage />} />
         <Route path="books" element={<BooksPage />} />
         <Route path="books/:bookId" element={<BookPage />} />

@@ -44,8 +44,18 @@ function fakeWork() {
     createIssue: notUsed,
     fileIssue,
     setState: notUsed,
+    setPriority: notUsed,
     comments: notUsed,
     addComment: notUsed,
+    queryIssues: notUsed,
+    inbox: notUsed,
+    triage: notUsed,
+    cycles: notUsed,
+    myIssues: notUsed,
+    views: notUsed,
+    createView: notUsed,
+    updateView: notUsed,
+    deleteView: notUsed,
   };
 }
 

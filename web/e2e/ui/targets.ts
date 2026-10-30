@@ -77,6 +77,11 @@ const APP_TARGETS: Target[] = [
   // The theme editor's words and its contrast table change as tokens are
   // added, so the layout audit covers it rather than a pixel baseline.
   app("appearance", "/settings/appearance", { visual: false }),
+  app("issues board", "/issues?layout=board", { server: "work", visual: false }),
+  app("issues list", "/issues?group=assignee", { server: "work", visual: false }),
+  app("my issues", "/issues/mine", { server: "work", visual: false }),
+  app("triage", "/issues/triage", { server: "work", visual: false }),
+  app("cycles", "/issues/cycles", { server: "work", visual: false }),
 ];
 
 function htmlFiles(directory: string): string[] {
