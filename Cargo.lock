@@ -9486,6 +9486,7 @@ dependencies = [
  "vellum-db",
  "vellum-format",
  "vellum-kernel",
+ "vellum-search",
  "vellum-store",
  "zeroize",
 ]
