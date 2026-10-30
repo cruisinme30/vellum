@@ -97,6 +97,8 @@ impl Drive {
             }
             self.authorize(actor, node.space, node.id, Permission::Edit)
                 .await?;
+            self.check_content(actor, node.space, &node.path, &content)
+                .await?;
             let space = self.space(node.space).await?;
             let size = content.len() as u64;
             self.ensure_quota(&space, size.saturating_sub(node.size).saturating_add(size))

@@ -37,5 +37,7 @@ pub use model::{
     Activity, ActivityKind, DriveTotals, Node, NodeKind, RetentionPolicy, ScanReport, Space,
     SpaceKind, SpaceSettings, TrashState, Usage, VersionRecord,
 };
-pub use ports::{Access, Clock, DriveIndex, Member, Permission, SpaceRole, SystemClock};
+pub use ports::{
+    Access, Clock, ContentCheck, DriveIndex, Member, Permission, SpaceRole, SystemClock,
+};
 pub use service::{DriveService, PageWrites};

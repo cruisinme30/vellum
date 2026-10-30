@@ -37,7 +37,7 @@ fn mcp(token: Option<&str>, method: &str, params: &Value) -> Request<Body> {
     b.body(Body::from(body.to_string())).unwrap()
 }
 
-async fn tool(app: &Router, token: &str, name: &str, args: Value) -> Reply {
+pub async fn tool(app: &Router, token: &str, name: &str, args: Value) -> Reply {
     send(
         app,
         mcp(

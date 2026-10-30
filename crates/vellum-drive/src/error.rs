@@ -26,6 +26,10 @@ pub enum DriveError {
     #[error("invalid request: {0}")]
     Invalid(String),
 
+    /// A [`ContentCheck`](crate::ContentCheck) refused the page text.
+    #[error("{0}")]
+    Refused(String),
+
     /// Something with that identity or name already exists.
     #[error("already exists: {0}")]
     AlreadyExists(String),
@@ -71,6 +75,7 @@ impl DriveError {
             Self::SpaceNotFound(_) | Self::NotFound(_) => "not_found",
             Self::PermissionDenied => "permission_denied",
             Self::Invalid(_) => "invalid",
+            Self::Refused(_) => "refused",
             Self::AlreadyExists(_) => "already_exists",
             Self::QuotaExceeded { .. } => "quota_exceeded",
             Self::Malformed { .. } => "malformed",
@@ -89,6 +94,7 @@ impl DriveError {
             }
             Self::PermissionDenied => ErrorKind::PermissionDenied,
             Self::Invalid(_)
+            | Self::Refused(_)
             | Self::Malformed { .. }
             | Self::Store(StoreError::InvalidPath { .. }) => ErrorKind::InvalidInput,
             Self::AlreadyExists(_)

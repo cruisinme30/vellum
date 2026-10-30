@@ -63,6 +63,33 @@
   font-size: 0.875rem;
 }
 
+.vl-secrets-banner {
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  border-radius: var(--vl-radius-m);
+  border-left: 4px solid var(--md-error);
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+.vl-secrets-banner p {
+  margin: 0 0 4px;
+}
+
+.vl-secrets-banner ul {
+  margin: 0;
+  padding-left: 1.25em;
+}
+
+.vl-secrets-banner li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+
 .vl-toolbar-gap {
   flex: 1;
 }

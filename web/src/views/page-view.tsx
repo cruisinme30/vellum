@@ -148,7 +148,7 @@ export function PageView() {
   const { store, collab } = useServices();
   const workspace = useWorkspace();
   const pageHistory = usePageHistory(pageId);
-  const { work } = useServerApis();
+  const { work, drive } = useServerApis();
   const view = usePageViewMode();
   const chips = useChipSources();
   const pageFiles = usePageFilesPanel(pageId, pageHistory.controls?.canWrite ?? false);
@@ -285,6 +285,7 @@ export function PageView() {
                 work={work}
                 me={workspace.me.handle}
                 chips={chips}
+                scanSecrets={drive?.scanSecrets}
                 actions={
                   <>
                     {pageFiles.button}

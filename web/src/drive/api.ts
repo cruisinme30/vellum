@@ -18,6 +18,7 @@ import type {
   NodeView,
   RecentList,
   Removed,
+  SecretScanResult,
   SettingsView,
   SpaceList,
   SpaceView,
@@ -90,6 +91,8 @@ export interface DriveApi {
   ) => Promise<SpaceView>;
   /** Applies the space's version retention now; returns how many went. */
   readonly pruneVersions: (spaceId: string) => Promise<number>;
+  /** The likely secrets in page text, and what a save of it would meet. */
+  readonly scanSecrets?: (text: string) => Promise<SecretScanResult>;
 }
 
 const DRIVE = "/api/v1/drive";
@@ -130,6 +133,8 @@ export function createHttpDriveApi(http: Http): DriveApi {
     return found.items;
   };
   return {
+    scanSecrets: (text) =>
+      http.send<SecretScanResult>("POST", "/api/v1/security/secrets/scan", { text }),
     async myDrive() {
       const found = await http.get<MyDrive>(`${DRIVE}/my-drive`);
       return found.space ?? undefined;

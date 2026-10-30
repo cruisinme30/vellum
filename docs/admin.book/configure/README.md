@@ -49,6 +49,26 @@ or files mounted by your orchestrator, never in the TOML file you
 commit. Vellum never writes a secret to its logs; the configuration's
 debug output shows `<redacted>` in their place.
 
+## Secrets in pages {#secret-scanning}
+
+Vellum scans every page as it is saved, whether a person, live editing
+or a model wrote it, for API keys, tokens and private keys. Set
+what happens in **Admin → Settings → Security**:
+
+::: facts
+
+- Warn, and save (the default): the save goes through, the editor shows a banner naming the kind and line, and the audit log records it
+- Block the save: the save is refused until the secret is removed; models get a tool error
+- Don't scan: nothing is checked
+
+:::
+
+**Allowed secrets** takes one entry per line: a kind such as `jwt` skips
+that kind everywhere, and any other text skips secrets that contain it,
+such as a documented example key. A line holding `vellum:allow-secret` is
+never scanned. The secret itself is never written to the audit log, the
+server log or an error.
+
 ## Workspace settings {#workspace}
 
 Everything else, from sign-in to quotas, is set in the app under
