@@ -4,7 +4,7 @@
 import { readdirSync, statSync } from "node:fs";
 import path from "node:path";
 
-import { HANDBOOK } from "./northstar-server";
+import { HANDBOOK, LAUNCH_PAGE, LAUNCH_PROJECT } from "./northstar-server";
 import type { ServerState } from "./server";
 
 /**
@@ -115,6 +115,24 @@ function serverScreens(): Target[] {
     screen("security settings", "/settings/security"),
     screen("help", "/help"),
     screen("collections (server)", "/data"),
+    // Planning (#543): projects, initiatives, insights, intake forms.
+    screen("projects", "/projects"),
+    screen("project", `/projects/${LAUNCH_PROJECT}`),
+    screen("initiatives", "/initiatives"),
+    screen("insights", "/insights"),
+    screen("asks", "/asks"),
+    screen("ask form", "/asks/ENG/bug-report"),
+    screen("new issue", "/issues/new"),
+    // AI and MCP (#543): bring-your-own-model settings, Ask, MCP setup.
+    screen("ai settings", "/settings/ai"),
+    screen("ask", "/ask"),
+    screen("admin mcp", "/admin/mcp"),
+    // Import, and a page's share, export and assistant panels (#543).
+    screen("import", "/import"),
+    screen("page (server)", `/p/${LAUNCH_PAGE}`),
+    panel("page share", `/p/${LAUNCH_PAGE}`, /^Share$/),
+    panel("page export", `/p/${LAUNCH_PAGE}`, /^Export$/),
+    panel("page assistant", `/p/${LAUNCH_PAGE}`, /^Assistant$/),
   ];
 }
 

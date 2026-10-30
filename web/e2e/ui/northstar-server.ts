@@ -12,6 +12,7 @@ import type {
   SectionDoc as SectionDocument,
   TeamsOut,
 } from "../../src/api/api.gen";
+import { MSG_PEERS, decodeFrame, encodeFrame, encodePeers } from "../../src/editor/collab/wire";
 import type { PreferencesWire } from "../../src/notifications/preferences";
 
 import { driveAnswer } from "./drive-fixture";
@@ -28,8 +29,21 @@ import {
   USAGE,
   USERS,
 } from "./northstar-admin";
+import {
+  EXPORT_PREVIEW,
+  FORMS,
+  INITIATIVES,
+  INSIGHTS,
+  LAUNCH,
+  MCP_SNIPPETS,
+  PROJECTS,
+  SHARING,
+  TEMPLATES,
+  UPDATES,
+} from "./northstar-planning";
 import { ISSUES, MY_WORK, MY_WORK_SETTINGS, TEAM, THREADS, USER } from "./northstar-work";
 
+export { LAUNCH_PROJECT } from "./northstar-planning";
 export { NORTHSTAR_NOW } from "./northstar-work";
 
 /**
@@ -47,6 +61,8 @@ export { NORTHSTAR_NOW } from "./northstar-work";
 export const APPEARANCE = { seed: "#3b5bdb", export_theme: "default", site_theme: "default" };
 
 export const HANDBOOK = "handbook";
+/** A page in Ada's drive (drive-fixture.ts). */
+export const LAUNCH_PAGE = "P1";
 
 const BOOK: BookInfo = {
   id: HANDBOOK,
@@ -141,6 +157,26 @@ const PREFERENCES: PreferencesWire = {
   muted: [],
 };
 
+/** A Yjs update that changes nothing. */
+const EMPTY = Uint8Array.from([0, 0]);
+
+/** The first client ID in an awareness update (a count, then the ID, as varints). */
+function firstClient(update: Uint8Array): number {
+  let offset = 0;
+  const uint = () => {
+    let value = 0;
+    let scale = 1;
+    for (;;) {
+      const byte = update[offset++] ?? 0;
+      value += (byte & 0x7f) * scale;
+      if (byte < 0x80) return value;
+      scale *= 0x80;
+    }
+  };
+  uint();
+  return uint();
+}
+
 /** Every GET the fake answers: the path after `/api/v1`, and its answer. */
 const READS: readonly (readonly [RegExp, unknown])[] = [
   [/^\/search$/, { hits: [], has_more: false, hybrid: false }],
@@ -160,6 +196,15 @@ const READS: readonly (readonly [RegExp, unknown])[] = [
   [/^\/work\/issues$/, { groups: [{ issues: ISSUES }] } satisfies IssueGroups],
   [/^\/work\/comments$/, THREADS],
   [/^\/work\/views$/, { views: [] }],
+  [/^\/work\/projects$/, { projects: PROJECTS }],
+  [/^\/work\/projects\/[^/]+\/updates$/, { updates: UPDATES }],
+  [/^\/work\/projects\/[^/]+$/, LAUNCH],
+  [/^\/work\/initiatives$/, { initiatives: INITIATIVES }],
+  [/^\/work\/insights$/, INSIGHTS],
+  [/^\/work\/teams\/[^/]+\/templates$/, { templates: TEMPLATES }],
+  [/^\/work\/teams\/[^/]+\/forms$/, { forms: FORMS }],
+  [/^\/drive\/items\/[^/]+\/sharing$/, SHARING],
+  [/^\/export\/(?:pages|books)\/[^/]+$/, EXPORT_PREVIEW],
   [/^\/me\/tokens$/, MY_TOKENS],
   [/^\/me\/token-policy$/, TOKEN_POLICY],
   [/^\/me\/second-factors$/, FACTORS],
@@ -220,6 +265,26 @@ export async function northstarServer(context: BrowserContext): Promise<void> {
       json: { needsSetup: false, credential: "session", scopes: ["read", "write"], user: USER },
     }),
   );
+  await context.route("**/mcp/setup", (route) =>
+    route.fulfill({ json: { snippets: MCP_SNIPPETS } }),
+  );
+  // The page editor's collab socket: answers the editor's first sync with
+  // an empty document and lets Priya write, so the page opens as it does
+  // for an editor instead of waiting.
+  await context.routeWebSocket("**/collab/**", (socket) => {
+    socket.onMessage((message) => {
+      if (typeof message === "string") return;
+      for (const wire of decodeFrame(new Uint8Array(message))) {
+        if (wire.type === "sync-step-1") {
+          socket.send(Buffer.from(encodeFrame([{ type: "sync-step-2", update: EMPTY }])));
+        } else if (wire.type === "awareness") {
+          const clientId = firstClient(wire.update);
+          const payload = encodePeers([{ clientId, user: USER.id, canWrite: true }]);
+          socket.send(Buffer.from(encodeFrame([{ type: "custom", tag: MSG_PEERS, payload }])));
+        }
+      }
+    });
+  });
   await context.route("**/api/csrf", (route) =>
     route.fulfill({ json: { token: "t", header: "x-csrf-token" } }),
   );

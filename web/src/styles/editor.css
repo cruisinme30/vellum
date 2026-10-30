@@ -30,11 +30,15 @@
   min-width: 0;
 }
 
+/* Wraps on a phone, where the page actions do not fit beside Done. */
 .vl-editor-save {
   display: flex;
-  flex: none;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 4px;
+  min-width: 0;
   margin-inline-start: auto;
 }
 
