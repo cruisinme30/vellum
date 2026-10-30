@@ -11,8 +11,8 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D190, D191, D192, D193, D205, D206, D207
-- Issue: #474, #497
+- Decisions: D190, D191, D192, D193, D205, D206, D207, D305
+- Issue: #474, #497, #541
 - Pull requests: to be linked when merged
 
 :::
@@ -94,6 +94,15 @@ and live `collection` blocks in pages (section 5).
 
 - Each reference becomes `prop("New name")`; the rest of the formula text
   stays as written.
+
+### `D305`: serve finds the folder a collection is created in
+
+- `vellum serve` gives the collections access adapter an async folder
+  lookup: a space's root folder is the space, any other path must be a
+  live drive folder. Pages, trashed folders and unknown paths have no
+  node, so creating there is refused, as before for everything.
+- A space made a moment ago may not be cached yet; a miss reloads the
+  space list once.
 
 ## Alternatives
 
