@@ -624,6 +624,9 @@ pub struct Opened {
     pub work: Option<Arc<WorkService>>,
     /// Group membership, which SCIM changes (ADR 0069, D294).
     pub group_members: Option<Arc<dyn vellum_identity::GroupMembers>>,
+    /// Every database the workspace opened, home first, for closing at
+    /// shutdown.
+    pub databases: Vec<Index>,
 }
 
 /// My Work's settings: where its secrets live and what it links to.
@@ -1193,6 +1196,9 @@ pub async fn open(
     let (store, roots) =
         crate::e2e::guarded(Arc::new(AnnouncingStore::new(files, feed.clone(), &me)));
     let (shards, authz, drive_index) = open_shards(&index, &var).await?;
+    let databases = std::iter::once(index.clone())
+        .chain(shards.iter().cloned())
+        .collect();
     let spaces = Arc::new(Spaces::default());
     let (events, queued) = crate::notifications::channel();
     let (rows, row_changes) = crate::search::row_feed();
@@ -1288,6 +1294,7 @@ pub async fn open(
         search: Some(search_status),
         work: Some(workspace.work),
         group_members: Some(workspace.group_members),
+        databases,
     })
 }
 

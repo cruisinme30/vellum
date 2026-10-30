@@ -374,6 +374,7 @@ pub fn run(config_path: Option<&Path>, observability: Observability) -> Result<(
             tracing::warn!("this binary was built without the web app; `/` shows a placeholder");
         }
         let gateway = app_gateway(&services, gateway)?;
+        let databases = services.databases();
         tracing::info!(bind = %serve_config.bind, app = %host_of(&config.public_url.clone().unwrap_or_default()), "starting vellum");
         // Live-editing sockets stay open until their rooms close, so save
         // and close the rooms before the server waits for connections.
@@ -381,8 +382,34 @@ pub fn run(config_path: Option<&Path>, observability: Observability) -> Result<(
             shutdown_signal().await;
             services.shutdown().await;
         };
-        serve(gateway, serve_config, stop).await
+        let served = serve(gateway, serve_config, stop).await;
+        close_databases(&databases).await;
+        served
     })
+}
+
+/// How long shutdown waits for database connections still in use.
+const DATABASE_CLOSE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// Closes every workspace database while the runtime still runs, so no
+/// connection is left closing on its own thread when the process exits.
+/// An encrypted connection closing then races SQLCipher's exit handler.
+async fn close_databases(databases: &[vellum_db::Index]) {
+    let all = async {
+        for database in databases {
+            database.close().await;
+        }
+    };
+    if tokio::time::timeout(DATABASE_CLOSE_TIMEOUT, all)
+        .await
+        .is_err()
+    {
+        tracing::warn!(
+            "database connections still in use after {DATABASE_CLOSE_TIMEOUT:?}; exiting anyway"
+        );
+    } else {
+        tracing::info!(databases = databases.len(), "databases closed");
+    }
 }
 
 #[cfg(test)]

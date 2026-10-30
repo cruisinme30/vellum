@@ -28,7 +28,7 @@ serde = { version = "1.0.229", features = ["derive"] }
 serde-saphyr = { version = "2.0.0", default-features = false, features = ["deserialize", "serialize"] }
 sha2 = "0.11.1"
 thiserror = "2.0.21"
-tokio = { version = "1", features = ["macros", "rt", "time"] }
+tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread", "time"] }
 tracing = "0.1.44"
 uuid = "1.29.0"
 vellum-kernel.workspace = true

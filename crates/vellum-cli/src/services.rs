@@ -72,6 +72,8 @@ pub struct Services {
     observability: Observability,
     /// The drive index, which Admin → Usage counts pages and storage from.
     drive_index: Option<Arc<dyn vellum_drive::DriveIndex>>,
+    /// The workspace's databases, closed at shutdown.
+    databases: Vec<vellum_db::Index>,
     /// The MCP endpoint, when an index is configured (ADR 0019, D217).
     mcp: Option<Arc<vellum_mcp::http::McpHttp>>,
     /// The workspace MCP tools run against, for other in-process callers
@@ -200,6 +202,7 @@ impl Services {
             admin_audit: None,
             observability: Observability::new(),
             drive_index: None,
+            databases: Vec::new(),
             mcp: None,
             mcp_workspace: None,
             audit: Arc::default(),
@@ -290,6 +293,7 @@ impl Services {
         self.rate_counts = opened.rate_counts;
         self.tasks = opened.tasks;
         self.drive_index = opened.drive_index;
+        self.databases = opened.databases;
         self.search = opened.search;
         if let Some((workspace, events)) = opened.mcp {
             let shared = self.rate_counts.as_ref().map(|counts| {
@@ -447,6 +451,12 @@ impl Services {
         if let Some(collab) = &self.collab {
             collab.shutdown().await;
         }
+    }
+
+    /// The workspace's databases, home first, so the server can close
+    /// them after its last request (see [`vellum_db::Index::close`]).
+    pub fn databases(&self) -> Vec<vellum_db::Index> {
+        self.databases.clone()
     }
 
     /// Every typed service, in registration order. With the admin
