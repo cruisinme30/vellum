@@ -156,7 +156,7 @@ describe("users page", () => {
     });
     expect(await screen.findByText("Marco Ruiz updated.")).toBeDefined();
 
-    await user.click(screen.getByRole("button", { name: "Remove Priya Shah's admin rights" }));
+    await user.click(screen.getByRole("button", { name: "Remove admin: Priya Shah" }));
     expect(updateUser).toHaveBeenLastCalledWith(PRIYA.id, { admin: false });
   });
 
@@ -181,7 +181,7 @@ describe("users page", () => {
       updateUser: () => Promise.reject(new Error("x")),
     });
     const user = renderWith(api, <UsersPage />);
-    await user.click(await screen.findByRole("button", { name: "Make Marco Ruiz an admin" }));
+    await user.click(await screen.findByRole("button", { name: "Make admin: Marco Ruiz" }));
     expect(await screen.findByRole("alert")).toBeDefined();
   });
 

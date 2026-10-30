@@ -106,6 +106,9 @@ function serverScreens(): Target[] {
     screen("admin settings", "/admin/settings"),
     screen("admin backups", "/admin/backups"),
     screen("admin webhooks", "/admin/webhooks"),
+    screen("admin users", "/admin/users"),
+    screen("admin spaces", "/admin/spaces"),
+    screen("admin groups", "/admin/groups"),
     screen("help", "/help"),
     screen("collections (server)", "/data"),
   ];

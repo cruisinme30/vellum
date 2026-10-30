@@ -3,7 +3,10 @@
 
 import type { RoutesView, TraceSummary } from "../../src/admin/requests/api";
 import type {
+  AdminSpaceList,
   AdminState,
+  GroupList,
+  UserView,
   AuditList,
   HookList,
   UsageCounts,
@@ -153,5 +156,69 @@ export const HOOKS: HookList = {
       rotating: false,
       secret_hint: "whsec_…4f2a",
     },
+  ],
+};
+
+export const USERS: UserView[] = [
+  {
+    id: PRIYA,
+    name: "Priya Raman",
+    handle: "priya",
+    email: "priya@northstar.dev",
+    admin: true,
+    disabled: false,
+    hasPassword: true,
+    createdAt: EARLIER,
+  },
+  {
+    id: "01M6409GN2EYWS8Z7NFQQ3SAM0",
+    name: "Sam Okafor-Lindqvist",
+    handle: "sam",
+    email: "sam.okafor-lindqvist@engineering.northstar.dev",
+    admin: false,
+    disabled: false,
+    hasPassword: false,
+    createdAt: EARLIER,
+  },
+  {
+    id: "01M6409GN2EYWS8Z7NFQQ3LEE0",
+    name: "Lee Chen",
+    handle: "lee",
+    email: "lee@northstar.dev",
+    admin: false,
+    disabled: true,
+    hasPassword: true,
+    createdAt: NOW,
+  },
+];
+
+export const ADMIN_SPACES: AdminSpaceList = {
+  spaces: [
+    {
+      space: {
+        id: "S2",
+        kind: "shared_drive",
+        slug: "northstar",
+        name: "Northstar Product and Engineering",
+        settings: { daily_days: 30, keep_all_days: 7, trash_days: 30, weekly_weeks: 52 },
+      },
+      used_bytes: 9_400_000_000,
+      members: [
+        { user_id: PRIYA, role: "owner" },
+        { user_id: "01M6409GN2EYWS8Z7NFQQ3SAM0", role: "editor" },
+      ],
+    },
+  ],
+};
+
+export const GROUPS: GroupList = {
+  groups: [
+    {
+      id: "01M6400000GROUP0ENGINEER01",
+      name: "Engineering",
+      description: "Everyone who ships code, including contractors on the platform team",
+      created_at: EARLIER,
+    },
+    { id: "01M6400000GROUP0DESIGN0001", name: "Design", description: "", created_at: NOW },
   ],
 };

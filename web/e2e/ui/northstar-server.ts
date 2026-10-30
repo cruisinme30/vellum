@@ -15,12 +15,15 @@ import type { PreferencesWire } from "../../src/notifications/preferences";
 import { driveAnswer } from "./drive-fixture";
 import {
   ADMIN_SETTINGS,
+  ADMIN_SPACES,
   ADMIN_STATE,
   AUDIT,
+  GROUPS,
   HOOKS,
   REQUESTS,
   ROUTES,
   USAGE,
+  USERS,
 } from "./northstar-admin";
 import { ISSUES, MY_WORK, MY_WORK_SETTINGS, TEAM, THREADS, USER } from "./northstar-work";
 
@@ -146,6 +149,7 @@ const READS: readonly (readonly [RegExp, unknown])[] = [
   [/^\/work\/teams$/, { teams: [TEAM] } satisfies TeamsOut],
   [/^\/work\/issues$/, { groups: [{ issues: ISSUES }] } satisfies IssueGroups],
   [/^\/work\/comments$/, THREADS],
+  [/^\/work\/views$/, { views: [] }],
   [
     /^\/books$/,
     { books: [{ id: HANDBOOK, path: "handbook", title: BOOK.title }] } satisfies BookList,
@@ -166,6 +170,10 @@ const READS: readonly (readonly [RegExp, unknown])[] = [
   [/^\/admin\/requests$/, REQUESTS],
   [/^\/admin\/routes$/, ROUTES],
   [/^\/admin\/webhooks$/, HOOKS],
+  [/^\/admin\/users$/, USERS],
+  [/^\/admin\/spaces$/, ADMIN_SPACES],
+  [/^\/admin\/groups$/, GROUPS],
+  [/^\/admin\/groups\/[^/]+\/members$/, { members: [] }],
   [/^\/spaces\/[^/]+\/e2e\/keys$/, { keys: [] }],
 ];
 
