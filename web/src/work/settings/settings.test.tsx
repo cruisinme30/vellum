@@ -8,7 +8,7 @@ import { Route } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Http } from "../../api/http";
-import { fakeApi, issue, renderAt, TEAM_FILE, where } from "../../test/work-fixtures";
+import { fakeApi, issue, renderAt, TEAM, TEAM_FILE, where } from "../../test/work-fixtures";
 import { createHttpWorkApi } from "../api";
 
 import { freshKey, moveWithinCategory, pruneGit, slug } from "./team-file";
@@ -49,6 +49,21 @@ describe("team settings API", () => {
     });
     await api.createTeam({ key: "OPS", name: "Ops" });
     expect(send).toHaveBeenCalledWith("POST", "/api/v1/work/teams", { key: "OPS", name: "Ops" });
+    await api.setTeamArchived("OPS", true);
+    expect(send).toHaveBeenCalledWith("POST", "/api/v1/work/teams/OPS/archive", {});
+    await api.setTeamArchived("OPS", false);
+    expect(send).toHaveBeenCalledWith("POST", "/api/v1/work/teams/OPS/restore", {});
+  });
+
+  it("lists active teams unless archived ones are asked for", async () => {
+    const get = vi.fn(() => Promise.resolve({ teams: [] }));
+    const api = createHttpWorkApi({ get, send: vi.fn() } as unknown as Http);
+    await api.teams();
+    await api.teams({ includeArchived: true });
+    expect(get.mock.calls).toEqual([
+      ["/api/v1/work/teams"],
+      ["/api/v1/work/teams", { include_archived: "true" }],
+    ]);
   });
 });
 
@@ -153,5 +168,53 @@ describe("team settings screen", () => {
     await waitFor(() => {
       expect(where()).toBe("/issues/settings?team=ENG2");
     });
+  });
+
+  it("archives a team after asking, then shows it archived with Restore", async () => {
+    let archived = false;
+    const api = fakeApi({
+      teams: vi.fn(() =>
+        Promise.resolve([
+          { ...TEAM, archived },
+          { ...TEAM, id: "t2", key: "OPS", name: "Operations" },
+        ]),
+      ),
+      setTeamArchived: vi.fn((key: string, value: boolean) => {
+        archived = value;
+        return Promise.resolve({ ...TEAM, key, archived: value });
+      }),
+    });
+    const user = renderAt("/issues/settings", api, route);
+    await user.click(await screen.findByRole("button", { name: "Archive Engineering" }));
+    const ask = screen.getByRole("group", { name: "Archive Engineering?" });
+    expect(api.setTeamArchived).not.toHaveBeenCalled();
+    await user.click(within(ask).getByRole("button", { name: "Archive team" }));
+    expect(api.setTeamArchived).toHaveBeenCalledWith("ENG", true);
+    // The screen stays on the team, now archived, with a way back.
+    expect(await screen.findByText(/Engineering is archived/)).toBeDefined();
+    expect(where()).toBe("/issues/settings?team=ENG");
+    expect(screen.getByRole("option", { name: "Engineering (archived)" })).toBeDefined();
+    await user.click(screen.getByRole("button", { name: "Restore team" }));
+    expect(api.setTeamArchived).toHaveBeenLastCalledWith("ENG", false);
+    expect(await screen.findByRole("button", { name: "Archive Engineering" })).toBeDefined();
+  });
+
+  it("hides archived teams from the picker until asked, and shows a refused archive", async () => {
+    const api = fakeApi({
+      teams: vi.fn(() =>
+        Promise.resolve([TEAM, { ...TEAM, id: "t2", key: "OLD", name: "Legacy", archived: true }]),
+      ),
+      setTeamArchived: vi.fn(() => Promise.reject(new Error("a recent sign-in is needed"))),
+    });
+    const user = renderAt("/issues/settings", api, route);
+    const picker = await screen.findByRole("combobox", { name: "Team" });
+    expect(within(picker).queryByRole("option", { name: "Legacy (archived)" })).toBeNull();
+    await user.click(screen.getByRole("checkbox", { name: "Show archived teams" }));
+    expect(within(picker).getByRole("option", { name: "Legacy (archived)" })).toBeDefined();
+
+    await user.click(screen.getByRole("button", { name: "Archive Engineering" }));
+    await user.click(screen.getByRole("button", { name: "Archive team" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("recent sign-in");
   });
 });

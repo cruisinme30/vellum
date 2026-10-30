@@ -15,8 +15,8 @@ use vellum_work::triage::{RuleActions, TriageRule};
 use vellum_work::view::{GroupBy, Layout, OrderBy, ShowClosed, View, Visibility, run};
 use vellum_work::{
     Category, Ctx, Cycle, Issue, IssueId, IssueKey, IssuePatch, NewIssue, Priority, Relation,
-    RelationKind, StatusKey, Team, TeamId, TeamKey, TriageAction, UserRef, ViewId, WorkEvent,
-    WorkGraph,
+    RelationKind, StatusKey, Team, TeamId, TeamKey, TriageAction, UserRef, ViewId, WorkError,
+    WorkEvent, WorkGraph,
 };
 
 fn user(h: &str) -> UserRef {
@@ -208,6 +208,53 @@ fn moving_keeps_the_old_identifier_as_an_alias() {
     // ENG never reuses number 1.
     let next = create(&mut g, 2, "Next", |_| {}, &c);
     assert_eq!(g.issue(&next).unwrap().key().to_string(), "ENG-2");
+}
+
+#[test]
+fn archived_teams_keep_their_issues_but_take_no_new_ones() {
+    let mut g = northstar();
+    let c = ctx(datetime!(2026-10-29 09:00 UTC), Some("dev"));
+    let kept = create(&mut g, 1, "Rotate certificates", |_| {}, &c);
+    let changes = g.set_team_archived(&tk("OPS"), true).unwrap();
+    assert!(changes.teams.contains(&tk("OPS")));
+    assert!(g.team(&tk("OPS")).unwrap().archived);
+    // Archiving twice changes nothing.
+    assert!(
+        g.set_team_archived(&tk("OPS"), true)
+            .unwrap()
+            .teams
+            .is_empty()
+    );
+
+    // No moves into it, no new issues, and no triage rule routes there.
+    let err = g.move_issue(&kept, &tk("OPS"), &c).unwrap_err();
+    assert!(matches!(&err, WorkError::ArchivedTeam(t) if t == &tk("OPS")));
+    assert_eq!(err.kind(), vellum_kernel::ErrorKind::Conflict);
+    assert!(
+        g.create_issue(NewIssue::new(id(2), tk("OPS"), "New"), &c)
+            .is_err()
+    );
+    let outsider = ctx(datetime!(2026-10-29 09:00 UTC), Some("outsider"));
+    let routed = g.create_issue(NewIssue::new(id(3), tk("ENG"), "pager fires"), &outsider);
+    assert!(matches!(routed, Err(WorkError::ArchivedTeam(_))));
+    assert!(
+        g.issue(&id(3)).is_none(),
+        "a refused issue leaves nothing behind"
+    );
+    assert_eq!(g.team(&tk("ENG")).unwrap().last_number, 1);
+
+    // Archiving ENG keeps its issue readable and editable where it is.
+    let _ = g.set_team_archived(&tk("ENG"), true).unwrap();
+    assert_eq!(g.resolve("ENG-1").unwrap().id, kept);
+
+    // Restored, it takes issues again.
+    let _ = g.set_team_archived(&tk("OPS"), false).unwrap();
+    let _ = g.move_issue(&kept, &tk("OPS"), &c).unwrap();
+    assert_eq!(g.issue(&kept).unwrap().key().to_string(), "OPS-1");
+    assert!(matches!(
+        g.set_team_archived(&tk("NOPE"), true),
+        Err(WorkError::UnknownTeam(_))
+    ));
 }
 
 #[test]

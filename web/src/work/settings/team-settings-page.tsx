@@ -6,6 +6,7 @@
  * triage rules, SLAs, estimates and Git mapping. The screen edits the
  * team's settings file as JSON and saves it whole through
  * `PUT /v1/work/teams/{team}`, which validates it before anything changes.
+ * Teams are archived and restored here too (#538, D303).
  */
 
 import { useState, type ComponentProps } from "react";
@@ -19,6 +20,7 @@ import type { IssueOut, TeamOut, WorkApi } from "../api";
 import { fieldText } from "../form";
 import { TeamPicker, useTeam, useWorkKeys, WorkNav } from "../nav";
 
+import { ArchiveSection } from "./archive";
 import { SlaSection, TriageSection } from "./rules";
 import { CyclesSection, EstimatesSection, GeneralSection, GitSection } from "./sections";
 import { StatusesSection, type Moves } from "./statuses";
@@ -163,27 +165,48 @@ function Editor({
   );
 }
 
-function TeamEditor({ api, team }: { readonly api: WorkApi; readonly team: TeamOut }) {
+function TeamEditor({
+  api,
+  team,
+  onArchived,
+}: {
+  readonly api: WorkApi;
+  readonly team: TeamOut;
+  readonly onArchived: (key: string) => void;
+}) {
   const [version, setVersion] = useState(0);
   const [saved, setSaved] = useState(false);
   useWorkKeys(team.key);
-  const loaded = useLoaded(() => api.teamSettings(team.key), [api, team.key, version], failureText);
+  const loaded = useLoaded(
+    () => api.teamSettings(team.key),
+    [api, team.key, team.archived, version],
+    failureText,
+  );
   return (
-    <Ready loaded={loaded}>
-      {(file) => (
-        <Editor
-          key={`${team.key}:${String(version)}`}
-          api={api}
-          team={team}
-          initial={file}
-          justSaved={saved}
-          onSaved={() => {
-            setSaved(true);
-            setVersion((v) => v + 1);
-          }}
-        />
-      )}
-    </Ready>
+    <>
+      <Ready loaded={loaded}>
+        {(file) => (
+          <Editor
+            key={`${team.key}:${String(team.archived)}:${String(version)}`}
+            api={api}
+            team={team}
+            initial={file}
+            justSaved={saved}
+            onSaved={() => {
+              setSaved(true);
+              setVersion((v) => v + 1);
+            }}
+          />
+        )}
+      </Ready>
+      <ArchiveSection
+        api={api}
+        team={team}
+        onChanged={() => {
+          onArchived(team.key);
+        }}
+      />
+    </>
   );
 }
 
@@ -278,24 +301,44 @@ function NewTeam({
 function TeamList({
   api,
   teams,
+  showArchived,
+  onShowArchived,
   onCreated,
+  onArchived,
 }: {
   readonly api: WorkApi;
   readonly teams: readonly TeamOut[];
+  readonly showArchived: boolean;
+  readonly onShowArchived: (show: boolean) => void;
   readonly onCreated: (key: string) => void;
+  readonly onArchived: (key: string) => void;
 }) {
   const t = useT();
   const team = useTeam(teams);
+  const named = teams.map((each) =>
+    each.archived ? { ...each, name: t("team-settings-archived-name", { name: each.name }) } : each,
+  );
+  const picked = named.find((each) => each.key === team?.key);
   return (
     <>
       <div className="vl-work-filters">
-        {team !== undefined && <TeamPicker teams={teams} team={team} reset />}
+        {picked !== undefined && <TeamPicker teams={named} team={picked} reset />}
+        <label className="vl-work-field">
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={(event) => {
+              onShowArchived(event.target.checked);
+            }}
+          />
+          {t("team-settings-show-archived")}
+        </label>
         <NewTeam api={api} onCreated={onCreated} />
       </div>
       {team === undefined ? (
         <p className="vl-muted">{t("issues-no-teams")}</p>
       ) : (
-        <TeamEditor key={team.key} api={api} team={team} />
+        <TeamEditor key={team.key} api={api} team={team} onArchived={onArchived} />
       )}
     </>
   );
@@ -303,15 +346,25 @@ function TeamList({
 
 function Teams({ api }: { readonly api: WorkApi }) {
   const [version, setVersion] = useState(0);
-  const [, setParameters] = useSearchParams();
-  const loaded = useLoaded(() => api.teams(), [api, version], failureText);
+  const [showArchived, setShowArchived] = useState(false);
+  const [parameters, setParameters] = useSearchParams();
+  // A team opened by its address stays reachable once archived.
+  const loaded = useLoaded(() => api.teams({ includeArchived: true }), [api, version], failureText);
+  const wanted = parameters.get("team");
   return (
     <Ready loaded={loaded}>
-      {(teams) => (
+      {(all) => (
         <TeamList
           api={api}
-          teams={teams}
+          teams={all.filter((team) => showArchived || !team.archived || team.key === wanted)}
+          showArchived={showArchived}
+          onShowArchived={setShowArchived}
           onCreated={(key) => {
+            setParameters({ team: key }, { replace: true });
+            setVersion((v) => v + 1);
+          }}
+          onArchived={(key) => {
+            // Stay on the team: archived, it shows with Restore.
             setParameters({ team: key }, { replace: true });
             setVersion((v) => v + 1);
           }}

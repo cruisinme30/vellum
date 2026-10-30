@@ -56,6 +56,7 @@ async function fakeWork(page: Page) {
     cycles: file["cycles"] !== undefined,
     labels: [],
     templates: [],
+    archived: file["archived"] === true,
   });
   const standard = (key: string, name: string, members: string[]): File => ({
     id: `id-${key}`,
@@ -86,22 +87,36 @@ async function fakeWork(page: Page) {
     teams.set(key, file);
     return outOf(file);
   };
+  /** The team list; archived teams only when asked for (D303). */
+  const list = (url: URL) => {
+    const all = url.searchParams.get("include_archived") === "true";
+    const listed = [...teams.values()].filter((file) => all || file["archived"] !== true);
+    return { teams: listed.map((file) => outOf(file)) };
+  };
+  /** Archives or restores a team, for `POST /teams/KEY/archive|restore`. */
+  const archive = (method: string, path: string) => {
+    const match = /^\/teams\/([A-Z0-9]+)\/(archive|restore)$/.exec(path);
+    const file = match === null ? undefined : teams.get(match[1] ?? "");
+    if (method !== "POST" || match === null || file === undefined) return;
+    file["archived"] = match[2] === "archive";
+    return outOf(file);
+  };
+  /** Saves a team's settings file, for `PUT /teams/KEY`. */
+  const put = (method: string, path: string, body: Record<string, unknown> | null) => {
+    if (method !== "PUT" || !/^\/teams\/[A-Z0-9]+$/.test(path)) return;
+    // The server parses the YAML text; the screen sends JSON, which is YAML.
+    const file = JSON.parse(String(body?.["yaml"])) as File;
+    teams.set(file.key, file);
+    return outOf(file);
+  };
   /** The answer for one request, or `undefined` for "not found". */
   const answer = (method: string, url: URL, body: Record<string, unknown> | null): unknown => {
     const path = url.pathname.replace("/api/v1/work", "");
-    if (path === "/teams") {
-      return method === "POST"
-        ? create(body ?? {})
-        : { teams: [...teams.values()].map((file) => outOf(file)) };
-    }
+    if (path === "/teams") return method === "POST" ? create(body ?? {}) : list(url);
+    const changed = archive(method, path) ?? put(method, path, body);
+    if (changed !== undefined) return changed;
     const settings = /^\/teams\/([A-Z0-9]+)\/settings$/.exec(path);
     if (settings !== null) return { settings: teams.get(settings[1] ?? ""), yaml: "" };
-    if (/^\/teams\/[A-Z0-9]+$/.test(path) && method === "PUT") {
-      // The server parses the YAML text; the screen sends JSON, which is YAML.
-      const file = JSON.parse(String(body?.["yaml"])) as File;
-      teams.set(file.key, file);
-      return outOf(file);
-    }
     if (path === "/issues")
       return { groups: columns(teams.get(url.searchParams.get("team") ?? "")) };
     return path === "/views" ? { views: [] } : undefined;
@@ -158,4 +173,30 @@ test("a new team gets a status, a one-week cycle and an SLA, and the board shows
   // The board has a column for the new status.
   await page.goto("/issues?team=ENG2&layout=board");
   await expect(page.getByRole("region", { name: "In Review" })).toBeVisible();
+});
+
+test("an admin archives a team after confirming, and restores it", async ({ page }) => {
+  await signedIn(page);
+  const teams = await fakeWork(page);
+  await page.goto("/issues/settings");
+  await expect(page.getByRole("textbox", { name: "Name", exact: true })).toHaveValue("Engineering");
+
+  await page.getByRole("button", { name: "Archive Engineering" }).click();
+  const ask = page.getByRole("group", { name: "Archive Engineering?" });
+  await expect(ask).toBeVisible();
+  const axe = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+    .analyze();
+  expect(axe.violations).toEqual([]);
+  await ask.getByRole("button", { name: "Archive team" }).click();
+
+  await expect(page.getByText("Engineering is archived.")).toBeVisible();
+  await expect(page).toHaveURL(/team=ENG/);
+  expect(teams.get("ENG")?.["archived"]).toBe(true);
+  await expect(page.getByRole("combobox", { name: "Team" })).toHaveValue("ENG");
+  await expect(page.getByRole("option", { name: "Engineering (archived)" })).toBeAttached();
+
+  await page.getByRole("button", { name: "Restore team" }).click();
+  await expect(page.getByRole("button", { name: "Archive Engineering" })).toBeVisible();
+  expect(teams.get("ENG")?.["archived"]).toBe(false);
 });
