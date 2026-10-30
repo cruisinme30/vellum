@@ -19,8 +19,8 @@ docker run -d --name vellum \
   ghcr.io/cruisinme30/vellum:1
 ```
 
-Put a reverse proxy that terminates TLS in front, or pass `--acme` and
-publish port 443 instead.
+Put a reverse proxy that terminates TLS in front, or set
+`VELLUM_TLS=acme` and publish port 443 instead.
 
 ## Health checks {#health}
 

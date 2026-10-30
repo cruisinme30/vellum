@@ -516,12 +516,12 @@ SPDX-License-Identifier: AGPL-3.0-only
           <li class="step">
             <h3>Start it</h3>
             <p>Point it at a folder, open <code>http://127.0.0.1:7700</code> and create the first account.</p>
-            <pre class="code" tabindex="0" aria-label="Start Vellum with a data folder"><code>vellum serve --data-dir ~/vellum</code></pre>
+            <pre class="code" tabindex="0" aria-label="Start Vellum with a data folder"><code>VELLUM_DATA_DIR=~/vellum vellum serve</code></pre>
           </li>
           <li class="step">
             <h3>Invite your team</h3>
             <p>Add sign-in with your company's single sign-on, then connect Claude if you like.</p>
-            <pre class="code" tabindex="0" aria-label="Connect Claude Code to Vellum"><code>claude mcp add vellum -- vellum mcp</code></pre>
+            <pre class="code" tabindex="0" aria-label="Connect Claude Code to Vellum"><code>claude mcp add --transport http vellum http://127.0.0.1:7700/mcp</code></pre>
           </li>
         </ol>
         <div class="today">

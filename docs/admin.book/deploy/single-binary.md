@@ -47,11 +47,12 @@ with a CycloneDX software bill of materials.
 ## Run {#run}
 
 ```bash
-vellum serve --data-dir ~/vellum
+VELLUM_DATA_DIR=~/vellum vellum serve
 ```
 
 Vellum listens on `127.0.0.1:7700` and creates the data folder on first
-start. Open `http://127.0.0.1:7700` and create the first account; it
+start. Without `VELLUM_DATA_DIR` it uses `vellum-data` in the current
+folder. Open `http://127.0.0.1:7700` and create the first account; it
 becomes the workspace owner. The same address serves the web app and
 the API under `/api`, so there is nothing else to host.
 
@@ -59,7 +60,7 @@ To serve other people, give Vellum a public address and let it get a
 certificate:
 
 ```bash
-VELLUM_BIND=0.0.0.0:443 VELLUM_PUBLIC_URL=https://vellum.northstar.dev vellum serve --acme
+VELLUM_BIND=0.0.0.0:443 VELLUM_PUBLIC_URL=https://vellum.northstar.dev VELLUM_TLS=acme vellum serve
 ```
 
 ## Run as a service {#service}
