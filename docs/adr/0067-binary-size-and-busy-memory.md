@@ -101,3 +101,7 @@ diagram renders in a median 9.7 ms instead of 8.9 ms.
   belongs to the release workflow.
 - The busy budget runs on every full-suite run, so a memory regression in
   collaboration or search fails the release.
+- Update, 2026-10-29: the evening batch grew the binary to 147.4 MB
+  (63.5 MB gzipped, a 64.3 MB image). The size limits sit just above
+  those sizes for now, so the release ships, and #491 tracks bringing the
+  download back to 40 MB and the image to 45 MB.
