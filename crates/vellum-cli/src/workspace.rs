@@ -566,6 +566,8 @@ struct Feeds {
     rows: Option<Arc<dyn IndexFeed>>,
     /// Page text saved through the API, for live editing rooms.
     pages: Option<Arc<dyn vellum_drive::PageWrites>>,
+    /// Checks page text before the drive writes it (secret scanning).
+    content: Option<Arc<dyn vellum_drive::ContentCheck>>,
     /// Which spaces are private: the e2e service changes it, the store's
     /// guard enforces it.
     private: vellum_e2e::PrivateRoots,
@@ -584,11 +586,15 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
     let drive_access: Arc<dyn vellum_drive::Access> = Arc::new(
         vellum_drive::authz::AuthzAccess::new(Arc::clone(authz), Arc::clone(&index)),
     );
-    let drive = Arc::new(Drive::new(
+    let mut drive = Drive::new(
         Arc::clone(&store),
         Arc::clone(&index),
         Arc::clone(&drive_access),
-    ));
+    );
+    if let Some(check) = feeds.content.clone() {
+        drive = drive.with_content_check(check);
+    }
+    let drive = Arc::new(drive);
     let e2e = Arc::new(crate::e2e::service(&store, &index, drive_access).with_roots(feeds.private));
     let lookup = Arc::clone(spaces);
     let space_of: vellum_collections::service::SpaceOf =
@@ -945,6 +951,7 @@ pub async fn open(
     notify: &Arc<NotifyStore>,
     webhooks: &Arc<Webhooks<SafeTransport>>,
     app_origin: &str,
+    secrets: &Arc<crate::secrets::SecretGuard>,
     var: impl Fn(&str) -> Option<String> + Send + Sync,
 ) -> Result<Opened, Error> {
     let setup = TasksSetup::new(identity, Some(&config.data_dir), &var);
@@ -983,6 +990,7 @@ pub async fn open(
             events,
             rows: Some(rows),
             pages: Some(Arc::clone(&live_pages) as Arc<dyn vellum_drive::PageWrites>),
+            content: Some(Arc::clone(secrets) as Arc<dyn vellum_drive::ContentCheck>),
             private: roots,
         },
         setup,
@@ -1040,7 +1048,9 @@ pub async fn open(
         events.clone(),
     );
     task_jobs(&replica, &workspace.tasks, notify, &config.data_dir)?;
-    workspace.services.push(Arc::new(Storage::new(store, !local)));
+    workspace
+        .services
+        .push(Arc::new(Storage::new(store, !local)));
     Ok(Opened {
         services: workspace.services,
         hooks,
@@ -1082,6 +1092,7 @@ pub async fn describe(
             events: Arc::new(TracingSink),
             rows: None,
             pages: None,
+            content: None,
             private: vellum_e2e::PrivateRoots::default(),
         },
         setup,

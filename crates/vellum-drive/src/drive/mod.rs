@@ -32,7 +32,7 @@ use vellum_store::{BlobPath, BlobStore, StoreError};
 use crate::error::{DriveError, DriveResult};
 use crate::layout;
 use crate::model::{Activity, ActivityKind, Node, NodeKind, Space};
-use crate::ports::{Access, Clock, DriveIndex, Permission, SystemClock};
+use crate::ports::{Access, Clock, ContentCheck, DriveIndex, Permission, SystemClock};
 
 pub use content::{SaveOutcome, Saved};
 pub use create::MY_DRIVE_NAME;
@@ -52,6 +52,7 @@ pub struct Drive {
     access: Arc<dyn Access>,
     clock: Arc<dyn Clock>,
     metrics: Metrics,
+    check: Option<Arc<dyn ContentCheck>>,
 }
 
 #[derive(Debug, Clone)]
@@ -102,6 +103,32 @@ impl Drive {
             access,
             clock,
             metrics: Metrics::new(),
+            check: None,
+        }
+    }
+
+    /// Checks every page text before it is written (R-SE-6).
+    #[must_use]
+    pub fn with_content_check(mut self, check: Arc<dyn ContentCheck>) -> Self {
+        self.check = Some(check);
+        self
+    }
+
+    /// Runs the content check, if there is one, on page text `bytes`.
+    async fn check_content(
+        &self,
+        actor: &Actor,
+        space: SpaceId,
+        path: &BlobPath,
+        bytes: &[u8],
+    ) -> DriveResult<()> {
+        match &self.check {
+            Some(check) => {
+                check
+                    .check(actor, space, path, &String::from_utf8_lossy(bytes))
+                    .await
+            }
+            None => Ok(()),
         }
     }
 

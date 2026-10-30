@@ -39,7 +39,18 @@ pub fn status_of(kind: ErrorKind) -> StatusCode {
 impl IntoResponse for ErrorResponse {
     fn into_response(self) -> Response {
         let kind = self.error.kind();
-        let status = status_of(kind);
+        // A save refused for the secrets in it (R-SE-6): the request was
+        // well formed, its content is what cannot be accepted.
+        let status = if kind == ErrorKind::InvalidInput
+            && self
+                .error
+                .message()
+                .starts_with(vellum_security::secrets::SECRETS_FOUND)
+        {
+            StatusCode::UNPROCESSABLE_ENTITY
+        } else {
+            status_of(kind)
+        };
         if kind == ErrorKind::Internal {
             tracing::error!(error = %self.error, source = ?std::error::Error::source(&self.error), "internal error");
         } else {

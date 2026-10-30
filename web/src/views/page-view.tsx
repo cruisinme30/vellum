@@ -111,7 +111,7 @@ export function PageView() {
   const { store, collab } = useServices();
   const workspace = useWorkspace();
   const pageHistory = usePageHistory(pageId);
-  const { work } = useServerApis();
+  const { work, drive } = useServerApis();
   const chips = useChipSources();
   const page = workspace.pages.find((p) => p.id === pageId);
   const trail = useMemo(() => ancestors(workspace.pages, pageId), [workspace.pages, pageId]);
@@ -242,6 +242,7 @@ export function PageView() {
             work={work}
             me={workspace.me.handle}
             chips={chips}
+            scanSecrets={drive?.scanSecrets}
           />
           {pageHistory.panel}
         </>

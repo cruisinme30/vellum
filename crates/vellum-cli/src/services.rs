@@ -71,6 +71,8 @@ pub struct Services {
     mcp_workspace: Option<Arc<dyn vellum_mcp::ports::Workspace>>,
     /// Where MCP calls are audited.
     audit: Arc<crate::mcp_serve::AuditTrail>,
+    /// Secret scanning on save, following the admin settings (D296).
+    secrets: Arc<crate::secrets::SecretGuard>,
 }
 
 impl std::fmt::Debug for Services {
@@ -167,6 +169,7 @@ impl Services {
             mcp: None,
             mcp_workspace: None,
             audit: Arc::default(),
+            secrets: Arc::default(),
         })
     }
 
@@ -194,6 +197,7 @@ impl Services {
         let (sampler, facts) = observability::counted(config, counts);
         observability::spawn_sampling(sampler);
         self.audit.attach(service.audit_log());
+        self.secrets.attach(Arc::clone(&service));
         observability::spawn_ticks(Arc::clone(&service), Arc::clone(&facts));
         self.admin = Some(observability::api(service, facts));
         self.observability = observability;
@@ -216,6 +220,7 @@ impl Services {
             self.notify.store(),
             &self.webhooks,
             &self.origin,
+            &self.secrets,
             var,
         )
         .await?;
@@ -302,6 +307,9 @@ impl Services {
             Arc::clone(&self.notify) as Arc<dyn Service>,
             Arc::new(WebhooksService::new(Arc::clone(&self.webhooks))),
         ];
+        all.push(Arc::new(crate::secrets::SecretsService::new(Arc::clone(
+            &self.secrets,
+        ))));
         all.extend(self.workspace.iter().cloned());
         all.extend(self.admin.iter().cloned());
         all

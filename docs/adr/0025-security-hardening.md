@@ -11,9 +11,9 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D103, D104, D105
+- Decisions: D103, D104, D105, D296
 - Issues: [#60](https://github.com/cruisinme30/vellum/issues/60) (outbound fetches), [#61](https://github.com/cruisinme30/vellum/issues/61) (uploads),
-  [#62](https://github.com/cruisinme30/vellum/issues/62) (secret scanning), [#186](https://github.com/cruisinme30/vellum/issues/186) (E2E private spaces)
+  [#62](https://github.com/cruisinme30/vellum/issues/62) (secret scanning), [#527](https://github.com/cruisinme30/vellum/issues/527) (secret scanning on save), [#186](https://github.com/cruisinme30/vellum/issues/186) (E2E private spaces)
 - Pull requests: #221
 
 :::
@@ -88,6 +88,18 @@ one place, and services call it.
   `SpaceMode::allows`. The desktop app runs search and MCP for those
   spaces locally.
 
+### D296: every page write is scanned for secrets, under an admin policy
+
+- The drive runs a `ContentCheck` before it creates or saves a page, so
+  the REST API, live editing, model drafts and any import that writes
+  through the drive are covered.
+  `vellum serve` plugs in secret scanning under Admin → Settings →
+  Security: `warn` (default) saves and audits, `block` refuses with a
+  `422` naming kind and line, `off` scans nothing.
+- The allow-list takes a rule id (`jwt`) or text the secret contains.
+  `security.scan_secrets` gives the editor its banner, with Remove and
+  It's not a secret. Errors, audit records and logs never hold the value.
+
 ## Alternatives
 
 - **Each service builds its own HTTP client**: DNS rebinding and
@@ -96,6 +108,8 @@ one place, and services call it.
   space.
 - **A shared space key wrapped per member**: removing a member re-keys
   the whole space; per-document recipients touch only headers.
+- **Scanning in each write path**: live editing, models and imports
+  would each need their own call; one drive seam cannot be skipped.
 
 ## Consequences
 

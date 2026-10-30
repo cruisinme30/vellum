@@ -14,7 +14,7 @@ use std::collections::BTreeSet;
 use std::fmt;
 
 use async_trait::async_trait;
-use vellum_kernel::{ObjectId, SpaceId, Timestamp, UserId, VersionId};
+use vellum_kernel::{Actor, ObjectId, SpaceId, Timestamp, UserId, VersionId};
 use vellum_store::BlobPath;
 
 use crate::error::DriveResult;
@@ -125,6 +125,23 @@ pub trait Access: Send + Sync + fmt::Debug {
     /// Every group `user` belongs to right now, nested groups included,
     /// by group ID. Book sections restricted to `group:<ID>` use it.
     async fn groups_of(&self, user: UserId) -> DriveResult<BTreeSet<ObjectId>>;
+}
+
+/// A check on page text before it is written, such as secret scanning
+/// (R-SE-6). It sees every page the drive creates or saves, whoever
+/// writes it: the REST API, live editing, models and imports.
+#[async_trait]
+pub trait ContentCheck: Send + Sync + fmt::Debug {
+    /// Checks `text`, about to be written by `actor` to the page at `path`
+    /// in `space`. An error refuses the write and is returned to the
+    /// writer, so it must not quote the text.
+    async fn check(
+        &self,
+        actor: &Actor,
+        space: SpaceId,
+        path: &BlobPath,
+        text: &str,
+    ) -> DriveResult<()>;
 }
 
 /// The source of the current time, replaceable in tests.

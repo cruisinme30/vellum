@@ -37,7 +37,7 @@ fn mcp(token: Option<&str>, method: &str, params: &Value) -> Request<Body> {
     b.body(Body::from(body.to_string())).unwrap()
 }
 
-async fn tool(app: &Router, token: &str, name: &str, args: Value) -> Reply {
+pub async fn tool(app: &Router, token: &str, name: &str, args: Value) -> Reply {
     send(
         app,
         mcp(
@@ -60,7 +60,7 @@ fn structured(reply: &Reply) -> Value {
 }
 
 /// A server over a fresh plaintext workspace.
-async fn server(dir: &std::path::Path) -> (Services, Router) {
+pub async fn server(dir: &std::path::Path) -> (Services, Router) {
     let mut config = vellum_kernel::Config::default();
     config.data_dir = dir.to_path_buf();
     let services = Services::open(ORIGIN, Some(dir), None)
@@ -84,15 +84,15 @@ async fn server(dir: &std::path::Path) -> (Services, Router) {
 /// A signed-in admin with a shared drive `eng` holding one page, and a
 /// personal token for MCP: the session cookie, its CSRF token, the page's
 /// ID and the bearer token.
-struct World {
-    cookie: String,
-    csrf: String,
-    page_id: String,
-    bearer: String,
+pub struct World {
+    pub cookie: String,
+    pub csrf: String,
+    pub page_id: String,
+    pub bearer: String,
 }
 
 impl World {
-    fn post(&self, path: &str, body: &Value) -> Request<Body> {
+    pub fn post(&self, path: &str, body: &Value) -> Request<Body> {
         finish(
             json_request("POST", path, body)
                 .header(header::COOKIE, &self.cookie)
@@ -101,7 +101,7 @@ impl World {
     }
 }
 
-async fn world(app: &Router) -> World {
+pub async fn world(app: &Router) -> World {
     let cookie = signed_in_admin(app).await;
     let mut w = World {
         csrf: csrf(app, &cookie).await,
