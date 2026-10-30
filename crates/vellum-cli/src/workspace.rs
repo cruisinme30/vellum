@@ -59,7 +59,6 @@ use crate::cluster::Replica;
 use crate::collab::{Collab, LivePages};
 use crate::feed::{AnnouncingStore, Caches};
 use crate::google_http::{self, Endpoints, FileLinks, GoogleHttp};
-use crate::identity::IdentityAuthenticator;
 use crate::page_render::{Handles, PageRenderService};
 use crate::reindex::{KEY_VAR, key_bytes};
 use crate::tasks::{DriveTasks, Parts, TasksSettings};
