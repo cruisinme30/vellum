@@ -45,6 +45,21 @@ impl PostgresBackend {
         migrator.run(&pool).await?;
         Ok(Self { pool })
     }
+
+    /// Documents with a block that has no embedding: the ones to embed
+    /// when hybrid search is turned on over an existing index.
+    ///
+    /// # Errors
+    /// Database failures.
+    pub async fn docs_without_vectors(&self) -> Result<Vec<DocId>> {
+        let rows =
+            sqlx::query("SELECT DISTINCT doc_id FROM vellum_search.blocks WHERE embedding IS NULL")
+                .fetch_all(&self.pool)
+                .await?;
+        rows.iter()
+            .map(|row| Ok(DocId::from(row.try_get::<Uuid, _>("doc_id")?)))
+            .collect()
+    }
 }
 
 /// Splits a query into positive terms, quoted phrases and negated terms,

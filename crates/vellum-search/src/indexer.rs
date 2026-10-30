@@ -270,6 +270,33 @@ pub async fn rebuild(
     .await
 }
 
+/// Indexes `docs` again without emptying the index first, `batch` at a
+/// time, logging progress as it goes. Used to add embeddings to documents
+/// indexed before hybrid search was turned on.
+///
+/// # Errors
+/// Source or backend failures; the documents done so far stay done.
+pub async fn reindex(
+    service: &SearchService,
+    source: &dyn DocumentSource,
+    docs: &[DocId],
+    batch: usize,
+) -> Result<usize> {
+    let span = tracing::info_span!("search.reindex", search.engine = service.engine());
+    async {
+        let total = docs.len();
+        let mut done = 0;
+        for chunk in docs.chunks(batch.max(1)) {
+            index_batch(service, source, chunk).await?;
+            done += chunk.len();
+            tracing::info!(done, total, "search: indexing again");
+        }
+        Ok(done)
+    }
+    .instrument(span)
+    .await
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;

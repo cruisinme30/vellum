@@ -87,7 +87,7 @@ holder = "identity (#523)"
 
 [[reservation]]
 decisions = "D295-D296"
-holder = "#526 and #527"
+holder = "serve wiring: llms.txt and hybrid search (#526, ADR 0011), secret scanning (#527, ADR 0025)"
 
 [[reservation]]
 decisions = "D297"

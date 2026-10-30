@@ -62,6 +62,9 @@ const OPS: [&str; 14] = [
 /// How long one service call may take.
 const BUDGET: Duration = Duration::from_secs(30);
 
+/// Most pages listed in `llms.txt` and the sitemap.
+const LISTED_PAGES: usize = 5_000;
+
 /// Most activity entries read per space for `list_changes`.
 const ACTIVITY_PER_SPACE: usize = 500;
 
@@ -775,6 +778,14 @@ impl Workspace for ServeWorkspace {
     async fn get_doc_by_path(&self, actor: &Actor, path: &str) -> Result<Document, WorkspaceError> {
         let caller = Caller::of(actor)?;
         let not_found = || WorkspaceError::NotFound(path.to_owned());
+        // The app's own page URL, `/p/{id}`.
+        if let Some(id) = path
+            .strip_prefix("/p/")
+            .map(|rest| rest.trim_end_matches('/'))
+            .filter(|id| !id.is_empty() && !id.contains('/'))
+        {
+            return self.get_doc(actor, id).await;
+        }
         let (slug, rest) = path
             .trim_start_matches('/')
             .split_once('/')
@@ -1290,9 +1301,10 @@ impl Workspace for ServeWorkspace {
             // Nothing is public through MCP: public pages have their own site.
             return Ok(ListingPage::default());
         };
-        let mut items: Vec<Listing> = self
-            .spaces(&caller)
-            .await?
+        let spaces = self.spaces(&caller).await?;
+        let slugs: HashMap<SpaceId, String> =
+            spaces.iter().map(|s| (s.id, s.slug.clone())).collect();
+        let mut items: Vec<Listing> = spaces
             .into_iter()
             .map(|s| Listing {
                 uri: format!("vellum://space/{}/tree", s.slug),
@@ -1302,6 +1314,26 @@ impl Workspace for ServeWorkspace {
                 space: s.slug,
             })
             .collect();
+        // Every page the caller may view, newest first (D295).
+        let pages = self
+            .drive
+            .find(
+                &caller.model(),
+                &vellum_drive::Filter {
+                    kinds: vec![NodeKind::Page],
+                    ..vellum_drive::Filter::default()
+                },
+                LISTED_PAGES,
+            )
+            .await
+            .map_err(write_err)?;
+        items.extend(pages.into_iter().map(|node| Listing {
+            uri: format!("vellum://doc/{}", node.id),
+            title: node.title.clone(),
+            description: None,
+            url: self.page_url(node.id),
+            space: slugs.get(&node.space).cloned().unwrap_or_default(),
+        }));
         if let Ok(books) = self.call(&caller, "books.list", json!({})).await {
             for b in books
                 .get("books")
