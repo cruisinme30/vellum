@@ -11,8 +11,8 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D267, D268, D269, D270
-- Issue: #191, #74
+- Decisions: D267, D268, D269, D270, D299
+- Issue: #191, #74, #528
 - Pull requests: to be linked when merged
 
 :::
@@ -73,6 +73,16 @@ re-homing under load had no test, and every page read rendered again.
 - Only the page render opts in. Other answers keep no cache headers, so
   nothing sensitive lands in a browser cache by default.
 
+### D299: the nightly measures what the brief promises
+
+- Reads go through the render route on 50-block Northstar pages: a hot
+  set and random pages at 2,000 reads/s; more than 1 % dropped fails.
+- `render_cold` saves a page, then times its first render (p95 300 ms).
+- `keystroke`: pairs of editors on two replicas; one types a stamped Yjs
+  update every 200 ms, the other times its arrival (p95 200 ms).
+- A nightly job runs the 30-page PDF test with `--release` (p95 3 s).
+- The new numbers join the summary, so the 10 % gate covers them (#528).
+
 ## Alternatives
 
 - **A polling status endpoint**: every open tab would poll the probes;
@@ -82,6 +92,8 @@ re-homing under load had no test, and every page read rendered again.
   replica's first read the only render.
 - **One cache shared by all replicas**: adds a service and a network hop
   for something every replica can rebuild in one render.
+- **Yjs inside k6**: k6 cannot load it; the probe writes the bytes of one
+  insert by hand into a root the editor ignores, checked against Yjs.
 - **An `ETag` on every GET**: would let browsers keep answers such as token
   lists; opt-in keeps the default conservative.
 

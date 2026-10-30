@@ -9,16 +9,21 @@
 // With BASE_URLS, requests take turns over the replicas. TOKEN, EMAIL and
 // PASSWORD are as in session.js.
 //
-// Scenarios mirror the brief's targets: 2,000 reads/s split between cached
-// and uncached pages, writes, and 50 concurrent editing sessions. The
-// thresholds are the SLOs; `cargo xtask perf-gate` separately fails the run
-// when any p95 grows 10 % or more over deploy/perf/baseline.json.
+// Scenarios mirror the brief's targets (#528, ADR 0022 D299): 2,000 reads/s
+// of rendered 50-block pages, split between a hot set and the rest; cold
+// renders right after a save; writes; and 50 editing sessions in pairs on
+// different replicas, timing each keystroke until the other editor sees
+// it. The thresholds are the SLOs, and k6 may drop no more than 1 % of the
+// reads it was asked to send; `cargo xtask perf-gate` separately fails the
+// run when any p95 grows 10 % or more over recent nights.
 
 import http from 'k6/http';
 import { check, fail } from 'k6';
 import { WebSocket } from 'k6/websockets';
 import { Trend } from 'k6/metrics';
-import { setTimeout } from 'k6/timers';
+import { clearInterval, setInterval, setTimeout } from 'k6/timers';
+import { insertUpdate, stamp, stampsIn, updateFrame } from './keystroke.js';
+import { northstarPage } from './pages.js';
 import { routes } from './routes.js';
 import { base, bases, createPage, savePage, signIn, space } from './session.js';
 import { summarise } from './summary.js';
@@ -28,6 +33,16 @@ const SCALE = Number(__ENV.SCALE || 1);
 const DURATION = __ENV.DURATION || '5m';
 
 const collabSync = new Trend('collab_sync', true);
+const keystroke = new Trend('keystroke', true);
+const renderCold = new Trend('render_cold', true);
+
+// Pairs of editors (two sessions each), pages kept for cold renders, and
+// the reads k6 may fail to send before the 2,000 reads/s claim is false.
+const PAIRS = Math.max(1, Math.round(25 * SCALE));
+const COLD_PAGES = 50;
+const seconds = (d) => Number(d.slice(0, -1)) * { s: 1, m: 60, h: 3600 }[d.slice(-1)];
+const READ_RATE = 2000 * SCALE;
+const MAX_DROPPED = Math.max(1, Math.ceil(0.01 * READ_RATE * seconds(DURATION)));
 
 export const options = {
   discardResponseBodies: false,
@@ -56,10 +71,24 @@ export const options = {
       duration: DURATION,
       preAllocatedVUs: 50,
     },
+    render_cold: {
+      executor: 'constant-arrival-rate',
+      exec: 'renderAfterSave',
+      rate: Math.max(1, Math.round(10 * SCALE)),
+      timeUnit: '1s',
+      duration: DURATION,
+      preAllocatedVUs: 20,
+    },
     collab_sync: {
       executor: 'constant-vus',
       exec: 'collab',
       vus: Math.max(1, Math.round(50 * SCALE)),
+      duration: DURATION,
+    },
+    keystroke: {
+      executor: 'constant-vus',
+      exec: 'keystrokes',
+      vus: PAIRS,
       duration: DURATION,
     },
   },
@@ -67,7 +96,11 @@ export const options = {
     'http_req_duration{scenario:read_cached}': ['p(95)<50', 'p(99)<120'],
     'http_req_duration{scenario:read_uncached}': ['p(95)<150'],
     'http_req_duration{scenario:write}': ['p(95)<150'],
+    render_cold: ['p(95)<300'],
     collab_sync: ['p(95)<200'],
+    keystroke: ['p(95)<200'],
+    'dropped_iterations{scenario:read_cached}': [`count<${MAX_DROPPED}`],
+    'dropped_iterations{scenario:read_uncached}': [`count<${MAX_DROPPED}`],
     http_req_failed: ['rate<0.001'],
   },
 };
@@ -85,30 +118,58 @@ export function setup() {
   const spaceId = space(bases[0], headers);
   const ids = [];
   for (let i = 0; i < PAGES; i += 1) {
-    const body = `# Northstar load page ${i}\n\nSeeded by the nightly load test.\n`;
-    ids.push(createPage(base(i), headers, spaceId, `Northstar load page ${i}`, body));
+    ids.push(createPage(base(i), headers, spaceId, `Northstar handbook ${i}`, northstarPage(i)));
   }
-  return { headers, spaceId, ids };
+  const cold = [];
+  for (let i = 0; i < COLD_PAGES; i += 1) {
+    cold.push(createPage(base(i), headers, spaceId, `Northstar cold ${i}`, northstarPage(i)));
+  }
+  const rooms = [];
+  for (let i = 0; i < PAIRS; i += 1) {
+    rooms.push(createPage(base(i), headers, spaceId, `Northstar pairing ${i}`, '# Pairing\n'));
+  }
+  return { headers, spaceId, ids, cold, rooms };
 }
 
 const pick = (ids) => ids[Math.floor(Math.random() * ids.length)];
 const server = () => base(__VU + __ITER);
 
-// The hot set: the same few pages, served from the render cache.
+// The hot set: the same few rendered pages, from each replica's render
+// cache.
 export function readCached(data) {
-  const res = http.get(`${server()}${routes.content(data.ids[__ITER % 10])}`, {
+  const res = http.get(`${server()}${routes.render(data.ids[__ITER % 10])}`, {
     headers: data.headers,
-    tags: { name: 'content' },
+    tags: { name: 'render' },
   });
   check(res, { 'cached read 200': (r) => r.status === 200 });
 }
 
+// Any of the seeded pages, with no copy in the browser.
 export function readUncached(data) {
-  const res = http.get(`${server()}${routes.content(pick(data.ids))}`, {
+  const res = http.get(`${server()}${routes.render(pick(data.ids))}`, {
     headers: { ...data.headers, 'Cache-Control': 'no-cache' },
-    tags: { name: 'content' },
+    tags: { name: 'render' },
   });
   check(res, { 'uncached read 200': (r) => r.status === 200 });
+}
+
+// A cold render: save a 50-block page, then time only its first render.
+export function renderAfterSave(data) {
+  const id = data.cold[__ITER % data.cold.length];
+  const target = server();
+  const saved = savePage(target, data.headers, id, northstarPage(`${__VU}-${__ITER}`), {
+    headers: { 'Idempotency-Key': `k6-cold-${__VU}-${__ITER}` },
+  });
+  if (saved.status !== 200) {
+    return; // another writer saved first; nothing new to render
+  }
+  const res = http.get(`${target}${routes.render(id)}`, {
+    headers: data.headers,
+    tags: { name: 'render-cold' },
+  });
+  if (check(res, { 'cold render 200': (r) => r.status === 200 })) {
+    renderCold.add(res.timings.duration);
+  }
 }
 
 export function write(data) {
@@ -146,6 +207,44 @@ export function collab(data) {
     }
   };
   setTimeout(() => ws.close(), 30000);
+}
+
+// One pair of editors in one room, on two replicas when there are two:
+// A types a stamped keystroke every 200 ms and B times its arrival. Each
+// session lasts 30 s, like a burst of typing, then the pair reconnects.
+export function keystrokes(data) {
+  const pair = (__VU - 1) % data.rooms.length;
+  const room = routes.collab(data.spaceId, data.rooms[pair]);
+  const url = (n) => `${base(n).replace(/^http/, 'ws')}${room}`;
+  const tag = `${__VU}x${__ITER}`;
+  const reader = new WebSocket(url(1), null, { headers: data.headers });
+  reader.binaryType = 'arraybuffer';
+  reader.onmessage = (event) => {
+    const now = Date.now();
+    for (const sent of stampsIn(event.data, tag)) keystroke.add(now - sent);
+  };
+  const writer = new WebSocket(url(0), null, { headers: data.headers });
+  writer.binaryType = 'arraybuffer';
+  // A client ID of its own per session, as a browser tab would have.
+  const client = (__VU * 100003 + __ITER * 7919 + Math.floor(Math.random() * 1e6)) % 2 ** 31;
+  let clock = 0;
+  let typing;
+  const type = () => {
+    const text = stamp(tag, Date.now());
+    writer.send(updateFrame(insertUpdate(client, clock, text)));
+    clock += text.length;
+  };
+  writer.onopen = () => {
+    // Give the reader a moment to join the room before the first key.
+    setTimeout(() => {
+      typing = setInterval(type, 200);
+    }, 500);
+  };
+  setTimeout(() => {
+    clearInterval(typing);
+    writer.close();
+    reader.close();
+  }, 30000);
 }
 
 export function handleSummary(data) {

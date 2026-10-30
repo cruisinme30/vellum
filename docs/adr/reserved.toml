@@ -99,7 +99,7 @@ holder = "#525"
 
 [[reservation]]
 decisions = "D299"
-holder = "#528"
+holder = "reliability gates thread: perf gates from the 1.0 audit (#528), ADR 0061"
 
 [[reservation]]
 adrs = "0070"
