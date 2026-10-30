@@ -3430,16 +3430,6 @@ export interface DriveRestoreNodeView {
 }
 
 /**
- * No input.
- */
-export type DriveSharedDrivesNoInput = Record<string, never>;
-
-/**
- * No input.
- */
-export type DriveSharedWithMeNoInput = Record<string, never>;
-
-/**
  * An operation that returns nothing else.
  */
 export interface DriveRevokeLinkDone {
@@ -3448,6 +3438,16 @@ export interface DriveRevokeLinkDone {
    */
   ok: boolean;
 }
+
+/**
+ * No input.
+ */
+export type DriveSharedDrivesNoInput = Record<string, never>;
+
+/**
+ * No input.
+ */
+export type DriveSharedWithMeNoInput = Record<string, never>;
 
 /**
  * An operation that returns nothing else.
