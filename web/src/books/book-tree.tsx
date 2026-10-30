@@ -205,9 +205,7 @@ export function BookTree({
                 void navigate(sectionPath(row.id));
               }}
             >
-              <span className="vl-book-tree-grip" aria-hidden="true">
-                ⋮⋮
-              </span>
+              <span className="vl-book-tree-grip" aria-hidden="true" />
               <span className="vl-book-tree-title">{label}</span>
             </div>
           );

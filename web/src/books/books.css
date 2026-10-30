@@ -172,6 +172,11 @@
   cursor: grab;
 }
 
+/* Drawn in CSS, not as text, so it stays two dots wide whatever the text does. */
+.vl-book-tree-grip::before {
+  content: "⋮⋮";
+}
+
 .vl-book-tree-title {
   min-width: 0;
 }
