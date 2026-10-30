@@ -256,12 +256,10 @@ mod tests {
     #[test]
     fn strips_disallowed_markup() {
         let out = page(
-            concat!(
-                r#"<p onclick="x()">a<script>alert(1)</script><a "#,
-                r#"href="javascript:alert(1)">l</a><img "#,
-                r#"src="data:image/png;base64,AA"><input "#,
-                r#"type="text"><style>p{}</style></p>"#,
-            ),
+            "<p onclick=\"x()\">a<script>alert(1)</script><a \
+                href=\"javascript:alert(1)\">l</a><img \
+                src=\"data:image/png;base64,AA\"><input \
+                type=\"text\"><style>p{}</style></p>",
             &[],
         );
         assert!(!out.contains("onclick"));
@@ -275,12 +273,10 @@ mod tests {
     #[test]
     fn forces_safe_link_and_frame_attributes() {
         let out = page(
-            concat!(
-                r#"<a href="https://northstar.dev">x</a><iframe "#,
-                r#"src="https://www.youtube-nocookie.com/embed/abc" "#,
-                r#"sandbox="allow-top-navigation"></iframe><iframe "#,
-                r#"src="https://evil.example/"></iframe>"#,
-            ),
+            "<a href=\"https://northstar.dev\">x</a><iframe \
+                src=\"https://www.youtube-nocookie.com/embed/abc\" \
+                sandbox=\"allow-top-navigation\"></iframe><iframe \
+                src=\"https://evil.example/\"></iframe>",
             &[],
         );
         assert!(
@@ -297,17 +293,14 @@ mod tests {
 
     #[test]
     fn splices_islands_into_placeholders_only() {
-        let html = concat!(
-            r#"<figure><span data-vl-island="0"></span></figure><p>&lt;span "#,
-            r#"data-vl-island="0"&gt;&lt;/span&gt;</p>"#,
-        );
+        let html = "<figure><span \
+            data-vl-island=\"0\"></span></figure><p>&lt;span \
+            data-vl-island=\"0\"&gt;&lt;/span&gt;</p>";
         let out = page(html, &["<svg></svg>".to_owned()]);
         assert_eq!(
             out,
-            concat!(
-                r#"<figure><svg></svg></figure><p>&lt;span "#,
-                r#"data-vl-island="0"&gt;&lt;/span&gt;</p>"#,
-            )
+            "<figure><svg></svg></figure><p>&lt;span \
+                data-vl-island=\"0\"&gt;&lt;/span&gt;</p>"
         );
         // Out-of-range placeholders are left empty, never panic.
         let out = page(

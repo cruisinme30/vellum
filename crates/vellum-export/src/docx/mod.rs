@@ -275,16 +275,12 @@ impl<'a> Writer<'a> {
         let _ = write!(
             self.body,
             concat!(
-                concat!(
-                    r#"<w:sectPr><w:footerReference w:type="default" "#,
-                    r#"r:id="{footer}"/>"#,
-                ),
+                "<w:sectPr><w:footerReference w:type=\"default\" \
+                    r:id=\"{footer}\"/>",
                 r#"<w:pgSz w:w="{w}" w:h="{h}"/>"#,
-                concat!(
-                    r#"<w:pgMar w:top="1440" w:right="1440" w:bottom="1440" "#,
-                    r#"w:left="1440" w:header="708" w:footer="708" "#,
-                    r#"w:gutter="0"/>"#,
-                ),
+                "<w:pgMar w:top=\"1440\" w:right=\"1440\" w:bottom=\"1440\" \
+                    w:left=\"1440\" w:header=\"708\" w:footer=\"708\" \
+                    w:gutter=\"0\"/>",
                 "</w:sectPr>"
             ),
             footer = footer,
@@ -292,21 +288,17 @@ impl<'a> Writer<'a> {
             h = height
         );
         let document = format!(
-            concat!(
-                r#"<?xml version="1.0" encoding="UTF-8" "#,
-                r#"standalone="yes"?><w:document "#,
-                r#"{}><w:body>{}</w:body></w:document>"#,
-            ),
+            "<?xml version=\"1.0\" encoding=\"UTF-8\" \
+                standalone=\"yes\"?><w:document \
+                {}><w:body>{}</w:body></w:document>",
             parts::DOCUMENT_NAMESPACES,
             self.body
         );
         let mut rels = String::from(concat!(
             r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#,
-            concat!(
-                r#"<Relationships "#,
-                r#"xmlns="http://schemas.openxmlformats.org/package/2006/rela"#,
-                r#"tionships">"#,
-            )
+            "<Relationships \
+                xmlns=\"http://schemas.openxmlformats.org/package/2006/relation\
+                ships\">"
         ));
         for (id, kind, target, external) in &self.rels {
             let _ = write!(
@@ -467,10 +459,8 @@ impl<'a> Writer<'a> {
                 let runs = self.bookmarked(anchor.as_deref(), runs);
                 let _ = write!(
                     self.body,
-                    concat!(
-                        r#"<w:p><w:pPr><w:pStyle "#,
-                        r#"w:val="Heading{level}"/></w:pPr>{runs}</w:p>"#,
-                    )
+                    "<w:p><w:pPr><w:pStyle \
+                        w:val=\"Heading{level}\"/></w:pPr>{runs}</w:p>"
                 );
             }
             Node::Paragraph { spans, anchor } => {
@@ -627,11 +617,8 @@ impl<'a> Writer<'a> {
             Some(name) => {
                 let id = self.next_bookmark;
                 self.next_bookmark += 1;
-                format!(concat!(
-                    r#"<w:bookmarkStart w:id="{id}" "#,
-                    r#"w:name="{name}"/>{runs}<w:bookmarkEnd "#,
-                    r#"w:id="{id}"/>"#,
-                ))
+                format!("<w:bookmarkStart w:id=\"{id}\" \
+                    w:name=\"{name}\"/>{runs}<w:bookmarkEnd w:id=\"{id}\"/>")
             }
             None => runs,
         }
@@ -700,16 +687,11 @@ impl<'a> Writer<'a> {
                         let _ = write!(
                             self.body,
                             concat!(
-                                concat!(
-                                    r#"<w:p><w:pPr><w:pStyle "#,
-                                    r#"w:val="ListParagraph"/>"#,
-                                ),
-                                concat!(
-                                    r#"<w:numPr><w:ilvl "#,
-                                    r#"w:val="{level}"/><w:numId "#,
-                                    r#"w:val="{num}"/></w:numPr></w:pPr>{runs"#,
-                                    r#"}</w:p>"#,
-                                )
+                                "<w:p><w:pPr><w:pStyle \
+                                    w:val=\"ListParagraph\"/>",
+                                "<w:numPr><w:ilvl w:val=\"{level}\"/><w:numId \
+                                    w:val=\"{num}\"/></w:numPr></w:pPr>{runs}</\
+                                    w:p>"
                             ),
                             level = level,
                             num = num,
@@ -721,11 +703,9 @@ impl<'a> Writer<'a> {
                         self.runs(spans, &mut runs);
                         let _ = write!(
                             self.body,
-                            concat!(
-                                r#"<w:p><w:pPr><w:pStyle "#,
-                                r#"w:val="ListParagraph"/><w:ind "#,
-                                r#"w:left="{}"/></w:pPr>{runs}</w:p>"#,
-                            ),
+                            "<w:p><w:pPr><w:pStyle \
+                                w:val=\"ListParagraph\"/><w:ind \
+                                w:left=\"{}\"/></w:pPr>{runs}</w:p>",
                             720 * (level + 1)
                         );
                     }
@@ -739,12 +719,10 @@ impl<'a> Writer<'a> {
             if item.blocks.is_empty() {
                 let _ = write!(
                     self.body,
-                    concat!(
-                        r#"<w:p><w:pPr><w:pStyle "#,
-                        r#"w:val="ListParagraph"/><w:numPr><w:ilvl "#,
-                        r#"w:val="{level}"/><w:numId "#,
-                        r#"w:val="{num}"/></w:numPr></w:pPr></w:p>"#,
-                    )
+                    "<w:p><w:pPr><w:pStyle \
+                        w:val=\"ListParagraph\"/><w:numPr><w:ilvl \
+                        w:val=\"{level}\"/><w:numId \
+                        w:val=\"{num}\"/></w:numPr></w:pPr></w:p>"
                 );
             }
         }
@@ -786,13 +764,11 @@ impl<'a> Writer<'a> {
     fn table_open(&mut self, style: &str, widths: &[u32], fixed: bool) {
         let _ = write!(
             self.body,
-            concat!(
-                r#"<w:tbl><w:tblPr><w:tblStyle w:val="{style}"/><w:tblW "#,
-                r#"w:w="5000" w:type="pct"/>{}<w:tblLook w:val="04A0" "#,
-                r#"w:firstRow="1" w:lastRow="0" w:firstColumn="0" "#,
-                r#"w:lastColumn="0" w:noHBand="0" "#,
-                r#"w:noVBand="1"/></w:tblPr><w:tblGrid>"#,
-            ),
+            "<w:tbl><w:tblPr><w:tblStyle w:val=\"{style}\"/><w:tblW \
+                w:w=\"5000\" w:type=\"pct\"/>{}<w:tblLook w:val=\"04A0\" \
+                w:firstRow=\"1\" w:lastRow=\"0\" w:firstColumn=\"0\" \
+                w:lastColumn=\"0\" w:noHBand=\"0\" \
+                w:noVBand=\"1\"/></w:tblPr><w:tblGrid>",
             if fixed {
                 r#"<w:tblLayout w:type="fixed"/>"#
             } else {
@@ -810,10 +786,8 @@ impl<'a> Writer<'a> {
         if let Some(color) = left_border {
             let _ = write!(
                 self.body,
-                concat!(
-                    r#"<w:tcBorders><w:left w:val="single" w:sz="24" "#,
-                    r#"w:space="0" w:color="{color}"/></w:tcBorders>"#,
-                )
+                "<w:tcBorders><w:left w:val=\"single\" w:sz=\"24\" \
+                    w:space=\"0\" w:color=\"{color}\"/></w:tcBorders>"
             );
         }
         if let Some(fill) = fill {
@@ -877,10 +851,8 @@ impl<'a> Writer<'a> {
         self.body.push_str("<w:tr>");
         self.cell_open(Some(tone_bg(tone)), Some(tone_fg(tone)));
         let label = format!(
-            concat!(
-                r#"<w:p><w:r><w:rPr><w:b/><w:color "#,
-                r#"w:val="{}"/></w:rPr><w:t>{}</w:t></w:r></w:p>"#,
-            ),
+            "<w:p><w:r><w:rPr><w:b/><w:color \
+                w:val=\"{}\"/></w:rPr><w:t>{}</w:t></w:r></w:p>",
             tone_fg(tone),
             tone.label()
         );
@@ -903,31 +875,23 @@ impl<'a> Writer<'a> {
                 self.cell_open(Some("F0F2F9"), None);
                 let _ = write!(
                     self.body,
-                    concat!(
-                        r#"<w:p><w:r><w:rPr><w:b/><w:sz "#,
-                        r#"w:val="32"/></w:rPr><w:t "#,
-                        r#"xml:space="preserve">{}</w:t></w:r></w:p>"#,
-                    ),
+                    "<w:p><w:r><w:rPr><w:b/><w:sz w:val=\"32\"/></w:rPr><w:t \
+                        xml:space=\"preserve\">{}</w:t></w:r></w:p>",
                     xml(&tile.value)
                 );
                 let _ = write!(
                     self.body,
-                    concat!(
-                        r#"<w:p><w:r><w:rPr><w:color "#,
-                        r#"w:val="46464F"/></w:rPr><w:t "#,
-                        r#"xml:space="preserve">{}</w:t></w:r></w:p>"#,
-                    ),
+                    "<w:p><w:r><w:rPr><w:color w:val=\"46464F\"/></w:rPr><w:t \
+                        xml:space=\"preserve\">{}</w:t></w:r></w:p>",
                     xml(&tile.label)
                 );
                 if !tile.delta.is_empty() {
                     let color = tile.trend.map_or("46464F", tone_fg);
                     let _ = write!(
                         self.body,
-                        concat!(
-                            r#"<w:p><w:r><w:rPr><w:color "#,
-                            r#"w:val="{color}"/></w:rPr><w:t "#,
-                            r#"xml:space="preserve">{}</w:t></w:r></w:p>"#,
-                        ),
+                        "<w:p><w:r><w:rPr><w:color \
+                            w:val=\"{color}\"/></w:rPr><w:t \
+                            xml:space=\"preserve\">{}</w:t></w:r></w:p>",
                         xml(&tile.delta)
                     );
                 }
@@ -956,15 +920,10 @@ impl<'a> Writer<'a> {
         let _ = write!(
             self.body,
             concat!(
-                concat!(
-                    r#"<w:p><w:pPr><w:pStyle "#,
-                    r#"w:val="TOC1"/></w:pPr><w:r><w:fldChar "#,
-                    r#"w:fldCharType="begin" w:dirty="true"/></w:r>"#,
-                ),
-                concat!(
-                    r#"<w:r><w:instrText xml:space="preserve"> TOC \o "#,
-                    r#""1-{depth}" \h \z \u </w:instrText></w:r>"#,
-                ),
+                "<w:p><w:pPr><w:pStyle w:val=\"TOC1\"/></w:pPr><w:r><w:fldChar \
+                    w:fldCharType=\"begin\" w:dirty=\"true\"/></w:r>",
+                "<w:r><w:instrText xml:space=\"preserve\"> TOC \\o \
+                    \"1-{depth}\" \\h \\z \\u </w:instrText></w:r>",
                 r#"<w:r><w:fldChar w:fldCharType="separate"/></w:r></w:p>"#
             ),
             depth = depth.clamp(1, 6)
@@ -977,13 +936,9 @@ impl<'a> Writer<'a> {
                 .unwrap_or_default();
             let _ = write!(
                 self.body,
-                concat!(
-                    r#"<w:p><w:pPr><w:pStyle "#,
-                    r#"w:val="{style}"/></w:pPr><w:hyperlink w:anchor="{}" "#,
-                    r#"w:history="1"><w:r><w:t "#,
-                    r#"xml:space="preserve">{}</w:t></w:r></w:hyperlink></w:p"#,
-                    r#">"#,
-                ),
+                "<w:p><w:pPr><w:pStyle w:val=\"{style}\"/></w:pPr><w:hyperlink \
+                    w:anchor=\"{}\" w:history=\"1\"><w:r><w:t \
+                    xml:space=\"preserve\">{}</w:t></w:r></w:hyperlink></w:p>",
                 xml(&link),
                 xml(&text)
             );
@@ -1075,50 +1030,31 @@ impl<'a> Writer<'a> {
         let id = self.next_drawing;
         self.next_drawing += 1;
         let svg_ext = svg_rel.map_or_else(String::new, |rel| {
-            format!(concat!(
-                r#"<a:extLst><a:ext "#,
-                r#"uri="{{96DAC541-7B7A-43D3-8B79-37D633B846F1}}"><asvg:s"#,
-                r#"vgBlip r:embed="{rel}"/></a:ext></a:extLst>"#,
-            ))
+            format!("<a:extLst><a:ext \
+                uri=\"{{96DAC541-7B7A-43D3-8B79-37D633B846F1}}\"><asvg:svgBlip \
+                r:embed=\"{rel}\"/></a:ext></a:extLst>")
         });
         Some(format!(
             concat!(
-                concat!(
-                    r#"<w:r><w:drawing><wp:inline distT="0" distB="0" "#,
-                    r#"distL="0" distR="0">"#,
-                ),
-                concat!(
-                    r#"<wp:extent cx="{cx}" cy="{cy}"/><wp:docPr id="{id}" "#,
-                    r#"name="Picture {id}" descr="{alt}"/>"#,
-                ),
-                concat!(
-                    r#"<wp:cNvGraphicFramePr><a:graphicFrameLocks "#,
-                    r#"noChangeAspect="1"/></wp:cNvGraphicFramePr>"#,
-                ),
-                concat!(
-                    r#"<a:graphic><a:graphicData "#,
-                    r#"uri="http://schemas.openxmlformats.org/drawingml/2006/"#,
-                    r#"picture">"#,
-                ),
-                concat!(
-                    r#"<pic:pic><pic:nvPicPr><pic:cNvPr id="{id}" "#,
-                    r#"name="Picture {id}" "#,
-                    r#"descr="{alt}"/><pic:cNvPicPr/></pic:nvPicPr>"#,
-                ),
-                concat!(
-                    r#"<pic:blipFill><a:blip "#,
-                    r#"r:embed="{png}">{svg}</a:blip><a:stretch><a:fillRect/>"#,
-                    r#"</a:stretch></pic:blipFill>"#,
-                ),
-                concat!(
-                    r#"<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext "#,
-                    r#"cx="{cx}" cy="{cy}"/></a:xfrm><a:prstGeom "#,
-                    r#"prst="rect"><a:avLst/></a:prstGeom></pic:spPr>"#,
-                ),
-                concat!(
-                    r#"</pic:pic></a:graphicData></a:graphic></wp:inline></w:"#,
-                    r#"drawing></w:r>"#,
-                )
+                "<w:r><w:drawing><wp:inline distT=\"0\" distB=\"0\" \
+                    distL=\"0\" distR=\"0\">",
+                "<wp:extent cx=\"{cx}\" cy=\"{cy}\"/><wp:docPr id=\"{id}\" \
+                    name=\"Picture {id}\" descr=\"{alt}\"/>",
+                "<wp:cNvGraphicFramePr><a:graphicFrameLocks \
+                    noChangeAspect=\"1\"/></wp:cNvGraphicFramePr>",
+                "<a:graphic><a:graphicData \
+                    uri=\"http://schemas.openxmlformats.org/drawingml/2006/pict\
+                    ure\">",
+                "<pic:pic><pic:nvPicPr><pic:cNvPr id=\"{id}\" name=\"Picture \
+                    {id}\" descr=\"{alt}\"/><pic:cNvPicPr/></pic:nvPicPr>",
+                "<pic:blipFill><a:blip \
+                    r:embed=\"{png}\">{svg}</a:blip><a:stretch><a:fillRect/></a\
+                    :stretch></pic:blipFill>",
+                "<pic:spPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"{cx}\" \
+                    cy=\"{cy}\"/></a:xfrm><a:prstGeom \
+                    prst=\"rect\"><a:avLst/></a:prstGeom></pic:spPr>",
+                "</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing>\
+                    </w:r>"
             ),
             cx = cx,
             cy = cy,
@@ -1139,10 +1075,8 @@ impl<'a> Writer<'a> {
             Some(run) => {
                 let _ = write!(
                     self.body,
-                    concat!(
-                        r#"<w:p><w:pPr><w:keepNext/><w:jc "#,
-                        r#"w:val="center"/></w:pPr>{run}</w:p>"#,
-                    )
+                    "<w:p><w:pPr><w:keepNext/><w:jc \
+                        w:val=\"center\"/></w:pPr>{run}</w:p>"
                 );
             }
             None => self.styled_paragraph(
@@ -1174,19 +1108,13 @@ impl<'a> Writer<'a> {
                     let _ = write!(
                         out,
                         concat!(
-                            concat!(
-                                r#"<w:r><w:fldChar w:fldCharType="begin" "#,
-                                r#"w:dirty="true"/></w:r>"#,
-                            ),
-                            concat!(
-                                r#"<w:r><w:instrText xml:space="preserve"> "#,
-                                r#"PAGEREF {} \h </w:instrText></w:r>"#,
-                            ),
-                            concat!(
-                                r#"<w:r><w:fldChar "#,
-                                r#"w:fldCharType="separate"/></w:r><w:r><w:t>"#,
-                                r#"#</w:t></w:r>"#,
-                            ),
+                            "<w:r><w:fldChar w:fldCharType=\"begin\" \
+                                w:dirty=\"true\"/></w:r>",
+                            "<w:r><w:instrText xml:space=\"preserve\"> PAGEREF \
+                                {} \\h </w:instrText></w:r>",
+                            "<w:r><w:fldChar \
+                                w:fldCharType=\"separate\"/></w:r><w:r><w:t>#</\
+                                w:t></w:r>",
                             r#"<w:r><w:fldChar w:fldCharType="end"/></w:r>"#
                         ),
                         xml(&name)

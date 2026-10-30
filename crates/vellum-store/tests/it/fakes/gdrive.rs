@@ -935,10 +935,8 @@ impl FakeDrive {
 
 #[test]
 fn parses_the_query_subset() {
-    let q = concat!(
-        r"name = 'it\'s a \\ and b' and 'p1' in parents and trashed = false ",
-        r"and mimeType != 'x'",
-    );
+    let q = "name = 'it\\'s a \\\\ and b' and 'p1' in parents and trashed = \
+        false and mimeType != 'x'";
     assert_eq!(
         parse_q(q),
         Ok(vec![

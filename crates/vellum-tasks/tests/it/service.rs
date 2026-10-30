@@ -790,11 +790,9 @@ END:VCALENDAR\r\n";
         "{inbox}"
     );
 
-    let report = concat!(
-        r#"<?xml version="1.0"?><D:sync-collection "#,
-        r#"xmlns:D="DAV:"><D:sync-token/><D:prop><D:getetag/></D:prop></D:syn"#,
-        r#"c-collection>"#,
-    );
+    let report = "<?xml version=\"1.0\"?><D:sync-collection \
+        xmlns:D=\"DAV:\"><D:sync-token/><D:prop><D:getetag/></D:prop></D:sync-c\
+        ollection>";
     let sync = f.raw("REPORT", &list_path, &[], report).await;
     assert_eq!(sync.status, 207);
     assert!(body(&sync).contains("abc-123.ics"));

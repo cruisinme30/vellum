@@ -284,10 +284,8 @@ properties:
     fn cheat_sheet_examples() {
         assert_eq!(ok(r#"prop("Estimate") * (1 - Progress)"#), "5.6");
         assert_eq!(
-            ok(concat!(
-                r#"if(Status == "Done", "done", if(days(Target, now()) < "#,
-                r#"7, "due soon", "on track"))"#,
-            )),
+            ok("if(Status == \"Done\", \"done\", if(days(Target, now()) < 7, \
+                \"due soon\", \"on track\"))"),
             "due soon"
         );
         assert_eq!(

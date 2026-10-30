@@ -179,11 +179,9 @@ impl Svg {
         let label = escape(name);
         let _ = write!(
             self.out,
-            concat!(
-                r#"<g><title>{label} ({ms:.1} ms, {pct:.2}%)</title><rect "#,
-                r#"x="{x:.1}" y="{y:.1}" width="{w:.1}" height="{h:.1}" "#,
-                r#"rx="2" fill="{fill}"/>"#,
-            ),
+            "<g><title>{label} ({ms:.1} ms, {pct:.2}%)</title><rect \
+                x=\"{x:.1}\" y=\"{y:.1}\" width=\"{w:.1}\" height=\"{h:.1}\" \
+                rx=\"2\" fill=\"{fill}\"/>",
             h = FRAME - 1.0,
             fill = colour(name),
         );
@@ -237,14 +235,12 @@ pub fn svg(folded: &Folded, title: &str) -> String {
     };
     let _ = write!(
         svg.out,
-        concat!(
-            r##"<svg xmlns="http://www.w3.org/2000/svg" width="{WIDTH}" "##,
-            r##"height="{height}" viewBox="0 0 {WIDTH} {height}" "##,
-            r##"font-family="Roboto, sans-serif" font-size="12"><rect "##,
-            r##"width="100%" height="100%" fill="#F7F8FC"/><text x="{PAD}" "##,
-            r##"y="22" font-size="16" fill="#1D1B20">{title} — {ms:.1} ms "##,
-            r##"total</text>"##,
-        ),
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{WIDTH}\" \
+            height=\"{height}\" viewBox=\"0 0 {WIDTH} {height}\" \
+            font-family=\"Roboto, sans-serif\" font-size=\"12\"><rect \
+            width=\"100%\" height=\"100%\" fill=\"#F7F8FC\"/><text x=\"{PAD}\" \
+            y=\"22\" font-size=\"16\" fill=\"#1D1B20\">{title} — {ms:.1} ms \
+            total</text>",
         title = escape(title),
         ms = root.total as f64 / 1000.0,
     );

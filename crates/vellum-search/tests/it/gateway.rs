@@ -274,10 +274,8 @@ async fn graphql_searches() -> TestResult {
     let corpus = Corpus::default();
     let gateway = gateway(&corpus).await?;
     let query = json!({
-        "query": concat!(
-            r#"{ searchQuery(input: {q: "canary deploy", kinds: "page"}) { "#,
-            r#"hits { doc block citation } has_more } }"#,
-        )
+        "query": "{ searchQuery(input: {q: \"canary deploy\", kinds: \
+            \"page\"}) { hits { doc block citation } has_more } }"
     });
     let (status, reply) =
         call(&gateway, "POST", "/api/graphql", "grace", Some(query)).await?;

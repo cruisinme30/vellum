@@ -842,14 +842,10 @@ mod tests {
         // Importing again adds nothing; a new task is appended.
         assert_eq!(append_new(&text, &lists[0]), None);
         let more = json.replace(
-            concat!(
-                r#"{"id":"d","title":"Gone","status":"needsAction","deleted":"#,
-                r#"true,"position":"003"}"#,
-            ),
-            concat!(
-                r#"{"id":"e","title":"New","status":"needsAction","position":"#,
-                r#""004"}"#,
-            ),
+            "{\"id\":\"d\",\"title\":\"Gone\",\"status\":\"needsAction\",\"dele\
+                ted\":true,\"position\":\"003\"}",
+            "{\"id\":\"e\",\"title\":\"New\",\"status\":\"needsAction\",\"posit\
+                ion\":\"004\"}",
         );
         let (updated, added) =
             append_new(&text, &google_tasks(&more).unwrap()[0]).unwrap();
@@ -857,11 +853,10 @@ mod tests {
         assert!(updated.starts_with(&text));
         assert!(updated.contains("\n\n- [ ] New {src=gtasks:e} ^blk-"));
         // A new subtask of a known task goes under it.
-        let child = more.replace(r#"{"id":"e","#, concat!(
-            r#"{"id":"f","title":"Second "#,
-            r#"child","status":"needsAction","parent":"a","position":"0015"},"#,
-            r#"{"id":"e","#,
-        ));
+        let child = more.replace(r#"{"id":"e","#, "{\"id\":\"f\",\"title\":\"Se\
+            cond \
+            child\",\"status\":\"needsAction\",\"parent\":\"a\",\"position\":\"\
+            0015\"},{\"id\":\"e\",");
         let (nested, added) =
             append_new(&updated, &google_tasks(&child).unwrap()[0]).unwrap();
         assert_eq!(added, 1);
@@ -878,10 +873,8 @@ mod tests {
 
     #[test]
     fn google_api_list_and_bad_json() {
-        let json = concat!(
-            r#"{"kind":"tasks#tasks","items":[{"id":"x","title":"One","status"#,
-            r#"":"needsAction","position":"0"}]}"#,
-        );
+        let json = "{\"kind\":\"tasks#tasks\",\"items\":[{\"id\":\"x\",\"title\
+            \":\"One\",\"status\":\"needsAction\",\"position\":\"0\"}]}";
         let lists = google_tasks(json).unwrap();
         assert_eq!(lists[0].title, "Google Tasks");
         assert!(google_tasks("[1,2]").is_err());

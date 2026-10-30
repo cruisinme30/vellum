@@ -252,20 +252,16 @@ mod tests {
     fn retheme_leaves_references_alone() {
         let reverse = vec![("#abcdef".to_owned(), "primary")];
         let out = retheme(
-            concat!(
-                r##"<p fill="#ABCDEF" style="stroke:#abcdef;" "##,
-                r##"marker="url(#abcdef)" href="#abcdef"/><q "##,
-                r##"fill="#abcdef0"/>"##,
-            ),
+            "<p fill=\"#ABCDEF\" style=\"stroke:#abcdef;\" \
+                marker=\"url(#abcdef)\" href=\"#abcdef\"/><q \
+                fill=\"#abcdef0\"/>",
             &reverse,
         );
         assert_eq!(
             out,
-            concat!(
-                r##"<p fill="var(--vl-primary)" "##,
-                r##"style="stroke:var(--vl-primary);" marker="url(#abcdef)" "##,
-                r##"href="#abcdef"/><q fill="#abcdef0"/>"##,
-            )
+            "<p fill=\"var(--vl-primary)\" style=\"stroke:var(--vl-primary);\" \
+                marker=\"url(#abcdef)\" href=\"#abcdef\"/><q \
+                fill=\"#abcdef0\"/>"
         );
     }
 }

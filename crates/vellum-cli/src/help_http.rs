@@ -535,20 +535,16 @@ mod tests {
 
     #[test]
     fn only_relative_markdown_links_are_rewritten() {
-        let html = concat!(
-            r#"<a href="../data/views.md#filters">a</a><a "#,
-            r#"href="https://x.dev/a.md">b</a><a href="/abs.md">c</a><a "#,
-            r#"href="README.md">d</a><a href="other.txt">e</a><a "#,
-            r#"href="../../admin.book/deploy/README.md">f</a>"#,
-        );
+        let html = "<a href=\"../data/views.md#filters\">a</a><a \
+            href=\"https://x.dev/a.md\">b</a><a href=\"/abs.md\">c</a><a \
+            href=\"README.md\">d</a><a href=\"other.txt\">e</a><a \
+            href=\"../../admin.book/deploy/README.md\">f</a>";
         assert_eq!(
             md_links_to_html(html),
-            concat!(
-                r#"<a href="../data/views.html#filters">a</a><a "#,
-                r#"href="https://x.dev/a.md">b</a><a href="/abs.md">c</a><a "#,
-                r#"href="README.html">d</a><a href="other.txt">e</a><a "#,
-                r#"href="../../admin/deploy/README.html">f</a>"#,
-            )
+            "<a href=\"../data/views.html#filters\">a</a><a \
+                href=\"https://x.dev/a.md\">b</a><a href=\"/abs.md\">c</a><a \
+                href=\"README.html\">d</a><a href=\"other.txt\">e</a><a \
+                href=\"../../admin/deploy/README.html\">f</a>"
         );
         assert_eq!(
             escape("<a href=\"x\">'"),

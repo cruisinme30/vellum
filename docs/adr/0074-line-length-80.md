@@ -21,9 +21,9 @@ vellum: 1
 
 Line lengths differed by tool: rustfmt wrapped Rust at 100 columns,
 Prettier wrapped the web app and desktop shell at 100, yamllint allowed 120
-and Markdown had no limit. Rustfmt and Prettier also leave long strings
-and comments alone, so many lines ran far past any limit. Gourav asked for
-one 80-character limit across every file, enforced, so code reads the same
+and Markdown had no limit. Both formatters also leave long strings and
+comments alone, so many lines ran far past any limit. The maintainer asked
+for one 80-character limit across every file, enforced, so code reads the same
 in a terminal, a side-by-side diff and a review on a phone.
 
 ## Decisions

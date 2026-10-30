@@ -132,10 +132,8 @@ pub fn write_model(dir: &std::path::Path, with_types: bool) -> OnnxConfig {
     std::fs::write(&vocab_path, VOCAB).unwrap();
     std::fs::write(
         dir.join("config.json"),
-        format!(concat!(
-            r#"{{"_name_or_path": "tiny", "hidden_size": {DIMS}, "#,
-            r#""max_position_embeddings": 16}}"#,
-        )),
+        format!("{{\"_name_or_path\": \"tiny\", \"hidden_size\": {DIMS}, \
+            \"max_position_embeddings\": 16}}"),
     )
     .unwrap();
     OnnxConfig {

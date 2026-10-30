@@ -145,23 +145,20 @@ impl Default for Claims {
 
 fn assertion_xml(c: &Claims) -> String {
     format!(
-        concat!(
-            r#"<saml:Assertion "#,
-            r#"xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="{id}" "#,
-            r#"Version="2.0" "#,
-            r#"IssueInstant="2026-10-30T12:00:00Z"><saml:Issuer>{issuer}</sam"#,
-            r#"l:Issuer><saml:Subject><saml:NameID>{name_id}</saml:NameID><sa"#,
-            r#"ml:SubjectConfirmation "#,
-            r#"Method="urn:oasis:names:tc:SAML:2.0:cm:bearer"><saml:SubjectCo"#,
-            r#"nfirmationData InResponseTo="{irt}" NotOnOrAfter="{nooa}" "#,
-            r#"Recipient="{recipient}"/></saml:SubjectConfirmation></saml:Sub"#,
-            r#"ject><saml:Conditions NotBefore="{nb}" "#,
-            r#"NotOnOrAfter="{nooa}"><saml:AudienceRestriction><saml:Audience"#,
-            r#">{audience}</saml:Audience></saml:AudienceRestriction></saml:C"#,
-            r#"onditions>{authn}<saml:AttributeStatement><saml:Attribute "#,
-            r#"Name="email"><saml:AttributeValue>{email}</saml:AttributeValue"#,
-            r#"></saml:Attribute></saml:AttributeStatement></saml:Assertion>"#,
-        ),
+        "<saml:Assertion xmlns:saml=\"urn:oasis:names:tc:SAML:2.0:assertion\" \
+            ID=\"{id}\" Version=\"2.0\" \
+            IssueInstant=\"2026-10-30T12:00:00Z\"><saml:Issuer>{issuer}</saml:I\
+            ssuer><saml:Subject><saml:NameID>{name_id}</saml:NameID><saml:Subje\
+            ctConfirmation \
+            Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><saml:SubjectConfi\
+            rmationData InResponseTo=\"{irt}\" NotOnOrAfter=\"{nooa}\" \
+            Recipient=\"{recipient}\"/></saml:SubjectConfirmation></saml:Subjec\
+            t><saml:Conditions NotBefore=\"{nb}\" \
+            NotOnOrAfter=\"{nooa}\"><saml:AudienceRestriction><saml:Audience>{a\
+            udience}</saml:Audience></saml:AudienceRestriction></saml:Condition\
+            s>{authn}<saml:AttributeStatement><saml:Attribute \
+            Name=\"email\"><saml:AttributeValue>{email}</saml:AttributeValue></\
+            saml:Attribute></saml:AttributeStatement></saml:Assertion>",
         id = c.assertion_id,
         issuer = c.issuer,
         name_id = c.name_id,
@@ -173,26 +170,21 @@ fn assertion_xml(c: &Claims) -> String {
         email = c.email,
         authn = c.authn_instant.as_deref().map_or_else(
             String::new,
-            |at| format!(concat!(
-                r#"<saml:AuthnStatement "#,
-                r#"AuthnInstant="{at}"><saml:AuthnContext><saml:AuthnContextC"#,
-                r#"lassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:Password</s"#,
-                r#"aml:AuthnContextClassRef></saml:AuthnContext></saml:AuthnS"#,
-                r#"tatement>"#,
-            ))
+            |at| format!("<saml:AuthnStatement \
+                AuthnInstant=\"{at}\"><saml:AuthnContext><saml:AuthnContextClas\
+                sRef>urn:oasis:names:tc:SAML:2.0:ac:classes:Password</saml:Auth\
+                nContextClassRef></saml:AuthnContext></saml:AuthnStatement>")
         ),
     )
 }
 
 fn response_xml(status: &str, assertions: &str) -> String {
-    format!(concat!(
-        r#"<samlp:Response "#,
-        r#"xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" ID="_r1" "#,
-        r#"Version="2.0" IssueInstant="2026-10-30T12:00:00Z" "#,
-        r#"Destination="{ACS}" "#,
-        r#"InResponseTo="{REQUEST}"><samlp:Status><samlp:StatusCode "#,
-        r#"Value="{status}"/></samlp:Status>{assertions}</samlp:Response>"#,
-    ))
+    format!("<samlp:Response \
+        xmlns:samlp=\"urn:oasis:names:tc:SAML:2.0:protocol\" ID=\"_r1\" \
+        Version=\"2.0\" IssueInstant=\"2026-10-30T12:00:00Z\" \
+        Destination=\"{ACS}\" \
+        InResponseTo=\"{REQUEST}\"><samlp:Status><samlp:StatusCode \
+        Value=\"{status}\"/></samlp:Status>{assertions}</samlp:Response>")
 }
 
 struct TestIdp {
@@ -239,22 +231,19 @@ impl TestIdp {
         let canonical = exc_c14n(xml, target, None, &[]).unwrap();
         let digest =
             STANDARD.encode(sha2::Sha256::digest(canonical.as_bytes()));
-        let signature = format!(concat!(
-            r##"<ds:Signature "##,
-            r##"xmlns:ds="http://www.w3.org/2000/09/xmldsig#"><ds:Signed"##,
-            r##"Info><ds:CanonicalizationMethod "##,
-            r##"Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/><ds"##,
-            r##":SignatureMethod Algorithm="{method}"/><ds:Reference "##,
-            r##"URI="#{id}"><ds:Transforms><ds:Transform "##,
-            r##"Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-s"##,
-            r##"ignature"/><ds:Transform "##,
-            r##"Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/></d"##,
-            r##"s:Transforms><ds:DigestMethod "##,
-            r##"Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><ds"##,
-            r##":DigestValue>{digest}</ds:DigestValue></ds:Reference></d"##,
-            r##"s:SignedInfo><ds:SignatureValue>VALUE</ds:SignatureValue"##,
-            r##"></ds:Signature>"##,
-        ));
+        let signature = format!("<ds:Signature \
+            xmlns:ds=\"http://www.w3.org/2000/09/xmldsig#\"><ds:SignedInfo><ds:\
+            CanonicalizationMethod \
+            Algorithm=\"http://www.w3.org/2001/10/xml-exc-c14n#\"/><ds:Signatur\
+            eMethod Algorithm=\"{method}\"/><ds:Reference \
+            URI=\"#{id}\"><ds:Transforms><ds:Transform \
+            Algorithm=\"http://www.w3.org/2000/09/xmldsig#enveloped-signature\"\
+            /><ds:Transform \
+            Algorithm=\"http://www.w3.org/2001/10/xml-exc-c14n#\"/></ds:Transfo\
+            rms><ds:DigestMethod \
+            Algorithm=\"http://www.w3.org/2001/04/xmlenc#sha256\"/><ds:DigestVa\
+            lue>{digest}</ds:DigestValue></ds:Reference></ds:SignedInfo><ds:Sig\
+            natureValue>VALUE</ds:SignatureValue></ds:Signature>");
         // Insert as the second child: after the Issuer or Status.
         let first = target.first_element_child().unwrap();
         let at = first.range().end;
@@ -409,10 +398,8 @@ fn unsigned_or_wrongly_signed_assertions_are_refused() {
     // Encrypted assertions are not read.
     let encrypted = response_xml(
         &claims.status,
-        concat!(
-            r#"<saml:EncryptedAssertion "#,
-            r#"xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"/>"#,
-        ),
+        "<saml:EncryptedAssertion \
+            xmlns:saml=\"urn:oasis:names:tc:SAML:2.0:assertion\"/>",
     );
     refused_with(&idp, &encrypted, "encrypted");
 }
@@ -470,18 +457,14 @@ fn signature_wrapping_is_refused() {
 #[test]
 fn entity_expansion_and_doctypes_are_refused() {
     let idp = TestIdp::new();
-    let bomb = concat!(
-        r#"<?xml version="1.0"?><!DOCTYPE r [<!ENTITY a "#,
-        r#""aaaaaaaaaa"><!ENTITY b "&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;"><!ENTITY "#,
-        r#"c "&b;&b;&b;&b;&b;&b;&b;&b;&b;&b;">]><samlp:Response "#,
-        r#"xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol">&c;</samlp:Resp"#,
-        r#"onse>"#,
-    );
+    let bomb = "<?xml version=\"1.0\"?><!DOCTYPE r [<!ENTITY a \
+        \"aaaaaaaaaa\"><!ENTITY b \"&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;\"><!ENTITY \
+        c \"&b;&b;&b;&b;&b;&b;&b;&b;&b;&b;\">]><samlp:Response \
+        xmlns:samlp=\"urn:oasis:names:tc:SAML:2.0:protocol\">&c;</samlp:Respons\
+        e>";
     refused_with(&idp, bomb, "cannot be read");
-    let external = concat!(
-        r#"<?xml version="1.0"?><!DOCTYPE r [<!ENTITY x SYSTEM "#,
-        r#""file:///etc/passwd">]><r>&x;</r>"#,
-    );
+    let external = "<?xml version=\"1.0\"?><!DOCTYPE r [<!ENTITY x SYSTEM \
+        \"file:///etc/passwd\">]><r>&x;</r>";
     refused_with(&idp, external, "cannot be read");
 }
 

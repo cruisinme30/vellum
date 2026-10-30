@@ -100,10 +100,8 @@ async fn sts(State(fake): State<Arc<Fake>>, body: String) -> impl IntoResponse {
 
 fn json_credentials(fake: &Fake) -> String {
     let expiration = fake.expiration.lock().unwrap().clone();
-    format!(concat!(
-        r#"{{"AccessKeyId":"{KEY_ID}","SecretAccessKey":"temp-secret","To"#,
-        r#"ken":"{SESSION}","Expiration":"{expiration}"}}"#,
-    ))
+    format!("{{\"AccessKeyId\":\"{KEY_ID}\",\"SecretAccessKey\":\"temp-secret\"\
+        ,\"Token\":\"{SESSION}\",\"Expiration\":\"{expiration}\"}}")
 }
 
 async fn container(

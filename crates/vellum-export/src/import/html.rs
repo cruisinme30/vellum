@@ -645,10 +645,8 @@ mod tests {
 
     #[test]
     fn hostile_markup_is_dropped() {
-        let md = convert(concat!(
-            r#"<body><script>alert(1)</script><p onclick="x">Hi <a "#,
-            r#"href="javascript:alert(1)">there</a></p></body>"#,
-        ));
+        let md = convert("<body><script>alert(1)</script><p onclick=\"x\">Hi \
+            <a href=\"javascript:alert(1)\">there</a></p></body>");
         assert!(!md.contains("alert"), "{md}");
         assert!(md.contains("Hi there"), "{md}");
     }

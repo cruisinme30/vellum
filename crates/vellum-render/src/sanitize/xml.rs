@@ -699,12 +699,10 @@ mod tests {
 
     #[test]
     fn keeps_drawing_elements_and_prefixes_ids() {
-        let out = clean(concat!(
-            r##"<svg xmlns="http://www.w3.org/2000/svg" id="m" "##,
-            r##"viewBox="0 0 10 10"><defs><marker id="arrow"><path "##,
-            r##"d="M0 0L5 5"/></marker></defs><path d="M1 1" "##,
-            r##"marker-end="url(#arrow)"/><use href="#arrow"/></svg>"##,
-        ));
+        let out = clean("<svg xmlns=\"http://www.w3.org/2000/svg\" id=\"m\" \
+            viewBox=\"0 0 10 10\"><defs><marker id=\"arrow\"><path d=\"M0 0L5 \
+            5\"/></marker></defs><path d=\"M1 1\" \
+            marker-end=\"url(#arrow)\"/><use href=\"#arrow\"/></svg>");
         assert!(
             out.starts_with("<svg viewBox=\"0 0 10 10\" id=\"f1-root\""),
             "{out}"
@@ -716,15 +714,12 @@ mod tests {
 
     #[test]
     fn removes_scripts_handlers_and_external_links() {
-        let out = clean(concat!(
-            r#"<svg xmlns="http://www.w3.org/2000/svg" "#,
-            r#"xmlns:xlink="http://www.w3.org/1999/xlink"><script>alert(1"#,
-            r#")</script><a xlink:href="javascript:alert(1)"><rect "#,
-            r#"onload="alert(1)" width="5"/></a><image "#,
-            r#"href="https://evil.example/x.png"/><use "#,
-            r#"href="https://evil.example/s.svg#a"/><foreignObject><ifram"#,
-            r#"e src="x"/><div>ok</div></foreignObject></svg>"#,
-        ));
+        let out = clean("<svg xmlns=\"http://www.w3.org/2000/svg\" \
+            xmlns:xlink=\"http://www.w3.org/1999/xlink\"><script>alert(1)</scri\
+            pt><a xlink:href=\"javascript:alert(1)\"><rect onload=\"alert(1)\" \
+            width=\"5\"/></a><image href=\"https://evil.example/x.png\"/><use \
+            href=\"https://evil.example/s.svg#a\"/><foreignObject><iframe \
+            src=\"x\"/><div>ok</div></foreignObject></svg>");
         assert!(!out.contains("script"), "{out}");
         assert!(!out.contains("alert"), "{out}");
         assert!(!out.contains("evil"), "{out}");
@@ -735,15 +730,12 @@ mod tests {
 
     #[test]
     fn filters_and_scopes_css() {
-        let out = clean(concat!(
-            r#"<svg xmlns="http://www.w3.org/2000/svg" "#,
-            r#"id="mermaid-1"><style>@import "#,
-            r#"url(https://evil.example/x.css); #mermaid-1 .node "#,
-            r#"rect{fill:#fff;stroke:var(--vl-outline)} "#,
-            r#"body{background:url(https://evil.example/t)} "#,
-            r#".label{color:red;position:fixed} @media "#,
-            r#"print{svg{display:none}}</style><rect class="node"/></svg>"#,
-        ));
+        let out = clean("<svg xmlns=\"http://www.w3.org/2000/svg\" \
+            id=\"mermaid-1\"><style>@import url(https://evil.example/x.css); \
+            #mermaid-1 .node rect{fill:#fff;stroke:var(--vl-outline)} \
+            body{background:url(https://evil.example/t)} \
+            .label{color:red;position:fixed} @media \
+            print{svg{display:none}}</style><rect class=\"node\"/></svg>");
         assert!(!out.contains("evil"), "{out}");
         assert!(!out.contains('@'), "{out}");
         assert!(!out.contains("position"), "{out}");
@@ -758,10 +750,8 @@ mod tests {
 
     #[test]
     fn moves_var_colours_into_style() {
-        let out = clean(concat!(
-            r##"<svg xmlns="http://www.w3.org/2000/svg"><rect "##,
-            r##"fill="var(--vl-chart-1)" stroke="#000"/></svg>"##,
-        ));
+        let out = clean("<svg xmlns=\"http://www.w3.org/2000/svg\"><rect \
+            fill=\"var(--vl-chart-1)\" stroke=\"#000\"/></svg>");
         assert!(
             out.contains(
                 r##"<rect stroke="#000" style="fill:var(--vl-chart-1);">"##
@@ -772,10 +762,8 @@ mod tests {
 
     #[test]
     fn rejects_dtds_and_foreign_roots() {
-        let xxe = concat!(
-            r#"<?xml version="1.0"?><!DOCTYPE svg [<!ENTITY x SYSTEM "#,
-            r#""file:///etc/passwd">]><svg>&x;</svg>"#,
-        );
+        let xxe = "<?xml version=\"1.0\"?><!DOCTYPE svg [<!ENTITY x SYSTEM \
+            \"file:///etc/passwd\">]><svg>&x;</svg>";
         assert!(matches!(
             sanitize_island(xxe, "f"),
             Err(IslandError::Xml(_))
@@ -792,18 +780,14 @@ mod tests {
 
     #[test]
     fn keeps_mathml() {
-        let out = clean(concat!(
-            r#"<math xmlns="http://www.w3.org/1998/Math/MathML" "#,
-            r#"display="block"><msub><mi>F</mi><mn>1</mn></msub><annotati"#,
-            r#"on encoding="application/x-tex">F_1</annotation></math>"#,
-        ));
+        let out = clean("<math xmlns=\"http://www.w3.org/1998/Math/MathML\" \
+            display=\"block\"><msub><mi>F</mi><mn>1</mn></msub><annotation \
+            encoding=\"application/x-tex\">F_1</annotation></math>");
         assert_eq!(
             out,
-            concat!(
-                r#"<math display="block" id="f1-root" "#,
-                r#"xmlns="http://www.w3.org/1998/Math/MathML"><msub><mi>F</mi"#,
-                r#"><mn>1</mn></msub></math>"#,
-            )
+            "<math display=\"block\" id=\"f1-root\" \
+                xmlns=\"http://www.w3.org/1998/Math/MathML\"><msub><mi>F</mi><m\
+                n>1</mn></msub></math>"
         );
     }
 }

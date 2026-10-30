@@ -608,11 +608,9 @@ mod tests {
 </r:Root>"#;
         assert_eq!(
             c14n(xml, &["Child"]),
-            concat!(
-                r#"<a:Child xmlns:a="urn:a" a="1" b="2" "#,
-                r#"a:z="&amp;&lt;&quot;"><Inner xmlns="urn:d">x &gt; "#,
-                r#"y</Inner><a:Empty></a:Empty></a:Child>"#,
-            )
+            "<a:Child xmlns:a=\"urn:a\" a=\"1\" b=\"2\" \
+                a:z=\"&amp;&lt;&quot;\"><Inner xmlns=\"urn:d\">x &gt; \
+                y</Inner><a:Empty></a:Empty></a:Child>"
         );
     }
 
@@ -623,10 +621,8 @@ mod tests {
         assert_eq!(c14n(xml, &["Child"]), "<Child><Leaf></Leaf></Child>");
         assert_eq!(
             c14n(xml, &[]),
-            concat!(
-                r#"<Root xmlns="urn:d"><Child "#,
-                r#"xmlns=""><Leaf></Leaf></Child></Root>"#,
-            )
+            "<Root xmlns=\"urn:d\"><Child \
+                xmlns=\"\"><Leaf></Leaf></Child></Root>"
         );
     }
 

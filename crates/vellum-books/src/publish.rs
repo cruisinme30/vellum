@@ -425,7 +425,7 @@ fn nav_html(toc: &Toc, current: &str) -> String {
     for item in &toc.items {
         match item {
             TocItem::Chapter(entry) => {
-                nav_entry(&mut out, entry, current, &root)
+                nav_entry(&mut out, entry, current, &root);
             }
             TocItem::Part { title } => {
                 let _ = writeln!(
@@ -435,7 +435,7 @@ fn nav_html(toc: &Toc, current: &str) -> String {
                 );
             }
             TocItem::Separator => {
-                out.push_str("<li class=\"sep\" role=\"separator\"></li>\n")
+                out.push_str("<li class=\"sep\" role=\"separator\"></li>\n");
             }
         }
     }

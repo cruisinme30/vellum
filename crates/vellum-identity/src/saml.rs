@@ -653,10 +653,8 @@ mod tests {
 
     #[test]
     fn metadata_with_a_dtd_is_refused() {
-        let xml = concat!(
-            r#"<?xml version="1.0"?><!DOCTYPE x [<!ENTITY a "#,
-            r#""aaaa">]><x>&a;</x>"#,
-        );
+        let xml = "<?xml version=\"1.0\"?><!DOCTYPE x [<!ENTITY a \
+            \"aaaa\">]><x>&a;</x>";
         assert_eq!(
             parse_metadata(xml.as_bytes()).unwrap_err().kind(),
             ErrorKind::InvalidInput

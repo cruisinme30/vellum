@@ -388,7 +388,7 @@ impl Summary {
                         blocks.push(link(chapter));
                     }
                     Item::Chapter(chapter) => {
-                        write_list_item(&mut list, chapter, 0)
+                        write_list_item(&mut list, chapter, 0);
                     }
                     Item::Separator | Item::Part(_) => {
                         if !list.is_empty() {
@@ -567,7 +567,7 @@ impl<'a> SummaryParser<'a> {
                     match phase {
                         Phase::Prefix => summary.prefix.push(Item::Separator),
                         Phase::Numbered => {
-                            summary.numbered.push(Item::Separator)
+                            summary.numbered.push(Item::Separator);
                         }
                         Phase::Suffix => summary.suffix.push(Item::Separator),
                     }

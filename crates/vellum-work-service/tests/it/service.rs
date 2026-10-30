@@ -875,10 +875,9 @@ async fn events_name_who_made_the_change() {
 async fn saved_views_are_shared_by_visibility_and_survive_a_restart() {
     let w = world().await;
     with_eng(&w).await;
-    let filter = concat!(
-        r#"{"or":[{"field":"priority","op":"is","values":["urgent"]},{"field""#,
-        r#":"assignee","op":"is","values":["@me"]}]}"#,
-    );
+    let filter = "{\"or\":[{\"field\":\"priority\",\"op\":\"is\",\"values\":[\"\
+        urgent\"]},{\"field\":\"assignee\",\"op\":\"is\",\"values\":[\"@me\"]}]\
+        }";
     let team_view = w
         .call(
             "dev",

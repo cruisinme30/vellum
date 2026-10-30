@@ -191,11 +191,9 @@ fn mcp_demo_answers_discover_over_stdio() {
         .stderr(Stdio::null())
         .spawn()
         .unwrap();
-    let request = concat!(
-        r#"{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_met"#,
-        r#"a":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.mod"#,
-        r#"elcontextprotocol/clientCapabilities":{}}}}"#,
-    );
+    let request = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"server/discover\"\
+        ,\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2\
+        026-07-28\",\"io.modelcontextprotocol/clientCapabilities\":{}}}}";
     let mut stdin = child.stdin.take().unwrap();
     writeln!(stdin, "{request}").unwrap();
     drop(stdin);

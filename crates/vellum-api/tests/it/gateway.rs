@@ -882,10 +882,8 @@ async fn graphql_covers_every_operation() -> TestResult {
     let read = send(
         &gw,
         gql(
-            concat!(
-                r#"{ notesGet(input: {space: "eng", id: 3}) { id text "#,
-                r#"priority labels } }"#,
-            ),
+            "{ notesGet(input: {space: \"eng\", id: 3}) { id text priority \
+                labels } }",
             "Bearer read",
         )?,
     )
@@ -905,10 +903,9 @@ async fn graphql_covers_every_operation() -> TestResult {
         "{}",
         read.text
     );
-    let created = send(&gw, gql(concat!(
-        r#"mutation { notesCreate(input: {space: "eng", text: "via graphql", "#,
-        r#"labels: ["x"]}) { id text } }"#,
-    ), "Bearer full")?).await?;
+    let created = send(&gw, gql("mutation { notesCreate(input: {space: \
+        \"eng\", text: \"via graphql\", labels: [\"x\"]}) { id text } \
+        }", "Bearer full")?).await?;
     assert_eq!(
         created.body.pointer("/data/notesCreate/text"),
         Some(&json!("via graphql")),
@@ -919,10 +916,8 @@ async fn graphql_covers_every_operation() -> TestResult {
     let denied = send(
         &gw,
         gql(
-            concat!(
-                r#"mutation { notesCreate(input: {space: "eng", text: "no"}) "#,
-                r#"{ id } }"#,
-            ),
+            "mutation { notesCreate(input: {space: \"eng\", text: \"no\"}) { \
+                id } }",
             "Bearer read",
         )?,
     )
