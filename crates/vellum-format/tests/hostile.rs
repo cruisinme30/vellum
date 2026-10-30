@@ -176,3 +176,38 @@ i: &i [*h,*h,*h,*h,*h,*h,*h,*h,*h]\n---\nbody\n";
     );
     let _ = survive(deep_map, BUDGET);
 }
+
+/// Fuzzer finding (`format_roundtrip`): an inline HTML tag that spans a line
+/// break was kept as one text run holding `\n`, which reads back as a soft
+/// break once the tag is escaped.
+#[test]
+fn raw_html_spanning_lines_round_trips() {
+    use vellum_format::ast::{Block, Inline};
+    let text = |t: &str| Inline::Text { text: t.into() };
+    let doc = parse("<di\nv class=\"note\">\nNever interpreted.\n").document;
+    assert_eq!(
+        doc.blocks,
+        vec![Block::Paragraph {
+            content: vec![
+                text("<di"),
+                Inline::SoftBreak,
+                text("v class=\"note\">"),
+                Inline::SoftBreak,
+                text("Never interpreted."),
+            ],
+            id: None,
+        }]
+    );
+    for src in [
+        "<di\nv class=\"note\">\nNever interpreted.\n",
+        "<di\r\nv class=\"note\">\nNever interpreted.\n</div>\n",
+        "x <di  \nv class=\"note\">\n",
+        "x <di \t\n   v class=\"note\">\n",
+        "x <a b='x\\\n'> y\n",
+        "<a\nb>\n===\n",
+        "- x <a\n  b> y\n",
+    ] {
+        let codes = survive(src.to_owned(), BUDGET);
+        assert!(codes.contains(&DiagnosticCode::RawHtml), "{src:?}");
+    }
+}

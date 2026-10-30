@@ -357,7 +357,8 @@ impl Cx<'_> {
             NodeValue::LineBreak => Inline::HardBreak,
             NodeValue::HtmlInline(html) => {
                 self.raw_html(node);
-                Inline::Text { text: html }
+                out.extend(html_text(&html));
+                return;
             }
             NodeValue::Emph => Inline::Emphasis {
                 content: self.inlines(node),
@@ -416,6 +417,44 @@ impl Cx<'_> {
         };
         out.push(inline);
     }
+}
+
+/// Raw inline HTML shown as text. A tag may span lines, but text cannot
+/// hold a line ending: each one becomes the break it reads back as once
+/// the text is escaped, with the whitespace around it dropped as at the
+/// end and start of any paragraph line.
+fn html_text(html: &str) -> Vec<Inline> {
+    let mut out = Vec::new();
+    let mut lines = html.split('\n').peekable();
+    let mut first = true;
+    while let Some(line) = lines.next() {
+        let line = if first {
+            line
+        } else {
+            line.trim_start_matches([' ', '\t'])
+        };
+        first = false;
+        let last = lines.peek().is_none();
+        let text = if last {
+            line
+        } else {
+            line.trim_end_matches([' ', '\t'])
+        };
+        if !text.is_empty() {
+            out.push(Inline::Text {
+                text: text.to_owned(),
+            });
+        }
+        if !last {
+            let spaces = line.len() - line.trim_end_matches(' ').len();
+            out.push(if spaces >= 2 {
+                Inline::HardBreak
+            } else {
+                Inline::SoftBreak
+            });
+        }
+    }
+    out
 }
 
 /// Trims whitespace from the start of the first and end of the last text
