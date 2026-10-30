@@ -11,8 +11,8 @@ vellum: 1
 
 - Date: 2026-10-30
 - Status: accepted
-- Decisions: D286, D287, D288, D289
-- Issue: #522
+- Decisions: D286, D287, D288, D289, D302
+- Issue: #522, #537
 - Pull requests: to be linked when merged
 
 :::
@@ -85,6 +85,20 @@ were inserted as markup.
   It holds no page content or credentials. A blocked clipboard shows the
   text to copy by hand.
 
+### D302: figures follow the accent colour
+
+- `render.stylesheet` takes an optional `seed` (`rrggbb`). With it, every
+  built-in theme in the sheet is `Theme::from_seed(theme, seed)`, so
+  figures keep contrast-checked pairs while primary, chart, callout and
+  syntax colours lean towards the accent. A bad seed is a 400.
+- The app asks with the accent in use: a custom theme's seed, else the
+  user's, else the organisation's
+  ([#537](https://github.com/cruisinme30/vellum/issues/537)). Vellum's own
+  seed sends none, so most users share one cached sheet. A new accent
+  swaps the sheet in place; only the newest request's answer is adopted.
+- A custom theme's token overrides still do not reach figures: they are
+  checked against the app's pairs, not the renderer's (see Alternatives).
+
 ## Alternatives
 
 - **Draw blocks from the page render, by block ID**: shows the saved page,
@@ -109,5 +123,7 @@ were inserted as markup.
   label text on `surface-container`. Edge labels now sit on
   `primary-container`, with a contrast test over every theme;
   `RENDER_VERSION` is 3, so cached renders refresh.
-- The accent seed and custom themes do not yet tint figures; built-in
-  themes do.
+- The accent seed and a custom theme's seed tint figures (D302); a
+  custom theme's individual token overrides do not.
+- `web/e2e/render.spec.ts` passes in Chromium, Firefox and WebKit at
+  laptop size, including the accent test.

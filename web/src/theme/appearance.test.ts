@@ -7,6 +7,7 @@ import {
   applyAppearance,
   DEFAULT_APPEARANCE,
   effectiveSeed,
+  figureSeed,
   loadAppearance,
   resolveTheme,
   saveAppearance,
@@ -177,6 +178,17 @@ describe("applyAppearance", () => {
       buildScheme("light", "#205020")["primary"],
     );
     expect(effectiveSeed(DEFAULT_APPEARANCE)).toBe(DEFAULT_SEED);
+  });
+
+  it("draws figures in the accent in use, or a custom theme's seed (D302)", () => {
+    expect(figureSeed(DEFAULT_APPEARANCE)).toBeUndefined();
+    expect(figureSeed({ ...DEFAULT_APPEARANCE, seed: DEFAULT_SEED })).toBeUndefined();
+    expect(figureSeed(DEFAULT_APPEARANCE, "#B02020")).toBe("#b02020");
+    expect(figureSeed({ ...DEFAULT_APPEARANCE, seed: "#205020" }, "#b02020")).toBe("#205020");
+    const custom = { name: "Ink", base: "dark", seed: "#225588", tokens: {} } as const;
+    expect(figureSeed({ ...DEFAULT_APPEARANCE, theme: "custom", custom }, "#b02020")).toBe(
+      "#225588",
+    );
   });
 
   it("applies a custom theme's tokens and marks the page", () => {

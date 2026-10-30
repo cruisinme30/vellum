@@ -25,8 +25,11 @@ export interface RenderApi {
   page(id: string): Promise<RenderedPageView>;
   /** One fenced block, drawn the way the page will show it. */
   block(input: BlockInput): Promise<RenderedBlockView>;
-  /** The stylesheet for rendered HTML, scoped to the app's render containers. */
-  stylesheet(): Promise<RenderStylesheet>;
+  /**
+   * The stylesheet for rendered HTML, scoped to the app's render containers.
+   * `seed`, an accent colour `#rrggbb`, tints figures to match the app (D302).
+   */
+  stylesheet(seed?: string): Promise<RenderStylesheet>;
 }
 
 /** Most blocks kept per tab; an edit that returns to an old text is instant. */
@@ -59,7 +62,12 @@ export function createHttpRenderApi(http: Http): RenderApi {
       }
       return drawn;
     },
-    stylesheet: () => http.get<RenderStylesheet>("/api/v1/render/stylesheet"),
+    stylesheet: (seed) =>
+      http.get<RenderStylesheet>(
+        seed === undefined
+          ? "/api/v1/render/stylesheet"
+          : `/api/v1/render/stylesheet?seed=${encodeURIComponent(seed.replace(/^#/, ""))}`,
+      ),
   };
 }
 

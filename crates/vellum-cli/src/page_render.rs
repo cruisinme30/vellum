@@ -117,10 +117,41 @@ pub struct RenderedBlockView {
     pub render_version: u32,
 }
 
-/// No input.
+/// Which accent colour to draw figures in (ADR 0068, D302).
 #[derive(Debug, Clone, Default, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub struct NoInput {}
+pub struct StylesheetInput {
+    /// The app's accent colour as six hex digits, `rrggbb` (a leading `#`
+    /// is accepted). Absent draws in Vellum's own colours.
+    #[serde(default)]
+    pub seed: Option<String>,
+}
+
+/// The app stylesheet for `seed`, or why the seed is unreadable.
+///
+/// # Errors
+///
+/// [`ErrorKind::InvalidInput`] when the seed is not six hex digits.
+pub fn app_stylesheet(seed: Option<&str>) -> Result<String, Error> {
+    let Some(raw) = seed.map(str::trim).filter(|s| !s.is_empty()) else {
+        return Ok(vellum_render::theme::scoped_stylesheet(
+            RENDER_SCOPE,
+            "data-theme",
+        ));
+    };
+    let hex = raw.strip_prefix('#').unwrap_or(raw);
+    let color: vellum_render::theme::Color = format!("#{hex}").parse().map_err(|_| {
+        Error::new(
+            ErrorKind::InvalidInput,
+            "seed must be six hex digits, rrggbb",
+        )
+    })?;
+    Ok(vellum_render::theme::scoped_stylesheet_from_seed(
+        RENDER_SCOPE,
+        "data-theme",
+        color,
+    ))
+}
 
 /// The stylesheet for rendered HTML inside the app.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
@@ -458,9 +489,9 @@ impl Service for PageRenderService {
                 "render.stylesheet",
                 "/v1/render/stylesheet",
                 Scope::Read,
-                |_ctx, _input: NoInput| async move {
+                |_ctx, input: StylesheetInput| async move {
                     Ok::<_, Error>(RenderStylesheet {
-                        css: vellum_render::theme::scoped_stylesheet(RENDER_SCOPE, "data-theme"),
+                        css: app_stylesheet(input.seed.as_deref())?,
                         scope: RENDER_SCOPE.trim_start_matches('.').to_owned(),
                         render_version: RENDER_VERSION,
                     })
@@ -849,6 +880,43 @@ mod tests {
         assert!(op.revalidates());
     }
 
+    #[tokio::test]
+    async fn the_app_stylesheet_follows_the_accent_colour() {
+        let w = world().await;
+        let plain = call(&w.ops, w.mara, "render.stylesheet", json!({}))
+            .await
+            .unwrap();
+        let tinted = call(
+            &w.ops,
+            w.mara,
+            "render.stylesheet",
+            json!({"seed": FIXTURE_ACCENT}),
+        )
+        .await
+        .unwrap();
+        let hashed = call(
+            &w.ops,
+            w.mara,
+            "render.stylesheet",
+            json!({"seed": "#C2185B"}),
+        )
+        .await
+        .unwrap();
+        assert_ne!(tinted["css"], plain["css"]);
+        assert_eq!(tinted["css"], hashed["css"]);
+        let seed = "#c2185b".parse().unwrap();
+        let dark =
+            vellum_render::theme::Theme::from_seed(vellum_render::theme::BuiltinTheme::Dark, seed);
+        let primary = format!("--vl-primary: {};", dark.get("primary"));
+        assert!(tinted["css"].as_str().unwrap().contains(&primary));
+        for bad in ["red", "12345", "#12345g", "1234567"] {
+            let err = call(&w.ops, w.mara, "render.stylesheet", json!({"seed": bad}))
+                .await
+                .unwrap_err();
+            assert_eq!(err.kind(), ErrorKind::InvalidInput, "{bad}");
+        }
+    }
+
     /// Fences from the render corpus that the web app's UI tests draw: one
     /// of every block issue #522 lists. Images and collections need the
     /// server's files, so they stay out.
@@ -884,6 +952,9 @@ mod tests {
         fences
     }
 
+    /// The accent colour the UI tests pick to see figures follow it.
+    const FIXTURE_ACCENT: &str = "c2185b";
+
     /// The server's answers the web UI tests replay (web/e2e/support/
     /// render-fixture.gen.json): the app stylesheet, every fixture block
     /// drawn alone, and a page holding all of them. Fails when the renderer
@@ -915,9 +986,20 @@ mod tests {
         let stylesheet = call(&w.ops, w.mara, "render.stylesheet", json!({}))
             .await
             .unwrap();
+        // The same sheet recoloured from an accent, for the D302 UI test.
+        let accented = call(
+            &w.ops,
+            w.mara,
+            "render.stylesheet",
+            json!({"seed": FIXTURE_ACCENT}),
+        )
+        .await
+        .unwrap();
         let fixture = json!({
             "markdown": page,
             "stylesheet": stylesheet,
+            "accent": format!("#{FIXTURE_ACCENT}"),
+            "stylesheet_accent": accented,
             "blocks": blocks,
             "page": {
                 "id": "01M6400000PAGE00ROADMAP001",

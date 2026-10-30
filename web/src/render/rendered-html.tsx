@@ -3,6 +3,8 @@
 
 import { useEffect, useRef } from "react";
 
+import { useFigureSeed } from "../theme/appearance-context";
+
 import type { RenderApi } from "./api";
 import { hydrateCalculators } from "./calculator";
 import { adoptCss, mountRendered } from "./mount";
@@ -12,26 +14,34 @@ const RENDER_SCOPE = "vl-render";
 
 interface Loading {
   readonly api: RenderApi;
+  readonly seed: string | undefined;
   done: Promise<void>;
-  remove?: () => void;
 }
 
 let loading: Loading | undefined;
+/** Removes the stylesheet in use, whichever request added it. */
+let removeAdopted: (() => void) | undefined;
 
 /**
- * Adds the renderer's stylesheet to the document once per server. Its
- * themes key off `<html data-theme>`, so a theme change restyles every
- * figure in place. A failure leaves figures unstyled but readable, and the
- * next rendered block tries again.
+ * Adds the renderer's stylesheet to the document once per server and
+ * accent colour. Its themes key off `<html data-theme>`, so a theme change
+ * restyles every figure in place; a new accent colour swaps the sheet for
+ * one recoloured from it (D302). A failure leaves figures unstyled but
+ * readable, and the next rendered block tries again.
  */
-function ensureRenderStylesheet(api: RenderApi, document_: Document = document): Promise<void> {
-  if (loading?.api === api) return loading.done;
-  const previous = loading;
-  const entry: Loading = { api, done: Promise.resolve() };
-  entry.done = api.stylesheet().then(
+export function ensureRenderStylesheet(
+  api: RenderApi,
+  seed?: string,
+  document_: Document = document,
+): Promise<void> {
+  if (loading?.api === api && loading.seed === seed) return loading.done;
+  const entry: Loading = { api, seed, done: Promise.resolve() };
+  entry.done = api.stylesheet(seed).then(
     ({ css }) => {
-      previous?.remove?.();
-      entry.remove = adoptCss(css, document_);
+      // A newer accent may have been asked for while this one loaded.
+      if (loading !== entry) return;
+      removeAdopted?.();
+      removeAdopted = adoptCss(css, document_);
     },
     () => {
       if (loading === entry) loading = undefined;
@@ -63,9 +73,10 @@ export function RenderedHtml({
   readonly label?: string;
 }) {
   const reference = useRef<HTMLDivElement>(null);
+  const seed = useFigureSeed();
   useEffect(() => {
-    void ensureRenderStylesheet(api);
-  }, [api]);
+    void ensureRenderStylesheet(api, seed);
+  }, [api, seed]);
   useEffect(() => {
     const root = reference.current;
     if (root === null) return;

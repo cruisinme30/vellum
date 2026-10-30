@@ -16,6 +16,7 @@ import { mediaQuery } from "../shell/use-media";
 
 import {
   applyAppearance,
+  figureSeed,
   loadAppearance,
   loadReadingFont,
   saveAppearance,
@@ -127,4 +128,15 @@ export function useAppearance(): AppearanceState {
     throw new Error("useAppearance needs an AppearanceProvider");
   }
   return value;
+}
+
+/**
+ * The accent colour rendered figures are drawn in (D302): the custom
+ * theme's seed, else the user's or the organisation's accent. Undefined
+ * means Vellum's own colours, and outside an {@link AppearanceProvider}
+ * (tests, embeds) too.
+ */
+export function useFigureSeed(): string | undefined {
+  const value = use(AppearanceContext);
+  return value === undefined ? undefined : figureSeed(value.appearance, value.organisation?.seed);
 }
