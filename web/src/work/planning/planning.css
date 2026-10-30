@@ -234,6 +234,11 @@
   overflow-x: auto;
 }
 
+.vl-plan-chart:focus-visible {
+  outline: 3px solid var(--md-primary);
+  outline-offset: 2px;
+}
+
 .vl-plan-chart figcaption {
   margin-bottom: 8px;
   font-weight: 500;

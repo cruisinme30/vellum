@@ -52,8 +52,12 @@ function Chart({
   const t = useT();
   const value = (r: Row) => (counting ? r.count : (r.p85 ?? 0));
   const max = Math.max(1, ...rows.map((r) => value(r)));
+  // The chart scrolls sideways on a narrow or zoomed screen, so it takes
+  // keyboard focus (WCAG 2.1.1, axe `scrollable-region-focusable`); its
+  // caption names it.
   return (
-    <figure className="vl-plan-chart">
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- see above
+    <figure className="vl-plan-chart" tabIndex={0}>
       <figcaption>{title}</figcaption>
       <table>
         <thead>
