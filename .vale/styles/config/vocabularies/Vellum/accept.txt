@@ -185,3 +185,6 @@ unlinks
 Hyperlegible
 nfpm
 winget
+rustc
+renderer's
+revalidates
