@@ -8,6 +8,7 @@ import { useT } from "../i18n/i18n";
 
 import { DESTINATIONS, type Destination } from "./destinations";
 import { Icon } from "./icon";
+import { NewButton, type NewActions } from "./new-menu";
 import { Popover } from "./popover";
 import { ThemeSettings } from "./theme-menu";
 
@@ -24,7 +25,8 @@ function RailLink({ destination }: { readonly destination: Destination }) {
 }
 
 interface NavProperties {
-  readonly onNew: () => void;
+  /** What New makes: a page, and a book where books can be made. */
+  readonly onNew: NewActions;
 }
 
 /** The Material 3 navigation rail, for windows 600 px and wider. */
@@ -47,10 +49,10 @@ export function NavigationRail({
       >
         <Icon name="menu" />
       </button>
-      <button type="button" className="vl-fab" onClick={onNew}>
+      <NewButton actions={onNew} className="vl-fab">
         <Icon name="edit" />
         <span className="vl-rail-label">{t("nav-new")}</span>
-      </button>
+      </NewButton>
       <RailLink destination={DESTINATIONS.home} />
       <RailLink destination={DESTINATIONS.search} />
       <RailLink destination={DESTINATIONS.favorites} />
@@ -121,12 +123,12 @@ export function BottomBar({
     // padding lets the last content scroll clear of it. The UI suite's
     // overlap check is told so.
     <nav ref={bar} className="vl-bottom-bar" aria-label={t("nav-label")} data-allow-overlap="">
-      <button type="button" className="vl-rail-item" onClick={onNew}>
+      <NewButton actions={onNew} className="vl-rail-item">
         <span className="vl-rail-indicator">
           <Icon name="edit" />
         </span>
         <span className="vl-rail-label">{t("nav-new")}</span>
-      </button>
+      </NewButton>
       <RailLink destination={DESTINATIONS.home} />
       <RailLink destination={DESTINATIONS.search} />
       <RailLink destination={DESTINATIONS.inbox} />

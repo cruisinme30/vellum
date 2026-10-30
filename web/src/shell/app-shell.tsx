@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Outlet, useLocation, useMatch, useNavigate } from "react-router";
 
 import { useServiceHealth } from "../api/health";
+import { useServerApi } from "../data/server-apis";
 import type { StoreProblem } from "../data/store";
 import { useServices, useWorkspace } from "../data/workspace-context";
 import { useT } from "../i18n/i18n";
@@ -12,6 +13,20 @@ import { useT } from "../i18n/i18n";
 import { BottomBar, NavigationRail } from "./navigation";
 import { Sidebar } from "./sidebar";
 import { COMPACT, MEDIUM, useMedia } from "./use-media";
+
+/**
+ * New → Book, which opens the New book form, where books can be made:
+ * they live on a server (#566, D323).
+ */
+function useNewBook(): (() => void) | undefined {
+  const navigate = useNavigate();
+  const books = useServerApi("books");
+  return books === undefined
+    ? undefined
+    : () => {
+        void navigate("/books?new=book");
+      };
+}
 
 /**
  * The Material 3 app shell: navigation rail, sidebar page tree and main
@@ -51,6 +66,7 @@ export function AppShell() {
       });
     }
   };
+  const onNew = { page: newPage, book: useNewBook() };
   const closeOverlay = () => {
     if (compact) {
       setSheet(false);
@@ -67,7 +83,7 @@ export function AppShell() {
       </a>
       {!compact && (
         <NavigationRail
-          onNew={newPage}
+          onNew={onNew}
           sidebarOpen={sidebar}
           onToggleSidebar={() => {
             setSidebar(!sidebar);
@@ -92,7 +108,7 @@ export function AppShell() {
       </main>
       {compact && (
         <BottomBar
-          onNew={newPage}
+          onNew={onNew}
           moreOpen={sheet}
           onMore={() => {
             setSheet(!sheet);

@@ -37,6 +37,8 @@ interface AccessInput {
 /** The book operations the web app uses. */
 export interface BooksApi {
   list(): Promise<BookSummary[]>;
+  /** Makes an empty book in a drive folder, such as `drives/users/priya`. */
+  create(title: string, folder: string): Promise<BookSummary>;
   /** A book with its table of contents. */
   book(id: string): Promise<BookInfo>;
   section(book: string, section: string): Promise<SectionDocument>;
@@ -74,6 +76,8 @@ export function createHttpBooksApi(http: Http): BooksApi {
       const found = await http.get<Out<"books.list">>(BOOKS);
       return found.books.toSorted((a, b) => a.title.localeCompare(b.title));
     },
+    create: (title, folder) =>
+      http.send<Out<"books.create">>("POST", BOOKS, { title, folder } satisfies In<"books.create">),
     book: (id) => http.get<BookInfo>(bookPath(id)),
     section: (book, section) => http.get<SectionDocument>(sectionPath(book, section)),
     addSection: (book, title, place) =>

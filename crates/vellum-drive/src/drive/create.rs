@@ -388,6 +388,104 @@ impl Drive {
         .await
     }
 
+    /// Creates an empty book titled `title` in the drive folder `folder`
+    /// (a space's root folder or a live folder): `Title.book/` with its
+    /// `book.yaml` and `SUMMARY.md`, owned by its creator (D322).
+    ///
+    /// # Errors
+    /// `Invalid` for a blank title or a path that is not such a folder,
+    /// `PermissionDenied` without edit rights on it, `QuotaExceeded`.
+    #[tracing::instrument(name = "drive.create_book", skip_all, fields(folder = %folder), err)]
+    pub async fn create_book(
+        &self,
+        actor: &Actor,
+        folder: &BlobPath,
+        title: &str,
+    ) -> DriveResult<Node> {
+        self.observe("create_book", async {
+            let title = title.trim();
+            if title.is_empty() {
+                return Err(DriveError::Invalid("a book needs a title".into()));
+            }
+            let (space, parent) = self.editable_folder(actor, folder).await?;
+            let path = self.free_path(folder, NodeKind::Book, title, None).await?;
+            let id = ObjectId::generate();
+            let book_id = vellum_books::BookId::parse(&id.to_string())
+                .map_err(|e| DriveError::Invalid(format!("bad book id: {e}")))?;
+            let book = vellum_books::Book::new(book_id, title);
+            let manifest = book
+                .manifest_text()
+                .map_err(|e| DriveError::Invalid(format!("cannot write book.yaml: {e}")))?;
+            let summary = book.summary_text();
+            let size = (manifest.len() + summary.len()) as u64;
+            self.ensure_quota(&space, size).await?;
+            let _ = self
+                .store
+                .put(
+                    &layout::id_file(NodeKind::Book, &path)?,
+                    Bytes::from(manifest),
+                    Precondition::IfAbsent,
+                )
+                .await?;
+            let _ = self
+                .store
+                .put(
+                    &path.join(layout::BOOK_SUMMARY_FILE)?,
+                    Bytes::from(summary),
+                    Precondition::IfAbsent,
+                )
+                .await?;
+            let node = Node {
+                id,
+                space: space.id,
+                kind: NodeKind::Book,
+                parent,
+                title: title.to_owned(),
+                path,
+                size,
+                modified: self.clock.now(),
+                created_by: Self::user_of(actor),
+                target: None,
+                trash: None,
+            };
+            self.created(actor, &node).await?;
+            Ok(node)
+        })
+        .await
+    }
+
+    /// The space and parent node of `dir`, a space's root folder or a live
+    /// folder, after checking `actor` may edit there (D305).
+    async fn editable_folder(
+        &self,
+        actor: &Actor,
+        dir: &BlobPath,
+    ) -> DriveResult<(Space, Option<ObjectId>)> {
+        let space = self
+            .index
+            .spaces()
+            .await?
+            .into_iter()
+            .find(|s| dir.starts_with(&s.root))
+            .ok_or_else(|| DriveError::Invalid(format!("{dir} is not in a space")))?;
+        let parent = if *dir == space.root {
+            None
+        } else {
+            match self.index.node_at(space.id, dir).await? {
+                Some(n) if n.kind == NodeKind::Folder && n.is_live() => Some(n.id),
+                _ => return Err(DriveError::Invalid(format!("{dir} is not a folder"))),
+            }
+        };
+        self.authorize(
+            actor,
+            space.id,
+            parent.unwrap_or_else(|| space.node_id()),
+            Permission::Edit,
+        )
+        .await?;
+        Ok((space, parent))
+    }
+
     /// Indexes a book or collection another service has just written at
     /// `path`, as if the drive had made it: the creator owns it, and it
     /// is in the folder tree (and so in permissions) at once (D321).
@@ -412,28 +510,7 @@ impl Drive {
             let dir = path
                 .parent()
                 .ok_or_else(|| DriveError::Invalid(format!("{path} is not in a space")))?;
-            let space = self
-                .index
-                .spaces()
-                .await?
-                .into_iter()
-                .find(|s| dir.starts_with(&s.root))
-                .ok_or_else(|| DriveError::Invalid(format!("{path} is not in a space")))?;
-            let parent = if dir == space.root {
-                None
-            } else {
-                match self.index.node_at(space.id, &dir).await? {
-                    Some(n) if n.kind == NodeKind::Folder && n.is_live() => Some(n.id),
-                    _ => return Err(DriveError::Invalid(format!("{dir} is not a folder"))),
-                }
-            };
-            self.authorize(
-                actor,
-                space.id,
-                parent.unwrap_or_else(|| space.node_id()),
-                Permission::Edit,
-            )
-            .await?;
+            let (space, parent) = self.editable_folder(actor, &dir).await?;
             let (text, _) = self.read_text(&layout::id_file(kind, path)?).await?;
             let id: ObjectId = frontmatter::get(&text, "id")
                 .and_then(|id| id.parse().ok())

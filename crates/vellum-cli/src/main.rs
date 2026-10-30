@@ -19,6 +19,8 @@ mod admin;
 mod assist;
 mod at_rest;
 mod backup_cli;
+#[cfg(test)]
+mod books_tests;
 mod cluster;
 mod collab;
 #[cfg(test)]

@@ -28,12 +28,12 @@ use vellum_store::{BlobPath, BlobStore, Precondition, StoreError};
 
 use crate::access::Access;
 use crate::api::{
-    AddSection, At, BookInfo, BookKey, BookList, BookSummary, CopySection, CreateSnapshot, Created,
-    DiffChanged, DiffInput, DiffMoved, DiffOutput, DiffSection, HistoryEntry, HistoryInput,
-    HistoryList, ListBooks, MergeSection, MoveSection, OutlineLine, PlaceInput, Publication,
-    PublicationList, Publish, PublishFormat, Region, Removed, RestoreOutline, SectionAccessInfo,
-    SectionDoc, SectionKey, SetSectionAccess, SnapshotInfo, SnapshotList, SplitSection, TocLine,
-    TocNode, TransferSection, UpdateSection,
+    AddSection, At, BookInfo, BookKey, BookList, BookSummary, CopySection, CreateBook,
+    CreateSnapshot, Created, DiffChanged, DiffInput, DiffMoved, DiffOutput, DiffSection,
+    HistoryEntry, HistoryInput, HistoryList, ListBooks, MergeSection, MoveSection, OutlineLine,
+    PlaceInput, Publication, PublicationList, Publish, PublishFormat, Region, Removed,
+    RestoreOutline, SectionAccessInfo, SectionDoc, SectionKey, SetSectionAccess, SnapshotInfo,
+    SnapshotList, SplitSection, TocLine, TocNode, TransferSection, UpdateSection,
 };
 use crate::files::{self, Loaded, book_error};
 use crate::history::{self, Record};
@@ -43,10 +43,29 @@ use crate::publish;
 /// Renders a page body for a published site; must return sanitised HTML.
 pub type SiteRenderer = Arc<dyn vellum_books::publish::Renderer + Send + Sync>;
 
+/// Makes a new book's folder, where the drive keeps its tree (D322).
+///
+/// The drive owns the folder tree that a book's permissions follow, so it
+/// makes the book: it checks the caller may edit the folder, writes
+/// `book.yaml` and `SUMMARY.md`, and indexes the book with its creator as
+/// owner.
+#[async_trait::async_trait]
+pub trait Shelf: Send + Sync + fmt::Debug {
+    /// Makes an empty book titled `title` in `folder` for `principal`;
+    /// returns its ID and `.book` folder.
+    async fn create(
+        &self,
+        principal: &Principal,
+        folder: &BlobPath,
+        title: &str,
+    ) -> Result<(BookId, BlobPath), Error>;
+}
+
 /// Serves books over the gateway.
 pub struct BooksService {
     store: Arc<dyn BlobStore>,
     access: Arc<dyn Access>,
+    shelf: Option<Arc<dyn Shelf>>,
     books: RwLock<Option<BTreeMap<BookId, BlobPath>>>,
     writes: Mutex<()>,
     renderer: SiteRenderer,
@@ -278,10 +297,58 @@ impl BooksService {
         Self {
             store,
             access,
+            shelf: None,
             books: RwLock::new(None),
             writes: Mutex::new(()),
             renderer: Arc::new(vellum_books::publish::PlainRenderer),
         }
+    }
+
+    /// Lets `books.create` make books through `shelf`; without one, it is
+    /// refused.
+    #[must_use]
+    pub fn with_shelf(mut self, maker: Arc<dyn Shelf>) -> Self {
+        self.shelf = Some(maker);
+        self
+    }
+
+    /// Makes an empty book in a drive folder and returns it (D322).
+    ///
+    /// # Errors
+    ///
+    /// `invalid_input` for a blank title or a bad folder,
+    /// `permission_denied` without edit rights on the folder or without a
+    /// drive to make books in.
+    pub async fn create(
+        &self,
+        ctx: &RequestContext,
+        input: CreateBook,
+    ) -> Result<BookSummary, Error> {
+        observe("create", async {
+            let Some(maker) = &self.shelf else {
+                return Err(Error::new(
+                    ErrorKind::PermissionDenied,
+                    "books can only be created in a drive",
+                ));
+            };
+            let title = input.title.trim();
+            if title.is_empty() {
+                return Err(Error::new(ErrorKind::InvalidInput, "a book needs a title"));
+            }
+            let folder = BlobPath::new(input.folder.trim_end_matches('/'))
+                .map_err(|e| Error::new(ErrorKind::InvalidInput, format!("bad folder: {e}")))?;
+            let (id, dir) = maker.create(&ctx.principal, &folder, title).await?;
+            // Known at once, so the list shows it without a fresh listing.
+            if let Some(books) = self.books.write().await.as_mut() {
+                let _ = books.insert(id, dir.clone());
+            }
+            Ok(BookSummary {
+                id,
+                title: title.to_owned(),
+                path: dir.as_str().to_owned(),
+            })
+        })
+        .await
     }
 
     /// Renders published sites with `renderer` (the render service)
@@ -1377,6 +1444,8 @@ impl Service for BooksService {
         vec![
             op!(self, query "books.list", "/v1/books", Scope::Read, list_op,
                 "List the books you can open"),
+            op!(self, Post "books.create", "/v1/books", Scope::WriteDirect, create,
+                "Create an empty book in a drive folder"),
             op!(self, query "books.get", "/v1/books/{book_id}", Scope::Read, get_op,
                 "Get a book's settings and table of contents"),
             op!(self, query "books.get_section", "/v1/books/{book_id}/sections/{section_id}",

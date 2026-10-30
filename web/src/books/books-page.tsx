@@ -12,8 +12,9 @@ import { CopyDiagnostic } from "../shell/copy-diagnostic";
 import { ExportButton } from "../transfer/export-button";
 
 import { AccessPanel } from "./access-panel";
-import type { BookInfo, BooksApi, BookSummary, Place, TocLine } from "./api";
+import type { BookInfo, BooksApi, Place, TocLine } from "./api";
 import { BookTree } from "./book-tree";
+import { AllBooks, bookPath } from "./books-index";
 import { HistoryPanel } from "./history-panel";
 import { MarkdownReader } from "./markdown";
 import { isNode, outlineRows, type OutlineRow } from "./outline";
@@ -23,29 +24,8 @@ import { SnapshotsPanel } from "./snapshots-panel";
 
 import "./books.css";
 
-const bookPath = (book: string) => `/books/${encodeURIComponent(book)}`;
 const sectionPath = (book: string, section: string) =>
   `${bookPath(book)}/${encodeURIComponent(section)}`;
-
-function BookList({ books }: { readonly books: readonly BookSummary[] }) {
-  const t = useT();
-  if (books.length === 0) return <p className="vl-muted">{t("books-empty")}</p>;
-  return (
-    <ul className="vl-book-list">
-      {books.map((book) => (
-        <li key={book.id}>
-          <Link to={bookPath(book.id)}>{book.title}</Link>
-          <small className="vl-muted">{book.path}</small>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function AllBooks({ api }: { readonly api: BooksApi }) {
-  const loaded = useLoaded(() => api.list(), [api], failureText);
-  return <Ready loaded={loaded}>{(books) => <BookList books={books} />}</Ready>;
-}
 
 /** Books: every book the person can read. */
 export function BooksPage() {

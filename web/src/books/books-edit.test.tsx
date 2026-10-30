@@ -77,6 +77,7 @@ function fakeApi(role: string): FakeApi {
         { id: "b2", title: "Guide", path: "g.book" },
       ]),
     ),
+    create: vi.fn(() => Promise.resolve({ id: "b3", title: "New", path: "n.book" })),
     book: vi.fn(() => Promise.resolve(book(role))),
     section: vi.fn((_b: string, s: string) => Promise.resolve(sectionDocument(s, manager))),
     addSection: vi.fn(() => Promise.resolve(sectionDocument("s9", manager))),

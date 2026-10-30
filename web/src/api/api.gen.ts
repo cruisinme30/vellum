@@ -1188,6 +1188,24 @@ export interface BooksCopySectionPlaceInput {
 }
 
 /**
+ * A book in a list.
+ */
+export interface BooksCreateBookSummary {
+  /**
+   * The book.
+   */
+  id: BookId;
+  /**
+   * The `.book` folder.
+   */
+  path: string;
+  /**
+   * Its title.
+   */
+  title: string;
+}
+
+/**
  * A snapshot's header.
  */
 export interface BooksCreateSnapshotSnapshotInfo {
@@ -2176,6 +2194,21 @@ export interface CopySection {
    * The section.
    */
   section_id: string;
+}
+
+/**
+ * `books.create`: a new, empty book (D322).
+ */
+export interface CreateBook {
+  /**
+   * The drive folder to make it in: a space's root folder, such as
+   * `drives/users/priya`, or a folder of one.
+   */
+  folder: string;
+  /**
+   * Its title, which also names its `.book` folder.
+   */
+  title: string;
 }
 
 /**
@@ -12815,6 +12848,13 @@ export interface Operations {
     input: CopySection;
     output: Created;
   };
+  /** Create an empty book in a drive folder */
+  "books.create": {
+    method: "POST";
+    path: "/v1/books";
+    input: CreateBook;
+    output: BooksCreateBookSummary;
+  };
   /** Tag the current book */
   "books.create_snapshot": {
     method: "POST";
@@ -14398,6 +14438,7 @@ export const OPERATIONS = {
   "assist.test": { method: "POST", path: "/v1/assist/test", mutation: true },
   "books.add_section": { method: "POST", path: "/v1/books/{book_id}/sections", mutation: true },
   "books.copy_section": { method: "POST", path: "/v1/books/{book_id}/sections/{section_id}/copy", mutation: true },
+  "books.create": { method: "POST", path: "/v1/books", mutation: true },
   "books.create_snapshot": { method: "POST", path: "/v1/books/{book_id}/snapshots", mutation: true },
   "books.diff": { method: "GET", path: "/v1/books/{book_id}/diff", mutation: false },
   "books.get": { method: "GET", path: "/v1/books/{book_id}", mutation: false },

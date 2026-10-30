@@ -54,4 +54,4 @@ mod service;
 
 pub use access::{Access, AuthzAccess, MirrorReport, SpaceOf};
 pub use mirror::Restrictions;
-pub use service::{BooksService, SiteRenderer};
+pub use service::{BooksService, Shelf, SiteRenderer};

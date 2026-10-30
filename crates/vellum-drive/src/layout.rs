@@ -33,6 +33,8 @@ pub const FOLDER_FILE: &str = ".vellum-folder.yaml";
 pub const ORDER_FILE: &str = ".vellum-order.yaml";
 /// The manifest inside a book folder.
 pub const BOOK_FILE: &str = "book.yaml";
+/// The table of contents inside a book folder.
+pub const BOOK_SUMMARY_FILE: &str = "SUMMARY.md";
 /// The schema inside a collection folder.
 pub const COLLECTION_FILE: &str = "schema.yaml";
 /// File name of a trash entry's manifest.

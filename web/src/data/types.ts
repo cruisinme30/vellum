@@ -13,6 +13,8 @@ export interface Space {
   readonly slug: string;
   readonly name: string;
   readonly icon: string;
+  /** Its folder on the server, such as `drives/users/priya`; absent in the demo. */
+  readonly root?: string;
 }
 
 /** Page status from front matter. */

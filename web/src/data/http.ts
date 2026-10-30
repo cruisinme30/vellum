@@ -89,6 +89,7 @@ function spaceOf(space: SpaceView): Space {
     slug: space.slug,
     name: space.name,
     icon: space.kind === "user_drive" ? "🏠" : "👥",
+    root: `drives/${space.kind === "user_drive" ? "users" : "shared"}/${space.slug}`,
   };
 }
 

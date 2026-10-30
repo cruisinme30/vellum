@@ -17,7 +17,7 @@ use crate::mcp_tests::{World, world};
 use crate::services::{Services, VERSION};
 
 /// A server over a fresh plaintext workspace.
-async fn server(dir: &std::path::Path) -> (Services, Router) {
+pub async fn server(dir: &std::path::Path) -> (Services, Router) {
     let mut config = vellum_kernel::Config::default();
     config.data_dir = dir.to_path_buf();
     let plaintext = |k: &str| (k == crate::workspace::PLAINTEXT_VAR).then(|| "1".to_owned());
@@ -37,11 +37,11 @@ async fn server(dir: &std::path::Path) -> (Services, Router) {
     (services, app)
 }
 
-async fn post(app: &Router, w: &World, path: &str, body: &Value) -> Reply {
+pub async fn post(app: &Router, w: &World, path: &str, body: &Value) -> Reply {
     send(app, w.post(path, body)).await
 }
 
-async fn get(app: &Router, w: &World, path: &str) -> Reply {
+pub async fn get(app: &Router, w: &World, path: &str) -> Reply {
     send(
         app,
         finish(request("GET", path).header(http::header::COOKIE, &w.cookie)),

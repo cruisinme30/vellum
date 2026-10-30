@@ -14,6 +14,16 @@ use vellum_kernel::BookId;
 #[derive(Debug, Clone, Default, Deserialize, JsonSchema)]
 pub struct ListBooks {}
 
+/// `books.create`: a new, empty book (D322).
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct CreateBook {
+    /// The drive folder to make it in: a space's root folder, such as
+    /// `drives/users/priya`, or a folder of one.
+    pub folder: String,
+    /// Its title, which also names its `.book` folder.
+    pub title: String,
+}
+
 /// A book in a list.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct BookSummary {

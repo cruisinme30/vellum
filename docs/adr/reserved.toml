@@ -151,3 +151,8 @@ holder = "local gate reuses stages that passed on the same inputs, ADR 0073"
 [[reservation]]
 decisions = "D321"
 holder = "new collections indexed by the drive (#565), addendum to ADR 0045"
+
+[[reservation]]
+adrs = "0075"
+decisions = "D322-D323"
+holder = "creating books (#566)"

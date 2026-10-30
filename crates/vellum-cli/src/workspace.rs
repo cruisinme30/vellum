@@ -460,6 +460,41 @@ impl vellum_collections::service::Tree for DriveTree {
     }
 }
 
+/// Books are made by the drive, which owns the tree they live in (D322).
+/// Book permissions find a book's space in `spaces`, so a space made a
+/// moment ago is loaded into it first, as for collections (D305).
+struct DriveShelf {
+    drive: Arc<Drive>,
+    spaces: Arc<Spaces>,
+    index: Arc<dyn DriveIndex>,
+}
+
+impl std::fmt::Debug for DriveShelf {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DriveShelf").finish_non_exhaustive()
+    }
+}
+
+#[async_trait::async_trait]
+impl vellum_books_service::Shelf for DriveShelf {
+    async fn create(
+        &self,
+        principal: &vellum_contracts::Principal,
+        folder: &BlobPath,
+        title: &str,
+    ) -> Result<(vellum_kernel::BookId, BlobPath), Error> {
+        let user = principal.require_user()?;
+        let node = self
+            .drive
+            .create_book(&vellum_kernel::Actor::User { user }, folder, title)
+            .await?;
+        if self.spaces.root_of(&node.path).is_none() {
+            self.spaces.replace(load_spaces(self.index.as_ref()).await?);
+        }
+        Ok((node.id.into(), node.path))
+    }
+}
+
 /// How often accounts made since startup are checked for a My Drive.
 const DRIVES_EVERY: Duration = Duration::from_secs(30);
 
@@ -560,9 +595,10 @@ fn books_service<S: AuthzStore + TreeSync + 'static>(
     store: Arc<dyn BlobStore>,
     authz: &Arc<Authz<S>>,
     space_of: vellum_collections::service::SpaceOf,
+    shelf: DriveShelf,
 ) -> Arc<BooksService> {
     let access = vellum_books_service::AuthzAccess::new(Arc::clone(authz), space_of);
-    let mut books = BooksService::new(store, Arc::new(access));
+    let mut books = BooksService::new(store, Arc::new(access)).with_shelf(Arc::new(shelf));
     if let Ok(figures) = crate::page_render::PageRenderService::figures_from_env() {
         books = books.with_renderer(Arc::new(crate::published::SiteRenderer::new(figures)));
     }
@@ -792,7 +828,12 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
     }
     collections = collections.with_tree(Arc::new(DriveTree(Arc::clone(&drive))));
     let collections = Arc::new(collections);
-    let books = books_service(Arc::clone(&store), authz, Arc::clone(&space_of));
+    let shelf = DriveShelf {
+        drive: Arc::clone(&drive),
+        spaces: Arc::clone(spaces),
+        index: Arc::clone(&index),
+    };
+    let books = books_service(Arc::clone(&store), authz, Arc::clone(&space_of), shelf);
     let directory = Arc::new(IdentityDirectory(Arc::clone(identity)));
     let (work, report) = WorkService::open(
         Arc::clone(&store),

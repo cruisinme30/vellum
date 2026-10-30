@@ -321,3 +321,23 @@
     transition: background-color 120ms ease;
   }
 }
+
+/* The New book form (#566). */
+.vl-book-new-open {
+  justify-self: start;
+  margin-bottom: 16px;
+}
+
+.vl-book-new {
+  display: grid;
+  gap: 12px;
+  max-width: 480px;
+  margin-bottom: 24px;
+}
+
+.vl-book-new-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}

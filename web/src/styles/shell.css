@@ -272,6 +272,22 @@
   box-shadow: 0 2px 6px rgb(0 0 0 / 20%);
 }
 
+/* The New menu (D323): from the rail it opens beside the button, from the
+   bottom bar above it, so it stays on screen. */
+.vl-new-anchor {
+  display: grid;
+}
+
+.vl-rail .vl-new-menu {
+  inset-inline: 0 auto;
+}
+
+.vl-bottom-bar .vl-new-menu {
+  top: auto;
+  bottom: 100%;
+  inset-inline: 0 auto;
+}
+
 .vl-menu [role="menuitem"] {
   display: flex;
   align-items: center;

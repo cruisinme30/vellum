@@ -13,9 +13,12 @@ numbers them and exports them as one document.
 
 ## Create a book {#create}
 
-1. Select **New → Book** and give it a title, such as "Engineering handbook".
-2. Add sections with **Add section after** or **Add subsection** above
-   the section you are reading.
+1. Select **New → Book**, or **New book** on the Books screen. Give it a
+   title, such as "Engineering handbook", choose the drive it goes in
+   (My Drive or a shared drive), and select **Create book**. The book
+   opens, empty.
+2. Select **Add the first section**, then add more with **Add section
+   after** or **Add subsection** above the section you are reading.
 3. Drag a section onto the top or bottom edge of another to put it
    before or after, or onto its middle to nest it. From the keyboard,
    press Alt+Shift with an arrow: up and down reorder, right nests under

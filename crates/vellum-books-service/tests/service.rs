@@ -17,11 +17,12 @@ use vellum_authz::{
     Actor, Authz, Change, Id, MemoryStore, Object, Permission, Relation, Subject, Tuple,
 };
 use vellum_books_service::api::{
-    AddSection, At, BookKey, CopySection, CreateSnapshot, DiffInput, HistoryEntry, HistoryInput,
-    ListBooks, MergeSection, MoveSection, PlaceInput, Publish, PublishFormat, RestoreOutline,
-    SectionKey, SetSectionAccess, SplitSection, TocLine, TransferSection, UpdateSection,
+    AddSection, At, BookKey, CopySection, CreateBook, CreateSnapshot, DiffInput, HistoryEntry,
+    HistoryInput, ListBooks, MergeSection, MoveSection, PlaceInput, Publish, PublishFormat,
+    RestoreOutline, SectionKey, SetSectionAccess, SplitSection, TocLine, TransferSection,
+    UpdateSection,
 };
-use vellum_books_service::{AuthzAccess, BooksService};
+use vellum_books_service::{AuthzAccess, BooksService, Shelf};
 use vellum_contracts::{CredentialKind, Principal, RequestContext, Scope, ScopeSet, Service as _};
 use vellum_kernel::{BookId, ErrorKind, ObjectId, RequestId, Timestamp, UserId};
 use vellum_store::{BlobPath, LocalStore};
@@ -665,11 +666,80 @@ async fn snapshots_and_diffs_respect_restrictions() {
 }
 
 #[tokio::test]
+async fn books_are_created_through_the_shelf_or_not_at_all() {
+    // #566 (D322): the drive makes books; without it, creating is refused.
+    let w = world().await;
+    let input = || CreateBook {
+        folder: "drives/shared/eng".to_owned(),
+        title: "Field guide".to_owned(),
+    };
+    let refused = w.service.create(&ctx(w.raj), input()).await.unwrap_err();
+    assert_eq!(refused.kind(), ErrorKind::PermissionDenied);
+    let blank = CreateBook {
+        title: "  ".to_owned(),
+        ..input()
+    };
+
+    // With a shelf, the service asks it and returns the new book.
+    let asked = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let space = w.space;
+    let service = BooksService::new(
+        Arc::new(LocalStore::open(&w.root).await.unwrap()),
+        Arc::new(AuthzAccess::new(
+            Arc::clone(&w.authz),
+            Arc::new(move |p: &BlobPath| p.as_str().starts_with("drives/shared/").then_some(space)),
+        )),
+    )
+    .with_shelf(Arc::new(FakeShelf(Arc::clone(&asked))));
+    let blank = service.create(&ctx(w.raj), blank).await.unwrap_err();
+    assert_eq!(blank.kind(), ErrorKind::InvalidInput);
+    let made = service
+        .create(
+            &ctx(w.raj),
+            CreateBook {
+                folder: "drives/shared/eng/".to_owned(),
+                title: " Field guide ".to_owned(),
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(made.title, "Field guide");
+    assert_eq!(made.path, "drives/shared/eng/Field guide.book");
+    assert_eq!(
+        *asked.lock().unwrap(),
+        vec![("drives/shared/eng".to_owned(), "Field guide".to_owned())]
+    );
+}
+
+/// Records what it was asked to make, and makes nothing.
+#[derive(Debug)]
+struct FakeShelf(Arc<std::sync::Mutex<Vec<(String, String)>>>);
+
+#[async_trait::async_trait]
+impl Shelf for FakeShelf {
+    async fn create(
+        &self,
+        _: &Principal,
+        folder: &BlobPath,
+        title: &str,
+    ) -> Result<(BookId, BlobPath), vellum_kernel::Error> {
+        self.0
+            .lock()
+            .unwrap()
+            .push((folder.as_str().to_owned(), title.to_owned()));
+        Ok((
+            BookId::generate(),
+            folder.join(&format!("{title}.book")).unwrap(),
+        ))
+    }
+}
+
+#[tokio::test]
 async fn registers_every_operation() {
     let w = world().await;
     assert_eq!(w.service.name(), "books");
     let ops = Arc::clone(&w.service).operations();
-    assert_eq!(ops.len(), 19);
+    assert_eq!(ops.len(), 20);
     let _ = ListBooks::default();
 }
 
