@@ -355,3 +355,61 @@ fn a_sealed_secret_needs_the_same_key() {
             .is_err()
     );
 }
+
+/// The browser's side: password, then the code, over the `/auth` routes.
+#[tokio::test]
+async fn a_browser_signs_in_with_a_password_and_a_code() {
+    use std::sync::Arc;
+
+    use axum::body::Body;
+    use http::{Request, StatusCode, header};
+    use http_body_util::BodyExt as _;
+    use tower::ServiceExt as _;
+
+    let id = identity();
+    let priya = id.setup(PRIYA, "Priya", PASSWORD).unwrap();
+    let (secret, _) = add_app(&id, priya.id);
+    let router = vellum_identity::http::browser_router(Arc::new(id));
+    let call = |path: &str, body: serde_json::Value| {
+        Request::post(path)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(body.to_string()))
+            .unwrap()
+    };
+
+    let response = router
+        .clone()
+        .oneshot(call(
+            "/sign-in",
+            serde_json::json!({ "email": PRIYA, "password": PASSWORD }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert!(response.headers().get(header::SET_COOKIE).is_none());
+    let body: serde_json::Value =
+        serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes()).unwrap();
+    let ticket = body["secondFactor"]["ticket"].as_str().unwrap().to_owned();
+
+    let wrong = router
+        .clone()
+        .oneshot(call(
+            "/sign-in/verify",
+            serde_json::json!({ "ticket": ticket, "code": "000000" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(wrong.status(), StatusCode::UNAUTHORIZED);
+
+    let code = code(&secret, now_step());
+    let ok = router
+        .oneshot(call(
+            "/sign-in/verify",
+            serde_json::json!({ "ticket": ticket, "code": code }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(ok.status(), StatusCode::OK);
+    let cookie = ok.headers()[header::SET_COOKIE].to_str().unwrap();
+    assert!(cookie.starts_with("__Host-vellum_session="), "{cookie}");
+}

@@ -1685,7 +1685,23 @@ admin-sso-issuer = Issuer URL
 admin-sso-status = Status
 admin-sso-off = Off
 admin-sso-from-env = Set by the server's environment
-admin-sso-add = Add an OpenID Connect provider
+admin-sso-add = Add a sign-in provider
+admin-sso-kind = Protocol
+admin-sso-kind-oidc = OpenID Connect
+admin-sso-kind-saml = SAML 2.0
+admin-saml-service = For SAML providers, Vellum's entity ID (and metadata URL) is
+admin-saml-acs = and the assertion consumer service URL (HTTP-POST) is
+admin-saml-metadata-url = Metadata URL
+admin-saml-read-button = Read metadata
+admin-saml-read = { $count ->
+    [one] Filled in from the metadata, with one signing certificate. Check the values, then save.
+   *[other] Filled in from the metadata, with { $count } signing certificates. Check the values, then save.
+}
+admin-saml-entity-id = Provider entity ID
+admin-saml-sso-url = Sign-in URL (HTTP-Redirect)
+admin-saml-certificate = Signing certificate (PEM)
+admin-saml-certificate-kept = Stored. Paste a new certificate to replace it.
+admin-saml-fingerprint = SHA-256 fingerprint:
 admin-sso-edit = Change { $name }
 admin-sso-edit-short = Change
 admin-sso-remove-label = Remove { $name }

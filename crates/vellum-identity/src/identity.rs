@@ -403,6 +403,17 @@ impl Identity {
         found: &SsoIdentity,
         user_agent: Option<&str>,
     ) -> Result<NewSession, Error> {
+        self.federated_sign_in(found, &|email| sso.config().may_create(email), user_agent)
+    }
+
+    /// Signs in someone a provider vouched for; `may_create` says whether
+    /// an address with no account gets one.
+    pub(crate) fn federated_sign_in(
+        &self,
+        found: &SsoIdentity,
+        may_create: &dyn Fn(&str) -> bool,
+        user_agent: Option<&str>,
+    ) -> Result<NewSession, Error> {
         if self.needs_setup() {
             return Err(Error::new(
                 ErrorKind::Conflict,
@@ -432,7 +443,7 @@ impl Identity {
                     .map(str::to_owned)
             })
             .unwrap_or_else(|| "Member".to_owned());
-        let may_create = email.as_deref().is_some_and(|e| sso.config().may_create(e));
+        let may_create = email.as_deref().is_some_and(may_create);
         let (user, created) = self.store.write(|s| {
             if let Some(user) = s.users.values().find(|u| u.sso.contains(&link)) {
                 return Ok((user.clone(), false));

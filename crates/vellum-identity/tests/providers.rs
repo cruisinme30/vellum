@@ -17,7 +17,7 @@ use serde_json::json;
 use url::Url;
 use vellum_contracts::BoxFuture;
 use vellum_identity::mfa::SignIn;
-use vellum_identity::providers::{ENV_PROVIDER, ProviderInput, UpdateSignIn};
+use vellum_identity::providers::{ENV_PROVIDER, ProviderInput, ProviderKind, UpdateSignIn};
 use vellum_identity::{Identity, IdentityConfig, SsoHttp, Store};
 use vellum_kernel::{Error, ErrorKind};
 
@@ -83,6 +83,11 @@ fn okta(secret: Option<&str>) -> ProviderInput {
         client_secret: secret.map(str::to_owned),
         allowed_domains: vec!["@Northstar.dev".into()],
         auto_create: true,
+        kind: ProviderKind::Oidc,
+        entity_id: String::new(),
+        sso_url: String::new(),
+        certificate: String::new(),
+        metadata_url: None,
     }
 }
 

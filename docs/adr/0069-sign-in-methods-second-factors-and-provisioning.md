@@ -70,15 +70,24 @@ came from [ADR 0057](0057-admin-users-spaces-and-reauthentication.md).
 
 - SP-initiated only: HTTP-Redirect `AuthnRequest`, HTTP-POST response to
   `/saml/acs`. Unsolicited responses are refused.
-- The response or assertion must carry an enveloped RSA-SHA256 or
-  ECDSA-SHA256 signature over exclusive C14N from a certificate pinned in
-  the provider settings; SHA-1 is refused.
-- Only the element the signature's reference names is read, located by a
-  unique ID, so a wrapped copy is never consumed.
+- The response holds exactly one assertion, and that assertion carries
+  its own enveloped RSA-SHA256 or ECDSA-SHA256 signature over exclusive
+  C14N from a certificate pinned in the provider settings (a response
+  signature is checked too when present). SHA-1, keys inside the document
+  and encrypted assertions are refused.
+- The signature's one reference must name the signed element's own ID,
+  IDs must be unique, and claims are read only from that element, so a
+  wrapped copy is never consumed. Values holding comments are refused.
 - A DTD is refused (no entity expansion); audience, recipient,
-  `InResponseTo`, `NotBefore` and `NotOnOrAfter` are checked; assertion
-  IDs are kept until they expire, so a replay is refused.
-- Metadata is imported by pasting it or from a URL through the SSRF guard.
+  `InResponseTo`, `NotBefore` and `NotOnOrAfter` are checked with two
+  minutes of skew. Sign-ins in progress and used assertion IDs live in the
+  replicated store until they expire, so any replica finishes a sign-in
+  and a replay is refused everywhere.
+- The relay state is a one-time secret, also set as a `SameSite=None`
+  cookie on `/saml`, which binds the response to the browser that began.
+- Metadata is read from a URL through the SSRF guard to fill in the form;
+  the admin checks the values and saves. Canonicalization is tested
+  against responses signed by another implementation (lxml).
 
 ### `D294`: SCIM 2.0 provisions people and groups
 

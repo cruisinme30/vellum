@@ -22,6 +22,8 @@ path = [
   "web/public/icons/**",
   "web/e2e/__screenshots__/**",
   "web/e2e/support/*.gen.json",
+  "crates/vellum-identity/tests/fixtures/saml/*.xml",
+  "crates/vellum-identity/tests/fixtures/saml/*.pem",
   "desktop/pnpm-lock.yaml",
   "desktop/package.json",
   "desktop/tsconfig.json",

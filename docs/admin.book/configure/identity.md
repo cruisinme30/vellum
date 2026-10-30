@@ -36,6 +36,15 @@ with a password and a second factor if the identity provider is down.
 Existing sessions keep working while the provider is down, and the
 `vellum admin break-glass` code always works.
 
+For a SAML 2.0 provider, choose **SAML 2.0** in the same form. Paste
+the provider's metadata URL and choose **Read metadata**, or type its
+entity ID, sign-in URL and signing certificate. In the provider, register
+Vellum's entity ID (`https://<your server>/saml/metadata`, which also
+serves Vellum's metadata) and the assertion consumer service URL
+(`https://<your server>/saml/acs`, HTTP-POST). Vellum needs signed
+assertions; turn off assertion encryption. Send the email address as the
+NameID or as an `email` attribute.
+
 Servers that share one database (replicas) must share the identity key:
 set the same 64-hex-character `VELLUM_IDENTITY_KEY` on each of them.
 

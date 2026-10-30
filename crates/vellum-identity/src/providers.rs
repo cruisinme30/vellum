@@ -27,6 +27,7 @@ use vellum_kernel::{Error, ErrorKind, Timestamp};
 use crate::identity::Identity;
 use crate::sso::{Sso, SsoConfig, SsoHttp};
 use crate::store::{Protocol, Provider, SecondFactorPolicy};
+use crate::xmldsig::Certificate;
 
 /// The ID of the provider configured by `VELLUM_OIDC_*`.
 pub const ENV_PROVIDER: &str = "env";
@@ -72,6 +73,14 @@ pub struct ProviderView {
     pub client_id: Option<String>,
     /// For OIDC, whether a client secret is stored.
     pub has_client_secret: bool,
+    /// For SAML, the provider's entity ID.
+    pub entity_id: Option<String>,
+    /// For SAML, where sign-in requests go.
+    pub sso_url: Option<String>,
+    /// For SAML, the SHA-256 fingerprints of the signing certificates.
+    pub certificate_fingerprints: Vec<String>,
+    /// For SAML, the metadata URL the settings came from.
+    pub metadata_url: Option<String>,
     /// Email domains whose people get an account on first sign-in.
     pub allowed_domains: Vec<String>,
     /// Whether a verified address with no account gets one.
@@ -91,9 +100,14 @@ pub struct ProviderInput {
     /// Whether the sign-in page offers it.
     #[serde(default = "yes")]
     pub enabled: bool,
-    /// The issuer URL (`https`, or `http` on this machine for testing).
+    /// `oidc` (the default) or `saml`. A provider keeps its kind.
+    #[serde(default)]
+    pub kind: ProviderKind,
+    /// OIDC: the issuer URL (`https`, or `http` on this machine).
+    #[serde(default)]
     pub issuer: String,
-    /// The client ID registered with the provider.
+    /// OIDC: the client ID registered with the provider.
+    #[serde(default)]
     pub client_id: String,
     /// A new client secret; absent keeps the stored one, empty removes it.
     #[serde(default)]
@@ -104,6 +118,61 @@ pub struct ProviderInput {
     /// Whether a verified address with no account gets one.
     #[serde(default)]
     pub auto_create: bool,
+    /// SAML: the provider's entity ID.
+    #[serde(default)]
+    pub entity_id: String,
+    /// SAML: the provider's sign-in URL (HTTP-Redirect binding).
+    #[serde(default)]
+    pub sso_url: String,
+    /// SAML: the signing certificates as PEM; empty keeps the stored ones.
+    #[serde(default)]
+    pub certificate: String,
+    /// SAML: the metadata URL the settings came from, for reference.
+    #[serde(default)]
+    pub metadata_url: Option<String>,
+}
+
+/// How Vellum talks to a provider.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum ProviderKind {
+    /// `OpenID Connect`.
+    #[default]
+    Oidc,
+    /// SAML 2.0.
+    Saml,
+}
+
+/// A metadata URL to read.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct MetadataUrl {
+    /// The provider's SAML metadata URL (`https`).
+    pub url: String,
+}
+
+/// What a provider's SAML metadata says, to fill in the form.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SamlMetadataView {
+    /// The provider's entity ID.
+    pub entity_id: String,
+    /// Its HTTP-Redirect sign-in URL.
+    pub sso_url: String,
+    /// Its signing certificates as PEM.
+    pub certificate: String,
+    /// Their SHA-256 fingerprints.
+    pub certificate_fingerprints: Vec<String>,
+}
+
+/// What a SAML provider needs to know about Vellum.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SamlServiceView {
+    /// Vellum's entity ID (also its metadata URL).
+    pub entity_id: String,
+    /// The assertion consumer service URL (HTTP-POST).
+    pub acs_url: String,
 }
 
 const fn yes() -> bool {
@@ -142,6 +211,8 @@ pub struct SignInView {
     pub providers: Vec<ProviderView>,
     /// The redirect URI to register with OIDC providers.
     pub oidc_callback_url: String,
+    /// What to register with SAML providers.
+    pub saml: SamlServiceView,
     /// How many enabled admins may still use a password (break-glass).
     pub break_glass_admins: usize,
 }
@@ -199,6 +270,49 @@ pub fn check_issuer(text: &str) -> Result<Url, Error> {
         return Err(invalid("the issuer cannot hold credentials or a fragment"));
     }
     Ok(url)
+}
+
+fn kind_changed() -> Error {
+    invalid("a provider keeps its kind; remove it and add a new one instead")
+}
+
+/// Checks SAML settings; an empty certificate keeps `old_certificates`.
+fn checked_saml(input: &ProviderInput, old_certificates: Vec<String>) -> Result<Protocol, Error> {
+    let entity_id = input.entity_id.trim();
+    if entity_id.is_empty() || entity_id.len() > 1024 {
+        return Err(invalid("enter the provider's entity ID"));
+    }
+    let sso_url = check_issuer(&input.sso_url)
+        .map_err(|_| invalid("the sign-in URL must use https (http only on this machine)"))?;
+    let certificates = if input.certificate.trim().is_empty() {
+        old_certificates
+    } else {
+        Certificate::parse_all(&input.certificate)?
+            .iter()
+            .map(Certificate::to_base64)
+            .collect()
+    };
+    if certificates.is_empty() {
+        return Err(invalid("paste the provider's signing certificate"));
+    }
+    if certificates.len() > 4 {
+        return Err(invalid(
+            "a provider can have at most 4 signing certificates",
+        ));
+    }
+    let metadata_url = input
+        .metadata_url
+        .as_deref()
+        .map(str::trim)
+        .filter(|u| !u.is_empty())
+        .map(|u| check_issuer(u).map(String::from))
+        .transpose()?;
+    Ok(Protocol::Saml {
+        entity_id: entity_id.to_owned(),
+        sso_url: sso_url.to_string(),
+        certificates,
+        metadata_url,
+    })
 }
 
 /// Cleans a domain list: lower-case, without `@`, no empties or repeats.
@@ -278,6 +392,10 @@ fn env_view(sso: &Sso) -> ProviderView {
         issuer: Some(config.issuer.to_string()),
         client_id: Some(config.client_id.clone()),
         has_client_secret: config.client_secret.is_some(),
+        entity_id: None,
+        sso_url: None,
+        certificate_fingerprints: Vec::new(),
+        metadata_url: None,
         allowed_domains: config.allowed_domains.clone(),
         auto_create: config.auto_create,
         read_only: true,
@@ -286,24 +404,64 @@ fn env_view(sso: &Sso) -> ProviderView {
 }
 
 fn record_view(p: &Provider) -> ProviderView {
-    let Protocol::Oidc {
-        issuer,
-        client_id,
-        client_secret,
-    } = &p.protocol;
-    ProviderView {
+    let mut view = ProviderView {
         id: p.id.clone(),
         name: p.name.clone(),
         kind: "oidc".to_owned(),
         enabled: p.enabled,
-        issuer: Some(issuer.clone()),
-        client_id: Some(client_id.clone()),
-        has_client_secret: client_secret.is_some(),
+        issuer: None,
+        client_id: None,
+        has_client_secret: false,
+        entity_id: None,
+        sso_url: None,
+        certificate_fingerprints: Vec::new(),
+        metadata_url: None,
         allowed_domains: p.allowed_domains.clone(),
         auto_create: p.auto_create,
         read_only: false,
         start_url: start_url(&p.id),
+    };
+    match &p.protocol {
+        Protocol::Oidc {
+            issuer,
+            client_id,
+            client_secret,
+        } => {
+            view.issuer = Some(issuer.clone());
+            view.client_id = Some(client_id.clone());
+            view.has_client_secret = client_secret.is_some();
+        }
+        Protocol::Saml {
+            entity_id,
+            sso_url,
+            certificates,
+            metadata_url,
+        } => {
+            "saml".clone_into(&mut view.kind);
+            view.entity_id = Some(entity_id.clone());
+            view.sso_url = Some(sso_url.clone());
+            view.certificate_fingerprints = certificates
+                .iter()
+                .filter_map(|c| Certificate::parse_all(c).ok())
+                .flatten()
+                .map(|c| c.fingerprint())
+                .collect();
+            view.metadata_url.clone_from(metadata_url);
+        }
     }
+    view
+}
+
+/// Whether a provider record creates an account for `email`.
+pub(crate) fn may_create(p: &Provider, email: &str) -> bool {
+    if !p.auto_create {
+        return false;
+    }
+    let domain = email.rsplit_once('@').map_or("", |(_, d)| d);
+    p.allowed_domains.is_empty()
+        || p.allowed_domains
+            .iter()
+            .any(|d| d.eq_ignore_ascii_case(domain))
 }
 
 impl Identity {
@@ -363,7 +521,9 @@ impl Identity {
                 s.sign_in
                     .providers
                     .iter()
-                    .find(|p| p.id == id && p.enabled)
+                    .find(|p| {
+                        p.id == id && p.enabled && matches!(p.protocol, Protocol::Oidc { .. })
+                    })
                     .cloned()
             })
             .ok_or_else(missing)?;
@@ -390,7 +550,10 @@ impl Identity {
             issuer,
             client_id,
             client_secret,
-        } = &record.protocol;
+        } = &record.protocol
+        else {
+            return Err(invalid("this provider does not use OpenID Connect"));
+        };
         let issuer = check_issuer(issuer)?;
         let client_secret = client_secret
             .as_deref()
@@ -445,6 +608,13 @@ impl Identity {
                 self.config().base(),
                 crate::http::SSO_CALLBACK_PATH
             ),
+            saml: {
+                let sp = self.saml_service();
+                SamlServiceView {
+                    entity_id: sp.entity_id,
+                    acs_url: sp.acs_url,
+                }
+            },
             break_glass_admins,
         }
     }
@@ -486,6 +656,32 @@ impl Identity {
         &self,
         id: &str,
         input: &ProviderInput,
+        old: Option<&Protocol>,
+    ) -> Result<Protocol, Error> {
+        match input.kind {
+            ProviderKind::Oidc => {
+                let old_secret = match old {
+                    None => None,
+                    Some(Protocol::Oidc { client_secret, .. }) => client_secret.clone(),
+                    Some(Protocol::Saml { .. }) => return Err(kind_changed()),
+                };
+                self.checked_oidc(id, input, old_secret)
+            }
+            ProviderKind::Saml => {
+                let old_certificates = match old {
+                    None => Vec::new(),
+                    Some(Protocol::Saml { certificates, .. }) => certificates.clone(),
+                    Some(Protocol::Oidc { .. }) => return Err(kind_changed()),
+                };
+                checked_saml(input, old_certificates)
+            }
+        }
+    }
+
+    fn checked_oidc(
+        &self,
+        id: &str,
+        input: &ProviderInput,
         old_secret: Option<String>,
     ) -> Result<Protocol, Error> {
         let issuer = check_issuer(&input.issuer)?;
@@ -513,7 +709,7 @@ impl Identity {
         })
     }
 
-    /// Adds an OIDC provider.
+    /// Adds an OIDC or SAML provider.
     ///
     /// # Errors
     ///
@@ -568,8 +764,7 @@ impl Identity {
             .store()
             .read(|s| s.sign_in.providers.iter().find(|p| p.id == id).cloned())
             .ok_or_else(|| Error::new(ErrorKind::NotFound, "provider not found"))?;
-        let Protocol::Oidc { client_secret, .. } = old.protocol;
-        let protocol = self.checked_protocol(id, input, client_secret)?;
+        let protocol = self.checked_protocol(id, input, Some(&old.protocol))?;
         let updated = self.store().write(|s| {
             let p = s.sign_in.providers.iter_mut().find(|p| p.id == id)?;
             p.name = name;
@@ -664,6 +859,13 @@ pub(crate) fn operations(identity: &Arc<Identity>) -> Vec<Operation> {
             }
         }
     };
+    let metadata = {
+        let id = Arc::clone(identity);
+        move |_: RequestContext, input: MetadataUrl| {
+            let id = Arc::clone(&id);
+            async move { id.read_saml_metadata(&input).await }
+        }
+    };
     vec![
         Operation::query(
             "identity.admin_sign_in",
@@ -690,7 +892,7 @@ pub(crate) fn operations(identity: &Arc<Identity>) -> Vec<Operation> {
             add,
         )
         .fresh_auth(FRESH_AUTH)
-        .summary("Add an OpenID Connect sign-in provider"),
+        .summary("Add an OpenID Connect or SAML sign-in provider"),
         Operation::mutation(
             "identity.admin_update_provider",
             HttpMethod::Put,
@@ -709,6 +911,15 @@ pub(crate) fn operations(identity: &Arc<Identity>) -> Vec<Operation> {
         )
         .fresh_auth(FRESH_AUTH)
         .summary("Remove a sign-in provider"),
+        Operation::mutation(
+            "identity.admin_saml_metadata",
+            HttpMethod::Post,
+            "/v1/admin/sign-in/saml-metadata",
+            Scope::Admin,
+            metadata,
+        )
+        .fresh_auth(FRESH_AUTH)
+        .summary("Read a SAML provider's metadata to fill in its settings"),
     ]
 }
 

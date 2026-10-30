@@ -26,6 +26,20 @@ const OKTA: ProviderView = {
   autoCreate: false,
   readOnly: false,
   startUrl: "/auth/sso/start?provider=okta",
+  certificateFingerprints: [],
+};
+
+const SAML: ProviderView = {
+  id: "entra",
+  name: "Entra ID",
+  kind: "saml",
+  enabled: true,
+  hasClientSecret: false,
+  allowedDomains: [],
+  autoCreate: false,
+  readOnly: false,
+  startUrl: "/auth/sso/start?provider=entra",
+  certificateFingerprints: ["AB:CD"],
 };
 
 const BASE: SignInView = {
@@ -35,6 +49,10 @@ const BASE: SignInView = {
   providers: [],
   oidcCallbackUrl: "https://vellum.northstar.dev/auth/sso/callback",
   breakGlassAdmins: 0,
+  saml: {
+    entityId: "https://vellum.northstar.dev/saml/metadata",
+    acsUrl: "https://vellum.northstar.dev/saml/acs",
+  },
 };
 
 function fakeSignIn(initial: SignInView) {
@@ -48,7 +66,10 @@ function fakeSignIn(initial: SignInView) {
     return Promise.resolve(view);
   });
   const addProvider = vi.fn<AdminSignInApi["addProvider"]>((input) => {
-    const added = { ...OKTA, name: input.name, issuer: input.issuer, clientId: input.clientId };
+    const added: ProviderView =
+      input.kind === "saml"
+        ? { ...SAML, name: input.name, entityId: input.entityId ?? "" }
+        : { ...OKTA, name: input.name, issuer: input.issuer ?? "", clientId: input.clientId ?? "" };
     view = { ...view, providers: [...view.providers, added] };
     return Promise.resolve(added);
   });
@@ -69,6 +90,14 @@ function fakeSignIn(initial: SignInView) {
     addProvider,
     updateProvider,
     removeProvider,
+    samlMetadata: vi.fn<AdminSignInApi["samlMetadata"]>(() =>
+      Promise.resolve({
+        entityId: "https://sts.windows.net/tenant/",
+        ssoUrl: "https://login.microsoftonline.com/tenant/saml2",
+        certificate: "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n",
+        certificateFingerprints: ["AB:CD"],
+      }),
+    ),
   };
   return { api, update, addProvider, updateProvider, removeProvider };
 }
@@ -104,7 +133,7 @@ describe("Admin → Sign-in", () => {
     const user = renderPage(api);
     expect(await screen.findByText("https://vellum.northstar.dev/auth/sso/callback")).toBeDefined();
     expect(screen.getByText(/No sign-in providers yet/)).toBeDefined();
-    const form = screen.getByRole("form", { name: "Add an OpenID Connect provider" });
+    const form = screen.getByRole("form", { name: "Add a sign-in provider" });
     await user.type(within(form).getByLabelText("Name"), "Okta");
     await user.type(within(form).getByLabelText("Issuer URL"), "https://northstar.okta.com");
     await user.type(within(form).getByLabelText("Client ID"), "vellum");
@@ -115,6 +144,7 @@ describe("Admin → Sign-in", () => {
     );
     await user.click(within(form).getByRole("button", { name: "Save" }));
     expect(addProvider).toHaveBeenCalledWith({
+      kind: "oidc",
       name: "Okta",
       issuer: "https://northstar.okta.com",
       clientId: "vellum",
@@ -125,6 +155,37 @@ describe("Admin → Sign-in", () => {
     });
     expect(await screen.findByText("Okta saved.")).toBeDefined();
     expect(screen.getByRole("rowheader", { name: "Okta" })).toBeDefined();
+  });
+
+  it("adds a SAML provider from its metadata URL", async () => {
+    const { api, addProvider } = fakeSignIn(BASE);
+    const user = renderPage(api);
+    expect(await screen.findByText("https://vellum.northstar.dev/saml/acs")).toBeDefined();
+    const form = screen.getByRole("form", { name: "Add a sign-in provider" });
+    await user.click(within(form).getByRole("radio", { name: "SAML 2.0" }));
+    await user.type(within(form).getByLabelText("Name"), "Entra ID");
+    await user.type(
+      within(form).getByLabelText("Metadata URL"),
+      "https://login.microsoftonline.com/tenant/federationmetadata.xml",
+    );
+    await user.click(within(form).getByRole("button", { name: "Read metadata" }));
+    expect(await within(form).findByText(/with one signing certificate/)).toBeDefined();
+    expect(within(form).getByLabelText<HTMLInputElement>("Provider entity ID").value).toBe(
+      "https://sts.windows.net/tenant/",
+    );
+    await user.click(within(form).getByRole("button", { name: "Save" }));
+    expect(addProvider).toHaveBeenCalledWith({
+      kind: "saml",
+      name: "Entra ID",
+      entityId: "https://sts.windows.net/tenant/",
+      ssoUrl: "https://login.microsoftonline.com/tenant/saml2",
+      certificate: "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----",
+      metadataUrl: "https://login.microsoftonline.com/tenant/federationmetadata.xml",
+      allowedDomains: [],
+      autoCreate: false,
+      enabled: true,
+    });
+    expect(await screen.findByText("Entra ID saved.")).toBeDefined();
   });
 
   it("changes a provider without resending its secret, and removes it", async () => {
