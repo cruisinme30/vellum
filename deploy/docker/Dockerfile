@@ -33,6 +33,8 @@ RUN pnpm run build
 
 # The static musl binary.
 FROM ${RUST_IMAGE} AS build
+# The build steps pipe into tr, so a failed command must fail the step.
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG TARGETARCH
 WORKDIR /src
 # musl-gcc compiles the C dependencies for the musl target. SQLCipher in
