@@ -156,11 +156,14 @@ impl Writer {
                 self.destination(url, title);
             }
             Inline::WikiLink { target, label } => {
+                // Both parts are read with escapes and entities decoded,
+                // and end at a bracket or a bar.
+                let special = ['[', ']', '|', '\\'];
                 self.out.push_str("[[");
-                self.out.push_str(target);
+                push_escaped(&mut self.out, target, &special);
                 if let Some(label) = label {
                     self.out.push('|');
-                    self.out.push_str(label);
+                    push_escaped(&mut self.out, label, &special);
                 }
                 self.out.push_str("]]");
             }

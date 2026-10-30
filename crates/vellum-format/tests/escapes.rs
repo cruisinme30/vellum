@@ -102,3 +102,26 @@ fn code_with_a_long_backtick_run_round_trips() {
     );
     assert_eq!(parse(&canonical).document, doc);
 }
+
+#[test]
+fn wiki_link_targets_and_labels_keep_brackets_bars_and_ampersands() {
+    // Fuzzer finding (`format_roundtrip`): `[[Runbook \\[draft]]` has the
+    // target `Runbook [draft`, which was written back without its escape.
+    for src in [
+        "Read [[Runbook \\[draft]] first\n",
+        "Read [[a\\]b|c \\| d]] first\n",
+        "Read [[R&amp;D|Q&amp;A]] first\n",
+        "Read [[back\\\\slash]] first\n",
+    ] {
+        let doc = parse(src).document;
+        assert!(
+            matches!(
+                &doc.blocks[..],
+                [Block::Paragraph { content, .. }] if matches!(content.get(1), Some(Inline::WikiLink { .. }))
+            ),
+            "{src:?}: {doc:?}"
+        );
+        let canonical = serialize(&doc);
+        assert_eq!(parse(&canonical).document, doc, "{src:?} as {canonical:?}");
+    }
+}
