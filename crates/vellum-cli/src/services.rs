@@ -83,6 +83,8 @@ pub struct Services {
     scanner: Option<Arc<Clamd>>,
     /// Secret scanning on save, following the admin settings (D296).
     secrets: Arc<crate::secrets::SecretGuard>,
+    /// Search's admin side, when an index is configured (D300).
+    search: Option<Arc<crate::search_admin::SearchStatus>>,
 }
 
 impl std::fmt::Debug for Services {
@@ -192,6 +194,7 @@ impl Services {
             drive: None,
             scanner: None,
             secrets: Arc::default(),
+            search: None,
         })
     }
 
@@ -220,6 +223,9 @@ impl Services {
         observability::spawn_sampling(sampler);
         self.audit.attach(service.audit_log());
         self.secrets.attach(Arc::clone(&service));
+        if let Some(search) = &self.search {
+            search.follow(Arc::clone(&service));
+        }
         observability::spawn_ticks(Arc::clone(&service), Arc::clone(&facts));
         self.admin_audit = Some(service.audit_log());
         self.admin = Some(observability::api(service, facts));
@@ -254,6 +260,7 @@ impl Services {
         self.rate_counts = opened.rate_counts;
         self.tasks = opened.tasks;
         self.drive_index = opened.drive_index;
+        self.search = opened.search;
         if let Some((workspace, events)) = opened.mcp {
             let shared = self.rate_counts.as_ref().map(|counts| {
                 let per_minute = vellum_mcp::ratelimit::RateLimit::default().per_minute;
@@ -389,6 +396,11 @@ impl Services {
                 .collect();
         }
         all.extend(self.admin.iter().cloned());
+        if let Some(search) = &self.search {
+            all.push(Arc::new(crate::search_admin::SearchAdminService::new(
+                Arc::clone(search),
+            )));
+        }
         all
     }
 
@@ -503,6 +515,7 @@ pub fn contract_gateway() -> Result<Gateway, Error> {
     let _ = std::fs::remove_dir_all(&scratch);
     services.workspace = described?;
     services.admin = Some(admin?);
+    services.search = Some(crate::search::describe_status()?);
     services
         .mount(GatewayBuilder::new(
             GatewayConfig::new("http://localhost", vec![0; 32]),

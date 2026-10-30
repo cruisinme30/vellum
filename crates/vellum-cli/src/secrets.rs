@@ -5,7 +5,8 @@
 //!
 //! - [`SecretGuard`] is the drive's content check, so it sees every page
 //!   the drive creates or saves: the REST API, live editing, models
-//!   writing through MCP, and imports. Under the admin's policy
+//!   writing through MCP, and imports. It also checks text files attached
+//!   to pages and every collection row written (D301). Under the admin's policy
 //!   (Admin → Settings → Security) a finding is audited and the save goes
 //!   through (`warn`, the default), or the save is refused with a typed
 //!   `422` (`block`). `off` scans nothing.
@@ -23,9 +24,10 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use vellum_admin::settings::SecuritySettings;
 use vellum_admin::{AdminService, AuditActor, AuditLog, NewAuditEvent, Outcome, SecretScanning};
-use vellum_contracts::{HttpMethod, Operation, RequestContext, Scope, Service};
+use vellum_collections::service::RowCheck;
+use vellum_contracts::{HttpMethod, Operation, Principal, RequestContext, Scope, Service};
 use vellum_drive::{ContentCheck, DriveError, DriveResult};
-use vellum_kernel::{Actor, Error, SpaceId};
+use vellum_kernel::{Actor, Error, ErrorKind, SpaceId};
 use vellum_security::secrets::{self, Finding, SECRETS_FOUND};
 use vellum_store::BlobPath;
 
@@ -33,7 +35,7 @@ use vellum_store::BlobPath;
 const MAX_REPORTED: usize = 20;
 
 /// The admin console's keyring type, as `vellum serve` builds it.
-type Admin = AdminService<vellum_crypto::LocalKeyring>;
+pub type Admin = AdminService<vellum_crypto::LocalKeyring>;
 
 /// The policy and the audit log, attached once the admin console opens.
 #[derive(Default)]
@@ -159,15 +161,10 @@ impl SecretGuard {
     }
 }
 
-#[async_trait]
-impl ContentCheck for SecretGuard {
-    async fn check(
-        &self,
-        actor: &Actor,
-        _space: SpaceId,
-        path: &BlobPath,
-        text: &str,
-    ) -> DriveResult<()> {
+impl SecretGuard {
+    /// Scans `text` under the policy now and audits what it finds. Under
+    /// `block`, the refusal's message: it names kinds and lines only.
+    async fn inspect(&self, actor: &Actor, path: &BlobPath, text: &str) -> Result<(), String> {
         let settings = self.settings().await;
         if settings.secret_scanning == SecretScanning::Off {
             return Ok(());
@@ -179,12 +176,40 @@ impl ContentCheck for SecretGuard {
         let blocked = settings.secret_scanning == SecretScanning::Block;
         self.audit(actor, path, &findings, blocked).await;
         if blocked {
-            return Err(DriveError::Refused(format!(
+            return Err(format!(
                 "{SECRETS_FOUND}: {}. Remove them, or ask an admin to allow them.",
                 summary(&findings)
-            )));
+            ));
         }
         Ok(())
+    }
+}
+
+#[async_trait]
+impl ContentCheck for SecretGuard {
+    async fn check(
+        &self,
+        actor: &Actor,
+        _space: SpaceId,
+        path: &BlobPath,
+        text: &str,
+    ) -> DriveResult<()> {
+        self.inspect(actor, path, text)
+            .await
+            .map_err(DriveError::Refused)
+    }
+}
+
+/// Collection rows (D301): the same policy as pages, and the same `422`.
+#[async_trait]
+impl RowCheck for SecretGuard {
+    async fn check(&self, principal: &Principal, path: &BlobPath, text: &str) -> Result<(), Error> {
+        let actor = principal
+            .user_id()
+            .map_or(Actor::External, |user| Actor::User { user });
+        self.inspect(&actor, path, text)
+            .await
+            .map_err(|message| Error::new(ErrorKind::InvalidInput, message))
     }
 }
 
@@ -325,8 +350,7 @@ mod tests {
         let guard = SecretGuard::default();
         let path = BlobPath::new("drives/shared/eng/deploys.md").unwrap();
         let text = page(&token());
-        guard
-            .check(&Actor::System, SpaceId::from_u128(1), &path, &text)
+        ContentCheck::check(&guard, &Actor::System, SpaceId::from_u128(1), &path, &text)
             .await
             .unwrap();
         let service = SecretsService::new(Arc::new(guard));
@@ -336,5 +360,24 @@ mod tests {
         assert_eq!(result.findings[0].rule, "github-token");
         assert_eq!(result.findings[0].line, 5);
         assert!(!result.findings[0].redacted.contains("a1B2c3D4"));
+    }
+
+    #[tokio::test]
+    async fn rows_meet_the_same_policy_as_pages() {
+        let guard = SecretGuard::default();
+        let path = BlobPath::new("drives/shared/eng/Bots.collection/rows/deploy.md").unwrap();
+        let principal = vellum_contracts::Principal::user(
+            vellum_kernel::UserId::from_u128(7),
+            vellum_contracts::CredentialKind::Session,
+            vellum_contracts::ScopeSet::from_scopes([Scope::WriteDirect]),
+            vellum_kernel::Timestamp::now(),
+        );
+        // Warn (no admin console yet): the row is written.
+        RowCheck::check(&guard, &principal, &path, &page(&token()))
+            .await
+            .unwrap();
+        RowCheck::check(&guard, &principal, &path, "no secrets here")
+            .await
+            .unwrap();
     }
 }

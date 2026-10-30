@@ -11,7 +11,7 @@ vellum: 1
 
 - Date: `2026-10-29`
 - Status: accepted
-- Decisions: `D61`, `D62`, `D63`, `D295`
+- Decisions: `D61`, `D62`, `D63`, `D295`, `D300`
 - Issue: `#102`, also `#99`, `#100`, `#172`, `#403` and `#526`
 - Pull requests: `#236`, and the page feed after it
 
@@ -85,14 +85,28 @@ runs the same checks against each engine.
   are mounted over the `/mcp` workspace, so they list only the pages the
   signed-in caller may view; anonymous visitors get an empty list.
 
+### `D300`: Admin turns hybrid ranking on or off and sees its progress
+
+- Admin → Settings → Search has `search.hybrid` (on by default). Off,
+  queries skip the model and rank by BM25 alone; documents keep getting
+  vectors, so turning it on again needs no backfill. Serve reads the
+  setting every 5 s and on each status read, so no restart is needed.
+- `admin_search.status` (`GET /v1/admin/search`) reports the engine, the
+  model, whether it is in memory, and the rebuild or backfill job with
+  done and total counts. The panel polls it every 3 s while a job runs.
+- The model stays a folder named by `VELLUM_EMBEDDINGS`; the release
+  binary builds tract in (the `onnx` feature of `vellum-search`).
+
 ## Alternatives
 
 - **ACLs in the index**: every grant change re-indexes blocks, missing the one-second target.
 - **Post-filter only**: ranks every space even when the caller reads one.
 - **External vector database**: ruled out by the brief.
 - **ONNX Runtime**: a native library per platform; tract is pure Rust.
-- **An admin toggle for embeddings**: the model is a file the operator
-  places, so an environment variable sits beside it; a toggle can follow.
+- **Uploading the model through Admin**: models are hundreds of
+  megabytes, beyond the upload limit, so the folder stays the operator's.
+- **Skipping vectors on write while hybrid is off**: saves CPU, but
+  turning it on again would need a backfill on every engine.
 
 ## Consequences
 

@@ -42,6 +42,8 @@ use vellum_search::{
 };
 use vellum_store::{BlobPath, BlobStore};
 
+use crate::search_admin::{SearchJob, SearchStatus};
+
 /// Context string for the search key, so it never equals the index key.
 const KEY_INFO: &[u8] = b"vellum search index key v1";
 
@@ -347,12 +349,18 @@ async fn backend(
 
 /// Embeds, in the background, the Postgres documents indexed before
 /// hybrid search was turned on.
-fn backfill(service: SearchService, source: Arc<WorkspaceSource>, postgres: PostgresBackend) {
+fn backfill(
+    service: SearchService,
+    source: Arc<WorkspaceSource>,
+    postgres: PostgresBackend,
+    status: Arc<SearchStatus>,
+) {
     drop(tokio::spawn(async move {
         let docs = match postgres.docs_without_vectors().await {
             Ok(docs) => docs,
             Err(error) => {
                 tracing::warn!(%error, "cannot list the documents without embeddings");
+                status.set_job(SearchJob::Failed, Some(error.to_string()));
                 return;
             }
         };
@@ -360,11 +368,51 @@ fn backfill(service: SearchService, source: Arc<WorkspaceSource>, postgres: Post
             return;
         }
         tracing::info!(documents = docs.len(), "search: adding embeddings");
-        match vellum_search::reindex(&service, source.as_ref(), &docs, REBUILD_BATCH).await {
-            Ok(done) => tracing::info!(documents = done, "search: embeddings added"),
-            Err(error) => tracing::warn!(%error, "search: adding embeddings stopped"),
+        status.set_job(SearchJob::Embedding, None);
+        let done = vellum_search::reindex_with_progress(
+            &service,
+            source.as_ref(),
+            &docs,
+            REBUILD_BATCH,
+            status.progress(),
+        )
+        .await;
+        match done {
+            Ok(done) => {
+                tracing::info!(documents = done, "search: embeddings added");
+                status.set_job(SearchJob::Done, None);
+            }
+            Err(error) => {
+                tracing::warn!(%error, "search: adding embeddings stopped");
+                status.set_job(SearchJob::Failed, Some(error.to_string()));
+            }
         }
     }));
+}
+
+/// Rebuilds the whole index, reporting progress to Admin; where the page
+/// feed should then start.
+async fn rebuild(
+    service: &SearchService,
+    source: &WorkspaceSource,
+    status: &SearchStatus,
+) -> Start {
+    status.set_job(SearchJob::Indexing, None);
+    let rebuilt =
+        vellum_search::rebuild_with_progress(service, source, REBUILD_BATCH, status.progress())
+            .await;
+    match rebuilt {
+        Ok(done) => {
+            tracing::info!(documents = done.documents, "search index rebuilt");
+            status.set_job(SearchJob::Done, None);
+            Start::Current
+        }
+        Err(error) => {
+            tracing::warn!(%error, "search rebuild failed; indexing page by page");
+            status.set_job(SearchJob::Failed, Some(error.to_string()));
+            Start::CatchUp
+        }
+    }
 }
 
 /// Hands the rows collections writes touch to the indexer.
@@ -388,7 +436,9 @@ fn forward_rows(indexer: Indexer, mut row_changes: mpsc::UnboundedReceiver<Vec<D
 /// # Errors
 ///
 /// When the index cannot be opened.
-pub async fn start<S: AuthzStore + 'static>(parts: Parts<S>) -> Result<SearchApi, Error> {
+pub async fn start<S: AuthzStore + 'static>(
+    parts: Parts<S>,
+) -> Result<(SearchApi, Arc<SearchStatus>), Error> {
     let Parts {
         data_dir,
         key,
@@ -417,9 +467,14 @@ pub async fn start<S: AuthzStore + 'static>(parts: Parts<S>) -> Result<SearchApi
         }),
         Arc::new(Sharded(shards.clone())) as Arc<dyn Stars>,
     );
-    if let Some(embedder) = embedder {
+    if let Some(embedder) = embedder.clone() {
         service = service.with_embedder(Arc::new(embedder));
     }
+    let status = SearchStatus::new(
+        service.clone(),
+        embedder,
+        embeddings.as_ref().map(|e| e.idle),
+    );
     let source = Arc::new(WorkspaceSource {
         drive: Sharded(
             shards
@@ -438,21 +493,18 @@ pub async fn start<S: AuthzStore + 'static>(parts: Parts<S>) -> Result<SearchApi
     );
     forward_rows(indexer.clone(), row_changes);
     if let (Some(postgres), true) = (postgres, embeddings.is_some()) {
-        backfill(service.clone(), Arc::clone(&source), postgres);
+        backfill(
+            service.clone(),
+            Arc::clone(&source),
+            postgres,
+            Arc::clone(&status),
+        );
     }
     let rebuild_service = service.clone();
+    let rebuild_status = Arc::clone(&status);
     drop(tokio::spawn(async move {
         let start = if matches!(opened, Opened::NeedsRebuild) {
-            match vellum_search::rebuild(&rebuild_service, source.as_ref(), REBUILD_BATCH).await {
-                Ok(done) => {
-                    tracing::info!(documents = done.documents, "search index rebuilt");
-                    Start::Current
-                }
-                Err(error) => {
-                    tracing::warn!(%error, "search rebuild failed; indexing page by page");
-                    Start::CatchUp
-                }
-            }
+            rebuild(&rebuild_service, source.as_ref(), &rebuild_status).await
         } else {
             // Rows can change while the server is down (a formula's inputs
             // edited on disk), so they are always indexed again.
@@ -484,7 +536,7 @@ pub async fn start<S: AuthzStore + 'static>(parts: Parts<S>) -> Result<SearchApi
             });
         }
     }));
-    Ok(SearchApi::new(service))
+    Ok((SearchApi::new(service), status))
 }
 
 /// The search API over an empty in-memory index, for printing the API
@@ -509,6 +561,41 @@ pub fn describe<S: AuthzStore + 'static>(authz: Arc<Authz<S>>) -> Result<SearchA
         Arc::new(NoStars),
     );
     Ok(SearchApi::new(service))
+}
+
+/// Reads nothing; for describing the admin search status contract.
+struct NoReader;
+
+#[async_trait]
+impl ReadAccess for NoReader {
+    async fn readable_spaces(&self, _: &Principal) -> vellum_search::Result<Vec<SpaceId>> {
+        Ok(Vec::new())
+    }
+
+    async fn filter_readable(
+        &self,
+        _: &Principal,
+        _: &[DocId],
+    ) -> vellum_search::Result<HashSet<DocId>> {
+        Ok(HashSet::new())
+    }
+}
+
+/// Search's admin status over an empty in-memory index, for printing the
+/// API contracts.
+///
+/// # Errors
+///
+/// When the in-memory index cannot be created.
+pub fn describe_status() -> Result<Arc<SearchStatus>, Error> {
+    let (backend, _) = TantivyBackend::open(&TantivyConfig {
+        location: Location::Memory,
+        key: None,
+        model: None,
+    })
+    .map_err(|e| unavailable("cannot open an in-memory search index", e))?;
+    let service = SearchService::new(Arc::new(backend), Arc::new(NoReader), Arc::new(NoStars));
+    Ok(SearchStatus::new(service, None, None))
 }
 
 #[cfg(test)]

@@ -370,6 +370,10 @@ export interface AdminSettings {
    */
   organisation?: string;
   /**
+   * Hybrid ranking.
+   */
+  search?: SearchSettings;
+  /**
    * Admin-session security.
    */
   security?: SecuritySettings;
@@ -475,6 +479,10 @@ export interface AdminUpdateSettingsAdminSettings {
    */
   organisation?: string;
   /**
+   * Hybrid ranking.
+   */
+  search?: SearchSettings;
+  /**
    * Admin-session security.
    */
   security?: SecuritySettings;
@@ -504,6 +512,10 @@ export interface AdminUpdateSettingsAdminSettings2 {
    * The organisation's display name.
    */
   organisation?: string;
+  /**
+   * Hybrid ranking.
+   */
+  search?: SearchSettings;
   /**
    * Admin-session security.
    */
@@ -7121,6 +7133,11 @@ export interface SearchHit {
 }
 
 /**
+ * What search is doing in the background.
+ */
+export type SearchJob = "idle" | "indexing" | "embedding" | "done" | "failed";
+
+/**
  * One page of search results.
  */
 export interface SearchPage {
@@ -7187,6 +7204,71 @@ export interface SearchQueryQueryInput {
    * Search the trash.
    */
   trashed?: boolean;
+}
+
+/**
+ * Search (R-AI-7, R-SR-5; ADR 0011 D300).
+ */
+export interface SearchSettings {
+  /**
+   * Ranks results with the local embedding model as well as keywords,
+   * when the server has one (`VELLUM_EMBEDDINGS`). Off, search is
+   * keyword-only; pages keep getting vectors, so turning it on again
+   * takes effect at once.
+   */
+  hybrid?: boolean;
+}
+
+/**
+ * Search as Admin → Settings → Search shows it.
+ */
+export interface SearchStatusView {
+  /**
+   * Its vector length.
+   */
+  dimensions?: number | null;
+  /**
+   * Documents the job has done.
+   */
+  done: number;
+  /**
+   * `tantivy` (the data folder) or `postgres`.
+   */
+  engine: string;
+  /**
+   * Why the last job stopped.
+   */
+  error?: string | null;
+  /**
+   * Whether queries are ranked with it now: a model is set and the
+   * `search.hybrid` setting is on.
+   */
+  hybrid: boolean;
+  /**
+   * How long it stays in memory unused.
+   */
+  idle_minutes?: number | null;
+  /**
+   * The background job.
+   */
+  job: SearchJob;
+  /**
+   * Whether the model is in memory now; it loads on first use and is
+   * dropped after `idle_minutes` unused.
+   */
+  loaded: boolean;
+  /**
+   * The model's id, such as `all-MiniLM-L6-v2`.
+   */
+  model?: string | null;
+  /**
+   * Whether the server has a local embedding model (`VELLUM_EMBEDDINGS`).
+   */
+  model_configured: boolean;
+  /**
+   * Documents the job has to do.
+   */
+  total: number;
 }
 
 /**
@@ -11565,6 +11647,13 @@ export interface Operations {
     input: AdminVerifyAuditEmpty;
     output: ChainReport;
   };
+  /** Search's engine, embedding model and background indexing */
+  "admin_search.status": {
+    method: "GET";
+    path: "/v1/admin/search";
+    input: NoInput;
+    output: SearchStatusView;
+  };
   /** Add a section */
   "books.add_section": {
     method: "POST";
@@ -13071,6 +13160,7 @@ export const OPERATIONS = {
   "admin.update_settings": { method: "PUT", path: "/v1/admin/settings", mutation: true },
   "admin.usage": { method: "GET", path: "/v1/admin/usage", mutation: false },
   "admin.verify_audit": { method: "POST", path: "/v1/admin/audit/verify", mutation: true },
+  "admin_search.status": { method: "GET", path: "/v1/admin/search", mutation: false },
   "books.add_section": { method: "POST", path: "/v1/books/{book_id}/sections", mutation: true },
   "books.copy_section": { method: "POST", path: "/v1/books/{book_id}/sections/{section_id}/copy", mutation: true },
   "books.create_snapshot": { method: "POST", path: "/v1/books/{book_id}/snapshots", mutation: true },

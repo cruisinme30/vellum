@@ -453,6 +453,21 @@ async fn ranking(service: &SearchService, c: &Corpus) -> Result<(), Failure> {
         top.citation
     );
     check!(page.hybrid, "hybrid ranking was off with an embedder");
+    // Turned off by the admin (D300): the same query is keyword-only.
+    service.set_hybrid(false);
+    let off = service
+        .search(&ada, &SearchQuery::new("canary deploy", 10))
+        .await;
+    service.set_hybrid(true);
+    let off = off?;
+    check!(
+        !off.hybrid,
+        "hybrid ranking stayed on after it was turned off"
+    );
+    check!(
+        off.hits.first().map(|h| h.doc) == Some(c.runbook),
+        "keyword-only search lost the best hit: {off:?}"
+    );
     check!(
         !docs_of(&page).contains(&c.trashed),
         "trash leaked into live search"

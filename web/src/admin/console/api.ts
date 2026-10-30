@@ -29,6 +29,7 @@ import type {
   ProviderInput,
   ProviderView,
   UsageCounts,
+  SearchStatusView,
   SettingsView,
   SignInView,
   SpaceRoleView,
@@ -58,6 +59,8 @@ export interface AdminConsoleApi {
   runDrill(): Promise<DrillReport>;
   /** People, content, storage and activity; `refresh` counts again now. */
   usage(refresh: boolean): Promise<UsageCounts>;
+  /** Search's engine, embedding model and background indexing (D300). */
+  readonly searchStatus?: () => Promise<SearchStatusView>;
   /** Webhook subscriptions (#149). */
   readonly webhooks?: WebhooksApi;
   /** Every account, oldest first. */
@@ -172,6 +175,7 @@ export function createHttpAdminConsoleApi(http: Http): AdminConsoleApi {
     backUpNow: () => http.send<BackupInfo>("POST", `${ADMIN}/backups`),
     runDrill: () => http.send<DrillReport>("POST", `${ADMIN}/backups/drill`),
     usage: (refresh) => http.get<UsageCounts>(`${ADMIN}/usage`, refresh ? { refresh: "true" } : {}),
+    searchStatus: () => http.get<SearchStatusView>(`${ADMIN}/search`),
     webhooks: createHttpWebhooksApi(http),
     users: () => http.get<UserView[]>(`${ADMIN}/users`),
     createUser: (input) => http.send<UserView>("POST", `${ADMIN}/users`, input),
@@ -274,6 +278,7 @@ export {
   type BackupFile,
   type ChainReport,
   type DrillReport,
+  type SearchStatusView,
   type UsageCounts,
   type Versioned,
 } from "../../api/api.gen";

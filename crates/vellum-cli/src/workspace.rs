@@ -522,6 +522,8 @@ pub struct Opened {
     pub drive: Option<Arc<Drive>>,
     /// Share links on the public origin (#95).
     pub public: Option<Arc<dyn vellum_api::public::PublicSite>>,
+    /// Search's admin side: the hybrid switch and indexing progress.
+    pub search: Option<Arc<crate::search_admin::SearchStatus>>,
 }
 
 /// My Work's settings: where its secrets live and what it links to.
@@ -574,6 +576,8 @@ struct Feeds {
     pages: Option<Arc<dyn vellum_drive::PageWrites>>,
     /// Checks page text before the drive writes it (secret scanning).
     content: Option<Arc<dyn vellum_drive::ContentCheck>>,
+    /// Checks row text before collections write it (secret scanning).
+    row_check: Option<Arc<dyn vellum_collections::service::RowCheck>>,
     /// Which spaces are private: the e2e service changes it, the store's
     /// guard enforces it.
     private: vellum_e2e::PrivateRoots,
@@ -679,6 +683,9 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
     );
     if let Some(feed) = feeds.rows {
         collections = collections.with_index_feed(feed);
+    }
+    if let Some(check) = feeds.row_check {
+        collections = collections.with_row_check(check);
     }
     let collections = Arc::new(collections);
     let books = books_service(Arc::clone(&store), authz, Arc::clone(&space_of));
@@ -1067,6 +1074,7 @@ pub async fn open(
             rows: Some(rows),
             pages: Some(Arc::clone(&live_pages) as Arc<dyn vellum_drive::PageWrites>),
             content: Some(Arc::clone(secrets) as Arc<dyn vellum_drive::ContentCheck>),
+            row_check: Some(Arc::clone(secrets) as Arc<dyn vellum_collections::service::RowCheck>),
             private: roots,
             sharing: SharingSetup::sql(&index, &var),
         },
@@ -1101,7 +1109,7 @@ pub async fn open(
     keep_drives(&workspace.drive, &drive_index, identity).await?;
     live_pages.attach(&collab);
     spaces.replace(load_spaces(drive_index.as_ref()).await?);
-    let search = crate::search::start(crate::search::Parts {
+    let (search, search_status) = crate::search::start(crate::search::Parts {
         data_dir: config.data_dir.clone(),
         key,
         index,
@@ -1142,6 +1150,7 @@ pub async fn open(
         books: Some(workspace.books),
         drive: Some(workspace.drive),
         public: Some(public_site(&workspace.sharing)?),
+        search: Some(search_status),
     })
 }
 
@@ -1174,6 +1183,7 @@ pub async fn describe(
             rows: None,
             pages: None,
             content: None,
+            row_check: None,
             private: vellum_e2e::PrivateRoots::default(),
             sharing: SharingSetup::memory(),
         },

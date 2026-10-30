@@ -17,6 +17,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
@@ -99,6 +100,9 @@ pub struct SearchService {
     access: Arc<dyn ReadAccess>,
     stars: Arc<dyn Stars>,
     embedder: Option<Arc<dyn Embedder>>,
+    /// Whether queries use the embedder (D300). Writes always do, so
+    /// turning hybrid ranking back on needs no backfill.
+    hybrid: Arc<AtomicBool>,
     tuning: Tuning,
 }
 
@@ -130,6 +134,7 @@ impl SearchService {
             access,
             stars,
             embedder: None,
+            hybrid: Arc::new(AtomicBool::new(true)),
             tuning: Tuning::default(),
         }
     }
@@ -139,6 +144,32 @@ impl SearchService {
     pub fn with_embedder(mut self, embedder: Arc<dyn Embedder>) -> Self {
         self.embedder = Some(embedder);
         self
+    }
+
+    /// The embedding model's id, when hybrid ranking is configured.
+    #[must_use]
+    pub fn model_id(&self) -> Option<&str> {
+        self.embedder.as_deref().map(Embedder::model_id)
+    }
+
+    /// The embedding model's vector length, when one is configured.
+    #[must_use]
+    pub fn dimensions(&self) -> Option<usize> {
+        self.embedder.as_deref().map(Embedder::dimensions)
+    }
+
+    /// Turns the semantic half of queries on or off (D300). Every clone
+    /// of this service follows. Documents keep getting vectors either
+    /// way, so turning it on again takes effect at once.
+    pub fn set_hybrid(&self, on: bool) {
+        self.hybrid.store(on, Ordering::Relaxed);
+    }
+
+    /// Whether queries are ranked with the embedding model: one is
+    /// configured and hybrid ranking is not turned off.
+    #[must_use]
+    pub fn hybrid(&self) -> bool {
+        self.embedder.is_some() && self.hybrid.load(Ordering::Relaxed)
     }
 
     /// Replaces the tuning knobs.
@@ -349,6 +380,9 @@ impl SearchService {
     /// The query vector, or `None` without an embedder or when it fails
     /// (search degrades to BM25 rather than failing).
     async fn embed_query(&self, text: &str) -> Option<Vec<f32>> {
+        if !self.hybrid.load(Ordering::Relaxed) {
+            return None;
+        }
         let embedder = self.embedder.as_ref()?;
         match traced("embedder", "embed_query", embedder.embed_query(text)).await {
             Ok(mut v) if v.len() == embedder.dimensions() => {

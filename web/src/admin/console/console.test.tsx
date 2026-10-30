@@ -307,6 +307,13 @@ describe("settings page", () => {
     expect(settings.security?.secret_scanning).toBe("block");
     expect(settings.security?.secret_allow).toEqual(["jwt", "AKIAIOSFODNN7EXAMPLE"]);
   });
+
+  it("reads the hybrid-ranking switch", () => {
+    const on = new FormData();
+    on.set("search.hybrid", "on");
+    expect(settingsFromForm(SETTINGS.settings, on).search?.hybrid).toBe(true);
+    expect(settingsFromForm(SETTINGS.settings, new FormData()).search?.hybrid).toBe(false);
+  });
 });
 
 describe("backups page", () => {

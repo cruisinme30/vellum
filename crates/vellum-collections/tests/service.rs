@@ -1768,3 +1768,116 @@ async fn refresh_reloads_the_folders_another_replica_changed() {
     other.refresh(&dir(RELS_DIR)).await;
     assert_eq!(summary(other.list(&c).await.unwrap()), fresh().await);
 }
+
+/// Refuses any row whose Markdown holds "SECRET", recording what it saw.
+#[derive(Debug, Default)]
+struct NoSecrets(Mutex<Vec<String>>);
+
+#[async_trait]
+impl vellum_collections::service::RowCheck for NoSecrets {
+    async fn check(&self, _: &Principal, path: &BlobPath, text: &str) -> Result<(), Error> {
+        self.0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .push(path.as_str().to_owned());
+        if text.contains("SECRET") {
+            return Err(Error::new(ErrorKind::InvalidInput, "secrets found: test"));
+        }
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn the_row_check_sees_every_row_write_and_a_refusal_writes_nothing() {
+    let f = fixture().await;
+    let check = Arc::new(NoSecrets::default());
+    let service = CollectionsService::new(f.store.clone(), f.grants.clone())
+        .with_clock(Arc::new(|| DateValue::ymd(2026, 10, 29).unwrap()))
+        .with_row_check(check.clone());
+    let ana = UserId::generate();
+    let c = ctx(ana);
+    f.grants.grant(ana, REQS, Need::Edit);
+    f.grants.grant(ana, RELS, Need::Edit);
+    let reqs: CollectionId = REQS.parse().unwrap();
+    let rows_before = std::fs::read_dir(f.root.join(REQS_DIR).join("rows"))
+        .unwrap()
+        .count();
+
+    // Create, update and CSV import are each refused, and nothing is written.
+    let create = |body: &str| CreateRowInput {
+        collection_id: reqs,
+        values: BTreeMap::new(),
+        body: body.to_owned(),
+    };
+    let refused = service.create_row(&c, create("key: SECRET\n")).await;
+    assert_eq!(kind(refused), ErrorKind::InvalidInput);
+    let update = UpdateRowInput {
+        collection_id: reqs,
+        row_id: R1.parse().unwrap(),
+        values: BTreeMap::new(),
+        body: Some("now with a SECRET\n".into()),
+    };
+    assert_eq!(
+        kind(service.update_row(&c, update).await),
+        ErrorKind::InvalidInput
+    );
+    assert!(
+        check
+            .0
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|p| p.ends_with("rows/replay.md"))
+    );
+    let import = ImportCsvInput {
+        collection_id: reqs,
+        csv: "Requirement\nSECRET token row\n".into(),
+        dry_run: false,
+    };
+    assert_eq!(
+        kind(service.import_csv(&c, import).await),
+        ErrorKind::InvalidInput
+    );
+    let rows_after = std::fs::read_dir(f.root.join(REQS_DIR).join("rows"))
+        .unwrap()
+        .count();
+    assert_eq!(rows_before, rows_after, "a refused write left a file");
+    assert!(read(&f.root, &format!("{REQS_DIR}/rows/replay.md")).contains("Replay notes."));
+    // The refused edits were dropped from memory too.
+    let row = service
+        .index_row(R1.parse().unwrap())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(row.body, "Replay notes.\n");
+
+    // A clean row still goes through.
+    let _ = service
+        .create_row(&c, create("Rotates weekly.\n"))
+        .await
+        .unwrap();
+
+    // So does creating a collection from CSV, unless a row holds a secret.
+    let folder = "drives/shared/Northstar";
+    f.grants.grant_folder(ana, folder);
+    let from_csv = |csv: &str| CreateFromCsvInput {
+        folder: folder.into(),
+        title: "Vendors".into(),
+        csv: csv.into(),
+        dry_run: false,
+    };
+    assert_eq!(
+        kind(
+            service
+                .create_from_csv(&c, from_csv("Name\nSECRET\n"))
+                .await
+        ),
+        ErrorKind::InvalidInput
+    );
+    assert!(!f.root.join(folder).join("Vendors.collection").exists());
+    let made = service
+        .create_from_csv(&c, from_csv("Name\nAcme\n"))
+        .await
+        .unwrap();
+    assert!(made.written);
+}

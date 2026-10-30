@@ -87,7 +87,13 @@ impl Drive {
                 )));
             }
             self.ensure_file_quota(&space, bytes.len() as u64).await?;
-            for candidate in names(name)?.take(MAX_ATTACHMENTS + 1) {
+            let candidates = names(name)?;
+            // A text file is checked like page text (secret scanning, D301).
+            if std::str::from_utf8(&bytes).is_ok() {
+                let path = file_path(&dir, name).unwrap_or_else(|_| dir.clone());
+                self.check_content(actor, node.space, &path, &bytes).await?;
+            }
+            for candidate in candidates.take(MAX_ATTACHMENTS + 1) {
                 let path = file_path(&dir, &candidate)?;
                 match self
                     .store
