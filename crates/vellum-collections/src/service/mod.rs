@@ -85,6 +85,22 @@ pub trait RowCheck: Send + Sync + fmt::Debug {
     ) -> Result<(), Error>;
 }
 
+/// Puts a new collection in the drive's folder tree (D321).
+///
+/// The collections service writes a new collection's files itself, but
+/// the drive owns the tree that permissions follow: until it indexes the
+/// folder, nobody (not even its creator) may open the collection.
+#[async_trait::async_trait]
+pub trait Tree: Send + Sync + fmt::Debug {
+    /// Indexes the collection folder `dir` that `principal` just created.
+    /// An error undoes the create.
+    async fn created(
+        &self,
+        principal: &Principal,
+        dir: &vellum_store::BlobPath,
+    ) -> Result<(), Error>;
+}
+
 /// Largest CSV file accepted for import, in bytes.
 pub const MAX_CSV_BYTES: usize = 16 * 1024 * 1024;
 
@@ -236,6 +252,7 @@ pub struct CollectionsService {
     writes: AtomicU64,
     index_feed: Option<Arc<dyn IndexFeed>>,
     row_check: Option<Arc<dyn RowCheck>>,
+    tree: Option<Arc<dyn Tree>>,
 }
 
 impl fmt::Debug for CollectionsService {
@@ -258,6 +275,7 @@ impl CollectionsService {
             writes: AtomicU64::new(0),
             index_feed: None,
             row_check: None,
+            tree: None,
         }
     }
 
@@ -273,6 +291,15 @@ impl CollectionsService {
     #[must_use]
     pub fn with_row_check(mut self, check: Arc<dyn RowCheck>) -> Self {
         self.row_check = Some(check);
+        self
+    }
+
+    /// Hands every collection created through the service to `tree`, so
+    /// it is in the folder tree at once (D321). Without one, a new
+    /// collection is only reachable once something else indexes it.
+    #[must_use]
+    pub fn with_tree(mut self, tree: Arc<dyn Tree>) -> Self {
+        self.tree = Some(tree);
         self
     }
 
@@ -1178,7 +1205,16 @@ impl CollectionsService {
                         "collections were not loaded",
                     ));
                 };
-                let result = state.create(self.store.as_ref(), dir, collection).await;
+                let mut result = state
+                    .create(self.store.as_ref(), dir.clone(), collection)
+                    .await;
+                if result.is_ok()
+                    && let Some(tree) = &self.tree
+                    && let Err(error) = tree.created(&ctx.principal, &dir).await
+                {
+                    self.remove_dir(&dir).await;
+                    result = Err(error);
+                }
                 crate::telemetry::wrote("create_from_csv", result.is_ok());
                 if result.is_err() {
                     *guard = None;
@@ -1199,6 +1235,29 @@ impl CollectionsService {
             collection: info,
             changed,
         })
+    }
+
+    /// Deletes the files of a collection whose create is being undone.
+    /// Best effort: what is left is an unindexed folder, which a rescan
+    /// picks up like any file written outside Vellum.
+    async fn remove_dir(&self, dir: &vellum_store::BlobPath) {
+        use futures::TryStreamExt;
+        let files: Vec<_> = match self.store.list(Some(dir)).try_collect().await {
+            Ok(files) => files,
+            Err(error) => {
+                tracing::warn!(%error, %dir, "new collection not removed");
+                return;
+            }
+        };
+        for file in files {
+            if let Err(error) = self
+                .store
+                .delete(&file.path, vellum_store::Precondition::None)
+                .await
+            {
+                tracing::warn!(%error, path = %file.path, "new collection file not removed");
+            }
+        }
     }
 
     fn csv_operations(this: &Arc<Self>) -> Vec<Operation> {

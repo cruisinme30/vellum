@@ -143,3 +143,7 @@ holder = "red team round 6 (#529)"
 adrs = "0073"
 decisions = "D318"
 holder = "local CI gate (#532), reserved by the coordinator"
+
+[[reservation]]
+decisions = "D321"
+holder = "new collections indexed by the drive (#565), addendum to ADR 0045"

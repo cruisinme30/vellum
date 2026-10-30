@@ -11,8 +11,8 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D190, D191, D192, D193, D205, D206, D207, D305
-- Issue: #474, #497, #541
+- Decisions: D190, D191, D192, D193, D205, D206, D207, D305, D321
+- Issue: #474, #497, #541, #565
 - Pull requests: to be linked when merged
 
 :::
@@ -103,6 +103,15 @@ and live `collection` blocks in pages (section 5).
   node, so creating there is refused, as before for everything.
 - A space made a moment ago may not be cached yet; a miss reloads the
   space list once.
+
+### `D321`: the drive indexes a collection made through the API
+
+- The collections service writes a new collection's files, then hands the
+  folder to the drive (`Drive::add_unit`), which puts it in the folder
+  tree with its creator as owner, as it does for folders and pages.
+  Permissions follow that tree, so before this a new collection was
+  hidden from everyone, its creator included (#565).
+- If the drive refuses, the create is undone and its files removed.
 
 ## Alternatives
 
