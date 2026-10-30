@@ -26,4 +26,4 @@ crates/vellum-contracts/src/blocks.rs line-length=off
 **/*.gen.json line-length=off
 corpus/** line-length=off
 crates/*/tests/fixtures/** line-length=off
-web/src/i18n/*.ftl line-length=off
+**/*.ftl line-length=off
