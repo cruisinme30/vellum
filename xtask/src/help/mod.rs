@@ -5,13 +5,15 @@
 //! `write`, regenerates what is derived from them.
 //!
 //! Derived files: the golden corpus inputs in `corpus/guide/` and the page
-//! table that embeds the books in `vellum-help`. `write` also gives new
+//! table that embeds the books in `vellum-help`, and the app's list of
+//! help IDs in `web/src/help/topics.gen.ts`. `write` also gives new
 //! pages an ID and records it in `book.yaml`.
 
 mod book;
 mod coverage;
 mod examples;
 mod generate;
+mod i18n;
 mod markdown;
 mod ulid;
 
@@ -26,6 +28,8 @@ use examples::Example;
 const CORPUS_DIR: &str = "corpus/guide";
 /// The generated page table.
 const PAGES_RS: &str = "crates/vellum-help/src/pages.rs";
+/// The app's list of contextual help IDs.
+const TOPICS_TS: &str = "web/src/help/topics.gen.ts";
 /// The contextual help map.
 const ANCHORS: &str = "docs/help-anchors.yaml";
 
@@ -48,11 +52,13 @@ pub fn run(mode: Option<&str>) -> Result<(), String> {
     let mut errors = Vec::new();
     let examples = check_books(&books, &mut errors);
     let anchors = check_anchors(&root, &books, &mut errors)?;
+    i18n::check(&root, &books, &mut errors)?;
     let mut outputs = generate::corpus(&examples);
     let _ = outputs.insert(
         PathBuf::from(PAGES_RS),
         generate::page_table(&books, &anchors),
     );
+    let _ = outputs.insert(PathBuf::from(TOPICS_TS), generate::topics_ts(&anchors));
     sync_outputs(&root, &outputs, write, &mut errors)?;
     if errors.is_empty() {
         Ok(())

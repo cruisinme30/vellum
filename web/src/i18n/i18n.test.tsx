@@ -8,8 +8,10 @@ import { renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
+import { EXPORT_THEMES, SITE_THEMES } from "../admin/console/settings-page";
 import { CHANNELS, KINDS } from "../notifications/preferences";
 import { DESTINATIONS } from "../shell/destinations";
+import { DENSITIES, FONTS, MOTIONS } from "../theme/appearance";
 import { THEMES } from "../theme/themes";
 
 import en from "./en.ftl?raw";
@@ -41,7 +43,14 @@ function familyIds(): string[] {
   return [
     ...Object.values(DESTINATIONS).map((destination) => `nav-${destination.id}`),
     ...THEMES.map((theme) => `theme-${theme}`),
-    ...["comfortable", "compact"].map((density) => `density-${density}`),
+    "theme-custom",
+    ...DENSITIES.map((density) => `density-${density}`),
+    ...MOTIONS.map((motion) => `motion-${motion}`),
+    ...FONTS.map((font) => `font-${font}`),
+    ...["too-large", "not-json", "format", "name", "base", "seed"].map(
+      (kind) => `theme-import-${kind}`,
+    ),
+    ...[...EXPORT_THEMES, ...SITE_THEMES].map((theme) => `admin-theme-${theme}`),
     ...KINDS.map((kind) => `notify-kind-${kind}`),
     ...CHANNELS.map((channel) => `notify-channel-${channel}`),
     ...["checking", "on", "off", "denied", "unsupported", "demo"].map(

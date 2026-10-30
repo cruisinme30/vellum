@@ -1,0 +1,287 @@
+/*
+ * SPDX-FileCopyrightText: 2026 The Vellum contributors
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+/* The Drive: places, folder lists, trash, details, filters and settings. */
+
+.vl-drive-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-block-end: 16px;
+}
+
+.vl-drive-nav a {
+  padding: 6px 12px;
+  border-radius: 16px;
+  color: var(--md-on-surface-variant);
+  text-decoration: none;
+}
+
+.vl-drive-nav a[aria-current="page"] {
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+  font-weight: 500;
+}
+
+.vl-drive-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.vl-drive-crumbs ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vl-drive-crumbs li + li::before {
+  content: "›";
+  margin-inline-end: 4px;
+  color: var(--md-on-surface-variant);
+}
+
+.vl-drive-crumbs a {
+  color: var(--md-primary);
+  overflow-wrap: anywhere;
+}
+
+.vl-drive-tools,
+.vl-drive-actions,
+.vl-drive-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  align-items: center;
+}
+
+.vl-drive-actions .vl-text-button {
+  min-height: 32px;
+  padding: 0 8px;
+}
+
+.vl-drive-usage {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-block: 8px;
+}
+
+.vl-drive-usage meter {
+  inline-size: min(240px, 100%);
+}
+
+.vl-drive-new-folder {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-block: 12px;
+}
+
+.vl-drive-new-folder input {
+  min-inline-size: 0;
+}
+
+.vl-drive-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 24px;
+  align-items: start;
+}
+
+.vl-drive-main {
+  min-inline-size: 0;
+  overflow-x: auto;
+}
+
+.vl-drive-notice:empty {
+  display: none;
+}
+
+.vl-drive-table {
+  inline-size: 100%;
+  border-collapse: collapse;
+}
+
+.vl-drive-table th,
+.vl-drive-table td {
+  padding: 6px 8px;
+  border-block-end: 1px solid var(--md-outline-variant);
+  text-align: start;
+  vertical-align: middle;
+}
+
+.vl-drive-table tr[aria-selected="true"] {
+  background: var(--md-surface-container);
+}
+
+.vl-drive-name {
+  overflow-wrap: anywhere;
+}
+
+.vl-drive-kind {
+  margin-inline-end: 6px;
+}
+
+.vl-drive-details {
+  inline-size: min(320px, 100%);
+  padding: 16px;
+  border-radius: var(--vl-radius-m);
+  background: var(--md-surface-container-low);
+  overflow-wrap: anywhere;
+}
+
+.vl-drive-details-head {
+  display: flex;
+  gap: 8px;
+  align-items: start;
+  justify-content: space-between;
+}
+
+.vl-drive-details h2 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.vl-drive-facts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 12px;
+}
+
+.vl-drive-facts dd {
+  margin: 0;
+}
+
+.vl-drive-activity,
+.vl-drive-links,
+.vl-drive-spaces {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.vl-drive-activity li {
+  display: grid;
+}
+
+.vl-drive-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgb(0 0 0 / 32%);
+}
+
+.vl-drive-dialog {
+  display: grid;
+  gap: 8px;
+  inline-size: min(440px, 100%);
+  max-block-size: calc(100dvh - 32px);
+  padding: 24px;
+  overflow: auto;
+  border-radius: var(--vl-radius-m);
+  background: var(--md-surface-container-high);
+  color: var(--md-on-surface);
+}
+
+.vl-drive-dialog h2 {
+  margin: 0 0 8px;
+  font-size: 1.25rem;
+  overflow-wrap: anywhere;
+}
+
+.vl-drive-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: end;
+  margin-block-start: 8px;
+}
+
+.vl-drive-filters,
+.vl-drive-settings {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  align-items: end;
+  margin-block-end: 16px;
+}
+
+.vl-drive-settings {
+  max-inline-size: 720px;
+}
+
+.vl-drive-settings > p,
+.vl-drive-settings > .vl-drive-dialog-actions,
+.vl-drive-filters fieldset {
+  grid-column: 1 / -1;
+}
+
+.vl-drive-filters fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--vl-radius-s);
+}
+
+.vl-drive-field {
+  display: grid;
+  gap: 4px;
+  min-inline-size: 0;
+}
+
+.vl-drive-check {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.vl-danger {
+  background: var(--md-error);
+  color: var(--md-on-error);
+}
+
+@media (width <= 720px) {
+  .vl-drive-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .vl-drive-details {
+    inline-size: auto;
+  }
+
+  /* On a phone the size column gives way to the name and actions. */
+  .vl-drive-table th:nth-child(3),
+  .vl-drive-table td:nth-child(3) {
+    display: none;
+  }
+}
+
+/* Fields carry the theme's colours, so dark themes keep their contrast. */
+.vl-drive input:not([type="checkbox"]),
+.vl-drive select {
+  box-sizing: border-box;
+  min-inline-size: 0;
+  min-block-size: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--md-outline);
+  border-radius: var(--vl-radius-s);
+  background: var(--md-surface-container-lowest);
+  color: var(--md-on-surface);
+  font: inherit;
+}

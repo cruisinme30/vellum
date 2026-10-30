@@ -15,9 +15,13 @@ tasks off. Treat the link like a password; **Reset link** replaces it.
 
 ## Reminders and digest {#reminders}
 
-Reminders arrive as web push, desktop and email notifications. The
-**daily digest** arrives at the time you choose with today's tasks,
-anything overdue and anything waiting on you.
+Reminders arrive as web push, desktop and email notifications. They are
+urgent, so they arrive during quiet hours too. The **daily digest**
+arrives at the time you choose under **Time zone and reminders** in My
+Work, with today's tasks, anything overdue and anything waiting on you,
+and only on days that aren't clear. Both follow your own time zone.
+Choose which channels each kind of notification uses in **Inbox →
+Notification settings**.
 
 ## Capture {#capture}
 

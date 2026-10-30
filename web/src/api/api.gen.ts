@@ -189,6 +189,11 @@ export interface AddSection {
 }
 
 /**
+ * No input.
+ */
+export type AdminAppearanceEmpty = Record<string, unknown>;
+
+/**
  * A finished backup.
  */
 export interface AdminCreateBackupBackupInfo {
@@ -231,6 +236,27 @@ export type AdminCreateBackupEmpty = Record<string, unknown>;
  * No input.
  */
 export type AdminExportAuditEmpty = Record<string, unknown>;
+
+/**
+ * The organisation's look (R-TH-1, R-TH-4; ADR 0007 D245).
+ */
+export interface AdminGetSettingsAppearanceSettings {
+  /**
+   * The theme exports (PDF, HTML, Word) use: a light theme, since
+   * paper is white.
+   */
+  export_theme?: string;
+  /**
+   * The seed colour every built-in theme is derived from, `#rrggbb`.
+   * People can still pick their own accent in the app.
+   */
+  seed?: string;
+  /**
+   * The theme of published sites; `auto` follows the reader's system
+   * light or dark setting.
+   */
+  site_theme?: string;
+}
 
 /**
  * No input.
@@ -289,6 +315,10 @@ export type AdminRunDrillEmpty = Record<string, unknown>;
  * Every admin setting.
  */
 export interface AdminSettings {
+  /**
+   * The organisation's seed colour and export and site themes.
+   */
+  appearance?: AdminGetSettingsAppearanceSettings;
   /**
    * Backups.
    */
@@ -349,6 +379,10 @@ export type AdminTelemetryPreviewEmpty = Record<string, unknown>;
  */
 export interface AdminUpdateSettingsAdminSettings {
   /**
+   * The organisation's seed colour and export and site themes.
+   */
+  appearance?: AdminUpdateSettingsAppearanceSettings;
+  /**
    * Backups.
    */
   backups?: BackupSettings;
@@ -375,6 +409,10 @@ export interface AdminUpdateSettingsAdminSettings {
  */
 export interface AdminUpdateSettingsAdminSettings2 {
   /**
+   * The organisation's seed colour and export and site themes.
+   */
+  appearance?: AdminUpdateSettingsAppearanceSettings2;
+  /**
    * Backups.
    */
   backups?: BackupSettings;
@@ -394,6 +432,48 @@ export interface AdminUpdateSettingsAdminSettings2 {
    * Anonymous usage reporting.
    */
   telemetry?: AdminUpdateSettingsTelemetrySettings2;
+}
+
+/**
+ * The organisation's look (R-TH-1, R-TH-4; ADR 0007 D245).
+ */
+export interface AdminUpdateSettingsAppearanceSettings {
+  /**
+   * The theme exports (PDF, HTML, Word) use: a light theme, since
+   * paper is white.
+   */
+  export_theme?: string;
+  /**
+   * The seed colour every built-in theme is derived from, `#rrggbb`.
+   * People can still pick their own accent in the app.
+   */
+  seed?: string;
+  /**
+   * The theme of published sites; `auto` follows the reader's system
+   * light or dark setting.
+   */
+  site_theme?: string;
+}
+
+/**
+ * The organisation's look (R-TH-1, R-TH-4; ADR 0007 D245).
+ */
+export interface AdminUpdateSettingsAppearanceSettings2 {
+  /**
+   * The theme exports (PDF, HTML, Word) use: a light theme, since
+   * paper is white.
+   */
+  export_theme?: string;
+  /**
+   * The seed colour every built-in theme is derived from, `#rrggbb`.
+   * People can still pick their own accent in the app.
+   */
+  seed?: string;
+  /**
+   * The theme of published sites; `auto` follows the reader's system
+   * light or dark setting.
+   */
+  site_theme?: string;
 }
 
 /**
@@ -520,6 +600,27 @@ export interface AppView {
    * The granted scopes.
    */
   scopes: Scope[];
+}
+
+/**
+ * The organisation's look (R-TH-1, R-TH-4; ADR 0007 D245).
+ */
+export interface AppearanceSettings {
+  /**
+   * The theme exports (PDF, HTML, Word) use: a light theme, since
+   * paper is white.
+   */
+  export_theme?: string;
+  /**
+   * The seed colour every built-in theme is derived from, `#rrggbb`.
+   * People can still pick their own accent in the app.
+   */
+  seed?: string;
+  /**
+   * The theme of published sites; `auto` follows the reader's system
+   * light or dark setting.
+   */
+  site_theme?: string;
 }
 
 export type Array_of_AppView = AppView[];
@@ -887,6 +988,26 @@ export interface BooksAddSectionPlaceInput {
 }
 
 /**
+ * A place in the tree: relative to a section, or at either end of a
+ * region.
+ */
+export interface BooksCopySectionPlaceInput {
+  /**
+   * Where.
+   */
+  at: At;
+  /**
+   * The region `start` and `end` refer to; `numbered` by default.
+   */
+  region?: Region | null;
+  /**
+   * The section `before`, `after`, `first_child_of` and
+   * `last_child_of` refer to.
+   */
+  section?: string | null;
+}
+
+/**
  * A snapshot's header.
  */
 export interface BooksCreateSnapshotSnapshotInfo {
@@ -909,6 +1030,16 @@ export interface BooksCreateSnapshotSnapshotInfo {
 }
 
 /**
+ * Sections a removal took out.
+ */
+export interface BooksMergeSectionRemoved {
+  /**
+   * The removed sections, the named one first.
+   */
+  removed: string[];
+}
+
+/**
  * A place in the tree: relative to a section, or at either end of a
  * region.
  */
@@ -926,6 +1057,40 @@ export interface BooksMoveSectionPlaceInput {
    * `last_child_of` refer to.
    */
   section?: string | null;
+}
+
+/**
+ * A publication of the book.
+ */
+export interface BooksPublicationsPublication {
+  /**
+   * When (RFC 3339).
+   */
+  at: string;
+  /**
+   * Who (`user:<id>`).
+   */
+  by: string;
+  /**
+   * How many files it holds.
+   */
+  files: number;
+  /**
+   * Where the files are in the store.
+   */
+  folder: string;
+  /**
+   * What was built.
+   */
+  format: PublishFormat;
+  /**
+   * Whether it is for everyone.
+   */
+  public: boolean;
+  /**
+   * Where a public site is served, relative to the app origin.
+   */
+  url?: string | null;
 }
 
 /**
@@ -963,6 +1128,26 @@ export interface BooksSetSectionAccessSectionAccessInfo {
    * Effective reviewers.
    */
   reviewers: string[];
+}
+
+/**
+ * A place in the tree: relative to a section, or at either end of a
+ * region.
+ */
+export interface BooksTransferSectionPlaceInput {
+  /**
+   * Where.
+   */
+  at: At;
+  /**
+   * The region `start` and `end` refer to; `numbered` by default.
+   */
+  region?: Region | null;
+  /**
+   * The section `before`, `after`, `first_child_of` and
+   * `last_child_of` refer to.
+   */
+  section?: string | null;
 }
 
 /**
@@ -1729,6 +1914,25 @@ export interface ContextInput {
 }
 
 /**
+ * `books.copy_section`: copies a section and everything under it within
+ * its book, with fresh IDs.
+ */
+export interface CopySection {
+  /**
+   * The book.
+   */
+  book_id: BookId;
+  /**
+   * Where the copy goes.
+   */
+  place: BooksCopySectionPlaceInput;
+  /**
+   * The section.
+   */
+  section_id: string;
+}
+
+/**
  * A new folder.
  */
 export interface CreateFolder {
@@ -2018,6 +2222,25 @@ export interface CreateUser {
    * An initial password; absent for SSO-only accounts.
    */
   password?: string | null;
+}
+
+/**
+ * Sections a split, copy or transfer created.
+ */
+export interface Created {
+  /**
+   * The book they are in.
+   */
+  book_id: BookId;
+  /**
+   * New section IDs, in reading order.
+   */
+  created: string[];
+  /**
+   * The section that now holds the named content (the copy's root for
+   * a copy, the section itself for a move or split).
+   */
+  section_id: string;
 }
 
 /**
@@ -3460,6 +3683,57 @@ export interface HighlightView {
 }
 
 /**
+ * A change to the book's manifest or summary: a reorder, a nest, an
+ * added, renamed or removed section, or new section access.
+ */
+export interface HistoryEntry {
+  /**
+   * When (RFC 3339).
+   */
+  at: string;
+  /**
+   * Who (`user:<id>`), empty for the system.
+   */
+  by: string;
+  /**
+   * The entry, for `books.restore_outline`.
+   */
+  id: string;
+  /**
+   * The operation, such as `move_section`.
+   */
+  op: string;
+  /**
+   * The outline after the change, without hidden sections.
+   */
+  outline: OutlineLine[];
+}
+
+/**
+ * `books.history`: the book's outline changes, newest first.
+ */
+export interface HistoryInput {
+  /**
+   * The book.
+   */
+  book_id: BookId;
+  /**
+   * The most entries to return, 1 to 200; 50 when absent.
+   */
+  limit?: number | null;
+}
+
+/**
+ * The book's outline history.
+ */
+export interface HistoryList {
+  /**
+   * Entries, newest first.
+   */
+  entries: HistoryEntry[];
+}
+
+/**
  * A hook with its secret, shown once.
  */
 export interface HookCreated {
@@ -4260,6 +4534,21 @@ export interface MentionRef {
 }
 
 /**
+ * `books.merge_section`: folds a section's children back into it as
+ * headings.
+ */
+export interface MergeSection {
+  /**
+   * The book.
+   */
+  book_id: BookId;
+  /**
+   * The section whose children are folded in.
+   */
+  section_id: string;
+}
+
+/**
  * Dragging a task to another bucket.
  */
 export interface MoveInput {
@@ -4609,6 +4898,36 @@ export interface OutlineEntry {
 }
 
 /**
+ * One section in a recorded outline, in reading order.
+ */
+export interface OutlineLine {
+  /**
+   * Nesting depth, 1 at the top.
+   */
+  depth: number;
+  /**
+   * The section.
+   */
+  id: string;
+  /**
+   * Its cross-reference label then, such as `§2.3 Services`.
+   */
+  label: string;
+  /**
+   * The section it sat under, if any.
+   */
+  parent?: string | null;
+  /**
+   * `prefix`, `numbered` or `suffix`.
+   */
+  region: string;
+  /**
+   * Its title then.
+   */
+  title: string;
+}
+
+/**
  * Names a page.
  */
 export interface PageKey {
@@ -4859,6 +5178,75 @@ export interface PropertyKey {
    */
   key: string;
 }
+
+/**
+ * A publication of the book.
+ */
+export interface Publication {
+  /**
+   * When (RFC 3339).
+   */
+  at: string;
+  /**
+   * Who (`user:<id>`).
+   */
+  by: string;
+  /**
+   * How many files it holds.
+   */
+  files: number;
+  /**
+   * Where the files are in the store.
+   */
+  folder: string;
+  /**
+   * What was built.
+   */
+  format: PublishFormat;
+  /**
+   * Whether it is for everyone.
+   */
+  public: boolean;
+  /**
+   * Where a public site is served, relative to the app origin.
+   */
+  url?: string | null;
+}
+
+/**
+ * The book's current publications.
+ */
+export interface PublicationList {
+  /**
+   * One per format, if published.
+   */
+  publications: BooksPublicationsPublication[];
+}
+
+/**
+ * `books.publish`.
+ */
+export interface Publish {
+  /**
+   * Who it is for (`user:<id>`, `group:<id>`): restricted sections are
+   * kept only for these. Empty publishes for everyone, and only a
+   * public site is served at `/published/books/<book id>/`.
+   */
+  audience?: string[];
+  /**
+   * The book.
+   */
+  book_id: BookId;
+  /**
+   * What to build.
+   */
+  format: PublishFormat;
+}
+
+/**
+ * What a publication is.
+ */
+export type PublishFormat = "site" | "mdbook";
 
 /**
  * The result of a push registration change.
@@ -5265,6 +5653,21 @@ export interface ResolveThread {
    * Thread ID.
    */
   thread_id: string;
+}
+
+/**
+ * `books.restore_outline`: puts every section that still exists back
+ * where an earlier outline had it.
+ */
+export interface RestoreOutline {
+  /**
+   * The book.
+   */
+  book_id: BookId;
+  /**
+   * The history entry to restore.
+   */
+  entry: string;
 }
 
 /**
@@ -6187,6 +6590,25 @@ export interface Span {
    * First character, counting from 0.
    */
   start: number;
+}
+
+/**
+ * `books.split_section`: turns a section's headings into child sections.
+ */
+export interface SplitSection {
+  /**
+   * The book.
+   */
+  book_id: BookId;
+  /**
+   * The heading level to split at, 1 to 6; the shallowest present when
+   * absent.
+   */
+  level?: number | null;
+  /**
+   * The section.
+   */
+  section_id: string;
 }
 
 /**
@@ -7207,6 +7629,33 @@ export interface TraceInput {
    * The 32-hex-digit W3C trace id.
    */
   trace_id: string;
+}
+
+/**
+ * `books.transfer_section`: moves or copies a section and everything
+ * under it into another book.
+ */
+export interface TransferSection {
+  /**
+   * The source book.
+   */
+  book_id: BookId;
+  /**
+   * Copy with fresh IDs instead of moving.
+   */
+  copy?: boolean;
+  /**
+   * Where it goes in the target book.
+   */
+  place: BooksTransferSectionPlaceInput;
+  /**
+   * The section.
+   */
+  section_id: string;
+  /**
+   * The target book.
+   */
+  to_book: BookId;
 }
 
 /**
@@ -9186,6 +9635,13 @@ export interface WorkUpdateIssueIssueOut {
 
 /** Every operation: its method, path, input and output. */
 export interface Operations {
+  /** The organisation's seed colour and export and site themes */
+  "admin.appearance": {
+    method: "GET";
+    path: "/v1/appearance";
+    input: AdminAppearanceEmpty;
+    output: AppearanceSettings;
+  };
   /** Browser timings for a page view or slow call, joined to its trace */
   "admin.client_report": {
     method: "POST";
@@ -9312,6 +9768,13 @@ export interface Operations {
     input: AddSection;
     output: SectionDoc;
   };
+  /** Copy a section with everything under it within the book */
+  "books.copy_section": {
+    method: "POST";
+    path: "/v1/books/{book_id}/sections/{section_id}/copy";
+    input: CopySection;
+    output: Created;
+  };
   /** Tag the current book */
   "books.create_snapshot": {
     method: "POST";
@@ -9340,6 +9803,13 @@ export interface Operations {
     input: SectionKey;
     output: SectionDoc;
   };
+  /** List the book's outline changes, newest first */
+  "books.history": {
+    method: "GET";
+    path: "/v1/books/{book_id}/history";
+    input: HistoryInput;
+    output: HistoryList;
+  };
   /** List the books you can open */
   "books.list": {
     method: "GET";
@@ -9354,12 +9824,33 @@ export interface Operations {
     input: BookKey;
     output: SnapshotList;
   };
+  /** Fold a section's children back into it as headings */
+  "books.merge_section": {
+    method: "POST";
+    path: "/v1/books/{book_id}/sections/{section_id}/merge";
+    input: MergeSection;
+    output: BooksMergeSectionRemoved;
+  };
   /** Move or nest a section with everything under it */
   "books.move_section": {
     method: "POST";
     path: "/v1/books/{book_id}/sections/{section_id}/move";
     input: MoveSection;
     output: SectionDoc;
+  };
+  /** List the book's current publications */
+  "books.publications": {
+    method: "GET";
+    path: "/v1/books/{book_id}/publications";
+    input: BookKey;
+    output: PublicationList;
+  };
+  /** Publish the book as a static site or an mdBook tree */
+  "books.publish": {
+    method: "POST";
+    path: "/v1/books/{book_id}/publish";
+    input: Publish;
+    output: Publication;
   };
   /** Remove a section with everything under it */
   "books.remove_section": {
@@ -9368,12 +9859,33 @@ export interface Operations {
     input: SectionKey;
     output: BooksRemoveSectionRemoved;
   };
+  /** Put the sections back in an earlier order */
+  "books.restore_outline": {
+    method: "POST";
+    path: "/v1/books/{book_id}/history/restore";
+    input: RestoreOutline;
+    output: BookInfo;
+  };
   /** Restrict a section and set its owners and reviewers */
   "books.set_section_access": {
     method: "PUT";
     path: "/v1/books/{book_id}/sections/{section_id}/access";
     input: SetSectionAccess;
     output: BooksSetSectionAccessSectionAccessInfo;
+  };
+  /** Turn a section's headings into sections */
+  "books.split_section": {
+    method: "POST";
+    path: "/v1/books/{book_id}/sections/{section_id}/split";
+    input: SplitSection;
+    output: Created;
+  };
+  /** Move or copy a section with everything under it into another book */
+  "books.transfer_section": {
+    method: "POST";
+    path: "/v1/books/{book_id}/sections/{section_id}/transfer";
+    input: TransferSection;
+    output: Created;
   };
   /** Rename a section or replace its body */
   "books.update_section": {
@@ -10415,6 +10927,7 @@ export interface Operations {
 
 /** How to call each operation, for the runtime in `client.ts`. */
 export const OPERATIONS = {
+  "admin.appearance": { method: "GET", path: "/v1/appearance", mutation: false },
   "admin.client_report": { method: "POST", path: "/v1/telemetry/client", mutation: true },
   "admin.create_backup": { method: "POST", path: "/v1/admin/backups", mutation: true },
   "admin.export_audit": { method: "GET", path: "/v1/admin/audit/export", mutation: false },
@@ -10433,15 +10946,23 @@ export const OPERATIONS = {
   "admin.usage": { method: "GET", path: "/v1/admin/usage", mutation: false },
   "admin.verify_audit": { method: "POST", path: "/v1/admin/audit/verify", mutation: true },
   "books.add_section": { method: "POST", path: "/v1/books/{book_id}/sections", mutation: true },
+  "books.copy_section": { method: "POST", path: "/v1/books/{book_id}/sections/{section_id}/copy", mutation: true },
   "books.create_snapshot": { method: "POST", path: "/v1/books/{book_id}/snapshots", mutation: true },
   "books.diff": { method: "GET", path: "/v1/books/{book_id}/diff", mutation: false },
   "books.get": { method: "GET", path: "/v1/books/{book_id}", mutation: false },
   "books.get_section": { method: "GET", path: "/v1/books/{book_id}/sections/{section_id}", mutation: false },
+  "books.history": { method: "GET", path: "/v1/books/{book_id}/history", mutation: false },
   "books.list": { method: "GET", path: "/v1/books", mutation: false },
   "books.list_snapshots": { method: "GET", path: "/v1/books/{book_id}/snapshots", mutation: false },
+  "books.merge_section": { method: "POST", path: "/v1/books/{book_id}/sections/{section_id}/merge", mutation: true },
   "books.move_section": { method: "POST", path: "/v1/books/{book_id}/sections/{section_id}/move", mutation: true },
+  "books.publications": { method: "GET", path: "/v1/books/{book_id}/publications", mutation: false },
+  "books.publish": { method: "POST", path: "/v1/books/{book_id}/publish", mutation: true },
   "books.remove_section": { method: "DELETE", path: "/v1/books/{book_id}/sections/{section_id}", mutation: true },
+  "books.restore_outline": { method: "POST", path: "/v1/books/{book_id}/history/restore", mutation: true },
   "books.set_section_access": { method: "PUT", path: "/v1/books/{book_id}/sections/{section_id}/access", mutation: true },
+  "books.split_section": { method: "POST", path: "/v1/books/{book_id}/sections/{section_id}/split", mutation: true },
+  "books.transfer_section": { method: "POST", path: "/v1/books/{book_id}/sections/{section_id}/transfer", mutation: true },
   "books.update_section": { method: "PATCH", path: "/v1/books/{book_id}/sections/{section_id}", mutation: true },
   "collections.add_property": { method: "POST", path: "/v1/collections/{collection_id}/properties", mutation: true },
   "collections.chart": { method: "GET", path: "/v1/collections/chart", mutation: false },

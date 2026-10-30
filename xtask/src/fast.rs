@@ -11,8 +11,12 @@
 //!
 //! Like CI, the Rust and web steps are skipped when the branch does not touch
 //! them; `scripts/ci/changed-areas.sh` decides for both (ADR 0035, D139).
-//! The Rust tests run only for the crates the branch changed; CI runs the
-//! whole workspace. `VELLUM_FAST_ALL_TESTS=1` tests every crate locally too.
+//! Locally the run is focused (Gourav, 2026-10-29: threads run focused
+//! tests and the integrator's batch runs everything): clippy, rustdoc and
+//! the Rust tests cover only the crates the branch changed, and the web and
+//! desktop unit tests only the files related to its changes, without the
+//! coverage gate. CI runs the whole workspace. `VELLUM_FAST_ALL_TESTS=1`
+//! runs the full checks locally too.
 
 use std::env;
 use std::ffi::OsString;
@@ -225,30 +229,50 @@ pub fn run() -> Result<(), String> {
 }
 
 /// The Web job's steps, run in `web/`.
-fn web_steps() -> Vec<Step> {
-    [
+fn web_steps(focus: Option<&str>) -> Vec<Step> {
+    let mut steps: Vec<Step> = [
         ("Web install", &["install", "--frozen-lockfile"][..]),
         ("Web format", &["run", "format:check"]),
         ("Web types", &["run", "typecheck"]),
         ("Web lint", &["run", "lint"]),
         ("Web dead code", &["run", "knip"]),
-        ("Web tests with coverage", &["run", "test:coverage"]),
         ("Web dependency audit", &["audit"]),
     ]
     .into_iter()
     .map(|(name, args)| Step::new(name, "pnpm", args).in_dir("web").area(Area::Web))
-    .collect()
+    .collect();
+    steps.insert(
+        5,
+        js_tests("Web tests", focus).in_dir("web").area(Area::Web),
+    );
+    steps
+}
+
+/// The unit tests of `web/` or `desktop/`: with coverage, or, focused on a
+/// base commit, only the tests related to the files changed since it.
+fn js_tests(name: &'static str, focus: Option<&str>) -> Step {
+    focus.map_or_else(
+        || Step::new(name, "pnpm", &["run", "test:coverage"]),
+        |base| {
+            let mut step = Step::new(
+                name,
+                "pnpm",
+                &["exec", "vitest", "run", "--passWithNoTests"],
+            );
+            step.args.push(format!("--changed={base}"));
+            step
+        },
+    )
 }
 
 /// The Desktop job's steps, run in `desktop/`.
-fn desktop_steps() -> Vec<Step> {
-    [
+fn desktop_steps(focus: Option<&str>) -> Vec<Step> {
+    let mut steps: Vec<Step> = [
         ("Desktop install", &["install", "--frozen-lockfile"][..]),
         ("Desktop format", &["run", "format:check"]),
         ("Desktop types", &["run", "typecheck"]),
         ("Desktop lint", &["run", "lint"]),
         ("Desktop dead code", &["run", "knip"]),
-        ("Desktop tests with coverage", &["run", "test:coverage"]),
         ("Desktop build", &["run", "build"]),
         ("Desktop dependency audit", &["audit"]),
     ]
@@ -258,7 +282,14 @@ fn desktop_steps() -> Vec<Step> {
             .in_dir("desktop")
             .area(Area::Desktop)
     })
-    .collect()
+    .collect();
+    steps.insert(
+        5,
+        js_tests("Desktop tests", focus)
+            .in_dir("desktop")
+            .area(Area::Desktop),
+    );
+    steps
 }
 
 /// Tests that start Postgres or Meilisearch in a container through
@@ -280,6 +311,20 @@ fn rust_tests(docker: bool, packages: Option<&[String]>) -> Step {
     let mut step = Step::new("Rust tests", "cargo", &["nextest", "run"])
         .needs("cargo-nextest")
         .area(Area::Rust);
+    scope(&mut step, packages);
+    for arg in ["--locked", "--profile", "ci"] {
+        step.args.push(arg.to_owned());
+    }
+    if !docker {
+        step.args.push("-E".to_owned());
+        step.args.push(format!("not ({DOCKER_TESTS})"));
+    }
+    step
+}
+
+/// Narrows a cargo step to `packages`: the whole workspace for `None`, not
+/// needed for none.
+fn scope(step: &mut Step, packages: Option<&[String]>) {
     match packages {
         None => step.args.push("--workspace".to_owned()),
         Some([]) => step.not_needed = true,
@@ -290,13 +335,18 @@ fn rust_tests(docker: bool, packages: Option<&[String]>) -> Step {
             }
         }
     }
-    for arg in ["--locked", "--profile", "ci"] {
-        step.args.push(arg.to_owned());
-    }
-    if !docker {
-        step.args.push("-E".to_owned());
-        step.args.push(format!("not ({DOCKER_TESTS})"));
-    }
+}
+
+/// A cargo step: `command`, its scope, then `rest`.
+fn cargo_step(
+    name: &'static str,
+    command: &str,
+    packages: Option<&[String]>,
+    rest: &[&str],
+) -> Step {
+    let mut step = Step::new(name, "cargo", &[command]);
+    scope(&mut step, packages);
+    step.args.extend(rest.iter().map(|arg| (*arg).to_owned()));
     step
 }
 
@@ -308,27 +358,16 @@ fn steps(base: Option<&str>, branch: Option<&str>, tested: Option<&[String]>) ->
         // `-D warnings` after `--` also denies rustc warnings in every
         // target, matching CI's RUSTFLAGS without invalidating the
         // contributor's normal build cache.
-        Step::new(
+        cargo_step(
             "Clippy",
-            "cargo",
-            &[
-                "clippy",
-                "--workspace",
-                "--all-targets",
-                "--locked",
-                "--",
-                "-D",
-                "warnings",
-            ],
+            "clippy",
+            tested,
+            &["--all-targets", "--locked", "--", "-D", "warnings"],
         )
         .area(Area::Rust),
-        Step::new(
-            "Rust docs",
-            "cargo",
-            &["doc", "--workspace", "--no-deps", "--locked"],
-        )
-        .with_env("RUSTDOCFLAGS", "-D warnings")
-        .area(Area::Rust),
+        cargo_step("Rust docs", "doc", tested, &["--no-deps", "--locked"])
+            .with_env("RUSTDOCFLAGS", "-D warnings")
+            .area(Area::Rust),
         rust_tests(docker_available(), tested),
         Step::new(
             "Licences, bans, sources and advisories",
@@ -341,8 +380,10 @@ fn steps(base: Option<&str>, branch: Option<&str>, tested: Option<&[String]>) ->
             .needs("cargo-audit")
             .area(Area::Rust),
     ];
-    steps.extend(web_steps());
-    steps.extend(desktop_steps());
+    // Focused JS tests need a base, and are full when the Rust side is.
+    let focus = base.filter(|_| tested.is_some());
+    steps.extend(web_steps(focus));
+    steps.extend(desktop_steps(focus));
     steps.extend([
         // Files, docs and secrets
         Step::new("REUSE headers", "reuse", &["lint"]),
@@ -352,7 +393,7 @@ fn steps(base: Option<&str>, branch: Option<&str>, tested: Option<&[String]>) ->
             "bash",
             &[
                 "-c",
-                "shellcheck -x scripts/*/*.sh deploy/*/*.sh .githooks/*",
+                "shellcheck -x scripts/*/*.sh deploy/*/*.sh deploy/packages/linux/*.sh site/*.sh .githooks/*",
             ],
         )
         .needs("shellcheck"),
@@ -373,12 +414,8 @@ fn steps(base: Option<&str>, branch: Option<&str>, tested: Option<&[String]>) ->
                 "--offline",
                 "--no-progress",
                 "--include-fragments",
-                "--exclude-path",
-                "LICENSES",
-                "--exclude-path",
-                "web/node_modules",
-                "--exclude-path",
-                "corpus",
+                // lychee.toml excludes LICENSES, corpus and downloaded
+                // third-party docs (node_modules, target, cargo home).
                 "**/*.md",
             ],
         ),
@@ -652,6 +689,37 @@ mod tests {
         ] {
             assert!(names.contains(&expected), "missing step {expected}");
         }
+    }
+
+    #[test]
+    fn focused_runs_check_only_the_changed_crates_and_files() {
+        let tested = vec!["vellum-db".to_owned()];
+        let steps = steps(Some("abc"), None, Some(&tested));
+        let args = |name: &str| {
+            steps
+                .iter()
+                .find(|step| step.name == name)
+                .map(|step| step.args.clone())
+                .unwrap_or_default()
+        };
+        assert_eq!(args("Clippy")[..3], ["clippy", "-p", "vellum-db"]);
+        assert!(args("Clippy").ends_with(&["-D".to_owned(), "warnings".to_owned()]));
+        assert_eq!(args("Rust docs")[..3], ["doc", "-p", "vellum-db"]);
+        assert!(args("Web tests").contains(&"--changed=abc".to_owned()));
+
+        let full = steps_full();
+        assert!(
+            full.iter()
+                .any(|s| s.name == "Clippy" && s.args.contains(&"--workspace".to_owned()))
+        );
+        assert!(
+            full.iter()
+                .any(|s| s.name == "Web tests" && s.args.contains(&"test:coverage".to_owned()))
+        );
+    }
+
+    fn steps_full() -> Vec<Step> {
+        steps(Some("abc"), None, None)
     }
 
     #[test]

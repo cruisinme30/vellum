@@ -4,6 +4,7 @@
 import { useCallback, useId, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 
+import { ViewTitle } from "../help/help-link";
 import { useT } from "../i18n/i18n";
 import { Icon } from "../shell/icon";
 
@@ -188,7 +189,7 @@ function CollectionBody({ collection }: { readonly collection: CollectionInfo })
         </ol>
       </nav>
       <div className="vl-collection-head">
-        <h1>{collection.title}</h1>
+        <ViewTitle title={collection.title} help="collection.views" />
         <div className="vl-collection-actions">
           <button
             type="button"

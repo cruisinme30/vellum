@@ -12,16 +12,33 @@
 #   4. pushes the multi-arch image to GHCR built from those same binaries,
 #      signed and with the SBOM attested;
 #   5. publishes the GitHub release with all of it attached;
-#   6. runs the upgrade and restore drill against the published image:
+#   6. refreshes the install channels: the Homebrew tap and winget (D250);
+#   7. runs the upgrade and restore drill against the published image:
 #      upgrade a seeded stack from each of the previous two releases, and
 #      restore a backup into a scratch stack, comparing counts each time.
 #
-# Desktop: builds the app for macOS, Windows and Linux and attaches it to a
-# draft GitHub release, for every v* tag. A tag push fails without the Apple
-# secrets. Set these repository secrets (ADR 0023, D99):
-#   macOS:   CSC_LINK, CSC_KEY_PASSWORD (Developer ID Application, .p12 as base64)
-#            APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID (notarisation)
-#   Windows: WIN_CSC_LINK, WIN_CSC_KEY_PASSWORD (code-signing certificate)
+# Install channels (ADR 0022, D250-D252): the static Linux binaries for
+# amd64 and arm64 (Raspberry Pi 3 and later), a macOS universal binary,
+# Windows x64 and arm64 binaries, .deb and .rpm packages, a Homebrew formula
+# and winget manifests. Every one is in SHA256SUMS and signed with Sigstore.
+#
+# Desktop: builds the app for macOS, Windows and Linux around those same
+# binaries and attaches it to a draft GitHub release, for every v* tag. A
+# tag push fails without the Apple secrets, and a 1.0 or later tag fails
+# without Windows signing.
+#
+# Secrets (repository secrets) and variables (repository variables):
+#   macOS (ADR 0023, D99): secrets CSC_LINK, CSC_KEY_PASSWORD (Developer ID
+#     Application, .p12 as base64), APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD,
+#     APPLE_TEAM_ID (notarisation)
+#   Windows (D252, Azure Trusted Signing): secrets AZURE_TENANT_ID,
+#     AZURE_CLIENT_ID, AZURE_CLIENT_SECRET; variables AZURE_SIGNING_ENDPOINT,
+#     AZURE_SIGNING_ACCOUNT, AZURE_SIGNING_PROFILE, WINDOWS_PUBLISHER_NAME
+#   Homebrew tap: secret HOMEBREW_TAP_TOKEN (contents: write on
+#     cruisinme30/homebrew-vellum)
+#   winget: secret WINGET_TOKEN (a classic token with public_repo, owning a
+#     fork of microsoft/winget-pkgs)
+# A channel whose secrets are missing is skipped with a notice.
 #
 # A manual run does one part only: an unsigned desktop build, or the drill
 # against a given image (or one built from the chosen commit).
@@ -98,7 +115,11 @@ jobs:
   binaries:
     name: Reproducible binary (${{ matrix.arch }})
     needs: verify
-    if: needs.verify.outputs.server == 'true'
+    # The desktop app bundles these, so desktop-only tags and manual
+    # desktop runs build them too.
+    if: >-
+      !cancelled() && needs.verify.result != 'failure' &&
+      (github.event_name == 'push' || inputs.part == 'desktop')
     strategy:
       matrix:
         include:
@@ -129,9 +150,181 @@ jobs:
           path: dist/
           if-no-files-found: error
 
+  native:
+    name: Native binary (${{ matrix.file }})
+    needs: verify
+    if: >-
+      !cancelled() && needs.verify.result != 'failure' &&
+      (github.event_name == 'push' || inputs.part == 'desktop')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-15, file: vellum-macos-universal }
+          - { os: windows-2025, file: vellum-windows-x64.exe, target: x86_64-pc-windows-msvc }
+          - { os: windows-2025, file: vellum-windows-arm64.exe, target: aarch64-pc-windows-msvc }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Release builds restore no caches, so a poisoned cache can't reach a
+      # signed release (ADR 0032).
+      - run: rustup toolchain install
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+      # The binary embeds web/dist at compile time.
+      - name: Web app
+        working-directory: web
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run build
+      - name: Universal macOS binary
+        if: runner.os == 'macOS'
+        run: |
+          rustup target add aarch64-apple-darwin x86_64-apple-darwin
+          cargo build --release --locked -p vellum-cli --target aarch64-apple-darwin
+          cargo build --release --locked -p vellum-cli --target x86_64-apple-darwin
+          mkdir -p dist
+          lipo -create -output "dist/${{ matrix.file }}" \
+            target/aarch64-apple-darwin/release/vellum target/x86_64-apple-darwin/release/vellum
+      - name: Windows binary
+        if: runner.os == 'Windows'
+        env:
+          TARGET: ${{ matrix.target }}
+          FILE: ${{ matrix.file }}
+        run: |
+          rustup target add "${TARGET}"
+          cargo build --release --locked -p vellum-cli --target "${TARGET}"
+          mkdir -p dist
+          cp "target/${TARGET}/release/vellum.exe" "dist/${FILE}"
+      - name: Sign and notarise the macOS binary
+        if: runner.os == 'macOS'
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          FILE: ${{ matrix.file }}
+        run: |
+          if [[ -z "${CSC_LINK}" || -z "${APPLE_ID}" ]]; then
+            echo "::notice::No Apple signing secrets: the macOS binary keeps its ad-hoc signature."
+            exit 0
+          fi
+          keychain="${RUNNER_TEMP}/signing.keychain-db"
+          password="$(openssl rand -hex 16)"
+          security create-keychain -p "${password}" "${keychain}"
+          security set-keychain-settings -lut 900 "${keychain}"
+          security unlock-keychain -p "${password}" "${keychain}"
+          base64 --decode <<<"${CSC_LINK}" >"${RUNNER_TEMP}/cert.p12"
+          security import "${RUNNER_TEMP}/cert.p12" -k "${keychain}" -P "${CSC_KEY_PASSWORD}" -T /usr/bin/codesign
+          rm -f "${RUNNER_TEMP}/cert.p12"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "${password}" "${keychain}" >/dev/null
+          security list-keychains -d user -s "${keychain}"
+          codesign --force --options runtime --timestamp --keychain "${keychain}" \
+            --sign "Developer ID Application" "dist/${FILE}"
+          ditto -c -k "dist/${FILE}" "${RUNNER_TEMP}/notarise.zip"
+          xcrun notarytool submit "${RUNNER_TEMP}/notarise.zip" --wait \
+            --apple-id "${APPLE_ID}" --password "${APPLE_APP_SPECIFIC_PASSWORD}" --team-id "${APPLE_TEAM_ID}"
+          security delete-keychain "${keychain}"
+      - name: Is Windows signing set up?
+        id: azure
+        if: runner.os == 'Windows'
+        env:
+          ENDPOINT: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+        run: |
+          if [[ -n "${ENDPOINT}" ]]; then
+            echo "sign=true" >>"${GITHUB_OUTPUT}"
+          else
+            echo "::notice::No Azure Trusted Signing variables: the Windows binary is unsigned."
+          fi
+      - name: Sign the Windows binary (Azure Trusted Signing)
+        if: steps.azure.outputs.sign == 'true'
+        uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.AZURE_SIGNING_PROFILE }}
+          files: ${{ github.workspace }}\dist\${{ matrix.file }}
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+      - name: The binary runs
+        if: matrix.target != 'aarch64-pc-windows-msvc'
+        run: |
+          chmod +x "dist/${{ matrix.file }}"
+          "dist/${{ matrix.file }}" --version
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-${{ matrix.file }}
+          path: dist/
+          if-no-files-found: error
+
+  packages:
+    name: Debian and RPM packages
+    needs: [verify, binaries]
+    if: needs.verify.outputs.server == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      NFPM_VERSION: 2.43.0
+      NFPM_SHA256: a80d5f724ed70b192ffa8a2bde469c013cef559c8afa3441eb51dd9a918beb6b
+      VERSION: ${{ needs.verify.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          pattern: binary-*
+          path: bin
+          merge-multiple: true
+      - name: Install nfpm (pinned by checksum)
+        run: |
+          curl -fsSL -o "${RUNNER_TEMP}/nfpm.tgz" \
+            "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_Linux_x86_64.tar.gz"
+          echo "${NFPM_SHA256}  ${RUNNER_TEMP}/nfpm.tgz" | sha256sum --check
+          tar -xzf "${RUNNER_TEMP}/nfpm.tgz" -C "${RUNNER_TEMP}" nfpm
+      - name: Build the packages
+        run: |
+          mkdir -p dist
+          for arch in amd64 arm64; do
+            chmod +x "bin/vellum-linux-${arch}"
+            for packager in deb rpm; do
+              ARCH="${arch}" BINARY="bin/vellum-linux-${arch}" "${RUNNER_TEMP}/nfpm" package \
+                --config deploy/packages/nfpm.yaml --packager "${packager}" --target dist/
+            done
+          done
+          ls -l dist
+      - name: The amd64 package installs, runs and its unit is valid
+        run: |
+          sudo apt-get install -y "./dist/vellum_${VERSION}_amd64.deb"
+          vellum --version
+          getent passwd vellum
+          systemd-analyze verify /usr/lib/systemd/system/vellum.service
+          sudo apt-get remove -y vellum
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: packages
+          path: dist/
+          if-no-files-found: error
+
   assemble:
     name: SBOM, checksums and signatures
-    needs: [verify, binaries]
+    needs: [verify, binaries, native, packages]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -148,6 +341,15 @@ jobs:
           pattern: binary-*
           path: dist
           merge-multiple: true
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          pattern: native-*
+          path: dist
+          merge-multiple: true
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: packages
+          path: dist
       - name: CycloneDX SBOM of the source tree (Rust and web)
         uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
@@ -166,7 +368,7 @@ jobs:
       - name: Sign every file with Sigstore
         working-directory: dist
         run: |
-          for file in vellum-* SHA256SUMS; do
+          for file in vellum[-_]* SHA256SUMS; do
             cosign sign-blob --yes --bundle "${file}.sigstore.json" "${file}"
           done
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -289,9 +491,82 @@ jobs:
           gh release create "${GITHUB_REF_NAME}" dist/* --repo "${GITHUB_REPOSITORY}" \
             --verify-tag --title "Vellum ${VERSION}" --notes-file notes.md
 
+  channels:
+    name: Homebrew and winget
+    needs: [verify, publish]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write # attach the manifests to the release
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: release-files
+          path: dist
+      - name: Write the formula and manifests from the signed checksums
+        run: |
+          cargo run --locked --package xtask -- installers \
+            --version "${VERSION}" --sums dist/SHA256SUMS --out channels --repo "${GITHUB_REPOSITORY}"
+          cp channels/homebrew/vellum.rb vellum.rb
+          tar -czf winget-manifests.tar.gz -C channels/winget manifests
+          gh release upload "${GITHUB_REF_NAME}" vellum.rb winget-manifests.tar.gz --repo "${GITHUB_REPOSITORY}"
+      - name: Update the Homebrew tap
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [[ -z "${TAP_TOKEN}" ]]; then
+            echo "::notice::No HOMEBREW_TAP_TOKEN: the tap was not updated. vellum.rb is on the release."
+            exit 0
+          fi
+          tap="${GITHUB_REPOSITORY_OWNER}/homebrew-vellum"
+          git clone --depth 1 "https://x-access-token:${TAP_TOKEN}@github.com/${tap}.git" tap
+          mkdir -p tap/Formula
+          cp channels/homebrew/vellum.rb tap/Formula/vellum.rb
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/vellum.rb
+          git commit -m "vellum ${VERSION}"
+          git push origin HEAD
+      - name: Propose the winget manifests
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          if [[ -z "${WINGET_TOKEN}" ]]; then
+            echo "::notice::No WINGET_TOKEN: no winget pull request. winget-manifests.tar.gz is on the release."
+            exit 0
+          fi
+          export GH_TOKEN="${WINGET_TOKEN}"
+          owner="$(gh api user --jq .login)"
+          gh repo sync "${owner}/winget-pkgs" --source microsoft/winget-pkgs --branch master
+          git clone --depth 1 --filter=blob:none --sparse \
+            "https://x-access-token:${WINGET_TOKEN}@github.com/${owner}/winget-pkgs.git" winget-pkgs
+          cd winget-pkgs
+          git sparse-checkout set manifests/v/Vellum
+          branch="vellum-${VERSION}"
+          git switch -c "${branch}"
+          cp -R ../channels/winget/manifests/. manifests/
+          git config user.name "${owner}"
+          git config user.email "${owner}@users.noreply.github.com"
+          git add manifests/v/Vellum
+          git commit -m "New version: Vellum.Vellum version ${VERSION}"
+          git push origin "${branch}"
+          gh pr create --repo microsoft/winget-pkgs --head "${owner}:${branch}" \
+            --title "New version: Vellum.Vellum version ${VERSION}" \
+            --body "Vellum ${VERSION}: https://github.com/${GITHUB_REPOSITORY}/releases/tag/${GITHUB_REF_NAME}"
+
   desktop:
     name: Desktop app (${{ matrix.os }})
-    if: github.event_name == 'push' || inputs.part == 'desktop'
+    needs: [binaries, native]
+    if: >-
+      !cancelled() && needs.binaries.result == 'success' && needs.native.result == 'success'
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write # electron-builder uploads to the draft release
@@ -312,9 +587,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # Release builds restore no caches, so a poisoned cache can't reach a
-      # signed release (ADR 0032).
-      - run: rustup toolchain install
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
           package_json_file: desktop/package.json
@@ -322,24 +594,31 @@ jobs:
         with:
           node-version: 22
           package-manager-cache: false
-      # The server binary embeds web/dist at compile time, so build the web
-      # app first or the binary ships the placeholder page.
       - name: Web app
         working-directory: web
         run: |
           pnpm install --frozen-lockfile
           pnpm run build
-      - name: Server binary (universal on macOS)
-        if: runner.os == 'macOS'
+      # The app bundles the released binaries rather than building its own
+      # (R-LT-3): the static Linux ones and the signed macOS and Windows ones.
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          pattern: ${{ runner.os == 'Linux' && 'binary-*' || 'native-*' }}
+          path: bin
+          merge-multiple: true
+      - name: Place one binary per architecture
+        shell: bash
         run: |
-          rustup target add aarch64-apple-darwin x86_64-apple-darwin
-          cargo build --release --locked -p vellum-cli --target aarch64-apple-darwin
-          cargo build --release --locked -p vellum-cli --target x86_64-apple-darwin
-          lipo -create -output target/release/vellum \
-            target/aarch64-apple-darwin/release/vellum target/x86_64-apple-darwin/release/vellum
-      - name: Server binary
-        if: runner.os != 'macOS'
-        run: cargo build --release --locked -p vellum-cli
+          place() { mkdir -p "target/desktop-bin/$2" && cp "bin/$1" "target/desktop-bin/$2/${VELLUM_BINARY}"; }
+          case "${RUNNER_OS}" in
+            macOS) place vellum-macos-universal x64 && place vellum-macos-universal arm64 ;;
+            Windows) place vellum-windows-x64.exe x64 && place vellum-windows-arm64.exe arm64 ;;
+            Linux)
+              place vellum-linux-amd64 x64 && place vellum-linux-arm64 arm64
+              sudo apt-get install -y rpm # electron-builder's rpm target
+              ;;
+          esac
+          chmod +x target/desktop-bin/*/*
       - name: Desktop app
         working-directory: desktop
         shell: bash
@@ -347,11 +626,16 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_LINK: ${{ runner.os == 'macOS' && secrets.CSC_LINK || '' }}
           CSC_KEY_PASSWORD: ${{ runner.os == 'macOS' && secrets.CSC_KEY_PASSWORD || '' }}
-          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
-          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          AZURE_TENANT_ID: ${{ runner.os == 'Windows' && secrets.AZURE_TENANT_ID || '' }}
+          AZURE_CLIENT_ID: ${{ runner.os == 'Windows' && secrets.AZURE_CLIENT_ID || '' }}
+          AZURE_CLIENT_SECRET: ${{ runner.os == 'Windows' && secrets.AZURE_CLIENT_SECRET || '' }}
+          AZURE_SIGNING_ENDPOINT: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          AZURE_SIGNING_ACCOUNT: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          AZURE_SIGNING_PROFILE: ${{ vars.AZURE_SIGNING_PROFILE }}
+          WINDOWS_PUBLISHER_NAME: ${{ vars.WINDOWS_PUBLISHER_NAME }}
         run: |
           pnpm install --frozen-lockfile
           pnpm run build
@@ -364,7 +648,23 @@ jobs:
             fi
             args+=(-c.mac.notarize=false)
           fi
-          if [[ -z "${CSC_LINK}${WIN_CSC_LINK}" ]]; then export CSC_IDENTITY_AUTO_DISCOVERY=false; fi
+          if [[ "${RUNNER_OS}" == "Windows" ]]; then
+            if [[ -n "${AZURE_SIGNING_ENDPOINT}" ]]; then
+              args+=(
+                "-c.win.azureSignOptions.endpoint=${AZURE_SIGNING_ENDPOINT}"
+                "-c.win.azureSignOptions.codeSigningAccountName=${AZURE_SIGNING_ACCOUNT}"
+                "-c.win.azureSignOptions.certificateProfileName=${AZURE_SIGNING_PROFILE}"
+                "-c.win.azureSignOptions.publisherName=${WINDOWS_PUBLISHER_NAME}"
+              )
+            elif [[ "${GITHUB_REF}" =~ ^refs/tags/v[1-9][0-9]*\.[0-9]+\.[0-9]+$ ]]; then
+              # 1.0 and later never ship an unsigned Windows build (D252).
+              echo "::error::Set the Azure Trusted Signing secrets and variables (see the top of this file)"
+              exit 1
+            else
+              echo "::notice::No Azure Trusted Signing variables: the Windows app is unsigned."
+            fi
+          fi
+          if [[ -z "${CSC_LINK}" ]]; then export CSC_IDENTITY_AUTO_DISCOVERY=false; fi
           pnpm exec electron-builder "${args[@]}"
 
   drill:

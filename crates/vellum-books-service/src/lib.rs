@@ -24,20 +24,34 @@
 //! | `books.list_snapshots` | `GET /v1/books/{book_id}/snapshots` | `read` |
 //! | `books.create_snapshot` | `POST /v1/books/{book_id}/snapshots` | `write:direct` |
 //! | `books.diff` | `GET /v1/books/{book_id}/diff` | `read` |
+//! | `books.history` | `GET /v1/books/{book_id}/history` | `read` |
+//! | `books.restore_outline` | `POST /v1/books/{book_id}/history/restore` | `write:direct` |
+//! | `books.copy_section` | `POST /v1/books/{book_id}/sections/{section_id}/copy` | `write:direct` |
+//! | `books.transfer_section` | `POST /v1/books/{book_id}/sections/{section_id}/transfer` | `write:direct` |
+//! | `books.split_section` | `POST /v1/books/{book_id}/sections/{section_id}/split` | `write:direct` |
+//! | `books.merge_section` | `POST /v1/books/{book_id}/sections/{section_id}/merge` | `write:direct` |
+//! | `books.publish` | `POST /v1/books/{book_id}/publish` | `write:direct` |
+//! | `books.publications` | `GET /v1/books/{book_id}/publications` | `read` |
 //!
 //! Access (D144): opening a book needs read access to its `.book` node.
 //! Editing needs edit access, and changing section access needs manage
 //! access. A restricted section is visible to book managers and owners,
 //! and to others only when they hold one of its effective `restrict_to`
 //! principals; anything else is "not found". Removing a section needs
-//! sight of everything under it.
+//! sight of everything under it, and so do copying, moving out and
+//! folding. Publishing needs manage access (D237).
+//!
+//! Every edit that changes the outline leaves a history record (D235),
+//! and restoring one puts the sections back in that order.
 
 pub mod access;
 pub mod api;
 pub mod files;
+pub mod history;
 pub mod mirror;
+pub mod publish;
 mod service;
 
 pub use access::{Access, AuthzAccess, MirrorReport, SpaceOf};
 pub use mirror::Restrictions;
-pub use service::BooksService;
+pub use service::{BooksService, SiteRenderer};

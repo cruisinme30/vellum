@@ -182,3 +182,6 @@ EICAR
 lettre
 rustls
 unlinks
+Hyperlegible
+nfpm
+winget

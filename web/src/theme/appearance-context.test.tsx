@@ -1,12 +1,13 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AppearanceProvider, useAppearance } from "./appearance-context";
+import { buildScheme } from "./themes";
 
 /** Swallows React's logged error for an expected throw. */
 const quiet = () => {
@@ -55,6 +56,8 @@ function ThemeName() {
 afterEach(() => {
   vi.unstubAllGlobals();
   delete document.documentElement.dataset["theme"];
+  document.documentElement.removeAttribute("style");
+  localStorage.clear();
 });
 
 describe("AppearanceProvider", () => {
@@ -115,6 +118,41 @@ describe("AppearanceProvider", () => {
       }
       restoreMatchMedia();
     }
+  });
+});
+
+describe("the organisation's look", () => {
+  it("themes from the organisation's seed and shares the look", async () => {
+    const organisation = vi.fn().mockResolvedValue({
+      seed: "#b02020",
+      exportTheme: "sepia",
+      siteTheme: "auto",
+    });
+    const withOrg = ({ children }: { readonly children: ReactNode }) => (
+      <AppearanceProvider organisation={organisation}>{children}</AppearanceProvider>
+    );
+    const { result } = renderHook(() => useAppearance(), { wrapper: withOrg });
+    await waitFor(() => {
+      expect(result.current.organisation?.exportTheme).toBe("sepia");
+    });
+    expect(document.documentElement.style.getPropertyValue("--md-primary")).toBe(
+      buildScheme("light", "#b02020")["primary"],
+    );
+  });
+
+  it("keeps Vellum's seed when the organisation's look cannot load", async () => {
+    const organisation = vi.fn().mockRejectedValue(new Error("offline"));
+    const withOrg = ({ children }: { readonly children: ReactNode }) => (
+      <AppearanceProvider organisation={organisation}>{children}</AppearanceProvider>
+    );
+    const { result } = renderHook(() => useAppearance(), { wrapper: withOrg });
+    await waitFor(() => {
+      expect(organisation).toHaveBeenCalled();
+    });
+    expect(result.current.organisation).toBeUndefined();
+    expect(document.documentElement.style.getPropertyValue("--md-primary")).toBe(
+      buildScheme("light")["primary"],
+    );
   });
 });
 

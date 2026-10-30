@@ -5,6 +5,7 @@ import { useId } from "react";
 import { Link, useSearchParams } from "react-router";
 
 import { useSearch, useWorkspace } from "../data/workspace-context";
+import { ViewTitle } from "../help/help-link";
 import { useT } from "../i18n/i18n";
 
 import { PageList } from "./page-list";
@@ -28,7 +29,7 @@ export function SearchView() {
   const hits = useSearch("search", query);
   return (
     <div className="vl-view">
-      <h1>{t("nav-search")}</h1>
+      <ViewTitle title={t("nav-search")} help="drive.search" />
       <div role="search" className="vl-search">
         <label htmlFor={id}>{t("search-label")}</label>
         <input

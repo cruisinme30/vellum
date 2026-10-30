@@ -27,6 +27,7 @@ mod feed;
 mod google_http;
 #[cfg(test)]
 mod google_http_tests;
+mod help_http;
 mod identity;
 #[cfg(test)]
 mod identity_tests;
@@ -35,6 +36,11 @@ mod keys;
 mod limits;
 mod mail;
 mod mcp;
+mod mcp_edit;
+mod mcp_serve;
+#[cfg(test)]
+mod mcp_tests;
+mod mcp_workspace;
 mod notifications;
 mod observability;
 mod page_render;
@@ -47,6 +53,7 @@ mod private_remote;
 mod private_remote_tests;
 #[cfg(test)]
 mod private_tests;
+mod published;
 mod reindex;
 mod reminders;
 mod search;

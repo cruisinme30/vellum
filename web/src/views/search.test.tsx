@@ -23,7 +23,10 @@ describe("SearchView", () => {
     const { user, location } = renderWithProviders(<SearchView />, "/search");
     await user.type(screen.getByRole("searchbox"), "gateway");
     expect(location()).toBe("/search?q=gateway");
-    const results = await screen.findAllByRole("link");
+    // Every link but the title's help link is a result.
+    const links = await screen.findAllByRole("link");
+    const results = links.filter((link) => !link.classList.contains("vl-help-link"));
+    expect(results).toHaveLength(links.length - 1);
     expect(screen.getByRole("status").textContent).toBe(`${String(results.length)} pages found`);
     expect(results[0]?.textContent).toContain("Gateway architecture");
   });

@@ -49,6 +49,7 @@ jobs:
       desktop: ${{ steps.areas.outputs.desktop }}
       files: ${{ steps.areas.outputs.files }}
       ui: ${{ steps.areas.outputs.ui }}
+      warm: ${{ steps.areas.outputs.warm }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -72,6 +73,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           passed=0
+          warm=false
           if [[ "${EVENT}" == "pull_request" && "${ACTION}" == "edited" ]]; then
             passed="$(gh api "repos/${GH_REPO}/actions/workflows/${WORKFLOW}/runs?head_sha=${SHA}&status=success" \
               --jq '.total_count' || echo 0)"
@@ -85,6 +87,14 @@ jobs:
             passed="$(gh api "repos/${GH_REPO}/actions/workflows/${WORKFLOW}/runs?head_sha=${pr_head}&status=success" \
               --jq '.total_count' || echo 0)"
           fi
+          if ((passed > 0)) && [[ "${EVENT}" == "push" ]] &&
+            git diff --name-only HEAD^1 HEAD | scripts/ci/changed-areas.sh | grep -qx 'rust=true'; then
+            # Only develop saves the Rust caches (D138), so the Rust jobs
+            # still build, without checking again, to keep them warm for
+            # the next batch (ADR 0049, D215).
+            warm=true
+          fi
+          echo "warm=${warm}" | tee -a "${GITHUB_OUTPUT}"
           if ((passed > 0)); then
             echo "This commit already passed; checking the description only."
             printf 'rust=false\nweb=false\ndesktop=false\nui=false\nfiles=false\n' | tee -a "${GITHUB_OUTPUT}"
@@ -106,7 +116,7 @@ jobs:
   rust:
     name: Rust
     needs: changes
-    if: needs.changes.outputs.rust == 'true'
+    if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.warm == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -124,20 +134,26 @@ jobs:
         with:
           tool: cargo-deny,cargo-audit,mdbook
       - name: Format
+        if: needs.changes.outputs.warm != 'true'
         run: cargo fmt --all --check
       - name: Clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Docs
         run: cargo doc --workspace --no-deps --locked
       - name: Crate boundaries
+        if: needs.changes.outputs.warm != 'true'
         run: cargo xtask boundaries
       - name: Block model is generated from schema/
+        if: needs.changes.outputs.warm != 'true'
         run: cargo xtask schema --check
       - name: Help books and their corpus
+        if: needs.changes.outputs.warm != 'true'
         run: cargo xtask help
       - name: Licences, bans, sources and advisories
+        if: needs.changes.outputs.warm != 'true'
         run: cargo deny --locked check
       - name: RustSec audit
+        if: needs.changes.outputs.warm != 'true'
         run: cargo audit --deny warnings
 
   rust-tests:
@@ -147,7 +163,7 @@ jobs:
     # coverage job.
     name: Rust tests
     needs: changes
-    if: needs.changes.outputs.rust == 'true' && !inputs.full-suite
+    if: (needs.changes.outputs.rust == 'true' || needs.changes.outputs.warm == 'true') && !inputs.full-suite
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -165,7 +181,15 @@ jobs:
           # The books tests build a published tree with mdBook.
           tool: cargo-nextest,mdbook
       - name: Tests
-        run: cargo nextest run --workspace --locked --profile ci
+        env:
+          WARM: ${{ needs.changes.outputs.warm }}
+        run: |
+          if [[ "${WARM}" == "true" ]]; then
+            # A warm-up run builds the tests for the cache without running them.
+            cargo nextest run --workspace --locked --profile ci --no-run
+          else
+            cargo nextest run --workspace --locked --profile ci
+          fi
 
   web:
     name: Web
@@ -322,7 +346,7 @@ jobs:
       - name: YAML
         run: yamllint --strict .
       - name: Shell
-        run: shellcheck -x scripts/*/*.sh deploy/*/*.sh .githooks/*
+        run: shellcheck -x scripts/*/*.sh deploy/*/*.sh deploy/packages/linux/*.sh site/*.sh .githooks/*
       - name: Workflow security (zizmor)
         # ADR 0032, D126: template injection, excessive token permissions,
         # unpinned or impostor actions, credential persistence, cooldowns.
@@ -343,10 +367,9 @@ jobs:
       - name: Local links
         uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
+          # Excluded paths are in lychee.toml, shared with `cargo xtask fast`.
           args: >-
-            --offline --no-progress --include-fragments
-            --exclude-path LICENSES --exclude-path web/node_modules
-            --exclude-path corpus '**/*.md'
+            --offline --no-progress --include-fragments '**/*.md'
           fail: true
       - name: Secrets
         # The pull request already scanned these commits; the action does

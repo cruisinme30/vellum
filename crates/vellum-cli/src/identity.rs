@@ -34,6 +34,12 @@ impl IdentityAuthenticator {
     }
 }
 
+/// Whether `path` is the MCP endpoint or below it.
+fn is_mcp(path: &str) -> bool {
+    path.strip_prefix("/mcp")
+        .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+}
+
 impl Authenticator for IdentityAuthenticator {
     fn authenticate<'a>(
         &'a self,
@@ -49,7 +55,14 @@ impl Authenticator for IdentityAuthenticator {
                         .or_else(|| v.strip_prefix("bearer "))
                 });
             if let Some(token) = bearer {
-                let resolved = self.identity.bearer(token.trim())?;
+                let resolved = match self.identity.bearer(token.trim()) {
+                    Ok(resolved) => resolved,
+                    // `/mcp` answers a bad token itself, with the
+                    // `WWW-Authenticate` challenge MCP clients follow to
+                    // sign in again (ADR 0019, D217).
+                    Err(_) if is_mcp(&request.path) => return Ok(Authenticated::anonymous()),
+                    Err(e) => return Err(e),
+                };
                 return Ok(Authenticated {
                     principal: resolved.principal,
                     csrf_binding: None,

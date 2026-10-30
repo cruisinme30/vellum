@@ -192,10 +192,10 @@ body {
   --links: #a8c7fa;
 }
 
-/* Syntax colours below 4.5:1 in the dark code theme. */
-.navy .hljs-attr,
-.coal .hljs-attr,
-.ayu .hljs-attr {
+/* Syntax colours below 4.5:1 in the dark code themes. */
+.navy :is(.hljs-attr, .hljs-variable, .hljs-template-variable, .hljs-tag, .hljs-name, .hljs-regexp),
+.coal :is(.hljs-attr, .hljs-variable, .hljs-template-variable, .hljs-tag, .hljs-name, .hljs-regexp),
+.ayu :is(.hljs-attr, .hljs-variable, .hljs-template-variable, .hljs-tag, .hljs-name, .hljs-regexp) {
   color: #e48a8a;
 }
 
@@ -224,6 +224,14 @@ body {
   min-height: 24px;
 }
 
+/* A link that fills a table cell is a target of its own, not a link in a
+   sentence, so it gets the 24 px minimum height too (SC 2.5.8). */
+td > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+}
+
 /* Long titles and code wrap instead of spilling over the page or the next cell. */
 .chapter li a,
 td,
@@ -241,4 +249,32 @@ pre > code:focus-visible,
 .table-wrapper:focus-visible {
   outline: 3px solid var(--links);
   outline-offset: 2px;
+}
+
+/* Other releases' guides in the site bar, and the feedback line at the
+   end of every page (ADR 0024, D257). */
+.vellum-versions {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-inline-start: auto;
+  color: var(--sidebar-fg);
+}
+.vellum-versions a[aria-current] {
+  font-weight: 600;
+  text-decoration: underline;
+}
+.vellum-feedback {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-block: 3em 1em;
+  padding-block-start: 1em;
+  border-top: 1px solid var(--sidebar-spacer);
+  font-size: 0.875rem;
+}
+.vellum-feedback .vellum-edit {
+  margin-inline-start: auto;
 }

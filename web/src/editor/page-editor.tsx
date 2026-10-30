@@ -4,12 +4,23 @@
 import { getSchema, type JSONContent } from "@tiptap/core";
 import { Collaboration } from "@tiptap/extension-collaboration";
 import { CollaborationCaret } from "@tiptap/extension-collaboration-caret";
-import { EditorContent, useEditor } from "@tiptap/react";
-import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { type Editor, EditorContent, useEditor } from "@tiptap/react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 import * as Y from "yjs";
 
 import { useT } from "../i18n/i18n";
+import { Icon } from "../shell/icon";
+import type { WorkApi } from "../work/api";
 
+import type { ChipSources } from "./chips/items";
+import { PresenceBar } from "./collab/presence";
 import type {
   CollabConnector,
   CollabSession,
@@ -19,6 +30,9 @@ import type {
 } from "./collab/provider";
 import { createSaver, type SaveStatus, type Saver } from "./collab/saving";
 import { FIELD, seedUpdate } from "./collab/seed";
+import { CommentMarkers, ensureAnchor, type Anchor } from "./comments/anchor";
+import { CommentsPanel } from "./comments/comments-panel";
+import { FileIssue } from "./comments/file-issue";
 import { vellumExtensions } from "./extensions";
 import type { ResolvePage } from "./nodes/inline";
 import { Toolbar } from "./toolbar";
@@ -40,6 +54,18 @@ export interface PageEditorProperties {
   readonly actions?: ReactNode;
   /** Told how to save the page now and whether it is editable; `undefined` once closed. */
   readonly onControls?: (controls?: EditorControls) => void;
+  /**
+   * Comments and issues, from a Vellum server; without it (demo mode) the
+   * Comment and Create issue controls are absent.
+   */
+  readonly work?: WorkApi | undefined;
+  /** The signed-in person's handle, to mark their own reactions. */
+  readonly me?: string | undefined;
+  /**
+   * People, pages and issues for the `@` and `[[` menus and live issue
+   * chips. Read when the page opens: pass one object for the page's life.
+   */
+  readonly chips?: ChipSources | undefined;
 }
 
 /** What the page around the editor may do with it. */
@@ -50,9 +76,14 @@ export interface EditorControls {
   readonly canWrite: boolean;
 }
 
-interface BoundProperties extends Omit<PageEditorProperties, "connector" | "pageId" | "spaceId"> {
+interface BoundProperties extends Omit<PageEditorProperties, "connector" | "spaceId"> {
   readonly session: CollabSession;
 }
+
+/** Which side tool is open, and the selection it was opened on. */
+type Side =
+  | { readonly kind: "comments"; readonly anchor: Anchor }
+  | { readonly kind: "issue"; readonly anchor: Anchor };
 
 /** A local session: always online and editable, and never changes. */
 const unsubscribeNothing = () => {
@@ -154,7 +185,70 @@ function SaveControls({
 
 const LOCAL_LIVE = (): LiveConnection => LOCAL;
 
+/** The Comment and Create issue buttons, with the issue form when open. */
+function WorkActions({
+  work,
+  editable,
+  side,
+  onToggle,
+  onClose,
+  pageId,
+  editor,
+}: {
+  readonly work: WorkApi;
+  readonly editable: boolean;
+  readonly side: Side | undefined;
+  readonly onToggle: (kind: Side["kind"]) => void;
+  readonly onClose: () => void;
+  readonly pageId: string;
+  readonly editor: Editor;
+}) {
+  const t = useT();
+  return (
+    <>
+      <button
+        type="button"
+        className="vl-icon-button"
+        aria-label={t("comments-open")}
+        title={t("comments-open")}
+        aria-expanded={side?.kind === "comments"}
+        onClick={() => {
+          onToggle("comments");
+        }}
+      >
+        <Icon name="comment" />
+      </button>
+      {editable && (
+        <span className="vl-file-issue-anchor">
+          <button
+            type="button"
+            className="vl-icon-button"
+            aria-label={t("file-issue-open")}
+            title={t("file-issue-open")}
+            aria-expanded={side?.kind === "issue"}
+            onClick={() => {
+              onToggle("issue");
+            }}
+          >
+            <Icon name="add_task" />
+          </button>
+          {side?.kind === "issue" && (
+            <FileIssue
+              api={work}
+              documentId={pageId}
+              editor={editor}
+              anchor={side.anchor}
+              onClose={onClose}
+            />
+          )}
+        </span>
+      )}
+    </>
+  );
+}
+
 function BoundEditor({
+  pageId,
   session,
   seed,
   user,
@@ -163,6 +257,9 @@ function BoundEditor({
   idleSaveMs,
   actions,
   onControls,
+  work,
+  me,
+  chips,
 }: BoundProperties) {
   const t = useT();
   const live = useLive(session.live);
@@ -194,8 +291,8 @@ function BoundEditor({
     [onControls],
   );
   const base = useMemo(
-    () => vellumExtensions({ t, resolvePage, history: false }),
-    [t, resolvePage],
+    () => vellumExtensions({ t, resolvePage, history: false, chips }),
+    [t, resolvePage, chips],
   );
   const [seeded] = useState(() => {
     if (seed) {
@@ -207,6 +304,7 @@ function BoundEditor({
     {
       extensions: [
         ...base,
+        CommentMarkers,
         Collaboration.configure({ document: session.doc, field: FIELD }),
         CollaborationCaret.configure({ provider: session, user }),
       ],
@@ -256,16 +354,47 @@ function BoundEditor({
     }
   }, [editor, editable]);
 
+  const [side, setSide] = useState<Side>();
+  const closeSide = useCallback(() => {
+    setSide(undefined);
+  }, []);
+  const openSide = (kind: Side["kind"]) => {
+    setSide(side?.kind === kind ? undefined : { kind, anchor: ensureAnchor(editor) });
+  };
+  const workActions = work && (
+    <WorkActions
+      work={work}
+      editable={editable}
+      side={side}
+      onToggle={openSide}
+      onClose={closeSide}
+      pageId={pageId}
+      editor={editor}
+    />
+  );
+
   return (
     <div className="vl-editor">
       <div className="vl-editor-bar">
         <Toolbar editor={editor} />
         <SaveControls saver={saver} canSave={editable && live.status === "online"}>
+          {workActions}
+          <PresenceBar awareness={session.awareness} live={session.live ? live : undefined} />
           {actions}
         </SaveControls>
       </div>
       <LiveNotice state={live} />
       <EditorContent editor={editor} />
+      {work && side?.kind === "comments" && (
+        <CommentsPanel
+          api={work}
+          documentId={pageId}
+          editor={editor}
+          me={me}
+          anchor={side.anchor}
+          onClose={closeSide}
+        />
+      )}
     </div>
   );
 }
@@ -298,5 +427,5 @@ export function PageEditor({ connector, pageId, spaceId, ...rest }: PageEditorPr
       </p>
     );
   }
-  return <BoundEditor key={pageId} session={open.session} {...rest} />;
+  return <BoundEditor key={pageId} pageId={pageId} session={open.session} {...rest} />;
 }

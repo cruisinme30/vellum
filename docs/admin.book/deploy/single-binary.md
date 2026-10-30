@@ -11,12 +11,33 @@ renderer, search and background jobs, with an encrypted SQLite index.
 
 ## Install {#install}
 
-Download the release for your platform from the project's releases
-page, check its signature, and put it on your `PATH`.
+Pick the channel for your platform. Every one installs the same signed
+release binary, on x86-64 or ARM64 (a Raspberry Pi 3 or later on a
+64-bit OS counts).
+
+| Platform | Command |
+| --- | --- |
+| macOS or Linux, Homebrew | `brew install cruisinme30/vellum/vellum` |
+| Windows | `winget install Vellum.Vellum` |
+| Debian, Ubuntu | `sudo apt install ./vellum_<version>_amd64.deb` (or `_arm64`) |
+| Fedora, RHEL, openSUSE | `sudo dnf install ./vellum-<version>-1.x86_64.rpm` (or `.aarch64`) |
+| Any Linux or macOS | The install script below |
+
+The install script picks the right binary for your platform:
 
 ```bash
-cosign verify-blob --bundle vellum.sigstore.json vellum
-chmod +x vellum && sudo mv vellum /usr/local/bin/
+curl -fsSL https://cruisinme30.github.io/vellum/install.sh | sh
+```
+
+The `.deb` and `.rpm` files are on the release page. To install by hand,
+download the binary for your platform, check its signature, and put it
+on your `PATH`:
+
+```bash
+cosign verify-blob vellum-linux-amd64 --bundle vellum-linux-amd64.sigstore.json \
+  --certificate-identity-regexp '^https://github.com/cruisinme30/vellum/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+chmod +x vellum-linux-amd64 && sudo mv vellum-linux-amd64 /usr/local/bin/vellum
 vellum --version
 ```
 
@@ -43,8 +64,18 @@ VELLUM_BIND=0.0.0.0:443 VELLUM_PUBLIC_URL=https://vellum.northstar.dev vellum se
 
 ## Run as a service {#service}
 
-On Linux, run Vellum under systemd so it starts on boot and restarts on
-failure:
+The `.deb` and `.rpm` packages install a hardened systemd unit and a
+`vellum` user, with data in `/var/lib/vellum`. Set the public address
+and the key passphrase in `/etc/vellum/vellum.env`, then start it:
+
+```bash
+sudo systemctl enable --now vellum
+```
+
+With Homebrew, `brew services start vellum` does the same on macOS and
+Linux, with data in Homebrew's `var/vellum`.
+
+For a binary installed by hand, a minimal unit is:
 
 ```ini
 [Unit]

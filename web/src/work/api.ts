@@ -9,6 +9,7 @@
 
 import type {
   CommentOut,
+  CommentResult,
   CompleteView,
   CreatedIssue,
   IssueGroups,
@@ -19,6 +20,7 @@ import type {
   TaskView,
   TeamOut,
   TeamsOut,
+  ThreadOut,
   ThreadsOut,
 } from "../api/api.gen";
 import type { Http } from "../api/http";
@@ -28,10 +30,43 @@ interface NewIssue {
   readonly team: string;
   readonly title: string;
   readonly description?: string;
+  /** `<doc id>#blk-…` when filed from a page's selection (R-WK-7). */
+  readonly sourceBlock?: string;
+  /** The selected text, kept on the issue as a quote. */
+  readonly quote?: string;
+}
+
+/** A new comment thread on a page, a block or an issue. */
+interface NewThread {
+  /** An issue key, a document ID or `<doc id>#blk-…`. */
+  readonly target: string;
+  readonly body: string;
+  /** The selected text, for a block thread. */
+  readonly quote?: string;
+  /** "Assign to" this handle. */
+  readonly assignTo?: string;
+}
+
+/**
+ * Comment threads (#94): the work core owns them, so the editor's comments
+ * panel and an issue page both use these calls.
+ */
+export interface CommentsApi {
+  /** The threads on a target; a document ID returns its block threads too. */
+  threads(target: string): Promise<ThreadOut[]>;
+  startThread(thread: NewThread): Promise<ThreadOut | undefined>;
+  reply(commentId: string, body: string): Promise<ThreadOut | undefined>;
+  editComment(commentId: string, body: string): Promise<ThreadOut | undefined>;
+  deleteComment(commentId: string): Promise<ThreadOut | undefined>;
+  /** Adds (`on`) or takes back a reaction. */
+  react(commentId: string, emoji: string, on: boolean): Promise<ThreadOut | undefined>;
+  resolve(threadId: string, resolved: boolean): Promise<ThreadOut | undefined>;
+  /** Assigns the thread to a handle; `undefined` unassigns. */
+  assign(threadId: string, assignee: string | undefined): Promise<ThreadOut | undefined>;
 }
 
 /** The Work and My Work operations the web app uses. */
-export interface WorkApi {
+export interface WorkApi extends CommentsApi {
   /** The signed-in person's tasks, in buckets. */
   myWork(): Promise<MyWorkView>;
   /** Adds a task from quick-add text such as "Call Sam tomorrow !high". */
@@ -46,8 +81,12 @@ export interface WorkApi {
   teams(): Promise<TeamOut[]>;
   /** A team's open issues, most important first. */
   issues(team: string): Promise<IssueOut[]>;
+  /** Issues whose title contains `query`, or the issue with that key, at most 8. */
+  searchIssues(query: string): Promise<IssueOut[]>;
   issue(key: string): Promise<IssueOut>;
   createIssue(issue: NewIssue): Promise<IssueOut>;
+  /** Files an issue and says which chip to write where (from a page selection). */
+  fileIssue(issue: NewIssue): Promise<CreatedIssue>;
   setState(key: string, state: string): Promise<IssueOut>;
   /** An issue's comments, oldest first, across its threads. */
   comments(key: string): Promise<CommentOut[]>;
@@ -60,6 +99,7 @@ export interface WorkApi {
 }
 
 const WORK = "/api/v1/work";
+const ISSUE_KEY = /^[a-z][a-z0-9]{1,9}-[1-9]\d*$/i;
 const segment = encodeURIComponent;
 const issuePath = (key: string) => `${WORK}/issues/${segment(key)}`;
 
@@ -97,11 +137,27 @@ export function createHttpWorkApi(http: Http): WorkApi {
       });
       return found.groups.flatMap((group) => group.issues);
     },
+    async searchIssues(query) {
+      if (ISSUE_KEY.test(query)) {
+        try {
+          return [await http.get<IssueOut>(issuePath(query.toUpperCase()))];
+        } catch {
+          // Not a key after all: search titles.
+        }
+      }
+      const found = await http.get<IssueGroups>(`${WORK}/issues`, {
+        filter: JSON.stringify({ field: "title", op: "contains", values: [query] }),
+        group_by: "none",
+        limit: 8,
+      });
+      return found.groups.flatMap((group) => group.issues).slice(0, 8);
+    },
     issue: (key) => http.get<IssueOut>(issuePath(key)),
     async createIssue(issue) {
-      const created = await http.send<CreatedIssue>("POST", `${WORK}/issues`, issue);
+      const created = await http.send<CreatedIssue>("POST", `${WORK}/issues`, issueBody(issue));
       return created.issue;
     },
+    fileIssue: (issue) => http.send<CreatedIssue>("POST", `${WORK}/issues`, issueBody(issue)),
     setState: (key, state) => http.send<IssueOut>("PATCH", issuePath(key), { state }),
     async comments(key) {
       const list = await http.get<ThreadsOut>(`${WORK}/comments`, { target: key });
@@ -113,6 +169,77 @@ export function createHttpWorkApi(http: Http): WorkApi {
     async addComment(key, body) {
       await http.send("POST", `${WORK}/comments`, { target: key, body });
     },
+    async threads(target) {
+      const list = await http.get<ThreadsOut>(`${WORK}/comments`, { target });
+      return list.threads;
+    },
+    startThread: (thread) =>
+      threadOf(
+        http.send<CommentResult>("POST", `${WORK}/comments`, {
+          target: thread.target,
+          body: thread.body,
+          quote: thread.quote,
+          assign_to: thread.assignTo,
+        }),
+      ),
+    reply: (commentId, body) =>
+      threadOf(http.send<CommentResult>("POST", `${WORK}/comments`, { reply_to: commentId, body })),
+    editComment: (commentId, body) =>
+      threadOf(http.send<CommentResult>("PATCH", commentPath(commentId), { body })),
+    deleteComment: (commentId) =>
+      threadOf(http.send<CommentResult>("DELETE", commentPath(commentId))),
+    react: (commentId, emoji, on) =>
+      threadOf(
+        http.send<CommentResult>("POST", `${commentPath(commentId)}/reactions`, { emoji, on }),
+      ),
+    resolve: (threadId, resolved) =>
+      threadOf(http.send<CommentResult>("POST", `${threadPath(threadId)}/resolve`, { resolved })),
+    assign: (threadId, assignee) =>
+      threadOf(http.send<CommentResult>("POST", `${threadPath(threadId)}/assign`, { assignee })),
+  };
+}
+
+const commentPath = (id: string) => `${WORK}/comments/${segment(id)}`;
+const threadPath = (id: string) => `${WORK}/threads/${segment(id)}`;
+
+async function threadOf(result: Promise<CommentResult>): Promise<ThreadOut | undefined> {
+  const { thread } = await result;
+  return thread ?? undefined;
+}
+
+function issueBody(issue: NewIssue) {
+  return {
+    team: issue.team,
+    title: issue.title,
+    description: issue.description,
+    source_block: issue.sourceBlock,
+    quote: issue.quote,
+  };
+}
+
+/** What an issue chip shows: the title, the state's name and whether it is finished. */
+export interface IssueChipStatus {
+  readonly title: string;
+  readonly state: string;
+  readonly closed: boolean;
+}
+
+/**
+ * Looks up issues for live chips (#93), naming each state the way its team
+ * does; the team list is fetched once.
+ */
+export function issueChipStatus(api: WorkApi): (key: string) => Promise<IssueChipStatus> {
+  let teams: Promise<TeamOut[]> | undefined;
+  return async (key) => {
+    teams ??= api.teams().catch(() => []);
+    const [issue, known] = await Promise.all([api.issue(key), teams]);
+    const team = known.find((candidate) => candidate.key === issue.team);
+    const state = team?.statuses.find((status) => status.key === issue.state)?.name ?? issue.state;
+    return {
+      title: issue.title,
+      state,
+      closed: issue.category === "completed" || issue.category === "canceled",
+    };
   };
 }
 

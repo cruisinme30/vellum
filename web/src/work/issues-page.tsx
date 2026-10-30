@@ -131,7 +131,7 @@ function IssuesForApi({ api }: { readonly api: WorkApi }) {
 export function IssuesPage() {
   const t = useT();
   return (
-    <ServerScreen api="work" title={t("issues")} className="vl-work">
+    <ServerScreen api="work" help="work.create-issue" title={t("issues")} className="vl-work">
       {(api) => <IssuesForApi api={api} />}
     </ServerScreen>
   );

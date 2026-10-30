@@ -11,7 +11,7 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D67, D68, D69, D143, D144, D145
+- Decisions: D67, D68, D69, D143, D144, D145, D235, D236, D237
 - Requirements: R-BK-1 to R-BK-10
 - Issue: #112, #113, #114, #115, #116, #117, #118, #327, #336
 - Pull requests: #212
@@ -107,6 +107,27 @@ sections narrow access, and books publish as sites. The code is
 - A drive copy of a book holds only what the copier may see
   (`Book::view_for`) and never `.snapshots/` (#327).
 
+### D235: the outline keeps its own history
+
+- Every edit that changes `book.yaml` or `SUMMARY.md` writes
+  `.history/<ULID>.json`: who, when, the operation, both files, and the
+  outline. The newest 500 stay; snapshots are the long-term record.
+- `books.restore_outline` moves every surviving section back after its
+  old sibling or under its old parent, so newer sections stay put.
+
+### D236: the web app edits the outline
+
+- Editors drag sections (edge: before or after, middle: nest) or press
+  Alt+Shift+arrows, and copy, move between books (link-safe: IDs stay),
+  split headings into sections and fold them back. Copying, moving out
+  and folding need sight of the whole subtree.
+
+### D237: publishing writes into the book folder
+
+- `books.publish` (managers) writes `.published/site/` or
+  `.published/mdbook/` plus a record. Only a public site is served, at
+  `/published/books/<id>/`, under the public origin's CSP.
+
 ## Alternatives
 
 - **Numbers stored in files**: every reorder would rewrite many files.
@@ -115,6 +136,7 @@ sections narrow access, and books publish as sites. The code is
 - **Enforce sections in the service only**: search, MCP and export would
   still reach restricted chapters through the index.
 - **Renumber per reader**: quoted numbers would differ between readers.
+- **History from the store's versions**: not every backend keeps them.
 
 ## Consequences
 

@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { screen, waitFor, within } from "@testing-library/react";
+import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { serviceHealth } from "../api/health";
 import { PAGE } from "../data/mock/northstar";
 import { matchQueries, renderApp } from "../test/render-app";
 
@@ -16,6 +18,19 @@ afterEach(() => {
 });
 
 describe("AppShell", () => {
+  it("shows a banner while the server is degraded and hides it when it recovers", () => {
+    renderApp("/");
+    expect(screen.queryByTestId("service-banner")).toBeNull();
+    act(() => {
+      serviceHealth.report(503, 1);
+    });
+    expect(screen.getByRole("status").textContent).toContain("Part of Vellum is unavailable");
+    act(() => {
+      serviceHealth.report(200);
+    });
+    expect(screen.queryByTestId("service-banner")).toBeNull();
+  });
+
   it("has a skip link to the main area", () => {
     renderApp("/");
     const skip = screen.getByRole("link", { name: "Skip to content" });

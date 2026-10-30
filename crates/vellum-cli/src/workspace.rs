@@ -319,6 +319,7 @@ fn keep_fresh(
     workspace: &Workspace,
     spaces: &Arc<Spaces>,
     drive_index: &Arc<dyn DriveIndex>,
+    events: crate::mcp_serve::Events,
 ) {
     let (reload, from) = (Arc::clone(spaces), Arc::clone(drive_index));
     crate::feed::follow(
@@ -337,6 +338,7 @@ fn keep_fresh(
                     }
                 })
             }),
+            events: Some(events),
         },
     );
     let (refresh, drive_index) = (Arc::clone(spaces), Arc::clone(drive_index));
@@ -458,6 +460,21 @@ impl EventSink for TracingSink {
     }
 }
 
+/// Books over `store`. Published sites render like the app; without
+/// diagram settings they fall back to the source text.
+fn books_service<S: AuthzStore + TreeSync + 'static>(
+    store: Arc<dyn BlobStore>,
+    authz: &Arc<Authz<S>>,
+    space_of: vellum_collections::service::SpaceOf,
+) -> Arc<BooksService> {
+    let access = vellum_books_service::AuthzAccess::new(Arc::clone(authz), space_of);
+    let mut books = BooksService::new(store, Arc::new(access));
+    if let Ok(figures) = crate::page_render::PageRenderService::figures_from_env() {
+        books = books.with_renderer(Arc::new(crate::published::SiteRenderer::new(figures)));
+    }
+    Arc::new(books)
+}
+
 /// The opened services, plus the two the file watcher drives, collections
 /// for the change feed and search, and Work, which the integration
 /// receivers act through.
@@ -491,6 +508,14 @@ pub struct Opened {
     pub tasks: Option<Arc<TasksService>>,
     /// The drive index, which Admin → Usage counts pages and storage from.
     pub drive_index: Option<Arc<dyn DriveIndex>>,
+    /// The workspace as MCP sees it, and the feed's events for its
+    /// listeners.
+    pub mcp: Option<(
+        Arc<crate::mcp_workspace::ServeWorkspace>,
+        crate::mcp_serve::Events,
+    )>,
+    /// Books, which also serve published sites at `/published`.
+    pub books: Option<Arc<BooksService>>,
 }
 
 /// My Work's settings: where its secrets live and what it links to.
@@ -579,13 +604,7 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
         collections = collections.with_index_feed(feed);
     }
     let collections = Arc::new(collections);
-    let books = Arc::new(BooksService::new(
-        Arc::clone(&store),
-        Arc::new(vellum_books_service::AuthzAccess::new(
-            Arc::clone(authz),
-            Arc::clone(&space_of),
-        )),
-    ));
+    let books = books_service(Arc::clone(&store), authz, Arc::clone(&space_of));
     let directory = Arc::new(IdentityDirectory(Arc::clone(identity)));
     let (work, report) = WorkService::open(
         Arc::clone(&store),
@@ -718,7 +737,7 @@ async fn open_shards(
 
 /// Rescans the workspace files once per cluster (a replica that starts
 /// while others run finds the index already current), then starts the
-/// cluster's upkeep (D163).
+/// cluster's upkeep (D163) and the drive's (D266).
 async fn rescan_and_maintain(
     replica: &Replica,
     others_alive: bool,
@@ -726,10 +745,10 @@ async fn rescan_and_maintain(
     index: &Index,
     shards: &[Index],
 ) {
-    let drive = Arc::clone(drive);
+    let scanned = Arc::clone(drive);
     replica
         .rescan_once(others_alive, async move {
-            match drive.scan().await {
+            match scanned.scan().await {
                 Ok(report) => {
                     tracing::info!(?report, "drive index rebuilt from the workspace files");
                 }
@@ -738,6 +757,44 @@ async fn rescan_and_maintain(
         })
         .await;
     replica.maintain(index, shards);
+    drive_jobs(replica, drive);
+}
+
+/// How often trashed items past their space's trash days are deleted.
+const TRASH_EXPIRY_EVERY: Duration = Duration::from_hours(1);
+/// How often every space's version retention is applied.
+const VERSION_RETENTION_EVERY: Duration = Duration::from_hours(24);
+
+/// The drive's upkeep (D266): trash expiry and version retention, each on
+/// one replica of the cluster at a time, as Vellum itself. Each also runs
+/// when a replica takes its lease, so a restart catches up at once.
+fn drive_jobs(replica: &Replica, drive: &Arc<Drive>) {
+    let trash = Arc::clone(drive);
+    replica.every("drive.trash_expiry", TRASH_EXPIRY_EVERY, move || {
+        let drive = Arc::clone(&trash);
+        async move {
+            match drive.purge_expired().await {
+                Ok(0) => {}
+                Ok(purged) => tracing::info!(purged, "deleted expired trash"),
+                Err(error) => tracing::warn!(%error, "trash expiry skipped"),
+            }
+        }
+    });
+    let versions = Arc::clone(drive);
+    replica.every(
+        "drive.version_retention",
+        VERSION_RETENTION_EVERY,
+        move || {
+            let drive = Arc::clone(&versions);
+            async move {
+                match drive.prune_all_versions().await {
+                    Ok(0) => {}
+                    Ok(pruned) => tracing::info!(pruned, "deleted versions past retention"),
+                    Err(error) => tracing::warn!(%error, "version retention skipped"),
+                }
+            }
+        },
+    );
 }
 
 /// My Work's cluster jobs: Google Calendar sync every
@@ -810,6 +867,67 @@ fn delivery(
     })
 }
 
+/// The workspace as MCP tools see it, and the feed's events for MCP
+/// listeners (ADR 0019, D217 and D219).
+fn mcp_parts(
+    workspace: &Workspace,
+    drive_index: &Arc<dyn DriveIndex>,
+    app_origin: &str,
+) -> (
+    Arc<crate::mcp_workspace::ServeWorkspace>,
+    crate::mcp_serve::Events,
+) {
+    let mcp = Arc::new(crate::mcp_workspace::ServeWorkspace::new(
+        Arc::clone(&workspace.drive),
+        Arc::clone(drive_index),
+        &workspace.services,
+        app_origin,
+    ));
+    let events =
+        crate::mcp_serve::Events::new(Arc::clone(drive_index), Arc::clone(&workspace.space_of));
+    (mcp, events)
+}
+
+/// Opens the index and the workspace files.
+async fn open_storage(
+    config: &Config,
+    bucket: Option<S3Config>,
+    var: impl Fn(&str) -> Option<String>,
+) -> Result<(Index, Files), Error> {
+    let index_config = index_config(config, var)?;
+    let index = Index::open(&index_config)
+        .await
+        .map_err(|e| unavailable("cannot open the index", e))?;
+    let files = open_files(config, bucket).await?;
+    warn_if_unshared(files.local, &index_config);
+    tracing::info!(backend = files.store.backend(), "workspace files opened");
+    Ok((index, files))
+}
+
+/// Live editing over the drive, with permissions from `authz`.
+fn open_collab(
+    workspace: &Workspace,
+    (authz, drive_index): (&Arc<Authz<ShardedStore>>, &Arc<dyn DriveIndex>),
+    index: &Index,
+    config: &Config,
+    app_origin: &str,
+    identity: &Arc<Identity>,
+) -> Result<Collab, Error> {
+    Collab::open(
+        Arc::clone(&workspace.drive),
+        Arc::new(DriveAuthzAccess::new(
+            Arc::clone(authz),
+            Arc::clone(drive_index),
+        )),
+        index.clone(),
+        &config.data_dir,
+        app_origin,
+        Arc::new(crate::identity::IdentityAuthenticator::new(Arc::clone(
+            identity,
+        ))),
+    )
+}
+
 /// Opens the workspace services for `config`, or returns none (with a
 /// warning) when no index is configured.
 ///
@@ -817,6 +935,10 @@ fn delivery(
 ///
 /// An unreachable database, a wrong key, an unreadable data folder or
 /// invalid integration settings.
+#[expect(
+    clippy::too_many_lines,
+    reason = "the composition root wires every workspace service in order"
+)]
 pub async fn open(
     config: &Config,
     identity: &Arc<Identity>,
@@ -828,16 +950,13 @@ pub async fn open(
     let setup = TasksSetup::new(identity, Some(&config.data_dir), &var);
     let bucket = bucket(&var)?;
     let key = search_key(config, &var)?;
-    let index_config = index_config(config, &var)?;
-    let index = Index::open(&index_config)
-        .await
-        .map_err(|e| unavailable("cannot open the index", e))?;
-    let Files {
-        store: files,
-        local,
-    } = open_files(config, bucket).await?;
-    warn_if_unshared(local, &index_config);
-    tracing::info!(backend = files.backend(), "workspace files opened");
+    let (
+        index,
+        Files {
+            store: files,
+            local,
+        },
+    ) = open_storage(config, bucket, &var).await?;
     // Follow the feed from before anything is loaded, so no change made
     // meanwhile is missed.
     let feed = Feed::new(index.clone());
@@ -885,18 +1004,13 @@ pub async fn open(
     // After the rescan, so every private space's folder is in the index.
     crate::e2e::keep_roots_fresh(Arc::clone(&workspace.e2e)).await;
     let hooks = crate::integrations::hooks(&store, &workspace.work, &var).await?;
-    let collab = Collab::open(
-        Arc::clone(&workspace.drive),
-        Arc::new(DriveAuthzAccess::new(
-            Arc::clone(&authz),
-            Arc::clone(&drive_index),
-        )),
-        index.clone(),
-        &config.data_dir,
+    let collab = open_collab(
+        &workspace,
+        (&authz, &drive_index),
+        &index,
+        config,
         app_origin,
-        Arc::new(crate::identity::IdentityAuthenticator::new(Arc::clone(
-            identity,
-        ))),
+        identity,
     )?;
     keep_drives(&workspace.drive, &drive_index, identity).await?;
     live_pages.attach(&collab);
@@ -915,18 +1029,30 @@ pub async fn open(
     })
     .await?;
     workspace.services.push(Arc::new(search));
-    keep_fresh(feed, me, cursor, &workspace, &spaces, &drive_index);
+    let (mcp, events) = mcp_parts(&workspace, &drive_index, app_origin);
+    keep_fresh(
+        feed,
+        me,
+        cursor,
+        &workspace,
+        &spaces,
+        &drive_index,
+        events.clone(),
+    );
     task_jobs(&replica, &workspace.tasks, notify, &config.data_dir)?;
-    let mut services = workspace.services;
-    services.push(Arc::new(Storage::new(store, !local)));
+    workspace
+        .services
+        .push(Arc::new(Storage::new(store, !local)));
     Ok(Opened {
-        services,
+        services: workspace.services,
         hooks,
         collab: Some(collab),
         replica: Some(replica),
         rate_counts: Some(rate_counts),
         tasks: Some(workspace.tasks),
         drive_index: Some(drive_index),
+        mcp: Some((mcp, events)),
+        books: Some(workspace.books),
     })
 }
 

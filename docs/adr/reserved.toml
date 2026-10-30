@@ -19,3 +19,41 @@ holder = "16 threads, allocated by the coordinator on 2026-10-29; see the projec
 [[reservation]]
 adrs = "0050-0064"
 holder = "15 gap workstreams: workstream n gets ADR 0049+n (drive UI, workstream 3, gets 0052)"
+
+[[reservation]]
+decisions = "D262-D263"
+holder = "integrations, ADR 0041 (renumbered by the integrator)"
+
+[[reservation]]
+adrs = "0065"
+decisions = "D264-D265"
+holder = "cluster thread: MCP templates and export"
+
+[[reservation]]
+decisions = "D266"
+holder = "drive retention job, ADR 0052"
+
+[[reservation]]
+decisions = "D267-D270"
+holder = "reliability (#191, #74), ADR 0061"
+
+[[reservation]]
+adrs = "0066"
+decisions = "D271"
+holder = "release binary build (ADR 0066 if it needs its own record)"
+
+[[reservation]]
+decisions = "D272"
+holder = "books thread: people picker"
+
+[[reservation]]
+decisions = "D273-D275"
+holder = "admin thread: groups"
+
+[[reservation]]
+decisions = "D276"
+holder = "editor thread: sharing, ADR 0054"
+
+[[reservation]]
+decisions = "D277"
+holder = "drive thread: uploads UI, ADR 0052"

@@ -125,19 +125,6 @@
   inset-inline-start: 76px;
 }
 
-.vl-theme-settings fieldset {
-  display: grid;
-  gap: 4px;
-  margin: 0 0 12px;
-  padding: 0;
-  border: 0;
-}
-
-.vl-theme-settings legend {
-  margin-bottom: 4px;
-  font-weight: 500;
-}
-
 .vl-radio {
   display: flex;
   align-items: center;
@@ -356,6 +343,39 @@
 .vl-view h1 {
   font-size: 2rem;
   font-weight: 400;
+}
+
+/* A screen's title and its contextual help link (ADR 0024, D256). */
+.vl-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.vl-title-row h1 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.vl-help-link {
+  flex: none;
+}
+
+.vl-guides {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.vl-guides a {
+  display: block;
+  padding: 16px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 16px;
+  font-weight: 500;
 }
 
 .vl-page-list {

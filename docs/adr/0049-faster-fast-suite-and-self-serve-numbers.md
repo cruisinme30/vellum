@@ -47,6 +47,9 @@ Threads also stopped work to ask the coordinator for ADR and D numbers.
 - "Rust tests" is its own job, started as soon as "Changed areas"
   finishes. "Rust" keeps format, clippy, docs and the policy checks.
 - Each job keeps its own Rust cache, saved only on develop (D138).
+  When a develop push skips its checks because the batch already passed,
+  both Rust jobs still build (clippy, docs, test binaries) to save the
+  caches; otherwise every batch would build from cold.
 - `[profile.dev]` uses `debug = "line-tables-only"`, and dependencies
   build with no debug info. Panic traces keep file and line numbers, while
   linking, cache restores and sandbox target directories all get smaller.
@@ -58,9 +61,9 @@ Threads also stopped work to ask the coordinator for ADR and D numbers.
   `docs/adr/` in the working tree and on every branch on `origin`.
 - `cargo xtask adr new <slug> --decisions N --issue N` starts a record
   from the template with those numbers. Pushing the branch claims them.
-- `docs/adr/reserved.toml` lists numbers handed out before any branch
-  holds them (ADRs 0050-0064, D205-D213 and D217-D261 today). The tool counts them as
-  taken, and the check fails when two reservations overlap.
+- `docs/adr/reserved.toml` lists numbers the coordinator handed out
+  before any branch holds them. The tool counts them as taken, and the
+  check fails when two reservations overlap.
 - `scripts/ci/check-adrs.sh` fails when two records share an ADR number
   or a D number, so collisions between branches fail the integration
   batch before they reach develop.

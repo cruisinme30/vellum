@@ -218,6 +218,7 @@ pub struct Operation {
     summary: &'static str,
     description: &'static str,
     deprecated: bool,
+    revalidate: bool,
     input: Schema,
     output: Schema,
     handler: Arc<dyn Handler>,
@@ -271,6 +272,7 @@ impl Operation {
             summary: "",
             description: "",
             deprecated: false,
+            revalidate: false,
             input: schema_of::<I>(),
             output: schema_of::<O>(),
             handler: Arc::new(TypedHandler {
@@ -366,6 +368,23 @@ impl Operation {
     pub const fn deprecated(mut self) -> Self {
         self.deprecated = true;
         self
+    }
+
+    /// Lets browsers keep a private copy of a query's answer and revalidate
+    /// it: the gateway sends a strong `ETag` with `Cache-Control: private,
+    /// no-cache`, and answers a matching `If-None-Match` with `304 Not
+    /// Modified` and no body. Only for answers that are fine to keep in the
+    /// reader's own browser cache (ADR 0061, D270); ignored for mutations.
+    #[must_use]
+    pub const fn revalidate(mut self) -> Self {
+        self.revalidate = true;
+        self
+    }
+
+    /// Whether the gateway answers conditional requests for this query.
+    #[must_use]
+    pub const fn revalidates(&self) -> bool {
+        self.revalidate && matches!(self.kind, OperationKind::Query)
     }
 
     /// The stable ID, `<service>.<name>` in `snake_case` segments.

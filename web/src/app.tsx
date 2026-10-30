@@ -25,6 +25,18 @@ import type { PageHistory } from "./data/history";
 import { ServerApisProvider } from "./data/server-apis";
 import type { WorkspaceStore } from "./data/store";
 import { useServices, WorkspaceProvider } from "./data/workspace-context";
+import type { DriveApi } from "./drive/api";
+import {
+  MyDrivePage,
+  RecentPage,
+  SharedDrivesPage,
+  SharedWithMePage,
+  SpacePage,
+  StarredPage,
+} from "./drive/drive-page";
+import { DriveSearchPage } from "./drive/search-page";
+import { DriveSettingsPage } from "./drive/settings-page";
+import { TrashPage } from "./drive/trash-page";
 import type { CollabConnector } from "./editor/collab/provider";
 import { I18nProvider, useT } from "./i18n/i18n";
 import { KeyboardRoot } from "./keyboard/keyboard-root";
@@ -34,7 +46,8 @@ import { createMockNotificationPreferencesStore } from "./notifications/preferen
 import type { PrivateSpacesApi } from "./platform/private/api";
 import { PrivateSpacesView } from "./platform/private/private-spaces-view";
 import { AppShell } from "./shell/app-shell";
-import { AppearanceProvider } from "./theme/appearance-context";
+import { AppearanceProvider, type OrganisationAppearance } from "./theme/appearance-context";
+import { AppearancePage } from "./theme/appearance-page";
 import { FavoritesView, HomeView } from "./views/home";
 import { AdminView, HelpView, NotFoundView } from "./views/info";
 import { NewPageView } from "./views/new-page";
@@ -86,6 +99,7 @@ export function AppRoutes() {
         <Route path="favorites" element={<FavoritesView />} />
         <Route path="inbox" element={<InboxView />} />
         <Route path="settings/notifications" element={<NotificationSettingsView />} />
+        <Route path="settings/appearance" element={<AppearancePage />} />
         <Route path="settings/private-spaces" element={<PrivateSpacesView />} />
         <Route path="new" element={<NewPageView />} />
         <Route path="my-work" element={<MyWorkPage />} />
@@ -94,6 +108,16 @@ export function AppRoutes() {
         <Route path="books" element={<BooksPage />} />
         <Route path="books/:bookId" element={<BookPage />} />
         <Route path="books/:bookId/:sectionId" element={<BookPage />} />
+        <Route path="drive" element={<MyDrivePage />} />
+        <Route path="drive/shared" element={<SharedDrivesPage />} />
+        <Route path="drive/shared-with-me" element={<SharedWithMePage />} />
+        <Route path="drive/starred" element={<StarredPage />} />
+        <Route path="drive/recent" element={<RecentPage />} />
+        <Route path="drive/search" element={<DriveSearchPage />} />
+        <Route path="drive/s/:spaceId" element={<SpacePage />} />
+        <Route path="drive/s/:spaceId/f/:folderId" element={<SpacePage />} />
+        <Route path="drive/s/:spaceId/trash" element={<TrashPage />} />
+        <Route path="drive/s/:spaceId/settings" element={<DriveSettingsPage />} />
         <Route path="data" element={<CollectionsIndexView />} />
         <Route path="data/:collectionId" element={<CollectionView />} />
         <Route path="help" element={<HelpView />} />
@@ -127,6 +151,8 @@ export interface AppServices {
   readonly work?: WorkApi | undefined;
   /** Books, from a Vellum server; absent in demo mode. */
   readonly books?: BooksApi | undefined;
+  /** The drive's spaces, trash, activity and settings; absent in demo mode. */
+  readonly drive?: DriveApi | undefined;
   /** Private spaces' device keys, from a Vellum server; absent in demo mode. */
   readonly privateSpaces?: PrivateSpacesApi | undefined;
   readonly collections: CollectionsStore;
@@ -134,6 +160,29 @@ export interface AppServices {
   readonly session?: { readonly auth: AuthApi; readonly status: AuthStatus } | undefined;
   /** Notification settings; the Northstar demo's when absent. */
   readonly notifications?: NotificationServices | undefined;
+  /** Loads the organisation's seed colour and themes; absent in demo mode. */
+  readonly appearance?: (() => Promise<OrganisationAppearance>) | undefined;
+}
+
+/**
+ * Loads the organisation's look only once someone is signed in: the server
+ * answers `GET /api/v1/appearance` to signed-in readers, so asking before
+ * sign-in fails on every sign-in and set-up screen.
+ */
+function SessionAppearance({
+  organisation,
+  children,
+}: {
+  readonly organisation: AppServices["appearance"];
+  readonly children: ReactNode;
+}) {
+  const session = useSession();
+  const signedIn = session === undefined || Boolean(session.status.user);
+  return (
+    <AppearanceProvider organisation={signedIn ? organisation : undefined}>
+      {children}
+    </AppearanceProvider>
+  );
 }
 
 function MaybeSession({
@@ -179,20 +228,25 @@ export function AppProviders({
   admin,
   work,
   books,
+  drive,
   privateSpaces,
   collections,
   session,
   notifications,
+  appearance,
   children,
 }: AppServices & { readonly children: ReactNode }) {
-  const serverApis = useMemo(() => ({ work, books, privateSpaces }), [work, books, privateSpaces]);
+  const serverApis = useMemo(
+    () => ({ work, books, drive, privateSpaces }),
+    [work, books, drive, privateSpaces],
+  );
   const [demoNotifications] = useState<NotificationServices>(() => ({
     store: createMockNotificationPreferencesStore(),
   }));
   return (
     <I18nProvider>
-      <AppearanceProvider>
-        <MaybeSession session={session}>
+      <MaybeSession session={session}>
+        <SessionAppearance organisation={appearance}>
           <WorkspaceProvider store={store} collab={collab} history={history}>
             <SignedInUser>
               <CollectionsProvider store={collections}>
@@ -204,8 +258,8 @@ export function AppProviders({
               </CollectionsProvider>
             </SignedInUser>
           </WorkspaceProvider>
-        </MaybeSession>
-      </AppearanceProvider>
+        </SessionAppearance>
+      </MaybeSession>
     </I18nProvider>
   );
 }

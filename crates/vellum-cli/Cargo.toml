@@ -32,6 +32,7 @@ reqwest = { version = "0.13.5", default-features = false, features = ["rustls", 
 http = "1.5.0"
 jiff = "0.2.38"
 lettre = { version = "0.11.23", default-features = false, features = ["smtp-transport", "tokio1-rustls", "aws-lc-rs", "rustls-platform-verifier"] }
+lru = "0.18.5"
 schemars = { version = "1.2.3", default-features = false, features = ["std", "derive"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde-saphyr = { version = "2.0.0", default-features = false, features = ["deserialize"] }
@@ -45,6 +46,7 @@ uuid = "1.29.0"
 vellum-admin = { path = "../vellum-admin" }
 vellum-api = { path = "../vellum-api" }
 vellum-authz = { path = "../vellum-authz" }
+vellum-books = { path = "../vellum-books" }
 vellum-books-service = { path = "../vellum-books-service" }
 vellum-collab = { path = "../vellum-collab" }
 vellum-collections = { path = "../vellum-collections" }

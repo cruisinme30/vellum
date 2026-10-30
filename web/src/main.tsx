@@ -9,6 +9,7 @@ import "./styles/shell.css";
 import "./styles/editor.css";
 import "./styles/collections.css";
 import "./styles/notifications.css";
+import "./styles/appearance.css";
 
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
@@ -23,6 +24,7 @@ import { createMockCollectionsStore } from "./collections/mock";
 import { createHttpPageHistory } from "./data/history";
 import { createHttpWorkspaceStore } from "./data/http";
 import { createNorthstarStore } from "./data/mock/northstar";
+import { createHttpDriveApi } from "./drive/api";
 import { lazyCache } from "./editor/collab/lazy-cache";
 import { createLocalConnector } from "./editor/collab/local-connector";
 import { createSocketConnector } from "./editor/collab/socket-connector";
@@ -33,6 +35,7 @@ import { createPlatform, startPlatform } from "./platform/platform";
 import { createHttpPrivateSpacesApi } from "./platform/private/api";
 import { DocumentCache } from "./platform/store/document-cache";
 import { openLocalDatabase } from "./platform/store/persistence";
+import { createHttpOrganisationAppearance } from "./theme/organisation";
 import { createHttpWorkApi } from "./work/api";
 
 // Demo pages keep their edits across reloads in the browser's local
@@ -56,13 +59,29 @@ const root = createRoot(container);
 // app runs on the Northstar demo data.
 const http = createHttp();
 const auth = createAuthApi(http);
-let status: Awaited<ReturnType<typeof auth.status>>;
-try {
-  status = await auth.status();
-} catch {
-  // A server that answers with an error: show the demo rather than nothing.
-  status = undefined;
+// Roboto's heavier faces download only once text uses them, so the first
+// paint would set headings and links in the fallback font and then reflow
+// (a layout shift). Fetch them while the server answers, for at most a
+// moment: a slow font still shows its fallback rather than holding the page.
+async function preloadFonts(): Promise<void> {
+  try {
+    await Promise.race([
+      Promise.all(["500 1em Roboto", "700 1em Roboto"].map((font) => document.fonts.load(font))),
+      new Promise((resolve) => setTimeout(resolve, 800)),
+    ]);
+  } catch {
+    // A font that fails to load keeps its fallback.
+  }
 }
+async function loadStatus(): Promise<Awaited<ReturnType<typeof auth.status>>> {
+  try {
+    return await auth.status();
+  } catch {
+    // A server that answers with an error: show the demo rather than nothing.
+    return undefined;
+  }
+}
+const [status] = await Promise.all([loadStatus(), preloadFonts()]);
 root.render(
   <StrictMode>
     <App
@@ -76,11 +95,13 @@ root.render(
       admin={status === undefined ? undefined : createHttpAdminConsoleApi(http)}
       work={status === undefined ? undefined : createHttpWorkApi(http)}
       books={status === undefined ? undefined : createHttpBooksApi(http)}
+      drive={status === undefined ? undefined : createHttpDriveApi(http)}
       privateSpaces={status === undefined ? undefined : createHttpPrivateSpacesApi(http)}
       collections={
         status === undefined ? createMockCollectionsStore() : createHttpCollectionsStore(http)
       }
       session={status === undefined ? undefined : { auth, status }}
+      appearance={status === undefined ? undefined : createHttpOrganisationAppearance(http)}
       notifications={
         status === undefined
           ? undefined

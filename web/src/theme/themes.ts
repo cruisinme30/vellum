@@ -264,21 +264,24 @@ export const CONTRAST_RULES: readonly ContrastRule[] = [
   })),
 ];
 
-/** A contrast rule a scheme breaks, with the ratio it reached. */
-export interface ContrastFailure extends ContrastRule {
+/** A contrast rule with the ratio a scheme reaches. */
+export interface ContrastResult extends ContrastRule {
   readonly ratio: number;
+}
+
+/** A contrast rule a scheme breaks, with the ratio it reached. */
+export type ContrastFailure = ContrastResult;
+
+/** Every contrast rule with the ratio the scheme reaches (R-TH-2). */
+export function contrastReport(scheme: Scheme): ContrastResult[] {
+  return CONTRAST_RULES.map((rule) => {
+    const fg = parseHex(scheme[rule.fg] ?? "");
+    const bg = parseHex(scheme[rule.bg] ?? "");
+    return { ...rule, ratio: fg && bg ? contrast(fg, bg) : 0 };
+  });
 }
 
 /** Validates a scheme against {@link CONTRAST_RULES} (R-TH-2). */
 export function checkContrast(scheme: Scheme): ContrastFailure[] {
-  const failures: ContrastFailure[] = [];
-  for (const rule of CONTRAST_RULES) {
-    const fg = parseHex(scheme[rule.fg] ?? "");
-    const bg = parseHex(scheme[rule.bg] ?? "");
-    const ratio = fg && bg ? contrast(fg, bg) : 0;
-    if (ratio < rule.min) {
-      failures.push({ ...rule, ratio });
-    }
-  }
-  return failures;
+  return contrastReport(scheme).filter((result) => result.ratio < result.min);
 }

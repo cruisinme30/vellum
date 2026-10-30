@@ -360,7 +360,7 @@ function MyWork({ api }: { readonly api: WorkApi }) {
 export function MyWorkPage() {
   const t = useT();
   return (
-    <ServerScreen api="work" title={t("my-work")} className="vl-work">
+    <ServerScreen api="work" help="mywork.buckets" title={t("my-work")} className="vl-work">
       {(api) => <MyWork api={api} />}
     </ServerScreen>
   );

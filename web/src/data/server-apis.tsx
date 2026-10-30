@@ -4,6 +4,9 @@
 import { createContext, use, type ReactNode } from "react";
 
 import type { BooksApi } from "../books/api";
+import type { DriveApi } from "../drive/api";
+import { ViewTitle } from "../help/help-link";
+import type { HelpTopic } from "../help/topics.gen";
 import { useT } from "../i18n/i18n";
 import type { PrivateSpacesApi } from "../platform/private/api";
 import type { WorkApi } from "../work/api";
@@ -14,6 +17,7 @@ import type { Loaded } from "./use-loaded";
 export interface ServerApis {
   readonly work?: WorkApi | undefined;
   readonly books?: BooksApi | undefined;
+  readonly drive?: DriveApi | undefined;
   readonly privateSpaces?: PrivateSpacesApi | undefined;
 }
 
@@ -30,6 +34,11 @@ export function ServerApisProvider({
   return <ServerApisContext value={apis}>{children}</ServerApisContext>;
 }
 
+/** The server-only APIs; each is `undefined` in demo mode. */
+export function useServerApis(): ServerApis {
+  return use(ServerApisContext);
+}
+
 /**
  * A screen's frame: its heading, and either the screen or, when the app runs
  * without a Vellum server, a note saying the screen needs one.
@@ -37,12 +46,15 @@ export function ServerApisProvider({
 export function ServerScreen<K extends keyof ServerApis>({
   api,
   title,
+  help,
   className,
   children,
 }: {
   readonly api: K;
   /** The heading; leave it out when the screen names itself once loaded. */
   readonly title?: string;
+  /** The help topic for the heading's `?` link. */
+  readonly help?: HelpTopic | undefined;
   readonly className?: string;
   readonly children: (api: NonNullable<ServerApis[K]>) => ReactNode;
 }) {
@@ -50,7 +62,7 @@ export function ServerScreen<K extends keyof ServerApis>({
   const found = use(ServerApisContext)[api];
   return (
     <section className={className === undefined ? "vl-view" : `vl-view ${className}`}>
-      {title !== undefined && <h1>{title}</h1>}
+      {title !== undefined && <ViewTitle title={title} help={help} />}
       {found === undefined ? <p>{t("needs-server")}</p> : children(found)}
     </section>
   );

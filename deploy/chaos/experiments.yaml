@@ -7,6 +7,9 @@
 # a 20-second bucket outage (#191, ADR 0044 D188): the servers stay in
 # rotation as degraded, writes in that window fail with 503 and are never
 # acknowledged, and everything acknowledged before or after must survive.
+# Last, every packet to and from the Postgres primary waits about 40 ms for
+# 90 seconds (ADR 0022, D255). Vellum keeps shared counters and leases in
+# Postgres, not Redis (ADR 0040), so the database faults cover a Redis one.
 apiVersion: chaos-mesh.org/v1alpha1
 kind: PodChaos
 metadata:
@@ -58,3 +61,20 @@ spec:
     selector:
       labelSelectors:
         app: minio
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: slow-postgres
+spec:
+  action: delay
+  mode: all
+  selector:
+    labelSelectors:
+      application: spilo
+      spilo-role: master
+  delay:
+    latency: 40ms
+    jitter: 10ms
+    correlation: "25"
+  duration: 90s

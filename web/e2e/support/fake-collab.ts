@@ -23,17 +23,29 @@ export interface FakeCollab {
   dones(): number;
 }
 
+/** Who a browser joins the room as. */
+interface Joiner {
+  /** The user ID the server vouches for in the peer list. */
+  readonly user?: string;
+  readonly canWrite?: boolean;
+}
+
+/** A room several browsers can join, for two-browser tests (#98). */
+export interface FakeRoom extends FakeCollab {
+  /** Routes this page's collab socket into the room. */
+  join(page: Page, joiner?: Joiner): Promise<void>;
+}
+
+const DEFAULT_USER = "01M6409GN2EYWS8Z7NFQQ3JNWZ";
+
 /**
  * Stands in for the live-editing rooms of `vellum serve` (`/collab/...`,
  * crates/vellum-collab): it greets with sync step 1, answers step 1 with
- * step 2, applies edits from writers, lists each editor once its presence
- * arrives, and answers Done.
+ * step 2, applies edits from writers and passes them on to the other
+ * sockets, relays presence, lists each editor once its presence arrives,
+ * and answers Done.
  */
-export async function fakeCollab(
-  page: Page,
-  options: { canWrite?: boolean; paragraph?: string } = {},
-): Promise<FakeCollab> {
-  const canWrite = options.canWrite ?? true;
+export function fakeRoom(options: { paragraph?: string } = {}): FakeRoom {
   const room = new Y.Doc();
   if (options.paragraph !== undefined) {
     const paragraph = new Y.XmlElement("paragraph");
@@ -41,66 +53,18 @@ export async function fakeCollab(
     room.getXmlFragment("default").insert(0, [paragraph]);
   }
   const urls: string[] = [];
-  const clients = new Set<number>();
+  const clients = new Map<number, { user: string; canWrite: boolean }>();
+  const sockets = new Set<{ send: (messages: WireMessage[]) => void }>();
+  // The latest presence of each socket, replayed to whoever joins later.
+  const presence = new Map<object, WireMessage>();
   let dones = 0;
 
   const peers = (): WireMessage => ({
     type: "custom",
     tag: MSG_PEERS,
     payload: encodePeers(
-      [...clients].map((clientId) => ({ clientId, user: "01M6409GN2EYWS8Z7NFQQ3JNWZ", canWrite })),
+      [...clients].map(([clientId, { user, canWrite }]) => ({ clientId, user, canWrite })),
     ),
-  });
-
-  await page.routeWebSocket("**/collab/**", (socket) => {
-    urls.push(socket.url());
-    const send = (messages: WireMessage[]) => {
-      socket.send(Buffer.from(encodeFrame(messages)));
-    };
-    send([{ type: "sync-step-1", stateVector: Y.encodeStateVector(room) }, peers()]);
-    socket.onMessage((data) => {
-      if (typeof data === "string") {
-        void socket.close({ code: 1003, reason: "binary frames only" });
-        return;
-      }
-      for (const message of decodeFrame(new Uint8Array(data))) {
-        switch (message.type) {
-          case "sync-step-1": {
-            send([
-              { type: "sync-step-2", update: Y.encodeStateAsUpdate(room, message.stateVector) },
-            ]);
-            break;
-          }
-          case "sync-step-2":
-          case "update": {
-            if (canWrite) {
-              Y.applyUpdate(room, message.update);
-            }
-            break;
-          }
-          case "awareness": {
-            // The first number of an awareness update is its count, then
-            // each entry starts with its client ID; one entry is enough here.
-            const id = readClientId(message.update);
-            if (id !== undefined && !clients.has(id)) {
-              clients.add(id);
-              send([peers()]);
-            }
-            break;
-          }
-          case "custom": {
-            if (message.tag === MSG_DONE) {
-              dones += 1;
-              send([{ type: "custom", tag: MSG_DONE, payload: new Uint8Array() }]);
-            }
-            break;
-          }
-          default: {
-            break;
-          }
-        }
-      }
-    });
   });
 
   return {
@@ -112,7 +76,95 @@ export async function fakeCollab(
         .map((block) => (block instanceof Y.XmlElement ? textOf(block) : ""))
         .join("\n"),
     dones: () => dones,
+    async join(page, joiner = {}) {
+      const user = joiner.user ?? DEFAULT_USER;
+      const canWrite = joiner.canWrite ?? true;
+      await page.routeWebSocket("**/collab/**", (socket) => {
+        urls.push(socket.url());
+        const self = {
+          send: (messages: WireMessage[]) => {
+            socket.send(Buffer.from(encodeFrame(messages)));
+          },
+        };
+        const others = (messages: WireMessage[]) => {
+          for (const other of sockets) if (other !== self) other.send(messages);
+        };
+        const mine = new Set<number>();
+        sockets.add(self);
+        socket.onClose(() => {
+          sockets.delete(self);
+          presence.delete(self);
+          for (const id of mine) clients.delete(id);
+          others([peers()]);
+        });
+        self.send([
+          { type: "sync-step-1", stateVector: Y.encodeStateVector(room) },
+          peers(),
+          ...presence.values(),
+        ]);
+        socket.onMessage((data) => {
+          if (typeof data === "string") {
+            void socket.close({ code: 1003, reason: "binary frames only" });
+            return;
+          }
+          for (const message of decodeFrame(new Uint8Array(data))) {
+            switch (message.type) {
+              case "sync-step-1": {
+                self.send([
+                  { type: "sync-step-2", update: Y.encodeStateAsUpdate(room, message.stateVector) },
+                ]);
+                break;
+              }
+              case "sync-step-2":
+              case "update": {
+                if (canWrite) {
+                  Y.applyUpdate(room, message.update);
+                  others([{ type: "update", update: message.update }]);
+                }
+                break;
+              }
+              case "awareness": {
+                // The first number of an awareness update is its count, then
+                // each entry starts with its client ID; one entry is enough here.
+                const id = readClientId(message.update);
+                if (id !== undefined && !clients.has(id)) {
+                  clients.set(id, { user, canWrite });
+                  mine.add(id);
+                  self.send([peers()]);
+                  others([peers()]);
+                }
+                presence.set(self, message);
+                others([message]);
+                break;
+              }
+              case "custom": {
+                if (message.tag === MSG_DONE) {
+                  dones += 1;
+                  self.send([{ type: "custom", tag: MSG_DONE, payload: new Uint8Array() }]);
+                }
+                break;
+              }
+              default: {
+                break;
+              }
+            }
+          }
+        });
+      });
+    },
   };
+}
+
+/** One browser in a room of its own; see {@link fakeRoom}. */
+export async function fakeCollab(
+  page: Page,
+  options: { canWrite?: boolean; paragraph?: string } = {},
+): Promise<FakeCollab> {
+  const room = fakeRoom(options);
+  await room.join(page, {
+    ...(options.canWrite === undefined ? {} : { canWrite: options.canWrite }),
+  });
+  return room;
 }
 
 /** The text inside a block, without its marks. */

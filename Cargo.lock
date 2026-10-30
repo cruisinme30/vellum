@@ -8993,6 +8993,7 @@ dependencies = [
  "http-body-util",
  "jiff",
  "lettre",
+ "lru",
  "reqwest",
  "schemars 1.2.3",
  "serde",
@@ -9010,6 +9011,7 @@ dependencies = [
  "vellum-admin",
  "vellum-api",
  "vellum-authz",
+ "vellum-books",
  "vellum-books-service",
  "vellum-collab",
  "vellum-collections",
@@ -9222,6 +9224,7 @@ dependencies = [
  "vellum-format",
  "vellum-jobs",
  "vellum-kernel",
+ "vellum-render",
  "zip",
 ]
 

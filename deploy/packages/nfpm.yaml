@@ -1,0 +1,57 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Debian and RPM packages of the static Linux binary (ADR 0022, D250).
+# The release workflow runs, once per architecture:
+#
+#   VERSION=1.2.3 ARCH=amd64 BINARY=dist/vellum-linux-amd64 \
+#     nfpm package --config deploy/packages/nfpm.yaml --packager deb --target dist/
+#
+# ARCH is the Go-style name (amd64, arm64); nfpm maps it to x86_64/aarch64
+# for RPM. The package installs `vellum` on the PATH, a `vellum` system user
+# and a systemd unit that runs `vellum serve` with its data in
+# /var/lib/vellum. The unit is not enabled on install: `vellum serve` with
+# no flags also works straight from a shell, with data in ./vellum-data.
+name: vellum
+arch: ${ARCH}
+platform: linux
+version: ${VERSION}
+version_schema: semver
+section: web
+priority: optional
+maintainer: The Vellum contributors <https://github.com/cruisinme30/vellum>
+description: |
+  Self-hosted workspace where every object is a Markdown file.
+  One static binary runs the whole server: `vellum serve`.
+vendor: The Vellum contributors
+homepage: https://cruisinme30.github.io/vellum/
+license: AGPL-3.0-only
+contents:
+  - src: ${BINARY}
+    dst: /usr/bin/vellum
+    file_info:
+      mode: 0755
+  - src: deploy/packages/linux/vellum.service
+    dst: /usr/lib/systemd/system/vellum.service
+    file_info:
+      mode: 0644
+  - src: deploy/packages/linux/vellum.env
+    dst: /etc/vellum/vellum.env
+    type: config|noreplace
+    file_info:
+      mode: 0640
+  - src: deploy/packages/linux/sysusers.conf
+    dst: /usr/lib/sysusers.d/vellum.conf
+    file_info:
+      mode: 0644
+  - dst: /var/lib/vellum
+    type: dir
+    file_info:
+      mode: 0750
+  - src: LICENSE
+    dst: /usr/share/doc/vellum/LICENSE
+    file_info:
+      mode: 0644
+scripts:
+  postinstall: deploy/packages/linux/postinstall.sh
+  preremove: deploy/packages/linux/preremove.sh
