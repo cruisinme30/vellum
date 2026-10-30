@@ -3,8 +3,10 @@
 
 import { act, render, screen, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
+import { ApiError } from "../../api/http";
+import type { RenderApi } from "../../render/api";
 import { Icon } from "../../shell/icon";
 import { body, fence } from "../content";
 import { renderEditor } from "../test-editor";
@@ -18,6 +20,24 @@ const preview = () => {
   }
   return within(element);
 };
+
+const drawn = (html: string, warnings: string[] = []) => ({
+  html,
+  warnings,
+  stale: false,
+  render_version: 2,
+});
+
+/** A renderer whose blocks come from `block`; the spy is handed back to assert on. */
+function fakeRender(block: RenderApi["block"]) {
+  const spy = vi.fn(block);
+  const api: RenderApi = {
+    block: spy,
+    page: vi.fn(),
+    stylesheet: vi.fn(() => Promise.resolve({ css: "", scope: "vl-render", render_version: 2 })),
+  };
+  return { api, spy };
+}
 
 describe("DataFenceView", () => {
   it("draws a bar chart with an accessible summary", async () => {
@@ -72,7 +92,7 @@ describe("DataFenceView", () => {
     await renderEditor(body(fence("d2", "a -> b"), fence("timeline", "Oct 6 | Start")));
     expect(screen.getByText(/The d2 diagram is drawn by the diagram service/)).toBeDefined();
     expect(
-      screen.getByText("The timeline block is drawn by the renderer when the page is saved."),
+      screen.getByText("The timeline block is drawn when Vellum runs with a server."),
     ).toBeDefined();
   });
 
@@ -120,5 +140,75 @@ describe("DataFenceView", () => {
     });
     await screen.findByText("sparkline");
     expect(headIcon()).toBe(iconPath("data_object"));
+  });
+
+  describe("with a server", () => {
+    it("shows the server's drawing, with the source behind the Source button", async () => {
+      const user = userEvent.setup();
+      const { api, spy } = fakeRender(() =>
+        Promise.resolve(
+          drawn('<article class="vl-doc"><ol class="vl-timeline"><li>Kickoff</li></ol></article>'),
+        ),
+      );
+      await renderEditor(body(fence("timeline", "2026-01-10 | Kickoff\n")), { render: api });
+      expect(await preview().findByText("Kickoff")).toBeDefined();
+      expect(spy).toHaveBeenCalledWith({
+        lang: "timeline",
+        args: "",
+        source: "2026-01-10 | Kickoff\n",
+      });
+      expect(document.querySelector(".vl-fence-render")?.classList.contains("vl-render")).toBe(
+        true,
+      );
+      const source = screen.getByLabelText("timeline source");
+      expect(source.hidden).toBe(true);
+      const toggle = screen.getByRole("button", { name: "Source" });
+      expect(toggle.getAttribute("aria-pressed")).toBe("false");
+      await user.click(toggle);
+      expect(source.hidden).toBe(false);
+      expect(toggle.getAttribute("aria-pressed")).toBe("true");
+    });
+
+    it("opens the source of an empty block, to write it", async () => {
+      const { api } = fakeRender(() => Promise.resolve(drawn("<article></article>")));
+      await renderEditor(body({ type: "dataFence", attrs: { lang: "mermaid", args: "" } }), {
+        render: api,
+      });
+      expect(screen.getByLabelText("mermaid source").hidden).toBe(false);
+    });
+
+    it("shows render warnings with Copy diagnostic", async () => {
+      const { api } = fakeRender(() =>
+        Promise.resolve(drawn("<article><pre>x</pre></article>", ["calculator `x`: oops"])),
+      );
+      await renderEditor(body(fence("calculator", "x: X = y\n")), { render: api });
+      expect(await preview().findByText(/calculator `x`: oops/)).toBeDefined();
+      expect(preview().getByRole("button", { name: "Copy diagnostic" })).toBeDefined();
+    });
+
+    it("falls back to the client preview when the server cannot draw", async () => {
+      const { api } = fakeRender(() =>
+        Promise.reject(
+          new ApiError("unavailable", "The renderer is busy.", {
+            requestId: "req-9",
+            route: "POST /api/v1/render/block",
+          }),
+        ),
+      );
+      await renderEditor(body(fence("chart", "labels: [A]\nvalues: [3]\n")), { render: api });
+      expect(
+        await preview().findByText(
+          "The block could not be drawn: The renderer is busy. (request req-9)",
+        ),
+      ).toBeDefined();
+      expect(preview().getByRole("img", { name: ": A 3" })).toBeDefined();
+      expect(preview().getByRole("button", { name: "Copy diagnostic" })).toBeDefined();
+    });
+
+    it("keeps collections on the client preview", async () => {
+      const { api, spy } = fakeRender(() => Promise.resolve(drawn("<p>server</p>")));
+      await renderEditor(body(fence("collection", "source: x\n")), { render: api });
+      expect(spy).not.toHaveBeenCalled();
+    });
   });
 });

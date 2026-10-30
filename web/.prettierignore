@@ -7,3 +7,4 @@ playwright-report
 test-results
 pnpm-lock.yaml
 src/**/*.gen.ts
+e2e/**/*.gen.json

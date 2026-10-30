@@ -352,6 +352,6 @@ describe("collection blocks in the editor", () => {
         <EmbedPreviewForTest fence="id: x" />
       </I18nProvider>,
     );
-    expect(screen.getByText(/drawn by the renderer/)).toBeDefined();
+    expect(screen.getByText(/drawn when Vellum runs with a server/)).toBeDefined();
   });
 });

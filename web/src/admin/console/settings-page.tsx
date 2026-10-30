@@ -6,6 +6,7 @@ import { useState, type ComponentProps, type ReactNode } from "react";
 import { failureText } from "../../data/failure";
 import { useLoaded } from "../../data/use-loaded";
 import { useT } from "../../i18n/i18n";
+import { CopyDiagnostic } from "../../shell/copy-diagnostic";
 
 import {
   formText,
@@ -236,6 +237,7 @@ function SettingsForm({
       {result?.ok === false && (
         <div className="vl-field-error" role="alert">
           <p>{result.message}</p>
+          <CopyDiagnostic message={result.message} />
           {result.conflict === true && (
             <button type="button" className="vl-text-button" onClick={onReload}>
               {t("admin-reload")}
@@ -258,6 +260,7 @@ function SettingsLoader({ api }: { readonly api: AdminConsoleApi }) {
     return (
       <p className="vl-field-error" role="alert">
         {loaded.message}
+        <CopyDiagnostic message={loaded.message} />
       </p>
     );
   }

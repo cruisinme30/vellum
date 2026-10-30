@@ -45,12 +45,22 @@ const DEFAULT_USER = "01M6409GN2EYWS8Z7NFQQ3JNWZ";
  * sockets, relays presence, lists each editor once its presence arrives,
  * and answers Done.
  */
-export function fakeRoom(options: { paragraph?: string } = {}): FakeRoom {
+export function fakeRoom(
+  options: { paragraph?: string; fences?: readonly { lang: string; source: string }[] } = {},
+): FakeRoom {
   const room = new Y.Doc();
   if (options.paragraph !== undefined) {
     const paragraph = new Y.XmlElement("paragraph");
     paragraph.insert(0, [new Y.XmlText(options.paragraph)]);
     room.getXmlFragment("default").insert(0, [paragraph]);
+  }
+  for (const { lang, source } of options.fences ?? []) {
+    const fence = new Y.XmlElement("dataFence");
+    fence.setAttribute("lang", lang);
+    fence.setAttribute("args", "");
+    fence.insert(0, [new Y.XmlText(source)]);
+    const body = room.getXmlFragment("default");
+    body.insert(body.length, [fence]);
   }
   const urls: string[] = [];
   const clients = new Map<number, { user: string; canWrite: boolean }>();
@@ -158,7 +168,11 @@ export function fakeRoom(options: { paragraph?: string } = {}): FakeRoom {
 /** One browser in a room of its own; see {@link fakeRoom}. */
 export async function fakeCollab(
   page: Page,
-  options: { canWrite?: boolean; paragraph?: string } = {},
+  options: {
+    canWrite?: boolean;
+    paragraph?: string;
+    fences?: readonly { lang: string; source: string }[];
+  } = {},
 ): Promise<FakeCollab> {
   const room = fakeRoom(options);
   await room.join(page, {

@@ -8,6 +8,7 @@ import { useId, useState, type ComponentProps } from "react";
 import { failureText } from "../../data/failure";
 import { useLoaded } from "../../data/use-loaded";
 import { useT } from "../../i18n/i18n";
+import { CopyDiagnostic } from "../../shell/copy-diagnostic";
 
 import type { DeliveryView, HookInput, HookView, WebhooksApi } from "./webhooks-api";
 
@@ -177,6 +178,7 @@ export function HookForm({
       {error !== undefined && (
         <p className="vl-field-error" role="alert">
           {error}
+          <CopyDiagnostic message={error} />
         </p>
       )}
     </form>
@@ -240,6 +242,7 @@ export function Deliveries({ api, hook }: { readonly api: WebhooksApi; readonly 
     return (
       <p className="vl-field-error" role="alert">
         {loaded.message}
+        <CopyDiagnostic message={loaded.message} />
       </p>
     );
   }

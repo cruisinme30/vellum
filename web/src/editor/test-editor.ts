@@ -9,8 +9,10 @@ import { DecorationSet } from "@tiptap/pm/view";
 import { EditorContent, useEditor, type ReactNodeViewProps } from "@tiptap/react";
 import { createElement, createRef, useEffect, type ComponentType, type ReactNode } from "react";
 
+import { ServerApisProvider } from "../data/server-apis";
 import en from "../i18n/en.ftl?raw";
 import { createTranslator } from "../i18n/i18n";
+import type { RenderApi } from "../render/api";
 
 import type { ChipSources } from "./chips/items";
 import type { ChannelFactory } from "./collab/local-connector";
@@ -91,18 +93,23 @@ export async function renderEditor(
     readonly chips?: ChipSources;
     /** Providers around the editor, such as the page's files. */
     readonly wrapper?: ComponentType<{ children: ReactNode }>;
+    /** A server renderer, for blocks drawn by the server. */
+    readonly render?: RenderApi;
   } = {},
 ): Promise<{ editor: Editor; unmount: () => void }> {
   let current: Editor | undefined;
+  const harness = createElement(EditorHarness, {
+    content,
+    editable: options.editable ?? true,
+    chips: options.chips,
+    onEditor: (editor: Editor) => {
+      current = editor;
+    },
+  });
   const { unmount } = render(
-    createElement(EditorHarness, {
-      content,
-      editable: options.editable ?? true,
-      chips: options.chips,
-      onEditor: (editor: Editor) => {
-        current = editor;
-      },
-    }),
+    options.render === undefined
+      ? harness
+      : createElement(ServerApisProvider, { apis: { render: options.render } }, harness),
     options.wrapper === undefined ? {} : { wrapper: options.wrapper },
   );
   // React node views render in a microtask after the editor mounts.

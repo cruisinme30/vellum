@@ -10,6 +10,7 @@ import "./styles/editor.css";
 import "./styles/collections.css";
 import "./styles/notifications.css";
 import "./styles/appearance.css";
+import "./styles/render.css";
 
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
@@ -38,6 +39,7 @@ import { createPlatform, startPlatform } from "./platform/platform";
 import { createHttpPrivateSpacesApi } from "./platform/private/api";
 import { DocumentCache } from "./platform/store/document-cache";
 import { openLocalDatabase } from "./platform/store/persistence";
+import { createHttpRenderApi } from "./render/api";
 import { createHttpOrganisationAppearance } from "./theme/organisation";
 import { createHttpWorkApi } from "./work/api";
 
@@ -106,6 +108,7 @@ root.render(
       directory={status === undefined ? undefined : createHttpDirectory(http)}
       attachments={status === undefined ? undefined : createHttpAttachmentsApi(http)}
       privateSpaces={status === undefined ? undefined : createHttpPrivateSpacesApi(http)}
+      render={status === undefined ? undefined : createHttpRenderApi(http)}
       collections={
         status === undefined ? createMockCollectionsStore() : createHttpCollectionsStore(http)
       }

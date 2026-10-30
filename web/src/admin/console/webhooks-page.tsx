@@ -6,6 +6,7 @@ import { useState } from "react";
 import { failureText } from "../../data/failure";
 import { useLoaded } from "../../data/use-loaded";
 import { useT } from "../../i18n/i18n";
+import { CopyDiagnostic } from "../../shell/copy-diagnostic";
 
 import { AdminScreen } from "./context";
 import type { HookInput, HookList, HookView, WebhooksApi } from "./webhooks-api";
@@ -220,6 +221,7 @@ function Hooks({ api }: { readonly api: WebhooksApi }) {
     return loaded.state === "failed" ? (
       <p className="vl-field-error" role="alert">
         {loaded.message}
+        <CopyDiagnostic message={loaded.message} />
       </p>
     ) : (
       <p className="vl-muted">{t("admin-loading")}</p>
@@ -240,6 +242,7 @@ function Hooks({ api }: { readonly api: WebhooksApi }) {
       {notice?.ok === false && (
         <p className="vl-field-error" role="alert">
           {notice.message}
+          <CopyDiagnostic message={notice.message} />
         </p>
       )}
       {hooks.length === 0 ? (

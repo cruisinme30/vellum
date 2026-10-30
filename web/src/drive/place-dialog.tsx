@@ -6,6 +6,7 @@ import { useEffect, useId, useRef, useState, type SyntheticEvent } from "react";
 import { failureText } from "../data/failure";
 import { useLoaded } from "../data/use-loaded";
 import { useT } from "../i18n/i18n";
+import { CopyDiagnostic } from "../shell/copy-diagnostic";
 
 import type { DriveApi, NodeView, Place, SpaceView } from "./api";
 
@@ -90,6 +91,7 @@ function FolderChoice({
     return (
       <p className="vl-field-error" role="alert">
         {loaded.message}
+        <CopyDiagnostic message={loaded.message} />
       </p>
     );
   }
@@ -225,6 +227,7 @@ export function PlaceDialog({
         {problem !== undefined && (
           <p className="vl-field-error" role="alert">
             {problem}
+            <CopyDiagnostic message={problem} />
           </p>
         )}
         <div className="vl-drive-dialog-actions">

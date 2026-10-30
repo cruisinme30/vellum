@@ -1,0 +1,107 @@
+/*
+ * SPDX-FileCopyrightText: 2026 The Vellum contributors
+ * SPDX-License-Identifier: AGPL-3.0-only
+ *
+ * Server-rendered HTML inside the app (ADR 0068). The renderer's own
+ * stylesheet (render.stylesheet) styles and colours everything under
+ * .vl-render with its contrast-checked theme for the app's data-theme;
+ * this file fits it into the page and keeps the app's own block styles
+ * from leaking in.
+ */
+
+.vl-render {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* The renderer's stylesheet comes later in the cascade; doubling the class
+   outranks its nested .vl-render rules. Text uses the app's reading font. */
+.vl-render.vl-render .vl-doc {
+  background: transparent;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* Editor block classes the renderer also uses. */
+.vl-render.vl-render .vl-image,
+.vl-render.vl-render .vl-embed {
+  padding: 0;
+  border: 0;
+}
+
+.vl-render.vl-render .vl-chart svg {
+  max-width: 100%;
+}
+
+/* A figure wider than the column scrolls inside its block. */
+.vl-render.vl-render .vl-figure {
+  overflow-x: auto;
+}
+
+/* The reading view. */
+.vl-reading {
+  margin-top: 16px;
+}
+
+.vl-reading .vl-doc > :first-child {
+  margin-top: 0;
+}
+
+.vl-view-switch {
+  display: inline-flex;
+  gap: 4px;
+}
+
+/* Rendered blocks in the editor. */
+.vl-fence-render {
+  min-height: 24px;
+}
+
+.vl-fence-render[aria-busy="true"] {
+  opacity: 0.6;
+}
+
+.vl-fence-warning {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin: 4px 0;
+  color: var(--md-on-surface-variant);
+  font-size: 0.875rem;
+}
+
+.vl-fence-source[hidden] {
+  display: none;
+}
+
+/* Copy diagnostic (R-OB-1). */
+.vl-diagnostic {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-inline-start: 8px;
+}
+
+.vl-diagnostic-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.vl-diagnostic-copy .vl-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.vl-diagnostic-status:empty {
+  display: none;
+}
+
+.vl-diagnostic-text {
+  flex-basis: 100%;
+  width: 100%;
+  font-family: var(--vl-mono);
+  font-size: 0.8125rem;
+}

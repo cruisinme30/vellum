@@ -54,11 +54,15 @@ export class ApiError extends Error {
   readonly status: number;
   readonly retryable: boolean;
   readonly requestId: string | undefined;
+  /** The request that failed, such as `GET /api/v1/my-work` (no query string). */
+  readonly route: string | undefined;
+  /** When it failed. */
+  readonly at: Date;
 
   constructor(
     code: ErrorCode,
     message: string,
-    details: { status?: number; retryable?: boolean; requestId?: string } = {},
+    details: { status?: number; retryable?: boolean; requestId?: string; route?: string } = {},
   ) {
     super(message);
     this.name = "ApiError";
@@ -66,6 +70,8 @@ export class ApiError extends Error {
     this.status = details.status ?? 0;
     this.retryable = details.retryable ?? false;
     this.requestId = details.requestId;
+    this.route = details.route;
+    this.at = new Date();
   }
 }
 
@@ -125,7 +131,14 @@ function requestIdOf(fromBody: unknown, header: string | undefined): { requestId
   return header === undefined ? {} : { requestId: header };
 }
 
-async function errorOf(response: Response): Promise<ApiError> {
+/** `METHOD /path` without the query string, which may hold search text. */
+function routeOf(method: string, url: string): string {
+  const path = url.split(/[?#]/, 1)[0] ?? url;
+  return `${method} ${path}`;
+}
+
+async function errorOf(response: Response, route?: string): Promise<ApiError> {
+  const where = route === undefined ? {} : { route };
   const header = response.headers.get("x-request-id") ?? undefined;
   let body: unknown;
   try {
@@ -140,6 +153,7 @@ async function errorOf(response: Response): Promise<ApiError> {
       status: response.status,
       retryable: body["retryable"] === true,
       ...requestIdOf(body["request_id"], header),
+      ...where,
     });
   }
   return new ApiError(
@@ -149,6 +163,7 @@ async function errorOf(response: Response): Promise<ApiError> {
       status: response.status,
       retryable: response.status >= 500,
       ...(header === undefined ? {} : { requestId: header }),
+      ...where,
     },
   );
 }
@@ -174,6 +189,7 @@ export function createHttp(options: HttpOptions = {}): Http {
     } catch {
       throw new ApiError("network", "Vellum could not reach the server. Check your connection.", {
         retryable: true,
+        route: routeOf(method, url),
       });
     }
     health.report(response.status, retryAfterSeconds(response.headers.get("retry-after")));
@@ -207,8 +223,8 @@ export function createHttp(options: HttpOptions = {}): Http {
     return csrf;
   };
 
-  const parse = async <T>(response: Response): Promise<T> => {
-    if (!response.ok) throw await errorOf(response);
+  const parse = async <T>(response: Response, route: string): Promise<T> => {
+    if (!response.ok) throw await errorOf(response, route);
     if (response.status === 204) return undefined as T;
     return (await response.json()) as T;
   };
@@ -242,7 +258,7 @@ export function createHttp(options: HttpOptions = {}): Http {
         response = await attempt();
       }
     }
-    return parse<T>(response);
+    return parse<T>(response, routeOf(method, path));
   };
 
   return {
@@ -250,7 +266,7 @@ export function createHttp(options: HttpOptions = {}): Http {
       const response = await request("GET", `${path}${queryString(query)}`, {
         headers: { accept: "application/json" },
       });
-      return parse<T>(response);
+      return parse<T>(response, routeOf("GET", path));
     },
 
     send<T>(method: Exclude<Method, "GET">, path: string, body?: unknown): Promise<T> {
