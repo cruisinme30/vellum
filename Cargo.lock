@@ -9490,6 +9490,7 @@ version = "0.0.0"
 dependencies = [
  "ammonia",
  "futures-util",
+ "imagesize",
  "material-colors",
  "merman",
  "proptest",
