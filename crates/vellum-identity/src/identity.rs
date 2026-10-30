@@ -403,15 +403,22 @@ impl Identity {
         found: &SsoIdentity,
         user_agent: Option<&str>,
     ) -> Result<NewSession, Error> {
-        self.federated_sign_in(found, &|email| sso.config().may_create(email), user_agent)
+        self.federated_sign_in(
+            found,
+            &|email| sso.config().may_create(email),
+            &|email| sso.config().may_link(email),
+            user_agent,
+        )
     }
 
-    /// Signs in someone a provider vouched for; `may_create` says whether
+    /// Signs in someone a provider vouched for; `may_link` says whether
+    /// an existing account with the address may be joined, and `may_create` says whether
     /// an address with no account gets one.
     pub(crate) fn federated_sign_in(
         &self,
         found: &SsoIdentity,
         may_create: &dyn Fn(&str) -> bool,
+        may_link: &dyn Fn(&str) -> bool,
         user_agent: Option<&str>,
     ) -> Result<NewSession, Error> {
         if self.needs_setup() {
@@ -461,6 +468,14 @@ impl Identity {
                 ));
             }
             if let Some(user) = s.users.values_mut().find(|u| u.email == email) {
+                // A provider limited to some domains must not take over
+                // accounts outside them (RT-043).
+                if !may_link(&email) {
+                    return Err(Error::new(
+                        ErrorKind::PermissionDenied,
+                        "this sign-in provider is not set up for this address",
+                    ));
+                }
                 user.sso.push(link.clone());
                 return Ok((user.clone(), false));
             }

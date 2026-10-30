@@ -88,16 +88,25 @@ impl SsoConfig {
     /// Whether an account may be created for `email`.
     #[must_use]
     pub fn may_create(&self, email: &str) -> bool {
-        if !self.auto_create {
-            return false;
-        }
-        let domain = email.rsplit_once('@').map_or("", |(_, d)| d);
-        self.allowed_domains.is_empty()
-            || self
-                .allowed_domains
-                .iter()
-                .any(|d| d.trim_start_matches('@').eq_ignore_ascii_case(domain))
+        self.auto_create && self.may_link(email)
     }
+
+    /// Whether this provider may sign in to an existing account with
+    /// `email`: any address without a domain list, otherwise only one in
+    /// the list (RT-043, D307).
+    #[must_use]
+    pub fn may_link(&self, email: &str) -> bool {
+        in_domains(&self.allowed_domains, email)
+    }
+}
+
+/// Whether `email` is in one of `domains`; an empty list allows any.
+pub(crate) fn in_domains(domains: &[String], email: &str) -> bool {
+    let domain = email.rsplit_once('@').map_or("", |(_, d)| d);
+    domains.is_empty()
+        || domains
+            .iter()
+            .any(|d| d.trim_start_matches('@').eq_ignore_ascii_case(domain))
 }
 
 /// The HTTP calls single sign-on makes, through the SSRF guard in
