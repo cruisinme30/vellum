@@ -5,6 +5,7 @@ import react from "@vitejs/plugin-react";
 import type { Connect, Plugin } from "vite";
 import { defineConfig } from "vitest/config";
 
+import { inlineAsset } from "./src/platform/inline-assets";
 import { vellumServiceWorker } from "./src/platform/pwa/vite-plugin";
 
 // `VELLUM_SERVER=http://127.0.0.1:8080 pnpm dev` runs the app against a
@@ -51,6 +52,8 @@ export default defineConfig({
     sourcemap: true,
     // The editor chunk (Tiptap, ProseMirror, Yjs) is about 560 kB; it loads lazily.
     chunkSizeWarningLimit: 600,
+    // Fonts stay files: the CSP blocks `data:` fonts (#569).
+    assetsInlineLimit: inlineAsset,
   },
   test: {
     environment: "jsdom",
