@@ -295,6 +295,30 @@ export function createHttpWorkspaceStore(
         return;
       }
     },
+    async loadPage(id) {
+      const known = snapshot.pages.find((p) => p.id === id);
+      if (known !== undefined) return known;
+      const asked = generation;
+      try {
+        const node = await http.get<NodeView>(item(id));
+        if (asked !== generation || !inTree(node)) return;
+        const starred = await http.get<NodeList>(`${DRIVE}/starred`);
+        if (asked !== generation) return;
+        const page = metaOf(
+          node,
+          1,
+          starred.items.some((n) => n.id === id),
+        );
+        // Another load may have brought it in meanwhile.
+        const present = snapshot.pages.find((p) => p.id === id);
+        if (present !== undefined) return present;
+        setPages((pages) => [...pages, page]);
+        return page;
+      } catch {
+        // Not found, or not the person's to open: the page says so.
+        return;
+      }
+    },
     renamePage(id, title) {
       change(
         patch(id, { title }),

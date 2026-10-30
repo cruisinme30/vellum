@@ -45,6 +45,13 @@ function fakeDrive(options: { hold?: boolean; trash?: unknown } = {}) {
       items: [node("F1", "folder"), node("P1", "page", "F1")],
       truncated: false,
     },
+    // Shared with Priya on its own, from a drive she cannot browse.
+    "/api/v1/drive/items/X1": {
+      ...node("X1", "page", "XF"),
+      space_id: "S9",
+      title: "Launch plan Q1",
+      created_by: "SOMEONE",
+    },
   };
   const http = {
     get: vi.fn((path: string, query?: { parent_id?: string }) => {
@@ -53,7 +60,9 @@ function fakeDrive(options: { hold?: boolean; trash?: unknown } = {}) {
           // Never answers.
         });
       const key = query?.parent_id === undefined ? path : `${path}?${query.parent_id}`;
-      return Promise.resolve(routes[key]);
+      return key in routes
+        ? Promise.resolve(routes[key])
+        : Promise.reject(new ApiError("not_found", "no such item"));
     }),
     send: vi.fn(() =>
       options.trash instanceof Error ? Promise.reject(options.trash) : Promise.resolve({}),
@@ -85,6 +94,23 @@ describe("pages on a server", () => {
     renderServer("/p/P1", fakeDrive({ hold: true }));
     expect(await screen.findByText("Loading your pages…", {}, { timeout: 5000 })).toBeDefined();
     expect(screen.queryByText("This page does not exist")).toBeNull();
+  });
+
+  it("opens a page shared on its own, outside every space the person can browse", async () => {
+    // #567: it was looked up only in the spaces' trees, so it "did not exist".
+    renderServer("/p/X1", fakeDrive());
+    const title = await screen.findByRole("textbox", { name: "Page title" });
+    expect(title).toHaveProperty("value", "Launch plan Q1");
+    expect(screen.queryByText("This page does not exist")).toBeNull();
+    // It does not join the sidebar's trees.
+    expect(screen.queryByRole("treeitem", { name: "Launch plan Q1" })).toBeNull();
+  });
+
+  it("says a page does not exist when the server has none by that ID", async () => {
+    renderServer("/p/NOPE", fakeDrive());
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "This page does not exist" }),
+    ).toBeDefined();
   });
 
   it("shows a folder as the list of pages in it", async () => {

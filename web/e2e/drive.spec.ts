@@ -7,7 +7,7 @@
 import { AxeBuilder } from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
-import { signedIn } from "./support/server-session";
+import { SAM, signedIn } from "./support/server-session";
 
 // Feature tests: once per browser, at laptop size. The UI suite covers sizes.
 // The offline worker is blocked: once it controls the page, WebKit and
@@ -93,4 +93,19 @@ test("a change the server refuses is undone and says why", async ({ page }) => {
   await page.getByRole("menuitem", { name: "Move to trash" }).click();
   await expect(tree.getByRole("treeitem", { name: "Plans" })).toHaveCount(0);
   expect(drive.items.map((item) => item.title)).toEqual(["Roadmap"]);
+});
+
+test("a page shared on its own opens from Shared with me", async ({ page }) => {
+  // #567: the page screen looked only in the person's own trees, so a page
+  // shared with them from someone else's drive "did not exist".
+  await signedIn(page, SAM);
+  await page.goto("/drive/shared-with-me");
+  await page.getByRole("link", { name: "Launch plan Q1" }).click();
+  await expect(page).toHaveURL(/\/p\/01M6400000PAGE00LAUNCHQ101$/);
+  await expect(page.getByRole("textbox", { name: "Page title" })).toHaveValue("Launch plan Q1");
+  await expect(page.getByRole("heading", { name: "This page does not exist" })).toHaveCount(0);
+  // It is not added to the person's own trees.
+  await expect(
+    page.getByRole("tree").getByRole("treeitem", { name: "Launch plan Q1" }),
+  ).toHaveCount(0);
 });
