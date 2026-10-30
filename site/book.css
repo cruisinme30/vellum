@@ -44,7 +44,11 @@
    an unmatched fallback (DejaVu Sans on Linux, which system-ui picks), the
    swap rewrapped every paragraph and the landing page moved by a CLS of
    0.12 on a phone over slow 4G. Sizes are measured in Chromium against the
-   landing page's text, one face per weight the site uses. */
+   landing page's text, one face per weight the site uses.
+   WebKit on Linux looks local() fonts up by family name only, so the
+   bold faces end with the family names too: it then picks the family's
+   bold member by the face's weight, where other browsers have already
+   matched the full name. */
 @font-face {
   font-family: "Vellum Sans Fallback";
   font-weight: 400;
@@ -66,7 +70,7 @@
 @font-face {
   font-family: "Vellum Sans Fallback";
   font-weight: 600;
-  src: local("Arial Bold"), local("Arial-BoldMT"), local("Liberation Sans Bold"), local("LiberationSans-Bold"), local("Arimo Bold"), local("Arimo-Bold");
+  src: local("Arial Bold"), local("Arial-BoldMT"), local("Liberation Sans Bold"), local("LiberationSans-Bold"), local("Arimo Bold"), local("Arimo-Bold"), local("Liberation Sans"), local("Arimo");
   size-adjust: 98.6%;
   ascent-override: 98%;
   descent-override: 29%;
@@ -75,7 +79,7 @@
 @font-face {
   font-family: "Vellum Sans Fallback";
   font-weight: 700;
-  src: local("Arial Bold"), local("Arial-BoldMT"), local("Liberation Sans Bold"), local("LiberationSans-Bold"), local("Arimo Bold"), local("Arimo-Bold");
+  src: local("Arial Bold"), local("Arial-BoldMT"), local("Liberation Sans Bold"), local("LiberationSans-Bold"), local("Arimo Bold"), local("Arimo-Bold"), local("Liberation Sans"), local("Arimo");
   size-adjust: 101.2%;
   ascent-override: 95.5%;
   descent-override: 28.3%;
