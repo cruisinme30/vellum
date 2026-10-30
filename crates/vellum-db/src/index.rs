@@ -57,9 +57,12 @@ pub enum IndexPool<'a> {
 
 /// A migrated, ready-to-use index. Cheap to clone.
 ///
-/// When the last clone of a SQLite index is dropped, its connections are
-/// closed before the drop returns. Keep an `Index`
-/// alive for as long as you use a pool borrowed from [`Index::pool`].
+/// Await [`Index::close`] before the process exits: it returns once every
+/// connection is closed. When the last clone of a SQLite index is dropped
+/// unclosed, its connections are closed too, but on a current-thread
+/// runtime the drop only starts the close (see `SqliteCloser`). Keep an
+/// `Index` alive for as long as you use a pool borrowed from
+/// [`Index::pool`].
 #[derive(Debug, Clone)]
 pub struct Index {
     pub(crate) pool: Pool,
@@ -87,7 +90,7 @@ fn init_openssl_without_exit_cleanup() {
     openssl_sys::init();
 }
 
-/// How long dropping the last SQLite index waits for its connections.
+/// How long closing the last SQLite index waits for connections in use.
 const CLOSE_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Closes a SQLite pool when the last [`Index`] clone goes away.
@@ -96,10 +99,23 @@ const CLOSE_TIMEOUT: Duration = Duration::from_secs(5);
 /// own worker thread. SQLCipher frees its shared state (key provider,
 /// private heap, mutexes) in an `atexit` handler. If a process exits while
 /// a worker is still closing an encrypted database, the two race and the
-/// process crashes at exit (SIGSEGV). Closing the pool here, before the
-/// drop returns, means no worker is left behind. OpenSSL's own exit
-/// handler is a separate race, handled by
+/// process crashes at exit (SIGSEGV in `sqlite3FreeCodecArg`). OpenSSL's
+/// own exit handler is a separate race, handled by
 /// [`init_openssl_without_exit_cleanup`].
+///
+/// `Pool::close` waits until every connection is back in the pool, and
+/// sqlx puts a released connection back from a task spawned on the
+/// runtime that released it. So closing must never block that runtime:
+///
+/// - Outside a runtime, or on a multi-thread one, the drop waits for the
+///   close; on a runtime worker it does so in `block_in_place`, which hands
+///   the worker's queued tasks to another thread first.
+/// - On a current-thread runtime the only thread that can run those tasks
+///   is the one dropping the index, so the drop starts the close on a
+///   helper thread and returns. Connections still queued on that runtime
+///   close when it next runs them. If the runtime is dropped first, sqlx
+///   drops them unclosed, so code that must not exit with a connection
+///   open (any encrypted index) awaits [`Index::close`] instead.
 #[derive(Debug)]
 struct SqliteCloser(SqlitePool);
 
@@ -108,33 +124,50 @@ impl Drop for SqliteCloser {
         if self.0.is_closed() {
             return;
         }
-        let pool = self.0.clone();
-        // A helper thread with its own runtime works whether the drop runs
-        // inside an async runtime or outside one.
-        let closer = std::thread::Builder::new()
-            .name("vellum-db-close".into())
-            .spawn(move || {
-                let runtime = tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .build();
-                match runtime {
-                    Ok(runtime) => {
-                        let closed = runtime.block_on(async {
-                            tokio::time::timeout(CLOSE_TIMEOUT, pool.close()).await
-                        });
-                        if closed.is_err() {
-                            tracing::warn!(
-                                "index connections still busy after {CLOSE_TIMEOUT:?}; not waiting"
-                            );
-                        }
-                    }
-                    Err(error) => tracing::warn!(%error, "could not close the index on drop"),
-                }
-            });
-        if let Ok(closer) = closer {
-            let _ = closer.join();
+        let runtime = tokio::runtime::Handle::try_current().ok();
+        let closer = close_in_background(self.0.clone());
+        let Ok(closer) = closer else {
+            return;
+        };
+        match runtime.map(|handle| handle.runtime_flavor()) {
+            None => {
+                let _ = closer.join();
+            }
+            Some(tokio::runtime::RuntimeFlavor::CurrentThread) => {}
+            Some(_) => {
+                let _ = tokio::task::block_in_place(|| closer.join());
+            }
         }
     }
+}
+
+/// Closes `pool` on a thread with its own runtime, which needs nothing
+/// from the caller's runtime except that it keeps running.
+fn close_in_background(pool: SqlitePool) -> std::io::Result<std::thread::JoinHandle<()>> {
+    let spawned = std::thread::Builder::new()
+        .name("vellum-db-close".into())
+        .spawn(move || {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build();
+            match runtime {
+                Ok(runtime) => {
+                    let closed = runtime.block_on(async {
+                        tokio::time::timeout(CLOSE_TIMEOUT, pool.close()).await
+                    });
+                    if closed.is_err() {
+                        tracing::warn!(
+                            "index connections still in use after {CLOSE_TIMEOUT:?}; not waiting"
+                        );
+                    }
+                }
+                Err(error) => tracing::warn!(%error, "could not close the index on drop"),
+            }
+        });
+    if let Err(error) = &spawned {
+        tracing::warn!(%error, "could not start closing the index");
+    }
+    spawned
 }
 
 impl Index {
@@ -276,7 +309,11 @@ impl Index {
         Ok(names)
     }
 
-    /// Closes every pooled connection.
+    /// Closes every pooled connection, for every clone of this index.
+    ///
+    /// Waits for connections in use to come back, so it runs on the
+    /// caller's runtime and never blocks it. When it returns, every SQLite
+    /// connection is closed, so the process can exit safely.
     pub async fn close(&self) {
         match &self.pool {
             Pool::Sqlite(pool) => pool.close().await,
