@@ -4,9 +4,12 @@
 import { useId, useState, type ReactNode } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router";
 
+import { SecondStepRequired } from "../api/auth";
 import { ApiError } from "../api/http";
 import { safeNext, useSession } from "../api/session";
 import { useT } from "../i18n/i18n";
+
+import { SecondStep } from "./second-step";
 
 /** What a failed request says, with the request ID to quote when reporting it. */
 export function describeError(error: unknown, fallback: string): string {
@@ -111,21 +114,64 @@ export function SignInView() {
   const next = safeNext(parameters.get("next"));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [step, setStep] = useState<SecondStepRequired>();
   const { busy, error, submit } = useSubmit(t("auth-error"));
 
   if (session === undefined) return <Navigate to="/" replace />;
   if (session.status.needsSetup) return <Navigate to="/setup" replace />;
 
-  const onSubmit = submit(async () => {
-    await session.auth.signIn(email, password);
+  const signedIn = async () => {
     await session.refresh();
     // A server-side page (an app asking for consent) needs a full load.
     if (next.startsWith("/oauth/")) globalThis.location.assign(next);
     else void navigate(next, { replace: true });
+  };
+  const onSubmit = submit(async () => {
+    try {
+      await session.auth.signIn(email, password);
+    } catch (error_) {
+      if (error_ instanceof SecondStepRequired && session.auth.steps !== undefined) {
+        setPassword("");
+        setStep(error_);
+        return;
+      }
+      throw error_;
+    }
+    await signedIn();
   });
 
+  if (step !== undefined && session.auth.steps !== undefined) {
+    return (
+      <AuthCard
+        title={step.step === "verify" ? t("second-step-title") : t("second-step-enrol-title")}
+        intro={step.step === "verify" ? t("second-step-intro") : t("second-step-enrol-intro")}
+      >
+        <SecondStep
+          step={step}
+          steps={session.auth.steps}
+          onSignedIn={signedIn}
+          onStartOver={() => {
+            setStep(undefined);
+          }}
+        />
+      </AuthCard>
+    );
+  }
+
+  const sso = session.status.sso ?? undefined;
   return (
     <AuthCard title={t("sign-in-title")} intro={t("sign-in-intro")}>
+      {sso !== undefined && (
+        <div className="vl-auth-sso">
+          <a
+            className="vl-filled-button"
+            href={`${sso.startUrl}${sso.startUrl.includes("?") ? "&" : "?"}${new URLSearchParams({ next }).toString()}`}
+          >
+            {t("sign-in-sso", { name: sso.name })}
+          </a>
+          <p className="vl-muted vl-auth-or">{t("sign-in-or")}</p>
+        </div>
+      )}
       <form className="vl-auth-form" onSubmit={onSubmit} aria-busy={busy}>
         <Field
           label={t("auth-email")}

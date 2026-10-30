@@ -129,6 +129,36 @@ describe("the re-authentication dialog", () => {
     });
   });
 
+  it("asks for a code when the account has a second factor", async () => {
+    const user = userEvent.setup();
+    const { http, send } = fakeHttp([
+      () =>
+        Promise.reject(new ApiError("unauthenticated", "second factor required", { status: 401 })),
+      () => Promise.reject(new ApiError("unauthenticated", "the code is wrong", { status: 401 })),
+      () => Promise.resolve(),
+    ]);
+    const gate = renderPrompt({ user: { ...ADMIN, hasPassword: true } }, http);
+    let answer: Promise<boolean> | undefined;
+    act(() => {
+      answer = gate.request();
+    });
+    await user.type(await screen.findByLabelText("Password"), "correct horse battery");
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+    const code = await screen.findByLabelText("Code from your app, or a recovery code");
+    expect(screen.queryByRole("alert")).toBeNull();
+    await user.type(code, "000000");
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("the code is wrong");
+    await user.type(screen.getByLabelText("Code from your app, or a recovery code"), "123456");
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+    await expect(answer).resolves.toBe(true);
+    expect(send).toHaveBeenLastCalledWith("POST", "/auth/reauthenticate", {
+      password: "correct horse battery",
+      code: "123456",
+    });
+  });
+
   it("offers single sign-on to an account without a password, and Escape cancels", async () => {
     const user = userEvent.setup();
     const { http } = fakeHttp([]);

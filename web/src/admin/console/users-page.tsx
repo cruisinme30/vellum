@@ -10,6 +10,7 @@ import { useT } from "../../i18n/i18n";
 
 import { formText, type AdminConsoleApi, type UserChange, type UserView } from "./api";
 import { AdminScreen } from "./context";
+import { SignInHelp } from "./sign-in-help";
 import type { Submit } from "./space-panel";
 
 const DAY = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" });
@@ -103,6 +104,8 @@ interface RowProperties {
   readonly self: boolean;
   readonly busy: boolean;
   readonly onChange: (change: UserChange) => void;
+  /** Sign-in help (issue #523); absent without the sign-in API. */
+  readonly onSignInHelp?: ((help: "reset-factors" | "sign-out") => void) | undefined;
 }
 
 /** Blocking ends every session, so it asks once more first. */
@@ -136,7 +139,7 @@ function ConfirmBlock({
 }
 
 /** What an admin can do to another account. */
-function RowActions({ user, self, busy, onChange }: RowProperties) {
+function RowActions({ user, self, busy, onChange, onSignInHelp }: RowProperties) {
   const t = useT();
   const [confirmBlock, setConfirmBlock] = useState(false);
   if (self) return <span className="vl-muted">{t("admin-users-self-note")}</span>;
@@ -184,6 +187,9 @@ function RowActions({ user, self, busy, onChange }: RowProperties) {
       >
         {user.disabled ? t("admin-users-unblock") : t("admin-users-block")}
       </button>
+      {onSignInHelp !== undefined && !user.disabled && (
+        <SignInHelp user={user} busy={busy} onSignInHelp={onSignInHelp} />
+      )}
     </div>
   );
 }
@@ -208,7 +214,10 @@ function UserRow(properties: RowProperties) {
           t("admin-users-active")
         )}
       </td>
-      <td>{user.hasPassword ? t("admin-users-by-password") : t("admin-users-by-sso")}</td>
+      <td>
+        {user.hasPassword ? t("admin-users-by-password") : t("admin-users-by-sso")}
+        {user.secondFactor === true && <div className="vl-muted">{t("admin-users-with-2fa")}</div>}
+      </td>
       <td>{DAY.format(new Date(user.createdAt))}</td>
       <td>
         <RowActions {...properties} />
@@ -247,6 +256,33 @@ function Users({ api }: { readonly api: AdminConsoleApi }) {
         setBusy(undefined);
       });
   };
+  const signIn = api.signIn;
+  const help =
+    signIn === undefined
+      ? undefined
+      : (user: UserView, kind: "reset-factors" | "sign-out") => {
+          setBusy(user.id);
+          setNotice(undefined);
+          const work =
+            kind === "sign-out"
+              ? signIn.signOutEverywhere(user.id).then((sessions) => {
+                  setNotice({
+                    ok: true,
+                    message: t("admin-users-signed-out", { name: user.name, count: sessions }),
+                  });
+                })
+              : signIn.resetFactors(user.id).then((updated) => {
+                  setChanged((before) => ({ ...before, [updated.id]: updated }));
+                  setNotice({ ok: true, message: t("admin-users-2fa-reset", { name: user.name }) });
+                });
+          work
+            .catch((error: unknown) => {
+              setNotice({ ok: false, message: failureText(error) });
+            })
+            .finally(() => {
+              setBusy(undefined);
+            });
+        };
   const users =
     loaded.state === "ready" ? loaded.value.map((user) => changed[user.id] ?? user) : [];
 
@@ -289,6 +325,13 @@ function Users({ api }: { readonly api: AdminConsoleApi }) {
                   onChange={(next) => {
                     change(user, next);
                   }}
+                  onSignInHelp={
+                    help === undefined
+                      ? undefined
+                      : (kind) => {
+                          help(user, kind);
+                        }
+                  }
                 />
               ))}
             </tbody>

@@ -31,10 +31,12 @@ pub enum Kind {
     BreakGlass,
     /// A pending `OAuth` consent.
     Consent,
+    /// A second-factor ticket or passkey ceremony (ADR 0069, D290).
+    MfaTicket,
 }
 
 impl Kind {
-    const ALL: [Self; 7] = [
+    const ALL: [Self; 8] = [
         Self::Session,
         Self::ApiToken,
         Self::AuthCode,
@@ -42,6 +44,7 @@ impl Kind {
         Self::RefreshToken,
         Self::BreakGlass,
         Self::Consent,
+        Self::MfaTicket,
     ];
 
     /// The prefix, including its underscore.
@@ -55,6 +58,7 @@ impl Kind {
             Self::RefreshToken => "vrt_",
             Self::BreakGlass => "vbg_",
             Self::Consent => "vcn_",
+            Self::MfaTicket => "vmt_",
         }
     }
 

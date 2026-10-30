@@ -14,6 +14,14 @@ vellum: 1
 - OpenID Connect (Google Workspace, Microsoft Entra ID, Okta, Keycloak and any other OIDC provider)
 - SAML 2.0
 
+People turn on two-step verification in **Settings → Two-step
+verification**: an authenticator app, passkeys, or both, plus ten
+one-time recovery codes. In **Admin → Sign-in**, require it for admins
+or for everyone who signs in with a password; people it covers set it up
+at their next sign-in. If someone loses every method and recovery code,
+**Admin → Users → Reset two-step verification** removes them and ends
+that person's sessions.
+
 With SSO on, you can require it for everyone except **break-glass
 admins**, who can still sign in with a password and passkey if the
 identity provider is down. Existing sessions keep working while the

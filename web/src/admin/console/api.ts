@@ -28,8 +28,10 @@ import type {
   GroupView,
   UsageCounts,
   SettingsView,
+  SignInView,
   SpaceRoleView,
   TokenPolicy,
+  UpdateSignIn,
   UserView,
   Versioned,
 } from "../../api/api.gen";
@@ -80,6 +82,8 @@ export interface AdminConsoleApi {
   groupMembers(id: string): Promise<GroupMembersView>;
   /** Everyone's personal API tokens (issue #523). */
   readonly tokens?: AdminTokensApi;
+  /** Sign-in rules and per-person sign-in help (issue #523). */
+  readonly signIn?: AdminSignInApi;
   changeGroupMembers(
     id: string,
     change: { add?: readonly string[]; remove?: readonly string[] },
@@ -95,6 +99,16 @@ export interface AdminTokensApi {
   policy(): Promise<TokenPolicy>;
   /** Caps the expiry of new tokens; `undefined` lifts the cap. */
   setPolicy(maxDays: number | undefined): Promise<TokenPolicy>;
+}
+
+/** The workspace's sign-in rules, and helping one person sign in (issue #523, ADR 0069). */
+export interface AdminSignInApi {
+  settings(): Promise<SignInView>;
+  update(change: UpdateSignIn): Promise<SignInView>;
+  /** Removes someone's authenticator app, passkeys and recovery codes; ends their sessions. */
+  resetFactors(userId: string): Promise<UserView>;
+  /** Ends every session of one person. */
+  signOutEverywhere(userId: string): Promise<number>;
 }
 
 /** What an admin changes about an account; unset fields stay as they are. */
@@ -179,6 +193,22 @@ export function createHttpAdminConsoleApi(http: Http): AdminConsoleApi {
     },
     groupMembers: (id) =>
       http.get<GroupMembersView>(`${ADMIN}/groups/${encodeURIComponent(id)}/members`),
+    signIn: {
+      settings: () => http.get<SignInView>(`${ADMIN}/sign-in`),
+      update: (change) => http.send<SignInView>("PATCH", `${ADMIN}/sign-in`, change),
+      resetFactors: (userId) =>
+        http.send<UserView>(
+          "POST",
+          `${ADMIN}/users/${encodeURIComponent(userId)}/second-factors/reset`,
+        ),
+      async signOutEverywhere(userId) {
+        const done = await http.send<{ sessions: number }>(
+          "POST",
+          `${ADMIN}/users/${encodeURIComponent(userId)}/sign-out`,
+        );
+        return done.sessions;
+      },
+    },
     tokens: {
       list: () => http.get<AdminTokenView[]>(`${ADMIN}/tokens`),
       async revoke(id) {
@@ -208,6 +238,7 @@ export function isConflict(error: unknown): boolean {
 }
 
 export {
+  type SignInView,
   type AdminTokenView,
   type TokenPolicy,
   type GroupMembersView,

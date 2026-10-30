@@ -22,8 +22,11 @@ aws-lc-rs = { version = "1.19.0", default-features = false, features = ["aws-lc-
 argon2 = { version = "0.6.0", default-features = false, features = ["alloc", "password-hash", "zeroize"] }
 axum = { version = "0.8.9", default-features = false, features = ["form", "json", "original-uri", "query", "tokio"] }
 base64 = "0.23.1"
+ciborium = "0.2.2"
+data-encoding = "2.11.1"
 getrandom = "0.4"
 http = "1.5.0"
+qrcodegen = "1.8.0"
 schemars = "1.2.3"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"

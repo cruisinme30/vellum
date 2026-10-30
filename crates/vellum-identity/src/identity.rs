@@ -16,11 +16,16 @@ use vellum_contracts::{CredentialKind, Principal, Scope, ScopeSet};
 use vellum_kernel::{Error, ErrorKind, Timestamp, UserId};
 
 use crate::lockout::{Key, Lockouts};
+use crate::mfa::{Proof, SignIn};
 use crate::oauth::{ClientMetadataFetcher, NoMetadataFetch, OAuthState};
 use crate::password;
+use crate::seal::Sealer;
 use crate::secret::{self, Kind, SecretHash};
 use crate::sso::{Sso, SsoIdentity};
-use crate::store::{ApiToken, Session, SessionMethod, SsoLink, State, Store, User, hash_key};
+use crate::store::{
+    ApiToken, SecondFactorPolicy, SecondFactors, Session, SessionMethod, SsoLink, State, Store,
+    User, hash_key,
+};
 
 /// How often `last_seen_at` and `last_used_at` are written back, so a busy
 /// session does not rewrite the store on every request.
@@ -140,6 +145,10 @@ pub struct TokenInfo {
 /// A user as the API shows it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "each flag is a separate fact the admin screens show"
+)]
 pub struct UserView {
     /// The user's ID.
     pub id: UserId,
@@ -155,6 +164,9 @@ pub struct UserView {
     pub disabled: bool,
     /// Whether the account has a password (otherwise SSO only).
     pub has_password: bool,
+    /// Whether the account has an authenticator app or passkey.
+    #[serde(default)]
+    pub second_factor: bool,
     /// When the account was created.
     pub created_at: Timestamp,
 }
@@ -169,6 +181,7 @@ impl From<&User> for UserView {
             admin: user.admin,
             disabled: user.disabled,
             has_password: user.password_hash.is_some(),
+            second_factor: user.factors.any(),
             created_at: user.created_at,
         }
     }
@@ -199,7 +212,8 @@ pub struct PeopleCounts {
 pub struct Identity {
     config: IdentityConfig,
     store: Store,
-    lockouts: Lockouts,
+    pub(crate) lockouts: Lockouts,
+    sealer: Option<Sealer>,
     hashing: password::Gate,
     pub(crate) oauth: OAuthState,
     pub(crate) fetcher: Arc<dyn ClientMetadataFetcher>,
@@ -259,7 +273,7 @@ fn wrong_credentials() -> Error {
     Error::new(ErrorKind::Unauthenticated, "the email or password is wrong")
 }
 
-fn locked(retry_after: Duration) -> Error {
+pub(crate) fn locked(retry_after: Duration) -> Error {
     Error::new(
         ErrorKind::RateLimited,
         format!(
@@ -288,11 +302,32 @@ impl Identity {
             config,
             store,
             lockouts: Lockouts::new(),
+            sealer: Sealer::ephemeral().ok(),
             hashing: password::Gate::default(),
             oauth: OAuthState::default(),
             fetcher: Arc::new(NoMetadataFetch),
             sso: None,
         }
+    }
+
+    /// Seals secrets identity reads back (authenticator apps, provider
+    /// client secrets) with `key`, which must stay the same across
+    /// restarts and replicas. Without it, a random key is used, and what
+    /// it sealed is lost on restart.
+    ///
+    /// # Errors
+    ///
+    /// [`ErrorKind::Internal`] if the key is refused.
+    pub fn with_sealing_key(mut self, key: &[u8; 32]) -> Result<Self, Error> {
+        self.sealer = Some(Sealer::new(key)?);
+        Ok(self)
+    }
+
+    /// The sealer for secrets identity reads back.
+    pub(crate) fn sealer(&self) -> Result<&Sealer, Error> {
+        self.sealer
+            .as_ref()
+            .ok_or_else(|| Error::new(ErrorKind::Internal, "no identity key"))
     }
 
     /// Turns on single sign-on with one `OpenID Connect` provider.
@@ -394,6 +429,7 @@ impl Identity {
                 disabled: false,
                 created_at: Timestamp::now(),
                 sso: vec![link.clone()],
+                factors: SecondFactors::default(),
             };
             let _ = s.users.insert(user.id, user.clone());
             Ok((user, true))
@@ -495,6 +531,7 @@ impl Identity {
             disabled: false,
             created_at: Timestamp::now(),
             sso: Vec::new(),
+            factors: SecondFactors::default(),
         };
         self.store.write(|s| {
             if s.user_by_email(&user.email).is_some() {
@@ -654,7 +691,33 @@ impl Identity {
         })?
     }
 
-    /// Signs in with email and password and opens a session.
+    /// Signs in with email and password and opens a session. Accounts
+    /// with a second factor, or that the workspace requires one of, are
+    /// refused: they sign in with [`Identity::sign_in_password`].
+    ///
+    /// # Errors
+    ///
+    /// As [`Identity::sign_in_password`], plus
+    /// [`ErrorKind::PermissionDenied`] when a second step is needed.
+    pub fn sign_in(
+        &self,
+        email: &str,
+        password: &str,
+        ip: Option<IpAddr>,
+        user_agent: Option<&str>,
+    ) -> Result<NewSession, Error> {
+        match self.sign_in_password(email, password, ip, user_agent)? {
+            SignIn::Session(session) => Ok(session),
+            SignIn::Verify(_) | SignIn::Enrol(_) => Err(Error::new(
+                ErrorKind::PermissionDenied,
+                "this account needs two-step verification; sign in from the web app",
+            )),
+        }
+    }
+
+    /// Checks an email and password. The answer is a session, or a ticket
+    /// for the second step when the account has a second factor or the
+    /// workspace requires one (D290).
     ///
     /// Failed attempts lock out the address and the client IP with
     /// exponential back-off (after 5 and 20 free failures).
@@ -664,13 +727,25 @@ impl Identity {
     /// [`ErrorKind::RateLimited`] while locked out,
     /// [`ErrorKind::Unauthenticated`] for a wrong address or password, and
     /// [`ErrorKind::PermissionDenied`] for a disabled account.
-    pub fn sign_in(
+    pub fn sign_in_password(
         &self,
         email: &str,
         password: &str,
         ip: Option<IpAddr>,
         user_agent: Option<&str>,
-    ) -> Result<NewSession, Error> {
+    ) -> Result<SignIn, Error> {
+        let user = self.check_password(email, password, ip)?;
+        self.after_password(&user, user_agent)
+    }
+
+    /// Checks an email and password against the lockout and the stored
+    /// hash, and returns the account.
+    fn check_password(
+        &self,
+        email: &str,
+        password: &str,
+        ip: Option<IpAddr>,
+    ) -> Result<User, Error> {
         let now = Instant::now();
         let email = email.trim().to_lowercase();
         if let Some(ip) = ip {
@@ -705,7 +780,10 @@ impl Identity {
             tracing::info!(event = "identity.sign_in_failed", "sign-in failed");
             return Err(wrong_credentials());
         };
-        self.lockouts.succeed(&self.store, Key::Email(&email));
+        // With a second factor, the lockout resets only after it.
+        if !user.factors.any() {
+            self.lockouts.succeed(&self.store, Key::Email(&email));
+        }
         if user.disabled {
             return Err(Error::new(
                 ErrorKind::PermissionDenied,
@@ -725,13 +803,8 @@ impl Identity {
                 }
             })?;
         }
-        tracing::info!(event = "identity.signed_in", user = %user.id, "signed in");
-        self.open_session(
-            user.id,
-            SessionMethod::Password,
-            self.config.session_lifetime,
-            user_agent,
-        )
+        tracing::info!(event = "identity.password_checked", user = %user.id, "password accepted");
+        Ok(user)
     }
 
     /// Opens a session for a user who has just proved their identity
@@ -819,16 +892,21 @@ impl Identity {
     }
 
     /// Proves the user's identity again, so admin actions that need a
-    /// recent sign-in are allowed.
+    /// recent sign-in are allowed. People with a second factor prove it
+    /// too: a code, or a passkey answering the ceremony of `ticket`
+    /// ([`Identity::reauth_passkey_options`]).
     ///
     /// # Errors
     ///
     /// As [`Identity::sign_in`], plus [`ErrorKind::Unauthenticated`] for an
-    /// unknown session.
+    /// unknown session, and `second factor required` when a factor is
+    /// needed and none was given.
     pub fn reauthenticate(
         &self,
         cookie: &str,
         password: &str,
+        proof: &Proof,
+        ticket: Option<&str>,
         ip: Option<IpAddr>,
     ) -> Result<(), Error> {
         let hash = secret::hash(cookie);
@@ -844,11 +922,11 @@ impl Identity {
                 "sign in to continue",
             ));
         };
-        // The same checks and lockout as signing in; the new session is
-        // discarded and the existing one refreshed instead.
-        let fresh = self.sign_in(&email, password, ip, None)?;
+        // The same checks and lockout as signing in, without a new session.
+        let user = self.check_password(&email, password, ip)?;
+        self.reauth_factor(&user, &session_id, proof, ticket, ip)?;
+        self.lockouts.succeed(&self.store, Key::Email(&email));
         self.store.write(|s| {
-            let _ = s.sessions.remove(&fresh.session.id);
             if let Some(session) = s.sessions.get_mut(&session_id) {
                 session.authenticated_at = Timestamp::now();
             }
@@ -895,6 +973,49 @@ impl Identity {
             s.grants.retain(|_, g| g.user != user);
             let grants = &s.grants;
             s.access_tokens.retain(|_, t| grants.contains_key(&t.grant));
+        })
+    }
+
+    /// Ends every session of a user ("sign out everywhere"). Tokens and
+    /// connected apps keep working; blocking the account ends those too.
+    ///
+    /// # Errors
+    ///
+    /// [`ErrorKind::NotFound`] for an unknown user.
+    pub fn sign_out_everywhere(&self, user: UserId) -> Result<usize, Error> {
+        let ended = self.store.write(|s| {
+            if !s.users.contains_key(&user) {
+                return None;
+            }
+            let before = s.sessions.len();
+            s.sessions.retain(|_, x| x.user != user);
+            s.mfa_challenges.retain(|_, c| c.user != user);
+            Some(before - s.sessions.len())
+        })?;
+        let ended = ended.ok_or_else(|| Error::new(ErrorKind::NotFound, "user not found"))?;
+        tracing::info!(event = "identity.signed_out_everywhere", user = %user, sessions = ended, "every session ended");
+        Ok(ended)
+    }
+
+    /// The workspace's second-factor policy.
+    #[must_use]
+    pub fn second_factor_policy(&self) -> SecondFactorPolicy {
+        self.store.read(|s| s.sign_in.second_factor)
+    }
+
+    /// Sets who must use a second factor with a password. People it newly
+    /// covers add one at their next sign-in; their sessions keep working.
+    ///
+    /// # Errors
+    ///
+    /// [`ErrorKind::Unavailable`] if the store cannot be written.
+    pub fn set_second_factor_policy(
+        &self,
+        policy: SecondFactorPolicy,
+    ) -> Result<SecondFactorPolicy, Error> {
+        self.store.write(|s| {
+            s.sign_in.second_factor = policy;
+            policy
         })
     }
 
@@ -1286,6 +1407,7 @@ impl Identity {
                 disabled: false,
                 created_at: Timestamp::now(),
                 sso: Vec::new(),
+                factors: SecondFactors::default(),
             };
             let id = user.id;
             let _ = s.users.insert(id, user);

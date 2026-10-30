@@ -6,12 +6,14 @@ import { BrowserRouter, Route, Routes } from "react-router";
 
 import type { AccountApi } from "./account/api";
 import { ApiTokensPage } from "./account/api-tokens-page";
+import { SecurityPage } from "./account/security-page";
 import type { AdminConsoleApi } from "./admin/console/api";
 import { AuditPage } from "./admin/console/audit-page";
 import { BackupsPage } from "./admin/console/backups-page";
 import { AdminConsoleProvider } from "./admin/console/context";
 import { GroupsPage } from "./admin/console/groups-page";
 import { SettingsPage } from "./admin/console/settings-page";
+import { SignInPage } from "./admin/console/sign-in-page";
 import { SpacesPage } from "./admin/console/spaces-page";
 import { AdminTokensPage } from "./admin/console/tokens-page";
 import { UsagePage } from "./admin/console/usage-page";
@@ -119,6 +121,7 @@ export function AppRoutes() {
         <Route path="settings/appearance" element={<AppearancePage />} />
         <Route path="settings/private-spaces" element={<PrivateSpacesView />} />
         <Route path="settings/api-tokens" element={<ApiTokensPage />} />
+        <Route path="settings/security" element={<SecurityPage />} />
         <Route path="new" element={<NewPageView />} />
         <Route path="my-work" element={<MyWorkPage />} />
         <Route path="issues" element={<IssuesPage />} />
@@ -155,6 +158,7 @@ export function AppRoutes() {
         <Route path="admin/spaces" element={<SpacesPage />} />
         <Route path="admin/groups" element={<GroupsPage />} />
         <Route path="admin/tokens" element={<AdminTokensPage />} />
+        <Route path="admin/sign-in" element={<SignInPage />} />
         <Route path="*" element={<NotFoundView />} />
       </Route>
     </Routes>
