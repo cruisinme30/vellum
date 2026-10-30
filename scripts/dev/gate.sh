@@ -619,7 +619,9 @@ stage_key[clamav]="$(fingerprint clamav '^deploy/' '')"
 # CodeQL scans the workflows and every JavaScript and TypeScript file.
 want codeql && stage_key[codeql]="$(fingerprint codeql . '\.(rs|md)$' \
   "$("$(codeql_cli)" version --format=terse 2>/dev/null || echo none)")"
-[[ -d "${pass_dir}" ]] && find "${pass_dir}" -type f -mtime +30 -delete 2>/dev/null || true
+if [[ -d "${pass_dir}" ]]; then
+  find "${pass_dir}" -type f -mtime +30 -delete 2>/dev/null || true
+fi
 
 # The browsers need the website built from this commit, so if any browser
 # runs, the website stage runs too; if none does, nothing needs installing.
