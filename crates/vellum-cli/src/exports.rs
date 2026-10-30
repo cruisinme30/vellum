@@ -61,7 +61,7 @@ use vellum_jobs::export::CollectionsEngine;
 use vellum_kernel::{Actor, BookId, Error, ErrorKind, ObjectId, SpaceId};
 use vellum_render::figure::{self, Figures};
 use vellum_render::theme::{BuiltinTheme, Theme};
-use vellum_security::upload::{self, Kind, Scanner, UploadError, UploadPolicy};
+use vellum_security::upload::{self, Kind, Scanner, UploadPolicy};
 
 use crate::uploads::{
     UploadRefusal, caller, encode, invalid, json, parse_page, refused, request_id, respond,
@@ -695,15 +695,16 @@ async fn import_upload<S: Scanner + 'static>(
             .may_import(&actor, space, parent)
             .await
             .map_err(Error::from)?;
-        let length = request
-            .headers()
-            .get(header::CONTENT_LENGTH)
-            .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.parse::<u64>().ok())
-            .ok_or_else(|| invalid("an import must say its Content-Length"))?;
-        if length > transfer.policy.max_bytes {
-            return Err(refused(&UploadError::TooLarge(transfer.policy.max_bytes)));
-        }
+        let Actor::User { user } = actor else {
+            return Err(invalid("imports need a signed-in person"));
+        };
+        // RT-045: the body is held in memory, so reserve it first.
+        let _reserved = crate::uploads::reserve_body(
+            &crate::uploads::Budget::shared(),
+            &request,
+            user,
+            transfer.policy.max_bytes,
+        )?;
         let bytes = axum::body::to_bytes(request.into_body(), usize::MAX)
             .await
             .map_err(|_| invalid("the upload did not arrive whole"))?;
@@ -714,7 +715,7 @@ async fn import_upload<S: Scanner + 'static>(
             space,
             parent,
             name,
-            bytes.to_vec(),
+            Vec::from(bytes),
         )
         .await?;
         Ok(json(StatusCode::CREATED, &view))

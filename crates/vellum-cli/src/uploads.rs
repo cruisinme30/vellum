@@ -18,13 +18,21 @@
 //! the scanner is down. An upload must say its `Content-Length`, which
 //! must be at most the policy's limit (`100 MiB` by default).
 //!
+//! Upload bodies are held in memory while they are checked, so every
+//! upload route first reserves its `Content-Length` from one [`Budget`]
+//! per process (RT-045): 512 `MiB` in flight by default
+//! (`VELLUM_UPLOAD_MEMORY_MIB`) and at most [`PER_USER`] uploads per
+//! person. Past either, the upload is refused with 503 before its body is
+//! read.
+//!
 //! A page links to its file as `vellum://attachment/{page_id}/{name}`,
 //! which a copy of the page re-points at the copy (D211). Downloads are
 //! served with the sniffed type, `nosniff` and a sandboxing CSP; anything
 //! but raster images and PDF is sent as a download, never shown inline.
 
+use std::collections::HashMap;
 use std::fmt::Write as _;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 
 use axum::Router;
 use axum::body::Body;
@@ -34,20 +42,158 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use bytes::Bytes;
 use serde::Serialize;
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use vellum_api::error::ErrorResponse;
 use vellum_contracts::{Principal, Scope};
 use vellum_drive::{Attachment, Drive};
-use vellum_kernel::{Actor, Error, ErrorKind, ObjectId, RequestId};
+use vellum_kernel::{Actor, Error, ErrorKind, ObjectId, RequestId, UserId};
 use vellum_security::upload::{self, Scanner, UploadError, UploadPolicy};
 
 /// Where the upload routes are mounted.
 pub const PREFIX: &str = "/api/v1/attachments";
+
+/// Variable setting how many `MiB` of upload bodies may be in memory.
+pub const MEMORY_VAR: &str = "VELLUM_UPLOAD_MEMORY_MIB";
+/// The default for [`MEMORY_VAR`].
+pub const DEFAULT_MEMORY_MIB: u32 = 512;
+/// Uploads one person may have in flight at once.
+pub const PER_USER: usize = 4;
+
+/// Upload bytes held in memory at once, across every upload route, and
+/// uploads per person (RT-045). Counted in `KiB`.
+#[derive(Debug)]
+pub struct Budget {
+    kib: Arc<Semaphore>,
+    total_kib: u32,
+    per_user: usize,
+    active: Mutex<HashMap<UserId, usize>>,
+}
+
+/// A reservation from the [`Budget`], returned when dropped.
+#[derive(Debug)]
+pub struct Reservation {
+    _kib: OwnedSemaphorePermit,
+    budget: Arc<Budget>,
+    user: UserId,
+}
+
+impl Drop for Reservation {
+    fn drop(&mut self) {
+        self.budget.release(self.user);
+    }
+}
+
+static SHARED: LazyLock<Arc<Budget>> = LazyLock::new(|| {
+    let mib = std::env::var(MEMORY_VAR)
+        .ok()
+        .and_then(|v| v.trim().parse::<u32>().ok())
+        .filter(|m| *m > 0)
+        .unwrap_or(DEFAULT_MEMORY_MIB);
+    Arc::new(Budget::new(mib, PER_USER))
+});
+
+impl Budget {
+    /// A budget of `mib` in flight and `per_user` uploads per person.
+    #[must_use]
+    pub fn new(mib: u32, per_user: usize) -> Self {
+        let total_kib = mib
+            .saturating_mul(1024)
+            .min(u32::try_from(Semaphore::MAX_PERMITS).unwrap_or(u32::MAX));
+        Self {
+            kib: Arc::new(Semaphore::new(total_kib as usize)),
+            total_kib,
+            per_user: per_user.max(1),
+            active: Mutex::new(HashMap::new()),
+        }
+    }
+
+    /// The process's budget, from [`MEMORY_VAR`].
+    #[must_use]
+    pub fn shared() -> Arc<Self> {
+        Arc::clone(&SHARED)
+    }
+
+    /// Reserves `length` bytes for `user`'s upload, without waiting.
+    ///
+    /// # Errors
+    ///
+    /// [`ErrorKind::Unavailable`] when the person has [`PER_USER`]
+    /// uploads in flight or the budget is spent.
+    pub fn reserve(self: &Arc<Self>, user: UserId, length: u64) -> Result<Reservation, Error> {
+        let busy = || {
+            Error::new(
+                ErrorKind::Unavailable,
+                "the server is busy with other uploads; try again in a moment",
+            )
+        };
+        let kib = u32::try_from(length.div_ceil(1024).max(1))
+            .unwrap_or(u32::MAX)
+            .min(self.total_kib.max(1));
+        {
+            let mut active = self.active.lock().unwrap_or_else(PoisonError::into_inner);
+            let n = active.entry(user).or_insert(0);
+            if *n >= self.per_user {
+                return Err(Error::new(
+                    ErrorKind::Unavailable,
+                    "you have too many uploads in progress; wait for one to finish",
+                ));
+            }
+            *n += 1;
+        }
+        let Ok(permit) = Arc::clone(&self.kib).try_acquire_many_owned(kib) else {
+            self.release(user);
+            return Err(busy());
+        };
+        Ok(Reservation {
+            _kib: permit,
+            budget: Arc::clone(self),
+            user,
+        })
+    }
+
+    /// Gives back one of `user`'s upload slots.
+    fn release(&self, user: UserId) {
+        let mut active = self.active.lock().unwrap_or_else(PoisonError::into_inner);
+        if let Some(n) = active.get_mut(&user) {
+            *n = n.saturating_sub(1);
+            if *n == 0 {
+                let _ = active.remove(&user);
+            }
+        }
+    }
+}
+
+/// The declared `Content-Length`, checked against `max`, with a
+/// reservation for it from `budget`.
+///
+/// # Errors
+///
+/// `InvalidInput` without a length, an upload refusal over `max`, and
+/// `Unavailable` when the budget is spent.
+pub fn reserve_body(
+    budget: &Arc<Budget>,
+    request: &Request,
+    user: UserId,
+    max: u64,
+) -> Result<Reservation, Error> {
+    let length = request
+        .headers()
+        .get(header::CONTENT_LENGTH)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.parse::<u64>().ok())
+        .ok_or_else(|| invalid("an upload must say its Content-Length"))?;
+    if length > max {
+        return Err(refused(&UploadError::TooLarge(max)));
+    }
+    budget.reserve(user, length)
+}
 
 /// What the routes share.
 struct Uploads<S> {
     drive: Arc<Drive>,
     scanner: Option<Arc<S>>,
     policy: UploadPolicy,
+    budget: Arc<Budget>,
 }
 
 /// The upload routes over `drive`, scanning with `scanner` when there is
@@ -57,10 +203,21 @@ pub fn router<S: Scanner + 'static>(
     scanner: Option<Arc<S>>,
     policy: UploadPolicy,
 ) -> Router {
+    router_with_budget(drive, scanner, policy, Budget::shared())
+}
+
+/// [`router`] with its own upload budget.
+pub fn router_with_budget<S: Scanner + 'static>(
+    drive: Arc<Drive>,
+    scanner: Option<Arc<S>>,
+    policy: UploadPolicy,
+    budget: Arc<Budget>,
+) -> Router {
     let state = Arc::new(Uploads {
         drive,
         scanner,
         policy,
+        budget,
     });
     Router::new()
         .route("/{page_id}", get(list::<S>).post(put::<S>))
@@ -147,17 +304,11 @@ async fn store<S: Scanner>(
         .attachment_page(&actor, page, true)
         .await
         .map_err(|e| at(e.into()))?;
-    let length = request
-        .headers()
-        .get(header::CONTENT_LENGTH)
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.parse::<u64>().ok())
-        .ok_or_else(|| at(invalid("an upload must say its Content-Length")))?;
-    if length > uploads.policy.max_bytes {
-        return Err(at(refused(&UploadError::TooLarge(
-            uploads.policy.max_bytes,
-        ))));
-    }
+    let Actor::User { user } = actor else {
+        return Err(at(invalid("uploads need a signed-in person")));
+    };
+    let _reserved =
+        reserve_body(&uploads.budget, &request, user, uploads.policy.max_bytes).map_err(at)?;
     let bytes = axum::body::to_bytes(request.into_body(), usize::MAX)
         .await
         .map_err(|_| at(invalid("the upload did not arrive whole")))?;
@@ -165,7 +316,7 @@ async fn store<S: Scanner>(
         uploads.policy,
         uploads.scanner.as_deref(),
         name,
-        bytes.to_vec(),
+        Vec::from(bytes),
     )
     .await
     .map_err(|e| at(refused(&e)))?;

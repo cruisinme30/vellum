@@ -313,3 +313,52 @@ async fn rights_are_checked_before_the_body() -> TestResult {
     );
     Ok(())
 }
+
+/// RT-045 (#550): uploads reserve their length from one budget before the
+/// body is read, and each person has a few at most in flight.
+#[tokio::test]
+async fn uploads_are_refused_when_the_memory_budget_is_spent() -> TestResult {
+    let w = World::new().await?;
+    let budget = Arc::new(uploads::Budget::new(1, 2));
+    let principal = Principal::user(
+        w.owner,
+        CredentialKind::Session,
+        ScopeSet::from_scopes(Scope::ALL.iter().copied()),
+        Timestamp::now(),
+    );
+    let app = Router::new()
+        .nest(
+            PREFIX,
+            uploads::router_with_budget(
+                Arc::clone(&w.drive),
+                Some(Arc::new(ok())),
+                UploadPolicy::default(),
+                Arc::clone(&budget),
+            ),
+        )
+        .layer(axum::Extension(principal));
+
+    // Someone else holds the whole MiB: the upload is refused before its
+    // body is read.
+    let other = budget.reserve(UserId::generate(), 1024 * 1024)?;
+    let (status, _, _) = call(&app, upload(&w.files(), "a.png", png())).await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    drop(other);
+
+    // With the budget back, it goes through, and its reservation is
+    // returned afterwards.
+    let (status, _, _) = call(&app, upload(&w.files(), "a.png", png())).await;
+    assert_eq!(status, StatusCode::CREATED);
+    let whole = budget.reserve(UserId::generate(), 1024 * 1024)?;
+    drop(whole);
+
+    // Two in flight for one person; the third waits its turn.
+    let one = budget.reserve(w.owner, 10)?;
+    let two = budget.reserve(w.owner, 10)?;
+    let (status, _, _) = call(&app, upload(&w.files(), "b.png", png())).await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    drop((one, two));
+    let (status, _, _) = call(&app, upload(&w.files(), "b.png", png())).await;
+    assert_eq!(status, StatusCode::CREATED);
+    Ok(())
+}

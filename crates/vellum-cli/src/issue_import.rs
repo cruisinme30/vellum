@@ -23,7 +23,7 @@ use std::sync::Arc;
 
 use axum::Router;
 use axum::extract::{Request, State};
-use axum::http::{StatusCode, header};
+use axum::http::StatusCode;
 use axum::response::Response;
 use axum::routing::post;
 use serde::Serialize;
@@ -33,7 +33,7 @@ use vellum_integrations::import::{self, Export, Member, Warning};
 use vellum_integrations::model::{IssueKey, WorkError};
 use vellum_integrations::work::steps;
 use vellum_kernel::{Actor, Error, ErrorKind};
-use vellum_security::upload::{self, Kind, Scanner, UploadError, UploadPolicy};
+use vellum_security::upload::{self, Kind, Scanner, UploadPolicy};
 use vellum_work::UserRef;
 use vellum_work_service::WorkService;
 
@@ -139,21 +139,24 @@ async fn import_issues<S: Scanner + 'static>(
             .cloned()
             .ok_or_else(|| invalid("say the file's name in the `name` query parameter"))?;
         let dry_run = query.get("dry_run").is_some_and(|v| v == "true");
-        let length = request
-            .headers()
-            .get(header::CONTENT_LENGTH)
-            .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.parse::<u64>().ok())
-            .ok_or_else(|| invalid("an import must say its Content-Length"))?;
-        if length > state.policy.max_bytes {
-            return Err(refused(&UploadError::TooLarge(state.policy.max_bytes)));
-        }
+        // RT-045: the body is held in memory, so reserve it first.
+        let _reserved = crate::uploads::reserve_body(
+            &crate::uploads::Budget::shared(),
+            &request,
+            user,
+            state.policy.max_bytes,
+        )?;
         let body = axum::body::to_bytes(request.into_body(), usize::MAX)
             .await
             .map_err(|_| invalid("the upload did not arrive whole"))?;
-        let cleaned = upload::check(state.policy, state.scanner.as_deref(), name, body.to_vec())
-            .await
-            .map_err(|e| refused(&e))?;
+        let cleaned = upload::check(
+            state.policy,
+            state.scanner.as_deref(),
+            name,
+            Vec::from(body),
+        )
+        .await
+        .map_err(|e| refused(&e))?;
         if cleaned.kind != Kind::Text {
             return Err(invalid("an issue export is a CSV or JSON text file"));
         }
