@@ -66,6 +66,25 @@ pub use api::{
 pub use index::{IndexFeed, IndexField, RowDocument};
 pub use state::{MAX_FILE_BYTES, MAX_ROWS_PER_COLLECTION, collection_dir};
 
+/// A check on a row's text before a collection writes it, such as secret
+/// scanning (R-SE-6, D301).
+///
+/// It sees every row created or changed through the service: the REST
+/// API, CSV imports and models through MCP.
+#[async_trait::async_trait]
+pub trait RowCheck: Send + Sync + fmt::Debug {
+    /// Checks `text`, the Markdown of a row about to be written by
+    /// `principal` at `path` (the collection folder for a new row). An
+    /// error refuses the whole write and is returned to the writer, so it
+    /// must not quote the text.
+    async fn check(
+        &self,
+        principal: &Principal,
+        path: &vellum_store::BlobPath,
+        text: &str,
+    ) -> Result<(), Error>;
+}
+
 /// Largest CSV file accepted for import, in bytes.
 pub const MAX_CSV_BYTES: usize = 16 * 1024 * 1024;
 
@@ -216,6 +235,7 @@ pub struct CollectionsService {
     /// prepared under the read lock can tell whether it is still current.
     writes: AtomicU64,
     index_feed: Option<Arc<dyn IndexFeed>>,
+    row_check: Option<Arc<dyn RowCheck>>,
 }
 
 impl fmt::Debug for CollectionsService {
@@ -237,6 +257,7 @@ impl CollectionsService {
             state: RwLock::new(None),
             writes: AtomicU64::new(0),
             index_feed: None,
+            row_check: None,
         }
     }
 
@@ -246,6 +267,30 @@ impl CollectionsService {
     pub fn with_index_feed(mut self, feed: Arc<dyn IndexFeed>) -> Self {
         self.index_feed = Some(feed);
         self
+    }
+
+    /// Checks every row's text before it is written (D301).
+    #[must_use]
+    pub fn with_row_check(mut self, check: Arc<dyn RowCheck>) -> Self {
+        self.row_check = Some(check);
+        self
+    }
+
+    /// Runs the row check on each row `changes` writes, as `state` now
+    /// holds it.
+    async fn check_rows(
+        &self,
+        principal: &Principal,
+        state: &State,
+        changes: &crate::workspace::Changeset,
+    ) -> Result<(), Error> {
+        let Some(check) = &self.row_check else {
+            return Ok(());
+        };
+        for (path, text) in state.row_texts(changes) {
+            check.check(principal, &path, &text).await?;
+        }
+        Ok(())
     }
 
     fn feed(&self, rows: Vec<DocId>) {
@@ -573,6 +618,11 @@ impl CollectionsService {
             };
             self.require_edit(state, &ctx.principal, id, true).await?;
             let changed = state.ws.apply(edit)?;
+            if let Err(e) = self.check_rows(&ctx.principal, state, &changed).await {
+                // The edit is applied in memory only: read the files again.
+                *guard = None;
+                return Err(e);
+            }
             let result = state.write(self.store.as_ref(), &changed).await;
             crate::telemetry::wrote(op, result.is_ok());
             if let Err(e) = result {
@@ -1025,6 +1075,10 @@ impl CollectionsService {
             if let Some(ws) = prepared.ws.take() {
                 state.ws = ws;
             }
+            if let Err(e) = self.check_rows(&ctx.principal, state, &changed).await {
+                *guard = None;
+                return Err(e);
+            }
             let result = state.write(self.store.as_ref(), &changed).await;
             crate::telemetry::wrote("import_csv", result.is_ok());
             if let Err(e) = result {
@@ -1101,6 +1155,15 @@ impl CollectionsService {
                 .collect(),
             deleted: std::collections::BTreeSet::new(),
         };
+        if !input.dry_run
+            && let Some(check) = &self.row_check
+        {
+            for row in collection.rows() {
+                check
+                    .check(&ctx.principal, &dir, &row.to_markdown(collection.schema()))
+                    .await?;
+            }
+        }
         if !input.dry_run {
             let span = tracing::info_span!("collections.create_from_csv", collection = %id);
             async {

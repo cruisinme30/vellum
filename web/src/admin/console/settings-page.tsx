@@ -16,10 +16,11 @@ import {
   type Versioned,
 } from "./api";
 import { AdminScreen } from "./context";
+import { SearchStatusPanel } from "./search-status";
 
 /** One editable setting: where it lives, and how the form shows it. */
 interface Field {
-  readonly group: "telemetry" | "observability" | "backups" | "security" | "appearance";
+  readonly group: "telemetry" | "observability" | "backups" | "security" | "search" | "appearance";
   readonly key: string;
   readonly kind: "number" | "text" | "toggle" | "color" | "select" | "lines";
   /** Smallest allowed number. */
@@ -62,6 +63,7 @@ const FIELDS: readonly Field[] = [
     optionLabels: "secret-scanning",
   },
   { group: "security", key: "secret_allow", kind: "lines" },
+  { group: "search", key: "hybrid", kind: "toggle" },
   { group: "observability", key: "slow_request_ms", kind: "number", min: 1 },
   { group: "observability", key: "trace_buffer_capacity", kind: "number", min: 1 },
   { group: "observability", key: "trace_buffer_mib", kind: "number", min: 1 },
@@ -70,7 +72,14 @@ const FIELDS: readonly Field[] = [
   { group: "telemetry", key: "interval_hours", kind: "number", min: 1 },
 ];
 
-const GROUPS = ["appearance", "backups", "security", "observability", "telemetry"] as const;
+const GROUPS = [
+  "appearance",
+  "backups",
+  "security",
+  "search",
+  "observability",
+  "telemetry",
+] as const;
 
 type Group = Readonly<Record<string, unknown>>;
 
@@ -260,6 +269,9 @@ function SettingsForm({
           {FIELDS.filter((field) => field.group === group).map((field) => (
             <FieldInput key={field.key} settings={current.settings} field={field} />
           ))}
+          {group === "search" && api.searchStatus && (
+            <SearchStatusPanel load={api.searchStatus} refreshKey={current.version} />
+          )}
         </Fieldset>
       ))}
       <div className="vl-admin-actions">
@@ -310,7 +322,7 @@ function SettingsLoader({ api }: { readonly api: AdminConsoleApi }) {
   );
 }
 
-/** Admin → Settings: appearance, backups, sessions, observability and telemetry. */
+/** Admin → Settings: appearance, backups, sessions, search, observability and telemetry. */
 export function SettingsPage() {
   const t = useT();
   return (

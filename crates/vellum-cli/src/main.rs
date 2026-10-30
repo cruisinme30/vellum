@@ -58,6 +58,7 @@ mod published;
 mod reindex;
 mod reminders;
 mod search;
+mod search_admin;
 mod secrets;
 #[cfg(test)]
 mod secrets_tests;

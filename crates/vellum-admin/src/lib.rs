@@ -35,5 +35,5 @@ pub use audit::{
 pub use service::{AdminPaths, AdminService, Caller};
 pub use settings::{
     AdminSettings, AppearanceSettings, EXPORT_THEMES, FileSettingsStore, MemorySettingsStore,
-    SITE_THEMES, SecretScanning, SettingsStore,
+    SITE_THEMES, SearchSettings, SecretScanning, SettingsStore,
 };

@@ -52,7 +52,10 @@ pub use api::{SearchApi, TitlesPage};
 pub use backend::{Change, IndexEntry, Scope, SearchBackend};
 pub use drive_feed::{DriveFeed, DriveSource, FeedConfig, Start};
 pub use error::{Result, SearchError};
-pub use indexer::{DocumentSource, Indexer, IndexerConfig, rebuild, reindex};
+pub use indexer::{
+    DocumentSource, Indexer, IndexerConfig, Progress, rebuild, rebuild_with_progress, reindex,
+    reindex_with_progress,
+};
 pub use meili_index::{MeiliBackend, MeiliConfig};
 pub use model::{
     BlockKind, DocKind, Filters, Fragment, IndexBlock, IndexDocument, SearchHit, SearchPage,

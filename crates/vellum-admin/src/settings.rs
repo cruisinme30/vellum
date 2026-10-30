@@ -168,6 +168,23 @@ pub enum SecretScanning {
 /// Most entries in the secret-scanning allow-list.
 pub const MAX_SECRET_ALLOW: usize = 100;
 
+/// Search (R-AI-7, R-SR-5; ADR 0011 D300).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(default, deny_unknown_fields)]
+pub struct SearchSettings {
+    /// Ranks results with the local embedding model as well as keywords,
+    /// when the server has one (`VELLUM_EMBEDDINGS`). Off, search is
+    /// keyword-only; pages keep getting vectors, so turning it on again
+    /// takes effect at once.
+    pub hybrid: bool,
+}
+
+impl Default for SearchSettings {
+    fn default() -> Self {
+        Self { hybrid: true }
+    }
+}
+
 /// The organisation's look (R-TH-1, R-TH-4; ADR 0007 D245).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
@@ -238,6 +255,8 @@ pub struct AdminSettings {
     pub security: SecuritySettings,
     /// The organisation's seed colour and export and site themes.
     pub appearance: AppearanceSettings,
+    /// Hybrid ranking.
+    pub search: SearchSettings,
 }
 
 impl Default for AdminSettings {
@@ -249,6 +268,7 @@ impl Default for AdminSettings {
             backups: BackupSettings::default(),
             security: SecuritySettings::default(),
             appearance: AppearanceSettings::default(),
+            search: SearchSettings::default(),
         }
     }
 }
@@ -559,6 +579,9 @@ mod tests {
         let s = AdminSettings::default();
         s.validate().unwrap();
         assert!(!s.telemetry.enabled);
+        assert!(s.search.hybrid, "hybrid ranking is on when a model is set");
+        let old: AdminSettings = serde_json::from_str(r#"{"organisation":"Northstar"}"#).unwrap();
+        assert!(old.search.hybrid, "settings saved before D300 keep it on");
         assert_ne!(new_install_id(), new_install_id());
     }
 

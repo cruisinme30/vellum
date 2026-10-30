@@ -173,8 +173,11 @@ pub trait Access: Send + Sync + fmt::Debug {
 }
 
 /// A check on page text before it is written, such as secret scanning
-/// (R-SE-6). It sees every page the drive creates or saves, whoever
-/// writes it: the REST API, live editing, models and imports.
+/// (R-SE-6).
+///
+/// It sees every page the drive creates or saves, whoever writes it: the
+/// REST API, live editing, models and imports, and every UTF-8 text file
+/// attached to a page (D301).
 #[async_trait]
 pub trait ContentCheck: Send + Sync + fmt::Debug {
     /// Checks `text`, about to be written by `actor` to the page at `path`

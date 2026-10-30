@@ -11,7 +11,7 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D103, D104, D105, D296
+- Decisions: D103, D104, D105, D296, D301
 - Issues: [#60](https://github.com/cruisinme30/vellum/issues/60) (outbound fetches), [#61](https://github.com/cruisinme30/vellum/issues/61) (uploads),
   [#62](https://github.com/cruisinme30/vellum/issues/62) (secret scanning), [#527](https://github.com/cruisinme30/vellum/issues/527) (secret scanning on save), [#186](https://github.com/cruisinme30/vellum/issues/186) (E2E private spaces)
 - Pull requests: #221
@@ -99,6 +99,17 @@ one place, and services call it.
 - The allow-list takes a rule id (`jwt`) or text the secret contains.
   `security.scan_secrets` gives the editor its banner, with Remove and
   It's not a secret. Errors, audit records and logs never hold the value.
+
+### D301: text uploads and collection rows are scanned too
+
+- `Drive::attach` runs the same `ContentCheck` on any file whose bytes
+  are UTF-8 text, so `.txt`, `.csv`, `.env` or `.json` uploads meet the
+  policy; binary files are not scanned.
+- Collections get a `RowCheck` port, run on each row's Markdown before a
+  create, update, CSV import or create-from-CSV writes it. MCP
+  `upsert_rows` goes through these. A refusal is the same `422`.
+- A Playwright test (`web/e2e/secrets.spec.ts`) sees the banner, Remove,
+  It's not a secret and the block wording in every browser.
 
 ## Alternatives
 

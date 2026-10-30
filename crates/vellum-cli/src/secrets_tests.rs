@@ -1,9 +1,10 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-//! Secret scanning on save inside `vellum serve` (R-SE-6, D296): each
-//! write path under each policy, and the secret never leaving the server
-//! in errors, audit records or logs.
+//! Secret scanning on save inside `vellum serve` (R-SE-6, D296, D301):
+//! each write path under each policy (pages, models, text uploads and
+//! collection rows), and the secret never leaving the server in errors,
+//! audit records or logs.
 
 use axum::Router;
 use http::{StatusCode, header};
@@ -212,5 +213,63 @@ async fn secrets_warn_by_default_block_when_asked_and_never_leak() {
 
     let audit = audit_text(&app, &w).await;
     assert!(!audit.contains(&secret), "the audit log holds the secret");
+    services.shutdown().await;
+}
+
+/// Uploads `text` as the file `name` on the world's page.
+async fn upload(app: &Router, w: &World, name: &str, text: &str) -> Reply {
+    let request = request(
+        "POST",
+        &format!("/api/v1/attachments/{}?name={name}", w.page_id),
+    )
+    .header(header::ORIGIN, ORIGIN)
+    .header(header::COOKIE, &w.cookie)
+    .header("x-csrf-token", &w.csrf)
+    .header(header::CONTENT_TYPE, "text/plain")
+    .header(header::CONTENT_LENGTH, text.len())
+    .body(axum::body::Body::from(text.to_owned()))
+    .unwrap();
+    send(app, request).await
+}
+
+/// Asserts a typed refusal that names the kind, never the secret.
+fn refused(reply: &Reply, secret: &str) {
+    assert_eq!(
+        reply.status,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "{}",
+        reply.text
+    );
+    assert!(reply.text.contains("github-token"), "{}", reply.text);
+    assert!(!reply.text.contains(secret), "{}", reply.text);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn text_uploads_are_scanned_too() {
+    let dir = tempfile::tempdir().unwrap();
+    let (services, app) = server(dir.path()).await;
+    let w = world(&app).await;
+    let secret = token();
+    let note = format!("deploy bot: {secret}\n");
+
+    // Warn: a text file holding a secret is kept, and audited. (Rows are
+    // checked by vellum-collections' `RowCheck` tests and the guard's.)
+    let kept = upload(&app, &w, "keys.txt", &note).await;
+    assert_eq!(kept.status, StatusCode::CREATED, "{}", kept.text);
+    let audit = audit_text(&app, &w).await;
+    assert!(audit.contains("security.secret_found"), "{audit}");
+    assert!(audit.contains(".attachments/keys.txt"), "{audit}");
+    assert!(!audit.contains(&secret));
+
+    // Block: the upload is refused with the same typed 422 as a page.
+    set_policy(&app, &w, "block", &[]).await;
+    refused(&upload(&app, &w, "keys-2.txt", &note).await, &secret);
+    // Clean files still go through after a refusal.
+    assert_eq!(
+        upload(&app, &w, "notes.txt", "Freeze on Fridays.\n")
+            .await
+            .status,
+        StatusCode::CREATED
+    );
     services.shutdown().await;
 }

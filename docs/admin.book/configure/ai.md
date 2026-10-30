@@ -52,8 +52,16 @@ in a folder the server can read (for example `all-MiniLM-L6-v2` or
 
 A folder Vellum cannot use stops the server at start with the reason.
 Pages indexed before you turned embeddings on get them in the
-background; the server log shows the progress. On Postgres, run
-`vellum reindex` after switching to a different model.
+background. On Postgres, run `vellum reindex` after switching to a
+different model.
+
+**Admin → Settings → Search** shows the index, the model and whether it
+is in memory, and how far a rebuild or the background embedding has
+got, updating every few seconds while it runs. Its switch **Rank results
+by meaning as well as words** turns the model off for queries without a
+restart, for example to compare results. Pages keep getting vectors
+while it is off, so turning it back on takes effect at once. To free the
+model's memory for good, unset `VELLUM_EMBEDDINGS` and restart.
 
 ## Markdown for models and crawlers {#llms-txt}
 

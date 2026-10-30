@@ -52,7 +52,9 @@ debug output shows `<redacted>` in their place.
 ## Secrets in pages {#secret-scanning}
 
 Vellum scans every page as it is saved, whether a person, live editing
-or a model wrote it, for API keys, tokens and private keys. Set
+or a model wrote it, for API keys, tokens and private keys. Text files
+attached to pages (`.txt`, `.csv`, `.env` and the like) and collection
+rows, including CSV imports, are scanned the same way. Set
 what happens in **Admin → Settings → Security**:
 
 ::: facts
