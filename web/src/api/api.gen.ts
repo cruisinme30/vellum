@@ -2735,16 +2735,6 @@ export interface Directory {
 }
 
 /**
- * Groups matching a search, in the people picker's shape.
- */
-export interface DirectoryEntries {
-  /**
-   * Names starting with the query first, then by name.
-   */
-  entries: GroupsSearchDirectoryEntry[];
-}
-
-/**
  * Someone or a group that can be granted access.
  */
 export interface DirectoryEntry {
@@ -3959,28 +3949,6 @@ export interface GroupsCreateGroupView {
    * The display name, unique ignoring case.
    */
   name: string;
-}
-
-/**
- * What a people picker shows for one group.
- */
-export interface GroupsSearchDirectoryEntry {
-  /**
-   * Its description, or "Group".
-   */
-  detail: string;
-  /**
-   * Always `group`.
-   */
-  kind: string;
-  /**
-   * The group's name.
-   */
-  name: string;
-  /**
-   * What a grant names: `group:<ID>`.
-   */
-  principal: string;
 }
 
 /**
@@ -10757,7 +10725,7 @@ export interface Operations {
     method: "GET";
     path: "/v1/directory/groups";
     input: GroupSearch;
-    output: DirectoryEntries;
+    output: Directory;
   };
   /** Rename a group or change its description */
   "groups.update": {
