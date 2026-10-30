@@ -30,10 +30,12 @@ pub mod settings;
 pub mod usage;
 
 pub use audit::{
-    AuditActor, AuditLog, AuditRecord, FileAuditLog, MemoryAuditLog, NewAuditEvent, Outcome,
+    AuditActor, AuditLog, AuditRecord, FileAuditLog, MemoryAuditLog,
+    NewAuditEvent, Outcome,
 };
 pub use service::{AdminPaths, AdminService, Caller};
 pub use settings::{
-    AdminSettings, AppearanceSettings, EXPORT_THEMES, FileSettingsStore, MemorySettingsStore,
-    SITE_THEMES, SearchSettings, SecretScanning, SettingsStore,
+    AdminSettings, AppearanceSettings, EXPORT_THEMES, FileSettingsStore,
+    MemorySettingsStore, SITE_THEMES, SearchSettings, SecretScanning,
+    SettingsStore,
 };

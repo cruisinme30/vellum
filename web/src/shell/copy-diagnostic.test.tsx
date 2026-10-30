@@ -14,9 +14,14 @@ import { CopyDiagnostic } from "./copy-diagnostic";
 describe("CopyDiagnostic", () => {
   it("copies the request ID, route and time of the failure shown", async () => {
     const user = userEvent.setup();
-    const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
+    const writeText = vi
+      .spyOn(navigator.clipboard, "writeText")
+      .mockResolvedValue();
     const message = failureText(
-      new ApiError("internal", "Saving failed.", { requestId: "req-7", route: "POST /api/v1/x" }),
+      new ApiError("internal", "Saving failed.", {
+        requestId: "req-7",
+        route: "POST /api/v1/x",
+      }),
     );
     render(
       <I18nProvider>
@@ -36,14 +41,20 @@ describe("CopyDiagnostic", () => {
 
   it("shows the text to copy by hand when the clipboard is blocked", async () => {
     const user = userEvent.setup();
-    vi.spyOn(navigator.clipboard, "writeText").mockRejectedValue(new Error("denied"));
+    vi.spyOn(navigator.clipboard, "writeText").mockRejectedValue(
+      new Error("denied"),
+    );
     render(
       <I18nProvider>
         <CopyDiagnostic message="Something broke" />
       </I18nProvider>,
     );
     await user.click(screen.getByRole("button", { name: "Copy diagnostic" }));
-    const manual = await screen.findByRole("textbox", { name: "Diagnostic to copy" });
-    expect((manual as HTMLTextAreaElement).value).toContain("Message: Something broke");
+    const manual = await screen.findByRole("textbox", {
+      name: "Diagnostic to copy",
+    });
+    expect((manual as HTMLTextAreaElement).value).toContain(
+      "Message: Something broke",
+    );
   });
 });

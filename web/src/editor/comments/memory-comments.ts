@@ -120,7 +120,8 @@ export function createMemoryCommentsApi(
           else by.delete(author);
           return {
             ...c,
-            reactions: by.size === 0 ? others : [...others, { emoji, by: [...by] }],
+            reactions:
+              by.size === 0 ? others : [...others, { emoji, by: [...by] }],
           };
         }),
       });
@@ -130,7 +131,9 @@ export function createMemoryCommentsApi(
       const next = { ...thread };
       delete next.resolved_at;
       delete next.resolved_by;
-      return replace(resolved ? { ...next, resolved_at: now(), resolved_by: author } : next);
+      return replace(
+        resolved ? { ...next, resolved_at: now(), resolved_by: author } : next,
+      );
     },
     async assign(threadId, assignee) {
       const thread = await byThread(threadId);

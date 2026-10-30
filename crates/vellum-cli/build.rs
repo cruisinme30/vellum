@@ -15,16 +15,22 @@ use std::path::{Path, PathBuf};
 use std::{env, fs, io};
 
 const PLACEHOLDER: &str = "<!doctype html>\n<html lang=\"en\">\n<head>\n\
-<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
-<title>Vellum</title>\n</head>\n<body>\n<main>\n<h1>The web app is not built</h1>\n\
-<p>This <code>vellum</code> binary was compiled without the web app. Build it with \
-<code>pnpm --dir web build</code>, then build the binary again. The API is available \
-under <code>/api</code>.</p>\n</main>\n</body>\n</html>\n";
+<meta charset=\"utf-8\">\n\
+<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
+<title>Vellum</title>\n</head>\n<body>\n<main>\n\
+<h1>The web app is not built</h1>\n\
+<p>This <code>vellum</code> binary was compiled without the web app. Build it \
+with <code>pnpm --dir web build</code>, then build the binary again. The API \
+is available under <code>/api</code>.</p>\n</main>\n</body>\n</html>\n";
 
 /// Every file under `dir`, as (`/relative/path`, absolute path). Source
 /// maps are left out: they are most of the build's size, and the binary
 /// has a 40 MB budget.
-fn files(root: &Path, dir: &Path, out: &mut Vec<(String, PathBuf)>) -> io::Result<()> {
+fn files(
+    root: &Path,
+    dir: &Path,
+    out: &mut Vec<(String, PathBuf)>,
+) -> io::Result<()> {
     for entry in fs::read_dir(dir)? {
         let path = entry?.path();
         if path.is_dir() {
@@ -43,7 +49,8 @@ fn files(root: &Path, dir: &Path, out: &mut Vec<(String, PathBuf)>) -> io::Resul
 }
 
 fn main() -> io::Result<()> {
-    let manifest = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap_or_default());
+    let manifest =
+        PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap_or_default());
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap_or_default());
     let dist = env::var_os("VELLUM_WEB_DIST").map_or_else(
         || manifest.join("..").join("..").join("web").join("dist"),
@@ -68,7 +75,11 @@ fn main() -> io::Result<()> {
          pub static FILES: &[(&str, &[u8])] = &["
     );
     for (url, path) in &table {
-        let _ = writeln!(code, "    ({url:?}, include_bytes!({:?})),", path.display());
+        let _ = writeln!(
+            code,
+            "    ({url:?}, include_bytes!({:?})),",
+            path.display()
+        );
     }
     code.push_str("];\n");
     fs::write(out_dir.join("web_app.rs"), code)?;

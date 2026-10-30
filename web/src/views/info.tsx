@@ -42,7 +42,11 @@ export function HelpView() {
         {GUIDES.map((guide) => (
           <li key={guide}>
             <a
-              href={session === undefined ? `${base}${guide}/index.html` : `${base}${guide}/`}
+              href={
+                session === undefined
+                  ? `${base}${guide}/index.html`
+                  : `${base}${guide}/`
+              }
               target="_blank"
               rel="noreferrer"
             >
@@ -75,7 +79,13 @@ export function HelpView() {
 }
 
 /** A destination whose workstream has not landed yet. */
-export function PendingView({ title, body }: { readonly title: string; readonly body: string }) {
+export function PendingView({
+  title,
+  body,
+}: {
+  readonly title: string;
+  readonly body: string;
+}) {
   return (
     <div className="vl-view">
       <h1>{title}</h1>
@@ -140,7 +150,9 @@ function AccountSection() {
   };
   return (
     <section className="vl-view" aria-labelledby="account-heading">
-      <h2 id="account-heading">{t("auth-signed-in-as", { name: user.name, email: user.email })}</h2>
+      <h2 id="account-heading">
+        {t("auth-signed-in-as", { name: user.name, email: user.email })}
+      </h2>
       <nav aria-label={t("account-links")}>
         <ul className="vl-account-links">
           <li>
@@ -150,7 +162,9 @@ function AccountSection() {
             <Link to="/settings/api-tokens">{t("account-tokens-link")}</Link>
           </li>
           <li>
-            <Link to="/settings/notifications">{t("account-notifications-link")}</Link>
+            <Link to="/settings/notifications">
+              {t("account-notifications-link")}
+            </Link>
           </li>
         </ul>
       </nav>

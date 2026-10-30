@@ -17,8 +17,13 @@ export function ScrollRegion({
   readonly children: ReactNode;
 }) {
   return (
-    // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- see above
-    <div className="vl-admin-scroll" tabIndex={0} role="region" aria-label={label}>
+    <div
+      className="vl-admin-scroll"
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+      tabIndex={0}
+      role="region"
+      aria-label={label}
+    >
       {children}
     </div>
   );

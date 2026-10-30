@@ -23,7 +23,11 @@ pub const EVENT_HEADER: &str = "X-GitHub-Event";
 /// # Errors
 ///
 /// [`InboundError::Unauthenticated`] if it is missing or wrong.
-pub fn verify(secret: &[u8], signature: Option<&str>, body: &[u8]) -> Result<(), InboundError> {
+pub fn verify(
+    secret: &[u8],
+    signature: Option<&str>,
+    body: &[u8],
+) -> Result<(), InboundError> {
     let hex = signature
         .and_then(|s| s.trim().strip_prefix("sha256="))
         .ok_or(InboundError::Unauthenticated)?;
@@ -40,8 +44,12 @@ pub fn verify(secret: &[u8], signature: Option<&str>, body: &[u8]) -> Result<(),
 /// # Errors
 ///
 /// [`InboundError::Malformed`] if the JSON is invalid.
-pub fn parse(event: &str, body: &[u8]) -> Result<Option<GitEvent>, InboundError> {
-    let json: Value = serde_json::from_slice(body).map_err(InboundError::malformed)?;
+pub fn parse(
+    event: &str,
+    body: &[u8],
+) -> Result<Option<GitEvent>, InboundError> {
+    let json: Value =
+        serde_json::from_slice(body).map_err(InboundError::malformed)?;
     let repo = text(&json, "/repository/full_name").to_owned();
     if repo.is_empty() {
         return Err(InboundError::malformed("repository.full_name missing"));
@@ -76,16 +84,19 @@ pub fn parse(event: &str, body: &[u8]) -> Result<Option<GitEvent>, InboundError>
             pull_request(&json, repo, action).map(Some)
         }
         "pull_request_review" => {
-            if text(&json, "/action") != "submitted" && text(&json, "/action") != "dismissed" {
+            if text(&json, "/action") != "submitted"
+                && text(&json, "/action") != "dismissed"
+            {
                 return Ok(None);
             }
-            let action = match (text(&json, "/action"), text(&json, "/review/state")) {
-                ("submitted", "approved") => PullRequestAction::Approved,
-                ("submitted", "changes_requested") | ("dismissed", _) => {
-                    PullRequestAction::ChangesRequested
-                }
-                _ => return Ok(None),
-            };
+            let action =
+                match (text(&json, "/action"), text(&json, "/review/state")) {
+                    ("submitted", "approved") => PullRequestAction::Approved,
+                    ("submitted", "changes_requested") | ("dismissed", _) => {
+                        PullRequestAction::ChangesRequested
+                    }
+                    _ => return Ok(None),
+                };
             pull_request(&json, repo, action).map(Some)
         }
         _ => Ok(None),
@@ -110,7 +121,10 @@ fn parse_push(json: &Value, repo: String) -> Option<GitEvent> {
                 .map(|c| Commit {
                     sha: text(c, "/id").to_owned(),
                     message: text(c, "/message").to_owned(),
-                    url: c.get("url").and_then(Value::as_str).map(str::to_owned),
+                    url: c
+                        .get("url")
+                        .and_then(Value::as_str)
+                        .map(str::to_owned),
                 })
                 .collect()
         })
@@ -132,7 +146,9 @@ fn pull_request(
     let number = json
         .pointer("/pull_request/number")
         .and_then(Value::as_u64)
-        .ok_or_else(|| InboundError::malformed("pull_request.number missing"))?;
+        .ok_or_else(|| {
+            InboundError::malformed("pull_request.number missing")
+        })?;
     Ok(GitEvent::PullRequest {
         pr: PrRef {
             provider: Provider::GitHub,
@@ -182,11 +198,15 @@ mod tests {
     fn pr(action: &str, merged: bool, draft: bool) -> Value {
         json!({
             "action": action,
-            "repository": {"full_name": "northstar/api", "default_branch": "main"},
+            "repository": {
+                "full_name": "northstar/api",
+                "default_branch": "main"
+            },
             "pull_request": {
                 "number": 12, "title": "ENG-142 Fix login", "body": "Fixes ENG-143",
                 "html_url": "https://github.com/northstar/api/pull/12",
-                "draft": draft, "merged": merged, "head": {"ref": "ada/eng-142-fix-login"}
+                "draft": draft, "merged": merged, "head": {"ref": "ada/eng-142-\
+                    fix-login"}
             },
             "review": {"state": "approved"}
         })
@@ -195,7 +215,9 @@ mod tests {
     #[test]
     fn pull_request_actions() -> Result<(), InboundError> {
         let action =
-            |event: &str, value: Value| -> Result<Option<PullRequestAction>, InboundError> {
+            |event: &str,
+             value: Value|
+             -> Result<Option<PullRequestAction>, InboundError> {
                 Ok(parse(event, &body(&value))?.and_then(|e| match e {
                     GitEvent::PullRequest { action, .. } => Some(action),
                     GitEvent::Push { .. } => None,
@@ -241,8 +263,15 @@ mod tests {
     fn pushes() -> Result<(), InboundError> {
         let push = json!({
             "ref": "refs/heads/main",
-            "repository": {"full_name": "northstar/api", "default_branch": "main"},
-            "commits": [{"id": "abc", "message": "Fix crash\n\nCloses ENG-9", "url": "https://github.com/c/abc"}]
+            "repository": {
+                "full_name": "northstar/api",
+                "default_branch": "main"
+            },
+            "commits": [{
+                "id": "abc",
+                "message": "Fix crash\n\nCloses ENG-9",
+                "url": "https://github.com/c/abc"
+            }]
         });
         let Some(GitEvent::Push {
             branch,
@@ -257,7 +286,8 @@ mod tests {
         assert!(default_branch);
         assert_eq!(commits.len(), 1);
 
-        let tag = json!({"ref": "refs/tags/v1", "repository": {"full_name": "a/b"}});
+        let tag =
+            json!({"ref": "refs/tags/v1", "repository": {"full_name": "a/b"}});
         assert_eq!(parse("push", &body(&tag))?, None);
         assert!(parse("push", b"not json").is_err());
         assert!(parse("push", b"{}").is_err());

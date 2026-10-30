@@ -15,7 +15,8 @@ use vellum_drive::authz::{AuthzAccess, TreeSync};
 use vellum_drive::memory::MemoryIndex;
 use vellum_drive::sharing::sql::SqlShareLinks;
 use vellum_drive::sharing::{
-    Grant, Grantee, LinkPasswords, MemoryShareLinks, Opened, Role, ShareLinks, Sharing,
+    Grant, Grantee, LinkPasswords, MemoryShareLinks, Opened, Role, ShareLinks,
+    Sharing,
 };
 use vellum_drive::sql::SqlIndex;
 use vellum_drive::{Drive, DriveError, DriveIndex, DriveResult, SpaceKind};
@@ -55,7 +56,11 @@ async fn sharing_in_memory() -> TestResult {
 #[tokio::test]
 async fn sharing_all_in_sqlite() -> TestResult {
     let dir = tempfile::tempdir()?;
-    let db = Index::open(&IndexConfig::sqlite(dir.path().join("index.sqlite"), None)).await?;
+    let db = Index::open(&IndexConfig::sqlite(
+        dir.path().join("index.sqlite"),
+        None,
+    ))
+    .await?;
     let authz = Arc::new(Authz::new(SqlStore::new(db.clone())));
     sharing_with(
         Arc::new(SqlIndex::new(db.clone())),
@@ -85,15 +90,26 @@ async fn sharing_with<S: AuthzStore + TreeSync + 'static>(
     )
     .with_public_origin(Some("https://pages.northstar.dev/".into()))
     .with_clock(Arc::new(move || {
-        Timestamp::from_unix_ms(now.load(Ordering::SeqCst)).unwrap_or_else(|_| Timestamp::now())
+        Timestamp::from_unix_ms(now.load(Ordering::SeqCst))
+            .unwrap_or_else(|_| Timestamp::now())
     }));
     assert_eq!(sharing.public_origin(), Some("https://pages.northstar.dev"));
-    let at = |offset: i64| Timestamp::from_unix_ms(clock.load(Ordering::SeqCst) + offset);
+    let at = |offset: i64| {
+        Timestamp::from_unix_ms(clock.load(Ordering::SeqCst) + offset)
+    };
 
-    let (alice_id, bob_id, carol_id) = (UserId::generate(), UserId::generate(), UserId::generate());
-    let (alice, bob) = (Actor::User { user: alice_id }, Actor::User { user: bob_id });
+    let (alice_id, bob_id, carol_id) =
+        (UserId::generate(), UserId::generate(), UserId::generate());
+    let (alice, bob) =
+        (Actor::User { user: alice_id }, Actor::User { user: bob_id });
     let eng = drive
-        .create_space(&alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .create_space(
+            &alice,
+            SpaceKind::SharedDrive,
+            "eng",
+            "Engineering",
+            None,
+        )
         .await?;
     let folder = drive.create_folder(&alice, eng.id, None, "Plans").await?;
     let page = drive
@@ -133,7 +149,8 @@ async fn sharing_with<S: AuthzStore + TreeSync + 'static>(
     assert!(
         grants
             .iter()
-            .any(|g| g.grantee == Grantee::User(bob_id) && g.role == Role::Editor)
+            .any(|g| g.grantee == Grantee::User(bob_id)
+                && g.role == Role::Editor)
     );
 
     // A new role replaces the old one rather than stacking.
@@ -191,7 +208,10 @@ async fn sharing_with<S: AuthzStore + TreeSync + 'static>(
     assert_eq!(link.token.expose().len(), ShareToken::LEN);
     let record = links.get(link.info.id).await?.ok_or("no record")?;
     assert_eq!(record.token_hash, link.token.hash());
-    assert!(matches!(sharing.open(&link.token, None).await?, Opened::Page(n) if n.id == page.id));
+    assert!(matches!(
+        sharing.open(&link.token, None).await?,
+        Opened::Page(n) if n.id == page.id
+    ));
 
     // A made-up token, or one a character off, finds nothing.
     let made_up = ShareToken::generate()?;
@@ -324,13 +344,20 @@ async fn link_passwords_lock_after_repeated_failures() -> TestResult {
     )
     .with_public_origin(Some("https://pages.northstar.dev".into()))
     .with_clock(Arc::new(move || {
-        Timestamp::from_unix_ms(now.load(Ordering::SeqCst)).unwrap_or_else(|_| Timestamp::now())
+        Timestamp::from_unix_ms(now.load(Ordering::SeqCst))
+            .unwrap_or_else(|_| Timestamp::now())
     }));
     let alice = Actor::User {
         user: UserId::generate(),
     };
     let eng = drive
-        .create_space(&alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .create_space(
+            &alice,
+            SpaceKind::SharedDrive,
+            "eng",
+            "Engineering",
+            None,
+        )
         .await?;
     let page = drive
         .create_page(&alice, eng.id, None, "Roadmap", "Ship it.")

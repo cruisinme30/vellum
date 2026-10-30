@@ -15,7 +15,8 @@ use std::time::Duration;
 use support::{Editor, TestCodec, add_paragraph, fixture, room, type_into};
 use vellum_collab::protocol::{self, MSG_DONE};
 use vellum_collab::{
-    Access, CloseReason, CollabConfig, MarkdownCodec as _, Outbound, VersionReason,
+    Access, CloseReason, CollabConfig, MarkdownCodec as _, Outbound,
+    VersionReason,
 };
 use yrs::sync::awareness::{AwarenessUpdate, AwarenessUpdateEntry};
 use yrs::sync::{Message, SyncMessage};
@@ -275,8 +276,10 @@ async fn editors_typing_through_a_drain_lose_nothing_on_the_new_node() {
             // Typing goes on: sent while the room is open, kept locally after.
             let before = editor.doc.transact().state_vector();
             add_paragraph(&editor.doc, &line(who, n));
-            let update = editor.doc.transact().encode_state_as_update_v1(&before);
-            let frame = protocol::encode(&[Message::Sync(SyncMessage::Update(update))]);
+            let update =
+                editor.doc.transact().encode_state_as_update_v1(&before);
+            let frame =
+                protocol::encode(&[Message::Sync(SyncMessage::Update(update))]);
             let _ = editor.connection.send(frame).await;
         }
     }
@@ -301,7 +304,10 @@ async fn editors_typing_through_a_drain_lose_nothing_on_the_new_node() {
     let mut rejoined = Vec::new();
     for editor in editors {
         let doc = editor.doc.clone();
-        rejoined.push(Editor::join_with(&node2, key, Access::Write, editor.user, doc).await);
+        rejoined.push(
+            Editor::join_with(&node2, key, Access::Write, editor.user, doc)
+                .await,
+        );
     }
     let complete = |e: &Editor| {
         let text = e.markdown();
@@ -336,7 +342,8 @@ async fn edits_not_yet_written_replay_from_the_editor_after_a_crash() {
     // The node dies; Alice reconnects to another one with her document.
     let node2 = f.second_node(quick());
     let doc = alice.doc.clone();
-    let mut alice2 = Editor::join_with(&node2, key, Access::Write, alice.user, doc).await;
+    let mut alice2 =
+        Editor::join_with(&node2, key, Access::Write, alice.user, doc).await;
     alice2.pump().await;
     let mut bob = Editor::join(&node2, key, Access::Write).await;
     assert!(
@@ -542,6 +549,7 @@ fn the_test_codec_is_canonical() {
     let tree = TestCodec.parse_markdown(md).unwrap();
     assert_eq!(TestCodec.to_markdown(&tree).unwrap(), md);
     let state = yrs::Doc::new().transact().state_vector();
-    let frame = protocol::encode(&[Message::Sync(SyncMessage::SyncStep1(state))]);
+    let frame =
+        protocol::encode(&[Message::Sync(SyncMessage::SyncStep1(state))]);
     assert!(!frame.is_empty());
 }

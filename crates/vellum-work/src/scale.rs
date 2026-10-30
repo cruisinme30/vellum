@@ -109,13 +109,25 @@ impl Serialize for Priority {
 impl<'de> Deserialize<'de> for Priority {
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         let n = u8::deserialize(d)?;
-        Self::from_number(n)
-            .ok_or_else(|| serde::de::Error::custom(format!("priority {n} is not 0 to 4")))
+        Self::from_number(n).ok_or_else(|| {
+            serde::de::Error::custom(format!("priority {n} is not 0 to 4"))
+        })
     }
 }
 
 /// T-shirt sizes for the t-shirt scale.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+)]
 pub enum Size {
     /// Extra small (1 point).
     XS,
@@ -197,7 +209,9 @@ impl fmt::Display for Estimate {
 }
 
 /// A team's estimate scale.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize,
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum EstimateScale {
     /// 1, 2, 3, 4, 5.
@@ -226,7 +240,8 @@ impl EstimateScale {
     /// The values on the scale, smallest first.
     #[must_use]
     pub fn values(self) -> Vec<Estimate> {
-        let points = |v: &[u32]| v.iter().copied().map(Estimate::Points).collect();
+        let points =
+            |v: &[u32]| v.iter().copied().map(Estimate::Points).collect();
         match self {
             Self::Linear => points(&[1, 2, 3, 4, 5]),
             Self::Fibonacci => points(&[1, 2, 3, 5, 8]),
@@ -241,8 +256,14 @@ impl EstimateScale {
     /// # Errors
     ///
     /// Returns [`WorkError::InvalidEstimate`] otherwise.
-    pub fn check(self, estimate: Estimate, allow_zero: bool) -> Result<(), WorkError> {
-        let zero_ok = allow_zero && estimate == Estimate::Points(0) && self != Self::TShirt;
+    pub fn check(
+        self,
+        estimate: Estimate,
+        allow_zero: bool,
+    ) -> Result<(), WorkError> {
+        let zero_ok = allow_zero
+            && estimate == Estimate::Points(0)
+            && self != Self::TShirt;
         if zero_ok || self.values().contains(&estimate) {
             Ok(())
         } else {
@@ -299,8 +320,11 @@ mod tests {
 
     #[test]
     fn estimates_serialise_as_numbers_or_sizes() {
-        let yaml =
-            serde_saphyr::to_string(&vec![Estimate::Points(3), Estimate::Size(Size::L)]).unwrap();
+        let yaml = serde_saphyr::to_string(&vec![
+            Estimate::Points(3),
+            Estimate::Size(Size::L),
+        ])
+        .unwrap();
         assert_eq!(yaml, "- 3\n- L\n");
         let back: Vec<Estimate> = serde_saphyr::from_str(&yaml).unwrap();
         assert_eq!(back, [Estimate::Points(3), Estimate::Size(Size::L)]);

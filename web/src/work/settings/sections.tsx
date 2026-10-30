@@ -92,7 +92,12 @@ function NumberField({
         onChange={(event) => {
           setRaw(event.target.value);
           const next = Number(event.target.value);
-          if (event.target.value !== "" && Number.isInteger(next) && next >= min && next <= max) {
+          if (
+            event.target.value !== "" &&
+            Number.isInteger(next) &&
+            next >= min &&
+            next <= max
+          ) {
             onChange(next);
           }
         }}
@@ -160,7 +165,13 @@ function Choice({
 }
 
 /** Name, time zone, lead and members. */
-export function GeneralSection({ file, edit }: { readonly file: TeamFile; readonly edit: Edit }) {
+export function GeneralSection({
+  file,
+  edit,
+}: {
+  readonly file: TeamFile;
+  readonly edit: Edit;
+}) {
   const t = useT();
   return (
     <section className="vl-settings-section" aria-labelledby="settings-general">
@@ -185,7 +196,9 @@ export function GeneralSection({ file, edit }: { readonly file: TeamFile; readon
         value={file.lead ?? ""}
         onChange={(lead) => {
           const handle = lead.trim().replace(/^@/, "");
-          edit((f) => (handle === "" ? without(f, "lead") : { ...f, lead: handle }));
+          edit((f) =>
+            handle === "" ? without(f, "lead") : { ...f, lead: handle },
+          );
         }}
       />
       <Text
@@ -201,16 +214,28 @@ export function GeneralSection({ file, edit }: { readonly file: TeamFile; readon
 }
 
 /** The estimate scale. */
-export function EstimatesSection({ file, edit }: { readonly file: TeamFile; readonly edit: Edit }) {
+export function EstimatesSection({
+  file,
+  edit,
+}: {
+  readonly file: TeamFile;
+  readonly edit: Edit;
+}) {
   const t = useT();
   const estimates = file.estimates ?? {};
   return (
-    <section className="vl-settings-section" aria-labelledby="settings-estimates">
+    <section
+      className="vl-settings-section"
+      aria-labelledby="settings-estimates"
+    >
       <h2 id="settings-estimates">{t("team-settings-estimates")}</h2>
       <Choice
         label={t("team-settings-scale")}
         value={estimates.scale ?? "fibonacci"}
-        options={SCALES.map((scale) => [scale, t(`team-settings-scale-${scale}`)])}
+        options={SCALES.map((scale) => [
+          scale,
+          t(`team-settings-scale-${scale}`),
+        ])}
         onChange={(scale) => {
           edit((f) => ({ ...f, estimates: { ...f.estimates, scale } }));
         }}
@@ -228,7 +253,10 @@ export function EstimatesSection({ file, edit }: { readonly file: TeamFile; read
         min={0}
         max={100}
         onChange={(unestimated_points) => {
-          edit((f) => ({ ...f, estimates: { ...f.estimates, unestimated_points } }));
+          edit((f) => ({
+            ...f,
+            estimates: { ...f.estimates, unestimated_points },
+          }));
         }}
       />
     </section>
@@ -246,11 +274,23 @@ const CYCLE_DEFAULTS: CycleSettings = {
 };
 
 /** Cycles: on or off, length, start day, cooldown and what joins them. */
-export function CyclesSection({ file, edit }: { readonly file: TeamFile; readonly edit: Edit }) {
+export function CyclesSection({
+  file,
+  edit,
+}: {
+  readonly file: TeamFile;
+  readonly edit: Edit;
+}) {
   const t = useT();
-  const cycles = file.cycles === undefined ? undefined : { ...CYCLE_DEFAULTS, ...file.cycles };
+  const cycles =
+    file.cycles === undefined
+      ? undefined
+      : { ...CYCLE_DEFAULTS, ...file.cycles };
   const set = (change: Partial<CycleSettings>) => {
-    edit((f) => ({ ...f, cycles: { ...CYCLE_DEFAULTS, ...f.cycles, ...change } }));
+    edit((f) => ({
+      ...f,
+      cycles: { ...CYCLE_DEFAULTS, ...f.cycles, ...change },
+    }));
   };
   return (
     <section className="vl-settings-section" aria-labelledby="settings-cycles">
@@ -259,7 +299,9 @@ export function CyclesSection({ file, edit }: { readonly file: TeamFile; readonl
         label={t("team-settings-cycles-on")}
         checked={cycles !== undefined}
         onChange={(on) => {
-          edit((f) => (on ? { ...f, cycles: CYCLE_DEFAULTS } : without(f, "cycles")));
+          edit((f) =>
+            on ? { ...f, cycles: CYCLE_DEFAULTS } : without(f, "cycles"),
+          );
         }}
       />
       {cycles !== undefined && (
@@ -276,7 +318,10 @@ export function CyclesSection({ file, edit }: { readonly file: TeamFile; readonl
           <Choice
             label={t("team-settings-cycle-start")}
             value={cycles.start_day ?? "monday"}
-            options={START_DAYS.map((day) => [day, t(`team-settings-day-${day}`)])}
+            options={START_DAYS.map((day) => [
+              day,
+              t(`team-settings-day-${day}`),
+            ])}
             onChange={(start_day) => {
               set({ start_day });
             }}
@@ -327,11 +372,20 @@ export function CyclesSection({ file, edit }: { readonly file: TeamFile; readonl
 }
 
 /** Which status each Git moment moves an issue to. */
-export function GitSection({ file, edit }: { readonly file: TeamFile; readonly edit: Edit }) {
+export function GitSection({
+  file,
+  edit,
+}: {
+  readonly file: TeamFile;
+  readonly edit: Edit;
+}) {
   const t = useT();
   const statuses: [string, string][] = [
     ["", t("team-settings-git-stay")],
-    ...file.workflow.statuses.map((status): [string, string] => [status.key, status.name]),
+    ...file.workflow.statuses.map((status): [string, string] => [
+      status.key,
+      status.name,
+    ]),
   ];
   const set = (moment: GitMoment, status: string) => {
     edit((f) => {
@@ -343,7 +397,9 @@ export function GitSection({ file, edit }: { readonly file: TeamFile; readonly e
     <section className="vl-settings-section" aria-labelledby="settings-git">
       <h2 id="settings-git">{t("team-settings-git")}</h2>
       <p className="vl-muted">
-        {file.git === undefined ? t("team-settings-git-default") : t("team-settings-git-own")}
+        {file.git === undefined
+          ? t("team-settings-git-default")
+          : t("team-settings-git-own")}
       </p>
       <div className="vl-settings-grid">
         {GIT_MOMENTS.map((moment) => (

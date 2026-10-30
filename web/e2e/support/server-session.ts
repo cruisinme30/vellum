@@ -29,7 +29,12 @@ export const SAM: User = {
 export async function signedIn(page: Page, user: User = USER) {
   await page.route("**/api/v1/auth/status", (route) =>
     route.fulfill({
-      json: { needsSetup: false, credential: "session", scopes: ["read"], user },
+      json: {
+        needsSetup: false,
+        credential: "session",
+        scopes: ["read"],
+        user,
+      },
     }),
   );
   await page.route("**/api/csrf", (route) =>

@@ -31,13 +31,16 @@ pub const DSIG_NS: &str = "http://www.w3.org/2000/09/xmldsig#";
 /// Exclusive XML canonicalization, without comments.
 pub const EXC_C14N: &str = "http://www.w3.org/2001/10/xml-exc-c14n#";
 /// The enveloped-signature transform.
-pub const ENVELOPED: &str = "http://www.w3.org/2000/09/xmldsig#enveloped-signature";
+pub const ENVELOPED: &str =
+    "http://www.w3.org/2000/09/xmldsig#enveloped-signature";
 /// SHA-256 digests.
 pub const SHA256: &str = "http://www.w3.org/2001/04/xmlenc#sha256";
 /// RSA PKCS#1 v1.5 with SHA-256.
-pub const RSA_SHA256: &str = "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256";
+pub const RSA_SHA256: &str =
+    "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256";
 /// ECDSA with SHA-256.
-pub const ECDSA_SHA256: &str = "http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha256";
+pub const ECDSA_SHA256: &str =
+    "http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha256";
 
 /// The deepest element nesting canonicalized.
 const MAX_DEPTH: usize = 64;
@@ -86,8 +89,9 @@ impl Certificate {
     ///
     /// [`ErrorKind::InvalidInput`] for anything else.
     pub fn from_der(der: &[u8]) -> Result<Self, Error> {
-        let (_, cert) = X509Certificate::from_der(der)
-            .map_err(|e| invalid(format!("the certificate cannot be read: {e}")))?;
+        let (_, cert) = X509Certificate::from_der(der).map_err(|e| {
+            invalid(format!("the certificate cannot be read: {e}"))
+        })?;
         let spki = cert.public_key();
         let bits = spki.subject_public_key.data.to_vec();
         let key = match spki.algorithm.algorithm.to_id_string().as_str() {
@@ -100,11 +104,17 @@ impl Certificate {
                     .and_then(|p| p.as_oid().ok())
                     .map(|o| o.to_id_string());
                 if curve.as_deref() != Some(OID_P256) {
-                    return Err(invalid("only P-256 elliptic-curve keys are supported"));
+                    return Err(invalid(
+                        "only P-256 elliptic-curve keys are supported",
+                    ));
                 }
                 Key::P256(bits)
             }
-            _ => return Err(invalid("the certificate needs an RSA or P-256 key")),
+            _ => {
+                return Err(invalid(
+                    "the certificate needs an RSA or P-256 key",
+                ));
+            }
         };
         Ok(Self {
             der: der.to_vec(),
@@ -136,10 +146,11 @@ impl Certificate {
         let certs = blocks
             .iter()
             .map(|b| {
-                let clean: String = b.chars().filter(|c| !c.is_whitespace()).collect();
-                let der = STANDARD
-                    .decode(clean)
-                    .map_err(|_| invalid("a certificate is not valid base64"))?;
+                let clean: String =
+                    b.chars().filter(|c| !c.is_whitespace()).collect();
+                let der = STANDARD.decode(clean).map_err(|_| {
+                    invalid("a certificate is not valid base64")
+                })?;
                 Self::from_der(&der)
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -178,14 +189,23 @@ impl Certificate {
             .join(":")
     }
 
-    fn verify(&self, algorithm: &str, message: &[u8], signature: &[u8]) -> bool {
+    fn verify(
+        &self,
+        algorithm: &str,
+        message: &[u8],
+        signature: &[u8],
+    ) -> bool {
         match (&self.key, algorithm) {
-            (Key::Rsa(key), RSA_SHA256) => UnparsedPublicKey::new(&RSA_PKCS1_2048_8192_SHA256, key)
-                .verify(message, signature)
-                .is_ok(),
-            (Key::P256(key), ECDSA_SHA256) => UnparsedPublicKey::new(&ECDSA_P256_SHA256_FIXED, key)
-                .verify(message, signature)
-                .is_ok(),
+            (Key::Rsa(key), RSA_SHA256) => {
+                UnparsedPublicKey::new(&RSA_PKCS1_2048_8192_SHA256, key)
+                    .verify(message, signature)
+                    .is_ok()
+            }
+            (Key::P256(key), ECDSA_SHA256) => {
+                UnparsedPublicKey::new(&ECDSA_P256_SHA256_FIXED, key)
+                    .verify(message, signature)
+                    .is_ok()
+            }
             _ => false,
         }
     }
@@ -193,7 +213,11 @@ impl Certificate {
 
 /// The element `node`'s child in `ns` named `name`, when there is exactly
 /// one.
-pub(crate) fn only_child<'a, 'i>(node: Node<'a, 'i>, ns: &str, name: &str) -> Option<Node<'a, 'i>> {
+pub(crate) fn only_child<'a, 'i>(
+    node: Node<'a, 'i>,
+    ns: &str,
+    name: &str,
+) -> Option<Node<'a, 'i>> {
     let mut found = None;
     for child in node.children() {
         if child.is_element()
@@ -216,7 +240,9 @@ pub(crate) fn children<'a, 'i: 'a>(
     name: &'a str,
 ) -> impl Iterator<Item = Node<'a, 'i>> + 'a {
     node.children().filter(move |c| {
-        c.is_element() && c.tag_name().namespace() == Some(ns) && c.tag_name().name() == name
+        c.is_element()
+            && c.tag_name().namespace() == Some(ns)
+            && c.tag_name().name() == name
     })
 }
 
@@ -230,7 +256,9 @@ pub fn check_unique_ids(root: Node<'_, '_>) -> Result<(), Error> {
     let mut seen = HashSet::new();
     for node in root.descendants().filter(Node::is_element) {
         for attr in node.attributes() {
-            if matches!(attr.name(), "ID" | "Id" | "id") && !seen.insert(attr.value()) {
+            if matches!(attr.name(), "ID" | "Id" | "id")
+                && !seen.insert(attr.value())
+            {
                 return Err(refused("the response repeats an element ID"));
             }
         }
@@ -258,19 +286,27 @@ pub fn verify_enveloped(
         .ok_or_else(|| refused("the element is not signed"))?;
     let info = only_child(signature, DSIG_NS, "SignedInfo")
         .ok_or_else(|| refused("the signature has no SignedInfo"))?;
-    let method =
-        |name: &str| only_child(info, DSIG_NS, name).and_then(|m| m.attribute("Algorithm"));
-    let c14n = only_child(info, DSIG_NS, "CanonicalizationMethod")
-        .ok_or_else(|| refused("the signature has no canonicalization method"))?;
+    let method = |name: &str| {
+        only_child(info, DSIG_NS, name).and_then(|m| m.attribute("Algorithm"))
+    };
+    let c14n = only_child(info, DSIG_NS, "CanonicalizationMethod").ok_or_else(
+        || refused("the signature has no canonicalization method"),
+    )?;
     if c14n.attribute("Algorithm") != Some(EXC_C14N) {
-        return Err(refused("the signature must use exclusive canonicalization"));
+        return Err(refused(
+            "the signature must use exclusive canonicalization",
+        ));
     }
     let algorithm = method("SignatureMethod").unwrap_or_default();
     if algorithm != RSA_SHA256 && algorithm != ECDSA_SHA256 {
-        return Err(refused("the signature must use RSA-SHA256 or ECDSA-SHA256"));
+        return Err(refused(
+            "the signature must use RSA-SHA256 or ECDSA-SHA256",
+        ));
     }
-    let reference = only_child(info, DSIG_NS, "Reference")
-        .ok_or_else(|| refused("the signature must have exactly one reference"))?;
+    let reference =
+        only_child(info, DSIG_NS, "Reference").ok_or_else(|| {
+            refused("the signature must have exactly one reference")
+        })?;
     if reference.attribute("URI") != Some(format!("#{id}").as_str()) {
         return Err(refused("the signature does not cover the signed element"));
     }
@@ -280,18 +316,25 @@ pub fn verify_enveloped(
         for transform in children(transforms, DSIG_NS, "Transform") {
             match transform.attribute("Algorithm") {
                 Some(ENVELOPED) => enveloped = true,
-                Some(EXC_C14N) => exclusive = Some(inclusive_prefixes(transform)),
-                _ => return Err(refused("the signature uses an unsupported transform")),
+                Some(EXC_C14N) => {
+                    exclusive = Some(inclusive_prefixes(transform))
+                }
+                _ => {
+                    return Err(refused(
+                        "the signature uses an unsupported transform",
+                    ));
+                }
             }
         }
     }
     let (Some(prefixes), true) = (exclusive, enveloped) else {
         return Err(refused(
-            "the signature must use the enveloped and exclusive canonicalization transforms",
+            "the signature must use the enveloped and exclusive \
+                canonicalization transforms",
         ));
     };
-    let digest_method =
-        only_child(reference, DSIG_NS, "DigestMethod").and_then(|m| m.attribute("Algorithm"));
+    let digest_method = only_child(reference, DSIG_NS, "DigestMethod")
+        .and_then(|m| m.attribute("Algorithm"));
     if digest_method != Some(SHA256) {
         return Err(refused("the signature must use SHA-256 digests"));
     }
@@ -310,7 +353,8 @@ pub fn verify_enveloped(
         .transpose()?
         .and_then(|text| decode(&text))
         .ok_or_else(|| refused("the signature has no value"))?;
-    let info_canonical = exc_c14n(source, info, None, &inclusive_prefixes(c14n))?;
+    let info_canonical =
+        exc_c14n(source, info, None, &inclusive_prefixes(c14n))?;
     if certificates
         .iter()
         .any(|c| c.verify(algorithm, info_canonical.as_bytes(), &value))
@@ -354,7 +398,10 @@ pub fn text_of(node: Node<'_, '_>) -> Result<String, Error> {
 }
 
 /// The qualified name of an element as written.
-fn element_qname<'i>(source: &'i str, node: Node<'_, 'i>) -> Result<&'i str, Error> {
+fn element_qname<'i>(
+    source: &'i str,
+    node: Node<'_, 'i>,
+) -> Result<&'i str, Error> {
     let start = node.range().start.saturating_add(1);
     let rest = source
         .get(start..)
@@ -404,8 +451,8 @@ fn escape_attr(text: &str, out: &mut String) {
 
 /// Exclusive XML canonicalization, without comments, of `apex`.
 ///
-/// It covers what `apex` holds, leaving out the element `skip` (an
-/// enveloped signature). `inclusive` lists prefixes rendered wherever they are in scope
+/// It covers what `apex` holds, leaving out the element `skip` (an enveloped
+/// signature). `inclusive` lists prefixes rendered wherever they are in scope
 /// (`#default` for the default namespace).
 ///
 /// # Errors
@@ -509,7 +556,9 @@ impl Context<'_, '_> {
                 NodeType::Element if Some(child.id()) != self.skip => {
                     self.element(child, &now, depth.saturating_add(1), out)?;
                 }
-                NodeType::Text => escape_text(child.text().unwrap_or_default(), out),
+                NodeType::Text => {
+                    escape_text(child.text().unwrap_or_default(), out)
+                }
                 NodeType::PI => {
                     if let Some(pi) = child.pi() {
                         out.push_str("<?");
@@ -559,17 +608,25 @@ mod tests {
 </r:Root>"#;
         assert_eq!(
             c14n(xml, &["Child"]),
-            r#"<a:Child xmlns:a="urn:a" a="1" b="2" a:z="&amp;&lt;&quot;"><Inner xmlns="urn:d">x &gt; y</Inner><a:Empty></a:Empty></a:Child>"#
+            concat!(
+                r#"<a:Child xmlns:a="urn:a" a="1" b="2" "#,
+                r#"a:z="&amp;&lt;&quot;"><Inner xmlns="urn:d">x &gt; "#,
+                r#"y</Inner><a:Empty></a:Empty></a:Child>"#,
+            )
         );
     }
 
     #[test]
     fn a_default_namespace_is_undeclared_only_when_rendered() {
-        let xml = r#"<Root xmlns="urn:d"><Child xmlns=""><Leaf/></Child></Root>"#;
+        let xml =
+            r#"<Root xmlns="urn:d"><Child xmlns=""><Leaf/></Child></Root>"#;
         assert_eq!(c14n(xml, &["Child"]), "<Child><Leaf></Leaf></Child>");
         assert_eq!(
             c14n(xml, &[]),
-            r#"<Root xmlns="urn:d"><Child xmlns=""><Leaf></Leaf></Child></Root>"#
+            concat!(
+                r#"<Root xmlns="urn:d"><Child "#,
+                r#"xmlns=""><Leaf></Leaf></Child></Root>"#,
+            )
         );
     }
 
@@ -581,7 +638,8 @@ mod tests {
 
     #[test]
     fn values_with_comments_or_elements_are_refused() {
-        let xml = "<a><b>user@northstar.dev<!---->.evil.example</b><c>ok</c></a>";
+        let xml =
+            "<a><b>user@northstar.dev<!---->.evil.example</b><c>ok</c></a>";
         let doc = roxmltree::Document::parse(xml).unwrap();
         let b = doc.root_element().first_child().unwrap();
         assert!(text_of(b).is_err());

@@ -18,15 +18,20 @@ describe("TEMPLATES", () => {
     expect(named.filter((name) => !(name in TEMPLATES))).toEqual([]);
   });
 
-  it.each(Object.entries(TEMPLATES))("%s builds a node the schema defines", (_name, build) => {
-    const content = build();
-    expect(NODE_NAMES.has(content.type ?? "")).toBe(true);
-    expect(build()).toEqual(content);
-  });
+  it.each(Object.entries(TEMPLATES))(
+    "%s builds a node the schema defines",
+    (_name, build) => {
+      const content = build();
+      expect(NODE_NAMES.has(content.type ?? "")).toBe(true);
+      expect(build()).toEqual(content);
+    },
+  );
 
   it("starts the chart from an example that previews", () => {
     const chart = TEMPLATES["chart"]?.();
-    expect(parseChart(chart?.content?.[0]?.text ?? "")?.values).toEqual([120, 185, 160, 240]);
+    expect(parseChart(chart?.content?.[0]?.text ?? "")?.values).toEqual([
+      120, 185, 160, 240,
+    ]);
   });
 
   it("makes the requested number of columns", () => {

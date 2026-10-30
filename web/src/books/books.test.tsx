@@ -36,7 +36,10 @@ const BOOK: BookInfo = {
   toc: [
     { kind: "part", title: "Start" },
     node("", "Draft", { draft: true }),
-    node("s1", "Welcome", { number: "1", children: [node("s2", "Setup", { number: "1.1" })] }),
+    node("s1", "Welcome", {
+      number: "1",
+      children: [node("s2", "Setup", { number: "1.1" })],
+    }),
     { kind: "separator" },
   ],
 };
@@ -44,7 +47,9 @@ const BOOK: BookInfo = {
 /** Only the reading operations; a reader never reaches the others. */
 function fakeApi(): BooksApi {
   const reading: Pick<BooksApi, "list" | "book" | "section"> = {
-    list: vi.fn(() => Promise.resolve([{ id: "b1", title: "Handbook", path: "handbook.book" }])),
+    list: vi.fn(() =>
+      Promise.resolve([{ id: "b1", title: "Handbook", path: "handbook.book" }]),
+    ),
     book: vi.fn(() => Promise.resolve(BOOK)),
     section: vi.fn((_book: string, section: string) =>
       Promise.resolve({
@@ -56,7 +61,10 @@ function fakeApi(): BooksApi {
         path: "x.md",
         restricted: false,
         source: "x",
-        markdown: section === "s1" ? "# Welcome\n\nHello **team**." : "Run `vellum serve`.",
+        markdown:
+          section === "s1"
+            ? "# Welcome\n\nHello **team**."
+            : "Run `vellum serve`.",
       }),
     ),
   };
@@ -69,7 +77,13 @@ const workspace = createMemoryStore({
   me: { handle: "priya", name: "Priya Raman" },
   people: [],
   spaces: [
-    { id: "S1", slug: "priya", name: "My Drive", icon: "🏠", root: "drives/users/priya" },
+    {
+      id: "S1",
+      slug: "priya",
+      name: "My Drive",
+      icon: "🏠",
+      root: "drives/users/priya",
+    },
     {
       id: "S2",
       slug: "engineering",
@@ -128,9 +142,13 @@ describe("books", () => {
     const user = renderAt("/books", api);
     await user.click(await screen.findByRole("link", { name: "Handbook" }));
 
-    expect(await screen.findByRole("heading", { level: 1, name: "Handbook" })).toBeDefined();
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Handbook" }),
+    ).toBeDefined();
     const article = await screen.findByRole("article");
-    expect(within(article).getByRole("heading", { level: 2 }).textContent).toBe("1 Welcome");
+    expect(within(article).getByRole("heading", { level: 2 }).textContent).toBe(
+      "1 Welcome",
+    );
     // The section's own title heading is not repeated.
     expect(within(article).getAllByRole("heading")).toHaveLength(1);
     expect(within(article).getByText("team").tagName).toBe("STRONG");
@@ -141,7 +159,9 @@ describe("books", () => {
     const code = await screen.findByText("vellum serve");
     expect(code.tagName).toBe("CODE");
     expect(
-      within(contents).getByRole("link", { name: "1.1 Setup" }).getAttribute("aria-current"),
+      within(contents)
+        .getByRole("link", { name: "1.1 Setup" })
+        .getAttribute("aria-current"),
     ).toBe("page");
   });
 
@@ -159,25 +179,42 @@ describe("books", () => {
     const form = screen.getByRole("form", { name: "New book" });
     const create_ = within(form).getByRole("button", { name: "Create book" });
     expect(create_).toHaveProperty("disabled", true);
-    await user.type(within(form).getByRole("textbox", { name: "Title" }), "Handbook");
-    expect(within(form).getByRole("combobox", { name: "Drive" })).toHaveProperty(
-      "value",
-      "drives/users/priya",
+    await user.type(
+      within(form).getByRole("textbox", { name: "Title" }),
+      "Handbook",
     );
-    await user.selectOptions(within(form).getByRole("combobox", { name: "Drive" }), "Engineering");
+    expect(
+      within(form).getByRole("combobox", { name: "Drive" }),
+    ).toHaveProperty("value", "drives/users/priya");
+    await user.selectOptions(
+      within(form).getByRole("combobox", { name: "Drive" }),
+      "Engineering",
+    );
     await user.click(create_);
-    expect(create).toHaveBeenCalledWith("Handbook", "drives/shared/engineering");
-    expect(await screen.findByRole("heading", { level: 1, name: "Handbook" })).toBeDefined();
+    expect(create).toHaveBeenCalledWith(
+      "Handbook",
+      "drives/shared/engineering",
+    );
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Handbook" }),
+    ).toBeDefined();
   });
 
   it("opens the New book form from New → Book, and says why a create failed", async () => {
-    const create = vi.fn(() => Promise.reject(new Error("You cannot create books in this drive.")));
+    const create = vi.fn(() =>
+      Promise.reject(new Error("You cannot create books in this drive.")),
+    );
     const user = renderAt("/books?new=book", { ...fakeApi(), create });
     const form = await screen.findByRole("form", { name: "New book" });
-    await user.type(within(form).getByRole("textbox", { name: "Title" }), "Notes");
+    await user.type(
+      within(form).getByRole("textbox", { name: "Title" }),
+      "Notes",
+    );
     await user.click(within(form).getByRole("button", { name: "Create book" }));
     const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toContain("You cannot create books in this drive.");
+    expect(alert.textContent).toContain(
+      "You cannot create books in this drive.",
+    );
     await user.click(within(form).getByRole("button", { name: "Cancel" }));
     expect(screen.queryByRole("form", { name: "New book" })).toBeNull();
     expect(screen.getByRole("button", { name: "New book" })).toBeDefined();
@@ -185,7 +222,9 @@ describe("books", () => {
 
   it("finds the first readable section", () => {
     expect(firstSection(BOOK.toc)).toBe("s1");
-    expect(firstSection([node("", "Empty", { children: [node("deep", "Deep")] })])).toBe("deep");
+    expect(
+      firstSection([node("", "Empty", { children: [node("deep", "Deep")] })]),
+    ).toBe("deep");
     expect(firstSection([])).toBeUndefined();
   });
 
@@ -224,11 +263,15 @@ describe("markdown reader", () => {
     expect(container.querySelector("h3")?.textContent).toBe("Steps");
     expect(container.querySelectorAll("ol li")).toHaveLength(2);
     expect(container.querySelector("ol em")?.textContent).toBe("Two");
-    expect(container.querySelector("a")?.getAttribute("href")).toBe("https://vellum.dev");
+    expect(container.querySelector("a")?.getAttribute("href")).toBe(
+      "https://vellum.dev",
+    );
     expect(container.querySelectorAll("a")).toHaveLength(1);
     expect(container.querySelector("blockquote")?.textContent).toBe("quoted");
     expect(container.querySelector("hr")).not.toBeNull();
-    expect(container.querySelector("pre code")?.textContent).toBe("<script>x</script>");
+    expect(container.querySelector("pre code")?.textContent).toBe(
+      "<script>x</script>",
+    );
     expect(container.querySelector("script")).toBeNull();
     expect(container.querySelector("b")).toBeNull();
   });

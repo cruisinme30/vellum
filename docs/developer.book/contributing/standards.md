@@ -13,9 +13,12 @@ CI enforces every rule here; warnings are errors.
 ::: facts
 
 - Forbidden: `unsafe` code
-- Denied: `unwrap`, `expect`, `panic!`, indexing that can panic, `todo!`, `dbg!` and `println!`
-- `clippy`: all lints denied; pedantic and nursery as warnings, which CI treats as errors
-- Documentation: every public item documented; `cargo doc` with warnings as errors
+- Denied: `unwrap`, `expect`, `panic!`, indexing that can panic, `todo!`, `dbg!`
+  and `println!`
+- `clippy`: all lints denied; pedantic and nursery as warnings, which CI treats
+  as errors
+- Documentation: every public item documented; `cargo doc` with warnings as
+  errors
 - Tests: `cargo nextest`; line coverage of at least 85% on core crates
 
 :::
@@ -24,8 +27,10 @@ CI enforces every rule here; warnings are errors.
 
 ::: facts
 
-- Compiler: strict, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, `verbatimModuleSyntax`
-- Lint: typescript-eslint strict type-checked and stylistic; React, hooks, accessibility, imports, unicorn and sonarjs rules
+- Compiler: strict, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`,
+  `noImplicitOverride`, `verbatimModuleSyntax`
+- Lint: typescript-eslint strict type-checked and stylistic; React, hooks,
+  accessibility, imports, unicorn and sonarjs rules
 - Limits: 400 lines per file, cyclomatic complexity 12, no default exports
 - Tests: Vitest with at least 85% coverage
 

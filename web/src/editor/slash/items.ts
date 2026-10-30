@@ -16,7 +16,11 @@ export interface SlashItem extends SlashData {
 export const SLASH_ITEMS: readonly SlashItem[] = SECTIONS.flatMap((section) =>
   NODES.flatMap((node) =>
     node.slash
-      .map((entry, index) => ({ ...entry, id: `${node.name}-${String(index)}`, node: node.name }))
+      .map((entry, index) => ({
+        ...entry,
+        id: `${node.name}-${String(index)}`,
+        node: node.name,
+      }))
       .filter((entry) => entry.section === section),
   ),
 );
@@ -48,7 +52,10 @@ function score(item: SlashItem, query: string): number {
 }
 
 /** Filters and ranks entries for what the user typed after `/`. */
-export function filterSlashItems(raw: string, items: readonly SlashItem[] = SLASH_ITEMS) {
+export function filterSlashItems(
+  raw: string,
+  items: readonly SlashItem[] = SLASH_ITEMS,
+) {
   const query = normalise(raw);
   if (query === "") {
     return [...items];

@@ -55,7 +55,8 @@ const IMDS_ENDPOINT: &str = "http://169.254.169.254";
 
 /// Hosts a plain-`http` container credential URL may name: the ECS and EKS
 /// Pod Identity agents. Anything else must be `https` or loopback.
-const CONTAINER_HOSTS: [&str; 3] = ["169.254.170.2", "169.254.170.23", "[fd00:ec2::23]"];
+const CONTAINER_HOSTS: [&str; 3] =
+    ["169.254.170.2", "169.254.170.23", "[fd00:ec2::23]"];
 
 /// Where an [`S3Store`](super::S3Store) gets the keys it signs with.
 #[derive(Clone, Debug)]
@@ -129,7 +130,10 @@ impl CredentialSource {
         let fail = |why: String| StoreError::Backend(format!("s3: {why}"));
         if let Some(access_key_id) = get("AWS_ACCESS_KEY_ID") {
             let secret = get("AWS_SECRET_ACCESS_KEY").ok_or_else(|| {
-                fail("AWS_ACCESS_KEY_ID is set but AWS_SECRET_ACCESS_KEY is not".into())
+                fail(
+                    "AWS_ACCESS_KEY_ID is set but AWS_SECRET_ACCESS_KEY is not"
+                        .into(),
+                )
             })?;
             return Ok(Self::Static(S3Credentials {
                 access_key_id,
@@ -152,7 +156,8 @@ impl CredentialSource {
             return Ok(Self::WebIdentity(WebIdentity {
                 role_arn,
                 token_file: token_file.into(),
-                session_name: get("AWS_ROLE_SESSION_NAME").unwrap_or_else(session_name),
+                session_name: get("AWS_ROLE_SESSION_NAME")
+                    .unwrap_or_else(session_name),
                 sts_endpoint,
             }));
         }
@@ -160,7 +165,9 @@ impl CredentialSource {
         let relative = get("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI");
         if full.is_some() || relative.is_some() {
             let url = match (full, relative) {
-                (_, Some(rel)) => format!("{ECS_HOST}/{}", rel.trim_start_matches('/')),
+                (_, Some(rel)) => {
+                    format!("{ECS_HOST}/{}", rel.trim_start_matches('/'))
+                }
                 (Some(full), None) => {
                     check_container_url(&full).map_err(fail)?;
                     full
@@ -169,12 +176,14 @@ impl CredentialSource {
             };
             return Ok(Self::Container(Container {
                 url,
-                token: get("AWS_CONTAINER_AUTHORIZATION_TOKEN").map(Secret::new),
-                token_file: get("AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE").map(PathBuf::from),
+                token: get("AWS_CONTAINER_AUTHORIZATION_TOKEN")
+                    .map(Secret::new),
+                token_file: get("AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE")
+                    .map(PathBuf::from),
             }));
         }
-        let imds_off =
-            get("AWS_EC2_METADATA_DISABLED").is_some_and(|v| v.eq_ignore_ascii_case("true"));
+        let imds_off = get("AWS_EC2_METADATA_DISABLED")
+            .is_some_and(|v| v.eq_ignore_ascii_case("true"));
         if on_aws && !imds_off {
             return Ok(Self::InstanceProfile(InstanceProfile {
                 endpoint: get("AWS_EC2_METADATA_SERVICE_ENDPOINT").map_or_else(
@@ -184,8 +193,9 @@ impl CredentialSource {
             }));
         }
         Err(fail(
-            "no credentials: set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY, or use workload \
-             identity (AWS_ROLE_ARN with AWS_WEB_IDENTITY_TOKEN_FILE, or \
+            "no credentials: set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY, \
+             or use workload identity (AWS_ROLE_ARN with \
+             AWS_WEB_IDENTITY_TOKEN_FILE, or \
              AWS_CONTAINER_CREDENTIALS_FULL_URI)"
                 .into(),
         ))
@@ -216,8 +226,9 @@ fn session_name() -> String {
 /// agents' link-local addresses, as the AWS SDKs require, so a planted
 /// variable cannot send the token to an arbitrary host.
 fn check_container_url(url: &str) -> Result<(), String> {
-    let parsed = reqwest::Url::parse(url)
-        .map_err(|e| format!("AWS_CONTAINER_CREDENTIALS_FULL_URI is not a URL: {e}"))?;
+    let parsed = reqwest::Url::parse(url).map_err(|e| {
+        format!("AWS_CONTAINER_CREDENTIALS_FULL_URI is not a URL: {e}")
+    })?;
     let host = parsed.host_str().unwrap_or_default();
     let allowed = match parsed.scheme() {
         "https" => true,
@@ -236,8 +247,8 @@ fn check_container_url(url: &str) -> Result<(), String> {
         Ok(())
     } else {
         Err(format!(
-            "AWS_CONTAINER_CREDENTIALS_FULL_URI must be https, loopback or an AWS agent \
-             address, not {host:?}"
+            "AWS_CONTAINER_CREDENTIALS_FULL_URI must be https, loopback or an \
+             AWS agent address, not {host:?}"
         ))
     }
 }
@@ -291,7 +302,9 @@ impl Provider {
             .timeout(Duration::from_secs(10))
             .user_agent(concat!("vellum/", env!("CARGO_PKG_VERSION")))
             .build()
-            .map_err(|e| StoreError::Backend(format!("s3: cannot build client: {e}")))?;
+            .map_err(|e| {
+                StoreError::Backend(format!("s3: cannot build client: {e}"))
+            })?;
         Ok(Self {
             source,
             client,
@@ -308,7 +321,10 @@ impl Provider {
         }
         match self.fetch().await {
             Ok(fetched) => {
-                tracing::debug!(source = self.source.kind(), "fetched s3 credentials");
+                tracing::debug!(
+                    source = self.source.kind(),
+                    "fetched s3 credentials"
+                );
                 let credentials = fetched.credentials.clone();
                 *cache = Some(fetched);
                 Ok(credentials)
@@ -316,7 +332,8 @@ impl Provider {
             Err(error) => match cache.as_ref().filter(|c| c.valid(now)) {
                 Some(old) => {
                     tracing::warn!(%error, source = self.source.kind(),
-                        "cannot refresh s3 credentials; using the current ones until they expire");
+                        "cannot refresh s3 credentials; using the current ones \
+                            until they expire");
                     Ok(old.credentials.clone())
                 }
                 None => Err(error),
@@ -324,7 +341,12 @@ impl Provider {
         }
     }
 
-    #[tracing::instrument(name = "s3.credentials", skip(self), fields(source = self.source.kind()), err)]
+    #[tracing::instrument(
+        name = "s3.credentials",
+        skip(self),
+        fields(source = self.source.kind()),
+        err
+    )]
     async fn fetch(&self) -> StoreResult<Cached> {
         match &self.source {
             CredentialSource::Static(credentials) => Ok(Cached {
@@ -332,13 +354,18 @@ impl Provider {
                 expires: None,
             }),
             CredentialSource::WebIdentity(web) => self.web_identity(web).await,
-            CredentialSource::Container(container) => self.container(container).await,
-            CredentialSource::InstanceProfile(imds) => self.instance_profile(imds).await,
+            CredentialSource::Container(container) => {
+                self.container(container).await
+            }
+            CredentialSource::InstanceProfile(imds) => {
+                self.instance_profile(imds).await
+            }
         }
     }
 
     async fn web_identity(&self, web: &WebIdentity) -> StoreResult<Cached> {
-        let token = read_token(&web.token_file, "AWS_WEB_IDENTITY_TOKEN_FILE").await?;
+        let token =
+            read_token(&web.token_file, "AWS_WEB_IDENTITY_TOKEN_FILE").await?;
         let form = [
             ("Action", "AssumeRoleWithWebIdentity"),
             ("Version", "2011-06-15"),
@@ -360,16 +387,20 @@ impl Provider {
             .map_err(|e| unreachable_source("STS", &e))?;
         if !status.is_success() {
             let code = list::element_text(&body, "Code").unwrap_or_default();
-            let message = list::element_text(&body, "Message").unwrap_or_default();
+            let message =
+                list::element_text(&body, "Message").unwrap_or_default();
             return Err(StoreError::Backend(format!(
-                "s3: STS refused AssumeRoleWithWebIdentity for {}: {status} {code} {message}",
+                "s3: STS refused AssumeRoleWithWebIdentity for {}: {status} \
+                    {code} {message}",
                 web.role_arn
             )));
         }
         let field = |tag: &str| {
             list::element_text(&body, tag)
                 .filter(|v| !v.is_empty())
-                .ok_or_else(|| StoreError::Backend(format!("s3: STS answer has no {tag}")))
+                .ok_or_else(|| {
+                    StoreError::Backend(format!("s3: STS answer has no {tag}"))
+                })
         };
         Ok(Cached {
             credentials: S3Credentials {
@@ -385,23 +416,27 @@ impl Provider {
 
     async fn container(&self, container: &Container) -> StoreResult<Cached> {
         let token = match (&container.token_file, &container.token) {
-            (Some(file), _) => {
-                Some(read_token(file, "AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE").await?)
-            }
+            (Some(file), _) => Some(
+                read_token(file, "AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE")
+                    .await?,
+            ),
             (None, token) => token.clone(),
         };
         let mut request = self.client.get(&container.url);
         if let Some(token) = &token {
-            request = request.header(reqwest::header::AUTHORIZATION, token.expose());
+            request =
+                request.header(reqwest::header::AUTHORIZATION, token.expose());
         }
-        let response = request
-            .send()
-            .await
-            .map_err(|e| unreachable_source("the container credential endpoint", &e))?;
+        let response = request.send().await.map_err(|e| {
+            unreachable_source("the container credential endpoint", &e)
+        })?;
         json_credentials(response, "the container credential endpoint").await
     }
 
-    async fn instance_profile(&self, imds: &InstanceProfile) -> StoreResult<Cached> {
+    async fn instance_profile(
+        &self,
+        imds: &InstanceProfile,
+    ) -> StoreResult<Cached> {
         let what = "the instance metadata service";
         let token = self
             .client
@@ -433,7 +468,8 @@ impl Provider {
             .map_err(|e| unreachable_source(what, &e))?;
         if roles.status() == StatusCode::NOT_FOUND {
             return Err(StoreError::Backend(format!(
-                "s3: this instance has no instance profile; attach a role or set {}",
+                "s3: this instance has no instance profile; attach a role or \
+                    set {}",
                 "AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY"
             )));
         }
@@ -446,7 +482,9 @@ impl Provider {
             .map(str::trim)
             .find(|l| !l.is_empty())
             .ok_or_else(|| {
-                StoreError::Backend(format!("s3: {what} lists no instance profile role"))
+                StoreError::Backend(format!(
+                    "s3: {what} lists no instance profile role"
+                ))
             })?;
         let response = self
             .client
@@ -469,10 +507,15 @@ struct JsonCredentials {
     expiration: Option<String>,
 }
 
-async fn json_credentials(response: reqwest::Response, what: &str) -> StoreResult<Cached> {
+async fn json_credentials(
+    response: reqwest::Response,
+    what: &str,
+) -> StoreResult<Cached> {
     let status = response.status();
     if !status.is_success() {
-        return Err(StoreError::Backend(format!("s3: {what} answered {status}")));
+        return Err(StoreError::Backend(format!(
+            "s3: {what} answered {status}"
+        )));
     }
     let body: JsonCredentials = response.json().await.map_err(|e| {
         StoreError::Backend(format!(
@@ -484,7 +527,10 @@ async fn json_credentials(response: reqwest::Response, what: &str) -> StoreResul
         credentials: S3Credentials {
             access_key_id: body.access_key_id,
             secret_access_key: Secret::new(body.secret_access_key),
-            session_token: body.token.filter(|t| !t.is_empty()).map(Secret::new),
+            session_token: body
+                .token
+                .filter(|t| !t.is_empty())
+                .map(Secret::new),
         },
         expires: body.expiration.as_deref().and_then(list::parse_timestamp),
     })
@@ -492,7 +538,10 @@ async fn json_credentials(response: reqwest::Response, what: &str) -> StoreResul
 
 async fn read_token(file: &std::path::Path, var: &str) -> StoreResult<Secret> {
     let text = tokio::fs::read_to_string(file).await.map_err(|e| {
-        StoreError::Backend(format!("s3: cannot read {var} {}: {e}", file.display()))
+        StoreError::Backend(format!(
+            "s3: cannot read {var} {}: {e}",
+            file.display()
+        ))
     })?;
     Ok(Secret::new(text.trim().to_owned()))
 }
@@ -533,9 +582,12 @@ mod tests {
 
     #[test]
     fn a_key_id_without_its_secret_is_refused() {
-        let error =
-            CredentialSource::from_vars(vars(&[("AWS_ACCESS_KEY_ID", "id")]), "us-east-1", true)
-                .unwrap_err();
+        let error = CredentialSource::from_vars(
+            vars(&[("AWS_ACCESS_KEY_ID", "id")]),
+            "us-east-1",
+            true,
+        )
+        .unwrap_err();
         assert!(error.to_string().contains("AWS_SECRET_ACCESS_KEY"));
     }
 
@@ -589,9 +641,11 @@ mod tests {
 
     #[test]
     fn instance_profile_only_on_aws() {
-        let on_aws = CredentialSource::from_vars(vars(&[]), "us-east-1", true).unwrap();
+        let on_aws =
+            CredentialSource::from_vars(vars(&[]), "us-east-1", true).unwrap();
         assert_eq!(on_aws.kind(), "instance_profile");
-        let custom = CredentialSource::from_vars(vars(&[]), "us-east-1", false).unwrap_err();
+        let custom = CredentialSource::from_vars(vars(&[]), "us-east-1", false)
+            .unwrap_err();
         assert!(custom.to_string().contains("no credentials"));
         let disabled = CredentialSource::from_vars(
             vars(&[("AWS_EC2_METADATA_DISABLED", "true")]),

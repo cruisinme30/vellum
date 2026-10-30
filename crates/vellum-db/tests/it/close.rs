@@ -23,7 +23,10 @@ type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 /// so sqlx's task to put it back is still queued on this runtime. Also
 /// returns a handle on the pool, to watch it close.
 async fn used_index(dir: &std::path::Path) -> TestResult<(Index, SqlitePool)> {
-    let config = IndexConfig::sqlite(dir.join("index.sqlite"), Some(IndexKey::new([3; 32])));
+    let config = IndexConfig::sqlite(
+        dir.join("index.sqlite"),
+        Some(IndexKey::new([3; 32])),
+    );
     let index = Index::open(&config).await?;
     let IndexPool::Sqlite(pool) = index.pool() else {
         return Err("a SQLite index has a SQLite pool".into());

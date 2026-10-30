@@ -23,9 +23,13 @@ use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use vellum_admin::settings::SecuritySettings;
-use vellum_admin::{AdminService, AuditActor, AuditLog, NewAuditEvent, Outcome, SecretScanning};
+use vellum_admin::{
+    AdminService, AuditActor, AuditLog, NewAuditEvent, Outcome, SecretScanning,
+};
 use vellum_collections::service::RowCheck;
-use vellum_contracts::{HttpMethod, Operation, Principal, RequestContext, Scope, Service};
+use vellum_contracts::{
+    HttpMethod, Operation, Principal, RequestContext, Scope, Service,
+};
 use vellum_drive::{ContentCheck, DriveError, DriveResult};
 use vellum_kernel::{Actor, Error, ErrorKind, SpaceId};
 use vellum_security::secrets::{self, Finding, SECRETS_FOUND};
@@ -85,7 +89,9 @@ fn summary(findings: &[Finding]) -> String {
 fn audit_actor(actor: &Actor) -> AuditActor {
     let (kind, user) = match actor {
         Actor::User { user } => ("user", Some(user.to_string())),
-        Actor::Model { on_behalf_of } => ("model", Some(on_behalf_of.to_string())),
+        Actor::Model { on_behalf_of } => {
+            ("model", Some(on_behalf_of.to_string()))
+        }
         Actor::External => ("external", None),
         _ => ("system", None),
     };
@@ -119,7 +125,8 @@ impl SecretGuard {
                 settings
             }
             Err(error) => {
-                tracing::warn!(%error, "secret scanning: admin settings unreadable, using the last ones");
+                tracing::warn!(%error, "secret scanning: admin settings \
+                    unreadable, using the last ones");
                 self.last
                     .lock()
                     .ok()
@@ -129,20 +136,27 @@ impl SecretGuard {
         }
     }
 
-    async fn audit(&self, actor: &Actor, path: &BlobPath, findings: &[Finding], blocked: bool) {
+    async fn audit(
+        &self,
+        actor: &Actor,
+        path: &BlobPath,
+        findings: &[Finding],
+        blocked: bool,
+    ) {
         let outcome = if blocked {
             Outcome::Denied
         } else {
             Outcome::Success
         };
         for f in findings.iter().take(MAX_REPORTED) {
-            let event = NewAuditEvent::new(audit_actor(actor), "security.secret_found")
-                .target(path.as_str())
-                .outcome(outcome)
-                .detail("rule", f.rule.id())
-                .detail("line", f.line)
-                .detail("column", f.column)
-                .detail("blocked", blocked);
+            let event =
+                NewAuditEvent::new(audit_actor(actor), "security.secret_found")
+                    .target(path.as_str())
+                    .outcome(outcome)
+                    .detail("rule", f.rule.id())
+                    .detail("line", f.line)
+                    .detail("column", f.column)
+                    .detail("blocked", blocked);
             if let Some(log) = self.audit.get() {
                 if let Err(error) = log.append(event).await {
                     tracing::warn!(%error, "secret finding not audited");
@@ -164,7 +178,12 @@ impl SecretGuard {
 impl SecretGuard {
     /// Scans `text` under the policy now and audits what it finds. Under
     /// `block`, the refusal's message: it names kinds and lines only.
-    async fn inspect(&self, actor: &Actor, path: &BlobPath, text: &str) -> Result<(), String> {
+    async fn inspect(
+        &self,
+        actor: &Actor,
+        path: &BlobPath,
+        text: &str,
+    ) -> Result<(), String> {
         let settings = self.settings().await;
         if settings.secret_scanning == SecretScanning::Off {
             return Ok(());
@@ -177,7 +196,8 @@ impl SecretGuard {
         self.audit(actor, path, &findings, blocked).await;
         if blocked {
             return Err(format!(
-                "{SECRETS_FOUND}: {}. Remove them, or ask an admin to allow them.",
+                "{SECRETS_FOUND}: {}. Remove them, or ask an admin to allow \
+                    them.",
                 summary(&findings)
             ));
         }
@@ -203,7 +223,12 @@ impl ContentCheck for SecretGuard {
 /// Collection rows (D301): the same policy as pages, and the same `422`.
 #[async_trait]
 impl RowCheck for SecretGuard {
-    async fn check(&self, principal: &Principal, path: &BlobPath, text: &str) -> Result<(), Error> {
+    async fn check(
+        &self,
+        principal: &Principal,
+        path: &BlobPath,
+        text: &str,
+    ) -> Result<(), Error> {
         let actor = principal
             .user_id()
             .map_or(Actor::External, |user| Actor::User { user });
@@ -257,7 +282,10 @@ impl SecretsService {
         Self { guard }
     }
 
-    async fn scan(&self, input: SecretScanInput) -> Result<SecretScanResult, Error> {
+    async fn scan(
+        &self,
+        input: SecretScanInput,
+    ) -> Result<SecretScanResult, Error> {
         let settings = self.guard.settings().await;
         let findings = if settings.secret_scanning == SecretScanning::Off {
             Vec::new()
@@ -303,9 +331,10 @@ impl Service for SecretsService {
             )
             .summary("Finds likely secrets in page text")
             .description(
-                "Returns the workspace's secret-scanning policy and the likely secrets \
-                 in the text (kind, line, column and a redacted preview), so the editor \
-                 can warn before a save. Nothing is stored or audited.",
+                "Returns the workspace's secret-scanning policy and the likely \
+                 secrets in the text (kind, line, column and a redacted \
+                 preview), so the editor can warn before a save. Nothing is \
+                 stored or audited.",
             ),
         ]
     }
@@ -350,9 +379,15 @@ mod tests {
         let guard = SecretGuard::default();
         let path = BlobPath::new("drives/shared/eng/deploys.md").unwrap();
         let text = page(&token());
-        ContentCheck::check(&guard, &Actor::System, SpaceId::from_u128(1), &path, &text)
-            .await
-            .unwrap();
+        ContentCheck::check(
+            &guard,
+            &Actor::System,
+            SpaceId::from_u128(1),
+            &path,
+            &text,
+        )
+        .await
+        .unwrap();
         let service = SecretsService::new(Arc::new(guard));
         let result = service.scan(SecretScanInput { text }).await.unwrap();
         assert_eq!(result.policy, SecretScanning::Warn);
@@ -365,7 +400,9 @@ mod tests {
     #[tokio::test]
     async fn rows_meet_the_same_policy_as_pages() {
         let guard = SecretGuard::default();
-        let path = BlobPath::new("drives/shared/eng/Bots.collection/rows/deploy.md").unwrap();
+        let path =
+            BlobPath::new("drives/shared/eng/Bots.collection/rows/deploy.md")
+                .unwrap();
         let principal = vellum_contracts::Principal::user(
             vellum_kernel::UserId::from_u128(7),
             vellum_contracts::CredentialKind::Session,

@@ -11,7 +11,9 @@ use crate::value::format_number;
 
 /// A range of characters (Unicode scalar values, not bytes) in the source,
 /// so editors can underline the exact spot of an error.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, schemars::JsonSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, schemars::JsonSchema,
+)]
 pub struct Span {
     /// First character, counting from 0.
     pub start: usize,
@@ -75,7 +77,9 @@ impl BinOp {
         match self {
             Self::Or => 1,
             Self::And => 2,
-            Self::Eq | Self::Ne | Self::Lt | Self::Gt | Self::Le | Self::Ge => 4,
+            Self::Eq | Self::Ne | Self::Lt | Self::Gt | Self::Le | Self::Ge => {
+                4
+            }
             Self::Add | Self::Sub => 5,
             Self::Mul | Self::Div | Self::Rem => 6,
         }
@@ -202,13 +206,21 @@ impl Func {
     pub const fn arity(self) -> (usize, Option<usize>) {
         match self {
             Self::Now => (0, Some(0)),
-            Self::Len | Self::Year | Self::Format | Self::Empty | Self::Upper | Self::Lower => {
-                (1, Some(1))
-            }
+            Self::Len
+            | Self::Year
+            | Self::Format
+            | Self::Empty
+            | Self::Upper
+            | Self::Lower => (1, Some(1)),
             Self::Round | Self::Percent => (1, Some(2)),
             Self::Days | Self::Contains => (2, Some(2)),
             Self::If => (2, Some(3)),
-            Self::Concat | Self::Min | Self::Max | Self::Sum | Self::Avg | Self::Count => (1, None),
+            Self::Concat
+            | Self::Min
+            | Self::Max
+            | Self::Sum
+            | Self::Avg
+            | Self::Count => (1, None),
         }
     }
 }
@@ -256,7 +268,8 @@ impl Node {
                 r.walk_mut(f);
             }
             Expr::Call(_, args) => args.iter_mut().for_each(|a| a.walk_mut(f)),
-            Expr::Number(_) | Expr::Text(_) | Expr::Bool(_) | Expr::Prop(_) => {}
+            Expr::Number(_) | Expr::Text(_) | Expr::Bool(_) | Expr::Prop(_) => {
+            }
         }
     }
 
@@ -317,7 +330,11 @@ impl fmt::Display for Node {
     }
 }
 
-fn write_child(f: &mut fmt::Formatter<'_>, node: &Node, wrap: bool) -> fmt::Result {
+fn write_child(
+    f: &mut fmt::Formatter<'_>,
+    node: &Node,
+    wrap: bool,
+) -> fmt::Result {
     if wrap {
         write!(f, "({node})")
     } else {

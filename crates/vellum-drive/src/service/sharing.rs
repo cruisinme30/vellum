@@ -17,7 +17,9 @@ use crate::model::NodeKind;
 use crate::sharing::{Grant, Grantee, LinkInfo, Role, Sharing, SharingState};
 
 /// A role granted on an item.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum RoleView {
     /// Read.
@@ -172,7 +174,11 @@ pub struct LinkKey {
     pub link_id: ShareId,
 }
 
-fn view(state: &SharingState, links_allowed: bool, handles: Option<&Handles>) -> SharingView {
+fn view(
+    state: &SharingState,
+    links_allowed: bool,
+    handles: Option<&Handles>,
+) -> SharingView {
     SharingView {
         item: NodeView::from(&state.node),
         grants: state
@@ -205,7 +211,11 @@ impl DriveService {
         self.sharing.as_ref().ok_or_else(unavailable)
     }
 
-    async fn sharing_view(&self, ctx: &RequestContext, id: ObjectId) -> Result<SharingView, Error> {
+    async fn sharing_view(
+        &self,
+        ctx: &RequestContext,
+        id: ObjectId,
+    ) -> Result<SharingView, Error> {
         let sharing = self.sharing()?;
         let state = sharing.state(&actor(ctx)?, id).await?;
         Ok(view(
@@ -223,7 +233,11 @@ impl DriveService {
         self.sharing_view(ctx, input.id).await
     }
 
-    async fn share(&self, ctx: &RequestContext, input: ShareInput) -> Result<SharingView, Error> {
+    async fn share(
+        &self,
+        ctx: &RequestContext,
+        input: ShareInput,
+    ) -> Result<SharingView, Error> {
         let grant = Grant {
             grantee: Grantee::parse(&input.principal)?,
             role: input.role.into(),
@@ -275,7 +289,11 @@ impl DriveService {
         })
     }
 
-    async fn revoke_link(&self, ctx: &RequestContext, input: LinkKey) -> Result<Done, Error> {
+    async fn revoke_link(
+        &self,
+        ctx: &RequestContext,
+        input: LinkKey,
+    ) -> Result<Done, Error> {
         self.sharing()?
             .revoke_link(&actor(ctx)?, input.link_id)
             .await?;
@@ -288,10 +306,12 @@ impl DriveService {
                 "List who has access to an item and its share links"),
             op!(self, Put "drive.share", "/v1/drive/items/{id}/grants", share,
                 "Give a person or group a role on an item"),
-            op!(self, Delete "drive.unshare", "/v1/drive/items/{id}/grants/{principal}", unshare,
+            op!(self, Delete "drive.unshare", "/v1/drive/items/{id}/grants/{pri\
+                ncipal}", unshare,
                 "Remove the roles a person or group holds on an item"),
             op!(self, Post "drive.create_link", "/v1/drive/items/{id}/links", create_link,
-                "Make a share link to a page, optionally expiring and password-protected"),
+                "Make a share link to a page, optionally expiring and \
+                    password-protected"),
             op!(self, Delete "drive.revoke_link", "/v1/drive/links/{link_id}", revoke_link,
                 "Revoke a share link"),
         ]

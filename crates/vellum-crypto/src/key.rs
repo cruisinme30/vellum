@@ -39,8 +39,8 @@ impl SecretKey {
 
     /// Builds a key from a slice, as returned by a key provider.
     ///
-    /// # Errors
-    /// [`CryptoError::Malformed`] unless the slice is exactly [`KEY_LEN`] bytes.
+    /// # Errors [`CryptoError::Malformed`] unless the slice is exactly
+    /// [`KEY_LEN`] bytes.
     pub fn from_slice(bytes: &[u8]) -> Result<Self, CryptoError> {
         let array: [u8; KEY_LEN] = bytes
             .try_into()
@@ -99,7 +99,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn generated_keys_differ_and_debug_hides_bytes() -> Result<(), CryptoError> {
+    fn generated_keys_differ_and_debug_hides_bytes() -> Result<(), CryptoError>
+    {
         let a = SecretKey::generate()?;
         let b = SecretKey::generate()?;
         assert_ne!(a.expose(), b.expose());

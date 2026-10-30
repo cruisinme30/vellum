@@ -30,7 +30,10 @@ const manifest: ShellManifest = {
 /** A CacheStorage over plain maps. */
 function fakeCaches(initial: Record<string, Record<string, string>> = {}) {
   const stores = new Map<string, Map<string, string>>(
-    Object.entries(initial).map(([name, entries]) => [name, new Map(Object.entries(entries))]),
+    Object.entries(initial).map(([name, entries]) => [
+      name,
+      new Map(Object.entries(entries)),
+    ]),
   );
   const open = (name: string) => {
     const store = stores.get(name) ?? new Map<string, string>();
@@ -42,7 +45,9 @@ function fakeCaches(initial: Record<string, Record<string, string>> = {}) {
       },
       match: (key: string) => {
         const body = store.get(key);
-        return Promise.resolve(body === undefined ? undefined : new Response(body));
+        return Promise.resolve(
+          body === undefined ? undefined : new Response(body),
+        );
       },
     });
   };
@@ -94,17 +99,25 @@ describe("routing", () => {
     ["/assets/unknown.js", "cors", "GET", "network"],
     ["/index.html", "cors", "POST", "network"],
   ])("%s (%s %s) goes to %s", (path, mode, method, kind) => {
-    expect(route(request(path, mode, method), ORIGIN, manifest).kind).toBe(kind);
+    expect(route(request(path, mode, method), ORIGIN, manifest).kind).toBe(
+      kind,
+    );
   });
 
   it("leaves other origins alone", () => {
-    const foreign = { url: "https://cdn.example/x.js", mode: "cors", method: "GET" };
+    const foreign = {
+      url: "https://cdn.example/x.js",
+      mode: "cors",
+      method: "GET",
+    };
     expect(route(foreign, ORIGIN, manifest)).toEqual({ kind: "network" });
   });
 });
 
 describe("respond", () => {
-  const fetchMock = vi.fn((url: string) => Promise.resolve(new Response(`network ${url}`)));
+  const fetchMock = vi.fn((url: string) =>
+    Promise.resolve(new Response(`network ${url}`)),
+  );
 
   it("serves navigations from the cached shell and assets cache-first", async () => {
     const { caches } = fakeCaches();
@@ -130,8 +143,15 @@ describe("respond", () => {
   it("lets the browser handle navigations when no shell is precached", async () => {
     const { caches } = fakeCaches();
     const bare = { version: "x", entries: [] };
-    const context = { caches, origin: ORIGIN, manifest: bare, fetch: fetchMock };
-    expect(await respond(request("/docs/1", "navigate"), context)).toBeUndefined();
+    const context = {
+      caches,
+      origin: ORIGIN,
+      manifest: bare,
+      fetch: fetchMock,
+    };
+    expect(
+      await respond(request("/docs/1", "navigate"), context),
+    ).toBeUndefined();
   });
 });
 
@@ -164,7 +184,10 @@ describe("push", () => {
   );
 
   it("never links to another origin", () => {
-    const payload = JSON.stringify({ title: "x", url: "https://evil.example/phish" });
+    const payload = JSON.stringify({
+      title: "x",
+      url: "https://evil.example/phish",
+    });
     expect(readPush(payload, ORIGIN).url).toBe("/inbox");
   });
 });
@@ -183,14 +206,20 @@ function windowClient(url: string) {
 
 function clientsOf(windows: WindowClientLike[]) {
   const openWindow = vi.fn(resolvedWith);
-  const clients: ClientsLike = { matchAll: () => Promise.resolve(windows), openWindow };
+  const clients: ClientsLike = {
+    matchAll: () => Promise.resolve(windows),
+    openWindow,
+  };
   return { clients, openWindow };
 }
 
 describe("notification clicks", () => {
   it("focuses a window already on the page", async () => {
     const exact = windowClient(`${ORIGIN}/inbox`);
-    const { clients, openWindow } = clientsOf([windowClient(`${ORIGIN}/`).client, exact.client]);
+    const { clients, openWindow } = clientsOf([
+      windowClient(`${ORIGIN}/`).client,
+      exact.client,
+    ]);
     await openNotice(clients, ORIGIN, "/inbox");
     expect(exact.focus).toHaveBeenCalled();
     expect(openWindow).not.toHaveBeenCalled();

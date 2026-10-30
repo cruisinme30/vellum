@@ -18,8 +18,8 @@ use vellum_kernel::{CommentId, DocId};
 use vellum_work::comment::AuthoredBy;
 use vellum_work::doclink::{self, IssueEmbed};
 use vellum_work::{
-    BlockRef, Comments, Ctx, IssueId, NewComment, NewIssue, Target, Team, TeamId, TeamKey, Thread,
-    UserRef, WorkError, WorkEvent, WorkGraph,
+    BlockRef, Comments, Ctx, IssueId, NewComment, NewIssue, Target, Team,
+    TeamId, TeamKey, Thread, UserRef, WorkError, WorkEvent, WorkGraph,
 };
 
 const NOW: OffsetDateTime = datetime!(2026-11-02 09:00 UTC);
@@ -52,8 +52,8 @@ fn plan_doc() -> DocId {
     "01JB3K9Q7Z5N8M2X4V6T0R1Y3W".parse().unwrap()
 }
 
-const PLAN: &str = "---\nid: 01JB3K9Q7Z5N8M2X4V6T0R1Y3W\ntitle: Gateway plan\n---\n\
-# Gateway plan ^blk-aaaaaaaa\n\n\
+const PLAN: &str = "---\nid: 01JB3K9Q7Z5N8M2X4V6T0R1Y3W\ntitle: Gateway plan\n\
+---\n# Gateway plan ^blk-aaaaaaaa\n\n\
 Rate limits drop bursts from the mobile app. ^blk-bbbbbbbb\n\n\
 Retry storms are tracked in ENG-1. ^blk-cccccccc\n";
 
@@ -85,7 +85,9 @@ fn northstar() -> WorkGraph {
     g
 }
 
-fn added(changes: &vellum_work::CommentChanges) -> (Vec<String>, Option<String>) {
+fn added(
+    changes: &vellum_work::CommentChanges,
+) -> (Vec<String>, Option<String>) {
     match changes.events.first() {
         Some(WorkEvent::CommentAdded {
             recipients,
@@ -106,7 +108,8 @@ fn issue_threads_notify_and_subscribe() {
     let target = g.comment_target("ENG-1").unwrap();
     let subscribers = g.issue(&iid(1)).unwrap().subscribers.clone();
 
-    let draft = NewComment::new(cid(1), target, "@dev can you take a look? cc `@sam`");
+    let draft =
+        NewComment::new(cid(1), target, "@dev can you take a look? cc `@sam`");
     let changes = c.add(draft, &subscribers, &as_user("priya")).unwrap();
     let (recipients, _) = added(&changes);
     assert!(recipients.contains(&"dev".to_owned()), "{recipients:?}");
@@ -154,7 +157,8 @@ fn issue_threads_notify_and_subscribe() {
 fn assign_from_a_comment_lands_in_my_work_until_resolved() {
     let mut c = Comments::new();
     let at = BlockRef::new(plan_doc(), "blk-bbbbbbbb").unwrap();
-    let mut draft = NewComment::new(cid(1), Target::block(at), "Can you size this?");
+    let mut draft =
+        NewComment::new(cid(1), Target::block(at), "Can you size this?");
     draft.quote = Some("Rate limits drop bursts".into());
     draft.assign_to = Some(user("dev"));
     let changes = c.add(draft, &[user("mara")], &as_user("priya")).unwrap();
@@ -177,7 +181,9 @@ fn assign_from_a_comment_lands_in_my_work_until_resolved() {
     assert!(c.assignments(&user("priya")).is_empty());
     assert!(matches!(
         changes.events.first(),
-        Some(WorkEvent::CommentThreadResolved { assignee: Some(a), .. }) if *a == user("priya")
+        Some(
+            WorkEvent::CommentThreadResolved { assignee: Some(a), .. }
+        ) if *a == user("priya")
     ));
     // Resolving twice changes nothing.
     assert_eq!(
@@ -212,7 +218,9 @@ fn only_authors_edit_and_deletes_keep_reply_context() {
         .unwrap();
     assert!(matches!(
         changes.events.first(),
-        Some(WorkEvent::CommentEdited { new_mentions, .. }) if *new_mentions == [user("mara")]
+        Some(
+            WorkEvent::CommentEdited { new_mentions, .. }
+        ) if *new_mentions == [user("mara")]
     ));
     assert!(c.thread(&cid(1)).unwrap().comments[0].edited_at.is_some());
 
@@ -424,8 +432,14 @@ fn issue_from_a_block_writes_a_chip_and_a_source_link() {
     // A block that is not there numbers nothing.
     let missing = BlockRef::new(plan_doc(), "blk-zzzzzzzz").unwrap();
     assert!(
-        g.issue_from_block(draft.clone(), &missing, None, PLAN, &as_user("priya"))
-            .is_err()
+        g.issue_from_block(
+            draft.clone(),
+            &missing,
+            None,
+            PLAN,
+            &as_user("priya")
+        )
+        .is_err()
     );
     assert!(g.issue(&iid(2)).is_none());
 
@@ -440,7 +454,9 @@ fn issue_from_a_block_writes_a_chip_and_a_source_link() {
         .unwrap();
     assert!(changes.issues.contains(&iid(2)));
     assert!(
-        doc.contains("Rate limits drop bursts from the mobile app. ENG-2 ^blk-bbbbbbbb"),
+        doc.contains(
+            "Rate limits drop bursts from the mobile app. ENG-2 ^blk-bbbbbbbb"
+        ),
         "{doc}"
     );
     let issue = g.issue(&iid(2)).unwrap();
@@ -497,11 +513,15 @@ fn project_pages_embed_issue_views() {
             .unwrap();
     }
     let _ = g
-        .create_issue(NewIssue::new(iid(5), tk("OPS"), "Pager"), &as_user("dev"))
+        .create_issue(
+            NewIssue::new(iid(5), tk("OPS"), "Pager"),
+            &as_user("dev"),
+        )
         .unwrap();
-    let embed =
-        IssueEmbed::from_yaml("filter:\n  field: team\n  op: is\n  values: [ENG]\nlimit: 3\n")
-            .unwrap();
+    let embed = IssueEmbed::from_yaml(
+        "filter:\n  field: team\n  op: is\n  values: [ENG]\nlimit: 3\n",
+    )
+    .unwrap();
     let groups = g
         .embed(&embed, None, &user("dev"), &as_user("dev"))
         .unwrap();
@@ -522,7 +542,8 @@ fn project_pages_embed_issue_views() {
         IssueEmbed::from_yaml("filter: {}\ncolour: red\n").is_err(),
         "unknown key"
     );
-    let named = IssueEmbed::from_yaml("view: 01JB3K9Q7Z5N8M2X4V6T0R1Y41\n").unwrap();
+    let named =
+        IssueEmbed::from_yaml("view: 01JB3K9Q7Z5N8M2X4V6T0R1Y41\n").unwrap();
     assert!(
         g.embed(&named, None, &user("dev"), &as_user("dev"))
             .is_err()
@@ -533,7 +554,11 @@ fn project_pages_embed_issue_views() {
 fn mentions_wait_in_my_work_until_answered_or_resolved() {
     let mut c = Comments::new();
     let at = BlockRef::new(plan_doc(), "blk-bbbbbbbb").unwrap();
-    let draft = NewComment::new(cid(1), Target::block(at), "@dev can you check the limits?");
+    let draft = NewComment::new(
+        cid(1),
+        Target::block(at),
+        "@dev can you check the limits?",
+    );
     let _ = c.add(draft, &[], &as_user("priya")).unwrap();
 
     let items = c.mentions_of(&user("dev"));
@@ -563,7 +588,11 @@ fn mentions_wait_in_my_work_until_answered_or_resolved() {
 #[test]
 fn a_thread_assigned_to_someone_is_not_also_their_mention() {
     let mut c = Comments::new();
-    let mut draft = NewComment::new(cid(1), Target::doc(plan_doc()), "@dev please size this");
+    let mut draft = NewComment::new(
+        cid(1),
+        Target::doc(plan_doc()),
+        "@dev please size this",
+    );
     draft.assign_to = Some(user("dev"));
     let _ = c.add(draft, &[], &as_user("priya")).unwrap();
     assert_eq!(c.assignments(&user("dev")).len(), 1);

@@ -161,3 +161,8 @@ holder = "creating books (#566)"
 adrs = "0076"
 decisions = "D324"
 holder = "coverage within a runner's disk, reserved by the coordinator"
+
+[[reservation]]
+adrs = "0074"
+decisions = "D320"
+holder = "80-character line limit (#564), reserved by the coordinator"

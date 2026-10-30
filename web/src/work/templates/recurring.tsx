@@ -1,7 +1,9 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-/** A team's open repeating issues, with their repeat changed or stopped (#144). */
+/**
+ * A team's open repeating issues, with their repeat changed or stopped (#144).
+ */
 
 import { useId, useState } from "react";
 import { Link } from "react-router";
@@ -44,13 +46,16 @@ function RecurringRow({
       },
     );
   };
+  const issueHref = `/issues/${encodeURIComponent(issue.key)}`;
   return (
     <li className="vl-tpl-recurring">
       <span className="vl-tpl-recurring-title">
-        <Link to={`/issues/${encodeURIComponent(issue.key)}`}>{issue.key}</Link> {issue.title}
+        <Link to={issueHref}>{issue.key}</Link> {issue.title}
       </span>
       <span className="vl-muted">
-        {issue.due == undefined ? t("tpl-no-due") : t("tpl-due", { due: issue.due })}
+        {issue.due == undefined
+          ? t("tpl-no-due")
+          : t("tpl-due", { due: issue.due })}
       </span>
       <label className="vl-visually-hidden" htmlFor={id}>
         {t("tpl-repeat-of", { key: issue.key })}
@@ -61,7 +66,10 @@ function RecurringRow({
         disabled={busy}
         onChange={(event) => {
           const next = event.target.value;
-          change(next, t("tpl-repeat-changed", { key: issue.key, repeat: next }));
+          change(
+            next,
+            t("tpl-repeat-changed", { key: issue.key, repeat: next }),
+          );
         }}
       >
         {repeatChoices(repeat).map((r) => (
@@ -111,7 +119,9 @@ export function Recurring({
   return (
     <section className="vl-settings-section" aria-labelledby="vl-tpl-recurring">
       <h2 id="vl-tpl-recurring">{t("tpl-recurring")}</h2>
-      <p className="vl-muted">{t("tpl-recurring-intro", { timezone: team.timezone })}</p>
+      <p className="vl-muted">
+        {t("tpl-recurring-intro", { timezone: team.timezone })}
+      </p>
       <Ready loaded={loaded}>
         {(issues) =>
           issues.length === 0 ? (

@@ -26,7 +26,11 @@ import "./assist.css";
 export function AssistantSettingsView() {
   const t = useT();
   return (
-    <ServerScreen api="assist" title={t("assist-settings-title")} className="vl-admin">
+    <ServerScreen
+      api="assist"
+      title={t("assist-settings-title")}
+      className="vl-admin"
+    >
       {(api) => <AssistantSettings api={api} />}
     </ServerScreen>
   );
@@ -67,8 +71,13 @@ function Fields({
     },
   });
   const pickProvider = (next: Provider) => {
-    const keepModel = value.model !== "" && value.model !== SUGGESTED_MODEL[value.provider];
-    onChange({ ...value, provider: next, model: keepModel ? value.model : SUGGESTED_MODEL[next] });
+    const keepModel =
+      value.model !== "" && value.model !== SUGGESTED_MODEL[value.provider];
+    onChange({
+      ...value,
+      provider: next,
+      model: keepModel ? value.model : SUGGESTED_MODEL[next],
+    });
   };
   return (
     <>
@@ -95,7 +104,11 @@ function Fields({
         {t("assist-api-key")}
         <input
           type="password"
-          placeholder={saved === undefined || saved.apiKey === "" ? "" : keyHint(saved.apiKey)}
+          placeholder={
+            saved === undefined || saved.apiKey === ""
+              ? ""
+              : keyHint(saved.apiKey)
+          }
           aria-describedby="assist-key-help"
           {...text("apiKey")}
         />
@@ -105,7 +118,11 @@ function Fields({
       </p>
       <label>
         {t("assist-base-url")}
-        <input type="url" placeholder={PLACEHOLDER[value.provider]} {...text("baseUrl")} />
+        <input
+          type="url"
+          placeholder={PLACEHOLDER[value.provider]}
+          {...text("baseUrl")}
+        />
       </label>
       <label className="vl-assist-check">
         <input
@@ -126,7 +143,9 @@ function Outcome({ result }: { readonly result: TestResult | undefined }) {
   return (
     <>
       <div role="status">
-        {result?.ok === true && <p>{`${result.detail} ${t("assist-saved")}`}</p>}
+        {result?.ok === true && (
+          <p>{`${result.detail} ${t("assist-saved")}`}</p>
+        )}
       </div>
       {result?.ok === false && (
         <p className="vl-field-error" role="alert">
@@ -141,7 +160,10 @@ function Outcome({ result }: { readonly result: TestResult | undefined }) {
 export function AssistantSettings({ api }: { readonly api: AssistApi }) {
   const t = useT();
   const { userId, stored } = useModel();
-  const [value, setValue] = useState<StoredModel>(() => ({ ...(stored ?? EMPTY), apiKey: "" }));
+  const [value, setValue] = useState<StoredModel>(() => ({
+    ...(stored ?? EMPTY),
+    apiKey: "",
+  }));
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<TestResult>();
 
@@ -152,7 +174,10 @@ export function AssistantSettings({ api }: { readonly api: AssistApi }) {
     event.preventDefault();
     // An empty key field keeps the saved key.
     const typed = value.apiKey.trim();
-    const next: StoredModel = { ...value, apiKey: typed === "" ? (stored?.apiKey ?? "") : typed };
+    const next: StoredModel = {
+      ...value,
+      apiKey: typed === "" ? (stored?.apiKey ?? "") : typed,
+    };
     setBusy(true);
     setResult(undefined);
     api

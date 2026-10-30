@@ -14,11 +14,18 @@ interface PopoverProperties {
  * A non-modal dialog anchored by CSS. Escape and a click outside close it,
  * and focus returns to whatever opened it.
  */
-export function Popover({ label, onClose, children, className = "" }: PopoverProperties) {
+export function Popover({
+  label,
+  onClose,
+  children,
+  className = "",
+}: PopoverProperties) {
   const panel = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
-    panel.current?.querySelector<HTMLElement>("input, button, a, [tabindex]")?.focus();
+    panel.current
+      ?.querySelector<HTMLElement>("input, button, a, [tabindex]")
+      ?.focus();
     const onPointer = (event: PointerEvent) => {
       if (!panel.current?.contains(event.target as Node)) {
         onClose();
@@ -38,7 +45,12 @@ export function Popover({ label, onClose, children, className = "" }: PopoverPro
     };
   }, [onClose]);
   return (
-    <div className={`vl-popover ${className}`} role="dialog" aria-label={label} ref={panel}>
+    <div
+      className={`vl-popover ${className}`}
+      role="dialog"
+      aria-label={label}
+      ref={panel}
+    >
       {children}
     </div>
   );

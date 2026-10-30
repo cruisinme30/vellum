@@ -4,7 +4,9 @@
 //! The drive's domain types.
 
 use serde::{Deserialize, Serialize};
-use vellum_kernel::{Actor, EventId, ObjectId, SpaceId, Timestamp, UserId, VersionId};
+use vellum_kernel::{
+    Actor, EventId, ObjectId, SpaceId, Timestamp, UserId, VersionId,
+};
 use vellum_store::BlobPath;
 
 /// What a space is for.

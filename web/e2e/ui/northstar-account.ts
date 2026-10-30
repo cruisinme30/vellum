@@ -34,7 +34,14 @@ export const FACTORS: FactorsView = {
   required: true,
   totp: true,
   recoveryCodesLeft: 7,
-  passkeys: [{ id: "pk1", name: "MacBook Touch ID", createdAt: EARLIER, lastUsedAt: NOW }],
+  passkeys: [
+    {
+      id: "pk1",
+      name: "MacBook Touch ID",
+      createdAt: EARLIER,
+      lastUsedAt: NOW,
+    },
+  ],
 };
 
 export const ADMIN_TOKENS: AdminTokenView[] = MY_TOKENS.map((token) => ({

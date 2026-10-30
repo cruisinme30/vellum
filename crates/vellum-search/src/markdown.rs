@@ -61,10 +61,13 @@ impl Walker {
                         Block::Paragraph { id, .. } => Some(*id),
                         _ => None,
                     });
-                    let text = join(item.blocks.iter().filter_map(|b| match b {
-                        Block::Paragraph { content, .. } => Some(plain_text(content)),
-                        _ => None,
-                    }));
+                    let text =
+                        join(item.blocks.iter().filter_map(|b| match b {
+                            Block::Paragraph { content, .. } => {
+                                Some(plain_text(content))
+                            }
+                            _ => None,
+                        }));
                     let kind = if item.task.is_some() {
                         BlockKind::Task
                     } else {
@@ -95,7 +98,9 @@ impl Walker {
             Block::Container(container) => match container.kind() {
                 ContainerKind::Callout | ContainerKind::Details => {
                     let body = container.sections.iter().map(|s| text_of(s));
-                    let text = join(std::iter::once(container.arg.clone()).chain(body));
+                    let text = join(
+                        std::iter::once(container.arg.clone()).chain(body),
+                    );
                     self.emit(container.id, BlockKind::Callout, text);
                 }
                 _ => {
@@ -175,18 +180,21 @@ fn row_text(cells: &[Vec<Inline>]) -> String {
 fn text_of(blocks: &[Block]) -> String {
     join(blocks.iter().map(|block| {
         match block {
-            Block::Paragraph { content, .. } | Block::Heading { content, .. } => {
-                plain_text(content)
-            }
+            Block::Paragraph { content, .. }
+            | Block::Heading { content, .. } => plain_text(content),
             Block::BlockQuote { blocks, .. } => text_of(blocks),
-            Block::List(list) => join(list.items.iter().map(|item| text_of(&item.blocks))),
+            Block::List(list) => {
+                join(list.items.iter().map(|item| text_of(&item.blocks)))
+            }
             Block::Fence(fence) => fence.literal.trim_end().to_owned(),
             Block::Table(table) => join(
                 std::iter::once(&table.header)
                     .chain(&table.rows)
                     .map(|row| row_text(row)),
             ),
-            Block::Container(container) => join(container.sections.iter().map(|s| text_of(s))),
+            Block::Container(container) => {
+                join(container.sections.iter().map(|s| text_of(s)))
+            }
             Block::ThematicBreak | Block::Math { .. } => String::new(),
         }
     }))

@@ -52,12 +52,17 @@ function hook(overrides: Partial<HookView> = {}): HookView {
 
 function fakeHooks(hooks: HookView[]) {
   const create = vi.fn<WebhooksApi["create"]>((input) =>
-    Promise.resolve({ hook: hook({ id: "wh_2", url: input.url }), secret: "whsec_NEWSECRET" }),
+    Promise.resolve({
+      hook: hook({ id: "wh_2", url: input.url }),
+      secret: "whsec_NEWSECRET",
+    }),
   );
   const update = vi.fn<WebhooksApi["update"]>((_id, input, enabled) =>
     Promise.resolve(hook({ ...input, enabled })),
   );
-  const test = vi.fn<WebhooksApi["test"]>(() => Promise.resolve({ ...DELIVERY, event: "ping" }));
+  const test = vi.fn<WebhooksApi["test"]>(() =>
+    Promise.resolve({ ...DELIVERY, event: "ping" }),
+  );
   const redeliver = vi.fn<WebhooksApi["redeliver"]>(() => Promise.resolve());
   const api: WebhooksApi = {
     list: () => Promise.resolve({ hooks, event_types: EVENT_TYPES }),
@@ -74,7 +79,9 @@ function fakeHooks(hooks: HookView[]) {
 
 function renderWith(webhooks?: WebhooksApi) {
   const user = userEvent.setup();
-  const api = (webhooks === undefined ? {} : { webhooks }) as unknown as AdminConsoleApi;
+  const api = (webhooks === undefined
+    ? {}
+    : { webhooks }) as unknown as AdminConsoleApi;
   render(
     <I18nProvider>
       <AdminConsoleProvider api={api}>
@@ -90,10 +97,17 @@ describe("webhooks admin", () => {
     renderWith(
       fakeHooks([
         hook(),
-        hook({ id: "wh_p", enabled: false, paused_reason: "failing since Monday", teams: ["ENG"] }),
+        hook({
+          id: "wh_p",
+          enabled: false,
+          paused_reason: "failing since Monday",
+          teams: ["ENG"],
+        }),
       ]).api,
     );
-    expect(await screen.findAllByText("https://hooks.northstar.dev/vellum")).toHaveLength(2);
+    expect(
+      await screen.findAllByText("https://hooks.northstar.dev/vellum"),
+    ).toHaveLength(2);
     expect(screen.getByText(/Paused: failing since Monday/u)).toBeTruthy();
     expect(screen.getAllByText("Every public team")).toHaveLength(1);
     expect(screen.getAllByText(/whsec_…abcd/u)).toHaveLength(2);
@@ -103,7 +117,10 @@ describe("webhooks admin", () => {
     const fake = fakeHooks([]);
     const user = renderWith(fake.api);
     expect(await screen.findByText("No webhooks yet.")).toBeTruthy();
-    await user.type(screen.getByLabelText(/^Receiver URL/u), "https://ci.northstar.dev/in");
+    await user.type(
+      screen.getByLabelText(/^Receiver URL/u),
+      "https://ci.northstar.dev/in",
+    );
     await user.click(screen.getByRole("checkbox", { name: "comment" }));
     await user.type(screen.getByLabelText(/^Teams/u), "eng, ops eng");
     await user.click(screen.getByRole("button", { name: "Add webhook" }));
@@ -113,22 +130,35 @@ describe("webhooks admin", () => {
       event_types: ["issue", "comment"],
       teams: ["ENG", "OPS"],
     });
-    const secret = await screen.findByRole("region", { name: /Copy the signing secret now/u });
+    const secret = await screen.findByRole("region", {
+      name: /Copy the signing secret now/u,
+    });
     expect(within(secret).getByText("whsec_NEWSECRET")).toBeTruthy();
-    await user.click(within(secret).getByRole("button", { name: "I have stored it" }));
+    await user.click(
+      within(secret).getByRole("button", { name: "I have stored it" }),
+    );
     expect(screen.queryByText("whsec_NEWSECRET")).toBeNull();
   });
 
   it("tests, turns off and shows deliveries", async () => {
     const fake = fakeHooks([hook()]);
     const user = renderWith(fake.api);
-    await user.click(await screen.findByRole("button", { name: "Send a test" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Send a test" }),
+    );
     expect(fake.test).toHaveBeenCalledWith("wh_1");
-    expect(await screen.findByText(/Test delivery: Delivered 204/u)).toBeTruthy();
+    expect(
+      await screen.findByText(/Test delivery: Delivered 204/u),
+    ).toBeTruthy();
     await user.click(await screen.findByRole("button", { name: "Turn off" }));
     expect(fake.update).toHaveBeenCalledWith(
       "wh_1",
-      { url: hook().url, description: "CI bridge", event_types: ["issue"], teams: [] },
+      {
+        url: hook().url,
+        description: "CI bridge",
+        event_types: ["issue"],
+        teams: [],
+      },
       false,
     );
     await user.click(await screen.findByRole("button", { name: "Deliveries" }));
@@ -150,21 +180,40 @@ describe("webhooks admin", () => {
   it("calls the webhook routes", async () => {
     const get = vi.fn(() => Promise.resolve({ deliveries: [] }));
     const send = vi.fn(() => Promise.resolve({}));
-    const api = createHttpWebhooksApi({ get, send, forgetSession: vi.fn() } as unknown as Http);
-    await api.update("wh 1", { url: "u", description: "", event_types: [], teams: [] }, true);
-    expect(send).toHaveBeenLastCalledWith("PUT", "/api/v1/admin/webhooks/wh%201", {
-      url: "u",
-      description: "",
-      event_types: [],
-      teams: [],
-      enabled: true,
-    });
+    const api = createHttpWebhooksApi({
+      get,
+      send,
+      forgetSession: vi.fn(),
+    } as unknown as Http);
+    await api.update(
+      "wh 1",
+      { url: "u", description: "", event_types: [], teams: [] },
+      true,
+    );
+    expect(send).toHaveBeenLastCalledWith(
+      "PUT",
+      "/api/v1/admin/webhooks/wh%201",
+      {
+        url: "u",
+        description: "",
+        event_types: [],
+        teams: [],
+        enabled: true,
+      },
+    );
     await api.redeliver("wh_1", "d1");
-    expect(send).toHaveBeenLastCalledWith("POST", "/api/v1/admin/webhooks/wh_1/redeliver", {
-      delivery_id: "d1",
-    });
+    expect(send).toHaveBeenLastCalledWith(
+      "POST",
+      "/api/v1/admin/webhooks/wh_1/redeliver",
+      {
+        delivery_id: "d1",
+      },
+    );
     await api.remove("wh_1");
-    expect(send).toHaveBeenLastCalledWith("DELETE", "/api/v1/admin/webhooks/wh_1");
+    expect(send).toHaveBeenLastCalledWith(
+      "DELETE",
+      "/api/v1/admin/webhooks/wh_1",
+    );
     expect(await api.deliveries("wh_1")).toEqual([]);
   });
 });

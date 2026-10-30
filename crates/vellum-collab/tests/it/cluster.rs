@@ -26,11 +26,15 @@ use testcontainers_modules::testcontainers::runners::AsyncRunner as _;
 use testcontainers_modules::testcontainers::{ContainerAsync, ImageExt as _};
 use tokio_tungstenite::tungstenite::Error as WsError;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest as _;
-use vellum_collab::cluster::{Cluster, ClusterConfig, FORWARD_HEADER, Membership, Node, Route};
+use vellum_collab::cluster::{
+    Cluster, ClusterConfig, FORWARD_HEADER, Membership, Node, Route,
+};
 use vellum_collab::memory::{MemoryFiles, MemoryUpdateStore};
 use vellum_collab::sql::{Envelope, SqlUpdateStore};
 use vellum_collab::ws;
-use vellum_collab::{Access, CollabConfig, Hub, JoinRequest, RoomKey, UpdateStore};
+use vellum_collab::{
+    Access, CollabConfig, Hub, JoinRequest, RoomKey, UpdateStore,
+};
 use vellum_crypto::{KekId, LocalKeyring, SecretKey};
 use vellum_db::sqlx::{self, Connection as _, PgConnection};
 use vellum_db::{Index, IndexConfig};
@@ -64,7 +68,11 @@ struct Replica {
     addr: String,
 }
 
-async fn replica(name: &str, hub: Hub, members: Arc<dyn Membership>) -> Replica {
+async fn replica(
+    name: &str,
+    hub: Hub,
+    members: Arc<dyn Membership>,
+) -> Replica {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap().to_string();
     let me = Node {
@@ -126,7 +134,12 @@ async fn edit_across(a: &Replica, b: &Replica, files: &MemoryFiles) {
 
     // A room B owns, so the editor on A is forwarded.
     let key = std::iter::repeat_with(room)
-        .find(|key| matches!(a.cluster.route(key), Route::Remote(ref n) if n.address == b.addr))
+        .find(|key| {
+            matches!(
+                a.cluster.route(key),
+                Route::Remote(ref n) if n.address == b.addr
+            )
+        })
         .unwrap();
     assert_eq!(b.cluster.route(&key), Route::Local);
     files.put(key, "# Northstar launch\n");
@@ -225,22 +238,24 @@ async fn two_replicas_edit_one_room_over_sockets() {
 /// A fresh database on the test server, so the replica list holds only
 /// this test's replicas.
 async fn postgres() -> (Option<ContainerAsync<Postgres>>, String) {
-    let (container, base) = if let Ok(base) = std::env::var("VELLUM_TEST_POSTGRES") {
-        (None, base)
-    } else {
-        let container = Postgres::default()
-            .with_tag("17-alpine")
-            .start()
-            .await
-            .unwrap();
-        let port = container.get_host_port_ipv4(5432).await.unwrap();
-        (
-            Some(container),
-            format!("postgres://postgres:postgres@127.0.0.1:{port}"),
-        )
-    };
+    let (container, base) =
+        if let Ok(base) = std::env::var("VELLUM_TEST_POSTGRES") {
+            (None, base)
+        } else {
+            let container = Postgres::default()
+                .with_tag("17-alpine")
+                .start()
+                .await
+                .unwrap();
+            let port = container.get_host_port_ipv4(5432).await.unwrap();
+            (
+                Some(container),
+                format!("postgres://postgres:postgres@127.0.0.1:{port}"),
+            )
+        };
     let base = base.trim_end_matches('/').to_owned();
-    let name = format!("collab_cluster_{}", ObjectId::generate().as_uuid().simple());
+    let name =
+        format!("collab_cluster_{}", ObjectId::generate().as_uuid().simple());
     let mut conn = PgConnection::connect(&format!("{base}/postgres"))
         .await
         .unwrap();
@@ -253,7 +268,10 @@ async fn postgres() -> (Option<ContainerAsync<Postgres>>, String) {
 
 /// The same key on every replica, as the data folder's key file gives.
 fn keyring() -> LocalKeyring {
-    LocalKeyring::new(KekId::new("test").unwrap(), SecretKey::from_bytes([9; 32]))
+    LocalKeyring::new(
+        KekId::new("test").unwrap(),
+        SecretKey::from_bytes([9; 32]),
+    )
 }
 
 /// The same story with the replica list and the change log in Postgres,
@@ -266,7 +284,8 @@ async fn two_replicas_share_a_postgres_cluster() {
     let mut indexes = Vec::new();
     for name in ["pod-a", "pod-b"] {
         let index = Index::open(&IndexConfig::postgres(&url)).await.unwrap();
-        let store = Arc::new(SqlUpdateStore::new(index.clone(), Envelope(keyring())));
+        let store =
+            Arc::new(SqlUpdateStore::new(index.clone(), Envelope(keyring())));
         let members = Arc::new(vellum_db::cluster::Nodes::new(index.clone()));
         replicas.push(replica(name, hub(store, &files), members).await);
         indexes.push(index);

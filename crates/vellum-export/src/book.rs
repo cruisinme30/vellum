@@ -123,8 +123,16 @@ enum Step<'a> {
 ///
 /// A scope naming a section that is not in the book exports only the
 /// title page and adds a warning.
-#[tracing::instrument(name = "export.book", skip_all, fields(scope = ?book.scope))]
-pub async fn lower_book(book: &BookExport, ports: &Ports, opts: &LowerOptions) -> Lowered {
+#[tracing::instrument(
+    name = "export.book",
+    skip_all,
+    fields(scope = ?book.scope)
+)]
+pub async fn lower_book(
+    book: &BookExport,
+    ports: &Ports,
+    opts: &LowerOptions,
+) -> Lowered {
     let started = Instant::now();
     let mut session = Session::new(ports);
     let (title, steps) = plan(book, &mut session);
@@ -138,12 +146,18 @@ pub async fn lower_book(book: &BookExport, ports: &Ports, opts: &LowerOptions) -
         } = step
         {
             if let Some(id) = &section.id {
-                let _ = refs
-                    .docs
-                    .insert(id.clone(), (format!("{prefix}top"), section.label.clone()));
+                let _ = refs.docs.insert(
+                    id.clone(),
+                    (format!("{prefix}top"), section.label.clone()),
+                );
             }
             if let Some(doc) = &section.document {
-                collect_block_refs(&doc.blocks, prefix, &section.label, &mut refs);
+                collect_block_refs(
+                    &doc.blocks,
+                    prefix,
+                    &section.label,
+                    &mut refs,
+                );
             }
         }
     }
@@ -172,7 +186,15 @@ pub async fn lower_book(book: &BookExport, ports: &Ports, opts: &LowerOptions) -
                 if *new_page {
                     blocks.push(Node::PageBreak);
                 }
-                let nodes = section_nodes(&mut session, section, *level, prefix, opts, &refs).await;
+                let nodes = section_nodes(
+                    &mut session,
+                    section,
+                    *level,
+                    prefix,
+                    opts,
+                    &refs,
+                )
+                .await;
                 blocks.extend(nodes);
             }
         }
@@ -185,22 +207,26 @@ pub async fn lower_book(book: &BookExport, ports: &Ports, opts: &LowerOptions) -
 /// The export title and its steps. Depth becomes heading level, lifted so
 /// the exported section starts at level 1; top-level sections start a new
 /// page; drafts are left out.
-fn plan<'a>(book: &'a BookExport, session: &mut Session<'_>) -> (String, Vec<Step<'a>>) {
+fn plan<'a>(
+    book: &'a BookExport,
+    session: &mut Session<'_>,
+) -> (String, Vec<Step<'a>>) {
     let mut steps = Vec::new();
     let mut count = 0usize;
-    let mut push = |steps: &mut Vec<Step<'a>>, section: &'a BookSection, shift: usize| {
-        if section.draft || section.document.is_none() {
-            return;
-        }
-        count += 1;
-        let depth = section.depth.saturating_sub(shift).max(1);
-        steps.push(Step::Section {
-            section,
-            level: u8::try_from(depth.min(6)).unwrap_or(6),
-            prefix: format!("s{count}-"),
-            new_page: depth == 1,
-        });
-    };
+    let mut push =
+        |steps: &mut Vec<Step<'a>>, section: &'a BookSection, shift: usize| {
+            if section.draft || section.document.is_none() {
+                return;
+            }
+            count += 1;
+            let depth = section.depth.saturating_sub(shift).max(1);
+            steps.push(Step::Section {
+                section,
+                level: u8::try_from(depth.min(6)).unwrap_or(6),
+                prefix: format!("s{count}-"),
+                new_page: depth == 1,
+            });
+        };
     match &book.scope {
         BookScope::Whole => {
             for item in &book.items {
@@ -212,7 +238,9 @@ fn plan<'a>(book: &'a BookExport, session: &mut Session<'_>) -> (String, Vec<Ste
                             push(&mut steps, section, 0);
                         }
                     }
-                    BookItem::Part(title) => steps.push(Step::Part(title.clone())),
+                    BookItem::Part(title) => {
+                        steps.push(Step::Part(title.clone()))
+                    }
                     BookItem::Separator => {}
                 }
             }
@@ -299,7 +327,12 @@ async fn section_nodes(
 }
 
 /// Registers block IDs of headings and paragraphs so block links resolve.
-fn collect_block_refs(blocks: &[Block], prefix: &str, label: &str, refs: &mut Refs) {
+fn collect_block_refs(
+    blocks: &[Block],
+    prefix: &str,
+    label: &str,
+    refs: &mut Refs,
+) {
     for block in blocks {
         match block {
             Block::Heading {
@@ -308,17 +341,21 @@ fn collect_block_refs(blocks: &[Block], prefix: &str, label: &str, refs: &mut Re
                 ..
             } => {
                 let id = id.to_string();
-                let _ = refs
-                    .blocks
-                    .insert(id.clone(), (format!("{prefix}{id}"), inline_text(content)));
+                let _ = refs.blocks.insert(
+                    id.clone(),
+                    (format!("{prefix}{id}"), inline_text(content)),
+                );
             }
             Block::Paragraph { id: Some(id), .. } => {
                 let id = id.to_string();
-                let _ = refs
-                    .blocks
-                    .insert(id.clone(), (format!("{prefix}{id}"), label.to_owned()));
+                let _ = refs.blocks.insert(
+                    id.clone(),
+                    (format!("{prefix}{id}"), label.to_owned()),
+                );
             }
-            Block::BlockQuote { blocks, .. } => collect_block_refs(blocks, prefix, label, refs),
+            Block::BlockQuote { blocks, .. } => {
+                collect_block_refs(blocks, prefix, label, refs)
+            }
             Block::List(list) => {
                 for item in &list.items {
                     collect_block_refs(&item.blocks, prefix, label, refs);

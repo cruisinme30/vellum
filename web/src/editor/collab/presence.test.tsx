@@ -32,7 +32,12 @@ function room() {
 const live = (peers: [number, boolean][]): LiveState => ({
   status: "online",
   canWrite: true,
-  peers: new Map(peers.map(([id, canWrite]) => [id, { user: `user-${String(id)}`, canWrite }])),
+  peers: new Map(
+    peers.map(([id, canWrite]) => [
+      id,
+      { user: `user-${String(id)}`, canWrite },
+    ]),
+  ),
 });
 
 describe("peers", () => {
@@ -92,10 +97,14 @@ describe("PresenceBar", () => {
         }),
       ).toBeDefined();
     });
-    const priyaSees = within(screen.getByTestId("Priya Shah")).getByRole("listitem");
+    const priyaSees = within(screen.getByTestId("Priya Shah")).getByRole(
+      "listitem",
+    );
     expect(priyaSees.getAttribute("aria-label")).toBe("Sam Okafor is editing");
     expect(priyaSees.textContent).toBe("SO");
-    const samSees = within(screen.getByTestId("Sam Okafor")).getByRole("listitem");
+    const samSees = within(screen.getByTestId("Sam Okafor")).getByRole(
+      "listitem",
+    );
     expect(samSees.getAttribute("aria-label")).toBe("Priya Shah is editing");
   });
 });

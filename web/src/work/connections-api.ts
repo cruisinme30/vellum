@@ -30,7 +30,10 @@ export interface ConnectionsApi {
   readonly revokeCapture: () => Promise<void>;
   /** Removes the person's Slack links. */
   readonly unlinkSlack: () => Promise<void>;
-  /** Makes an API token for a CalDAV app, which it uses as its password. Shown once. */
+  /**
+   * Makes an API token for a CalDAV app, which it uses as its password. Shown
+   * once.
+   */
   readonly appPassword: (name: string) => Promise<string>;
   /** Imports an export from another app; `project` names a Todoist list. */
   readonly importTasks: (
@@ -63,10 +66,14 @@ export function createHttpConnectionsApi(http: Http): ConnectionsApi {
     },
     async appPassword(name) {
       // CalDAV clients read and write tasks, nothing else.
-      const created = await http.send<CreatedToken>("POST", "/api/v1/me/tokens", {
-        name,
-        scopes: ["read", "write:direct"],
-      });
+      const created = await http.send<CreatedToken>(
+        "POST",
+        "/api/v1/me/tokens",
+        {
+          name,
+          scopes: ["read", "write:direct"],
+        },
+      );
       return created.token;
     },
     importTasks: (from, content, project) =>

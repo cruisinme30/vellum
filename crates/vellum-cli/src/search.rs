@@ -6,10 +6,11 @@
 //! - The index is embedded tantivy in `<data>/.vellum/search`, sealed with
 //!   a key derived from `VELLUM_INDEX_KEY` (plaintext in plaintext mode),
 //!   or Postgres full-text search when the server runs on Postgres.
-//! - Drive pages reach it through `vellum_search::DriveFeed`, which follows
-//!   the page change log. With the shared Postgres tables one replica of the
-//!   cluster follows it at a time (ADR 0038, D164). Collection rows reach it through the collections
-//!   service's index feed, so formulas and rollups are searchable too.
+//! - Drive pages reach it through `vellum_search::DriveFeed`, which follows the
+//!   page change log. With the shared Postgres tables one replica of the
+//!   cluster follows it at a time (ADR 0038, D164). Collection rows reach it
+//!   through the collections service's index feed, so formulas and rollups are
+//!   searchable too.
 //! - A row has no node of its own in the permission tree, so a row hit is
 //!   checked against its collection: whoever can read the collection can
 //!   find its rows.
@@ -33,12 +34,14 @@ use vellum_authz::{Authz, AuthzStore};
 use vellum_collections::CollectionsService;
 use vellum_collections::service::{IndexFeed, RowDocument, SpaceOf};
 use vellum_db::{Index, IndexPool};
-use vellum_kernel::{DocId, Error, ErrorKind, ObjectId, SpaceId, Timestamp, UserId};
+use vellum_kernel::{
+    DocId, Error, ErrorKind, ObjectId, SpaceId, Timestamp, UserId,
+};
 use vellum_search::{
-    DocKind, DocumentSource, DriveFeed, DriveSource, FeedConfig, IndexDocument, IndexKey, Indexer,
-    IndexerConfig, Location, OnnxConfig, OnnxEmbedder, Opened, PostgresBackend, Principal,
-    ReadAccess, SearchApi, SearchBackend, SearchService, Sharded, Stars, Start, TantivyBackend,
-    TantivyConfig,
+    DocKind, DocumentSource, DriveFeed, DriveSource, FeedConfig, IndexDocument,
+    IndexKey, Indexer, IndexerConfig, Location, OnnxConfig, OnnxEmbedder,
+    Opened, PostgresBackend, Principal, ReadAccess, SearchApi, SearchBackend,
+    SearchService, Sharded, Stars, Start, TantivyBackend, TantivyConfig,
 };
 use vellum_store::{BlobPath, BlobStore};
 
@@ -70,17 +73,23 @@ pub struct Embeddings {
 ///
 /// # Errors
 /// An idle time that is not a whole number of minutes.
-pub fn embeddings(var: impl Fn(&str) -> Option<String>) -> Result<Option<Embeddings>, Error> {
-    let Some(dir) = var("VELLUM_EMBEDDINGS").filter(|d| !d.trim().is_empty()) else {
+pub fn embeddings(
+    var: impl Fn(&str) -> Option<String>,
+) -> Result<Option<Embeddings>, Error> {
+    let Some(dir) = var("VELLUM_EMBEDDINGS").filter(|d| !d.trim().is_empty())
+    else {
         return Ok(None);
     };
     let minutes = match var("VELLUM_EMBEDDINGS_IDLE_MINUTES") {
-        Some(m) if !m.trim().is_empty() => m.trim().parse::<u64>().map_err(|_| {
-            Error::new(
-                ErrorKind::InvalidInput,
-                "VELLUM_EMBEDDINGS_IDLE_MINUTES must be a whole number of minutes",
-            )
-        })?,
+        Some(m) if !m.trim().is_empty() => {
+            m.trim().parse::<u64>().map_err(|_| {
+                Error::new(
+                    ErrorKind::InvalidInput,
+                    "VELLUM_EMBEDDINGS_IDLE_MINUTES must be a whole number of \
+                    minutes",
+                )
+            })?
+        }
         _ => DEFAULT_IDLE_MINUTES,
     };
     Ok(Some(Embeddings {
@@ -99,7 +108,11 @@ fn embedder(config: &Embeddings) -> Result<OnnxEmbedder, Error> {
             format!("VELLUM_EMBEDDINGS is not a usable model folder: {e}"),
         )
     })?;
-    tracing::info!(model = %onnx.model_id, dimensions = onnx.dimensions, "hybrid search is on");
+    tracing::info!(
+        model = %onnx.model_id,
+        dimensions = onnx.dimensions,
+        "hybrid search is on"
+    );
     let embedder = OnnxEmbedder::new(onnx);
     let idle = config.idle;
     let reaper = embedder.clone();
@@ -165,7 +178,10 @@ pub struct RowAwareAccess<S: AuthzStore + 'static> {
 
 #[async_trait]
 impl<S: AuthzStore + 'static> ReadAccess for RowAwareAccess<S> {
-    async fn readable_spaces(&self, who: &Principal) -> vellum_search::Result<Vec<SpaceId>> {
+    async fn readable_spaces(
+        &self,
+        who: &Principal,
+    ) -> vellum_search::Result<Vec<SpaceId>> {
         self.authz.readable_spaces(who).await
     }
 
@@ -174,7 +190,8 @@ impl<S: AuthzStore + 'static> ReadAccess for RowAwareAccess<S> {
         who: &Principal,
         docs: &[DocId],
     ) -> vellum_search::Result<HashSet<DocId>> {
-        let nodes: Vec<DocId> = docs.iter().map(|d| self.rows.node(*d)).collect();
+        let nodes: Vec<DocId> =
+            docs.iter().map(|d| self.rows.node(*d)).collect();
         let allowed = self.authz.filter_readable(who, &nodes).await?;
         Ok(docs
             .iter()
@@ -190,7 +207,10 @@ struct NoStars;
 
 #[async_trait]
 impl Stars for NoStars {
-    async fn starred(&self, _: UserId) -> vellum_search::Result<HashSet<DocId>> {
+    async fn starred(
+        &self,
+        _: UserId,
+    ) -> vellum_search::Result<HashSet<DocId>> {
         Ok(HashSet::new())
     }
 }
@@ -240,7 +260,10 @@ fn source_error(e: impl std::fmt::Display) -> vellum_search::SearchError {
 
 #[async_trait]
 impl DocumentSource for WorkspaceSource {
-    async fn load(&self, doc: DocId) -> vellum_search::Result<Option<IndexDocument>> {
+    async fn load(
+        &self,
+        doc: DocId,
+    ) -> vellum_search::Result<Option<IndexDocument>> {
         if let Some(row) = self
             .collections
             .index_row(doc)
@@ -253,7 +276,10 @@ impl DocumentSource for WorkspaceSource {
             if let Some(space) = space {
                 self.rows
                     .set(doc, Some(DocId::from_u128(row.collection.as_u128())));
-                return Ok(Some(row_document(row, SpaceId::from_u128(space.0))));
+                return Ok(Some(row_document(
+                    row,
+                    SpaceId::from_u128(space.0),
+                )));
             }
             // Outside every space: nobody could read it, so leave it out.
             self.rows.set(doc, None);
@@ -340,10 +366,11 @@ async fn backend(
         // A different model (or turning embeddings on or off) rebuilds.
         model,
     };
-    let (backend, opened) = tokio::task::spawn_blocking(move || TantivyBackend::open(&config))
-        .await
-        .map_err(|e| unavailable("search index task failed", e))?
-        .map_err(|e| unavailable("cannot open the search index", e))?;
+    let (backend, opened) =
+        tokio::task::spawn_blocking(move || TantivyBackend::open(&config))
+            .await
+            .map_err(|e| unavailable("search index task failed", e))?
+            .map_err(|e| unavailable("cannot open the search index", e))?;
     Ok((Arc::new(backend), opened, None))
 }
 
@@ -359,7 +386,8 @@ fn backfill(
         let docs = match postgres.docs_without_vectors().await {
             Ok(docs) => docs,
             Err(error) => {
-                tracing::warn!(%error, "cannot list the documents without embeddings");
+                tracing::warn!(%error, "cannot list the documents without \
+                    embeddings");
                 status.set_job(SearchJob::Failed, Some(error.to_string()));
                 return;
             }
@@ -398,9 +426,13 @@ async fn rebuild(
     status: &SearchStatus,
 ) -> Start {
     status.set_job(SearchJob::Indexing, None);
-    let rebuilt =
-        vellum_search::rebuild_with_progress(service, source, REBUILD_BATCH, status.progress())
-            .await;
+    let rebuilt = vellum_search::rebuild_with_progress(
+        service,
+        source,
+        REBUILD_BATCH,
+        status.progress(),
+    )
+    .await;
     match rebuilt {
         Ok(done) => {
             tracing::info!(documents = done.documents, "search index rebuilt");
@@ -408,7 +440,8 @@ async fn rebuild(
             Start::Current
         }
         Err(error) => {
-            tracing::warn!(%error, "search rebuild failed; indexing page by page");
+            tracing::warn!(%error, "search rebuild failed; indexing page by \
+                page");
             status.set_job(SearchJob::Failed, Some(error.to_string()));
             Start::CatchUp
         }
@@ -416,7 +449,10 @@ async fn rebuild(
 }
 
 /// Hands the rows collections writes touch to the indexer.
-fn forward_rows(indexer: Indexer, mut row_changes: mpsc::UnboundedReceiver<Vec<DocId>>) {
+fn forward_rows(
+    indexer: Indexer,
+    mut row_changes: mpsc::UnboundedReceiver<Vec<DocId>>,
+) {
     drop(tokio::spawn(async move {
         while let Some(batch) = row_changes.recv().await {
             for row in batch {
@@ -457,7 +493,8 @@ pub async fn start<S: AuthzStore + 'static>(
     let model = embedder
         .as_ref()
         .map(|e| vellum_search::Embedder::model_id(e).to_owned());
-    let (backend, opened, postgres) = backend(&data_dir, key, &index, model).await?;
+    let (backend, opened, postgres) =
+        backend(&data_dir, key, &index, model).await?;
     let rows = Arc::new(RowOwners::default());
     let mut service = SearchService::new(
         backend,
@@ -479,7 +516,12 @@ pub async fn start<S: AuthzStore + 'static>(
         drive: Sharded(
             shards
                 .iter()
-                .map(|shard| DriveSource::new(Arc::new(shard.clone()), Arc::clone(&store)))
+                .map(|shard| {
+                    DriveSource::new(
+                        Arc::new(shard.clone()),
+                        Arc::clone(&store),
+                    )
+                })
                 .collect(),
         ),
         collections: Arc::clone(&collections),
@@ -516,7 +558,9 @@ pub async fn start<S: AuthzStore + 'static>(
                         }
                     }
                 }
-                Err(error) => tracing::warn!(%error, "collection rows not reindexed"),
+                Err(error) => {
+                    tracing::warn!(%error, "collection rows not reindexed")
+                }
             }
             Start::CatchUp
         };
@@ -545,7 +589,9 @@ pub async fn start<S: AuthzStore + 'static>(
 /// # Errors
 ///
 /// When the in-memory index cannot be created.
-pub fn describe<S: AuthzStore + 'static>(authz: Arc<Authz<S>>) -> Result<SearchApi, Error> {
+pub fn describe<S: AuthzStore + 'static>(
+    authz: Arc<Authz<S>>,
+) -> Result<SearchApi, Error> {
     let (backend, _) = TantivyBackend::open(&TantivyConfig {
         location: Location::Memory,
         key: None,
@@ -568,7 +614,10 @@ struct NoReader;
 
 #[async_trait]
 impl ReadAccess for NoReader {
-    async fn readable_spaces(&self, _: &Principal) -> vellum_search::Result<Vec<SpaceId>> {
+    async fn readable_spaces(
+        &self,
+        _: &Principal,
+    ) -> vellum_search::Result<Vec<SpaceId>> {
         Ok(Vec::new())
     }
 
@@ -594,7 +643,11 @@ pub fn describe_status() -> Result<Arc<SearchStatus>, Error> {
         model: None,
     })
     .map_err(|e| unavailable("cannot open an in-memory search index", e))?;
-    let service = SearchService::new(Arc::new(backend), Arc::new(NoReader), Arc::new(NoStars));
+    let service = SearchService::new(
+        Arc::new(backend),
+        Arc::new(NoReader),
+        Arc::new(NoStars),
+    );
     Ok(SearchStatus::new(service, None, None))
 }
 
@@ -602,7 +655,9 @@ pub fn describe_status() -> Result<Arc<SearchStatus>, Error> {
 mod tests {
     use std::collections::BTreeMap;
 
-    use vellum_authz::{Actor, Change, Id, MemoryStore, Object, Relation, Subject, Tuple};
+    use vellum_authz::{
+        Actor, Change, Id, MemoryStore, Object, Relation, Subject, Tuple,
+    };
     use vellum_collections::service::{Access, Need};
     use vellum_db::IndexConfig;
     use vellum_store::LocalStore;
@@ -678,7 +733,9 @@ mod tests {
 
     /// One page about deploying, in a space Ada can read, searched with
     /// and without the tiny model.
-    async fn search_for_rollout(model: Option<&Path>) -> vellum_search::SearchPage {
+    async fn search_for_rollout(
+        model: Option<&Path>,
+    ) -> vellum_search::SearchPage {
         let space = Id(5);
         let doc = DocId::from_u128(77);
         let store = MemoryStore::new();
@@ -737,7 +794,10 @@ mod tests {
                 modified: Timestamp::now(),
                 ancestors: vec![ObjectId::from(space)],
                 trashed: false,
-                blocks: vellum_search::markdown::blocks(doc, "We deploy on Fridays."),
+                blocks: vellum_search::markdown::blocks(
+                    doc,
+                    "We deploy on Fridays.",
+                ),
             })])
             .await
             .unwrap();
@@ -789,27 +849,35 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn rows_are_indexed_with_their_values_and_readable_through_the_collection() {
-        let dir = std::env::temp_dir().join(format!("vellum-search-rows-{}", std::process::id()));
+    async fn rows_are_indexed_and_readable_through_the_collection() {
+        let dir = std::env::temp_dir()
+            .join(format!("vellum-search-rows-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let folder = dir.join("drives/shared/Northstar/Vendors.collection");
         std::fs::create_dir_all(folder.join("rows")).unwrap();
         std::fs::write(
             folder.join("schema.yaml"),
             format!(
-                "id: {COLLECTION}\ntitle: Vendors\nproperties:\n  - {{key: t, name: Name, type: title}}\n  - {{key: city, name: City, type: text}}\n"
+                "id: {COLLECTION}\ntitle: Vendors\n\
+                    properties:\n  - {{key: t, name: Name, type: title}}\n  - \
+                    {{key: city, name: City, type: text}}\n"
             ),
         )
         .unwrap();
         std::fs::write(
             folder.join("rows/acme.md"),
-            format!("---\nid: {ROW}\nt: Acme\ncity: Zanzibar\n---\nShips on Fridays.\n"),
+            format!(
+                "---\nid: {ROW}\nt: Acme\ncity: Zanzibar\n---\n\
+                Ships on Fridays.\n"
+            ),
         )
         .unwrap();
-        let store: Arc<dyn BlobStore> = Arc::new(LocalStore::open(&dir).await.unwrap());
-        let index = Index::open(&IndexConfig::sqlite(dir.join("index.sqlite"), None))
-            .await
-            .unwrap();
+        let store: Arc<dyn BlobStore> =
+            Arc::new(LocalStore::open(&dir).await.unwrap());
+        let index =
+            Index::open(&IndexConfig::sqlite(dir.join("index.sqlite"), None))
+                .await
+                .unwrap();
         let collections = Arc::new(CollectionsService::new(
             Arc::clone(&store),
             Arc::new(Nobody),
@@ -830,7 +898,8 @@ mod tests {
         assert_eq!(doc.kind, DocKind::Row);
         assert_eq!(doc.title, "Acme");
         assert_eq!(doc.space, SpaceId::from_u128(5));
-        let text: Vec<&str> = doc.blocks.iter().map(|b| b.text.as_str()).collect();
+        let text: Vec<&str> =
+            doc.blocks.iter().map(|b| b.text.as_str()).collect();
         assert!(text.contains(&"City: Zanzibar"), "{text:?}");
         assert!(text.contains(&"Ships on Fridays."), "{text:?}");
 

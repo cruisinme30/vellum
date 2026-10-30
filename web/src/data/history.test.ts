@@ -9,8 +9,12 @@ import { createHttpPageHistory, ulidTime } from "./history";
 
 describe("ulidTime", () => {
   it("reads the time from a ULID", () => {
-    expect(ulidTime("01ARZ3NDEKTSV4RRFFQ69G5FAV")?.getTime()).toBe(1_469_922_850_259);
-    expect(ulidTime("01arz3ndektsv4rrffq69g5fav")?.getTime()).toBe(1_469_922_850_259);
+    expect(ulidTime("01ARZ3NDEKTSV4RRFFQ69G5FAV")?.getTime()).toBe(
+      1_469_922_850_259,
+    );
+    expect(ulidTime("01arz3ndektsv4rrffq69g5fav")?.getTime()).toBe(
+      1_469_922_850_259,
+    );
   });
 
   it("refuses anything else", () => {
@@ -46,14 +50,22 @@ describe("page history over HTTP", () => {
   it("reads a version's text, or nothing when it is not text", async () => {
     const text = client({ id: older, content: "# Plan\n" });
     expect(await text.history.read("p", older)).toBe("# Plan\n");
-    expect(text.get).toHaveBeenCalledWith(`/api/v1/drive/items/p/versions/${older}`);
-    const binary = client({ id: older, content: JSON.parse("null") as unknown });
+    expect(text.get).toHaveBeenCalledWith(
+      `/api/v1/drive/items/p/versions/${older}`,
+    );
+    const binary = client({
+      id: older,
+      content: JSON.parse("null") as unknown,
+    });
     expect(await binary.history.read("p", older)).toBeUndefined();
   });
 
   it("restores a version", async () => {
     const { history, send } = client({});
     await history.restore("p", older);
-    expect(send).toHaveBeenCalledWith("POST", `/api/v1/drive/items/p/versions/${older}/restore`);
+    expect(send).toHaveBeenCalledWith(
+      "POST",
+      `/api/v1/drive/items/p/versions/${older}/restore`,
+    );
   });
 });

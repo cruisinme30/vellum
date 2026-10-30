@@ -16,9 +16,13 @@ fn category(name: &str) -> Option<StateCategory> {
         "triage" => StateCategory::Triage,
         "backlog" | "icebox" => StateCategory::Backlog,
         "todo" | "to do" | "unstarted" | "planned" => StateCategory::Unstarted,
-        "in progress" | "in review" | "started" | "doing" => StateCategory::Started,
+        "in progress" | "in review" | "started" | "doing" => {
+            StateCategory::Started
+        }
         "done" | "completed" | "closed" | "shipped" => StateCategory::Completed,
-        "canceled" | "cancelled" | "won't do" | "wont do" => StateCategory::Canceled,
+        "canceled" | "cancelled" | "won't do" | "wont do" => {
+            StateCategory::Canceled
+        }
         "duplicate" => StateCategory::Duplicate,
         _ => return None,
     })
@@ -76,7 +80,9 @@ pub fn read(text: &str) -> Result<Export, ImportError> {
             ("Related to", Relation::Related),
             ("Duplicate of", Relation::DuplicateOf),
         ] {
-            relations.extend(list(table.get(row, &[column])).map(|other| (relation, other)));
+            relations.extend(
+                list(table.get(row, &[column])).map(|other| (relation, other)),
+            );
         }
         let due = table.get(row, &["Due Date"]);
         export.issues.push(ImportedIssue {
@@ -107,9 +113,15 @@ pub fn read(text: &str) -> Result<Export, ImportError> {
 mod tests {
     use super::*;
 
-    const SAMPLE: &str = "ID,Team,Title,Description,Status,Estimate,Priority,Project,Creator,Assignee,Labels,Created,Started,Completed,Canceled,Due Date,Parent issue,Blocked by\n\
-NS-12,Northstar,Ship export,\"Use **Typst**, not Chromium\",In Review,3,High,Exports,ada@northstar.dev,bo@northstar.dev,\"export, pdf\",2026-01-05T10:00:00.000Z,2026-01-06T10:00:00.000Z,,,2026-02-01,NS-10,NS-11\n\
-NS-13,Northstar,Old idea,,Someday,,No priority,,ada@northstar.dev,,,2026-01-07T10:00:00.000Z,,,2026-01-08T10:00:00.000Z,,,\n";
+    const SAMPLE: &str = "ID,Team,Title,Description,Status,Estimate,Priority,Pr\
+oject,Creator,Assignee,Labels,Created,Started,Completed,Canceled,Due \
+Date,Parent issue,Blocked by\n\
+NS-12,Northstar,Ship export,\"Use **Typst**, not Chromium\",In \
+Review,3,High,Exports,ada@northstar.dev,bo@northstar.dev,\"export, \
+pdf\",2026-01-05T10:00:00.000Z,2026-01-06T10:00:00.000Z,,,2026-02-01,NS-10,NS-1\
+1\nNS-13,Northstar,Old idea,,Someday,,No \
+priority,,ada@northstar.dev,,,2026-01-07T10:00:00.000Z,,,2026-01-08T10:00:00.00\
+0Z,,,\n";
 
     #[test]
     fn reads_linear_csv() -> Result<(), ImportError> {

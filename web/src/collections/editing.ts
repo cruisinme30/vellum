@@ -17,20 +17,28 @@ export interface Choice {
   readonly color?: string;
 }
 
-const CHOICE_TYPES = new Set<PropertyType>(["select", "multi", "person", "relation"]);
+const CHOICE_TYPES = new Set<PropertyType>([
+  "select",
+  "multi",
+  "person",
+  "relation",
+]);
 
 /** Whether a property is edited by picking from a list. */
 export const isChoice = (type: PropertyType) => CHOICE_TYPES.has(type);
 
 /** Whether a property holds several picks. */
-export const isMultiple = (type: PropertyType) => type === "multi" || type === "relation";
+export const isMultiple = (type: PropertyType) =>
+  type === "multi" || type === "relation";
 
 /** The value a set of picks stores. */
 export function choiceValue(type: PropertyType, ids: readonly string[]): Value {
   if (ids.length === 0) {
     return EMPTY;
   }
-  return isMultiple(type) ? list(ids.map((id) => text(id))) : text(ids[0] ?? "");
+  return isMultiple(type)
+    ? list(ids.map((id) => text(id)))
+    : text(ids[0] ?? "");
 }
 
 /** The value that puts a row in a group: lists hold the one pick. */
@@ -41,8 +49,13 @@ export function groupValue(type: PropertyType, value: Value | null): Value {
   return isMultiple(type) ? list([value]) : value;
 }
 
-/** A property as an editor needs it, from the full schema or a result column. */
-export function propertyOf(properties: readonly PropertyInfo[], column: Column): PropertyInfo {
+/**
+ * A property as an editor needs it, from the full schema or a result column.
+ */
+export function propertyOf(
+  properties: readonly PropertyInfo[],
+  column: Column,
+): PropertyInfo {
   return (
     properties.find((p) => p.key === column.key) ?? {
       key: column.key,
@@ -57,19 +70,25 @@ export function propertyOf(properties: readonly PropertyInfo[], column: Column):
 /** Display names by person handle. */
 export function usePeople(): ReadonlyMap<string, string> {
   const { people } = useWorkspace();
-  return useMemo(() => new Map(people.map((p) => [p.handle, p.name])), [people]);
+  return useMemo(
+    () => new Map(people.map((p) => [p.handle, p.name])),
+    [people],
+  );
 }
 
 /** What a picker offers for a property: options, people or related rows. */
 export function useChoices(property: PropertyInfo): readonly Choice[] {
   const { people } = useWorkspace();
-  const target = property.type === "relation" ? (property.relation?.to ?? "") : "";
+  const target =
+    property.type === "relation" ? (property.relation?.to ?? "") : "";
   const related = useLoad(`choices:${target}`, async (store) => {
     if (target === "") {
       return [];
     }
     const result = await store.query({ collection_id: target });
-    return result.groups.flatMap((g) => g.rows.map((r) => ({ id: r.id, label: r.title })));
+    return result.groups.flatMap((g) =>
+      g.rows.map((r) => ({ id: r.id, label: r.title })),
+    );
   });
   if (property.type === "person") {
     return people.map((p) => ({ id: p.handle, label: p.name }));
@@ -85,8 +104,13 @@ export function useChoices(property: PropertyInfo): readonly Choice[] {
 }
 
 /** The labels of the picks a value holds, by choice id. */
-export function choiceLabels(choices: readonly Choice[], value: Value | undefined): string[] {
-  return texts(value).map((id) => choices.find((c) => c.id === id)?.label ?? id);
+export function choiceLabels(
+  choices: readonly Choice[],
+  value: Value | undefined,
+): string[] {
+  return texts(value).map(
+    (id) => choices.find((c) => c.id === id)?.label ?? id,
+  );
 }
 
 /**
@@ -96,7 +120,11 @@ export function choiceLabels(choices: readonly Choice[], value: Value | undefine
 export function useWriter(collectionId: string) {
   const store = useCollections();
   return useCallback(
-    async (rowId: string, values: Readonly<Record<string, Value>>, body?: string) => {
+    async (
+      rowId: string,
+      values: Readonly<Record<string, Value>>,
+      body?: string,
+    ) => {
       try {
         await store.updateRow({
           collection_id: collectionId,

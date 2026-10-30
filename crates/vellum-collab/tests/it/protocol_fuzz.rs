@@ -33,7 +33,8 @@ fn message() -> impl Strategy<Value = Message> {
 fn frame() -> impl Strategy<Value = Vec<u8>> {
     prop_oneof![
         prop::collection::vec(any::<u8>(), 0..256),
-        prop::collection::vec(message(), 1..6).prop_map(|m| protocol::encode(&m)),
+        prop::collection::vec(message(), 1..6)
+            .prop_map(|m| protocol::encode(&m)),
     ]
 }
 
@@ -41,7 +42,9 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(128))]
 
     #[test]
-    fn rooms_survive_arbitrary_frames(frames in prop::collection::vec(frame(), 1..12)) {
+    fn rooms_survive_arbitrary_frames(
+        frames in prop::collection::vec(frame(), 1..12)
+    ) {
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
@@ -58,7 +61,9 @@ proptest! {
             let writer = Editor::join(&f.hub, key, Access::Write).await;
             writer.edit(|doc| add_paragraph(doc, "alive")).await;
             let mut reader = Editor::join(&f.hub, key, Access::Read).await;
-            assert!(reader.pump_until(|e| e.markdown().contains("alive")).await);
+            assert!(
+                reader.pump_until(|e| e.markdown().contains("alive")).await
+            );
         });
     }
 }

@@ -7,7 +7,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use serde_json::{Value, json};
-use tokio::io::{AsyncBufReadExt as _, AsyncWriteExt as _, BufReader, DuplexStream};
+use tokio::io::{
+    AsyncBufReadExt as _, AsyncWriteExt as _, BufReader, DuplexStream,
+};
 use vellum_mcp::auth::{Principal, ScopeSet};
 use vellum_mcp::http::request_body;
 use vellum_mcp::memory::{MemoryAudit, MemoryWorkspace};
@@ -38,7 +40,8 @@ fn start() -> Client {
     };
     let (client_in, server_in) = tokio::io::duplex(1 << 16);
     let (server_out, client_out) = tokio::io::duplex(1 << 16);
-    let done = tokio::spawn(stdio::serve(server, principal, server_in, server_out));
+    let done =
+        tokio::spawn(stdio::serve(server, principal, server_in, server_out));
     Client {
         input: client_in,
         output: BufReader::new(client_out).lines(),
@@ -54,7 +57,11 @@ impl Client {
     }
 
     async fn recv(&mut self) -> Value {
-        let line = tokio::time::timeout(Duration::from_secs(2), self.output.next_line()).await;
+        let line = tokio::time::timeout(
+            Duration::from_secs(2),
+            self.output.next_line(),
+        )
+        .await;
         let text = line.ok().and_then(Result::ok).flatten().unwrap_or_default();
         assert!(!text.contains('\n'));
         serde_json::from_str(&text).unwrap_or(Value::Null)
@@ -121,7 +128,12 @@ async fn subscriptions_are_correlated_and_cancellable() {
     // Other requests interleave on the same channel.
     c.send(&request_body(11, "prompts/list", json!({}))).await;
     assert_eq!(c.recv().await["id"], 11);
-    c.send(&json!({ "jsonrpc": "2.0", "method": "notifications/cancelled", "params": { "requestId": 10, "reason": "done" } })).await;
+    c.send(&json!({
+        "jsonrpc": "2.0",
+        "method": "notifications/cancelled",
+        "params": { "requestId": 10, "reason": "done" }
+    }))
+    .await;
     tokio::time::sleep(Duration::from_millis(50)).await;
     c.notifier.resource_list_changed();
     c.send(&request_body(12, "tools/list", json!({}))).await;
@@ -135,7 +147,13 @@ async fn subscriptions_are_correlated_and_cancellable() {
 #[tokio::test]
 async fn legacy_handshake_then_plain_requests() {
     let mut c = start();
-    c.send(&json!({ "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": { "protocolVersion": "2025-11-25", "capabilities": {} } })).await;
+    c.send(&json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": { "protocolVersion": "2025-11-25", "capabilities": {} }
+    }))
+    .await;
     assert_eq!(c.recv().await["result"]["protocolVersion"], "2025-11-25");
     c.send(&json!({ "jsonrpc": "2.0", "method": "notifications/initialized" }))
         .await;

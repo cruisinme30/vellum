@@ -20,10 +20,12 @@ use std::sync::Arc;
 use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 use chacha20poly1305::{XChaCha20Poly1305, XNonce};
 use tantivy::HasLen;
-use tantivy::directory::error::{DeleteError, LockError, OpenReadError, OpenWriteError};
+use tantivy::directory::error::{
+    DeleteError, LockError, OpenReadError, OpenWriteError,
+};
 use tantivy::directory::{
-    AntiCallToken, Directory, DirectoryLock, FileHandle, Lock, OwnedBytes, TerminatingWrite,
-    WatchCallback, WatchHandle, WritePtr,
+    AntiCallToken, Directory, DirectoryLock, FileHandle, Lock, OwnedBytes,
+    TerminatingWrite, WatchCallback, WatchHandle, WritePtr,
 };
 use zeroize::Zeroizing;
 
@@ -128,14 +130,17 @@ fn aad(path: &Path, index: u64, last: bool) -> Vec<u8> {
 
 fn fresh_salt() -> io::Result<[u8; SALT_LEN]> {
     let mut salt = [0_u8; SALT_LEN];
-    getrandom::fill(&mut salt).map_err(|_| io::Error::other("no randomness for the index salt"))?;
+    getrandom::fill(&mut salt)
+        .map_err(|_| io::Error::other("no randomness for the index salt"))?;
     Ok(salt)
 }
 
 /// Encrypts a whole buffer into the file format.
 fn seal_all(cipher: &Cipher, path: &Path, data: &[u8]) -> io::Result<Vec<u8>> {
     let salt = fresh_salt()?;
-    let mut out = Vec::with_capacity(HEADER_LEN + data.len() + (data.len() / CHUNK + 1) * TAG);
+    let mut out = Vec::with_capacity(
+        HEADER_LEN + data.len() + (data.len() / CHUNK + 1) * TAG,
+    );
     out.extend_from_slice(MAGIC);
     out.extend_from_slice(&salt);
     let mut chunks: Vec<&[u8]> = data.chunks(CHUNK).collect();
@@ -144,7 +149,13 @@ fn seal_all(cipher: &Cipher, path: &Path, data: &[u8]) -> io::Result<Vec<u8>> {
     }
     let count = chunks.len();
     for (index, chunk) in chunks.into_iter().enumerate() {
-        let sealed = cipher.seal(path, &salt, index as u64, index + 1 == count, chunk)?;
+        let sealed = cipher.seal(
+            path,
+            &salt,
+            index as u64,
+            index + 1 == count,
+            chunk,
+        )?;
         out.extend_from_slice(&sealed);
     }
     Ok(out)
@@ -158,7 +169,12 @@ struct Layout {
 }
 
 fn layout(file_len: usize) -> io::Result<Layout> {
-    let corrupt = || io::Error::new(io::ErrorKind::InvalidData, "truncated encrypted index file");
+    let corrupt = || {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            "truncated encrypted index file",
+        )
+    };
     let body = file_len.checked_sub(HEADER_LEN).ok_or_else(corrupt)?;
     if body < TAG {
         return Err(corrupt());
@@ -175,9 +191,9 @@ fn layout(file_len: usize) -> io::Result<Layout> {
 }
 
 fn read_header(bytes: &[u8]) -> io::Result<[u8; SALT_LEN]> {
-    let header = bytes
-        .get(..HEADER_LEN)
-        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "missing index header"))?;
+    let header = bytes.get(..HEADER_LEN).ok_or_else(|| {
+        io::Error::new(io::ErrorKind::InvalidData, "missing index header")
+    })?;
     let (magic, salt) = header.split_at(MAGIC.len());
     if magic != MAGIC {
         return Err(io::Error::new(
@@ -186,8 +202,9 @@ fn read_header(bytes: &[u8]) -> io::Result<[u8; SALT_LEN]> {
         ));
     }
     // The salt is read from the file header, never a fixed value.
-    <[u8; SALT_LEN]>::try_from(salt)
-        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "short index header"))
+    <[u8; SALT_LEN]>::try_from(salt).map_err(|_| {
+        io::Error::new(io::ErrorKind::InvalidData, "short index header")
+    })
 }
 
 /// Decrypts a whole buffer in the file format.
@@ -235,9 +252,14 @@ impl fmt::Debug for EncryptedDirectory {
 }
 
 impl Directory for EncryptedDirectory {
-    fn get_file_handle(&self, path: &Path) -> Result<Arc<dyn FileHandle>, OpenReadError> {
+    fn get_file_handle(
+        &self,
+        path: &Path,
+    ) -> Result<Arc<dyn FileHandle>, OpenReadError> {
         let inner = self.inner.get_file_handle(path)?;
-        let wrap = |error: io::Error| OpenReadError::wrap_io_error(error, path.to_path_buf());
+        let wrap = |error: io::Error| {
+            OpenReadError::wrap_io_error(error, path.to_path_buf())
+        };
         let header = inner
             .read_bytes(0..HEADER_LEN.min(inner.len()))
             .map_err(wrap)?;
@@ -261,7 +283,9 @@ impl Directory for EncryptedDirectory {
     }
 
     fn open_write(&self, path: &Path) -> Result<WritePtr, OpenWriteError> {
-        let wrap = |error: io::Error| OpenWriteError::wrap_io_error(error, path.to_path_buf());
+        let wrap = |error: io::Error| {
+            OpenWriteError::wrap_io_error(error, path.to_path_buf())
+        };
         let salt = fresh_salt().map_err(wrap)?;
         let mut inner = self.inner.open_write(path)?;
         inner.write_all(MAGIC).map_err(wrap)?;
@@ -279,8 +303,9 @@ impl Directory for EncryptedDirectory {
 
     fn atomic_read(&self, path: &Path) -> Result<Vec<u8>, OpenReadError> {
         let sealed = self.inner.atomic_read(path)?;
-        open_all(&self.cipher, path, &sealed)
-            .map_err(|error| OpenReadError::wrap_io_error(error, path.to_path_buf()))
+        open_all(&self.cipher, path, &sealed).map_err(|error| {
+            OpenReadError::wrap_io_error(error, path.to_path_buf())
+        })
     }
 
     fn atomic_write(&self, path: &Path, data: &[u8]) -> io::Result<()> {
@@ -297,7 +322,10 @@ impl Directory for EncryptedDirectory {
         self.inner.acquire_lock(lock)
     }
 
-    fn watch(&self, watch_callback: WatchCallback) -> tantivy::Result<WatchHandle> {
+    fn watch(
+        &self,
+        watch_callback: WatchCallback,
+    ) -> tantivy::Result<WatchHandle> {
         self.inner.watch(watch_callback)
     }
 }
@@ -354,7 +382,12 @@ impl FileHandle for EncryptedFile {
         let offset = range.start - first * CHUNK;
         let wanted = plain
             .get(offset..offset + range.len())
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "short encrypted chunk"))?
+            .ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "short encrypted chunk",
+                )
+            })?
             .to_vec();
         Ok(OwnedBytes::new(wanted))
     }
@@ -372,9 +405,13 @@ struct EncryptingWriter {
 
 impl EncryptingWriter {
     fn emit(&mut self, last: bool) -> io::Result<()> {
-        let sealed = self
-            .cipher
-            .seal(&self.path, &self.salt, self.index, last, &self.buffer)?;
+        let sealed = self.cipher.seal(
+            &self.path,
+            &self.salt,
+            self.index,
+            last,
+            &self.buffer,
+        )?;
         let inner = self
             .inner
             .as_mut()
@@ -427,7 +464,10 @@ mod tests {
 
     fn dir() -> (RamDirectory, EncryptedDirectory) {
         let ram = RamDirectory::create();
-        let enc = EncryptedDirectory::new(Box::new(ram.clone()), &IndexKey::from_bytes([7; 32]));
+        let enc = EncryptedDirectory::new(
+            Box::new(ram.clone()),
+            &IndexKey::from_bytes([7; 32]),
+        );
         (ram, enc)
     }
 
@@ -443,17 +483,26 @@ mod tests {
     #[test]
     fn streamed_files_round_trip_at_every_size_and_range() {
         let (_, enc) = dir();
-        for size in [0, 1, CHUNK - 1, CHUNK, CHUNK + 1, 3 * CHUNK, 3 * CHUNK + 17] {
-            let data: Vec<u8> = (0..size).map(|i| u8::try_from(i % 251).unwrap()).collect();
+        for size in
+            [0, 1, CHUNK - 1, CHUNK, CHUNK + 1, 3 * CHUNK, 3 * CHUNK + 17]
+        {
+            let data: Vec<u8> =
+                (0..size).map(|i| u8::try_from(i % 251).unwrap()).collect();
             let name = format!("f{size}");
             write(&enc, &name, &data);
             let handle = enc.get_file_handle(Path::new(&name)).unwrap();
             assert_eq!(handle.len(), size);
-            assert_eq!(handle.read_bytes(0..size).unwrap().as_slice(), &data[..]);
+            assert_eq!(
+                handle.read_bytes(0..size).unwrap().as_slice(),
+                &data[..]
+            );
             if size > 10 {
                 let mid = size / 2;
                 let r = (mid - 5)..(mid + 5).min(size);
-                assert_eq!(handle.read_bytes(r.clone()).unwrap().as_slice(), &data[r]);
+                assert_eq!(
+                    handle.read_bytes(r.clone()).unwrap().as_slice(),
+                    &data[r]
+                );
             }
             assert!(handle.read_bytes(0..size + 1).is_err());
         }
@@ -495,7 +544,10 @@ mod tests {
         let handle = enc.get_file_handle(Path::new("a")).unwrap();
         assert!(handle.read_bytes(0..handle.len()).is_err());
         // Another key cannot read.
-        let other = EncryptedDirectory::new(Box::new(ram.clone()), &IndexKey::from_bytes([8; 32]));
+        let other = EncryptedDirectory::new(
+            Box::new(ram.clone()),
+            &IndexKey::from_bytes([8; 32]),
+        );
         enc.atomic_write(Path::new("m"), b"x").unwrap();
         assert!(other.atomic_read(Path::new("m")).is_err());
         // A plaintext file is refused.

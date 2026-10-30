@@ -29,7 +29,12 @@ const USER = {
   handle: "priya",
   admin: false,
 };
-const STATUS: AuthStatus = { needsSetup: false, credential: "session", scopes: [], user: USER };
+const STATUS: AuthStatus = {
+  needsSetup: false,
+  credential: "session",
+  scopes: [],
+  user: USER,
+};
 const AUTH: AuthApi = {
   status: () => Promise.resolve(STATUS),
   signIn: () => Promise.resolve(USER),
@@ -57,7 +62,9 @@ function fakeAssist(overrides: Partial<AssistApi> = {}) {
     test: vi.fn<AssistApi["test"]>(() =>
       Promise.resolve({ ok: true, detail: "claude-opus-5-5 answered." }),
     ),
-    summarize: vi.fn<AssistApi["summarize"]>(() => Promise.resolve({ ...ANSWER, citations: [] })),
+    summarize: vi.fn<AssistApi["summarize"]>(() =>
+      Promise.resolve({ ...ANSWER, citations: [] }),
+    ),
     ask: vi.fn<AssistApi["ask"]>(() => Promise.resolve(ANSWER)),
     draft: vi.fn<AssistApi["draft"]>(() =>
       Promise.resolve({
@@ -96,7 +103,9 @@ function fakeSetup() {
       },
     ]),
   );
-  const testConnection = vi.fn<McpSetupApi["testConnection"]>(() => Promise.resolve(OK_REPORT));
+  const testConnection = vi.fn<McpSetupApi["testConnection"]>(() =>
+    Promise.resolve(OK_REPORT),
+  );
   return { api: { snippets, testConnection }, testConnection };
 }
 
@@ -137,20 +146,26 @@ afterEach(() => {
 });
 
 describe("model settings in the browser", () => {
-  it("keeps the key in session storage unless remembered, and never sends empty fields", () => {
-    saveModel(USER.id, SAVED);
-    expect(sessionStorage.getItem(`vellum.assist.${USER.id}`)).toContain("sk-ant-secret-1234");
-    expect(localStorage.getItem(`vellum.assist.${USER.id}`)).toBeNull();
-    saveModel(USER.id, { ...SAVED, remember: true });
-    expect(sessionStorage.getItem(`vellum.assist.${USER.id}`)).toBeNull();
-    expect(loadModel(USER.id)?.remember).toBe(true);
-    expect(toSettings({ ...SAVED, apiKey: " " })).toEqual({
-      provider: "anthropic",
-      model: "claude-opus-5-5",
-    });
-    forgetModel(USER.id);
-    expect(loadModel(USER.id)).toBeUndefined();
-  });
+  it(
+    "keeps the key in session storage unless remembered, and never sends " +
+      "empty fields",
+    () => {
+      saveModel(USER.id, SAVED);
+      expect(sessionStorage.getItem(`vellum.assist.${USER.id}`)).toContain(
+        "sk-ant-secret-1234",
+      );
+      expect(localStorage.getItem(`vellum.assist.${USER.id}`)).toBeNull();
+      saveModel(USER.id, { ...SAVED, remember: true });
+      expect(sessionStorage.getItem(`vellum.assist.${USER.id}`)).toBeNull();
+      expect(loadModel(USER.id)?.remember).toBe(true);
+      expect(toSettings({ ...SAVED, apiKey: " " })).toEqual({
+        provider: "anthropic",
+        model: "claude-opus-5-5",
+      });
+      forgetModel(USER.id);
+      expect(loadModel(USER.id)).toBeUndefined();
+    },
+  );
 
   it("tests the model before saving it", async () => {
     const user = userEvent.setup();
@@ -163,7 +178,9 @@ describe("model settings in the browser", () => {
       model: "claude-opus-5-5",
       api_key: "sk-ant-new-9999",
     });
-    expect(await textOf(screen.findByRole("status"))).toContain("Saved in this browser.");
+    expect(await textOf(screen.findByRole("status"))).toContain(
+      "Saved in this browser.",
+    );
     expect(loadModel(USER.id)?.apiKey).toBe("sk-ant-new-9999");
   });
 
@@ -171,13 +188,18 @@ describe("model settings in the browser", () => {
     const user = userEvent.setup();
     const { api } = fakeAssist({
       test: vi.fn(() =>
-        Promise.resolve({ ok: false, detail: "The provider refused the key (invalid x-api-key)." }),
+        Promise.resolve({
+          ok: false,
+          detail: "The provider refused the key (invalid x-api-key).",
+        }),
       ),
     });
     renderSignedIn(<AssistantSettings api={api} />);
     await user.type(screen.getByLabelText("API key"), "bad");
     await user.click(screen.getByRole("button", { name: "Test and save" }));
-    expect(await textOf(screen.findByRole("alert"))).toContain("refused the key");
+    expect(await textOf(screen.findByRole("alert"))).toContain(
+      "refused the key",
+    );
     expect(loadModel(USER.id)).toBeUndefined();
   });
 });
@@ -185,9 +207,9 @@ describe("model settings in the browser", () => {
 describe("ask this space", () => {
   it("asks for a model first", () => {
     renderSignedIn(<Ask api={fakeAssist().api} />);
-    expect(screen.getByRole("link", { name: "Set up a model" }).getAttribute("href")).toBe(
-      "/settings/ai",
-    );
+    expect(
+      screen.getByRole("link", { name: "Set up a model" }).getAttribute("href"),
+    ).toBe("/settings/ai");
   });
 
   it("answers with links to the cited blocks", async () => {
@@ -195,15 +217,24 @@ describe("ask this space", () => {
     const user = userEvent.setup();
     const { api, ask } = fakeAssist();
     renderSignedIn(<Ask api={api} />, "/ask?q=When%20do%20we%20launch%3F");
-    expect(screen.getByLabelText("Question")).toHaveProperty("value", "When do we launch?");
+    expect(screen.getByLabelText("Question")).toHaveProperty(
+      "value",
+      "When do we launch?",
+    );
     await user.click(screen.getByRole("button", { name: "Ask" }));
     expect(ask).toHaveBeenCalledWith(
-      { provider: "anthropic", model: "claude-opus-5-5", api_key: "sk-ant-secret-1234" },
+      {
+        provider: "anthropic",
+        model: "claude-opus-5-5",
+        api_key: "sk-ant-secret-1234",
+      },
       "When do we launch?",
       undefined,
     );
     const sources = await screen.findByRole("region", { name: "Sources" });
-    const link = within(sources).getByRole("link", { name: "Launch plan › Goals" });
+    const link = within(sources).getByRole("link", {
+      name: "Launch plan › Goals",
+    });
     expect(link.getAttribute("href")).toBe("/p/01JDLAUNCH#blk-ship0001");
     expect(screen.getByText("24 November").tagName).toBe("STRONG");
   });
@@ -213,7 +244,12 @@ describe("ask this space", () => {
     const user = userEvent.setup();
     const { api } = fakeAssist({
       ask: vi.fn(() =>
-        Promise.reject(new ApiError("rate_limited", "the provider is rate limiting this key")),
+        Promise.reject(
+          new ApiError(
+            "rate_limited",
+            "the provider is rate limiting this key",
+          ),
+        ),
       ),
     });
     renderSignedIn(<Ask api={api} />);
@@ -228,15 +264,25 @@ describe("page assistant", () => {
     saveModel(USER.id, SAVED);
     const user = userEvent.setup();
     const { api, summarize, draft } = fakeAssist();
-    renderSignedIn(<PageAssistant api={api} pageId="01JDLAUNCH" onClose={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: "Summarise this page" }));
+    renderSignedIn(
+      <PageAssistant api={api} pageId="01JDLAUNCH" onClose={vi.fn()} />,
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Summarise this page" }),
+    );
     expect(summarize).toHaveBeenCalledWith(
       expect.objectContaining({ model: "claude-opus-5-5" }),
       "01JDLAUNCH",
     );
     expect(await screen.findByText(/Written by claude-opus-5-5/)).toBeTruthy();
-    await user.type(screen.getByLabelText("Title of the new page"), "Billing launch");
-    await user.type(screen.getByLabelText("What it should say"), "Ship billing in December.");
+    await user.type(
+      screen.getByLabelText("Title of the new page"),
+      "Billing launch",
+    );
+    await user.type(
+      screen.getByLabelText("What it should say"),
+      "Ship billing in December.",
+    );
     await user.click(screen.getByRole("button", { name: "Draft the page" }));
     expect(draft).toHaveBeenCalledWith(expect.anything(), {
       templatePageId: "01JDLAUNCH",

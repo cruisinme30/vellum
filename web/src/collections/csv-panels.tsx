@@ -52,12 +52,19 @@ function Report({ report }: { readonly report: CsvImported }) {
   return (
     <div className="vl-csv-report" role="status">
       <p>
-        {t(report.written ? "collection-csv-added" : "collection-csv-would-add", {
-          rows: report.rows,
-        })}
+        {t(
+          report.written ? "collection-csv-added" : "collection-csv-would-add",
+          {
+            rows: report.rows,
+          },
+        )}
       </p>
       {report.skippedColumns.length > 0 && (
-        <p>{t("collection-csv-skipped", { columns: report.skippedColumns.join(", ") })}</p>
+        <p>
+          {t("collection-csv-skipped", {
+            columns: report.skippedColumns.join(", "),
+          })}
+        </p>
       )}
       {report.diagnostics.length > 0 && (
         <ul>
@@ -109,7 +116,10 @@ export function ImportPanel({
       });
   };
   return (
-    <SidePanel title={t("collection-import-title", { collection: info.title })} onClose={onClose}>
+    <SidePanel
+      title={t("collection-import-title", { collection: info.title })}
+      onClose={onClose}
+    >
       <p className="vl-muted">{t("collection-import-intro")}</p>
       <CsvSource
         text={csv}

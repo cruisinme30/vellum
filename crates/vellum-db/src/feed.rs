@@ -73,7 +73,11 @@ impl Feed {
     ///
     /// # Errors
     /// When the database is unreachable.
-    pub async fn publish(&self, origin: &str, items: &[(&str, &str)]) -> Result<i64> {
+    pub async fn publish(
+        &self,
+        origin: &str,
+        items: &[(&str, &str)],
+    ) -> Result<i64> {
         if items.is_empty() {
             return self.head().await;
         }
@@ -86,7 +90,8 @@ impl Feed {
                     system,
                     "feed.bump",
                     sqlx::query_as(
-                        "UPDATE cluster_feed SET head = head + ?1 WHERE id = 1 RETURNING head",
+                        "UPDATE cluster_feed SET head = head + ?1 WHERE id = 1 \
+                            RETURNING head",
                     )
                     .bind(n)
                     .fetch_one(&mut *tx),
@@ -97,7 +102,8 @@ impl Feed {
                         system,
                         "feed.append",
                         sqlx::query(
-                            "INSERT INTO cluster_changes (seq, topic, subject, origin) VALUES (?1, ?2, ?3, ?4)",
+                            "INSERT INTO cluster_changes (seq, topic, subject, \
+                                origin) VALUES (?1, ?2, ?3, ?4)",
                         )
                         .bind(head - n + 1 + len_i64(i))
                         .bind(topic)
@@ -116,7 +122,8 @@ impl Feed {
                     system,
                     "feed.bump",
                     sqlx::query_as(
-                        "UPDATE cluster_feed SET head = head + $1 WHERE id = 1 RETURNING head",
+                        "UPDATE cluster_feed SET head = head + $1 WHERE id = 1 \
+                            RETURNING head",
                     )
                     .bind(n)
                     .fetch_one(&mut *tx),
@@ -127,7 +134,8 @@ impl Feed {
                         system,
                         "feed.append",
                         sqlx::query(
-                            "INSERT INTO cluster_changes (seq, topic, subject, origin) VALUES ($1, $2, $3, $4)",
+                            "INSERT INTO cluster_changes (seq, topic, subject, \
+                                origin) VALUES ($1, $2, $3, $4)",
                         )
                         .bind(head - n + 1 + len_i64(i))
                         .bind(topic)
@@ -156,10 +164,20 @@ impl Feed {
         let system = self.index.backend().otel_system();
         Ok(match self.index.pool() {
             IndexPool::Sqlite(pool) => {
-                traced(system, "feed.bounds", sqlx::query_as(SQL).fetch_one(pool)).await?
+                traced(
+                    system,
+                    "feed.bounds",
+                    sqlx::query_as(SQL).fetch_one(pool),
+                )
+                .await?
             }
             IndexPool::Postgres(pool) => {
-                traced(system, "feed.bounds", sqlx::query_as(SQL).fetch_one(pool)).await?
+                traced(
+                    system,
+                    "feed.bounds",
+                    sqlx::query_as(SQL).fetch_one(pool),
+                )
+                .await?
             }
         })
     }
@@ -180,34 +198,30 @@ impl Feed {
         let limit = len_i64(limit.max(1));
         let system = self.index.backend().otel_system();
         let rows: Vec<(i64, String, String, String)> = match self.index.pool() {
-            IndexPool::Sqlite(pool) => {
-                traced(
-                    system,
-                    "feed.read",
-                    sqlx::query_as(
-                        "SELECT seq, topic, subject, origin FROM cluster_changes \
+            IndexPool::Sqlite(pool) => traced(
+                system,
+                "feed.read",
+                sqlx::query_as(
+                    "SELECT seq, topic, subject, origin FROM cluster_changes \
                          WHERE seq > ?1 ORDER BY seq LIMIT ?2",
-                    )
-                    .bind(cursor)
-                    .bind(limit)
-                    .fetch_all(pool),
                 )
-                .await?
-            }
-            IndexPool::Postgres(pool) => {
-                traced(
-                    system,
-                    "feed.read",
-                    sqlx::query_as(
-                        "SELECT seq, topic, subject, origin FROM cluster_changes \
+                .bind(cursor)
+                .bind(limit)
+                .fetch_all(pool),
+            )
+            .await?,
+            IndexPool::Postgres(pool) => traced(
+                system,
+                "feed.read",
+                sqlx::query_as(
+                    "SELECT seq, topic, subject, origin FROM cluster_changes \
                          WHERE seq > $1 ORDER BY seq LIMIT $2",
-                    )
-                    .bind(cursor)
-                    .bind(limit)
-                    .fetch_all(pool),
                 )
-                .await?
-            }
+                .bind(cursor)
+                .bind(limit)
+                .fetch_all(pool),
+            )
+            .await?,
         };
         // Pruned between the two reads: the first row is not the next one,
         // or the rows up to the head are gone.
@@ -253,7 +267,8 @@ impl Feed {
                     system,
                     "feed.horizon",
                     sqlx::query_as(
-                        "UPDATE cluster_feed SET horizon = max(horizon, head - ?1) WHERE id = 1 RETURNING horizon",
+                        "UPDATE cluster_feed SET horizon = max(horizon, head - \
+                            ?1) WHERE id = 1 RETURNING horizon",
                     )
                     .bind(keep)
                     .fetch_one(&mut *tx),
@@ -277,7 +292,8 @@ impl Feed {
                     system,
                     "feed.horizon",
                     sqlx::query_as(
-                        "UPDATE cluster_feed SET horizon = GREATEST(horizon, head - $1) WHERE id = 1 RETURNING horizon",
+                        "UPDATE cluster_feed SET horizon = GREATEST(horizon, \
+                            head - $1) WHERE id = 1 RETURNING horizon",
                     )
                     .bind(keep)
                     .fetch_one(&mut *tx),

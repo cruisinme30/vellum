@@ -169,7 +169,10 @@ impl Book {
             } else {
                 let reported = repairs.iter().any(|r| {
                     matches!(r, Repair::CreatedMissing { id: created, .. }
-                        | Repair::IdAssigned { id: created, .. } if created == &id)
+                        | Repair::IdAssigned {
+                            id: created,
+                            ..
+                        } if created == &id)
                 });
                 if !reported {
                     repairs.push(Repair::Added {
@@ -266,7 +269,10 @@ impl Book {
     }
 
     /// Changes how sections are numbered.
-    pub const fn set_numbering(&mut self, style: crate::manifest::NumberingStyle) {
+    pub const fn set_numbering(
+        &mut self,
+        style: crate::manifest::NumberingStyle,
+    ) {
         self.manifest.numbering = style;
     }
 
@@ -365,7 +371,8 @@ impl Book {
     /// [`BookError::NotAllowed`] when the new text changes or drops the
     /// front-matter id, which is immutable.
     pub fn set_text(&mut self, id: &NodeId, text: String) -> Result<()> {
-        let declared = markdown::front_matter(&text, "id").and_then(|raw| NodeId::parse(&raw).ok());
+        let declared = markdown::front_matter(&text, "id")
+            .and_then(|raw| NodeId::parse(&raw).ok());
         if declared.as_ref() != Some(id) {
             return Err(BookError::NotAllowed(format!(
                 "the front matter of {id} must keep `id: {id}`"
@@ -460,7 +467,9 @@ impl Book {
         let mut out = Vec::new();
         if let Some(chapter) = self.summary.chapter(slot) {
             chapter.walk(&mut |c| {
-                if let Some(id) = c.location.as_ref().and_then(|p| self.id_at(p)) {
+                if let Some(id) =
+                    c.location.as_ref().and_then(|p| self.id_at(p))
+                {
                     out.push(id.clone());
                 }
             });
@@ -506,7 +515,8 @@ fn identify(
         let text = markdown::new_chapter(&id, name, Some("draft"), "");
         return (id, text);
     };
-    let declared = markdown::front_matter(&text, "id").and_then(|raw| NodeId::parse(&raw).ok());
+    let declared = markdown::front_matter(&text, "id")
+        .and_then(|raw| NodeId::parse(&raw).ok());
     match declared {
         Some(id) if !seen.contains_key(&id) => (id, text),
         Some(old) => {
@@ -582,7 +592,8 @@ pub(crate) mod fixtures {
                 "onboarding/first-week.md",
                 3,
                 "Your first week",
-                "Read [§](vellum://doc/01JBK0000000000000000000A5) first.\n\n## Day one\n\nBadge.\n\n## Day two\n\nLaptop.",
+                "Read [§](vellum://doc/01JBK0000000000000000000A5) first.\n\n\
+                    ## Day one\n\nBadge.\n\n## Day two\n\nLaptop.",
             ),
             (
                 "architecture/README.md",
@@ -594,12 +605,14 @@ pub(crate) mod fixtures {
                 "architecture/services.md",
                 5,
                 "Services",
-                "See [the glossary](../glossary.md) and [](vellum://doc/01JBK0000000000000000000A2).",
+                "See [the glossary](../glossary.md) and \
+                    [](vellum://doc/01JBK0000000000000000000A2).",
             ),
             ("glossary.md", 6, "Glossary", "Terms."),
         ];
         let mut manifest = String::from(
-            "vellum: 1\nid: 01JBK00000000000000000B00K\ntitle: Northstar handbook\nnodes:\n",
+            "vellum: 1\nid: 01JBK00000000000000000B00K\n\
+                title: Northstar handbook\nnodes:\n",
         );
         let mut files = BTreeMap::new();
         for (path, n, title, body) in paths {
@@ -641,7 +654,10 @@ mod tests {
             section: Section::Numbered,
             path: vec![1, 1],
         };
-        assert_eq!(book.numbers().get(&draft), Some(&SectionNumber(vec![1, 2])));
+        assert_eq!(
+            book.numbers().get(&draft),
+            Some(&SectionNumber(vec![1, 2]))
+        );
         Ok(())
     }
 
@@ -656,12 +672,15 @@ mod tests {
             .replace("architecture/services.md", "architecture/svc.md")
             .replace(
                 "[Glossary](glossary.md)",
-                "[Glossary](glossary.md)\n\n[Notes](notes.md)\n\n[Later](later.md)",
+                "[Glossary](glossary.md)\n\n[Notes](notes.md)\n\n\
+                    [Later](later.md)",
             );
         let mut files: BTreeMap<String, String> = book
             .files()
             .iter()
-            .map(|(p, t)| (p.as_str().replace("services.md", "svc.md"), t.clone()))
+            .map(|(p, t)| {
+                (p.as_str().replace("services.md", "svc.md"), t.clone())
+            })
             .collect();
         let _ = files.insert("notes.md".into(), "Just notes.\n".into());
         let mut ids = SequentialIds::new("01JBK00008");
@@ -676,16 +695,23 @@ mod tests {
             from: ChapterPath::parse("architecture/services.md")?,
             to: ChapterPath::parse("architecture/svc.md")?,
         }));
-        assert!(
-            repairs.iter().any(
-                |r| matches!(r, Repair::IdAssigned { path, .. } if path.as_str() == "notes.md")
-            )
-        );
+        assert!(repairs.iter().any(|r| matches!(
+            r,
+            Repair::IdAssigned {
+                path,
+                ..
+            } if path.as_str() == "notes.md"
+        )));
         let created = repairs.iter().find_map(|r| match r {
-            Repair::CreatedMissing { id, path } if path.as_str() == "later.md" => Some(id.clone()),
+            Repair::CreatedMissing { id, path }
+                if path.as_str() == "later.md" =>
+            {
+                Some(id.clone())
+            }
             _ => None,
         });
-        let created = created.ok_or_else(|| BookError::Inconsistent("no draft".into()))?;
+        let created = created
+            .ok_or_else(|| BookError::Inconsistent("no draft".into()))?;
         assert_eq!(
             markdown::front_matter(loaded.text(&created)?, "status").as_deref(),
             Some("draft")
@@ -722,18 +748,19 @@ mod tests {
             |p| files.get(p.as_str()).cloned(),
             &mut ids,
         )?;
-        assert!(
-            repairs
-                .iter()
-                .any(|r| matches!(r, Repair::Reidentified { old, .. } if old == &id(6)))
-        );
+        assert!(repairs.iter().any(
+            |r| matches!(r, Repair::Reidentified { old, .. } if old == &id(6))
+        ));
         Ok(())
     }
 
     #[test]
     fn ids_are_immutable() {
         let mut book = handbook();
-        let result = book.set_text(&id(6), "---\nid: 01JBK0000000000000000000A7\n---\n".into());
+        let result = book.set_text(
+            &id(6),
+            "---\nid: 01JBK0000000000000000000A7\n---\n".into(),
+        );
         assert!(result.is_err());
         let ok = markdown::new_chapter(&id(6), "Glossary", None, "More terms.");
         assert!(book.set_text(&id(6), ok).is_ok());
@@ -742,7 +769,8 @@ mod tests {
     #[test]
     fn rejects_duplicate_summary_paths() -> Result<()> {
         let book = handbook();
-        let summary = format!("{}\n[Again](glossary.md)\n", book.summary_text());
+        let summary =
+            format!("{}\n[Again](glossary.md)\n", book.summary_text());
         let files = book.files().clone();
         let result = Book::load(
             &book.manifest_text()?,

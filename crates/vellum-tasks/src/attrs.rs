@@ -61,7 +61,8 @@ const fn is_key_char(c: char) -> bool {
 }
 
 const fn is_bare_char(c: char) -> bool {
-    c.is_ascii_alphanumeric() || matches!(c, '_' | ':' | '+' | '-' | '.' | '/' | '=' | ',' | ';')
+    c.is_ascii_alphanumeric()
+        || matches!(c, '_' | ':' | '+' | '-' | '.' | '/' | '=' | ',' | ';')
 }
 
 impl Attrs {
@@ -165,7 +166,9 @@ impl Attrs {
                     return Err(AttrsError::Unterminated(key));
                 }
             } else {
-                while let Some((_, c)) = chars.next_if(|(_, c)| !c.is_whitespace()) {
+                while let Some((_, c)) =
+                    chars.next_if(|(_, c)| !c.is_whitespace())
+                {
                     value.push(c);
                 }
                 if value.is_empty() {
@@ -181,7 +184,9 @@ impl Attrs {
     /// can read; used to decide where the item title ends.
     #[must_use]
     pub fn looks_like_span(text: &str) -> bool {
-        text.starts_with('{') && text.ends_with('}') && Self::parse(text).is_ok()
+        text.starts_with('{')
+            && text.ends_with('}')
+            && Self::parse(text).is_ok()
     }
 
     /// Sorts keys into the canonical order; unknown keys keep their order
@@ -235,9 +240,10 @@ mod tests {
 
     #[test]
     fn parses_bare_and_quoted_values() {
-        let attrs = Attrs::parse(
-            r#"{due=2026-11-03T15:00 rrule="FREQ=WEEKLY;BYDAY=MO" note="a \"b\" \\"}"#,
-        )
+        let attrs = Attrs::parse(concat!(
+            r#"{due=2026-11-03T15:00 rrule="FREQ=WEEKLY;BYDAY=MO" "#,
+            r#"note="a \"b\" \\"}"#,
+        ))
         .unwrap();
         assert_eq!(attrs.get("due"), Some("2026-11-03T15:00"));
         assert_eq!(attrs.get("rrule"), Some("FREQ=WEEKLY;BYDAY=MO"));
@@ -246,7 +252,8 @@ mod tests {
 
     #[test]
     fn writes_canonical_order_and_round_trips() {
-        let mut attrs = Attrs::parse("{zz=1 due=2026-11-03 when=evening}").unwrap();
+        let mut attrs =
+            Attrs::parse("{zz=1 due=2026-11-03 when=evening}").unwrap();
         attrs.canonicalise();
         assert_eq!(attrs.to_string(), "{when=evening due=2026-11-03 zz=1}");
         attrs.set("rrule", "FREQ=DAILY;INTERVAL=2");

@@ -14,8 +14,11 @@ import type { BookDiff, BooksApi } from "./api";
 function DiffView({ diff }: { readonly diff: BookDiff }) {
   const t = useT();
   const empty =
-    diff.added.length + diff.removed.length + diff.moved.length + diff.changed.length === 0 &&
-    diff.settings.length === 0;
+    diff.added.length +
+      diff.removed.length +
+      diff.moved.length +
+      diff.changed.length ===
+      0 && diff.settings.length === 0;
   if (empty) return <p className="vl-muted">{t("books-diff-none")}</p>;
   return (
     <div className="vl-book-diff">
@@ -44,7 +47,9 @@ function DiffView({ diff }: { readonly diff: BookDiff }) {
           <h3>{t("books-diff-moved")}</h3>
           <ul>
             {diff.moved.map((s) => (
-              <li key={s.id}>{t("books-diff-moved-line", { from: s.from, to: s.to })}</li>
+              <li key={s.id}>
+                {t("books-diff-moved-line", { from: s.from, to: s.to })}
+              </li>
             ))}
           </ul>
         </>
@@ -94,7 +99,11 @@ export function SnapshotsPanel({
 }) {
   const t = useT();
   const [version, setVersion] = useState(0);
-  const loaded = useLoaded(() => api.snapshots(book), [api, book, version], failureText);
+  const loaded = useLoaded(
+    () => api.snapshots(book),
+    [api, book, version],
+    failureText,
+  );
   const [compare, setCompare] = useState<{ from: string; to: string }>();
   const diff = useLoaded(
     async () => {
@@ -126,7 +135,10 @@ export function SnapshotsPanel({
     });
   };
   return (
-    <section className="vl-book-panel" aria-labelledby="vl-book-snapshots-title">
+    <section
+      className="vl-book-panel"
+      aria-labelledby="vl-book-snapshots-title"
+    >
       <h2 id="vl-book-snapshots-title">{t("books-snapshots")}</h2>
       {canEdit && (
         <form className="vl-book-tool-form" onSubmit={take}>
@@ -196,7 +208,9 @@ export function SnapshotsPanel({
         }
       </Ready>
       {compare !== undefined && (
-        <Ready loaded={diff}>{(found) => found !== undefined && <DiffView diff={found} />}</Ready>
+        <Ready loaded={diff}>
+          {(found) => found !== undefined && <DiffView diff={found} />}
+        </Ready>
       )}
     </section>
   );

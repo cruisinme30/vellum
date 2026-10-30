@@ -72,22 +72,31 @@ function draftFrom(form: FormData, team: string, template: string): IssueDraft {
 /** The repeat choices, plus one a URL asked for. */
 function repeatChoices(asked: string | undefined): readonly string[] {
   const known: readonly string[] = REPEATS;
-  return asked === undefined || known.includes(asked) ? known : [...known, asked];
+  return asked === undefined || known.includes(asked)
+    ? known
+    : [...known, asked];
 }
 
-function TemplatePreview({ template }: { readonly template: TemplateOut | undefined }) {
+function TemplatePreview({
+  template,
+}: {
+  readonly template: TemplateOut | undefined;
+}) {
   const t = useT();
   if (template === undefined) return;
   const facts = [
-    template.title != undefined && t("plan-template-title", { title: template.title }),
+    template.title != undefined &&
+      t("plan-template-title", { title: template.title }),
     template.priority != undefined &&
       t("plan-suggest-priority", {
         priority: t(priorityId(template.priority)),
       }),
-    template.labels.length > 0 && t("plan-suggest-labels", { labels: template.labels.join(", ") }),
+    template.labels.length > 0 &&
+      t("plan-suggest-labels", { labels: template.labels.join(", ") }),
     template.assignee != undefined &&
       t("plan-suggest-assignee", { assignee: `@${template.assignee}` }),
-    template.repeat != undefined && t("plan-template-repeat", { repeat: template.repeat }),
+    template.repeat != undefined &&
+      t("plan-template-repeat", { repeat: template.repeat }),
   ].filter((f): f is string => typeof f === "string");
   return (
     <div className="vl-plan-template" aria-live="polite">
@@ -98,13 +107,19 @@ function TemplatePreview({ template }: { readonly template: TemplateOut | undefi
           ))}
         </ul>
       )}
-      {template.body !== "" && <p className="vl-issue-description">{template.body}</p>}
+      {template.body !== "" && (
+        <p className="vl-issue-description">{template.body}</p>
+      )}
     </div>
   );
 }
 
 /** The fields a URL may prefill. */
-function DraftFields({ asked }: { readonly asked: ReturnType<typeof draftFromUrl> }) {
+function DraftFields({
+  asked,
+}: {
+  readonly asked: ReturnType<typeof draftFromUrl>;
+}) {
   const t = useT();
   const repeats = repeatChoices(asked.repeat);
   return (
@@ -119,7 +134,11 @@ function DraftFields({ asked }: { readonly asked: ReturnType<typeof draftFromUrl
         />
       </Field>
       <Field label={t("plan-description")}>
-        <textarea name="description" rows={6} defaultValue={asked.description} />
+        <textarea
+          name="description"
+          rows={6}
+          defaultValue={asked.description}
+        />
       </Field>
       <Field label={t("plan-priority")}>
         <select name="priority" defaultValue={asked.priority ?? ""}>
@@ -132,7 +151,11 @@ function DraftFields({ asked }: { readonly asked: ReturnType<typeof draftFromUrl
         </select>
       </Field>
       <Field label={t("plan-estimate")}>
-        <input name="estimate" defaultValue={asked.estimate} autoComplete="off" />
+        <input
+          name="estimate"
+          defaultValue={asked.estimate}
+          autoComplete="off"
+        />
       </Field>
       <Field label={t("plan-assignee")}>
         <input
@@ -159,7 +182,9 @@ function DraftFields({ asked }: { readonly asked: ReturnType<typeof draftFromUrl
         <select name="repeat" defaultValue={asked.repeat ?? ""}>
           {repeats.map((r) => (
             <option key={r} value={r}>
-              {r === "" ? t("plan-repeat-never") : t("plan-repeat-every", { repeat: r })}
+              {r === ""
+                ? t("plan-repeat-never")
+                : t("plan-repeat-every", { repeat: r })}
             </option>
           ))}
         </select>
@@ -198,7 +223,8 @@ function NewIssue({
       void navigate(`/issues/${encodeURIComponent(issue.key)}`);
     },
   );
-  if (teams.length === 0) return <p className="vl-muted">{t("issues-no-teams")}</p>;
+  if (teams.length === 0)
+    return <p className="vl-muted">{t("issues-no-teams")}</p>;
   return (
     <form className="vl-plan-form vl-plan-issue-form" onSubmit={onSubmit}>
       <Field label={t("issues-team")}>
@@ -253,14 +279,22 @@ function NewIssue({
 
 function NewIssueForApi({ api }: { readonly api: PlanningApi }) {
   const loaded = useLoaded(() => api.teams(), [api], failureText);
-  return <Ready loaded={loaded}>{(teams) => <NewIssue api={api} teams={teams} />}</Ready>;
+  return (
+    <Ready loaded={loaded}>
+      {(teams) => <NewIssue api={api} teams={teams} />}
+    </Ready>
+  );
 }
 
 /** New issue: every field, a template, a repeat, prefilled from the URL. */
 export function NewIssuePage() {
   const t = useT();
   return (
-    <ServerScreen api="planning" title={t("plan-issue-new")} className="vl-work vl-plan">
+    <ServerScreen
+      api="planning"
+      title={t("plan-issue-new")}
+      className="vl-work vl-plan"
+    >
       {(api) => <NewIssueForApi api={api} />}
     </ServerScreen>
   );

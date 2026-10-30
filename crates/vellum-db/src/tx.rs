@@ -15,6 +15,9 @@ use std::future::Future;
 
 use sqlx::{PgPool, Postgres, Sqlite, SqlitePool, Transaction};
 
+/// A write transaction on SQLite.
+type SqliteTx = Transaction<'static, Sqlite>;
+
 /// Starts a transaction that will write. Use it, not `Pool::begin`, for
 /// every transaction that writes to the index.
 pub trait BeginWrite {
@@ -24,7 +27,9 @@ pub trait BeginWrite {
     /// Acquires a connection and begins a write transaction on it.
     fn begin_write(
         &self,
-    ) -> impl Future<Output = Result<Transaction<'static, Self::Database>, sqlx::Error>> + Send;
+    ) -> impl Future<
+        Output = Result<Transaction<'static, Self::Database>, sqlx::Error>,
+    > + Send;
 }
 
 impl BeginWrite for SqlitePool {
@@ -32,7 +37,7 @@ impl BeginWrite for SqlitePool {
 
     fn begin_write(
         &self,
-    ) -> impl Future<Output = Result<Transaction<'static, Sqlite>, sqlx::Error>> + Send {
+    ) -> impl Future<Output = Result<SqliteTx, sqlx::Error>> + Send {
         self.begin_with("BEGIN IMMEDIATE")
     }
 }
@@ -42,7 +47,9 @@ impl BeginWrite for PgPool {
 
     fn begin_write(
         &self,
-    ) -> impl Future<Output = Result<Transaction<'static, Postgres>, sqlx::Error>> + Send {
+    ) -> impl Future<
+        Output = Result<Transaction<'static, Postgres>, sqlx::Error>,
+    > + Send {
         self.begin()
     }
 }

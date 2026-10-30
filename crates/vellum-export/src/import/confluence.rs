@@ -38,12 +38,16 @@ pub(super) fn import(bytes: &[u8]) -> Result<Builder, ImportError> {
         }
         let text = String::from_utf8_lossy(&entry.bytes);
         let page = Html::parse_document(&text);
-        let title = title(&page).unwrap_or_else(|| super::stem(&entry.path).replace('_', " "));
+        let title = title(&page)
+            .unwrap_or_else(|| super::stem(&entry.path).replace('_', " "));
         let _ = titles.insert(entry.path.clone(), title.clone());
         pages.push((entry.path.clone(), title, page));
     }
     if pages.is_empty() {
-        return Err(ImportError::format(FORMAT, "the archive has no HTML pages"));
+        return Err(ImportError::format(
+            FORMAT,
+            "the archive has no HTML pages",
+        ));
     }
     for (path, title, page) in pages {
         let mut folders = Vec::new();
@@ -152,10 +156,12 @@ fn main(page: &Html) -> Option<ElementRef<'_>> {
 macro_rules! selector {
     ($name:ident, $css:literal) => {
         fn $name() -> Selector {
-            static SELECTOR: std::sync::OnceLock<Selector> = std::sync::OnceLock::new();
+            static SELECTOR: std::sync::OnceLock<Selector> =
+                std::sync::OnceLock::new();
             SELECTOR
                 .get_or_init(|| {
-                    Selector::parse($css).unwrap_or_else(|_| unreachable!("valid selector"))
+                    Selector::parse($css)
+                        .unwrap_or_else(|_| unreachable!("valid selector"))
                 })
                 .clone()
         }
@@ -192,9 +198,11 @@ mod tests {
 
     #[test]
     fn titles_drop_the_space_name() {
-        let page = Html::parse_document(
-            r#"<html><head><title>Ops : Restart</title></head><body><h1 id="title-heading"><span id="title-text"> Ops : Restart the gateway </span></h1></body></html>"#,
-        );
+        let page = Html::parse_document(concat!(
+            r#"<html><head><title>Ops : Restart</title></head><body><h1 "#,
+            r#"id="title-heading"><span id="title-text"> Ops : Restart "#,
+            r#"the gateway </span></h1></body></html>"#,
+        ));
         assert_eq!(title(&page).as_deref(), Some("Restart the gateway"));
     }
 }

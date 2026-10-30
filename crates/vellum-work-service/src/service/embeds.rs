@@ -81,8 +81,14 @@ impl EmbedView {
                             state: graph
                                 .team(&i.team)
                                 .and_then(|t| t.workflow.get(&i.state))
-                                .map_or_else(|| i.state.to_string(), |s| s.name.clone()),
-                            assignee: i.assignee.as_ref().map(UserRef::to_string),
+                                .map_or_else(
+                                    || i.state.to_string(),
+                                    |s| s.name.clone(),
+                                ),
+                            assignee: i
+                                .assignee
+                                .as_ref()
+                                .map(UserRef::to_string),
                             priority: i.priority.number(),
                         }
                     })
@@ -103,7 +109,11 @@ impl WorkService {
     ///
     /// Saved views are not stored by the service yet, so a block that
     /// names one reports that instead of a view.
-    pub async fn issue_embeds(&self, markdown: &str, viewer: &UserRef) -> Vec<EmbedResult> {
+    pub async fn issue_embeds(
+        &self,
+        markdown: &str,
+        viewer: &UserRef,
+    ) -> Vec<EmbedResult> {
         let blocks = issue_blocks(markdown);
         if blocks.is_empty() {
             return Vec::new();

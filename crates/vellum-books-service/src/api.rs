@@ -509,7 +509,9 @@ pub struct MergeSection {
 }
 
 /// What a publication is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum PublishFormat {
     /// A static HTML site with no scripts.

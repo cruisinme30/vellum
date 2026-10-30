@@ -16,8 +16,15 @@ fuzz_target!(|src: &str| {
             let parsed = vellum_format::parse(&src);
             let text = vellum_format::serialize(&parsed.document);
             let again = vellum_format::parse(&text);
-            assert_eq!(again.document, parsed.document, "round trip changed the document");
-            assert_eq!(vellum_format::serialize(&again.document), text, "not idempotent");
+            assert_eq!(
+                again.document, parsed.document,
+                "round trip changed the document"
+            );
+            assert_eq!(
+                vellum_format::serialize(&again.document),
+                text,
+                "not idempotent"
+            );
         })
         .expect("spawn");
     if let Err(panic) = worker.join() {

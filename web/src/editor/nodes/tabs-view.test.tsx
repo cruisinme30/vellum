@@ -6,14 +6,22 @@ import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { body, p, tabs } from "../content";
-import { createTestEditor, detachedViewProperties, renderEditor } from "../test-editor";
+import {
+  createTestEditor,
+  detachedViewProperties,
+  renderEditor,
+} from "../test-editor";
 
 import { TabsView } from "./tabs-view";
 
-const content = body(tabs(["Overview", p("first")], ["Details", p("second")], ["", p("third")]));
+const content = body(
+  tabs(["Overview", p("first")], ["Details", p("second")], ["", p("third")]),
+);
 
 const selectedTab = () =>
-  screen.getAllByRole("tab").find((tab) => tab.getAttribute("aria-selected") === "true");
+  screen
+    .getAllByRole("tab")
+    .find((tab) => tab.getAttribute("aria-selected") === "true");
 
 /** The visible panel's text, without its title field. */
 const visiblePanelText = () =>
@@ -46,7 +54,9 @@ describe("TabsView", () => {
 
   it("keeps only the selected tab in the tab order", async () => {
     await renderEditor(content);
-    expect(screen.getAllByRole("tab").map((tab) => tab.tabIndex)).toEqual([0, -1, -1]);
+    expect(screen.getAllByRole("tab").map((tab) => tab.tabIndex)).toEqual([
+      0, -1, -1,
+    ]);
   });
 
   it("selects a tab on click", async () => {
@@ -87,7 +97,9 @@ describe("TabsView", () => {
     const user = userEvent.setup();
     const { editor } = await renderEditor(content);
     await user.click(screen.getByRole("button", { name: "Add a tab" }));
-    expect(editor.state.doc.firstChild?.lastChild?.attrs["title"]).toBe("Tab 4");
+    expect(editor.state.doc.firstChild?.lastChild?.attrs["title"]).toBe(
+      "Tab 4",
+    );
     expect(selectedTab()?.textContent).toBe("Tab 4");
   });
 
@@ -100,7 +112,9 @@ describe("TabsView", () => {
     }
     await user.clear(title);
     await user.type(title, "Summary");
-    expect(editor.state.doc.firstChild?.firstChild?.attrs["title"]).toBe("Summary");
+    expect(editor.state.doc.firstChild?.firstChild?.attrs["title"]).toBe(
+      "Summary",
+    );
     expect(screen.getByRole("tab", { name: "Summary" })).toBeDefined();
   });
 
@@ -108,7 +122,9 @@ describe("TabsView", () => {
     await renderEditor(content, { editable: false });
     expect(screen.queryByRole("button", { name: "Add a tab" })).toBeNull();
     const titles = screen.getAllByRole("textbox", { name: "Tab title" });
-    expect(titles.every((title) => (title as HTMLInputElement).readOnly)).toBe(true);
+    expect(titles.every((title) => (title as HTMLInputElement).readOnly)).toBe(
+      true,
+    );
   });
 
   it("adds nothing once the block has left the document", async () => {

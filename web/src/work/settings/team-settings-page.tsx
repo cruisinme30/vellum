@@ -22,14 +22,23 @@ import { TeamPicker, useTeam, useWorkKeys, WorkNav } from "../nav";
 
 import { ArchiveSection } from "./archive";
 import { SlaSection, TriageSection } from "./rules";
-import { CyclesSection, EstimatesSection, GeneralSection, GitSection } from "./sections";
+import {
+  CyclesSection,
+  EstimatesSection,
+  GeneralSection,
+  GitSection,
+} from "./sections";
 import { StatusesSection, type Moves } from "./statuses";
 import { pruneGit, type TeamFile } from "./team-file";
 
 import "./settings.css";
 
 /** The issues in a status, closed ones included. */
-async function issuesIn(api: WorkApi, team: string, status: string): Promise<IssueOut[]> {
+async function issuesIn(
+  api: WorkApi,
+  team: string,
+  status: string,
+): Promise<IssueOut[]> {
   const groups = await api.queryIssues({
     team,
     group_by: "none",
@@ -40,7 +49,11 @@ async function issuesIn(api: WorkApi, team: string, status: string): Promise<Iss
 }
 
 /** Moves every issue out of the statuses being removed. */
-async function runMoves(api: WorkApi, team: string, moves: Moves): Promise<void> {
+async function runMoves(
+  api: WorkApi,
+  team: string,
+  moves: Moves,
+): Promise<void> {
   for (const [from, to] of Object.entries(moves)) {
     // A query returns one page of issues; go again until none are left.
     for (let round = 0; round < 50; round += 1) {
@@ -73,7 +86,9 @@ function SaveBar({
         disabled={!dirty || state === "saving"}
         onClick={onSave}
       >
-        {state === "saving" ? t("team-settings-saving") : t("team-settings-save")}
+        {state === "saving"
+          ? t("team-settings-saving")
+          : t("team-settings-save")}
       </button>
       <button
         type="button"
@@ -111,7 +126,9 @@ function Editor({
 }) {
   const [draft, setDraft] = useState(initial);
   const [moves, setMoves] = useState<Moves>({});
-  const [state, setState] = useState<"idle" | "saving" | "saved">(justSaved ? "saved" : "idle");
+  const [state, setState] = useState<"idle" | "saving" | "saved">(
+    justSaved ? "saved" : "idle",
+  );
   const [error, setError] = useState<string>();
   const edit = (change: (file: TeamFile) => TeamFile) => {
     setState("idle");
@@ -260,7 +277,11 @@ function NewTeam({
     );
   }
   return (
-    <form className="vl-work-add" onSubmit={submit} aria-label={t("team-settings-new")}>
+    <form
+      className="vl-work-add"
+      onSubmit={submit}
+      aria-label={t("team-settings-new")}
+    >
       <label>
         {t("team-settings-name")}
         <input name="name" required autoComplete="off" />
@@ -318,13 +339,17 @@ function TeamList({
   const t = useT();
   const team = useTeam(teams);
   const named = teams.map((each) =>
-    each.archived ? { ...each, name: t("team-settings-archived-name", { name: each.name }) } : each,
+    each.archived
+      ? { ...each, name: t("team-settings-archived-name", { name: each.name }) }
+      : each,
   );
   const picked = named.find((each) => each.key === team?.key);
   return (
     <>
       <div className="vl-work-filters">
-        {picked !== undefined && <TeamPicker teams={named} team={picked} reset />}
+        {picked !== undefined && (
+          <TeamPicker teams={named} team={picked} reset />
+        )}
         <label className="vl-work-field">
           <input
             type="checkbox"
@@ -340,7 +365,12 @@ function TeamList({
       {team === undefined ? (
         <p className="vl-muted">{t("issues-no-teams")}</p>
       ) : (
-        <TeamEditor key={team.key} api={api} team={team} onArchived={onArchived} />
+        <TeamEditor
+          key={team.key}
+          api={api}
+          team={team}
+          onArchived={onArchived}
+        />
       )}
     </>
   );
@@ -351,14 +381,20 @@ function Teams({ api }: { readonly api: WorkApi }) {
   const [showArchived, setShowArchived] = useState(false);
   const [parameters, setParameters] = useSearchParams();
   // A team opened by its address stays reachable once archived.
-  const loaded = useLoaded(() => api.teams({ includeArchived: true }), [api, version], failureText);
+  const loaded = useLoaded(
+    () => api.teams({ includeArchived: true }),
+    [api, version],
+    failureText,
+  );
   const wanted = parameters.get("team");
   return (
     <Ready loaded={loaded}>
       {(all) => (
         <TeamList
           api={api}
-          teams={all.filter((team) => showArchived || !team.archived || team.key === wanted)}
+          teams={all.filter(
+            (team) => showArchived || !team.archived || team.key === wanted,
+          )}
           showArchived={showArchived}
           onShowArchived={setShowArchived}
           onCreated={(key) => {

@@ -12,7 +12,9 @@
 //! data names what the secret is for, so a sealed value cannot be moved
 //! to another field or account.
 
-use aws_lc_rs::aead::{AES_256_GCM, Aad, LessSafeKey, NONCE_LEN, Nonce, UnboundKey};
+use aws_lc_rs::aead::{
+    AES_256_GCM, Aad, LessSafeKey, NONCE_LEN, Nonce, UnboundKey,
+};
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use vellum_kernel::{Error, ErrorKind};
@@ -39,7 +41,8 @@ impl Sealer {
     ///
     /// [`ErrorKind::Internal`] if the key is refused.
     pub fn new(key: &[u8; 32]) -> Result<Self, Error> {
-        let key = UnboundKey::new(&AES_256_GCM, key).map_err(|_| internal("bad identity key"))?;
+        let key = UnboundKey::new(&AES_256_GCM, key)
+            .map_err(|_| internal("bad identity key"))?;
         Ok(Self {
             key: LessSafeKey::new(key),
         })
@@ -53,7 +56,8 @@ impl Sealer {
     /// [`ErrorKind::Internal`] if the random source fails.
     pub fn ephemeral() -> Result<Self, Error> {
         let mut key = [0_u8; 32];
-        getrandom::fill(&mut key).map_err(|_| internal("random source failed"))?;
+        getrandom::fill(&mut key)
+            .map_err(|_| internal("random source failed"))?;
         Self::new(&key)
     }
 
@@ -62,9 +66,14 @@ impl Sealer {
     /// # Errors
     ///
     /// [`ErrorKind::Internal`] if the random source or cipher fails.
-    pub fn seal(&self, purpose: &str, plaintext: &[u8]) -> Result<String, Error> {
+    pub fn seal(
+        &self,
+        purpose: &str,
+        plaintext: &[u8],
+    ) -> Result<String, Error> {
         let mut nonce = [0_u8; NONCE_LEN];
-        getrandom::fill(&mut nonce).map_err(|_| internal("random source failed"))?;
+        getrandom::fill(&mut nonce)
+            .map_err(|_| internal("random source failed"))?;
         let mut sealed = plaintext.to_vec();
         self.key
             .seal_in_place_append_tag(
@@ -99,7 +108,8 @@ impl Sealer {
             .open_in_place(nonce, Aad::from(purpose.as_bytes()), &mut body)
             .map_err(|_| {
                 internal(
-                    "a sealed secret does not open: the identity key changed or it was altered",
+                    "a sealed secret does not open: the identity key changed \
+                        or it was altered",
                 )
             })?;
         Ok(opened.to_vec())

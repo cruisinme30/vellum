@@ -201,7 +201,9 @@ pub struct SsoLink {
 }
 
 /// How a browser session was established.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum SessionMethod {
     /// Email and password.
@@ -496,7 +498,17 @@ pub struct SamlRequest {
 }
 
 /// Who must use a second factor when signing in with a password.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum SecondFactorPolicy {
     /// Nobody: people choose.
@@ -536,7 +548,10 @@ impl State {
         let mut base: String = local
             .chars()
             .map(|c| {
-                if c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '.' | '_' | '-') {
+                if c.is_ascii_lowercase()
+                    || c.is_ascii_digit()
+                    || matches!(c, '.' | '_' | '-')
+                {
                     c
                 } else {
                     '-'
@@ -583,9 +598,11 @@ impl State {
         self.mfa_challenges.retain(|_, c| c.expires > now);
         self.saml_requests.retain(|_, r| r.expires > now);
         self.saml_seen.retain(|_, until| *until > now);
-        let forget = i64::try_from(LOCKOUT_MEMORY.as_millis()).unwrap_or(i64::MAX);
-        self.lockouts
-            .retain(|_, a| a.until.unix_ms().saturating_add(forget) > now.unix_ms());
+        let forget =
+            i64::try_from(LOCKOUT_MEMORY.as_millis()).unwrap_or(i64::MAX);
+        self.lockouts.retain(|_, a| {
+            a.until.unix_ms().saturating_add(forget) > now.unix_ms()
+        });
     }
 
     /// Makes room for one more lockout record.
@@ -595,7 +612,8 @@ impl State {
         }
         self.sweep(now);
         if self.lockouts.len() >= MAX_LOCKOUTS {
-            let mut untils: Vec<i64> = self.lockouts.values().map(|a| a.until.unix_ms()).collect();
+            let mut untils: Vec<i64> =
+                self.lockouts.values().map(|a| a.until.unix_ms()).collect();
             untils.sort_unstable();
             if let Some(&cutoff) = untils.get(untils.len() / 2) {
                 self.lockouts.retain(|_, a| a.until.unix_ms() > cutoff);
@@ -679,12 +697,13 @@ impl Store {
         })?;
         if copied {
             let path = data_dir.join(".vellum").join("identity.json");
-            std::fs::rename(&path, path.with_extension("json.imported")).map_err(|e| {
-                Error::new(
-                    ErrorKind::Internal,
-                    format!("cannot rename {}: {e}", path.display()),
-                )
-            })?;
+            std::fs::rename(&path, path.with_extension("json.imported"))
+                .map_err(|e| {
+                    Error::new(
+                        ErrorKind::Internal,
+                        format!("cannot rename {}: {e}", path.display()),
+                    )
+                })?;
         }
         Ok(copied)
     }
@@ -704,7 +723,9 @@ impl Store {
                     format!("cannot parse {}: {e}", path.display()),
                 )
             })?,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => State::default(),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                State::default()
+            }
             Err(e) => {
                 return Err(Error::new(
                     ErrorKind::Internal,
@@ -740,14 +761,21 @@ impl Store {
     ///
     /// [`ErrorKind::Internal`] if the file cannot be written, and
     /// [`ErrorKind::Unavailable`] if the database cannot be.
-    pub fn write<R>(&self, f: impl FnOnce(&mut State) -> R) -> Result<R, Error> {
+    pub fn write<R>(
+        &self,
+        f: impl FnOnce(&mut State) -> R,
+    ) -> Result<R, Error> {
         match &self.0 {
             Backend::Local { path, state } => {
-                let mut state = state.lock().unwrap_or_else(PoisonError::into_inner);
+                let mut state =
+                    state.lock().unwrap_or_else(PoisonError::into_inner);
                 let result = f(&mut state);
                 if let Some(path) = path {
                     let bytes = serde_json::to_vec(&*state).map_err(|e| {
-                        Error::new(ErrorKind::Internal, format!("encode identity: {e}"))
+                        Error::new(
+                            ErrorKind::Internal,
+                            format!("encode identity: {e}"),
+                        )
                     })?;
                     drop(state);
                     save(path, &bytes)?;
@@ -798,11 +826,16 @@ mod hash_b64 {
 
     use crate::secret::SecretHash;
 
-    pub(super) fn serialize<S: Serializer>(hash: &SecretHash, s: S) -> Result<S::Ok, S::Error> {
+    pub(super) fn serialize<S: Serializer>(
+        hash: &SecretHash,
+        s: S,
+    ) -> Result<S::Ok, S::Error> {
         s.serialize_str(&URL_SAFE_NO_PAD.encode(hash))
     }
 
-    pub(super) fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<SecretHash, D::Error> {
+    pub(super) fn deserialize<'de, D: Deserializer<'de>>(
+        d: D,
+    ) -> Result<SecretHash, D::Error> {
         let text = String::deserialize(d)?;
         let bytes = URL_SAFE_NO_PAD
             .decode(text)
@@ -820,7 +853,10 @@ mod hashes_b64 {
 
     use crate::secret::SecretHash;
 
-    pub(super) fn serialize<S: Serializer>(hashes: &[SecretHash], s: S) -> Result<S::Ok, S::Error> {
+    pub(super) fn serialize<S: Serializer>(
+        hashes: &[SecretHash],
+        s: S,
+    ) -> Result<S::Ok, S::Error> {
         s.collect_seq(hashes.iter().map(|h| URL_SAFE_NO_PAD.encode(h)))
     }
 
@@ -847,7 +883,8 @@ mod tests {
 
     #[test]
     fn the_file_round_trips_and_is_private() {
-        let dir = std::env::temp_dir().join(format!("vellum-identity-{}", std::process::id()));
+        let dir = std::env::temp_dir()
+            .join(format!("vellum-identity-{}", std::process::id()));
         let store = Store::open(&dir).unwrap();
         let id = UserId::generate();
         store

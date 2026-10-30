@@ -11,7 +11,9 @@ use bytes::Bytes;
 use vellum_api::auth::{Authenticated, Authenticator, RequestMeta};
 use vellum_api::config::GatewayConfig;
 use vellum_api::gateway::GatewayBuilder;
-use vellum_contracts::{BoxFuture, CredentialKind, Principal, ScopeSet, Service};
+use vellum_contracts::{
+    BoxFuture, CredentialKind, Principal, ScopeSet, Service,
+};
 use vellum_crypto::recipients::{RecipientSecret, seal_for};
 use vellum_drive::memory::{MemoryAccess, MemoryIndex, Role};
 use vellum_drive::{DriveIndex as _, Space, SpaceKind, SpaceSettings};
@@ -20,12 +22,16 @@ use vellum_private::{DeviceIdentity, PrivateAgent, PrivateSpace};
 use vellum_store::{BlobPath, BlobStore, LocalStore, Precondition};
 
 use crate::pins::Pins;
-use crate::private_remote::{E2eClient, RemoteSpaces, UNTRUSTED, enrol, reseal};
+use crate::private_remote::{
+    E2eClient, RemoteSpaces, UNTRUSTED, enrol, reseal,
+};
 
 const OWNER: UserId = UserId::from_u128(1);
 const MEMBER: UserId = UserId::from_u128(2);
 const SPACE: &str = "01JDB0ARD00000000000000000";
-const PAGE: &str = "---\nid: 01JDB0ARDP1AN0000000000000\ntitle: Q4 plan\nvellum: 1\n---\n\n# Q4 ^blk-q4000001\n\nRaise the seed round in December.\n";
+const PAGE: &str = "---\nid: 01JDB0ARDP1AN0000000000000\ntitle: Q4 plan\n\
+    vellum: 1\n---\n\n# Q4 ^blk-q4000001\n\n\
+    Raise the seed round in December.\n";
 
 /// `Bearer owner` and `Bearer member`, both freshly signed in.
 struct Tokens;
@@ -102,11 +108,14 @@ async fn server() -> Server {
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let url = format!("http://{}", listener.local_addr().unwrap());
-    let gateway = GatewayBuilder::new(GatewayConfig::new(url.clone(), vec![7; 32]), "1.0.0-test")
-        .service(Arc::new(e2e) as Arc<dyn Service>)
-        .authenticator(Arc::new(Tokens))
-        .build()
-        .unwrap();
+    let gateway = GatewayBuilder::new(
+        GatewayConfig::new(url.clone(), vec![7; 32]),
+        "1.0.0-test",
+    )
+    .service(Arc::new(e2e) as Arc<dyn Service>)
+    .authenticator(Arc::new(Tokens))
+    .build()
+    .unwrap();
     let router = gateway.router();
     drop(tokio::spawn(
         async move { axum::serve(listener, router).await },
@@ -134,7 +143,8 @@ async fn devices_enrol_seal_reseal_and_search_through_the_server() {
 
     // The owner makes the space private by enrolling their laptop, then
     // uploads a page sealed to it.
-    let (laptop_dir, phone_dir) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let (laptop_dir, phone_dir) =
+        (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
     let laptop_pins = Pins::new(laptop_dir.path().to_owned());
     let phone_pins = Pins::new(phone_dir.path().to_owned());
     let first = enrol(&owner, &laptop, space, "Owner's laptop", &laptop_pins)
@@ -161,9 +171,10 @@ async fn devices_enrol_seal_reseal_and_search_through_the_server() {
 
     // The member's phone joins. Until a device that can open the page
     // reseals it, the phone cannot read it.
-    let phone_key = enrol(&member, &phone, space, "Member's phone", &phone_pins)
-        .await
-        .unwrap();
+    let phone_key =
+        enrol(&member, &phone, space, "Member's phone", &phone_pins)
+            .await
+            .unwrap();
     // The phone cannot open the page yet, but it seals the readable page
     // left from before the space turned private.
     let report = reseal(&member, &phone, space, &phone_pins, &[])

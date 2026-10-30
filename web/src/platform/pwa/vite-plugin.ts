@@ -33,10 +33,14 @@ function listFiles(directory: string, prefix = ""): string[] {
 }
 
 /** The emitted worker chunk, still holding the placeholder. */
-function isWorkerChunk(value: unknown): value is { type: "chunk"; code: string } {
+function isWorkerChunk(
+  value: unknown,
+): value is { type: "chunk"; code: string } {
   if (typeof value !== "object" || value === null) return false;
   const { type, code } = value as { type?: unknown; code?: unknown };
-  return type === "chunk" && typeof code === "string" && code.includes(PLACEHOLDER);
+  return (
+    type === "chunk" && typeof code === "string" && code.includes(PLACEHOLDER)
+  );
 }
 
 /** A built output file, as the bundle reports it. */
@@ -54,8 +58,13 @@ export function shellManifest(
   publicFiles: readonly OutputFile[],
 ): ShellManifest {
   const entries: PrecacheEntry[] = [...outputs, ...publicFiles]
-    .filter(({ fileName }) => !fileName.endsWith(".map") && fileName !== "sw.js")
-    .map(({ fileName, content }) => ({ url: `/${fileName}`, revision: hash(content) }))
+    .filter(
+      ({ fileName }) => !fileName.endsWith(".map") && fileName !== "sw.js",
+    )
+    .map(({ fileName, content }) => ({
+      url: `/${fileName}`,
+      revision: hash(content),
+    }))
     .toSorted((a, b) => a.url.localeCompare(b.url));
   return { version: hash(JSON.stringify(entries)), entries };
 }
@@ -105,10 +114,15 @@ export function vellumServiceWorker(): Plugin {
       const manifest = shellManifest(outputs, publicFiles);
       const worker: unknown = bundle["sw.js"];
       if (!isWorkerChunk(worker)) {
-        this.error(`vellum: ${WORKER_SOURCE} under ${root} did not build to sw.js`);
+        this.error(
+          `vellum: ${WORKER_SOURCE} under ${root} did not build to sw.js`,
+        );
         return;
       }
-      worker.code = worker.code.replaceAll(PLACEHOLDER, JSON.stringify(manifest));
+      worker.code = worker.code.replaceAll(
+        PLACEHOLDER,
+        JSON.stringify(manifest),
+      );
     },
   };
 }

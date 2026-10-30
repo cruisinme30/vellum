@@ -13,7 +13,9 @@ export interface User {
   readonly name: string;
   readonly handle: string;
   readonly admin: boolean;
-  /** Whether the account has a password; without one it signs in with SSO only. */
+  /**
+   * Whether the account has a password; without one it signs in with SSO only.
+   */
   readonly hasPassword?: boolean;
 }
 
@@ -56,7 +58,11 @@ export class SecondStepRequired extends Error {
     readonly ticket: string,
     readonly methods: readonly string[],
   ) {
-    super(step === "verify" ? "second factor required" : "second factor setup required");
+    super(
+      step === "verify"
+        ? "second factor required"
+        : "second factor setup required",
+    );
     this.name = "SecondStepRequired";
   }
 }
@@ -70,13 +76,20 @@ interface SecondStepProof {
 /** A first factor added at sign-in. */
 type Enrolment =
   | { readonly code: string }
-  | { readonly passkey: { readonly name: string; readonly credential: RegistrationJson } };
+  | {
+      readonly passkey: {
+        readonly name: string;
+        readonly credential: RegistrationJson;
+      };
+    };
 
 /** The second step of a sign-in, against a ticket. */
 export interface SignInSteps {
   /** Redeems the ticket with a code, recovery code or passkey; signs in. */
   verify(ticket: string, proof: SecondStepProof): Promise<User | undefined>;
-  /** The passkey options for the ticket: sign with one, or create one to enrol. */
+  /**
+   * The passkey options for the ticket: sign with one, or create one to enrol.
+   */
   passkeyOptions(ticket: string): Promise<unknown>;
   /** An authenticator app to set up with an enrolment ticket. */
   authenticator(ticket: string): Promise<TotpSetup>;
@@ -84,14 +97,21 @@ export interface SignInSteps {
   enrol(
     ticket: string,
     enrolment: Enrolment,
-  ): Promise<{ readonly user: User | undefined; readonly recoveryCodes: readonly string[] }>;
+  ): Promise<{
+    readonly user: User | undefined;
+    readonly recoveryCodes: readonly string[];
+  }>;
 }
 
 /** Sign-in, sign-out and first-run set-up, on top of the HTTP client. */
 export interface AuthApi {
-  /** `identity.status`; `undefined` when no Vellum server answers (demo mode). */
+  /**
+   * `identity.status`; `undefined` when no Vellum server answers (demo mode).
+   */
   status(): Promise<AuthStatus | undefined>;
-  /** Signs in, or throws {@link SecondStepRequired} when a second step remains. */
+  /**
+   * Signs in, or throws {@link SecondStepRequired} when a second step remains.
+   */
   signIn(email: string, password: string): Promise<User | undefined>;
   signOut(): Promise<void>;
   /** Creates the first administrator, then signs them in. */
@@ -102,8 +122,14 @@ export interface AuthApi {
 
 interface SignInAnswer {
   readonly user?: User | null;
-  readonly secondFactor?: { readonly ticket: string; readonly methods: readonly string[] };
-  readonly enrol?: { readonly ticket: string; readonly methods: readonly string[] };
+  readonly secondFactor?: {
+    readonly ticket: string;
+    readonly methods: readonly string[];
+  };
+  readonly enrol?: {
+    readonly ticket: string;
+    readonly methods: readonly string[];
+  };
   readonly recoveryCodes?: readonly string[];
 }
 
@@ -113,7 +139,10 @@ const isStatus = (value: unknown): value is AuthStatus =>
   typeof (value as Record<string, unknown>)["needsSetup"] === "boolean";
 
 export function createAuthApi(http: Http): AuthApi {
-  const signIn = async (email: string, password: string): Promise<User | undefined> => {
+  const signIn = async (
+    email: string,
+    password: string,
+  ): Promise<User | undefined> => {
     const result = await http.send<SignInAnswer>("POST", "/auth/sign-in", {
       email,
       password,
@@ -126,17 +155,25 @@ export function createAuthApi(http: Http): AuthApi {
       );
     }
     if (result.enrol !== undefined) {
-      throw new SecondStepRequired("enrol", result.enrol.ticket, result.enrol.methods);
+      throw new SecondStepRequired(
+        "enrol",
+        result.enrol.ticket,
+        result.enrol.methods,
+      );
     }
     http.forgetSession();
     return result.user ?? undefined;
   };
   const steps: SignInSteps = {
     async verify(ticket, proof) {
-      const result = await http.send<SignInAnswer>("POST", "/auth/sign-in/verify", {
-        ticket,
-        ...proof,
-      });
+      const result = await http.send<SignInAnswer>(
+        "POST",
+        "/auth/sign-in/verify",
+        {
+          ticket,
+          ...proof,
+        },
+      );
       http.forgetSession();
       return result.user ?? undefined;
     },
@@ -153,12 +190,19 @@ export function createAuthApi(http: Http): AuthApi {
     authenticator: (ticket) =>
       http.send<TotpSetup>("POST", "/auth/sign-in/authenticator", { ticket }),
     async enrol(ticket, enrolment) {
-      const result = await http.send<SignInAnswer>("POST", "/auth/sign-in/enrol", {
-        ticket,
-        ...enrolment,
-      });
+      const result = await http.send<SignInAnswer>(
+        "POST",
+        "/auth/sign-in/enrol",
+        {
+          ticket,
+          ...enrolment,
+        },
+      );
       http.forgetSession();
-      return { user: result.user ?? undefined, recoveryCodes: result.recoveryCodes ?? [] };
+      return {
+        user: result.user ?? undefined,
+        recoveryCodes: result.recoveryCodes ?? [],
+      };
     },
   };
   return {
@@ -167,8 +211,12 @@ export function createAuthApi(http: Http): AuthApi {
         const status: unknown = await http.get("/api/v1/auth/status");
         return isStatus(status) ? status : undefined;
       } catch (error) {
-        // Only "nobody is there" means demo mode; a real server's error is real.
-        if (error instanceof ApiError && (error.code === "network" || error.status === 404)) {
+        // Only "nobody is there" means demo mode; a real server's error is
+        // real.
+        if (
+          error instanceof ApiError &&
+          (error.code === "network" || error.status === 404)
+        ) {
           return;
         }
         throw error;

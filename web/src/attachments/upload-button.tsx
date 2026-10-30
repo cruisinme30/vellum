@@ -29,7 +29,9 @@ export function UploadButton({
   const input = useRef<HTMLInputElement>(null);
   const inputId = useId();
   const [state, setState] = useState<
-    { kind: "idle" } | { kind: "busy"; name: string } | { kind: "failed"; message: string }
+    | { kind: "idle" }
+    | { kind: "busy"; name: string }
+    | { kind: "failed"; message: string }
   >({ kind: "idle" });
   if (files === undefined) return;
 
@@ -41,7 +43,10 @@ export function UploadButton({
       onUploaded(stored);
     } catch (error) {
       const problem = uploadProblem(error);
-      setState({ kind: "failed", message: `${t(problem.key)} ${problem.detail}` });
+      setState({
+        kind: "failed",
+        message: `${t(problem.key)} ${problem.detail}`,
+      });
     }
   };
 

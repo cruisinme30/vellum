@@ -17,7 +17,9 @@ use jiff::civil::{Date, Weekday};
 use vellum_kernel::DocId;
 
 use crate::checklist::Checklist;
-use crate::model::{Due, IssueCategory, Origin, Priority, Source, Task, TaskFields, When};
+use crate::model::{
+    Due, IssueCategory, Origin, Priority, Source, Task, TaskFields, When,
+};
 use crate::telemetry;
 
 /// The file a checklist lives in, as the index knows it.
@@ -38,7 +40,8 @@ pub struct FileContext {
 /// [`crate::checklist::ensure_block_ids`]) gives them one.
 #[must_use]
 pub fn project_file(context: &FileContext, source: &str) -> Vec<Task> {
-    let _span = tracing::debug_span!("tasks.project_file", doc = %context.doc).entered();
+    let _span = tracing::debug_span!("tasks.project_file", doc = %context.doc)
+        .entered();
     let list = Checklist::parse(source);
     let tasks: Vec<Task> = list
         .items
@@ -70,21 +73,23 @@ pub fn project_file(context: &FileContext, source: &str) -> Vec<Task> {
 
 /// Whether a projected task belongs in `me`'s My Work.
 ///
-/// Items in a list belong to the people they mention, or to the list's owner when they
-/// mention nobody; items in documents belong to the people they mention.
-/// Issues, comments and reviews are already selected for `me` by the
+/// Items in a list belong to the people they mention, or to the list's owner
+/// when they mention nobody; items in documents belong to the people they
+/// mention. Issues, comments and reviews are already selected for `me` by the
 /// union query.
 #[must_use]
 pub fn belongs_to(task: &Task, me: &str, owner: Option<&str>) -> bool {
     match &task.source {
         Source::Checklist { origin, .. } => {
-            let mentioned = task.assignees.iter().any(|a| a.eq_ignore_ascii_case(me));
+            let mentioned =
+                task.assignees.iter().any(|a| a.eq_ignore_ascii_case(me));
             match origin {
                 Origin::Doc => mentioned,
                 Origin::Inbox | Origin::List => {
                     mentioned
                         || (task.assignees.is_empty()
-                            && owner.is_some_and(|o| o.eq_ignore_ascii_case(me)))
+                            && owner
+                                .is_some_and(|o| o.eq_ignore_ascii_case(me)))
                 }
             }
         }
@@ -149,12 +154,12 @@ pub fn bucket(task: &Task, today: Date) -> Bucket {
         Source::Review { .. } => Bucket::Today,
         Source::Issue { category, .. } => match category {
             IssueCategory::Started => Bucket::Today,
-            IssueCategory::Triage | IssueCategory::Backlog | IssueCategory::Unstarted => {
-                Bucket::Anytime
-            }
-            IssueCategory::Completed | IssueCategory::Canceled | IssueCategory::Duplicate => {
-                Bucket::Done
-            }
+            IssueCategory::Triage
+            | IssueCategory::Backlog
+            | IssueCategory::Unstarted => Bucket::Anytime,
+            IssueCategory::Completed
+            | IssueCategory::Canceled
+            | IssueCategory::Duplicate => Bucket::Done,
         },
     }
 }
@@ -248,14 +253,19 @@ fn order(a: &Entry, b: &Entry) -> Ordering {
 }
 
 /// Builds a view row with its subtasks, taking them out of `children`.
-fn entry(task: Task, today: Date, children: &mut BTreeMap<String, Vec<Task>>) -> Entry {
+fn entry(
+    task: Task,
+    today: Date,
+    children: &mut BTreeMap<String, Vec<Task>>,
+) -> Entry {
     let own = children.remove(&task.source.key()).unwrap_or_default();
     let kids = own
         .into_iter()
         .map(|child| entry(child, today, children))
         .collect();
     Entry {
-        overdue: !task.done && task.fields.due.is_some_and(|d| d.date() < today),
+        overdue: !task.done
+            && task.fields.due.is_some_and(|d| d.date() < today),
         task,
         children: kids,
     }
@@ -268,10 +278,13 @@ fn entry(task: Task, today: Date, children: &mut BTreeMap<String, Vec<Task>>) ->
 /// is also in the set is shown under it; otherwise it stands alone.
 #[must_use]
 pub fn build(tasks: Vec<Task>, today: Date) -> MyWork {
-    let _span = tracing::debug_span!("tasks.build_view", tasks = tasks.len()).entered();
+    let _span =
+        tracing::debug_span!("tasks.build_view", tasks = tasks.len()).entered();
     let keys: Vec<String> = tasks.iter().map(|t| t.source.key()).collect();
     let parent_key = |task: &Task| -> Option<String> {
-        let (Source::Checklist { doc, .. }, Some(parent)) = (&task.source, task.parent) else {
+        let (Source::Checklist { doc, .. }, Some(parent)) =
+            (&task.source, task.parent)
+        else {
             return None;
         };
         Some(format!("{doc}.{parent}"))
@@ -343,7 +356,11 @@ pub enum Target {
 /// reschedule", R-MW-1). Dragging moves the start date; the deadline
 /// is a commitment and stays.
 #[must_use]
-pub fn reschedule(fields: &TaskFields, target: Target, today: Date) -> TaskFields {
+pub fn reschedule(
+    fields: &TaskFields,
+    target: Target,
+    today: Date,
+) -> TaskFields {
     let mut fields = fields.clone();
     let (start, when) = match target {
         Target::Inbox => (None, None),
@@ -361,8 +378,10 @@ pub fn reschedule(fields: &TaskFields, target: Target, today: Date) -> TaskField
 /// The next day after `today` that falls on `weekday` (never today).
 #[must_use]
 pub fn next_weekday(today: Date, weekday: Weekday) -> Date {
-    let ahead = (weekday.to_monday_zero_offset() - today.weekday().to_monday_zero_offset() + 6)
-        .rem_euclid(7)
+    let ahead = (weekday.to_monday_zero_offset()
+        - today.weekday().to_monday_zero_offset()
+        + 6)
+    .rem_euclid(7)
         + 1;
     today.checked_add(i64::from(ahead).days()).unwrap_or(today)
 }
@@ -452,7 +471,10 @@ mod tests {
             list: None,
         };
         let today = date(2026, 11, 2);
-        assert_eq!(bucket(&issue(IssueCategory::Started), today), Bucket::Today);
+        assert_eq!(
+            bucket(&issue(IssueCategory::Started), today),
+            Bucket::Today
+        );
         assert_eq!(
             bucket(&issue(IssueCategory::Backlog), today),
             Bucket::Anytime

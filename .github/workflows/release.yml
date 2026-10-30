@@ -641,7 +641,8 @@ jobs:
           pnpm run build
           args=(--config electron-builder.yml --publish always)
           if [[ "${RUNNER_OS}" == "macOS" && -z "${APPLE_ID}" ]]; then
-            # A tagged release never ships an unsigned macOS build (ADR 0023, D99).
+            # A tagged release never ships an unsigned macOS build (ADR 0023,
+            # D99).
             if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
               echo "::error::Set APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID, CSC_LINK and CSC_KEY_PASSWORD"
               exit 1

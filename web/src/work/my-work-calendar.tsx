@@ -15,7 +15,12 @@ import { useLoaded } from "../data/use-loaded";
 import { useT } from "../i18n/i18n";
 
 import type { GoogleView, TaskView, WorkApi } from "./api";
-import { blockEnd, formatBlock, MAX_BLOCK_MINUTES, parseBlock } from "./schedule";
+import {
+  blockEnd,
+  formatBlock,
+  MAX_BLOCK_MINUTES,
+  parseBlock,
+} from "./schedule";
 
 /** The block a task has, as "15:00–16:30, 2026-11-03". */
 export function BlockLabel({ task }: { readonly task: TaskView }) {
@@ -58,7 +63,10 @@ export function BlockForm({
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const start = data.get("start");
-    const block = formatBlock(typeof start === "string" ? start : "", Number(data.get("minutes")));
+    const block = formatBlock(
+      typeof start === "string" ? start : "",
+      Number(data.get("minutes")),
+    );
     if (block === undefined) {
       setError(t("my-work-block-invalid"));
       return;
@@ -139,11 +147,16 @@ function Google({
       setError(failureText(error_));
     });
   };
-  if (!status.configured) return <p className="vl-muted">{t("my-work-google-off")}</p>;
+  if (!status.configured)
+    return <p className="vl-muted">{t("my-work-google-off")}</p>;
   return (
     <>
       <p className="vl-muted">
-        {t(status.connected ? "my-work-google-connected" : "my-work-google-not-connected")}
+        {t(
+          status.connected
+            ? "my-work-google-connected"
+            : "my-work-google-not-connected",
+        )}
       </p>
       <div className="vl-quick-actions">
         {status.connected ? (
@@ -155,7 +168,11 @@ function Google({
                 run(api.syncGoogle(), (synced) => {
                   setNote(
                     t("my-work-google-synced", {
-                      changed: synced.created + synced.updated + synced.moved + synced.deleted,
+                      changed:
+                        synced.created +
+                        synced.updated +
+                        synced.moved +
+                        synced.deleted,
                     }),
                   );
                   onSynced();
@@ -180,7 +197,8 @@ function Google({
             className="vl-filled-button"
             onClick={() => {
               run(api.connectGoogle(), (consent) => {
-                // Google's consent page; it comes back to /connect/google/callback.
+                // Google's consent page; it comes back to
+                // /connect/google/callback.
                 globalThis.location.assign(consent);
               });
             }}

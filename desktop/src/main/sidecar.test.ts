@@ -8,7 +8,11 @@ import { startSidecar, type Child, type SidecarDeps } from "./sidecar.js";
 function deps(
   readyAfter: number,
   exitCode?: number,
-): SidecarDeps & { child: Child; kill: () => void; env: () => Record<string, string> } {
+): SidecarDeps & {
+  child: Child;
+  kill: () => void;
+  env: () => Record<string, string>;
+} {
   let clock = 0;
   let polls = 0;
   let environment: Record<string, string> = {};
@@ -34,8 +38,11 @@ function deps(
     fetch: (url) => {
       polls += 1;
       expect(url).toBe("http://127.0.0.1:41000/readyz");
-      if (polls === 1) return Promise.reject(new TypeError("connection refused"));
-      return Promise.resolve(new Response(undefined, { status: polls > readyAfter ? 200 : 503 }));
+      if (polls === 1)
+        return Promise.reject(new TypeError("connection refused"));
+      return Promise.resolve(
+        new Response(undefined, { status: polls > readyAfter ? 200 : 503 }),
+      );
     },
     sleep: (ms) => {
       clock += ms;
@@ -48,7 +55,10 @@ function deps(
 describe("startSidecar", () => {
   it("starts vellum serve on loopback and waits for readiness", async () => {
     const fake = deps(3);
-    const sidecar = await startSidecar({ binary: "/bin/vellum", dataDir: "/data" }, fake);
+    const sidecar = await startSidecar(
+      { binary: "/bin/vellum", dataDir: "/data" },
+      fake,
+    );
     expect(sidecar.url).toBe("http://127.0.0.1:41000");
     expect(fake.env()).toEqual({
       VELLUM_BIND: "127.0.0.1:41000",
@@ -61,13 +71,13 @@ describe("startSidecar", () => {
   });
 
   it("fails when the server exits or never becomes ready", async () => {
-    await expect(startSidecar({ binary: "b", dataDir: "d" }, deps(1000, 2))).rejects.toThrow(
-      /exited with code 2/,
-    );
+    await expect(
+      startSidecar({ binary: "b", dataDir: "d" }, deps(1000, 2)),
+    ).rejects.toThrow(/exited with code 2/);
     const slow = deps(1000);
-    await expect(startSidecar({ binary: "b", dataDir: "d", timeoutMs: 500 }, slow)).rejects.toThrow(
-      /ready in time/,
-    );
+    await expect(
+      startSidecar({ binary: "b", dataDir: "d", timeoutMs: 500 }, slow),
+    ).rejects.toThrow(/ready in time/);
     expect(slow.kill).toHaveBeenCalled();
   });
 });

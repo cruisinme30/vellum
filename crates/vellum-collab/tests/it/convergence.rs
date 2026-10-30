@@ -18,8 +18,12 @@ use std::collections::BTreeMap;
 use proptest::prelude::*;
 use support::{TestCodec, sync_docs};
 use vellum_collab::tree::{self, CONTENT_FIELD};
-use vellum_collab::{DocTree, Element, FormatCodec, MarkdownCodec, Node, TextRun};
-use yrs::types::xml::{XmlElementPrelim, XmlFragment as _, XmlOut, XmlTextPrelim};
+use vellum_collab::{
+    DocTree, Element, FormatCodec, MarkdownCodec, Node, TextRun,
+};
+use yrs::types::xml::{
+    XmlElementPrelim, XmlFragment as _, XmlOut, XmlTextPrelim,
+};
 use yrs::{Any, Doc, Text as _, Transact as _, Xml as _};
 
 // ---------------------------------------------------------------------------
@@ -39,8 +43,15 @@ fn any_value() -> impl Strategy<Value = Any> {
     prop_oneof![
         3 => any_scalar(),
         1 => prop::collection::vec(any_scalar(), 0..4).prop_map(Any::from),
-        1 => prop::collection::hash_map("[a-z]{1,5}", any_scalar(), 0..4).prop_map(|m| {
-            Any::from(m.into_iter().collect::<std::collections::HashMap<String, Any>>())
+        1 => prop::collection::hash_map(
+            "[a-z]{1,5}",
+            any_scalar(),
+            0..4
+        ).prop_map(|m| {
+            Any::from(
+                m.into_iter().collect::<std::collections::HashMap<String,
+                Any>>()
+            )
         }),
     ]
 }
@@ -53,7 +64,8 @@ fn marks() -> impl Strategy<Value = BTreeMap<String, Any>> {
             Just(Any::Map(std::sync::Arc::default())),
             "[a-z]{1,8}".prop_map(|href| {
                 let mut attrs = std::collections::HashMap::new();
-                let _previous = attrs.insert("href".to_owned(), Any::from(href));
+                let _previous =
+                    attrs.insert("href".to_owned(), Any::from(href));
                 Any::from(attrs)
             }),
         ],
@@ -63,7 +75,8 @@ fn marks() -> impl Strategy<Value = BTreeMap<String, Any>> {
 
 fn text_node() -> impl Strategy<Value = Node> {
     prop::collection::vec(
-        ("[a-z 😀éß]{0,10}", marks()).prop_map(|(text, marks)| TextRun { text, marks }),
+        ("[a-z 😀éß]{0,10}", marks())
+            .prop_map(|(text, marks)| TextRun { text, marks }),
         0..4,
     )
     .prop_map(Node::Text)
@@ -72,7 +85,8 @@ fn text_node() -> impl Strategy<Value = Node> {
 fn node() -> impl Strategy<Value = Node> {
     let leaf = prop_oneof![
         text_node(),
-        "[a-z]{1,8}".prop_map(|name| Node::Element(Element::new(name, Vec::new()))),
+        "[a-z]{1,8}"
+            .prop_map(|name| Node::Element(Element::new(name, Vec::new()))),
     ];
     leaf.prop_recursive(3, 24, 4, |inner| {
         (
@@ -159,14 +173,23 @@ enum Op {
 fn op() -> impl Strategy<Value = Op> {
     prop_oneof![
         6 => (any::<usize>(), any::<usize>(), "[a-z ]{1,6}", any::<bool>())
-            .prop_map(|(block, at, text, bold)| Op::Type { block, at, text, bold }),
+            .prop_map(
+                |(block, at, text, bold)| Op::Type { block, at, text, bold }
+            ),
         2 => (any::<usize>(), any::<usize>(), 1..4_usize)
             .prop_map(|(block, at, len)| Op::Delete { block, at, len }),
         2 => (any::<usize>(), prop::option::of(1..4_u8), "[a-z]{1,6}")
             .prop_map(|(at, heading, text)| Op::AddBlock { at, heading, text }),
         1 => any::<usize>().prop_map(|at| Op::RemoveBlock { at }),
-        1 => prop::collection::vec("(# )?[a-z]{1,5}( \\*\\*[a-z]{1,4}\\*\\*)?", 1..4)
-            .prop_map(|blocks| Op::External { markdown: format!("{}\n", blocks.join("\n\n")) }),
+        1 => prop::collection::vec(
+            "(# )?[a-z]{1,5}( \\*\\*[a-z]{1,4}\\*\\*)?",
+            1..4
+        )
+            .prop_map(
+                |blocks| Op::External {
+                    markdown: format!("{}\n", blocks.join("\n\n"))
+                }
+            ),
         2 => any::<usize>().prop_map(|with| Op::Sync { with }),
     ]
 }
@@ -222,8 +245,10 @@ fn apply(replicas: &[Doc], peer: usize, op: &Op, codec: Codec<'_>) {
                 let mut txn = doc.transact_mut();
                 let mut attrs = yrs::types::Attrs::new();
                 if *bold {
-                    let _previous =
-                        attrs.insert(codec.bold.into(), Any::Map(std::sync::Arc::default()));
+                    let _previous = attrs.insert(
+                        codec.bold.into(),
+                        Any::Map(std::sync::Arc::default()),
+                    );
                 }
                 target.insert_with_attributes(&mut txn, index, text, attrs);
             }
@@ -244,12 +269,23 @@ fn apply(replicas: &[Doc], peer: usize, op: &Op, codec: Codec<'_>) {
             let index = u32::try_from(*at % (len as usize + 1)).unwrap();
             let element = match heading {
                 Some(level) => {
-                    let element =
-                        content.insert(&mut txn, index, XmlElementPrelim::empty("heading"));
-                    let _unused = element.insert_attribute(&mut txn, "level", i64::from(*level));
+                    let element = content.insert(
+                        &mut txn,
+                        index,
+                        XmlElementPrelim::empty("heading"),
+                    );
+                    let _unused = element.insert_attribute(
+                        &mut txn,
+                        "level",
+                        i64::from(*level),
+                    );
                     element
                 }
-                None => content.insert(&mut txn, index, XmlElementPrelim::empty("paragraph")),
+                None => content.insert(
+                    &mut txn,
+                    index,
+                    XmlElementPrelim::empty("paragraph"),
+                ),
             };
             let target = element.insert(&mut txn, 0, XmlTextPrelim::new(""));
             target.insert(&mut txn, 0, text);
@@ -260,7 +296,10 @@ fn apply(replicas: &[Doc], peer: usize, op: &Op, codec: Codec<'_>) {
             let mut txn = doc.transact_mut();
             let len = content.len(&txn);
             if len > 0 {
-                content.remove(&mut txn, u32::try_from(*at % len as usize).unwrap());
+                content.remove(
+                    &mut txn,
+                    u32::try_from(*at % len as usize).unwrap(),
+                );
             }
             drop(txn);
         }
@@ -378,7 +417,9 @@ proptest! {
         }
         let mut theirs_blocks = blocks;
         theirs_blocks[changed] = format!("{} **ext**", theirs_blocks[changed]);
-        let theirs = TestCodec.parse_markdown(&format!("{}\n", theirs_blocks.join("\n\n"))).unwrap();
+        let theirs = TestCodec.parse_markdown(
+            &format!("{}\n", theirs_blocks.join("\n\n"))
+        ).unwrap();
         let _update = tree::merge(&doc, &base, &theirs);
 
         let merged = TestCodec.to_markdown(&tree::read(&doc)).unwrap();

@@ -59,8 +59,10 @@ what happens in **Admin → Settings → Security**:
 
 ::: facts
 
-- Warn, and save (the default): the save goes through, the editor shows a banner naming the kind and line, and the audit log records it
-- Block the save: the save is refused until the secret is removed; models get a tool error
+- Warn, and save (the default): the save goes through, the editor shows a banner
+  naming the kind and line, and the audit log records it
+- Block the save: the save is refused until the secret is removed; models get a
+  tool error
 - Don't scan: nothing is checked
 
 :::

@@ -41,7 +41,8 @@ impl PostgresBackend {
     pub async fn connect(pool: PgPool) -> Result<Self> {
         let mut migrator = sqlx::migrate!("migrations/postgres");
         let _ = migrator.create_schema(SCHEMA);
-        let _ = migrator.dangerous_set_table_name(format!("{SCHEMA}._sqlx_migrations"));
+        let _ = migrator
+            .dangerous_set_table_name(format!("{SCHEMA}._sqlx_migrations"));
         migrator.run(&pool).await?;
         Ok(Self { pool })
     }
@@ -52,10 +53,12 @@ impl PostgresBackend {
     /// # Errors
     /// Database failures.
     pub async fn docs_without_vectors(&self) -> Result<Vec<DocId>> {
-        let rows =
-            sqlx::query("SELECT DISTINCT doc_id FROM vellum_search.blocks WHERE embedding IS NULL")
-                .fetch_all(&self.pool)
-                .await?;
+        let rows = sqlx::query(
+            "SELECT DISTINCT doc_id FROM vellum_search.blocks \
+                WHERE embedding IS NULL",
+        )
+        .fetch_all(&self.pool)
+        .await?;
         rows.iter()
             .map(|row| Ok(DocId::from(row.try_get::<Uuid, _>("doc_id")?)))
             .collect()
@@ -142,7 +145,8 @@ fn push_scope(q: &mut QueryBuilder<Postgres>, scope: Scope<'_>) {
             .push(")");
     }
     if !f.kinds.is_empty() {
-        let kinds: Vec<String> = f.kinds.iter().map(|k| k.as_str().to_owned()).collect();
+        let kinds: Vec<String> =
+            f.kinds.iter().map(|k| k.as_str().to_owned()).collect();
         let _ = q.push(" AND doc_kind = ANY(").push_bind(kinds).push(")");
     }
     if let Some(range) = &f.modified {
@@ -162,8 +166,8 @@ fn push_scope(q: &mut QueryBuilder<Postgres>, scope: Scope<'_>) {
 
 macro_rules! block_columns {
     () => {
-        "space_id, doc_id, block_id, position, section_id, doc_kind, block_kind, title, path, \
-         headings, body"
+        "space_id, doc_id, block_id, position, section_id, doc_kind, \
+         block_kind, title, path, headings, body"
     };
 }
 
@@ -178,7 +182,8 @@ fn read_block(row: &PgRow) -> Result<StoredBlock> {
     Ok(StoredBlock {
         space: SpaceId::from(row.try_get::<Uuid, _>("space_id")?),
         doc: DocId::from(row.try_get::<Uuid, _>("doc_id")?),
-        block: block(row.try_get("block_id")?).ok_or_else(|| corrupt("block_id"))?,
+        block: block(row.try_get("block_id")?)
+            .ok_or_else(|| corrupt("block_id"))?,
         position: u32::try_from(row.try_get::<i32, _>("position")?)
             .map_err(|_| corrupt("position"))?,
         section: match row.try_get::<Option<i64>, _>("section_id")? {
@@ -205,13 +210,16 @@ fn block_number(id: BlockId) -> i64 {
     i64::try_from(id.as_u64()).unwrap_or(i64::MAX)
 }
 
-async fn insert(tx: &mut sqlx::Transaction<'_, Postgres>, entries: &[&IndexEntry]) -> Result<()> {
+async fn insert(
+    tx: &mut sqlx::Transaction<'_, Postgres>,
+    entries: &[&IndexEntry],
+) -> Result<()> {
     if entries.is_empty() {
         return Ok(());
     }
     let mut docs = QueryBuilder::<Postgres>::new(
-        "INSERT INTO vellum_search.docs (space_id, doc_id, doc_kind, title, path, owner_id, \
-         modified_at, ancestors, trashed) ",
+        "INSERT INTO vellum_search.docs (space_id, doc_id, doc_kind, title, \
+         path, owner_id, modified_at, ancestors, trashed) ",
     );
     let _ = docs.push_values(entries, |mut row, entry| {
         let d = &entry.doc;
@@ -234,9 +242,10 @@ async fn insert(tx: &mut sqlx::Transaction<'_, Postgres>, entries: &[&IndexEntry
         .collect();
     for chunk in rows.chunks(INSERT_CHUNK) {
         let mut q = QueryBuilder::<Postgres>::new(
-            "INSERT INTO vellum_search.blocks (space_id, doc_id, block_id, position, section_id, \
-             doc_kind, block_kind, title, path, headings, headings_text, body, owner_id, \
-             modified_at, ancestors, trashed, embedding) ",
+            "INSERT INTO vellum_search.blocks (space_id, doc_id, block_id, \
+             position, section_id, doc_kind, block_kind, title, path, \
+             headings, headings_text, body, owner_id, modified_at, ancestors, \
+             trashed, embedding) ",
         );
         let _ = q.push_values(chunk, |mut row, (entry, i)| {
             let d = &entry.doc;
@@ -260,7 +269,9 @@ async fn insert(tx: &mut sqlx::Transaction<'_, Postgres>, entries: &[&IndexEntry
                 .push_bind(d.modified.unix_ms())
                 .push_bind(uuids(d.ancestors.iter().copied()))
                 .push_bind(d.trashed)
-                .push_bind(entry.vectors.as_ref().and_then(|v| v.get(*i).cloned()));
+                .push_bind(
+                    entry.vectors.as_ref().and_then(|v| v.get(*i).cloned()),
+                );
         });
         let _ = q.build().execute(&mut **tx).await?;
     }
@@ -301,23 +312,28 @@ impl SearchBackend for PostgresBackend {
             }
         }
         let mut tx = self.pool.begin().await?;
-        let _ = sqlx::query("DELETE FROM vellum_search.blocks WHERE doc_id = ANY($1)")
-            .bind(&removed)
-            .execute(&mut *tx)
-            .await?;
-        let _ = sqlx::query("DELETE FROM vellum_search.docs WHERE doc_id = ANY($1)")
-            .bind(&removed)
-            .execute(&mut *tx)
-            .await?;
+        let _ = sqlx::query(
+            "DELETE FROM vellum_search.blocks WHERE doc_id = ANY($1)",
+        )
+        .bind(&removed)
+        .execute(&mut *tx)
+        .await?;
+        let _ = sqlx::query(
+            "DELETE FROM vellum_search.docs WHERE doc_id = ANY($1)",
+        )
+        .bind(&removed)
+        .execute(&mut *tx)
+        .await?;
         insert(&mut tx, &upserts).await?;
         tx.commit().await?;
         Ok(())
     }
 
     async fn clear(&self) -> Result<()> {
-        let _ = sqlx::query("TRUNCATE vellum_search.blocks, vellum_search.docs")
-            .execute(&self.pool)
-            .await?;
+        let _ =
+            sqlx::query("TRUNCATE vellum_search.blocks, vellum_search.docs")
+                .execute(&self.pool)
+                .await?;
         Ok(())
     }
 
@@ -338,7 +354,10 @@ impl SearchBackend for PostgresBackend {
             .push(") AS query WHERE tsv @@ query");
         push_scope(&mut q, scope);
         let _ = q
-            .push(" ORDER BY ts_rank_cd(tsv, query) DESC, doc_id, position LIMIT ")
+            .push(
+                " ORDER BY ts_rank_cd(tsv, query) DESC, doc_id, position \
+                LIMIT ",
+            )
             .push_bind(i64::try_from(limit).unwrap_or(i64::MAX));
         let rows = q.build().fetch_all(&self.pool).await?;
         rows.iter().map(read_block).collect()
@@ -357,7 +376,10 @@ impl SearchBackend for PostgresBackend {
             .push(BLOCK_COLUMNS)
             .push(", vellum_search.dot(embedding, ")
             .push_bind(vector.to_vec())
-            .push(") AS similarity FROM vellum_search.blocks WHERE embedding IS NOT NULL");
+            .push(
+                ") AS similarity FROM vellum_search.blocks WHERE embedding \
+                IS NOT NULL",
+            );
         push_scope(&mut q, scope);
         let _ = q
             .push(") AS scored WHERE similarity >= ")
@@ -368,13 +390,19 @@ impl SearchBackend for PostgresBackend {
         rows.iter().map(read_block).collect()
     }
 
-    async fn titles(&self, text: &str, scope: Scope<'_>, limit: usize) -> Result<Vec<TitleHit>> {
+    async fn titles(
+        &self,
+        text: &str,
+        scope: Scope<'_>,
+        limit: usize,
+    ) -> Result<Vec<TitleHit>> {
         let words = crate::tantivy_index::plain_words(text);
         if words.is_empty() {
             return Ok(Vec::new());
         }
         let mut q = QueryBuilder::<Postgres>::new(
-            "SELECT space_id, doc_id, doc_kind, title, path FROM vellum_search.docs WHERE TRUE",
+            "SELECT space_id, doc_id, doc_kind, title, path FROM \
+                vellum_search.docs WHERE TRUE",
         );
         for word in &words {
             // Word-start match; the trigram index serves the regex.
@@ -405,7 +433,11 @@ impl SearchBackend for PostgresBackend {
             .collect()
     }
 
-    async fn block(&self, doc: DocId, block: BlockId) -> Result<Option<StoredBlock>> {
+    async fn block(
+        &self,
+        doc: DocId,
+        block: BlockId,
+    ) -> Result<Option<StoredBlock>> {
         let sql = concat!(
             "SELECT ",
             block_columns!(),
@@ -419,7 +451,11 @@ impl SearchBackend for PostgresBackend {
         row.as_ref().map(read_block).transpose()
     }
 
-    async fn section(&self, doc: DocId, section: Option<BlockId>) -> Result<Vec<StoredBlock>> {
+    async fn section(
+        &self,
+        doc: DocId,
+        section: Option<BlockId>,
+    ) -> Result<Vec<StoredBlock>> {
         let sql = concat!(
             "SELECT ",
             block_columns!(),

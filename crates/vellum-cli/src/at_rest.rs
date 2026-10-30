@@ -24,7 +24,8 @@ use std::sync::{Arc, Mutex};
 
 use bytes::Bytes;
 use vellum_crypto::{
-    CryptoError, KekId, KeyProvider, LocalKeyring, PassphraseKdf, SecretKey, WrappedDek,
+    CryptoError, KekId, KeyProvider, LocalKeyring, PassphraseKdf, SecretKey,
+    WrappedDek,
 };
 use vellum_kernel::{Config, Error, ErrorKind};
 use vellum_kms::RemoteKeys;
@@ -121,7 +122,10 @@ impl KeyProvider for AtRestKeys {
         }
     }
 
-    async fn unwrap(&self, wrapped: &WrappedDek) -> Result<SecretKey, CryptoError> {
+    async fn unwrap(
+        &self,
+        wrapped: &WrappedDek,
+    ) -> Result<SecretKey, CryptoError> {
         match self {
             Self::Remote(p) => p.unwrap(wrapped).await,
             Self::Passphrase(p) => {
@@ -164,20 +168,24 @@ impl PassphraseKeys {
     }
 
     async fn kek(&self, id: &KekId) -> Result<SecretKey, CryptoError> {
-        if let Some(kek) = self.derived.lock().ok().and_then(|d| d.get(id).cloned()) {
+        if let Some(kek) =
+            self.derived.lock().ok().and_then(|d| d.get(id).cloned())
+        {
             return Ok(kek);
         }
-        let kdf =
-            PassphraseKdf::from_kek_id(id).map_err(|_| CryptoError::UnknownKek(id.clone()))?;
+        let kdf = PassphraseKdf::from_kek_id(id)
+            .map_err(|_| CryptoError::UnknownKek(id.clone()))?;
         if kdf.m_kib() > MAX_M_KIB {
             return Err(CryptoError::UnknownKek(id.clone()));
         }
         let passphrase = Arc::clone(&self.passphrase);
         // Argon2id takes a noticeable fraction of a second; keep it off the
         // async workers.
-        let kek = tokio::task::spawn_blocking(move || kdf.derive(passphrase.as_slice()))
-            .await
-            .map_err(|_| CryptoError::Kdf)??;
+        let kek = tokio::task::spawn_blocking(move || {
+            kdf.derive(passphrase.as_slice())
+        })
+        .await
+        .map_err(|_| CryptoError::Kdf)??;
         if let Ok(mut derived) = self.derived.lock()
             && (derived.len() < DERIVED_MAX || derived.contains_key(id))
         {
@@ -189,7 +197,9 @@ impl PassphraseKeys {
 
 /// The passphrase from `VELLUM_KEK_PASSPHRASE` or the file
 /// `VELLUM_KEK_PASSPHRASE_FILE` names (one trailing newline dropped).
-fn passphrase(var: &impl Fn(&str) -> Option<String>) -> Result<Option<Zeroizing<Vec<u8>>>, Error> {
+fn passphrase(
+    var: &impl Fn(&str) -> Option<String>,
+) -> Result<Option<Zeroizing<Vec<u8>>>, Error> {
     let secret = match (var(PASSPHRASE_VAR), var(PASSPHRASE_FILE_VAR)) {
         (None, None) => return Ok(None),
         (Some(_), Some(_)) => {
@@ -199,10 +209,10 @@ fn passphrase(var: &impl Fn(&str) -> Option<String>) -> Result<Option<Zeroizing<
         }
         (Some(value), None) => Zeroizing::new(value.into_bytes()),
         (None, Some(path)) => {
-            let mut bytes = Zeroizing::new(
-                std::fs::read(&path)
-                    .map_err(|e| invalid(format!("cannot read {PASSPHRASE_FILE_VAR}: {e}")))?,
-            );
+            let mut bytes =
+                Zeroizing::new(std::fs::read(&path).map_err(|e| {
+                    invalid(format!("cannot read {PASSPHRASE_FILE_VAR}: {e}"))
+                })?);
             if bytes.ends_with(b"\n") {
                 let _ = bytes.pop();
                 if bytes.ends_with(b"\r") {
@@ -225,18 +235,25 @@ async fn passphrase_kek(store: &dyn BlobStore) -> Result<KekId, Error> {
     for _ in 0..3 {
         match store.get(&path).await {
             Ok(blob) => {
-                let text = std::str::from_utf8(&blob.bytes)
-                    .map_err(|_| unavailable(format!("{PASSPHRASE_KEK_PATH} is not text")))?;
-                let id = KekId::new(text.trim())
-                    .map_err(|_| unavailable(format!("{PASSPHRASE_KEK_PATH} is damaged")))?;
-                let _ = PassphraseKdf::from_kek_id(&id)
-                    .map_err(|_| unavailable(format!("{PASSPHRASE_KEK_PATH} is damaged")))?;
+                let text = std::str::from_utf8(&blob.bytes).map_err(|_| {
+                    unavailable(format!("{PASSPHRASE_KEK_PATH} is not text"))
+                })?;
+                let id = KekId::new(text.trim()).map_err(|_| {
+                    unavailable(format!("{PASSPHRASE_KEK_PATH} is damaged"))
+                })?;
+                let _ = PassphraseKdf::from_kek_id(&id).map_err(|_| {
+                    unavailable(format!("{PASSPHRASE_KEK_PATH} is damaged"))
+                })?;
                 return Ok(id);
             }
             Err(StoreError::NotFound(_)) => {
                 let id = PassphraseKdf::generate()
                     .and_then(|kdf| kdf.kek_id())
-                    .map_err(|e| unavailable(format!("cannot make the passphrase KEK: {e}")))?;
+                    .map_err(|e| {
+                        unavailable(format!(
+                            "cannot make the passphrase KEK: {e}"
+                        ))
+                    })?;
                 match store
                     .put(
                         &path,
@@ -247,7 +264,10 @@ async fn passphrase_kek(store: &dyn BlobStore) -> Result<KekId, Error> {
                 {
                     Ok(_) => return Ok(id),
                     // Another replica wrote it first; read theirs.
-                    Err(StoreError::PreconditionFailed { .. } | StoreError::AlreadyExists(_)) => {}
+                    Err(
+                        StoreError::PreconditionFailed { .. }
+                        | StoreError::AlreadyExists(_),
+                    ) => {}
                     Err(e) => {
                         return Err(unavailable(format!(
                             "cannot save {PASSPHRASE_KEK_PATH}: {e}"
@@ -283,14 +303,18 @@ pub async fn keys(
 ) -> Result<Option<AtRestKeys>, Error> {
     let var = |name: &str| var(name).filter(|v| !v.trim().is_empty());
     if on(var(PLAINTEXT_VAR)) {
-        tracing::warn!("workspace files are stored without encryption ({PLAINTEXT_VAR})");
+        tracing::warn!(
+            "workspace files are stored without encryption ({PLAINTEXT_VAR})"
+        );
         // Files written now are plaintext, so a later switch back on must
         // run the upgrade pass again.
         if let Ok(record) = BlobPath::new(UPGRADED_PATH) {
             match files.delete(&record, Precondition::None).await {
                 Ok(()) | Err(StoreError::NotFound(_)) => {}
                 // Best effort: an unreachable store fails later, clearly.
-                Err(error) => tracing::warn!(%error, "cannot clear {UPGRADED_PATH}"),
+                Err(error) => {
+                    tracing::warn!(%error, "cannot clear {UPGRADED_PATH}")
+                }
             }
         }
         return Ok(None);
@@ -309,8 +333,8 @@ pub async fn keys(
     if shared {
         return Err(invalid(format!(
             "files in a shared bucket are encrypted at rest: set {KMS_VAR}, or \
-             {PASSPHRASE_VAR} or {PASSPHRASE_FILE_VAR} (the same on every replica), \
-             or {PLAINTEXT_VAR}=1 to store them in plaintext"
+             {PASSPHRASE_VAR} or {PASSPHRASE_FILE_VAR} (the same on every \
+             replica), or {PLAINTEXT_VAR}=1 to store them in plaintext"
         )));
     }
     key_file_keys(config, files).await.map(Some)
@@ -319,37 +343,50 @@ pub async fn keys(
 /// The data folder's own key. Its id carries a fingerprint, recorded in
 /// the store on first use, so a lost or replaced key file stops startup
 /// instead of making a new key that cannot open the existing files.
-async fn key_file_keys(config: &Config, files: &dyn BlobStore) -> Result<AtRestKeys, Error> {
+async fn key_file_keys(
+    config: &Config,
+    files: &dyn BlobStore,
+) -> Result<AtRestKeys, Error> {
     let marker = BlobPath::new(KEY_FILE_MARKER).map_err(unavailable)?;
     let recorded = match files.get(&marker).await {
-        Ok(blob) => Some(String::from_utf8_lossy(&blob.bytes).trim().to_owned()),
+        Ok(blob) => {
+            Some(String::from_utf8_lossy(&blob.bytes).trim().to_owned())
+        }
         Err(StoreError::NotFound(_)) => None,
-        Err(e) => return Err(unavailable(format!("cannot read {KEY_FILE_MARKER}: {e}"))),
+        Err(e) => {
+            return Err(unavailable(format!(
+                "cannot read {KEY_FILE_MARKER}: {e}"
+            )));
+        }
     };
     let path = config.data_dir.join(".vellum").join("keys").join(KEY_FILE);
     if recorded.is_some() && !path.exists() {
         return Err(invalid(format!(
-            "the files in {} are encrypted with a key that is missing: restore {}, \
-             or set the key service or passphrase they were encrypted with",
+            "the files in {} are encrypted with a key that is missing: restore \
+             {}, or set the key service or passphrase they were encrypted with",
             config.data_dir.display(),
             path.display()
         )));
     }
-    let bytes = Zeroizing::new(crate::keys::key_file(&config.data_dir, KEY_FILE)?);
+    let bytes =
+        Zeroizing::new(crate::keys::key_file(&config.data_dir, KEY_FILE)?);
     let key = bytes
         .get(..32)
         .and_then(|k| <[u8; 32]>::try_from(k).ok())
-        .ok_or_else(|| Error::new(ErrorKind::Internal, "the files key is too short"))?;
-    let digest =
-        <sha2::Sha256 as sha2::Digest>::digest([b"vellum/files-kek/v1:".as_slice(), &key].concat());
+        .ok_or_else(|| {
+            Error::new(ErrorKind::Internal, "the files key is too short")
+        })?;
+    let digest = <sha2::Sha256 as sha2::Digest>::digest(
+        [b"vellum/files-kek/v1:".as_slice(), &key].concat(),
+    );
     let fingerprint = hex::encode(digest.get(..8).unwrap_or_default());
     let id = KekId::new(format!("{KEY_FILE_KEK}:{fingerprint}"))
         .map_err(|e| Error::new(ErrorKind::Internal, e.to_string()))?;
     match recorded {
         Some(recorded) if recorded != id.as_str() => {
             return Err(invalid(format!(
-                "{} is not the key the files were encrypted with ({recorded}); restore the \
-                 original key file",
+                "{} is not the key the files were encrypted with ({recorded}); \
+                 restore the original key file",
                 path.display()
             )));
         }
@@ -362,7 +399,9 @@ async fn key_file_keys(config: &Config, files: &dyn BlobStore) -> Result<AtRestK
                     Precondition::IfAbsent,
                 )
                 .await
-                .map_err(|e| unavailable(format!("cannot save {KEY_FILE_MARKER}: {e}")))?;
+                .map_err(|e| {
+                    unavailable(format!("cannot save {KEY_FILE_MARKER}: {e}"))
+                })?;
         }
     }
     Ok(AtRestKeys::KeyFile(LocalKeyring::new(
@@ -409,7 +448,9 @@ pub async fn reader(
 ) -> Result<OpeningReader, Error> {
     let store = vellum_store::LocalStore::open(&config.data_dir)
         .await
-        .map_err(|e| unavailable(format!("cannot open the data folder: {e}")))?;
+        .map_err(|e| {
+            unavailable(format!("cannot open the data folder: {e}"))
+        })?;
     let keys = keys(config, &store, false, var).await?;
     Ok(OpeningReader {
         keys: keys.map(Arc::new),
@@ -424,19 +465,28 @@ pub type SealedFiles<S> = Sealed<S, AtRestKeys, PrefixPolicy>;
 /// store's own key markers, and E2E private-space ciphertext is kept as
 /// the clients sealed it. A background pass then seals what an older
 /// version stored in plaintext (see [`upgrade`]).
-pub fn seal<S: BlobStore + 'static>(store: S, keys: AtRestKeys) -> Arc<dyn BlobStore> {
-    tracing::info!(kek = keys.source(), "workspace files are encrypted at rest");
+pub fn seal<S: BlobStore + 'static>(
+    store: S,
+    keys: AtRestKeys,
+) -> Arc<dyn BlobStore> {
+    tracing::info!(
+        kek = keys.source(),
+        "workspace files are encrypted at rest"
+    );
     let sealed = Arc::new(sealed(store, keys));
     let pass = Arc::clone(&sealed);
     drop(tokio::spawn(async move {
         match upgrade(pass.as_ref()).await {
-            Ok(report) if report.done => tracing::info!(?report, "workspace files sealed"),
+            Ok(report) if report.done => {
+                tracing::info!(?report, "workspace files sealed")
+            }
             Ok(report) => tracing::warn!(
                 ?report,
                 "some files are not sealed yet; the next start retries"
             ),
             Err(error) => {
-                tracing::warn!(%error, "sealing existing files failed; the next start retries");
+                tracing::warn!(%error, "sealing existing files failed; the \
+                    next start retries");
             }
         }
     }));
@@ -462,7 +512,8 @@ const UPGRADED_PATH: &str = ".vellum/sealed";
 /// drives (pages, books, collections), and the version history and trash
 /// that hold their content. Everything else under `.vellum` is Vellum's
 /// own state, some of it read straight from disk, so it is left as is.
-const UPGRADE_ROOTS: [&str; 4] = ["drives", "spaces", ".vellum/versions", ".vellum/trash"];
+const UPGRADE_ROOTS: [&str; 4] =
+    ["drives", "spaces", ".vellum/versions", ".vellum/trash"];
 
 /// What an [`upgrade`] pass did.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -490,7 +541,9 @@ pub struct Upgrade {
 /// # Errors
 ///
 /// The store cannot be listed or the record cannot be written.
-pub async fn upgrade<S: BlobStore>(sealed: &SealedFiles<S>) -> Result<Upgrade, StoreError> {
+pub async fn upgrade<S: BlobStore>(
+    sealed: &SealedFiles<S>,
+) -> Result<Upgrade, StoreError> {
     use futures::StreamExt as _;
 
     let kek = sealed.keys().current_kek();
@@ -531,7 +584,11 @@ pub async fn upgrade<S: BlobStore>(sealed: &SealedFiles<S>) -> Result<Upgrade, S
                         break;
                     }
                     Err(error) => {
-                        tracing::warn!(path = %entry.path, %error, "cannot seal a file yet");
+                        tracing::warn!(
+                            path = %entry.path,
+                            %error,
+                            "cannot seal a file yet"
+                        );
                         break;
                     }
                 }
@@ -562,7 +619,9 @@ mod tests {
     use super::*;
     use vellum_store::LocalStore;
 
-    fn lookup<'a>(pairs: &'a [(&'a str, &'a str)]) -> impl Fn(&str) -> Option<String> + 'a {
+    fn lookup<'a>(
+        pairs: &'a [(&'a str, &'a str)],
+    ) -> impl Fn(&str) -> Option<String> + 'a {
         move |name| {
             pairs
                 .iter()
@@ -601,7 +660,8 @@ mod tests {
             )
             .await
             .unwrap();
-        let on_disk = std::fs::read(dir.path().join("spaces/eng/notes.md")).unwrap();
+        let on_disk =
+            std::fs::read(dir.path().join("spaces/eng/notes.md")).unwrap();
         assert!(vellum_crypto::is_envelope(&on_disk));
         assert!(!on_disk.windows(6).any(|w| w == b"Secret"));
         assert_eq!(
@@ -610,7 +670,8 @@ mod tests {
         );
 
         // A file written before encryption was on still reads.
-        std::fs::write(dir.path().join("spaces/eng/old.md"), "# Old\n").unwrap();
+        std::fs::write(dir.path().join("spaces/eng/old.md"), "# Old\n")
+            .unwrap();
         assert_eq!(
             &sealed.get(&path("spaces/eng/old.md")).await.unwrap().bytes[..],
             b"# Old\n"
@@ -665,9 +726,13 @@ mod tests {
         write("drives/shared/eng/.vellum-folder.yaml", b"id: eng\n");
         write(".vellum/versions/doc/v1.md", b"# Runbook\nOld text.\n");
         write(".vellum/tasks/secrets.json", b"{}");
-        let device = vellum_crypto::recipients::RecipientSecret::generate().unwrap();
-        let private =
-            vellum_crypto::recipients::seal_for(&[device.public()], b"# Diary\n").unwrap();
+        let device =
+            vellum_crypto::recipients::RecipientSecret::generate().unwrap();
+        let private = vellum_crypto::recipients::seal_for(
+            &[device.public()],
+            b"# Diary\n",
+        )
+        .unwrap();
         write("drives/users/ana/Private/Diary.md", &private);
         private
     }
@@ -735,7 +800,9 @@ mod tests {
         let second = sealed(raw, AtRestKeys::KeyFile(ring));
         let report = upgrade(&second).await.unwrap();
         assert_eq!((report.rewritten, report.done), (3, true));
-        let runbook = std::fs::read(dir.path().join("drives/shared/eng/Runbook.md")).unwrap();
+        let runbook =
+            std::fs::read(dir.path().join("drives/shared/eng/Runbook.md"))
+                .unwrap();
         assert_eq!(
             vellum_crypto::kek_of(&runbook).unwrap().as_str(),
             "local:new"
@@ -751,16 +818,22 @@ mod tests {
             .unwrap()
             .unwrap();
         let store = sealed(raw, keys);
-        let device = vellum_crypto::recipients::RecipientSecret::generate().unwrap();
-        let private =
-            vellum_crypto::recipients::seal_for(&[device.public()], b"# Diary\n").unwrap();
+        let device =
+            vellum_crypto::recipients::RecipientSecret::generate().unwrap();
+        let private = vellum_crypto::recipients::seal_for(
+            &[device.public()],
+            b"# Diary\n",
+        )
+        .unwrap();
         let at = path("drives/users/ana/Private/Diary.md");
         let _ = store
             .put(&at, Bytes::from(private.clone()), Precondition::None)
             .await
             .unwrap();
         // The desktop agent reads the folder or bucket raw and opens it.
-        let disk = std::fs::read(dir.path().join("drives/users/ana/Private/Diary.md")).unwrap();
+        let disk =
+            std::fs::read(dir.path().join("drives/users/ana/Private/Diary.md"))
+                .unwrap();
         assert_eq!(disk, private);
         assert_eq!(
             vellum_crypto::recipients::open_as(&device, &disk).unwrap(),
@@ -796,7 +869,8 @@ mod tests {
         let _ = old_workspace(dir.path());
         let cfg = config(dir.path());
         let raw = LocalStore::open(dir.path()).await.unwrap();
-        let keys_on = keys(&cfg, &raw, false, lookup(&[])).await.unwrap().unwrap();
+        let keys_on =
+            keys(&cfg, &raw, false, lookup(&[])).await.unwrap().unwrap();
         assert!(upgrade(&sealed(raw, keys_on)).await.unwrap().done);
 
         let raw = LocalStore::open(dir.path()).await.unwrap();
@@ -806,13 +880,16 @@ mod tests {
                 .unwrap()
                 .is_none()
         );
-        std::fs::write(dir.path().join("drives/shared/eng/New.md"), "# New\n").unwrap();
+        std::fs::write(dir.path().join("drives/shared/eng/New.md"), "# New\n")
+            .unwrap();
 
         let raw = LocalStore::open(dir.path()).await.unwrap();
-        let keys_on = keys(&cfg, &raw, false, lookup(&[])).await.unwrap().unwrap();
+        let keys_on =
+            keys(&cfg, &raw, false, lookup(&[])).await.unwrap().unwrap();
         let report = upgrade(&sealed(raw, keys_on)).await.unwrap();
         assert_eq!(report.rewritten, 1);
-        let new = std::fs::read(dir.path().join("drives/shared/eng/New.md")).unwrap();
+        let new =
+            std::fs::read(dir.path().join("drives/shared/eng/New.md")).unwrap();
         assert!(vellum_crypto::is_envelope(&new));
     }
 
@@ -883,10 +960,15 @@ mod tests {
     async fn crafted_kek_ids_cannot_demand_huge_derivations() {
         let keys = PassphraseKeys::new(
             Zeroizing::new(b"pass".to_vec()),
-            KekId::new("argon2id$m=65536$t=3$p=4$00112233445566778899aabbccddeeff").unwrap(),
+            KekId::new(
+                "argon2id$m=65536$t=3$p=4$00112233445566778899aabbccddeeff",
+            )
+            .unwrap(),
         );
-        let huge =
-            KekId::new("argon2id$m=1048576$t=3$p=4$00112233445566778899aabbccddeeff").unwrap();
+        let huge = KekId::new(
+            "argon2id$m=1048576$t=3$p=4$00112233445566778899aabbccddeeff",
+        )
+        .unwrap();
         assert!(matches!(
             keys.kek(&huge).await,
             Err(CryptoError::UnknownKek(_))

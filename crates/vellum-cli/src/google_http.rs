@@ -60,7 +60,9 @@ impl Endpoints {
     ///
     /// Never in practice; the URLs are constants.
     pub fn google() -> Result<Self, Error> {
-        let parse = |u: &str| Url::parse(u).map_err(|e| unavailable("bad Google URL", e));
+        let parse = |u: &str| {
+            Url::parse(u).map_err(|e| unavailable("bad Google URL", e))
+        };
         Ok(Self {
             token: parse("https://oauth2.googleapis.com/token")?,
             revoke: parse("https://oauth2.googleapis.com/revoke")?,
@@ -118,14 +120,19 @@ impl GoogleHttp {
         })
     }
 
-    async fn token_request(&self, form: &[(&str, &str)]) -> Result<TokenReply, Error> {
+    async fn token_request(
+        &self,
+        form: &[(&str, &str)],
+    ) -> Result<TokenReply, Error> {
         let response = self
             .http
             .post(self.endpoints.token.clone())
             .form(form)
             .send()
             .await
-            .map_err(|e| unavailable("Google sign-in failed", e.without_url()))?;
+            .map_err(|e| {
+                unavailable("Google sign-in failed", e.without_url())
+            })?;
         let status = response.status();
         if status.as_u16() == 400 || status.as_u16() == 401 {
             return Err(Error::new(
@@ -157,7 +164,8 @@ impl GoogleHttp {
                 ("grant_type", "refresh_token"),
             ])
             .await?;
-        let life = Duration::from_secs(reply.expires_in.unwrap_or(3600)).saturating_sub(EARLY);
+        let life = Duration::from_secs(reply.expires_in.unwrap_or(3600))
+            .saturating_sub(EARLY);
         let _ = self.tokens.lock().await.insert(
             grant.to_owned(),
             (reply.access_token.clone(), Instant::now() + life),
@@ -168,9 +176,9 @@ impl GoogleHttp {
     fn url(&self, segments: &[&str]) -> Result<Url, Error> {
         let mut url = self.endpoints.api.clone();
         {
-            let mut path = url
-                .path_segments_mut()
-                .map_err(|()| unavailable("bad Calendar URL", "cannot be a base"))?;
+            let mut path = url.path_segments_mut().map_err(|()| {
+                unavailable("bad Calendar URL", "cannot be a base")
+            })?;
             let _ = path.pop_if_empty();
             for segment in segments {
                 let _ = path.push(segment);
@@ -191,10 +199,9 @@ impl GoogleHttp {
         if let Some(body) = body {
             request = request.json(body);
         }
-        let response = request
-            .send()
-            .await
-            .map_err(|e| unavailable("Google Calendar failed", e.without_url()))?;
+        let response = request.send().await.map_err(|e| {
+            unavailable("Google Calendar failed", e.without_url())
+        })?;
         if response.status().as_u16() == 401 {
             let _ = self.tokens.lock().await.remove(grant);
         }
@@ -204,10 +211,9 @@ impl GoogleHttp {
     async fn json(response: reqwest::Response) -> Result<Value, Error> {
         let status = response.status();
         match status.as_u16() {
-            200..=299 => response
-                .json()
-                .await
-                .map_err(|e| unavailable("Google Calendar reply", e.without_url())),
+            200..=299 => response.json().await.map_err(|e| {
+                unavailable("Google Calendar reply", e.without_url())
+            }),
             401 | 403 => Err(Error::new(
                 ErrorKind::Unauthenticated,
                 "Google Calendar refused the request; connect it again",
@@ -252,7 +258,8 @@ impl GoogleHttp {
                     let _ = query.append_pair("pageToken", token);
                 }
             }
-            let response = self.call(grant, reqwest::Method::GET, url, None).await?;
+            let response =
+                self.call(grant, reqwest::Method::GET, url, None).await?;
             if response.status().as_u16() == 410 {
                 return Ok(Changes::Expired);
             }
@@ -260,7 +267,9 @@ impl GoogleHttp {
             if let Some(items) = page.get("items").and_then(Value::as_array) {
                 events.extend(items.iter().cloned());
             }
-            if let Some(next) = page.get("nextPageToken").and_then(Value::as_str) {
+            if let Some(next) =
+                page.get("nextPageToken").and_then(Value::as_str)
+            {
                 page_token = Some(next.to_owned());
                 continue;
             }
@@ -303,12 +312,12 @@ impl GoogleCalendar for GoogleHttp {
                     "Google sent no refresh token; connect again",
                 )
             })?;
-            let life = Duration::from_secs(reply.expires_in.unwrap_or(3600)).saturating_sub(EARLY);
-            let _ = self
-                .tokens
-                .lock()
-                .await
-                .insert(grant.clone(), (reply.access_token, Instant::now() + life));
+            let life = Duration::from_secs(reply.expires_in.unwrap_or(3600))
+                .saturating_sub(EARLY);
+            let _ = self.tokens.lock().await.insert(
+                grant.clone(),
+                (reply.access_token, Instant::now() + life),
+            );
             Ok(grant)
         })
     }
@@ -335,7 +344,9 @@ impl GoogleCalendar for GoogleHttp {
         calendar: String,
         sync_token: Option<String>,
     ) -> BoxFuture<'_, Result<Changes, Error>> {
-        Box::pin(async move { self.list(&grant, &calendar, sync_token.as_deref()).await })
+        Box::pin(async move {
+            self.list(&grant, &calendar, sync_token.as_deref()).await
+        })
     }
 
     fn insert(
@@ -396,8 +407,12 @@ impl GoogleCalendar for GoogleHttp {
                 .form(&[("token", grant.as_str())])
                 .send()
                 .await
-                .map_err(|e| unavailable("Google revoke failed", e.without_url()))?;
-            if response.status().is_success() || response.status().as_u16() == 400 {
+                .map_err(|e| {
+                    unavailable("Google revoke failed", e.without_url())
+                })?;
+            if response.status().is_success()
+                || response.status().as_u16() == 400
+            {
                 Ok(())
             } else {
                 Err(unavailable("Google revoke failed", response.status()))
@@ -430,7 +445,8 @@ impl FileLinks {
 
 fn write_private(path: &std::path::Path, bytes: &[u8]) -> Result<(), Error> {
     use std::io::Write as _;
-    let fail = |e: std::io::Error| unavailable("cannot save a Google connection", e);
+    let fail =
+        |e: std::io::Error| unavailable("cannot save a Google connection", e);
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir).map_err(fail)?;
     }
@@ -449,22 +465,33 @@ fn write_private(path: &std::path::Path, bytes: &[u8]) -> Result<(), Error> {
 }
 
 impl GoogleLinks for FileLinks {
-    fn link(&self, user: UserId) -> BoxFuture<'_, Result<Option<GoogleLink>, Error>> {
+    fn link(
+        &self,
+        user: UserId,
+    ) -> BoxFuture<'_, Result<Option<GoogleLink>, Error>> {
         Box::pin(async move {
             let Some(path) = self.path(user) else {
                 return Ok(self.memory.lock().await.get(&user).cloned());
             };
             match std::fs::read(&path) {
-                Ok(bytes) => serde_json::from_slice(&bytes)
-                    .map(Some)
-                    .map_err(|e| unavailable("a Google connection is unreadable", e)),
+                Ok(bytes) => {
+                    serde_json::from_slice(&bytes).map(Some).map_err(|e| {
+                        unavailable("a Google connection is unreadable", e)
+                    })
+                }
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-                Err(e) => Err(unavailable("cannot read a Google connection", e)),
+                Err(e) => {
+                    Err(unavailable("cannot read a Google connection", e))
+                }
             }
         })
     }
 
-    fn set_link(&self, user: UserId, link: Option<GoogleLink>) -> BoxFuture<'_, Result<(), Error>> {
+    fn set_link(
+        &self,
+        user: UserId,
+        link: Option<GoogleLink>,
+    ) -> BoxFuture<'_, Result<(), Error>> {
         Box::pin(async move {
             let Some(path) = self.path(user) else {
                 match link {
@@ -479,14 +506,19 @@ impl GoogleLinks for FileLinks {
             };
             match link {
                 Some(link) => {
-                    let bytes = serde_json::to_vec(&link)
-                        .map_err(|e| Error::new(ErrorKind::Internal, e.to_string()))?;
+                    let bytes = serde_json::to_vec(&link).map_err(|e| {
+                        Error::new(ErrorKind::Internal, e.to_string())
+                    })?;
                     write_private(&path, &bytes)
                 }
                 None => match std::fs::remove_file(&path) {
                     Ok(()) => Ok(()),
-                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-                    Err(e) => Err(unavailable("cannot remove a Google connection", e)),
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                        Ok(())
+                    }
+                    Err(e) => {
+                        Err(unavailable("cannot remove a Google connection", e))
+                    }
                 },
             }
         })
@@ -499,8 +531,15 @@ impl GoogleLinks for FileLinks {
             };
             let entries = match std::fs::read_dir(dir) {
                 Ok(entries) => entries,
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
-                Err(e) => return Err(unavailable("cannot list Google connections", e)),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                    return Ok(Vec::new());
+                }
+                Err(e) => {
+                    return Err(unavailable(
+                        "cannot list Google connections",
+                        e,
+                    ));
+                }
             };
             Ok(entries
                 .flatten()

@@ -13,7 +13,15 @@ use crate::manifest::NumberingStyle;
 
 /// A section number such as `2.3`, held as its components (`[2, 3]`).
 #[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
 )]
 #[serde(transparent)]
 pub struct SectionNumber(pub Vec<u32>);
@@ -103,7 +111,11 @@ fn roman(mut n: u32) -> String {
 /// The cross-reference label for a section: `§2.3 Services`, or just the
 /// title when the section is unnumbered or the book uses no numbers.
 #[must_use]
-pub fn label(number: Option<&SectionNumber>, style: NumberingStyle, title: &str) -> String {
+pub fn label(
+    number: Option<&SectionNumber>,
+    style: NumberingStyle,
+    title: &str,
+) -> String {
     number
         .and_then(|n| n.format(style))
         .map_or_else(|| title.to_owned(), |n| format!("§{n} {title}"))
@@ -122,7 +134,10 @@ mod tests {
             label(Some(&n), NumberingStyle::Decimal, "Services"),
             "§2.3 Services"
         );
-        assert_eq!(label(None, NumberingStyle::Decimal, "Glossary"), "Glossary");
+        assert_eq!(
+            label(None, NumberingStyle::Decimal, "Glossary"),
+            "Glossary"
+        );
     }
 
     #[test]

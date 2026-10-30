@@ -18,10 +18,13 @@ use std::collections::BTreeMap;
 
 use yrs::types::ToJson as _;
 use yrs::types::text::YChange;
-use yrs::types::xml::{XmlElementPrelim, XmlFragment as _, XmlOut, XmlTextPrelim};
+use yrs::types::xml::{
+    XmlElementPrelim, XmlFragment as _, XmlOut, XmlTextPrelim,
+};
 use yrs::{
-    Any, Doc, Map as _, MapRef, OffsetKind, Options, Out, ReadTxn, Text as _, Transact,
-    TransactionMut, Xml as _, XmlElementRef, XmlFragmentRef, XmlTextRef,
+    Any, Doc, Map as _, MapRef, OffsetKind, Options, Out, ReadTxn, Text as _,
+    Transact, TransactionMut, Xml as _, XmlElementRef, XmlFragmentRef,
+    XmlTextRef,
 };
 
 /// Name of the `XmlFragment` root holding the body. The editor binds
@@ -86,7 +89,11 @@ impl Element {
 
     /// Adds an attribute.
     #[must_use]
-    pub fn with_attr(mut self, key: impl Into<String>, value: impl Into<Any>) -> Self {
+    pub fn with_attr(
+        mut self,
+        key: impl Into<String>,
+        value: impl Into<Any>,
+    ) -> Self {
         let _previous = self.attrs.insert(key.into(), value.into());
         self
     }
@@ -123,13 +130,19 @@ impl Node {
             Self::Element(element) => Self::Element(Element {
                 name: element.name.clone(),
                 attrs: element.attrs.clone(),
-                children: element.children.iter().map(Self::normalized).collect(),
+                children: element
+                    .children
+                    .iter()
+                    .map(Self::normalized)
+                    .collect(),
             }),
             Self::Text(runs) => {
                 let mut out: Vec<TextRun> = Vec::with_capacity(runs.len());
                 for run in runs.iter().filter(|run| !run.text.is_empty()) {
                     match out.last_mut() {
-                        Some(last) if last.marks == run.marks => last.text.push_str(&run.text),
+                        Some(last) if last.marks == run.marks => {
+                            last.text.push_str(&run.text)
+                        }
                         _ => out.push(run.clone()),
                     }
                 }
@@ -175,13 +188,20 @@ pub fn read(doc: &Doc) -> DocTree {
     }
 }
 
-fn read_children<T: ReadTxn>(txn: &T, parent: &impl yrs::types::xml::XmlFragment) -> Vec<Node> {
+fn read_children<T: ReadTxn>(
+    txn: &T,
+    parent: &impl yrs::types::xml::XmlFragment,
+) -> Vec<Node> {
     let mut nodes = Vec::new();
     for child in parent.children(txn) {
         match child {
-            XmlOut::Element(element) => nodes.push(Node::Element(read_element(txn, &element))),
+            XmlOut::Element(element) => {
+                nodes.push(Node::Element(read_element(txn, &element)))
+            }
             XmlOut::Text(text) => nodes.push(Node::Text(read_text(txn, &text))),
-            XmlOut::Fragment(fragment) => nodes.extend(read_children(txn, &fragment)),
+            XmlOut::Fragment(fragment) => {
+                nodes.extend(read_children(txn, &fragment))
+            }
         }
     }
     nodes
@@ -308,7 +328,8 @@ pub fn merge(doc: &Doc, base: &DocTree, theirs: &DocTree) -> Vec<u8> {
     };
 
     let mut deletions = vec![false; current.content.len()];
-    let mut insertions: Vec<Vec<&Node>> = vec![Vec::new(); current.content.len() + 1];
+    let mut insertions: Vec<Vec<&Node>> =
+        vec![Vec::new(); current.content.len() + 1];
     let mut kept_base = vec![false; base_blocks.len()];
     for (b, _) in &to_theirs {
         if let Some(slot) = kept_base.get_mut(*b) {
@@ -389,7 +410,8 @@ fn middle_pairs(old: &[Node], new: &[Node]) -> Vec<(usize, usize)> {
             let value = if old.get(row) == new.get(col) {
                 cell(&lengths, at(row + 1, col + 1)) + 1
             } else {
-                cell(&lengths, at(row + 1, col)).max(cell(&lengths, at(row, col + 1)))
+                cell(&lengths, at(row + 1, col))
+                    .max(cell(&lengths, at(row, col + 1)))
             };
             if let Some(slot) = lengths.get_mut(at(row, col)) {
                 *slot = value;
@@ -403,7 +425,9 @@ fn middle_pairs(old: &[Node], new: &[Node]) -> Vec<(usize, usize)> {
             pairs.push((row, col));
             row += 1;
             col += 1;
-        } else if cell(&lengths, at(row + 1, col)) >= cell(&lengths, at(row, col + 1)) {
+        } else if cell(&lengths, at(row + 1, col))
+            >= cell(&lengths, at(row, col + 1))
+        {
             row += 1;
         } else {
             col += 1;
@@ -416,7 +440,11 @@ fn cell(lengths: &[u32], index: usize) -> u32 {
     lengths.get(index).copied().unwrap_or(0)
 }
 
-fn write_meta(txn: &mut TransactionMut, meta: &MapRef, fields: &BTreeMap<String, Any>) {
+fn write_meta(
+    txn: &mut TransactionMut,
+    meta: &MapRef,
+    fields: &BTreeMap<String, Any>,
+) {
     let stale: Vec<String> = meta
         .iter(txn)
         .filter(|(key, value)| fields.get(*key) != Some(&value.to_json(txn)))
@@ -445,9 +473,14 @@ fn insert_node(
 ) {
     match node {
         Node::Element(element) => {
-            let target = parent.insert(txn, index, XmlElementPrelim::empty(element.name.as_str()));
+            let target = parent.insert(
+                txn,
+                index,
+                XmlElementPrelim::empty(element.name.as_str()),
+            );
             for (key, value) in &element.attrs {
-                let _unused = target.insert_attribute(txn, key.as_str(), value.clone());
+                let _unused =
+                    target.insert_attribute(txn, key.as_str(), value.clone());
             }
             for (child_index, child) in (0_u32..).zip(&element.children) {
                 insert_node(txn, &target, child_index, child);

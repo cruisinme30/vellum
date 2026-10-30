@@ -24,7 +24,11 @@ fn declared_types(schema: &Value) -> Vec<&str> {
     }
 }
 
-fn coerce_scalar(field: &str, text: &str, schema: Option<&Value>) -> Result<Value, Error> {
+fn coerce_scalar(
+    field: &str,
+    text: &str,
+    schema: Option<&Value>,
+) -> Result<Value, Error> {
     let types = schema.map(declared_types).unwrap_or_default();
     let has = |t: &str| types.contains(&t);
     if has("null") && text == "null" {
@@ -53,7 +57,11 @@ fn coerce_scalar(field: &str, text: &str, schema: Option<&Value>) -> Result<Valu
         match text {
             "true" => return Ok(Value::Bool(true)),
             "false" => return Ok(Value::Bool(false)),
-            _ if !has("string") => return Err(invalid(format!("`{field}` must be true or false"))),
+            _ if !has("string") => {
+                return Err(invalid(format!(
+                    "`{field}` must be true or false"
+                )));
+            }
             _ => {}
         }
     }
@@ -78,25 +86,33 @@ pub fn build(
     query: Option<&str>,
     body: Option<&[u8]>,
 ) -> Result<Value, Error> {
-    let mut input = match body.filter(|b| !b.iter().all(u8::is_ascii_whitespace)) {
-        None => Map::new(),
-        Some(bytes) => match serde_json::from_slice::<Value>(bytes) {
-            Ok(Value::Object(map)) => map,
-            Ok(_) => return Err(invalid("the request body must be a JSON object".into())),
-            Err(err) => {
-                return Err(invalid(format!(
-                    "the request body is not valid JSON: {err}"
-                )));
-            }
-        },
-    };
+    let mut input =
+        match body.filter(|b| !b.iter().all(u8::is_ascii_whitespace)) {
+            None => Map::new(),
+            Some(bytes) => match serde_json::from_slice::<Value>(bytes) {
+                Ok(Value::Object(map)) => map,
+                Ok(_) => {
+                    return Err(invalid(
+                        "the request body must be a JSON object".into(),
+                    ));
+                }
+                Err(err) => {
+                    return Err(invalid(format!(
+                        "the request body is not valid JSON: {err}"
+                    )));
+                }
+            },
+        };
     if let Some(query) = query.filter(|_| !op.method().has_body()) {
         {
-            let pairs: Vec<(String, String)> = serde_urlencoded::from_str(query)
-                .map_err(|err| invalid(format!("the query string is malformed: {err}")))?;
+            let pairs: Vec<(String, String)> =
+                serde_urlencoded::from_str(query).map_err(|err| {
+                    invalid(format!("the query string is malformed: {err}"))
+                })?;
             for (name, text) in pairs {
                 let schema = property(op, &name);
-                let is_array = schema.is_some_and(|s| declared_types(s).contains(&"array"));
+                let is_array = schema
+                    .is_some_and(|s| declared_types(s).contains(&"array"));
                 if is_array {
                     let item_schema = schema.and_then(|s| s.get("items"));
                     let item = coerce_scalar(&name, &text, item_schema)?;
@@ -107,7 +123,9 @@ pub fn build(
                         Value::Array(items) => items.push(item),
                         _ => {
                             return Err(invalid(
-                                "a list field was given twice in different forms".into(),
+                                "a list field was given twice in different \
+                                    forms"
+                                    .into(),
                             ));
                         }
                     }
@@ -115,7 +133,9 @@ pub fn build(
                     .insert(name.clone(), coerce_scalar(&name, &text, schema)?)
                     .is_some()
                 {
-                    return Err(invalid(format!("`{name}` was given more than once")));
+                    return Err(invalid(format!(
+                        "`{name}` was given more than once"
+                    )));
                 }
             }
         }
@@ -180,7 +200,14 @@ mod tests {
         )?;
         assert_eq!(
             v,
-            json!({"space_id":"S1","limit":5,"ratio":0.5,"archived":true,"tags":["a","b"],"sizes":[3]})
+            json!({
+                "space_id":"S1",
+                "limit":5,
+                "ratio":0.5,
+                "archived":true,
+                "tags":["a","b"],
+                "sizes":[3]
+            })
         );
         assert!(build(&op, &params, Some("limit=x"), None).is_err());
         assert!(build(&op, &params, Some("archived=maybe"), None).is_err());
@@ -204,10 +231,15 @@ mod tests {
             |_c, _i: In| async { Ok(Out {}) },
         );
         let params = vec![("space_id".to_owned(), "S1".to_owned())];
-        let v = build(&op, &params, Some("ignored=1"), Some(br#"{"ratio": 2}"#))?;
+        let v =
+            build(&op, &params, Some("ignored=1"), Some(br#"{"ratio": 2}"#))?;
         assert_eq!(v, json!({"space_id":"S1","ratio":2}));
-        assert!(build(&op, &params, None, Some(br#"{"space_id":"S2"}"#)).is_err());
-        assert!(build(&op, &params, None, Some(br#"{"space_id":"S1"}"#)).is_ok());
+        assert!(
+            build(&op, &params, None, Some(br#"{"space_id":"S2"}"#)).is_err()
+        );
+        assert!(
+            build(&op, &params, None, Some(br#"{"space_id":"S1"}"#)).is_ok()
+        );
         assert!(build(&op, &params, None, Some(b"[1]")).is_err());
         assert!(build(&op, &params, None, Some(b"{nope")).is_err());
         assert_eq!(

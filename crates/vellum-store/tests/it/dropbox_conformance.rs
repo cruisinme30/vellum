@@ -18,7 +18,8 @@ use bytes::Bytes;
 use fake::FakeDropbox;
 use futures::{StreamExt, TryStreamExt};
 use vellum_store::{
-    BlobPath, BlobStore, Metered, Precondition, StoreError, StoreResult, conformance,
+    BlobPath, BlobStore, Metered, Precondition, StoreError, StoreResult,
+    conformance,
     remote::{DropboxConfig, DropboxStore, Secret, StaticToken, TokenSource},
 };
 
@@ -31,9 +32,11 @@ fn config(fake: &FakeDropbox, tokens: Arc<dyn TokenSource>) -> DropboxConfig {
     DropboxConfig::new(ROOT, tokens).with_urls(&fake.url, &fake.url)
 }
 
-async fn store() -> Result<(FakeDropbox, DropboxStore), Box<dyn std::error::Error>> {
+async fn store()
+-> Result<(FakeDropbox, DropboxStore), Box<dyn std::error::Error>> {
     let fake = FakeDropbox::start(TOKEN).await?;
-    let store = DropboxStore::new(config(&fake, Arc::new(StaticToken::new(TOKEN))))?;
+    let store =
+        DropboxStore::new(config(&fake, Arc::new(StaticToken::new(TOKEN))))?;
     Ok((fake, store))
 }
 
@@ -105,7 +108,8 @@ async fn non_ascii_paths_are_escaped_in_the_arg_header() -> TestResult {
         fake.display("/Apps/Vellum/Notes – ü.md").as_deref(),
         Some("/Apps/Vellum/Notes – ü.md")
     );
-    let args: Vec<Vec<u8>> = fake.calls().into_iter().filter_map(|c| c.api_arg).collect();
+    let args: Vec<Vec<u8>> =
+        fake.calls().into_iter().filter_map(|c| c.api_arg).collect();
     assert_eq!(args.len(), 2, "upload and download");
     for arg in &args {
         assert!(arg.is_ascii(), "{}", String::from_utf8_lossy(arg));
@@ -168,7 +172,12 @@ async fn a_token_rejected_twice_is_a_backend_error() -> TestResult {
     let store = DropboxStore::new(config(&fake, tokens.clone()))?;
     let got = store.head(&path("a.md")?).await;
     assert!(
-        matches!(&got, Err(StoreError::Backend(m)) if m.contains("401") && !m.contains("sl.expired")),
+        matches!(
+            &got,
+            Err(
+                StoreError::Backend(m)
+            ) if m.contains("401") && !m.contains("sl.expired")
+        ),
         "{got:?}"
     );
     assert_eq!(tokens.invalidations.load(Ordering::SeqCst), 2);

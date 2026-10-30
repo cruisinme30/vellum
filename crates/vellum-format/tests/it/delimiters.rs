@@ -29,7 +29,8 @@ const MARKS: &[Mark] = &[
 
 /// Text made of delimiter characters, alone and in runs.
 const DELIMITERS: &[&str] = &[
-    "*", "**", "_", "__", "~", "~~", "~~~", "=", "==", "===", "^", "^^", "`", "[", "]",
+    "*", "**", "_", "__", "~", "~~", "~~~", "=", "==", "===", "^", "^^", "`",
+    "[", "]",
 ];
 
 /// What sits before and after the content under test: nothing, spaces,
@@ -57,7 +58,9 @@ fn in_context(content: &[Inline], (before, after): (&str, &str)) -> Document {
     {
         match (all.last_mut(), inline) {
             (_, Inline::Text { text }) if text.is_empty() => {}
-            (Some(Inline::Text { text: last }), Inline::Text { text }) => last.push_str(&text),
+            (Some(Inline::Text { text: last }), Inline::Text { text }) => {
+                last.push_str(&text)
+            }
             (_, inline) => all.push(inline),
         }
     }
@@ -187,7 +190,9 @@ fn marks_beside_and_inside_marks_round_trip() {
                 vec![a(vec![text("y"), b(x())])],
             ] {
                 for &context in CONTEXTS {
-                    let _ = assert_written_fixed_point(&in_context(&content, context));
+                    let _ = assert_written_fixed_point(&in_context(
+                        &content, context,
+                    ));
                 }
             }
             for (_, c) in MARKS {
@@ -197,7 +202,9 @@ fn marks_beside_and_inside_marks_round_trip() {
                     vec![a(vec![b(x())]), c(vec![text("y")])],
                 ] {
                     for &context in CONTEXTS {
-                        let _ = assert_written_fixed_point(&in_context(&content, context));
+                        let _ = assert_written_fixed_point(&in_context(
+                            &content, context,
+                        ));
                     }
                 }
             }

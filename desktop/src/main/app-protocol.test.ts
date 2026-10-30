@@ -5,7 +5,11 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { handleAppRequest, resolveAsset, type ProtocolOptions } from "./app-protocol.js";
+import {
+  handleAppRequest,
+  resolveAsset,
+  type ProtocolOptions,
+} from "./app-protocol.js";
 import type { Fetch } from "./fetch.js";
 
 const root = path.resolve("/srv/web");
@@ -22,7 +26,9 @@ function options(overrides: Partial<ProtocolOptions> = {}): ProtocolOptions {
     accessToken: () => Promise.resolve("token1"),
     readFile: (file) => {
       const text = files.get(file);
-      return Promise.resolve(text === undefined ? undefined : new TextEncoder().encode(text));
+      return Promise.resolve(
+        text === undefined ? undefined : new TextEncoder().encode(text),
+      );
     },
     fetch: () => Promise.resolve(new Response("{}")),
     csp: () => "default-src 'self'",
@@ -34,11 +40,15 @@ describe("resolveAsset", () => {
   it("serves files and falls back to index.html for app routes", () => {
     expect(resolveAsset(root, "/")).toBe(path.join(root, "index.html"));
     expect(resolveAsset(root, "/p/abc")).toBe(path.join(root, "index.html"));
-    expect(resolveAsset(root, "/assets/app.js")).toBe(path.join(root, "assets", "app.js"));
+    expect(resolveAsset(root, "/assets/app.js")).toBe(
+      path.join(root, "assets", "app.js"),
+    );
   });
 
   it("never leaves the web root", () => {
-    expect(resolveAsset(root, "/../secret.txt")).toBe(path.join(root, "secret.txt"));
+    expect(resolveAsset(root, "/../secret.txt")).toBe(
+      path.join(root, "secret.txt"),
+    );
     expect(resolveAsset(root, "/%2e%2e/%2e%2e/etc/passwd.txt")).toBe(
       path.join(root, "etc", "passwd.txt"),
     );
@@ -55,22 +65,38 @@ async function signedOut(): Promise<string | undefined> {
 }
 
 async function status(url: string, method = "GET"): Promise<number> {
-  const response = await handleAppRequest(new Request(url, { method }), options());
+  const response = await handleAppRequest(
+    new Request(url, { method }),
+    options(),
+  );
   return response.status;
 }
 
 describe("handleAppRequest", () => {
   it("serves the app with a CSP on HTML", async () => {
-    const page = await handleAppRequest(new Request("app://vellum/p/1"), options());
+    const page = await handleAppRequest(
+      new Request("app://vellum/p/1"),
+      options(),
+    );
     expect(page.headers.get("content-type")).toBe("text/html; charset=utf-8");
-    expect(page.headers.get("content-security-policy")).toBe("default-src 'self'");
+    expect(page.headers.get("content-security-policy")).toBe(
+      "default-src 'self'",
+    );
     expect(await page.text()).toBe("<!doctype html>");
 
-    const script = await handleAppRequest(new Request("app://vellum/assets/app.js"), options());
-    expect(script.headers.get("content-type")).toBe("text/javascript; charset=utf-8");
+    const script = await handleAppRequest(
+      new Request("app://vellum/assets/app.js"),
+      options(),
+    );
+    expect(script.headers.get("content-type")).toBe(
+      "text/javascript; charset=utf-8",
+    );
     expect(script.headers.get("content-security-policy")).toBeNull();
 
-    const binary = await handleAppRequest(new Request("app://vellum/data.bin"), options());
+    const binary = await handleAppRequest(
+      new Request("app://vellum/data.bin"),
+      options(),
+    );
     expect(binary.headers.get("content-type")).toBe("application/octet-stream");
 
     const head = await handleAppRequest(
@@ -101,7 +127,11 @@ describe("handleAppRequest", () => {
     const response = await handleAppRequest(
       new Request("app://vellum/api/v1/sync/push?x=1", {
         method: "POST",
-        headers: { authorization: "Bearer stolen", cookie: "c=d", "x-request-id": "r1" },
+        headers: {
+          authorization: "Bearer stolen",
+          cookie: "c=d",
+          "x-request-id": "r1",
+        },
         body: '{"m":1}',
       }),
       options({ fetch: fetcher }),
@@ -113,27 +143,33 @@ describe("handleAppRequest", () => {
     expect(headers.get("authorization")).toBe("Bearer token1");
     expect(headers.get("cookie")).toBeNull();
     expect(headers.get("x-request-id")).toBe("r1");
-    expect(new TextDecoder().decode(seen?.init?.body as ArrayBuffer)).toBe('{"m":1}');
+    expect(new TextDecoder().decode(seen?.init?.body as ArrayBuffer)).toBe(
+      '{"m":1}',
+    );
     expect(seen?.init?.redirect).toBe("manual");
   });
 
-  it("forwards signed-out GETs without a token and reports an unreachable server", async () => {
-    let headers: Headers | undefined;
-    const fetcher: Fetch = (_url, init) => {
-      headers = new Headers(init?.headers);
-      expect(init?.body).toBeUndefined();
-      return Promise.resolve(new Response("[]"));
-    };
-    await handleAppRequest(
-      new Request("app://vellum/api/v1/me"),
-      options({ fetch: fetcher, accessToken: signedOut }),
-    );
-    expect(headers?.get("authorization")).toBeNull();
+  it(
+    "forwards signed-out GETs without a token and reports an unreachable " +
+      "server",
+    async () => {
+      let headers: Headers | undefined;
+      const fetcher: Fetch = (_url, init) => {
+        headers = new Headers(init?.headers);
+        expect(init?.body).toBeUndefined();
+        return Promise.resolve(new Response("[]"));
+      };
+      await handleAppRequest(
+        new Request("app://vellum/api/v1/me"),
+        options({ fetch: fetcher, accessToken: signedOut }),
+      );
+      expect(headers?.get("authorization")).toBeNull();
 
-    const offline = await handleAppRequest(
-      new Request("app://vellum/api/v1/me"),
-      options({ fetch: () => Promise.reject(new TypeError("offline")) }),
-    );
-    expect(offline.status).toBe(503);
-  });
+      const offline = await handleAppRequest(
+        new Request("app://vellum/api/v1/me"),
+        options({ fetch: () => Promise.reject(new TypeError("offline")) }),
+      );
+      expect(offline.status).toBe(503);
+    },
+  );
 });

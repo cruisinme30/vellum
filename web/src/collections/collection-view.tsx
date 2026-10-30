@@ -28,7 +28,9 @@ type Panel =
   | { readonly kind: "row"; readonly id: string; readonly fresh: boolean }
   | { readonly kind: "view" | "new-view" | "properties" | "import" };
 
-const LAYOUTS: Readonly<Record<ViewKind, (properties: ViewProperties) => React.ReactNode>> = {
+const LAYOUTS: Readonly<
+  Record<ViewKind, (properties: ViewProperties) => React.ReactNode>
+> = {
   table: TableView,
   board: BoardView,
   gallery: GalleryView,
@@ -124,8 +126,14 @@ function OpenPanel({
   }
 }
 
-/** A loaded collection: view tabs, the chosen view, "New row" and the row panel. */
-function CollectionBody({ collection }: { readonly collection: CollectionInfo }) {
+/**
+ * A loaded collection: view tabs, the chosen view, "New row" and the row panel.
+ */
+function CollectionBody({
+  collection,
+}: {
+  readonly collection: CollectionInfo;
+}) {
   const t = useT();
   const idBase = useId();
   const panelId = useId();
@@ -156,7 +164,11 @@ function CollectionBody({ collection }: { readonly collection: CollectionInfo })
     try {
       const written = await store.createRow({ collection_id: collection.id });
       setActionError(undefined);
-      setOpen(written.row ? { kind: "row", id: written.row.row.id, fresh: true } : undefined);
+      setOpen(
+        written.row
+          ? { kind: "row", id: written.row.row.id, fresh: true }
+          : undefined,
+      );
     } catch (error) {
       setActionError(messageOf(error));
     }
@@ -211,11 +223,19 @@ function CollectionBody({ collection }: { readonly collection: CollectionInfo })
             <Icon name="arrow_upward" size={20} />
             {t("collection-import")}
           </button>
-          <button type="button" className="vl-text-button" onClick={() => void exportCsv()}>
+          <button
+            type="button"
+            className="vl-text-button"
+            onClick={() => void exportCsv()}
+          >
             <Icon name="arrow_downward" size={20} />
             {t("collection-export")}
           </button>
-          <button type="button" className="vl-filled-button" onClick={() => void newRow()}>
+          <button
+            type="button"
+            className="vl-filled-button"
+            onClick={() => void newRow()}
+          >
             <Icon name="add" size={20} />
             {t("collection-new-row")}
           </button>

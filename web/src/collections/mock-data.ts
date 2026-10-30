@@ -4,7 +4,10 @@
 import type { PropertyInfo, Value, ViewInfo } from "./types";
 import { bool, date, EMPTY, isEmpty, list, number, text } from "./value";
 
-/** Computes a formula from a row's values: the mock's stand-in for the formula engine. */
+/**
+ * Computes a formula from a row's values: the mock's stand-in for the formula
+ * engine.
+ */
 type Formula = (values: Readonly<Record<string, Value>>) => Value;
 
 export interface MockCollection {
@@ -54,7 +57,11 @@ const LABELS = [
   { name: "performance", color: "orange" },
 ];
 
-const view = (name: string, kind: ViewInfo["kind"], extra: Partial<ViewInfo> = {}): ViewInfo => ({
+const view = (
+  name: string,
+  kind: ViewInfo["kind"],
+  extra: Partial<ViewInfo> = {},
+): ViewInfo => ({
   name,
   kind,
   filters: [],
@@ -64,7 +71,8 @@ const view = (name: string, kind: ViewInfo["kind"], extra: Partial<ViewInfo> = {
 });
 
 const pointsLeft: Formula = (values) => {
-  const done = values["status"]?.type === "text" && values["status"].value === "Done";
+  const done =
+    values["status"]?.type === "text" && values["status"].value === "Done";
   const estimate = values["est"];
   return number(done || estimate?.type !== "number" ? 0 : estimate.value);
 };
@@ -75,12 +83,30 @@ const ISSUES: MockCollection = {
   path: "engineering/issues.collection",
   properties: [
     { key: "name", name: "Issue", type: "title", computed: false },
-    { key: "status", name: "Status", type: "select", computed: false, options: STATUS },
-    { key: "labels", name: "Labels", type: "multi", computed: false, options: LABELS },
+    {
+      key: "status",
+      name: "Status",
+      type: "select",
+      computed: false,
+      options: STATUS,
+    },
+    {
+      key: "labels",
+      name: "Labels",
+      type: "multi",
+      computed: false,
+      options: LABELS,
+    },
     { key: "owner", name: "Owner", type: "person", computed: false },
     { key: "start", name: "Start", type: "date", computed: false },
     { key: "due", name: "Due", type: "date", computed: false },
-    { key: "est", name: "Estimate", type: "number", computed: false, format: "plain" },
+    {
+      key: "est",
+      name: "Estimate",
+      type: "number",
+      computed: false,
+      format: "plain",
+    },
     { key: "blocked", name: "Blocked", type: "checkbox", computed: false },
     { key: "link", name: "Link", type: "url", computed: false },
     {
@@ -101,11 +127,23 @@ const ISSUES: MockCollection = {
   ],
   views: [
     view("All issues", "table", { sorts: ["due"] }),
-    view("Board", "board", { group: "status", hidden: ["link", "start", "release"] }),
-    view("Gallery", "gallery", { hidden: ["link", "start", "release", "left"] }),
+    view("Board", "board", {
+      group: "status",
+      hidden: ["link", "start", "release"],
+    }),
+    view("Gallery", "gallery", {
+      hidden: ["link", "start", "release", "left"],
+    }),
     view("Calendar", "calendar", { date: "due" }),
-    view("Timeline", "timeline", { date: "start", end: "due", sorts: ["start"] }),
-    view("Open", "list", { filters: ["status is not Done"], sorts: ["est desc"] }),
+    view("Timeline", "timeline", {
+      date: "start",
+      end: "due",
+      sorts: ["start"],
+    }),
+    view("Open", "list", {
+      filters: ["status is not Done"],
+      sorts: ["est desc"],
+    }),
   ],
   formulas: { left: pointsLeft },
 };
@@ -235,13 +273,27 @@ const ISSUE_SEEDS: readonly IssueSeed[] = [
     false,
     RELEASE.beta,
   ],
-  ["Flaky TLS handshake test", "Backlog", ["bug"], "", "", "", undefined, false, RELEASE.next],
+  [
+    "Flaky TLS handshake test",
+    "Backlog",
+    ["bug"],
+    "",
+    "",
+    "",
+    undefined,
+    false,
+    RELEASE.next,
+  ],
 ];
 
-const issueId = (index: number) => `01JB3KD2ISSUE00000000000${String(index + 10)}`;
+const issueId = (index: number) =>
+  `01JB3KD2ISSUE00000000000${String(index + 10)}`;
 
 const ISSUE_ROWS: readonly MockRow[] = ISSUE_SEEDS.map(
-  ([name, status, labels, owner, start, due, estimate, blocked, release], index) => ({
+  (
+    [name, status, labels, owner, start, due, estimate, blocked, release],
+    index,
+  ) => ({
     id: issueId(index),
     values: {
       name: text(name),
@@ -252,7 +304,10 @@ const ISSUE_ROWS: readonly MockRow[] = ISSUE_SEEDS.map(
       due: due === "" ? EMPTY : date(due),
       est: estimate === undefined ? EMPTY : number(estimate),
       blocked: bool(blocked),
-      link: index === 1 ? text("https://status.northstar.example/incidents/42") : EMPTY,
+      link:
+        index === 1
+          ? text("https://status.northstar.example/incidents/42")
+          : EMPTY,
       release: release === undefined ? EMPTY : list([text(release)]),
     },
     body: `Notes on ${name.toLowerCase()}.`,
@@ -282,6 +337,9 @@ const RELEASE_ROWS: readonly MockRow[] = [
 export function northstarCollections(): MockSeed {
   return {
     collections: [ISSUES, RELEASES],
-    rows: { [COLLECTION.issues]: ISSUE_ROWS, [COLLECTION.releases]: RELEASE_ROWS },
+    rows: {
+      [COLLECTION.issues]: ISSUE_ROWS,
+      [COLLECTION.releases]: RELEASE_ROWS,
+    },
   };
 }

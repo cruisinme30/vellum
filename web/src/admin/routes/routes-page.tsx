@@ -3,7 +3,12 @@
 
 import { useEffect, useState } from "react";
 
-import { AdminApiError, fetchRoutes, type RouteStat, type RoutesView } from "../requests/api";
+import {
+  AdminApiError,
+  fetchRoutes,
+  type RouteStat,
+  type RoutesView,
+} from "../requests/api";
 
 import "../requests/requests.css";
 
@@ -42,10 +47,14 @@ function RouteRow({ stat }: { readonly stat: RouteStat }) {
       <td>{milliseconds(stat.p50_ms)}</td>
       <td>
         {milliseconds(stat.p95_ms)}
-        {stat.over_budget && <strong className="vl-routes__over"> over budget</strong>}
+        {stat.over_budget && (
+          <strong className="vl-routes__over"> over budget</strong>
+        )}
       </td>
       <td>{milliseconds(stat.p99_ms)}</td>
-      <td>{stat.budget_ms === undefined ? "–" : `${String(stat.budget_ms)} ms`}</td>
+      <td>
+        {stat.budget_ms === undefined ? "–" : `${String(stat.budget_ms)} ms`}
+      </td>
       <td>{stat.in_flight}</td>
     </tr>
   );
@@ -64,10 +73,17 @@ function RouteTable({ view }: { readonly view: RoutesView }) {
       {/* The table scrolls sideways when large text or zoom makes it wider
           than a phone, so the scroller takes keyboard focus (WCAG 2.1.1,
           axe scrollable-region-focusable). */}
-      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- see above */}
-      <div className="vl-requests__scroll" role="region" aria-label="Routes table" tabIndex={0}>
+      <div
+        className="vl-requests__scroll"
+        role="region"
+        aria-label="Routes table"
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+        tabIndex={0}
+      >
         <table className="vl-requests__table">
-          <caption>Routes, busiest first, over the last {view.minutes} minutes</caption>
+          <caption>
+            Routes, busiest first, over the last {view.minutes} minutes
+          </caption>
           <thead>
             <tr>
               <th scope="col">Route</th>
@@ -94,7 +110,10 @@ function RouteTable({ view }: { readonly view: RoutesView }) {
 /** Admin → Routes: RED and saturation per route, with slow routes marked. */
 export function RoutesPage({ fetcher }: { readonly fetcher?: typeof fetch }) {
   const [minutes, setMinutes] = useState<number>(15);
-  const [loaded, setLoaded] = useState<{ readonly key: number; readonly load: Load }>();
+  const [loaded, setLoaded] = useState<{
+    readonly key: number;
+    readonly load: Load;
+  }>();
 
   useEffect(() => {
     let live = true;
@@ -107,7 +126,8 @@ export function RoutesPage({ fetcher }: { readonly fetcher?: typeof fetch }) {
           error instanceof AdminApiError
             ? `${error.message} (request ${error.requestId})`
             : String(error);
-        if (live) setLoaded({ key: minutes, load: { state: "failed", message } });
+        if (live)
+          setLoaded({ key: minutes, load: { state: "failed", message } });
       },
     );
     return () => {
@@ -115,7 +135,8 @@ export function RoutesPage({ fetcher }: { readonly fetcher?: typeof fetch }) {
     };
   }, [minutes, fetcher]);
 
-  const load: Load = loaded?.key === minutes ? loaded.load : { state: "loading" };
+  const load: Load =
+    loaded?.key === minutes ? loaded.load : { state: "loading" };
   return (
     <section className="vl-requests">
       <h1>Routes</h1>
@@ -135,7 +156,9 @@ export function RoutesPage({ fetcher }: { readonly fetcher?: typeof fetch }) {
         </select>
       </label>
       {load.state === "loading" && <p role="status">Loading routes…</p>}
-      {load.state === "failed" && <p role="alert">Could not load routes: {load.message}</p>}
+      {load.state === "failed" && (
+        <p role="alert">Could not load routes: {load.message}</p>
+      )}
       {load.state === "ready" && <RouteTable view={load.value} />}
     </section>
   );

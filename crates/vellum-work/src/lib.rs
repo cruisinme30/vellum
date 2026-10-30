@@ -49,7 +49,8 @@ pub mod view;
 pub mod workflow;
 
 pub use comment::{
-    BlockRef, Comment, CommentChanges, Comments, Mention, NewComment, Target, Thread,
+    BlockRef, Comment, CommentChanges, Comments, Mention, NewComment, Target,
+    Thread,
 };
 pub use cycle::{Cycle, CycleKey, CycleSettings};
 pub use doclink::{BackLink, IssueEmbed};
@@ -57,7 +58,10 @@ pub use error::{Result, WorkError};
 pub use event::{IssueSnapshot, WorkEvent};
 pub use filter::{Condition, Field, Filter, Op};
 pub use graph::{Changes, Ctx, IssuePatch, NewIssue, WorkGraph};
-pub use id::{InitiativeId, IssueId, MilestoneId, ProjectId, TeamId, UpdateId, UserRef, ViewId};
+pub use id::{
+    InitiativeId, IssueId, MilestoneId, ProjectId, TeamId, UpdateId, UserRef,
+    ViewId,
+};
 pub use intake::IntakeForm;
 pub use issue::{Issue, IssueKey, Relation, RelationKind};
 pub use project::{Health, Initiative, Project, ProjectUpdate};

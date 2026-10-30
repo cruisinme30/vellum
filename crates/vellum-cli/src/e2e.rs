@@ -52,7 +52,12 @@ impl SpaceAccess for DriveSpaces {
         Ok(self.index.space(space).await?.map(|s| s.root))
     }
 
-    async fn allowed(&self, user: UserId, space: SpaceId, need: Need) -> Result<bool, Error> {
+    async fn allowed(
+        &self,
+        user: UserId,
+        space: SpaceId,
+        need: Need,
+    ) -> Result<bool, Error> {
         let permission = match need {
             Need::View => Permission::View,
             Need::Edit => Permission::Edit,
@@ -67,7 +72,9 @@ impl SpaceAccess for DriveSpaces {
 
 /// Puts the private-space guard in front of `store`: private spaces then
 /// accept only sealed pages, whichever service writes (D208).
-pub fn guarded(store: Arc<dyn BlobStore>) -> (Arc<dyn BlobStore>, vellum_e2e::PrivateRoots) {
+pub fn guarded(
+    store: Arc<dyn BlobStore>,
+) -> (Arc<dyn BlobStore>, vellum_e2e::PrivateRoots) {
     let roots = vellum_e2e::PrivateRoots::default();
     (
         Arc::new(vellum_e2e::Guard::new(store, roots.clone())),
@@ -83,7 +90,9 @@ const ROOTS_EVERY: std::time::Duration = std::time::Duration::from_secs(15);
 /// [`ROOTS_EVERY`] on this replica.
 pub async fn keep_roots_fresh(e2e: Arc<E2e>) {
     match e2e.refresh_roots().await {
-        Ok(count) => tracing::info!(private_spaces = count, "private spaces loaded"),
+        Ok(count) => {
+            tracing::info!(private_spaces = count, "private spaces loaded")
+        }
         Err(error) => tracing::warn!(%error, "private spaces not loaded yet"),
     }
     drop(tokio::spawn(async move {

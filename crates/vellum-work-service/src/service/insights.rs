@@ -121,8 +121,8 @@ impl WorkService {
         let st = self.read_state().await;
         let mut filter = match &i.filter {
             Some(text) => {
-                let f: Filter =
-                    serde_json::from_str(text).map_err(|e| invalid(&format!("filter: {e}")))?;
+                let f: Filter = serde_json::from_str(text)
+                    .map_err(|e| invalid(&format!("filter: {e}")))?;
                 f.check().map_err(|e| invalid(&format!("filter: {e}")))?;
                 f
             }
@@ -130,7 +130,8 @@ impl WorkService {
         };
         if let Some(team) = &i.team {
             let key = Self::team_key(&st.graph, team)?.to_string();
-            let only = Condition::new(Field::Team, Op::Is, &[key.as_str()]).into();
+            let only =
+                Condition::new(Field::Team, Op::Is, &[key.as_str()]).into();
             filter = Filter::And {
                 and: vec![only, filter],
             };
@@ -157,7 +158,8 @@ impl WorkService {
                 .map(|t| parse_name("interval", t))
                 .transpose()?,
         };
-        let answer = insights::run(&st.graph, &query, &ctx, ctx.actor.as_ref())?;
+        let answer =
+            insights::run(&st.graph, &query, &ctx, ctx.actor.as_ref())?;
         Ok(InsightsOut {
             overall: answer.overall.into(),
             buckets: answer.buckets.into_iter().map(Into::into).collect(),

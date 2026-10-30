@@ -10,7 +10,9 @@
 # its release publishes. A cloud environment's setup script runs it, so
 # every cloud session starts with the tools (ADR 0048, D202):
 #
-#   curl -sSfL https://raw.githubusercontent.com/cruisinme30/vellum/develop/scripts/dev/install-tools.sh | bash
+# curl -sSfL
+# https://raw.githubusercontent.com/cruisinme30/vellum/develop/scripts/dev/install-tools.sh
+# | bash
 #
 # Helm is installed only with VELLUM_INSTALL_HELM=1: its download host is
 # not on the cloud network allowlist. scripts/ci/lint-infra.sh skips the

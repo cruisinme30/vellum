@@ -18,7 +18,10 @@ fn paragraph(text: &str) -> Document {
 
 #[test]
 fn escaped_extras_are_literal_text() {
-    let doc = parse("Ping \\@everyone about ENG\\-142 by 2026\\-11-24 \\^blk-a1b2c3d4\n").document;
+    let doc = parse(
+        "Ping \\@everyone about ENG\\-142 by 2026\\-11-24 \\^blk-a1b2c3d4\n",
+    )
+    .document;
     assert_eq!(
         doc,
         paragraph("Ping @everyone about ENG-142 by 2026-11-24 ^blk-a1b2c3d4")
@@ -117,7 +120,9 @@ fn wiki_link_targets_and_labels_keep_brackets_bars_and_ampersands() {
         assert!(
             matches!(
                 &doc.blocks[..],
-                [Block::Paragraph { content, .. }] if matches!(content.get(1), Some(Inline::WikiLink { .. }))
+                [
+                    Block::Paragraph { content, .. }
+                ] if matches!(content.get(1), Some(Inline::WikiLink { .. }))
             ),
             "{src:?}: {doc:?}"
         );

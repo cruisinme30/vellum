@@ -104,7 +104,8 @@ fn a_password_alone_no_longer_signs_in_once_an_app_is_added() {
         .verify_sign_in(&step.ticket, &code_only(&used), None)
         .unwrap_err();
     assert_eq!(again.kind(), ErrorKind::Unauthenticated);
-    let replay = ticket(id.sign_in_password(PRIYA, PASSWORD, None, None).unwrap());
+    let replay =
+        ticket(id.sign_in_password(PRIYA, PASSWORD, None, None).unwrap());
     assert!(id.verify_sign_in(&replay, &code_only(&used), None).is_err());
 }
 
@@ -113,24 +114,28 @@ fn recovery_codes_work_once_each() {
     let id = identity();
     let priya = id.setup(PRIYA, "Priya", PASSWORD).unwrap();
     let (_, recovery) = add_app(&id, priya.id);
-    let first = ticket(id.sign_in_password(PRIYA, PASSWORD, None, None).unwrap());
+    let first =
+        ticket(id.sign_in_password(PRIYA, PASSWORD, None, None).unwrap());
     let typed = recovery[0].to_uppercase().replace('-', " ");
     assert!(id.verify_sign_in(&first, &code_only(&typed), None).is_ok());
     assert_eq!(id.factors(priya.id).unwrap().recovery_codes_left, 9);
-    let second = ticket(id.sign_in_password(PRIYA, PASSWORD, None, None).unwrap());
+    let second =
+        ticket(id.sign_in_password(PRIYA, PASSWORD, None, None).unwrap());
     assert!(
         id.verify_sign_in(&second, &code_only(&recovery[0]), None)
             .is_err()
     );
     let renewed = id.new_recovery_codes(priya.id).unwrap();
     assert_eq!(id.factors(priya.id).unwrap().recovery_codes_left, 10);
-    let third = ticket(id.sign_in_password(PRIYA, PASSWORD, None, None).unwrap());
+    let third =
+        ticket(id.sign_in_password(PRIYA, PASSWORD, None, None).unwrap());
     assert!(
         id.verify_sign_in(&third, &code_only(&recovery[1]), None)
             .is_err(),
         "the old set is gone"
     );
-    let fourth = ticket(id.sign_in_password(PRIYA, PASSWORD, None, None).unwrap());
+    let fourth =
+        ticket(id.sign_in_password(PRIYA, PASSWORD, None, None).unwrap());
     assert!(
         id.verify_sign_in(&fourth, &code_only(&renewed[0]), None)
             .is_ok()
@@ -142,7 +147,8 @@ fn guessing_codes_ends_the_ticket_and_locks_the_account() {
     let id = identity();
     let priya = id.setup(PRIYA, "Priya", PASSWORD).unwrap();
     let (secret, _) = add_app(&id, priya.id);
-    let step = ticket(id.sign_in_password(PRIYA, PASSWORD, None, None).unwrap());
+    let step =
+        ticket(id.sign_in_password(PRIYA, PASSWORD, None, None).unwrap());
     for guess in 0..5 {
         let error = id
             .verify_sign_in(&step, &code_only(&format!("{guess:06}")), None)
@@ -165,7 +171,8 @@ fn guessing_codes_ends_the_ticket_and_locks_the_account() {
     ));
     // Wrong codes count with wrong passwords: one more guess on a new
     // ticket passes the free failures, and the address locks.
-    let next = ticket(id.sign_in_password(PRIYA, PASSWORD, None, None).unwrap());
+    let next =
+        ticket(id.sign_in_password(PRIYA, PASSWORD, None, None).unwrap());
     let _ = id.verify_sign_in(&next, &code_only("999999"), None);
     let locked = id
         .sign_in_password(PRIYA, PASSWORD, None, None)
@@ -182,7 +189,8 @@ fn tickets_are_bound_to_their_purpose() {
     let id = identity();
     let priya = id.setup(PRIYA, "Priya", PASSWORD).unwrap();
     let _ = add_app(&id, priya.id);
-    let step = ticket(id.sign_in_password(PRIYA, PASSWORD, None, None).unwrap());
+    let step =
+        ticket(id.sign_in_password(PRIYA, PASSWORD, None, None).unwrap());
     // A sign-in ticket cannot enrol a new factor or be guessed into shape.
     assert!(id.ticket_totp_setup(&step).is_err());
     assert!(
@@ -270,8 +278,14 @@ fn re_authentication_asks_for_the_factor() {
         .unwrap_err();
     assert_eq!(missing.message(), "second factor required");
     assert!(
-        id.reauthenticate(&before.secret, PASSWORD, &code_only("999999"), None, None)
-            .is_err()
+        id.reauthenticate(
+            &before.secret,
+            PASSWORD,
+            &code_only("999999"),
+            None,
+            None
+        )
+        .is_err()
     );
     assert!(
         id.reauthenticate(
@@ -337,13 +351,18 @@ fn a_sealed_secret_needs_the_same_key() {
     .unwrap();
     let priya = first.setup(PRIYA, "Priya", PASSWORD).unwrap();
     let (secret, _) = add_app(&first, priya.id);
-    let text = std::fs::read_to_string(dir.path().join(".vellum/identity.json")).unwrap();
+    let text =
+        std::fs::read_to_string(dir.path().join(".vellum/identity.json"))
+            .unwrap();
     assert!(!text.contains(&secret), "the secret is sealed at rest");
     drop(first);
 
-    let other_key = Identity::new(IdentityConfig::new(url), Store::open(dir.path()).unwrap())
-        .with_sealing_key(&[2; 32])
-        .unwrap();
+    let other_key = Identity::new(
+        IdentityConfig::new(url),
+        Store::open(dir.path()).unwrap(),
+    )
+    .with_sealing_key(&[2; 32])
+    .unwrap();
     let step = ticket(
         other_key
             .sign_in_password(PRIYA, PASSWORD, None, None)
@@ -387,8 +406,10 @@ async fn a_browser_signs_in_with_a_password_and_a_code() {
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
     assert!(response.headers().get(header::SET_COOKIE).is_none());
-    let body: serde_json::Value =
-        serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes()).unwrap();
+    let body: serde_json::Value = serde_json::from_slice(
+        &response.into_body().collect().await.unwrap().to_bytes(),
+    )
+    .unwrap();
     let ticket = body["secondFactor"]["ticket"].as_str().unwrap().to_owned();
 
     let wrong = router

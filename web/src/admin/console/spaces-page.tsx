@@ -8,11 +8,18 @@ import { formatSize } from "../../data/format";
 import { useLoaded } from "../../data/use-loaded";
 import { useT } from "../../i18n/i18n";
 
-import { formText, type AdminConsoleApi, type AdminSpaceView, type UserView } from "./api";
+import {
+  formText,
+  type AdminConsoleApi,
+  type AdminSpaceView,
+  type UserView,
+} from "./api";
 import { AdminScreen } from "./context";
 import { nameOf, SpacePanel, type Run, type Submit } from "./space-panel";
 
-/** A folder-path name from a display name: lowercase letters, digits and dashes. */
+/**
+ * A folder-path name from a display name: lowercase letters, digits and dashes.
+ */
 export function slugOf(name: string): string {
   return name
     .normalize("NFKD")
@@ -27,7 +34,10 @@ export function slugOf(name: string): string {
 function usage(space: AdminSpaceView, t: ReturnType<typeof useT>): string {
   const quota = space.space.settings.quota_bytes;
   return typeof quota === "number"
-    ? t("admin-spaces-used-of", { used: formatSize(space.used_bytes), quota: formatSize(quota) })
+    ? t("admin-spaces-used-of", {
+        used: formatSize(space.used_bytes),
+        quota: formatSize(quota),
+      })
     : formatSize(space.used_bytes);
 }
 
@@ -68,7 +78,11 @@ function CreateSpaceForm({
     );
   };
   return (
-    <form className="vl-admin-form" aria-labelledby={`${id}-title`} onSubmit={submit}>
+    <form
+      className="vl-admin-form"
+      aria-labelledby={`${id}-title`}
+      onSubmit={submit}
+    >
       <h2 id={`${id}-title`}>{t("admin-spaces-create")}</h2>
       <label>
         {t("admin-spaces-name")}
@@ -138,7 +152,9 @@ function Spaces({ api }: { readonly api: AdminConsoleApi }) {
 
   // A change answers with the space as it now is, so the list keeps its
   // place instead of loading again; a new space reloads the list.
-  const [changed, setChanged] = useState<Readonly<Record<string, AdminSpaceView>>>({});
+  const [changed, setChanged] = useState<
+    Readonly<Record<string, AdminSpaceView>>
+  >({});
   const run: Run = (task, done, fresh = false) => {
     setBusy(true);
     setNotice(undefined);
@@ -176,7 +192,9 @@ function Spaces({ api }: { readonly api: AdminConsoleApi }) {
           {notice.message}
         </p>
       )}
-      {loaded.state === "loading" && <p className="vl-muted">{t("admin-loading")}</p>}
+      {loaded.state === "loading" && (
+        <p className="vl-muted">{t("admin-loading")}</p>
+      )}
       {loaded.state === "failed" && (
         <p className="vl-field-error" role="alert">
           {loaded.message}
@@ -189,7 +207,9 @@ function Spaces({ api }: { readonly api: AdminConsoleApi }) {
           ) : (
             <div className="vl-admin-scroll">
               <table className="vl-admin-table">
-                <caption>{t("admin-spaces-caption", { count: spaces.length })}</caption>
+                <caption>
+                  {t("admin-spaces-caption", { count: spaces.length })}
+                </caption>
                 <thead>
                   <tr>
                     <th scope="col">{t("admin-spaces-name")}</th>
@@ -227,10 +247,16 @@ function Spaces({ api }: { readonly api: AdminConsoleApi }) {
                           <button
                             type="button"
                             className="vl-text-button"
-                            aria-label={t("admin-spaces-manage-label", { name: space.space.name })}
+                            aria-label={t("admin-spaces-manage-label", {
+                              name: space.space.name,
+                            })}
                             aria-expanded={space.space.id === selected}
                             onClick={() => {
-                              setSelected(space.space.id === selected ? undefined : space.space.id);
+                              setSelected(
+                                space.space.id === selected
+                                  ? undefined
+                                  : space.space.id,
+                              );
                             }}
                           >
                             {t("admin-spaces-manage")}
@@ -252,14 +278,22 @@ function Spaces({ api }: { readonly api: AdminConsoleApi }) {
               run={run}
             />
           )}
-          <CreateSpaceForm api={api} users={loaded.value.users} busy={busy} run={run} />
+          <CreateSpaceForm
+            api={api}
+            users={loaded.value.users}
+            busy={busy}
+            run={run}
+          />
         </>
       )}
     </>
   );
 }
 
-/** Admin → Spaces: every shared drive and My Drive, their size, settings and members. */
+/**
+ * Admin → Spaces: every shared drive and My Drive, their size, settings and
+ * members.
+ */
 export function SpacesPage() {
   const t = useT();
   return (

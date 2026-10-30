@@ -45,7 +45,12 @@ pub trait UpdateStore: Send + Sync + 'static {
 
     /// Atomically replaces every record up to and including `through` with
     /// one record at `through` holding `merged`. Later records are kept.
-    async fn compact(&self, room: RoomKey, through: Seq, merged: Vec<u8>) -> Result<()>;
+    async fn compact(
+        &self,
+        room: RoomKey,
+        through: Seq,
+        merged: Vec<u8>,
+    ) -> Result<()>;
 }
 
 /// Why a Markdown version was written.
@@ -93,7 +98,11 @@ pub trait DocumentFiles: Send + Sync + 'static {
     async fn read_markdown(&self, room: RoomKey) -> Result<Option<String>>;
 
     /// Writes a new version of the file (and its version history entry).
-    async fn write_version(&self, room: RoomKey, version: MarkdownVersion) -> Result<()>;
+    async fn write_version(
+        &self,
+        room: RoomKey,
+        version: MarkdownVersion,
+    ) -> Result<()>;
 }
 
 /// Converts between Vellum Markdown and the editor's node tree.

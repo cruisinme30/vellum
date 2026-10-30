@@ -14,7 +14,9 @@ const rowsOf = (result: ViewResult) => result.groups.flatMap((g) => g.rows);
 
 describe("CSV text", () => {
   it("parses quotes, commas, doubled quotes and line breaks", () => {
-    expect(parseCsv('Name,Note\r\n"Ship, then rest","He said ""go""\nnow"\n\n,\n')).toEqual([
+    expect(
+      parseCsv('Name,Note\r\n"Ship, then rest","He said ""go""\nnow"\n\n,\n'),
+    ).toEqual([
       ["Name", "Note"],
       ["Ship, then rest", 'He said "go"\nnow'],
     ]);
@@ -32,7 +34,8 @@ describe("collection blocks", () => {
   it("read id, view, layout, repeated filters and a limit", () => {
     expect(
       embedQuery(
-        "id: C1\nview: Open\ntype: board\nfilter: Status is Done\nfilter: Estimate > 1\nlimit: 5\nnoise",
+        "id: C1\nview: Open\ntype: board\nfilter: Status is Done\nfilter: " +
+          "Estimate > 1\nlimit: 5\nnoise",
       ),
     ).toEqual({
       collection_id: "C1",
@@ -55,17 +58,29 @@ describe("the mock store's schema, CSV and embed operations", () => {
       group: "Status",
       hide: ["Link"],
     });
-    expect(info.views.at(-1)).toMatchObject({ name: "Mine", group: "status", hidden: ["link"] });
-    info = await store.saveView({ collection_id: ISSUES, view: "mine", rename_to: "Ours" });
+    expect(info.views.at(-1)).toMatchObject({
+      name: "Mine",
+      group: "status",
+      hidden: ["link"],
+    });
+    info = await store.saveView({
+      collection_id: ISSUES,
+      view: "mine",
+      rename_to: "Ours",
+    });
     expect(info.views.map((v) => v.name)).toContain("Ours");
     await expect(
-      store.saveView({ collection_id: ISSUES, view: "Ours", rename_to: "board" }),
+      store.saveView({
+        collection_id: ISSUES,
+        view: "Ours",
+        rename_to: "board",
+      }),
     ).rejects.toThrow(/already exists/);
     info = await store.deleteView({ collection_id: ISSUES, view: "OURS" });
     expect(info.views.map((v) => v.name)).not.toContain("Ours");
-    await expect(store.deleteView({ collection_id: ISSUES, view: "Ours" })).rejects.toThrow(
-      /no view/,
-    );
+    await expect(
+      store.deleteView({ collection_id: ISSUES, view: "Ours" }),
+    ).rejects.toThrow(/no view/);
   });
 
   it("adds, renames and removes properties, cleaning up views", async () => {
@@ -76,24 +91,40 @@ describe("the mock store's schema, CSV and embed operations", () => {
       type: "select",
       options: [{ name: "Soon" }],
     });
-    expect(info.properties.at(-1)).toMatchObject({ key: "due_date", type: "select" });
+    expect(info.properties.at(-1)).toMatchObject({
+      key: "due_date",
+      type: "select",
+    });
     await expect(
-      store.addProperty({ collection_id: ISSUES, name: "status", type: "text" }),
+      store.addProperty({
+        collection_id: ISSUES,
+        name: "status",
+        type: "text",
+      }),
     ).rejects.toThrow(/already exists/);
-    info = await store.updateProperty({ collection_id: ISSUES, key: "due_date", name: "When" });
+    info = await store.updateProperty({
+      collection_id: ISSUES,
+      key: "due_date",
+      name: "When",
+    });
     expect(info.properties.at(-1)?.name).toBe("When");
     info = await store.deleteProperty({ collection_id: ISSUES, key: "status" });
     expect(info.properties.some((p) => p.key === "status")).toBe(false);
     const board = info.views.find((v) => v.name === "Board");
     expect(board?.group).toBeUndefined();
     expect(info.views.find((v) => v.name === "Open")?.filters).toEqual([]);
-    await expect(store.deleteProperty({ collection_id: ISSUES, key: "name" })).rejects.toThrow(
-      /title/,
-    );
-    info = await store.deleteProperty({ collection_id: ISSUES, key: "release" });
+    await expect(
+      store.deleteProperty({ collection_id: ISSUES, key: "name" }),
+    ).rejects.toThrow(/title/);
+    info = await store.deleteProperty({
+      collection_id: ISSUES,
+      key: "release",
+    });
     expect(info.properties.some((p) => p.key === "release")).toBe(false);
     const releases = await store.info(RELEASES);
-    expect(releases.properties.some((p) => p.relation?.to === ISSUES)).toBe(false);
+    expect(releases.properties.some((p) => p.relation?.to === ISSUES)).toBe(
+      false,
+    );
   });
 
   it("links collections both ways and rolls up through the link", async () => {
@@ -119,7 +150,10 @@ describe("the mock store's schema, CSV and embed operations", () => {
       type: "relation",
       to: ISSUES,
     });
-    expect(self.properties.slice(-2).map((p) => p.name)).toEqual(["Duplicates", "Issues"]);
+    expect(self.properties.slice(-2).map((p) => p.name)).toEqual([
+      "Duplicates",
+      "Issues",
+    ]);
     const rolled = await store.addProperty({
       collection_id: RELEASES,
       name: "Blocker count",
@@ -149,27 +183,45 @@ describe("the mock store's schema, CSV and embed operations", () => {
     expect(info.properties.find((p) => p.key === "left")?.formula).toBe(
       'if(Status == "Done", 0, prop("Story points"))',
     );
-    info = await store.updateProperty({ collection_id: ISSUES, key: "est", type: "formula" });
+    info = await store.updateProperty({
+      collection_id: ISSUES,
+      key: "est",
+      type: "formula",
+    });
     expect(info.properties.find((p) => p.key === "est")?.computed).toBe(true);
     await expect(
-      store.updateProperty({ collection_id: ISSUES, key: "name", type: "text" }),
+      store.updateProperty({
+        collection_id: ISSUES,
+        key: "name",
+        type: "text",
+      }),
     ).rejects.toThrow(/keep their type/);
   });
 
   it("deletes a row and unlinks it from the other side", async () => {
     const store = createMockCollectionsStore();
     const release = rowsOf(await store.query({ collection_id: RELEASES }))[0];
-    const detail = await store.getRow({ collection_id: RELEASES, row_id: release?.id ?? "" });
+    const detail = await store.getRow({
+      collection_id: RELEASES,
+      row_id: release?.id ?? "",
+    });
     const issues = detail.row.cells["issues"];
     const first = issues && "value" in issues ? issues.value : undefined;
     const id =
-      first?.type === "list" && first.value[0]?.type === "text" ? first.value[0].value : "";
+      first?.type === "list" && first.value[0]?.type === "text"
+        ? first.value[0].value
+        : "";
     expect(id).not.toBe("");
-    const written = await store.deleteRow({ collection_id: ISSUES, row_id: id });
+    const written = await store.deleteRow({
+      collection_id: ISSUES,
+      row_id: id,
+    });
     expect(written.changed.deleted).toEqual([{ collection: ISSUES, row: id }]);
-    expect(rowsOf(await store.query({ collection_id: ISSUES })).some((r) => r.id === id)).toBe(
-      false,
-    );
+    expect(
+      rowsOf(await store.query({ collection_id: ISSUES })).some(
+        (r) => r.id === id,
+      ),
+    ).toBe(false);
     const releases = await Promise.all(
       rowsOf(await store.query({ collection_id: RELEASES })).map((r) =>
         store.getRow({ collection_id: RELEASES, row_id: r.id }),
@@ -183,9 +235,18 @@ describe("the mock store's schema, CSV and embed operations", () => {
     const file = await store.exportCsv({ collection_id: ISSUES, view: "Open" });
     expect(file.fileName).toBe("Issues - Open.csv");
     expect(file.csv.split("\n")[0]).toMatch(/^Issue,Status/);
-    const csv = 'Issue,Estimate,Labels,Blocked,Mood\nNew one,3,"bug, docs",yes,happy\n';
-    const check = await store.importCsv({ collection_id: ISSUES, csv, dry_run: true });
-    expect(check).toMatchObject({ written: false, rows: 1, skippedColumns: ["Mood"] });
+    const csv =
+      'Issue,Estimate,Labels,Blocked,Mood\nNew one,3,"bug, docs",yes,happy\n';
+    const check = await store.importCsv({
+      collection_id: ISSUES,
+      csv,
+      dry_run: true,
+    });
+    expect(check).toMatchObject({
+      written: false,
+      rows: 1,
+      skippedColumns: ["Mood"],
+    });
     const before = await store.query({ collection_id: ISSUES });
     expect(before.total).toBe(8);
     const done = await store.importCsv({ collection_id: ISSUES, csv });
@@ -201,7 +262,9 @@ describe("the mock store's schema, CSV and embed operations", () => {
       title: "Hosts",
       csv: "Host,Cores,Since,Notes\nalpha,8,2026-01-02,fast\nbeta,4,2026-03-04,\n",
     });
-    expect(made.collection.path).toBe("drives/shared/Northstar/Hosts.collection");
+    expect(made.collection.path).toBe(
+      "drives/shared/Northstar/Hosts.collection",
+    );
     expect(made.collection.properties.map((p) => p.type)).toEqual([
       "title",
       "number",

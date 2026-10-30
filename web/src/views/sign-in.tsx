@@ -11,7 +11,9 @@ import { useT } from "../i18n/i18n";
 
 import { SecondStep } from "./second-step";
 
-/** What a failed request says, with the request ID to quote when reporting it. */
+/**
+ * What a failed request says, with the request ID to quote when reporting it.
+ */
 export function describeError(error: unknown, fallback: string): string {
   if (error instanceof ApiError) {
     return error.requestId === undefined
@@ -88,24 +90,27 @@ function Field({
 function useSubmit(fallback: string) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
-  const submit = (run: () => Promise<void>) => (event: { preventDefault(): void }) => {
-    event.preventDefault();
-    setBusy(true);
-    setError(undefined);
-    run().then(
-      () => {
-        setBusy(false);
-      },
-      (error_: unknown) => {
-        setBusy(false);
-        setError(describeError(error_, fallback));
-      },
-    );
-  };
+  const submit =
+    (run: () => Promise<void>) => (event: { preventDefault(): void }) => {
+      event.preventDefault();
+      setBusy(true);
+      setError(undefined);
+      run().then(
+        () => {
+          setBusy(false);
+        },
+        (error_: unknown) => {
+          setBusy(false);
+          setError(describeError(error_, fallback));
+        },
+      );
+    };
   return { busy, error, submit };
 }
 
-/** `/sign-in?next=…`: the server sends people here when they need to sign in. */
+/**
+ * `/sign-in?next=…`: the server sends people here when they need to sign in.
+ */
 export function SignInView() {
   const t = useT();
   const session = useSession();
@@ -130,7 +135,10 @@ export function SignInView() {
     try {
       await session.auth.signIn(email, password);
     } catch (error_) {
-      if (error_ instanceof SecondStepRequired && session.auth.steps !== undefined) {
+      if (
+        error_ instanceof SecondStepRequired &&
+        session.auth.steps !== undefined
+      ) {
         setPassword("");
         setStep(error_);
         return;
@@ -143,8 +151,16 @@ export function SignInView() {
   if (step !== undefined && session.auth.steps !== undefined) {
     return (
       <AuthCard
-        title={step.step === "verify" ? t("second-step-title") : t("second-step-enrol-title")}
-        intro={step.step === "verify" ? t("second-step-intro") : t("second-step-enrol-intro")}
+        title={
+          step.step === "verify"
+            ? t("second-step-title")
+            : t("second-step-enrol-title")
+        }
+        intro={
+          step.step === "verify"
+            ? t("second-step-intro")
+            : t("second-step-enrol-intro")
+        }
       >
         <SecondStep
           step={step}

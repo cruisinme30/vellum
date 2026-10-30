@@ -40,16 +40,27 @@ export default defineConfig(
       "import-x/resolver-next": [createTypeScriptImportResolver()],
     },
     rules: {
-      "max-lines": ["error", { max: 400, skipBlankLines: true, skipComments: true }],
+      // 400 lines at 100 columns; the same code at 80 columns takes about
+      // a quarter more lines (ADR 0074).
+      "max-lines": [
+        "error",
+        { max: 500, skipBlankLines: true, skipComments: true },
+      ],
       complexity: ["error", 12],
       "import-x/no-default-export": "error",
-      "import-x/order": ["error", { "newlines-between": "always", alphabetize: { order: "asc" } }],
+      "import-x/order": [
+        "error",
+        { "newlines-between": "always", alphabetize: { order: "asc" } },
+      ],
       "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/no-non-null-assertion": "error",
       "no-restricted-syntax": [
         "error",
         { selector: "TSAnyKeyword", message: "Use unknown and narrow it." },
-        { selector: "TSNonNullExpression", message: "Handle the missing case instead of `!`." },
+        {
+          selector: "TSNonNullExpression",
+          message: "Handle the missing case instead of `!`.",
+        },
       ],
     },
   },

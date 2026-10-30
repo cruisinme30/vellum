@@ -28,7 +28,11 @@ pub struct HeaderAuthorizer;
 
 #[async_trait]
 impl Authorizer for HeaderAuthorizer {
-    async fn authorize(&self, request: &Parts, _room: RoomKey) -> Result<(UserId, Access)> {
+    async fn authorize(
+        &self,
+        request: &Parts,
+        _room: RoomKey,
+    ) -> Result<(UserId, Access)> {
         let header = request
             .headers
             .get("authorization")
@@ -36,7 +40,9 @@ impl Authorizer for HeaderAuthorizer {
         match header {
             Some("Bearer writer") => Ok((UserId::generate(), Access::Write)),
             Some("Bearer reader") => Ok((UserId::generate(), Access::Read)),
-            Some(_) => Err(Error::new(ErrorKind::PermissionDenied, "no access")),
+            Some(_) => {
+                Err(Error::new(ErrorKind::PermissionDenied, "no access"))
+            }
             None => Err(Error::new(ErrorKind::Unauthenticated, "sign in")),
         }
     }
@@ -57,14 +63,17 @@ impl WsEditor {
         token: &str,
     ) -> std::result::Result<Self, WsError> {
         let url = format!(
-            "ws://{addr}/collab/{}/{}?traceparent=00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+            "ws://{addr}/collab/{}/{}?traceparent=00-4bf92f3577b34da6a3ce929d0e\
+                0e4736-00f067aa0ba902b7-01",
             key.space, key.doc
         );
         let mut request = url.into_client_request()?;
-        let _previous = request
-            .headers_mut()
-            .insert("authorization", format!("Bearer {token}").parse().unwrap());
-        let (socket, _response) = tokio_tungstenite::connect_async(request).await?;
+        let _previous = request.headers_mut().insert(
+            "authorization",
+            format!("Bearer {token}").parse().unwrap(),
+        );
+        let (socket, _response) =
+            tokio_tungstenite::connect_async(request).await?;
         let mut editor = Self {
             socket,
             doc: tree::new_doc(),
@@ -93,10 +102,14 @@ impl WsEditor {
     }
 
     /// Reads frames until `until` holds; returns whether an update arrived.
-    pub async fn read_until(&mut self, mut until: impl FnMut(&Self) -> bool) -> bool {
+    pub async fn read_until(
+        &mut self,
+        mut until: impl FnMut(&Self) -> bool,
+    ) -> bool {
         let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
         while !until(self) {
-            let Ok(Some(Ok(message))) = tokio::time::timeout_at(deadline, self.socket.next()).await
+            let Ok(Some(Ok(message))) =
+                tokio::time::timeout_at(deadline, self.socket.next()).await
             else {
                 return false;
             };
@@ -106,11 +119,16 @@ impl WsEditor {
             for message in protocol::decode(&frame).unwrap() {
                 match message {
                     Message::Sync(SyncMessage::SyncStep1(sv)) => {
-                        let update = self.doc.transact().encode_state_as_update_v1(&sv);
-                        self.send(&[Message::Sync(SyncMessage::SyncStep2(update))])
-                            .await;
+                        let update =
+                            self.doc.transact().encode_state_as_update_v1(&sv);
+                        self.send(&[Message::Sync(SyncMessage::SyncStep2(
+                            update,
+                        ))])
+                        .await;
                     }
-                    Message::Sync(SyncMessage::SyncStep2(u) | SyncMessage::Update(u)) => {
+                    Message::Sync(
+                        SyncMessage::SyncStep2(u) | SyncMessage::Update(u),
+                    ) => {
                         let update = protocol::decode_update(&u).unwrap();
                         self.doc.transact_mut().apply_update(update).unwrap();
                     }

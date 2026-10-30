@@ -36,11 +36,13 @@ async fn admin_token(identity: &Identity, signed_in_ago: Duration) -> String {
         code_challenge_method: Some("S256".into()),
         ..AuthorizeRequest::default()
     };
-    let Authorize::Consent(view) = identity.authorize(user, &request).await else {
+    let Authorize::Consent(view) = identity.authorize(user, &request).await
+    else {
         panic!("expected a consent screen");
     };
     let ago = i64::try_from(signed_in_ago.as_millis()).unwrap();
-    let signed_in = Timestamp::from_unix_ms(Timestamp::now().unix_ms() - ago).unwrap();
+    let signed_in =
+        Timestamp::from_unix_ms(Timestamp::now().unix_ms() - ago).unwrap();
     let back = identity
         .decide(user, Some(signed_in), &view.consent_id, true)
         .unwrap();

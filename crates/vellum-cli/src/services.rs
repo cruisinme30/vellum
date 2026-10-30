@@ -18,7 +18,8 @@ use vellum_api::config::GatewayConfig;
 use vellum_api::gateway::{Gateway, GatewayBuilder};
 use vellum_contracts::Service;
 use vellum_identity::{
-    Identity, IdentityConfig, IdentityService, Sso, SsoConfig, Store, http as identity_http,
+    Identity, IdentityConfig, IdentityService, Sso, SsoConfig, Store,
+    http as identity_http,
 };
 use vellum_kernel::{Config, Error, ErrorKind};
 use vellum_notify::endpoint::{self, SafeTransport};
@@ -156,13 +157,16 @@ impl Services {
         let mut config = IdentityConfig::new(url.clone());
         config.data_dir = data_dir.map(Path::to_path_buf);
         let shared = store.is_shared();
-        let mut identity =
-            Identity::new(config, store).with_metadata_fetcher(Arc::new(GuardedFetcher::new()?));
-        if let Some(key) = identity_key(data_dir, shared, |k| std::env::var(k).ok())? {
+        let mut identity = Identity::new(config, store)
+            .with_metadata_fetcher(Arc::new(GuardedFetcher::new()?));
+        if let Some(key) =
+            identity_key(data_dir, shared, |k| std::env::var(k).ok())?
+        {
             identity = identity.with_sealing_key(&key)?;
         }
         identity = identity.with_sso_http(Arc::new(|issuer: &Url| {
-            let http: Arc<dyn vellum_identity::SsoHttp> = Arc::new(GuardedSsoHttp::new(issuer)?);
+            let http: Arc<dyn vellum_identity::SsoHttp> =
+                Arc::new(GuardedSsoHttp::new(issuer)?);
             Ok(http)
         }));
         if let Some(sso) = sso {
@@ -178,12 +182,13 @@ impl Services {
             Some(dir) => HookStore::open(dir, endpoint::policy(&[]))?,
             None => HookStore::memory(endpoint::policy(&[])),
         };
-        let transport = SafeTransport::new(endpoint::policy(&[])).map_err(|e| {
-            Error::new(
-                ErrorKind::Internal,
-                format!("cannot build the webhook client: {e}"),
-            )
-        })?;
+        let transport =
+            SafeTransport::new(endpoint::policy(&[])).map_err(|e| {
+                Error::new(
+                    ErrorKind::Internal,
+                    format!("cannot build the webhook client: {e}"),
+                )
+            })?;
         Ok(Self {
             identity: Arc::new(identity),
             notify: Arc::new(NotifyService::new(Arc::new(notify))),
@@ -237,7 +242,8 @@ impl Services {
             identity: Arc::clone(&self.identity),
             drive: self.drive_index.clone(),
         });
-        let (service, _) = observability::open(config, &observability, var).await?;
+        let (service, _) =
+            observability::open(config, &observability, var).await?;
         let (sampler, facts) = observability::counted(config, counts);
         observability::spawn_sampling(sampler);
         self.audit.attach(service.audit_log());
@@ -258,7 +264,10 @@ impl Services {
     /// # Errors
     ///
     /// A malformed `VELLUM_AI_ENDPOINTS`.
-    pub fn with_assist(mut self, var: impl Fn(&str) -> Option<String>) -> Result<Self, Error> {
+    pub fn with_assist(
+        mut self,
+        var: impl Fn(&str) -> Option<String>,
+    ) -> Result<Self, Error> {
         if let Some(workspace) = &self.mcp_workspace {
             self.assist = crate::assist::service(Arc::clone(workspace), var)?;
         }
@@ -297,8 +306,11 @@ impl Services {
         self.search = opened.search;
         if let Some((workspace, events)) = opened.mcp {
             let shared = self.rate_counts.as_ref().map(|counts| {
-                let per_minute = vellum_mcp::ratelimit::RateLimit::default().per_minute;
-                let limit = Arc::new(crate::limits::ClusterLimit::new(u64::from(per_minute)));
+                let per_minute =
+                    vellum_mcp::ratelimit::RateLimit::default().per_minute;
+                let limit = Arc::new(crate::limits::ClusterLimit::new(
+                    u64::from(per_minute),
+                ));
                 limit.spawn_sync(counts.clone());
                 limit as Arc<dyn vellum_mcp::ratelimit::SharedLimit>
             });
@@ -344,7 +356,9 @@ impl Services {
     }
 
     /// Share links on the public origin, when an index is configured.
-    pub fn public_site(&self) -> Option<Arc<dyn vellum_api::public::PublicSite>> {
+    pub fn public_site(
+        &self,
+    ) -> Option<Arc<dyn vellum_api::public::PublicSite>> {
         self.public.clone()
     }
 
@@ -353,10 +367,15 @@ impl Services {
     /// workspace index they answer 503.
     pub fn transfer(&self) -> (axum::Router, axum::Router) {
         let Some(drive) = &self.drive else {
-            return (exports::unavailable_router(), exports::unavailable_router());
+            return (
+                exports::unavailable_router(),
+                exports::unavailable_router(),
+            );
         };
         let figures = crate::page_render::PageRenderService::figures_from_env()
-            .inspect_err(|e| tracing::warn!(error = %e, "exports draw no figures"))
+            .inspect_err(
+                |e| tracing::warn!(error = %e, "exports draw no figures"),
+            )
             .ok()
             .map(Arc::new);
         let transfer = Arc::new(exports::Transfer::new(
@@ -376,16 +395,17 @@ impl Services {
     /// The issue import route, mounted at [`issue_import::PREFIX`] by
     /// [`Self::mount`]. Without a workspace index it answers 503.
     pub fn issue_import(&self) -> axum::Router {
-        self.work
-            .as_ref()
-            .map_or_else(issue_import::unavailable_router, |work| {
+        self.work.as_ref().map_or_else(
+            issue_import::unavailable_router,
+            |work| {
                 issue_import::router(
                     Arc::clone(work),
                     Arc::clone(&self.identity),
                     self.scanner.clone(),
                     UploadPolicy::default(),
                 )
-            })
+            },
+        )
     }
 
     /// Rate-limit counts shared with the other replicas, when an index is
@@ -410,7 +430,9 @@ impl Services {
         let figures = crate::page_render::PageRenderService::figures_from_env()
             .map_err(|e| e.to_string())
             .or_else(|_| {
-                vellum_render::figure::Figures::new(vellum_render::figure::FigureConfig::default())
+                vellum_render::figure::Figures::new(
+                    vellum_render::figure::FigureConfig::default(),
+                )
             });
         let figures = match figures {
             Ok(figures) => Some(figures),
@@ -429,7 +451,9 @@ impl Services {
             Some(workspace) => crate::site_http::markdown_pages(
                 web_app,
                 Arc::clone(workspace),
-                Arc::new(IdentityAuthenticator::new(Arc::clone(&self.identity))),
+                Arc::new(IdentityAuthenticator::new(Arc::clone(
+                    &self.identity,
+                ))),
             ),
             None => web_app,
         }
@@ -474,7 +498,9 @@ impl Services {
         if let Some(log) = &self.admin_audit {
             all = all
                 .into_iter()
-                .map(|service| vellum_admin::audited::audited(service, Arc::clone(log)))
+                .map(|service| {
+                    vellum_admin::audited::audited(service, Arc::clone(log))
+                })
                 .collect();
         }
         all.extend(self.admin.iter().cloned());
@@ -500,10 +526,14 @@ impl Services {
             builder = builder.mount_cross_site("/hooks", hooks.clone());
         }
         if let Some(books) = &self.books {
-            builder = builder.mount("/published", crate::published::router(Arc::clone(books)));
+            builder = builder.mount(
+                "/published",
+                crate::published::router(Arc::clone(books)),
+            );
         }
         if let Some(tasks) = &self.tasks {
-            for (prefix, router) in crate::tasks_http::routers(tasks, identity) {
+            for (prefix, router) in crate::tasks_http::routers(tasks, identity)
+            {
                 builder = builder.mount_cross_site(prefix, router);
             }
         }
@@ -512,12 +542,16 @@ impl Services {
             "/unsubscribe",
             crate::mail::router(Arc::clone(self.notify.store())),
         );
-        let mut well_known = identity_http::well_known_router(Arc::clone(identity));
+        let mut well_known =
+            identity_http::well_known_router(Arc::clone(identity));
         if let Some(mcp) = &self.mcp {
             // Bearer tokens only, from clients on other origins: no CSRF.
-            builder = builder
-                .mount_cross_site("/mcp", vellum_mcp::http::endpoint_router(Arc::clone(mcp)));
-            well_known = well_known.merge(vellum_mcp::http::metadata_router(Arc::clone(mcp)));
+            builder = builder.mount_cross_site(
+                "/mcp",
+                vellum_mcp::http::endpoint_router(Arc::clone(mcp)),
+            );
+            well_known = well_known
+                .merge(vellum_mcp::http::metadata_router(Arc::clone(mcp)));
         }
         if let Some(workspace) = &self.mcp_workspace {
             // `llms.txt` and the Markdown sitemap (R-AI-6, D295).
@@ -527,14 +561,25 @@ impl Services {
         }
         builder
             .route_metrics(self.observability.metrics.clone())
-            .authenticator(Arc::new(IdentityAuthenticator::new(Arc::clone(identity))))
+            .authenticator(Arc::new(IdentityAuthenticator::new(Arc::clone(
+                identity,
+            ))))
             .mount("/auth", identity_http::browser_router(Arc::clone(identity)))
-            .mount_cross_site("/oauth", identity_http::oauth_router(Arc::clone(identity)))
-            .mount_cross_site("/saml", identity_http::saml_router(Arc::clone(identity)))
+            .mount_cross_site(
+                "/oauth",
+                identity_http::oauth_router(Arc::clone(identity)),
+            )
+            .mount_cross_site(
+                "/saml",
+                identity_http::saml_router(Arc::clone(identity)),
+            )
             // Providers provision with their own bearer token (D294).
             .mount_cross_site(
                 vellum_identity::scim::SCIM_PREFIX,
-                vellum_identity::scim::router(Arc::clone(identity), self.group_members.clone()),
+                vellum_identity::scim::router(
+                    Arc::clone(identity),
+                    self.group_members.clone(),
+                ),
             )
             .mount_cross_site("/.well-known", well_known)
             .mount("/collab", self.collab())
@@ -626,16 +671,18 @@ pub fn identity_key(
     };
     if shared {
         tracing::warn!(
-            "VELLUM_IDENTITY_KEY is not set: each replica makes its own identity key, so \
-             authenticator codes fail on replicas other than the one that set them up; \
-             set it from a shared secret"
+            "VELLUM_IDENTITY_KEY is not set: each replica makes its own \
+             identity key, so authenticator codes fail on replicas other than \
+             the one that set them up; set it from a shared secret"
         );
     }
     let bytes = crate::keys::key_file(dir, "identity.key")?;
     let key: [u8; 32] = bytes
         .get(..32)
         .and_then(|b| b.try_into().ok())
-        .ok_or_else(|| Error::new(ErrorKind::Internal, "the identity key is too short"))?;
+        .ok_or_else(|| {
+            Error::new(ErrorKind::Internal, "the identity key is too short")
+        })?;
     Ok(Some(key))
 }
 
@@ -643,14 +690,17 @@ pub fn identity_key(
 /// permissions and an empty scratch folder that is removed afterwards.
 pub fn contract_gateway() -> Result<Gateway, Error> {
     let mut services = Services::open("http://localhost", None, None)?;
-    let scratch = std::env::temp_dir().join(format!("vellum-contracts-{}", std::process::id()));
+    let scratch = std::env::temp_dir()
+        .join(format!("vellum-contracts-{}", std::process::id()));
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .map_err(|e| {
-            Error::new(ErrorKind::Internal, "cannot start the async runtime").with_source(e)
+            Error::new(ErrorKind::Internal, "cannot start the async runtime")
+                .with_source(e)
         })?;
-    let described = runtime.block_on(workspace::describe(&scratch, &services.identity));
+    let described =
+        runtime.block_on(workspace::describe(&scratch, &services.identity));
     let admin = observability::describe(&scratch);
     let _ = std::fs::remove_dir_all(&scratch);
     services.workspace = described?;

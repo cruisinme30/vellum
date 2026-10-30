@@ -12,16 +12,21 @@ use std::time::{Duration, Instant};
 use async_trait::async_trait;
 use bytes::Bytes;
 use serde_json::json;
+use vellum_collections::service::api::CollectionList;
 use vellum_collections::service::{
-    Access, AddPropertyInput, ChartInput, CollectionsService, CreateFromCsvInput, CreateRowInput,
-    ExportCsvInput, ImportCsvInput, IndexFeed, Need, PropertyKey, QueryInput, RowKey,
-    SaveViewInput, UpdatePropertyInput, UpdateRowInput, ViewKey,
+    Access, AddPropertyInput, ChartInput, CollectionsService,
+    CreateFromCsvInput, CreateRowInput, ExportCsvInput, ImportCsvInput,
+    IndexFeed, Need, PropertyKey, QueryInput, RowKey, SaveViewInput,
+    UpdatePropertyInput, UpdateRowInput, ViewKey,
 };
 use vellum_collections::{DateValue, Value, ViewKind, view};
 use vellum_contracts::{
-    CredentialKind, Principal, Readiness, RequestContext, Scope, ScopeSet, Service,
+    CredentialKind, Principal, Readiness, RequestContext, Scope, ScopeSet,
+    Service,
 };
-use vellum_kernel::{CollectionId, DocId, Error, ErrorKind, RequestId, Timestamp, UserId};
+use vellum_kernel::{
+    CollectionId, DocId, Error, ErrorKind, RequestId, Timestamp, UserId,
+};
 use vellum_store::{BlobPath, BlobStore, LocalStore, Precondition};
 
 const REQS: &str = "01JBQ8Y4ZK6V3W2N5R7T9X1C30";
@@ -132,21 +137,33 @@ fn seed(root: &Path) {
         root,
         &format!("{REQS_DIR}/schema.yaml"),
         &format!(
-            "id: {REQS}\ntitle: Requirements\nproperties:\n  - {{key: t, name: Requirement, type: title}}\n  - {{key: est, name: Estimate, type: number}}\n  - {{key: dn, name: Done, type: checkbox}}\n  - {{key: rel, name: Release, type: relation, to: {RELS}, back: rq}}\n  - {{key: left, name: Remaining, type: formula, f: 'if(Done, 0, Estimate)'}}\nviews:\n  - {{name: All, type: table, sort: est desc}}\n  - {{name: Open, type: list, filter: Done is false}}\n"
+            "id: {REQS}\ntitle: Requirements\n\
+                properties:\n  - {{key: t, name: Requirement, type: title}}\n  \
+                - {{key: est, name: Estimate, type: number}}\n  - {{key: dn, \
+                name: Done, type: checkbox}}\n  - {{key: rel, name: Release, \
+                type: relation, to: {RELS}, back: rq}}\n  - {{key: left, name: \
+                Remaining, type: formula, f: 'if(Done, 0, Estimate)'}}\n\
+                views:\n  - {{name: All, type: table, sort: est desc}}\n  - \
+                {{name: Open, type: list, filter: Done is false}}\n"
         ),
     );
     write(
         root,
         &format!("{RELS_DIR}/schema.yaml"),
         &format!(
-            "id: {RELS}\ntitle: Releases\nproperties:\n  - {{key: t, name: Release, type: title}}\n  - {{key: rq, name: Requirements, type: relation, to: {REQS}, back: rel}}\n  - {{key: pts, name: Points, type: rollup, via: rq, prop: est, agg: sum}}\n"
+            "id: {RELS}\ntitle: Releases\n\
+                properties:\n  - {{key: t, name: Release, type: title}}\n  - \
+                {{key: rq, name: Requirements, type: relation, to: {REQS}, \
+                back: rel}}\n  - {{key: pts, name: Points, type: rollup, via: \
+                rq, prop: est, agg: sum}}\n"
         ),
     );
     write(
         root,
         &format!("{REQS_DIR}/rows/replay.md"),
         &format!(
-            "---\nid: {R1}\nt: Replay 7 days\nest: 8\ndn: true\nrel: [{V10}]\n---\nReplay notes.\n"
+            "---\nid: {R1}\nt: Replay 7 days\nest: 8\ndn: true\nrel: [{V10}]\n\
+                ---\nReplay notes.\n"
         ),
     );
     write(
@@ -163,7 +180,8 @@ fn seed(root: &Path) {
         root,
         &format!("{SECRET_DIR}/schema.yaml"),
         &format!(
-            "id: {SECRET}\ntitle: Salaries\nproperties:\n  - {{key: t, name: Name, type: title}}\n"
+            "id: {SECRET}\ntitle: Salaries\n\
+                properties:\n  - {{key: t, name: Name, type: title}}\n"
         ),
     );
     // Not collections: ignored.
@@ -218,14 +236,16 @@ async fn lists_and_describes_only_what_the_caller_can_read() {
     f.grants.grant(ana, REQS, Need::Read);
     f.grants.grant(ana, RELS, Need::Read);
     let list = f.service.list(&c).await.unwrap();
-    let titles: Vec<&str> = list.collections.iter().map(|s| s.title.as_str()).collect();
+    let titles: Vec<&str> =
+        list.collections.iter().map(|s| s.title.as_str()).collect();
     assert_eq!(titles, ["Releases", "Requirements"]);
     assert_eq!(list.collections[1].rows, 2);
     assert_eq!(list.collections[1].views, ["All", "Open"]);
     assert_eq!(list.collections[1].path, REQS_DIR);
 
     let info = f.service.get(&c, REQS.parse().unwrap()).await.unwrap();
-    let keys: Vec<&str> = info.properties.iter().map(|p| p.key.as_str()).collect();
+    let keys: Vec<&str> =
+        info.properties.iter().map(|p| p.key.as_str()).collect();
     assert_eq!(keys, ["t", "est", "dn", "rel", "left"]);
     assert!(info.properties[4].computed);
     assert_eq!(
@@ -405,7 +425,10 @@ async fn writes_rows_mirrors_links_and_trashes() {
             &c,
             CreateRowInput {
                 collection_id: reqs,
-                values: BTreeMap::from([("t".to_owned(), Value::Text("Audit log".into()))]),
+                values: BTreeMap::from([(
+                    "t".to_owned(),
+                    Value::Text("Audit log".into()),
+                )]),
                 body: String::new(),
             },
         )
@@ -498,7 +521,10 @@ async fn bad_edits_are_rejected_before_anything_is_written() {
             UpdateRowInput {
                 collection_id: reqs,
                 row_id: R2.parse().unwrap(),
-                values: BTreeMap::from([("left".to_owned(), Value::Number(1.0))]),
+                values: BTreeMap::from([(
+                    "left".to_owned(),
+                    Value::Number(1.0),
+                )]),
                 body: None,
             },
         )
@@ -670,7 +696,8 @@ async fn operations_are_valid_and_callable() {
     f.grants.grant(ana, RELS, Need::Edit);
     assert_eq!(f.service.name(), "collections");
     let ops = f.service.clone().operations();
-    let ids: Vec<&str> = ops.iter().map(vellum_contracts::Operation::id).collect();
+    let ids: Vec<&str> =
+        ops.iter().map(vellum_contracts::Operation::id).collect();
     assert_eq!(
         ids,
         [
@@ -720,7 +747,10 @@ async fn operations_are_valid_and_callable() {
     let created = by_id("collections.create_row")
         .call(
             ctx(ana),
-            json!({"collection_id": REQS, "values": {"Requirement": {"type": "text", "value": "Exports"}}}),
+            json!({
+                "collection_id": REQS,
+                "values": {"Requirement": {"type": "text", "value": "Exports"}}
+            }),
         )
         .await
         .unwrap();
@@ -728,7 +758,11 @@ async fn operations_are_valid_and_callable() {
     let _ = by_id("collections.update_row")
         .call(
             ctx(ana),
-            json!({"collection_id": REQS, "row_id": new_id, "values": {"est": {"type": "number", "value": 2}}}),
+            json!({
+                "collection_id": REQS,
+                "row_id": new_id,
+                "values": {"est": {"type": "number", "value": 2}}
+            }),
         )
         .await
         .unwrap();
@@ -750,7 +784,8 @@ async fn resolves_embedded_views_live() {
     f.grants.grant(ana, REQS, Need::Edit);
     f.grants.grant(ana, RELS, Need::Edit);
     let c = ctx(ana);
-    let fence = format!("id: {REQS}\nview: Open\ntype: board\nsort: Estimate desc\n");
+    let fence =
+        format!("id: {REQS}\nview: Open\ntype: board\nsort: Estimate desc\n");
     let embed = f.service.resolve_embed(&c.principal, &fence).await.unwrap();
     assert_eq!(embed.title, "Requirements");
     assert_eq!(embed.path, REQS_DIR);
@@ -1005,9 +1040,10 @@ async fn adds_changes_and_removes_properties() {
 
     // A select gets a key from its name and lands at the end.
     let mut status = add("Status", "select");
-    status.options =
-        serde_json::from_value(json!([{"name": "Draft"}, {"name": "Live", "color": "green"}]))
-            .unwrap();
+    status.options = serde_json::from_value(
+        json!([{"name": "Draft"}, {"name": "Live", "color": "green"}]),
+    )
+    .unwrap();
     let info = f.service.add_property(&c, status).await.unwrap();
     let last = info.properties.last().unwrap();
     assert_eq!(
@@ -1042,7 +1078,8 @@ async fn adds_changes_and_removes_properties() {
         ErrorKind::InvalidInput
     );
 
-    // A formula and a rollup (its relation named, not keyed) are checked as on load.
+    // A formula and a rollup (its relation named, not keyed) are checked as on
+    // load.
     let mut twice = add("Twice", "formula");
     twice.formula = Some("Estimate * 2".into());
     let info = f.service.add_property(&c, twice).await.unwrap();
@@ -1054,9 +1091,12 @@ async fn adds_changes_and_removes_properties() {
     let mut rename = change("status");
     rename.name = Some("Stage".into());
     rename.options = Some(
-        serde_json::from_value(
-            json!([{"name": "Draft"}, {"name": "Live"}, {"name": "Live"}, {"name": " "}]),
-        )
+        serde_json::from_value(json!([
+            {"name": "Draft"},
+            {"name": "Live"},
+            {"name": "Live"},
+            {"name": " "}
+        ]))
         .unwrap(),
     );
     let info = f.service.update_property(&c, rename).await.unwrap();
@@ -1135,7 +1175,10 @@ async fn removing_a_property_cleans_up_views() {
 }
 
 #[cfg(test)]
-fn cell(row: &vellum_collections::service::RowDetail, key: &str) -> serde_json::Value {
+fn cell(
+    row: &vellum_collections::service::RowDetail,
+    key: &str,
+) -> serde_json::Value {
     serde_json::to_value(row).unwrap()["row"]["cells"][key].clone()
 }
 
@@ -1173,7 +1216,8 @@ async fn relations_and_rollups_are_added_and_removed_on_both_sides() {
     blocks.to = Some(REQS.parse().unwrap());
     blocks.back_name = Some("Blocked by".into());
     let info = f.service.add_property(&c, blocks).await.unwrap();
-    let names: Vec<&str> = info.properties.iter().map(|p| p.name.as_str()).collect();
+    let names: Vec<&str> =
+        info.properties.iter().map(|p| p.name.as_str()).collect();
     assert!(names.ends_with(&["Blocks", "Blocked by"]), "{names:?}");
 
     // Removing a relation waits for its rollup, then takes the pair along.
@@ -1262,7 +1306,8 @@ async fn types_change_without_losing_values_and_renames_rewrite_formulas() {
     // A number can become a select: its values read as the option text.
     let mut to_select = change("est");
     to_select.kind = Some("select".into());
-    to_select.options = Some(serde_json::from_value(json!([{"name": "8"}])).unwrap());
+    to_select.options =
+        Some(serde_json::from_value(json!([{"name": "8"}])).unwrap());
     let _ = f.service.update_property(&c, to_select).await.unwrap();
     let row = f.service.get_row(&c, row_key()).await.unwrap();
     assert_eq!(
@@ -1299,7 +1344,8 @@ async fn a_schema_changed_on_disk_is_not_overwritten() {
     let c = ctx(ana);
     let _ = f.service.list(&c).await.unwrap();
     let schema_path = format!("{REQS_DIR}/schema.yaml");
-    let edited = read(&f.root, &schema_path).replace("title: Requirements", "title: Reqs");
+    let edited = read(&f.root, &schema_path)
+        .replace("title: Requirements", "title: Reqs");
     write(&f.root, &schema_path, &edited);
     assert_eq!(
         kind(f.service.save_view(&c, board("Board")).await),
@@ -1384,7 +1430,8 @@ async fn imports_csv_rows_into_a_collection() {
     f.grants.grant(ana, RELS, Need::Edit);
     let c = ctx(ana);
     let reqs: CollectionId = REQS.parse().unwrap();
-    let text = "Requirement,Estimate,Release,Colour\nSSO,13,v1.0,red\nAudit log,abc,,blue\n";
+    let text = "Requirement,Estimate,Release,Colour\nSSO,13,v1.0,red\n\
+        Audit log,abc,,blue\n";
     let input = |dry_run| ImportCsvInput {
         collection_id: reqs,
         csv: text.into(),
@@ -1434,14 +1481,13 @@ async fn creates_a_collection_from_csv() {
     let ana = UserId::generate();
     let c = ctx(ana);
     let folder = "drives/shared/Northstar";
-    let input = |dry_run| {
-        CreateFromCsvInput {
+    let input = |dry_run| CreateFromCsvInput {
         folder: folder.into(),
         title: "Vendors".into(),
-        csv: "Name,Annual cost,Renewal,Active\nAcme,1200,2026-12-01,true\nGlobex,800,2027-03-15,false\n"
+        csv: "Name,Annual cost,Renewal,Active\nAcme,1200,2026-12-01,true\n\
+            Globex,800,2027-03-15,false\n"
             .into(),
         dry_run,
-    }
     };
     assert_eq!(
         kind(f.service.create_from_csv(&c, input(false)).await),
@@ -1465,7 +1511,9 @@ async fn creates_a_collection_from_csv() {
     let made = f.service.create_from_csv(&c, input(false)).await.unwrap();
     assert!(made.written);
     assert_eq!(made.rows, 2);
-    assert!(read(&f.root, &format!("{dir}/schema.yaml")).contains("title: Vendors"));
+    assert!(
+        read(&f.root, &format!("{dir}/schema.yaml")).contains("title: Vendors")
+    );
     assert!(read(&f.root, &format!("{dir}/rows/acme.md")).contains("Acme"));
     let id = made.collection.id;
     f.grants.grant(ana, &id.to_string(), Need::Edit);
@@ -1559,14 +1607,18 @@ async fn feeds_search_rows_with_computed_values() {
         ]
     );
 
-    // Editing a requirement re-indexes it and the release whose rollup reads it.
+    // Editing a requirement re-indexes it and the release whose rollup reads
+    // it.
     let _ = service
         .update_row(
             &ctx(ana),
             UpdateRowInput {
                 collection_id: reqs,
                 row_id: R1.parse().unwrap(),
-                values: BTreeMap::from([("est".to_owned(), Value::Number(13.0))]),
+                values: BTreeMap::from([(
+                    "est".to_owned(),
+                    Value::Number(13.0),
+                )]),
                 body: None,
             },
         )
@@ -1656,7 +1708,8 @@ async fn an_import_does_not_overwrite_a_write_that_lands_meanwhile() {
         grants: f.grants.clone(),
         hook: Mutex::new(None),
     });
-    let service = Arc::new(CollectionsService::new(f.store.clone(), access.clone()));
+    let service =
+        Arc::new(CollectionsService::new(f.store.clone(), access.clone()));
     let ana = UserId::generate();
     f.grants.grant(ana, REQS, Need::Edit);
     f.grants.grant(ana, RELS, Need::Edit);
@@ -1675,7 +1728,10 @@ async fn an_import_does_not_overwrite_a_write_that_lands_meanwhile() {
                     UpdateRowInput {
                         collection_id: reqs,
                         row_id: R2.parse().unwrap(),
-                        values: BTreeMap::from([("est".to_owned(), Value::Number(21.0))]),
+                        values: BTreeMap::from([(
+                            "est".to_owned(),
+                            Value::Number(21.0),
+                        )]),
                         body: None,
                     },
                 )
@@ -1719,13 +1775,15 @@ async fn an_import_does_not_overwrite_a_write_that_lands_meanwhile() {
 #[tokio::test]
 async fn refresh_reloads_the_folders_another_replica_changed() {
     let f = fixture().await;
-    let other = Arc::new(CollectionsService::new(f.store.clone(), f.grants.clone()));
+    let other =
+        Arc::new(CollectionsService::new(f.store.clone(), f.grants.clone()));
     let ana = UserId::generate();
     for id in [REQS, RELS, SECRET] {
         f.grants.grant(ana, id, Need::Read);
     }
     let c = ctx(ana);
-    let summary = |list: vellum_collections::service::api::CollectionList| -> Vec<(String, usize)> {
+    type Summary = Vec<(String, usize)>;
+    let summary = |list: CollectionList| -> Summary {
         list.collections
             .into_iter()
             .map(|s| (s.title, s.rows))
@@ -1775,13 +1833,21 @@ struct NoSecrets(Mutex<Vec<String>>);
 
 #[async_trait]
 impl vellum_collections::service::RowCheck for NoSecrets {
-    async fn check(&self, _: &Principal, path: &BlobPath, text: &str) -> Result<(), Error> {
+    async fn check(
+        &self,
+        _: &Principal,
+        path: &BlobPath,
+        text: &str,
+    ) -> Result<(), Error> {
         self.0
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .push(path.as_str().to_owned());
         if text.contains("SECRET") {
-            return Err(Error::new(ErrorKind::InvalidInput, "secrets found: test"));
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "secrets found: test",
+            ));
         }
         Ok(())
     }
@@ -1842,7 +1908,10 @@ async fn the_row_check_sees_every_row_write_and_a_refusal_writes_nothing() {
         .unwrap()
         .count();
     assert_eq!(rows_before, rows_after, "a refused write left a file");
-    assert!(read(&f.root, &format!("{REQS_DIR}/rows/replay.md")).contains("Replay notes."));
+    assert!(
+        read(&f.root, &format!("{REQS_DIR}/rows/replay.md"))
+            .contains("Replay notes.")
+    );
     // The refused edits were dropped from memory too.
     let row = service
         .index_row(R1.parse().unwrap())

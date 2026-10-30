@@ -46,7 +46,8 @@ impl Writer<'_> {
         match view {
             Some(view) => self.issue_view(&view),
             None => self.out.push_str(
-                "<p class=\"vl-live-placeholder\">A live view of issues; it fills in when the page opens.</p>",
+                "<p class=\"vl-live-placeholder\">A live view of issues; it \
+                    fills in when the page opens.</p>",
             ),
         }
         self.out.push_str("</section>");
@@ -60,8 +61,9 @@ impl Writer<'_> {
         }
         let total: usize = view.groups.iter().map(|g| g.issues.len()).sum();
         if total == 0 && view.layout == IssueLayout::List {
-            self.out
-                .push_str("<p class=\"vl-issues-empty\">No issues match this view.</p>");
+            self.out.push_str(
+                "<p class=\"vl-issues-empty\">No issues match this view.</p>",
+            );
         } else if view.layout == IssueLayout::Board {
             self.out.push_str("<div class=\"vl-issues-board\">");
             for g in &view.groups {

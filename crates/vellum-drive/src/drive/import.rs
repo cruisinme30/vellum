@@ -69,7 +69,12 @@ impl Drive {
     /// # Errors
     /// `PermissionDenied` without edit rights on the parent, `Invalid` for
     /// a bad path or too many files, `QuotaExceeded`.
-    #[tracing::instrument(name = "drive.import", skip_all, fields(space = %space, files = files.len()), err)]
+    #[tracing::instrument(
+        name = "drive.import",
+        skip_all,
+        fields(space = %space, files = files.len()),
+        err
+    )]
     pub async fn import(
         &self,
         actor: &Actor,
@@ -101,7 +106,8 @@ impl Drive {
             let dir = self.dir_of(&space, parent).await?;
             let title = name.trim();
             let title = if title.is_empty() { "Import" } else { title };
-            let dest = self.free_path(&dir, NodeKind::Folder, title, None).await?;
+            let dest =
+                self.free_path(&dir, NodeKind::Folder, title, None).await?;
             let folders = folder_dirs(files.iter().map(|(p, _)| p.as_str()));
             let mut written = 0_usize;
             for folder in std::iter::once(String::new()).chain(folders) {
@@ -135,11 +141,16 @@ impl Drive {
             let nodes = self
                 .index_tree(&space, &dest, true, parent, Self::user_of(actor))
                 .await?;
-            let top = nodes
-                .iter()
-                .find(|n| n.path == dest)
-                .cloned()
-                .ok_or_else(|| DriveError::Invalid("the import could not be indexed".into()))?;
+            let top =
+                nodes.iter().find(|n| n.path == dest).cloned().ok_or_else(
+                    || {
+                        DriveError::Invalid(
+                            "the import could not be \
+                    indexed"
+                                .into(),
+                        )
+                    },
+                )?;
             if let Some(user) = Self::user_of(actor) {
                 self.access.grant_owner(user, top.space, top.id).await?;
                 self.index.touch(user, top.id, top.modified).await?;
@@ -147,7 +158,12 @@ impl Drive {
             let ids: Vec<ObjectId> = nodes.iter().map(|n| n.id).collect();
             self.access.tree_changed(space.id, &ids).await?;
             self.record(actor, &top, ActivityKind::Created).await?;
-            tracing::info!(folder = %top.id, nodes = nodes.len(), files = written, "import written");
+            tracing::info!(
+                folder = %top.id,
+                nodes = nodes.len(),
+                files = written,
+                "import written"
+            );
             Ok(Imported {
                 nodes: nodes.len().saturating_sub(1),
                 folder: top,
@@ -160,7 +176,9 @@ impl Drive {
 
 /// Refuses a path that leaves the folder or names Vellum's own files.
 fn check_path(path: &str) -> DriveResult<()> {
-    let bad = |why: &str| Err(DriveError::Invalid(format!("import path {path:?}: {why}")));
+    let bad = |why: &str| {
+        Err(DriveError::Invalid(format!("import path {path:?}: {why}")))
+    };
     if path.starts_with('/') {
         return bad("must be relative");
     }
@@ -186,7 +204,9 @@ fn check_path(path: &str) -> DriveResult<()> {
 /// directory except a page's nested pages (`Title/` beside `Title.md`,
 /// D168) and anything inside a book or collection. Sorted, so a parent
 /// comes before its children.
-fn folder_dirs<'a>(paths: impl Iterator<Item = &'a str> + Clone) -> Vec<String> {
+fn folder_dirs<'a>(
+    paths: impl Iterator<Item = &'a str> + Clone,
+) -> Vec<String> {
     let pages: BTreeSet<&str> = paths
         .clone()
         .filter_map(|p| p.strip_suffix(".md"))

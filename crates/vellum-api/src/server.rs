@@ -122,9 +122,12 @@ impl ConnectionLimits {
         match length {
             // The route's own body limit refuses a larger declared length
             // before the body is read; the cap only bounds a lie.
-            Some(length) if upload && self.upload_rate > 0 => self.body_timeout.saturating_add(
-                Duration::from_secs(length / self.upload_rate).min(MAX_UPLOAD_EXTRA),
-            ),
+            Some(length) if upload && self.upload_rate > 0 => {
+                self.body_timeout.saturating_add(
+                    Duration::from_secs(length / self.upload_rate)
+                        .min(MAX_UPLOAD_EXTRA),
+                )
+            }
             _ => self.body_timeout,
         }
     }
@@ -154,7 +157,11 @@ struct PerClient {
 
 impl PerClient {
     /// Counts a connection from `ip`, or `None` when it already holds `cap`.
-    fn enter(self: &Arc<Self>, ip: std::net::IpAddr, cap: usize) -> Option<Held> {
+    fn enter(
+        self: &Arc<Self>,
+        ip: std::net::IpAddr,
+        cap: usize,
+    ) -> Option<Held> {
         let ip = vellum_security::rate::client_bucket(ip);
         let mut held = self.held.lock().ok()?;
         let count = held.entry(ip).or_insert(0);
@@ -183,8 +190,12 @@ impl Drop for Held {
     }
 }
 
-fn io_error(what: &str, err: impl std::error::Error + Send + Sync + 'static) -> Error {
-    Error::new(ErrorKind::Unavailable, format!("{what} failed")).with_source(err)
+fn io_error(
+    what: &str,
+    err: impl std::error::Error + Send + Sync + 'static,
+) -> Error {
+    Error::new(ErrorKind::Unavailable, format!("{what} failed"))
+        .with_source(err)
 }
 
 fn provider() -> Arc<CryptoProvider> {
@@ -210,7 +221,10 @@ fn tls13(
 /// # Errors
 ///
 /// `unavailable` when a file cannot be read or holds no certificate or key.
-pub fn load_pem(cert: &std::path::Path, key: &std::path::Path) -> Result<Arc<ServerConfig>, Error> {
+pub fn load_pem(
+    cert: &std::path::Path,
+    key: &std::path::Path,
+) -> Result<Arc<ServerConfig>, Error> {
     let chain = CertificateDer::pem_file_iter(cert)
         .map_err(|e| io_error("reading the TLS certificate", e))?
         .collect::<Result<Vec<_>, _>>()
@@ -247,22 +261,27 @@ fn acme(
             "ACME needs at least one domain",
         ));
     }
-    let mut config = rustls_acme::AcmeConfig::new_with_provider(domains, provider())
-        .contact(contact)
-        .cache(rustls_acme::caches::DirCache::new(cache_dir.to_path_buf()));
+    let mut config =
+        rustls_acme::AcmeConfig::new_with_provider(domains, provider())
+            .contact(contact)
+            .cache(rustls_acme::caches::DirCache::new(cache_dir.to_path_buf()));
     config = match directory {
         Some(url) => config.directory(url),
         None => config.directory_lets_encrypt(true),
     };
     let mut state = config.state();
     let resolver = state.resolver();
-    let default = tls13(|b| Ok(b.with_no_client_auth().with_cert_resolver(resolver)))?;
+    let default =
+        tls13(|b| Ok(b.with_no_client_auth().with_cert_resolver(resolver)))?;
     let challenge = state.challenge_rustls_config_with_provider(provider());
     drop(tokio::spawn(async move {
         while let Some(event) = state.next().await {
             match event {
                 Ok(ok) => tracing::info!(event = ?ok, "acme"),
-                Err(err) => tracing::error!(error = ?err, "acme certificate renewal failed"),
+                Err(err) => {
+                    tracing::error!(error = ?err, "acme certificate renewal \
+                        failed")
+                }
             }
         }
     }));
@@ -301,7 +320,9 @@ pub async fn serve_listener(
 ) -> Result<(), Error> {
     let acceptor = match &config.tls {
         Tls::Off => Acceptor::Plain,
-        Tls::Files { cert, key } => Acceptor::Tls(TlsAcceptor::from(load_pem(cert, key)?)),
+        Tls::Files { cert, key } => {
+            Acceptor::Tls(TlsAcceptor::from(load_pem(cert, key)?))
+        }
         Tls::Acme {
             domains,
             contact,
@@ -312,7 +333,11 @@ pub async fn serve_listener(
     let local = listener
         .local_addr()
         .map_err(|e| io_error("reading the listener address", e))?;
-    tracing::info!(address = %local, tls = !matches!(acceptor, Acceptor::Plain), "listening");
+    tracing::info!(
+        address = %local,
+        tls = !matches!(acceptor, Acceptor::Plain),
+        "listening"
+    );
     let (stop_tx, stop_rx) = tokio::sync::watch::channel(false);
     if let Some(redirect) = config.redirect_http {
         drop(tokio::spawn(redirect_to_https(
@@ -356,19 +381,29 @@ pub async fn serve_listener(
             },
             () = &mut shutdown => break,
         };
-        let Some(held) = clients.enter(peer.ip(), limits.max_connections_per_ip) else {
-            tracing::info!(event = "gateway.client_connection_cap", peer = %peer.ip(), "refused a connection: this client holds too many");
+        let Some(held) =
+            clients.enter(peer.ip(), limits.max_connections_per_ip)
+        else {
+            tracing::info!(
+                event = "gateway.client_connection_cap",
+                peer = %peer.ip(),
+                "refused a connection: this client holds too many"
+            );
             drop(tcp);
             continue;
         };
         let activity = Activity::new();
-        let service = per_connection(router.clone(), peer, limits, Arc::clone(&activity));
+        let service =
+            per_connection(router.clone(), peer, limits, Arc::clone(&activity));
         let acceptor = Arc::clone(&acceptor);
         let watcher = graceful.watcher();
         drop(tokio::spawn(async move {
-            if let Err(err) = connection(&acceptor, tcp, service, watcher, limits, &activity).await
+            if let Err(err) =
+                connection(&acceptor, tcp, service, watcher, limits, &activity)
+                    .await
             {
-                tracing::debug!(error = %err, peer = %peer, "connection ended with an error");
+                tracing::debug!(error = %err, peer = %peer, "connection ended \
+                    with an error");
             }
             drop(held);
             drop(slot);
@@ -379,7 +414,9 @@ pub async fn serve_listener(
     tracing::info!("shutting down: draining in-flight requests");
     tokio::select! {
         () = graceful.shutdown() => tracing::info!("drained"),
-        () = tokio::time::sleep(gateway.drain_timeout()) => tracing::warn!("drain timed out; closing remaining connections"),
+        () = tokio::time::sleep(
+            gateway.drain_timeout()
+        ) => tracing::warn!("drain timed out; closing remaining connections"),
     }
     Ok(())
 }
@@ -416,9 +453,13 @@ fn per_connection(
         ));
         let router = router.clone();
         async move {
-            let response =
-                tower::ServiceExt::oneshot(router, http::Request::from_parts(parts, body)).await?;
-            Ok(response.map(|body| axum::body::Body::new(Tracked::new(body, busy))))
+            let response = tower::ServiceExt::oneshot(
+                router,
+                http::Request::from_parts(parts, body),
+            )
+            .await?;
+            Ok(response
+                .map(|body| axum::body::Body::new(Tracked::new(body, busy))))
         }
     })
 }
@@ -434,13 +475,16 @@ where
     E: Into<Box<dyn std::error::Error + Send + Sync>>,
 {
     tokio::pin!(conn);
-    let mut tick = tokio::time::interval((idle / 4).max(Duration::from_millis(10)));
+    let mut tick =
+        tokio::time::interval((idle / 4).max(Duration::from_millis(10)));
     loop {
         tokio::select! {
             done = &mut conn => return done.map_err(Into::into),
             _ = tick.tick() => {
                 if activity.idle_for() >= idle {
-                    tracing::debug!("closing a connection that held no request");
+                    tracing::debug!(
+                        "closing a connection that held no request"
+                    );
                     return Ok(());
                 }
             }
@@ -480,38 +524,53 @@ where
                 Ok(Ok(n)) if n > 0 => {}
                 Ok(Ok(_)) => return Ok(()),
                 Ok(Err(err)) => return Err(err.into()),
-                Err(_) => return Err("no request before the handshake timeout".into()),
+                Err(_) => {
+                    return Err(
+                        "no request before the handshake timeout".into()
+                    );
+                }
             }
-            let conn = builder.serve_connection_with_upgrades(TokioIo::new(tcp), service);
+            let conn = builder
+                .serve_connection_with_upgrades(TokioIo::new(tcp), service);
             until_idle(watcher.watch(conn), activity, idle).await
         }
         Acceptor::Tls(tls) => {
             let stream = tokio::time::timeout(handshake, tls.accept(tcp))
                 .await
                 .map_err(|_| "TLS handshake timed out")??;
-            let conn = builder.serve_connection_with_upgrades(TokioIo::new(stream), service);
+            let conn = builder
+                .serve_connection_with_upgrades(TokioIo::new(stream), service);
             until_idle(watcher.watch(conn), activity, idle).await
         }
         Acceptor::Acme { default, challenge } => {
             let start = tokio::time::timeout(
                 handshake,
-                LazyConfigAcceptor::new(rustls::server::Acceptor::default(), tcp),
+                LazyConfigAcceptor::new(
+                    rustls::server::Acceptor::default(),
+                    tcp,
+                ),
             )
             .await
             .map_err(|_| "TLS handshake timed out")??;
             if rustls_acme::is_tls_alpn_challenge(&start.client_hello()) {
                 tracing::info!("answering an ACME TLS-ALPN-01 challenge");
-                let mut tls =
-                    tokio::time::timeout(handshake, start.into_stream(Arc::clone(challenge)))
-                        .await
-                        .map_err(|_| "TLS handshake timed out")??;
+                let mut tls = tokio::time::timeout(
+                    handshake,
+                    start.into_stream(Arc::clone(challenge)),
+                )
+                .await
+                .map_err(|_| "TLS handshake timed out")??;
                 tokio::io::AsyncWriteExt::shutdown(&mut tls).await?;
                 return Ok(());
             }
-            let stream = tokio::time::timeout(handshake, start.into_stream(Arc::clone(default)))
-                .await
-                .map_err(|_| "TLS handshake timed out")??;
-            let conn = builder.serve_connection_with_upgrades(TokioIo::new(stream), service);
+            let stream = tokio::time::timeout(
+                handshake,
+                start.into_stream(Arc::clone(default)),
+            )
+            .await
+            .map_err(|_| "TLS handshake timed out")??;
+            let conn = builder
+                .serve_connection_with_upgrades(TokioIo::new(stream), service);
             until_idle(watcher.watch(conn), activity, idle).await
         }
     }
@@ -543,7 +602,8 @@ fn fit_to_open_file_limit(wanted: usize) -> usize {
         wanted.min(usize::try_from(room).unwrap_or(usize::MAX))
     });
     if cap < wanted {
-        tracing::warn!(cap, wanted, open_files = ?limit.current, "the open-file limit lowers the connection cap");
+        tracing::warn!(cap, wanted, open_files = ?limit.current, "the \
+            open-file limit lowers the connection cap");
     }
     cap.max(1)
 }
@@ -565,14 +625,18 @@ struct AcceptErrors {
 impl AcceptErrors {
     fn failed(&mut self, err: &std::io::Error) {
         if self.failing == 0 {
-            tracing::warn!(error = %err, "accept failed; pausing new connections");
+            tracing::warn!(error = %err, "accept failed; pausing new \
+                connections");
         }
         self.failing = self.failing.saturating_add(1);
     }
 
     fn recovered(&mut self) {
         if self.failing > 0 {
-            tracing::warn!(failed = self.failing, "accepting connections again");
+            tracing::warn!(
+                failed = self.failing,
+                "accepting connections again"
+            );
             self.failing = 0;
         }
     }
@@ -601,7 +665,8 @@ async fn redirect_to_https(
     let listener = match TcpListener::bind(bind).await {
         Ok(l) => l,
         Err(err) => {
-            tracing::error!(error = %err, address = %bind, "could not bind the HTTP redirect listener");
+            tracing::error!(error = %err, address = %bind, "could not bind the \
+                HTTP redirect listener");
             return;
         }
     };
@@ -683,7 +748,10 @@ mod tests {
         );
         // Other routes, unknown lengths and lies keep their bounds.
         assert_eq!(limits.body_time("/api/v1/books", Some(mib100)), base);
-        assert_eq!(limits.body_time("/api/v1/attachmentsX", Some(mib100)), base);
+        assert_eq!(
+            limits.body_time("/api/v1/attachmentsX", Some(mib100)),
+            base
+        );
         assert_eq!(limits.body_time("/api/v1/attachments/01J", None), base);
         assert_eq!(
             limits.body_time("/api/v1/attachments/01J", Some(u64::MAX)),

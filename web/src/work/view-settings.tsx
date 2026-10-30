@@ -18,7 +18,14 @@ export const GROUPS: readonly GroupBy[] = [
   "label",
   "none",
 ];
-export const ORDERS = ["priority", "updated", "created", "due", "estimate", "title"] as const;
+export const ORDERS = [
+  "priority",
+  "updated",
+  "created",
+  "due",
+  "estimate",
+  "title",
+] as const;
 export const CLOSED = ["past_week", "past_month", "all", "none"] as const;
 export const VISIBILITIES = ["private", "team", "workspace"] as const;
 export const CATEGORIES = [
@@ -41,8 +48,14 @@ export interface Settings {
   readonly view: string | undefined;
 }
 
-function pick<T extends string>(value: string | null, allowed: readonly T[], fallback: T): T {
-  return value !== null && (allowed as readonly string[]).includes(value) ? (value as T) : fallback;
+function pick<T extends string>(
+  value: string | null,
+  allowed: readonly T[],
+  fallback: T,
+): T {
+  return value !== null && (allowed as readonly string[]).includes(value)
+    ? (value as T)
+    : fallback;
 }
 
 export function useSettings(): [
@@ -58,7 +71,9 @@ export function useSettings(): [
     filter: parameters.get("filter") ?? undefined,
     view: parameters.get("view") ?? undefined,
   };
-  const change = (next: Partial<Record<keyof Settings, string | undefined>>) => {
+  const change = (
+    next: Partial<Record<keyof Settings, string | undefined>>,
+  ) => {
     const updated = new URLSearchParams(parameters);
     for (const [key, value] of Object.entries(next)) {
       if (value === undefined) updated.delete(key);

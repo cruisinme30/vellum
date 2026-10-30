@@ -98,7 +98,8 @@ fn handle(text: &str) -> String {
 }
 
 fn members_line(members: &[String]) -> String {
-    let quoted: Vec<String> = members.iter().map(|m| quote(&format!("@{m}"))).collect();
+    let quoted: Vec<String> =
+        members.iter().map(|m| quote(&format!("@{m}"))).collect();
     format!("members: [{}]", quoted.join(", "))
 }
 
@@ -209,7 +210,9 @@ fn write_members(source: &str, members: &[String]) -> Option<String> {
 pub fn share(source: &str, member: &str) -> Option<String> {
     let meta = read_meta(source);
     let member = member.trim_start_matches('@').to_ascii_lowercase();
-    if meta.owner.as_deref() == Some(member.as_str()) || meta.members.contains(&member) {
+    if meta.owner.as_deref() == Some(member.as_str())
+        || meta.members.contains(&member)
+    {
         return None;
     }
     let mut members = meta.members;
@@ -225,7 +228,8 @@ pub fn unshare(source: &str, member: &str) -> Option<String> {
     if !meta.members.contains(&member) {
         return None;
     }
-    let members: Vec<String> = meta.members.into_iter().filter(|m| *m != member).collect();
+    let members: Vec<String> =
+        meta.members.into_iter().filter(|m| *m != member).collect();
     write_members(source, &members)
 }
 
@@ -252,7 +256,8 @@ pub fn comment_assignment(text: &str) -> Option<(Vec<String>, String)> {
                 consumed += word.len();
                 continue;
             }
-            if let Some(h) = trimmed.strip_prefix('@').filter(|h| !h.is_empty()) {
+            if let Some(h) = trimmed.strip_prefix('@').filter(|h| !h.is_empty())
+            {
                 assignees.push(h.to_ascii_lowercase());
                 consumed += word.len();
                 continue;
@@ -283,9 +288,12 @@ pub fn comment_assignment(text: &str) -> Option<(Vec<String>, String)> {
     if assignees.is_empty() {
         return None;
     }
-    let mut title: String = title.split_whitespace().collect::<Vec<_>>().join(" ");
+    let mut title: String =
+        title.split_whitespace().collect::<Vec<_>>().join(" ");
     title = title
-        .trim_matches(|c: char| c == '-' || c == ':' || c == ',' || c.is_whitespace())
+        .trim_matches(|c: char| {
+            c == '-' || c == ':' || c == ',' || c.is_whitespace()
+        })
         .to_owned();
     if title.chars().count() > 140 {
         title = title.chars().take(139).collect::<String>() + "…";
@@ -298,7 +306,12 @@ pub fn comment_assignment(text: &str) -> Option<(Vec<String>, String)> {
 
 /// The My Work task for an assigning comment.
 #[must_use]
-pub fn comment_task(comment: CommentId, doc: DocId, text: &str, resolved: bool) -> Option<Task> {
+pub fn comment_task(
+    comment: CommentId,
+    doc: DocId,
+    text: &str,
+    resolved: bool,
+) -> Option<Task> {
     let (assignees, title) = comment_assignment(text)?;
     Some(Task {
         source: Source::Comment {
@@ -336,13 +349,18 @@ mod tests {
 
     #[test]
     fn sharing_edits_only_the_members_line() {
-        let file = new_list(id(), "Groceries \"weekly\"", "gourav") + "- [ ] Milk ^blk-00000001\n";
+        let file = new_list(id(), "Groceries \"weekly\"", "gourav")
+            + "- [ ] Milk ^blk-00000001\n";
         let meta = read_meta(&file);
         assert_eq!(meta.title, "Groceries \"weekly\"");
         assert_eq!(meta.owner.as_deref(), Some("gourav"));
         assert_eq!(meta.id, Some(id()));
         let shared = share(&file, "@Ann").unwrap();
-        assert!(shared.contains("owner: \"@gourav\"\nmembers: [\"@ann\"]\nvellum: 1\n"));
+        assert!(
+            shared.contains(
+                "owner: \"@gourav\"\nmembers: [\"@ann\"]\nvellum: 1\n"
+            )
+        );
         assert!(shared.ends_with("- [ ] Milk ^blk-00000001\n"));
         let shared = share(&shared, "bob").unwrap();
         assert_eq!(read_meta(&shared).members, ["ann", "bob"]);
@@ -356,26 +374,32 @@ mod tests {
 
     #[test]
     fn block_style_members_are_read_and_replaced() {
-        let file = "---\ntitle: Trip\nmembers:\n  - \"@ann\"\n  - '@bob'\nvellum: 1\n---\nbody\n";
+        let file = "---\ntitle: Trip\nmembers:\n  - \"@ann\"\n  - '@bob'\n\
+            vellum: 1\n---\nbody\n";
         assert_eq!(read_meta(file).members, ["ann", "bob"]);
         let out = share(file, "cy").unwrap();
         assert_eq!(
             out,
-            "---\ntitle: Trip\nmembers: [\"@ann\", \"@bob\", \"@cy\"]\nvellum: 1\n---\nbody\n"
+            "---\ntitle: Trip\nmembers: [\"@ann\", \"@bob\", \"@cy\"]\n\
+                vellum: 1\n---\nbody\n"
         );
     }
 
     #[test]
     fn comments_assign_tasks() {
-        let (who, title) =
-            comment_assignment("Can you check the numbers? Assign to @Ann and @bob.").unwrap();
+        let (who, title) = comment_assignment(
+            "Can you check the numbers? Assign to @Ann and @bob.",
+        )
+        .unwrap();
         assert_eq!(who, ["ann", "bob"]);
         assert_eq!(title, "Can you check the numbers?");
         let (who, title) = comment_assignment("+@cy update the chart").unwrap();
         assert_eq!(who, ["cy"]);
         assert_eq!(title, "update the chart");
         assert_eq!(comment_assignment("Looks good @ann"), None);
-        let task = comment_task(CommentId::generate(), id(), "assign to @ann", true).unwrap();
+        let task =
+            comment_task(CommentId::generate(), id(), "assign to @ann", true)
+                .unwrap();
         assert_eq!(task.title, "Follow up on comment");
         assert!(task.done);
     }

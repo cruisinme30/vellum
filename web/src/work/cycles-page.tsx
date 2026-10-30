@@ -28,7 +28,10 @@ function today(): string {
 }
 
 /** Where a cycle stands on `on`: cycles end the day before `ends_on`. */
-export function cycleState(cycle: CycleOut, on: string): "past" | "current" | "upcoming" {
+export function cycleState(
+  cycle: CycleOut,
+  on: string,
+): "past" | "current" | "upcoming" {
   if (cycle.ends_on <= on) return "past";
   return cycle.starts_on <= on ? "current" : "upcoming";
 }
@@ -60,9 +63,13 @@ function Cycles({
 }) {
   const t = useT();
   if (!team.cycles && found.cycles.length === 0) {
-    return <p className="vl-muted">{t("work-cycles-off", { team: team.name })}</p>;
+    return (
+      <p className="vl-muted">{t("work-cycles-off", { team: team.name })}</p>
+    );
   }
-  const current = found.cycles.find((cycle) => cycleState(cycle, on) === "current");
+  const current = found.cycles.find(
+    (cycle) => cycleState(cycle, on) === "current",
+  );
   const velocity = found.velocity ?? undefined;
   return (
     <>
@@ -75,10 +82,18 @@ function Cycles({
         <p className="vl-muted">{t("work-cycle-none-current")}</p>
       ) : (
         <section aria-labelledby="current-cycle" className="vl-cycle-current">
-          <h2 id="current-cycle">{t("work-cycle-current", { name: name(current) })}</h2>
+          <h2 id="current-cycle">
+            {t("work-cycle-current", { name: name(current) })}
+          </h2>
           <p className="vl-muted">
-            {t("work-cycle-dates", { start: current.starts_on, end: current.ends_on })} ·{" "}
-            <Link to={boardLink(team.key, current.key)}>{t("work-cycle-open-board")}</Link>
+            {t("work-cycle-dates", {
+              start: current.starts_on,
+              end: current.ends_on,
+            })}{" "}
+            ·{" "}
+            <Link to={boardLink(team.key, current.key)}>
+              {t("work-cycle-open-board")}
+            </Link>
           </p>
           <BurnUpChart points={current.burn_up} title={name(current)} />
         </section>
@@ -100,12 +115,19 @@ function Cycles({
             return (
               <tr
                 key={cycle.key}
-                className={state === "current" ? "vl-cycle-row-current" : undefined}
+                className={
+                  state === "current" ? "vl-cycle-row-current" : undefined
+                }
               >
                 <th scope="row">
                   <Link to={boardLink(team.key, cycle.key)}>{name(cycle)}</Link>
                 </th>
-                <td>{t("work-cycle-dates", { start: cycle.starts_on, end: cycle.ends_on })}</td>
+                <td>
+                  {t("work-cycle-dates", {
+                    start: cycle.starts_on,
+                    end: cycle.ends_on,
+                  })}
+                </td>
                 <td>{t(`work-cycle-state-${state}`)}</td>
                 <td>
                   {t("work-cycle-done-of", {
@@ -132,8 +154,16 @@ function TeamCycles({
   readonly on: string;
 }) {
   useWorkKeys(team.key);
-  const loaded = useLoaded(() => api.cycles(team.key), [api, team.key], failureText);
-  return <Ready loaded={loaded}>{(found) => <Cycles team={team} found={found} on={on} />}</Ready>;
+  const loaded = useLoaded(
+    () => api.cycles(team.key),
+    [api, team.key],
+    failureText,
+  );
+  return (
+    <Ready loaded={loaded}>
+      {(found) => <Cycles team={team} found={found} on={on} />}
+    </Ready>
+  );
 }
 
 function CyclesForTeams({
@@ -147,7 +177,8 @@ function CyclesForTeams({
 }) {
   const t = useT();
   const team = useTeam(teams);
-  if (team === undefined) return <p className="vl-muted">{t("issues-no-teams")}</p>;
+  if (team === undefined)
+    return <p className="vl-muted">{t("issues-no-teams")}</p>;
   return (
     <>
       <div className="vl-work-filters">
@@ -173,9 +204,17 @@ export function CyclesPage({ on = today() }: { readonly on?: string }) {
   );
 }
 
-function CyclesLoader({ api, on }: { readonly api: WorkApi; readonly on: string }) {
+function CyclesLoader({
+  api,
+  on,
+}: {
+  readonly api: WorkApi;
+  readonly on: string;
+}) {
   const loaded = useLoaded(() => api.teams(), [api], failureText);
   return (
-    <Ready loaded={loaded}>{(teams) => <CyclesForTeams api={api} teams={teams} on={on} />}</Ready>
+    <Ready loaded={loaded}>
+      {(teams) => <CyclesForTeams api={api} teams={teams} on={on} />}
+    </Ready>
   );
 }

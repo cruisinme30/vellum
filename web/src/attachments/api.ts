@@ -36,7 +36,8 @@ export interface AttachmentsApi {
 const ATTACHMENTS = "/api/v1/attachments";
 
 /** Only the server's own attachment paths are ever deleted through `remove`. */
-const isAttachmentUrl = (url: string) => url.startsWith(`${ATTACHMENTS}/`) && !url.includes("..");
+const isAttachmentUrl = (url: string) =>
+  url.startsWith(`${ATTACHMENTS}/`) && !url.includes("..");
 
 /** Attachments over a Vellum server. */
 export function createHttpAttachmentsApi(http: Http): AttachmentsApi {
@@ -61,8 +62,14 @@ export function createHttpAttachmentsApi(http: Http): AttachmentsApi {
   };
 }
 
-/** Why an upload failed, for the person: the server's statuses (D212) in plain words. */
-export function uploadProblem(error: unknown): { readonly key: string; readonly detail: string } {
+/**
+ * Why an upload failed, for the person: the server's statuses (D212) in plain
+ * words.
+ */
+export function uploadProblem(error: unknown): {
+  readonly key: string;
+  readonly detail: string;
+} {
   const detail = error instanceof Error ? error.message : String(error);
   if (!(error instanceof ApiError)) return { key: "upload-failed", detail };
   const keys: Record<number, string> = {

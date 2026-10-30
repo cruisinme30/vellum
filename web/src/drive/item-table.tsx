@@ -28,8 +28,17 @@ const KIND_MARK: Record<NodeView["kind"], string> = {
   shortcut: "↪️",
 };
 
-/** An item's name: a link to where it opens, or for a shortcut a button that follows it. */
-function ItemName({ api, node }: { readonly api: DriveApi; readonly node: NodeView }) {
+/**
+ * An item's name: a link to where it opens, or for a shortcut a button that
+ * follows it.
+ */
+function ItemName({
+  api,
+  node,
+}: {
+  readonly api: DriveApi;
+  readonly node: NodeView;
+}) {
   const t = useT();
   const navigate = useNavigate();
   const [problem, setProblem] = useState<string>();
@@ -44,7 +53,9 @@ function ItemName({ api, node }: { readonly api: DriveApi; readonly node: NodeVi
       <>
         {mark}
         <Link to={path}>{node.title}</Link>
-        <span className="vl-visually-hidden">{", " + t(`drive-kind-${node.kind}`)}</span>
+        <span className="vl-visually-hidden">
+          {", " + t(`drive-kind-${node.kind}`)}
+        </span>
       </>
     );
   }
@@ -60,7 +71,11 @@ function ItemName({ api, node }: { readonly api: DriveApi; readonly node: NodeVi
   return (
     <>
       {mark}
-      <button type="button" className="vl-link-button" onClick={() => void follow()}>
+      <button
+        type="button"
+        className="vl-link-button"
+        onClick={() => void follow()}
+      >
         {node.title}
       </button>
       <span className="vl-visually-hidden">{`, ${t("drive-kind-shortcut")}`}</span>
@@ -97,7 +112,10 @@ function RowActions({
         type="button"
         className="vl-text-button"
         aria-pressed={starred}
-        aria-label={t(starred ? "drive-unstar-label" : "drive-star-label", name)}
+        aria-label={t(
+          starred ? "drive-unstar-label" : "drive-star-label",
+          name,
+        )}
         onClick={onStar}
       >
         {starred ? "★" : "☆"}
@@ -178,7 +196,9 @@ export function ItemTable({
       if (next) changed.add(node.id);
       else changed.delete(node.id);
       setStarred(changed);
-      return t(next ? "drive-starred-done" : "drive-unstarred-done", { title: node.title });
+      return t(next ? "drive-starred-done" : "drive-unstarred-done", {
+        title: node.title,
+      });
     });
   const trash = (node: NodeView) =>
     run(async () => {
@@ -210,7 +230,9 @@ export function ItemTable({
                 <th scope="col">{t("drive-modified")}</th>
                 <th scope="col">{t("drive-size")}</th>
                 <th scope="col">
-                  <span className="vl-visually-hidden">{t("drive-actions")}</span>
+                  <span className="vl-visually-hidden">
+                    {t("drive-actions")}
+                  </span>
                 </th>
               </tr>
             </thead>
@@ -221,7 +243,9 @@ export function ItemTable({
                     <ItemName api={api} node={node} />
                   </td>
                   <td>{formatWhen(node.modified)}</td>
-                  <td>{node.kind === "folder" ? "—" : formatBytes(node.size)}</td>
+                  <td>
+                    {node.kind === "folder" ? "—" : formatBytes(node.size)}
+                  </td>
                   <td>
                     <RowActions
                       node={node}
@@ -263,7 +287,9 @@ export function ItemTable({
           }}
           onDone={(result) => {
             const title = placing.item.title;
-            setNotice(t(`drive-${placing.mode}-done`, { title, where: result.path }));
+            setNotice(
+              t(`drive-${placing.mode}-done`, { title, where: result.path }),
+            );
             setPlacing(undefined);
             onChanged();
           }}

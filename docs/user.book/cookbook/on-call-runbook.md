@@ -12,7 +12,9 @@ calculator that sizes the rollback.
 
 ## Steps
 
-1. Create a page "Runbook: gateway latency" in the OPS shared drive and set its status to verified with `verify_every: 90d`, so it reminds Sam to check it each quarter.
+1. Create a page "Runbook: gateway latency" in the OPS shared drive and set its
+   status to verified with `verify_every: 90d`, so it reminds Sam to check it
+   each quarter.
 2. Draw the decision with a Mermaid flowchart.
 3. Write the procedure with `/steps`, putting each command in a code block.
 4. Add a calculator so the engineer can see how many replicas they need.

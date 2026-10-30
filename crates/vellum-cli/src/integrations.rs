@@ -81,17 +81,19 @@ pub async fn hooks(
     work: &Arc<WorkService>,
     var: impl Fn(&str) -> Option<String> + Send + Sync,
 ) -> Result<Option<axum::Router>, Error> {
-    let secret = |name: &str| var(name).map(|v| v.trim().to_owned()).unwrap_or_default();
+    let secret =
+        |name: &str| var(name).map(|v| v.trim().to_owned()).unwrap_or_default();
     if SECRET_VARS.iter().all(|v| secret(v).is_empty()) {
         return Ok(None);
     }
     let file = load_settings(store.as_ref()).await?;
-    let bot = UserRef::parse(file.bot.as_deref().unwrap_or(DEFAULT_BOT)).map_err(|e| {
-        Error::new(
-            ErrorKind::InvalidInput,
-            format!("{SETTINGS_PATH}: bad bot handle: {e}"),
-        )
-    })?;
+    let bot = UserRef::parse(file.bot.as_deref().unwrap_or(DEFAULT_BOT))
+        .map_err(|e| {
+            Error::new(
+                ErrorKind::InvalidInput,
+                format!("{SETTINGS_PATH}: bad bot handle: {e}"),
+            )
+        })?;
     let config = file.into_config(Secrets {
         github: secret(GITHUB_SECRET_VAR),
         gitlab: secret(GITLAB_TOKEN_VAR),
@@ -124,10 +126,12 @@ async fn default_mappings(work: &WorkService, git: &mut Settings) {
     for team in teams {
         match work.read(|graph, _| steps::states(graph, &team)).await {
             Ok(states) => {
-                let _ = git.mappings.insert(team, Mapping::default_for(&states));
+                let _ =
+                    git.mappings.insert(team, Mapping::default_for(&states));
             }
             Err(error) => {
-                tracing::warn!(%team, %error, "connected team has no workflow; Git will not move its issues");
+                tracing::warn!(%team, %error, "connected team has no workflow; \
+                    Git will not move its issues");
             }
         }
     }
@@ -143,8 +147,12 @@ async fn load_settings(store: &dyn BlobStore) -> Result<SettingsFile, Error> {
                     format!("{SETTINGS_PATH} is not UTF-8"),
                 )
             })?;
-            serde_saphyr::from_str(text)
-                .map_err(|e| Error::new(ErrorKind::InvalidInput, format!("{SETTINGS_PATH}: {e}")))
+            serde_saphyr::from_str(text).map_err(|e| {
+                Error::new(
+                    ErrorKind::InvalidInput,
+                    format!("{SETTINGS_PATH}: {e}"),
+                )
+            })
         }
         Err(StoreError::NotFound(_)) => {
             tracing::warn!(
@@ -316,7 +324,8 @@ impl ServiceWork {
             &mut vellum_work::WorkGraph,
             &mut vellum_work::Comments,
             &vellum_work::Ctx,
-        ) -> Result<vellum_work_service::Outcome<R>, WorkError>
+        )
+            -> Result<vellum_work_service::Outcome<R>, WorkError>
         + Send,
     ) -> Result<R, WorkError> {
         let mut failed = None;
@@ -335,15 +344,24 @@ impl ServiceWork {
 }
 
 impl WorkCommands for ServiceWork {
-    async fn issue(&self, key: &IssueKey) -> Result<Option<IssueSnapshot>, WorkError> {
+    async fn issue(
+        &self,
+        key: &IssueKey,
+    ) -> Result<Option<IssueSnapshot>, WorkError> {
         self.work.read(|graph, _| steps::snapshot(graph, key)).await
     }
 
-    async fn states(&self, team: &str) -> Result<Vec<WorkflowState>, WorkError> {
+    async fn states(
+        &self,
+        team: &str,
+    ) -> Result<Vec<WorkflowState>, WorkError> {
         self.work.read(|graph, _| steps::states(graph, team)).await
     }
 
-    async fn git_mapping(&self, team: &str) -> Result<Option<Mapping>, WorkError> {
+    async fn git_mapping(
+        &self,
+        team: &str,
+    ) -> Result<Option<Mapping>, WorkError> {
         self.work
             .read(|graph, _| steps::git_mapping(graph, team))
             .await
@@ -357,7 +375,12 @@ impl WorkCommands for ServiceWork {
     ) -> Result<(), WorkError> {
         // The reason ("GitHub northstar/api#12 merged") goes to the audit
         // trail through this span.
-        let span = tracing::info_span!("work.set_state", issue = %key, state = state_id, reason);
+        let span = tracing::info_span!(
+            "work.set_state",
+            issue = %key,
+            state = state_id,
+            reason
+        );
         tracing::Instrument::instrument(
             self.run(self.bot.clone(), |graph, _, ctx| {
                 let changes = steps::set_state(graph, key, state_id, ctx)?;
@@ -368,11 +391,15 @@ impl WorkCommands for ServiceWork {
         .await
     }
 
-    async fn create_issue(&self, draft: IssueDraft) -> Result<IssueKey, WorkError> {
+    async fn create_issue(
+        &self,
+        draft: IssueDraft,
+    ) -> Result<IssueKey, WorkError> {
         let span = tracing::info_span!("work.create_issue", team = %draft.team);
         tracing::Instrument::instrument(
             self.run(self.bot.clone(), |graph, _, ctx| {
-                let (key, changes) = steps::create_issue(graph, draft.clone(), ctx)?;
+                let (key, changes) =
+                    steps::create_issue(graph, draft.clone(), ctx)?;
                 Ok((changes.unwrap_or_default(), None, key))
             }),
             span,
@@ -390,7 +417,8 @@ impl WorkCommands for ServiceWork {
         let span = tracing::info_span!("work.add_comment", issue = %key);
         tracing::Instrument::instrument(
             self.run(actor, |graph, comments, ctx| {
-                let (added, changes) = steps::add_comment(graph, comments, key, body, ctx)?;
+                let (added, changes) =
+                    steps::add_comment(graph, comments, key, body, ctx)?;
                 Ok((changes, Some(added), ()))
             }),
             span,
@@ -401,9 +429,15 @@ impl WorkCommands for ServiceWork {
 
 fn to_kernel(e: &WorkError) -> Error {
     match e {
-        WorkError::NotFound(what) => Error::new(ErrorKind::NotFound, what.clone()),
-        WorkError::Refused(why) => Error::new(ErrorKind::InvalidInput, why.clone()),
-        WorkError::Unavailable(why) => Error::new(ErrorKind::Unavailable, why.clone()),
+        WorkError::NotFound(what) => {
+            Error::new(ErrorKind::NotFound, what.clone())
+        }
+        WorkError::Refused(why) => {
+            Error::new(ErrorKind::InvalidInput, why.clone())
+        }
+        WorkError::Unavailable(why) => {
+            Error::new(ErrorKind::Unavailable, why.clone())
+        }
     }
 }
 
@@ -442,8 +476,11 @@ impl StoreLinks {
         }
     }
 
-    async fn read_all(&self) -> Result<BTreeMap<IssueKey, IssueLinks>, WorkError> {
-        let dir = blob_path(LINKS_DIR).map_err(|e| WorkError::Unavailable(e.to_string()))?;
+    async fn read_all(
+        &self,
+    ) -> Result<BTreeMap<IssueKey, IssueLinks>, WorkError> {
+        let dir = blob_path(LINKS_DIR)
+            .map_err(|e| WorkError::Unavailable(e.to_string()))?;
         let mut entries = self.store.list(Some(&dir));
         let mut all = BTreeMap::new();
         while let Some(entry) = entries.next().await {
@@ -471,7 +508,11 @@ impl StoreLinks {
                     let _ = all.insert(key, links);
                 }
                 Err(error) => {
-                    tracing::warn!(path = entry.path.as_str(), %error, "unreadable issue links skipped");
+                    tracing::warn!(
+                        path = entry.path.as_str(),
+                        %error,
+                        "unreadable issue links skipped"
+                    );
                 }
             }
         }
@@ -499,11 +540,15 @@ impl LinkStore for StoreLinks {
             .await
     }
 
-    async fn save(&self, key: &IssueKey, links: &IssueLinks) -> Result<(), WorkError> {
+    async fn save(
+        &self,
+        key: &IssueKey,
+        links: &IssueLinks,
+    ) -> Result<(), WorkError> {
         let path = blob_path(&format!("{LINKS_DIR}/{key}.json"))
             .map_err(|e| WorkError::Unavailable(e.to_string()))?;
-        let bytes =
-            serde_json::to_vec_pretty(links).map_err(|e| WorkError::Unavailable(e.to_string()))?;
+        let bytes = serde_json::to_vec_pretty(links)
+            .map_err(|e| WorkError::Unavailable(e.to_string()))?;
         // Write first, so memory never claims a link the disk lacks.
         let _ = self
             .store
@@ -516,7 +561,10 @@ impl LinkStore for StoreLinks {
         .await
     }
 
-    async fn issues_for_pr(&self, pr: &PrRef) -> Result<BTreeSet<IssueKey>, WorkError> {
+    async fn issues_for_pr(
+        &self,
+        pr: &PrRef,
+    ) -> Result<BTreeSet<IssueKey>, WorkError> {
         self.with_links(|all| {
             all.iter()
                 .filter(|(_, links)| links.prs.iter().any(|l| &l.pr == pr))
@@ -528,7 +576,8 @@ impl LinkStore for StoreLinks {
 }
 
 fn blob_path(path: &str) -> Result<BlobPath, Error> {
-    BlobPath::new(path).map_err(|e| Error::new(ErrorKind::Internal, format!("{path}: {e}")))
+    BlobPath::new(path)
+        .map_err(|e| Error::new(ErrorKind::Internal, format!("{path}: {e}")))
 }
 
 #[cfg(test)]
@@ -549,8 +598,11 @@ mod tests {
 
     const GITHUB: &str = "github-test-secret";
 
-    async fn workspace(dir: &std::path::Path) -> (Arc<dyn BlobStore>, Arc<WorkService>) {
-        let store: Arc<dyn BlobStore> = Arc::new(LocalStore::open(dir).await.unwrap());
+    async fn workspace(
+        dir: &std::path::Path,
+    ) -> (Arc<dyn BlobStore>, Arc<WorkService>) {
+        let store: Arc<dyn BlobStore> =
+            Arc::new(LocalStore::open(dir).await.unwrap());
         let (work, _) = WorkService::open(
             Arc::clone(&store),
             Arc::new(StaticDirectory::new()),
@@ -588,7 +640,9 @@ mod tests {
             .unwrap();
     }
 
-    fn vars(pairs: &[(&str, &str)]) -> impl Fn(&str) -> Option<String> + Send + Sync + use<> {
+    fn vars(
+        pairs: &[(&str, &str)],
+    ) -> impl Fn(&str) -> Option<String> + Send + Sync + use<> {
         let map: BTreeMap<String, String> = pairs
             .iter()
             .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
@@ -597,17 +651,18 @@ mod tests {
     }
 
     fn signature(body: &[u8]) -> String {
-        let mut mac = hmac::Hmac::<sha2::Sha256>::new_from_slice(GITHUB.as_bytes()).unwrap();
+        let mut mac =
+            hmac::Hmac::<sha2::Sha256>::new_from_slice(GITHUB.as_bytes())
+                .unwrap();
         mac.update(body);
-        let hex = mac
-            .finalize()
-            .into_bytes()
-            .iter()
-            .fold(String::new(), |mut out, b| {
+        let hex = mac.finalize().into_bytes().iter().fold(
+            String::new(),
+            |mut out, b| {
                 use std::fmt::Write as _;
                 let _ = write!(out, "{b:02x}");
                 out
-            });
+            },
+        );
         format!("sha256={hex}")
     }
 
@@ -654,7 +709,8 @@ mod tests {
         write(
             &store,
             SETTINGS_PATH,
-            "repositories:\n  - provider: bitbucket\n    repo: a/b\n    teams: [ENG]\n",
+            "repositories:\n  - provider: bitbucket\n    repo: a/b\n    teams: \
+                [ENG]\n",
         )
         .await;
         assert!(hooks(&store, &work, on()).await.is_err());
@@ -671,14 +727,18 @@ mod tests {
         write(
             &store,
             SETTINGS_PATH,
-            "repositories:\n  - provider: github\n    repo: northstar/api\n    teams: [eng]\n",
+            "repositories:\n  - provider: github\n    repo: northstar/api\n    \
+                teams: [eng]\n",
         )
         .await;
         let router = hooks(&store, &work, vars(&[(GITHUB_SECRET_VAR, GITHUB)]))
             .await
             .unwrap()
             .unwrap();
-        let commands = ServiceWork::new(Arc::clone(&work), UserRef::parse("integrations").unwrap());
+        let commands = ServiceWork::new(
+            Arc::clone(&work),
+            UserRef::parse("integrations").unwrap(),
+        );
         let issue = commands
             .create_issue(IssueDraft::new("ENG", "Fix login", Source::App))
             .await
@@ -687,7 +747,10 @@ mod tests {
 
         let body = serde_json::to_vec(&json!({
             "action": "opened",
-            "repository": {"full_name": "northstar/api", "default_branch": "main"},
+            "repository": {
+                "full_name": "northstar/api",
+                "default_branch": "main"
+            },
             "pull_request": {
                 "number": 12, "title": "Fix login", "body": "Fixes ENG-1",
                 "html_url": "https://github.com/northstar/api/pull/12",
@@ -731,7 +794,8 @@ mod tests {
     async fn intake_is_filed_once_and_errors_keep_their_kind() {
         let dir = tempfile::tempdir().unwrap();
         let (_, work) = workspace(dir.path()).await;
-        let commands = ServiceWork::new(work, UserRef::parse("integrations").unwrap());
+        let commands =
+            ServiceWork::new(work, UserRef::parse("integrations").unwrap());
         let alert = || {
             IssueDraft::new(
                 "ENG",

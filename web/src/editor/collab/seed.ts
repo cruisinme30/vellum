@@ -21,7 +21,11 @@ const SEED_CLIENT = 1;
 export function seedUpdate(schema: Schema, content: JSONContent): Uint8Array {
   const document_ = new Y.Doc();
   document_.clientID = SEED_CLIENT;
-  prosemirrorJSONToYXmlFragment(schema, content, document_.getXmlFragment(FIELD));
+  prosemirrorJSONToYXmlFragment(
+    schema,
+    content,
+    document_.getXmlFragment(FIELD),
+  );
   const update = Y.encodeStateAsUpdate(document_);
   document_.destroy();
   return update;

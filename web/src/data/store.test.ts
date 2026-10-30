@@ -19,7 +19,12 @@ const SPACE = "space-a";
 const NO_DOCUMENT = undefined;
 const NOW = new Date("2026-10-29T12:00:00.000Z");
 
-function page(id: string, title: string, parentId?: string, updatedAt = "2026-10-01"): PageMeta {
+function page(
+  id: string,
+  title: string,
+  parentId?: string,
+  updatedAt = "2026-10-01",
+): PageMeta {
   return {
     id,
     spaceId: SPACE,
@@ -49,7 +54,10 @@ const SEED: WorkspaceSeed = {
   ],
   bodies: {
     parent: body(p("Ask ", mention("dev"), " about the ", b("gateway"), ".")),
-    child: body(p(`${LONG_PREFIX}needle${LONG_SUFFIX}`), p("cc ", mention("dev"))),
+    child: body(
+      p(`${LONG_PREFIX}needle${LONG_SUFFIX}`),
+      p("cc ", mention("dev")),
+    ),
     other: body(p("Mentions the gateway too")),
   },
 };
@@ -77,21 +85,29 @@ describe("plainText", () => {
       p("See ", link("docs", "https://example.com"), " by ", mention("sam")),
       p(wiki("Target page", "Label")),
     );
-    expect(squash(plainText(document_))).toBe("See docs by @sam Target page Label");
+    expect(squash(plainText(document_))).toBe(
+      "See docs by @sam Target page Label",
+    );
   });
 
-  it("is empty for a missing document and tolerates a mention without a handle", () => {
-    expect(plainText(NO_DOCUMENT)).toBe("");
-    const bare: JSONContent = { type: "mention" };
-    expect(plainText(bare)).toBe("@");
-  });
+  it(
+    "is empty for a missing document and tolerates a mention without a " +
+      "handle",
+    () => {
+      expect(plainText(NO_DOCUMENT)).toBe("");
+      const bare: JSONContent = { type: "mention" };
+      expect(plainText(bare)).toBe("@");
+    },
+  );
 });
 
 describe("newPageId", () => {
   it("makes a 26-character Crockford ULID from the time and randomness", () => {
     const id = newPageId(0, () => 0);
     expect(id).toBe("0".repeat(26));
-    expect(newPageId(Date.UTC(2026, 0, 1), () => 0.999)).toMatch(/^[0-9A-HJKMNP-TV-Z]{10}Z{16}$/);
+    expect(newPageId(Date.UTC(2026, 0, 1), () => 0.999)).toMatch(
+      /^[0-9A-HJKMNP-TV-Z]{10}Z{16}$/,
+    );
   });
 
   it("uses the clock and Math.random by default", () => {
@@ -110,7 +126,11 @@ describe("createMemoryStore", () => {
     const store = createStore();
     const listener = vi.fn();
     const unsubscribe = store.subscribe(listener);
-    const created = await store.createPage({ spaceId: SPACE, parentId: "parent", title: "New" });
+    const created = await store.createPage({
+      spaceId: SPACE,
+      parentId: "parent",
+      title: "New",
+    });
     expect(created).toMatchObject({
       parentId: "parent",
       position: 2,
@@ -127,7 +147,10 @@ describe("createMemoryStore", () => {
   });
 
   it("creates the first page of an empty parent with an empty title", async () => {
-    const created = await createStore().createPage({ spaceId: SPACE, parentId: "child" });
+    const created = await createStore().createPage({
+      spaceId: SPACE,
+      parentId: "child",
+    });
     expect(created?.position).toBe(1);
     expect(created?.title).toBe("");
   });
@@ -136,28 +159,34 @@ describe("createMemoryStore", () => {
     const store = createStore();
     store.renamePage("other", "Budget 2027");
     store.toggleStar("other");
-    const renamed = store.getSnapshot().pages.find((entry) => entry.id === "other");
+    const renamed = store
+      .getSnapshot()
+      .pages.find((entry) => entry.id === "other");
     expect(renamed).toMatchObject({
       title: "Budget 2027",
       starred: true,
       updatedAt: NOW.toISOString(),
     });
     store.toggleStar("other");
-    expect(store.getSnapshot().pages.find((entry) => entry.id === "other")?.starred).toBe(false);
+    expect(
+      store.getSnapshot().pages.find((entry) => entry.id === "other")?.starred,
+    ).toBe(false);
   });
 
   it("moves a page", () => {
     const store = createStore();
     store.movePage("other", { spaceId: SPACE, parentId: "parent", index: 0 });
-    expect(store.getSnapshot().pages.find((entry) => entry.id === "other")?.parentId).toBe(
-      "parent",
-    );
+    expect(
+      store.getSnapshot().pages.find((entry) => entry.id === "other")?.parentId,
+    ).toBe("parent");
   });
 
   it("trashes a page with its subtree", () => {
     const store = createStore();
     store.trashPage("parent");
-    expect(store.getSnapshot().pages.map((entry) => entry.id)).toEqual(["other"]);
+    expect(store.getSnapshot().pages.map((entry) => entry.id)).toEqual([
+      "other",
+    ]);
   });
 
   it("never has a problem to dismiss", () => {
@@ -196,7 +225,9 @@ describe("search", () => {
 
   it("matches titles without a body match", async () => {
     const hits = await createStore().search("budget");
-    expect(hits.map((hit) => [hit.page.id, hit.snippet])).toEqual([["other", ""]]);
+    expect(hits.map((hit) => [hit.page.id, hit.snippet])).toEqual([
+      ["other", ""],
+    ]);
   });
 
   it("trims long snippets with ellipses on both sides", async () => {
@@ -210,7 +241,11 @@ describe("search", () => {
     const store = createStore();
     store.renamePage("child", "A gateway child");
     const hits = await store.search("gateway");
-    expect(hits.map((hit) => hit.page.id)).toEqual(["child", "parent", "other"]);
+    expect(hits.map((hit) => hit.page.id)).toEqual([
+      "child",
+      "parent",
+      "other",
+    ]);
   });
 });
 

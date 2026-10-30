@@ -6,7 +6,12 @@ import { useId, useState, type ComponentProps } from "react";
 import { failureText } from "../../data/failure";
 import { useT } from "../../i18n/i18n";
 
-import { formText, type AdminSignInApi, type ProviderInput, type ProviderView } from "./api";
+import {
+  formText,
+  type AdminSignInApi,
+  type ProviderInput,
+  type ProviderView,
+} from "./api";
 
 type Submit = NonNullable<ComponentProps<"form">["onSubmit"]>;
 type Kind = "oidc" | "saml";
@@ -22,7 +27,11 @@ function domainList(text: string): string[] {
  * What the form holds. A blank client secret or certificate keeps the
  * stored one when changing a provider.
  */
-function providerInput(data: FormData, kind: Kind, adding: boolean): ProviderInput {
+function providerInput(
+  data: FormData,
+  kind: Kind,
+  adding: boolean,
+): ProviderInput {
   const common = {
     kind,
     name: formText(data, "name"),
@@ -54,10 +63,11 @@ function Field({
   name,
   label,
   ...rest
-}: { readonly id: string; readonly name: string; readonly label: string } & Omit<
-  ComponentProps<"input">,
-  "id" | "name"
->) {
+}: {
+  readonly id: string;
+  readonly name: string;
+  readonly label: string;
+} & Omit<ComponentProps<"input">, "id" | "name">) {
   return (
     <>
       <label htmlFor={id}>{label}</label>
@@ -98,7 +108,11 @@ function OidcFields({
         label={t("admin-sso-client-secret")}
         type="password"
         autoComplete="off"
-        placeholder={editing?.hasClientSecret === true ? t("admin-sso-secret-kept") : undefined}
+        placeholder={
+          editing?.hasClientSecret === true
+            ? t("admin-sso-secret-kept")
+            : undefined
+        }
       />
     </>
   );
@@ -113,7 +127,13 @@ function samlStart(editing: ProviderView | undefined) {
   };
 }
 
-function ReadNotice({ ok, text }: { readonly ok: boolean; readonly text: string }) {
+function ReadNotice({
+  ok,
+  text,
+}: {
+  readonly ok: boolean;
+  readonly text: string;
+}) {
   return ok ? (
     <p className="vl-muted" role="status">
       {text}
@@ -168,7 +188,9 @@ function SamlFields({
           setCertificate(found.certificate);
           setNotice({
             ok: true,
-            text: t("admin-saml-read", { count: found.certificateFingerprints.length }),
+            text: t("admin-saml-read", {
+              count: found.certificateFingerprints.length,
+            }),
           });
         },
         (error: unknown) => {
@@ -224,7 +246,9 @@ function SamlFields({
           setSsoUrl(event.target.value);
         }}
       />
-      <label htmlFor={field("certificate")}>{t("admin-saml-certificate")}</label>
+      <label htmlFor={field("certificate")}>
+        {t("admin-saml-certificate")}
+      </label>
       <textarea
         id={field("certificate")}
         name="certificate"
@@ -233,7 +257,9 @@ function SamlFields({
         required={fingerprints.length === 0}
         value={certificate}
         placeholder={
-          fingerprints.length > 0 ? t("admin-saml-certificate-kept") : "-----BEGIN CERTIFICATE-----"
+          fingerprints.length > 0
+            ? t("admin-saml-certificate-kept")
+            : "-----BEGIN CERTIFICATE-----"
         }
         onChange={(event) => {
           setCertificate(event.target.value);
@@ -305,11 +331,17 @@ export function ProviderForm({
   const submit: Submit = (event) => {
     event.preventDefault();
     const form = event.currentTarget;
-    const input = providerInput(new FormData(form), kind, editing === undefined);
+    const input = providerInput(
+      new FormData(form),
+      kind,
+      editing === undefined,
+    );
     setBusy(true);
     setError(undefined);
     const saving =
-      editing === undefined ? api.addProvider(input) : api.updateProvider(editing.id, input);
+      editing === undefined
+        ? api.addProvider(input)
+        : api.updateProvider(editing.id, input);
     saving
       .then(
         (saved) => {
@@ -333,9 +365,15 @@ export function ProviderForm({
       aria-busy={busy}
     >
       <h3 id={field("title")}>
-        {editing === undefined ? t("admin-sso-add") : t("admin-sso-edit", { name: editing.name })}
+        {editing === undefined
+          ? t("admin-sso-add")
+          : t("admin-sso-edit", { name: editing.name })}
       </h3>
-      <KindChoice kind={kind} fixed={editing !== undefined} onChange={setKind} />
+      <KindChoice
+        kind={kind}
+        fixed={editing !== undefined}
+        onChange={setKind}
+      />
       <Field
         id={field("name")}
         name="name"
@@ -358,7 +396,11 @@ export function ProviderForm({
         placeholder="northstar.dev"
       />
       <label className="vl-account-scope">
-        <input type="checkbox" name="autoCreate" defaultChecked={start.autoCreate} />
+        <input
+          type="checkbox"
+          name="autoCreate"
+          defaultChecked={start.autoCreate}
+        />
         <span>{t("admin-sso-auto-create")}</span>
       </label>
       <label className="vl-account-scope">

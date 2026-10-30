@@ -63,8 +63,12 @@ pub use error::{Diagnostic, EditError, SchemaError, Severity};
 pub use fence::{ChartData, ChartSource, CollectionEmbed, EmbedError};
 pub use formula::{Formula, FormulaError, Span};
 pub use row::Row;
-pub use schema::{Aggregation, NumberFormat, Property, PropertyType, Schema, SelectOption};
+pub use schema::{
+    Aggregation, NumberFormat, Property, PropertyType, Schema, SelectOption,
+};
 pub use service::CollectionsService;
 pub use value::{DateValue, Value};
-pub use view::{Filter, FilterOp, QueryError, Sort, ViewDef, ViewKind, ViewResult};
+pub use view::{
+    Filter, FilterOp, QueryError, Sort, ViewDef, ViewKind, ViewResult,
+};
 pub use workspace::{Changeset, Collection, Edit, RowRef, Workspace};

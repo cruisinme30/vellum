@@ -134,7 +134,10 @@ pub trait Resolver: Send + Sync {
         let safe = !path.is_empty()
             && path.chars().all(|c| {
                 c.is_ascii_alphanumeric()
-                    || matches!(c, '-' | '_' | '.' | '/' | '?' | '=' | '&' | '#' | '%')
+                    || matches!(
+                        c,
+                        '-' | '_' | '.' | '/' | '?' | '=' | '&' | '#' | '%'
+                    )
             });
         safe.then(|| format!("/{short}/{path}"))
     }

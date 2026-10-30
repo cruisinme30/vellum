@@ -72,7 +72,11 @@ pub const ID_PREFIX: &str = "u-";
 const MAX_DEPTH: usize = 32;
 
 impl<'a> Writer<'a> {
-    pub fn new(resolver: &'a dyn Resolver, figures: &'a Figures, kroki: &'a Resolved) -> Self {
+    pub fn new(
+        resolver: &'a dyn Resolver,
+        figures: &'a Figures,
+        kroki: &'a Resolved,
+    ) -> Self {
         Self {
             out: String::with_capacity(16 * 1024),
             islands: Vec::new(),
@@ -143,7 +147,8 @@ impl<'a> Writer<'a> {
 
     /// Writes ` id="…" class="base user…"` from block attributes.
     pub fn attrs(&mut self, base: &str, attrs: &Attributes) {
-        if let Some(id) = attrs.id.as_deref().filter(|id| html::is_user_id(id)) {
+        if let Some(id) = attrs.id.as_deref().filter(|id| html::is_user_id(id))
+        {
             let id = self.unique_id(id);
             push_attr(&mut self.out, "id", &id);
         }
@@ -162,7 +167,8 @@ impl<'a> Writer<'a> {
     /// Adds a sanitised SVG or MathML island and writes its placeholder.
     pub fn island(&mut self, markup: &str) -> Result<(), String> {
         let n = self.islands.len();
-        let clean = sanitize_island(markup, &format!("f{n}")).map_err(|e| e.to_string())?;
+        let clean = sanitize_island(markup, &format!("f{n}"))
+            .map_err(|e| e.to_string())?;
         self.islands.push(clean);
         self.out.push_str("<span data-vl-island=\"");
         self.out.push_str(&n.to_string());
@@ -204,7 +210,9 @@ impl<'a> Writer<'a> {
                 content,
                 attrs,
                 id,
-            } => self.heading(*level, content, attrs, id.map(|b| b.to_string())),
+            } => {
+                self.heading(*level, content, attrs, id.map(|b| b.to_string()))
+            }
             Block::ThematicBreak => self.out.push_str("<hr>"),
             Block::BlockQuote { blocks, id } => {
                 self.out.push_str("<blockquote");
@@ -279,8 +287,10 @@ impl<'a> Writer<'a> {
         for item in &list.items {
             match item.task {
                 Some(done) => {
-                    self.out
-                        .push_str("<li class=\"vl-task\"><input type=\"checkbox\" disabled");
+                    self.out.push_str(
+                        "<li class=\"vl-task\"><input \
+                            type=\"checkbox\" disabled",
+                    );
                     if done {
                         self.out.push_str(" checked");
                     }
@@ -326,7 +336,8 @@ impl<'a> Writer<'a> {
 
     /// The body of a `vl-math` div, which the caller opens.
     fn math(&mut self, literal: &str) {
-        let rendered = crate::math::to_mathml(literal).and_then(|m| self.island(&m));
+        let rendered =
+            crate::math::to_mathml(literal).and_then(|m| self.island(&m));
         if let Err(e) = rendered {
             self.warn(format!("math: {e}"));
             self.out.push_str("<pre class=\"vl-math-error\"><code>");
@@ -358,7 +369,8 @@ impl<'a> Writer<'a> {
                 align(&mut self.out, table.alignments.get(i));
                 self.out.push('>');
                 let text = vellum_format::plain_text(cell);
-                match (compare && i > 0).then(|| compare_mark(&text)).flatten() {
+                match (compare && i > 0).then(|| compare_mark(&text)).flatten()
+                {
                     Some((class, mark, label)) => {
                         self.out.push_str("<span class=\"");
                         self.out.push_str(class);
@@ -420,12 +432,16 @@ impl<'a> Writer<'a> {
             if entries.is_empty() {
                 list = String::from("<p>No headings yet.</p>");
             }
-            self.out = self.out.replacen(&format!("\u{1}toc{n}\u{1}"), &list, 1);
+            self.out =
+                self.out.replacen(&format!("\u{1}toc{n}\u{1}"), &list, 1);
         }
     }
 
     /// The figure for a fence: drawn locally, or from the Kroki pre-pass.
-    pub fn figure(&self, f: &vellum_format::Fence) -> Option<Result<Figure, FigureError>> {
+    pub fn figure(
+        &self,
+        f: &vellum_format::Fence,
+    ) -> Option<Result<Figure, FigureError>> {
         self.figures.draw_local(f).or_else(|| {
             let key = crate::figure::content_key(f);
             Some(match self.kroki.get(&key) {
@@ -449,11 +465,15 @@ fn align(out: &mut String, a: Option<&Alignment>) {
 }
 
 /// `✓ ✗ ◐` or yes/no/part.
-fn compare_mark(text: &str) -> Option<(&'static str, &'static str, &'static str)> {
+fn compare_mark(
+    text: &str,
+) -> Option<(&'static str, &'static str, &'static str)> {
     match text.trim().to_lowercase().as_str() {
         "✓" | "✔" | "yes" => Some(("vl-yes", "✓", "Yes")),
         "✗" | "✘" | "no" => Some(("vl-no", "✗", "No")),
-        "◐" | "part" | "partly" | "partial" => Some(("vl-part", "◐", "Partly")),
+        "◐" | "part" | "partly" | "partial" => {
+            Some(("vl-part", "◐", "Partly"))
+        }
         _ => None,
     }
 }
@@ -463,20 +483,24 @@ fn is_compare_matrix(table: &Table) -> bool {
     table.header.len() >= 2
         && !table.rows.is_empty()
         && table.rows.iter().all(|row| {
-            row.iter()
-                .skip(1)
-                .all(|cell| compare_mark(&vellum_format::plain_text(cell)).is_some())
+            row.iter().skip(1).all(|cell| {
+                compare_mark(&vellum_format::plain_text(cell)).is_some()
+            })
         })
 }
 
 /// Status words that become coloured chips in table cells.
 fn chip_class(text: &str) -> Option<&'static str> {
     Some(match text.trim().to_lowercase().as_str() {
-        "done" | "shipped" | "approved" | "stable" | "verified" | "yes" | "complete"
-        | "completed" => "vl-chip-good",
+        "done" | "shipped" | "approved" | "stable" | "verified" | "yes"
+        | "complete" | "completed" => "vl-chip-good",
         "in review" | "in progress" | "started" => "vl-chip-info",
-        "partly" | "open" | "at risk" | "p1" | "p2" | "outdated" => "vl-chip-warn",
-        "blocked" | "no" | "p0" | "off track" | "canceled" | "cancelled" => "vl-chip-crit",
+        "partly" | "open" | "at risk" | "p1" | "p2" | "outdated" => {
+            "vl-chip-warn"
+        }
+        "blocked" | "no" | "p0" | "off track" | "canceled" | "cancelled" => {
+            "vl-chip-crit"
+        }
         "decision" | "later" => "vl-chip-tip",
         "draft" | "backlog" => "vl-chip-note",
         _ => return None,

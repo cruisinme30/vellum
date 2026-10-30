@@ -12,8 +12,11 @@ use vellum_observe::{TraceQuery, TraceStore, recorder_layer};
 fn kernel_subscriber_feeds_the_ring_buffer() {
     let store = Arc::new(TraceStore::default());
     let config = TelemetryConfig::from_lookup("vellum-test", "0.0.0", |_| None);
-    let (subscriber, _guard) =
-        subscriber_with(&config, Some(Box::new(recorder_layer(Arc::clone(&store))))).unwrap();
+    let (subscriber, _guard) = subscriber_with(
+        &config,
+        Some(Box::new(recorder_layer(Arc::clone(&store)))),
+    )
+    .unwrap();
     tracing::subscriber::with_default(subscriber, || {
         let span = tracing::info_span!(target: "vellum_jobs", "job.digest");
         let _entered = span.enter();

@@ -15,8 +15,8 @@ use vellum_crypto::CryptoError;
 use vellum_crypto::recipients::{is_recipient_envelope, recipients_of};
 use vellum_kernel::{DocId, ObjectId, SpaceId, Timestamp, UserId};
 use vellum_search::{
-    IndexKey, Location, Principal, ReadAccess, SearchError, SearchHit, SearchQuery, SearchService,
-    Stars, TantivyBackend, TantivyConfig, Update,
+    IndexKey, Location, Principal, ReadAccess, SearchError, SearchHit,
+    SearchQuery, SearchService, Stars, TantivyBackend, TantivyConfig, Update,
 };
 use vellum_store::layout::{FOLDER_META, Kind};
 use vellum_store::{BlobPath, BlobStore, StoreError};
@@ -60,14 +60,16 @@ impl PrivateSpace {
         } else {
             bytes.to_vec()
         };
-        let text = String::from_utf8(bytes)
-            .map_err(|_| AgentError::NotASpace(format!("{root}: the manifest is not text")))?;
+        let text = String::from_utf8(bytes).map_err(|_| {
+            AgentError::NotASpace(format!("{root}: the manifest is not text"))
+        })?;
         let meta: Manifest = serde_saphyr::from_str(&text)
             .map_err(|e| AgentError::NotASpace(format!("{root}: {e}")))?;
-        let id: ObjectId = meta
-            .id
-            .parse()
-            .map_err(|_| AgentError::NotASpace(format!("{root}: the manifest id is not valid")))?;
+        let id: ObjectId = meta.id.parse().map_err(|_| {
+            AgentError::NotASpace(format!(
+                "{root}: the manifest id is not valid"
+            ))
+        })?;
         Ok(Self {
             id: id.into(),
             slug: slug.to_owned(),
@@ -152,7 +154,8 @@ impl PrivateAgent {
         spaces: Vec<PrivateSpace>,
     ) -> Result<Self, AgentError> {
         let mut seen = HashSet::new();
-        if let Some(dup) = spaces.iter().find(|s| !seen.insert(s.slug.clone())) {
+        if let Some(dup) = spaces.iter().find(|s| !seen.insert(s.slug.clone()))
+        {
             return Err(AgentError::DuplicateSlug(dup.slug.clone()));
         }
         let key = vellum_crypto::recipients::RecipientSecret::generate()?;
@@ -162,7 +165,11 @@ impl PrivateAgent {
             model: None,
         })?;
         let readable = Everything(spaces.iter().map(|s| s.id).collect());
-        let search = SearchService::new(Arc::new(backend), Arc::new(readable), Arc::new(NoStars));
+        let search = SearchService::new(
+            Arc::new(backend),
+            Arc::new(readable),
+            Arc::new(NoStars),
+        );
         Ok(Self {
             identity,
             store,
@@ -218,10 +225,12 @@ impl PrivateAgent {
                         .collect(),
                 )
                 .await?;
-            *self.docs.write().await = docs.into_iter().map(|(id, d)| (id, Arc::new(d))).collect();
+            *self.docs.write().await =
+                docs.into_iter().map(|(id, d)| (id, Arc::new(d))).collect();
             let span = tracing::Span::current();
             let _ = span.record("opened", report.opened);
-            let _ = span.record("not_for_this_device", report.not_for_this_device);
+            let _ =
+                span.record("not_for_this_device", report.not_for_this_device);
             let _ = span.record("unreadable", report.unreadable);
             Ok(report)
         }
@@ -235,7 +244,8 @@ impl PrivateAgent {
         report: &mut Report,
         docs: &mut BTreeMap<DocId, PrivateDoc>,
     ) -> Result<(), AgentError> {
-        let entries: Vec<_> = self.store.list(Some(&space.root)).try_collect().await?;
+        let entries: Vec<_> =
+            self.store.list(Some(&space.root)).try_collect().await?;
         let mine = self.identity.fingerprint();
         for entry in entries {
             if Kind::of(&entry.path) != Kind::Document {
@@ -249,24 +259,30 @@ impl PrivateAgent {
                 Err(StoreError::NotFound(_)) => continue,
                 Err(error) => {
                     report.unreadable += 1;
-                    tracing::warn!(path = %entry.path, %error, "skipped a private page that could not be fetched");
+                    tracing::warn!(path = %entry.path, %error, "skipped a \
+                        private page that could not be fetched");
                     continue;
                 }
             };
             if !is_recipient_envelope(&sealed) {
                 report.not_sealed += 1;
-                tracing::warn!(path = %entry.path, "skipped a file that is not sealed in a private space");
+                tracing::warn!(path = %entry.path, "skipped a file that is not \
+                    sealed in a private space");
                 continue;
             }
             let plain = match self.identity.open(&sealed) {
                 Ok(plain) => plain,
-                Err(_) if !recipients_of(&sealed).is_ok_and(|r| r.contains(&mine)) => {
+                Err(_)
+                    if !recipients_of(&sealed)
+                        .is_ok_and(|r| r.contains(&mine)) =>
+                {
                     report.not_for_this_device += 1;
                     continue;
                 }
                 Err(error) => {
                     report.unreadable += 1;
-                    tracing::warn!(path = %entry.path, %error, "a private page did not open");
+                    tracing::warn!(path = %entry.path, %error, "a private page \
+                        did not open");
                     continue;
                 }
             };
@@ -300,14 +316,21 @@ impl PrivateAgent {
     /// # Errors
     ///
     /// The index failed.
-    #[tracing::instrument(name = "private.search", skip(self, text), fields(chars = text.len()))]
+    #[tracing::instrument(
+        name = "private.search",
+        skip(self, text),
+        fields(chars = text.len())
+    )]
     pub async fn search(
         &self,
         text: &str,
         space: Option<&str>,
         limit: usize,
     ) -> Result<Vec<SearchHit>, AgentError> {
-        let mut query = SearchQuery::new(text, limit.clamp(1, vellum_search::model::MAX_LIMIT));
+        let mut query = SearchQuery::new(
+            text,
+            limit.clamp(1, vellum_search::model::MAX_LIMIT),
+        );
         if let Some(slug) = space {
             match self.space(slug) {
                 Some(space) => query.filters.spaces = vec![space.id],
@@ -327,7 +350,10 @@ impl PrivateAgent {
     }
 
     /// The page at this path in the store.
-    pub async fn document_by_path(&self, path: &str) -> Option<Arc<PrivateDoc>> {
+    pub async fn document_by_path(
+        &self,
+        path: &str,
+    ) -> Option<Arc<PrivateDoc>> {
         self.docs
             .read()
             .await
@@ -360,7 +386,10 @@ struct Everything(Vec<SpaceId>);
 
 #[async_trait]
 impl ReadAccess for Everything {
-    async fn readable_spaces(&self, _principal: &Principal) -> vellum_search::Result<Vec<SpaceId>> {
+    async fn readable_spaces(
+        &self,
+        _principal: &Principal,
+    ) -> vellum_search::Result<Vec<SpaceId>> {
         Ok(self.0.clone())
     }
 
@@ -377,7 +406,10 @@ struct NoStars;
 
 #[async_trait]
 impl Stars for NoStars {
-    async fn starred(&self, _user: UserId) -> vellum_search::Result<HashSet<DocId>> {
+    async fn starred(
+        &self,
+        _user: UserId,
+    ) -> vellum_search::Result<HashSet<DocId>> {
         Ok(HashSet::new())
     }
 }

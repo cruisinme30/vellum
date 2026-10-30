@@ -9,15 +9,18 @@ use std::time::Duration;
 
 use sqlx::postgres::{PgPool, PgPoolOptions};
 use sqlx::sqlite::{
-    SqliteConnectOptions, SqliteJournalMode, SqlitePool, SqlitePoolOptions, SqliteSynchronous,
+    SqliteConnectOptions, SqliteJournalMode, SqlitePool, SqlitePoolOptions,
+    SqliteSynchronous,
 };
 
 use crate::config::IndexConfig;
 use crate::error::{Error, Result};
 use crate::telemetry::traced;
 
-static SQLITE_MIGRATIONS: sqlx::migrate::Migrator = sqlx::migrate!("./migrations/sqlite");
-static POSTGRES_MIGRATIONS: sqlx::migrate::Migrator = sqlx::migrate!("./migrations/postgres");
+static SQLITE_MIGRATIONS: sqlx::migrate::Migrator =
+    sqlx::migrate!("./migrations/sqlite");
+static POSTGRES_MIGRATIONS: sqlx::migrate::Migrator =
+    sqlx::migrate!("./migrations/postgres");
 
 /// Which database the index lives in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -143,7 +146,9 @@ impl Drop for SqliteCloser {
 
 /// Closes `pool` on a thread with its own runtime, which needs nothing
 /// from the caller's runtime except that it keeps running.
-fn close_in_background(pool: SqlitePool) -> std::io::Result<std::thread::JoinHandle<()>> {
+fn close_in_background(
+    pool: SqlitePool,
+) -> std::io::Result<std::thread::JoinHandle<()>> {
     let spawned = std::thread::Builder::new()
         .name("vellum-db-close".into())
         .spawn(move || {
@@ -173,8 +178,8 @@ fn close_in_background(pool: SqlitePool) -> std::io::Result<std::thread::JoinHan
 impl Index {
     /// Connects, unlocks (SQLCipher), and applies every pending migration.
     ///
-    /// # Errors
-    /// Fails if the database is unreachable, the key is wrong, or a migration fails.
+    /// # Errors Fails if the database is unreachable, the key is wrong, or a
+    /// migration fails.
     #[tracing::instrument(name = "db.open", skip_all, fields(db.system))]
     pub async fn open(config: &IndexConfig) -> Result<Self> {
         let index = match config {
@@ -198,8 +203,11 @@ impl Index {
                     .connect_with(options)
                     .await
                     .map_err(|err| match err {
-                        // SQLITE_NOTADB: wrong key, or an encrypted file opened without one.
-                        sqlx::Error::Database(db) if db.code().as_deref() == Some("26") => {
+                        // SQLITE_NOTADB: wrong key, or an encrypted file opened
+                        // without one.
+                        sqlx::Error::Database(db)
+                            if db.code().as_deref() == Some("26") =>
+                        {
                             Error::Locked {
                                 path: path.display().to_string(),
                             }
@@ -226,7 +234,8 @@ impl Index {
                 }
             }
         };
-        let _ = tracing::Span::current().record("db.system", index.backend().otel_system());
+        let _ = tracing::Span::current()
+            .record("db.system", index.backend().otel_system());
         index.migrate().await?;
         Ok(index)
     }
@@ -257,9 +266,12 @@ impl Index {
     pub async fn migrate(&self) -> Result<()> {
         let system = self.backend().otel_system();
         match &self.pool {
-            Pool::Sqlite(pool) => traced(system, "migrate", SQLITE_MIGRATIONS.run(pool)).await?,
+            Pool::Sqlite(pool) => {
+                traced(system, "migrate", SQLITE_MIGRATIONS.run(pool)).await?
+            }
             Pool::Postgres(pool) => {
-                traced(system, "migrate", POSTGRES_MIGRATIONS.run(pool)).await?;
+                traced(system, "migrate", POSTGRES_MIGRATIONS.run(pool))
+                    .await?;
             }
         }
         Ok(())
@@ -273,10 +285,20 @@ impl Index {
         let system = self.backend().otel_system();
         match &self.pool {
             Pool::Sqlite(pool) => {
-                let _ = traced(system, "ping", sqlx::query("SELECT 1").execute(pool)).await?;
+                let _ = traced(
+                    system,
+                    "ping",
+                    sqlx::query("SELECT 1").execute(pool),
+                )
+                .await?;
             }
             Pool::Postgres(pool) => {
-                let _ = traced(system, "ping", sqlx::query("SELECT 1").execute(pool)).await?;
+                let _ = traced(
+                    system,
+                    "ping",
+                    sqlx::query("SELECT 1").execute(pool),
+                )
+                .await?;
             }
         }
         Ok(())
@@ -292,16 +314,17 @@ impl Index {
         let names = match &self.pool {
             Pool::Sqlite(pool) => {
                 let q = sqlx::query_scalar(
-                    "SELECT name FROM sqlite_master WHERE type = 'table' \
-                     AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_sqlx_%' ORDER BY name",
+                    "SELECT name FROM sqlite_master WHERE type = 'table' AND \
+                     name NOT LIKE 'sqlite_%' AND name NOT LIKE '_sqlx_%' \
+                     ORDER BY name",
                 );
                 traced(system, "table_names", q.fetch_all(pool)).await?
             }
             Pool::Postgres(pool) => {
                 let q = sqlx::query_scalar(
                     "SELECT table_name::text FROM information_schema.tables \
-                     WHERE table_schema = current_schema() AND table_name NOT LIKE '_sqlx_%' \
-                     ORDER BY table_name",
+                     WHERE table_schema = current_schema() AND table_name NOT \
+                     LIKE '_sqlx_%' ORDER BY table_name",
                 );
                 traced(system, "table_names", q.fetch_all(pool)).await?
             }

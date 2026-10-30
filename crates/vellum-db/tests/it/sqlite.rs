@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-//! SQLite backend: migrations from zero, SQLCipher encryption, schema constraints.
+//! SQLite backend: migrations from zero, SQLCipher encryption, schema
+//! constraints.
 
 use std::str::FromStr as _;
 
@@ -50,7 +51,8 @@ const fn key(byte: u8) -> IndexKey {
 #[tokio::test]
 async fn migrates_from_zero_and_is_idempotent() {
     let dir = tempfile::tempdir().unwrap();
-    let config = IndexConfig::sqlite(dir.path().join("index.sqlite"), Some(key(7)));
+    let config =
+        IndexConfig::sqlite(dir.path().join("index.sqlite"), Some(key(7)));
     let index = Index::open(&config).await.unwrap();
     assert_eq!(index.backend(), Backend::Sqlite);
     index.ping().await.unwrap();
@@ -123,16 +125,18 @@ async fn schema_enforces_ids_paths_and_cascades() {
     let doc = [2_u8; 16];
 
     let _ = sqlx::query(
-        "INSERT INTO spaces (space_id, kind, slug, root_path, name, indexed_at) \
-         VALUES (?, 'shared_drive', 'eng', 'drives/shared/eng', 'Engineering', 0)",
+        "INSERT INTO spaces (space_id, kind, slug, root_path, name, \
+         indexed_at) VALUES (?, 'shared_drive', 'eng', 'drives/shared/eng', \
+         'Engineering', 0)",
     )
     .bind(&space[..])
     .execute(&mut conn)
     .await
     .unwrap();
 
-    let insert_doc = "INSERT INTO documents (space_id, doc_id, kind, path, title, content_hash, \
-                      byte_size, modified_at, indexed_at) VALUES (?, ?, 'page', ?, 'Roadmap', 'h', 1, 0, 0)";
+    let insert_doc = "INSERT INTO documents (space_id, doc_id, kind, path, \
+                      title, content_hash, byte_size, modified_at, indexed_at) \
+                      VALUES (?, ?, 'page', ?, 'Roadmap', 'h', 1, 0, 0)";
     let _ = sqlx::query(insert_doc)
         .bind(&space[..])
         .bind(&doc[..])
@@ -141,7 +145,8 @@ async fn schema_enforces_ids_paths_and_cascades() {
         .await
         .unwrap();
 
-    // Same path twice in one space, a short ID, and an unknown space are all rejected.
+    // Same path twice in one space, a short ID, and an unknown space are all
+    // rejected.
     let dup_path = sqlx::query(insert_doc)
         .bind(&space[..])
         .bind(&[3_u8; 16][..])

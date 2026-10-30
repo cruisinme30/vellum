@@ -43,13 +43,15 @@ enum Engine {
 
 /// The fixtures, as (version, SQL), oldest first.
 fn fixtures() -> Vec<(i64, String)> {
-    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/upgrade");
+    let dir =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/upgrade");
     let mut found: Vec<(i64, String)> = std::fs::read_dir(&dir)
         .unwrap()
         .map(|entry| entry.unwrap().path())
         .filter(|path| path.extension().is_some_and(|e| e == "sql"))
         .map(|path| {
-            let version = path.file_stem().unwrap().to_str().unwrap().parse().unwrap();
+            let version =
+                path.file_stem().unwrap().to_str().unwrap().parse().unwrap();
             (version, std::fs::read_to_string(&path).unwrap())
         })
         .collect();
@@ -125,30 +127,23 @@ fn versions(migrator: &Migrator) -> Vec<i64> {
     migrator.iter().map(|m| m.version).collect()
 }
 
-const SQLITE_SCHEMA: &str = "SELECT type || ' ' || name || ': ' || coalesce(sql, '') \
-     FROM sqlite_master \
-     WHERE name NOT LIKE 'sqlite_%' AND name <> '_sqlx_migrations' \
-     ORDER BY type, name";
+const SQLITE_SCHEMA: &str = "SELECT type || ' ' || name || ': ' || \
+     coalesce(sql, '') FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' AND \
+     name <> '_sqlx_migrations' ORDER BY type, name";
 
-const POSTGRES_SCHEMA: &str = "\
-    SELECT 'column ' || table_name || '.' || column_name || ' ' || data_type || ' ' \
-        || is_nullable || ' ' || coalesce(column_default, '') \
-    FROM information_schema.columns \
-    WHERE table_schema = 'public' AND table_name <> '_sqlx_migrations' \
-    UNION ALL \
-    SELECT 'index ' || indexdef FROM pg_indexes \
-    WHERE schemaname = 'public' AND tablename <> '_sqlx_migrations' \
-    UNION ALL \
-    SELECT 'constraint ' || conrelid::regclass || ' ' || conname || ' ' || pg_get_constraintdef(oid) \
-    FROM pg_constraint WHERE connamespace = 'public'::regnamespace \
-        AND conrelid::regclass::text <> '_sqlx_migrations' \
-    UNION ALL \
-    SELECT 'trigger ' || tgrelid::regclass || ' ' || tgname || ' ' || pg_get_triggerdef(oid) \
-    FROM pg_trigger WHERE NOT tgisinternal \
-    UNION ALL \
-    SELECT 'function ' || p.proname || ' ' || md5(pg_get_functiondef(p.oid)) \
-    FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace \
-    ORDER BY 1";
+const POSTGRES_SCHEMA: &str = "SELECT 'column ' || table_name || '.' || \
+    column_name || ' ' || data_type || ' ' || is_nullable || ' ' || \
+    coalesce(column_default, '') FROM information_schema.columns WHERE \
+    table_schema = 'public' AND table_name <> '_sqlx_migrations' UNION ALL \
+    SELECT 'index ' || indexdef FROM pg_indexes WHERE schemaname = 'public' \
+    AND tablename <> '_sqlx_migrations' UNION ALL SELECT 'constraint ' || \
+    conrelid::regclass || ' ' || conname || ' ' || pg_get_constraintdef(oid) \
+    FROM pg_constraint WHERE connamespace = 'public'::regnamespace AND \
+    conrelid::regclass::text <> '_sqlx_migrations' UNION ALL SELECT 'trigger ' \
+    || tgrelid::regclass || ' ' || tgname || ' ' || pg_get_triggerdef(oid) \
+    FROM pg_trigger WHERE NOT tgisinternal UNION ALL SELECT 'function ' || \
+    p.proname || ' ' || md5(pg_get_functiondef(p.oid)) FROM pg_proc p WHERE \
+    p.pronamespace = 'public'::regnamespace ORDER BY 1";
 
 async fn sqlite_conn(path: &Path) -> SqliteConnection {
     let options = SqliteConnectOptions::from_str("sqlite://")
@@ -253,7 +248,9 @@ impl Server {
         let port = container.get_host_port_ipv4(5432).await.unwrap();
         Self {
             _container: Some(container),
-            admin_url: format!("postgres://postgres:postgres@127.0.0.1:{port}/postgres"),
+            admin_url: format!(
+                "postgres://postgres:postgres@127.0.0.1:{port}/postgres"
+            ),
         }
     }
 
@@ -357,11 +354,13 @@ fn fixtures_render_for_both_engines() {
     let sql = "-- ID(n) in a comment is left alone\nVALUES (ID(1), ID(255))";
     assert_eq!(
         render(sql, Engine::Sqlite),
-        "VALUES (X'0193c0de000070008000000000000001', X'0193c0de0000700080000000000000ff')\n"
+        "VALUES (X'0193c0de000070008000000000000001', \
+            X'0193c0de0000700080000000000000ff')\n"
     );
     assert_eq!(
         render(sql, Engine::Postgres),
-        "VALUES ('0193c0de-0000-7000-8000-000000000001', '0193c0de-0000-7000-8000-0000000000ff')\n"
+        "VALUES ('0193c0de-0000-7000-8000-000000000001', \
+            '0193c0de-0000-7000-8000-0000000000ff')\n"
     );
     assert!(seeded_tables(3).contains(&"drive_nodes".to_owned()));
     assert!(seeded_tables(2).is_empty());

@@ -18,11 +18,14 @@ use vellum_admin::AuditLog as _;
 use vellum_admin::audit::AuditQuery;
 use vellum_admin::usage::{UsageFacts, UsageReport, UsageTransport};
 use vellum_admin::{
-    AdminPaths, AdminService, AuditActor, Caller, MemoryAuditLog, MemorySettingsStore,
+    AdminPaths, AdminService, AuditActor, Caller, MemoryAuditLog,
+    MemorySettingsStore,
 };
 use vellum_crypto::{KekId, LocalKeyring, SecretKey};
 use vellum_kernel::{ErrorKind, Result};
-use vellum_observe::{RequestObservation, RouteMetrics, TraceParent, TraceQuery, TraceStore};
+use vellum_observe::{
+    RequestObservation, RouteMetrics, TraceParent, TraceQuery, TraceStore,
+};
 
 #[derive(Default)]
 struct Recorded(Mutex<Vec<(String, UsageReport)>>);
@@ -52,7 +55,8 @@ fn fixture() -> Fixture {
     let data = tempfile::tempdir().unwrap();
     let scratch = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(data.path().join("drives/shared/eng")).unwrap();
-    std::fs::write(data.path().join("drives/shared/eng/Plan.md"), "# Plan\n").unwrap();
+    std::fs::write(data.path().join("drives/shared/eng/Plan.md"), "# Plan\n")
+        .unwrap();
     let audit = Arc::new(MemoryAuditLog::default());
     let traces = Arc::new(TraceStore::default());
     let metrics = RouteMetrics::new();
@@ -190,12 +194,17 @@ async fn tick_backs_up_drills_and_reports_once() {
 #[tokio::test]
 async fn requests_routes_slos_profile_and_client_reports() {
     let f = fixture();
-    let subscriber =
-        tracing_subscriber::registry().with(vellum_observe::recorder_layer(f.traces.clone()));
+    let subscriber = tracing_subscriber::registry()
+        .with(vellum_observe::recorder_layer(f.traces.clone()));
     let trace_id = tracing::subscriber::with_default(subscriber, || {
         tracing::callsite::rebuild_interest_cache();
-        let obs =
-            RequestObservation::begin(&f.metrics, "GET", "/api/v1/pages/{page_id}", None, "req-1");
+        let obs = RequestObservation::begin(
+            &f.metrics,
+            "GET",
+            "/api/v1/pages/{page_id}",
+            None,
+            "req-1",
+        );
         let id = obs.trace_id();
         {
             let _enter = obs.span().enter();

@@ -45,31 +45,46 @@ const STATUS: Record<Exclude<ServerState, "signed-in">, object> = {
  * Answers the requests the app makes before anyone signs in. Routes are set
  * on the context, so they also answer requests a service worker forwards.
  */
-export async function fakeServer(page: Page, state: ServerState | undefined): Promise<void> {
+export async function fakeServer(
+  page: Page,
+  state: ServerState | undefined,
+): Promise<void> {
   if (state === undefined) return;
   const context = page.context();
   if (state === "work") await workRoutes(context);
   if (state === "signed-in") {
-    // Relative times ("2 days ago") and today's buckets stay the same on any day.
+    // Relative times ("2 days ago") and today's buckets stay the same on any
+    // day.
     await page.clock.setFixedTime(NORTHSTAR_NOW);
     await northstarServer(context);
     return;
   }
-  await context.route("**/api/v1/auth/status", (route) => route.fulfill({ json: STATUS[state] }));
+  await context.route("**/api/v1/auth/status", (route) =>
+    route.fulfill({ json: STATUS[state] }),
+  );
   // The organisation's look is fetched before anyone signs in (R-TH-1).
-  await context.route("**/api/v1/appearance", (route) => route.fulfill({ json: APPEARANCE }));
+  await context.route("**/api/v1/appearance", (route) =>
+    route.fulfill({ json: APPEARANCE }),
+  );
   await context.route("**/api/csrf", (route) =>
     route.fulfill({ json: { token: "t", header: "x-csrf-token" } }),
   );
   // The organisation's look (ADR 0007): the defaults, as a new server has.
-  await context.route("**/api/v1/appearance", (route) => route.fulfill({ json: {} }));
+  await context.route("**/api/v1/appearance", (route) =>
+    route.fulfill({ json: {} }),
+  );
   if (state !== "drive") return;
   await context.route("**/api/v1/**", (route) => {
     const url = new URL(route.request().url());
-    if (url.pathname === "/api/v1/auth/status" || url.pathname === "/api/v1/appearance") {
+    if (
+      url.pathname === "/api/v1/auth/status" ||
+      url.pathname === "/api/v1/appearance"
+    ) {
       return route.fallback();
     }
     const json = driveAnswer(url.pathname);
-    return json === undefined ? route.fulfill({ status: 404, json: {} }) : route.fulfill({ json });
+    return json === undefined
+      ? route.fulfill({ status: 404, json: {} })
+      : route.fulfill({ json });
   });
 }

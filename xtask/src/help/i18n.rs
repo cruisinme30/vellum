@@ -18,12 +18,17 @@ use super::markdown;
 pub const I18N_DIR: &str = "docs/i18n";
 
 /// Checks every translation under `docs/i18n` against `books`.
-pub fn check(root: &Path, books: &[Book], errors: &mut Vec<String>) -> Result<(), String> {
+pub fn check(
+    root: &Path,
+    books: &[Book],
+    errors: &mut Vec<String>,
+) -> Result<(), String> {
     let dir = root.join(I18N_DIR);
     let Ok(locales) = fs::read_dir(&dir) else {
         return Ok(());
     };
-    let mut locales: Vec<_> = locales.filter_map(Result::ok).map(|e| e.path()).collect();
+    let mut locales: Vec<_> =
+        locales.filter_map(Result::ok).map(|e| e.path()).collect();
     locales.sort();
     for locale_dir in locales.iter().filter(|p| p.is_dir()) {
         let locale = locale_dir
@@ -50,14 +55,20 @@ pub fn check(root: &Path, books: &[Book], errors: &mut Vec<String>) -> Result<()
                     .and_then(|n| n.to_str())
                     .unwrap_or_default()
             );
-            if !book_dir.is_dir() || book_dir.extension().is_none_or(|x| x != "book") {
-                errors.push(format!("{shown}: only <name>.book folders belong here"));
+            if !book_dir.is_dir()
+                || book_dir.extension().is_none_or(|x| x != "book")
+            {
+                errors.push(format!(
+                    "{shown}: only <name>.book folders belong here"
+                ));
                 continue;
             }
             let translated = Book::load(&book_dir)?;
             match books.iter().find(|b| b.name == translated.name) {
                 Some(english) => compare(&shown, english, &translated, errors),
-                None => errors.push(format!("{shown}: there is no English book of that name")),
+                None => errors.push(format!(
+                    "{shown}: there is no English book of that name"
+                )),
             }
         }
     }
@@ -65,7 +76,12 @@ pub fn check(root: &Path, books: &[Book], errors: &mut Vec<String>) -> Result<()
 }
 
 /// The ways `translated` may not differ from `english`.
-pub fn compare(shown: &str, english: &Book, translated: &Book, errors: &mut Vec<String>) {
+pub fn compare(
+    shown: &str,
+    english: &Book,
+    translated: &Book,
+    errors: &mut Vec<String>,
+) {
     if translated.manifest.id != english.manifest.id {
         errors.push(format!(
             "{shown}/book.yaml: `id` must be the English book's"
@@ -85,7 +101,8 @@ pub fn compare(shown: &str, english: &Book, translated: &Book, errors: &mut Vec<
             continue;
         };
         let location = format!("{shown}/{}", page.path);
-        let id = |p: &super::book::Page| p.front.as_ref().and_then(|f| f.id.clone());
+        let id =
+            |p: &super::book::Page| p.front.as_ref().and_then(|f| f.id.clone());
         if id(page) != id(original) {
             errors.push(format!("{location}: `id` must be the English page's"));
         }
@@ -95,7 +112,8 @@ pub fn compare(shown: &str, english: &Book, translated: &Book, errors: &mut Vec<
         for anchor in wanted {
             if !anchors.contains(&anchor) {
                 errors.push(format!(
-                    "{location}: keep the heading anchor `{{#{anchor}}}` from the English page"
+                    "{location}: keep the heading anchor `{{#{anchor}}}` from \
+                        the English page"
                 ));
             }
         }
@@ -106,8 +124,8 @@ pub fn compare(shown: &str, english: &Book, translated: &Book, errors: &mut Vec<
 fn is_locale(tag: &str) -> bool {
     let mut parts = tag.split('-');
     let language = parts.next().unwrap_or_default();
-    let ok_language =
-        (2..=3).contains(&language.len()) && language.chars().all(|c| c.is_ascii_lowercase());
+    let ok_language = (2..=3).contains(&language.len())
+        && language.chars().all(|c| c.is_ascii_lowercase());
     ok_language
         && parts.all(|p| {
             (p.len() == 2 && p.chars().all(|c| c.is_ascii_uppercase()))
@@ -142,12 +160,13 @@ mod tests {
         Book::load(&book_dir).unwrap()
     }
 
-    const PAGE: &str =
-        "---\nid: 01M63CFE67X46N7KX44C7WV4HP\ntitle: Start\nvellum: 1\n---\n\n## Share {#share}\n";
+    const PAGE: &str = "---\nid: 01M63CFE67X46N7KX44C7WV4HP\ntitle: Start\n\
+        vellum: 1\n---\n\n## Share {#share}\n";
 
     #[test]
     fn a_translation_keeps_ids_paths_and_anchors() {
-        let dir = std::env::temp_dir().join(format!("vellum-i18n-{}", std::process::id()));
+        let dir = std::env::temp_dir()
+            .join(format!("vellum-i18n-{}", std::process::id()));
         let english = book(
             &dir.join("en"),
             "user",

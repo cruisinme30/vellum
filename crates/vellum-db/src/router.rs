@@ -163,7 +163,9 @@ impl ShardRouter {
         let pick = shards
             .iter()
             .enumerate()
-            .min_by_key(|(i, s)| (counts.get(s.name()).copied().unwrap_or(0), *i))
+            .min_by_key(|(i, s)| {
+                (counts.get(s.name()).copied().unwrap_or(0), *i)
+            })
             .map_or(0, |(i, _)| i);
         let name = shards
             .get(pick)
@@ -180,7 +182,8 @@ impl ShardRouter {
 
 /// Records each space found on a shard but missing from the map.
 async fn adopt(sharded: &ShardedIndex) -> Result<()> {
-    const SQL: &str = "SELECT space_id FROM spaces UNION SELECT space_id FROM drive_spaces";
+    const SQL: &str =
+        "SELECT space_id FROM spaces UNION SELECT space_id FROM drive_spaces";
     let known = sharded.assignments().await?;
     for shard in sharded.shards() {
         let index = shard.index();

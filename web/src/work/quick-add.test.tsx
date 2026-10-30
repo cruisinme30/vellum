@@ -10,10 +10,17 @@ import { ServerApisProvider } from "../data/server-apis";
 import { I18nProvider } from "../i18n/i18n";
 
 import type { TaskView, WorkApi } from "./api";
-import { QuickAddForm, QuickAddProvider, usePageTask, useQuickAdd } from "./quick-add";
+import {
+  QuickAddForm,
+  QuickAddProvider,
+  usePageTask,
+  useQuickAdd,
+} from "./quick-add";
 import { fakeApi, NONE } from "./test-work";
 
-/** A parse that sets every field, with spans that overlap or run past the text. */
+/**
+ * A parse that sets every field, with spans that overlap or run past the text.
+ */
 function fullParse(text: string): ParseView {
   return {
     title: "Pay rent",
@@ -65,10 +72,17 @@ function renderForm(api: WorkApi, onAdded = vi.fn<(title: string) => void>()) {
 
 describe("QuickAddForm", () => {
   it("lists everything the parser understood", async () => {
-    const { api } = fakeApi({ parse: (text) => Promise.resolve(fullParse(text)) });
+    const { api } = fakeApi({
+      parse: (text) => Promise.resolve(fullParse(text)),
+    });
     const { user } = renderForm(api);
-    await user.type(screen.getByRole("textbox", { name: "Add a task" }), "Pay rent");
-    const facts = await screen.findByRole("list", { name: "What Vellum understood" });
+    await user.type(
+      screen.getByRole("textbox", { name: "Add a task" }),
+      "Pay rent",
+    );
+    const facts = await screen.findByRole("list", {
+      name: "What Vellum understood",
+    });
     const items = within(facts)
       .getAllByRole("listitem")
       .map((item) => item.textContent);
@@ -84,7 +98,9 @@ describe("QuickAddForm", () => {
     ]);
     const marks = document.querySelectorAll(".vl-quick-line mark");
     expect([...marks].map((mark) => mark.textContent)).toEqual(["Pay"]);
-    expect(document.querySelector(".vl-quick-line")?.textContent).toBe("Pay rent");
+    expect(document.querySelector(".vl-quick-line")?.textContent).toBe(
+      "Pay rent",
+    );
   });
 
   it("says a rule repeats on schedule when it does not count from completion", async () => {
@@ -98,7 +114,10 @@ describe("QuickAddForm", () => {
       },
     });
     const { user } = renderForm(api);
-    await user.type(screen.getByRole("textbox", { name: "Add a task" }), "Pay rent");
+    await user.type(
+      screen.getByRole("textbox", { name: "Add a task" }),
+      "Pay rent",
+    );
     expect(await screen.findByText(/^Repeats: /)).toBeDefined();
     expect(screen.queryByText(/Repeats after done/)).toBeNull();
   });
@@ -114,18 +133,28 @@ describe("QuickAddForm", () => {
     );
     const { api } = fakeApi({ parse });
     const { user } = renderForm(api);
-    await user.type(screen.getByRole("textbox", { name: "Add a task" }), "soon");
+    await user.type(
+      screen.getByRole("textbox", { name: "Add a task" }),
+      "soon",
+    );
     await waitFor(() => {
       expect(document.querySelector(".vl-quick-line mark")).not.toBeNull();
     });
-    expect(screen.queryByRole("list", { name: "What Vellum understood" })).toBeNull();
+    expect(
+      screen.queryByRole("list", { name: "What Vellum understood" }),
+    ).toBeNull();
   });
 
   it("adds the task without highlights when parsing fails", async () => {
-    const parse = vi.fn<WorkApi["parse"]>(() => Promise.reject(new Error("offline")));
+    const parse = vi.fn<WorkApi["parse"]>(() =>
+      Promise.reject(new Error("offline")),
+    );
     const { api, addTask } = fakeApi({ parse });
     const { user, onAdded } = renderForm(api);
-    await user.type(screen.getByRole("textbox", { name: "Add a task" }), "Call mum");
+    await user.type(
+      screen.getByRole("textbox", { name: "Add a task" }),
+      "Call mum",
+    );
     await waitFor(() => {
       expect(parse).toHaveBeenCalled();
     });
@@ -150,13 +179,18 @@ describe("QuickAddForm", () => {
     const { user } = renderForm(api);
     const list = await screen.findByRole("combobox", { name: "List" });
     await user.selectOptions(list, "list-ops");
-    await user.type(screen.getByRole("textbox", { name: "Add a task" }), "Deploy");
+    await user.type(
+      screen.getByRole("textbox", { name: "Add a task" }),
+      "Deploy",
+    );
     await user.click(screen.getByRole("button", { name: "Add" }));
     expect(addTask).toHaveBeenCalledWith("Deploy", "list-ops");
   });
 
   it("hides the list picker when lists fail to load", async () => {
-    const lists = vi.fn<WorkApi["lists"]>(() => Promise.reject(new Error("down")));
+    const lists = vi.fn<WorkApi["lists"]>(() =>
+      Promise.reject(new Error("down")),
+    );
     const { api } = fakeApi({ lists });
     renderForm(api);
     await waitFor(() => {
@@ -166,7 +200,9 @@ describe("QuickAddForm", () => {
   });
 
   it("shows why adding failed and keeps the line", async () => {
-    const addTask = vi.fn<WorkApi["addTask"]>(() => Promise.reject(new Error("Quota reached")));
+    const addTask = vi.fn<WorkApi["addTask"]>(() =>
+      Promise.reject(new Error("Quota reached")),
+    );
     const { api } = fakeApi({ addTask });
     const { user, onAdded } = renderForm(api);
     const line = screen.getByRole("textbox", { name: "Add a task" });
@@ -187,9 +223,15 @@ describe("QuickAddForm", () => {
     );
     const { api } = fakeApi({ addTask });
     const { user, onAdded } = renderForm(api);
-    await user.type(screen.getByRole("textbox", { name: "Add a task" }), "Once{Enter}{Enter}");
+    await user.type(
+      screen.getByRole("textbox", { name: "Add a task" }),
+      "Once{Enter}{Enter}",
+    );
     expect(addTask).toHaveBeenCalledOnce();
-    expect(screen.getByRole("button", { name: "Add" })).toHaveProperty("disabled", true);
+    expect(screen.getByRole("button", { name: "Add" })).toHaveProperty(
+      "disabled",
+      true,
+    );
     pending.resolve?.(fakeTask("new", "Once"));
     await waitFor(() => {
       expect(onAdded).toHaveBeenCalledWith("Once");
@@ -197,7 +239,11 @@ describe("QuickAddForm", () => {
   });
 });
 
-function PageTaskButton({ page }: { readonly page?: { id: string; title: string } }) {
+function PageTaskButton({
+  page,
+}: {
+  readonly page?: { id: string; title: string };
+}) {
   const task = usePageTask(page);
   return (
     <button
@@ -237,7 +283,10 @@ function renderProvider(work: WorkApi | undefined, children: React.ReactNode) {
   return user;
 }
 
-/** Matches a title that ends with a link to page "a b", whose title had no letters. */
+/**
+ * Matches a title that ends with a link to page "a b", whose title had no
+ * letters.
+ */
 const STRING_WITH_LINK: unknown = expect.stringContaining("[page](/p/a%20b)");
 
 describe("usePageTask", () => {
@@ -248,23 +297,33 @@ describe("usePageTask", () => {
   });
 
   it("is off without a server", () => {
-    renderProvider(undefined, <PageTaskButton page={{ id: "P1", title: "Plan" }} />);
+    renderProvider(
+      undefined,
+      <PageTaskButton page={{ id: "P1", title: "Plan" }} />,
+    );
     expect(screen.getByRole("button", { name: "No task" })).toBeDefined();
   });
 
-  it("opens quick-add with the text, linking to a page whose title has only brackets", async () => {
-    const { api, update } = fakeApi();
-    const user = renderProvider(api, <PageTaskButton page={{ id: "a b", title: "[]" }} />);
-    await user.click(screen.getByRole("button", { name: "Make task" }));
-    const dialog = screen.getByRole("dialog", { name: "Quick-add a task" });
-    expect(within(dialog).getByText(/links back to/)).toBeDefined();
-    await user.click(within(dialog).getByRole("button", { name: "Add" }));
-    await waitFor(() => {
-      expect(update).toHaveBeenCalledWith("new", {
-        title: STRING_WITH_LINK,
+  it(
+    "opens quick-add with the text, linking to a page whose title has only " +
+      "brackets",
+    async () => {
+      const { api, update } = fakeApi();
+      const user = renderProvider(
+        api,
+        <PageTaskButton page={{ id: "a b", title: "[]" }} />,
+      );
+      await user.click(screen.getByRole("button", { name: "Make task" }));
+      const dialog = screen.getByRole("dialog", { name: "Quick-add a task" });
+      expect(within(dialog).getByText(/links back to/)).toBeDefined();
+      await user.click(within(dialog).getByRole("button", { name: "Add" }));
+      await waitFor(() => {
+        expect(update).toHaveBeenCalledWith("new", {
+          title: STRING_WITH_LINK,
+        });
       });
-    });
-  });
+    },
+  );
 });
 
 describe("the blank quick-add dialog", () => {
@@ -280,6 +339,8 @@ describe("the blank quick-add dialog", () => {
     expect(screen.getByRole("dialog")).toBeDefined();
     await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Blank" }));
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Blank" }),
+    );
   });
 });

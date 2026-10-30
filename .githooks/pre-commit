@@ -78,6 +78,9 @@ if ((${#markdown[@]} > 0)); then
   fi
 fi
 
+# Added lines over 80 characters (ADR 0074, D320); exempt files are skipped.
+check "line length" scripts/ci/check-line-length.sh --staged
+
 if have gitleaks; then
   check gitleaks gitleaks git --pre-commit --staged --redact --no-banner --log-level warn .
 else

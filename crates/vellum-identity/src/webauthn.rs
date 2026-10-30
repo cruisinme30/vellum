@@ -12,7 +12,8 @@
 //! never goes backwards (a cloned key).
 
 use aws_lc_rs::signature::{
-    ECDSA_P256_SHA256_ASN1, RSA_PKCS1_2048_8192_SHA256, RsaPublicKeyComponents, UnparsedPublicKey,
+    ECDSA_P256_SHA256_ASN1, RSA_PKCS1_2048_8192_SHA256, RsaPublicKeyComponents,
+    UnparsedPublicKey,
 };
 use base64::Engine as _;
 use base64::engine::general_purpose::{URL_SAFE, URL_SAFE_NO_PAD};
@@ -39,7 +40,8 @@ const MAX_FIELD: usize = 16 * 1024;
 pub struct RelyingParty {
     /// The relying party ID: the public host (`vellum.northstar.dev`).
     pub id: String,
-    /// The only origin ceremonies may come from (`https://vellum.northstar.dev`).
+    /// The only origin ceremonies may come from
+    /// (`https://vellum.northstar.dev`).
     pub origin: String,
 }
 
@@ -61,7 +63,8 @@ pub enum PublicKey {
     },
 }
 
-/// A credential as the browser returns it from `navigator.credentials.create()`.
+/// A credential as the browser returns it from
+/// `navigator.credentials.create()`.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Registration {
@@ -156,8 +159,8 @@ fn client_data(
     challenge: &str,
 ) -> Result<[u8; 32], Error> {
     let bytes = b64(raw)?;
-    let data: ClientData =
-        serde_json::from_slice(&bytes).map_err(|_| refused("the client data is not JSON"))?;
+    let data: ClientData = serde_json::from_slice(&bytes)
+        .map_err(|_| refused("the client data is not JSON"))?;
     if data.kind != kind {
         return Err(refused("the ceremony type is wrong"));
     }
@@ -178,7 +181,10 @@ struct AuthData<'a> {
     rest: &'a [u8],
 }
 
-fn auth_data<'a>(rp: &RelyingParty, data: &'a [u8]) -> Result<AuthData<'a>, Error> {
+fn auth_data<'a>(
+    rp: &RelyingParty,
+    data: &'a [u8],
+) -> Result<AuthData<'a>, Error> {
     let short = || refused("the authenticator data is too short");
     let (rp_hash, rest) = data.split_at_checked(32).ok_or_else(short)?;
     let (&flags, rest) = rest.split_first().ok_or_else(short)?;
@@ -284,14 +290,16 @@ pub fn verify_registration(
     }
     let malformed = || refused("the credential data is malformed");
     // AAGUID (16 bytes), credential ID length (2), credential ID, COSE key.
-    let (_aaguid, rest) = parsed.rest.split_at_checked(16).ok_or_else(malformed)?;
+    let (_aaguid, rest) =
+        parsed.rest.split_at_checked(16).ok_or_else(malformed)?;
     let (len, rest) = rest.split_first_chunk::<2>().ok_or_else(malformed)?;
     let id_len = usize::from(u16::from_be_bytes(*len));
     if id_len == 0 || id_len > 1023 {
         return Err(malformed());
     }
     let (id, key) = rest.split_at_checked(id_len).ok_or_else(malformed)?;
-    let key: Value = ciborium::from_reader(key).map_err(|_| refused("the key is not CBOR"))?;
+    let key: Value = ciborium::from_reader(key)
+        .map_err(|_| refused("the key is not CBOR"))?;
     let presented = b64(&credential.id)?;
     if presented != id {
         return Err(refused("the credential ID does not match"));
@@ -329,9 +337,11 @@ pub fn verify_assertion(
     let mut signed = data.clone();
     signed.extend_from_slice(&hash);
     let ok = match key {
-        PublicKey::Es256 { point } => UnparsedPublicKey::new(&ECDSA_P256_SHA256_ASN1, b64(point)?)
-            .verify(&signed, &signature)
-            .is_ok(),
+        PublicKey::Es256 { point } => {
+            UnparsedPublicKey::new(&ECDSA_P256_SHA256_ASN1, b64(point)?)
+                .verify(&signed, &signature)
+                .is_ok()
+        }
         PublicKey::Rs256 { n, e } => RsaPublicKeyComponents {
             n: b64(n)?,
             e: b64(e)?,
@@ -343,7 +353,9 @@ pub fn verify_assertion(
         return Err(refused("the signature is wrong"));
     }
     // Authenticators that keep no counter always send 0.
-    if (parsed.sign_count != 0 || stored_count != 0) && parsed.sign_count <= stored_count {
+    if (parsed.sign_count != 0 || stored_count != 0)
+        && parsed.sign_count <= stored_count
+    {
         return Err(refused(
             "its counter went backwards, which suggests a copied key",
         ));
@@ -356,7 +368,9 @@ pub(crate) mod tests {
     //! A software authenticator, for this crate's tests.
 
     use aws_lc_rs::rand::SystemRandom;
-    use aws_lc_rs::signature::{ECDSA_P256_SHA256_ASN1_SIGNING, EcdsaKeyPair, KeyPair as _};
+    use aws_lc_rs::signature::{
+        ECDSA_P256_SHA256_ASN1_SIGNING, EcdsaKeyPair, KeyPair as _,
+    };
 
     use super::*;
 
@@ -370,10 +384,16 @@ pub(crate) mod tests {
     impl SoftKey {
         pub fn new() -> Self {
             let rng = SystemRandom::new();
-            let pkcs8 =
-                EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, &rng).unwrap();
-            let pair =
-                EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, pkcs8.as_ref()).unwrap();
+            let pkcs8 = EcdsaKeyPair::generate_pkcs8(
+                &ECDSA_P256_SHA256_ASN1_SIGNING,
+                &rng,
+            )
+            .unwrap();
+            let pair = EcdsaKeyPair::from_pkcs8(
+                &ECDSA_P256_SHA256_ASN1_SIGNING,
+                pkcs8.as_ref(),
+            )
+            .unwrap();
             Self {
                 pair,
                 id: vec![9; 16],
@@ -388,7 +408,11 @@ pub(crate) mod tests {
             .unwrap()
         }
 
-        pub fn register(&self, rp: &RelyingParty, challenge: &str) -> Registration {
+        pub fn register(
+            &self,
+            rp: &RelyingParty,
+            challenge: &str,
+        ) -> Registration {
             let point = self.pair.public_key().as_ref();
             let cose = Value::Map(vec![
                 (Value::Integer(1.into()), Value::Integer(2.into())),
@@ -407,7 +431,9 @@ pub(crate) mod tests {
             data.push(FLAG_USER_PRESENT | FLAG_ATTESTED);
             data.extend_from_slice(&self.count.to_be_bytes());
             data.extend_from_slice(&[0; 16]);
-            data.extend_from_slice(&u16::try_from(self.id.len()).unwrap().to_be_bytes());
+            data.extend_from_slice(
+                &u16::try_from(self.id.len()).unwrap().to_be_bytes(),
+            );
             data.extend_from_slice(&self.id);
             ciborium::into_writer(&cose, &mut data).unwrap();
             let object = Value::Map(vec![
@@ -430,7 +456,12 @@ pub(crate) mod tests {
             }
         }
 
-        pub fn assert(&mut self, rp_id: &str, origin: &str, challenge: &str) -> Assertion {
+        pub fn assert(
+            &mut self,
+            rp_id: &str,
+            origin: &str,
+            challenge: &str,
+        ) -> Assertion {
             self.count += 1;
             let mut data: Vec<u8> = Sha256::digest(rp_id.as_bytes()).to_vec();
             data.push(FLAG_USER_PRESENT);
@@ -438,7 +469,8 @@ pub(crate) mod tests {
             let client = Self::client_data("webauthn.get", challenge, origin);
             let mut signed = data.clone();
             signed.extend_from_slice(&Sha256::digest(&client));
-            let signature = self.pair.sign(&SystemRandom::new(), &signed).unwrap();
+            let signature =
+                self.pair.sign(&SystemRandom::new(), &signed).unwrap();
             Assertion {
                 id: encode(&self.id),
                 response: AssertionResponse {
@@ -461,36 +493,60 @@ pub(crate) mod tests {
     fn a_soft_key_registers_and_asserts() {
         let rp = rp();
         let mut key = SoftKey::new();
-        let registered = verify_registration(&rp, "chal1", &key.register(&rp, "chal1")).unwrap();
+        let registered =
+            verify_registration(&rp, "chal1", &key.register(&rp, "chal1"))
+                .unwrap();
         assert_eq!(registered.id, encode(&key.id));
         let assertion = key.assert(&rp.id, &rp.origin, "chal2");
-        let count = verify_assertion(&rp, "chal2", &registered.key, 0, &assertion).unwrap();
+        let count =
+            verify_assertion(&rp, "chal2", &registered.key, 0, &assertion)
+                .unwrap();
         assert_eq!(count, 1);
         // The same assertion again: the counter did not move.
-        assert!(verify_assertion(&rp, "chal2", &registered.key, count, &assertion).is_err());
+        assert!(
+            verify_assertion(&rp, "chal2", &registered.key, count, &assertion)
+                .is_err()
+        );
     }
 
     #[test]
     fn ceremonies_for_another_site_or_challenge_are_refused() {
         let rp = rp();
         let mut key = SoftKey::new();
-        assert!(verify_registration(&rp, "other", &key.register(&rp, "chal1")).is_err());
+        assert!(
+            verify_registration(&rp, "other", &key.register(&rp, "chal1"))
+                .is_err()
+        );
         let evil = RelyingParty {
             id: "evil.example".into(),
             origin: "https://evil.example".into(),
         };
-        assert!(verify_registration(&rp, "chal1", &key.register(&evil, "chal1")).is_err());
-        let registered = verify_registration(&rp, "c", &key.register(&rp, "c")).unwrap();
+        assert!(
+            verify_registration(&rp, "chal1", &key.register(&evil, "chal1"))
+                .is_err()
+        );
+        let registered =
+            verify_registration(&rp, "c", &key.register(&rp, "c")).unwrap();
         let wrong_origin = key.assert(&rp.id, "https://evil.example", "x");
-        assert!(verify_assertion(&rp, "x", &registered.key, 0, &wrong_origin).is_err());
+        assert!(
+            verify_assertion(&rp, "x", &registered.key, 0, &wrong_origin)
+                .is_err()
+        );
         let wrong_rp = key.assert("evil.example", &rp.origin, "y");
-        assert!(verify_assertion(&rp, "y", &registered.key, 0, &wrong_rp).is_err());
+        assert!(
+            verify_assertion(&rp, "y", &registered.key, 0, &wrong_rp).is_err()
+        );
         let other = SoftKey::new();
-        let other_key = verify_registration(&rp, "z", &other.register(&rp, "z")).unwrap();
+        let other_key =
+            verify_registration(&rp, "z", &other.register(&rp, "z")).unwrap();
         let good = key.assert(&rp.id, &rp.origin, "w");
         assert!(verify_assertion(&rp, "w", &other_key.key, 0, &good).is_err());
         let mut tampered = key.assert(&rp.id, &rp.origin, "v");
-        tampered.response.client_data_json = encode(br#"{"type":"webauthn.get","challenge":"v","origin":"https://vellum.northstar.dev","x":1}"#);
-        assert!(verify_assertion(&rp, "v", &registered.key, 0, &tampered).is_err());
+        tampered.response.client_data_json = encode(
+            br#"{"type":"webauthn.get","challenge":"v","origin":"https://vellum.northstar.dev","x":1}"#
+        );
+        assert!(
+            verify_assertion(&rp, "v", &registered.key, 0, &tampered).is_err()
+        );
     }
 }

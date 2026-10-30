@@ -69,13 +69,17 @@ describe("hydrateCalculators", () => {
     if (!units) throw new Error("no slider");
     units.value = "250";
     units.dispatchEvent(new Event("input", { bubbles: true }));
-    const outputs = [...root.querySelectorAll("output")].map((o) => o.textContent);
+    const outputs = [...root.querySelectorAll("output")].map(
+      (o) => o.textContent,
+    );
     expect(outputs).toEqual(["250", "12", "3,000 USD", "1,500", "–"]);
 
     unwire();
     units.value = "10";
     units.dispatchEvent(new Event("input", { bubbles: true }));
-    expect(root.querySelector(".vl-calc-result output")?.textContent).toBe("3,000 USD");
+    expect(root.querySelector(".vl-calc-result output")?.textContent).toBe(
+      "3,000 USD",
+    );
     root.remove();
   });
 });

@@ -6,8 +6,8 @@
 #   - to develop, main or chore/release-*: refuses unless scripts/dev/gate.sh
 #     passed on the pushed commit's tree (main and release branches need a
 #     --release run), so CI never finds what a local run would have;
-#   - to any other branch: runs the Fast suite, as before (ADR 0048).
-# Install with: cargo xtask install-hooks (or git config core.hooksPath .githooks)
+# - to any other branch: runs the Fast suite, as before (ADR 0048). Install
+# with: cargo xtask install-hooks (or git config core.hooksPath .githooks)
 set -euo pipefail
 
 root="$(git rev-parse --show-toplevel)"

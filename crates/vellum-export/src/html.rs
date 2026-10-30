@@ -12,13 +12,19 @@
 use std::fmt::Write as _;
 use std::time::Instant;
 
-use crate::flow::{Align, Flow, Layout, Node, Span, Style, Table, TableStyle, Tone};
+use crate::flow::{
+    Align, Flow, Layout, Node, Span, Style, Table, TableStyle, Tone,
+};
 use crate::metrics;
 use crate::pdf::PrintTheme;
 
 /// Writes `flow` as a standalone HTML document.
 #[must_use]
-#[tracing::instrument(name = "export.html", skip_all, fields(blocks = flow.blocks.len()))]
+#[tracing::instrument(
+    name = "export.html",
+    skip_all,
+    fields(blocks = flow.blocks.len())
+)]
 pub fn write(flow: &Flow, theme: &PrintTheme) -> String {
     let started = Instant::now();
     let mut w = Writer {
@@ -54,8 +60,10 @@ pub fn escape(text: &str) -> String {
 
 fn safe_url(url: &str) -> Option<&str> {
     let lower = url.trim().to_ascii_lowercase();
-    (lower.starts_with("https://") || lower.starts_with("http://") || lower.starts_with("mailto:"))
-        .then_some(url.trim())
+    (lower.starts_with("https://")
+        || lower.starts_with("http://")
+        || lower.starts_with("mailto:"))
+    .then_some(url.trim())
 }
 
 const fn tone_class(tone: Tone) -> &'static str {
@@ -76,10 +84,13 @@ impl Writer<'_> {
         let c = &theme.colors;
         let _ = write!(
             self.out,
-            "<!doctype html>\n<html lang=\"{lang}\">\n<head>\n<meta charset=\"utf-8\">\n\
-             <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
-             <meta name=\"generator\" content=\"Vellum\">\n<title>{title}</title>\n<style>\n\
-             :root{{--text:{};--heading:{};--muted:{};--primary:{};--outline:{};--surface:{}}}\n",
+            "<!doctype html>\n<html lang=\"{lang}\">\n<head>\n\
+             <meta charset=\"utf-8\">\n\
+             <meta name=\"viewport\" content=\"width=device-width, \
+             initial-scale=1\">\n<meta name=\"generator\" content=\"Vellum\">\n\
+             <title>{title}</title>\n<style>\n\
+             :root{{--text:{};--heading:{};--muted:{};--primary:{};--outline:{}\
+             ;--surface:{}}}\n",
             c.text, c.heading, c.muted, c.primary, c.outline, c.surface
         );
         let mut tones: Vec<_> = theme.tones.iter().collect();
@@ -99,7 +110,8 @@ impl Writer<'_> {
         if show {
             let _ = writeln!(
                 self.out,
-                "<header class=\"title\"><h1>{title}</h1><p class=\"muted\">As of {}</p></header>",
+                "<header class=\"title\"><h1>{title}</h1><p class=\"muted\">As \
+                    of {}</p></header>",
                 escape(&self.flow.as_of)
             );
         }
@@ -131,7 +143,11 @@ impl Writer<'_> {
                     .unwrap_or_default();
                 let _ = write!(self.out, "<h{level}{id}>");
                 if let Some(number) = number {
-                    let _ = write!(self.out, "<span class=\"num\">{}</span> ", escape(number));
+                    let _ = write!(
+                        self.out,
+                        "<span class=\"num\">{}</span> ",
+                        escape(number)
+                    );
                 }
                 self.spans(spans);
                 let _ = writeln!(self.out, "</h{level}>");
@@ -157,7 +173,9 @@ impl Writer<'_> {
                         let _ = writeln!(self.out, "<ol start=\"{n}\">");
                     }
                     Some(_) => self.out.push_str("<ol>\n"),
-                    None if tasks => self.out.push_str("<ul class=\"tasks\">\n"),
+                    None if tasks => {
+                        self.out.push_str("<ul class=\"tasks\">\n")
+                    }
                     None => self.out.push_str("<ul>\n"),
                 }
                 for item in items {
@@ -184,12 +202,17 @@ impl Writer<'_> {
                 } else {
                     format!(" class=\"language-{}\"", escape(lang))
                 };
-                let _ = writeln!(self.out, "<pre><code{class}>{}</code></pre>", escape(text));
+                let _ = writeln!(
+                    self.out,
+                    "<pre><code{class}>{}</code></pre>",
+                    escape(text)
+                );
             }
             Node::Math { tex, .. } => {
                 let _ = writeln!(
                     self.out,
-                    "<pre class=\"math\"><code class=\"language-latex\">{}</code></pre>",
+                    "<pre class=\"math\"><code \
+                        class=\"language-latex\">{}</code></pre>",
                     escape(tex)
                 );
             }
@@ -230,7 +253,9 @@ impl Writer<'_> {
                         .unwrap_or_default();
                     let _ = writeln!(
                         self.out,
-                        "<div class=\"tile\"><div class=\"value\">{}</div><div class=\"muted\">{}</div><div class=\"delta{tone}\">{}</div></div>",
+                        "<div class=\"tile\"><div class=\"value\">{}</div><div \
+                            class=\"muted\">{}</div><div \
+                            class=\"delta{tone}\">{}</div></div>",
                         escape(&tile.value),
                         escape(&tile.label),
                         escape(&tile.delta)
@@ -243,7 +268,8 @@ impl Writer<'_> {
                 for card in cards {
                     let _ = write!(
                         self.out,
-                        "<div class=\"tile\"><div><strong>{} {}</strong></div><div>",
+                        "<div class=\"tile\"><div><strong>{} \
+                            {}</strong></div><div>",
                         escape(&card.icon),
                         escape(&card.title)
                     );
@@ -256,7 +282,10 @@ impl Writer<'_> {
                 for bar in bars {
                     let _ = writeln!(
                         self.out,
-                        "<div class=\"bar\"><span>{}</span><meter min=\"0\" max=\"100\" value=\"{:.0}\">{:.0}%</meter><span>{:.0}%</span></div>",
+                        "<div class=\"bar\"><span>{}</span><meter min=\"0\" \
+                            max=\"100\" \
+                            value=\"{:.0}\">{:.0}%</meter><span>{:.0}%</span></\
+                            div>",
                         escape(&bar.label),
                         bar.percent,
                         bar.percent,
@@ -272,7 +301,9 @@ impl Writer<'_> {
                 );
                 let _ = writeln!(
                     self.out,
-                    "<div class=\"linkcard\"><strong>{link}</strong><p>{}</p><p class=\"muted\">{}</p></div>",
+                    "<div \
+                        class=\"linkcard\"><strong>{link}</strong><p>{}</p><p \
+                        class=\"muted\">{}</p></div>",
                     escape(text),
                     escape(url)
                 );
@@ -287,12 +318,17 @@ impl Writer<'_> {
                 let src = self.data_uri(asset);
                 let _ = write!(
                     self.out,
-                    "<figure><img src=\"{src}\" alt=\"{}\" style=\"max-width:{:.0}pt\">",
+                    "<figure><img src=\"{src}\" alt=\"{}\" \
+                        style=\"max-width:{:.0}pt\">",
                     escape(alt),
                     width
                 );
                 if !caption.is_empty() {
-                    let _ = write!(self.out, "<figcaption>{}</figcaption>", escape(caption));
+                    let _ = write!(
+                        self.out,
+                        "<figcaption>{}</figcaption>",
+                        escape(caption)
+                    );
                 }
                 self.out.push_str("</figure>\n");
             }
@@ -308,12 +344,18 @@ impl Writer<'_> {
                     escape(alt)
                 );
                 if !caption.is_empty() {
-                    let _ = write!(self.out, "<figcaption>{}</figcaption>", escape(caption));
+                    let _ = write!(
+                        self.out,
+                        "<figcaption>{}</figcaption>",
+                        escape(caption)
+                    );
                 }
                 self.out.push_str("</figure>\n");
             }
             Node::Toc { depth } => self.toc(*depth),
-            Node::PageBreak => self.out.push_str("<div class=\"page-break\"></div>\n"),
+            Node::PageBreak => {
+                self.out.push_str("<div class=\"page-break\"></div>\n")
+            }
         }
     }
 
@@ -328,7 +370,9 @@ impl Writer<'_> {
             Some(Align::Right) => " style=\"text-align:right\"",
             _ => "",
         };
-        if !table.header.is_empty() && table.header.iter().any(|c| !c.spans.is_empty()) {
+        if !table.header.is_empty()
+            && table.header.iter().any(|c| !c.spans.is_empty())
+        {
             self.out.push_str("<thead><tr>");
             for (i, cell) in table.header.iter().enumerate() {
                 let _ = write!(self.out, "<th{}>", align(i));
@@ -343,7 +387,11 @@ impl Writer<'_> {
             for (i, cell) in row.iter().enumerate() {
                 let _ = write!(self.out, "<td{}>", align(i));
                 if let Some(tone) = cell.shade {
-                    let _ = write!(self.out, "<span class=\"chip t-{}\">", tone_class(tone));
+                    let _ = write!(
+                        self.out,
+                        "<span class=\"chip t-{}\">",
+                        tone_class(tone)
+                    );
                     self.spans(&cell.spans);
                     self.out.push_str("</span>");
                 } else {
@@ -370,9 +418,10 @@ impl Writer<'_> {
                     && *level <= depth
                 {
                     let text = crate::flow::plain_text(spans);
-                    let text = number
-                        .as_ref()
-                        .map_or_else(|| text.clone(), |n| format!("{n} {text}"));
+                    let text = number.as_ref().map_or_else(
+                        || text.clone(),
+                        |n| format!("{n} {text}"),
+                    );
                     entries.push((*level, anchor.clone(), text));
                 }
             });
@@ -396,7 +445,8 @@ impl Writer<'_> {
                 Span::Text { text, style } => self.text(text, *style),
                 Span::Link { url, spans } => match safe_url(url) {
                     Some(url) => {
-                        let _ = write!(self.out, "<a href=\"{}\">", escape(url));
+                        let _ =
+                            write!(self.out, "<a href=\"{}\">", escape(url));
                         self.spans(spans);
                         self.out.push_str("</a>");
                     }
@@ -455,7 +505,8 @@ impl Writer<'_> {
 
 /// Standard base64 with padding.
 fn base64(bytes: &[u8]) -> String {
-    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const TABLE: &[u8; 64] =
+        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
     for chunk in bytes.chunks(3) {
         let b = [
@@ -463,7 +514,8 @@ fn base64(bytes: &[u8]) -> String {
             chunk.get(1).copied().unwrap_or(0),
             chunk.get(2).copied().unwrap_or(0),
         ];
-        let n = (u32::from(b[0]) << 16) | (u32::from(b[1]) << 8) | u32::from(b[2]);
+        let n =
+            (u32::from(b[0]) << 16) | (u32::from(b[1]) << 8) | u32::from(b[2]);
         for i in 0..4 {
             if i <= chunk.len() {
                 let index = (n >> (18 - 6 * i)) & 63;
@@ -479,31 +531,40 @@ fn base64(bytes: &[u8]) -> String {
 }
 
 const STYLE: &str = "\
-body{margin:0;color:var(--text);background:#fff;font:16px/1.6 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+body{margin:0;color:var(--text);background:#fff;font:16px/1.6 \
+    system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
 main{max-width:46rem;margin:0 auto;padding:2rem 1rem}
 h1,h2,h3,h4,h5,h6{color:var(--heading);line-height:1.25}
 .muted{color:var(--muted)}
 a{color:var(--primary)}
-pre{background:var(--surface);padding:.75rem 1rem;border-radius:6px;overflow-x:auto}
+pre{background:var(--surface);padding:.75rem \
+    1rem;border-radius:6px;overflow-x:auto}
 code{font-family:ui-monospace,'Roboto Mono',Menlo,monospace;font-size:.92em}
-blockquote{margin:0;padding-left:1rem;border-left:3px solid var(--outline);color:var(--muted)}
+blockquote{margin:0;padding-left:1rem;border-left:3px solid \
+    var(--outline);color:var(--muted)}
 table{border-collapse:collapse;width:100%;margin:1rem 0}
-th,td{border-bottom:1px solid var(--outline);padding:.4rem .6rem;text-align:left;vertical-align:top}
+th,td{border-bottom:1px solid var(--outline);padding:.4rem \
+    .6rem;text-align:left;vertical-align:top}
 table.facts td:first-child{font-weight:600;width:30%}
 .chip{background:var(--bg);color:var(--fg);border-radius:4px;padding:0 .4rem}
-.callout{background:var(--bg);border-left:4px solid var(--fg);padding:.5rem 1rem;margin:1rem 0;border-radius:4px}
-.columns,.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));gap:1rem}
-.tile,.linkcard{border:1px solid var(--outline);border-radius:8px;padding:.75rem 1rem}
+.callout{background:var(--bg);border-left:4px solid var(--fg);padding:.5rem \
+    1rem;margin:1rem 0;border-radius:4px}
+.columns,.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(12rem\
+    ,1fr));gap:1rem}
+.tile,.linkcard{border:1px solid \
+    var(--outline);border-radius:8px;padding:.75rem 1rem}
 .tile .value{font-size:1.6rem;font-weight:600}
 .delta{color:var(--fg,var(--muted))}
-.bar{display:grid;grid-template-columns:1fr 2fr 3rem;gap:.5rem;align-items:center}
+.bar{display:grid;grid-template-columns:1fr 2fr \
+    3rem;gap:.5rem;align-items:center}
 .bar meter{width:100%}
 figure{margin:1rem 0;text-align:center}
 figure img{max-width:100%;height:auto}
 figcaption{color:var(--muted);font-size:.9em}
 img.inline{height:1em;vertical-align:middle}
 .toc ul{list-style:none;padding-left:0}
-.toc .l2{padding-left:1rem}.toc .l3{padding-left:2rem}.toc .l4{padding-left:3rem}
+.toc .l2{padding-left:1rem}.toc .l3{padding-left:2rem}.toc \
+    .l4{padding-left:3rem}
 .num{color:var(--muted)}
 ul.tasks{list-style:none;padding-left:0}
 @media print{.page-break{break-after:page}}
@@ -553,11 +614,10 @@ mod tests {
         assert!(html.contains("<title>Gateway &lt;beta&gt;</title>"));
         assert!(!html.contains("<script>"));
         assert!(!html.contains("javascript:"));
-        assert!(
-            html.contains(
-                "<a href=\"https://northstar.dev?a=1&amp;b=2\"><strong>site</strong></a>"
-            )
-        );
+        assert!(html.contains(
+            "<a href=\"https://northstar.dev?a=1&amp;b=2\"><strong>site</st\
+                    rong></a>"
+        ));
     }
 
     #[test]

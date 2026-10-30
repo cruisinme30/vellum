@@ -59,7 +59,8 @@ impl WebhookSecret {
     pub fn parse(text: &str) -> Result<Self, SecretError> {
         let body = text.strip_prefix(PREFIX).ok_or(SecretError::Malformed)?;
         let bytes = unb64url(body).ok_or(SecretError::Malformed)?;
-        let array: [u8; LEN] = bytes.try_into().map_err(|_| SecretError::Malformed)?;
+        let array: [u8; LEN] =
+            bytes.try_into().map_err(|_| SecretError::Malformed)?;
         Ok(Self(array))
     }
 

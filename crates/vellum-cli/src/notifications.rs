@@ -29,7 +29,9 @@ use vellum_notify::endpoint::SafeTransport;
 use vellum_notify::hooks::Webhooks;
 use vellum_notify::mail::Mailer;
 use vellum_notify::service::NotifyStore;
-use vellum_notify::work::{IssueInfo, IssueLookup, notifications, webhook_events};
+use vellum_notify::work::{
+    IssueInfo, IssueLookup, notifications, webhook_events,
+};
 use vellum_work::{IssueId, WorkEvent, WorkGraph};
 use vellum_work_service::{EventSink, WorkService};
 
@@ -53,7 +55,9 @@ impl EventSink for WorkEvents {
         for event in events {
             tracing::debug!(?event, "work event");
             if self.queue.try_send(event).is_err() {
-                tracing::warn!("notification queue full; an event was not notified");
+                tracing::warn!(
+                    "notification queue full; an event was not notified"
+                );
             }
         }
     }
@@ -103,12 +107,13 @@ pub fn start(
     store: Arc<NotifyStore>,
     delivery: Delivery,
 ) -> Result<Ticker, Error> {
-    let transport = SafeTransport::new(vellum_notify::endpoint::policy(&[])).map_err(|e| {
-        Error::new(
-            ErrorKind::Internal,
-            format!("cannot build the push client: {e}"),
-        )
-    })?;
+    let transport = SafeTransport::new(vellum_notify::endpoint::policy(&[]))
+        .map_err(|e| {
+            Error::new(
+                ErrorKind::Internal,
+                format!("cannot build the push client: {e}"),
+            )
+        })?;
     let dispatcher = Arc::new(Dispatcher::new(store, transport));
     let webhooks = Arc::clone(&delivery.webhooks);
     {
@@ -136,7 +141,8 @@ async fn notify<T: vellum_notify::delivery::HttpTransport>(
         .read(|graph, _| notifications(event, &Graph(graph), now))
         .await;
     for one in addressed {
-        let to: Vec<UserId> = one.to.iter().filter_map(|h| account(identity, h)).collect();
+        let to: Vec<UserId> =
+            one.to.iter().filter_map(|h| account(identity, h)).collect();
         if to.is_empty() {
             continue;
         }
@@ -150,7 +156,11 @@ async fn notify<T: vellum_notify::delivery::HttpTransport>(
 }
 
 /// Queues the webhook deliveries `event` causes.
-async fn publish(event: &WorkEvent, work: &WorkService, webhooks: &Webhooks<SafeTransport>) {
+async fn publish(
+    event: &WorkEvent,
+    work: &WorkService,
+    webhooks: &Webhooks<SafeTransport>,
+) {
     if !webhooks.store().any_enabled() {
         return;
     }

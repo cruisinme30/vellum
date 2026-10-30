@@ -76,8 +76,11 @@ pub type SpaceOf = Arc<dyn Fn(&BlobPath) -> Option<Id> + Send + Sync>;
 
 /// Finds the authz node of a drive folder, from the index; `None` when
 /// the path is not a live folder of a known space (D305).
-pub type NodeOf =
-    Arc<dyn Fn(BlobPath) -> futures::future::BoxFuture<'static, Option<Id>> + Send + Sync>;
+pub type NodeOf = Arc<
+    dyn Fn(BlobPath) -> futures::future::BoxFuture<'static, Option<Id>>
+        + Send
+        + Sync,
+>;
 
 /// [`Access`] backed by the authorization engine.
 ///
@@ -138,7 +141,11 @@ impl<S> AuthzAccess<S> {
             .check(space, who, node, permission)
             .await
             .map_err(|e| {
-                Error::new(ErrorKind::Unavailable, "access could not be checked").with_source(e)
+                Error::new(
+                    ErrorKind::Unavailable,
+                    "access could not be checked",
+                )
+                .with_source(e)
             })?;
         Ok(decision.allowed)
     }
@@ -195,7 +202,9 @@ impl<S: AuthzStore + 'static> Access for AuthzAccess<S> {
 mod tests {
     use std::collections::BTreeMap;
 
-    use vellum_authz::{Actor, Change, MemoryStore, Object, Relation, Subject, Tuple};
+    use vellum_authz::{
+        Actor, Change, MemoryStore, Object, Relation, Subject, Tuple,
+    };
     use vellum_contracts::{CredentialKind, Scope, ScopeSet};
     use vellum_kernel::{ShareId, Timestamp, UserId};
 
@@ -232,7 +241,9 @@ mod tests {
             .unwrap();
         let access = AuthzAccess::new(
             authz,
-            Arc::new(|p: &BlobPath| p.as_str().starts_with("drives/").then_some(Id(1))),
+            Arc::new(|p: &BlobPath| {
+                p.as_str().starts_with("drives/").then_some(Id(1))
+            }),
         );
         let ana = Principal::user(
             user,
@@ -240,7 +251,8 @@ mod tests {
             ScopeSet::from_scopes([Scope::WriteDirect]),
             Timestamp::now(),
         );
-        let path = BlobPath::new("drives/shared/Ops/Vendors.collection").unwrap();
+        let path =
+            BlobPath::new("drives/shared/Ops/Vendors.collection").unwrap();
         let elsewhere = BlobPath::new("tasks/ana/Vendors.collection").unwrap();
         assert!(
             access
@@ -277,11 +289,17 @@ mod tests {
         let ops = BlobPath::new("drives/shared/Ops").unwrap();
         assert!(!access.allowed_in(&ana, &ops, Need::Edit).await.unwrap());
         let folder = Id(77);
-        let access = access.with_folders(Arc::new(
-            move |_: BlobPath| -> futures::future::BoxFuture<'static, Option<Id>> {
-                Box::pin(async move { Some(folder) })
-            },
-        ));
+        let access =
+            access.with_folders(
+                Arc::new(
+                    move |_: BlobPath| -> futures::future::BoxFuture<
+                        'static,
+                        Option<Id>,
+                    > {
+                        Box::pin(async move { Some(folder) })
+                    },
+                ),
+            );
         assert!(access.allowed_in(&ana, &ops, Need::Edit).await.unwrap());
         assert!(!access.allowed_in(&anon, &ops, Need::Edit).await.unwrap());
         assert_eq!(Need::Edit.as_str(), "edit");

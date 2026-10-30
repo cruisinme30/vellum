@@ -6,8 +6,8 @@
 
 use proptest::prelude::*;
 use vellum_crypto::recipients::{
-    RecipientPublic, RecipientSecret, add_recipient, is_recipient_envelope, open_as, recipients_of,
-    remove_recipient, seal_for,
+    RecipientPublic, RecipientSecret, add_recipient, is_recipient_envelope,
+    open_as, recipients_of, remove_recipient, seal_for,
 };
 use vellum_crypto::{CryptoError, is_envelope};
 
@@ -16,7 +16,8 @@ type TestResult = Result<(), CryptoError>;
 fn hex32(text: &str) -> [u8; 32] {
     let mut out = [0_u8; 32];
     for (slot, i) in out.iter_mut().zip((0..64).step_by(2)) {
-        *slot = u8::from_str_radix(text.get(i..i + 2).unwrap_or("00"), 16).unwrap_or(0);
+        *slot = u8::from_str_radix(text.get(i..i + 2).unwrap_or("00"), 16)
+            .unwrap_or(0);
     }
     out
 }
@@ -31,11 +32,15 @@ fn x25519_matches_rfc_7748() {
     ));
     assert_eq!(
         alice.public().to_bytes(),
-        hex32("8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a")
+        hex32(
+            "8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a"
+        )
     );
     assert_eq!(
         bob.public().to_bytes(),
-        hex32("de9edb7d7b7dc1b4d35b61c2ece435373f8343c85b78674dadfc7e146f882b4f")
+        hex32(
+            "de9edb7d7b7dc1b4d35b61c2ece435373f8343c85b78674dadfc7e146f882b4f"
+        )
     );
 }
 
@@ -65,7 +70,8 @@ fn members_open_and_outsiders_cannot() -> TestResult {
 
 #[test]
 fn membership_changes_keep_the_payload() -> TestResult {
-    let (ana, ben) = (RecipientSecret::generate()?, RecipientSecret::generate()?);
+    let (ana, ben) =
+        (RecipientSecret::generate()?, RecipientSecret::generate()?);
     let sealed = seal_for(&[ana.public()], b"plan")?;
     let tail = sealed.get(sealed.len() - 20..).unwrap_or_default().to_vec();
 
@@ -74,7 +80,10 @@ fn membership_changes_keep_the_payload() -> TestResult {
     assert_eq!(add_recipient(&ana, &ben.public(), &added)?, added);
     assert_eq!(open_as(&ben, &added)?, b"plan");
     assert!(added.ends_with(&tail));
-    assert!(add_recipient(&RecipientSecret::generate()?, &ben.public(), &sealed).is_err());
+    assert!(
+        add_recipient(&RecipientSecret::generate()?, &ben.public(), &sealed)
+            .is_err()
+    );
 
     let removed = remove_recipient(&ana.public(), &added)?;
     assert!(open_as(&ana, &removed).is_err());
@@ -111,8 +120,12 @@ fn rejects_bad_inputs() -> TestResult {
 
 proptest! {
     #[test]
-    fn garbage_never_panics(data in proptest::collection::vec(any::<u8>(), 0..512)) {
-        let ana = RecipientSecret::generate().map_err(|e| TestCaseError::fail(e.to_string()))?;
+    fn garbage_never_panics(
+        data in proptest::collection::vec(any::<u8>(), 0..512)
+    ) {
+        let ana = RecipientSecret::generate().map_err(
+            |e| TestCaseError::fail(e.to_string())
+        )?;
         let mut framed = b"\0VLE\x02".to_vec();
         framed.extend_from_slice(&data);
         prop_assert!(open_as(&ana, &framed).is_err());

@@ -36,7 +36,9 @@ export function SignInHelp({
             onSignInHelp(confirm);
           }}
         >
-          {confirm === "sign-out" ? t("admin-users-sign-out") : t("admin-users-reset-2fa")}
+          {confirm === "sign-out"
+            ? t("admin-users-sign-out")
+            : t("admin-users-reset-2fa")}
         </button>
         <button
           type="button"

@@ -19,13 +19,13 @@ vellum: 1
 
 ## Context
 
-Every Vellum file is untrusted input: a collaborator, a synced folder, an
-import or an MCP client can write any bytes, and the server parses them on
-save, render and index. The brief (section 11 and 12) asks for a hardened,
-self-hosted service that meets its latency and memory budgets under load.
-The project lead asked for continuous red teaming: attack what has
-merged, prove each finding, and make sure the fix lands (#259). The first sweep found a 3 KB
-document that aborts the process with a stack overflow (#260).
+Every Vellum file is untrusted input: a collaborator, a synced folder, an import
+or an MCP client can write any bytes, and the server parses them on save, render
+and index. The brief (section 11 and 12) asks for a hardened, self-hosted
+service that meets its latency and memory budgets under load. The project lead
+asked for continuous red teaming: attack what has merged, prove each finding,
+and make sure the fix lands (#259). The first sweep found a 3 KB document that
+aborts the process with a stack overflow (#260).
 
 ## Decisions
 

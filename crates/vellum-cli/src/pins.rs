@@ -51,12 +51,17 @@ impl Pins {
         let home = std::env::var_os("HOME")
             .or_else(|| std::env::var_os("USERPROFILE"))
             .filter(|h| !h.is_empty())
-            .ok_or_else(|| format!("set {DIR_VAR} to a folder for trusted device keys"))?;
+            .ok_or_else(|| {
+                format!("set {DIR_VAR} to a folder for trusted device keys")
+            })?;
         Ok(Self::new(Path::new(&home).join(".vellum").join("private")))
     }
 
     fn file(&self, server: &str, space: SpaceId) -> PathBuf {
-        let digest = Sha256::digest(format!("{}\n{space}", server.trim_end_matches('/')));
+        let digest = Sha256::digest(format!(
+            "{}\n{space}",
+            server.trim_end_matches('/')
+        ));
         let name = hex::encode(digest.get(..16).unwrap_or_default());
         self.dir.join(format!("{name}.json"))
     }
@@ -66,7 +71,11 @@ impl Pins {
     /// # Errors
     ///
     /// The file exists but cannot be read or parsed.
-    pub fn load(&self, server: &str, space: SpaceId) -> Result<Option<BTreeSet<String>>, String> {
+    pub fn load(
+        &self,
+        server: &str,
+        space: SpaceId,
+    ) -> Result<Option<BTreeSet<String>>, String> {
         let path = self.file(server, space);
         match std::fs::read(&path) {
             Ok(bytes) => serde_json::from_slice::<PinFile>(&bytes)
@@ -89,7 +98,8 @@ impl Pins {
         trusted: &BTreeSet<String>,
     ) -> Result<(), String> {
         let path = self.file(server, space);
-        let io = |e: std::io::Error| format!("cannot write {}: {e}", path.display());
+        let io =
+            |e: std::io::Error| format!("cannot write {}: {e}", path.display());
         std::fs::create_dir_all(&self.dir).map_err(io)?;
         let body = serde_json::to_vec_pretty(&PinFile {
             server: server.to_owned(),

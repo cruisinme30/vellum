@@ -14,7 +14,8 @@ use serde::{Deserialize, Deserializer, Serialize};
 use crate::error::WorkError;
 
 pub use vellum_kernel::{
-    InitiativeId, IssueId, MilestoneId, ProjectId, ProjectUpdateId as UpdateId, TeamId, ViewId,
+    InitiativeId, IssueId, MilestoneId, ProjectId, ProjectUpdateId as UpdateId,
+    TeamId, ViewId,
 };
 
 /// A person, written as their handle (`dev`, `priya`).

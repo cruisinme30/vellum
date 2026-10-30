@@ -140,9 +140,9 @@ async fn postgres_store_conforms() {
     for n in 0..4 {
         let name = format!("sync_{n}");
         if let vellum_db::IndexPool::Postgres(pool) = admin.pool() {
-            let _ = vellum_db::sqlx::query(vellum_db::sqlx::AssertSqlSafe(format!(
-                "CREATE DATABASE {name}"
-            )))
+            let _ = vellum_db::sqlx::query(vellum_db::sqlx::AssertSqlSafe(
+                format!("CREATE DATABASE {name}"),
+            ))
             .execute(pool)
             .await
             .unwrap();

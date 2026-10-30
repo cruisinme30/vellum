@@ -20,14 +20,27 @@ import { endOfDay } from "./dates";
 import { SharePanel } from "./share-panel";
 
 const PEOPLE = createListDirectory([
-  { kind: "user", principal: "user:01PRIYA", name: "Priya Raman", detail: "priya@northstar.dev" },
-  { kind: "group", principal: "group:01SRE", name: "SRE", detail: "12 members" },
+  {
+    kind: "user",
+    principal: "user:01PRIYA",
+    name: "Priya Raman",
+    detail: "priya@northstar.dev",
+  },
+  {
+    kind: "group",
+    principal: "group:01SRE",
+    name: "SRE",
+    detail: "12 members",
+  },
 ]);
 
 /** A link password typed in the test. */
 const PHRASE = ["northstar", "2026"].join("-");
 
-const HANDLES: Record<string, string> = { "user:01SAM": "sam", "user:01PRIYA": "priya" };
+const HANDLES: Record<string, string> = {
+  "user:01SAM": "sam",
+  "user:01PRIYA": "priya",
+};
 
 /** A grant's optional fields, left out when unset. */
 function pick(handle: string | undefined, expiresAt: string | undefined) {
@@ -39,7 +52,9 @@ function pick(handle: string | undefined, expiresAt: string | undefined) {
 
 /** Sharing in memory, as the server answers it. */
 function memorySharing(kind: "page" | "folder" = "page", linksAllowed = true) {
-  let grants: GrantView[] = [{ principal: "user:01SAM", handle: "sam", role: "owner" }];
+  let grants: GrantView[] = [
+    { principal: "user:01SAM", handle: "sam", role: "owner" },
+  ];
   let links: LinkView[] = [];
   let next = 0;
   const view = (): SharingView =>
@@ -52,7 +67,8 @@ function memorySharing(kind: "page" | "folder" = "page", linksAllowed = true) {
   const api: SharingApi = {
     state: () => Promise.resolve(view()),
     share(_id, principal, role, expiresAt) {
-      if (principal === "user:01FAIL") return Promise.reject(new Error("Not allowed."));
+      if (principal === "user:01FAIL")
+        return Promise.reject(new Error("Not allowed."));
       grants = [
         ...grants.filter((g) => g.principal !== principal),
         { principal, role, ...pick(HANDLES[principal], expiresAt) },
@@ -104,16 +120,31 @@ describe("share dialog", () => {
     const api = memorySharing();
     const share = vi.spyOn(api, "share");
     const { user } = renderPanel(api);
-    expect(await screen.findByRole("heading", { name: "Share Roadmap" })).toBeDefined();
+    expect(
+      await screen.findByRole("heading", { name: "Share Roadmap" }),
+    ).toBeDefined();
     const access = screen.getByRole("region", { name: "People with access" });
     expect(within(access).getByText("@sam")).toBeDefined();
     expect(within(access).getByText("Owner")).toBeDefined();
 
-    await user.type(screen.getByRole("combobox", { name: "People or groups" }), "pri");
-    await user.click(await screen.findByRole("option", { name: /Priya Raman/u }));
-    await user.selectOptions(screen.getByRole("combobox", { name: "Role" }), "editor");
+    await user.type(
+      screen.getByRole("combobox", { name: "People or groups" }),
+      "pri",
+    );
+    await user.click(
+      await screen.findByRole("option", { name: /Priya Raman/u }),
+    );
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Role" }),
+      "editor",
+    );
     await user.click(screen.getByRole("button", { name: "Share" }));
-    expect(share).toHaveBeenCalledWith("pg1", "user:01PRIYA", "editor", undefined);
+    expect(share).toHaveBeenCalledWith(
+      "pg1",
+      "user:01PRIYA",
+      "editor",
+      undefined,
+    );
     expect(await within(access).findByText("@priya")).toBeDefined();
 
     await user.selectOptions(
@@ -122,7 +153,9 @@ describe("share dialog", () => {
     );
     expect(share).toHaveBeenLastCalledWith("pg1", "user:01PRIYA", "viewer");
 
-    await user.click(within(access).getByRole("button", { name: "Remove @priya" }));
+    await user.click(
+      within(access).getByRole("button", { name: "Remove @priya" }),
+    );
     expect(within(access).queryByText("@priya")).toBeNull();
   });
 
@@ -143,11 +176,18 @@ describe("share dialog", () => {
     const create = vi.spyOn(api, "createLink");
     const { user } = renderPanel(api);
     const links = await screen.findByRole("region", { name: "Share links" });
-    await user.type(within(links).getByLabelText("Password (optional)"), PHRASE);
-    await user.click(within(links).getByRole("button", { name: "Create link" }));
+    await user.type(
+      within(links).getByLabelText("Password (optional)"),
+      PHRASE,
+    );
+    await user.click(
+      within(links).getByRole("button", { name: "Create link" }),
+    );
     expect(create).toHaveBeenCalledWith("pg1", { password: PHRASE });
     const made = await within(links).findByLabelText("New link");
-    expect((made as HTMLInputElement).value).toBe("https://pages.northstar.dev/s/tok1");
+    expect((made as HTMLInputElement).value).toBe(
+      "https://pages.northstar.dev/s/tok1",
+    );
     expect(within(links).getByText(/only time/u)).toBeDefined();
     expect(within(links).getByText(/Active · Password/u)).toBeDefined();
 
@@ -184,14 +224,20 @@ describe("sharing api", () => {
       expires_at: undefined,
     });
     await api.unshare("pg1", "user:01PRIYA");
-    expect(send).toHaveBeenCalledWith("DELETE", "/api/v1/drive/items/pg1/grants/user%3A01PRIYA");
+    expect(send).toHaveBeenCalledWith(
+      "DELETE",
+      "/api/v1/drive/items/pg1/grants/user%3A01PRIYA",
+    );
     await api.createLink("pg1", { expiresAt: "2026-11-01T06:59:59.000Z" });
     expect(send).toHaveBeenCalledWith("POST", "/api/v1/drive/items/pg1/links", {
       expires_at: "2026-11-01T06:59:59.000Z",
       password: undefined,
     });
     await api.revokeLink("link1");
-    expect(send).toHaveBeenLastCalledWith("DELETE", "/api/v1/drive/links/link1");
+    expect(send).toHaveBeenLastCalledWith(
+      "DELETE",
+      "/api/v1/drive/links/link1",
+    );
   });
 
   it("ends a picked day at its last second, and rejects junk", () => {

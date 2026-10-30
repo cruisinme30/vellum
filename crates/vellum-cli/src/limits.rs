@@ -83,7 +83,9 @@ impl ClusterLimit {
         let me = Arc::clone(self);
         drop(tokio::spawn(async move {
             let mut tick = tokio::time::interval(SYNC_EVERY);
-            tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+            tick.set_missed_tick_behavior(
+                tokio::time::MissedTickBehavior::Delay,
+            );
             loop {
                 let _ = tick.tick().await;
                 me.sync(&shared).await;
@@ -98,7 +100,8 @@ impl ClusterLimit {
 
     async fn sync_at(&self, shared: &SharedCounts, now: i64) {
         let (window, pending) = {
-            let mut counts = self.counts.lock().unwrap_or_else(PoisonError::into_inner);
+            let mut counts =
+                self.counts.lock().unwrap_or_else(PoisonError::into_inner);
             counts.roll(now);
             (counts.window, std::mem::take(&mut counts.pending))
         };
@@ -108,19 +111,25 @@ impl ClusterLimit {
         let hits: Vec<(String, u64)> = pending.into_iter().collect();
         match shared.add(window, &hits).await {
             Ok(totals) => {
-                let mut counts = self.counts.lock().unwrap_or_else(PoisonError::into_inner);
+                let mut counts =
+                    self.counts.lock().unwrap_or_else(PoisonError::into_inner);
                 if counts.window == window {
                     counts.totals.extend(totals);
                 }
             }
-            Err(error) => tracing::warn!(%error, "rate counts not shared; limits are per replica"),
+            Err(error) => {
+                tracing::warn!(%error, "rate counts not shared; limits are per \
+                    replica")
+            }
         }
     }
 
     fn hit_at(&self, caller: &str, now: i64) -> Option<Duration> {
-        let mut counts = self.counts.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut counts =
+            self.counts.lock().unwrap_or_else(PoisonError::into_inner);
         counts.roll(now);
-        let known = counts.totals.contains_key(caller) || counts.pending.contains_key(caller);
+        let known = counts.totals.contains_key(caller)
+            || counts.pending.contains_key(caller);
         if !known && counts.totals.len() + counts.pending.len() >= MAX_CALLERS {
             return None;
         }
@@ -129,7 +138,8 @@ impl ClusterLimit {
             *n += 1;
             *n
         };
-        let seen = counts.totals.get(caller).copied().unwrap_or_default() + pending;
+        let seen =
+            counts.totals.get(caller).copied().unwrap_or_default() + pending;
         let window = counts.window;
         drop(counts);
         if seen <= self.per_window {
@@ -158,10 +168,14 @@ impl vellum_mcp::ratelimit::SharedLimit for ClusterLimit {
 /// Exempts live-editing joins forwarded by another replica, when the
 /// cluster key is set.
 #[must_use]
-pub fn forwarded_joins(var: impl Fn(&str) -> Option<String>) -> Option<RateExempt> {
+pub fn forwarded_joins(
+    var: impl Fn(&str) -> Option<String>,
+) -> Option<RateExempt> {
     let key = var(CLUSTER_KEY_VAR).filter(|k| !k.is_empty())?.into_bytes();
     if key.len() < 32 {
-        tracing::warn!("{CLUSTER_KEY_VAR} is shorter than 32 bytes; ignoring it");
+        tracing::warn!(
+            "{CLUSTER_KEY_VAR} is shorter than 32 bytes; ignoring it"
+        );
         return None;
     }
     Some(Arc::new(move |headers: &HeaderMap, path: &str| {
@@ -181,9 +195,12 @@ mod tests {
     #[tokio::test]
     async fn the_allowance_holds_across_replicas() {
         let dir = tempfile::tempdir().unwrap();
-        let index = Index::open(&IndexConfig::sqlite(dir.path().join("index.sqlite"), None))
-            .await
-            .unwrap();
+        let index = Index::open(&IndexConfig::sqlite(
+            dir.path().join("index.sqlite"),
+            None,
+        ))
+        .await
+        .unwrap();
         let shared = SharedCounts::new(index);
         let (a, b) = (ClusterLimit::new(5), ClusterLimit::new(5));
         let now = now_ms();

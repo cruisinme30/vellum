@@ -15,11 +15,17 @@ use tower::ServiceExt as _;
 use vellum_api::auth::{Authenticated, Authenticator, RequestMeta};
 use vellum_api::config::GatewayConfig;
 use vellum_api::gateway::{Gateway, GatewayBuilder};
-use vellum_authz::{Actor, Authz, Change, Id, MemoryStore, Object, Relation, Subject, Tuple};
-use vellum_contracts::{BoxFuture, CredentialKind, Principal, Scope, ScopeSet, Service};
+use vellum_authz::{
+    Actor, Authz, Change, Id, MemoryStore, Object, Relation, Subject, Tuple,
+};
+use vellum_contracts::{
+    BoxFuture, CredentialKind, Principal, Scope, ScopeSet, Service,
+};
 use vellum_kernel::{Error, ErrorKind, SpaceId, Timestamp};
 use vellum_search::conformance::{Corpus, StaticStars, bid};
-use vellum_search::{Location, SearchApi, SearchService, TantivyBackend, TantivyConfig, Update};
+use vellum_search::{
+    Location, SearchApi, SearchService, TantivyBackend, TantivyConfig, Update,
+};
 
 type TestResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
 
@@ -65,7 +71,8 @@ async fn permissions(
     corpus: &Corpus,
 ) -> Result<Arc<Authz<MemoryStore>>, Box<dyn std::error::Error + Send + Sync>> {
     let store = MemoryStore::new();
-    let mut trees: BTreeMap<SpaceId, BTreeMap<Id, Option<Id>>> = BTreeMap::new();
+    let mut trees: BTreeMap<SpaceId, BTreeMap<Id, Option<Id>>> =
+        BTreeMap::new();
     for doc in corpus.documents() {
         let tree = trees.entry(doc.space).or_default();
         let space = doc.space.as_u128();
@@ -100,7 +107,9 @@ async fn permissions(
     Ok(authz)
 }
 
-async fn gateway(corpus: &Corpus) -> Result<Gateway, Box<dyn std::error::Error + Send + Sync>> {
+async fn gateway(
+    corpus: &Corpus,
+) -> Result<Gateway, Box<dyn std::error::Error + Send + Sync>> {
     let (backend, _) = TantivyBackend::open(&TantivyConfig {
         location: Location::Memory,
         key: None,
@@ -165,7 +174,8 @@ fn docs(page: &Value) -> Vec<String> {
 async fn every_operation_is_in_openapi_and_graphql() -> TestResult {
     let corpus = Corpus::default();
     let gateway = gateway(&corpus).await?;
-    let (status, openapi) = call(&gateway, "GET", "/api/openapi.json", "", None).await?;
+    let (status, openapi) =
+        call(&gateway, "GET", "/api/openapi.json", "", None).await?;
     assert_eq!(status, StatusCode::OK);
     let mut ids: Vec<String> = openapi["paths"]
         .as_object()
@@ -189,12 +199,14 @@ async fn rest_search_is_filtered_by_permissions() -> TestResult {
     let corpus = Corpus::default();
     let gateway = gateway(&corpus).await?;
 
-    let (status, ada) = call(&gateway, "GET", "/api/v1/search?q=budget", "ada", None).await?;
+    let (status, ada) =
+        call(&gateway, "GET", "/api/v1/search?q=budget", "ada", None).await?;
     assert_eq!(status, StatusCode::OK, "{ada}");
     assert!(docs(&ada).contains(&corpus.budget.to_string()), "{ada}");
 
     // Grace cannot read finance, so its budget page never shows up.
-    let (status, grace) = call(&gateway, "GET", "/api/v1/search?q=budget", "grace", None).await?;
+    let (status, grace) =
+        call(&gateway, "GET", "/api/v1/search?q=budget", "grace", None).await?;
     assert_eq!(status, StatusCode::OK, "{grace}");
     assert!(
         !docs(&grace).contains(&corpus.budget.to_string()),
@@ -216,7 +228,8 @@ async fn rest_search_is_filtered_by_permissions() -> TestResult {
         "{page}"
     );
 
-    let (status, _) = call(&gateway, "GET", "/api/v1/search?q=budget", "", None).await?;
+    let (status, _) =
+        call(&gateway, "GET", "/api/v1/search?q=budget", "", None).await?;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
     Ok(())
 }
@@ -249,7 +262,8 @@ async fn titles_and_context_over_rest() -> TestResult {
         "{context}"
     );
 
-    let missing = format!("/api/v1/search/context/{}/{}", corpus.runbook, bid(77));
+    let missing =
+        format!("/api/v1/search/context/{}/{}", corpus.runbook, bid(77));
     let (status, _) = call(&gateway, "GET", &missing, "ada", None).await?;
     assert_eq!(status, StatusCode::NOT_FOUND);
     Ok(())
@@ -260,18 +274,27 @@ async fn graphql_searches() -> TestResult {
     let corpus = Corpus::default();
     let gateway = gateway(&corpus).await?;
     let query = json!({
-        "query": r#"{ searchQuery(input: {q: "canary deploy", kinds: "page"}) { hits { doc block citation } has_more } }"#
+        "query": concat!(
+            r#"{ searchQuery(input: {q: "canary deploy", kinds: "page"}) { "#,
+            r#"hits { doc block citation } has_more } }"#,
+        )
     });
-    let (status, reply) = call(&gateway, "POST", "/api/graphql", "grace", Some(query)).await?;
+    let (status, reply) =
+        call(&gateway, "POST", "/api/graphql", "grace", Some(query)).await?;
     assert_eq!(status, StatusCode::OK, "{reply}");
     assert_eq!(
         reply.pointer("/data/searchQuery/hits/0/block"),
         Some(&json!(bid(3).to_string())),
         "{reply}"
     );
-    let titles =
-        json!({ "query": r#"{ searchTitles(input: {q: "gatew"}) { hits { doc title } } }"# });
-    let (status, reply) = call(&gateway, "POST", "/api/graphql", "ada", Some(titles)).await?;
+    let titles = json!({
+        "query": concat!(
+            r#"{ searchTitles(input: {q: "gatew"}) "#,
+            "{ hits { doc title } } }"
+        )
+    });
+    let (status, reply) =
+        call(&gateway, "POST", "/api/graphql", "ada", Some(titles)).await?;
     assert_eq!(status, StatusCode::OK, "{reply}");
     assert!(
         reply

@@ -48,7 +48,8 @@ pub fn set(yaml: &str, key: &str, value: &str) -> String {
     let mut out = String::with_capacity(yaml.len() + line.len() + 1);
     let mut found = false;
     for raw in yaml.split_inclusive('\n') {
-        if !found && value_of(raw.trim_end_matches(['\r', '\n']), key).is_some() {
+        if !found && value_of(raw.trim_end_matches(['\r', '\n']), key).is_some()
+        {
             found = true;
             out.push_str(&line);
             out.push('\n');
@@ -71,7 +72,9 @@ pub fn set(yaml: &str, key: &str, value: &str) -> String {
 #[must_use]
 pub fn set_md(text: &str, key: &str, value: &str) -> String {
     match split(text) {
-        Some((yaml, body)) => format!("---\n{}---\n{body}", set(yaml, key, value)),
+        Some((yaml, body)) => {
+            format!("---\n{}---\n{body}", set(yaml, key, value))
+        }
         None => format!("---\n{}---\n{text}", set("", key, value)),
     }
 }
@@ -96,7 +99,9 @@ fn strip_comment(value: &str) -> &str {
 }
 
 fn unquote(value: &str) -> String {
-    if let Some(inner) = value.strip_prefix('"').and_then(|v| v.strip_suffix('"')) {
+    if let Some(inner) =
+        value.strip_prefix('"').and_then(|v| v.strip_suffix('"'))
+    {
         let mut out = String::with_capacity(inner.len());
         let mut chars = inner.chars();
         while let Some(c) = chars.next() {
@@ -113,7 +118,9 @@ fn unquote(value: &str) -> String {
         }
         return out;
     }
-    if let Some(inner) = value.strip_prefix('\'').and_then(|v| v.strip_suffix('\'')) {
+    if let Some(inner) =
+        value.strip_prefix('\'').and_then(|v| v.strip_suffix('\''))
+    {
         return inner.replace("''", "'");
     }
     value.to_owned()
@@ -124,8 +131,8 @@ fn quote(value: &str) -> String {
     let plain = !value.is_empty()
         && value == value.trim()
         && !value.starts_with([
-            '-', '?', ':', ',', '[', ']', '{', '}', '#', '&', '*', '!', '|', '>', '\'', '"', '%',
-            '@', '`',
+            '-', '?', ':', ',', '[', ']', '{', '}', '#', '&', '*', '!', '|',
+            '>', '\'', '"', '%', '@', '`',
         ])
         && !value.contains(": ")
         && !value.contains(" #")
@@ -159,7 +166,8 @@ fn quote(value: &str) -> String {
 mod tests {
     use super::*;
 
-    const DOC: &str = "---\nid: 01JB3K9Q7Z5N8M2X4V6T0R1Y3W\ntitle: Roadmap 2027 # shown in the tree\ntags: [a]\n---\n# Body\n";
+    const DOC: &str = "---\nid: 01JB3K9Q7Z5N8M2X4V6T0R1Y3W\n\
+        title: Roadmap 2027 # shown in the tree\ntags: [a]\n---\n# Body\n";
 
     #[test]
     fn reads_keys() {
@@ -177,7 +185,8 @@ mod tests {
         let out = set_md(DOC, "title", "Plan: 2028");
         assert_eq!(
             out,
-            "---\nid: 01JB3K9Q7Z5N8M2X4V6T0R1Y3W\ntitle: \"Plan: 2028\"\ntags: [a]\n---\n# Body\n"
+            "---\nid: 01JB3K9Q7Z5N8M2X4V6T0R1Y3W\ntitle: \"Plan: 2028\"\n\
+                tags: [a]\n---\n# Body\n"
         );
         assert_eq!(get_md(&out, "title").as_deref(), Some("Plan: 2028"));
     }

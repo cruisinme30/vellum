@@ -25,7 +25,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use aws_lc_rs::signature::{
-    ECDSA_P256_SHA256_FIXED, RSA_PKCS1_2048_8192_SHA256, RsaPublicKeyComponents, UnparsedPublicKey,
+    ECDSA_P256_SHA256_FIXED, RSA_PKCS1_2048_8192_SHA256,
+    RsaPublicKeyComponents, UnparsedPublicKey,
 };
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -113,7 +114,8 @@ pub(crate) fn in_domains(domains: &[String], email: &str) -> bool {
 /// production.
 pub trait SsoHttp: Send + Sync + 'static {
     /// GETs `url` and returns the body of a 2xx response.
-    fn get<'a>(&'a self, url: &'a str) -> BoxFuture<'a, Result<Vec<u8>, Error>>;
+    fn get<'a>(&'a self, url: &'a str)
+    -> BoxFuture<'a, Result<Vec<u8>, Error>>;
 
     /// POSTs `form` (URL-encoded) to `url`, with HTTP basic credentials
     /// when given, and returns the status and body.
@@ -236,8 +238,9 @@ fn unavailable(message: impl fmt::Display) -> Error {
 
 fn random() -> Result<String, Error> {
     let mut bytes = [0_u8; 32];
-    getrandom::fill(&mut bytes)
-        .map_err(|e| Error::new(ErrorKind::Internal, format!("random source failed: {e}")))?;
+    getrandom::fill(&mut bytes).map_err(|e| {
+        Error::new(ErrorKind::Internal, format!("random source failed: {e}"))
+    })?;
     Ok(URL_SAFE_NO_PAD.encode(bytes))
 }
 
@@ -276,10 +279,14 @@ impl Sso {
         &self.config
     }
 
-    async fn get_json<T: for<'de> Deserialize<'de>>(&self, url: &str) -> Result<T, Error> {
+    async fn get_json<T: for<'de> Deserialize<'de>>(
+        &self,
+        url: &str,
+    ) -> Result<T, Error> {
         let body = self.http.get(url).await.map_err(unavailable)?;
-        serde_json::from_slice(&body)
-            .map_err(|e| unavailable(format!("unreadable response from {url}: {e}")))
+        serde_json::from_slice(&body).map_err(|e| {
+            unavailable(format!("unreadable response from {url}: {e}"))
+        })
     }
 
     async fn discovery(&self) -> Result<Discovery, Error> {
@@ -297,11 +304,16 @@ impl Sso {
                 found.issuer
             )));
         }
-        self.cache.lock().await.discovery = Some((found.clone(), Instant::now()));
+        self.cache.lock().await.discovery =
+            Some((found.clone(), Instant::now()));
         Ok(found)
     }
 
-    async fn keys(&self, discovery: &Discovery, refresh: bool) -> Result<Vec<Jwk>, Error> {
+    async fn keys(
+        &self,
+        discovery: &Discovery,
+        refresh: bool,
+    ) -> Result<Vec<Jwk>, Error> {
         {
             let cache = self.cache.lock().await;
             if let Some((keys, at)) = &cache.keys {
@@ -334,7 +346,8 @@ impl Sso {
         let state = random()?;
         let nonce = random()?;
         let verifier = random()?;
-        let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()));
+        let challenge =
+            URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()));
         {
             let mut pending = self.pending.lock().await;
             pending.retain(|_, p| p.started.elapsed() < PENDING_LIFETIME);
@@ -355,8 +368,10 @@ impl Sso {
                 },
             );
         }
-        let mut url = Url::parse(&discovery.authorization_endpoint)
-            .map_err(|e| unavailable(format!("bad authorization endpoint: {e}")))?;
+        let mut url =
+            Url::parse(&discovery.authorization_endpoint).map_err(|e| {
+                unavailable(format!("bad authorization endpoint: {e}"))
+            })?;
         let _ = url
             .query_pairs_mut()
             .append_pair("response_type", "code")
@@ -394,11 +409,12 @@ impl Sso {
         code: &str,
         cookie_state: Option<&str>,
     ) -> Result<SsoFinish, Error> {
-        let same_browser =
-            cookie_state.is_some_and(|c| bool::from(c.as_bytes().ct_eq(state.as_bytes())));
+        let same_browser = cookie_state
+            .is_some_and(|c| bool::from(c.as_bytes().ct_eq(state.as_bytes())));
         if !same_browser {
             return Err(failed(
-                "this sign-in was started in another browser or has expired; start again",
+                "this sign-in was started in another browser or has expired; \
+                    start again",
             ));
         }
         let pending = self
@@ -407,7 +423,11 @@ impl Sso {
             .await
             .remove(state)
             .filter(|p| p.started.elapsed() < PENDING_LIFETIME)
-            .ok_or_else(|| failed("this sign-in has expired or was already used; start again"))?;
+            .ok_or_else(|| {
+                failed(
+                    "this sign-in has expired or was already used; start again",
+                )
+            })?;
         let discovery = self.discovery().await?;
         let mut form = vec![
             ("grant_type".to_owned(), "authorization_code".to_owned()),
@@ -417,7 +437,9 @@ impl Sso {
         ];
         // client_secret_basic: both parts form-encoded (RFC 6749, 2.3.1).
         let basic = self.config.client_secret.as_ref().map(|secret| {
-            let enc = |s: &str| url::form_urlencoded::byte_serialize(s.as_bytes()).collect();
+            let enc = |s: &str| {
+                url::form_urlencoded::byte_serialize(s.as_bytes()).collect()
+            };
             (enc(&self.config.client_id), enc(secret))
         });
         if basic.is_none() {
@@ -428,8 +450,9 @@ impl Sso {
             .post_form(&discovery.token_endpoint, form, basic)
             .await
             .map_err(unavailable)?;
-        let tokens: Tokens = serde_json::from_slice(&body)
-            .map_err(|_| unavailable(format!("unreadable token response (HTTP {status})")))?;
+        let tokens: Tokens = serde_json::from_slice(&body).map_err(|_| {
+            unavailable(format!("unreadable token response (HTTP {status})"))
+        })?;
         if let Some(error) = tokens.error {
             let detail = tokens.error_description.unwrap_or_default();
             return Err(failed(format!(
@@ -474,7 +497,9 @@ impl Sso {
             keys = self.keys(discovery, true).await?;
         }
         let key = find_key(&keys, &header.alg, header.kid.as_deref())
-            .ok_or_else(|| failed("the ID token is signed with an unknown key"))?;
+            .ok_or_else(|| {
+                failed("the ID token is signed with an unknown key")
+            })?;
         check_signature(key, &header.alg, signed.as_bytes(), &signature)?;
         let claims: Claims = serde_json::from_slice(&decode(claims_b64)?)
             .map_err(|_| failed("the ID token claims are malformed"))?;
@@ -570,9 +595,9 @@ impl Claims {
     /// reused a sign-in the provider remembered.
     fn check_recent(&self, now: Timestamp) -> Result<(), Error> {
         let now_secs = now.unix_ms() / 1000;
-        let recent = self
-            .auth_time
-            .is_some_and(|at| (now_secs - at).abs() <= 5 * 60 + CLOCK_SKEW_SECS);
+        let recent = self.auth_time.is_some_and(|at| {
+            (now_secs - at).abs() <= 5 * 60 + CLOCK_SKEW_SECS
+        });
         if recent {
             Ok(())
         } else {
@@ -599,8 +624,12 @@ impl Claims {
         if !audiences.contains(&client_id) {
             return Err(failed("the ID token is for another application"));
         }
-        if (audiences.len() > 1 || self.azp.is_some()) && self.azp.as_deref() != Some(client_id) {
-            return Err(failed("the ID token was issued to another application"));
+        if (audiences.len() > 1 || self.azp.is_some())
+            && self.azp.as_deref() != Some(client_id)
+        {
+            return Err(failed(
+                "the ID token was issued to another application",
+            ));
         }
         let now_secs = now.unix_ms() / 1000;
         if self.exp + CLOCK_SKEW_SECS <= now_secs {
@@ -623,7 +652,11 @@ impl Claims {
     }
 }
 
-fn find_key<'a>(keys: &'a [Jwk], alg: &str, kid: Option<&str>) -> Option<&'a Jwk> {
+fn find_key<'a>(
+    keys: &'a [Jwk],
+    alg: &str,
+    kid: Option<&str>,
+) -> Option<&'a Jwk> {
     let kty = match alg {
         "RS256" => "RSA",
         "ES256" => "EC",
@@ -650,7 +683,12 @@ fn find_key<'a>(keys: &'a [Jwk], alg: &str, kid: Option<&str>) -> Option<&'a Jwk
     }
 }
 
-fn check_signature(key: &Jwk, alg: &str, message: &[u8], signature: &[u8]) -> Result<(), Error> {
+fn check_signature(
+    key: &Jwk,
+    alg: &str,
+    message: &[u8],
+    signature: &[u8],
+) -> Result<(), Error> {
     let bad_key = || failed("the provider's signing key is malformed");
     let part = |v: &Option<String>| {
         v.as_deref()

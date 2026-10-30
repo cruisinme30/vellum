@@ -19,7 +19,8 @@ use std::time::Duration;
 use vellum_contracts::{HttpMethod, Operation, Scope, Service};
 
 use crate::api::{
-    DeleteObject, EnrolDevice, GetObject, ListObjects, PutObject, RevokeDevice, SpaceRef,
+    DeleteObject, EnrolDevice, GetObject, ListObjects, PutObject, RevokeDevice,
+    SpaceRef,
 };
 use crate::app::E2e;
 
@@ -31,7 +32,10 @@ impl Service for E2e {
         "e2e"
     }
 
-    #[expect(clippy::too_many_lines, reason = "one block per operation reads best")]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one block per operation reads best"
+    )]
     fn operations(self: Arc<Self>) -> Vec<Operation> {
         let svc = Arc::clone(&self);
         let keys = Operation::query(
@@ -48,26 +52,31 @@ impl Service for E2e {
         )
         .summary("List the devices a private space is sealed to")
         .description(
-            "Every device key enrolled in the end-to-end encrypted space. Devices seal new \
-             pages to exactly these keys. An empty list means the space is not private.",
+            "Every device key enrolled in the end-to-end encrypted space. \
+             Devices seal new pages to exactly these keys. An empty list means \
+             the space is not private.",
         );
         let svc = Arc::clone(&self);
-        let enrol = Operation::mutation(
-            "e2e.enrol",
-            HttpMethod::Post,
-            "/v1/spaces/{space_id}/e2e/keys",
-            Scope::WriteDirect,
-            move |ctx, input: EnrolDevice| {
-                let svc = Arc::clone(&svc);
-                async move { svc.enrol(ctx.principal.require_user()?, input).await }
-            },
-        )
-        .fresh_auth(FRESH)
-        .summary("Enrol this device in a private space")
-        .description(
-            "Adds the caller's device public key. The first key makes the space private and \
-             needs a manager. Existing members' devices then add the new key to each page.",
-        );
+        let enrol =
+            Operation::mutation(
+                "e2e.enrol",
+                HttpMethod::Post,
+                "/v1/spaces/{space_id}/e2e/keys",
+                Scope::WriteDirect,
+                move |ctx, input: EnrolDevice| {
+                    let svc = Arc::clone(&svc);
+                    async move {
+                        svc.enrol(ctx.principal.require_user()?, input).await
+                    }
+                },
+            )
+            .fresh_auth(FRESH)
+            .summary("Enrol this device in a private space")
+            .description(
+                "Adds the caller's device public key. The first key makes the \
+             space private and needs a manager. Existing members' devices then \
+             add the new key to each page.",
+            );
         let svc = Arc::clone(&self);
         let revoke = Operation::mutation(
             "e2e.revoke",
@@ -76,15 +85,18 @@ impl Service for E2e {
             Scope::WriteDirect,
             move |ctx, input: RevokeDevice| {
                 let svc = Arc::clone(&svc);
-                async move { svc.revoke(ctx.principal.require_user()?, input).await }
+                async move {
+                    svc.revoke(ctx.principal.require_user()?, input).await
+                }
             },
         )
         .fresh_auth(FRESH)
         .summary("Revoke a device from a private space")
         .description(
-            "Removes a lost or retired device's key: your own, or anyone's if you manage the \
-             space. Members' devices strip it from each page. A device that kept old \
-             ciphertext can still read what it could read before.",
+            "Removes a lost or retired device's key: your own, or anyone's if \
+             you manage the space. Members' devices strip it from each page. A \
+             device that kept old ciphertext can still read what it could read \
+             before.",
         );
         let svc = Arc::clone(&self);
         let objects = Operation::query(
@@ -93,11 +105,15 @@ impl Service for E2e {
             Scope::Read,
             move |ctx, input: ListObjects| {
                 let svc = Arc::clone(&svc);
-                async move { svc.objects(ctx.principal.require_user()?, input).await }
+                async move {
+                    svc.objects(ctx.principal.require_user()?, input).await
+                }
             },
         )
         .summary("List a private space's objects")
-        .description("Paths, sizes and change times, a page at a time in path order.");
+        .description(
+            "Paths, sizes and change times, a page at a time in path order.",
+        );
         let svc = Arc::clone(&self);
         let get = Operation::query(
             "e2e.get",
@@ -105,13 +121,16 @@ impl Service for E2e {
             Scope::Read,
             move |ctx, input: GetObject| {
                 let svc = Arc::clone(&svc);
-                async move { svc.get(ctx.principal.require_user()?, input).await }
+                async move {
+                    svc.get(ctx.principal.require_user()?, input).await
+                }
             },
         )
         .summary("Download a sealed page")
         .description(
-            "The recipient envelope, base64, as stored. Only members' devices can open it. \
-             Objects that are not end-to-end encrypted are refused.",
+            "The recipient envelope, base64, as stored. Only members' devices \
+             can open it. Objects that are not end-to-end encrypted are \
+             refused.",
         );
         let svc = Arc::clone(&self);
         let put = Operation::mutation(
@@ -121,27 +140,33 @@ impl Service for E2e {
             Scope::WriteDirect,
             move |ctx, input: PutObject| {
                 let svc = Arc::clone(&svc);
-                async move { svc.put(ctx.principal.require_user()?, input).await }
+                async move {
+                    svc.put(ctx.principal.require_user()?, input).await
+                }
             },
         )
         .summary("Upload a page sealed on this device")
         .description(
-            "Stores a recipient envelope sealed to exactly the space's current keys. Pass the \
-             version you replace as `if_match`, or nothing to create.",
+            "Stores a recipient envelope sealed to exactly the space's current \
+             keys. Pass the version you replace as `if_match`, or nothing to \
+             create.",
         );
         let svc = self;
-        let delete = Operation::mutation(
-            "e2e.delete",
-            HttpMethod::Delete,
-            "/v1/spaces/{space_id}/e2e/object",
-            Scope::WriteDirect,
-            move |ctx, input: DeleteObject| {
-                let svc = Arc::clone(&svc);
-                async move { svc.delete(ctx.principal.require_user()?, input).await }
-            },
-        )
-        .summary("Delete a sealed page")
-        .description("Deletes the object if it is still at `if_match`.");
+        let delete =
+            Operation::mutation(
+                "e2e.delete",
+                HttpMethod::Delete,
+                "/v1/spaces/{space_id}/e2e/object",
+                Scope::WriteDirect,
+                move |ctx, input: DeleteObject| {
+                    let svc = Arc::clone(&svc);
+                    async move {
+                        svc.delete(ctx.principal.require_user()?, input).await
+                    }
+                },
+            )
+            .summary("Delete a sealed page")
+            .description("Deletes the object if it is still at `if_match`.");
         vec![keys, enrol, revoke, objects, get, put, delete]
     }
 }

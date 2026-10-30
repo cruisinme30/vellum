@@ -34,9 +34,14 @@ export function parseHex(hex: string): Rgb | undefined {
   if (body === undefined) {
     return undefined;
   }
-  const full = body.length === 3 ? body.replaceAll(/[\da-f]/gi, (c) => c + c) : body;
+  const full =
+    body.length === 3 ? body.replaceAll(/[\da-f]/gi, (c) => c + c) : body;
   const value = Number.parseInt(full, 16);
-  return { r: ((value >> 16) & 255) / 255, g: ((value >> 8) & 255) / 255, b: (value & 255) / 255 };
+  return {
+    r: ((value >> 16) & 255) / 255,
+    g: ((value >> 8) & 255) / 255,
+    b: (value & 255) / 255,
+  };
 }
 
 const channel = (v: number) =>
@@ -49,8 +54,10 @@ export function toHex({ r, g, b }: Rgb): string {
   return `#${channel(r)}${channel(g)}${channel(b)}`;
 }
 
-const toLinear = (v: number) => (v <= 0.040_45 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
-const fromLinear = (v: number) => (v <= 0.003_130_8 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055);
+const toLinear = (v: number) =>
+  v <= 0.040_45 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+const fromLinear = (v: number) =>
+  v <= 0.003_130_8 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055;
 
 /** WCAG relative luminance. */
 export function luminance({ r, g, b }: Rgb): number {
@@ -59,7 +66,10 @@ export function luminance({ r, g, b }: Rgb): number {
 
 /** WCAG contrast ratio between two colours, from 1 to 21. */
 export function contrast(a: Rgb, b: Rgb): number {
-  const [hi, lo] = [luminance(a), luminance(b)].toSorted((x, y) => y - x) as [number, number];
+  const [hi, lo] = [luminance(a), luminance(b)].toSorted((x, y) => y - x) as [
+    number,
+    number,
+  ];
   return (hi + 0.05) / (lo + 0.05);
 }
 
@@ -71,7 +81,8 @@ export function toLch(rgb: Rgb): Lch {
   const x = (0.412_456_4 * r + 0.357_576_1 * g + 0.180_437_5 * b) / WHITE.x;
   const y = (0.212_672_9 * r + 0.715_152_2 * g + 0.072_175 * b) / WHITE.y;
   const z = (0.019_333_9 * r + 0.119_192 * g + 0.950_304_1 * b) / WHITE.z;
-  const f = (t: number) => (t > EPSILON ? Math.cbrt(t) : (KAPPA * t + 16) / 116);
+  const f = (t: number) =>
+    t > EPSILON ? Math.cbrt(t) : (KAPPA * t + 16) / 116;
   const [fx, fy, fz] = [f(x), f(y), f(z)];
   const l = 116 * fy - 16;
   const a = 500 * (fx - fy);
@@ -86,7 +97,8 @@ function lchToRaw({ l, c, h }: Lch): { rgb: Rgb; inGamut: boolean } {
   const fy = (l + 16) / 116;
   const fx = fy + a / 500;
   const fz = fy - b / 200;
-  const inv = (t: number) => (t ** 3 > EPSILON ? t ** 3 : (116 * t - 16) / KAPPA);
+  const inv = (t: number) =>
+    t ** 3 > EPSILON ? t ** 3 : (116 * t - 16) / KAPPA;
   const x = inv(fx) * WHITE.x;
   const y = (l > KAPPA * EPSILON ? fy ** 3 : l / KAPPA) * WHITE.y;
   const z = inv(fz) * WHITE.z;
@@ -94,10 +106,15 @@ function lchToRaw({ l, c, h }: Lch): { rgb: Rgb; inGamut: boolean } {
   const lg = -0.969_266 * x + 1.876_010_8 * y + 0.041_556 * z;
   const lb = 0.055_643_4 * x - 0.204_025_9 * y + 1.057_225_2 * z;
   const inGamut = [lr, lg, lb].every((v) => v >= -0.0001 && v <= 1.0001);
-  return { rgb: { r: fromLinear(lr), g: fromLinear(lg), b: fromLinear(lb) }, inGamut };
+  return {
+    rgb: { r: fromLinear(lr), g: fromLinear(lg), b: fromLinear(lb) },
+    inGamut,
+  };
 }
 
-/** Converts CIE LCh to sRGB, lowering chroma until the colour fits the gamut. */
+/**
+ * Converts CIE LCh to sRGB, lowering chroma until the colour fits the gamut.
+ */
 export function fromLch(lch: Lch): Rgb {
   let low = 0;
   let high = lch.c;

@@ -17,7 +17,9 @@ use serde_json::json;
 use url::Url;
 use vellum_contracts::BoxFuture;
 use vellum_identity::mfa::SignIn;
-use vellum_identity::providers::{ENV_PROVIDER, ProviderInput, ProviderKind, UpdateSignIn};
+use vellum_identity::providers::{
+    ENV_PROVIDER, ProviderInput, ProviderKind, UpdateSignIn,
+};
 use vellum_identity::{Identity, IdentityConfig, SsoHttp, Store};
 use vellum_kernel::{Error, ErrorKind};
 
@@ -35,8 +37,13 @@ struct Recorder {
 }
 
 impl SsoHttp for Recorder {
-    fn get<'a>(&'a self, url: &'a str) -> BoxFuture<'a, Result<Vec<u8>, Error>> {
-        let body = (url == format!("{ISSUER}/.well-known/openid-configuration")).then(|| {
+    fn get<'a>(
+        &'a self,
+        url: &'a str,
+    ) -> BoxFuture<'a, Result<Vec<u8>, Error>> {
+        let body = (url
+            == format!("{ISSUER}/.well-known/openid-configuration"))
+        .then(|| {
             json!({
                 "issuer": ISSUER,
                 "authorization_endpoint": format!("{ISSUER}/authorize"),
@@ -46,7 +53,9 @@ impl SsoHttp for Recorder {
             .to_string()
             .into_bytes()
         });
-        Box::pin(async move { body.ok_or_else(|| Error::new(ErrorKind::NotFound, "no page")) })
+        Box::pin(async move {
+            body.ok_or_else(|| Error::new(ErrorKind::NotFound, "no page"))
+        })
     }
 
     fn post_form<'a>(

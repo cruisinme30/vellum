@@ -41,42 +41,59 @@ impl LocalFeed {
     /// # Errors
     /// Returns [`StoreError::Backend`] if the OS watch cannot start.
     pub fn start(root: &Path, tx: mpsc::Sender<BlobPath>) -> StoreResult<Self> {
-        let root: PathBuf = root.canonicalize().map_err(|e| StoreError::Io {
-            path: root.display().to_string(),
-            source: e,
-        })?;
+        let root: PathBuf =
+            root.canonicalize().map_err(|e| StoreError::Io {
+                path: root.display().to_string(),
+                source: e,
+            })?;
         let base = root.clone();
-        let mut watcher =
-            notify::recommended_watcher(move |res: notify::Result<notify::Event>| match res {
+        let mut watcher = notify::recommended_watcher(
+            move |res: notify::Result<notify::Event>| match res {
                 // Reads are not changes (closing a written file is).
                 // Reporting them would also loop: the reconciler lists
                 // folders, which the OS reports as reads.
                 Ok(event) if is_read(event.kind) => {}
                 Ok(event) => {
-                    for path in event.paths.iter().filter_map(|p| relative(&base, p)) {
+                    for path in
+                        event.paths.iter().filter_map(|p| relative(&base, p))
+                    {
                         if tx.blocking_send(path).is_err() {
                             return; // The reconciler has stopped.
                         }
                     }
                 }
                 Err(e) => tracing::warn!(error = %e, "filesystem watch error"),
-            })
-            .map_err(|e| StoreError::Backend(format!("cannot start watcher: {e}")))?;
+            },
+        )
+        .map_err(|e| {
+            StoreError::Backend(format!("cannot start watcher: {e}"))
+        })?;
         watcher
             .watch(&root, RecursiveMode::Recursive)
-            .map_err(|e| StoreError::Backend(format!("cannot watch {}: {e}", root.display())))?;
+            .map_err(|e| {
+                StoreError::Backend(format!(
+                    "cannot watch {}: {e}",
+                    root.display()
+                ))
+            })?;
         tracing::info!(root = %root.display(), "watching for external changes");
         Ok(Self { _watcher: watcher })
     }
 }
 
 fn is_read(kind: EventKind) -> bool {
-    matches!(kind, EventKind::Access(access) if access != AccessKind::Close(AccessMode::Write))
+    matches!(
+        kind,
+        EventKind::Access(
+            access
+        ) if access != AccessKind::Close(AccessMode::Write)
+    )
 }
 
 fn relative(root: &Path, file: &Path) -> Option<BlobPath> {
     let rel = file.strip_prefix(root).ok()?;
-    let parts: Option<Vec<&str>> = rel.components().map(|c| c.as_os_str().to_str()).collect();
+    let parts: Option<Vec<&str>> =
+        rel.components().map(|c| c.as_os_str().to_str()).collect();
     let joined = parts?.join("/");
     if joined
         .rsplit('/')
@@ -93,9 +110,9 @@ fn relative(root: &Path, file: &Path) -> Option<BlobPath> {
 
 /// Drives `reconciler` from a feed until either channel closes.
 ///
-/// It gathers touched paths until the feed is quiet for a moment, reconciles them,
-/// and sends the resulting changes in order. Pending removals are
-/// flushed when their grace period ends even if the feed stays quiet.
+/// It gathers touched paths until the feed is quiet for a moment, reconciles
+/// them, and sends the resulting changes in order. Pending removals are flushed
+/// when their grace period ends even if the feed stays quiet.
 ///
 /// # Errors
 /// Returns the first store error from reconciling.
@@ -107,7 +124,9 @@ pub async fn run<S: BlobStore>(
     loop {
         let mut batch = Vec::new();
         let first = match reconciler.next_deadline() {
-            Some(due) => tokio::time::timeout_at(due.into(), feed.recv()).await.ok(),
+            Some(due) => {
+                tokio::time::timeout_at(due.into(), feed.recv()).await.ok()
+            }
             None => Some(feed.recv().await),
         };
         match first {
@@ -158,7 +177,9 @@ mod tests {
     #[test]
     fn vellum_state_and_temp_files_are_not_reported() {
         let root = Path::new("/data");
-        let rel = |p: &str| relative(root, &root.join(p)).map(|b| b.as_str().to_owned());
+        let rel = |p: &str| {
+            relative(root, &root.join(p)).map(|b| b.as_str().to_owned())
+        };
         assert_eq!(rel("drives/Plan.md").as_deref(), Some("drives/Plan.md"));
         assert_eq!(rel(".vellum/index.sqlite-wal"), None);
         assert_eq!(rel(".vellum/versions/01M63X7PTPE44TNDZ490X8R47P"), None);

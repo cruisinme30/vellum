@@ -61,7 +61,9 @@ impl Svg {
     #[must_use]
     pub fn new(width: f64, height: f64, title: &str) -> Self {
         let mut out = String::with_capacity(4096);
-        out.push_str("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 ");
+        out.push_str(
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 ",
+        );
         out.push_str(&num(width));
         out.push(' ');
         out.push_str(&num(height));
@@ -85,7 +87,16 @@ impl Svg {
 
     /// A filled rectangle with an optional tooltip.
     #[allow(clippy::too_many_arguments)]
-    pub fn rect(&mut self, x: f64, y: f64, w: f64, h: f64, rx: f64, fill: &str, tip: Option<&str>) {
+    pub fn rect(
+        &mut self,
+        x: f64,
+        y: f64,
+        w: f64,
+        h: f64,
+        rx: f64,
+        fill: &str,
+        tip: Option<&str>,
+    ) {
         self.out.push_str("<rect x=\"");
         self.out.push_str(&num(x));
         self.out.push_str("\" y=\"");
@@ -105,7 +116,16 @@ impl Svg {
 
     /// A rectangle with a stroke and fill.
     #[allow(clippy::too_many_arguments)]
-    pub fn boxed(&mut self, x: f64, y: f64, w: f64, h: f64, rx: f64, fill: &str, stroke: &str) {
+    pub fn boxed(
+        &mut self,
+        x: f64,
+        y: f64,
+        w: f64,
+        h: f64,
+        rx: f64,
+        fill: &str,
+        stroke: &str,
+    ) {
         self.out.push_str("<rect x=\"");
         self.out.push_str(&num(x));
         self.out.push_str("\" y=\"");
@@ -124,7 +144,10 @@ impl Svg {
     }
 
     /// A straight line.
-    #[allow(clippy::too_many_arguments, reason = "two points plus stroke style")]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "two points plus stroke style"
+    )]
     pub fn line(
         &mut self,
         x1: f64,
@@ -154,7 +177,14 @@ impl Svg {
     }
 
     /// A path with fill and stroke.
-    pub fn path(&mut self, d: &str, fill: &str, stroke: &str, width: f64, tip: Option<&str>) {
+    pub fn path(
+        &mut self,
+        d: &str,
+        fill: &str,
+        stroke: &str,
+        width: f64,
+        tip: Option<&str>,
+    ) {
         self.out.push_str("<path d=\"");
         self.out.push_str(d);
         self.out.push_str("\" style=\"fill:");
@@ -169,7 +199,14 @@ impl Svg {
     }
 
     /// A circle.
-    pub fn circle(&mut self, cx: f64, cy: f64, r: f64, fill: &str, tip: Option<&str>) {
+    pub fn circle(
+        &mut self,
+        cx: f64,
+        cy: f64,
+        r: f64,
+        fill: &str,
+        tip: Option<&str>,
+    ) {
         self.out.push_str("<circle cx=\"");
         self.out.push_str(&num(cx));
         self.out.push_str("\" cy=\"");

@@ -7,7 +7,13 @@
  * the address, so a view can be bookmarked or sent as a link.
  */
 
-import { useCallback, useRef, useState, type ComponentProps, type RefObject } from "react";
+import {
+  useCallback,
+  useRef,
+  useState,
+  type ComponentProps,
+  type RefObject,
+} from "react";
 import { useNavigate } from "react-router";
 
 import { failureText } from "../data/failure";
@@ -16,14 +22,28 @@ import { useLoaded } from "../data/use-loaded";
 import { useT } from "../i18n/i18n";
 import { CopyDiagnostic } from "../shell/copy-diagnostic";
 
-import type { GroupOut, IssueOut, IssueQuery, TeamOut, ViewOut, WorkApi } from "./api";
+import type {
+  GroupOut,
+  IssueOut,
+  IssueQuery,
+  TeamOut,
+  ViewOut,
+  WorkApi,
+} from "./api";
 import { IssueResults } from "./board";
 import { PRIORITIES } from "./chips";
 import { parse, serialize, type Group } from "./filter";
 import { FilterBuilder } from "./filter-builder";
 import { TeamPicker, useTeam, useWorkKeys, WorkNav } from "./nav";
 import { SavedViews, Statuses } from "./saved-views";
-import { CLOSED, GROUPS, ORDERS, Select, useSettings, type Settings } from "./view-settings";
+import {
+  CLOSED,
+  GROUPS,
+  ORDERS,
+  Select,
+  useSettings,
+  type Settings,
+} from "./view-settings";
 
 import "./work.css";
 
@@ -124,12 +144,18 @@ function Results({
   // While a change reloads the view, keep showing the last result so the
   // board does not flash and the moved card keeps its focus.
   const shape = JSON.stringify(query);
-  const [last, setLast] = useState<{ shape: string; groups: readonly GroupOut[] }>();
+  const [last, setLast] = useState<{
+    shape: string;
+    groups: readonly GroupOut[];
+  }>();
   if (loaded.state === "ready" && last?.groups !== loaded.value) {
     setLast({ shape, groups: loaded.value });
   }
   const fresh = loaded.state === "ready" ? loaded.value : undefined;
-  const kept = loaded.state === "loading" && last?.shape === shape ? last.groups : undefined;
+  const kept =
+    loaded.state === "loading" && last?.shape === shape
+      ? last.groups
+      : undefined;
   const shown = fresh ?? kept;
   if (shown === undefined) return <Ready loaded={loaded}>{() => <></>}</Ready>;
   return (
@@ -143,7 +169,13 @@ function Results({
   );
 }
 
-function TeamIssues({ api, team }: { readonly api: WorkApi; readonly team: TeamOut }) {
+function TeamIssues({
+  api,
+  team,
+}: {
+  readonly api: WorkApi;
+  readonly team: TeamOut;
+}) {
   const t = useT();
   const [settings, change] = useSettings();
   const [showFilter, setShowFilter] = useState(false);
@@ -172,8 +204,16 @@ function TeamIssues({ api, team }: { readonly api: WorkApi; readonly team: TeamO
   return (
     <>
       <NewIssueForm api={api} team={team} input={newIssue} />
-      <div className="vl-work-toolbar" role="toolbar" aria-label={t("work-view-settings")}>
-        <div className="vl-segmented" role="group" aria-label={t("work-layout")}>
+      <div
+        className="vl-work-toolbar"
+        role="toolbar"
+        aria-label={t("work-view-settings")}
+      >
+        <div
+          className="vl-segmented"
+          role="group"
+          aria-label={t("work-layout")}
+        >
           {(["list", "board"] as const).map((layout) => (
             <button
               key={layout}
@@ -191,7 +231,11 @@ function TeamIssues({ api, team }: { readonly api: WorkApi; readonly team: TeamO
           label={t("work-group-by")}
           value={settings.group}
           options={GROUPS}
-          name={(group) => (group === "none" ? t("work-group-nothing") : t(`work-group-${group}`))}
+          name={(group) =>
+            group === "none"
+              ? t("work-group-nothing")
+              : t(`work-group-${group}`)
+          }
           onChange={(group) => {
             change({ group });
           }}
@@ -222,7 +266,9 @@ function TeamIssues({ api, team }: { readonly api: WorkApi; readonly team: TeamO
             setShowFilter((shown) => !shown);
           }}
         >
-          {conditions === 0 ? t("work-filter") : t("work-filter-count", { count: conditions })}
+          {conditions === 0
+            ? t("work-filter")
+            : t("work-filter-count", { count: conditions })}
         </button>
       </div>
       {showFilter &&
@@ -271,10 +317,17 @@ function count(group: Group): number {
   );
 }
 
-function Teams({ api, teams }: { readonly api: WorkApi; readonly teams: readonly TeamOut[] }) {
+function Teams({
+  api,
+  teams,
+}: {
+  readonly api: WorkApi;
+  readonly teams: readonly TeamOut[];
+}) {
   const t = useT();
   const team = useTeam(teams);
-  if (team === undefined) return <p className="vl-muted">{t("issues-no-teams")}</p>;
+  if (team === undefined)
+    return <p className="vl-muted">{t("issues-no-teams")}</p>;
   return (
     <>
       <div className="vl-work-filters">
@@ -287,7 +340,11 @@ function Teams({ api, teams }: { readonly api: WorkApi; readonly teams: readonly
 
 function IssuesForApi({ api }: { readonly api: WorkApi }) {
   const loaded = useLoaded(() => api.teams(), [api], failureText);
-  return <Ready loaded={loaded}>{(teams) => <Teams api={api} teams={teams} />}</Ready>;
+  return (
+    <Ready loaded={loaded}>
+      {(teams) => <Teams api={api} teams={teams} />}
+    </Ready>
+  );
 }
 
 /** Issues: a team's issues as a list or board, and a form to file a new one. */

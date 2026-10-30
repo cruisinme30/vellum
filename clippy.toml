@@ -9,5 +9,9 @@ allow-panic-in-tests = true
 allow-indexing-slicing-in-tests = true
 allow-print-in-tests = true
 
+# clippy's default of 100 lines counted lines at 100 columns; the same code
+# at 80 columns takes about a quarter more lines (ADR 0074).
+too-many-lines-threshold = 125
+
 # Product and protocol names that are not code identifiers.
 doc-valid-idents = ["SQLite", "SQLCipher", "OpenSSL", "PostgreSQL", "OpenTelemetry", "GraphQL", "OpenAPI", "ProseMirror", "TypeScript", "WebSocket", "GitHub", "GitLab", "PlantUML", "MathML", "CodePen", "YouTube", "CalDAV", "DAVx5", "ETag", "..."]

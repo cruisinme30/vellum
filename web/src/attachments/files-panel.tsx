@@ -73,12 +73,22 @@ function FileRow({
   );
 }
 
-function FileList({ files, canWrite }: { readonly files: PageFiles; readonly canWrite: boolean }) {
+function FileList({
+  files,
+  canWrite,
+}: {
+  readonly files: PageFiles;
+  readonly canWrite: boolean;
+}) {
   const t = useT();
   const [version, setVersion] = useState(0);
   const [notice, setNotice] = useState("");
   const [problem, setProblem] = useState<string>();
-  const loaded = useLoaded(() => files.api.list(files.pageId), [files, version], failureText);
+  const loaded = useLoaded(
+    () => files.api.list(files.pageId),
+    [files, version],
+    failureText,
+  );
   const reload = () => {
     setVersion((value) => value + 1);
   };

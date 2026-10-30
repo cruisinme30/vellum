@@ -50,18 +50,20 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::{RwLock, RwLockReadGuard};
 use tracing::Instrument as _;
 use vellum_contracts::{
-    BoxFuture, HttpMethod, Operation, Principal, Readiness, RequestContext, Scope, Service,
+    BoxFuture, HttpMethod, Operation, Principal, Readiness, RequestContext,
+    Scope, Service,
 };
 use vellum_kernel::{CollectionId, DocId, Error, ErrorKind};
 use vellum_store::BlobStore;
 
 pub use access::{Access, AuthzAccess, Need, SpaceOf};
 pub use api::{
-    AddPropertyInput, ChartInput, CollectionInfo, CollectionKey, CollectionList, CollectionSummary,
-    CreateFromCsvInput, CreateRowInput, CsvExport, CsvImported, EmbedInput, EmbedResult,
-    ExportCsvInput, ImportCsvInput, ListCollections, PropertyInfo, PropertyKey, QueryInput,
-    RelationInfo, RollupInfo, RowDetail, RowKey, RowWritten, SaveViewInput, UpdatePropertyInput,
-    UpdateRowInput, ViewInfo, ViewKey,
+    AddPropertyInput, ChartInput, CollectionInfo, CollectionKey,
+    CollectionList, CollectionSummary, CreateFromCsvInput, CreateRowInput,
+    CsvExport, CsvImported, EmbedInput, EmbedResult, ExportCsvInput,
+    ImportCsvInput, ListCollections, PropertyInfo, PropertyKey, QueryInput,
+    RelationInfo, RollupInfo, RowDetail, RowKey, RowWritten, SaveViewInput,
+    UpdatePropertyInput, UpdateRowInput, ViewInfo, ViewKey,
 };
 pub use index::{IndexFeed, IndexField, RowDocument};
 pub use state::{MAX_FILE_BYTES, MAX_ROWS_PER_COLLECTION, collection_dir};
@@ -105,7 +107,10 @@ pub trait Tree: Send + Sync + fmt::Debug {
 pub const MAX_CSV_BYTES: usize = 16 * 1024 * 1024;
 
 /// The saved view `name`, the first view, or a plain table.
-fn view_def(schema: &crate::schema::Schema, name: Option<&str>) -> Result<ViewDef, Error> {
+fn view_def(
+    schema: &crate::schema::Schema,
+    name: Option<&str>,
+) -> Result<ViewDef, Error> {
     match (name, schema.view(name)) {
         (_, Some(v)) => Ok(v.clone()),
         (None, None) => Ok(ViewDef::default_table()),
@@ -150,7 +155,10 @@ fn view_name(name: &str) -> Result<String, Error> {
     {
         return Err(Error::new(
             ErrorKind::InvalidInput,
-            format!("a view name needs 1 to {MAX_VIEW_NAME_CHARS} printable characters"),
+            format!(
+                "a view name needs 1 to {MAX_VIEW_NAME_CHARS} printable \
+                    characters"
+            ),
         ));
     }
     Ok(name.to_owned())
@@ -212,7 +220,10 @@ fn prepare_import(
 }
 
 /// A loaded collection's schema, views and load problems.
-fn collection_info(state: &State, id: CollectionId) -> Result<CollectionInfo, Error> {
+fn collection_info(
+    state: &State,
+    id: CollectionId,
+) -> Result<CollectionInfo, Error> {
     match (state.ws.collection(id), state.folder(id)) {
         (Some(c), Ok(f)) => Ok(CollectionInfo::new(
             c.schema(),
@@ -336,7 +347,10 @@ impl CollectionsService {
     /// # Errors
     ///
     /// When the collections cannot be read from the store.
-    pub async fn index_row(&self, row: DocId) -> Result<Option<RowDocument>, Error> {
+    pub async fn index_row(
+        &self,
+        row: DocId,
+    ) -> Result<Option<RowDocument>, Error> {
         let state = self.read().await?;
         let mut computer = Computer::new(&state.ws, (self.clock)());
         let doc = index::row_document(&state, &mut computer, row);
@@ -374,7 +388,10 @@ impl CollectionsService {
     /// wrote to them (ADR 0038), keeping every other collection loaded.
     /// Falls back to [`Self::invalidate`] when a targeted reload cannot
     /// give the same result as a full one.
-    pub async fn refresh(&self, dirs: &std::collections::BTreeSet<vellum_store::BlobPath>) {
+    pub async fn refresh(
+        &self,
+        dirs: &std::collections::BTreeSet<vellum_store::BlobPath>,
+    ) {
         if dirs.is_empty() {
             return;
         }
@@ -385,7 +402,8 @@ impl CollectionsService {
             return;
         };
         if let Err(error) = state.reload(self.store.as_ref(), dirs).await {
-            tracing::info!(%error, "reloading every collection after a change elsewhere");
+            tracing::info!(%error, "reloading every collection after a change \
+                elsewhere");
             *guard = None;
         }
     }
@@ -406,8 +424,9 @@ impl CollectionsService {
         if guard.is_none() {
             *guard = Some(State::load(self.store.as_ref()).await?);
         }
-        RwLockReadGuard::try_map(guard.downgrade(), Option::as_ref)
-            .map_err(|_| Error::new(ErrorKind::Internal, "collections were not loaded"))
+        RwLockReadGuard::try_map(guard.downgrade(), Option::as_ref).map_err(
+            |_| Error::new(ErrorKind::Internal, "collections were not loaded"),
+        )
     }
 
     /// Checks that `principal` may read `id`, answering "not found" when it
@@ -418,7 +437,12 @@ impl CollectionsService {
         principal: &Principal,
         id: CollectionId,
     ) -> Result<(), Error> {
-        let not_found = || Error::new(ErrorKind::NotFound, format!("collection {id} not found"));
+        let not_found = || {
+            Error::new(
+                ErrorKind::NotFound,
+                format!("collection {id} not found"),
+            )
+        };
         let folder = state.folder(id).map_err(|_| not_found())?;
         if !self
             .access
@@ -475,7 +499,8 @@ impl CollectionsService {
                 let message = if target == id {
                     "you cannot edit this collection"
                 } else {
-                    "editing this collection also changes a linked collection you cannot edit"
+                    "editing this collection also changes a linked collection \
+                        you cannot edit"
                 };
                 return Err(Error::new(ErrorKind::PermissionDenied, message));
             }
@@ -488,7 +513,10 @@ impl CollectionsService {
     /// # Errors
     ///
     /// When the store or the access check is unavailable.
-    pub async fn list(&self, ctx: &RequestContext) -> Result<CollectionList, Error> {
+    pub async fn list(
+        &self,
+        ctx: &RequestContext,
+    ) -> Result<CollectionList, Error> {
         let state = self.read().await?;
         let mut collections = Vec::new();
         for c in state.ws.collections() {
@@ -507,7 +535,12 @@ impl CollectionsService {
                 title: c.schema().title.clone(),
                 path: folder.path.as_str().to_owned(),
                 rows: c.len(),
-                views: c.schema().views.iter().map(|v| v.name.clone()).collect(),
+                views: c
+                    .schema()
+                    .views
+                    .iter()
+                    .map(|v| v.name.clone())
+                    .collect(),
             });
         }
         drop(state);
@@ -533,10 +566,12 @@ impl CollectionsService {
         let state = self.read().await?;
         self.require_read(&state, &ctx.principal, id).await?;
         let folder = state.folder(id)?;
-        let c = state
-            .ws
-            .collection(id)
-            .ok_or_else(|| Error::new(ErrorKind::NotFound, format!("collection {id} not found")))?;
+        let c = state.ws.collection(id).ok_or_else(|| {
+            Error::new(
+                ErrorKind::NotFound,
+                format!("collection {id} not found"),
+            )
+        })?;
         let info = CollectionInfo::new(
             c.schema(),
             folder.path.as_str().to_owned(),
@@ -564,7 +599,12 @@ impl CollectionsService {
             .ws
             .collection(id)
             .map(crate::workspace::Collection::schema)
-            .ok_or_else(|| Error::new(ErrorKind::NotFound, format!("collection {id} not found")))?;
+            .ok_or_else(|| {
+                Error::new(
+                    ErrorKind::NotFound,
+                    format!("collection {id} not found"),
+                )
+            })?;
         let mut def = view_def(schema, input.view.as_deref())?;
         let list = one_or_many;
         let overlay = ViewDefRaw {
@@ -586,8 +626,14 @@ impl CollectionsService {
         Ok(result?)
     }
 
-    fn detail(&self, state: &State, id: CollectionId, row: DocId) -> Result<RowDetail, Error> {
-        let not_found = || Error::new(ErrorKind::NotFound, format!("row {row} not found"));
+    fn detail(
+        &self,
+        state: &State,
+        id: CollectionId,
+        row: DocId,
+    ) -> Result<RowDetail, Error> {
+        let not_found =
+            || Error::new(ErrorKind::NotFound, format!("row {row} not found"));
         let c = state.ws.collection(id).ok_or_else(not_found)?;
         let r = c.row(row).ok_or_else(not_found)?;
         let path = state
@@ -613,7 +659,11 @@ impl CollectionsService {
     ///
     /// `not_found` when the collection or row does not exist or cannot be
     /// read.
-    pub async fn get_row(&self, ctx: &RequestContext, key: RowKey) -> Result<RowDetail, Error> {
+    pub async fn get_row(
+        &self,
+        ctx: &RequestContext,
+        key: RowKey,
+    ) -> Result<RowDetail, Error> {
         let state = self.read().await?;
         self.require_read(&state, &ctx.principal, key.collection_id)
             .await?;
@@ -630,7 +680,8 @@ impl CollectionsService {
         edit: Edit,
         row: Option<DocId>,
     ) -> Result<RowWritten, Error> {
-        let span = tracing::info_span!("collections.edit", op, collection = %id);
+        let span =
+            tracing::info_span!("collections.edit", op, collection = %id);
         async move {
             let mut guard = self.state.write().await;
             self.bump();
@@ -645,7 +696,9 @@ impl CollectionsService {
             };
             self.require_edit(state, &ctx.principal, id, true).await?;
             let changed = state.ws.apply(edit)?;
-            if let Err(e) = self.check_rows(&ctx.principal, state, &changed).await {
+            if let Err(e) =
+                self.check_rows(&ctx.principal, state, &changed).await
+            {
                 // The edit is applied in memory only: read the files again.
                 *guard = None;
                 return Err(e);
@@ -719,7 +772,11 @@ impl CollectionsService {
     /// # Errors
     ///
     /// As [`Self::update_row`].
-    pub async fn delete_row(&self, ctx: &RequestContext, key: RowKey) -> Result<RowWritten, Error> {
+    pub async fn delete_row(
+        &self,
+        ctx: &RequestContext,
+        key: RowKey,
+    ) -> Result<RowWritten, Error> {
         let edit = Edit::DeleteRow {
             collection: key.collection_id,
             row: key.row_id,
@@ -742,7 +799,11 @@ impl CollectionsService {
     where
         F: FnOnce(&mut crate::schema::Schema) -> Result<(), Error> + Send,
     {
-        let span = tracing::info_span!("collections.edit_schema", op, collection = %id);
+        let span = tracing::info_span!(
+            "collections.edit_schema",
+            op,
+            collection = %id
+        );
         async move {
             let mut guard = self.state.write().await;
             self.bump();
@@ -761,7 +822,10 @@ impl CollectionsService {
                 .collection(id)
                 .map(|c| c.schema().clone())
                 .ok_or_else(|| {
-                    Error::new(ErrorKind::NotFound, format!("collection {id} not found"))
+                    Error::new(
+                        ErrorKind::NotFound,
+                        format!("collection {id} not found"),
+                    )
                 })?;
             change(&mut schema)?;
             state.ws.set_schema(schema)?;
@@ -777,7 +841,12 @@ impl CollectionsService {
                     f.path.as_str().to_owned(),
                     f.diagnostics.clone(),
                 ),
-                _ => return Err(Error::new(ErrorKind::Internal, "collection vanished")),
+                _ => {
+                    return Err(Error::new(
+                        ErrorKind::Internal,
+                        "collection vanished",
+                    ));
+                }
             };
             drop(guard);
             Ok(info)
@@ -814,7 +883,8 @@ impl CollectionsService {
                 limit: input.limit,
             };
             let def = ViewDef::from_raw(&raw, schema)?;
-            let at = schema.views.iter().position(|v| same_name(&v.name, &name));
+            let at =
+                schema.views.iter().position(|v| same_name(&v.name, &name));
             if let Some(new) = &new_name {
                 let taken = schema
                     .views
@@ -882,7 +952,10 @@ impl CollectionsService {
                 async move { s.save_view(&ctx, input).await }
             },
         )
-        .summary("Save a view: its layout, filters, sorts, grouping and hidden columns");
+        .summary(
+            "Save a view: its layout, filters, sorts, grouping and hidden \
+            columns",
+        );
         let s = Arc::clone(this);
         let delete_view = Operation::mutation(
             "collections.delete_view",
@@ -918,18 +991,22 @@ impl CollectionsService {
         principal: &Principal,
         fence: &str,
     ) -> Result<EmbedResult, Error> {
-        let embed = crate::fence::CollectionEmbed::parse(fence).map_err(|e| embed_error(&e))?;
+        let embed = crate::fence::CollectionEmbed::parse(fence)
+            .map_err(|e| embed_error(&e))?;
         let state = self.read().await?;
         self.require_read(&state, principal, embed.id).await?;
-        let (title, path) = match (state.ws.collection(embed.id), state.folder(embed.id)) {
-            (Some(c), Ok(f)) => (c.schema().title.clone(), f.path.as_str().to_owned()),
-            _ => {
-                return Err(Error::new(
-                    ErrorKind::NotFound,
-                    format!("collection {} not found", embed.id),
-                ));
-            }
-        };
+        let (title, path) =
+            match (state.ws.collection(embed.id), state.folder(embed.id)) {
+                (Some(c), Ok(f)) => {
+                    (c.schema().title.clone(), f.path.as_str().to_owned())
+                }
+                _ => {
+                    return Err(Error::new(
+                        ErrorKind::NotFound,
+                        format!("collection {} not found", embed.id),
+                    ));
+                }
+            };
         let mut computer = Computer::new(&state.ws, (self.clock)());
         let result = embed.resolve(&mut computer);
         drop(computer);
@@ -987,16 +1064,19 @@ impl CollectionsService {
 
     fn embed_operations(this: &Arc<Self>) -> Vec<Operation> {
         let s = Arc::clone(this);
-        let embed = Operation::query(
-            "collections.embed",
-            "/v1/collections/embed",
-            Scope::Read,
-            move |ctx, input: EmbedInput| {
-                let s = Arc::clone(&s);
-                async move { s.resolve_embed(&ctx.principal, &input.fence).await }
-            },
-        )
-        .summary("Show the live rows of a collection block in a page");
+        let embed =
+            Operation::query(
+                "collections.embed",
+                "/v1/collections/embed",
+                Scope::Read,
+                move |ctx, input: EmbedInput| {
+                    let s = Arc::clone(&s);
+                    async move {
+                        s.resolve_embed(&ctx.principal, &input.fence).await
+                    }
+                },
+            )
+            .summary("Show the live rows of a collection block in a page");
         let s = Arc::clone(this);
         let chart = Operation::query(
             "collections.chart",
@@ -1030,7 +1110,12 @@ impl CollectionsService {
             .ws
             .collection(id)
             .map(crate::workspace::Collection::schema)
-            .ok_or_else(|| Error::new(ErrorKind::NotFound, format!("collection {id} not found")))?;
+            .ok_or_else(|| {
+                Error::new(
+                    ErrorKind::NotFound,
+                    format!("collection {id} not found"),
+                )
+            })?;
         let def = view_def(schema, input.view.as_deref())?;
         let stem = if input.view.is_some() {
             format!("{} - {}", schema.title, def.name)
@@ -1061,7 +1146,8 @@ impl CollectionsService {
     ) -> Result<CsvImported, Error> {
         csv_size(&input.csv)?;
         let id = input.collection_id;
-        let span = tracing::info_span!("collections.import_csv", collection = %id);
+        let span =
+            tracing::info_span!("collections.import_csv", collection = %id);
         async move {
             // Match and apply the file under the read lock, so a large
             // import does not stall every other request.
@@ -1069,7 +1155,8 @@ impl CollectionsService {
                 let state = self.read().await?;
                 let seen = self.writes.load(Ordering::Acquire);
                 self.require_edit(&state, &ctx.principal, id, true).await?;
-                let prepared = prepare_import(&state, &input.csv, id, input.dry_run)?;
+                let prepared =
+                    prepare_import(&state, &input.csv, id, input.dry_run)?;
                 if input.dry_run {
                     let collection = collection_info(&state, id)?;
                     drop(state);
@@ -1079,7 +1166,8 @@ impl CollectionsService {
                 (seen, prepared)
             };
             let mut guard = self.state.write().await;
-            let current = self.writes.load(Ordering::Acquire) == seen && guard.is_some();
+            let current =
+                self.writes.load(Ordering::Acquire) == seen && guard.is_some();
             self.bump();
             if guard.is_none() {
                 *guard = Some(State::load(self.store.as_ref()).await?);
@@ -1102,7 +1190,9 @@ impl CollectionsService {
             if let Some(ws) = prepared.ws.take() {
                 state.ws = ws;
             }
-            if let Err(e) = self.check_rows(&ctx.principal, state, &changed).await {
+            if let Err(e) =
+                self.check_rows(&ctx.principal, state, &changed).await
+            {
                 *guard = None;
                 return Err(e);
             }
@@ -1140,7 +1230,11 @@ impl CollectionsService {
         let (skipped_columns, diagnostics) =
             (import.skipped_columns.clone(), import.diagnostics.clone());
         let collection = import.into_collection();
-        let info = CollectionInfo::new(collection.schema(), dir.as_str().to_owned(), Vec::new());
+        let info = CollectionInfo::new(
+            collection.schema(),
+            dir.as_str().to_owned(),
+            Vec::new(),
+        );
         let changed = crate::workspace::Changeset {
             written: collection
                 .rows()
@@ -1156,12 +1250,19 @@ impl CollectionsService {
         {
             for row in collection.rows() {
                 check
-                    .check(&ctx.principal, &dir, &row.to_markdown(collection.schema()))
+                    .check(
+                        &ctx.principal,
+                        &dir,
+                        &row.to_markdown(collection.schema()),
+                    )
                     .await?;
             }
         }
         if !input.dry_run {
-            let span = tracing::info_span!("collections.create_from_csv", collection = %id);
+            let span = tracing::info_span!(
+                "collections.create_from_csv",
+                collection = %id
+            );
             async {
                 let mut guard = self.state.write().await;
                 self.bump();
@@ -1221,10 +1322,13 @@ impl CollectionsService {
                 "a collection needs a title",
             ));
         }
-        let folder = vellum_store::BlobPath::new(input.folder.trim_end_matches('/'))
-            .map_err(state::store_error)?;
+        let folder =
+            vellum_store::BlobPath::new(input.folder.trim_end_matches('/'))
+                .map_err(state::store_error)?;
         if !matches!(
-            vellum_store::layout::Kind::of(&folder.join("x.md").map_err(state::store_error)?),
+            vellum_store::layout::Kind::of(
+                &folder.join("x.md").map_err(state::store_error)?
+            ),
             vellum_store::layout::Kind::Document
         ) {
             return Err(Error::new(
@@ -1253,7 +1357,8 @@ impl CollectionsService {
     /// picks up like any file written outside Vellum.
     async fn remove_dir(&self, dir: &vellum_store::BlobPath) {
         use futures::TryStreamExt;
-        let files: Vec<_> = match self.store.list(Some(dir)).try_collect().await {
+        let files: Vec<_> = match self.store.list(Some(dir)).try_collect().await
+        {
             Ok(files) => files,
             Err(error) => {
                 tracing::warn!(%error, %dir, "new collection not removed");
@@ -1418,7 +1523,9 @@ impl Service for CollectionsService {
         Box::pin(async move {
             match self.read().await {
                 Ok(_) => Readiness::Ready,
-                Err(e) => Readiness::Degraded(format!("collections could not load: {e}")),
+                Err(e) => Readiness::Degraded(format!(
+                    "collections could not load: {e}"
+                )),
             }
         })
     }

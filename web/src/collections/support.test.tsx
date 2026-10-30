@@ -9,7 +9,14 @@ import { describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../test/render-app";
 
 import { useCollections } from "./context";
-import { addDays, addMonths, daysBetween, monthOf, monthWeeks, today } from "./dates";
+import {
+  addDays,
+  addMonths,
+  daysBetween,
+  monthOf,
+  monthWeeks,
+  today,
+} from "./dates";
 import { choiceValue, groupValue, propertyOf } from "./editing";
 import { OptionPicker } from "./option-picker";
 import type { Value } from "./types";
@@ -34,7 +41,9 @@ describe("useCollections", () => {
     vi.spyOn(console, "error").mockImplementation(() => {
       // React reports the thrown error; the test expects it.
     });
-    expect(() => renderHook(() => useCollections())).toThrow(/needs a CollectionsProvider/);
+    expect(() => renderHook(() => useCollections())).toThrow(
+      /needs a CollectionsProvider/,
+    );
   });
 });
 
@@ -48,7 +57,10 @@ describe("values", () => {
     expect(isEmpty(text(""))).toBe(true);
     expect(isEmpty(list([EMPTY, text("")]))).toBe(true);
     expect(isEmpty(number(0))).toBe(false);
-    expect(texts(list([text("a"), list([text("b")]), number(1)]))).toEqual(["a", "b"]);
+    expect(texts(list([text("a"), list([text("b")]), number(1)]))).toEqual([
+      "a",
+      "b",
+    ]);
     expect(texts(text(""))).toEqual([]);
   });
 
@@ -71,11 +83,21 @@ describe("values", () => {
     expect(parseInput("title", " ")).toEqual({ value: text("") });
     expect(parseInput("text", "")).toEqual({ value: EMPTY });
     expect(parseInput("number", "1,500.5")).toEqual({ value: number(1500.5) });
-    expect(parseInput("number", "1e400")).toEqual({ error: "collection-error-number" });
-    expect(parseInput("date", "2026-11-02")).toEqual({ value: date("2026-11-02") });
-    expect(parseInput("date", "2026-13-45")).toEqual({ error: "collection-error-date" });
-    expect(parseInput("date", "soon")).toEqual({ error: "collection-error-date" });
-    expect(parseInput("url", "https://x.example")).toEqual({ value: text("https://x.example") });
+    expect(parseInput("number", "1e400")).toEqual({
+      error: "collection-error-number",
+    });
+    expect(parseInput("date", "2026-11-02")).toEqual({
+      value: date("2026-11-02"),
+    });
+    expect(parseInput("date", "2026-13-45")).toEqual({
+      error: "collection-error-date",
+    });
+    expect(parseInput("date", "soon")).toEqual({
+      error: "collection-error-date",
+    });
+    expect(parseInput("url", "https://x.example")).toEqual({
+      value: text("https://x.example"),
+    });
     expect(parseInput("url", "x")).toEqual({ error: "collection-error-url" });
     expect(sameValue(undefined, EMPTY)).toBe(true);
     expect(sameValue(text("a"), text("b"))).toBe(false);
@@ -84,13 +106,21 @@ describe("values", () => {
   it("turns picks and groups into values", () => {
     expect(choiceValue("select", [])).toEqual(EMPTY);
     expect(choiceValue("select", ["Done"])).toEqual(text("Done"));
-    expect(choiceValue("multi", ["a", "b"])).toEqual(list([text("a"), text("b")]));
+    expect(choiceValue("multi", ["a", "b"])).toEqual(
+      list([text("a"), text("b")]),
+    );
     // eslint-disable-next-line unicorn/no-null -- the "No …" group's value
     expect(groupValue("select", null)).toEqual(EMPTY);
     expect(groupValue("relation", text("r"))).toEqual(list([text("r")]));
     expect(groupValue("checkbox", bool(true))).toEqual(bool(true));
     expect(
-      propertyOf([], { key: "x", name: "X", type: "select", format: "plain", editable: false }),
+      propertyOf([], {
+        key: "x",
+        name: "X",
+        type: "select",
+        format: "plain",
+        editable: false,
+      }),
     ).toEqual({ key: "x", name: "X", type: "select", computed: true });
     expect(
       propertyOf([], {
@@ -141,14 +171,20 @@ describe("OptionPicker", () => {
         />
       </div>,
     );
-    return { onCommit, onCancel, listbox: screen.getByRole("listbox", { name: "Pick" }) };
+    return {
+      onCommit,
+      onCancel,
+      listbox: screen.getByRole("listbox", { name: "Pick" }),
+    };
   }
 
   it("picks one with the keyboard, or none", async () => {
     const user = userEvent.setup();
     const { onCommit, listbox } = renderPicker(false, ["b"]);
     expect(document.activeElement).toBe(listbox);
-    expect(within(listbox).getByRole("option", { name: "Beta" }).dataset["active"]).toBe("true");
+    expect(
+      within(listbox).getByRole("option", { name: "Beta" }).dataset["active"],
+    ).toBe("true");
     await user.keyboard("{End}{ArrowDown}{Home}{Enter}");
     expect(onCommit).toHaveBeenLastCalledWith([]);
   });
@@ -193,6 +229,8 @@ describe("OptionPicker", () => {
       />,
     );
     expect(screen.getByText("Nothing to choose from.")).toBeDefined();
-    expect(screen.getByRole("listbox").hasAttribute("aria-activedescendant")).toBe(false);
+    expect(
+      screen.getByRole("listbox").hasAttribute("aria-activedescendant"),
+    ).toBe(false);
   });
 });

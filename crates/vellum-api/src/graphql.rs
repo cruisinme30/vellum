@@ -17,8 +17,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use async_graphql::dynamic::{
-    Enum, Field, FieldFuture, FieldValue, InputObject, InputValue, Object, ResolverContext, Scalar,
-    Schema, SchemaError, TypeRef,
+    Enum, Field, FieldFuture, FieldValue, InputObject, InputValue, Object,
+    ResolverContext, Scalar, Schema, SchemaError, TypeRef,
 };
 use async_graphql::{ErrorExtensions as _, Name};
 use serde_json::Value;
@@ -121,10 +121,15 @@ fn split_null(schema: &Value) -> (Value, bool) {
         if let Some(Value::Array(options)) = schema.get(key) {
             let rest: Vec<&Value> = options
                 .iter()
-                .filter(|o| o.get("type").and_then(Value::as_str) != Some("null"))
+                .filter(|o| {
+                    o.get("type").and_then(Value::as_str) != Some("null")
+                })
                 .collect();
             if rest.len() == 1 && options.len() == 2 {
-                return (rest.first().map_or(Value::Null, |v| (*v).clone()), true);
+                return (
+                    rest.first().map_or(Value::Null, |v| (*v).clone()),
+                    true,
+                );
             }
         }
     }
@@ -174,7 +179,10 @@ struct Builder<'a> {
 }
 
 impl Builder<'_> {
-    fn component<'s>(&'s self, schema: &'s Value) -> Option<(String, &'s Value)> {
+    fn component<'s>(
+        &'s self,
+        schema: &'s Value,
+    ) -> Option<(String, &'s Value)> {
         let name = schema
             .get("$ref")?
             .as_str()?
@@ -188,7 +196,9 @@ impl Builder<'_> {
             "boolean" => Some(TypeRef::BOOLEAN),
             "number" => Some(TypeRef::FLOAT),
             "integer" => match schema.get("format").and_then(Value::as_str) {
-                Some("int8" | "int16" | "int32" | "uint8" | "uint16") => Some(TypeRef::INT),
+                Some("int8" | "int16" | "int32" | "uint8" | "uint16") => {
+                    Some(TypeRef::INT)
+                }
                 _ => Some(INT64_SCALAR),
             },
             _ => None,
@@ -222,15 +232,19 @@ impl Builder<'_> {
         if let Some(values) = enum_values(&schema) {
             return (self.enum_type(&name, &values), Shape::Enum);
         }
-        if let Some(scalar) = Self::scalar(&schema)
-            .filter(|_| schema.get("type").and_then(Value::as_str) != Some("object"))
-        {
+        if let Some(scalar) = Self::scalar(&schema).filter(|_| {
+            schema.get("type").and_then(Value::as_str) != Some("object")
+        }) {
             return (TypeRef::named(scalar), Shape::Scalar);
         }
         if schema.get("type").and_then(Value::as_str) == Some("array") {
-            let items = schema.get("items").cloned().unwrap_or(Value::Bool(true));
+            let items =
+                schema.get("items").cloned().unwrap_or(Value::Bool(true));
             let (inner, shape) = self.output(&items, &format!("{name}Item"));
-            return (TypeRef::List(Box::new(inner)), Shape::List(Box::new(shape)));
+            return (
+                TypeRef::List(Box::new(inner)),
+                Shape::List(Box::new(shape)),
+            );
         }
         let properties = schema
             .get("properties")
@@ -243,28 +257,38 @@ impl Builder<'_> {
         if self.outputs.insert(type_name.clone()) {
             let required = required_set(&schema);
             let mut object = Object::new(type_name.clone());
-            if let Some(description) = schema.get("description").and_then(Value::as_str) {
+            if let Some(description) =
+                schema.get("description").and_then(Value::as_str)
+            {
                 object = object.description(description);
             }
             for (field, field_schema) in &properties {
-                let (ty, shape) =
-                    self.output(field_schema, &format!("{type_name}{}", pascal(field)));
+                let (ty, shape) = self.output(
+                    field_schema,
+                    &format!("{type_name}{}", pascal(field)),
+                );
                 let ty = if required.contains(field.as_str()) {
                     ty
                 } else {
                     nullable(ty)
                 };
                 let key = field.clone();
-                let mut f = Field::new(field.clone(), ty, move |ctx: ResolverContext<'_>| {
-                    let value = ctx
-                        .parent_value
-                        .downcast_ref::<Value>()
-                        .and_then(|parent| parent.get(&key))
-                        .cloned()
-                        .unwrap_or(Value::Null);
-                    FieldFuture::Value(to_field_value(value, &shape))
-                });
-                if let Some(description) = field_schema.get("description").and_then(Value::as_str) {
+                let mut f = Field::new(
+                    field.clone(),
+                    ty,
+                    move |ctx: ResolverContext<'_>| {
+                        let value = ctx
+                            .parent_value
+                            .downcast_ref::<Value>()
+                            .and_then(|parent| parent.get(&key))
+                            .cloned()
+                            .unwrap_or(Value::Null);
+                        FieldFuture::Value(to_field_value(value, &shape))
+                    },
+                );
+                if let Some(description) =
+                    field_schema.get("description").and_then(Value::as_str)
+                {
                     f = f.description(description);
                 }
                 object = object.field(f);
@@ -289,14 +313,17 @@ impl Builder<'_> {
         if let Some(values) = enum_values(&schema) {
             return self.enum_type(&name, &values);
         }
-        if let Some(scalar) = Self::scalar(&schema)
-            .filter(|_| schema.get("type").and_then(Value::as_str) != Some("object"))
-        {
+        if let Some(scalar) = Self::scalar(&schema).filter(|_| {
+            schema.get("type").and_then(Value::as_str) != Some("object")
+        }) {
             return TypeRef::named(scalar);
         }
         if schema.get("type").and_then(Value::as_str) == Some("array") {
-            let items = schema.get("items").cloned().unwrap_or(Value::Bool(true));
-            return TypeRef::List(Box::new(self.input(&items, &format!("{name}Item"))));
+            let items =
+                schema.get("items").cloned().unwrap_or(Value::Bool(true));
+            return TypeRef::List(Box::new(
+                self.input(&items, &format!("{name}Item")),
+            ));
         }
         let properties = schema
             .get("properties")
@@ -314,18 +341,25 @@ impl Builder<'_> {
         if self.inputs.insert(type_name.clone()) {
             let required = required_set(&schema);
             let mut object = InputObject::new(type_name.clone());
-            if let Some(description) = schema.get("description").and_then(Value::as_str) {
+            if let Some(description) =
+                schema.get("description").and_then(Value::as_str)
+            {
                 object = object.description(description);
             }
             for (field, field_schema) in &properties {
-                let ty = self.input(field_schema, &format!("{type_name}{}", pascal(field)));
+                let ty = self.input(
+                    field_schema,
+                    &format!("{type_name}{}", pascal(field)),
+                );
                 let ty = if required.contains(field.as_str()) {
                     ty
                 } else {
                     nullable(ty)
                 };
                 let mut v = InputValue::new(field.clone(), ty);
-                if let Some(description) = field_schema.get("description").and_then(Value::as_str) {
+                if let Some(description) =
+                    field_schema.get("description").and_then(Value::as_str)
+                {
                     v = v.description(description);
                 }
                 object = object.field(v);
@@ -359,9 +393,9 @@ fn to_field_value(value: Value, shape: &Shape) -> Option<FieldValue<'static>> {
         Shape::Scalar => Some(FieldValue::value(
             async_graphql::Value::from_json(value).unwrap_or_default(),
         )),
-        Shape::Enum => value
-            .as_str()
-            .map(|s| FieldValue::value(async_graphql::Value::Enum(Name::new(s)))),
+        Shape::Enum => value.as_str().map(|s| {
+            FieldValue::value(async_graphql::Value::Enum(Name::new(s)))
+        }),
         Shape::Object => Some(FieldValue::owned_any(value)),
         Shape::List(item) => match value {
             Value::Array(items) => {
@@ -399,34 +433,36 @@ fn operation_field(
         .get("properties")
         .and_then(Value::as_object)
         .is_some_and(|p| !p.is_empty());
-    let input_ty = has_input.then(|| builder.input(input, &format!("{owner}Input")));
+    let input_ty =
+        has_input.then(|| builder.input(input, &format!("{owner}Input")));
     let registered = Arc::clone(registered);
-    let mut field = Field::new(name, out_ty, move |ctx: ResolverContext<'_>| {
-        let registered = Arc::clone(&registered);
-        let shape = shape.clone();
-        FieldFuture::new(async move {
-            let request = ctx.data::<GraphqlRequest>()?;
-            let input = match ctx.args.get("input") {
-                Some(value) => value
-                    .as_value()
-                    .clone()
-                    .into_json()
-                    .map_err(|e| async_graphql::Error::new(e.to_string()))?,
-                None => Value::Object(serde_json::Map::new()),
-            };
-            let context = RequestContext {
-                request_id: request.request_id,
-                principal: request.authenticated.principal.clone(),
-                deadline: Instant::now() + registered.op.time_budget(),
-                traceparent: request.traceparent.clone(),
-            };
-            let output = registered
-                .invoke(context, input)
-                .await
-                .map_err(|e| graphql_error(&e, request.request_id))?;
-            Ok(to_field_value(output, &shape))
-        })
-    });
+    let mut field =
+        Field::new(name, out_ty, move |ctx: ResolverContext<'_>| {
+            let registered = Arc::clone(&registered);
+            let shape = shape.clone();
+            FieldFuture::new(async move {
+                let request = ctx.data::<GraphqlRequest>()?;
+                let input = match ctx.args.get("input") {
+                    Some(value) => {
+                        value.as_value().clone().into_json().map_err(|e| {
+                            async_graphql::Error::new(e.to_string())
+                        })?
+                    }
+                    None => Value::Object(serde_json::Map::new()),
+                };
+                let context = RequestContext {
+                    request_id: request.request_id,
+                    principal: request.authenticated.principal.clone(),
+                    deadline: Instant::now() + registered.op.time_budget(),
+                    traceparent: request.traceparent.clone(),
+                };
+                let output = registered
+                    .invoke(context, input)
+                    .await
+                    .map_err(|e| graphql_error(&e, request.request_id))?;
+                Ok(to_field_value(output, &shape))
+            })
+        });
     if let Some(ty) = input_ty {
         field = field.argument(InputValue::new("input", ty));
     }
@@ -449,7 +485,10 @@ fn operation_field(
 /// # Errors
 ///
 /// A [`SchemaError`] if the generated types are inconsistent (a bug).
-pub fn schema(registry: &Registry, version: &'static str) -> Result<Schema, SchemaError> {
+pub fn schema(
+    registry: &Registry,
+    version: &'static str,
+) -> Result<Schema, SchemaError> {
     let mut components = Components::default();
     let ops: Vec<(Arc<RegisteredOp>, Value, Value)> = registry
         .operations()
@@ -484,7 +523,13 @@ pub fn schema(registry: &Registry, version: &'static str) -> Result<Schema, Sche
     let mut mutation = Object::new("Mutation");
     let mut has_mutation = false;
     for (registered, input, output) in &ops {
-        let field = operation_field(&mut builder, &components, registered, input, output);
+        let field = operation_field(
+            &mut builder,
+            &components,
+            registered,
+            input,
+            output,
+        );
         match registered.op.kind() {
             OperationKind::Query => query = query.field(field),
             OperationKind::Mutation => {
@@ -493,18 +538,28 @@ pub fn schema(registry: &Registry, version: &'static str) -> Result<Schema, Sche
             }
         }
     }
-    let mut schema = Schema::build("Query", has_mutation.then_some("Mutation"), None)
-        .register(query)
-        .register(Scalar::new(JSON_SCALAR).description("Any JSON value."))
-        .register(
-            Scalar::new(INT64_SCALAR)
-                .description("A signed or unsigned integer wider than 32 bits, as a JSON number.")
-                .validator(
-                    |v| matches!(v, async_graphql::Value::Number(n) if n.is_i64() || n.is_u64()),
-                ),
-        )
-        .limit_depth(MAX_DEPTH)
-        .limit_complexity(MAX_COMPLEXITY);
+    let mut schema = Schema::build(
+        "Query",
+        has_mutation.then_some("Mutation"),
+        None,
+    )
+    .register(query)
+    .register(Scalar::new(JSON_SCALAR).description("Any JSON value."))
+    .register(
+        Scalar::new(INT64_SCALAR)
+            .description(
+                "A signed or unsigned integer wider than 32 bits, \
+                    as a JSON number.",
+            )
+            .validator(|v| {
+                matches!(
+                    v,
+                    async_graphql::Value::Number(n) if n.is_i64() || n.is_u64()
+                )
+            }),
+    )
+    .limit_depth(MAX_DEPTH)
+    .limit_complexity(MAX_COMPLEXITY);
     if has_mutation {
         schema = schema.register(mutation);
     }
@@ -530,7 +585,8 @@ mod tests {
         let (inner, n) = split_null(&json!({"type": ["string", "null"]}));
         assert!(n);
         assert_eq!(inner, json!({"type": "string"}));
-        let (inner, n) = split_null(&json!({"anyOf": [{"$ref": "#/x"}, {"type": "null"}]}));
+        let (inner, n) =
+            split_null(&json!({"anyOf": [{"$ref": "#/x"}, {"type": "null"}]}));
         assert!(n);
         assert_eq!(inner, json!({"$ref": "#/x"}));
         assert_eq!(
@@ -539,7 +595,8 @@ mod tests {
         );
         assert_eq!(enum_values(&json!({"enum": ["write:draft"]})), None);
         assert_eq!(
-            enum_values(&json!({"oneOf": [{"const": "x"}, {"const": "y"}]})).map(|v| v.len()),
+            enum_values(&json!({"oneOf": [{"const": "x"}, {"const": "y"}]}))
+                .map(|v| v.len()),
             Some(2)
         );
     }

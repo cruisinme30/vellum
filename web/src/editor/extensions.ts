@@ -3,7 +3,12 @@
 
 import type { AnyExtension } from "@tiptap/core";
 import { Highlight } from "@tiptap/extension-highlight";
-import { BulletList, OrderedList, TaskItem, TaskList } from "@tiptap/extension-list";
+import {
+  BulletList,
+  OrderedList,
+  TaskItem,
+  TaskList,
+} from "@tiptap/extension-list";
 import { Subscript } from "@tiptap/extension-subscript";
 import { Superscript } from "@tiptap/extension-superscript";
 import { Placeholder } from "@tiptap/extensions";
@@ -62,7 +67,9 @@ export interface ExtensionOptions {
   readonly resolvePage: ResolvePage;
   /** Off when Yjs owns undo history (always, outside tests). */
   readonly history: boolean;
-  /** People, pages and issues for the `@` and `[[` menus and live issue chips. */
+  /**
+   * People, pages and issues for the `@` and `[[` menus and live issue chips.
+   */
   readonly chips?: ChipSources | undefined;
 }
 
@@ -88,11 +95,14 @@ export function vellumExtensions({
       link: {
         openOnClick: false,
         autolink: true,
-        // http, https and mailto are linkify built-ins: registering them again as
-        // custom protocols only warns ("already initialized") from the second editor on.
+        // http, https and mailto are linkify built-ins: registering them again
+        // as custom protocols only warns ("already initialized") from the
+        // second editor on.
         isAllowedUri: (url, context) =>
-          /^(?:https?:|mailto:|\/|#)/i.test(url) && context.defaultValidate(url),
-        // Tiptap removes an attribute set to null: links never open a new window by default.
+          /^(?:https?:|mailto:|\/|#)/i.test(url) &&
+          context.defaultValidate(url),
+        // Tiptap removes an attribute set to null: links never open a new
+        // window by default.
         // eslint-disable-next-line unicorn/no-null
         HTMLAttributes: { rel: "noopener noreferrer", target: null },
       },
@@ -158,7 +168,8 @@ export function vellumExtensions({
     SlashCommand.configure({ t }),
     ChipSuggest.configure({ t, sources: chips }),
     Placeholder.configure({
-      placeholder: ({ node }) => (node.type.name === "paragraph" ? t("editor-placeholder") : ""),
+      placeholder: ({ node }) =>
+        node.type.name === "paragraph" ? t("editor-placeholder") : "",
     }),
   ];
 }

@@ -9,7 +9,9 @@ use std::fmt;
 use async_trait::async_trait;
 use vellum_db::sqlx::types::Uuid;
 use vellum_db::{Index, IndexPool, sqlx, traced};
-use vellum_kernel::{ObjectId, ShareId, ShareTokenHash, SpaceId, Timestamp, UserId};
+use vellum_kernel::{
+    ObjectId, ShareId, ShareTokenHash, SpaceId, Timestamp, UserId,
+};
 
 use super::{LinkRecord, ShareLinks};
 use crate::error::{DriveError, DriveResult};
@@ -100,7 +102,8 @@ macro_rules! select {
             traced(
                 system,
                 concat!("drive.share_links.", $op),
-                sqlx::query_as(concat!("SELECT ", columns!(), " FROM share_links WHERE ", $filter))
+                sqlx::query_as(concat!("SELECT ", columns!(), " FROM \
+                    share_links WHERE ", $filter))
                     .bind($bind)
                     .fetch_all(pool),
             )
@@ -153,13 +156,21 @@ impl ShareLinks for SqlShareLinks {
 
     async fn get(&self, id: ShareId) -> DriveResult<Option<LinkRecord>> {
         Ok(
-            select!(self, "get", "link_id = $1", Uuid::from_u128(id.as_u128()))?
-                .into_iter()
-                .next(),
+            select!(
+                self,
+                "get",
+                "link_id = $1",
+                Uuid::from_u128(id.as_u128())
+            )?
+            .into_iter()
+            .next(),
         )
     }
 
-    async fn by_hash(&self, hash: &ShareTokenHash) -> DriveResult<Option<LinkRecord>> {
+    async fn by_hash(
+        &self,
+        hash: &ShareTokenHash,
+    ) -> DriveResult<Option<LinkRecord>> {
         Ok(
             select!(self, "by_hash", "token_hash = $1", hash.to_string())?
                 .into_iter()
@@ -173,7 +184,8 @@ impl ShareLinks for SqlShareLinks {
                 system,
                 "drive.share_links.revoke",
                 sqlx::query(
-                    "UPDATE share_links SET revoked_at = $2 WHERE link_id = $1 AND revoked_at IS NULL",
+                    "UPDATE share_links SET revoked_at = $2 WHERE link_id = $1 \
+                        AND revoked_at IS NULL",
                 )
                 .bind(Uuid::from_u128(id.as_u128()))
                 .bind(at.unix_ms())

@@ -49,7 +49,11 @@ export function Ask({ api }: { readonly api: AssistApi }) {
     setError(undefined);
     setAnswer(undefined);
     api
-      .ask(toSettings(stored), question.trim(), space === "" ? undefined : space)
+      .ask(
+        toSettings(stored),
+        question.trim(),
+        space === "" ? undefined : space,
+      )
       .then(setAnswer, (error_: unknown) => {
         setError(failureText(error_));
       })
@@ -60,7 +64,9 @@ export function Ask({ api }: { readonly api: AssistApi }) {
 
   return (
     <>
-      <p className="vl-muted">{t("assist-ask-intro", { model: stored.model })}</p>
+      <p className="vl-muted">
+        {t("assist-ask-intro", { model: stored.model })}
+      </p>
       <form className="vl-assist-ask" onSubmit={submit}>
         <label htmlFor={`${id}-q`}>{t("assist-question")}</label>
         <textarea

@@ -1,13 +1,24 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-// Test helpers for the block editor: a headless editor with every Vellum extension.
+// Test helpers for the block editor: a headless editor with every Vellum
+// extension.
 import { act, render } from "@testing-library/react";
 import { Editor, type JSONContent } from "@tiptap/core";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { DecorationSet } from "@tiptap/pm/view";
-import { EditorContent, useEditor, type ReactNodeViewProps } from "@tiptap/react";
-import { createElement, createRef, useEffect, type ComponentType, type ReactNode } from "react";
+import {
+  EditorContent,
+  useEditor,
+  type ReactNodeViewProps,
+} from "@tiptap/react";
+import {
+  createElement,
+  createRef,
+  useEffect,
+  type ComponentType,
+  type ReactNode,
+} from "react";
 
 import { ServerApisProvider } from "../data/server-apis";
 import en from "../i18n/en.ftl?raw";
@@ -51,7 +62,9 @@ export function typeText(editor: Editor, text: string): void {
     const { from, to } = editor.state.selection;
     const view = editor.view;
     const handled = view.someProp("handleTextInput", (handler) =>
-      handler(view, from, to, character, () => view.state.tr.insertText(character, from, to)),
+      handler(view, from, to, character, () =>
+        view.state.tr.insertText(character, from, to),
+      ),
     );
     if (handled !== true) {
       view.dispatch(view.state.tr.insertText(character, from, to));
@@ -73,9 +86,19 @@ interface EditorHarnessProperties {
 }
 
 /** A React-mounted Vellum editor, so node views render through portals. */
-function EditorHarness({ content, editable = true, onEditor, chips }: EditorHarnessProperties) {
+function EditorHarness({
+  content,
+  editable = true,
+  onEditor,
+  chips,
+}: EditorHarnessProperties) {
   const editor = useEditor({
-    extensions: vellumExtensions({ t: english, resolvePage: resolveGateway, history: true, chips }),
+    extensions: vellumExtensions({
+      t: english,
+      resolvePage: resolveGateway,
+      history: true,
+      chips,
+    }),
     content,
     editable,
   });
@@ -85,7 +108,10 @@ function EditorHarness({ content, editable = true, onEditor, chips }: EditorHarn
   return createElement(EditorContent, { editor });
 }
 
-/** Renders a React editor, waits for its node views and hands back the Tiptap instance. */
+/**
+ * Renders a React editor, waits for its node views and hands back the Tiptap
+ * instance.
+ */
 export async function renderEditor(
   content: JSONContent | string,
   options: {
@@ -109,7 +135,11 @@ export async function renderEditor(
   const { unmount } = render(
     options.render === undefined
       ? harness
-      : createElement(ServerApisProvider, { apis: { render: options.render } }, harness),
+      : createElement(
+          ServerApisProvider,
+          { apis: { render: options.render } },
+          harness,
+        ),
     options.wrapper === undefined ? {} : { wrapper: options.wrapper },
   );
   // React node views render in a microtask after the editor mounts.
@@ -122,7 +152,10 @@ export async function renderEditor(
   return { editor: current, unmount };
 }
 
-/** An in-memory BroadcastChannel stand-in: messages reach the other channels of a name. */
+/**
+ * An in-memory BroadcastChannel stand-in: messages reach the other channels of
+ * a name.
+ */
 class MemoryChannel extends EventTarget {
   constructor(
     private readonly peers: Set<MemoryChannel>,
@@ -148,7 +181,9 @@ class MemoryChannel extends EventTarget {
   }
 }
 
-/** A channel factory whose channels live in memory, with every message posted. */
+/**
+ * A channel factory whose channels live in memory, with every message posted.
+ */
 export function memoryChannels(): {
   factory: ChannelFactory;
   posted: unknown[];
@@ -161,7 +196,8 @@ export function memoryChannels(): {
     rooms.set(name, peers);
     return new MemoryChannel(peers, posted);
   };
-  const open = () => [...rooms.values()].reduce((count, peers) => count + peers.size, 0);
+  const open = () =>
+    [...rooms.values()].reduce((count, peers) => count + peers.size, 0);
   return { factory, posted, open };
 }
 
@@ -184,7 +220,10 @@ const noop = () => {
  * Props for rendering a node view component on its own, outside an editor
  * view, as ProseMirror does for a node that has just been detached.
  */
-export function detachedViewProperties(editor: Editor, node: ProseMirrorNode): ReactNodeViewProps {
+export function detachedViewProperties(
+  editor: Editor,
+  node: ProseMirrorNode,
+): ReactNodeViewProps {
   return {
     editor,
     node,

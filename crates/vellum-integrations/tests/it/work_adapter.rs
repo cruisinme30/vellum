@@ -11,8 +11,12 @@ use std::sync::{Arc, Mutex};
 
 use jiff::Timestamp;
 use vellum_integrations::git::automation::{IssueLinks, Mapping};
-use vellum_integrations::git::event::{GitEvent, PrRef, Provider, PullRequestAction};
-use vellum_integrations::git::service::{LinkStore, Repository, Settings, apply};
+use vellum_integrations::git::event::{
+    GitEvent, PrRef, Provider, PullRequestAction,
+};
+use vellum_integrations::git::service::{
+    LinkStore, Repository, Settings, apply,
+};
 use vellum_integrations::model::{
     IssueDraft, IssueKey, Source, StateCategory, WorkCommands, WorkError,
 };
@@ -130,12 +134,19 @@ impl LinkStore for Links {
         Ok(self.0.lock().unwrap().get(key).cloned().unwrap_or_default())
     }
 
-    async fn save(&self, key: &IssueKey, links: &IssueLinks) -> Result<(), WorkError> {
+    async fn save(
+        &self,
+        key: &IssueKey,
+        links: &IssueLinks,
+    ) -> Result<(), WorkError> {
         let _ = self.0.lock().unwrap().insert(key.clone(), links.clone());
         Ok(())
     }
 
-    async fn issues_for_pr(&self, pr: &PrRef) -> Result<BTreeSet<IssueKey>, WorkError> {
+    async fn issues_for_pr(
+        &self,
+        pr: &PrRef,
+    ) -> Result<BTreeSet<IssueKey>, WorkError> {
         Ok(self
             .0
             .lock()
@@ -161,7 +172,11 @@ async fn git_automation_moves_engine_issues() {
             repo: "northstar/api".to_owned(),
             teams: std::iter::once("ENG".to_owned()).collect(),
         }],
-        mappings: std::iter::once(("ENG".to_owned(), Mapping::default_for(&states))).collect(),
+        mappings: std::iter::once((
+            "ENG".to_owned(),
+            Mapping::default_for(&states),
+        ))
+        .collect(),
     };
     let links = Links::default();
     let pr = |action| GitEvent::PullRequest {

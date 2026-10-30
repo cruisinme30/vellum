@@ -5,7 +5,11 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 
 import { useT } from "../i18n/i18n";
 
-import { isPrincipal, type DirectoryApi, type DirectoryEntry } from "./directory";
+import {
+  isPrincipal,
+  type DirectoryApi,
+  type DirectoryEntry,
+} from "./directory";
 
 import "./people.css";
 
@@ -18,7 +22,10 @@ interface PeoplePickerProperties {
   /** Chosen principals (`user:<id>`, `group:<id>`), in the order chosen. */
   readonly value: readonly string[];
   readonly onChange: (value: string[]) => void;
-  /** Where to search; without one, only full `user:` or `group:` IDs can be typed. */
+  /**
+   * Where to search; without one, only full `user:` or `group:` IDs can be
+   * typed.
+   */
   readonly directory?: DirectoryApi | undefined;
   /** Help text under the field. */
   readonly hint?: string | undefined;
@@ -33,7 +40,10 @@ interface Answer {
 }
 
 /** The directory's answer for `query`, once typing has paused. */
-function useSearch(directory: DirectoryApi | undefined, query: string): Answer | undefined {
+function useSearch(
+  directory: DirectoryApi | undefined,
+  query: string,
+): Answer | undefined {
   const [answer, setAnswer] = useState<Answer>();
   useEffect(() => {
     if (directory === undefined || query.length < 2) return;
@@ -115,7 +125,12 @@ function Options({
 }) {
   const t = useT();
   return (
-    <div id={`${id}-list`} role="listbox" className="vl-people-list" hidden={!shown}>
+    <div
+      id={`${id}-list`}
+      role="listbox"
+      className="vl-people-list"
+      hidden={!shown}
+    >
       {matches.map((entry, index) => (
         <div
           key={entry.principal}
@@ -199,15 +214,20 @@ export function PeoplePicker({
   const [active, setActive] = useState(0);
   const [open, setOpen] = useState(false);
   // Names learned from searches, so chips read as people, not IDs.
-  const [names, setNames] = useState<ReadonlyMap<string, DirectoryEntry>>(new Map());
+  const [names, setNames] = useState<ReadonlyMap<string, DirectoryEntry>>(
+    new Map(),
+  );
   const q = query.trim();
   const answer = useSearch(directory, q);
-  const matches = (answer?.found ?? []).filter((entry) => !value.includes(entry.principal));
+  const matches = (answer?.found ?? []).filter(
+    (entry) => !value.includes(entry.principal),
+  );
   const shown = open && matches.length > 0;
 
   const add = (principal: string, entry?: DirectoryEntry) => {
     if (!value.includes(principal)) onChange([...value, principal]);
-    if (entry !== undefined) setNames((known) => new Map(known).set(principal, entry));
+    if (entry !== undefined)
+      setNames((known) => new Map(known).set(principal, entry));
     setQuery("");
     setOpen(false);
     input.current?.focus();
@@ -218,7 +238,8 @@ export function PeoplePicker({
   };
   const step = (by: number) => {
     setOpen(true);
-    if (matches.length > 0) setActive((a) => (a + by + matches.length) % matches.length);
+    if (matches.length > 0)
+      setActive((a) => (a + by + matches.length) % matches.length);
   };
 
   const keys: Readonly<Record<string, () => boolean>> = {
@@ -254,7 +275,13 @@ export function PeoplePicker({
   return (
     <div className="vl-people">
       <label htmlFor={`${id}-input`}>{label}</label>
-      <Chips label={label} value={value} names={names} disabled={disabled} onRemove={remove} />
+      <Chips
+        label={label}
+        value={value}
+        names={names}
+        disabled={disabled}
+        onRemove={remove}
+      />
       <input
         ref={input}
         id={`${id}-input`}
@@ -262,7 +289,9 @@ export function PeoplePicker({
         aria-expanded={shown}
         aria-controls={`${id}-list`}
         aria-autocomplete="list"
-        aria-activedescendant={shown ? `${id}-option-${String(active)}` : undefined}
+        aria-activedescendant={
+          shown ? `${id}-option-${String(active)}` : undefined
+        }
         aria-describedby={hint === undefined ? undefined : `${id}-hint`}
         autoComplete="off"
         disabled={disabled}

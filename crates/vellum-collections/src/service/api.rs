@@ -13,7 +13,9 @@ use vellum_kernel::{CollectionId, DocId};
 
 use crate::compute::ComputedRow;
 use crate::error::Diagnostic;
-use crate::schema::{Aggregation, NumberFormat, Property, PropertyType, Schema, SelectOption};
+use crate::schema::{
+    Aggregation, NumberFormat, Property, PropertyType, Schema, SelectOption,
+};
 use crate::value::Value;
 use crate::view::{ViewDef, ViewKind};
 use crate::workspace::Changeset;
@@ -509,7 +511,11 @@ impl From<&ViewDef> for ViewInfo {
         Self {
             name: v.name.clone(),
             kind: v.kind,
-            filters: v.filters.iter().map(crate::view::Filter::to_text).collect(),
+            filters: v
+                .filters
+                .iter()
+                .map(crate::view::Filter::to_text)
+                .collect(),
             sorts: v.sorts.iter().map(crate::view::Sort::to_text).collect(),
             group: v.group.clone(),
             hidden: v.hidden.clone(),
@@ -539,12 +545,20 @@ pub struct CollectionInfo {
 }
 
 impl CollectionInfo {
-    pub(crate) fn new(schema: &Schema, path: String, diagnostics: Vec<Diagnostic>) -> Self {
+    pub(crate) fn new(
+        schema: &Schema,
+        path: String,
+        diagnostics: Vec<Diagnostic>,
+    ) -> Self {
         Self {
             id: schema.id,
             title: schema.title.clone(),
             path,
-            properties: schema.properties.iter().map(PropertyInfo::from).collect(),
+            properties: schema
+                .properties
+                .iter()
+                .map(PropertyInfo::from)
+                .collect(),
             views: schema.views.iter().map(ViewInfo::from).collect(),
             diagnostics,
         }

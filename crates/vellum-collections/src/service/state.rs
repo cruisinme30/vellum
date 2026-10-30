@@ -15,12 +15,16 @@ use bytes::Bytes;
 use futures::TryStreamExt as _;
 use vellum_kernel::{CollectionId, DocId, Error, ErrorKind};
 use vellum_store::layout::{Kind, SYSTEM_DIR};
-use vellum_store::{BlobEntry, BlobPath, BlobStore, Etag, Precondition, StoreError};
+use vellum_store::{
+    BlobEntry, BlobPath, BlobStore, Etag, Precondition, StoreError,
+};
 
 use crate::error::Diagnostic;
 use crate::row::{Row, slug};
 use crate::schema::Schema;
-use crate::workspace::{Changeset, Collection, ROWS_DIR, RowRef, SCHEMA_FILE, Workspace};
+use crate::workspace::{
+    Changeset, Collection, ROWS_DIR, RowRef, SCHEMA_FILE, Workspace,
+};
 
 /// Most row files one collection folder may hold.
 pub const MAX_ROWS_PER_COLLECTION: usize = 100_000;
@@ -50,11 +54,13 @@ pub struct State {
 pub fn store_error(e: StoreError) -> Error {
     let kind = match &e {
         StoreError::NotFound(_) => ErrorKind::NotFound,
-        StoreError::AlreadyExists(_) | StoreError::PreconditionFailed { .. } => ErrorKind::Conflict,
+        StoreError::AlreadyExists(_)
+        | StoreError::PreconditionFailed { .. } => ErrorKind::Conflict,
         StoreError::InvalidPath { .. } => ErrorKind::InvalidInput,
         _ => ErrorKind::Unavailable,
     };
-    Error::new(kind, "the collection files could not be read or written").with_source(e)
+    Error::new(kind, "the collection files could not be read or written")
+        .with_source(e)
 }
 
 async fn read_text(
@@ -78,9 +84,9 @@ async fn read_text(
 
 /// Whether `path` is a row page directly inside `collection/rows/`.
 fn is_row_of(path: &BlobPath, collection: &BlobPath) -> bool {
-    path.parent()
-        .is_some_and(|dir| dir.file_name() == ROWS_DIR && dir.parent().as_ref() == Some(collection))
-        && path.file_name().to_ascii_lowercase().ends_with(".md")
+    path.parent().is_some_and(|dir| {
+        dir.file_name() == ROWS_DIR && dir.parent().as_ref() == Some(collection)
+    }) && path.file_name().to_ascii_lowercase().ends_with(".md")
 }
 
 /// Reads one collection folder: its schema at `schema_path` and the row
@@ -93,13 +99,16 @@ async fn read_folder(
     schema_size: u64,
     mut row_files: Vec<&BlobEntry>,
 ) -> Result<Option<(Collection, Folder)>, Error> {
-    let Some((schema_text, schema_etag)) = read_text(store, schema_path, schema_size).await? else {
+    let Some((schema_text, schema_etag)) =
+        read_text(store, schema_path, schema_size).await?
+    else {
         return Ok(None);
     };
     let schema = match Schema::from_yaml(&schema_text) {
         Ok(s) => s,
         Err(e) => {
-            tracing::warn!(path = %schema_path, error = %e, "skipping a collection with an invalid schema");
+            tracing::warn!(path = %schema_path, error = %e, "skipping a \
+                collection with an invalid schema");
             return Ok(None);
         }
     };
@@ -118,14 +127,17 @@ async fn read_folder(
     }
     let mut collection = Collection::new(schema);
     for entry in row_files {
-        let Some((text, etag)) = read_text(store, &entry.path, entry.size).await? else {
+        let Some((text, etag)) =
+            read_text(store, &entry.path, entry.size).await?
+        else {
             folder.diagnostics.push(Diagnostic::error(
                 entry.path.as_str(),
                 "the file is too large or vanished and was skipped",
             ));
             continue;
         };
-        let (mut row, mut diags) = Row::parse(&text, collection.schema(), entry.path.as_str());
+        let (mut row, mut diags) =
+            Row::parse(&text, collection.schema(), entry.path.as_str());
         folder.diagnostics.append(&mut diags);
         if folder.rows.contains_key(&row.id) {
             // A copied file: keep both rows, but the copy needs its
@@ -160,16 +172,18 @@ impl State {
     /// Reads every collection in the store.
     pub async fn load(store: &dyn BlobStore) -> Result<Self, Error> {
         let started = Instant::now();
-        let entries: Vec<_> = store.list(None).try_collect().await.map_err(store_error)?;
-        let mut schemas: Vec<(BlobPath, BlobPath, u64, std::time::SystemTime)> = entries
-            .iter()
-            .filter_map(|e| match Kind::of(&e.path) {
-                Kind::CollectionSchema { collection } => {
-                    Some((collection, e.path.clone(), e.size, e.modified))
-                }
-                _ => None,
-            })
-            .collect();
+        let entries: Vec<_> =
+            store.list(None).try_collect().await.map_err(store_error)?;
+        let mut schemas: Vec<(BlobPath, BlobPath, u64, std::time::SystemTime)> =
+            entries
+                .iter()
+                .filter_map(|e| match Kind::of(&e.path) {
+                    Kind::CollectionSchema { collection } => {
+                        Some((collection, e.path.clone(), e.size, e.modified))
+                    }
+                    _ => None,
+                })
+                .collect();
         // Oldest first: when a folder is copied with its schema, the copy
         // repeats the collection ID and the original keeps it.
         schemas.sort_by(|a, b| a.3.cmp(&b.3).then_with(|| a.0.cmp(&b.0)));
@@ -188,16 +202,19 @@ impl State {
             };
             let id = collection.id();
             if let Some(first) = state.folders.get_mut(&id) {
-                tracing::warn!(path = %dir, first = %first.path, "skipping a collection whose id is already used");
+                tracing::warn!(path = %dir, first = %first.path, "skipping a \
+                    collection whose id is already used");
                 first.diagnostics.push(Diagnostic::warning(
                     dir.as_str(),
-                    "this folder repeats the collection's id and was not loaded; give its schema.yaml a new id",
+                    "this folder repeats the collection's id and was not \
+                        loaded; give its schema.yaml a new id",
                 ));
                 continue;
             }
             total_rows += collection.len();
             if let Err(e) = state.ws.insert(collection) {
-                tracing::warn!(path = %dir, error = %e, "skipping a collection whose links do not check");
+                tracing::warn!(path = %dir, error = %e, "skipping a collection \
+                    whose links do not check");
                 continue;
             }
             let _ = state.folders.insert(id, folder);
@@ -216,7 +233,8 @@ impl State {
         store: &dyn BlobStore,
         dirs: &BTreeSet<BlobPath>,
     ) -> Result<(), Error> {
-        let differs = |why: &str| Error::new(ErrorKind::Conflict, why.to_owned());
+        let differs =
+            |why: &str| Error::new(ErrorKind::Conflict, why.to_owned());
         for dir in dirs {
             let old = self
                 .folders
@@ -227,30 +245,35 @@ impl State {
                 let _ = self.folders.remove(&id);
                 let _ = self.ws.remove(id);
             }
-            let entries: Vec<BlobEntry> = match store.list(Some(dir)).try_collect().await {
-                Ok(entries) => entries,
-                Err(StoreError::NotFound(_)) => Vec::new(),
-                Err(e) => return Err(store_error(e)),
-            };
+            let entries: Vec<BlobEntry> =
+                match store.list(Some(dir)).try_collect().await {
+                    Ok(entries) => entries,
+                    Err(StoreError::NotFound(_)) => Vec::new(),
+                    Err(e) => return Err(store_error(e)),
+                };
             let schema_path = dir.join(SCHEMA_FILE).map_err(store_error)?;
-            let Some(schema) = entries.iter().find(|e| e.path == schema_path) else {
+            let Some(schema) = entries.iter().find(|e| e.path == schema_path)
+            else {
                 continue;
             };
             let mut row_files: Vec<_> =
                 entries.iter().filter(|e| is_row_of(&e.path, dir)).collect();
             row_files.sort_by(|a, b| a.path.cmp(&b.path));
             let Some((collection, folder)) =
-                read_folder(store, dir, &schema_path, schema.size, row_files).await?
+                read_folder(store, dir, &schema_path, schema.size, row_files)
+                    .await?
             else {
                 continue;
             };
             let id = collection.id();
             if self.folders.contains_key(&id) {
-                return Err(differs("a reloaded collection repeats another's id"));
+                return Err(differs(
+                    "a reloaded collection repeats another's id",
+                ));
             }
-            self.ws
-                .insert(collection)
-                .map_err(|_| differs("a reloaded collection's links do not check"))?;
+            self.ws.insert(collection).map_err(|_| {
+                differs("a reloaded collection's links do not check")
+            })?;
             let _ = self.folders.insert(id, folder);
         }
         // A collection that went may still be a relation target.
@@ -261,9 +284,12 @@ impl State {
 
     /// The folder of a loaded collection.
     pub fn folder(&self, id: CollectionId) -> Result<&Folder, Error> {
-        self.folders
-            .get(&id)
-            .ok_or_else(|| Error::new(ErrorKind::NotFound, format!("collection {id} not found")))
+        self.folders.get(&id).ok_or_else(|| {
+            Error::new(
+                ErrorKind::NotFound,
+                format!("collection {id} not found"),
+            )
+        })
     }
 
     /// The collections that an edit of `id` may write to: itself and the
@@ -272,7 +298,11 @@ impl State {
         let mut out = BTreeSet::from([id]);
         if let Some(c) = self.ws.collection(id) {
             for p in &c.schema().properties {
-                if let crate::schema::PropertyType::Relation { to, back: Some(_) } = &p.kind {
+                if let crate::schema::PropertyType::Relation {
+                    to,
+                    back: Some(_),
+                } = &p.kind
+                {
                     let _ = out.insert(*to);
                 }
             }
@@ -286,7 +316,9 @@ impl State {
         let mut out = BTreeSet::from([id]);
         if let Some(c) = self.ws.collection(id) {
             for p in &c.schema().properties {
-                if let crate::schema::PropertyType::Relation { to, .. } = &p.kind {
+                if let crate::schema::PropertyType::Relation { to, .. } =
+                    &p.kind
+                {
                     let _ = out.insert(*to);
                 }
             }
@@ -298,7 +330,11 @@ impl State {
     /// in place if the file still has the etag it was read at; new rows
     /// get a fresh file named after their title; deleted rows move to
     /// `.vellum/trash/collections/<collection>/<row>.md`.
-    pub async fn write(&mut self, store: &dyn BlobStore, changes: &Changeset) -> Result<(), Error> {
+    pub async fn write(
+        &mut self,
+        store: &dyn BlobStore,
+        changes: &Changeset,
+    ) -> Result<(), Error> {
         for r in &changes.written {
             self.write_row(store, *r).await?;
         }
@@ -320,7 +356,8 @@ impl State {
         let names = collection.file_names();
         let mut rows = BTreeMap::new();
         let mut schema = None;
-        let by_name: BTreeMap<&String, DocId> = names.iter().map(|(id, n)| (n, *id)).collect();
+        let by_name: BTreeMap<&String, DocId> =
+            names.iter().map(|(id, n)| (n, *id)).collect();
         for (rel, text) in collection.files()? {
             let path = dir.join(&rel).map_err(store_error)?;
             let meta = match store
@@ -328,7 +365,10 @@ impl State {
                 .await
             {
                 Ok(meta) => meta,
-                Err(StoreError::AlreadyExists(_) | StoreError::PreconditionFailed { .. }) => {
+                Err(
+                    StoreError::AlreadyExists(_)
+                    | StoreError::PreconditionFailed { .. },
+                ) => {
                     return Err(Error::new(
                         ErrorKind::Conflict,
                         format!("{dir} already exists"),
@@ -343,7 +383,10 @@ impl State {
             }
         }
         let schema = schema.ok_or_else(|| {
-            Error::new(ErrorKind::Internal, "the new collection has no schema.yaml")
+            Error::new(
+                ErrorKind::Internal,
+                "the new collection has no schema.yaml",
+            )
         })?;
         let folder = Folder {
             path: dir,
@@ -367,13 +410,20 @@ impl State {
         let text = self
             .ws
             .collection(id)
-            .ok_or_else(|| Error::new(ErrorKind::NotFound, format!("collection {id} not found")))?
+            .ok_or_else(|| {
+                Error::new(
+                    ErrorKind::NotFound,
+                    format!("collection {id} not found"),
+                )
+            })?
             .schema()
             .to_yaml()?;
-        let folder = self
-            .folders
-            .get_mut(&id)
-            .ok_or_else(|| Error::new(ErrorKind::NotFound, format!("collection {id} not found")))?;
+        let folder = self.folders.get_mut(&id).ok_or_else(|| {
+            Error::new(
+                ErrorKind::NotFound,
+                format!("collection {id} not found"),
+            )
+        })?;
         let (path, etag) = folder.schema.clone();
         let meta = store
             .put(&path, Bytes::from(text), Precondition::IfMatch(etag))
@@ -393,29 +443,35 @@ impl State {
                 let c = self.ws.collection(r.collection)?;
                 let row = c.row(r.row)?;
                 let folder = self.folders.get(&r.collection)?;
-                let path = folder
-                    .rows
-                    .get(&r.row)
-                    .map_or_else(|| folder.path.clone(), |(path, _)| path.clone());
+                let path = folder.rows.get(&r.row).map_or_else(
+                    || folder.path.clone(),
+                    |(path, _)| path.clone(),
+                );
                 Some((path, row.to_markdown(c.schema())))
             })
             .collect()
     }
 
-    async fn write_row(&mut self, store: &dyn BlobStore, r: RowRef) -> Result<(), Error> {
+    async fn write_row(
+        &mut self,
+        store: &dyn BlobStore,
+        r: RowRef,
+    ) -> Result<(), Error> {
         let (text, title) = {
             let c = self.ws.collection(r.collection).ok_or_else(|| {
-                Error::new(ErrorKind::Internal, "written row's collection vanished")
+                Error::new(
+                    ErrorKind::Internal,
+                    "written row's collection vanished",
+                )
             })?;
-            let row = c
-                .row(r.row)
-                .ok_or_else(|| Error::new(ErrorKind::Internal, "written row vanished"))?;
+            let row = c.row(r.row).ok_or_else(|| {
+                Error::new(ErrorKind::Internal, "written row vanished")
+            })?;
             (row.to_markdown(c.schema()), row.title(c.schema()))
         };
-        let folder = self
-            .folders
-            .get_mut(&r.collection)
-            .ok_or_else(|| Error::new(ErrorKind::Internal, "written row's folder vanished"))?;
+        let folder = self.folders.get_mut(&r.collection).ok_or_else(|| {
+            Error::new(ErrorKind::Internal, "written row's folder vanished")
+        })?;
         let bytes = Bytes::from(text);
         if let Some((path, etag)) = folder.rows.get(&r.row).cloned() {
             let meta = store
@@ -425,7 +481,8 @@ impl State {
             let _ = folder.rows.insert(r.row, (path, meta.etag));
             return Ok(());
         }
-        let taken: BTreeSet<&str> = folder.rows.values().map(|(p, _)| p.file_name()).collect();
+        let taken: BTreeSet<&str> =
+            folder.rows.values().map(|(p, _)| p.file_name()).collect();
         let base = match slug(&title) {
             s if s.is_empty() => "untitled".to_owned(),
             s => s,
@@ -458,7 +515,10 @@ impl State {
                     return Ok(());
                 }
                 // A file we have not loaded holds the name; try the next.
-                Err(StoreError::AlreadyExists(_) | StoreError::PreconditionFailed { .. }) => {}
+                Err(
+                    StoreError::AlreadyExists(_)
+                    | StoreError::PreconditionFailed { .. },
+                ) => {}
                 Err(e) => return Err(store_error(e)),
             }
         }
@@ -468,7 +528,11 @@ impl State {
         ))
     }
 
-    async fn trash_row(&mut self, store: &dyn BlobStore, r: RowRef) -> Result<(), Error> {
+    async fn trash_row(
+        &mut self,
+        store: &dyn BlobStore,
+        r: RowRef,
+    ) -> Result<(), Error> {
         let Some(folder) = self.folders.get_mut(&r.collection) else {
             return Ok(());
         };

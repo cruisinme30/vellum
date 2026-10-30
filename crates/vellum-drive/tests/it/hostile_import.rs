@@ -31,7 +31,13 @@ async fn imported_ids_never_take_over_existing_nodes() -> TestResult {
         user: UserId::generate(),
     };
     let eng = drive
-        .create_space(&alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .create_space(
+            &alice,
+            SpaceKind::SharedDrive,
+            "eng",
+            "Engineering",
+            None,
+        )
         .await?;
     let secret = drive
         .create_page(&alice, eng.id, None, "Secret", "# Payroll\n")

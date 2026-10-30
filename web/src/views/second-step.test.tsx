@@ -38,7 +38,9 @@ function steps() {
   );
   const api: SignInSteps = {
     verify,
-    passkeyOptions: vi.fn<SignInSteps["passkeyOptions"]>(() => Promise.resolve({ challenge: "x" })),
+    passkeyOptions: vi.fn<SignInSteps["passkeyOptions"]>(() =>
+      Promise.resolve({ challenge: "x" }),
+    ),
     authenticator: vi.fn<SignInSteps["authenticator"]>(() =>
       Promise.reject(new ApiError("unavailable", "try later")),
     ),
@@ -58,7 +60,12 @@ function show(step: SecondStepRequired, api: SignInSteps) {
   const user = userEvent.setup();
   render(
     <I18nProvider>
-      <SecondStep step={step} steps={api} onSignedIn={onSignedIn} onStartOver={onStartOver} />
+      <SecondStep
+        step={step}
+        steps={api}
+        onSignedIn={onSignedIn}
+        onStartOver={onStartOver}
+      />
     </I18nProvider>,
   );
   return { user, onSignedIn, onStartOver };
@@ -74,7 +81,10 @@ describe("verifying the second step", () => {
   it("signs in with a passkey", async () => {
     passkeys.sign.mockResolvedValue({ id: "k" });
     const { api, verify } = steps();
-    const { user, onSignedIn } = show(new SecondStepRequired("verify", "vmt_1", ["passkey"]), api);
+    const { user, onSignedIn } = show(
+      new SecondStepRequired("verify", "vmt_1", ["passkey"]),
+      api,
+    );
     expect(screen.queryByRole("button", { name: "Verify" })).toBeNull();
     await user.click(screen.getByRole("button", { name: /passkey/i }));
     await waitFor(() => {
@@ -84,8 +94,13 @@ describe("verifying the second step", () => {
   });
 
   it("says so when the browser cancels the passkey", async () => {
-    passkeys.sign.mockRejectedValue(new DOMException("cancelled", "NotAllowedError"));
-    const { user } = show(new SecondStepRequired("verify", "vmt_1", ["passkey"]), steps().api);
+    passkeys.sign.mockRejectedValue(
+      new DOMException("cancelled", "NotAllowedError"),
+    );
+    const { user } = show(
+      new SecondStepRequired("verify", "vmt_1", ["passkey"]),
+      steps().api,
+    );
     await user.click(screen.getByRole("button", { name: /passkey/i }));
     expect(await textOf(screen.findByRole("alert"))).not.toBe("cancelled");
   });
@@ -117,7 +132,9 @@ describe("enrolling during sign-in", () => {
     );
     await user.type(screen.getByRole("textbox"), "Laptop");
     await user.click(screen.getByRole("button", { name: /passkey/i }));
-    expect(await textOf(screen.findByTestId("recovery-codes"))).toContain("aaaaa-bbbbb");
+    expect(await textOf(screen.findByTestId("recovery-codes"))).toContain(
+      "aaaaa-bbbbb",
+    );
     expect(enrol).toHaveBeenCalledWith("vmt_e", {
       passkey: { name: "Laptop", credential: { id: "new" } },
     });
@@ -127,11 +144,20 @@ describe("enrolling during sign-in", () => {
     });
   });
 
-  it("shows why an app could not be set up, and hides passkeys the browser lacks", async () => {
-    passkeys.supported = false;
-    const { user } = show(new SecondStepRequired("enrol", "vmt_e", ["totp"]), steps().api);
-    expect(screen.queryByRole("textbox")).toBeNull();
-    await user.click(screen.getByRole("button", { name: "Set up an authenticator app" }));
-    expect(await textOf(screen.findByRole("alert"))).toBe("try later");
-  });
+  it(
+    "shows why an app could not be set up, and hides passkeys the browser " +
+      "lacks",
+    async () => {
+      passkeys.supported = false;
+      const { user } = show(
+        new SecondStepRequired("enrol", "vmt_e", ["totp"]),
+        steps().api,
+      );
+      expect(screen.queryByRole("textbox")).toBeNull();
+      await user.click(
+        screen.getByRole("button", { name: "Set up an authenticator app" }),
+      );
+      expect(await textOf(screen.findByRole("alert"))).toBe("try later");
+    },
+  );
 });

@@ -106,7 +106,8 @@ prios="$(jq -c '[.[].Priority | select(. != "")] + ["P0"] | unique | map({name:.
 statuses='[{"name":"Todo","color":"GRAY"},{"name":"In Progress","color":"YELLOW"},{"name":"Blocked","color":"RED"},{"name":"Done","color":"GREEN"}]'
 
 load_fields
-# The first version of this script made Owner a text field; Owner thread replaces it.
+# The first version of this script made Owner a text field; Owner thread
+# replaces it.
 old_owner="$(jq -c '.[] | select(.name == "Owner" and .dataType == "TEXT")' <<<"$FIELDS")"
 if [[ -n "$old_owner" ]]; then
   gqlv 'mutation($id:ID!){deleteProjectV2Field(input:{fieldId:$id}){clientMutationId}}' "$(jq -c '{id:.id}' <<<"$old_owner")" >/dev/null
@@ -132,13 +133,15 @@ load_items() {
       values:([.fieldValues.nodes[] | select(.field) | {key:.field.name, value:(.text // .name // "")}] | from_entries)})'
 }
 
-# run_batched FILE: one mutation per line, sent BATCH at a time as aliased mutations.
+# run_batched FILE: one mutation per line, sent BATCH at a time as aliased
+# mutations.
 run_batched() {
   [[ -s "$1" ]] || return 0
   rm -f "$TMP"/chunk.*
   split -l "$BATCH" "$1" "$TMP/chunk."
   for c in "$TMP"/chunk.*; do
-    # Adds and value updates are idempotent, so a failed batch is simply retried.
+    # Adds and value updates are idempotent, so a failed batch is simply
+    # retried.
     local q try
     q="mutation{$(awk '{printf "m%d: %s\n", NR, $0}' "$c")}"
     for try in 1 2 3 4; do

@@ -26,13 +26,16 @@ use vellum_crypto::KeyProvider;
 use vellum_kernel::{Error, ErrorKind, Result, Timestamp};
 
 /// The hash before the first record: 64 zeros.
-pub const GENESIS: &str = "0000000000000000000000000000000000000000000000000000000000000000";
+pub const GENESIS: &str =
+    "0000000000000000000000000000000000000000000000000000000000000000";
 
 /// The most records one query returns.
 pub const MAX_LIST: usize = 1000;
 
 /// How an audited action ended.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Outcome {
     /// The action happened.
@@ -127,7 +130,11 @@ impl NewAuditEvent {
 
     /// Adds one detail.
     #[must_use]
-    pub fn detail(mut self, key: &str, value: impl Into<serde_json::Value>) -> Self {
+    pub fn detail(
+        mut self,
+        key: &str,
+        value: impl Into<serde_json::Value>,
+    ) -> Self {
         let _ = self.details.insert(key.to_owned(), value.into());
         self
     }
@@ -156,14 +163,22 @@ struct Hashed<'a> {
     prev_hash: &'a str,
 }
 
-fn hash_of(seq: u64, at: Timestamp, event: &NewAuditEvent, prev_hash: &str) -> Result<String> {
+fn hash_of(
+    seq: u64,
+    at: Timestamp,
+    event: &NewAuditEvent,
+    prev_hash: &str,
+) -> Result<String> {
     let body = serde_json::to_vec(&Hashed {
         seq,
         at,
         event,
         prev_hash,
     })
-    .map_err(|e| Error::new(ErrorKind::Internal, "cannot encode audit record").with_source(e))?;
+    .map_err(|e| {
+        Error::new(ErrorKind::Internal, "cannot encode audit record")
+            .with_source(e)
+    })?;
     let mut h = Sha256::new();
     h.update(prev_hash.as_bytes());
     h.update(b"\n");
@@ -197,12 +212,15 @@ impl AuditRecord {
     /// Whether the stored hash matches the content.
     #[must_use]
     pub fn is_intact(&self) -> bool {
-        hash_of(self.seq, self.at, &self.event, &self.prev_hash).is_ok_and(|h| h == self.hash)
+        hash_of(self.seq, self.at, &self.event, &self.prev_hash)
+            .is_ok_and(|h| h == self.hash)
     }
 }
 
 /// Filters for [`AuditLog::list`].
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(default)]
 pub struct AuditQuery {
     /// Only this action.
@@ -376,7 +394,9 @@ fn io_error(what: &'static str) -> impl FnOnce(std::io::Error) -> Error {
     move |e| Error::new(ErrorKind::Unavailable, what).with_source(e)
 }
 
-fn crypto_error(what: &'static str) -> impl FnOnce(vellum_crypto::CryptoError) -> Error {
+fn crypto_error(
+    what: &'static str,
+) -> impl FnOnce(vellum_crypto::CryptoError) -> Error {
     move |e| Error::new(ErrorKind::Internal, what).with_source(e)
 }
 
@@ -428,7 +448,10 @@ impl<K: KeyProvider + 'static> FileAuditLog<K> {
         if let Some(b) = report.broken_at {
             return Err(Error::new(
                 ErrorKind::Conflict,
-                format!("audit log is broken at record {}: {}", b.seq, b.reason),
+                format!(
+                    "audit log is broken at record {}: {}",
+                    b.seq, b.reason
+                ),
             ));
         }
         *log.head.lock().await = Head {
@@ -470,14 +493,17 @@ impl<K: KeyProvider + 'static> FileAuditLog<K> {
         let mut records = Vec::new();
         for line in text.lines().filter(|l| !l.trim().is_empty()) {
             let sealed = B64.decode(line.trim()).map_err(|e| {
-                Error::new(ErrorKind::Conflict, "audit segment is corrupt").with_source(e)
+                Error::new(ErrorKind::Conflict, "audit segment is corrupt")
+                    .with_source(e)
             })?;
             let plain = vellum_crypto::open(&*self.keys, &sealed)
                 .await
                 .map_err(crypto_error("cannot open an audit record"))?;
-            let record: AuditRecord = serde_json::from_slice(&plain).map_err(|e| {
-                Error::new(ErrorKind::Conflict, "audit record is corrupt").with_source(e)
-            })?;
+            let record: AuditRecord =
+                serde_json::from_slice(&plain).map_err(|e| {
+                    Error::new(ErrorKind::Conflict, "audit record is corrupt")
+                        .with_source(e)
+                })?;
             records.push(record);
         }
         Ok(records)
@@ -499,7 +525,8 @@ impl<K: KeyProvider + 'static> FileAuditLog<K> {
                     .await
                     .map_err(crypto_error("cannot open the audit head"))?;
                 serde_json::from_slice(&plain).map(Some).map_err(|e| {
-                    Error::new(ErrorKind::Conflict, "audit head is corrupt").with_source(e)
+                    Error::new(ErrorKind::Conflict, "audit head is corrupt")
+                        .with_source(e)
                 })
             }
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
@@ -509,7 +536,8 @@ impl<K: KeyProvider + 'static> FileAuditLog<K> {
 
     async fn write_head(&self, head: &Head) -> Result<()> {
         let plain = serde_json::to_vec(head).map_err(|e| {
-            Error::new(ErrorKind::Internal, "cannot encode the audit head").with_source(e)
+            Error::new(ErrorKind::Internal, "cannot encode the audit head")
+                .with_source(e)
         })?;
         let sealed = vellum_crypto::seal(&*self.keys, &plain)
             .await
@@ -520,12 +548,18 @@ impl<K: KeyProvider + 'static> FileAuditLog<K> {
 
 #[async_trait]
 impl<K: KeyProvider + 'static> AuditLog for FileAuditLog<K> {
-    #[tracing::instrument(name = "audit.append", skip_all, fields(action = %event.action))]
+    #[tracing::instrument(
+        name = "audit.append",
+        skip_all,
+        fields(action = %event.action)
+    )]
     async fn append(&self, event: NewAuditEvent) -> Result<AuditRecord> {
         let mut head = self.head.lock().await;
-        let record = AuditRecord::chain(head.seq, &head.hash, Timestamp::now(), event)?;
+        let record =
+            AuditRecord::chain(head.seq, &head.hash, Timestamp::now(), event)?;
         let plain = serde_json::to_vec(&record).map_err(|e| {
-            Error::new(ErrorKind::Internal, "cannot encode audit record").with_source(e)
+            Error::new(ErrorKind::Internal, "cannot encode audit record")
+                .with_source(e)
         })?;
         let sealed = vellum_crypto::seal(&*self.keys, &plain)
             .await
@@ -582,7 +616,9 @@ impl<K: KeyProvider + 'static> AuditLog for FileAuditLog<K> {
             if !consistent {
                 report.broken_at = Some(ChainBreak {
                     seq: report.records + 1,
-                    reason: "records are missing after the last one (head mismatch)".to_owned(),
+                    reason:
+                        "records are missing after the last one (head mismatch)"
+                            .to_owned(),
                 });
             }
         }
@@ -613,7 +649,10 @@ mod tests {
         let first = log.append(event("admin.a")).await.unwrap();
         assert_eq!(first.prev_hash, GENESIS);
         let second = log
-            .append(NewAuditEvent::new(AuditActor::system(), "admin.b").outcome(Outcome::Denied))
+            .append(
+                NewAuditEvent::new(AuditActor::system(), "admin.b")
+                    .outcome(Outcome::Denied),
+            )
             .await
             .unwrap();
         assert_eq!(second.prev_hash, first.hash);
@@ -643,8 +682,10 @@ mod tests {
 
     #[test]
     fn verify_finds_tampering() {
-        let a = AuditRecord::chain(0, GENESIS, Timestamp::now(), event("x")).unwrap();
-        let b = AuditRecord::chain(1, &a.hash, Timestamp::now(), event("y")).unwrap();
+        let a = AuditRecord::chain(0, GENESIS, Timestamp::now(), event("x"))
+            .unwrap();
+        let b = AuditRecord::chain(1, &a.hash, Timestamp::now(), event("y"))
+            .unwrap();
         let mut edited = b.clone();
         edited.event.action = "z".into();
         let report = verify_chain(&[a.clone(), edited]);
@@ -673,7 +714,8 @@ mod tests {
                 .unwrap();
             assert!(format!("{log:?}").contains("FileAuditLog"));
             for i in 0..3 {
-                let _ = log.append(event(&format!("admin.e{i}"))).await.unwrap();
+                let _ =
+                    log.append(event(&format!("admin.e{i}"))).await.unwrap();
             }
             let newest = log
                 .list(&AuditQuery {
@@ -682,7 +724,10 @@ mod tests {
                 })
                 .await
                 .unwrap();
-            assert_eq!(newest.iter().map(|r| r.seq).collect::<Vec<_>>(), vec![3, 2]);
+            assert_eq!(
+                newest.iter().map(|r| r.seq).collect::<Vec<_>>(),
+                vec![3, 2]
+            );
         }
         let log = FileAuditLog::open(dir.path(), Arc::clone(&keys))
             .await
@@ -708,7 +753,8 @@ mod tests {
     #[tokio::test]
     async fn file_log_rejects_garbage() {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("2026-10.log"), "not base64!\n").unwrap();
+        std::fs::write(dir.path().join("2026-10.log"), "not base64!\n")
+            .unwrap();
         let err = FileAuditLog::open(dir.path(), keyring()).await.unwrap_err();
         assert_eq!(err.kind(), ErrorKind::Conflict);
     }

@@ -3,7 +3,11 @@
 
 import { useId, useState, type ComponentProps } from "react";
 
-import { CodeField, RecoveryCodesPanel, TotpSetupPanel } from "../account/factor-parts";
+import {
+  CodeField,
+  RecoveryCodesPanel,
+  TotpSetupPanel,
+} from "../account/factor-parts";
 import {
   createPasskey,
   passkeysSupported,
@@ -32,7 +36,11 @@ function useWork(fallback: string) {
       },
       (error_: unknown) => {
         setBusy(false);
-        setError(error_ instanceof DOMException ? fallback : describeError(error_, fallback));
+        setError(
+          error_ instanceof DOMException
+            ? fallback
+            : describeError(error_, fallback),
+        );
       },
     );
   };
@@ -74,7 +82,9 @@ function Verify({
   };
   const withPasskey = () => {
     run(async () => {
-      const options = (await steps.passkeyOptions(step.ticket)) as RequestOptionsJson;
+      const options = (await steps.passkeyOptions(
+        step.ticket,
+      )) as RequestOptionsJson;
       const passkey = await signWithPasskey(options);
       await steps.verify(step.ticket, { passkey });
       await onSignedIn();
@@ -83,7 +93,12 @@ function Verify({
   return (
     <>
       {hasPasskey && (
-        <button type="button" className="vl-filled-button" disabled={busy} onClick={withPasskey}>
+        <button
+          type="button"
+          className="vl-filled-button"
+          disabled={busy}
+          onClick={withPasskey}
+        >
           {t("second-step-passkey")}
         </button>
       )}
@@ -92,7 +107,11 @@ function Verify({
           <div className="vl-auth-field">
             <CodeField
               id={`${id}-code`}
-              label={recovery ? t("second-step-recovery-code") : t("second-step-app-code")}
+              label={
+                recovery
+                  ? t("second-step-recovery-code")
+                  : t("second-step-app-code")
+              }
               value={code}
               onChange={setCode}
               recovery={recovery}
@@ -114,7 +133,9 @@ function Verify({
             setCode("");
           }}
         >
-          {recovery && hasApp ? t("second-step-use-app") : t("second-step-use-recovery")}
+          {recovery && hasApp
+            ? t("second-step-use-app")
+            : t("second-step-use-recovery")}
         </button>
       )}
     </>
@@ -169,9 +190,13 @@ function Enrol({
   const addPasskey: Submit = (event) => {
     event.preventDefault();
     run(async () => {
-      const options = (await steps.passkeyOptions(step.ticket)) as CreationOptionsJson;
+      const options = (await steps.passkeyOptions(
+        step.ticket,
+      )) as CreationOptionsJson;
       const credential = await createPasskey(options);
-      const done = await steps.enrol(step.ticket, { passkey: { name, credential } });
+      const done = await steps.enrol(step.ticket, {
+        passkey: { name, credential },
+      });
       setCodes(done.recoveryCodes);
     });
   };

@@ -30,11 +30,17 @@ const SOURCES: readonly ImportSource[] = [
   "docmost",
 ];
 
-const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
+const errorText = (error: unknown) =>
+  error instanceof Error ? error.message : String(error);
 
 function ImportForm({ api }: { readonly api: TransferApi }) {
   const t = useT();
-  const ids = { source: useId(), space: useId(), folder: useId(), file: useId() };
+  const ids = {
+    source: useId(),
+    space: useId(),
+    folder: useId(),
+    file: useId(),
+  };
   const workspace = useWorkspace();
   const { store } = useServices();
   const [source, setSource] = useState<ImportSource>("notion");
@@ -48,7 +54,9 @@ function ImportForm({ api }: { readonly api: TransferApi }) {
     | { readonly kind: "failed"; readonly message: string }
   >({ kind: "idle" });
   const spaceId = space === "" ? (workspace.spaces[0]?.id ?? "") : space;
-  const folders = workspace.pages.filter((p) => p.spaceId === spaceId && p.folder === true);
+  const folders = workspace.pages.filter(
+    (p) => p.spaceId === spaceId && p.folder === true,
+  );
 
   const submit = async (event: SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -79,7 +87,8 @@ function ImportForm({ api }: { readonly api: TransferApi }) {
         onChange={(event) => {
           const chosen = event.currentTarget.files?.[0];
           setFile(chosen);
-          const guess = chosen === undefined ? undefined : guessSource(chosen.name);
+          const guess =
+            chosen === undefined ? undefined : guessSource(chosen.name);
           if (guess !== undefined) setSource(guess);
         }}
       />
@@ -131,7 +140,9 @@ function ImportForm({ api }: { readonly api: TransferApi }) {
         <button
           type="submit"
           className="vl-filled-button"
-          disabled={file === undefined || spaceId === "" || state.kind === "working"}
+          disabled={
+            file === undefined || spaceId === "" || state.kind === "working"
+          }
         >
           <Icon name="upload" size={20} />
           {state.kind === "working" ? t("import-working") : t("import-start")}
@@ -141,14 +152,21 @@ function ImportForm({ api }: { readonly api: TransferApi }) {
         {state.kind === "done" && (
           <div className="vl-import-done">
             <p>
-              {t("import-done", { pages: state.result.nodes, title: state.result.title })}{" "}
+              {t("import-done", {
+                pages: state.result.nodes,
+                title: state.result.title,
+              })}{" "}
               <Link to={`/p/${encodeURIComponent(state.result.folder_id)}`}>
                 {t("import-open")}
               </Link>
             </p>
             {state.result.warnings.length > 0 && (
               <details className="vl-transfer-warnings">
-                <summary>{t("export-warnings", { count: state.result.warnings.length })}</summary>
+                <summary>
+                  {t("export-warnings", {
+                    count: state.result.warnings.length,
+                  })}
+                </summary>
                 <ul>
                   {state.result.warnings.map((w, index) => (
                     <li key={index}>
@@ -280,20 +298,29 @@ export function IssueImportForm({ api }: { readonly api: TransferApi }) {
         {state.kind === "done" && (
           <div className="vl-import-done">
             <p>
-              {t(state.report.dry_run ? "import-issues-planned" : "import-issues-done", {
-                created: state.report.created,
-                skipped: state.report.skipped,
-              })}
+              {t(
+                state.report.dry_run
+                  ? "import-issues-planned"
+                  : "import-issues-done",
+                {
+                  created: state.report.created,
+                  skipped: state.report.skipped,
+                },
+              )}
             </p>
             {state.report.warnings.length > 0 && (
               <details className="vl-transfer-warnings">
                 <summary>
-                  {t("import-issues-warnings", { count: state.report.warnings.length })}
+                  {t("import-issues-warnings", {
+                    count: state.report.warnings.length,
+                  })}
                 </summary>
                 <ul>
                   {state.report.warnings.map((w, index) => (
                     <li key={index}>
-                      {w.external_id == undefined ? undefined : <strong>{w.external_id}: </strong>}
+                      {w.external_id == undefined ? undefined : (
+                        <strong>{w.external_id}: </strong>
+                      )}
                       {w.message}
                     </li>
                   ))}
@@ -312,7 +339,10 @@ export function IssueImportForm({ api }: { readonly api: TransferApi }) {
   );
 }
 
-/** Import: a Notion, Confluence or Markdown export, or a Word file, into a new folder. */
+/**
+ * Import: a Notion, Confluence or Markdown export, or a Word file, into a new
+ * folder.
+ */
 export function ImportScreen() {
   const t = useT();
   return (

@@ -34,7 +34,8 @@ export const LAUNCH: ProjectOut = {
   teams: ["ENG"],
   start_date: "2026-09-01",
   target_date: "2026-11-30",
-  markdown: "Ship 1.0 to the first ten design partners, with sign-in, Drive and Books.",
+  markdown:
+    "Ship 1.0 to the first ten design partners, with sign-in, Drive and Books.",
   issues: 24,
   completed_issues: 15,
   completed: 15,
@@ -69,7 +70,9 @@ const MIGRATION: ProjectOut = {
   health: null, // eslint-disable-line unicorn/no-null -- the wire type
   start_date: null, // eslint-disable-line unicorn/no-null -- the wire type
   id: "migration",
-  title: "Move every customer workspace off the legacy storage engine before the spring",
+  title:
+    "Move every customer workspace off the legacy storage engine before the " +
+    "spring",
   status: "planned",
   lead: "grace",
   members: ["grace"],
@@ -126,7 +129,14 @@ const stats = (count: number, p50: number) => ({
   p95_hours: p50 * 3.4,
 });
 
-const WEEKS = ["2026-09-07", "2026-09-14", "2026-09-21", "2026-09-28", "2026-10-05", "2026-10-12"];
+const WEEKS = [
+  "2026-09-07",
+  "2026-09-14",
+  "2026-09-21",
+  "2026-09-28",
+  "2026-10-05",
+  "2026-10-12",
+];
 
 export const INSIGHTS: InsightsOut = {
   overall: stats(84, 31),
@@ -156,7 +166,9 @@ export const FORMS: readonly FormOut[] = [
   {
     slug: "bug-report",
     title: "Report a bug",
-    description: "Tell the Engineering team about something that does not work as it should.",
+    description:
+      "Tell the Engineering team about something that does not work as it " +
+      "should.",
     public: false,
     fields: [
       {
@@ -200,7 +212,11 @@ export const SHARING: SharingView = {
   },
   grants: [
     { principal: PRIYA, handle: "priya", role: "owner" },
-    { principal: "01M64U0000000000000000GRC0", handle: "grace", role: "editor" },
+    {
+      principal: "01M64U0000000000000000GRC0",
+      handle: "grace",
+      role: "editor",
+    },
     {
       principal: "01M64U0000000000000000LIN0",
       handle: "linus",
@@ -236,7 +252,11 @@ export const MCP_SNIPPETS: readonly Snippet[] = [
     instructions: "Add this to claude_desktop_config.json.",
     language: "json",
     code: JSON.stringify(
-      { mcpServers: { vellum: { type: "http", url: "https://vellum.northstar.dev/mcp" } } },
+      {
+        mcpServers: {
+          vellum: { type: "http", url: "https://vellum.northstar.dev/mcp" },
+        },
+      },
       undefined,
       2,
     ),
@@ -246,7 +266,8 @@ export const MCP_SNIPPETS: readonly Snippet[] = [
 const PREVIEW_PAGE = [
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 210 297">',
   '<rect width="210" height="297" fill="#fff"/>',
-  '<text x="20" y="40" font-size="12" font-family="sans-serif">Northstar 1.0 launch plan</text>',
+  '<text x="20" y="40" font-size="12" font-family="sans-serif">Northstar 1.0 ' +
+    "launch plan</text>",
   '<rect x="20" y="55" width="170" height="3" fill="#ccc"/>',
   '<rect x="20" y="65" width="150" height="3" fill="#ccc"/>',
   "</svg>",

@@ -10,9 +10,22 @@ import { useLoaded } from "../../data/use-loaded";
 import { useT } from "../../i18n/i18n";
 
 import type { IssueOut, PlanningApi, ProjectOut, UpdateOut } from "./api";
-import { Failure, Field, HEALTHS, HealthChip, Progress, day, text, useSubmit } from "./shared";
+import {
+  Failure,
+  Field,
+  HEALTHS,
+  HealthChip,
+  Progress,
+  day,
+  text,
+  useSubmit,
+} from "./shared";
 
-const WHEN = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" });
+const WHEN = new Intl.DateTimeFormat("en", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
 
 function Milestones({
   api,
@@ -39,10 +52,17 @@ function Milestones({
           {project.milestones.map((m) => (
             <li key={m.id}>
               <span className="vl-plan-row-title">{m.name}</span>
-              <Progress percent={m.percent} label={t("plan-progress-of", { title: m.name })} />
+              <Progress
+                percent={m.percent}
+                label={t("plan-progress-of", { title: m.name })}
+              />
               <small className="vl-muted">
-                {t("plan-issues-done", { done: m.completed_issues, total: m.issues })}
-                {m.target_date != undefined && ` · ${t("plan-due", { date: day(m.target_date) })}`}
+                {t("plan-issues-done", {
+                  done: m.completed_issues,
+                  total: m.issues,
+                })}
+                {m.target_date != undefined &&
+                  ` · ${t("plan-due", { date: day(m.target_date) })}`}
               </small>
             </li>
           ))}
@@ -75,9 +95,14 @@ function Updates({
 }) {
   const t = useT();
   const [version, setVersion] = useState(0);
-  const loaded = useLoaded(() => api.updates(project.id), [api, project.id, version], failureText);
+  const loaded = useLoaded(
+    () => api.updates(project.id),
+    [api, project.id, version],
+    failureText,
+  );
   const { busy, error, onSubmit } = useSubmit(
-    (form) => api.postUpdate(project.id, text(form, "health"), text(form, "body")),
+    (form) =>
+      api.postUpdate(project.id, text(form, "health"), text(form, "body")),
     () => {
       setVersion((v) => v + 1);
       onChange();
@@ -86,13 +111,20 @@ function Updates({
   return (
     <section aria-labelledby="vl-plan-updates">
       <h2 id="vl-plan-updates">{t("plan-updates")}</h2>
-      {project.update_due && <p className="vl-plan-due">{t("plan-update-due-long")}</p>}
+      {project.update_due && (
+        <p className="vl-plan-due">{t("plan-update-due-long")}</p>
+      )}
       <form className="vl-plan-form vl-plan-update-form" onSubmit={onSubmit}>
         <fieldset className="vl-plan-health-pick">
           <legend>{t("plan-health")}</legend>
           {HEALTHS.map((health, index) => (
             <label key={health}>
-              <input type="radio" name="health" value={health} defaultChecked={index === 0} />
+              <input
+                type="radio"
+                name="health"
+                value={health}
+                defaultChecked={index === 0}
+              />
               <HealthChip health={health} />
             </label>
           ))}
@@ -122,7 +154,9 @@ function Updates({
                       })}
                     </small>
                   </p>
-                  {u.body.trim() !== "" && <p className="vl-issue-description">{u.body.trim()}</p>}
+                  {u.body.trim() !== "" && (
+                    <p className="vl-issue-description">{u.body.trim()}</p>
+                  )}
                   {u.changes.length > 0 && (
                     <ul className="vl-plan-changes">
                       {u.changes.map((c) => (
@@ -220,10 +254,20 @@ function ProjectIssues({
   );
 }
 
-function Project({ api, projectId }: { readonly api: PlanningApi; readonly projectId: string }) {
+function Project({
+  api,
+  projectId,
+}: {
+  readonly api: PlanningApi;
+  readonly projectId: string;
+}) {
   const t = useT();
   const [version, setVersion] = useState(0);
-  const loaded = useLoaded(() => api.project(projectId), [api, projectId, version], failureText);
+  const loaded = useLoaded(
+    () => api.project(projectId),
+    [api, projectId, version],
+    failureText,
+  );
   const refresh = () => {
     setVersion((v) => v + 1);
   };
@@ -232,7 +276,8 @@ function Project({ api, projectId }: { readonly api: PlanningApi; readonly proje
       {(project) => (
         <>
           <p className="vl-muted">
-            <Link to="/projects">{t("plan-projects")}</Link> · {t(`plan-status-${project.status}`)}
+            <Link to="/projects">{t("plan-projects")}</Link> ·{" "}
+            {t(`plan-status-${project.status}`)}
           </p>
           <h1>{project.title}</h1>
           <div className="vl-plan-summary">
@@ -242,7 +287,10 @@ function Project({ api, projectId }: { readonly api: PlanningApi; readonly proje
               label={t("plan-progress-of", { title: project.title })}
             />
             <span>
-              {t("plan-issues-done", { done: project.completed_issues, total: project.issues })}
+              {t("plan-issues-done", {
+                done: project.completed_issues,
+                total: project.issues,
+              })}
             </span>
             {project.lead != undefined && (
               <span>{t("plan-lead-is", { lead: `@${project.lead}` })}</span>

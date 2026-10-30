@@ -42,7 +42,17 @@ pub const MAX_KEY_LEN: usize = 32;
 pub const MAX_PROPERTIES: usize = 256;
 
 /// How rollups combine the related rows' values.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Aggregation {
     /// Number of related rows.
@@ -82,7 +92,16 @@ impl Aggregation {
 
 /// How a numeric result is displayed.
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize, schemars::JsonSchema,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    Default,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
 )]
 #[serde(rename_all = "snake_case")]
 pub enum NumberFormat {
@@ -94,7 +113,9 @@ pub enum NumberFormat {
 }
 
 /// One select or multi-select option.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
 pub struct SelectOption {
     /// The option text, as stored in row files.
     pub name: String,
@@ -233,7 +254,8 @@ impl Schema {
     ///
     /// Returns a [`SchemaError`] naming the first problem found.
     pub fn from_yaml(text: &str) -> Result<Self, SchemaError> {
-        let raw: SchemaRaw = crate::yaml::from_str(text).map_err(SchemaError::Yaml)?;
+        let raw: SchemaRaw =
+            crate::yaml::from_str(text).map_err(SchemaError::Yaml)?;
         Self::from_raw(raw)
     }
 
@@ -361,17 +383,21 @@ impl Schema {
             .properties
             .iter()
             .map(|p| match &p.kind {
-                PropertyType::Formula { formula, .. } => formula::compile(formula.source(), self)
-                    .map(Some)
-                    .map_err(|error| SchemaError::Formula {
-                        key: p.key.clone(),
-                        error,
-                    }),
+                PropertyType::Formula { formula, .. } => {
+                    formula::compile(formula.source(), self).map(Some).map_err(
+                        |error| SchemaError::Formula {
+                            key: p.key.clone(),
+                            error,
+                        },
+                    )
+                }
                 _ => Ok(None),
             })
             .collect::<Result<_, _>>()?;
         for (p, f) in self.properties.iter_mut().zip(compiled) {
-            if let (PropertyType::Formula { formula, .. }, Some(f)) = (&mut p.kind, f) {
+            if let (PropertyType::Formula { formula, .. }, Some(f)) =
+                (&mut p.kind, f)
+            {
                 *formula = f;
             }
         }
@@ -431,12 +457,19 @@ impl Schema {
     /// # Errors
     ///
     /// [`SchemaError::MissingField`] or [`SchemaError::UnknownType`].
-    pub fn property_type(spec: &PropertySpec) -> Result<PropertyType, SchemaError> {
+    pub fn property_type(
+        spec: &PropertySpec,
+    ) -> Result<PropertyType, SchemaError> {
         property_type(&PropertyRaw {
             key: spec.key.clone(),
             name: spec.name.clone(),
             kind: spec.kind.clone(),
-            options: spec.options.iter().cloned().map(OptionRaw::Full).collect(),
+            options: spec
+                .options
+                .iter()
+                .cloned()
+                .map(OptionRaw::Full)
+                .collect(),
             via: spec.via.clone(),
             prop: spec.prop.clone(),
             agg: spec.agg,
@@ -490,7 +523,8 @@ fn find_cycle<'a>(
         return Ok(());
     }
     if let Some(at) = path.iter().position(|k| *k == key) {
-        let mut cycle: Vec<String> = path.iter().skip(at).map(|k| (*k).to_owned()).collect();
+        let mut cycle: Vec<String> =
+            path.iter().skip(at).map(|k| (*k).to_owned()).collect();
         cycle.push(key.to_owned());
         return Err(SchemaError::FormulaCycle(cycle));
     }
@@ -567,7 +601,9 @@ fn property_type(p: &PropertyRaw) -> Result<PropertyType, SchemaError> {
             }
         }
         "formula" => PropertyType::Formula {
-            formula: Formula::uncompiled(p.f.clone().ok_or_else(|| missing("f"))?),
+            formula: Formula::uncompiled(
+                p.f.clone().ok_or_else(|| missing("f"))?,
+            ),
             format,
         },
         "created" => PropertyType::Created,
@@ -743,25 +779,31 @@ mod tests {
         let cases = [
             ("  - {key: a, name: A, type: text}\n", "title"),
             (
-                "  - {key: t, name: T, type: title}\n  - {key: t, name: U, type: text}\n",
+                "  - {key: t, name: T, type: title}\n  - {key: t, name: U, \
+                    type: text}\n",
                 "duplicate",
             ),
             ("  - {key: id, name: T, type: title}\n", "reserved"),
             ("  - {key: Bad, name: T, type: title}\n", "invalid"),
             (
-                "  - {key: t, name: T, type: title}\n  - {key: x, name: X, type: wat}\n",
+                "  - {key: t, name: T, type: title}\n  - {key: x, name: X, \
+                    type: wat}\n",
                 "unknown",
             ),
             (
-                "  - {key: t, name: T, type: title}\n  - {key: a, name: A, type: formula, f: 'B + 1'}\n  - {key: b, name: B, type: formula, f: 'A + 1'}\n",
+                "  - {key: t, name: T, type: title}\n  - {key: a, name: A, \
+                    type: formula, f: 'B + 1'}\n  - {key: b, name: B, type: \
+                    formula, f: 'A + 1'}\n",
                 "circular",
             ),
             (
-                "  - {key: t, name: T, type: title}\n  - {key: a, name: A, type: formula, f: 'Nope + 1'}\n",
+                "  - {key: t, name: T, type: title}\n  - {key: a, name: A, \
+                    type: formula, f: 'Nope + 1'}\n",
                 "unknown property",
             ),
             (
-                "  - {key: t, name: T, type: title}\n  - {key: r, name: R, type: rollup, via: t, prop: x, agg: sum}\n",
+                "  - {key: t, name: T, type: title}\n  - {key: r, name: R, \
+                    type: rollup, via: t, prop: x, agg: sum}\n",
                 "relation",
             ),
         ];

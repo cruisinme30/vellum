@@ -23,7 +23,9 @@ const SYNC_STEP_2 = 1;
 const SYNC_UPDATE = 2;
 const AUTH_DENIED = 0;
 
-/** Client → server: Done was pressed. Server → client: the version is written. */
+/**
+ * Client → server: Done was pressed. Server → client: the version is written.
+ */
 export const MSG_DONE = 101;
 /** Server → client: who holds each awareness client ID. */
 export const MSG_PEERS = 102;
@@ -36,7 +38,11 @@ export type WireMessage =
   | { readonly type: "awareness"; readonly update: Uint8Array }
   | { readonly type: "awareness-query" }
   | { readonly type: "auth"; readonly denied: string | undefined }
-  | { readonly type: "custom"; readonly tag: number; readonly payload: Uint8Array };
+  | {
+      readonly type: "custom";
+      readonly tag: number;
+      readonly payload: Uint8Array;
+    };
 
 /** One awareness client of a connected editor, as the server vouches for it. */
 export interface PeerEntry {
@@ -207,7 +213,10 @@ function readMessage(reader: Reader): WireMessage {
     }
     case MSG_AUTH: {
       const answer = reader.uint();
-      return { type: "auth", denied: answer === AUTH_DENIED ? reader.string() : undefined };
+      return {
+        type: "auth",
+        denied: answer === AUTH_DENIED ? reader.string() : undefined,
+      };
     }
     case MSG_QUERY_AWARENESS: {
       return { type: "awareness-query" };
@@ -219,7 +228,9 @@ function readMessage(reader: Reader): WireMessage {
 }
 
 /** Encodes messages into one frame. */
-export function encodeFrame(messages: readonly WireMessage[]): Uint8Array<ArrayBuffer> {
+export function encodeFrame(
+  messages: readonly WireMessage[],
+): Uint8Array<ArrayBuffer> {
   const writer = new Writer();
   for (const message of messages) {
     writeMessage(writer, message);
@@ -267,7 +278,11 @@ export function decodePeers(payload: Uint8Array): PeerEntry[] {
   }
   const entries: PeerEntry[] = [];
   for (let index = 0; index < count; index++) {
-    entries.push({ clientId: reader.uint(), user: reader.string(), canWrite: reader.uint() === 1 });
+    entries.push({
+      clientId: reader.uint(),
+      user: reader.string(),
+      canWrite: reader.uint() === 1,
+    });
   }
   if (reader.more) {
     throw new WireError("trailing bytes after the peer list");

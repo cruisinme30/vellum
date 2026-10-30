@@ -34,7 +34,11 @@ export function usePageViewMode() {
     );
   };
   const toggle = render !== undefined && (
-    <div className="vl-view-switch" role="group" aria-label={t("page-view-switch")}>
+    <div
+      className="vl-view-switch"
+      role="group"
+      aria-label={t("page-view-switch")}
+    >
       <button
         type="button"
         className="vl-text-button"
@@ -68,7 +72,13 @@ export function usePageViewMode() {
  * browser revalidates with the page's `ETag`, so an unchanged page costs a
  * `304` (ADR 0061, D270).
  */
-export function ReadingView({ pageId, api }: { readonly pageId: string; readonly api: RenderApi }) {
+export function ReadingView({
+  pageId,
+  api,
+}: {
+  readonly pageId: string;
+  readonly api: RenderApi;
+}) {
   const t = useT();
   const loaded = useLoaded(() => api.page(pageId), [api, pageId], failureText);
   if (loaded.state === "loading") {

@@ -38,9 +38,13 @@ function MentionRow({
         </small>{" "}
         {task.title}
       </span>
-      {key !== undefined && <Link to={`/issues/${encodeURIComponent(key)}`}>{key}</Link>}
+      {key !== undefined && (
+        <Link to={`/issues/${encodeURIComponent(key)}`}>{key}</Link>
+      )}
       {key === undefined && page !== undefined && (
-        <Link to={`/p/${encodeURIComponent(page)}`}>{t("my-work-open-page")}</Link>
+        <Link to={`/p/${encodeURIComponent(page)}`}>
+          {t("my-work-open-page")}
+        </Link>
       )}
       <button
         type="button"
@@ -97,7 +101,9 @@ function MoveMenu({
   );
 }
 
-/** One task: its tick box, its title (a link for an issue) and when it is due. */
+/**
+ * One task: its tick box, its title (a link for an issue) and when it is due.
+ */
 function TaskRow({
   api,
   task,
@@ -114,10 +120,12 @@ function TaskRow({
   const t = useT();
   const [blocking, setBlocking] = useState(false);
   const key = task.issue_key ?? undefined;
-  if (task.kind === "mention") return <MentionRow task={task} onDismiss={actions.onDismiss} />;
+  if (task.kind === "mention")
+    return <MentionRow task={task} onDismiss={actions.onDismiss} />;
   const movable = isMovable(task) && !task.done;
   return (
-    // Dragging is the pointer shortcut; the Move menu is the keyboard way (R-MW-1).
+    // Dragging is the pointer shortcut; the Move menu is the keyboard way
+    // (R-MW-1).
     // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
     <li
       className={task.overdue ? "vl-task vl-task-overdue" : "vl-task"}
@@ -142,10 +150,16 @@ function TaskRow({
         />
         <span className="vl-task-title">{task.title}</span>
       </label>
-      {key !== undefined && <Link to={`/issues/${encodeURIComponent(key)}`}>{key}</Link>}
-      {task.list != undefined && <small className="vl-muted">#{task.list}</small>}
+      {key !== undefined && (
+        <Link to={`/issues/${encodeURIComponent(key)}`}>{key}</Link>
+      )}
+      {task.list != undefined && (
+        <small className="vl-muted">#{task.list}</small>
+      )}
       {task.fields.due != undefined && (
-        <small className="vl-muted">{t("my-work-due", { date: task.fields.due })}</small>
+        <small className="vl-muted">
+          {t("my-work-due", { date: task.fields.due })}
+        </small>
       )}
       <BlockLabel task={task} />
       {movable && (
@@ -197,7 +211,10 @@ function dropProperties(onDrop: (task: string) => void) {
   };
 }
 
-/** While a task is dragged: every place it can go, including buckets with nothing in them. */
+/**
+ * While a task is dragged: every place it can go, including buckets with
+ * nothing in them.
+ */
 function DropBar({
   today,
   onDrop,
@@ -222,7 +239,9 @@ function DropBar({
   );
 }
 
-/** The buckets that hold tasks, in the server's order; each takes dropped tasks. */
+/**
+ * The buckets that hold tasks, in the server's order; each takes dropped tasks.
+ */
 function Buckets({
   api,
   view,
@@ -244,22 +263,29 @@ function Buckets({
     },
   };
   const moveById = (id: string, to: string) => {
-    const task = view.sections.flatMap((section) => section.tasks).find((each) => each.id === id);
+    const task = view.sections
+      .flatMap((section) => section.tasks)
+      .find((each) => each.id === id);
     setDragging(undefined);
     if (task !== undefined) actions.onMove(task, to);
   };
   const sections = view.sections.filter((section) => section.tasks.length > 0);
-  if (sections.length === 0) return <p className="vl-muted">{t("my-work-empty")}</p>;
+  if (sections.length === 0)
+    return <p className="vl-muted">{t("my-work-empty")}</p>;
   return (
     <>
-      {dragging !== undefined && <DropBar today={view.today} onDrop={moveById} />}
+      {dragging !== undefined && (
+        <DropBar today={view.today} onDrop={moveById} />
+      )}
       {sections.map((section) => {
         const target = sectionTarget(section);
         return (
           <section
             key={`${section.bucket}:${section.day ?? section.week_of ?? ""}`}
             className={
-              dragging !== undefined && target !== undefined ? "vl-drop-target" : undefined
+              dragging !== undefined && target !== undefined
+                ? "vl-drop-target"
+                : undefined
             }
             {...(target !== undefined &&
               dropProperties((task) => {
@@ -315,7 +341,11 @@ function SlackLink({ api }: { readonly api: WorkApi }) {
     );
   }
   return (
-    <div className="vl-work-banner" role="region" aria-label={t("my-work-slack-title")}>
+    <div
+      className="vl-work-banner"
+      role="region"
+      aria-label={t("my-work-slack-title")}
+    >
       <p>{t("my-work-slack-ask")}</p>
       <div className="vl-work-banner-actions">
         <button
@@ -405,7 +435,9 @@ function MyWork({ api }: { readonly api: WorkApi }) {
         </p>
       )}
       <Ready loaded={loaded}>
-        {(view) => <Buckets api={api} view={view} actions={actions} onChanged={reload} />}
+        {(view) => (
+          <Buckets api={api} view={view} actions={actions} onChanged={reload} />
+        )}
       </Ready>
       {answered && <ListsPanel api={api} onChanged={reload} />}
       {answered && <CalendarPanel api={api} onChanged={reload} />}
@@ -414,11 +446,19 @@ function MyWork({ api }: { readonly api: WorkApi }) {
   );
 }
 
-/** My Work: the signed-in person's tasks and assigned issues, by when they are due. */
+/**
+ * My Work: the signed-in person's tasks and assigned issues, by when they are
+ * due.
+ */
 export function MyWorkPage() {
   const t = useT();
   return (
-    <ServerScreen api="work" help="mywork.buckets" title={t("my-work")} className="vl-work">
+    <ServerScreen
+      api="work"
+      help="mywork.buckets"
+      title={t("my-work")}
+      className="vl-work"
+    >
       {(api) => (
         <>
           <p className="vl-work-links">

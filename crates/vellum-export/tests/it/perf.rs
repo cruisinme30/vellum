@@ -18,9 +18,11 @@ use vellum_jobs::export::CollectionsEngine;
 const RUNS: usize = 7;
 
 fn thirty_pages() -> String {
-    let guide = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/guide/page");
-    let mut out =
-        String::from("---\ntitle: Northstar operations handbook\n---\n\n::: toc\n:::\n\n");
+    let guide = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../corpus/guide/page");
+    let mut out = String::from(
+        "---\ntitle: Northstar operations handbook\n---\n\n::: toc\n:::\n\n",
+    );
     let mut names: Vec<_> = std::fs::read_dir(&guide)
         .unwrap()
         .filter_map(Result::ok)

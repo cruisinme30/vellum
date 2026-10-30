@@ -32,8 +32,16 @@ function ActivityLine({ event }: { readonly event: ActivityView }) {
   );
 }
 
-/** A feed of changes, newest first: to one item, or to a whole space by its ID. */
-export function ActivityFeed({ api, id }: { readonly api: DriveApi; readonly id: string }) {
+/**
+ * A feed of changes, newest first: to one item, or to a whole space by its ID.
+ */
+export function ActivityFeed({
+  api,
+  id,
+}: {
+  readonly api: DriveApi;
+  readonly id: string;
+}) {
   const t = useT();
   const loaded = useLoaded(() => api.activity(id), [api, id], failureText);
   return (
@@ -44,7 +52,10 @@ export function ActivityFeed({ api, id }: { readonly api: DriveApi; readonly id:
         ) : (
           <ul className="vl-drive-activity">
             {events.map((event, index) => (
-              <ActivityLine key={`${event.at}-${String(index)}`} event={event} />
+              <ActivityLine
+                key={`${event.at}-${String(index)}`}
+                event={event}
+              />
             ))}
           </ul>
         )
@@ -53,7 +64,13 @@ export function ActivityFeed({ api, id }: { readonly api: DriveApi; readonly id:
   );
 }
 
-function Backlinks({ api, id }: { readonly api: DriveApi; readonly id: string }) {
+function Backlinks({
+  api,
+  id,
+}: {
+  readonly api: DriveApi;
+  readonly id: string;
+}) {
   const t = useT();
   const loaded = useLoaded(() => api.backlinks(id), [api, id], failureText);
   return (
@@ -75,7 +92,10 @@ function Backlinks({ api, id }: { readonly api: DriveApi; readonly id: string })
   );
 }
 
-/** An item's facts, its activity and, for a page, the pages linking to it (R-DR-7). */
+/**
+ * An item's facts, its activity and, for a page, the pages linking to it
+ * (R-DR-7).
+ */
 export function DetailsPanel({
   api,
   item,

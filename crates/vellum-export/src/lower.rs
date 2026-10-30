@@ -21,22 +21,26 @@ use std::fmt::Write as _;
 
 use futures::future::join_all;
 use vellum_format::{
-    Alignment, Block, Container, ContainerKind, Document, Fence, FenceKind, Inline, ListItem,
+    Alignment, Block, Container, ContainerKind, Document, Fence, FenceKind,
+    Inline, ListItem,
 };
 
 use vellum_format::blocks::{
-    Architecture, Board, Calculator, Cards, Chart, DataTable, Facts, Image as ImageFence, Progress,
-    Read, RiskMatrix, Roadmap, Stats, Steps, Tabs, Timeline, Trend,
+    Architecture, Board, Calculator, Cards, Chart, DataTable, Facts,
+    Image as ImageFence, Progress, Read, RiskMatrix, Roadmap, Stats, Steps,
+    Tabs, Timeline, Trend,
 };
 
 use crate::calc::display_number;
 use crate::error::ExportWarning;
 use crate::flow::{
-    Align, Asset, Bar, Card, Cell, Flow, Item, Layout, Media, Node, Span, Stat, Style, Table,
-    TableStyle, Tone,
+    Align, Asset, Bar, Card, Cell, Flow, Item, Layout, Media, Node, Span, Stat,
+    Style, Table, TableStyle, Tone,
 };
 use crate::math;
-use crate::ports::{CalcValue, FigureError, FigureSvg, IssueChip, PageRef, Ports, Snapshot};
+use crate::ports::{
+    CalcValue, FigureError, FigureSvg, IssueChip, PageRef, Ports, Snapshot,
+};
 
 /// Most images and figures one export may carry. The print backend gives
 /// each a file slot, so the limit also bounds the typesetter's file table.
@@ -107,14 +111,21 @@ pub struct Lowered {
 }
 
 /// Lowers one document for `opts.target`.
-pub async fn lower(doc: &Document, ports: &Ports, opts: &LowerOptions) -> Lowered {
+pub async fn lower(
+    doc: &Document,
+    ports: &Ports,
+    opts: &LowerOptions,
+) -> Lowered {
     let mut session = Session::new(ports);
     let title = doc_title(doc);
     let blocks = session.lower(doc, opts).await;
-    let mut lowered = session.finish(title, Layout::Document, &opts.as_of, blocks);
+    let mut lowered =
+        session.finish(title, Layout::Document, &opts.as_of, blocks);
     lowered.flow.show_title = !matches!(
         doc.blocks.first(),
-        Some(Block::Heading { level: 1, content, .. }) if inline_text(content) == lowered.flow.title
+        Some(
+            Block::Heading { level: 1, content, .. }
+        ) if inline_text(content) == lowered.flow.title
     );
     lowered
 }
@@ -149,9 +160,13 @@ pub fn inline_text(inlines: &[Inline]) -> String {
             | Inline::Highlight { content }
             | Inline::Subscript { content }
             | Inline::Superscript { content }
-            | Inline::Link { content, .. } => out.push_str(&inline_text(content)),
+            | Inline::Link { content, .. } => {
+                out.push_str(&inline_text(content))
+            }
             Inline::Image { alt, .. } => out.push_str(&inline_text(alt)),
-            Inline::WikiLink { target, label } => out.push_str(label.as_deref().unwrap_or(target)),
+            Inline::WikiLink { target, label } => {
+                out.push_str(label.as_deref().unwrap_or(target))
+            }
             Inline::Mention { handle } => {
                 out.push('@');
                 out.push_str(handle);
@@ -208,7 +223,11 @@ impl<'p> Session<'p> {
     }
 
     /// Lowers `doc` with `opts`, resolving everything it needs first.
-    pub async fn lower(&mut self, doc: &Document, opts: &LowerOptions) -> Vec<Node> {
+    pub async fn lower(
+        &mut self,
+        doc: &Document,
+        opts: &LowerOptions,
+    ) -> Vec<Node> {
         let mut wants = Wants::default();
         wants.blocks(&doc.blocks, opts.target);
         let answers = self.resolve(wants).await;
@@ -228,7 +247,13 @@ impl<'p> Session<'p> {
 
     /// Finishes the export.
     #[must_use]
-    pub fn finish(self, title: String, layout: Layout, as_of: &str, blocks: Vec<Node>) -> Lowered {
+    pub fn finish(
+        self,
+        title: String,
+        layout: Layout,
+        as_of: &str,
+        blocks: Vec<Node>,
+    ) -> Lowered {
         let mut flow = Flow {
             title,
             as_of: as_of.to_owned(),
@@ -246,24 +271,25 @@ impl<'p> Session<'p> {
 
     async fn resolve(&mut self, wants: Wants) -> Answers {
         let ports = self.ports;
-        let figures = join_all(wants.figures.into_iter().map(|fence| async move {
-            let key = fence_key(&fence);
-            let live =
-                fence.kind() == FenceKind::Chart && Chart::parse(&fence).data.source.is_some();
-            let result = if live {
-                match ports.live.chart(&fence).await {
-                    Ok(resolved) => ports
-                        .figures
-                        .render(&resolved)
-                        .await
-                        .map(|svg| (svg, Some(resolved))),
-                    Err(error) => Err(FigureError::Unavailable(error.0)),
-                }
-            } else {
-                ports.figures.render(&fence).await.map(|svg| (svg, None))
-            };
-            (key, result)
-        }));
+        let figures =
+            join_all(wants.figures.into_iter().map(|fence| async move {
+                let key = fence_key(&fence);
+                let live = fence.kind() == FenceKind::Chart
+                    && Chart::parse(&fence).data.source.is_some();
+                let result = if live {
+                    match ports.live.chart(&fence).await {
+                        Ok(resolved) => ports
+                            .figures
+                            .render(&resolved)
+                            .await
+                            .map(|svg| (svg, Some(resolved))),
+                        Err(error) => Err(FigureError::Unavailable(error.0)),
+                    }
+                } else {
+                    ports.figures.render(&fence).await.map(|svg| (svg, None))
+                };
+                (key, result)
+            }));
         let collections =
             join_all(wants.collections.into_iter().map(|fence| async move {
                 (fence_key(&fence), ports.live.collection(&fence).await)
@@ -278,24 +304,17 @@ impl<'p> Session<'p> {
                     (url, result)
                 }),
         );
-        let issues = join_all(
-            wants
-                .issues
-                .into_iter()
-                .map(|key| async move { (key.clone(), ports.live.issue(&key).await) }),
-        );
-        let pages = join_all(
-            wants
-                .pages
-                .into_iter()
-                .map(|t| async move { (t.clone(), ports.live.page(&t).await) }),
-        );
-        let people = join_all(
-            wants
-                .people
-                .into_iter()
-                .map(|h| async move { (h.clone(), ports.live.person(&h).await) }),
-        );
+        let issues = join_all(wants.issues.into_iter().map(|key| async move {
+            (key.clone(), ports.live.issue(&key).await)
+        }));
+        let pages =
+            join_all(wants.pages.into_iter().map(|t| async move {
+                (t.clone(), ports.live.page(&t).await)
+            }));
+        let people =
+            join_all(wants.people.into_iter().map(|h| async move {
+                (h.clone(), ports.live.person(&h).await)
+            }));
         let (figures, collections, images, issues, pages, people) =
             futures::join!(figures, collections, images, issues, pages, people);
 
@@ -319,8 +338,10 @@ impl<'p> Session<'p> {
             let name = match result {
                 Ok(bytes) => self.add_asset(&url, bytes),
                 Err(error) => {
-                    self.warnings
-                        .push(ExportWarning::new(url.clone(), error.to_string()));
+                    self.warnings.push(ExportWarning::new(
+                        url.clone(),
+                        error.to_string(),
+                    ));
                     None
                 }
             };
@@ -328,9 +349,9 @@ impl<'p> Session<'p> {
         }
         for (key, result) in figures {
             let value = result.and_then(|(svg, resolved)| {
-                let asset = self
-                    .add_figure(&svg)
-                    .ok_or_else(|| FigureError::Unavailable("too many figures".into()))?;
+                let asset = self.add_figure(&svg).ok_or_else(|| {
+                    FigureError::Unavailable("too many figures".into())
+                })?;
                 Ok(FigureAnswer {
                     asset,
                     svg,
@@ -360,7 +381,10 @@ impl<'p> Session<'p> {
         if self.assets.len() >= MAX_ASSETS {
             self.warnings.push(ExportWarning::new(
                 url,
-                format!("the export already holds {MAX_ASSETS} images; this one was left out"),
+                format!(
+                    "the export already holds {MAX_ASSETS} images; this \
+                    one was left out"
+                ),
             ));
             return None;
         }
@@ -394,7 +418,8 @@ impl<'p> Session<'p> {
 
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)] // clamped first
 fn px(value: f64) -> Option<u32> {
-    (value.is_finite() && value > 0.0).then(|| value.min(100_000.0).round() as u32)
+    (value.is_finite() && value > 0.0)
+        .then(|| value.min(100_000.0).round() as u32)
 }
 
 /// Width and height of a raster image from its header.
@@ -422,7 +447,9 @@ fn image_size(media: Media, bytes: &[u8]) -> (Option<u32>, Option<u32>) {
 
 fn jpeg_size(bytes: &[u8]) -> (Option<u32>, Option<u32>) {
     let mut at = 2;
-    while let (Some(&marker_lead), Some(&marker)) = (bytes.get(at), bytes.get(at + 1)) {
+    while let (Some(&marker_lead), Some(&marker)) =
+        (bytes.get(at), bytes.get(at + 1))
+    {
         if marker_lead != 0xFF {
             break;
         }
@@ -432,7 +459,10 @@ fn jpeg_size(bytes: &[u8]) -> (Option<u32>, Option<u32>) {
                 b.get(1).copied().unwrap_or(0),
             ]))
         });
-        if matches!(marker, 0xC0..=0xC3 | 0xC5..=0xC7 | 0xC9..=0xCB | 0xCD..=0xCF) {
+        if matches!(
+            marker,
+            0xC0..=0xC3 | 0xC5..=0xC7 | 0xC9..=0xCB | 0xCD..=0xCF
+        ) {
             let h = bytes.get(at + 5..at + 7).map(|b| {
                 u32::from(u16::from_be_bytes([
                     b.first().copied().unwrap_or(0),
@@ -485,7 +515,8 @@ impl Wants {
 
     fn block(&mut self, block: &Block, target: Target) {
         match block {
-            Block::Paragraph { content, .. } | Block::Heading { content, .. } => {
+            Block::Paragraph { content, .. }
+            | Block::Heading { content, .. } => {
                 self.inlines(content);
             }
             Block::BlockQuote { blocks, .. } => self.blocks(blocks, target),
@@ -495,7 +526,9 @@ impl Wants {
                 }
             }
             Block::Table(table) => {
-                for cell in table.header.iter().chain(table.rows.iter().flatten()) {
+                for cell in
+                    table.header.iter().chain(table.rows.iter().flatten())
+                {
                     self.inlines(cell);
                 }
             }
@@ -511,10 +544,13 @@ impl Wants {
 
     fn fence(&mut self, fence: &Fence, target: Target) {
         let wants_figure = match fence.kind() {
-            FenceKind::Chart | FenceKind::Diagram | FenceKind::Architecture => true,
-            FenceKind::Timeline | FenceKind::Roadmap | FenceKind::RiskMatrix | FenceKind::Board => {
-                target == Target::Print
+            FenceKind::Chart | FenceKind::Diagram | FenceKind::Architecture => {
+                true
             }
+            FenceKind::Timeline
+            | FenceKind::Roadmap
+            | FenceKind::RiskMatrix
+            | FenceKind::Board => target == Target::Print,
             FenceKind::Collection => {
                 if self.once(format!("c{}", fence_key(fence))) {
                     self.collections.push(fence.clone());
@@ -602,7 +638,11 @@ struct Ctx<'a, 'p> {
 }
 
 impl Ctx<'_, '_> {
-    fn warn(&mut self, location: impl Into<String>, message: impl Into<String>) {
+    fn warn(
+        &mut self,
+        location: impl Into<String>,
+        message: impl Into<String>,
+    ) {
         self.session
             .warnings
             .push(ExportWarning::new(location, message));
@@ -633,11 +673,13 @@ impl Ctx<'_, '_> {
     fn block(&mut self, block: &Block, out: &mut Vec<Node>) {
         match block {
             Block::Paragraph { content, id } => {
-                if let [Inline::Image { url, title, alt }] = content.as_slice() {
+                if let [Inline::Image { url, title, alt }] = content.as_slice()
+                {
                     out.push(self.image_block(url, &inline_text(alt), title));
                     return;
                 }
-                let anchor = id.and_then(|id| self.block_anchor(&id.to_string()));
+                let anchor =
+                    id.and_then(|id| self.block_anchor(&id.to_string()));
                 out.push(Node::Paragraph {
                     spans: self.spans(content),
                     anchor,
@@ -653,10 +695,14 @@ impl Ctx<'_, '_> {
                 let anchor = id
                     .and_then(|id| self.block_anchor(&id.to_string()))
                     .unwrap_or_else(|| {
-                        self.unique_anchor(&attrs.id.clone().unwrap_or_else(|| slug(&text)))
+                        self.unique_anchor(
+                            &attrs.id.clone().unwrap_or_else(|| slug(&text)),
+                        )
                     });
                 out.push(Node::Heading {
-                    level: level.saturating_add(self.opts.heading_offset).clamp(1, 6),
+                    level: level
+                        .saturating_add(self.opts.heading_offset)
+                        .clamp(1, 6),
                     number: None,
                     spans: self.spans(content),
                     anchor: Some(anchor),
@@ -713,7 +759,10 @@ impl Ctx<'_, '_> {
                 typst: Some(typst),
             },
             Err(error) => {
-                self.warn("math", format!("{error}; the formula is shown as TeX"));
+                self.warn(
+                    "math",
+                    format!("{error}; the formula is shown as TeX"),
+                );
                 Node::Math {
                     tex: tex.trim().to_owned(),
                     typst: None,
@@ -723,10 +772,14 @@ impl Ctx<'_, '_> {
     }
 
     fn image_block(&self, url: &str, alt: &str, caption: &str) -> Node {
-        let Some(asset) = self.session.by_url.get(url).cloned().flatten() else {
+        let Some(asset) = self.session.by_url.get(url).cloned().flatten()
+        else {
             return Node::Paragraph {
                 spans: vec![Span::Text {
-                    text: format!("[Image: {}]", if alt.is_empty() { url } else { alt }),
+                    text: format!(
+                        "[Image: {}]",
+                        if alt.is_empty() { url } else { alt }
+                    ),
                     style: Style {
                         italic: true,
                         ..Style::default()
@@ -763,7 +816,10 @@ impl Ctx<'_, '_> {
                     } else {
                         out.push(Node::Code {
                             lang: fence.lang.clone(),
-                            text: fence.literal.trim_end_matches('\n').to_owned(),
+                            text: fence
+                                .literal
+                                .trim_end_matches('\n')
+                                .to_owned(),
                         });
                     }
                 }
@@ -831,7 +887,10 @@ impl Ctx<'_, '_> {
             }
             Some(Err(FigureError::Unsupported)) | None => false,
             Some(Err(error)) => {
-                let message = format!("{error}; shown as {}", fallback_name(fence.kind()));
+                let message = format!(
+                    "{error}; shown as {}",
+                    fallback_name(fence.kind())
+                );
                 self.warn(fence.lang.clone(), message);
                 false
             }
@@ -866,10 +925,9 @@ impl Ctx<'_, '_> {
                 let mut row = vec![Cell::text(label.clone())];
                 row.extend(chart.series.iter().map(|series| {
                     Cell::text(
-                        series
-                            .values
-                            .get(i)
-                            .map_or_else(String::new, |v| format!("{}{unit}", display_number(*v))),
+                        series.values.get(i).map_or_else(String::new, |v| {
+                            format!("{}{unit}", display_number(*v))
+                        }),
                     )
                 }));
                 row
@@ -890,7 +948,9 @@ impl Ctx<'_, '_> {
         let mut items: Vec<Item> = arch
             .lanes
             .iter()
-            .map(|lane| text_item(&format!("{}: {}", lane.name, lane.items.join(", "))))
+            .map(|lane| {
+                text_item(&format!("{}: {}", lane.name, lane.items.join(", ")))
+            })
             .collect();
         items.extend(arch.arrows.iter().map(|arrow| {
             let label = arrow
@@ -956,7 +1016,10 @@ impl Ctx<'_, '_> {
                 Item {
                     check: None,
                     blocks: vec![Node::Paragraph {
-                        spans: vec![Span::bold(bar.name), Span::plain(format!(": {when}"))],
+                        spans: vec![
+                            Span::bold(bar.name),
+                            Span::plain(format!(": {when}")),
+                        ],
                         anchor: None,
                     }],
                 }
@@ -967,7 +1030,9 @@ impl Ctx<'_, '_> {
 
     fn risk_list(&mut self, fence: &Fence, out: &mut Vec<Node>) {
         let mut risks = self.read(&fence.lang, RiskMatrix::parse(fence)).risks;
-        risks.sort_by_key(|r| std::cmp::Reverse(u16::from(r.likelihood) * u16::from(r.impact)));
+        risks.sort_by_key(|r| {
+            std::cmp::Reverse(u16::from(r.likelihood) * u16::from(r.impact))
+        });
         let items = risks
             .into_iter()
             .map(|risk| Item {
@@ -1058,10 +1123,13 @@ impl Ctx<'_, '_> {
         let sums: Vec<usize> = table
             .sum
             .iter()
-            .filter_map(|sum| table.header.iter().position(|h| h.trim() == sum.trim()))
+            .filter_map(|sum| {
+                table.header.iter().position(|h| h.trim() == sum.trim())
+            })
             .collect();
         if !sums.is_empty() {
-            let mut row: Vec<Cell> = table.header.iter().map(|_| Cell::text("")).collect();
+            let mut row: Vec<Cell> =
+                table.header.iter().map(|_| Cell::text("")).collect();
             if let Some(first) = row.first_mut() {
                 *first = Cell {
                     spans: vec![Span::bold("Total")],
@@ -1072,7 +1140,13 @@ impl Ctx<'_, '_> {
                 let total: f64 = table
                     .rows
                     .iter()
-                    .filter_map(|row| row.get(index)?.replace(',', "").trim().parse::<f64>().ok())
+                    .filter_map(|row| {
+                        row.get(index)?
+                            .replace(',', "")
+                            .trim()
+                            .parse::<f64>()
+                            .ok()
+                    })
                     .sum();
                 if let Some(cell) = row.get_mut(index) {
                     *cell = Cell {
@@ -1111,7 +1185,9 @@ impl Ctx<'_, '_> {
                 ]
             })
             .collect();
-        for (output, CalcValue { unit, value }) in calc.outputs.into_iter().zip(values) {
+        for (output, CalcValue { unit, value }) in
+            calc.outputs.into_iter().zip(values)
+        {
             let unit = unit.unwrap_or_default();
             let value = match &value {
                 Ok(value) if unit == "$" || unit == "€" || unit == "£" => {
@@ -1154,14 +1230,26 @@ impl Ctx<'_, '_> {
                 out.push(caption_paragraph(&title));
                 out.push(Node::Table(Table {
                     style: TableStyle::Data,
-                    align: snapshot.columns.iter().map(|_| Align::Left).collect(),
-                    header: snapshot.columns.iter().cloned().map(Cell::text).collect(),
+                    align: snapshot
+                        .columns
+                        .iter()
+                        .map(|_| Align::Left)
+                        .collect(),
+                    header: snapshot
+                        .columns
+                        .iter()
+                        .cloned()
+                        .map(Cell::text)
+                        .collect(),
                     rows: snapshot
                         .rows
                         .iter()
                         .map(|row| {
-                            let mut cells: Vec<Cell> = row.iter().map(|v| status_cell(v)).collect();
-                            cells.resize_with(snapshot.columns.len(), || Cell::text(""));
+                            let mut cells: Vec<Cell> =
+                                row.iter().map(|v| status_cell(v)).collect();
+                            cells.resize_with(snapshot.columns.len(), || {
+                                Cell::text("")
+                            });
                             cells
                         })
                         .collect(),
@@ -1257,7 +1345,8 @@ impl Ctx<'_, '_> {
                 out.push(Node::Columns { columns });
             }
             ContainerKind::Tabs => {
-                let tabs = self.read(&container.name, Tabs::parse(container)).tabs;
+                let tabs =
+                    self.read(&container.name, Tabs::parse(container)).tabs;
                 for tab in tabs {
                     let title = self.spans(&tab.title);
                     let blocks = self.blocks(&tab.blocks);
@@ -1296,7 +1385,8 @@ impl Ctx<'_, '_> {
                 out.push(Node::Stats { tiles });
             }
             ContainerKind::Facts => {
-                let facts = self.read(&container.name, Facts::parse(container)).items;
+                let facts =
+                    self.read(&container.name, Facts::parse(container)).items;
                 let rows = facts
                     .iter()
                     .map(|fact| {
@@ -1345,7 +1435,8 @@ impl Ctx<'_, '_> {
                 out.push(Node::Progress { bars });
             }
             ContainerKind::Steps => {
-                let steps = self.read(&container.name, Steps::parse(container)).steps;
+                let steps =
+                    self.read(&container.name, Steps::parse(container)).steps;
                 let items = steps
                     .iter()
                     .map(|step| {
@@ -1382,7 +1473,12 @@ impl Ctx<'_, '_> {
                     .filter_map(|b| match b {
                         Block::Paragraph { content, .. } => Some(
                             content
-                                .split(|i| matches!(i, Inline::SoftBreak | Inline::HardBreak))
+                                .split(|i| {
+                                    matches!(
+                                        i,
+                                        Inline::SoftBreak | Inline::HardBreak
+                                    )
+                                })
                                 .map(inline_text)
                                 .collect::<Vec<_>>()
                                 .join("\n"),
@@ -1390,7 +1486,8 @@ impl Ctx<'_, '_> {
                         _ => None,
                     })
                     .collect::<Vec<_>>();
-                let mut lines = text.iter().flat_map(|t| t.lines()).map(str::trim);
+                let mut lines =
+                    text.iter().flat_map(|t| t.lines()).map(str::trim);
                 let title = lines.next().unwrap_or(&container.arg).to_owned();
                 let rest = lines.collect::<Vec<_>>().join(" ");
                 out.push(Node::LinkCard {
@@ -1426,7 +1523,12 @@ impl Ctx<'_, '_> {
         out
     }
 
-    fn inlines(&mut self, inlines: &[Inline], style: Style, out: &mut Vec<Span>) {
+    fn inlines(
+        &mut self,
+        inlines: &[Inline],
+        style: Style,
+        out: &mut Vec<Span>,
+    ) {
         for inline in inlines {
             self.inline(inline, style, out);
         }
@@ -1489,14 +1591,15 @@ impl Ctx<'_, '_> {
                 self.inlines(content, style, &mut spans);
                 self.link(url, spans, out);
             }
-            Inline::Image { url, alt, .. } => match self.session.by_url.get(url).cloned().flatten()
-            {
-                Some(asset) => out.push(Span::Image {
-                    asset,
-                    alt: inline_text(alt),
-                }),
-                None => push_text(out, &inline_text(alt), style),
-            },
+            Inline::Image { url, alt, .. } => {
+                match self.session.by_url.get(url).cloned().flatten() {
+                    Some(asset) => out.push(Span::Image {
+                        asset,
+                        alt: inline_text(alt),
+                    }),
+                    None => push_text(out, &inline_text(alt), style),
+                }
+            }
             Inline::WikiLink { target, label } => {
                 let page = self.answers.pages.get(target).cloned();
                 let text = label
@@ -1577,7 +1680,8 @@ impl Ctx<'_, '_> {
             }
             match &self.opts.base_url {
                 Some(base) => {
-                    let mut href = format!("{}/d/{doc}", base.trim_end_matches('/'));
+                    let mut href =
+                        format!("{}/d/{doc}", base.trim_end_matches('/'));
                     if !fragment.is_empty() {
                         let _ = write!(href, "#{fragment}");
                     }
@@ -1611,7 +1715,9 @@ impl Ctx<'_, '_> {
 /// and other schemes become plain text.
 fn is_safe_url(url: &str) -> bool {
     let lower = url.trim().to_ascii_lowercase();
-    lower.starts_with("https://") || lower.starts_with("http://") || lower.starts_with("mailto:")
+    lower.starts_with("https://")
+        || lower.starts_with("http://")
+        || lower.starts_with("mailto:")
 }
 
 fn push_text(out: &mut Vec<Span>, text: &str, style: Style) {
@@ -1685,15 +1791,17 @@ fn status_cell(text: &str) -> Cell {
 /// The chip shade for a cell that holds only a status word.
 fn status_tone(text: &str) -> Option<Tone> {
     match text.trim().to_lowercase().as_str() {
-        "done" | "complete" | "completed" | "verified" | "shipped" | "on track" | "approved"
-        | "yes" | "pass" | "passed" => Some(Tone::Good),
-        "in review" | "in progress" | "started" | "at risk" | "review" | "pending" | "doing" => {
-            Some(Tone::Warn)
+        "done" | "complete" | "completed" | "verified" | "shipped"
+        | "on track" | "approved" | "yes" | "pass" | "passed" => {
+            Some(Tone::Good)
         }
-        "blocked" | "off track" | "failed" | "fail" | "canceled" | "cancelled" | "outdated" => {
-            Some(Tone::Crit)
+        "in review" | "in progress" | "started" | "at risk" | "review"
+        | "pending" | "doing" => Some(Tone::Warn),
+        "blocked" | "off track" | "failed" | "fail" | "canceled"
+        | "cancelled" | "outdated" => Some(Tone::Crit),
+        "todo" | "to do" | "backlog" | "draft" | "planned" | "not started" => {
+            Some(Tone::Note)
         }
-        "todo" | "to do" | "backlog" | "draft" | "planned" | "not started" => Some(Tone::Note),
         _ => None,
     }
 }
@@ -1755,8 +1863,8 @@ mod tests {
         let gif = b"GIF89a\x40\x01\xf0\x00".to_vec();
         assert_eq!(image_size(Media::Gif, &gif), (Some(320), Some(240)));
         let jpeg = [
-            0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x04, 0x00, 0x00, 0xFF, 0xC0, 0x00, 0x11, 0x08, 0x00,
-            0x20, 0x00, 0x40,
+            0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x04, 0x00, 0x00, 0xFF, 0xC0, 0x00,
+            0x11, 0x08, 0x00, 0x20, 0x00, 0x40,
         ];
         assert_eq!(image_size(Media::Jpeg, &jpeg), (Some(64), Some(32)));
     }

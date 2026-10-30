@@ -38,12 +38,15 @@ const FRESH_AUTH: Duration = crate::service::FRESH_AUTH;
 
 /// Builds the HTTP client a provider's sign-ins call out through (the
 /// SSRF guard, trusting the issuer's host).
-pub type SsoHttpFactory = Arc<dyn Fn(&Url) -> Result<Arc<dyn SsoHttp>, Error> + Send + Sync>;
+pub type SsoHttpFactory =
+    Arc<dyn Fn(&Url) -> Result<Arc<dyn SsoHttp>, Error> + Send + Sync>;
 
 /// Relying parties built from provider records, by ID, with the settings
 /// they were built from.
 #[derive(Default)]
-pub(crate) struct SsoCache(std::sync::Mutex<HashMap<String, (Provider, Arc<Sso>)>>);
+pub(crate) struct SsoCache(
+    std::sync::Mutex<HashMap<String, (Provider, Arc<Sso>)>>,
+);
 
 impl std::fmt::Debug for SsoCache {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -133,7 +136,17 @@ pub struct ProviderInput {
 }
 
 /// How Vellum talks to a provider.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    JsonSchema,
+)]
 #[serde(rename_all = "lowercase")]
 pub enum ProviderKind {
     /// `OpenID Connect`.
@@ -260,16 +273,21 @@ fn is_loopback(url: &Url) -> bool {
 ///
 /// [`ErrorKind::InvalidInput`] for anything else.
 pub fn check_issuer(text: &str) -> Result<Url, Error> {
-    let url =
-        Url::parse(text.trim()).map_err(|e| invalid(format!("the issuer is not a URL: {e}")))?;
+    let url = Url::parse(text.trim())
+        .map_err(|e| invalid(format!("the issuer is not a URL: {e}")))?;
     let local_http = url.scheme() == "http" && is_loopback(&url);
     if url.scheme() != "https" && !local_http {
         return Err(invalid(
             "the issuer must use https (http only on this machine)",
         ));
     }
-    if !url.username().is_empty() || url.password().is_some() || url.fragment().is_some() {
-        return Err(invalid("the issuer cannot hold credentials or a fragment"));
+    if !url.username().is_empty()
+        || url.password().is_some()
+        || url.fragment().is_some()
+    {
+        return Err(invalid(
+            "the issuer cannot hold credentials or a fragment",
+        ));
     }
     Ok(url)
 }
@@ -279,13 +297,17 @@ fn kind_changed() -> Error {
 }
 
 /// Checks SAML settings; an empty certificate keeps `old_certificates`.
-fn checked_saml(input: &ProviderInput, old_certificates: Vec<String>) -> Result<Protocol, Error> {
+fn checked_saml(
+    input: &ProviderInput,
+    old_certificates: Vec<String>,
+) -> Result<Protocol, Error> {
     let entity_id = input.entity_id.trim();
     if entity_id.is_empty() || entity_id.len() > 1024 {
         return Err(invalid("enter the provider's entity ID"));
     }
-    let sso_url = check_issuer(&input.sso_url)
-        .map_err(|_| invalid("the sign-in URL must use https (http only on this machine)"))?;
+    let sso_url = check_issuer(&input.sso_url).map_err(|_| {
+        invalid("the sign-in URL must use https (http only on this machine)")
+    })?;
     let certificates = if input.certificate.trim().is_empty() {
         old_certificates
     } else {
@@ -342,7 +364,10 @@ fn domains(list: &[String]) -> Result<Vec<String>, Error> {
 
 fn check_provider_name(name: &str) -> Result<String, Error> {
     let name = name.trim();
-    if name.is_empty() || name.chars().count() > 60 || name.chars().any(char::is_control) {
+    if name.is_empty()
+        || name.chars().count() > 60
+        || name.chars().any(char::is_control)
+    {
         return Err(invalid("name the provider in 1 to 60 characters"));
     }
     Ok(name.to_owned())
@@ -502,8 +527,16 @@ impl Identity {
     /// [`ErrorKind::NotFound`] for an unknown or disabled provider, and
     /// [`ErrorKind::Unavailable`] when no HTTP client is set up or the
     /// client secret cannot be opened.
-    pub fn sso_provider(&self, id: Option<&str>) -> Result<(String, Arc<Sso>), Error> {
-        let missing = || Error::new(ErrorKind::NotFound, "this sign-in provider is not set up");
+    pub fn sso_provider(
+        &self,
+        id: Option<&str>,
+    ) -> Result<(String, Arc<Sso>), Error> {
+        let missing = || {
+            Error::new(
+                ErrorKind::NotFound,
+                "this sign-in provider is not set up",
+            )
+        };
         let id = match id.filter(|i| !i.is_empty()) {
             Some(id) => id.to_owned(),
             None => self
@@ -514,7 +547,11 @@ impl Identity {
                 .ok_or_else(missing)?,
         };
         if id == ENV_PROVIDER {
-            return self.sso().cloned().map(|sso| (id, sso)).ok_or_else(missing);
+            return self
+                .sso()
+                .cloned()
+                .map(|sso| (id, sso))
+                .ok_or_else(missing);
         }
         let record = self
             .store()
@@ -523,7 +560,9 @@ impl Identity {
                     .providers
                     .iter()
                     .find(|p| {
-                        p.id == id && p.enabled && matches!(p.protocol, Protocol::Oidc { .. })
+                        p.id == id
+                            && p.enabled
+                            && matches!(p.protocol, Protocol::Oidc { .. })
                     })
                     .cloned()
             })
@@ -559,9 +598,14 @@ impl Identity {
         let client_secret = client_secret
             .as_deref()
             .map(|sealed| {
-                let bytes = self.sealer()?.open(&secret_purpose(&record.id), sealed)?;
-                String::from_utf8(bytes)
-                    .map_err(|_| Error::new(ErrorKind::Internal, "a client secret is not text"))
+                let bytes =
+                    self.sealer()?.open(&secret_purpose(&record.id), sealed)?;
+                String::from_utf8(bytes).map_err(|_| {
+                    Error::new(
+                        ErrorKind::Internal,
+                        "a client secret is not text",
+                    )
+                })
             })
             .transpose()?;
         let factory = self.sso_http_factory().ok_or_else(|| {
@@ -627,7 +671,10 @@ impl Identity {
     ///
     /// [`ErrorKind::Conflict`] when single sign-on would be required with
     /// no provider to sign in with.
-    pub fn update_sign_in(&self, change: &UpdateSignIn) -> Result<SignInView, Error> {
+    pub fn update_sign_in(
+        &self,
+        change: &UpdateSignIn,
+    ) -> Result<SignInView, Error> {
         let has_env = self.sso().is_some();
         self.store().write(|s| {
             if change.require_sso == Some(true)
@@ -636,7 +683,8 @@ impl Identity {
             {
                 return Err(Error::new(
                     ErrorKind::Conflict,
-                    "add and turn on a sign-in provider before requiring single sign-on",
+                    "add and turn on a sign-in provider before requiring \
+                        single sign-on",
                 ));
             }
             if let Some(policy) = change.second_factor {
@@ -664,7 +712,9 @@ impl Identity {
             ProviderKind::Oidc => {
                 let old_secret = match old {
                     None => None,
-                    Some(Protocol::Oidc { client_secret, .. }) => client_secret.clone(),
+                    Some(Protocol::Oidc { client_secret, .. }) => {
+                        client_secret.clone()
+                    }
                     Some(Protocol::Saml { .. }) => return Err(kind_changed()),
                 };
                 self.checked_oidc(id, input, old_secret)
@@ -672,7 +722,9 @@ impl Identity {
             ProviderKind::Saml => {
                 let old_certificates = match old {
                     None => Vec::new(),
-                    Some(Protocol::Saml { certificates, .. }) => certificates.clone(),
+                    Some(Protocol::Saml { certificates, .. }) => {
+                        certificates.clone()
+                    }
                     Some(Protocol::Oidc { .. }) => return Err(kind_changed()),
                 };
                 checked_saml(input, old_certificates)
@@ -717,11 +769,15 @@ impl Identity {
     ///
     /// [`ErrorKind::InvalidInput`] for bad settings, and
     /// [`ErrorKind::Conflict`] at the provider limit.
-    pub fn add_provider(&self, input: &ProviderInput) -> Result<ProviderView, Error> {
+    pub fn add_provider(
+        &self,
+        input: &ProviderInput,
+    ) -> Result<ProviderView, Error> {
         let name = check_provider_name(&input.name)?;
         let allowed_domains = domains(&input.allowed_domains)?;
         let id = self.store().read(|s| {
-            let taken: Vec<&str> = s.sign_in.providers.iter().map(|p| p.id.as_str()).collect();
+            let taken: Vec<&str> =
+                s.sign_in.providers.iter().map(|p| p.id.as_str()).collect();
             slug(&name, &taken)
         });
         let protocol = self.checked_protocol(&id, input, None)?;
@@ -739,7 +795,9 @@ impl Identity {
             if s.sign_in.providers.len() >= MAX_PROVIDERS {
                 return Err(Error::new(
                     ErrorKind::Conflict,
-                    format!("a workspace keeps at most {MAX_PROVIDERS} providers"),
+                    format!(
+                        "a workspace keeps at most {MAX_PROVIDERS} providers"
+                    ),
                 ));
             }
             if s.sign_in.providers.iter().any(|p| p.id == stored.id) {
@@ -748,7 +806,11 @@ impl Identity {
             s.sign_in.providers.push(stored);
             Ok(())
         })??;
-        tracing::info!(event = "identity.provider_added", provider = %id, "sign-in provider added");
+        tracing::info!(
+            event = "identity.provider_added",
+            provider = %id,
+            "sign-in provider added"
+        );
         Ok(record_view(&record))
     }
 
@@ -759,13 +821,19 @@ impl Identity {
     /// [`ErrorKind::NotFound`] for an unknown provider (the environment's
     /// cannot be changed here), and [`ErrorKind::InvalidInput`] for bad
     /// settings.
-    pub fn update_provider(&self, id: &str, input: &ProviderInput) -> Result<ProviderView, Error> {
+    pub fn update_provider(
+        &self,
+        id: &str,
+        input: &ProviderInput,
+    ) -> Result<ProviderView, Error> {
         let name = check_provider_name(&input.name)?;
         let allowed_domains = domains(&input.allowed_domains)?;
         let old = self
             .store()
             .read(|s| s.sign_in.providers.iter().find(|p| p.id == id).cloned())
-            .ok_or_else(|| Error::new(ErrorKind::NotFound, "provider not found"))?;
+            .ok_or_else(|| {
+                Error::new(ErrorKind::NotFound, "provider not found")
+            })?;
         let protocol = self.checked_protocol(id, input, Some(&old.protocol))?;
         let updated = self.store().write(|s| {
             let p = s.sign_in.providers.iter_mut().find(|p| p.id == id)?;
@@ -776,9 +844,14 @@ impl Identity {
             p.protocol = protocol;
             Some(p.clone())
         })?;
-        let updated =
-            updated.ok_or_else(|| Error::new(ErrorKind::NotFound, "provider not found"))?;
-        tracing::info!(event = "identity.provider_changed", provider = %id, "sign-in provider changed");
+        let updated = updated.ok_or_else(|| {
+            Error::new(ErrorKind::NotFound, "provider not found")
+        })?;
+        tracing::info!(
+            event = "identity.provider_changed",
+            provider = %id,
+            "sign-in provider changed"
+        );
         Ok(record_view(&updated))
     }
 
@@ -794,13 +867,18 @@ impl Identity {
         let has_env = self.sso().is_some();
         self.store().write(|s| {
             if !s.sign_in.providers.iter().any(|p| p.id == id) {
-                return Err(Error::new(ErrorKind::NotFound, "provider not found"));
+                return Err(Error::new(
+                    ErrorKind::NotFound,
+                    "provider not found",
+                ));
             }
-            let others = has_env || s.sign_in.providers.iter().any(|p| p.id != id && p.enabled);
+            let others = has_env
+                || s.sign_in.providers.iter().any(|p| p.id != id && p.enabled);
             if s.sign_in.require_sso && !others {
                 return Err(Error::new(
                     ErrorKind::Conflict,
-                    "single sign-on is required: turn that off or add another provider first",
+                    "single sign-on is required: turn that off or add another \
+                        provider first",
                 ));
             }
             s.sign_in.providers.retain(|p| p.id != id);
@@ -812,7 +890,11 @@ impl Identity {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .remove(id);
-        tracing::info!(event = "identity.provider_removed", provider = %id, "sign-in provider removed");
+        tracing::info!(
+            event = "identity.provider_removed",
+            provider = %id,
+            "sign-in provider removed"
+        );
         Ok(())
     }
 }
@@ -951,7 +1033,9 @@ pub(crate) fn operations(identity: &Arc<Identity>) -> Vec<Operation> {
             rotate_scim,
         )
         .fresh_auth(FRESH_AUTH)
-        .summary("Make a new SCIM provisioning token; the old one stops working"),
+        .summary(
+            "Make a new SCIM provisioning token; the old one stops working",
+        ),
         Operation::mutation(
             "identity.admin_revoke_scim",
             HttpMethod::Delete,
@@ -985,7 +1069,12 @@ mod tests {
         assert!(check_issuer("https://user:pw@id.northstar.dev").is_err());
         assert!(check_issuer("javascript:alert(1)").is_err());
         assert_eq!(
-            domains(&["@Northstar.dev".into(), " ".into(), "northstar.dev".into()]).unwrap(),
+            domains(&[
+                "@Northstar.dev".into(),
+                " ".into(),
+                "northstar.dev".into()
+            ])
+            .unwrap(),
             ["northstar.dev"]
         );
         assert!(domains(&["not a domain".into()]).is_err());

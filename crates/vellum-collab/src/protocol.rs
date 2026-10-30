@@ -334,8 +334,8 @@ impl Decoder for UpdateGuard<'_> {
 
     fn read_len(&mut self) -> Result<u32, ReadError> {
         use yrs::block::{
-            BLOCK_GC_REF_NUMBER, BLOCK_ITEM_ANY_REF_NUMBER, BLOCK_ITEM_DELETED_REF_NUMBER,
-            BLOCK_ITEM_JSON_REF_NUMBER,
+            BLOCK_GC_REF_NUMBER, BLOCK_ITEM_ANY_REF_NUMBER,
+            BLOCK_ITEM_DELETED_REF_NUMBER, BLOCK_ITEM_JSON_REF_NUMBER,
         };
         let at = self.position();
         let len = self.inner.read_len()?;
@@ -344,10 +344,14 @@ impl Decoder for UpdateGuard<'_> {
             return Ok(len);
         }
         match self.info & 0b1111 {
-            BLOCK_ITEM_JSON_REF_NUMBER | BLOCK_ITEM_ANY_REF_NUMBER if !self.count_fits_at(at) => {
+            BLOCK_ITEM_JSON_REF_NUMBER | BLOCK_ITEM_ANY_REF_NUMBER
+                if !self.count_fits_at(at) =>
+            {
                 return Err(ReadError::UnexpectedValue);
             }
-            BLOCK_ITEM_DELETED_REF_NUMBER => self.spend_clock(Some(u64::from(len)))?,
+            BLOCK_ITEM_DELETED_REF_NUMBER => {
+                self.spend_clock(Some(u64::from(len)))?
+            }
             _ => {}
         }
         Ok(len)
@@ -458,7 +462,8 @@ fn counts_fit(frame: &[u8]) -> bool {
 /// when the bytes are not a message.
 fn next_fits(cursor: &mut Cursor<'_>) -> Option<bool> {
     use yrs::sync::protocol::{
-        MSG_AUTH, MSG_AWARENESS, MSG_QUERY_AWARENESS, MSG_SYNC, MSG_SYNC_STEP_1, PERMISSION_DENIED,
+        MSG_AUTH, MSG_AWARENESS, MSG_QUERY_AWARENESS, MSG_SYNC,
+        MSG_SYNC_STEP_1, PERMISSION_DENIED,
     };
     Some(match cursor.read_var::<u8>().ok()? {
         MSG_SYNC => {
@@ -533,7 +538,10 @@ fn awareness_fits(payload: &[u8]) -> bool {
 /// left for yrs to reject, so `entry` must judge each value as soon as it
 /// reads it: yrs acts on a value (and may panic) before it finds the
 /// bytes missing after it.
-fn entries_fit(payload: &[u8], entry: impl Fn(&mut Cursor<'_>) -> Option<bool>) -> bool {
+fn entries_fit(
+    payload: &[u8],
+    entry: impl Fn(&mut Cursor<'_>) -> Option<bool>,
+) -> bool {
     if !count_fits(payload) {
         return false;
     }
@@ -681,7 +689,8 @@ mod tests {
         // collab_frames oom-9071b3eb: a block of JSON content claiming
         // 536,870,911 strings in the one byte left (12.9 GB).
         refused(&[
-            0x02, 0x01, 0x01, 0x32, 0x42, 0x01, 0x01, 0xff, 0xff, 0xff, 0xff, 0x01, 0xff,
+            0x02, 0x01, 0x01, 0x32, 0x42, 0x01, 0x01, 0xff, 0xff, 0xff, 0xff,
+            0x01, 0xff,
         ]);
         // More clients than bytes.
         refused(&[0xff, 0xff, 0xff, 0x0f, 0]);
@@ -702,7 +711,8 @@ mod tests {
         // collab_frames crash-d6d83abc (debug assertions on): two clients,
         // the first with no blocks and a 56-bit ID.
         let crash = [
-            0x02, 0x00, 0xb1, 0xb1, 0xb1, 0xb1, 0xb1, 0xb1, 0xb1, 0xb1, 0x00, 0x00,
+            0x02, 0x00, 0xb1, 0xb1, 0xb1, 0xb1, 0xb1, 0xb1, 0xb1, 0xb1, 0x00,
+            0x00,
         ];
         // A block whose right origin names a 64-bit client, and a delete
         // set naming one.
@@ -725,7 +735,8 @@ mod tests {
         }
         // collab_frames crash-7b9bb8fa (overflow checks on): a delete-set
         // range from clock 4,294,967,295 onwards.
-        let wraps = [0x00, 0x01, 0x07, 0x01, 0xff, 0xff, 0xff, 0xff, 0x0f, 0x01];
+        let wraps =
+            [0x00, 0x01, 0x07, 0x01, 0xff, 0xff, 0xff, 0xff, 0x0f, 0x01];
         // collab_frames crash-6b37ee07 (overflow checks on): a client at
         // clock 9 whose GC block runs its clock past u32::MAX.
         let crash = [
@@ -737,7 +748,8 @@ mod tests {
             0x01, 0x01, 0x01, 0x09, 0x0a, 0xff, 0xff, 0xff, 0xff, 0x0f, 0x00,
         ];
         let deleted_item = [
-            0x01, 0x01, 0x01, 0xf0, 0xff, 0xff, 0xff, 0x0f, 0x01, 0x01, 0x01, b'a', 0x20, 0x00,
+            0x01, 0x01, 0x01, 0xf0, 0xff, 0xff, 0xff, 0x0f, 0x01, 0x01, 0x01,
+            b'a', 0x20, 0x00,
         ];
         for update in [&wraps[..], &crash, &skip, &deleted_item] {
             assert!(
@@ -759,8 +771,9 @@ mod tests {
         // collab_frames crash-3a13ef52: an awareness entry whose 64-bit
         // client ID is followed by a truncated state.
         let frame = [
-            0x02, 0x02, 0x01, 0x14, 0x02, 0x40, 0x2d, 0x01, 0x02, 0x9c, 0x9c, 0x9c, 0x9c, 0x9c,
-            0x9c, 0x9c, 0x9c, 0x9c, 0x9c, 0x61, 0x9c, 0x9c, 0x02, 0x02,
+            0x02, 0x02, 0x01, 0x14, 0x02, 0x40, 0x2d, 0x01, 0x02, 0x9c, 0x9c,
+            0x9c, 0x9c, 0x9c, 0x9c, 0x9c, 0x9c, 0x9c, 0x9c, 0x61, 0x9c, 0x9c,
+            0x02, 0x02,
         ];
         assert!(!counts_fit(&frame));
         let mut sv = vec![1];
@@ -815,7 +828,11 @@ mod tests {
             Any::from(1),
             Any::from(std::collections::HashMap::from([(
                 "k".to_owned(),
-                Any::from(vec![Any::Null, Any::from("v"), Any::from(vec![0_u8; 3])]),
+                Any::from(vec![
+                    Any::Null,
+                    Any::from("v"),
+                    Any::from(vec![0_u8; 3]),
+                ]),
             )])),
             Any::from(Vec::<Any>::new()),
         ]);
@@ -823,7 +840,8 @@ mod tests {
         let _ = list.insert(&mut txn, 1, 2.5);
         let bytes = txn.encode_update_v1();
         drop(txn);
-        let update = decode_update(&bytes).unwrap_or_else(|e| unreachable!("{e}"));
+        let update =
+            decode_update(&bytes).unwrap_or_else(|e| unreachable!("{e}"));
         let copy = yrs::Doc::new();
         let copied = copy.get_or_insert_text("body");
         let copied_list = copy.get_or_insert_array("list");
@@ -851,7 +869,8 @@ mod tests {
                 can_write: false,
             },
         ];
-        let decoded = decode_peers(&encode_peers(&entries)).unwrap_or_else(|e| unreachable!("{e}"));
+        let decoded = decode_peers(&encode_peers(&entries))
+            .unwrap_or_else(|e| unreachable!("{e}"));
         assert_eq!(decoded, entries);
     }
 }

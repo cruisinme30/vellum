@@ -11,7 +11,15 @@ import { useT } from "../../i18n/i18n";
 
 import type { InitiativeOut, PlanningApi, ProjectOut } from "./api";
 import { ProjectRow } from "./projects-page";
-import { Failure, Field, HealthChip, Progress, day, text, useSubmit } from "./shared";
+import {
+  Failure,
+  Field,
+  HealthChip,
+  Progress,
+  day,
+  text,
+  useSubmit,
+} from "./shared";
 
 function NewInitiative({
   api,
@@ -30,7 +38,9 @@ function NewInitiative({
       title,
       owner: text(form, "owner"),
       target_date: text(form, "target"),
-      projects: form.getAll("projects").filter((p): p is string => typeof p === "string"),
+      projects: form
+        .getAll("projects")
+        .filter((p): p is string => typeof p === "string"),
     });
   }, onCreated);
   return (
@@ -101,7 +111,10 @@ function Initiatives({ api }: { readonly api: PlanningApi }) {
   const [version, setVersion] = useState(0);
   const loaded = useLoaded(
     async () => {
-      const [initiatives, projects] = await Promise.all([api.initiatives(), api.projects()]);
+      const [initiatives, projects] = await Promise.all([
+        api.initiatives(),
+        api.projects(),
+      ]);
       return { initiatives, projects };
     },
     [api, version],
@@ -140,7 +153,11 @@ function Initiatives({ api }: { readonly api: PlanningApi }) {
 export function InitiativesPage() {
   const t = useT();
   return (
-    <ServerScreen api="planning" title={t("plan-initiatives")} className="vl-work vl-plan">
+    <ServerScreen
+      api="planning"
+      title={t("plan-initiatives")}
+      className="vl-work vl-plan"
+    >
       {(api) => <Initiatives api={api} />}
     </ServerScreen>
   );

@@ -23,7 +23,10 @@ async fn connect(path: &Path) -> sqlx::Result<SqliteConnection> {
     SqliteConnection::connect_with(&options).await
 }
 
-async fn count(conn: &mut SqliteConnection, sql: &'static str) -> sqlx::Result<i64> {
+async fn count(
+    conn: &mut SqliteConnection,
+    sql: &'static str,
+) -> sqlx::Result<i64> {
     sqlx::query_scalar(sql).fetch_one(conn).await
 }
 
@@ -84,12 +87,13 @@ async fn rebuilds_spaces_folders_documents_and_closure_from_files() {
             ("task_list", "today.md"),
         ]
     );
-    let roadmap: (String, String, Uuid) =
-        sqlx::query_as("SELECT title, status, folder_id FROM documents WHERE doc_id = ?")
-            .bind(uuid(fx.roadmap))
-            .fetch_one(&mut conn)
-            .await
-            .unwrap();
+    let roadmap: (String, String, Uuid) = sqlx::query_as(
+        "SELECT title, status, folder_id FROM documents WHERE doc_id = ?",
+    )
+    .bind(uuid(fx.roadmap))
+    .fetch_one(&mut conn)
+    .await
+    .unwrap();
     assert_eq!(
         roadmap,
         (
@@ -99,9 +103,11 @@ async fn rebuilds_spaces_folders_documents_and_closure_from_files() {
         )
     );
 
-    // The book page sits under its book, then the space; every node has a self row.
+    // The book page sits under its book, then the space; every node has a self
+    // row.
     let chain: Vec<(Uuid, i32)> = sqlx::query_as(
-        "SELECT ancestor_id, depth FROM page_ancestors WHERE descendant_id = ? ORDER BY depth",
+        "SELECT ancestor_id, depth FROM page_ancestors WHERE descendant_id = ? \
+            ORDER BY depth",
     )
     .bind(uuid(fx.handbook_intro))
     .fetch_all(&mut conn)
@@ -136,8 +142,9 @@ async fn second_reindex_drops_deleted_files_and_keeps_grants() {
 
     let mut conn = connect(&path).await.unwrap();
     let _ = sqlx::query(
-        "INSERT INTO grants (space_id, object_type, object_id, relation, subject_type, \
-         subject_id, created_at) VALUES (?, 'doc', ?, 'viewer', 'user', ?, 0)",
+        "INSERT INTO grants (space_id, object_type, object_id, relation, \
+         subject_type, subject_id, created_at) VALUES (?, 'doc', ?, 'viewer', \
+         'user', ?, 0)",
     )
     .bind(uuid(fx.eng_space))
     .bind(uuid(fx.roadmap))
@@ -145,7 +152,10 @@ async fn second_reindex_drops_deleted_files_and_keeps_grants() {
     .execute(&mut conn)
     .await
     .unwrap();
-    std::fs::remove_file(work.path().join("drives/shared/engineering/loose/notes.md")).unwrap();
+    std::fs::remove_file(
+        work.path().join("drives/shared/engineering/loose/notes.md"),
+    )
+    .unwrap();
 
     let again = index.reindex(work.path(), PlainFiles).await.unwrap();
     assert_eq!(again.documents, 8);
@@ -169,16 +179,21 @@ async fn second_reindex_drops_deleted_files_and_keeps_grants() {
 async fn an_empty_folder_gives_an_empty_index() {
     let work = tempfile::tempdir().unwrap();
     let db = tempfile::tempdir().unwrap();
-    let index = Index::open(&IndexConfig::sqlite(db.path().join("i.sqlite"), None))
-        .await
-        .unwrap();
+    let index =
+        Index::open(&IndexConfig::sqlite(db.path().join("i.sqlite"), None))
+            .await
+            .unwrap();
     let report = index.reindex(work.path(), PlainFiles).await.unwrap();
     assert_eq!(report, ReindexReport::default());
 }
 
 /// Every file under `root`, as a bucket listing would hold it.
 fn listing_of(root: &Path) -> std::io::Result<vellum_db::Listing> {
-    fn walk(root: &Path, dir: &Path, out: &mut vellum_db::Listing) -> std::io::Result<()> {
+    fn walk(
+        root: &Path,
+        dir: &Path,
+        out: &mut vellum_db::Listing,
+    ) -> std::io::Result<()> {
         for entry in std::fs::read_dir(dir)? {
             let path = entry?.path();
             if path.is_dir() {
@@ -209,9 +224,12 @@ fn listing_of(root: &Path) -> std::io::Result<vellum_db::Listing> {
 
 async fn rows(path: &Path) -> sqlx::Result<Vec<(String, String, String, i64)>> {
     let mut conn = connect(path).await?;
-    sqlx::query_as("SELECT path, kind, content_hash, modified_at FROM documents ORDER BY path")
-        .fetch_all(&mut conn)
-        .await
+    sqlx::query_as(
+        "SELECT path, kind, content_hash, modified_at FROM \
+        documents ORDER BY path",
+    )
+    .fetch_all(&mut conn)
+    .await
 }
 
 #[tokio::test]

@@ -22,11 +22,15 @@ use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 use time::macros::datetime;
-use vellum_contracts::{CredentialKind, Operation, Principal, RequestContext, ScopeSet, Service};
+use vellum_contracts::{
+    CredentialKind, Operation, Principal, RequestContext, ScopeSet, Service,
+};
 use vellum_kernel::{RequestId, Timestamp, UserId};
 use vellum_store::LocalStore;
 use vellum_work::UserRef;
-use vellum_work_service::{EventLog, FixedClock, READ_FRESH, StaticDirectory, WorkService};
+use vellum_work_service::{
+    EventLog, FixedClock, READ_FRESH, StaticDirectory, WorkService,
+};
 
 const PEOPLE: [&str; 2] = ["mara", "dev"];
 
@@ -36,7 +40,10 @@ struct Replica {
     users: Vec<(&'static str, UserId)>,
 }
 
-async fn replica(store: Arc<LocalStore>, users: &[(&'static str, UserId)]) -> Replica {
+async fn replica(
+    store: Arc<LocalStore>,
+    users: &[(&'static str, UserId)],
+) -> Replica {
     let mut directory = StaticDirectory::new();
     for (name, id) in users {
         directory = directory.with(*id, UserRef::parse(name).unwrap());
@@ -62,7 +69,12 @@ impl Replica {
             .unwrap_or_else(|e| panic!("{op} as {who} failed: {e}"))
     }
 
-    async fn try_call(&self, who: &str, op: &str, input: Value) -> Result<Value, String> {
+    async fn try_call(
+        &self,
+        who: &str,
+        op: &str,
+        input: Value,
+    ) -> Result<Value, String> {
         let id = self.users.iter().find(|(n, _)| *n == who).unwrap().1;
         let principal = Principal::user(
             id,
@@ -100,7 +112,8 @@ impl Replica {
 
 async fn pair() -> (tempfile::TempDir, Replica, Replica) {
     let dir = tempfile::tempdir().unwrap();
-    let users: Vec<_> = PEOPLE.iter().map(|n| (*n, UserId::generate())).collect();
+    let users: Vec<_> =
+        PEOPLE.iter().map(|n| (*n, UserId::generate())).collect();
     let store = Arc::new(LocalStore::open(dir.path()).await.unwrap());
     let a = replica(Arc::clone(&store), &users).await;
     let b = replica(store, &users).await;
@@ -114,7 +127,12 @@ async fn concurrent_creates_on_two_replicas_never_share_a_number() {
         .call(
             "mara",
             "work.create_team",
-            json!({"key": "ENG", "name": "Engineering", "lead": "mara", "members": ["dev"]}),
+            json!({
+                "key": "ENG",
+                "name": "Engineering",
+                "lead": "mara",
+                "members": ["dev"]
+            }),
         )
         .await;
     let per_side = 15;
@@ -142,7 +160,8 @@ async fn concurrent_creates_on_two_replicas_never_share_a_number() {
         );
     }
     assert_eq!(created.len(), 2 * per_side);
-    let expected: BTreeSet<String> = (1..=2 * per_side).map(|n| format!("ENG-{n}")).collect();
+    let expected: BTreeSet<String> =
+        (1..=2 * per_side).map(|n| format!("ENG-{n}")).collect();
     assert_eq!(created, expected);
 
     tokio::time::sleep(READ_FRESH + Duration::from_millis(50)).await;
@@ -157,7 +176,12 @@ async fn a_write_on_one_replica_is_read_on_the_other_within_a_second() {
         .call(
             "mara",
             "work.create_team",
-            json!({"key": "ENG", "name": "Engineering", "lead": "mara", "members": ["dev"]}),
+            json!({
+                "key": "ENG",
+                "name": "Engineering",
+                "lead": "mara",
+                "members": ["dev"]
+            }),
         )
         .await;
     let _ = b
@@ -221,7 +245,12 @@ async fn a_new_team_on_one_replica_rebuilds_the_other() {
         .call(
             "mara",
             "work.create_team",
-            json!({"key": "OPS", "name": "Operations", "lead": "mara", "members": ["dev"]}),
+            json!({
+                "key": "OPS",
+                "name": "Operations",
+                "lead": "mara",
+                "members": ["dev"]
+            }),
         )
         .await;
     let out = b

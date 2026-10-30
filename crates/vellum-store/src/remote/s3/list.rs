@@ -39,9 +39,12 @@ pub struct Page {
 /// Returns a description when the body is not a `ListBucketResult` or
 /// says it is truncated without giving a continuation token.
 pub fn parse(xml: &str) -> Result<Page, String> {
-    let root = element(xml, "ListBucketResult").ok_or("not a ListBucketResult")?;
-    let url_encoded = element(root, "EncodingType").is_some_and(|e| e.trim() == "url");
-    let truncated = element(root, "IsTruncated").is_some_and(|t| t.trim() == "true");
+    let root =
+        element(xml, "ListBucketResult").ok_or("not a ListBucketResult")?;
+    let url_encoded =
+        element(root, "EncodingType").is_some_and(|e| e.trim() == "url");
+    let truncated =
+        element(root, "IsTruncated").is_some_and(|t| t.trim() == "true");
     let next = element(root, "NextContinuationToken").map(unescape);
     if truncated && next.is_none() {
         return Err("truncated listing without a continuation token".into());
@@ -81,7 +84,10 @@ fn element<'a>(xml: &'a str, tag: &'a str) -> Option<&'a str> {
 }
 
 /// The text of every `<tag>` in `xml`, in order.
-fn elements<'a>(xml: &'a str, tag: &'a str) -> impl Iterator<Item = &'a str> + 'a {
+fn elements<'a>(
+    xml: &'a str,
+    tag: &'a str,
+) -> impl Iterator<Item = &'a str> + 'a {
     let mut rest = xml;
     std::iter::from_fn(move || {
         loop {
@@ -93,8 +99,12 @@ fn elements<'a>(xml: &'a str, tag: &'a str) -> impl Iterator<Item = &'a str> + '
             };
             let close = after_name.find('>')?;
             let attrs = after_name.get(..close)?;
-            // `<tagX>` is a different element; `<tag attr="">` and `<tag/>` match.
-            if !(attrs.is_empty() || attrs.starts_with(char::is_whitespace) || attrs == "/") {
+            // `<tagX>` is a different element; `<tag attr="">` and `<tag/>`
+            // match.
+            if !(attrs.is_empty()
+                || attrs.starts_with(char::is_whitespace)
+                || attrs == "/")
+            {
                 rest = after;
                 continue;
             }
@@ -127,7 +137,10 @@ fn unescape(text: &str) -> String {
                 "quot" => '"',
                 "apos" => '\'',
                 _ => {
-                    let code = match name.strip_prefix("#x").or_else(|| name.strip_prefix("#X")) {
+                    let code = match name
+                        .strip_prefix("#x")
+                        .or_else(|| name.strip_prefix("#X"))
+                    {
                         Some(hex) => u32::from_str_radix(hex, 16).ok()?,
                         None => name.strip_prefix('#')?.parse().ok()?,
                     };
@@ -247,10 +260,10 @@ mod tests {
 
     #[test]
     fn plain_keys_are_only_xml_unescaped() -> Result<(), String> {
-        let xml = "<ListBucketResult><IsTruncated>false</IsTruncated>\
-                   <Contents><Key>a+b &amp; c&#x2F;&#47;.md</Key><Size>2</Size></Contents>\
-                   <NextContinuationToken>ignored</NextContinuationToken>\
-                   </ListBucketResult>";
+        let xml = "<ListBucketResult><IsTruncated>false</IsTruncated><Contents>\
+                   <Key>a+b &amp; \
+                   c&#x2F;&#47;.md</Key><Size>2</Size></Contents><NextContinuat\
+                   ionToken>ignored</NextContinuationToken></ListBucketResult>";
         let page = parse(xml)?;
         assert_eq!(page.next, None);
         assert_eq!(
@@ -266,7 +279,8 @@ mod tests {
     #[test]
     fn empty_and_malformed_bodies() {
         let empty = parse(
-            "<ListBucketResult><Prefix/><KeyCount>0</KeyCount><IsTruncated>false</IsTruncated></ListBucketResult>",
+            "<ListBucketResult><Prefix/><KeyCount>0</KeyCount><IsTruncated>fals\
+                e</IsTruncated></ListBucketResult>",
         );
         assert_eq!(
             empty,
@@ -277,7 +291,11 @@ mod tests {
         );
         assert!(parse("<Error><Code>NoSuchBucket</Code></Error>").is_err());
         assert!(
-            parse("<ListBucketResult><IsTruncated>true</IsTruncated></ListBucketResult>").is_err()
+            parse(
+                "<ListBucketResult><IsTruncated>true</IsTruncated></ListBucke\
+                tResult>"
+            )
+            .is_err()
         );
     }
 

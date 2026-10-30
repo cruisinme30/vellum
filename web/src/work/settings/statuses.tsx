@@ -45,7 +45,9 @@ function Removal({
     (each) => each.key !== status.key && each.category !== "triage",
   );
   const [target, setTarget] = useState(
-    others.find((each) => each.category === status.category)?.key ?? others[0]?.key ?? "",
+    others.find((each) => each.category === status.category)?.key ??
+      others[0]?.key ??
+      "",
   );
   return (
     <div
@@ -53,7 +55,9 @@ function Removal({
       role="group"
       aria-label={t("team-settings-remove-status", { name: status.name })}
     >
-      <label htmlFor={id}>{t("team-settings-move-issues", { count, name: status.name })}</label>
+      <label htmlFor={id}>
+        {t("team-settings-move-issues", { count, name: status.name })}
+      </label>
       <select
         id={id}
         value={target}
@@ -99,8 +103,11 @@ function StatusRow({
   const t = useT();
   const [removing, setRemoving] = useState<number>();
   const [error, setError] = useState<string>();
-  const canDefault = status.category === "backlog" || status.category === "unstarted";
-  const peers = file.workflow.statuses.filter((each) => each.category === status.category);
+  const canDefault =
+    status.category === "backlog" || status.category === "unstarted";
+  const peers = file.workflow.statuses.filter(
+    (each) => each.category === status.category,
+  );
   const rename = (name: string) => {
     edit((f) => ({
       ...f,
@@ -120,7 +127,9 @@ function StatusRow({
         ...f,
         workflow: {
           ...f.workflow,
-          statuses: f.workflow.statuses.filter((each) => each.key !== status.key),
+          statuses: f.workflow.statuses.filter(
+            (each) => each.key !== status.key,
+          ),
         },
       }),
     );
@@ -151,7 +160,10 @@ function StatusRow({
           checked={file.workflow.default === status.key}
           disabled={!canDefault}
           onChange={() => {
-            edit((f) => ({ ...f, workflow: { ...f.workflow, default: status.key } }));
+            edit((f) => ({
+              ...f,
+              workflow: { ...f.workflow, default: status.key },
+            }));
           }}
         />
         {t("team-settings-default")}
@@ -218,7 +230,13 @@ function StatusRow({
   );
 }
 
-function AddStatus({ category, edit }: { readonly category: Category; readonly edit: Edit }) {
+function AddStatus({
+  category,
+  edit,
+}: {
+  readonly category: Category;
+  readonly edit: Edit;
+}) {
   const t = useT();
   const submit: NonNullable<ComponentProps<"form">["onSubmit"]> = (event) => {
     event.preventDefault();
@@ -243,7 +261,9 @@ function AddStatus({ category, edit }: { readonly category: Category; readonly e
       <input
         name="name"
         autoComplete="off"
-        aria-label={t("team-settings-add-status", { category: t(`work-category-${category}`) })}
+        aria-label={t("team-settings-add-status", {
+          category: t(`work-category-${category}`),
+        })}
         placeholder={t("team-settings-add-status-hint")}
       />
       <button type="submit" className="vl-text-button">
@@ -267,12 +287,18 @@ export function StatusesSection({
 }) {
   const t = useT();
   return (
-    <section className="vl-settings-section" aria-labelledby="settings-statuses">
+    <section
+      className="vl-settings-section"
+      aria-labelledby="settings-statuses"
+    >
       <h2 id="settings-statuses">{t("team-settings-statuses")}</h2>
       <p className="vl-muted">{t("team-settings-statuses-hint")}</p>
       {CATEGORIES.map((category) => {
-        const statuses = file.workflow.statuses.filter((status) => status.category === category);
-        // One triage and one duplicate status at most; the engine keeps them fixed.
+        const statuses = file.workflow.statuses.filter(
+          (status) => status.category === category,
+        );
+        // One triage and one duplicate status at most; the engine keeps them
+        // fixed.
         const fixed = category === "triage" || category === "duplicate";
         if (fixed && statuses.length === 0) return;
         return (

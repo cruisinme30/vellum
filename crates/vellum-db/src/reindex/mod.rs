@@ -70,7 +70,8 @@ impl Tree for Disk {
         let Ok(entries) = std::fs::read_dir(dir) else {
             return Vec::new();
         };
-        let mut paths: Vec<PathBuf> = entries.filter_map(|e| e.ok().map(|e| e.path())).collect();
+        let mut paths: Vec<PathBuf> =
+            entries.filter_map(|e| e.ok().map(|e| e.path())).collect();
         paths.sort();
         paths
     }
@@ -126,7 +127,12 @@ impl Listing {
 
     /// Adds the file at `path`, with its contents when the index needs
     /// them. A later insert of the same path replaces the earlier one.
-    pub fn insert(&mut self, path: &str, modified: SystemTime, bytes: Option<Vec<u8>>) {
+    pub fn insert(
+        &mut self,
+        path: &str,
+        modified: SystemTime,
+        bytes: Option<Vec<u8>>,
+    ) {
         let file = PathBuf::from(path);
         let mut parent = PathBuf::new();
         for component in file.components() {
@@ -194,7 +200,8 @@ pub struct ReindexReport {
     pub spaces: usize,
     /// Folders indexed.
     pub folders: usize,
-    /// Documents indexed (pages, books, collections, rows, issues, task lists, shortcuts).
+    /// Documents indexed (pages, books, collections, rows, issues, task lists,
+    /// shortcuts).
     pub documents: usize,
     /// Files and folders that were skipped, and why.
     pub problems: Vec<Problem>,
@@ -213,8 +220,8 @@ pub struct Problem {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ProblemKind {
-    /// No `id` (front matter, `.vellum-folder.yaml`, `book.yaml` or `schema.yaml`).
-    /// The store assigns IDs; a reindex never writes files.
+    /// No `id` (front matter, `.vellum-folder.yaml`, `book.yaml` or
+    /// `schema.yaml`). The store assigns IDs; a reindex never writes files.
     MissingId,
     /// Another path, earlier in sorted order, already holds this ID.
     DuplicateId(ObjectId),
@@ -226,7 +233,9 @@ impl fmt::Display for Problem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
             ProblemKind::MissingId => write!(f, "{}: no id", self.path),
-            ProblemKind::DuplicateId(id) => write!(f, "{}: id {id} is already used", self.path),
+            ProblemKind::DuplicateId(id) => {
+                write!(f, "{}: id {id} is already used", self.path)
+            }
             ProblemKind::Unreadable(why) => write!(f, "{}: {why}", self.path),
         }
     }
@@ -339,11 +348,20 @@ macro_rules! write_snapshot {
         let snap: &Snapshot = $snap;
         let mut tx = $pool.begin_write().await?;
         // Deleting spaces cascades to folders, documents and page_ancestors.
-        let _ = traced($system, "reindex.clear", sqlx::query("DELETE FROM spaces").execute(&mut *tx)).await?;
+        let _ = traced(
+            $system,
+            "reindex.clear",
+            sqlx::query(
+                "DELETE FROM \
+            spaces",
+            )
+            .execute(&mut *tx),
+        )
+        .await?;
         for s in &snap.spaces {
             let q = sqlx::query(
-                "INSERT INTO spaces (space_id, kind, slug, root_path, name, plaintext, indexed_at) \
-                 VALUES ($1, $2, $3, $4, $5, $6, $7)",
+                "INSERT INTO spaces (space_id, kind, slug, root_path, name, \
+                 plaintext, indexed_at) VALUES ($1, $2, $3, $4, $5, $6, $7)",
             )
             .bind(uuid(s.space_id))
             .bind(s.kind.as_str())
@@ -352,12 +370,14 @@ macro_rules! write_snapshot {
             .bind(&s.name)
             .bind(s.plaintext)
             .bind($now);
-            let _ = traced($system, "reindex.insert_space", q.execute(&mut *tx)).await?;
+            let _ =
+                traced($system, "reindex.insert_space", q.execute(&mut *tx))
+                    .await?;
         }
         for f in &snap.folders {
             let q = sqlx::query(
-                "INSERT INTO folders (space_id, folder_id, parent_id, path, name, icon, indexed_at) \
-                 VALUES ($1, $2, $3, $4, $5, $6, $7)",
+                "INSERT INTO folders (space_id, folder_id, parent_id, path, \
+                 name, icon, indexed_at) VALUES ($1, $2, $3, $4, $5, $6, $7)",
             )
             .bind(uuid(f.space_id))
             .bind(uuid(f.folder_id))
@@ -366,13 +386,16 @@ macro_rules! write_snapshot {
             .bind(&f.name)
             .bind(&f.icon)
             .bind($now);
-            let _ = traced($system, "reindex.insert_folder", q.execute(&mut *tx)).await?;
+            let _ =
+                traced($system, "reindex.insert_folder", q.execute(&mut *tx))
+                    .await?;
         }
         for d in &snap.documents {
             let q = sqlx::query(
-                "INSERT INTO documents (space_id, doc_id, folder_id, kind, path, title, status, \
-                 content_hash, byte_size, modified_at, indexed_at) \
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+                "INSERT INTO documents (space_id, doc_id, folder_id, kind, \
+                 path, title, status, content_hash, byte_size, modified_at, \
+                 indexed_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, \
+                 $11)",
             )
             .bind(uuid(d.space_id))
             .bind(uuid(d.doc_id))
@@ -385,22 +408,26 @@ macro_rules! write_snapshot {
             .bind(d.byte_size)
             .bind(d.modified_at)
             .bind($now);
-            let _ = traced($system, "reindex.insert_document", q.execute(&mut *tx)).await?;
+            let _ =
+                traced($system, "reindex.insert_document", q.execute(&mut *tx))
+                    .await?;
         }
         for (space, ancestor, descendant, depth) in &snap.ancestors {
             let q = sqlx::query(
-                "INSERT INTO page_ancestors (space_id, ancestor_id, descendant_id, depth) \
-                 VALUES ($1, $2, $3, $4)",
+                "INSERT INTO page_ancestors (space_id, ancestor_id, \
+                 descendant_id, depth) VALUES ($1, $2, $3, $4)",
             )
             .bind(uuid(*space))
             .bind(uuid(*ancestor))
             .bind(uuid(*descendant))
             .bind(*depth);
-            let _ = traced($system, "reindex.insert_ancestor", q.execute(&mut *tx)).await?;
+            let _ =
+                traced($system, "reindex.insert_ancestor", q.execute(&mut *tx))
+                    .await?;
         }
         let q = sqlx::query(
-            "INSERT INTO index_meta (key, value) VALUES ('last_reindex_ms', $1) \
-             ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+            "INSERT INTO index_meta (key, value) VALUES ('last_reindex_ms', \
+             $1) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
         )
         .bind($now.to_string());
         let _ = traced($system, "reindex.stamp", q.execute(&mut *tx)).await?;
@@ -411,7 +438,11 @@ macro_rules! write_snapshot {
 impl Snapshot {
     /// Keeps only the rows of the spaces `keep` accepts. Problems stay with
     /// the first part, so a split snapshot reports each one once.
-    pub fn split_off(&self, keep: impl Fn(ObjectId) -> bool, problems: bool) -> Self {
+    pub fn split_off(
+        &self,
+        keep: impl Fn(ObjectId) -> bool,
+        problems: bool,
+    ) -> Self {
         Self {
             spaces: self
                 .spaces
@@ -484,7 +515,9 @@ pub async fn scan_listing(listing: Listing, now: i64) -> Result<Snapshot> {
     )
 }
 
-fn finish(joined: std::result::Result<Snapshot, tokio::task::JoinError>) -> Result<Snapshot> {
+fn finish(
+    joined: std::result::Result<Snapshot, tokio::task::JoinError>,
+) -> Result<Snapshot> {
     let snap = joined.map_err(|err| Error::Io(io::Error::other(err)))?;
     for problem in &snap.problems {
         tracing::warn!(%problem, "reindex skipped a path");
@@ -501,15 +534,24 @@ impl Index {
     /// # Errors
     /// Fails if the scan task panics or the database write fails; the old
     /// index is then left as it was.
-    #[tracing::instrument(name = "db.reindex", skip_all, fields(root = %root.display(), documents))]
-    pub async fn reindex<R>(&self, root: &Path, reader: R) -> Result<ReindexReport>
+    #[tracing::instrument(
+        name = "db.reindex",
+        skip_all,
+        fields(root = %root.display(), documents)
+    )]
+    pub async fn reindex<R>(
+        &self,
+        root: &Path,
+        reader: R,
+    ) -> Result<ReindexReport>
     where
         R: FileReader + 'static,
     {
         let now = now_ms();
         let snap = scan(root, reader, now).await?;
         self.write_snapshot(&snap, now).await?;
-        let _ = tracing::Span::current().record("documents", snap.documents.len());
+        let _ =
+            tracing::Span::current().record("documents", snap.documents.len());
         Ok(snap.report())
     }
 
@@ -517,17 +559,29 @@ impl Index {
     ///
     /// # Errors
     /// As [`Index::reindex`].
-    #[tracing::instrument(name = "db.reindex", skip_all, fields(files = listing.len(), documents))]
-    pub async fn reindex_listing(&self, listing: Listing) -> Result<ReindexReport> {
+    #[tracing::instrument(
+        name = "db.reindex",
+        skip_all,
+        fields(files = listing.len(), documents)
+    )]
+    pub async fn reindex_listing(
+        &self,
+        listing: Listing,
+    ) -> Result<ReindexReport> {
         let now = now_ms();
         let snap = scan_listing(listing, now).await?;
         self.write_snapshot(&snap, now).await?;
-        let _ = tracing::Span::current().record("documents", snap.documents.len());
+        let _ =
+            tracing::Span::current().record("documents", snap.documents.len());
         Ok(snap.report())
     }
 
     /// Replaces the derived tables with `snap` in one transaction.
-    pub(crate) async fn write_snapshot(&self, snap: &Snapshot, now: i64) -> Result<()> {
+    pub(crate) async fn write_snapshot(
+        &self,
+        snap: &Snapshot,
+        now: i64,
+    ) -> Result<()> {
         let system = self.backend().otel_system();
         match &self.pool {
             Pool::Sqlite(pool) => write_snapshot!(pool, system, snap, now),

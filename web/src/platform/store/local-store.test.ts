@@ -34,7 +34,11 @@ async function setup(extra: Partial<LocalStoreOptions> = {}) {
 }
 
 async function reopen(database: LocalDatabase, server: FakeServer) {
-  return LocalStore.open({ database, mutators: issueMutators, transport: server });
+  return LocalStore.open({
+    database,
+    mutators: issueMutators,
+    transport: server,
+  });
 }
 
 describe("LocalStore", () => {
@@ -49,15 +53,23 @@ describe("LocalStore", () => {
     const listener = vi.fn();
     const unsubscribe = store.subscribe(["issues", "other"], listener);
     const before = store.version;
-    const mutation = store.mutate("createIssue", { key: "ENG-1", title: "Fix login" });
+    const mutation = store.mutate("createIssue", {
+      key: "ENG-1",
+      title: "Fix login",
+    });
     expect(mutation.id).toBe(1);
-    expect(store.get("issues", "ENG-1")).toEqual({ title: "Fix login", state: "backlog" });
+    expect(store.get("issues", "ENG-1")).toEqual({
+      title: "Fix login",
+      state: "backlog",
+    });
     expect(store.scan("issues")).toHaveLength(1);
     expect(listener).toHaveBeenCalledTimes(1);
     expect(store.version).toBe(before + 1);
-    expect(recorded.some((entry) => entry.name === "vellum.client.mutation.perceived_ms")).toBe(
-      true,
-    );
+    expect(
+      recorded.some(
+        (entry) => entry.name === "vellum.client.mutation.perceived_ms",
+      ),
+    ).toBe(true);
     unsubscribe();
     store.mutate("createIssue", { key: "ENG-2", title: "b" });
     expect(listener).toHaveBeenCalledTimes(1);
@@ -71,7 +83,10 @@ describe("LocalStore", () => {
     const again = await reopen(database, server);
     expect(again.clientId).toBe(store.clientId);
     expect(again.pending.map((mutation) => mutation.id)).toEqual([1, 2]);
-    expect(again.get("issues", "ENG-1")).toEqual({ title: "offline", state: "started" });
+    expect(again.get("issues", "ENG-1")).toEqual({
+      title: "offline",
+      state: "started",
+    });
     expect(again.mutate("deleteIssue", { key: "ENG-1" }).id).toBe(3);
   });
 
@@ -80,27 +95,44 @@ describe("LocalStore", () => {
     store.mutate("createIssue", { key: "ENG-1", title: "a" });
     const outcome = await store.sync();
     expect(outcome).toEqual({ pushed: 1, pulled: 1, pending: 0 });
-    expect(store.get("issues", "ENG-1")).toEqual({ title: "a", state: "backlog" });
+    expect(store.get("issues", "ENG-1")).toEqual({
+      title: "a",
+      state: "backlog",
+    });
     const again = await reopen(database, server);
     expect(again.pending).toEqual([]);
-    expect(again.get("issues", "ENG-1")).toEqual({ title: "a", state: "backlog" });
-    expect(again.mutate("setState", { key: "ENG-1", state: "done" }).id).toBe(2);
+    expect(again.get("issues", "ENG-1")).toEqual({
+      title: "a",
+      state: "backlog",
+    });
+    expect(again.mutate("setState", { key: "ENG-1", state: "done" }).id).toBe(
+      2,
+    );
     expect(await again.sync()).toEqual({ pushed: 1, pulled: 1, pending: 0 });
   });
 
   it("merges other people's changes under local pending edits", async () => {
     const { server, store } = await setup();
-    server.serverApply({ name: "createIssue", args: { key: "ENG-7", title: "theirs" } });
+    server.serverApply({
+      name: "createIssue",
+      args: { key: "ENG-7", title: "theirs" },
+    });
     await store.sync();
     store.mutate("setState", { key: "ENG-7", state: "started" });
-    server.serverApply({ name: "createIssue", args: { key: "ENG-8", title: "new" } });
+    server.serverApply({
+      name: "createIssue",
+      args: { key: "ENG-8", title: "new" },
+    });
     server.failNext = new SyncError("down", 503, true, "r");
     await expect(store.sync()).rejects.toBeInstanceOf(SyncError);
     expect(store.pending).toHaveLength(1);
     expect(store.get("issues", "ENG-7")).toMatchObject({ state: "started" });
     await store.sync();
     expect(store.get("issues", "ENG-8")).toMatchObject({ title: "new" });
-    expect(store.get("issues", "ENG-7")).toEqual({ title: "theirs", state: "started" });
+    expect(store.get("issues", "ENG-7")).toEqual({
+      title: "theirs",
+      state: "started",
+    });
     expect(store.pending).toEqual([]);
   });
 
@@ -167,6 +199,8 @@ describe("LocalStore", () => {
 
   it("uses the injected clock for creation times", async () => {
     const { store } = await setup({ now: () => 42 });
-    expect(store.mutate("createIssue", { key: "ENG-1", title: "a" }).createdAt).toBe(42);
+    expect(
+      store.mutate("createIssue", { key: "ENG-1", title: "a" }).createdAt,
+    ).toBe(42);
   });
 });

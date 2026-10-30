@@ -9,9 +9,9 @@
 //! | `VELLUM_SMTP_URL` | `smtps://user:pass@smtp.example.com` (TLS), `smtp://user:pass@host:587?tls=required` (STARTTLS), or `file:///path` to write `.eml` files instead (for trying it out) |
 //! | `VELLUM_MAIL_FROM` | the sender, such as `Vellum <notifications@northstar.dev>`; defaults to `notifications@` the public host |
 //!
-//! Without `VELLUM_SMTP_URL` no email is sent: notifications, My Work
-//! reminders and digests included, stay in the inbox and on push. The SMTP password is part of the URL, so treat the
-//! variable as a secret.
+//! Without `VELLUM_SMTP_URL` no email is sent: notifications, My Work reminders
+//! and digests included, stay in the inbox and on push. The SMTP password is
+//! part of the URL, so treat the variable as a secret.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -22,7 +22,9 @@ use axum::http::{StatusCode, header};
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::get;
 use lettre::address::Envelope;
-use lettre::{Address, AsyncSmtpTransport, AsyncTransport as _, Tokio1Executor};
+use lettre::{
+    Address, AsyncSmtpTransport, AsyncTransport as _, Tokio1Executor,
+};
 use serde::Deserialize;
 use url::Url;
 use vellum_identity::Identity;
@@ -50,14 +52,17 @@ impl std::fmt::Debug for Outbound {
         match self {
             // Never print the URL: it holds the password.
             Self::Smtp(_) => f.write_str("Outbound::Smtp"),
-            Self::Files(dir) => f.debug_tuple("Outbound::Files").field(dir).finish(),
+            Self::Files(dir) => {
+                f.debug_tuple("Outbound::Files").field(dir).finish()
+            }
         }
     }
 }
 
 fn from_address(message: &[u8]) -> Option<Address> {
     // The envelope sender is the From address the message was built with.
-    let head = std::str::from_utf8(message.get(..message.len().min(4096))?).ok()?;
+    let head =
+        std::str::from_utf8(message.get(..message.len().min(4096))?).ok()?;
     let line = head.lines().find(|l| l.starts_with("From: "))?;
     let start = line.rfind('<')?;
     let end = line.rfind('>')?;
@@ -68,7 +73,8 @@ impl MailTransport for Outbound {
     async fn send(&self, to: &str, message: &[u8]) -> Result<(), String> {
         match self {
             Self::Smtp(smtp) => {
-                let to: Address = to.parse().map_err(|e| format!("bad recipient: {e}"))?;
+                let to: Address =
+                    to.parse().map_err(|e| format!("bad recipient: {e}"))?;
                 let envelope = Envelope::new(from_address(message), vec![to])
                     .map_err(|e| format!("bad envelope: {e}"))?;
                 smtp.send_raw(&envelope, message)
@@ -80,7 +86,10 @@ impl MailTransport for Outbound {
                 let mut id = [0_u8; 8];
                 let _ = getrandom::fill(&mut id);
                 let id = u64::from_le_bytes(id);
-                let name = format!("{}-{id:016x}.eml", jiff::Timestamp::now().as_second());
+                let name = format!(
+                    "{}-{id:016x}.eml",
+                    jiff::Timestamp::now().as_second()
+                );
                 tokio::fs::create_dir_all(dir)
                     .await
                     .map_err(|e| e.to_string())?;
@@ -106,9 +115,12 @@ pub fn setup(
         tracing::info!("no {SMTP_URL_VAR}; notification email is off");
         return Ok(None);
     };
-    let bad = |what: &str| Error::new(ErrorKind::InvalidInput, format!("{SMTP_URL_VAR}: {what}"));
-    let base_url = Url::parse(public_url)
-        .map_err(|e| Error::new(ErrorKind::InvalidInput, format!("public URL: {e}")))?;
+    let bad = |what: &str| {
+        Error::new(ErrorKind::InvalidInput, format!("{SMTP_URL_VAR}: {what}"))
+    };
+    let base_url = Url::parse(public_url).map_err(|e| {
+        Error::new(ErrorKind::InvalidInput, format!("public URL: {e}"))
+    })?;
     let outbound = if let Some(path) = raw.strip_prefix("file://") {
         Outbound::Files(PathBuf::from(path))
     } else {
@@ -222,11 +234,14 @@ fn user_of(link: &Link) -> Option<UserId> {
 
 fn page(status: StatusCode, title: &str, body: &str) -> Response {
     let html = format!(
-        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">\
-         <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\
-         <title>{title}</title><style>body{{font-family:system-ui,sans-serif;max-width:32rem;margin:4rem auto;padding:0 1rem;line-height:1.5;color:#1d2330}}\
-         button{{font:inherit;padding:.5rem 1rem;border-radius:6px;border:0;background:#2f5bd3;color:#fff;cursor:pointer}}</style></head>\
-         <body><h1>{title}</h1>{body}</body></html>"
+        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta \
+         name=\"viewport\" \
+         content=\"width=device-width,initial-scale=1\"><title>{title}</title><\
+         style>body{{font-family:system-ui,sans-serif;max-width:32rem;margin:4r\
+         em auto;padding:0 \
+         1rem;line-height:1.5;color:#1d2330}}button{{font:inherit;padding:.5re\
+         m 1rem;border-radius:6px;border:0;background:#2f5bd3;color:#fff;cursor\
+         :pointer}}</style></head><body><h1>{title}</h1>{body}</body></html>"
     );
     (
         status,
@@ -250,32 +265,44 @@ fn what(subject: &str) -> String {
     format!("emails about {}", escape(subject))
 }
 
-async fn confirm(State(store): State<Arc<NotifyStore>>, Query(link): Query<Link>) -> Response {
-    let valid = user_of(&link).is_some_and(|u| store.check_unsubscribe(u, &link.s, &link.t));
+async fn confirm(
+    State(store): State<Arc<NotifyStore>>,
+    Query(link): Query<Link>,
+) -> Response {
+    let valid = user_of(&link)
+        .is_some_and(|u| store.check_unsubscribe(u, &link.s, &link.t));
     if !valid {
         return page(
             StatusCode::BAD_REQUEST,
             "Link not valid",
-            "<p>This unsubscribe link is not valid. Change your email settings in Vellum instead.</p>",
+            "<p>This unsubscribe link is not valid. Change your email settings \
+                in Vellum instead.</p>",
         );
     }
     let action = format!(
         "?u={}&amp;s={}&amp;t={}",
         escape(&link.u),
-        escape(&url::form_urlencoded::byte_serialize(link.s.as_bytes()).collect::<String>()),
+        escape(
+            &url::form_urlencoded::byte_serialize(link.s.as_bytes())
+                .collect::<String>()
+        ),
         escape(&link.t)
     );
     page(
         StatusCode::OK,
         "Unsubscribe",
         &format!(
-            "<p>Stop {}?</p><form method=\"post\" action=\"{action}\"><button type=\"submit\">Unsubscribe</button></form>",
+            "<p>Stop {}?</p><form method=\"post\" action=\"{action}\"><button \
+                type=\"submit\">Unsubscribe</button></form>",
             what(&link.s)
         ),
     )
 }
 
-async fn apply(State(store): State<Arc<NotifyStore>>, Query(link): Query<Link>) -> Response {
+async fn apply(
+    State(store): State<Arc<NotifyStore>>,
+    Query(link): Query<Link>,
+) -> Response {
     let Some(user) = user_of(&link) else {
         return page(
             StatusCode::BAD_REQUEST,
@@ -288,7 +315,8 @@ async fn apply(State(store): State<Arc<NotifyStore>>, Query(link): Query<Link>) 
             StatusCode::OK,
             "Unsubscribed",
             &format!(
-                "<p>You will no longer get {}. You can turn it back on in your notification settings.</p>",
+                "<p>You will no longer get {}. You can turn it back on in your \
+                    notification settings.</p>",
                 what(&link.s)
             ),
         ),
@@ -337,13 +365,16 @@ mod tests {
             SMTP_URL_VAR => Some("file:///tmp/vellum-mail".to_owned()),
             _ => None,
         };
-        let (out, config) = setup(env, "https://vellum.northstar.dev").unwrap().unwrap();
+        let (out, config) =
+            setup(env, "https://vellum.northstar.dev").unwrap().unwrap();
         assert!(matches!(out, Outbound::Files(_)));
         assert_eq!(config.from.address, "notifications@vellum.northstar.dev");
         let bad = |k: &str| (k == SMTP_URL_VAR).then(|| "ftp://x".to_owned());
         assert!(setup(bad, "https://vellum.northstar.dev").is_err());
-        let smtp =
-            |k: &str| (k == SMTP_URL_VAR).then(|| "smtps://u:p@smtp.northstar.dev".to_owned());
+        let smtp = |k: &str| {
+            (k == SMTP_URL_VAR)
+                .then(|| "smtps://u:p@smtp.northstar.dev".to_owned())
+        };
         let (out, _) = setup(smtp, "https://vellum.northstar.dev")
             .unwrap()
             .unwrap();
@@ -355,7 +386,8 @@ mod tests {
 
     #[test]
     fn the_envelope_sender_comes_from_the_message() {
-        let raw = b"From: \"Vellum\" <notifications@northstar.dev>\r\nTo: <a@b.dev>\r\n\r\nhi";
+        let raw = b"From: \"Vellum\" <notifications@northstar.dev>\r\n\
+            To: <a@b.dev>\r\n\r\nhi";
         assert_eq!(
             from_address(raw).unwrap().to_string(),
             "notifications@northstar.dev"

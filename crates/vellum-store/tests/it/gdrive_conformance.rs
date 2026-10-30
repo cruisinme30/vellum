@@ -68,14 +68,21 @@ fn path(raw: &str) -> StoreResult<BlobPath> {
     BlobPath::new(raw)
 }
 
-async fn put(store: &GoogleDriveStore, raw: &str, body: &'static [u8]) -> StoreResult<()> {
+async fn put(
+    store: &GoogleDriveStore,
+    raw: &str,
+    body: &'static [u8],
+) -> StoreResult<()> {
     let _ = store
         .put(&path(raw)?, Bytes::from_static(body), Precondition::None)
         .await?;
     Ok(())
 }
 
-async fn listing(store: &dyn BlobStore, dir: Option<&str>) -> StoreResult<Vec<String>> {
+async fn listing(
+    store: &dyn BlobStore,
+    dir: Option<&str>,
+) -> StoreResult<Vec<String>> {
     let dir = dir.map(BlobPath::new).transpose()?;
     let mut got: Vec<String> = store
         .list(dir.as_ref())
@@ -102,7 +109,8 @@ async fn metered_gdrive_store_conforms() -> TestResult {
 
 #[tokio::test]
 async fn uncached_gdrive_store_conforms() -> TestResult {
-    let (_drive, store) = store_with(|c| c.cache_ttl = std::time::Duration::ZERO).await?;
+    let (_drive, store) =
+        store_with(|c| c.cache_ttl = std::time::Duration::ZERO).await?;
     conformance::run_with(&store, Guarantees::BestEffort).await?;
     Ok(())
 }
@@ -276,14 +284,16 @@ async fn google_native_files_are_skipped() -> TestResult {
         b"",
         None,
     );
-    let _ = drive.insert(docs, ".vellum-tmp-7-1", "text/plain", b"partial", None);
+    let _ =
+        drive.insert(docs, ".vellum-tmp-7-1", "text/plain", b"partial", None);
     let _ = drive.insert(docs, "a/b", "text/plain", b"slash", None);
 
     assert_eq!(listing(&store, None).await?, ["docs/real.md"]);
     let plan = path("docs/Plan")?;
     let got = store.get(&plan).await;
     assert!(
-        matches!(&got, Err(StoreError::Backend(msg)) if msg.contains("Google-native")),
+        matches!(&got, Err(StoreError::Backend(msg)) if msg.contains("Google-na\
+            tive")),
         "{got:?}"
     );
     assert!(matches!(
@@ -316,7 +326,8 @@ async fn google_native_files_are_skipped() -> TestResult {
 async fn if_absent_racers_converge_on_one_file() -> TestResult {
     let (drive, store) = store().await?;
     let p = path("race/new folder/a.md")?;
-    let writes = (0..8_u8).map(|i| store.put(&p, Bytes::from(vec![i]), Precondition::IfAbsent));
+    let writes = (0..8_u8)
+        .map(|i| store.put(&p, Bytes::from(vec![i]), Precondition::IfAbsent));
     let results = join_all(writes).await;
     let wins: Vec<_> = results.iter().filter_map(|r| r.as_ref().ok()).collect();
     let lost = results
@@ -408,7 +419,12 @@ async fn unauthorized_refreshes_the_token_once() -> TestResult {
     let store = GoogleDriveStore::new(drive.config(revoked.clone()))?;
     let got = store.head(&path("a.md")?).await;
     assert!(
-        matches!(&got, Err(StoreError::Backend(msg)) if msg.contains("401") && !msg.contains("worse")),
+        matches!(
+            &got,
+            Err(
+                StoreError::Backend(msg)
+            ) if msg.contains("401") && !msg.contains("worse")
+        ),
         "{got:?}"
     );
     assert_eq!(revoked.invalidated.load(Ordering::SeqCst), 1);
@@ -418,18 +434,28 @@ async fn unauthorized_refreshes_the_token_once() -> TestResult {
 #[tokio::test]
 async fn rate_limits_are_retried_but_denials_are_not() -> TestResult {
     let (drive, store) = store().await?;
-    let limited =
-        json!({ "error": { "code": 403, "errors": [{ "reason": "userRateLimitExceeded" }] } });
+    let limited = json!({
+        "error": {
+            "code": 403,
+            "errors": [{ "reason": "userRateLimitExceeded" }]
+        }
+    });
     drive.inject(StatusCode::FORBIDDEN, limited.clone());
     drive.inject(StatusCode::FORBIDDEN, limited);
     put(&store, "a.md", b"a").await?;
     assert_eq!(store.get(&path("a.md")?).await?.bytes.as_ref(), b"a");
 
-    let denied = json!({ "error": { "code": 403, "errors": [{ "reason": "insufficientFilePermissions" }] } });
+    let denied = json!({
+        "error": {
+            "code": 403,
+            "errors": [{ "reason": "insufficientFilePermissions" }]
+        }
+    });
     drive.inject(StatusCode::FORBIDDEN, denied);
     let got = store.get(&path("a.md")?).await;
     assert!(
-        matches!(&got, Err(StoreError::Backend(msg)) if msg.contains("insufficientFilePermissions")),
+        matches!(&got, Err(StoreError::Backend(msg)) if msg.contains("insuffici\
+            entFilePermissions")),
         "{got:?}"
     );
     Ok(())
@@ -439,7 +465,13 @@ async fn rate_limits_are_retried_but_denials_are_not() -> TestResult {
 async fn listing_pages_through_large_folders() -> TestResult {
     let (drive, store) = store().await?;
     for i in 0..7 {
-        let _ = drive.insert(ROOT_ID, &format!("n{i}.md"), "text/markdown", b"x", None);
+        let _ = drive.insert(
+            ROOT_ID,
+            &format!("n{i}.md"),
+            "text/markdown",
+            b"x",
+            None,
+        );
     }
     let lists = drive.list_calls();
     assert_eq!(listing(&store, None).await?.len(), 7);

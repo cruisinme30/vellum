@@ -41,9 +41,9 @@ impl CycleKey {
                 .get(..4)
                 .is_some_and(|y| y.bytes().all(|b| b.is_ascii_digit()))
             && text.get(4..6) == Some("-C")
-            && text
-                .get(6..)
-                .is_some_and(|n| n.bytes().all(|b| b.is_ascii_digit()) && n != "00");
+            && text.get(6..).is_some_and(|n| {
+                n.bytes().all(|b| b.is_ascii_digit()) && n != "00"
+            });
         if ok {
             Ok(Self(text.to_owned()))
         } else {
@@ -80,7 +80,9 @@ impl<'de> Deserialize<'de> for CycleKey {
 }
 
 /// The day of the week cycles start on.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize,
+)]
 #[serde(rename_all = "lowercase")]
 pub enum StartDay {
     /// Monday.
@@ -263,7 +265,8 @@ impl Cycle {
             path: path.to_owned(),
             reason,
         };
-        let cycle: Self = serde_saphyr::from_str(text).map_err(|e| err(e.to_string()))?;
+        let cycle: Self =
+            serde_saphyr::from_str(text).map_err(|e| err(e.to_string()))?;
         if cycle.ends_on <= cycle.starts_on {
             return Err(err("ends_on must be after starts_on".to_owned()));
         }
@@ -322,7 +325,8 @@ pub fn plan(
     let length = Duration::weeks(i64::from(settings.duration_weeks));
     let gap = Duration::weeks(i64::from(settings.cooldown_weeks));
     let mut last_end = existing.iter().map(|c| c.ends_on).max();
-    let mut years: Vec<i32> = existing.iter().map(|c| c.starts_on.year()).collect();
+    let mut years: Vec<i32> =
+        existing.iter().map(|c| c.starts_on.year()).collect();
     let live = |end: Date| end > today;
     let mut live_count = existing.iter().filter(|c| live(c.ends_on)).count();
     let wanted = usize::from(settings.upcoming) + 1;
@@ -338,7 +342,9 @@ pub fn plan(
             start
         } else {
             let back = i64::from(today.weekday().number_days_from_monday())
-                - i64::from(settings.start_day.weekday().number_days_from_monday());
+                - i64::from(
+                    settings.start_day.weekday().number_days_from_monday(),
+                );
             today
                 .checked_sub(Duration::days(back.rem_euclid(7)))
                 .ok_or_else(overflow)?
@@ -377,7 +383,9 @@ pub enum Rollover {
 #[must_use]
 pub const fn rollover_action(category: Category) -> Rollover {
     match category {
-        Category::Completed | Category::Canceled | Category::Duplicate => Rollover::Keep,
+        Category::Completed | Category::Canceled | Category::Duplicate => {
+            Rollover::Keep
+        }
         Category::Unstarted | Category::Started => Rollover::MoveToNext,
         Category::Triage | Category::Backlog => Rollover::Remove,
     }
@@ -424,9 +432,11 @@ pub fn snapshot<'a>(
 /// Mean completed points of the last three cycles that ended by `today`.
 #[must_use]
 pub fn velocity(cycles: &[Cycle], today: Date) -> Option<f64> {
-    let mut past: Vec<&Cycle> = cycles.iter().filter(|c| c.is_past(today)).collect();
+    let mut past: Vec<&Cycle> =
+        cycles.iter().filter(|c| c.is_past(today)).collect();
     past.sort_by_key(|c| std::cmp::Reverse(c.ends_on));
-    let last: Vec<u32> = past.iter().take(3).map(|c| c.completed_points()).collect();
+    let last: Vec<u32> =
+        past.iter().take(3).map(|c| c.completed_points()).collect();
     if last.is_empty() {
         return None;
     }

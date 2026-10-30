@@ -43,9 +43,9 @@ impl ShardedStore {
     }
 
     fn shard(&self, at: usize) -> Result<&SqlStore, StoreError> {
-        self.shards
-            .get(at)
-            .ok_or_else(|| StoreError::Backend(format!("no shard #{at}").into()))
+        self.shards.get(at).ok_or_else(|| {
+            StoreError::Backend(format!("no shard #{at}").into())
+        })
     }
 
     fn home(&self) -> Result<&SqlStore, StoreError> {
@@ -78,7 +78,10 @@ impl AuthzStore for ShardedStore {
         self.home()?.write_directory(upsert, delete).await
     }
 
-    async fn spaces_granting(&self, groups: &BTreeSet<Id>) -> Result<Vec<Id>, StoreError> {
+    async fn spaces_granting(
+        &self,
+        groups: &BTreeSet<Id>,
+    ) -> Result<Vec<Id>, StoreError> {
         let mut all = BTreeSet::new();
         for shard in &self.shards {
             all.extend(shard.spaces_granting(groups).await?);
@@ -136,7 +139,11 @@ impl AuthzStore for ShardedStore {
         Ok(all)
     }
 
-    async fn spaces_of(&self, principal: Principal, now_ms: i64) -> Result<Vec<Id>, StoreError> {
+    async fn spaces_of(
+        &self,
+        principal: Principal,
+        now_ms: i64,
+    ) -> Result<Vec<Id>, StoreError> {
         let mut all = BTreeSet::new();
         for shard in &self.shards {
             all.extend(shard.spaces_of(principal, now_ms).await?);

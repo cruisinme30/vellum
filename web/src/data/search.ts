@@ -24,7 +24,10 @@ function trimPunctuation(word: string): string {
   return word.slice(start, end);
 }
 
-/** The words of a query, lower case, longest first so overlaps mark the longer one. */
+/**
+ * The words of a query, lower case, longest first so overlaps mark the longer
+ * one.
+ */
 function terms(query: string): string[] {
   return [
     ...new Set(
@@ -43,11 +46,16 @@ function terms(query: string): string[] {
  */
 export function highlight(text: string, query: string): Fragment[] {
   const words = terms(query);
-  if (text === "" || words.length === 0) return text === "" ? [] : [{ text, hit: false }];
+  if (text === "" || words.length === 0)
+    return text === "" ? [] : [{ text, hit: false }];
   const lower = text.toLowerCase();
   const marked = Array.from<boolean>({ length: text.length }).fill(false);
   for (const word of words) {
-    for (let at = lower.indexOf(word); at !== -1; at = lower.indexOf(word, at + word.length)) {
+    for (
+      let at = lower.indexOf(word);
+      at !== -1;
+      at = lower.indexOf(word, at + word.length)
+    ) {
       marked.fill(true, at, at + word.length);
     }
   }
@@ -72,10 +80,12 @@ export function matchesFilters(
   if (filters === undefined) return true;
   if (filters.owner === "me" && page.owner !== me) return false;
   if (filters.starred === true && !page.starred) return false;
-  if (filters.spaceId !== undefined && page.spaceId !== filters.spaceId) return false;
+  if (filters.spaceId !== undefined && page.spaceId !== filters.spaceId)
+    return false;
   if (filters.modifiedDays !== undefined) {
     const changed = Date.parse(page.updatedAt);
-    if (Number.isNaN(changed) || changed < now - filters.modifiedDays * DAY_MS) return false;
+    if (Number.isNaN(changed) || changed < now - filters.modifiedDays * DAY_MS)
+      return false;
   }
   return true;
 }
@@ -90,9 +100,17 @@ export function filterHits(
   return hits.filter((hit) => matchesFilters(hit.page, filters, me, now));
 }
 
-/** The earliest change time the `modifiedDays` filter lets through, in Unix milliseconds. */
-export function modifiedFrom(filters: SearchFilters | undefined, now: number = Date.now()) {
-  return filters?.modifiedDays === undefined ? undefined : now - filters.modifiedDays * DAY_MS;
+/**
+ * The earliest change time the `modifiedDays` filter lets through, in Unix
+ * milliseconds.
+ */
+export function modifiedFrom(
+  filters: SearchFilters | undefined,
+  now: number = Date.now(),
+) {
+  return filters?.modifiedDays === undefined
+    ? undefined
+    : now - filters.modifiedDays * DAY_MS;
 }
 
 /**
@@ -106,7 +124,9 @@ function titleScore(title: string, query: string): number {
   if (at > 0 && /[\s\-_/.:([]/.test(lower.charAt(at - 1))) return 3;
   if (at > 0) return 2;
   const words = terms(query);
-  return words.length > 1 && words.every((word) => lower.includes(word)) ? 1 : 0;
+  return words.length > 1 && words.every((word) => lower.includes(word))
+    ? 1
+    : 0;
 }
 
 function compare(a: string, b: string): number {
@@ -118,7 +138,11 @@ function compare(a: string, b: string): number {
  * Instant title search: pages whose title matches `raw`, best match first,
  * then starred, then most recently changed. Folders are left out.
  */
-export function searchTitles(pages: readonly PageMeta[], raw: string, limit = 8): PageMeta[] {
+export function searchTitles(
+  pages: readonly PageMeta[],
+  raw: string,
+  limit = 8,
+): PageMeta[] {
   const query = raw.trim().toLowerCase();
   if (query === "") return [];
   const found: { page: PageMeta; score: number }[] = [];
@@ -127,7 +151,8 @@ export function searchTitles(pages: readonly PageMeta[], raw: string, limit = 8)
     const score = titleScore(page.title, query);
     if (score > 0) found.push({ page, score });
   }
-  // Plain comparisons: ISO times sort as text, and localeCompare is too slow here.
+  // Plain comparisons: ISO times sort as text, and localeCompare is too slow
+  // here.
   return found
     .toSorted(
       (a, b) =>

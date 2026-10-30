@@ -24,13 +24,16 @@ pub fn key_file(data_dir: &Path, name: &str) -> Result<Vec<u8>, Error> {
         )
         .with_source(e)
     };
-    if let Some(existing) = std::fs::read(&path).ok().filter(|k| k.len() >= 32) {
+    if let Some(existing) = std::fs::read(&path).ok().filter(|k| k.len() >= 32)
+    {
         return Ok(existing);
     }
     std::fs::create_dir_all(&dir).map_err(io)?;
     let mut key = vec![0u8; 32];
-    getrandom::fill(&mut key)
-        .map_err(|e| Error::new(ErrorKind::Internal, "the random source failed").with_source(e))?;
+    getrandom::fill(&mut key).map_err(|e| {
+        Error::new(ErrorKind::Internal, "the random source failed")
+            .with_source(e)
+    })?;
     let mut options = std::fs::OpenOptions::new();
     let _ = options.write(true).create(true).truncate(true);
     #[cfg(unix)]

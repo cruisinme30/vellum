@@ -26,7 +26,8 @@ fn write(root: &Path, rel: &str, body: &str) -> io::Result<()> {
 
 fn page(id: ObjectId, title: &str) -> String {
     format!(
-        "---\nid: {id}\ntitle: {title}\nstatus: verified\nvellum: 1\n---\n\n# {title}\n\nNorthstar notes.\n"
+        "---\nid: {id}\ntitle: {title}\nstatus: verified\nvellum: 1\n---\n\n\
+            # {title}\n\nNorthstar notes.\n"
     )
 }
 

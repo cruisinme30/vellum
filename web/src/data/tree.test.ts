@@ -41,7 +41,10 @@ function page(
   };
 }
 
-/** root-1 > (child-1 > grandchild), child-2; root-2; and one page in another space. */
+/**
+ * root-1 > (child-1 > grandchild), child-2; root-2; and one page in another
+ * space.
+ */
 const PAGES: readonly PageMeta[] = [
   page("root-2", undefined, 2),
   page("child-2", "root-1", 2),
@@ -54,19 +57,31 @@ const PAGES: readonly PageMeta[] = [
 const ids = (pages: readonly PageMeta[]) => pages.map((entry) => entry.id);
 const shape = (nodes: readonly TreeNode[]): unknown[] =>
   nodes.map((node) =>
-    node.children.length === 0 ? node.page.id : [node.page.id, shape(node.children)],
+    node.children.length === 0
+      ? node.page.id
+      : [node.page.id, shape(node.children)],
   );
-const byId = (pages: readonly PageMeta[], id: string) => pages.find((entry) => entry.id === id);
+const byId = (pages: readonly PageMeta[], id: string) =>
+  pages.find((entry) => entry.id === id);
 
 describe("siblings", () => {
   it("lists the pages under one parent of one space, by position", () => {
-    expect(ids(siblings(PAGES, SPACE, TOP_LEVEL))).toEqual(["root-1", "root-2"]);
-    expect(ids(siblings(PAGES, SPACE, "root-1"))).toEqual(["child-1", "child-2"]);
+    expect(ids(siblings(PAGES, SPACE, TOP_LEVEL))).toEqual([
+      "root-1",
+      "root-2",
+    ]);
+    expect(ids(siblings(PAGES, SPACE, "root-1"))).toEqual([
+      "child-1",
+      "child-2",
+    ]);
     expect(ids(siblings(PAGES, OTHER_SPACE, TOP_LEVEL))).toEqual(["elsewhere"]);
   });
 
   it("breaks position ties by title", () => {
-    const pages = [page("b", undefined, 1, SPACE, "Beta"), page("a", undefined, 1, SPACE, "Alpha")];
+    const pages = [
+      page("b", undefined, 1, SPACE, "Beta"),
+      page("a", undefined, 1, SPACE, "Alpha"),
+    ];
     expect(ids(siblings(pages, SPACE, TOP_LEVEL))).toEqual(["a", "b"]);
   });
 });
@@ -85,7 +100,11 @@ describe("buildTree", () => {
   });
 
   it("stops at a cycle instead of recursing forever", () => {
-    const pages = [page("top", undefined, 1), page("a", "b", 1), page("b", "a", 1)];
+    const pages = [
+      page("top", undefined, 1),
+      page("a", "b", 1),
+      page("b", "a", 1),
+    ];
     expect(shape(buildTree(pages, SPACE))).toEqual(["top"]);
   });
 
@@ -122,21 +141,39 @@ describe("ancestors", () => {
   it("skips a missing parent and survives cycles", () => {
     expect(ancestors([page("orphan", "missing", 1)], "orphan")).toEqual([]);
     const cycle = [page("a", "b", 1), page("b", "a", 1)];
-    expect(ids(ancestors(cycle, "a")).toSorted(alphabetical)).toEqual(["a", "b"]);
+    expect(ids(ancestors(cycle, "a")).toSorted(alphabetical)).toEqual([
+      "a",
+      "b",
+    ]);
   });
 });
 
 describe("movePage", () => {
   it("reorders a page among its siblings", () => {
-    const moved = movePage(PAGES, "root-2", { spaceId: SPACE, parentId: undefined, index: 0 });
-    expect(ids(siblings(moved, SPACE, TOP_LEVEL))).toEqual(["root-2", "root-1"]);
+    const moved = movePage(PAGES, "root-2", {
+      spaceId: SPACE,
+      parentId: undefined,
+      index: 0,
+    });
+    expect(ids(siblings(moved, SPACE, TOP_LEVEL))).toEqual([
+      "root-2",
+      "root-1",
+    ]);
     expect(byId(moved, "root-2")?.position).toBe(1);
     expect(byId(moved, "root-1")?.position).toBe(2);
   });
 
   it("re-parents a page and clamps the index", () => {
-    const moved = movePage(PAGES, "root-2", { spaceId: SPACE, parentId: "root-1", index: 99 });
-    expect(ids(siblings(moved, SPACE, "root-1"))).toEqual(["child-1", "child-2", "root-2"]);
+    const moved = movePage(PAGES, "root-2", {
+      spaceId: SPACE,
+      parentId: "root-1",
+      index: 99,
+    });
+    expect(ids(siblings(moved, SPACE, "root-1"))).toEqual([
+      "child-1",
+      "child-2",
+      "root-2",
+    ]);
     expect(byId(moved, "root-2")?.parentId).toBe("root-1");
   });
 
@@ -156,7 +193,11 @@ describe("movePage", () => {
   });
 
   it("refuses to move a page into its own subtree", () => {
-    const moved = movePage(PAGES, "root-1", { spaceId: SPACE, parentId: "grandchild", index: 0 });
+    const moved = movePage(PAGES, "root-1", {
+      spaceId: SPACE,
+      parentId: "grandchild",
+      index: 0,
+    });
     expect(moved).toEqual(PAGES);
     expect(moved).not.toBe(PAGES);
   });
@@ -164,8 +205,12 @@ describe("movePage", () => {
   it("refuses an unknown page, a missing parent or a parent in another space", () => {
     const target = { spaceId: SPACE, parentId: undefined, index: 0 };
     expect(movePage(PAGES, "unknown", target)).toEqual(PAGES);
-    expect(movePage(PAGES, "root-2", { ...target, parentId: "missing" })).toEqual(PAGES);
-    expect(movePage(PAGES, "root-2", { ...target, parentId: "elsewhere" })).toEqual(PAGES);
+    expect(
+      movePage(PAGES, "root-2", { ...target, parentId: "missing" }),
+    ).toEqual(PAGES);
+    expect(
+      movePage(PAGES, "root-2", { ...target, parentId: "elsewhere" }),
+    ).toEqual(PAGES);
   });
 });
 

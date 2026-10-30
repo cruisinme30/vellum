@@ -18,7 +18,8 @@ object storage; what changes is configuration, not software.
 
 - 💻 **Single** One process, SQLite and a folder. A laptop or a small server.
 - 🐳 **Team** Docker Compose with Postgres, object storage and Kroki.
-- ☸️ **Org** Kubernetes with Helm: two of everything, a Postgres replica and sharding by space.
+- ☸️ **Org** Kubernetes with Helm: two of everything, a Postgres replica and
+  sharding by space.
 
 :::
 
@@ -33,10 +34,13 @@ which is how the Org profile scales out.
 
 ::: facts
 
-- Operating system: Linux (x86-64 or ARM64), macOS or Windows for the single binary; Linux for containers
-- Memory: under 80 MB idle for the single binary; see [capacity](operate/capacity.md) for larger profiles
+- Operating system: Linux (x86-64 or ARM64), macOS or Windows for the single
+  binary; Linux for containers
+- Memory: under 80 MB idle for the single binary; see
+  [capacity](operate/capacity.md) for larger profiles
 - Network: one HTTPS port; Vellum can get its own certificate with ACME
-- Storage: a folder, S3-compatible storage, Google Drive, Dropbox, OneDrive or Git
+- Storage: a folder, S3-compatible storage, Google Drive, Dropbox, OneDrive or
+  Git
 
 :::
 

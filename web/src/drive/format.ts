@@ -6,8 +6,13 @@ import type { Translate } from "../i18n/i18n";
 import type { ActorView } from "./api";
 
 const UNITS = ["B", "KB", "MB", "GB", "TB"] as const;
-const BYTES_FORMAT = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 });
-const WHEN = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
+const BYTES_FORMAT = new Intl.NumberFormat(undefined, {
+  maximumFractionDigits: 1,
+});
+const WHEN = new Intl.DateTimeFormat(undefined, {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
 
 /** A byte count as a short size: `0 B`, `512 B`, `1.5 MB`. */
 export function formatBytes(bytes: number): string {
@@ -20,20 +25,29 @@ export function formatBytes(bytes: number): string {
   return `${BYTES_FORMAT.format(value)} ${UNITS[unit] ?? "B"}`;
 }
 
-/** A server timestamp as a local date and time; the text itself when it does not parse. */
+/**
+ * A server timestamp as a local date and time; the text itself when it does not
+ * parse.
+ */
 export function formatWhen(timestamp: string): string {
   const date = new Date(timestamp);
   return Number.isNaN(date.getTime()) ? timestamp : WHEN.format(date);
 }
 
 /** Who made a change, from the signed-in person's point of view. */
-export function actorText(t: Translate, actor: ActorView, me: string | undefined): string {
+export function actorText(
+  t: Translate,
+  actor: ActorView,
+  me: string | undefined,
+): string {
   switch (actor.type) {
     case "user": {
       return actor.user === me ? t("drive-actor-you") : t("drive-actor-person");
     }
     case "model": {
-      return actor.on_behalf_of === me ? t("drive-actor-model-you") : t("drive-actor-model");
+      return actor.on_behalf_of === me
+        ? t("drive-actor-model-you")
+        : t("drive-actor-model");
     }
     case "external": {
       return t("drive-actor-external");
@@ -45,7 +59,10 @@ export function actorText(t: Translate, actor: ActorView, me: string | undefined
 }
 
 /** The share of a quota used, 0 to 1; undefined without a quota. */
-export function usedShare(used: number, quota: number | null | undefined): number | undefined {
+export function usedShare(
+  used: number,
+  quota: number | null | undefined,
+): number | undefined {
   if (quota === undefined || quota === null || quota <= 0) return undefined;
   return Math.min(1, used / quota);
 }

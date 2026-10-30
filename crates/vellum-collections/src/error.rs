@@ -19,7 +19,10 @@ pub enum SchemaError {
     #[error("schema.yaml needs an id")]
     MissingId,
     /// A property key is not `[a-z][a-z0-9_]*` of at most 32 characters.
-    #[error("property key {0:?} is invalid: use a-z, 0-9 and _, starting with a letter")]
+    #[error(
+        "property key {0:?} is invalid: use a-z, 0-9 and _, starting with a \
+            letter"
+    )]
     InvalidKey(String),
     /// A property key is reserved for page front matter.
     #[error("property key {0:?} is reserved for page front matter")]
@@ -84,7 +87,8 @@ pub enum SchemaError {
     },
     /// A relation's `back` does not pair up with a relation pointing back.
     #[error(
-        "relation {key:?}: {back:?} must be a relation in the other collection pointing back with back: {key}"
+        "relation {key:?}: {back:?} must be a relation in the other collection \
+            pointing back with back: {key}"
     )]
     RelationBack {
         /// The relation property key.
@@ -145,7 +149,9 @@ impl From<SchemaError> for vellum_kernel::Error {
 impl From<EditError> for vellum_kernel::Error {
     fn from(error: EditError) -> Self {
         let kind = match &error {
-            EditError::UnknownCollection(_) | EditError::UnknownRow(_) => ErrorKind::NotFound,
+            EditError::UnknownCollection(_) | EditError::UnknownRow(_) => {
+                ErrorKind::NotFound
+            }
             EditError::DuplicateRow(_) => ErrorKind::Conflict,
             _ => ErrorKind::InvalidInput,
         };
@@ -154,7 +160,9 @@ impl From<EditError> for vellum_kernel::Error {
 }
 
 /// How serious a diagnostic is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Severity {
     /// Data was kept but may not mean what the author intended.
@@ -178,7 +186,10 @@ pub struct Diagnostic {
 }
 
 impl Diagnostic {
-    pub(crate) fn warning(location: impl Into<String>, message: impl Into<String>) -> Self {
+    pub(crate) fn warning(
+        location: impl Into<String>,
+        message: impl Into<String>,
+    ) -> Self {
         Self {
             severity: Severity::Warning,
             location: location.into(),
@@ -186,7 +197,10 @@ impl Diagnostic {
         }
     }
 
-    pub(crate) fn error(location: impl Into<String>, message: impl Into<String>) -> Self {
+    pub(crate) fn error(
+        location: impl Into<String>,
+        message: impl Into<String>,
+    ) -> Self {
         Self {
             severity: Severity::Error,
             location: location.into(),

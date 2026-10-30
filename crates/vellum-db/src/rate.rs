@@ -37,14 +37,19 @@ impl SharedCounts {
     ///
     /// # Errors
     /// When the database is unreachable.
-    pub async fn add(&self, window_ms: i64, hits: &[(String, u64)]) -> Result<Vec<(String, u64)>> {
+    pub async fn add(
+        &self,
+        window_ms: i64,
+        hits: &[(String, u64)],
+    ) -> Result<Vec<(String, u64)>> {
         let mut totals = Vec::with_capacity(hits.len());
         let system = self.index.backend().otel_system();
         for chunk in hits.chunks(CHUNK) {
             let rows: Vec<(String, i64)> = match self.index.pool() {
                 IndexPool::Sqlite(pool) => {
-                    let mut q =
-                        QueryBuilder::new("INSERT INTO rate_counts (caller, window_ms, hits) ");
+                    let mut q = QueryBuilder::new(
+                        "INSERT INTO rate_counts (caller, window_ms, hits) ",
+                    );
                     let _ = q.push_values(chunk, |mut row, (caller, n)| {
                         let _ = row
                             .push_bind(caller)
@@ -52,14 +57,21 @@ impl SharedCounts {
                             .push_bind(i64::try_from(*n).unwrap_or(i64::MAX));
                     });
                     let _ = q.push(
-                        " ON CONFLICT (caller, window_ms) DO UPDATE \
-                         SET hits = rate_counts.hits + excluded.hits RETURNING caller, hits",
+                        " ON CONFLICT (caller, window_ms) DO UPDATE SET hits = \
+                         rate_counts.hits + excluded.hits RETURNING caller, \
+                         hits",
                     );
-                    traced(system, "rate.add", q.build_query_as().fetch_all(pool)).await?
+                    traced(
+                        system,
+                        "rate.add",
+                        q.build_query_as().fetch_all(pool),
+                    )
+                    .await?
                 }
                 IndexPool::Postgres(pool) => {
-                    let mut q =
-                        QueryBuilder::new("INSERT INTO rate_counts (caller, window_ms, hits) ");
+                    let mut q = QueryBuilder::new(
+                        "INSERT INTO rate_counts (caller, window_ms, hits) ",
+                    );
                     let _ = q.push_values(chunk, |mut row, (caller, n)| {
                         let _ = row
                             .push_bind(caller)
@@ -67,16 +79,21 @@ impl SharedCounts {
                             .push_bind(i64::try_from(*n).unwrap_or(i64::MAX));
                     });
                     let _ = q.push(
-                        " ON CONFLICT (caller, window_ms) DO UPDATE \
-                         SET hits = rate_counts.hits + excluded.hits RETURNING caller, hits",
+                        " ON CONFLICT (caller, window_ms) DO UPDATE SET hits = \
+                         rate_counts.hits + excluded.hits RETURNING caller, \
+                         hits",
                     );
-                    traced(system, "rate.add", q.build_query_as().fetch_all(pool)).await?
+                    traced(
+                        system,
+                        "rate.add",
+                        q.build_query_as().fetch_all(pool),
+                    )
+                    .await?
                 }
             };
-            totals.extend(
-                rows.into_iter()
-                    .map(|(caller, n)| (caller, u64::try_from(n).unwrap_or_default())),
-            );
+            totals.extend(rows.into_iter().map(|(caller, n)| {
+                (caller, u64::try_from(n).unwrap_or_default())
+            }));
         }
         Ok(totals)
     }

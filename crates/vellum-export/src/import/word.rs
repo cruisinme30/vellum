@@ -16,7 +16,10 @@ use std::collections::{HashMap, HashSet};
 
 use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
-use vellum_format::{Alignment, Attributes, Block, Document, Fence, Inline, List, ListItem, Table};
+use vellum_format::{
+    Alignment, Attributes, Block, Document, Fence, Inline, List, ListItem,
+    Table,
+};
 
 use super::{Builder, archive};
 use crate::error::ImportError;
@@ -34,8 +37,9 @@ pub(super) fn import(name: &str, bytes: &[u8]) -> Result<Builder, ImportError> {
             .find(|e| e.path == path)
             .map(|e| String::from_utf8_lossy(&e.bytes).into_owned())
     };
-    let document = file("word/document.xml")
-        .ok_or_else(|| ImportError::format(FORMAT, "word/document.xml is missing"))?;
+    let document = file("word/document.xml").ok_or_else(|| {
+        ImportError::format(FORMAT, "word/document.xml is missing")
+    })?;
     let styles = file("word/styles.xml")
         .map(|x| styles(&x))
         .unwrap_or_default();
@@ -47,8 +51,9 @@ pub(super) fn import(name: &str, bytes: &[u8]) -> Result<Builder, ImportError> {
         .unwrap_or_default();
 
     let mut builder = Builder::new(FORMAT);
-    let read = read_body(&document)
-        .map_err(|e| ImportError::format(FORMAT, format!("document.xml: {e}")))?;
+    let read = read_body(&document).map_err(|e| {
+        ImportError::format(FORMAT, format!("document.xml: {e}"))
+    })?;
     let mut ctx = Convert {
         styles: &styles,
         numbering: &numbering,
@@ -65,7 +70,9 @@ pub(super) fn import(name: &str, bytes: &[u8]) -> Result<Builder, ImportError> {
     let title = blocks
         .iter()
         .find_map(|b| match b {
-            Block::Heading { content, .. } => Some(crate::lower::inline_text(content)),
+            Block::Heading { content, .. } => {
+                Some(crate::lower::inline_text(content))
+            }
             _ => None,
         })
         .filter(|t| !t.trim().is_empty())
@@ -74,7 +81,12 @@ pub(super) fn import(name: &str, bytes: &[u8]) -> Result<Builder, ImportError> {
         front_matter: None,
         blocks,
     });
-    let _ = builder.page(&format!("{stem}.md"), &format!("{stem}.md"), &title, text);
+    let _ = builder.page(
+        &format!("{stem}.md"),
+        &format!("{stem}.md"),
+        &title,
+        text,
+    );
     for entry in entries {
         if let Some(media) = entry.path.strip_prefix("word/media/") {
             let out = format!("{stem} assets/{media}");
@@ -108,26 +120,32 @@ fn styles(xml: &str) -> HashMap<String, Style> {
     let mut current: Option<String> = None;
     loop {
         match reader.read_event() {
-            Ok(Event::Start(e) | Event::Empty(e)) => match e.local_name().as_ref() {
-                "style" => {
-                    current = attr(&e, "styleId");
-                    if let Some(id) = &current {
-                        let _ = raw.insert(id.clone(), RawStyle::default());
-                    }
-                }
-                "name" | "basedOn" | "outlineLvl" => {
-                    if let Some(style) = current.as_ref().and_then(|id| raw.get_mut(id)) {
-                        let value = attr(&e, "val").unwrap_or_default();
-                        match e.local_name().as_ref() {
-                            "name" => style.name = value,
-                            "basedOn" => style.based_on = Some(value),
-                            _ => style.outline = value.parse().ok(),
+            Ok(Event::Start(e) | Event::Empty(e)) => {
+                match e.local_name().as_ref() {
+                    "style" => {
+                        current = attr(&e, "styleId");
+                        if let Some(id) = &current {
+                            let _ = raw.insert(id.clone(), RawStyle::default());
                         }
                     }
+                    "name" | "basedOn" | "outlineLvl" => {
+                        if let Some(style) =
+                            current.as_ref().and_then(|id| raw.get_mut(id))
+                        {
+                            let value = attr(&e, "val").unwrap_or_default();
+                            match e.local_name().as_ref() {
+                                "name" => style.name = value,
+                                "basedOn" => style.based_on = Some(value),
+                                _ => style.outline = value.parse().ok(),
+                            }
+                        }
+                    }
+                    _ => {}
                 }
-                _ => {}
-            },
-            Ok(Event::End(e)) if e.local_name().as_ref() == "style" => current = None,
+            }
+            Ok(Event::End(e)) if e.local_name().as_ref() == "style" => {
+                current = None
+            }
             Ok(Event::Eof) | Err(_) => break,
             _ => {}
         }
@@ -149,7 +167,10 @@ fn styles(xml: &str) -> HashMap<String, Style> {
         if name.contains("quote") {
             return Some(Style::Quote);
         }
-        if name.contains("code") || name.contains("preformatted") || name.contains("source") {
+        if name.contains("code")
+            || name.contains("preformatted")
+            || name.contains("source")
+        {
             return Some(Style::Code);
         }
         style.outline.map(|n| Style::Heading((n + 1).clamp(1, 6)))
@@ -173,37 +194,46 @@ fn styles(xml: &str) -> HashMap<String, Style> {
 type Numbering = HashMap<String, HashMap<u8, Option<u64>>>;
 
 fn numbering(xml: &str) -> Numbering {
-    let mut abstracts: HashMap<String, HashMap<u8, Option<u64>>> = HashMap::new();
+    let mut abstracts: HashMap<String, HashMap<u8, Option<u64>>> =
+        HashMap::new();
     let mut nums: HashMap<String, String> = HashMap::new();
     let mut reader = Reader::from_str(xml);
-    let (mut abstract_id, mut level, mut num_id) = (None::<String>, None::<u8>, None::<String>);
+    let (mut abstract_id, mut level, mut num_id) =
+        (None::<String>, None::<u8>, None::<String>);
     let mut start = 1u64;
     loop {
         match reader.read_event() {
-            Ok(Event::Start(e) | Event::Empty(e)) => match e.local_name().as_ref() {
-                "abstractNum" => abstract_id = attr(&e, "abstractNumId"),
-                "lvl" => {
-                    level = attr(&e, "ilvl").and_then(|l| l.parse().ok());
-                    start = 1;
-                }
-                "start" => start = attr(&e, "val").and_then(|v| v.parse().ok()).unwrap_or(1),
-                "numFmt" => {
-                    if let (Some(a), Some(l)) = (&abstract_id, level) {
-                        let ordered = attr(&e, "val").is_some_and(|v| v != "bullet" && v != "none");
-                        let _ = abstracts
-                            .entry(a.clone())
-                            .or_default()
-                            .insert(l, ordered.then_some(start));
+            Ok(Event::Start(e) | Event::Empty(e)) => {
+                match e.local_name().as_ref() {
+                    "abstractNum" => abstract_id = attr(&e, "abstractNumId"),
+                    "lvl" => {
+                        level = attr(&e, "ilvl").and_then(|l| l.parse().ok());
+                        start = 1;
                     }
-                }
-                "num" => num_id = attr(&e, "numId"),
-                "abstractNumId" => {
-                    if let (Some(n), Some(a)) = (&num_id, attr(&e, "val")) {
-                        let _ = nums.insert(n.clone(), a);
+                    "start" => {
+                        start = attr(&e, "val")
+                            .and_then(|v| v.parse().ok())
+                            .unwrap_or(1)
                     }
+                    "numFmt" => {
+                        if let (Some(a), Some(l)) = (&abstract_id, level) {
+                            let ordered = attr(&e, "val")
+                                .is_some_and(|v| v != "bullet" && v != "none");
+                            let _ = abstracts
+                                .entry(a.clone())
+                                .or_default()
+                                .insert(l, ordered.then_some(start));
+                        }
+                    }
+                    "num" => num_id = attr(&e, "numId"),
+                    "abstractNumId" => {
+                        if let (Some(n), Some(a)) = (&num_id, attr(&e, "val")) {
+                            let _ = nums.insert(n.clone(), a);
+                        }
+                    }
+                    _ => {}
                 }
-                _ => {}
-            },
+            }
             Ok(Event::End(e)) => match e.local_name().as_ref() {
                 "abstractNum" => abstract_id = None,
                 "lvl" => level = None,
@@ -230,7 +260,9 @@ fn rels(xml: &str) -> HashMap<String, Rel> {
     let mut reader = Reader::from_str(xml);
     loop {
         match reader.read_event() {
-            Ok(Event::Start(e) | Event::Empty(e)) if e.local_name().as_ref() == "Relationship" => {
+            Ok(Event::Start(e) | Event::Empty(e))
+                if e.local_name().as_ref() == "Relationship" =>
+            {
                 let (Some(id), Some(kind), Some(target)) =
                     (attr(&e, "Id"), attr(&e, "Type"), attr(&e, "Target"))
                 else {
@@ -355,14 +387,21 @@ fn read_body(xml: &str) -> Result<Vec<Item>, String> {
                     }
                     "ilvl" => {
                         if let Some(p) = &mut r.para {
-                            let level = attr(e, "val").and_then(|v| v.parse().ok()).unwrap_or(0);
-                            p.num = Some((p.num.take().map(|n| n.0).unwrap_or_default(), level));
+                            let level = attr(e, "val")
+                                .and_then(|v| v.parse().ok())
+                                .unwrap_or(0);
+                            p.num = Some((
+                                p.num.take().map(|n| n.0).unwrap_or_default(),
+                                level,
+                            ));
                         }
                     }
                     "numId" => {
                         if let Some(p) = &mut r.para {
                             let level = p.num.as_ref().map_or(0, |n| n.1);
-                            p.num = attr(e, "val").filter(|v| v != "0").map(|v| (v, level));
+                            p.num = attr(e, "val")
+                                .filter(|v| v != "0")
+                                .map(|v| (v, level));
                         }
                     }
                     "r" => r.run = RunStyle::default(),
@@ -372,20 +411,24 @@ fn read_body(xml: &str) -> Result<Vec<Item>, String> {
                     "i" if r.in_rpr => r.run.italic = on(e),
                     "strike" | "dstrike" if r.in_rpr => r.run.strike = on(e),
                     "highlight" if r.in_rpr => r.run.highlight = on(e),
-                    "vertAlign" if r.in_rpr => match attr(e, "val").as_deref() {
-                        Some("superscript") => r.run.sup = true,
-                        Some("subscript") => r.run.sub = true,
-                        _ => {}
-                    },
+                    "vertAlign" if r.in_rpr => {
+                        match attr(e, "val").as_deref() {
+                            Some("superscript") => r.run.sup = true,
+                            Some("subscript") => r.run.sub = true,
+                            _ => {}
+                        }
+                    }
                     "rFonts" if r.in_rpr => {
-                        r.run.code |= attr(e, "ascii").is_some_and(|f| is_mono(&f));
+                        r.run.code |=
+                            attr(e, "ascii").is_some_and(|f| is_mono(&f));
                     }
                     "rStyle" if r.in_rpr => {
-                        r.run.code |=
-                            attr(e, "val").is_some_and(|s| s.to_lowercase().contains("code"));
+                        r.run.code |= attr(e, "val")
+                            .is_some_and(|s| s.to_lowercase().contains("code"));
                     }
                     "hyperlink" if !empty => {
-                        let target = attr(e, "id").map(|id| format!("rel:{id}"));
+                        let target =
+                            attr(e, "id").map(|id| format!("rel:{id}"));
                         r.link.push(target);
                     }
                     "del" if !empty => r.deleted += 1,
@@ -421,7 +464,9 @@ fn read_body(xml: &str) -> Result<Vec<Item>, String> {
                             r.push(Piece::Image { rel, alt });
                         }
                     }
-                    "footnoteReference" | "endnoteReference" => r.items.push(Item::Footnote),
+                    "footnoteReference" | "endnoteReference" => {
+                        r.items.push(Item::Footnote)
+                    }
                     "oMath" if !empty => {
                         r.math_depth += 1;
                         if r.math_depth == 1 {
@@ -440,7 +485,9 @@ fn read_body(xml: &str) -> Result<Vec<Item>, String> {
                         }
                     }
                     "tc" if r.table_depth == 1 => {
-                        if let Some(row) = r.table.as_mut().and_then(|t| t.last_mut()) {
+                        if let Some(row) =
+                            r.table.as_mut().and_then(|t| t.last_mut())
+                        {
                             row.push(Vec::new());
                         }
                     }
@@ -452,15 +499,16 @@ fn read_body(xml: &str) -> Result<Vec<Item>, String> {
                 r.content(&text);
             }
             Event::GeneralRef(g) => {
-                let c = g.resolve_char_ref().ok().flatten().or_else(|| {
-                    match g.xml10_content().as_ref() {
-                        "amp" => Some('&'),
-                        "lt" => Some('<'),
-                        "gt" => Some('>'),
-                        "quot" => Some('"'),
-                        "apos" => Some('\''),
-                        _ => None,
-                    }
+                let c = g.resolve_char_ref().ok().flatten().or_else(|| match g
+                    .xml10_content()
+                    .as_ref()
+                {
+                    "amp" => Some('&'),
+                    "lt" => Some('<'),
+                    "gt" => Some('>'),
+                    "quot" => Some('"'),
+                    "apos" => Some('\''),
+                    _ => None,
                 });
                 if let Some(c) = c {
                     r.content(&c.to_string());
@@ -622,7 +670,8 @@ impl Convert<'_> {
             match item {
                 Item::Footnote => self.warn_once(
                     "footnote",
-                    "footnotes and endnotes were left out; their markers are not imported",
+                    "footnotes and endnotes were left out; their markers are \
+                        not imported",
                 ),
                 Item::Table(rows) => {
                     if let Some(table) = self.table(rows) {
@@ -632,7 +681,9 @@ impl Convert<'_> {
                 Item::Para(para) => match self.style(&para) {
                     Some(Style::Toc) => {}
                     Some(Style::Title) => self.heading(1, &para, &mut out),
-                    Some(Style::Heading(level)) => self.heading(level, &para, &mut out),
+                    Some(Style::Heading(level)) => {
+                        self.heading(level, &para, &mut out)
+                    }
                     Some(Style::Code) => {
                         let mut literal = plain(&para);
                         literal.push('\n');
@@ -670,7 +721,8 @@ impl Convert<'_> {
                     None if para.num.is_some() => {
                         let mut run = vec![para];
                         while let Some(Item::Para(next)) = items.peek() {
-                            if next.num.is_none() || self.style(next).is_some() {
+                            if next.num.is_none() || self.style(next).is_some()
+                            {
                                 break;
                             }
                             let next = next.clone();
@@ -701,7 +753,10 @@ impl Convert<'_> {
     /// A paragraph, or display math when the paragraph is one equation.
     fn paragraph(&mut self, para: &Para) -> Vec<Block> {
         if let [Piece::Math(math)] = para.pieces.as_slice() {
-            self.warn_once("math", "equations were imported as their text, not as TeX");
+            self.warn_once(
+                "math",
+                "equations were imported as their text, not as TeX",
+            );
             return vec![Block::Math {
                 id: None,
                 literal: math.trim().to_owned(),
@@ -726,7 +781,9 @@ impl Convert<'_> {
                 .and_then(|levels| levels.get(&level))
                 .copied()
                 .flatten();
-            while stack.len() > 1 && stack.last().is_some_and(|(l, _)| *l > level) {
+            while stack.len() > 1
+                && stack.last().is_some_and(|(l, _)| *l > level)
+            {
                 close(&mut stack);
             }
             if stack.last().is_none_or(|(l, _)| *l < level) {
@@ -813,9 +870,10 @@ impl Convert<'_> {
         let mut runs: Vec<Piece> = Vec::new();
         for piece in pieces {
             match (runs.last_mut(), piece) {
-                (Some(Piece::Text(text, style, link)), Piece::Text(more, s, l))
-                    if style == s && link == l =>
-                {
+                (
+                    Some(Piece::Text(text, style, link)),
+                    Piece::Text(more, s, l),
+                ) if style == s && link == l => {
                     text.push_str(more);
                 }
                 _ => runs.push(piece.clone()),
@@ -828,7 +886,9 @@ impl Convert<'_> {
                 Piece::Text(_, _, Some(link)) => {
                     let link = link.clone();
                     let mut content = Vec::new();
-                    while let Some(Piece::Text(text, style, Some(l))) = runs.get(i) {
+                    while let Some(Piece::Text(text, style, Some(l))) =
+                        runs.get(i)
+                    {
                         if *l != link {
                             break;
                         }
@@ -845,7 +905,9 @@ impl Convert<'_> {
                     }
                     continue;
                 }
-                Piece::Text(text, style, None) => out.extend(styled(text, *style)),
+                Piece::Text(text, style, None) => {
+                    out.extend(styled(text, *style))
+                }
                 Piece::Break => out.push(Inline::HardBreak),
                 Piece::Image { rel, alt } => match self.rels.get(rel) {
                     Some(Rel::Image(path)) => out.push(Inline::Image {
@@ -859,11 +921,16 @@ impl Convert<'_> {
                     }),
                     _ => self.warn_once(
                         "image",
-                        "some pictures are not stored in the file and were left out",
+                        "some pictures are not stored in the file and were \
+                            left out",
                     ),
                 },
                 Piece::Math(math) => {
-                    self.warn_once("math", "equations were imported as their text, not as TeX");
+                    self.warn_once(
+                        "math",
+                        "equations were imported as their \
+                        text, not as TeX",
+                    );
                     out.push(Inline::Code {
                         code: math.trim().to_owned(),
                     });

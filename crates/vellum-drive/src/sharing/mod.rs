@@ -26,7 +26,8 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use async_trait::async_trait;
 use vellum_kernel::{
-    Actor, ObjectId, ShareId, ShareToken, ShareTokenHash, SpaceId, Timestamp, UserId,
+    Actor, ObjectId, ShareId, ShareToken, ShareTokenHash, SpaceId, Timestamp,
+    UserId,
 };
 
 use crate::drive::Drive;
@@ -89,7 +90,8 @@ impl Role {
             "editor" => Ok(Self::Editor),
             "manager" => Ok(Self::Manager),
             other => Err(DriveError::Invalid(format!(
-                "role must be viewer, commenter, editor or manager, not {other:?}"
+                "role must be viewer, commenter, editor or manager, not \
+                    {other:?}"
             ))),
         }
     }
@@ -111,10 +113,16 @@ impl Grantee {
     ///
     /// [`DriveError::Invalid`] for any other text.
     pub fn parse(text: &str) -> DriveResult<Self> {
-        let bad = || DriveError::Invalid(format!("expected user:<id> or group:<id>, not {text:?}"));
+        let bad = || {
+            DriveError::Invalid(format!(
+                "expected user:<id> or group:<id>, not {text:?}"
+            ))
+        };
         match text.split_once(':') {
             Some(("user", id)) => id.parse().map(Self::User).map_err(|_| bad()),
-            Some(("group", id)) => id.parse().map(Self::Group).map_err(|_| bad()),
+            Some(("group", id)) => {
+                id.parse().map(Self::Group).map_err(|_| bad())
+            }
             _ => Err(bad()),
         }
     }
@@ -167,7 +175,8 @@ impl LinkRecord {
     /// Whether the link opens at `now`.
     #[must_use]
     pub fn is_live(&self, now: Timestamp) -> bool {
-        self.revoked_at.is_none() && self.expires_at.is_none_or(|t| t.unix_ms() > now.unix_ms())
+        self.revoked_at.is_none()
+            && self.expires_at.is_none_or(|t| t.unix_ms() > now.unix_ms())
     }
 }
 
@@ -237,9 +246,18 @@ pub enum Opened {
 #[async_trait]
 pub trait ShareAccess: Send + Sync + fmt::Debug {
     /// Whether `user` may change who has access to `node`.
-    async fn can_share(&self, user: UserId, space: SpaceId, node: ObjectId) -> DriveResult<bool>;
+    async fn can_share(
+        &self,
+        user: UserId,
+        space: SpaceId,
+        node: ObjectId,
+    ) -> DriveResult<bool>;
     /// The role grants made directly on `node`, live ones only.
-    async fn grants(&self, space: SpaceId, node: ObjectId) -> DriveResult<Vec<Grant>>;
+    async fn grants(
+        &self,
+        space: SpaceId,
+        node: ObjectId,
+    ) -> DriveResult<Vec<Grant>>;
     /// Grants `role` (replacing that grantee's other roles on the item);
     /// [`DriveError::PermissionDenied`] unless `user` may share it.
     async fn grant(
@@ -293,7 +311,10 @@ pub trait ShareLinks: Send + Sync + fmt::Debug {
     /// One link by ID.
     async fn get(&self, id: ShareId) -> DriveResult<Option<LinkRecord>>;
     /// The link whose token hashes to `hash`.
-    async fn by_hash(&self, hash: &ShareTokenHash) -> DriveResult<Option<LinkRecord>>;
+    async fn by_hash(
+        &self,
+        hash: &ShareTokenHash,
+    ) -> DriveResult<Option<LinkRecord>>;
     /// Marks a link revoked; a second call keeps the first time.
     async fn revoke(&self, id: ShareId, at: Timestamp) -> DriveResult<()>;
 }
@@ -341,9 +362,11 @@ impl ShareLinks for MemoryShareLinks {
     }
 
     async fn of_node(&self, node: ObjectId) -> DriveResult<Vec<LinkRecord>> {
-        let mut found: Vec<LinkRecord> =
-            self.with(|all| all.iter().filter(|r| r.node == node).cloned().collect());
-        found.sort_by_key(|r| std::cmp::Reverse((r.created_at.unix_ms(), r.id)));
+        let mut found: Vec<LinkRecord> = self.with(|all| {
+            all.iter().filter(|r| r.node == node).cloned().collect()
+        });
+        found
+            .sort_by_key(|r| std::cmp::Reverse((r.created_at.unix_ms(), r.id)));
         Ok(found)
     }
 
@@ -351,8 +374,15 @@ impl ShareLinks for MemoryShareLinks {
         Ok(self.with(|all| all.iter().find(|r| r.id == id).cloned()))
     }
 
-    async fn by_hash(&self, hash: &ShareTokenHash) -> DriveResult<Option<LinkRecord>> {
-        Ok(self.with(|all| all.iter().find(|r| &r.token_hash == hash).cloned()))
+    async fn by_hash(
+        &self,
+        hash: &ShareTokenHash,
+    ) -> DriveResult<Option<LinkRecord>> {
+        Ok(
+            self.with(|all| {
+                all.iter().find(|r| &r.token_hash == hash).cloned()
+            }),
+        )
     }
 
     async fn revoke(&self, id: ShareId, at: Timestamp) -> DriveResult<()> {
@@ -436,7 +466,10 @@ impl Sharing {
 
     /// Replaces the clock, for tests.
     #[must_use]
-    pub fn with_clock(mut self, clock: Arc<dyn Fn() -> Timestamp + Send + Sync>) -> Self {
+    pub fn with_clock(
+        mut self,
+        clock: Arc<dyn Fn() -> Timestamp + Send + Sync>,
+    ) -> Self {
         self.clock = clock;
         self
     }
@@ -450,7 +483,8 @@ impl Sharing {
     /// still far too few for a guessed password of 8 characters or more.
     fn locked_out(&self, link: ShareId) -> bool {
         let now = self.now().unix_ms();
-        let failures = self.failures.lock().unwrap_or_else(PoisonError::into_inner);
+        let failures =
+            self.failures.lock().unwrap_or_else(PoisonError::into_inner);
         failures.get(&link).is_some_and(|(count, since)| {
             *count >= MAX_PASSWORD_FAILURES && now - since < PASSWORD_WINDOW_MS
         })
@@ -459,7 +493,8 @@ impl Sharing {
     /// Counts a wrong password for `link`.
     fn failed(&self, link: ShareId) {
         let now = self.now().unix_ms();
-        let mut failures = self.failures.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut failures =
+            self.failures.lock().unwrap_or_else(PoisonError::into_inner);
         if failures.len() >= MAX_TRACKED_LINKS {
             failures.retain(|_, (_, since)| now - *since < PASSWORD_WINDOW_MS);
             if failures.len() >= MAX_TRACKED_LINKS {
@@ -477,7 +512,11 @@ impl Sharing {
     /// The live item, if `user` may share it. Someone who may only view it
     /// gets [`DriveError::PermissionDenied`]; someone who may not even see
     /// it gets [`DriveError::NotFound`], as the drive answers elsewhere.
-    async fn shareable(&self, actor: &Actor, id: ObjectId) -> DriveResult<(UserId, Node)> {
+    async fn shareable(
+        &self,
+        actor: &Actor,
+        id: ObjectId,
+    ) -> DriveResult<(UserId, Node)> {
         let user = person(actor)?;
         let node = self.drive.get(actor, id).await?;
         if !node.is_live() {
@@ -495,7 +534,11 @@ impl Sharing {
     ///
     /// `NotFound`, `PermissionDenied` (the caller may not share it), or a
     /// storage failure.
-    pub async fn state(&self, actor: &Actor, id: ObjectId) -> DriveResult<SharingState> {
+    pub async fn state(
+        &self,
+        actor: &Actor,
+        id: ObjectId,
+    ) -> DriveResult<SharingState> {
         let (_, node) = self.shareable(actor, id).await?;
         let mut grants = self.access.grants(node.space, node.id).await?;
         grants.sort_by_key(|g| (std::cmp::Reverse(g.role), g.grantee));
@@ -520,7 +563,12 @@ impl Sharing {
     ///
     /// `NotFound`, `PermissionDenied`, `Invalid` for an expiry in the past,
     /// or a storage failure.
-    pub async fn share(&self, actor: &Actor, id: ObjectId, grant: &Grant) -> DriveResult<()> {
+    pub async fn share(
+        &self,
+        actor: &Actor,
+        id: ObjectId,
+        grant: &Grant,
+    ) -> DriveResult<()> {
         let (user, node) = self.shareable(actor, id).await?;
         if let Some(at) = grant.expires_at
             && at.unix_ms() <= self.now().unix_ms()
@@ -554,7 +602,12 @@ impl Sharing {
     /// # Errors
     ///
     /// `NotFound`, `PermissionDenied`, or a storage failure.
-    pub async fn unshare(&self, actor: &Actor, id: ObjectId, grantee: Grantee) -> DriveResult<()> {
+    pub async fn unshare(
+        &self,
+        actor: &Actor,
+        id: ObjectId,
+        grantee: Grantee,
+    ) -> DriveResult<()> {
         let (user, node) = self.shareable(actor, id).await?;
         if grantee == Grantee::User(user) {
             return Err(DriveError::Invalid(
@@ -604,7 +657,8 @@ impl Sharing {
             }
             Some(p) if p.chars().count() < MIN_PASSWORD_CHARS => {
                 return Err(DriveError::Invalid(format!(
-                    "the password must be at least {MIN_PASSWORD_CHARS} characters"
+                    "the password must be at least {MIN_PASSWORD_CHARS} \
+                        characters"
                 )));
             }
             Some(p) => Some(self.passwords.hash(p.to_owned()).await?),
@@ -618,11 +672,13 @@ impl Sharing {
             .count();
         if live >= MAX_LINKS_PER_ITEM {
             return Err(DriveError::Invalid(format!(
-                "a page can have at most {MAX_LINKS_PER_ITEM} live links; revoke one first"
+                "a page can have at most {MAX_LINKS_PER_ITEM} live links; \
+                    revoke one first"
             )));
         }
-        let token = ShareToken::generate()
-            .map_err(|e| DriveError::Index(format!("cannot make a token: {e}")))?;
+        let token = ShareToken::generate().map_err(|e| {
+            DriveError::Index(format!("cannot make a token: {e}"))
+        })?;
         let record = LinkRecord {
             id: ShareId::generate(),
             space: node.space,
@@ -645,7 +701,12 @@ impl Sharing {
             self.links.revoke(record.id, now).await?;
             return Err(error);
         }
-        tracing::info!(node = %node.id, link = %record.id, password = record.password_hash.is_some(), "share link created");
+        tracing::info!(
+            node = %node.id,
+            link = %record.id,
+            password = record.password_hash.is_some(),
+            "share link created"
+        );
         Ok(NewLink {
             info: LinkInfo::of(&record, now),
             token,
@@ -658,7 +719,11 @@ impl Sharing {
     ///
     /// `NotFound` for an unknown link, `PermissionDenied` when the caller
     /// may not share its page, or a storage failure.
-    pub async fn revoke_link(&self, actor: &Actor, link: ShareId) -> DriveResult<()> {
+    pub async fn revoke_link(
+        &self,
+        actor: &Actor,
+        link: ShareId,
+    ) -> DriveResult<()> {
         let record = self.links.get(link).await?.ok_or_else(link_gone)?;
         let (user, node) = self.shareable(actor, record.node).await?;
         self.links.revoke(link, self.now()).await?;
@@ -676,9 +741,14 @@ impl Sharing {
     /// # Errors
     ///
     /// `NotFound`, or a storage failure.
-    pub async fn open(&self, token: &ShareToken, password: Option<&str>) -> DriveResult<Opened> {
+    pub async fn open(
+        &self,
+        token: &ShareToken,
+        password: Option<&str>,
+    ) -> DriveResult<Opened> {
         let gone = link_gone;
-        let record = self.links.by_hash(&token.hash()).await?.ok_or_else(gone)?;
+        let record =
+            self.links.by_hash(&token.hash()).await?.ok_or_else(gone)?;
         if !record.token_hash.verify(token) || !record.is_live(self.now()) {
             return Err(gone());
         }
@@ -689,7 +759,8 @@ impl Sharing {
             // Too many wrong guesses: refuse without hashing, so neither a
             // guessing run nor a flood of slow hashes gets anywhere (RT-042).
             if self.locked_out(record.id) {
-                tracing::warn!(link = %record.id, "share link password locked after repeated failures");
+                tracing::warn!(link = %record.id, "share link password locked \
+                    after repeated failures");
                 return Ok(Opened::PasswordRequired { retry: true });
             }
             if given.len() > MAX_PASSWORD_BYTES
@@ -699,7 +770,10 @@ impl Sharing {
                     .await
             {
                 self.failed(record.id);
-                tracing::info!(link = %record.id, "share link password refused");
+                tracing::info!(
+                    link = %record.id,
+                    "share link password refused"
+                );
                 return Ok(Opened::PasswordRequired { retry: true });
             }
             let _ = self

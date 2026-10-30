@@ -86,7 +86,8 @@ mod tests {
     #[test]
     fn templates_fill_only_unset_fields() {
         let t: Template = serde_saphyr::from_str(
-            "name: Bug report\ntitle: 'Bug: '\npriority: 2\nlabels: [type/bug]\nbody: |\n  ## Steps\n",
+            "name: Bug report\ntitle: 'Bug: '\npriority: 2\n\
+                labels: [type/bug]\nbody: |\n  ## Steps\n",
         )
         .unwrap();
         let mut d = NewIssue::new(

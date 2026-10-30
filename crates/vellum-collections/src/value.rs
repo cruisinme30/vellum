@@ -163,28 +163,44 @@ impl schemars::JsonSchema for DateValue {
         schemars::json_schema!({
             "type": "string",
             "description": "A UTC date, YYYY-MM-DD, optionally with THH:MM[:SS]",
-            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}(:[0-9]{2})?)?$",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}(:[0-9]{2\
+                })?)?$",
         })
     }
 }
 
 impl Serialize for DateValue {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
         serializer.collect_str(self)
     }
 }
 
 impl<'de> Deserialize<'de> for DateValue {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Self, D::Error> {
         let text = <std::borrow::Cow<'de, str>>::deserialize(deserializer)?;
-        Self::parse(&text).ok_or_else(|| serde::de::Error::custom("expected YYYY-MM-DD[THH:MM]"))
+        Self::parse(&text).ok_or_else(|| {
+            serde::de::Error::custom("expected YYYY-MM-DD[THH:MM]")
+        })
     }
 }
 
 /// A property value.
 ///
 /// Serialised for the API as `{"type": "number", "value": 3}`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default, schemars::JsonSchema)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Serialize,
+    Deserialize,
+    Default,
+    schemars::JsonSchema,
+)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum Value {
     /// No value.
@@ -380,9 +396,11 @@ mod tests {
 
     #[test]
     fn dates_parse_and_print() {
-        let d = DateValue::parse("2026-10-28").unwrap_or_else(|| unreachable!());
+        let d =
+            DateValue::parse("2026-10-28").unwrap_or_else(|| unreachable!());
         assert_eq!(d.to_string(), "2026-10-28");
-        let t = DateValue::parse("2026-10-28T09:30Z").unwrap_or_else(|| unreachable!());
+        let t = DateValue::parse("2026-10-28T09:30Z")
+            .unwrap_or_else(|| unreachable!());
         assert_eq!(t.to_string(), "2026-10-28T09:30");
         assert!(DateValue::parse("2026-13-01").is_none());
         assert!(DateValue::parse("26-1-1").is_none());
@@ -408,12 +426,16 @@ mod tests {
     #[test]
     fn sort_puts_empty_first_and_ignores_case() {
         assert_eq!(Value::Empty.sort_cmp(&Value::Number(1.0)), Ordering::Less);
-        assert_eq!(Value::text("a").sort_cmp(&Value::text("B")), Ordering::Less);
+        assert_eq!(
+            Value::text("a").sort_cmp(&Value::text("B")),
+            Ordering::Less
+        );
     }
 
     #[test]
     fn values_serialise_tagged() {
-        let json = serde_json::to_string(&Value::Number(3.0)).unwrap_or_default();
+        let json =
+            serde_json::to_string(&Value::Number(3.0)).unwrap_or_default();
         assert_eq!(json, r#"{"type":"number","value":3.0}"#);
     }
 }

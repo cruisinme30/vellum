@@ -28,7 +28,10 @@ function path(
   y: (v: number) => number,
 ) {
   return points
-    .map((p, index) => `${index === 0 ? "M" : "L"}${x(index).toFixed(1)},${y(value(p)).toFixed(1)}`)
+    .map((p, index) => {
+      const command = index === 0 ? "M" : "L";
+      return `${command}${x(index).toFixed(1)},${y(value(p)).toFixed(1)}`;
+    })
     .join(" ");
 }
 
@@ -37,7 +40,11 @@ function day(date: string): string {
   const parsed = new Date(`${date}T00:00:00Z`);
   return Number.isNaN(parsed.getTime())
     ? date
-    : parsed.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
+    : parsed.toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        timeZone: "UTC",
+      });
 }
 
 /** The burn-up chart. */
@@ -50,11 +57,18 @@ export function BurnUpChart({
 }) {
   const t = useT();
   const id = useId();
-  if (points.length === 0) return <p className="vl-muted">{t("work-burn-empty")}</p>;
+  if (points.length === 0)
+    return <p className="vl-muted">{t("work-burn-empty")}</p>;
   const top = Math.max(1, ...points.map((p) => Math.max(p.scope, p.completed)));
-  const inner = { w: WIDTH - PAD.left - PAD.right, h: HEIGHT - PAD.top - PAD.bottom };
+  const inner = {
+    w: WIDTH - PAD.left - PAD.right,
+    h: HEIGHT - PAD.top - PAD.bottom,
+  };
   const x = (index: number) =>
-    PAD.left + (points.length === 1 ? inner.w / 2 : (index / (points.length - 1)) * inner.w);
+    PAD.left +
+    (points.length === 1
+      ? inner.w / 2
+      : (index / (points.length - 1)) * inner.w);
   const y = (v: number) => PAD.top + inner.h - (v / top) * inner.h;
   const ticks = [0, Math.round(top / 2), top];
   const first = points[0];
@@ -94,24 +108,50 @@ export function BurnUpChart({
           </g>
         ))}
         {first !== undefined && (
-          <text className="vl-burn-axis" x={x(0)} y={HEIGHT - 8} textAnchor="start">
+          <text
+            className="vl-burn-axis"
+            x={x(0)}
+            y={HEIGHT - 8}
+            textAnchor="start"
+          >
             {day(first.date)}
           </text>
         )}
         {last !== undefined && points.length > 1 && (
-          <text className="vl-burn-axis" x={x(points.length - 1)} y={HEIGHT - 8} textAnchor="end">
+          <text
+            className="vl-burn-axis"
+            x={x(points.length - 1)}
+            y={HEIGHT - 8}
+            textAnchor="end"
+          >
             {day(last.date)}
           </text>
         )}
-        <path className="vl-burn-scope" d={path(points, (p) => p.scope, x, y)} />
-        <path className="vl-burn-completed" d={path(points, (p) => p.completed, x, y)} />
+        <path
+          className="vl-burn-scope"
+          d={path(points, (p) => p.scope, x, y)}
+        />
+        <path
+          className="vl-burn-completed"
+          d={path(points, (p) => p.completed, x, y)}
+        />
         {points.map((p, index) => (
-          <circle key={p.date} className="vl-burn-dot" cx={x(index)} cy={y(p.completed)} r={3} />
+          <circle
+            key={p.date}
+            className="vl-burn-dot"
+            cx={x(index)}
+            cy={y(p.completed)}
+            r={3}
+          />
         ))}
       </svg>
       <figcaption className="vl-burn-legend">
-        <span className="vl-burn-key vl-burn-key-scope">{t("work-burn-scope")}</span>
-        <span className="vl-burn-key vl-burn-key-completed">{t("work-burn-completed")}</span>
+        <span className="vl-burn-key vl-burn-key-scope">
+          {t("work-burn-scope")}
+        </span>
+        <span className="vl-burn-key vl-burn-key-completed">
+          {t("work-burn-completed")}
+        </span>
       </figcaption>
       <details className="vl-burn-table">
         <summary>{t("work-burn-table")}</summary>

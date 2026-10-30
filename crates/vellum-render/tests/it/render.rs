@@ -8,7 +8,11 @@
 //! to its `.html` sibling. Run with `VELLUM_BLESS=1` to write the expected
 //! files after a reviewed change.
 
-#![allow(clippy::unwrap_used, clippy::indexing_slicing, reason = "test helpers")]
+#![allow(
+    clippy::unwrap_used,
+    clippy::indexing_slicing,
+    reason = "test helpers"
+)]
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -17,8 +21,8 @@ use std::time::{Duration, Instant};
 use vellum_format::parse;
 use vellum_render::figure::{FigureConfig, Figures};
 use vellum_render::resolve::{
-    IssueCard, IssueGroup, IssueLayout, IssueRef, IssueView, IssuesAt, NoResolver, Resolved,
-    Resolver,
+    IssueCard, IssueGroup, IssueLayout, IssueRef, IssueView, IssuesAt,
+    NoResolver, Resolved, Resolver,
 };
 use vellum_render::{RenderOptions, RenderedPage, Renderer};
 
@@ -27,7 +31,11 @@ fn renderer() -> Renderer {
 }
 
 fn render(src: &str) -> RenderedPage {
-    renderer().render_offline(&parse(src).document, &NoResolver, &RenderOptions::default())
+    renderer().render_offline(
+        &parse(src).document,
+        &NoResolver,
+        &RenderOptions::default(),
+    )
 }
 
 fn corpus() -> PathBuf {
@@ -39,7 +47,10 @@ fn inputs() -> Vec<PathBuf> {
         .unwrap()
         .filter_map(Result::ok)
         .map(|e| e.path())
-        .filter(|p| p.extension().is_some_and(|e| e == "md") && !p.ends_with("README.md"))
+        .filter(|p| {
+            p.extension().is_some_and(|e| e == "md")
+                && !p.ends_with("README.md")
+        })
         .collect();
     files.sort();
     files
@@ -61,7 +72,13 @@ fn assert_safe(name: &str, html: &str) {
         assert!(
             !matches!(
                 element,
-                "script" | "object" | "embed" | "base" | "meta" | "link" | "form"
+                "script"
+                    | "object"
+                    | "embed"
+                    | "base"
+                    | "meta"
+                    | "link"
+                    | "form"
             ),
             "{name}: <{tag}>"
         );
@@ -75,7 +92,10 @@ fn assert_safe(name: &str, html: &str) {
             assert!(!lower.contains(bad), "{name}: {bad} in <{tag}>");
         }
         for attr in lower.split_whitespace().skip(1) {
-            assert!(!attr.starts_with("on"), "{name}: event handler in <{tag}>");
+            assert!(
+                !attr.starts_with("on"),
+                "{name}: event handler in <{tag}>"
+            );
         }
         if element == "iframe" {
             assert!(lower.contains("sandbox="), "{name}: unsandboxed <{tag}>");
@@ -118,7 +138,10 @@ fn golden_html_corpus() {
             fs::write(&expected, &out).unwrap();
         }
         if fs::read_to_string(&expected).unwrap_or_default() != out {
-            failures.push(format!("{name}: HTML differs from {}", expected.display()));
+            failures.push(format!(
+                "{name}: HTML differs from {}",
+                expected.display()
+            ));
         }
     }
     assert!(
@@ -195,7 +218,9 @@ fn every_block_renders_without_falling_back_to_source() {
 
 #[test]
 fn islands_get_unique_ids() {
-    let page = render("```chart\nvalues: [1, 2]\n```\n\n```chart\nvalues: [3, 4]\n```\n");
+    let page = render(
+        "```chart\nvalues: [1, 2]\n```\n\n```chart\nvalues: [3, 4]\n```\n",
+    );
     assert!(page.html.contains("id=\"f0-root\""));
     assert!(page.html.contains("id=\"f1-root\""));
     assert!(page.html.contains("aria-labelledby=\"f1-title\""));
@@ -204,7 +229,8 @@ fn islands_get_unique_ids() {
 #[test]
 fn outline_and_title() {
     let page = render(
-        "---\ntitle: Gateway rollout\n---\n# Overview\n\n::: toc\n:::\n\n## Plan\n\n### Risks\n\n## Plan\n",
+        "---\ntitle: Gateway rollout\n---\n# Overview\n\n::: toc\n:::\n\n\
+            ## Plan\n\n### Risks\n\n## Plan\n",
     );
     assert_eq!(page.title.as_deref(), Some("Gateway rollout"));
     let ids: Vec<&str> = page.toc.iter().map(|e| e.id.as_str()).collect();
@@ -239,9 +265,13 @@ impl Resolver for Workspace {
 
 #[test]
 fn references_resolve_through_the_resolver() {
-    let doc =
-        parse("See [[Gateway rollout]] and [[Missing page]], ask @maya about ENG-142.\n").document;
-    let page = renderer().render_offline(&doc, &Workspace, &RenderOptions::default());
+    let doc = parse(
+        "See [[Gateway rollout]] and [[Missing page]], ask @maya about \
+            ENG-142.\n",
+    )
+    .document;
+    let page =
+        renderer().render_offline(&doc, &Workspace, &RenderOptions::default());
     assert!(page.html.contains("href=\"/d/01JB\""), "{}", page.html);
     assert!(page.html.contains("vl-unresolved"));
     assert!(page.html.contains("@Maya Chen"));
@@ -287,7 +317,8 @@ fn fifty_block_page_renders_within_budget() {
     let mut times: Vec<Duration> = (0..20)
         .map(|_| {
             let t = Instant::now();
-            let _ = r.render_offline(&doc, &NoResolver, &RenderOptions::default());
+            let _ =
+                r.render_offline(&doc, &NoResolver, &RenderOptions::default());
             t.elapsed()
         })
         .collect();
@@ -321,7 +352,8 @@ async fn async_render_without_kroki_matches_offline() {
 #[test]
 fn ids_cannot_clobber_globals() {
     let page = render(
-        "# exports\n\n## location {#module}\n\nSee [the plan](#exports).\n\n```calculator\nname: Name = 1\nout: Out = name * 2\n```\n",
+        "# exports\n\n## location {#module}\n\nSee [the plan](#exports).\n\n\
+            ```calculator\nname: Name = 1\nout: Out = name * 2\n```\n",
     );
     for tag in tags(&page.html) {
         for attr in ["id=\"", "name=\""] {
@@ -388,8 +420,15 @@ impl Resolver for Issues {
 
 #[test]
 fn issue_blocks_render_live_views() {
-    let src = "::: issues\nfilter:\n  field: status\n:::\n\n:::: tip\n::: issues ^blk-a1b2c3d4\nlayout: board\n:::\n::::\n\n```md\n::: issues\n:::\n```\n\n::: issues\nbad: 1\n:::\n\n::: issues\nlimit: 5\n:::\n";
-    let page = renderer().render_offline(&parse(src).document, &Issues, &RenderOptions::default());
+    let src = "::: issues\nfilter:\n  field: status\n:::\n\n:::: tip\n\
+        ::: issues ^blk-a1b2c3d4\nlayout: board\n:::\n::::\n\n```md\n\
+        ::: issues\n:::\n```\n\n::: issues\nbad: 1\n:::\n\n::: issues\n\
+        limit: 5\n:::\n";
+    let page = renderer().render_offline(
+        &parse(src).document,
+        &Issues,
+        &RenderOptions::default(),
+    );
     let html = &page.html;
     assert_safe("issues", html);
     // The list view, with its heading, groups, cards and the overflow note.

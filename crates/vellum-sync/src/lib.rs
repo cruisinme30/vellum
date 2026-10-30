@@ -26,10 +26,11 @@ pub mod sql;
 
 pub use app::{MAX_MUTATION_ID, MAX_PUSH, Mutators, PULL_PAGE, Sync};
 pub use domain::{
-    Change, ClientId, ClientMutation, Patch, PullRequest, PullResponse, PushRequest, PushResponse,
-    Record, Rejected,
+    Change, ClientId, ClientMutation, Patch, PullRequest, PullResponse,
+    PushRequest, PushResponse, Record, Rejected,
 };
 pub use ports::{
-    AccessKey, ClientState, LogInfo, MutationContext, ReadAccess, ServerMutator, SyncStore,
+    AccessKey, ClientState, LogInfo, MutationContext, ReadAccess,
+    ServerMutator, SyncStore,
 };
 pub use sql::SqlStore;

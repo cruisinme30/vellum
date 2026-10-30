@@ -28,7 +28,10 @@ use vellum_crypto::{KekId, LocalKeyring, SecretKey};
 use vellum_db::{Index, IndexConfig, IndexPool, sqlx};
 
 fn keyring() -> LocalKeyring {
-    LocalKeyring::new(KekId::new("test").unwrap(), SecretKey::generate().unwrap())
+    LocalKeyring::new(
+        KekId::new("test").unwrap(),
+        SecretKey::generate().unwrap(),
+    )
 }
 
 async fn sqlite(dir: &tempfile::TempDir) -> Index {
@@ -53,7 +56,8 @@ async fn conformance(store: &SqlUpdateStore) {
     assert_eq!(store.append(b, b"other".to_vec()).await.unwrap(), 1);
     assert!(!store.seed(b, b"late".to_vec()).await.unwrap());
     let log = store.load(a).await.unwrap();
-    let records: Vec<(u64, &[u8])> = log.iter().map(|r| (r.seq, r.update.as_slice())).collect();
+    let records: Vec<(u64, &[u8])> =
+        log.iter().map(|r| (r.seq, r.update.as_slice())).collect();
     assert_eq!(
         records,
         [(1, &b"seed"[..]), (2, &b"one"[..]), (3, &b"two"[..])]
@@ -116,10 +120,11 @@ async fn sealed_records_are_unreadable_without_the_key() {
     let IndexPool::Sqlite(pool) = index.pool() else {
         unreachable!()
     };
-    let stored: Vec<u8> = sqlx::query_scalar("SELECT payload FROM collab_updates")
-        .fetch_one(pool)
-        .await
-        .unwrap();
+    let stored: Vec<u8> =
+        sqlx::query_scalar("SELECT payload FROM collab_updates")
+            .fetch_one(pool)
+            .await
+            .unwrap();
     assert!(!stored.windows(9).any(|w| w == b"Northstar"));
 
     // Another key, or none, cannot read it.
@@ -145,12 +150,13 @@ async fn a_record_moved_to_another_document_is_refused() {
     let IndexPool::Sqlite(pool) = index.pool() else {
         unreachable!()
     };
-    let _moved = sqlx::query("UPDATE collab_updates SET space_id = ?, doc_id = ?")
-        .bind(to.space.as_u128().to_be_bytes().to_vec())
-        .bind(to.doc.as_u128().to_be_bytes().to_vec())
-        .execute(pool)
-        .await
-        .unwrap();
+    let _moved =
+        sqlx::query("UPDATE collab_updates SET space_id = ?, doc_id = ?")
+            .bind(to.space.as_u128().to_be_bytes().to_vec())
+            .bind(to.doc.as_u128().to_be_bytes().to_vec())
+            .execute(pool)
+            .await
+            .unwrap();
     assert!(store.load(to).await.is_err());
     index.close().await;
 }
@@ -200,7 +206,8 @@ async fn a_second_hub_rebuilds_the_room_from_the_database() {
     second_index.close().await;
 }
 
-type Started = Result<(ContainerAsync<Postgres>, String), Box<dyn std::error::Error>>;
+type Started =
+    Result<(ContainerAsync<Postgres>, String), Box<dyn std::error::Error>>;
 
 async fn postgres() -> Started {
     let container = Postgres::default().with_tag("17-alpine").start().await?;

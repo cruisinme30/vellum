@@ -11,7 +11,9 @@ use crate::code::{self, CodeOptions};
 use crate::figure::{Figure, FigureError};
 use crate::html::{self, num, push_attr};
 use crate::model;
-use vellum_format::blocks::{Board, Calculator, CollectionView, Data, DataTable, Image, Timeline};
+use vellum_format::blocks::{
+    Board, Calculator, CollectionView, Data, DataTable, Image, Timeline,
+};
 
 fn pair<'a>(f: &'a Fence, key: &str) -> Option<&'a str> {
     f.attrs
@@ -25,7 +27,10 @@ impl Writer<'_> {
     pub(super) fn fence(&mut self, f: &Fence) {
         match f.kind() {
             FenceKind::Code => self.code(f),
-            FenceKind::Chart if pair(f, "source").is_some() && f.literal.trim().is_empty() => {
+            FenceKind::Chart
+                if pair(f, "source").is_some()
+                    && f.literal.trim().is_empty() =>
+            {
                 self.live_chart(f);
             }
             FenceKind::Chart
@@ -64,7 +69,9 @@ impl Writer<'_> {
         let options = CodeOptions {
             numbered: pair(f, "lines").is_some_and(|v| v != "false")
                 || f.attrs.classes.iter().any(|c| c == "lines"),
-            highlighted: pair(f, "hl").map(code::parse_line_list).unwrap_or_default(),
+            highlighted: pair(f, "hl")
+                .map(code::parse_line_list)
+                .unwrap_or_default(),
         };
         self.out.push_str("<figure");
         self.attrs("vl-code", &f.attrs);
@@ -150,7 +157,11 @@ impl Writer<'_> {
         }
         if figure.stale {
             self.stale += 1;
-            self.out.push_str("<details class=\"vl-figure-source\" data-stale=\"true\"><summary>Showing the last rendered version: the diagram service is unavailable.</summary>");
+            self.out.push_str(
+                "<details class=\"vl-figure-source\" \
+                data-stale=\"true\"><summary>Showing the last rendered \
+                version: the diagram service is unavailable.</summary>",
+            );
             self.source(f);
             self.out.push_str("</details>");
         }
@@ -177,8 +188,9 @@ impl Writer<'_> {
     }
 
     fn chart_table(&mut self, chart: &model::Chart) {
-        self.out
-            .push_str("<table class=\"vl-sr-only\"><thead><tr><th scope=\"col\">");
+        self.out.push_str(
+            "<table class=\"vl-sr-only\"><thead><tr><th scope=\"col\">",
+        );
         html::text(
             &mut self.out,
             if chart.kind == model::ChartKind::Scatter {
@@ -239,13 +251,17 @@ impl Writer<'_> {
     fn live_chart(&mut self, f: &Fence) {
         self.out.push_str("<figure");
         self.attrs("vl-figure vl-chart vl-live-placeholder", &f.attrs);
-        for (key, attr) in [("source", "data-source"), ("x", "data-x"), ("y", "data-y")] {
+        for (key, attr) in
+            [("source", "data-source"), ("x", "data-x"), ("y", "data-y")]
+        {
             if let Some(v) = pair(f, key) {
                 push_attr(&mut self.out, attr, v);
             }
         }
-        self.out
-            .push_str(">A live chart of a collection; it fills in when the page opens.</figure>");
+        self.out.push_str(
+            ">A live chart of a collection; it fills in when the \
+                page opens.</figure>",
+        );
     }
 
     fn timeline(&mut self, f: &Fence, t: &Timeline) {
@@ -315,7 +331,9 @@ impl Writer<'_> {
             return self.source(f);
         }
         let col = |name: Option<&str>| {
-            name.and_then(|n| table.header.iter().position(|h| h.eq_ignore_ascii_case(n)))
+            name.and_then(|n| {
+                table.header.iter().position(|h| h.eq_ignore_ascii_case(n))
+            })
         };
         let bar = col(table.bar.as_deref());
         let sums: Vec<usize> = table
@@ -358,9 +376,14 @@ impl Writer<'_> {
                 });
                 match (Some(i) == bar, model::parse_number(cell)) {
                     (true, Some(v)) => {
-                        self.out
-                            .push_str("<span class=\"vl-bar-cell\"><meter min=\"0\"");
-                        push_attr(&mut self.out, "max", &num(bar_max.max(f64::MIN_POSITIVE)));
+                        self.out.push_str(
+                            "<span class=\"vl-bar-cell\"><meter min=\"0\"",
+                        );
+                        push_attr(
+                            &mut self.out,
+                            "max",
+                            &num(bar_max.max(f64::MIN_POSITIVE)),
+                        );
                         push_attr(&mut self.out, "value", &num(v));
                         self.out.push_str("></meter><span>");
                         html::text(&mut self.out, cell);
@@ -380,7 +403,9 @@ impl Writer<'_> {
                     let total: f64 = table
                         .rows
                         .iter()
-                        .filter_map(|r| r.get(i).and_then(|v| model::parse_number(v)))
+                        .filter_map(|r| {
+                            r.get(i).and_then(|v| model::parse_number(v))
+                        })
                         .sum();
                     self.out.push_str("<td class=\"vl-align-right\">");
                     html::text(
@@ -401,7 +426,10 @@ impl Writer<'_> {
 
     fn calculator(&mut self, f: &Fence, calc: &Calculator) {
         if calc.outputs.is_empty() {
-            self.warn("calculator needs a result line such as `total: Total = units * price`");
+            self.warn(
+                "calculator needs a result line such as `total: Total = \
+                units * price`",
+            );
             return self.source(f);
         }
         let mut vars: Vec<(String, f64)> = calc
@@ -413,7 +441,8 @@ impl Writer<'_> {
         self.attrs("vl-calculator", &f.attrs);
         self.out.push('>');
         for input in &calc.inputs {
-            let id = self.unique_id(&format!("calc-{}", html::slug(&input.key)));
+            let id =
+                self.unique_id(&format!("calc-{}", html::slug(&input.key)));
             let min = input.min.unwrap_or_else(|| input.value.min(0.0));
             let max = input
                 .max
@@ -448,7 +477,10 @@ impl Writer<'_> {
             self.out.push_str("</span> <output>");
             match result {
                 Ok(v) => {
-                    html::text(&mut self.out, &crate::figure::chart::format_value(v, unit));
+                    html::text(
+                        &mut self.out,
+                        &crate::figure::chart::format_value(v, unit),
+                    );
                     // Later outputs may use earlier ones.
                     vars.push((output.key.clone(), v));
                 }
@@ -480,11 +512,9 @@ impl Writer<'_> {
         self.out.push_str("><img");
         push_attr(&mut self.out, "src", &src);
         push_attr(&mut self.out, "alt", &image.alt);
-        if let Some(w) = image
-            .width
-            .as_deref()
-            .filter(|w| w.trim_end_matches(['%', 'x', 'p']).parse::<u32>().is_ok())
-        {
+        if let Some(w) = image.width.as_deref().filter(|w| {
+            w.trim_end_matches(['%', 'x', 'p']).parse::<u32>().is_ok()
+        }) {
             push_attr(&mut self.out, "width", w.trim_end_matches("px"));
         }
         self.out.push_str(" loading=\"lazy\" decoding=\"async\">");
@@ -517,8 +547,9 @@ impl Writer<'_> {
                     html::text(&mut self.out, &snap.title);
                     self.out.push_str("</strong></p>");
                 }
-                self.out
-                    .push_str("<div class=\"vl-table-wrap\"><table><thead><tr>");
+                self.out.push_str(
+                    "<div class=\"vl-table-wrap\"><table><thead><tr>",
+                );
                 for h in &snap.header {
                     self.out.push_str("<th scope=\"col\">");
                     html::text(&mut self.out, h);

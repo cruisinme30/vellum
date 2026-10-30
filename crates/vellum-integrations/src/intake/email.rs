@@ -66,7 +66,9 @@ fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 
 fn split_part(raw: &[u8]) -> Part<'_> {
     let (head, body) = match (find(raw, b"\r\n\r\n"), find(raw, b"\n\n")) {
-        (Some(crlf), Some(lf)) if lf < crlf => (raw.get(..lf), raw.get(lf + 2..)),
+        (Some(crlf), Some(lf)) if lf < crlf => {
+            (raw.get(..lf), raw.get(lf + 2..))
+        }
         (Some(crlf), _) => (raw.get(..crlf), raw.get(crlf + 4..)),
         (None, Some(lf)) => (raw.get(..lf), raw.get(lf + 2..)),
         (None, None) => (Some(raw), None),
@@ -133,7 +135,9 @@ fn decode_qp(input: &[u8]) -> Vec<u8> {
 
 fn decode_charset(bytes: &[u8], charset: &str) -> String {
     match charset.to_ascii_lowercase().as_str() {
-        "iso-8859-1" | "latin1" | "windows-1252" => bytes.iter().map(|b| char::from(*b)).collect(),
+        "iso-8859-1" | "latin1" | "windows-1252" => {
+            bytes.iter().map(|b| char::from(*b)).collect()
+        }
         _ => String::from_utf8_lossy(bytes).into_owned(),
     }
 }
@@ -250,7 +254,8 @@ fn text_of(part: &Part<'_>, depth: usize) -> Option<(bool, String)> {
         .unwrap_or("text/plain")
         .to_ascii_lowercase();
     if content_type.starts_with("multipart/") && depth < 5 {
-        let boundary = param(part.header("Content-Type").unwrap_or_default(), "boundary")?;
+        let boundary =
+            param(part.header("Content-Type").unwrap_or_default(), "boundary")?;
         let delimiter = format!("--{boundary}");
         let body = String::from_utf8_lossy(part.body);
         let mut html = None;
@@ -300,7 +305,8 @@ pub fn parse(raw: &[u8]) -> Result<Mail, InboundError> {
         .header("Auto-Submitted")
         .is_some_and(|v| !v.trim().eq_ignore_ascii_case("no"))
         || part.header("Precedence").is_some_and(|v| {
-            ["bulk", "list", "junk"].contains(&v.trim().to_ascii_lowercase().as_str())
+            ["bulk", "list", "junk"]
+                .contains(&v.trim().to_ascii_lowercase().as_str())
         })
         || part.header("List-Id").is_some();
     Ok(Mail {
@@ -439,7 +445,8 @@ pub fn classify(mail: &Mail, settings: &EmailSettings) -> EmailIntake {
             && let Some(rest) = local.strip_prefix("reply+")
         {
             let mut parts = rest.splitn(3, '.');
-            let (Some(key), Some(user), Some(tag)) = (parts.next(), parts.next(), parts.next())
+            let (Some(key), Some(user), Some(tag)) =
+                (parts.next(), parts.next(), parts.next())
             else {
                 return EmailIntake::Ignored("malformed reply address");
             };
@@ -449,15 +456,20 @@ pub fn classify(mail: &Mail, settings: &EmailSettings) -> EmailIntake {
             // With no secret anyone could compute a tag, so replies are
             // refused rather than trusted.
             if settings.reply_secret.is_empty() {
-                return EmailIntake::Ignored("reply addresses are not configured");
+                return EmailIntake::Ignored(
+                    "reply addresses are not configured",
+                );
             }
             // Addresses may be lower-cased in transit, so tags are computed
             // over the lower-case user ID (ULIDs are case-insensitive).
             // The sender is part of the tag, so a reply from anyone but the
             // notified address does not match.
-            let expected = reply_tag(&settings.reply_secret, &key, user, &mail.from);
+            let expected =
+                reply_tag(&settings.reply_secret, &key, user, &mail.from);
             if !mac::equal(expected.as_bytes(), tag.as_bytes()) {
-                return EmailIntake::Ignored("reply address tag does not match");
+                return EmailIntake::Ignored(
+                    "reply address tag does not match",
+                );
             }
             let body = strip_quoted(&mail.text);
             if body.is_empty() {
@@ -494,7 +506,8 @@ pub fn classify(mail: &Mail, settings: &EmailSettings) -> EmailIntake {
                     message_id: mail.message_id.clone(),
                 },
             );
-            draft.description = Body::new().text(&strip_quoted(&mail.text)).finish();
+            draft.description =
+                Body::new().text(&strip_quoted(&mail.text)).finish();
             draft.reporter = Some(mail.from.clone());
             return EmailIntake::NewIssue(Box::new(draft));
         }
@@ -551,27 +564,31 @@ Please look soon=\r\n\
     }
 
     #[test]
-    fn multipart_prefers_text_and_plus_addresses_route() -> Result<(), InboundError> {
-        let raw = "From: bo@northstar.dev\nTo: issues+eng@northstar.dev\nSubject: Crash\n\
-Content-Type: multipart/alternative; boundary=\"b1\"\n\n\
---b1\nContent-Type: text/html; charset=utf-8\n\n<p>HTML &amp; body</p>\n\
---b1\nContent-Type: text/plain; charset=utf-8\nContent-Transfer-Encoding: base64\n\nQ3Jhc2ggb24gc3RhcnQ=\n\
---b1--\n";
+    fn multipart_prefers_text_and_plus_addresses_route()
+    -> Result<(), InboundError> {
+        let raw = "From: bo@northstar.dev\nTo: issues+eng@northstar.dev\n\
+Subject: Crash\nContent-Type: multipart/alternative; boundary=\"b1\"\n\n--b1\n\
+Content-Type: text/html; charset=utf-8\n\n<p>HTML &amp; body</p>\n--b1\n\
+Content-Type: text/plain; charset=utf-8\nContent-Transfer-Encoding: base64\n\n\
+Q3Jhc2ggb24gc3RhcnQ=\n--b1--\n";
         let mail = parse(raw.as_bytes())?;
         assert_eq!(mail.text.trim(), "Crash on start");
-        assert!(
-            matches!(classify(&mail, &settings()), EmailIntake::NewIssue(d) if d.team == "ENG")
-        );
+        assert!(matches!(
+            classify(&mail, &settings()),
+            EmailIntake::NewIssue(d) if d.team == "ENG"
+        ));
 
-        let html_only = "From: bo@northstar.dev\nTo: issues+eng@northstar.dev\nSubject: X\n\
-Content-Type: multipart/alternative; boundary=b2\n\n--b2\nContent-Type: text/html\n\n<p>Only &amp; html</p>\n--b2--\n";
+        let html_only = "From: bo@northstar.dev\nTo: issues+eng@northstar.dev\n\
+Subject: X\nContent-Type: multipart/alternative; boundary=b2\n\n--b2\n\
+Content-Type: text/html\n\n<p>Only &amp; html</p>\n--b2--\n";
         assert_eq!(parse(html_only.as_bytes())?.text.trim(), "Only & html");
         Ok(())
     }
 
     #[test]
     fn replies_become_comments() -> Result<(), InboundError> {
-        let key = IssueKey::parse("ENG-142").map_err(InboundError::malformed)?;
+        let key =
+            IssueKey::parse("ENG-142").map_err(InboundError::malformed)?;
         let address = reply_address(
             b"reply-secret",
             &key,
@@ -581,7 +598,8 @@ Content-Type: multipart/alternative; boundary=b2\n\n--b2\nContent-Type: text/htm
         );
         let raw = format!(
             "From: bo@northstar.dev\nTo: {address}\nSubject: Re: ENG-142\n\n\
-Looks good, shipping it.\n\nOn Tue, Nov 24, 2026 at 9:00 AM Vellum wrote:\n> old text\n"
+Looks good, shipping it.\n\nOn Tue, Nov 24, 2026 at 9:00 AM Vellum wrote:\n\
+> old text\n"
         );
         let mail = parse(raw.as_bytes())?;
         assert_eq!(
@@ -614,7 +632,13 @@ Looks good, shipping it.\n\nOn Tue, Nov 24, 2026 at 9:00 AM Vellum wrote:\n> old
         };
         let keyless = raw.replace(
             &address,
-            &reply_address(b"", &key, "01JD3Z", "bo@northstar.dev", "northstar.dev"),
+            &reply_address(
+                b"",
+                &key,
+                "01JD3Z",
+                "bo@northstar.dev",
+                "northstar.dev",
+            ),
         );
         assert_eq!(
             classify(&parse(keyless.as_bytes())?, &unset),
@@ -625,7 +649,8 @@ Looks good, shipping it.\n\nOn Tue, Nov 24, 2026 at 9:00 AM Vellum wrote:\n> old
 
     #[test]
     fn automatic_and_unrouted_mail_is_ignored() -> Result<(), InboundError> {
-        let auto = "From: a@b.dev\nTo: eng@intake.northstar.dev\nAuto-Submitted: auto-replied\nSubject: Out of office\n\nAway";
+        let auto = "From: a@b.dev\nTo: eng@intake.northstar.dev\n\
+            Auto-Submitted: auto-replied\nSubject: Out of office\n\nAway";
         assert_eq!(
             classify(&parse(auto.as_bytes())?, &settings()),
             EmailIntake::Ignored("automatic message")

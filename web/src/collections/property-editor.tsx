@@ -21,7 +21,11 @@ import { FormError, SidePanel } from "./side-panel";
 import type { CollectionInfo, NewPropertyType, PropertyInfo } from "./types";
 
 /** Calls `action`, then reports its error or clears the last one. */
-function report(action: Promise<unknown>, onError: (error?: string) => void, after?: () => void) {
+function report(
+  action: Promise<unknown>,
+  onError: (error?: string) => void,
+  after?: () => void,
+) {
   action.then(
     () => {
       onError();
@@ -34,10 +38,19 @@ function report(action: Promise<unknown>, onError: (error?: string) => void, aft
 }
 
 /** What changed in one property's form, as an update. */
-function changesOf(property: PropertyInfo, name: string, type: string, extras: Extras) {
+function changesOf(
+  property: PropertyInfo,
+  name: string,
+  type: string,
+  extras: Extras,
+) {
   const retyped = type !== property.type;
   const settings = settingsFor(type, extras, property.options);
-  const before = settingsFor(property.type, extrasOf(property), property.options);
+  const before = settingsFor(
+    property.type,
+    extrasOf(property),
+    property.options,
+  );
   const settingsChanged = JSON.stringify(settings) !== JSON.stringify(before);
   return {
     ...(name.trim() === property.name ? {} : { name: name.trim() }),
@@ -70,7 +83,11 @@ function PropertyRow({
     const changed = changesOf(property, name, type, extras);
     if (Object.keys(changed).length > 0) {
       report(
-        store.updateProperty({ collection_id: info.id, key: property.key, ...changed }),
+        store.updateProperty({
+          collection_id: info.id,
+          key: property.key,
+          ...changed,
+        }),
         onError,
       );
     }
@@ -85,7 +102,9 @@ function PropertyRow({
         }}
       >
         <label className="vl-field">
-          {t("collection-property-name", { type: labels[property.type] ?? property.type })}
+          {t("collection-property-name", {
+            type: labels[property.type] ?? property.type,
+          })}
           <input
             required
             maxLength={100}
@@ -115,7 +134,9 @@ function PropertyRow({
         {type !== property.type && (
           <p className="vl-muted vl-hint">{t("collection-retype-hint")}</p>
         )}
-        {type !== "relation" && <TypeFields info={info} type={type} extras={extras} set={set} />}
+        {type !== "relation" && (
+          <TypeFields info={info} type={type} extras={extras} set={set} />
+        )}
         <div className="vl-panel-actions">
           <button type="submit" className="vl-text-button">
             {t("collection-save")}
@@ -124,7 +145,9 @@ function PropertyRow({
             <button
               type="button"
               className="vl-icon-button"
-              aria-label={t("collection-delete-property", { property: property.name })}
+              aria-label={t("collection-delete-property", {
+                property: property.name,
+              })}
               onClick={() => {
                 setConfirming(true);
               }}
@@ -138,14 +161,21 @@ function PropertyRow({
               className="vl-text-button vl-danger"
               onClick={() => {
                 report(
-                  store.deleteProperty({ collection_id: info.id, key: property.key }),
+                  store.deleteProperty({
+                    collection_id: info.id,
+                    key: property.key,
+                  }),
                   onError,
                 );
               }}
             >
               {twoWay
-                ? t("collection-confirm-delete-relation", { property: property.name })
-                : t("collection-confirm-delete-property", { property: property.name })}
+                ? t("collection-confirm-delete-relation", {
+                    property: property.name,
+                  })
+                : t("collection-confirm-delete-property", {
+                    property: property.name,
+                  })}
             </button>
           )}
         </div>
@@ -233,7 +263,9 @@ function Problems({ info }: { readonly info: CollectionInfo }) {
   if (info.diagnostics.length === 0) return;
   return (
     <details className="vl-csv-report">
-      <summary>{t("collection-problems", { count: info.diagnostics.length })}</summary>
+      <summary>
+        {t("collection-problems", { count: info.diagnostics.length })}
+      </summary>
       <ul>
         {info.diagnostics.slice(0, 50).map((d, index) => (
           <li key={`${String(index)}-${d.location}`}>{d.message}</li>
@@ -243,7 +275,10 @@ function Problems({ info }: { readonly info: CollectionInfo }) {
   );
 }
 
-/** A collection's properties: rename, retype, re-option, remove, and add new ones. */
+/**
+ * A collection's properties: rename, retype, re-option, remove, and add new
+ * ones.
+ */
 export function PropertiesPanel({
   info,
   onClose,

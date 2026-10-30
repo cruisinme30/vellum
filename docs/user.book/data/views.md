@@ -14,7 +14,8 @@ same rows; changing a value in one view changes it everywhere.
 ::: cards
 
 - ▦ **Table** Rows and columns; resize, reorder and hide columns.
-- 🗂 **Board** Cards in columns grouped by a select, person or status property; drag to change the value.
+- 🗂 **Board** Cards in columns grouped by a select, person or status property;
+  drag to change the value.
 - 🖼 **Gallery** Cards with the row's cover image.
 - 📅 **Calendar** Rows on their date property.
 - 📈 **Timeline** Rows as bars between a start and end date.

@@ -12,7 +12,10 @@ import { ThemeEditor } from "./theme-editor";
 function ThemeSection() {
   const t = useT();
   return (
-    <section aria-labelledby="vl-appearance-theme" className="vl-appearance-section">
+    <section
+      aria-labelledby="vl-appearance-theme"
+      className="vl-appearance-section"
+    >
       <h2 id="vl-appearance-theme">{t("theme-title")}</h2>
       <ThemePicker name="vl-appearance-theme" />
       <SeedPicker />
@@ -24,7 +27,10 @@ function ReadingSection() {
   const t = useT();
   const { appearance, update } = useAppearance();
   return (
-    <section aria-labelledby="vl-appearance-reading" className="vl-appearance-section">
+    <section
+      aria-labelledby="vl-appearance-reading"
+      className="vl-appearance-section"
+    >
       <h2 id="vl-appearance-reading">{t("reading-title")}</h2>
       <div className="vl-appearance-grid">
         <Choices
@@ -73,7 +79,9 @@ function ReadingSection() {
   );
 }
 
-/** Settings → Appearance: theme, accent, reading settings and the theme editor. */
+/**
+ * Settings → Appearance: theme, accent, reading settings and the theme editor.
+ */
 export function AppearancePage() {
   const t = useT();
   return (

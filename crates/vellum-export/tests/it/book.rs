@@ -6,7 +6,9 @@
 
 use std::io::Read as _;
 
-use vellum_export::book::{BookExport, BookItem, BookScope, BookSection, lower_book};
+use vellum_export::book::{
+    BookExport, BookItem, BookScope, BookSection, lower_book,
+};
 use vellum_export::docx::{DocxOptions, write};
 use vellum_export::flow::{Node, Span};
 use vellum_export::pdf::{PdfEngine, PrintTheme};

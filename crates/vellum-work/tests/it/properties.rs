@@ -9,11 +9,17 @@ use vellum_work::{Issue, IssueId, IssueKey, Priority, StatusKey};
 
 proptest! {
     #[test]
-    fn identifiers_round_trip(team in "[A-Z][A-Z0-9]{1,6}", number in 1_u64..1_000_000_000) {
+    fn identifiers_round_trip(
+        team in "[A-Z][A-Z0-9]{1,6}",
+        number in 1_u64..1_000_000_000
+    ) {
         let text = format!("{team}-{number}");
         let key = IssueKey::parse(&text).unwrap();
         prop_assert_eq!(key.to_string(), text);
-        prop_assert_eq!(IssueKey::parse(&key.to_string().to_lowercase()).unwrap(), key);
+        prop_assert_eq!(
+            IssueKey::parse(&key.to_string().to_lowercase()).unwrap(),
+            key
+        );
     }
 
     #[test]
@@ -70,8 +76,16 @@ proptest! {
             .collect::<Vec<_>>()
             .concat();
         let key = IssueKey::parse(&format!("ENG-{number}")).unwrap();
-        let once = vellum_work::doclink::insert_chip(&doc, "blk-00000000", &key).unwrap();
-        let twice = vellum_work::doclink::insert_chip(&once, "blk-00000000", &key).unwrap();
+        let once = vellum_work::doclink::insert_chip(
+            &doc,
+            "blk-00000000",
+            &key
+        ).unwrap();
+        let twice = vellum_work::doclink::insert_chip(
+            &once,
+            "blk-00000000",
+            &key
+        ).unwrap();
         prop_assert_eq!(&once, &twice);
         prop_assert_eq!(once.len(), doc.len() + key.to_string().len() + 1);
         prop_assert_eq!(vellum_work::mention::blocks(&once).len(), lines.len());

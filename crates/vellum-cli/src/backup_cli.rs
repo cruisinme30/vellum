@@ -39,7 +39,10 @@ pub struct RestoreArgs {
 pub async fn backup_now(config: Option<&Path>) -> Result<Vec<String>, Error> {
     let config = load(config)?;
     let (service, _) =
-        observability::open(&config, &Observability::new(), |k| std::env::var(k).ok()).await?;
+        observability::open(&config, &Observability::new(), |k| {
+            std::env::var(k).ok()
+        })
+        .await?;
     let info = service.backup_now(&Caller::system()).await?;
     Ok(vec![format!(
         "Backup {} written: {} files, {} bytes ({} on disk) in {} ms",
@@ -55,7 +58,10 @@ pub async fn backup_now(config: Option<&Path>) -> Result<Vec<String>, Error> {
 pub async fn list(config: Option<&Path>) -> Result<Vec<String>, Error> {
     let config = load(config)?;
     let (service, _) =
-        observability::open(&config, &Observability::new(), |k| std::env::var(k).ok()).await?;
+        observability::open(&config, &Observability::new(), |k| {
+            std::env::var(k).ok()
+        })
+        .await?;
     let files = service.backups().await?;
     if files.is_empty() {
         return Ok(vec!["No backups yet.".to_owned()]);
@@ -76,7 +82,8 @@ pub async fn restore(args: &RestoreArgs) -> Result<Vec<String>, Error> {
     let keys = observability::keyring("backup", &key)?;
     let report = backup::restore(&keys, &args.file, &args.into).await?;
     Ok(vec![format!(
-        "Restored {} files ({} bytes) into {} in {} ms; every file matches the manifest.",
+        "Restored {} files ({} bytes) into {} in {} ms; every file matches the \
+            manifest.",
         report.files,
         report.bytes,
         args.into.display(),
@@ -86,7 +93,8 @@ pub async fn restore(args: &RestoreArgs) -> Result<Vec<String>, Error> {
 
 fn load(config: Option<&Path>) -> Result<Config, Error> {
     Config::load(config).map_err(|e| {
-        Error::new(ErrorKind::InvalidInput, "cannot read the configuration").with_source(e)
+        Error::new(ErrorKind::InvalidInput, "cannot read the configuration")
+            .with_source(e)
     })
 }
 
@@ -153,7 +161,8 @@ mod tests {
     async fn a_backup_restores_into_an_empty_folder() {
         let data = tempfile::tempdir().unwrap();
         let config = config_in(data.path());
-        std::fs::write(data.path().join("page.md"), "# Northstar launch\n").unwrap();
+        std::fs::write(data.path().join("page.md"), "# Northstar launch\n")
+            .unwrap();
         let keys_dir = data.path().join(".vellum").join("keys");
         std::fs::create_dir_all(&keys_dir).unwrap();
         std::fs::write(keys_dir.join("backup.key"), [7; 32]).unwrap();

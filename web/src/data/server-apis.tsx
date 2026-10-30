@@ -68,7 +68,9 @@ export function useServerApis(): ServerApis {
 }
 
 /** One server API, or `undefined` in demo mode. */
-export function useServerApi<K extends keyof ServerApis>(name: K): ServerApis[K] {
+export function useServerApi<K extends keyof ServerApis>(
+  name: K,
+): ServerApis[K] {
   return use(ServerApisContext)[name];
 }
 
@@ -94,14 +96,18 @@ export function ServerScreen<K extends keyof ServerApis>({
   const t = useT();
   const found = use(ServerApisContext)[api];
   return (
-    <section className={className === undefined ? "vl-view" : `vl-view ${className}`}>
+    <section
+      className={className === undefined ? "vl-view" : `vl-view ${className}`}
+    >
       {title !== undefined && <ViewTitle title={title} help={help} />}
       {found === undefined ? <p>{t("needs-server")}</p> : children(found)}
     </section>
   );
 }
 
-/** A load's state: a loading line, the failure, or `children` with the value. */
+/**
+ * A load's state: a loading line, the failure, or `children` with the value.
+ */
 export function Ready<T>({
   loaded,
   children,

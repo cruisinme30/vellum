@@ -26,13 +26,16 @@ fn forged(parts: &[&[u8]]) -> String {
         .into_bytes()
         .iter()
         .flat_map(|b| [b >> 4, b & 0x0f])
-        .map(|n| char::from(digits.get(usize::from(n)).copied().unwrap_or(b'0')))
+        .map(|n| {
+            char::from(digits.get(usize::from(n)).copied().unwrap_or(b'0'))
+        })
         .collect()
 }
 
 #[test]
 fn receivers_without_a_secret_refuse_forged_requests() {
-    let body = br#"{"action":"closed","repository":{"full_name":"northstar/app"}}"#;
+    let body =
+        br#"{"action":"closed","repository":{"full_name":"northstar/app"}}"#;
 
     let github_sig = format!("sha256={}", forged(&[body]));
     assert!(
@@ -47,7 +50,8 @@ fn receivers_without_a_secret_refuse_forged_requests() {
 
     let now = Timestamp::now();
     let ts = now.as_second().to_string();
-    let slack_sig = format!("v0={}", forged(&[b"v0:", ts.as_bytes(), b":", body]));
+    let slack_sig =
+        format!("v0={}", forged(&[b"v0:", ts.as_bytes(), b":", body]));
     assert!(
         slack::verify(b"", Some(&ts), Some(&slack_sig), body, now).is_err(),
         "Slack accepted a request signed with an empty secret"

@@ -37,7 +37,11 @@ pub struct McpArgs {
     space: Vec<(String, String)>,
     /// How often to reopen the private spaces, in seconds, to pick up
     /// pages synced since the last pass.
-    #[arg(long, default_value_t = 60, value_parser = clap::value_parser!(u64).range(5..))]
+    #[arg(
+        long,
+        default_value_t = 60,
+        value_parser = clap::value_parser!(u64).range(5..)
+    )]
     refresh_secs: u64,
     /// Read the private spaces from this Vellum server instead of the data
     /// folder. Only ciphertext is downloaded; the token comes from
@@ -50,7 +54,10 @@ pub struct McpArgs {
 pub fn run(args: &McpArgs) -> ExitCode {
     if !args.demo && !args.private {
         tracing::error!(
-            "`vellum mcp` serves the demo (`--demo`) or this device's private spaces (`--private --space slug=path`); for the workspace, point your MCP client at the server's /mcp endpoint, such as https://vellum.example.com/mcp"
+            "`vellum mcp` serves the demo (`--demo`) or this device's private \
+                spaces (`--private --space slug=path`); for the workspace, \
+                point your MCP client at the server's /mcp endpoint, such as \
+                https://vellum.example.com/mcp"
         );
         return ExitCode::FAILURE;
     }
@@ -66,8 +73,12 @@ pub fn run(args: &McpArgs) -> ExitCode {
     };
     let result = runtime.block_on(async {
         if args.private {
-            let agent = open_private(&args.space, args.server.as_deref()).await?;
-            keep_fresh(Arc::clone(&agent), Duration::from_secs(args.refresh_secs));
+            let agent =
+                open_private(&args.space, args.server.as_deref()).await?;
+            keep_fresh(
+                Arc::clone(&agent),
+                Duration::from_secs(args.refresh_secs),
+            );
             // Reads only: write tools are not offered at all.
             serve(
                 Arc::new(PrivateWorkspace::new(agent)),
@@ -112,19 +123,20 @@ async fn open_private(
 ) -> Result<Arc<PrivateAgent>, String> {
     let identity = device_identity()?;
     let store: Arc<dyn BlobStore> = if let Some(server) = server {
-        let token = std::env::var(crate::private_remote::TOKEN_VAR).unwrap_or_default();
+        let token =
+            std::env::var(crate::private_remote::TOKEN_VAR).unwrap_or_default();
         Arc::new(RemoteSpaces::new(E2eClient::new(server, &token)?))
     } else {
-        let config = vellum_kernel::config::Config::load(None).map_err(|e| e.to_string())?;
-        Arc::new(
-            LocalStore::open(&config.data_dir)
-                .await
-                .map_err(|e| format!("cannot open {}: {e}", config.data_dir.display()))?,
-        )
+        let config = vellum_kernel::config::Config::load(None)
+            .map_err(|e| e.to_string())?;
+        Arc::new(LocalStore::open(&config.data_dir).await.map_err(|e| {
+            format!("cannot open {}: {e}", config.data_dir.display())
+        })?)
     };
     let mut opened = Vec::with_capacity(spaces.len());
     for (slug, path) in spaces {
-        let root = BlobPath::new(path.as_str()).map_err(|e| format!("{slug}: {e}"))?;
+        let root =
+            BlobPath::new(path.as_str()).map_err(|e| format!("{slug}: {e}"))?;
         opened.push(
             PrivateSpace::open(store.as_ref(), &identity, slug, root)
                 .await
@@ -136,7 +148,8 @@ async fn open_private(
         spaces = opened.len(),
         "opening private spaces"
     );
-    let agent = PrivateAgent::new(identity, store, opened).map_err(|e| e.to_string())?;
+    let agent = PrivateAgent::new(identity, store, opened)
+        .map_err(|e| e.to_string())?;
     let report = agent.refresh().await.map_err(|e| e.to_string())?;
     tracing::info!(
         opened = report.opened,
@@ -163,14 +176,22 @@ fn keep_fresh(agent: Arc<PrivateAgent>, every: Duration) {
     }));
 }
 
-async fn serve(workspace: Arc<dyn Workspace>, principal: Principal) -> Result<(), String> {
+async fn serve(
+    workspace: Arc<dyn Workspace>,
+    principal: Principal,
+) -> Result<(), String> {
     let server = Arc::new(McpServer::new(
         workspace,
         Arc::new(MemoryAudit::default()),
         ServerConfig::default(),
     ));
     tracing::info!(scopes = %principal.scopes, "serving MCP over stdio");
-    vellum_mcp::stdio::serve(server, principal, tokio::io::stdin(), tokio::io::stdout())
-        .await
-        .map_err(|e| format!("the MCP stdio transport failed: {e}"))
+    vellum_mcp::stdio::serve(
+        server,
+        principal,
+        tokio::io::stdin(),
+        tokio::io::stdout(),
+    )
+    .await
+    .map_err(|e| format!("the MCP stdio transport failed: {e}"))
 }

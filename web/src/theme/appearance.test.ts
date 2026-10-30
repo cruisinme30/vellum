@@ -20,7 +20,9 @@ const KEY = "vellum.appearance";
 
 const NO_STORAGE = undefined;
 
-/** A storage stub; like the Web Storage API it answers `null` for a missing key. */
+/**
+ * A storage stub; like the Web Storage API it answers `null` for a missing key.
+ */
 const storing = (value?: string) => ({
   // eslint-disable-next-line unicorn/no-null -- Storage.getItem returns null for a missing key.
   getItem: () => value ?? null,
@@ -63,13 +65,23 @@ describe("loadAppearance", () => {
       custom: { format: "nope" },
     });
     expect(loadAppearance(storing(saved))).toEqual(DEFAULT_APPEARANCE);
-    expect(loadAppearance(storing(JSON.stringify({ seed: 42 })))).toEqual(DEFAULT_APPEARANCE);
+    expect(loadAppearance(storing(JSON.stringify({ seed: 42 })))).toEqual(
+      DEFAULT_APPEARANCE,
+    );
   });
 
-  it("treats Vellum's own seed, saved by older versions, as following the organisation", () => {
-    const saved = JSON.stringify({ theme: "dark", seed: "#4F5B92", density: "compact" });
-    expect(loadAppearance(storing(saved)).seed).toBeUndefined();
-  });
+  it(
+    "treats Vellum's own seed, saved by older versions, as following the " +
+      "organisation",
+    () => {
+      const saved = JSON.stringify({
+        theme: "dark",
+        seed: "#4F5B92",
+        density: "compact",
+      });
+      expect(loadAppearance(storing(saved)).seed).toBeUndefined();
+    },
+  );
 
   it("keeps a valid custom theme and drops one that fails contrast", () => {
     const custom = {
@@ -79,11 +91,15 @@ describe("loadAppearance", () => {
       seed: "#225588",
       tokens: {},
     };
-    const good = loadAppearance(storing(JSON.stringify({ theme: "custom", custom })));
+    const good = loadAppearance(
+      storing(JSON.stringify({ theme: "custom", custom })),
+    );
     expect(good.theme).toBe("custom");
     expect(good.custom?.name).toBe("Ink");
     const unreadable = { ...custom, tokens: { "on-surface": "#fafafa" } };
-    const bad = loadAppearance(storing(JSON.stringify({ theme: "custom", custom: unreadable })));
+    const bad = loadAppearance(
+      storing(JSON.stringify({ theme: "custom", custom: unreadable })),
+    );
     expect(bad.custom).toBeUndefined();
     expect(bad.theme).toBe("system");
   });
@@ -105,7 +121,11 @@ describe("loadAppearance", () => {
 
 describe("saveAppearance", () => {
   it("writes JSON that loadAppearance reads back", () => {
-    const value: Appearance = { ...DEFAULT_APPEARANCE, theme: "dim", seed: "#112233" };
+    const value: Appearance = {
+      ...DEFAULT_APPEARANCE,
+      theme: "dim",
+      seed: "#112233",
+    };
     saveAppearance(localStorage, value);
     expect(localStorage.getItem(KEY)).toBe(JSON.stringify(value));
     expect(loadAppearance(localStorage)).toEqual(value);
@@ -135,7 +155,12 @@ describe("resolveTheme", () => {
   });
 
   it("uses a custom theme's start, or the OS without one", () => {
-    const custom = { name: "Ink", base: "sepia", seed: "#225588", tokens: {} } as const;
+    const custom = {
+      name: "Ink",
+      base: "sepia",
+      seed: "#225588",
+      tokens: {},
+    } as const;
     expect(resolveTheme("custom", true, custom)).toBe("sepia");
     expect(resolveTheme("custom", true)).toBe("dark");
   });
@@ -148,7 +173,9 @@ describe("applyAppearance", () => {
     expect(root.dataset["theme"]).toBe("dark");
     expect(root.dataset["density"]).toBe("compact");
     expect(root.style.colorScheme).toBe("dark");
-    expect(root.style.getPropertyValue("--md-primary")).toBe(buildScheme("dark")["primary"]);
+    expect(root.style.getPropertyValue("--md-primary")).toBe(
+      buildScheme("dark")["primary"],
+    );
   });
 
   it("writes the reading settings and the text size", () => {
@@ -173,7 +200,12 @@ describe("applyAppearance", () => {
     expect(root.style.getPropertyValue("--md-primary")).toBe(
       buildScheme("light", "#b02020")["primary"],
     );
-    applyAppearance(root, { ...DEFAULT_APPEARANCE, seed: "#205020" }, false, "#b02020");
+    applyAppearance(
+      root,
+      { ...DEFAULT_APPEARANCE, seed: "#205020" },
+      false,
+      "#b02020",
+    );
     expect(root.style.getPropertyValue("--md-primary")).toBe(
       buildScheme("light", "#205020")["primary"],
     );
@@ -182,13 +214,22 @@ describe("applyAppearance", () => {
 
   it("draws figures in the accent in use, or a custom theme's seed (D302)", () => {
     expect(figureSeed(DEFAULT_APPEARANCE)).toBeUndefined();
-    expect(figureSeed({ ...DEFAULT_APPEARANCE, seed: DEFAULT_SEED })).toBeUndefined();
+    expect(
+      figureSeed({ ...DEFAULT_APPEARANCE, seed: DEFAULT_SEED }),
+    ).toBeUndefined();
     expect(figureSeed(DEFAULT_APPEARANCE, "#B02020")).toBe("#b02020");
-    expect(figureSeed({ ...DEFAULT_APPEARANCE, seed: "#205020" }, "#b02020")).toBe("#205020");
-    const custom = { name: "Ink", base: "dark", seed: "#225588", tokens: {} } as const;
-    expect(figureSeed({ ...DEFAULT_APPEARANCE, theme: "custom", custom }, "#b02020")).toBe(
-      "#225588",
-    );
+    expect(
+      figureSeed({ ...DEFAULT_APPEARANCE, seed: "#205020" }, "#b02020"),
+    ).toBe("#205020");
+    const custom = {
+      name: "Ink",
+      base: "dark",
+      seed: "#225588",
+      tokens: {},
+    } as const;
+    expect(
+      figureSeed({ ...DEFAULT_APPEARANCE, theme: "custom", custom }, "#b02020"),
+    ).toBe("#225588");
   });
 
   it("applies a custom theme's tokens and marks the page", () => {
@@ -199,7 +240,11 @@ describe("applyAppearance", () => {
       seed: "#225588",
       tokens: { primary: "#123456" },
     } as const;
-    applyAppearance(root, { ...DEFAULT_APPEARANCE, theme: "custom", custom }, true);
+    applyAppearance(
+      root,
+      { ...DEFAULT_APPEARANCE, theme: "custom", custom },
+      true,
+    );
     expect(root.style.getPropertyValue("--md-primary")).toBe("#123456");
     expect(root.dataset["theme"]).toBe("light");
     expect(root.dataset["customTheme"]).toBe("Ink");

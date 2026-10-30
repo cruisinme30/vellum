@@ -24,7 +24,9 @@ pub fn client() -> Result<reqwest::Client, CryptoError> {
         .timeout(TIMEOUT)
         .redirect(reqwest::redirect::Policy::none())
         .build()
-        .map_err(|e| CryptoError::Provider(format!("cannot build HTTP client: {e}")))
+        .map_err(|e| {
+            CryptoError::Provider(format!("cannot build HTTP client: {e}"))
+        })
 }
 
 /// The associated data for a DEK wrapped under `kek`.
@@ -37,9 +39,11 @@ pub fn b64(bytes: &[u8]) -> String {
 }
 
 pub fn unb64(backend: &str, text: &str) -> Result<Vec<u8>, CryptoError> {
-    STANDARD
-        .decode(text)
-        .map_err(|_| CryptoError::Provider(format!("{backend}: response is not valid base64")))
+    STANDARD.decode(text).map_err(|_| {
+        CryptoError::Provider(format!(
+            "{backend}: response is not valid base64"
+        ))
+    })
 }
 
 /// Reads the string at `pointer` (a JSON pointer) from a response body.
@@ -50,21 +54,28 @@ pub fn string_at<'a>(
 ) -> Result<&'a str, CryptoError> {
     body.pointer(pointer)
         .and_then(Value::as_str)
-        .ok_or_else(|| CryptoError::Provider(format!("{backend}: response lacks {pointer}")))
+        .ok_or_else(|| {
+            CryptoError::Provider(format!(
+                "{backend}: response lacks {pointer}"
+            ))
+        })
 }
 
 /// Turns a decoded key from a service into a DEK.
 pub fn dek(backend: &str, bytes: &[u8]) -> Result<SecretKey, CryptoError> {
     SecretKey::from_slice(bytes).map_err(|_| {
-        CryptoError::Provider(format!("{backend}: unwrapped key has the wrong length"))
+        CryptoError::Provider(format!(
+            "{backend}: unwrapped key has the wrong length"
+        ))
     })
 }
 
 /// Encodes a request body. A wrap request holds the DEK in base64; the HTTP
 /// stack keeps its own copy, so this is not zeroized either.
 pub fn to_json(backend: &str, body: &Value) -> Result<Vec<u8>, CryptoError> {
-    serde_json::to_vec(body)
-        .map_err(|_| CryptoError::Provider(format!("{backend}: cannot encode request")))
+    serde_json::to_vec(body).map_err(|_| {
+        CryptoError::Provider(format!("{backend}: cannot encode request"))
+    })
 }
 
 /// Sends a request and parses a JSON body, mapping transport failures and
@@ -75,7 +86,10 @@ pub async fn send_json(
     request: reqwest::RequestBuilder,
 ) -> Result<Value, CryptoError> {
     let response = request.send().await.map_err(|e| {
-        CryptoError::Provider(format!("{backend}: request failed: {}", without_url(&e)))
+        CryptoError::Provider(format!(
+            "{backend}: request failed: {}",
+            without_url(&e)
+        ))
     })?;
     let status = response.status();
     let bytes = response.bytes().await.map_err(|e| {
@@ -91,8 +105,9 @@ pub async fn send_json(
             "{backend}: HTTP {status}: {short}"
         )));
     }
-    serde_json::from_slice(&bytes)
-        .map_err(|_| CryptoError::Provider(format!("{backend}: response is not JSON")))
+    serde_json::from_slice(&bytes).map_err(|_| {
+        CryptoError::Provider(format!("{backend}: response is not JSON"))
+    })
 }
 
 /// Sends a request and returns a short text body (instance metadata).
@@ -102,7 +117,10 @@ pub async fn send_text(
     request: reqwest::RequestBuilder,
 ) -> Result<String, CryptoError> {
     let response = request.send().await.map_err(|e| {
-        CryptoError::Provider(format!("{backend}: request failed: {}", without_url(&e)))
+        CryptoError::Provider(format!(
+            "{backend}: request failed: {}",
+            without_url(&e)
+        ))
     })?;
     let status = response.status();
     if !status.is_success() {
@@ -154,7 +172,9 @@ pub fn safe_segment(text: &str, extra: &[char]) -> bool {
             .split('/')
             .any(|part| part.is_empty() || part == "." || part == "..")
         && text.chars().all(|c| {
-            c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-') || extra.contains(&c)
+            c.is_ascii_alphanumeric()
+                || matches!(c, '_' | '.' | '-')
+                || extra.contains(&c)
         })
 }
 

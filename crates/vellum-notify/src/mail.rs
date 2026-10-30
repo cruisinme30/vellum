@@ -108,7 +108,8 @@ pub trait Directory: Send + Sync {
 
 /// Makes the `Reply-To` address for an email about `subject`, so a reply
 /// becomes a comment (the integrations crate checks it).
-pub type ReplyAddress = Arc<dyn Fn(&str, &Contact) -> Option<String> + Send + Sync>;
+pub type ReplyAddress =
+    Arc<dyn Fn(&str, &Contact) -> Option<String> + Send + Sync>;
 
 /// How emails are addressed and linked.
 #[derive(Clone)]
@@ -191,7 +192,11 @@ fn decide(
 
 impl<M: MailTransport> Mailer<M> {
     /// A mailer over `store`, sending through `transport`.
-    pub const fn new(store: Arc<NotifyStore>, transport: M, config: MailConfig) -> Self {
+    pub const fn new(
+        store: Arc<NotifyStore>,
+        transport: M,
+        config: MailConfig,
+    ) -> Self {
         Self {
             store,
             transport,
@@ -217,9 +222,10 @@ impl<M: MailTransport> Mailer<M> {
             let due = self
                 .store
                 .update(*user, |state| {
-                    let (due, later): (Vec<_>, Vec<_>) = std::mem::take(&mut state.email_queue)
-                        .into_iter()
-                        .partition(|q| q.not_before <= now);
+                    let (due, later): (Vec<_>, Vec<_>) =
+                        std::mem::take(&mut state.email_queue)
+                            .into_iter()
+                            .partition(|q| q.not_before <= now);
                     state.email_queue = later;
                     Ok(due)
                 })
@@ -245,7 +251,11 @@ impl<M: MailTransport> Mailer<M> {
                         requeue.push(pending);
                     }
                     Decision::Send => {
-                        let message = self.notification_email(contact, &pending.notification, now);
+                        let message = self.notification_email(
+                            contact,
+                            &pending.notification,
+                            now,
+                        );
                         if self.send(contact, &message, "notification").await {
                             report.sent += 1;
                         } else {
@@ -253,8 +263,9 @@ impl<M: MailTransport> Mailer<M> {
                             if pending.attempts >= MAX_ATTEMPTS {
                                 report.failed += 1;
                             } else {
-                                pending.not_before =
-                                    now.checked_add(backoff(pending.attempts)).unwrap_or(now);
+                                pending.not_before = now
+                                    .checked_add(backoff(pending.attempts))
+                                    .unwrap_or(now);
                                 report.retrying += 1;
                                 requeue.push(pending);
                             }
@@ -271,10 +282,11 @@ impl<M: MailTransport> Mailer<M> {
                             pending.not_before,
                             pending.skip_if_read,
                         );
-                        if let Some(q) = state
-                            .email_queue
-                            .iter_mut()
-                            .find(|q| q.notification.subject == pending.notification.subject)
+                        if let Some(q) =
+                            state.email_queue.iter_mut().find(|q| {
+                                q.notification.subject
+                                    == pending.notification.subject
+                            })
                         {
                             q.attempts = q.attempts.max(pending.attempts);
                         }
@@ -298,7 +310,12 @@ impl<M: MailTransport> Mailer<M> {
         report
     }
 
-    async fn send(&self, contact: &Contact, message: &EmailMessage, kind: &'static str) -> bool {
+    async fn send(
+        &self,
+        contact: &Contact,
+        message: &EmailMessage,
+        kind: &'static str,
+    ) -> bool {
         let bytes = match message.encode() {
             Ok(bytes) => bytes,
             Err(error) => {
@@ -313,7 +330,8 @@ impl<M: MailTransport> Mailer<M> {
             outcome = tracing::field::Empty
         );
         async {
-            let result = self.transport.send(&contact.mailbox.address, &bytes).await;
+            let result =
+                self.transport.send(&contact.mailbox.address, &bytes).await;
             let outcome = if result.is_ok() { "delivered" } else { "retry" };
             let _ = tracing::Span::current().record("outcome", outcome);
             tracing::info!(
@@ -331,10 +349,10 @@ impl<M: MailTransport> Mailer<M> {
     }
 
     fn link(&self, path: &str) -> String {
-        self.config
-            .base_url
-            .join(path)
-            .map_or_else(|_| self.config.base_url.to_string(), |u| u.to_string())
+        self.config.base_url.join(path).map_or_else(
+            |_| self.config.base_url.to_string(),
+            |u| u.to_string(),
+        )
     }
 
     fn unsubscribe_url(&self, user: UserId, subject: &str) -> String {
@@ -395,12 +413,14 @@ impl<M: MailTransport> Mailer<M> {
         }
         let _ = write!(
             text,
-            "Open: {open}\n\n--\nStop emails about {subject}: {unsubscribe}\nNotification settings: {settings}\n",
+            "Open: {open}\n\n--\nStop emails about {subject}: {unsubscribe}\n\
+                Notification settings: {settings}\n",
             subject = n.subject
         );
         let html = page(&format!(
-            "<p style=\"font-size:16px;font-weight:600;margin:0 0 12px\">{title}</p>{body}\
-             <p><a href=\"{open}\" style=\"{BUTTON}\">Open {subject}</a></p>{footer}",
+            "<p style=\"font-size:16px;font-weight:600;margin:0 0 \
+             12px\">{title}</p>{body}<p><a href=\"{open}\" \
+             style=\"{BUTTON}\">Open {subject}</a></p>{footer}",
             title = esc(&n.title),
             body = if n.body.is_empty() {
                 String::new()
@@ -418,7 +438,8 @@ impl<M: MailTransport> Mailer<M> {
                 &settings
             ),
         ));
-        let mut message = self.envelope(contact, n.title.clone(), &n.subject, now);
+        let mut message =
+            self.envelope(contact, n.title.clone(), &n.subject, now);
         message.text = text;
         message.html = html;
         message.unsubscribe_url = unsubscribe;
@@ -431,22 +452,28 @@ impl<M: MailTransport> Mailer<M> {
     }
 }
 
-const BUTTON: &str = "display:inline-block;padding:8px 14px;border-radius:6px;background:#2f5bd3;color:#ffffff;text-decoration:none;font-weight:600";
+const BUTTON: &str = "display:inline-block;padding:8px \
+    14px;border-radius:6px;background:#2f5bd3;color:#ffffff;text-decoration:non\
+    e;font-weight:600";
 
 fn page(inner: &str) -> String {
     format!(
-        "<!doctype html><html><body style=\"margin:0;padding:24px;background:#f6f7f9;\">\
-         <div style=\"max-width:560px;margin:0 auto;padding:24px;background:#ffffff;border-radius:8px;\
-         font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;color:#1d2330\">\
-         {inner}</div></body></html>"
+        "<!doctype html><html><body \
+         style=\"margin:0;padding:24px;background:#f6f7f9;\"><div \
+         style=\"max-width:560px;margin:0 \
+         auto;padding:24px;background:#ffffff;border-radius:8px;font-family:-ap\
+         ple-system,Segoe \
+         UI,Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;co\
+         lor:#1d2330\">{inner}</div></body></html>"
     )
 }
 
 fn footer(stop: &str, unsubscribe: &str, settings: &str) -> String {
     format!(
-        "<hr style=\"border:0;border-top:1px solid #e3e6eb;margin:24px 0 12px\">\
-         <p style=\"font-size:12px;color:#5f6b7a;margin:0\"><a href=\"{}\" style=\"color:#5f6b7a\">{stop}</a> · \
-         <a href=\"{}\" style=\"color:#5f6b7a\">Notification settings</a></p>",
+        "<hr style=\"border:0;border-top:1px solid #e3e6eb;margin:24px 0 \
+         12px\"><p style=\"font-size:12px;color:#5f6b7a;margin:0\"><a \
+         href=\"{}\" style=\"color:#5f6b7a\">{stop}</a> · <a href=\"{}\" \
+         style=\"color:#5f6b7a\">Notification settings</a></p>",
         esc(unsubscribe),
         esc(settings)
     )
@@ -495,7 +522,11 @@ fn backoff(attempt: u32) -> SignedDuration {
 }
 
 /// The HMAC behind [`NotifyStore::unsubscribe_token`].
-pub(crate) fn sign_unsubscribe(key: &[u8; 32], user: UserId, subject: &str) -> String {
+pub(crate) fn sign_unsubscribe(
+    key: &[u8; 32],
+    user: UserId,
+    subject: &str,
+) -> String {
     #[expect(clippy::expect_used, reason = "HMAC takes keys of any length")]
     let mut mac = Hmac::<Sha256>::new_from_slice(key).expect("any key length");
     mac.update(b"vellum-unsubscribe\0");
@@ -517,7 +548,10 @@ pub fn unsubscribe(
     subject: &str,
     token: &str,
 ) -> Result<(), Error> {
-    if subject.is_empty() || subject.len() > 200 || !store.check_unsubscribe(user, subject, token) {
+    if subject.is_empty()
+        || subject.len() > 200
+        || !store.check_unsubscribe(user, subject, token)
+    {
         return Err(Error::new(
             ErrorKind::PermissionDenied,
             "this unsubscribe link is not valid",
@@ -559,7 +593,11 @@ mod tests {
         Timestamp::from_second(1_800_000_000 + minutes * 60).unwrap()
     }
 
-    fn note(kind: NotificationKind, subject: &str, minute: i64) -> Notification {
+    fn note(
+        kind: NotificationKind,
+        subject: &str,
+        minute: i64,
+    ) -> Notification {
         Notification {
             kind,
             subject: subject.to_owned(),
@@ -582,10 +620,10 @@ mod tests {
             if self.fail {
                 return Err("421 try later".to_owned());
             }
-            self.sent
-                .lock()
-                .unwrap()
-                .push((to.to_owned(), String::from_utf8_lossy(message).into_owned()));
+            self.sent.lock().unwrap().push((
+                to.to_owned(),
+                String::from_utf8_lossy(message).into_owned(),
+            ));
             Ok(())
         }
     }
@@ -620,7 +658,12 @@ mod tests {
         )
     }
 
-    fn file(m: &Mailer<&Outbox>, n: &Notification, not_before: Timestamp, skip: bool) {
+    fn file(
+        m: &Mailer<&Outbox>,
+        n: &Notification,
+        not_before: Timestamp,
+        skip: bool,
+    ) {
         m.store
             .update(user(), |s| {
                 inbox::add(&mut s.inbox, n, "line".to_owned());
@@ -663,11 +706,9 @@ mod tests {
         let sent = outbox.sent.lock().unwrap().clone();
         assert_eq!(sent.len(), 1);
         assert_eq!(sent[0].0, "zoe@northstar.dev");
-        assert!(
-            sent[0]
-                .1
-                .contains("List-Unsubscribe: <https://vellum.northstar.dev/unsubscribe?u=")
-        );
+        assert!(sent[0].1.contains(
+            "List-Unsubscribe: <https://vellum.northstar.dev/unsubscribe?u="
+        ));
         assert!(m.store.user(user()).email_queue.is_empty());
     }
 

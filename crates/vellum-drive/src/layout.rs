@@ -141,7 +141,10 @@ pub fn versions_dir(doc: ObjectId) -> DriveResult<BlobPath> {
 ///
 /// # Errors
 /// Never fails for valid IDs; the result is propagated for uniformity.
-pub fn version_paths(doc: ObjectId, version: VersionId) -> DriveResult<(BlobPath, BlobPath)> {
+pub fn version_paths(
+    doc: ObjectId,
+    version: VersionId,
+) -> DriveResult<(BlobPath, BlobPath)> {
     let dir = versions_dir(doc)?;
     Ok((
         dir.join(&format!("{version}.md"))?,
@@ -202,7 +205,9 @@ pub fn classify(path: &BlobPath) -> Option<(NodeKind, BlobPath)> {
         if name == BOOK_FILE && dir_name.ends_with(NodeKind::Book.suffix()) {
             return Some((NodeKind::Book, dir.clone()));
         }
-        if name == COLLECTION_FILE && dir_name.ends_with(NodeKind::Collection.suffix()) {
+        if name == COLLECTION_FILE
+            && dir_name.ends_with(NodeKind::Collection.suffix())
+        {
             return Some((NodeKind::Collection, dir.clone()));
         }
     }
@@ -250,7 +255,11 @@ pub fn title_from_path(kind: NodeKind, path: &BlobPath) -> String {
 ///
 /// # Errors
 /// Fails if `path` is not under `from` or the result is invalid.
-pub fn rebase(path: &BlobPath, from: &BlobPath, to: &BlobPath) -> DriveResult<BlobPath> {
+pub fn rebase(
+    path: &BlobPath,
+    from: &BlobPath,
+    to: &BlobPath,
+) -> DriveResult<BlobPath> {
     if path == from {
         return Ok(to.clone());
     }
@@ -258,7 +267,9 @@ pub fn rebase(path: &BlobPath, from: &BlobPath, to: &BlobPath) -> DriveResult<Bl
         .as_str()
         .strip_prefix(from.as_str())
         .and_then(|r| r.strip_prefix('/'))
-        .ok_or_else(|| DriveError::Invalid(format!("{path} is not under {from}")))?;
+        .ok_or_else(|| {
+            DriveError::Invalid(format!("{path} is not under {from}"))
+        })?;
     Ok(to.join(rest)?)
 }
 
@@ -361,8 +372,8 @@ mod tests {
 
     #[test]
     fn space_roots_round_trip() {
-        let root =
-            space_root(SpaceKind::SharedDrive, "eng").unwrap_or_else(|e| unreachable!("{e}"));
+        let root = space_root(SpaceKind::SharedDrive, "eng")
+            .unwrap_or_else(|e| unreachable!("{e}"));
         assert_eq!(root.as_str(), "drives/shared/eng");
         assert_eq!(
             parse_space_root(&root),
@@ -396,8 +407,14 @@ mod tests {
             rebase_member(NodeKind::Page, &from, &from, &to).ok(),
             Some(to.clone())
         );
-        assert!(rebase_member(NodeKind::Page, &p("d/Other/x.md"), &from, &to).is_err());
-        assert!(rebase_member(NodeKind::Folder, &p("d/Plan/x.md"), &from, &to).is_err());
+        assert!(
+            rebase_member(NodeKind::Page, &p("d/Other/x.md"), &from, &to)
+                .is_err()
+        );
+        assert!(
+            rebase_member(NodeKind::Folder, &p("d/Plan/x.md"), &from, &to)
+                .is_err()
+        );
     }
 
     #[test]

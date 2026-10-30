@@ -61,13 +61,18 @@ impl NumberingStyle {
 }
 
 impl Serialize for NumberingStyle {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+    fn serialize<S: Serializer>(
+        &self,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(self.as_str())
     }
 }
 
 impl<'de> Deserialize<'de> for NumberingStyle {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+    fn deserialize<D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Self, D::Error> {
         let raw = String::deserialize(deserializer)?;
         match raw.trim() {
             "decimal" | "1.1" => Ok(Self::Decimal),
@@ -150,13 +155,18 @@ impl fmt::Display for Principal {
 }
 
 impl Serialize for Principal {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+    fn serialize<S: Serializer>(
+        &self,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(&self.0)
     }
 }
 
 impl<'de> Deserialize<'de> for Principal {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+    fn deserialize<D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Self, D::Error> {
         let raw = String::deserialize(deserializer)?;
         Self::parse(&raw).map_err(serde::de::Error::custom)
     }
@@ -249,8 +259,8 @@ impl Manifest {
     /// an unsupported version, a `max_depth` outside 1 to 6, or two
     /// sections sharing a path.
     pub fn parse(text: &str) -> Result<Self> {
-        let manifest: Self =
-            serde_saphyr::from_str(text).map_err(|e| BookError::Manifest(e.to_string()))?;
+        let manifest: Self = serde_saphyr::from_str(text)
+            .map_err(|e| BookError::Manifest(e.to_string()))?;
         manifest.validate()?;
         Ok(manifest)
     }
@@ -274,7 +284,9 @@ impl Manifest {
             )));
         }
         if self.title.trim().is_empty() {
-            return Err(BookError::Manifest("title must not be empty".to_owned()));
+            return Err(BookError::Manifest(
+                "title must not be empty".to_owned(),
+            ));
         }
         let mut seen = BTreeSet::new();
         for (id, entry) in &self.nodes {
@@ -294,7 +306,8 @@ impl Manifest {
     ///
     /// Returns [`BookError::Manifest`] if serialisation fails.
     pub fn to_yaml(&self) -> Result<String> {
-        serde_saphyr::to_string(self).map_err(|e| BookError::Manifest(e.to_string()))
+        serde_saphyr::to_string(self)
+            .map_err(|e| BookError::Manifest(e.to_string()))
     }
 
     /// The id of the section stored at `path`.

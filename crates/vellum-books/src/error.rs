@@ -62,7 +62,9 @@ pub enum BookError {
     #[error("not allowed: {0}")]
     NotAllowed(String),
     /// A section restriction would widen access instead of narrowing it.
-    #[error("section {node} cannot grant {principal}: an enclosing section does not")]
+    #[error(
+        "section {node} cannot grant {principal}: an enclosing section does not"
+    )]
     WidensAccess {
         /// The section being restricted.
         node: NodeId,

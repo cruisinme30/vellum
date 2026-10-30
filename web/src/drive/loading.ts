@@ -22,12 +22,17 @@ export function useReloadable<T>(
 ): { readonly loaded: Loaded<T>; readonly reload: () => void } {
   const [version, setVersion] = useState(0);
   const loaded = useLoaded(load, [...keys, version], failureText);
-  const [kept, setKept] = useState<{ keys: readonly unknown[]; value: Loaded<T> }>();
+  const [kept, setKept] = useState<{
+    keys: readonly unknown[];
+    value: Loaded<T>;
+  }>();
   if (loaded.state !== "loading" && kept?.value !== loaded) {
     setKept({ keys, value: loaded });
   }
   const shown =
-    loaded.state === "loading" && kept !== undefined && sameKeys(kept.keys, keys)
+    loaded.state === "loading" &&
+    kept !== undefined &&
+    sameKeys(kept.keys, keys)
       ? kept.value
       : loaded;
   const reload = useCallback(() => {
@@ -43,19 +48,29 @@ export interface Listing {
 }
 
 /** Loads some items together with the person's stars. */
-export async function withStars(api: DriveApi, items: Promise<NodeView[]>): Promise<Listing> {
+export async function withStars(
+  api: DriveApi,
+  items: Promise<NodeView[]>,
+): Promise<Listing> {
   const [found, starred] = await Promise.all([items, api.starred()]);
   return { items: found, starred: new Set(starred.map((node) => node.id)) };
 }
 
-/** The spaces the person can open: their My Drive first, then the shared drives. */
+/**
+ * The spaces the person can open: their My Drive first, then the shared drives.
+ */
 export async function loadSpaces(api: DriveApi): Promise<SpaceView[]> {
   const [mine, shared] = await Promise.all([api.myDrive(), api.sharedDrives()]);
-  return mine === undefined ? shared : [mine, ...shared.filter((space) => space.id !== mine.id)];
+  return mine === undefined
+    ? shared
+    : [mine, ...shared.filter((space) => space.id !== mine.id)];
 }
 
 /** The folders above a folder, top first, ending with the folder itself. */
-export async function ancestors(api: DriveApi, folderId: string): Promise<NodeView[]> {
+export async function ancestors(
+  api: DriveApi,
+  folderId: string,
+): Promise<NodeView[]> {
   const chain: NodeView[] = [];
   let next: string | undefined = folderId;
   for (let step = 0; next !== undefined && step < 32; step += 1) {

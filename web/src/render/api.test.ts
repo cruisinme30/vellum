@@ -31,7 +31,11 @@ describe("createHttpRenderApi", () => {
   it("draws each block text once, and asks again after a failure", async () => {
     const { http, send } = fakeHttp();
     const api = createHttpRenderApi(http);
-    const block = { lang: "mermaid", args: "", source: "graph TD\n  A --> B\n" };
+    const block = {
+      lang: "mermaid",
+      args: "",
+      source: "graph TD\n  A --> B\n",
+    };
     await api.block(block);
     await api.block({ ...block });
     expect(send).toHaveBeenCalledTimes(1);

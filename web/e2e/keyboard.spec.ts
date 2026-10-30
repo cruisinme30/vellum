@@ -10,17 +10,23 @@ const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 // installed; blocking it removed that. The PWA has its own tests.
 test.use({ serviceWorkers: "block" });
 
-test("the command menu opens from the keyboard and passes WCAG 2.2 AA", async ({ page }) => {
+test("the command menu opens from the keyboard and passes WCAG 2.2 AA", async ({
+  page,
+}) => {
   // Reduced motion turns off the 80 ms pop-in, so axe never measures
   // half-faded text and no animation is left to wait on.
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   await expect(page.getByRole("navigation", { name: "Main" })).toBeVisible();
   await page.keyboard.press("ControlOrMeta+k");
-  const search = page.getByRole("combobox", { name: "Search pages and commands" });
+  const search = page.getByRole("combobox", {
+    name: "Search pages and commands",
+  });
   await expect(search).toBeFocused();
   await search.fill("short");
-  await expect(page.getByRole("option", { name: /Show all shortcuts/ })).toBeVisible();
+  await expect(
+    page.getByRole("option", { name: /Show all shortcuts/ }),
+  ).toBeVisible();
   const results = await new AxeBuilder({ page }).withTags(WCAG).analyze();
   expect(results.violations).toEqual([]);
 

@@ -30,7 +30,18 @@ use super::refs::RefKind;
 use crate::model::{IssueSnapshot, StateCategory, WorkflowState};
 
 /// How far the work behind an issue has got.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    Serialize,
+    Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Stage {
     /// Every closing pull request was closed without merging.
@@ -82,7 +93,8 @@ impl Mapping {
         };
         let branch = first(StateCategory::Started);
         let review = started_named(&["review"]).or_else(|| branch.clone());
-        let ready = started_named(&["ready", "merge"]).or_else(|| review.clone());
+        let ready =
+            started_named(&["ready", "merge"]).or_else(|| review.clone());
         Self {
             branch_pushed: branch,
             pr_opened: review,
@@ -131,10 +143,16 @@ pub enum PrStatus {
 impl PrStatus {
     /// The status after `action`, from the previous one if any.
     #[must_use]
-    pub const fn after(previous: Option<Self>, action: PullRequestAction, draft: bool) -> Self {
+    pub const fn after(
+        previous: Option<Self>,
+        action: PullRequestAction,
+        draft: bool,
+    ) -> Self {
         match action {
             PullRequestAction::Draft => Self::Draft,
-            PullRequestAction::Opened | PullRequestAction::ReadyForReview => Self::Open,
+            PullRequestAction::Opened | PullRequestAction::ReadyForReview => {
+                Self::Open
+            }
             PullRequestAction::Approved => Self::Approved,
             PullRequestAction::ChangesRequested => {
                 if draft {
@@ -227,13 +245,16 @@ impl IssueLinks {
         if open.is_some() {
             return open;
         }
-        if closing.contains(&PrStatus::Merged) || !self.closing_commits.is_empty() {
+        if closing.contains(&PrStatus::Merged)
+            || !self.closing_commits.is_empty()
+        {
             return Some(Stage::Merged);
         }
         if closing.contains(&PrStatus::ClosedUnmerged) {
             return Some(Stage::ClosedUnmerged);
         }
-        (!self.branches.is_empty() || !self.commits.is_empty()).then_some(Stage::Branch)
+        (!self.branches.is_empty() || !self.commits.is_empty())
+            .then_some(Stage::Branch)
     }
 }
 
@@ -252,17 +273,23 @@ pub fn decide<'m>(
     }
     let not_started = matches!(
         current.category,
-        StateCategory::Triage | StateCategory::Backlog | StateCategory::Unstarted
+        StateCategory::Triage
+            | StateCategory::Backlog
+            | StateCategory::Unstarted
     );
     // An unmapped started state (say "QA", set by hand) ranks as Branch.
-    let current_stage = mapping
-        .progress_stage_of(&current.id)
-        .or_else(|| (current.category == StateCategory::Started).then_some(Stage::Branch));
+    let current_stage = mapping.progress_stage_of(&current.id).or_else(|| {
+        (current.category == StateCategory::Started).then_some(Stage::Branch)
+    });
     let allowed = match stage {
         Stage::Merged => true,
-        Stage::ClosedUnmerged => mapping.progress_stage_of(&current.id).is_some(),
+        Stage::ClosedUnmerged => {
+            mapping.progress_stage_of(&current.id).is_some()
+        }
         Stage::Branch => not_started,
-        Stage::InReview | Stage::ReadyToMerge => not_started || current_stage < Some(stage),
+        Stage::InReview | Stage::ReadyToMerge => {
+            not_started || current_stage < Some(stage)
+        }
     };
     allowed.then_some(target)
 }
@@ -434,7 +461,10 @@ mod tests {
             pr_opened: None,
             ..m
         };
-        assert_eq!(decide(&issue_in("todo"), Some(Stage::InReview), &off), None);
+        assert_eq!(
+            decide(&issue_in("todo"), Some(Stage::InReview), &off),
+            None
+        );
     }
 
     #[test]
@@ -446,7 +476,11 @@ mod tests {
             PrStatus::Approved
         );
         assert_eq!(
-            PrStatus::after(Some(PrStatus::Approved), A::ChangesRequested, false),
+            PrStatus::after(
+                Some(PrStatus::Approved),
+                A::ChangesRequested,
+                false
+            ),
             PrStatus::Open
         );
         assert_eq!(

@@ -117,10 +117,15 @@ fn wait<T>(rx: &mpsc::Receiver<Result<T, Error>>) -> Result<T, Error> {
     let recv = || match rx.recv_timeout(WAIT) {
         Ok(result) => result,
         Err(mpsc::RecvTimeoutError::Timeout) => Err(unavailable("timed out")),
-        Err(mpsc::RecvTimeoutError::Disconnected) => Err(unavailable("worker stopped")),
+        Err(mpsc::RecvTimeoutError::Disconnected) => {
+            Err(unavailable("worker stopped"))
+        }
     };
     match tokio::runtime::Handle::try_current() {
-        Ok(handle) if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread => {
+        Ok(handle)
+            if handle.runtime_flavor()
+                == tokio::runtime::RuntimeFlavor::MultiThread =>
+        {
             tokio::task::block_in_place(recv)
         }
         _ => recv(),
@@ -140,16 +145,17 @@ impl Shared {
         let _worker = std::thread::Builder::new()
             .name("vellum-identity-db".into())
             .spawn(move || {
-                let runtime = match tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .build()
-                {
-                    Ok(runtime) => runtime,
-                    Err(e) => {
-                        let _ = opened_tx.send(Err(unavailable(e)));
-                        return;
-                    }
-                };
+                let runtime =
+                    match tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                    {
+                        Ok(runtime) => runtime,
+                        Err(e) => {
+                            let _ = opened_tx.send(Err(unavailable(e)));
+                            return;
+                        }
+                    };
                 runtime.block_on(async move {
                     let index = match Index::open(&config).await {
                         Ok(index) => index,
@@ -163,7 +169,9 @@ impl Shared {
                     // overlap; the loop ends when the store is dropped.
                     while let Some(job) = queue.recv().await {
                         let index = index.clone();
-                        drop(tokio::spawn(async move { run(&index, job).await }));
+                        drop(tokio::spawn(
+                            async move { run(&index, job).await },
+                        ));
                     }
                     index.close().await;
                 });
@@ -182,7 +190,10 @@ impl Shared {
         Ok(shared)
     }
 
-    fn send<T>(&self, job: impl FnOnce(mpsc::Sender<Result<T, Error>>) -> Job) -> Result<T, Error> {
+    fn send<T>(
+        &self,
+        job: impl FnOnce(mpsc::Sender<Result<T, Error>>) -> Job,
+    ) -> Result<T, Error> {
         let (tx, rx) = mpsc::channel();
         self.jobs
             .send(job(tx))
@@ -222,8 +233,12 @@ impl Shared {
     /// # Errors
     ///
     /// [`ErrorKind::Unavailable`] if the database cannot be written.
-    pub fn write<R>(&self, f: impl FnOnce(&mut State) -> R) -> Result<R, Error> {
-        let _writing = self.writing.lock().unwrap_or_else(PoisonError::into_inner);
+    pub fn write<R>(
+        &self,
+        f: impl FnOnce(&mut State) -> R,
+    ) -> Result<R, Error> {
+        let _writing =
+            self.writing.lock().unwrap_or_else(PoisonError::into_inner);
         let since = self.lock().version;
         let begun = self.send(|reply| Job::Write { since, reply })?;
         // No other writer can commit until this one ends, so the cache plus
@@ -293,16 +308,19 @@ async fn refresh(index: &Index, since: i64) -> Result<Delta, Error> {
         let mut tx = pool.begin().await.map_err(db)?;
         if postgres {
             // One snapshot for the version and the rows.
-            let _ = sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
-                .execute(&mut *tx)
-                .await
-                .map_err(db)?;
+            let _ = sqlx::query(
+                "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY",
+            )
+            .execute(&mut *tx)
+            .await
+            .map_err(db)?;
         }
-        let (version, horizon): (i64, i64) =
-            sqlx::query_as("SELECT version, horizon FROM identity_meta WHERE id = 1")
-                .fetch_one(&mut *tx)
-                .await
-                .map_err(db)?;
+        let (version, horizon): (i64, i64) = sqlx::query_as(
+            "SELECT version, horizon FROM identity_meta WHERE id = 1",
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(db)?;
         let delta = if version == since {
             Delta {
                 version,
@@ -312,7 +330,8 @@ async fn refresh(index: &Index, since: i64) -> Result<Delta, Error> {
         } else if since < horizon || since > version {
             // Too far behind (deletes were purged), or a rebuilt database.
             let rows: Vec<RawRow> = sqlx::query_as(
-                "SELECT kind, id, record FROM identity_records WHERE record IS NOT NULL",
+                "SELECT kind, id, record FROM identity_records WHERE record IS \
+                    NOT NULL",
             )
             .fetch_all(&mut *tx)
             .await
@@ -323,12 +342,14 @@ async fn refresh(index: &Index, since: i64) -> Result<Delta, Error> {
                 rows: rows.into_iter().map(into_row).collect(),
             }
         } else {
-            let rows: Vec<RawRow> =
-                sqlx::query_as("SELECT kind, id, record FROM identity_records WHERE version > $1")
-                    .bind(since)
-                    .fetch_all(&mut *tx)
-                    .await
-                    .map_err(db)?;
+            let rows: Vec<RawRow> = sqlx::query_as(
+                "SELECT kind, id, record FROM identity_records \
+                    WHERE version > $1",
+            )
+            .bind(since)
+            .fetch_all(&mut *tx)
+            .await
+            .map_err(db)?;
             Delta {
                 version,
                 full: false,
@@ -373,7 +394,8 @@ async fn write(
                 }
             } else if since < horizon || since > previous {
                 let rows: Vec<RawRow> = sqlx::query_as(
-                    "SELECT kind, id, record FROM identity_records WHERE record IS NOT NULL",
+                    "SELECT kind, id, record FROM identity_records WHERE \
+                        record IS NOT NULL",
                 )
                 .fetch_all(&mut *tx)
                 .await
@@ -385,7 +407,8 @@ async fn write(
                 }
             } else {
                 let rows: Vec<RawRow> = sqlx::query_as(
-                    "SELECT kind, id, record FROM identity_records WHERE version > $1",
+                    "SELECT kind, id, record FROM identity_records WHERE \
+                        version > $1",
                 )
                 .bind(since)
                 .fetch_all(&mut *tx)
@@ -417,9 +440,10 @@ async fn write(
                     async {
                         for row in &rows {
                             let _ = sqlx::query(
-                                "INSERT INTO identity_records (kind, id, version, record) \
-                                 VALUES ($1, $2, $3, $4) ON CONFLICT (kind, id) DO UPDATE \
-                                 SET version = excluded.version, record = excluded.record",
+                                "INSERT INTO identity_records (kind, id, \
+                                 version, record) VALUES ($1, $2, $3, $4) ON \
+                                 CONFLICT (kind, id) DO UPDATE SET version = \
+                                 excluded.version, record = excluded.record",
                             )
                             .bind(&row.kind)
                             .bind(&row.id)
@@ -439,12 +463,14 @@ async fn write(
                             .execute(&mut *tx)
                             .await
                             .map_err(db)?;
-                            let _ =
-                                sqlx::query("UPDATE identity_meta SET horizon = $1 WHERE id = 1")
-                                    .bind(purge_to)
-                                    .execute(&mut *tx)
-                                    .await
-                                    .map_err(db)?;
+                            let _ = sqlx::query(
+                                "UPDATE identity_meta SET horizon \
+                                    = $1 WHERE id = 1",
+                            )
+                            .bind(purge_to)
+                            .execute(&mut *tx)
+                            .await
+                            .map_err(db)?;
                         }
                         tx.commit().await.map_err(db)
                     }
@@ -457,11 +483,16 @@ async fn write(
 }
 
 fn encode<T: Serialize>(value: &T) -> Result<String, Error> {
-    serde_json::to_string(value)
-        .map_err(|e| Error::new(ErrorKind::Internal, format!("encode identity record: {e}")))
+    serde_json::to_string(value).map_err(|e| {
+        Error::new(ErrorKind::Internal, format!("encode identity record: {e}"))
+    })
 }
 
-fn decode<T: DeserializeOwned>(kind: &str, id: &str, json: &str) -> Result<T, Error> {
+fn decode<T: DeserializeOwned>(
+    kind: &str,
+    id: &str,
+    json: &str,
+) -> Result<T, Error> {
     serde_json::from_str(json).map_err(|e| {
         Error::new(
             ErrorKind::Internal,
@@ -582,10 +613,14 @@ pub fn diff(old: &State, new: &State) -> Result<Vec<Row>, Error> {
     Ok(rows)
 }
 
-fn put<V: DeserializeOwned>(map: &mut BTreeMap<String, V>, row: &Row) -> Result<(), Error> {
+fn put<V: DeserializeOwned>(
+    map: &mut BTreeMap<String, V>,
+    row: &Row,
+) -> Result<(), Error> {
     match &row.record {
         Some(json) => {
-            let _ = map.insert(row.id.clone(), decode(&row.kind, &row.id, json)?);
+            let _ =
+                map.insert(row.id.clone(), decode(&row.kind, &row.id, json)?);
         }
         None => {
             let _ = map.remove(&row.id);
@@ -606,12 +641,17 @@ fn apply(state: &mut State, delta: &Delta) -> Result<(), Error> {
                 let id = row.id.parse().map_err(|_| {
                     Error::new(
                         ErrorKind::Internal,
-                        format!("bad user ID in the identity records: {}", row.id),
+                        format!(
+                            "bad user ID in the identity records: {}",
+                            row.id
+                        ),
                     )
                 })?;
                 match &row.record {
                     Some(json) => {
-                        let _ = state.users.insert(id, decode(&row.kind, &row.id, json)?);
+                        let _ = state
+                            .users
+                            .insert(id, decode(&row.kind, &row.id, json)?);
                     }
                     None => {
                         let _ = state.users.remove(&id);
@@ -635,7 +675,10 @@ fn apply(state: &mut State, delta: &Delta) -> Result<(), Error> {
                     None => crate::store::SignInSettings::default(),
                 };
             }
-            other => tracing::debug!(kind = other, "skipping an unknown identity record"),
+            other => tracing::debug!(
+                kind = other,
+                "skipping an unknown identity record"
+            ),
         }
     }
     Ok(())

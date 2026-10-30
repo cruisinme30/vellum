@@ -37,8 +37,10 @@ pub trait KeyProvider: Send + Sync {
     fn current_kek(&self) -> KekId;
 
     /// Wraps `dek` under the current KEK.
-    fn wrap(&self, dek: &SecretKey)
-    -> impl Future<Output = Result<WrappedDek, CryptoError>> + Send;
+    fn wrap(
+        &self,
+        dek: &SecretKey,
+    ) -> impl Future<Output = Result<WrappedDek, CryptoError>> + Send;
 
     /// Unwraps a DEK under whichever KEK `wrapped.kek_id` names.
     fn unwrap(
@@ -96,7 +98,8 @@ impl LocalKeyring {
 
     fn wrap_now(&self, dek: &SecretKey) -> Result<WrappedDek, CryptoError> {
         let kek = self.kek(&self.current)?;
-        let (nonce, ciphertext) = aead::seal(kek, &wrap_aad(&self.current), dek.expose())?;
+        let (nonce, ciphertext) =
+            aead::seal(kek, &wrap_aad(&self.current), dek.expose())?;
         let mut blob = Vec::with_capacity(NONCE_LEN + ciphertext.len());
         blob.extend_from_slice(&nonce);
         blob.extend_from_slice(&ciphertext);
@@ -106,7 +109,10 @@ impl LocalKeyring {
         })
     }
 
-    fn unwrap_now(&self, wrapped: &WrappedDek) -> Result<SecretKey, CryptoError> {
+    fn unwrap_now(
+        &self,
+        wrapped: &WrappedDek,
+    ) -> Result<SecretKey, CryptoError> {
         let kek = self.kek(&wrapped.kek_id)?;
         let (nonce, ciphertext) = wrapped
             .blob
@@ -151,7 +157,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn wraps_under_current_and_unwraps_retired() -> Result<(), CryptoError> {
+    async fn wraps_under_current_unwraps_retired() -> Result<(), CryptoError> {
         let old = KekId::new("kek-old")?;
         let mut ring = LocalKeyring::new(old.clone(), SecretKey::generate()?);
         let dek = SecretKey::generate()?;

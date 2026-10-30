@@ -9,7 +9,12 @@ import { useT } from "../../i18n/i18n";
 import { CopyDiagnostic } from "../../shell/copy-diagnostic";
 
 import { AdminScreen } from "./context";
-import type { HookInput, HookList, HookView, WebhooksApi } from "./webhooks-api";
+import type {
+  HookInput,
+  HookList,
+  HookView,
+  WebhooksApi,
+} from "./webhooks-api";
 import {
   Deliveries,
   HookForm,
@@ -64,7 +69,9 @@ function HookCard({
       <div className="vl-admin-hook-head">
         <div className="vl-admin-hook-what">
           <strong className="vl-admin-hook-url">{hook.url}</strong>
-          {hook.description !== "" && <span className="vl-muted">{hook.description}</span>}
+          {hook.description !== "" && (
+            <span className="vl-muted">{hook.description}</span>
+          )}
         </div>
         <Status hook={hook} />
       </div>
@@ -75,7 +82,11 @@ function HookCard({
         </div>
         <div>
           <dt>{t("admin-webhooks-teams")}</dt>
-          <dd>{hook.teams.length === 0 ? t("admin-webhooks-all-teams") : hook.teams.join(", ")}</dd>
+          <dd>
+            {hook.teams.length === 0
+              ? t("admin-webhooks-all-teams")
+              : hook.teams.join(", ")}
+          </dd>
         </div>
         <div>
           <dt>{t("admin-webhooks-last")}</dt>
@@ -84,7 +95,8 @@ function HookCard({
               t("admin-webhooks-never")
             ) : (
               <>
-                {when(hook.last_delivery.at)} · <Outcome delivery={hook.last_delivery} />
+                {when(hook.last_delivery.at)} ·{" "}
+                <Outcome delivery={hook.last_delivery} />
               </>
             )}
             {hook.queued > 0 && (
@@ -99,7 +111,12 @@ function HookCard({
           <dt>{t("admin-webhooks-secret")}</dt>
           <dd>
             <code>whsec_…{hook.secret_hint}</code>
-            {hook.rotating && <small className="vl-muted"> {t("admin-webhooks-rotating")}</small>}
+            {hook.rotating && (
+              <small className="vl-muted">
+                {" "}
+                {t("admin-webhooks-rotating")}
+              </small>
+            )}
           </dd>
         </div>
       </dl>
@@ -150,7 +167,9 @@ function HookCard({
             act(api.update(hook.id, input, !hook.enabled).then(() => quiet));
           }}
         >
-          {hook.enabled ? t("admin-webhooks-turn-off") : t("admin-webhooks-turn-on")}
+          {hook.enabled
+            ? t("admin-webhooks-turn-off")
+            : t("admin-webhooks-turn-on")}
         </button>
         <button
           type="button"
@@ -173,9 +192,17 @@ function HookCard({
           className="vl-text-button vl-danger"
           disabled={busy}
           onClick={() => {
-            if (!globalThis.confirm(t("admin-webhooks-delete-confirm", { url: hook.url }))) return;
+            if (
+              !globalThis.confirm(
+                t("admin-webhooks-delete-confirm", { url: hook.url }),
+              )
+            )
+              return;
             act(
-              api.remove(hook.id).then(() => ({ ok: true, message: t("admin-webhooks-deleted") })),
+              api.remove(hook.id).then(() => ({
+                ok: true,
+                message: t("admin-webhooks-deleted"),
+              })),
             );
           }}
         >
@@ -211,7 +238,8 @@ function Hooks({ api }: { readonly api: WebhooksApi }) {
   // Keep showing the list while it reloads after a change, so open
   // panels and focus stay where they were.
   const [shown, setShown] = useState<HookList>();
-  if (loaded.state === "ready" && loaded.value !== shown) setShown(loaded.value);
+  if (loaded.state === "ready" && loaded.value !== shown)
+    setShown(loaded.value);
   const changed = (next?: Notice) => {
     setNotice(next);
     setReload((n) => n + 1);
@@ -281,7 +309,11 @@ export function WebhooksPage() {
   return (
     <AdminScreen title={t("admin-webhooks")} intro={t("admin-webhooks-intro")}>
       {(api) =>
-        api.webhooks === undefined ? <p>{t("admin-needs-server")}</p> : <Hooks api={api.webhooks} />
+        api.webhooks === undefined ? (
+          <p>{t("admin-needs-server")}</p>
+        ) : (
+          <Hooks api={api.webhooks} />
+        )
       }
     </AdminScreen>
   );

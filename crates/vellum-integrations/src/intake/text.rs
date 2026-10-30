@@ -13,7 +13,9 @@
 //! Vellum adds itself, such as a facts block or a "View in Slack" link,
 //! become markup.
 
-use vellum_format::{Attributes, Block, Container, Document, Inline, List, ListItem};
+use vellum_format::{
+    Attributes, Block, Container, Document, Inline, List, ListItem,
+};
 
 /// A description under construction.
 #[derive(Debug, Clone, Default)]
@@ -89,8 +91,9 @@ impl Body {
     /// Adds a link Vellum made itself, such as a provider permalink. A
     /// URL that is not `https` or `http` is shown as text instead.
     pub fn link(&mut self, label: &str, url: &str) -> &mut Self {
-        let web = url::Url::parse(url)
-            .is_ok_and(|u| matches!(u.scheme(), "https" | "http") && u.host().is_some());
+        let web = url::Url::parse(url).is_ok_and(|u| {
+            matches!(u.scheme(), "https" | "http") && u.host().is_some()
+        });
         let content = if web {
             vec![Inline::Link {
                 url: url.to_owned(),
@@ -309,7 +312,10 @@ mod tests {
                 };
                 for inline in content {
                     assert!(
-                        matches!(inline, Inline::Text { .. } | Inline::Code { .. }),
+                        matches!(
+                            inline,
+                            Inline::Text { .. } | Inline::Code { .. }
+                        ),
                         "markup leaked in facts: {inline:?}"
                     );
                 }
@@ -318,7 +324,12 @@ mod tests {
         assert!(matches!(
             blocks.get(1),
             Some(Block::Paragraph { content, .. })
-                if matches!(content.as_slice(), [Inline::Link { url, .. }] if url == "https://sentry.io/issues/1/")
+                if matches!(
+                    content.as_slice(),
+                    [
+                        Inline::Link { url, .. }
+                    ] if url == "https://sentry.io/issues/1/"
+                )
         ));
         let Some(Block::Paragraph { content, .. }) = blocks.get(2) else {
             panic!("no fallback paragraph");

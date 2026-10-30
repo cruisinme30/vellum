@@ -13,7 +13,12 @@ import {
   type WorkApi,
 } from "./api";
 
-const ISSUE = { key: "ENG-7", title: "Fix sign-in", team: "ENG", state: "todo" } as IssueOut;
+const ISSUE = {
+  key: "ENG-7",
+  title: "Fix sign-in",
+  team: "ENG",
+  state: "todo",
+} as IssueOut;
 
 const offline = () => Promise.reject(new Error("offline"));
 
@@ -24,13 +29,17 @@ interface Call {
 }
 
 /** An Http that records each call and answers from `answer`. */
-function fakeHttp(answer: (method: string, path: string) => unknown = () => ({})) {
+function fakeHttp(
+  answer: (method: string, path: string) => unknown = () => ({}),
+) {
   const calls: Call[] = [];
   const reply = (method: string, path: string) => {
     try {
       return Promise.resolve(answer(method, path));
     } catch (error) {
-      return Promise.reject(error instanceof Error ? error : new Error(String(error)));
+      return Promise.reject(
+        error instanceof Error ? error : new Error(String(error)),
+      );
     }
   };
   const http = {
@@ -66,7 +75,10 @@ describe("the Work API over HTTP", () => {
     const api = createHttpWorkApi(http);
     await api.teams();
     await api.teams({ includeArchived: true });
-    expect(calls.map((call) => call.query)).toEqual([undefined, { include_archived: "true" }]);
+    expect(calls.map((call) => call.query)).toEqual([
+      undefined,
+      { include_archived: "true" },
+    ]);
   });
 
   it("looks up an issue key first, and falls back to titles", async () => {
@@ -83,7 +95,9 @@ describe("the Work API over HTTP", () => {
     known = false;
     await expect(api.searchIssues("eng-7")).resolves.toEqual([ISSUE]);
     await expect(api.searchIssues("sign")).resolves.toEqual([ISSUE]);
-    expect(calls.filter((call) => call.path.endsWith("/issues"))).toHaveLength(2);
+    expect(calls.filter((call) => call.path.endsWith("/issues"))).toHaveLength(
+      2,
+    );
   });
 
   it("scopes saved views to a team only when one is given", async () => {
@@ -91,7 +105,10 @@ describe("the Work API over HTTP", () => {
     const api = createHttpWorkApi(http);
     await api.views();
     await api.views("ENG");
-    expect(calls.map((call) => call.query)).toEqual([undefined, { team: "ENG" }]);
+    expect(calls.map((call) => call.query)).toEqual([
+      undefined,
+      { team: "ENG" },
+    ]);
   });
 
   it("archives and restores a team", async () => {
@@ -122,12 +139,17 @@ describe("issue chip status", () => {
   } as TeamOut;
   const issues = new Map<string, IssueOut>([
     ["ENG-7", ISSUE],
-    ["ENG-8", { ...ISSUE, key: "ENG-8", state: "shipped", category: "completed" }],
+    [
+      "ENG-8",
+      { ...ISSUE, key: "ENG-8", state: "shipped", category: "completed" },
+    ],
     ["OPS-1", { ...ISSUE, key: "OPS-1", team: "OPS", category: "canceled" }],
   ]);
   const issue = (key: string) => {
     const found = issues.get(key);
-    return found === undefined ? Promise.reject(new Error(key)) : Promise.resolve(found);
+    return found === undefined
+      ? Promise.reject(new Error(key))
+      : Promise.resolve(found);
   };
 
   it("names states the way the team does, and says when an issue is finished", async () => {
@@ -148,7 +170,10 @@ describe("issue chip status", () => {
   });
 
   it("shows raw state keys when the teams cannot be read", async () => {
-    const status = issueChipStatus({ teams: offline, issue } as unknown as WorkApi);
+    const status = issueChipStatus({
+      teams: offline,
+      issue,
+    } as unknown as WorkApi);
     await expect(status("ENG-7")).resolves.toMatchObject({ state: "todo" });
   });
 });

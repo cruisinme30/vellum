@@ -69,7 +69,9 @@ impl Authenticator for IdentityAuthenticator {
                     // `/mcp` answers a bad token itself, with the
                     // `WWW-Authenticate` challenge MCP clients follow to
                     // sign in again (ADR 0019, D217).
-                    Err(_) if is_mcp(&request.path) => return Ok(Authenticated::anonymous()),
+                    Err(_) if is_mcp(&request.path) => {
+                        return Ok(Authenticated::anonymous());
+                    }
                     Err(e) => return Err(e),
                 };
                 return Ok(Authenticated {
@@ -80,9 +82,11 @@ impl Authenticator for IdentityAuthenticator {
             let name = self.identity.config().cookie_name();
             Ok(cookie(&request.headers, name)
                 .and_then(|value| self.identity.session(value))
-                .map_or_else(Authenticated::anonymous, |resolved| Authenticated {
-                    principal: resolved.principal,
-                    csrf_binding: resolved.csrf_binding,
+                .map_or_else(Authenticated::anonymous, |resolved| {
+                    Authenticated {
+                        principal: resolved.principal,
+                        csrf_binding: resolved.csrf_binding,
+                    }
                 }))
         })
     }
@@ -111,14 +115,18 @@ impl GuardedFetcher {
         policy.max_redirects = 0;
         policy.timeout = Duration::from_secs(5);
         policy.max_body_bytes = MAX_CLIENT_DOCUMENT;
-        let client = SafeClient::new(policy)
-            .map_err(|e| Error::new(ErrorKind::Internal, format!("HTTP client: {e}")))?;
+        let client = SafeClient::new(policy).map_err(|e| {
+            Error::new(ErrorKind::Internal, format!("HTTP client: {e}"))
+        })?;
         Ok(Self { client })
     }
 }
 
 impl ClientMetadataFetcher for GuardedFetcher {
-    fn fetch<'a>(&'a self, url: &'a str) -> BoxFuture<'a, Result<Vec<u8>, Error>> {
+    fn fetch<'a>(
+        &'a self,
+        url: &'a str,
+    ) -> BoxFuture<'a, Result<Vec<u8>, Error>> {
         Box::pin(async move {
             self.client.get_bytes(url).await.map_err(|e| {
                 Error::new(
@@ -159,7 +167,9 @@ fn is_loopback(url: &Url) -> bool {
 /// # Errors
 ///
 /// A malformed URL, a missing client ID or a bad flag.
-pub fn oidc_config(var: impl Fn(&str) -> Option<String>) -> Result<Option<SsoConfig>, Error> {
+pub fn oidc_config(
+    var: impl Fn(&str) -> Option<String>,
+) -> Result<Option<SsoConfig>, Error> {
     let get = |k: &str| {
         var(k)
             .map(|v| v.trim().to_owned())
@@ -168,15 +178,21 @@ pub fn oidc_config(var: impl Fn(&str) -> Option<String>) -> Result<Option<SsoCon
     let Some(issuer) = get("VELLUM_OIDC_ISSUER") else {
         return Ok(None);
     };
-    let issuer = Url::parse(&issuer)
-        .map_err(|e| invalid(format!("VELLUM_OIDC_ISSUER is not a URL: {e}")))?;
-    if issuer.scheme() != "https" && !(issuer.scheme() == "http" && is_loopback(&issuer)) {
+    let issuer = Url::parse(&issuer).map_err(|e| {
+        invalid(format!("VELLUM_OIDC_ISSUER is not a URL: {e}"))
+    })?;
+    if issuer.scheme() != "https"
+        && !(issuer.scheme() == "http" && is_loopback(&issuer))
+    {
         return Err(invalid(
-            "VELLUM_OIDC_ISSUER must use https (http only on this machine)".into(),
+            "VELLUM_OIDC_ISSUER must use https (http only on this machine)"
+                .into(),
         ));
     }
     let client_id = get("VELLUM_OIDC_CLIENT_ID").ok_or_else(|| {
-        invalid("VELLUM_OIDC_ISSUER is set but VELLUM_OIDC_CLIENT_ID is not".into())
+        invalid(
+            "VELLUM_OIDC_ISSUER is set but VELLUM_OIDC_CLIENT_ID is not".into(),
+        )
     })?;
     let allowed_domains: Vec<String> = get("VELLUM_OIDC_ALLOWED_DOMAINS")
         .map(|v| {
@@ -242,8 +258,9 @@ impl GuardedSsoHttp {
         policy.max_redirects = 3;
         policy.timeout = Duration::from_secs(10);
         policy.max_body_bytes = MAX_PROVIDER_RESPONSE;
-        let client = SafeClient::new(policy)
-            .map_err(|e| Error::new(ErrorKind::Internal, format!("HTTP client: {e}")))?;
+        let client = SafeClient::new(policy).map_err(|e| {
+            Error::new(ErrorKind::Internal, format!("HTTP client: {e}"))
+        })?;
         Ok(Self { client })
     }
 }
@@ -253,7 +270,10 @@ fn provider_error(e: impl std::fmt::Display) -> Error {
 }
 
 impl SsoHttp for GuardedSsoHttp {
-    fn get<'a>(&'a self, url: &'a str) -> BoxFuture<'a, Result<Vec<u8>, Error>> {
+    fn get<'a>(
+        &'a self,
+        url: &'a str,
+    ) -> BoxFuture<'a, Result<Vec<u8>, Error>> {
         Box::pin(async move {
             self.client
                 .get_trusted_bytes(url)

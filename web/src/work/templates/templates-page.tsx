@@ -28,7 +28,8 @@ import "../settings/settings.css";
 import "./templates.css";
 
 /** Which template the editor is open on: a new one, or one by index. */
-type Editing = { readonly kind: "new" } | { readonly kind: "edit"; readonly index: number };
+type Editing =
+  { readonly kind: "new" } | { readonly kind: "edit"; readonly index: number };
 
 /** The templates once the one being edited is saved. */
 function withSaved(
@@ -38,11 +39,16 @@ function withSaved(
 ): readonly Template[] {
   return editing.kind === "new"
     ? [...templates, template]
-    : templates.map((each, index) => (index === editing.index ? template : each));
+    : templates.map((each, index) =>
+        index === editing.index ? template : each,
+      );
 }
 
 /** The names the template being edited must not take. */
-function otherNames(templates: readonly Template[], editing: Editing): readonly string[] {
+function otherNames(
+  templates: readonly Template[],
+  editing: Editing,
+): readonly string[] {
   return templates
     .filter((_, index) => editing.kind === "new" || index !== editing.index)
     .map((each) => each.name);
@@ -60,7 +66,12 @@ function AddButton({
   const t = useT();
   return (
     <>
-      <button type="button" className="vl-filled-button" disabled={disabled} onClick={onAdd}>
+      <button
+        type="button"
+        className="vl-filled-button"
+        disabled={disabled}
+        onClick={onAdd}
+      >
         {t("tpl-new")}
       </button>
       {error !== undefined && (
@@ -119,7 +130,10 @@ function Templates({
         busy={busy}
         error={error}
         onSave={(template) => {
-          save(withSaved(templates, editing, template), t("tpl-saved", { name: template.name }));
+          save(
+            withSaved(templates, editing, template),
+            t("tpl-saved", { name: template.name }),
+          );
         }}
         onCancel={() => {
           setEditing(undefined);
@@ -131,7 +145,9 @@ function Templates({
     <section className="vl-settings-section" aria-labelledby="vl-tpl-heading">
       <h2 id="vl-tpl-heading">{t("tpl-heading")}</h2>
       <p className="vl-muted">{t("tpl-intro")}</p>
-      {templates.length === 0 && !adding && <p className="vl-muted">{t("tpl-empty")}</p>}
+      {templates.length === 0 && !adding && (
+        <p className="vl-muted">{t("tpl-empty")}</p>
+      )}
       <ul className="vl-tpl-list">
         {templates.map((template, index) =>
           editingIndex === index ? (
@@ -151,14 +167,24 @@ function Templates({
                 setEditing({ kind: "edit", index });
               }}
               onCopy={() => {
-                const copy = { ...template, name: copyName(template.name, names) };
+                const copy = {
+                  ...template,
+                  name: copyName(template.name, names),
+                };
                 save(
-                  [...templates.slice(0, index + 1), copy, ...templates.slice(index + 1)],
+                  [
+                    ...templates.slice(0, index + 1),
+                    copy,
+                    ...templates.slice(index + 1),
+                  ],
                   t("tpl-saved", { name: copy.name }),
                 );
               }}
               onMove={(step) => {
-                save(moved(templates, index, step), t("tpl-moved", { name: template.name }));
+                save(
+                  moved(templates, index, step),
+                  t("tpl-moved", { name: template.name }),
+                );
               }}
               onRemove={() => {
                 save(
@@ -186,7 +212,13 @@ function Templates({
   );
 }
 
-function TeamTemplates({ api, team }: { readonly api: WorkApi; readonly team: TeamOut }) {
+function TeamTemplates({
+  api,
+  team,
+}: {
+  readonly api: WorkApi;
+  readonly team: TeamOut;
+}) {
   const planning = useServerApi("planning");
   const [version, setVersion] = useState(0);
   const [said, setSaid] = useState("");
@@ -195,9 +227,14 @@ function TeamTemplates({ api, team }: { readonly api: WorkApi; readonly team: Te
     async () => {
       const [file, projects] = await Promise.all([
         api.teamSettings(team.key),
-        planning === undefined ? Promise.resolve([]) : planning.projects().catch(() => []),
+        planning === undefined
+          ? Promise.resolve([])
+          : planning.projects().catch(() => []),
       ]);
-      return { file, projects: projects.filter((each) => each.teams.includes(team.key)) };
+      return {
+        file,
+        projects: projects.filter((each) => each.teams.includes(team.key)),
+      };
     },
     [api, planning, team.key, version],
     failureText,
@@ -225,7 +262,12 @@ function TeamTemplates({ api, team }: { readonly api: WorkApi; readonly team: Te
               onSaved={done}
             />
             {planning !== undefined && (
-              <Recurring planning={planning} team={team} version={version} onChanged={done} />
+              <Recurring
+                planning={planning}
+                team={team}
+                version={version}
+                onChanged={done}
+              />
             )}
           </>
         )}
@@ -239,7 +281,9 @@ function Teams({ api }: { readonly api: WorkApi }) {
   const loaded = useLoaded(() => api.teams(), [api], failureText);
   return (
     <Ready loaded={loaded}>
-      {(teams) => <TeamChoice api={api} teams={teams} empty={t("issues-no-teams")} />}
+      {(teams) => (
+        <TeamChoice api={api} teams={teams} empty={t("issues-no-teams")} />
+      )}
     </Ready>
   );
 }

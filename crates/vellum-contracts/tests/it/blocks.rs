@@ -3,7 +3,9 @@
 
 //! Checks the generated block model is self-consistent.
 
-use vellum_contracts::blocks::{CalloutKind, DataFenceLang, MarkType, NodeType, SCHEMA_VERSION};
+use vellum_contracts::blocks::{
+    CalloutKind, DataFenceLang, MarkType, NodeType, SCHEMA_VERSION,
+};
 
 #[test]
 fn every_name_round_trips() {

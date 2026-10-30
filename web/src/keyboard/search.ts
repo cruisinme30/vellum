@@ -39,7 +39,10 @@ export function score(text: string, query: string): number {
 }
 
 /** The commands matching `query`, best first; ties keep their order. */
-export function rankCommands(commands: readonly Command[], query: string): Command[] {
+export function rankCommands(
+  commands: readonly Command[],
+  query: string,
+): Command[] {
   return commands
     .map((command, index) => ({
       command,

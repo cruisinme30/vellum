@@ -46,9 +46,13 @@ export function AppShell() {
   // The sidebar choice applies to the window size it was made in; the
   // "More" sheet belongs to the route it was opened on, so navigating
   // closes it without an effect.
-  const [sidebarChoice, setSidebarChoice] = useState<{ medium: boolean; open: boolean }>();
+  const [sidebarChoice, setSidebarChoice] = useState<{
+    medium: boolean;
+    open: boolean;
+  }>();
   const [sheetPath, setSheetPath] = useState<string>();
-  const sidebar = sidebarChoice?.medium === medium ? sidebarChoice.open : !medium;
+  const sidebar =
+    sidebarChoice?.medium === medium ? sidebarChoice.open : !medium;
   const sheet = sheetPath === location.pathname;
   const setSidebar = (open: boolean) => {
     setSidebarChoice({ medium, open });
@@ -96,14 +100,20 @@ export function AppShell() {
         aria-label={t("sidebar-label")}
         hidden={!showSidebar}
       >
-        <Sidebar currentId={currentId} compact={compact} onNavigate={closeOverlay} />
+        <Sidebar
+          currentId={currentId}
+          compact={compact}
+          onNavigate={closeOverlay}
+        />
       </aside>
       {showSidebar && (compact || medium) && (
         <div className="vl-scrim" aria-hidden="true" onClick={closeOverlay} />
       )}
       <main id="vl-main" className="vl-main" tabIndex={-1}>
         {health.degraded && <ServiceBanner />}
-        {workspace.problem !== undefined && <WorkspaceProblem problem={workspace.problem} />}
+        {workspace.problem !== undefined && (
+          <WorkspaceProblem problem={workspace.problem} />
+        )}
         <Outlet />
       </main>
       {compact && (
@@ -133,7 +143,9 @@ function ServiceBanner() {
   );
 }
 
-/** A change or load the server refused, with its request ID, until dismissed. */
+/**
+ * A change or load the server refused, with its request ID, until dismissed.
+ */
 function WorkspaceProblem({ problem }: { readonly problem: StoreProblem }) {
   const t = useT();
   const { store } = useServices();

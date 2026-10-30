@@ -24,9 +24,15 @@ const ROUNDS: usize = 4;
 pub fn blocks(blocks: &mut [Block], diagnostics: &mut Vec<Diagnostic>) {
     for block in blocks {
         match block {
-            Block::Paragraph { content, .. } => settle(content, Place::Paragraph, diagnostics),
-            Block::Heading { content, .. } => settle(content, Place::Heading, diagnostics),
-            Block::BlockQuote { blocks: inner, .. } => self::blocks(inner, diagnostics),
+            Block::Paragraph { content, .. } => {
+                settle(content, Place::Paragraph, diagnostics)
+            }
+            Block::Heading { content, .. } => {
+                settle(content, Place::Heading, diagnostics)
+            }
+            Block::BlockQuote { blocks: inner, .. } => {
+                self::blocks(inner, diagnostics)
+            }
             Block::List(list) => {
                 for item in &mut list.items {
                     self::blocks(&mut item.blocks, diagnostics);
@@ -51,7 +57,11 @@ pub fn blocks(blocks: &mut [Block], diagnostics: &mut Vec<Diagnostic>) {
     }
 }
 
-fn settle(content: &mut Vec<Inline>, place: Place, diagnostics: &mut Vec<Diagnostic>) {
+fn settle(
+    content: &mut Vec<Inline>,
+    place: Place,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
     if !content.iter().any(has_marks) {
         return;
     }
@@ -96,9 +106,17 @@ fn read_back(content: &[Inline], place: Place) -> Option<Vec<Inline>> {
     };
     let mut blocks = crate::parse_unsettled(&src).document.blocks;
     match (place, blocks.pop(), blocks.is_empty()) {
-        (Place::Paragraph, Some(Block::Paragraph { content, id: None }), true)
-        | (Place::Heading, Some(Block::Heading { content, .. }), true) => Some(content),
-        (Place::Cell, Some(Block::Table(mut table)), true) if table.header.len() == 1 => {
+        (
+            Place::Paragraph,
+            Some(Block::Paragraph { content, id: None }),
+            true,
+        )
+        | (Place::Heading, Some(Block::Heading { content, .. }), true) => {
+            Some(content)
+        }
+        (Place::Cell, Some(Block::Table(mut table)), true)
+            if table.header.len() == 1 =>
+        {
             table.header.pop()
         }
         _ => None,

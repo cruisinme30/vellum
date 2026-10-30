@@ -92,16 +92,19 @@ store. Live editing rooms are routed to one replica per document.
 
 ::: facts
 
-- single: under 80 MB of memory idle, cold start under 2 seconds, no other services
+- single: under 80 MB of memory idle, cold start under 2 seconds, no other
+  services
 - team: 50 people editing at once and 2,000 page reads per second on one host
-- org: 99.9% monthly availability, no single point of failure, database recovery point of zero, recovery time under 15 minutes
+- org: 99.9% monthly availability, no single point of failure, database recovery
+  point of zero, recovery time under 15 minutes
 
 :::
 
 ## Moving up a rung {#migrate}
 
 1. Take a backup with `vellum admin backup`.
-2. Start the new profile against the same content, or copy the content to its new storage with `vellum migrate-storage`.
+2. Start the new profile against the same content, or copy the content to its
+   new storage with `vellum migrate-storage`.
 3. Run `vellum reindex` to build the index in the new database.
 4. Point your DNS at the new deployment.
 

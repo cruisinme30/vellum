@@ -40,9 +40,11 @@ pub const ASSERTION_NS: &str = "urn:oasis:names:tc:SAML:2.0:assertion";
 pub const METADATA_NS: &str = "urn:oasis:names:tc:SAML:2.0:metadata";
 const SUCCESS: &str = "urn:oasis:names:tc:SAML:2.0:status:Success";
 const BEARER: &str = "urn:oasis:names:tc:SAML:2.0:cm:bearer";
-const HTTP_REDIRECT: &str = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect";
+const HTTP_REDIRECT: &str =
+    "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect";
 const HTTP_POST: &str = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST";
-const EMAIL_FORMAT: &str = "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress";
+const EMAIL_FORMAT: &str =
+    "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress";
 
 /// Clock difference tolerated between Vellum and the provider.
 const CLOCK_SKEW_MS: i64 = 120_000;
@@ -174,8 +176,9 @@ pub struct Metadata {
 /// [`ErrorKind::Internal`] if the random source fails.
 pub fn new_id() -> Result<String, Error> {
     let mut bytes = [0_u8; 20];
-    getrandom::fill(&mut bytes)
-        .map_err(|e| Error::new(ErrorKind::Internal, format!("random source failed: {e}")))?;
+    getrandom::fill(&mut bytes).map_err(|e| {
+        Error::new(ErrorKind::Internal, format!("random source failed: {e}"))
+    })?;
     let mut id = String::from("_");
     for b in bytes {
         let _ = write!(id, "{b:02x}");
@@ -207,26 +210,27 @@ pub fn authn_request_url(
 ) -> Result<String, Error> {
     let force = if force { " ForceAuthn=\"true\"" } else { "" };
     let xml = format!(
-        "<samlp:AuthnRequest xmlns:samlp=\"{PROTOCOL_NS}\" xmlns:saml=\"{ASSERTION_NS}\" \
-         ID=\"{id}\" Version=\"2.0\" IssueInstant=\"{now}\" Destination=\"{dest}\" \
-         AssertionConsumerServiceURL=\"{acs}\" ProtocolBinding=\"{HTTP_POST}\"{force}>\
-         <saml:Issuer>{issuer}</saml:Issuer>\
-         <samlp:NameIDPolicy AllowCreate=\"true\"/>\
-         </samlp:AuthnRequest>",
+        "<samlp:AuthnRequest xmlns:samlp=\"{PROTOCOL_NS}\" \
+         xmlns:saml=\"{ASSERTION_NS}\" ID=\"{id}\" Version=\"2.0\" \
+         IssueInstant=\"{now}\" Destination=\"{dest}\" \
+         AssertionConsumerServiceURL=\"{acs}\" \
+         ProtocolBinding=\"{HTTP_POST}\"{force}><saml:Issuer>{issuer}</saml:Iss\
+         uer><samlp:NameIDPolicy AllowCreate=\"true\"/></samlp:AuthnRequest>",
         id = escape(request_id),
         dest = escape(&idp.sso_url),
         acs = escape(&sp.acs_url),
         issuer = escape(&sp.entity_id),
     );
     let mut deflate = DeflateEncoder::new(Vec::new(), Compression::default());
-    deflate
-        .write_all(xml.as_bytes())
-        .map_err(|e| Error::new(ErrorKind::Internal, format!("deflate failed: {e}")))?;
-    let deflated = deflate
-        .finish()
-        .map_err(|e| Error::new(ErrorKind::Internal, format!("deflate failed: {e}")))?;
-    let mut url = Url::parse(&idp.sso_url)
-        .map_err(|e| invalid(format!("the provider's sign-in URL is not a URL: {e}")))?;
+    deflate.write_all(xml.as_bytes()).map_err(|e| {
+        Error::new(ErrorKind::Internal, format!("deflate failed: {e}"))
+    })?;
+    let deflated = deflate.finish().map_err(|e| {
+        Error::new(ErrorKind::Internal, format!("deflate failed: {e}"))
+    })?;
+    let mut url = Url::parse(&idp.sso_url).map_err(|e| {
+        invalid(format!("the provider's sign-in URL is not a URL: {e}"))
+    })?;
     let _ = url
         .query_pairs_mut()
         .append_pair("SAMLRequest", &STANDARD.encode(deflated))
@@ -239,12 +243,13 @@ pub fn authn_request_url(
 pub fn sp_metadata(sp: &ServiceProvider) -> String {
     format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
-         <md:EntityDescriptor xmlns:md=\"{METADATA_NS}\" entityID=\"{entity}\">\
-         <md:SPSSODescriptor AuthnRequestsSigned=\"false\" WantAssertionsSigned=\"true\" \
-         protocolSupportEnumeration=\"{PROTOCOL_NS}\">\
-         <md:NameIDFormat>{EMAIL_FORMAT}</md:NameIDFormat>\
-         <md:AssertionConsumerService Binding=\"{HTTP_POST}\" Location=\"{acs}\" index=\"0\" isDefault=\"true\"/>\
-         </md:SPSSODescriptor></md:EntityDescriptor>\n",
+         <md:EntityDescriptor xmlns:md=\"{METADATA_NS}\" \
+         entityID=\"{entity}\"><md:SPSSODescriptor \
+         AuthnRequestsSigned=\"false\" WantAssertionsSigned=\"true\" \
+         protocolSupportEnumeration=\"{PROTOCOL_NS}\"><md:NameIDFormat>{EMAIL_F\
+         ORMAT}</md:NameIDFormat><md:AssertionConsumerService \
+         Binding=\"{HTTP_POST}\" Location=\"{acs}\" index=\"0\" \
+         isDefault=\"true\"/></md:SPSSODescriptor></md:EntityDescriptor>\n",
         entity = escape(&sp.entity_id),
         acs = escape(&sp.acs_url),
     )
@@ -257,16 +262,22 @@ fn parse(text: &str) -> Result<Document<'_>, Error> {
         ..ParsingOptions::default()
     };
     Document::parse_with_options(text, options).map_err(|e| {
-        tracing::info!(event = "identity.saml_refused", error = %e, "unreadable SAML XML");
+        tracing::info!(event = "identity.saml_refused", error = %e, "unreadabl\
+            e SAML XML");
         refused(format!("the XML cannot be read: {e}"))
     })
 }
 
 fn is(node: Node<'_, '_>, ns: &str, name: &str) -> bool {
-    node.is_element() && node.tag_name().namespace() == Some(ns) && node.tag_name().name() == name
+    node.is_element()
+        && node.tag_name().namespace() == Some(ns)
+        && node.tag_name().name() == name
 }
 
-fn time(node: Node<'_, '_>, attribute: &str) -> Result<Option<Timestamp>, Error> {
+fn time(
+    node: Node<'_, '_>,
+    attribute: &str,
+) -> Result<Option<Timestamp>, Error> {
     node.attribute(attribute)
         .map(|t| {
             t.parse::<Timestamp>()
@@ -280,15 +291,20 @@ fn time(node: Node<'_, '_>, attribute: &str) -> Result<Option<Timestamp>, Error>
 /// # Errors
 ///
 /// [`ErrorKind::Unauthenticated`] for anything the module docs refuse.
-pub fn read_response(encoded: &str, expected: &Expected<'_>) -> Result<Asserted, Error> {
+pub fn read_response(
+    encoded: &str,
+    expected: &Expected<'_>,
+) -> Result<Asserted, Error> {
     if encoded.len() > MAX_RESPONSE_BYTES {
         return Err(refused("the response is too large"));
     }
-    let clean: String = encoded.chars().filter(|c| !c.is_whitespace()).collect();
+    let clean: String =
+        encoded.chars().filter(|c| !c.is_whitespace()).collect();
     let bytes = STANDARD
         .decode(clean)
         .map_err(|_| refused("the response is not base64"))?;
-    let text = String::from_utf8(bytes).map_err(|_| refused("the response is not UTF-8"))?;
+    let text = String::from_utf8(bytes)
+        .map_err(|_| refused("the response is not UTF-8"))?;
     let doc = parse(&text)?;
     let response = doc.root_element();
     if !is(response, PROTOCOL_NS, "Response") {
@@ -304,17 +320,23 @@ pub fn read_response(encoded: &str, expected: &Expected<'_>) -> Result<Asserted,
         .is_some()
     {
         return Err(refused(
-            "encrypted assertions are not supported; turn off assertion encryption",
+            "encrypted assertions are not supported; turn off assertion \
+                encryption",
         ));
     }
     let assertion = only_child(response, ASSERTION_NS, "Assertion")
-        .ok_or_else(|| refused("the response must hold exactly one assertion"))?;
+        .ok_or_else(|| {
+            refused("the response must hold exactly one assertion")
+        })?;
     xmldsig::verify_enveloped(&text, assertion, &expected.idp.certificates)?;
     // From here on, only the verified assertion is read.
     read_assertion(assertion, expected)
 }
 
-fn check_response(response: Node<'_, '_>, expected: &Expected<'_>) -> Result<(), Error> {
+fn check_response(
+    response: Node<'_, '_>,
+    expected: &Expected<'_>,
+) -> Result<(), Error> {
     if response.attribute("Version") != Some("2.0") {
         return Err(refused("the response is not SAML 2.0"));
     }
@@ -342,7 +364,10 @@ fn check_response(response: Node<'_, '_>, expected: &Expected<'_>) -> Result<(),
     Ok(())
 }
 
-fn read_assertion(assertion: Node<'_, '_>, expected: &Expected<'_>) -> Result<Asserted, Error> {
+fn read_assertion(
+    assertion: Node<'_, '_>,
+    expected: &Expected<'_>,
+) -> Result<Asserted, Error> {
     let now = expected.now.unix_ms();
     let id = assertion
         .attribute("ID")
@@ -358,15 +383,20 @@ fn read_assertion(assertion: Node<'_, '_>, expected: &Expected<'_>) -> Result<As
     }
     let conditions = only_child(assertion, ASSERTION_NS, "Conditions")
         .ok_or_else(|| refused("the assertion has no conditions"))?;
-    if time(conditions, "NotBefore")?.is_some_and(|t| t.unix_ms() > now + CLOCK_SKEW_MS) {
-        return Err(refused("the assertion is not valid yet; check the clocks"));
+    if time(conditions, "NotBefore")?
+        .is_some_and(|t| t.unix_ms() > now + CLOCK_SKEW_MS)
+    {
+        return Err(refused(
+            "the assertion is not valid yet; check the clocks",
+        ));
     }
-    let not_after =
-        time(conditions, "NotOnOrAfter")?.ok_or_else(|| refused("the assertion has no expiry"))?;
+    let not_after = time(conditions, "NotOnOrAfter")?
+        .ok_or_else(|| refused("the assertion has no expiry"))?;
     if not_after.unix_ms() + CLOCK_SKEW_MS <= now {
         return Err(refused("the assertion has expired"));
     }
-    let mut restrictions = children(conditions, ASSERTION_NS, "AudienceRestriction").peekable();
+    let mut restrictions =
+        children(conditions, ASSERTION_NS, "AudienceRestriction").peekable();
     if restrictions.peek().is_none() {
         return Err(refused("the assertion names no audience"));
     }
@@ -390,7 +420,8 @@ fn read_assertion(assertion: Node<'_, '_>, expected: &Expected<'_>) -> Result<As
     let confirmed_until = confirmation(subject, expected)?;
     let (mut email, name) = attributes(assertion)?;
     if email.is_none()
-        && (name_id_node.attribute("Format") == Some(EMAIL_FORMAT) || name_id.contains('@'))
+        && (name_id_node.attribute("Format") == Some(EMAIL_FORMAT)
+            || name_id.contains('@'))
     {
         email = Some(name_id.clone());
     }
@@ -416,14 +447,19 @@ fn read_assertion(assertion: Node<'_, '_>, expected: &Expected<'_>) -> Result<As
 }
 
 /// Checks the bearer confirmation and returns until when it holds.
-fn confirmation(subject: Node<'_, '_>, expected: &Expected<'_>) -> Result<Timestamp, Error> {
+fn confirmation(
+    subject: Node<'_, '_>,
+    expected: &Expected<'_>,
+) -> Result<Timestamp, Error> {
     let now = expected.now.unix_ms();
     let mut problem = "the assertion has no bearer confirmation";
     for confirmation in children(subject, ASSERTION_NS, "SubjectConfirmation") {
         if confirmation.attribute("Method") != Some(BEARER) {
             continue;
         }
-        let Some(data) = only_child(confirmation, ASSERTION_NS, "SubjectConfirmationData") else {
+        let Some(data) =
+            only_child(confirmation, ASSERTION_NS, "SubjectConfirmationData")
+        else {
             continue;
         };
         if data.attribute("Recipient") != Some(expected.sp.acs_url.as_str()) {
@@ -434,12 +470,16 @@ fn confirmation(subject: Node<'_, '_>, expected: &Expected<'_>) -> Result<Timest
             problem = "the assertion answers another sign-in";
             continue;
         }
-        if time(data, "NotBefore")?.is_some_and(|t| t.unix_ms() > now + CLOCK_SKEW_MS) {
+        if time(data, "NotBefore")?
+            .is_some_and(|t| t.unix_ms() > now + CLOCK_SKEW_MS)
+        {
             problem = "the assertion is not valid yet; check the clocks";
             continue;
         }
         match time(data, "NotOnOrAfter")? {
-            Some(until) if until.unix_ms() + CLOCK_SKEW_MS > now => return Ok(until),
+            Some(until) if until.unix_ms() + CLOCK_SKEW_MS > now => {
+                return Ok(until);
+            }
             Some(_) => problem = "the assertion has expired",
             None => problem = "the assertion's confirmation has no expiry",
         }
@@ -448,7 +488,9 @@ fn confirmation(subject: Node<'_, '_>, expected: &Expected<'_>) -> Result<Timest
 }
 
 /// The email and display name from the attribute statements.
-fn attributes(assertion: Node<'_, '_>) -> Result<(Option<String>, Option<String>), Error> {
+fn attributes(
+    assertion: Node<'_, '_>,
+) -> Result<(Option<String>, Option<String>), Error> {
     let mut email = None;
     let mut name = None;
     for statement in children(assertion, ASSERTION_NS, "AttributeStatement") {
@@ -457,7 +499,9 @@ fn attributes(assertion: Node<'_, '_>) -> Result<(Option<String>, Option<String>
                 .attribute("Name")
                 .unwrap_or_default()
                 .to_lowercase();
-            let Some(value) = children(attribute, ASSERTION_NS, "AttributeValue").next() else {
+            let Some(value) =
+                children(attribute, ASSERTION_NS, "AttributeValue").next()
+            else {
                 continue;
             };
             let value = text_of(value)?.trim().to_owned();
@@ -466,7 +510,8 @@ fn attributes(assertion: Node<'_, '_>) -> Result<(Option<String>, Option<String>
             }
             if email.is_none() && EMAIL_ATTRIBUTES.contains(&key.as_str()) {
                 email = Some(value);
-            } else if name.is_none() && NAME_ATTRIBUTES.contains(&key.as_str()) {
+            } else if name.is_none() && NAME_ATTRIBUTES.contains(&key.as_str())
+            {
                 name = Some(value);
             }
         }
@@ -482,18 +527,22 @@ fn attributes(assertion: Node<'_, '_>) -> Result<(Option<String>, Option<String>
 /// [`ErrorKind::InvalidInput`] when the document is not identity
 /// provider metadata or lacks one of those.
 pub fn parse_metadata(bytes: &[u8]) -> Result<Metadata, Error> {
-    let text = std::str::from_utf8(bytes).map_err(|_| invalid("the metadata is not UTF-8"))?;
+    let text = std::str::from_utf8(bytes)
+        .map_err(|_| invalid("the metadata is not UTF-8"))?;
     let doc = parse(text).map_err(|e| invalid(e.message().to_owned()))?;
     let root = doc.root_element();
     let entity = if is(root, METADATA_NS, "EntityDescriptor") {
         Some(root)
     } else if is(root, METADATA_NS, "EntitiesDescriptor") {
-        let mut found = children(root, METADATA_NS, "EntityDescriptor")
-            .filter(|e| only_child(*e, METADATA_NS, "IDPSSODescriptor").is_some());
+        let mut found =
+            children(root, METADATA_NS, "EntityDescriptor").filter(|e| {
+                only_child(*e, METADATA_NS, "IDPSSODescriptor").is_some()
+            });
         let first = found.next();
         if found.next().is_some() {
             return Err(invalid(
-                "the metadata describes several providers; use one provider's URL",
+                "the metadata describes several providers; use one provider's \
+                    URL",
             ));
         }
         first
@@ -505,8 +554,9 @@ pub fn parse_metadata(bytes: &[u8]) -> Result<Metadata, Error> {
         .attribute("entityID")
         .ok_or_else(|| invalid("the metadata has no entity ID"))?
         .to_owned();
-    let idp = only_child(entity, METADATA_NS, "IDPSSODescriptor")
-        .ok_or_else(|| invalid("the metadata does not describe an identity provider"))?;
+    let idp = only_child(entity, METADATA_NS, "IDPSSODescriptor").ok_or_else(
+        || invalid("the metadata does not describe an identity provider"),
+    )?;
     let sso_url = children(idp, METADATA_NS, "SingleSignOnService")
         .find(|s| s.attribute("Binding") == Some(HTTP_REDIRECT))
         .and_then(|s| s.attribute("Location"))
@@ -521,7 +571,8 @@ pub fn parse_metadata(bytes: &[u8]) -> Result<Metadata, Error> {
             .descendants()
             .filter(|n| is(*n, xmldsig::DSIG_NS, "X509Certificate"))
         {
-            let text = text_of(cert).map_err(|e| invalid(e.message().to_owned()))?;
+            let text =
+                text_of(cert).map_err(|e| invalid(e.message().to_owned()))?;
             certificates.extend(Certificate::parse_all(&text)?);
         }
     }
@@ -559,9 +610,18 @@ mod tests {
             sso_url: "https://idp.northstar.dev/sso?tenant=1".into(),
             certificates: Vec::new(),
         };
-        let url = authn_request_url(&sp(), &idp, "_abc", "_relay", true, Timestamp::now()).unwrap();
+        let url = authn_request_url(
+            &sp(),
+            &idp,
+            "_abc",
+            "_relay",
+            true,
+            Timestamp::now(),
+        )
+        .unwrap();
         let url = Url::parse(&url).unwrap();
-        let pairs: Vec<(String, String)> = url.query_pairs().into_owned().collect();
+        let pairs: Vec<(String, String)> =
+            url.query_pairs().into_owned().collect();
         assert_eq!(pairs[0], ("tenant".into(), "1".into()));
         assert_eq!(pairs[2], ("RelayState".into(), "_relay".into()));
         let deflated = STANDARD.decode(&pairs[1].1).unwrap();
@@ -571,12 +631,14 @@ mod tests {
             .unwrap();
         assert!(xml.contains("ID=\"_abc\""));
         assert!(xml.contains("ForceAuthn=\"true\""));
-        assert!(
-            xml.contains("AssertionConsumerServiceURL=\"https://vellum.northstar.dev/saml/acs\"")
-        );
-        assert!(
-            xml.contains("<saml:Issuer>https://vellum.northstar.dev/saml/metadata</saml:Issuer>")
-        );
+        assert!(xml.contains(
+            "AssertionConsumerServiceURL=\"https://vellum.northsta\
+                r.dev/saml/acs\""
+        ));
+        assert!(xml.contains(
+            "<saml:Issuer>https://vellum.northstar.dev/saml/metada\
+                ta</saml:Issuer>"
+        ));
         let doc = Document::parse(&xml).unwrap();
         assert!(is(doc.root_element(), PROTOCOL_NS, "AuthnRequest"));
     }
@@ -591,7 +653,10 @@ mod tests {
 
     #[test]
     fn metadata_with_a_dtd_is_refused() {
-        let xml = r#"<?xml version="1.0"?><!DOCTYPE x [<!ENTITY a "aaaa">]><x>&a;</x>"#;
+        let xml = concat!(
+            r#"<?xml version="1.0"?><!DOCTYPE x [<!ENTITY a "#,
+            r#""aaaa">]><x>&a;</x>"#,
+        );
         assert_eq!(
             parse_metadata(xml.as_bytes()).unwrap_err().kind(),
             ErrorKind::InvalidInput

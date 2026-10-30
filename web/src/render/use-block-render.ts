@@ -16,7 +16,9 @@ interface Failure {
   readonly diagnostic: Diagnostic;
 }
 
-/** A block's drawing: the latest answer, and whether a newer one is on its way. */
+/**
+ * A block's drawing: the latest answer, and whether a newer one is on its way.
+ */
 export interface BlockDrawing {
   /** The last drawing that arrived; kept while the next one loads. */
   readonly drawn?: RenderedBlockView | undefined;
@@ -38,7 +40,10 @@ interface Answer {
  * {@link DRAW_DELAY_MS}, and an answer for older text is dropped. With no
  * `api` (demo mode) nothing is drawn.
  */
-export function useBlockRender(api: RenderApi | undefined, block: BlockInput): BlockDrawing {
+export function useBlockRender(
+  api: RenderApi | undefined,
+  block: BlockInput,
+): BlockDrawing {
   const [answer, setAnswer] = useState<Answer>();
   const key = JSON.stringify([block.lang, block.args ?? "", block.source]);
   // The first drawing goes at once; later ones wait for typing to pause.
@@ -57,7 +62,10 @@ export function useBlockRender(api: RenderApi | undefined, block: BlockInput): B
         (error: unknown) => {
           if (!current) return;
           const text = failureText(error);
-          setAnswer({ key, failure: { text, diagnostic: diagnosticOf(error) } });
+          setAnswer({
+            key,
+            failure: { text, diagnostic: diagnosticOf(error) },
+          });
         },
       );
     }, delay);

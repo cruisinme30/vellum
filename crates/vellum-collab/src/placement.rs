@@ -14,7 +14,10 @@ use crate::hub::RoomKey;
 /// The node among `nodes` that owns `room`, or `None` when the list is
 /// empty. Node names must be unique and stable (a pod name, say).
 #[must_use]
-pub fn owner<'a, N: AsRef<str>>(room: &RoomKey, nodes: &'a [N]) -> Option<&'a N> {
+pub fn owner<'a, N: AsRef<str>>(
+    room: &RoomKey,
+    nodes: &'a [N],
+) -> Option<&'a N> {
     let room_hash = room_hash(room);
     nodes.iter().max_by_key(|node| {
         (

@@ -17,7 +17,9 @@
 
 use opentelemetry::trace::TracerProvider as _;
 use opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge;
-use opentelemetry_otlp::{LogExporter, MetricExporter, SpanExporter, WithExportConfig as _};
+use opentelemetry_otlp::{
+    LogExporter, MetricExporter, SpanExporter, WithExportConfig as _,
+};
 use opentelemetry_sdk::Resource;
 use opentelemetry_sdk::logs::SdkLoggerProvider;
 use opentelemetry_sdk::metrics::SdkMeterProvider;
@@ -56,7 +58,9 @@ impl TelemetryConfig {
     /// Builds a configuration from the process environment.
     #[must_use]
     pub fn from_env(service_name: &str, service_version: &str) -> Self {
-        Self::from_lookup(service_name, service_version, |key| std::env::var(key).ok())
+        Self::from_lookup(service_name, service_version, |key| {
+            std::env::var(key).ok()
+        })
     }
 
     /// Builds a configuration from any key lookup; [`Self::from_env`] uses
@@ -67,7 +71,8 @@ impl TelemetryConfig {
         service_version: &str,
         lookup: impl Fn(&str) -> Option<String>,
     ) -> Self {
-        let non_empty = |key: &str| lookup(key).filter(|value| !value.trim().is_empty());
+        let non_empty =
+            |key: &str| lookup(key).filter(|value| !value.trim().is_empty());
         let log_format = match non_empty("VELLUM_LOG_FORMAT").as_deref() {
             Some("pretty") => LogFormat::Pretty,
             _ => LogFormat::Json,
@@ -75,7 +80,8 @@ impl TelemetryConfig {
         Self {
             service_name: service_name.to_owned(),
             service_version: service_version.to_owned(),
-            filter: non_empty("VELLUM_LOG").unwrap_or_else(|| "info".to_owned()),
+            filter: non_empty("VELLUM_LOG")
+                .unwrap_or_else(|| "info".to_owned()),
             log_format,
             otlp_endpoint: non_empty("OTEL_EXPORTER_OTLP_ENDPOINT"),
         }
@@ -131,7 +137,10 @@ struct Providers {
 }
 
 impl Providers {
-    fn build(config: &TelemetryConfig, endpoint: &str) -> Result<Self, TelemetryError> {
+    fn build(
+        config: &TelemetryConfig,
+        endpoint: &str,
+    ) -> Result<Self, TelemetryError> {
         let base = endpoint.trim_end_matches('/');
         let resource = Resource::builder()
             .with_service_name(config.service_name.clone())
@@ -192,7 +201,8 @@ pub fn subscriber(
 
 /// A layer added beneath the kernel's own, such as the Admin → Requests
 /// recorder from `vellum-observe`.
-pub type ExtraLayer = Box<dyn tracing_subscriber::Layer<Registry> + Send + Sync>;
+pub type ExtraLayer =
+    Box<dyn tracing_subscriber::Layer<Registry> + Send + Sync>;
 
 /// Like [`subscriber`], with one extra layer that sees every span and
 /// event the filter lets through.
@@ -253,8 +263,8 @@ pub fn subscriber_with(
 /// The meter for `scope` on the process's meter provider.
 ///
 /// Instruments made from it export over OTLP once [`init`] installed an
-/// exporter, and cost nothing otherwise. Observable gauges registered on it are read at each
-/// export, so their callbacks should only read cached values.
+/// exporter, and cost nothing otherwise. Observable gauges registered on it are
+/// read at each export, so their callbacks should only read cached values.
 #[must_use]
 pub fn meter(scope: &'static str) -> opentelemetry::metrics::Meter {
     opentelemetry::global::meter(scope)
@@ -274,7 +284,9 @@ fn is_exporter_target(target: &str) -> bool {
 ///
 /// Returns [`TelemetryError`] when the configuration is invalid or
 /// telemetry was already initialised.
-pub fn init(config: &TelemetryConfig) -> Result<TelemetryGuard, TelemetryError> {
+pub fn init(
+    config: &TelemetryConfig,
+) -> Result<TelemetryGuard, TelemetryError> {
     init_with(config, None)
 }
 
@@ -303,7 +315,9 @@ mod tests {
             .iter()
             .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
             .collect();
-        TelemetryConfig::from_lookup("vellum-test", "0.0.0", |key| env.get(key).cloned())
+        TelemetryConfig::from_lookup("vellum-test", "0.0.0", |key| {
+            env.get(key).cloned()
+        })
     }
 
     #[test]
@@ -330,7 +344,8 @@ mod tests {
 
     #[test]
     fn blank_values_fall_back_to_defaults() {
-        let c = config(&[("VELLUM_LOG", " "), ("OTEL_EXPORTER_OTLP_ENDPOINT", "")]);
+        let c =
+            config(&[("VELLUM_LOG", " "), ("OTEL_EXPORTER_OTLP_ENDPOINT", "")]);
         assert_eq!(c.filter, "info");
         assert_eq!(c.otlp_endpoint, None);
     }
@@ -352,7 +367,8 @@ mod tests {
     #[test]
     fn local_only_subscriber_records_spans() {
         for format in ["json", "pretty"] {
-            let (sub, guard) = subscriber(&config(&[("VELLUM_LOG_FORMAT", format)])).unwrap();
+            let (sub, guard) =
+                subscriber(&config(&[("VELLUM_LOG_FORMAT", format)])).unwrap();
             assert!(!guard.is_exporting());
             tracing::subscriber::with_default(sub, || {
                 let span = tracing::info_span!("kernel.test");
@@ -364,13 +380,17 @@ mod tests {
 
     #[test]
     fn exporting_subscriber_builds_and_shuts_down() {
-        let c = config(&[("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:9/")]);
+        let c =
+            config(&[("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:9/")]);
         let (sub, guard) = subscriber(&c).unwrap();
         assert!(guard.is_exporting());
         tracing::subscriber::with_default(sub, || {
             let span = tracing::info_span!("kernel.export");
             let _entered = span.enter();
-            tracing::info!(monotonic_counter.kernel_test_events = 1_u64, "exported");
+            tracing::info!(
+                monotonic_counter.kernel_test_events = 1_u64,
+                "exported"
+            );
         });
         drop(guard);
     }
@@ -392,8 +412,11 @@ mod tests {
             }
         }
         let seen = Arc::new(AtomicUsize::new(0));
-        let (sub, _guard) =
-            subscriber_with(&config(&[]), Some(Box::new(Count(Arc::clone(&seen))))).unwrap();
+        let (sub, _guard) = subscriber_with(
+            &config(&[]),
+            Some(Box::new(Count(Arc::clone(&seen)))),
+        )
+        .unwrap();
         tracing::subscriber::with_default(sub, || {
             let span = tracing::info_span!("kernel.extra");
             drop(span.enter());

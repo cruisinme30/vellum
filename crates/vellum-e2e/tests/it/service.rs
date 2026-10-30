@@ -14,8 +14,8 @@ use base64::engine::general_purpose::STANDARD;
 use bytes::Bytes;
 use vellum_crypto::recipients::{RecipientSecret, open_as, seal_for};
 use vellum_e2e::{
-    DeleteObject, E2e, EnrolDevice, GetObject, ListObjects, Need, PutObject, RevokeDevice,
-    SpaceAccess,
+    DeleteObject, E2e, EnrolDevice, GetObject, ListObjects, Need, PutObject,
+    RevokeDevice, SpaceAccess,
 };
 use vellum_kernel::{Error, ErrorKind, SpaceId, UserId};
 use vellum_store::LocalStore;
@@ -36,10 +36,16 @@ struct Access(BTreeMap<UserId, Need>);
 #[async_trait]
 impl SpaceAccess for Access {
     async fn root(&self, space_id: SpaceId) -> Result<Option<BlobPath>, Error> {
-        Ok((space_id == space()).then(|| BlobPath::new("drives/board").unwrap()))
+        Ok((space_id == space())
+            .then(|| BlobPath::new("drives/board").unwrap()))
     }
 
-    async fn allowed(&self, user: UserId, _: SpaceId, need: Need) -> Result<bool, Error> {
+    async fn allowed(
+        &self,
+        user: UserId,
+        _: SpaceId,
+        need: Need,
+    ) -> Result<bool, Error> {
         Ok(self.0.get(&user).is_some_and(|held| *held >= need))
     }
 }
@@ -58,7 +64,8 @@ async fn fixture() -> Fixture {
         (MEMBER, Need::Edit),
         (READER, Need::View),
     ]));
-    let e2e = E2e::new(Arc::clone(&store) as Arc<dyn BlobStore>, Arc::new(access));
+    let e2e =
+        E2e::new(Arc::clone(&store) as Arc<dyn BlobStore>, Arc::new(access));
     Fixture {
         _dir: dir,
         store,
@@ -211,7 +218,9 @@ async fn uploads_must_be_sealed_to_exactly_the_current_keys() {
         kind(f.e2e.put(MEMBER, put("a.md", &missing, None)).await),
         ErrorKind::Conflict
     );
-    let extra = seal_for(&[laptop.public(), phone.public(), stranger.public()], b"x").unwrap();
+    let extra =
+        seal_for(&[laptop.public(), phone.public(), stranger.public()], b"x")
+            .unwrap();
     assert_eq!(
         kind(f.e2e.put(MEMBER, put("a.md", &extra, None)).await),
         ErrorKind::Conflict
@@ -227,7 +236,8 @@ async fn uploads_must_be_sealed_to_exactly_the_current_keys() {
         ErrorKind::InvalidInput
     );
 
-    let good = seal_for(&[phone.public(), laptop.public()], b"# Board minutes").unwrap();
+    let good = seal_for(&[phone.public(), laptop.public()], b"# Board minutes")
+        .unwrap();
     let stored = f
         .e2e
         .put(MEMBER, put("notes/a.md", &good, None))
@@ -386,7 +396,8 @@ async fn revocation_rules() {
         "the last key stays"
     );
     let phone_key = f.e2e.enrol(MEMBER, enrol(&phone, "phone")).await.unwrap();
-    let tablet_key = f.e2e.enrol(READER, enrol(&tablet, "tablet")).await.unwrap();
+    let tablet_key =
+        f.e2e.enrol(READER, enrol(&tablet, "tablet")).await.unwrap();
     assert_eq!(
         kind(f.e2e.revoke(READER, revoke(&phone_key.fingerprint)).await),
         ErrorKind::PermissionDenied,
@@ -440,7 +451,8 @@ async fn concurrent_enrolments_all_land() {
 #[tokio::test]
 async fn the_guard_keeps_readable_writes_out_of_private_spaces() {
     let dir = tempfile::tempdir().unwrap();
-    let local: Arc<dyn BlobStore> = Arc::new(LocalStore::open(dir.path()).await.unwrap());
+    let local: Arc<dyn BlobStore> =
+        Arc::new(LocalStore::open(dir.path()).await.unwrap());
     let roots = vellum_e2e::PrivateRoots::default();
     let guarded: Arc<dyn BlobStore> =
         Arc::new(vellum_e2e::Guard::new(Arc::clone(&local), roots.clone()));
@@ -450,7 +462,8 @@ async fn the_guard_keeps_readable_writes_out_of_private_spaces() {
             (READER, Need::View),
         ])))
     };
-    let e2e = E2e::new(Arc::clone(&guarded), access()).with_roots(roots.clone());
+    let e2e =
+        E2e::new(Arc::clone(&guarded), access()).with_roots(roots.clone());
     let path = |p: &str| BlobPath::new(p).unwrap();
     let put = |p: &'static str, bytes: Vec<u8>| {
         let guarded = Arc::clone(&guarded);
@@ -505,7 +518,8 @@ async fn the_guard_keeps_readable_writes_out_of_private_spaces() {
 
     // Another replica learns the space is private from the key list.
     let other_roots = vellum_e2e::PrivateRoots::default();
-    let other = E2e::new(Arc::clone(&local), access()).with_roots(other_roots.clone());
+    let other =
+        E2e::new(Arc::clone(&local), access()).with_roots(other_roots.clone());
     assert_eq!(other.refresh_roots().await.unwrap(), 1);
     assert_eq!(
         other_roots.relative(&path("drives/board/x.md")).as_deref(),

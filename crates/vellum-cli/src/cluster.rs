@@ -87,11 +87,14 @@ impl Replica {
         let (beats, node) = (nodes.clone(), me.clone());
         let beating = tokio::spawn(async move {
             let mut tick = tokio::time::interval(BEAT_EVERY);
-            tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+            tick.set_missed_tick_behavior(
+                tokio::time::MissedTickBehavior::Delay,
+            );
             loop {
                 let _ = tick.tick().await;
                 if let Err(error) = beats.beat(&node).await {
-                    tracing::warn!(%error, "cannot record this replica's heartbeat");
+                    tracing::warn!(%error, "cannot record this replica's \
+                        heartbeat");
                 }
             }
         })
@@ -114,16 +117,21 @@ impl Replica {
         F: Future<Output = ()>,
     {
         if others_alive {
-            tracing::info!("another replica is running; skipping the startup rescan");
+            tracing::info!(
+                "another replica is running; skipping the startup rescan"
+            );
             return;
         }
         match self.leases.hold(RESCAN, &self.me.name, TTL, rescan).await {
             Ok(Some(())) => {}
             Ok(None) => {
-                tracing::info!("another replica is rescanning; skipping the startup rescan");
+                tracing::info!(
+                    "another replica is rescanning; skipping the startup rescan"
+                );
             }
             Err(error) => {
-                tracing::warn!(%error, "cannot take the rescan lease; skipping the rescan");
+                tracing::warn!(%error, "cannot take the rescan lease; skipping \
+                    the rescan");
             }
         }
     }
@@ -144,7 +152,9 @@ impl Replica {
                 let tick = tick.clone();
                 async move {
                     let mut timer = tokio::time::interval(period);
-                    timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+                    timer.set_missed_tick_behavior(
+                        tokio::time::MissedTickBehavior::Delay,
+                    );
                     loop {
                         let _ = timer.tick().await;
                         tick().await;
@@ -157,7 +167,8 @@ impl Replica {
     /// Prunes the change feed, finished jobs and rate counts in `index`,
     /// and the page change log on every shard, on one replica at a time.
     pub fn maintain(&self, index: &Index, shards: &[Index]) {
-        let changes: Vec<DriveChanges> = shards.iter().cloned().map(DriveChanges::new).collect();
+        let changes: Vec<DriveChanges> =
+            shards.iter().cloned().map(DriveChanges::new).collect();
         let (feed, jobs, rates) = (
             Feed::new(index.clone()),
             Queue::new(index.clone()),
@@ -167,24 +178,35 @@ impl Replica {
             let (feed, changes, jobs, rates) =
                 (feed.clone(), changes.clone(), jobs.clone(), rates.clone());
             async move {
-                let window = i64::try_from(crate::limits::WINDOW.as_millis()).unwrap_or(i64::MAX);
-                let before = vellum_db::cluster::now_ms().saturating_sub(2 * window);
+                let window = i64::try_from(crate::limits::WINDOW.as_millis())
+                    .unwrap_or(i64::MAX);
+                let before =
+                    vellum_db::cluster::now_ms().saturating_sub(2 * window);
                 if let Err(error) = rates.prune(before).await {
                     tracing::warn!(%error, "cannot prune old rate counts");
                 }
                 match feed.prune(crate::feed::KEEP).await {
                     Ok(gone) => tracing::debug!(gone, "pruned the change feed"),
-                    Err(error) => tracing::warn!(%error, "cannot prune the change feed"),
+                    Err(error) => tracing::warn!(%error, "cannot prune the \
+                        change feed"),
                 }
                 for log in &changes {
                     match log.prune(KEEP_PAGE_CHANGES).await {
-                        Ok(gone) => tracing::debug!(gone, "pruned the page change log"),
-                        Err(error) => tracing::warn!(%error, "cannot prune the page change log"),
+                        Ok(gone) => tracing::debug!(
+                            gone,
+                            "pruned the page \
+                            change log"
+                        ),
+                        Err(error) => {
+                            tracing::warn!(%error, "cannot prune the \
+                            page change log")
+                        }
                     }
                 }
                 match jobs.prune(KEEP_FINISHED_JOBS).await {
                     Ok(gone) => tracing::debug!(gone, "pruned finished jobs"),
-                    Err(error) => tracing::warn!(%error, "cannot prune finished jobs"),
+                    Err(error) => tracing::warn!(%error, "cannot prune \
+                        finished jobs"),
                 }
             }
         });
@@ -194,7 +216,8 @@ impl Replica {
     pub async fn leave(&self) {
         self.beating.abort();
         if let Err(error) = self.nodes.leave(&self.me).await {
-            tracing::warn!(%error, "cannot remove this replica from the heartbeat table");
+            tracing::warn!(%error, "cannot remove this replica from the \
+                heartbeat table");
         }
     }
 }
@@ -211,18 +234,23 @@ mod tests {
     #[tokio::test]
     async fn only_the_first_replica_rescans() {
         let dir = tempfile::tempdir().unwrap();
-        let index = Index::open(&IndexConfig::sqlite(dir.path().join("index.sqlite"), None))
-            .await
-            .unwrap();
+        let index = Index::open(&IndexConfig::sqlite(
+            dir.path().join("index.sqlite"),
+            None,
+        ))
+        .await
+        .unwrap();
         let rescans = Arc::new(AtomicU32::new(0));
         let rescan = |count: Arc<AtomicU32>| async move {
             let _ = count.fetch_add(1, Ordering::SeqCst);
         };
 
-        let (a, others) = Replica::join(&index, "pod-a:1:1", |_| None).await.unwrap();
+        let (a, others) =
+            Replica::join(&index, "pod-a:1:1", |_| None).await.unwrap();
         assert!(!others);
         a.rescan_once(others, rescan(Arc::clone(&rescans))).await;
-        let (b, others) = Replica::join(&index, "pod-b:1:1", |_| None).await.unwrap();
+        let (b, others) =
+            Replica::join(&index, "pod-b:1:1", |_| None).await.unwrap();
         assert!(others);
         b.rescan_once(others, rescan(Arc::clone(&rescans))).await;
         assert_eq!(rescans.load(Ordering::SeqCst), 1);
@@ -230,7 +258,8 @@ mod tests {
         // Once both have left, the next one to start rescans again.
         a.leave().await;
         b.leave().await;
-        let (c, others) = Replica::join(&index, "pod-c:1:1", |_| None).await.unwrap();
+        let (c, others) =
+            Replica::join(&index, "pod-c:1:1", |_| None).await.unwrap();
         assert!(!others);
         c.rescan_once(others, rescan(Arc::clone(&rescans))).await;
         assert_eq!(rescans.load(Ordering::SeqCst), 2);

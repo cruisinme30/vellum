@@ -118,12 +118,19 @@ mod tests {
 
     #[test]
     fn keeps_the_default_page_and_follows_the_seed() {
-        let red = PrintTheme::from_builtin(BuiltinTheme::Light, Color::from_u32(0xB0_2020));
+        let red = PrintTheme::from_builtin(
+            BuiltinTheme::Light,
+            Color::from_u32(0xB0_2020),
+        );
         let base = PrintTheme::default();
         assert_eq!(red.paper, base.paper);
         assert_eq!(red.fonts, base.fonts);
         assert_ne!(red.colors.primary, base.colors.primary);
-        let high = PrintTheme::from_builtin(BuiltinTheme::HighContrast, DEFAULT_SEED);
-        assert!(color(&high.colors.text).contrast(Color::from_u32(0xFF_FFFF)) >= 7.0);
+        let high =
+            PrintTheme::from_builtin(BuiltinTheme::HighContrast, DEFAULT_SEED);
+        assert!(
+            color(&high.colors.text).contrast(Color::from_u32(0xFF_FFFF))
+                >= 7.0
+        );
     }
 }

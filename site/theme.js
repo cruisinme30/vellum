@@ -29,7 +29,8 @@
       localStorage.setItem(KEY, value);
       localStorage.setItem("mdbook-theme", value === "dark" ? "navy" : "light");
     } catch (e) {
-      // Private windows may refuse storage: the toggle still works for this page.
+      // Private windows may refuse storage: the toggle still works for this
+      // page.
     }
   }
 

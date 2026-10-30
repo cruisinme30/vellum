@@ -20,11 +20,11 @@ vellum: 1
 
 ## Context
 
-[ADR 0024](0024-help-books.md) put the help books in the binary and mapped help IDs to
-headings, but nothing in the app opened them, the website had no
-versions, feedback or edit links, the ten videos had no way to be made,
-and translations had no check. The website also published every part's
-introduction (each `README.md`) as an empty page with only its title.
+[ADR 0024](0024-help-books.md) put the help books in the binary and mapped help
+IDs to headings, but nothing in the app opened them, the website had no
+versions, feedback or edit links, the ten videos had no way to be made, and
+translations had no check. The website also published every part's introduction
+(each `README.md`) as an empty page with only its title.
 
 ## Decisions
 

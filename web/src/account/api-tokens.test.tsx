@@ -29,13 +29,19 @@ function fakeAccount(overrides: Partial<AccountApi> = {}) {
   const createToken = vi.fn<AccountApi["createToken"]>((input) =>
     Promise.resolve({
       token: "vlm_secret_once",
-      details: { ...CI, id: "tok2", name: input.name, scopes: [...input.scopes] },
+      details: {
+        ...CI,
+        id: "tok2",
+        name: input.name,
+        scopes: [...input.scopes],
+      },
     }),
   );
   const revokeToken = vi.fn<AccountApi["revokeToken"]>(() => Promise.resolve());
   const api: AccountApi = {
     tokens: () => Promise.resolve([CI]),
-    tokenPolicy: () => Promise.resolve({ maxDays: 90, scopes: ["read", "write:draft", "work"] }),
+    tokenPolicy: () =>
+      Promise.resolve({ maxDays: 90, scopes: ["read", "write:draft", "work"] }),
     createToken,
     revokeToken,
     factors: unused,
@@ -114,7 +120,10 @@ describe("Settings → API tokens", () => {
     expect(within(expiry).queryByRole("option", { name: "Never" })).toBeNull();
     expect(screen.getByText(/at most 90 days/)).toBeDefined();
 
-    await user.type(screen.getByRole("textbox", { name: "Name" }), "Claude Desktop");
+    await user.type(
+      screen.getByRole("textbox", { name: "Name" }),
+      "Claude Desktop",
+    );
     await user.click(screen.getByRole("checkbox", { name: /Work/ }));
     await user.selectOptions(expiry, "90");
     await user.click(screen.getByRole("button", { name: "Create token" }));
@@ -156,12 +165,18 @@ describe("Admin → API tokens", () => {
   it("lists everyone's tokens, revokes one and sets the cap", async () => {
     const revoke = vi.fn<AdminTokensApi["revoke"]>(() => Promise.resolve());
     const setPolicy = vi.fn<AdminTokensApi["setPolicy"]>((maxDays) =>
-      Promise.resolve({ ...(maxDays === undefined ? {} : { maxDays }), scopes: ["read"] }),
+      Promise.resolve({
+        ...(maxDays === undefined ? {} : { maxDays }),
+        scopes: ["read"],
+      }),
     );
     const tokens: AdminTokensApi = {
       list: () =>
         Promise.resolve([
-          { token: CI, owner: { id: "u1", name: "Sam", email: "sam@northstar.dev" } },
+          {
+            token: CI,
+            owner: { id: "u1", name: "Sam", email: "sam@northstar.dev" },
+          },
         ]),
       revoke,
       policy: () => Promise.resolve({ scopes: ["read"] }),
@@ -175,7 +190,9 @@ describe("Admin → API tokens", () => {
         </AdminConsoleProvider>
       </I18nProvider>,
     );
-    await user.click(await screen.findByRole("button", { name: "Revoke Sam's token CI" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Revoke Sam's token CI" }),
+    );
     await user.click(screen.getByRole("button", { name: "Revoke" }));
     expect(revoke).toHaveBeenCalledWith("tok1");
 

@@ -37,7 +37,8 @@ use vellum_render::{RenderOptions, Renderer};
 pub const PREFIX: &str = "/guide";
 
 /// Where a page's source lives, for "Suggest an edit".
-const EDIT_BASE: &str = "https://github.com/cruisinme30/vellum/edit/develop/docs";
+const EDIT_BASE: &str =
+    "https://github.com/cruisinme30/vellum/edit/develop/docs";
 
 /// The reader's own layout, after the theme stylesheet.
 const READER_CSS: &str = include_str!("help_reader.css");
@@ -96,7 +97,8 @@ fn html_name(path: &str) -> String {
 }
 
 async fn index() -> Response {
-    let mut body = String::from("<h1>Vellum help</h1>\n<ul class=\"vl-help-books\">\n");
+    let mut body =
+        String::from("<h1>Vellum help</h1>\n<ul class=\"vl-help-books\">\n");
     for book in Book::ALL {
         let _ = writeln!(
             body,
@@ -117,21 +119,27 @@ async fn stylesheet() -> Response {
         header::CONTENT_TYPE,
         HeaderValue::from_static("text/css; charset=utf-8"),
     );
-    let _ = headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
+    let _ = headers
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
     response
 }
 
 async fn topic(Path(id): Path<String>) -> Response {
-    topic_url(&id).map_or_else(not_found, |url| Redirect::to(&url).into_response())
+    topic_url(&id)
+        .map_or_else(not_found, |url| Redirect::to(&url).into_response())
 }
 
 async fn book_root(Path(book): Path<String>) -> Response {
     Book::from_slug(&book).map_or_else(not_found, |book| {
-        Redirect::permanent(&format!("{PREFIX}/{}/", book.slug())).into_response()
+        Redirect::permanent(&format!("{PREFIX}/{}/", book.slug()))
+            .into_response()
     })
 }
 
-async fn book_home(State(reader): State<Arc<Reader>>, Path(book): Path<String>) -> Response {
+async fn book_home(
+    State(reader): State<Arc<Reader>>,
+    Path(book): Path<String>,
+) -> Response {
     let Some(book) = Book::from_slug(&book) else {
         return not_found();
     };
@@ -163,7 +171,8 @@ async fn book_file(
         header::CONTENT_TYPE,
         HeaderValue::from_static(asset_type(&path)),
     );
-    let _ = headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
+    let _ = headers
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
     response
 }
 
@@ -210,13 +219,19 @@ impl Reader {
 
 /// A whole help page: the site bar, the book's contents, the page and its
 /// footer.
-fn document(title: &str, page: Option<&Page>, main: &str, contents: &str) -> String {
+fn document(
+    title: &str,
+    page: Option<&Page>,
+    main: &str,
+    contents: &str,
+) -> String {
     let book_title = page.map(|p| p.book().title());
     let full_title = book_title.map_or_else(
         || escape(title),
         |book| format!("{} · {}", escape(title), escape(book)),
     );
-    let mut nav = format!("<a class=\"vl-help-home\" href=\"{PREFIX}/\">Vellum help</a>");
+    let mut nav =
+        format!("<a class=\"vl-help-home\" href=\"{PREFIX}/\">Vellum help</a>");
     for book in Book::ALL {
         let current = page.is_some_and(|p| p.book() == book);
         let _ = write!(
@@ -233,8 +248,10 @@ fn document(title: &str, page: Option<&Page>, main: &str, contents: &str) -> Str
     }
     let footer = page.map_or_else(String::new, |p| {
         format!(
-            "<footer class=\"vl-help-footer\"><a href=\"{EDIT_BASE}/{}.book/{}\" rel=\"noopener\">Suggest an edit</a> \
-             <span>Help for this server's version of Vellum.</span></footer>",
+            "<footer class=\"vl-help-footer\"><a \
+             href=\"{EDIT_BASE}/{}.book/{}\" rel=\"noopener\">Suggest an \
+             edit</a> <span>Help for this server's version of \
+             Vellum.</span></footer>",
             p.book().slug(),
             escape(p.path())
         )
@@ -242,14 +259,22 @@ fn document(title: &str, page: Option<&Page>, main: &str, contents: &str) -> Str
     let aside = if contents.is_empty() {
         String::new()
     } else {
-        format!("<nav class=\"vl-help-contents\" aria-label=\"Contents\">{contents}</nav>")
+        format!(
+            "<nav class=\"vl-help-contents\" \
+                aria-label=\"Contents\">{contents}</nav>"
+        )
     };
     format!(
-        "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
-         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
-         <title>{full_title}</title>\n<link rel=\"stylesheet\" href=\"{PREFIX}/vellum.css\">\n</head>\n\
-         <body class=\"vl-help\">\n<header class=\"vl-help-bar\"><nav aria-label=\"Help books\">{nav}</nav></header>\n\
-         <div class=\"vl-help-layout\">{aside}<main id=\"main\">\n{main}\n{footer}</main></div>\n</body>\n</html>\n"
+        "<!doctype html>\n<html lang=\"en\">\n<head>\n\
+         <meta charset=\"utf-8\">\n\
+         <meta name=\"viewport\" content=\"width=device-width, \
+         initial-scale=1\">\n<title>{full_title}</title>\n\
+         <link rel=\"stylesheet\" href=\"{PREFIX}/vellum.css\">\n</head>\n\
+         <body class=\"vl-help\">\n\
+         <header class=\"vl-help-bar\"><nav aria-label=\"Help \
+         books\">{nav}</nav></header>\n\
+         <div class=\"vl-help-layout\">{aside}<main id=\"main\">\n{main}\n\
+         {footer}</main></div>\n</body>\n</html>\n"
     )
 }
 
@@ -261,7 +286,11 @@ fn contents(book: Book, current: &str) -> String {
         let trimmed = line.trim_start();
         if let Some(part) = trimmed.strip_prefix("# ") {
             if part != "Summary" {
-                let _ = write!(out, "<li class=\"vl-help-part\">{}</li>", escape(part));
+                let _ = write!(
+                    out,
+                    "<li class=\"vl-help-part\">{}</li>",
+                    escape(part)
+                );
             }
             continue;
         }
@@ -314,7 +343,8 @@ fn md_links_to_html(html: &str) -> String {
         let (path, fragment) = target
             .split_once('#')
             .map_or((target, None), |(p, f)| (p, Some(f)));
-        let relative = !path.contains(':') && !path.starts_with('/') && !path.is_empty();
+        let relative =
+            !path.contains(':') && !path.starts_with('/') && !path.is_empty();
         match path.strip_suffix(".md") {
             Some(stem) if relative => {
                 out.push_str(&stem.replace(".book/", "/"));
@@ -369,14 +399,16 @@ fn html(status: StatusCode, body: &str) -> Response {
         header::CONTENT_TYPE,
         HeaderValue::from_static("text/html; charset=utf-8"),
     );
-    let _ = headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
+    let _ = headers
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
     response
 }
 
 fn not_found() -> Response {
     let body = format!(
-        "<h1>No such help page</h1>\n<p><a href=\"{PREFIX}/\">See every help book</a>, \
-         or run <code>vellum docs</code> on the server.</p>\n"
+        "<h1>No such help page</h1>\n\
+         <p><a href=\"{PREFIX}/\">See every help book</a>, or run <code>vellum \
+         docs</code> on the server.</p>\n"
     );
     html(
         StatusCode::NOT_FOUND,
@@ -446,7 +478,11 @@ mod tests {
     async fn pages_link_to_html_and_carry_no_script() {
         let (status, _, body) = get("/user/writing/text.html").await;
         assert_eq!(status, StatusCode::OK);
-        assert!(body.contains("<link rel=\"stylesheet\" href=\"/guide/vellum.css\">"));
+        assert!(
+            body.contains(
+                "<link rel=\"stylesheet\" href=\"/guide/vellum.css\">"
+            )
+        );
         assert!(
             body.contains("aria-current=\"page\""),
             "contents mark the page"
@@ -478,7 +514,8 @@ mod tests {
 
     #[tokio::test]
     async fn assets_and_the_stylesheet_are_served_and_nothing_else() {
-        let (status, _, svg) = get("/user/writing/assets/request-path.svg").await;
+        let (status, _, svg) =
+            get("/user/writing/assets/request-path.svg").await;
         assert_eq!(status, StatusCode::OK);
         assert!(svg.starts_with("<?xml"));
         let (status, _, css) = get("/vellum.css").await;
@@ -498,10 +535,20 @@ mod tests {
 
     #[test]
     fn only_relative_markdown_links_are_rewritten() {
-        let html = r#"<a href="../data/views.md#filters">a</a><a href="https://x.dev/a.md">b</a><a href="/abs.md">c</a><a href="README.md">d</a><a href="other.txt">e</a><a href="../../admin.book/deploy/README.md">f</a>"#;
+        let html = concat!(
+            r#"<a href="../data/views.md#filters">a</a><a "#,
+            r#"href="https://x.dev/a.md">b</a><a href="/abs.md">c</a><a "#,
+            r#"href="README.md">d</a><a href="other.txt">e</a><a "#,
+            r#"href="../../admin.book/deploy/README.md">f</a>"#,
+        );
         assert_eq!(
             md_links_to_html(html),
-            r#"<a href="../data/views.html#filters">a</a><a href="https://x.dev/a.md">b</a><a href="/abs.md">c</a><a href="README.html">d</a><a href="other.txt">e</a><a href="../../admin/deploy/README.html">f</a>"#
+            concat!(
+                r#"<a href="../data/views.html#filters">a</a><a "#,
+                r#"href="https://x.dev/a.md">b</a><a href="/abs.md">c</a><a "#,
+                r#"href="README.html">d</a><a href="other.txt">e</a><a "#,
+                r#"href="../../admin/deploy/README.html">f</a>"#,
+            )
         );
         assert_eq!(
             escape("<a href=\"x\">'"),

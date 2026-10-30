@@ -18,14 +18,17 @@ pub const PROTOCOL_VERSION: &str = "2026-07-28";
 pub const LEGACY_PROTOCOL_VERSION: &str = "2025-11-25";
 
 /// Every revision this server answers, newest first.
-pub const SUPPORTED_VERSIONS: [&str; 2] = [PROTOCOL_VERSION, LEGACY_PROTOCOL_VERSION];
+pub const SUPPORTED_VERSIONS: [&str; 2] =
+    [PROTOCOL_VERSION, LEGACY_PROTOCOL_VERSION];
 
 /// `_meta` key: protocol version of a request.
-pub const META_PROTOCOL_VERSION: &str = "io.modelcontextprotocol/protocolVersion";
+pub const META_PROTOCOL_VERSION: &str =
+    "io.modelcontextprotocol/protocolVersion";
 /// `_meta` key: client name and version.
 pub const META_CLIENT_INFO: &str = "io.modelcontextprotocol/clientInfo";
 /// `_meta` key: client capabilities for one request.
-pub const META_CLIENT_CAPABILITIES: &str = "io.modelcontextprotocol/clientCapabilities";
+pub const META_CLIENT_CAPABILITIES: &str =
+    "io.modelcontextprotocol/clientCapabilities";
 /// `_meta` key: server name and version on every result.
 pub const META_SERVER_INFO: &str = "io.modelcontextprotocol/serverInfo";
 /// `_meta` key: the subscription a notification belongs to.
@@ -126,9 +129,14 @@ impl Incoming {
     ///
     /// Returns `INVALID_REQUEST` when the value is not a request or
     /// notification.
-    pub fn from_value(value: Value) -> Result<Self, (Option<RequestId>, RpcError)> {
+    pub fn from_value(
+        value: Value,
+    ) -> Result<Self, (Option<RequestId>, RpcError)> {
         let Value::Object(mut obj) = value else {
-            return Err((None, RpcError::invalid_request("message must be an object")));
+            return Err((
+                None,
+                RpcError::invalid_request("message must be an object"),
+            ));
         };
         let id = match obj.remove("id") {
             None => None,
@@ -137,7 +145,9 @@ impl Incoming {
                 None => {
                     return Err((
                         None,
-                        RpcError::invalid_request("id must be an integer or string"),
+                        RpcError::invalid_request(
+                            "id must be an integer or string",
+                        ),
                     ));
                 }
             },
@@ -145,12 +155,17 @@ impl Incoming {
             Some(_) => {
                 return Err((
                     None,
-                    RpcError::invalid_request("id must be an integer or string"),
+                    RpcError::invalid_request(
+                        "id must be an integer or string",
+                    ),
                 ));
             }
         };
         if obj.get("jsonrpc").and_then(Value::as_str) != Some("2.0") {
-            return Err((id, RpcError::invalid_request("jsonrpc must be \"2.0\"")));
+            return Err((
+                id,
+                RpcError::invalid_request("jsonrpc must be \"2.0\""),
+            ));
         }
         if obj.contains_key("result") || obj.contains_key("error") {
             return Err((
@@ -159,12 +174,20 @@ impl Incoming {
             ));
         }
         let Some(Value::String(method)) = obj.remove("method") else {
-            return Err((id, RpcError::invalid_request("method must be a string")));
+            return Err((
+                id,
+                RpcError::invalid_request("method must be a string"),
+            ));
         };
         let params = match obj.remove("params") {
             None | Some(Value::Null) => Map::new(),
             Some(Value::Object(p)) => p,
-            Some(_) => return Err((id, RpcError::invalid_request("params must be an object"))),
+            Some(_) => {
+                return Err((
+                    id,
+                    RpcError::invalid_request("params must be an object"),
+                ));
+            }
         };
         Ok(Self { id, method, params })
     }
@@ -183,7 +206,9 @@ impl Incoming {
 }
 
 /// A JSON-RPC error object.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, thiserror::Error)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, thiserror::Error,
+)]
 #[error("{message} ({code})")]
 pub struct RpcError {
     /// The error code.
@@ -247,7 +272,9 @@ impl RpcError {
             code::UNSUPPORTED_PROTOCOL_VERSION,
             "Unsupported protocol version",
         )
-        .with_data(json!({ "supported": SUPPORTED_VERSIONS, "requested": requested }))
+        .with_data(
+            json!({ "supported": SUPPORTED_VERSIONS, "requested": requested }),
+        )
     }
 
     /// `-32020 Header mismatch`.
@@ -291,12 +318,16 @@ impl Outgoing {
     #[must_use]
     pub fn to_value(&self) -> Value {
         match self {
-            Self::Result { id, result } => json!({ "jsonrpc": "2.0", "id": id, "result": result }),
+            Self::Result { id, result } => {
+                json!({ "jsonrpc": "2.0", "id": id, "result": result })
+            }
             Self::Error {
                 id: Some(id),
                 error,
             } => json!({ "jsonrpc": "2.0", "id": id, "error": error }),
-            Self::Error { id: None, error } => json!({ "jsonrpc": "2.0", "error": error }),
+            Self::Error { id: None, error } => {
+                json!({ "jsonrpc": "2.0", "error": error })
+            }
             Self::Notification { method, params } => {
                 json!({ "jsonrpc": "2.0", "method": method, "params": params })
             }
@@ -349,7 +380,10 @@ impl RequestMeta {
     ///
     /// `-32602` when a required field is missing or malformed, and
     /// `-32022` when the version is not supported.
-    pub fn read(msg: &Incoming, fallback_version: Option<&str>) -> Result<Self, RpcError> {
+    pub fn read(
+        msg: &Incoming,
+        fallback_version: Option<&str>,
+    ) -> Result<Self, RpcError> {
         let empty = Map::new();
         let meta = msg.meta().unwrap_or(&empty);
         let version = match meta.get(META_PROTOCOL_VERSION) {
@@ -389,7 +423,9 @@ impl RequestMeta {
         let client_info = meta
             .get(META_CLIENT_INFO)
             .and_then(|v| serde_json::from_value(v.clone()).ok());
-        let text = |key: &str| meta.get(key).and_then(Value::as_str).map(str::to_owned);
+        let text = |key: &str| {
+            meta.get(key).and_then(Value::as_str).map(str::to_owned)
+        };
         Ok(Self {
             protocol_version: version,
             client_capabilities,
@@ -409,7 +445,11 @@ impl RequestMeta {
 
 /// Builds a complete result: adds `resultType` and the server identity.
 #[must_use]
-pub fn complete(mut body: Map<String, Value>, server_name: &str, server_version: &str) -> Value {
+pub fn complete(
+    mut body: Map<String, Value>,
+    server_name: &str,
+    server_version: &str,
+) -> Value {
     let _ = body.insert("resultType".to_owned(), json!("complete"));
     let meta = body.entry("_meta").or_insert_with(|| json!({}));
     if let Value::Object(meta) = meta {
@@ -444,7 +484,8 @@ mod tests {
             "params": {"_meta": {
                 META_PROTOCOL_VERSION: PROTOCOL_VERSION,
                 META_CLIENT_CAPABILITIES: {},
-                "traceparent": "00-0af7651916cd43dd8448eb211c80319c-00f067aa0ba902b7-01"
+                "traceparent": "00-0af7651916cd43dd8448eb211c80319c-00f067aa0ba\
+                    902b7-01"
             }}
         })
         .to_string()
@@ -452,7 +493,8 @@ mod tests {
 
     #[test]
     fn parses_a_modern_request() -> Result<(), String> {
-        let msg = Incoming::parse(&modern("tools/list")).map_err(|e| e.1.message)?;
+        let msg =
+            Incoming::parse(&modern("tools/list")).map_err(|e| e.1.message)?;
         assert_eq!(msg.id, Some(RequestId::Number(1)));
         let meta = RequestMeta::read(&msg, None).map_err(|e| e.message)?;
         assert!(meta.is_modern());
@@ -474,8 +516,11 @@ mod tests {
     #[test]
     fn rejects_unknown_versions_with_the_supported_list() {
         let mut msg = Incoming::parse(&modern("tools/list")).ok();
-        if let Some(Value::Object(meta)) = msg.as_mut().and_then(|m| m.params.get_mut("_meta")) {
-            let _ = meta.insert(META_PROTOCOL_VERSION.into(), json!("1900-01-01"));
+        if let Some(Value::Object(meta)) =
+            msg.as_mut().and_then(|m| m.params.get_mut("_meta"))
+        {
+            let _ =
+                meta.insert(META_PROTOCOL_VERSION.into(), json!("1900-01-01"));
         }
         let err = msg.and_then(|m| RequestMeta::read(&m, None).err());
         assert_eq!(
@@ -490,9 +535,12 @@ mod tests {
 
     #[test]
     fn legacy_requests_use_the_fallback_version() -> Result<(), String> {
-        let msg = Incoming::parse(r#"{"jsonrpc":"2.0","id":"a","method":"tools/list"}"#)
-            .map_err(|e| e.1.message)?;
-        let meta = RequestMeta::read(&msg, Some(LEGACY_PROTOCOL_VERSION)).map_err(|e| e.message)?;
+        let msg = Incoming::parse(
+            r#"{"jsonrpc":"2.0","id":"a","method":"tools/list"}"#,
+        )
+        .map_err(|e| e.1.message)?;
+        let meta = RequestMeta::read(&msg, Some(LEGACY_PROTOCOL_VERSION))
+            .map_err(|e| e.message)?;
         assert!(!meta.is_modern());
         Ok(())
     }

@@ -14,14 +14,17 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use vellum_crypto::recipients::{RecipientPublic, RecipientSecret, seal_for};
-use vellum_private::{AgentError, DeviceIdentity, PrivateAgent, PrivateSpace, Report};
+use vellum_private::{
+    AgentError, DeviceIdentity, PrivateAgent, PrivateSpace, Report,
+};
 use vellum_store::{BlobPath, BlobStore, LocalStore, Precondition};
 
 const SPACE_ID: &str = "01JDB0ARD00000000000000000";
 const ROOT: &str = "drives/shared/board";
 
 fn page(id: &str, title: &str, body: &str) -> Vec<u8> {
-    format!("---\nid: {id}\ntitle: {title}\nvellum: 1\n---\n\n{body}\n").into_bytes()
+    format!("---\nid: {id}\ntitle: {title}\nvellum: 1\n---\n\n{body}\n")
+        .into_bytes()
 }
 
 async fn put(store: &LocalStore, path: &str, bytes: Vec<u8>) {
@@ -60,7 +63,8 @@ async fn world() -> World {
     let plan = page(
         "01JDB0ARDP1AN0000000000001",
         "Fundraising plan",
-        "# Q4\n\nRaise the seed round in December with Northstar Ventures.\n\n## Risks\n\nRunway is nine months.",
+        "# Q4\n\nRaise the seed round in December with Northstar Ventures.\n\n\
+            ## Risks\n\nRunway is nine months.",
     );
     put(
         &store,
@@ -90,7 +94,8 @@ async fn world() -> World {
         seal_for(&[colleague], &theirs).unwrap(),
     )
     .await;
-    let mut tampered = seal_for(&both, &page("01JDB0ARDTAMPER00000000004", "T", "x")).unwrap();
+    let mut tampered =
+        seal_for(&both, &page("01JDB0ARDTAMPER00000000004", "T", "x")).unwrap();
     let last = tampered.len() - 1;
     tampered[last] ^= 1;
     put(&store, &format!("{ROOT}/tampered.md"), tampered).await;
@@ -274,6 +279,7 @@ async fn bad_spaces_are_refused() {
     )
     .await
     .unwrap();
-    let dup = PrivateAgent::new(me, world.store.clone(), vec![space.clone(), space]);
+    let dup =
+        PrivateAgent::new(me, world.store.clone(), vec![space.clone(), space]);
     assert!(matches!(dup, Err(AgentError::DuplicateSlug(_))));
 }

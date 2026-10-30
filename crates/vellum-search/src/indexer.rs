@@ -141,7 +141,8 @@ async fn run(
     mut rx: mpsc::Receiver<Job>,
 ) {
     let mut pending: BTreeSet<DocId> = BTreeSet::new();
-    let mut failures: std::collections::HashMap<DocId, u32> = std::collections::HashMap::new();
+    let mut failures: std::collections::HashMap<DocId, u32> =
+        std::collections::HashMap::new();
     let mut waiters: Vec<oneshot::Sender<Result<()>>> = Vec::new();
     loop {
         // Block for the first job, then gather a burst until quiet.
@@ -181,12 +182,16 @@ async fn run(
 
         let mut outcome = Ok(());
         while !pending.is_empty() {
-            let batch: Vec<DocId> = pending.iter().take(config.batch).copied().collect();
+            let batch: Vec<DocId> =
+                pending.iter().take(config.batch).copied().collect();
             for doc in &batch {
                 let _ = pending.remove(doc);
             }
-            if let Err(error) = index_batch(&service, source.as_ref(), &batch).await {
-                tracing::warn!(%error, documents = batch.len(), "indexing batch failed");
+            if let Err(error) =
+                index_batch(&service, source.as_ref(), &batch).await
+            {
+                tracing::warn!(%error, documents = batch.len(), "indexing \
+                    batch failed");
                 tracing::debug!(counter.vellum.search.index_failures = 1_u64);
                 for doc in &batch {
                     let tries = failures.entry(*doc).or_insert(0);
@@ -195,7 +200,8 @@ async fn run(
                         let _ = pending.insert(*doc);
                     } else {
                         let _ = failures.remove(doc);
-                        tracing::error!(%doc, "gave up indexing a document; a rebuild will pick it up");
+                        tracing::error!(%doc, "gave up indexing a document; a \
+                            rebuild will pick it up");
                     }
                 }
                 outcome = Err(error);
@@ -233,7 +239,8 @@ async fn index_batch(
         updates.push(loaded.map_or(Update::Remove(*doc), Update::Upsert));
     }
     tracing::debug!(
-        counter.vellum.search.indexed_documents = u64::try_from(docs.len()).unwrap_or(u64::MAX)
+        counter.vellum.search.indexed_documents =
+            u64::try_from(docs.len()).unwrap_or(u64::MAX)
     );
     service.write(updates).await
 }
@@ -300,7 +307,8 @@ pub async fn rebuild_with_progress(
     batch: usize,
     progress: &Progress,
 ) -> Result<Rebuilt> {
-    let span = tracing::info_span!("search.rebuild", search.engine = service.engine());
+    let span =
+        tracing::info_span!("search.rebuild", search.engine = service.engine());
     async {
         service.clear().await?;
         let docs = source.list().await?;
@@ -330,7 +338,8 @@ pub async fn reindex(
     docs: &[DocId],
     batch: usize,
 ) -> Result<usize> {
-    reindex_with_progress(service, source, docs, batch, &Progress::default()).await
+    reindex_with_progress(service, source, docs, batch, &Progress::default())
+        .await
 }
 
 /// As [`reindex`], counting documents into `progress` as it goes.
@@ -344,7 +353,8 @@ pub async fn reindex_with_progress(
     batch: usize,
     progress: &Progress,
 ) -> Result<usize> {
-    let span = tracing::info_span!("search.reindex", search.engine = service.engine());
+    let span =
+        tracing::info_span!("search.reindex", search.engine = service.engine());
     async {
         let total = docs.len();
         progress.start(total);
@@ -411,7 +421,11 @@ mod tests {
         Event::new(corpus.eng, Actor::System, kind)
     }
 
-    async fn hits(service: &SearchService, corpus: &Corpus, text: &str) -> usize {
+    async fn hits(
+        service: &SearchService,
+        corpus: &Corpus,
+        text: &str,
+    ) -> usize {
         service
             .search(&Principal::User(corpus.ada), &SearchQuery::new(text, 50))
             .await
@@ -428,14 +442,20 @@ mod tests {
             let _ = files.docs.lock().unwrap().insert(doc.doc, doc);
         }
         let service = service(&corpus);
-        let (indexer, task) =
-            Indexer::spawn(service.clone(), files.clone(), IndexerConfig::default());
+        let (indexer, task) = Indexer::spawn(
+            service.clone(),
+            files.clone(),
+            IndexerConfig::default(),
+        );
 
         for _ in 0..10 {
             indexer
                 .on_event(&event(
                     &corpus,
-                    EventKind::doc_updated(corpus.runbook, VersionId::generate()),
+                    EventKind::doc_updated(
+                        corpus.runbook,
+                        VersionId::generate(),
+                    ),
                 ))
                 .await
                 .unwrap();
@@ -504,8 +524,11 @@ mod tests {
     #[tokio::test]
     async fn flush_reports_failures() {
         let corpus = Corpus::default();
-        let (indexer, _task) =
-            Indexer::spawn(service(&corpus), Arc::new(Broken), IndexerConfig::default());
+        let (indexer, _task) = Indexer::spawn(
+            service(&corpus),
+            Arc::new(Broken),
+            IndexerConfig::default(),
+        );
         indexer
             .on_event(&event(&corpus, EventKind::doc_created(corpus.runbook)))
             .await

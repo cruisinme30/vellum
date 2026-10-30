@@ -219,8 +219,9 @@ mod tests {
     #[test]
     fn the_first_matching_rule_wins() {
         let rules: Vec<TriageRule> = serde_saphyr::from_str(
-            "- name: crashes\n  when: {field: title, op: contains, values: [crash]}\n  then: {assignee: dev, labels: [type/bug], priority: 1}\n\
-             - name: all\n  when: {and: []}\n  then: {assignee: priya}\n",
+            "- name: crashes\n  when: {field: title, op: contains, values: \
+             [crash]}\n  then: {assignee: dev, labels: [type/bug], priority: \
+             1}\n- name: all\n  when: {and: []}\n  then: {assignee: priya}\n",
         )
         .unwrap();
         let mut i = triaged();
@@ -251,28 +252,36 @@ mod tests {
 
         let mut i = triaged();
         let until = datetime!(2026-10-30 09:00 UTC);
-        let _ = decide(&mut i, &TriageAction::Snooze { until }, &w, now).unwrap();
+        let _ =
+            decide(&mut i, &TriageAction::Snooze { until }, &w, now).unwrap();
         assert!(!is_visible(&i, now));
         assert!(is_visible(&i, until));
 
-        let _ = decide(&mut i, &TriageAction::Accept { status: None }, &w, now).unwrap();
+        let _ = decide(&mut i, &TriageAction::Accept { status: None }, &w, now)
+            .unwrap();
         assert_eq!(i.state, key("backlog"));
         assert_eq!(i.triaged_at, Some(now));
-        assert!(decide(&mut i, &TriageAction::Accept { status: None }, &w, now).is_err());
+        assert!(
+            decide(&mut i, &TriageAction::Accept { status: None }, &w, now)
+                .is_err()
+        );
 
         let mut i = triaged();
         let bad = TriageAction::Accept {
             status: Some(key("triage")),
         };
         assert!(decide(&mut i, &bad, &w, now).is_err());
-        let _ = decide(&mut i, &TriageAction::Decline { reason: None }, &w, now).unwrap();
+        let _ =
+            decide(&mut i, &TriageAction::Decline { reason: None }, &w, now)
+                .unwrap();
         assert_eq!(i.state, key("canceled"));
 
         let mut i = triaged();
         let me = TriageAction::Duplicate { of: i.id };
         assert!(decide(&mut i, &me, &w, now).is_err());
         let of = "01JBZ3M8K2Q4R5S6T7V8W9X0A9".parse::<IssueId>().unwrap();
-        let _ = decide(&mut i, &TriageAction::Duplicate { of }, &w, now).unwrap();
+        let _ =
+            decide(&mut i, &TriageAction::Duplicate { of }, &w, now).unwrap();
         assert_eq!(i.state, key("duplicate"));
         assert_eq!(i.relations[0].issue, of);
         assert!(i.canceled_at.is_some());

@@ -11,7 +11,8 @@ vellum: 1
 **Admin → Sign-in** turns on any mix of:
 
 - email and password, with optional TOTP or passkeys
-- OpenID Connect (Google Workspace, Microsoft Entra ID, Okta, Keycloak and any other OIDC provider)
+- OpenID Connect (Google Workspace, Microsoft Entra ID, Okta, Keycloak and any
+  other OIDC provider)
 - SAML 2.0
 
 ```mermaid

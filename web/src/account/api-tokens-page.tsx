@@ -12,15 +12,30 @@ import { useT } from "../i18n/i18n";
 import "../admin/console/console.css";
 import "./account.css";
 
-import type { AccountApi, CreatedToken, Scope, TokenPolicy, TokenView } from "./api";
+import type {
+  AccountApi,
+  CreatedToken,
+  Scope,
+  TokenPolicy,
+  TokenView,
+} from "./api";
 
-const DAY = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" });
+const DAY = new Intl.DateTimeFormat("en", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
 
 /** Each scope's label and what it lets a token do. */
-const SCOPE_TEXT: Readonly<Record<Scope, readonly [label: string, hint: string]>> = {
+const SCOPE_TEXT: Readonly<
+  Record<Scope, readonly [label: string, hint: string]>
+> = {
   read: ["tokens-scope-read", "tokens-scope-read-hint"],
   "write:draft": ["tokens-scope-write-draft", "tokens-scope-write-draft-hint"],
-  "write:direct": ["tokens-scope-write-direct", "tokens-scope-write-direct-hint"],
+  "write:direct": [
+    "tokens-scope-write-direct",
+    "tokens-scope-write-direct-hint",
+  ],
   work: ["tokens-scope-work", "tokens-scope-work-hint"],
   admin: ["tokens-scope-admin", "tokens-scope-admin-hint"],
 };
@@ -56,7 +71,9 @@ function NewSecret({
   return (
     <div className="vl-admin-secret" role="region" aria-labelledby={id}>
       <p id={id}>
-        <strong>{t("tokens-secret-title", { name: created.details.name })}</strong>{" "}
+        <strong>
+          {t("tokens-secret-title", { name: created.details.name })}
+        </strong>{" "}
         {t("tokens-secret-hint")}
       </p>
       <code className="vl-admin-secret-value" data-testid="new-token">
@@ -106,7 +123,9 @@ function CreateTokenForm({
     const form = event.currentTarget;
     const data = new FormData(form);
     const name = formText(data, "name");
-    const scopes = policy.scopes.filter((scope) => data.get(`scope-${scope}`) === "on");
+    const scopes = policy.scopes.filter(
+      (scope) => data.get(`scope-${scope}`) === "on",
+    );
     if (scopes.length === 0) {
       setError(t("tokens-error-scopes"));
       return;
@@ -134,7 +153,11 @@ function CreateTokenForm({
       });
   };
   return (
-    <form className="vl-admin-form" aria-labelledby={`${id}-title`} onSubmit={submit}>
+    <form
+      className="vl-admin-form"
+      aria-labelledby={`${id}-title`}
+      onSubmit={submit}
+    >
       <h2 id={`${id}-title`}>{t("tokens-create-title")}</h2>
       <label>
         {t("tokens-name")}
@@ -152,7 +175,11 @@ function CreateTokenForm({
           const [label, hint] = SCOPE_TEXT[scope];
           return (
             <label key={scope} className="vl-account-scope">
-              <input type="checkbox" name={`scope-${scope}`} defaultChecked={scope === "read"} />
+              <input
+                type="checkbox"
+                name={`scope-${scope}`}
+                defaultChecked={scope === "read"}
+              />
               <span>
                 <code>{scope}</code> {t(label)}
                 <small className="vl-muted">{t(hint)}</small>
@@ -163,7 +190,10 @@ function CreateTokenForm({
       </fieldset>
       <label>
         {t("tokens-expiry")}
-        <select name="expiry" defaultValue={String(defaultExpiry(policy.maxDays))}>
+        <select
+          name="expiry"
+          defaultValue={String(defaultExpiry(policy.maxDays))}
+        >
           {choices.map((choice) => (
             <option key={choice} value={String(choice)}>
               {choice === "never"
@@ -173,7 +203,9 @@ function CreateTokenForm({
           ))}
         </select>
         {policy.maxDays !== null && policy.maxDays !== undefined && (
-          <small className="vl-muted">{t("tokens-expiry-cap", { days: policy.maxDays })}</small>
+          <small className="vl-muted">
+            {t("tokens-expiry-cap", { days: policy.maxDays })}
+          </small>
         )}
       </label>
       {error !== undefined && (
@@ -191,7 +223,9 @@ function CreateTokenForm({
 }
 
 function when(value: string | null | undefined, fallback: string): string {
-  return value === null || value === undefined ? fallback : DAY.format(new Date(value));
+  return value === null || value === undefined
+    ? fallback
+    : DAY.format(new Date(value));
 }
 
 function TokenRow({
@@ -209,7 +243,9 @@ function TokenRow({
   const t = useT();
   const [confirm, setConfirm] = useState(false);
   const expired =
-    token.expiresAt !== null && token.expiresAt !== undefined && Date.parse(token.expiresAt) <= now;
+    token.expiresAt !== null &&
+    token.expiresAt !== undefined &&
+    Date.parse(token.expiresAt) <= now;
   return (
     <tr>
       <th scope="row">{token.name}</th>
@@ -224,7 +260,9 @@ function TokenRow({
       <td>{when(token.lastUsedAt, t("tokens-never-used"))}</td>
       <td>
         {expired ? (
-          <span className="vl-admin-badge vl-admin-badge-off">{t("tokens-expired")}</span>
+          <span className="vl-admin-badge vl-admin-badge-off">
+            {t("tokens-expired")}
+          </span>
         ) : (
           when(token.expiresAt, t("tokens-no-expiry"))
         )}
@@ -284,7 +322,10 @@ function Tokens({ api }: { readonly api: AccountApi }) {
   const [notice, setNotice] = useState<{ ok: boolean; message: string }>();
   const loaded = useLoaded(
     async () => {
-      const [tokens, policy] = await Promise.all([api.tokens(), api.tokenPolicy()]);
+      const [tokens, policy] = await Promise.all([
+        api.tokens(),
+        api.tokenPolicy(),
+      ]);
       return { tokens, policy, now: Date.now() };
     },
     [api, reload],
@@ -297,7 +338,10 @@ function Tokens({ api }: { readonly api: AccountApi }) {
       .revokeToken(token.id)
       .then(
         () => {
-          setNotice({ ok: true, message: t("tokens-revoked", { name: token.name }) });
+          setNotice({
+            ok: true,
+            message: t("tokens-revoked", { name: token.name }),
+          });
           setReload((n) => n + 1);
         },
         (error: unknown) => {
@@ -312,7 +356,9 @@ function Tokens({ api }: { readonly api: AccountApi }) {
     <Ready loaded={loaded}>
       {({ tokens, policy, now }) => (
         <>
-          <div role="status">{notice?.ok === true && <p>{notice.message}</p>}</div>
+          <div role="status">
+            {notice?.ok === true && <p>{notice.message}</p>}
+          </div>
           {notice?.ok === false && (
             <p className="vl-field-error" role="alert">
               {notice.message}
@@ -331,7 +377,9 @@ function Tokens({ api }: { readonly api: AccountApi }) {
           ) : (
             <div className="vl-admin-scroll">
               <table className="vl-admin-table">
-                <caption>{t("tokens-caption", { count: tokens.length })}</caption>
+                <caption>
+                  {t("tokens-caption", { count: tokens.length })}
+                </caption>
                 <thead>
                   <tr>
                     <th scope="col">{t("tokens-name")}</th>

@@ -42,7 +42,11 @@ function ConfirmButton({
   }
   return (
     <span className="vl-drive-confirm">
-      <button type="button" className="vl-filled-button vl-danger" onClick={onConfirm}>
+      <button
+        type="button"
+        className="vl-filled-button vl-danger"
+        onClick={onConfirm}
+      >
         {confirm}
       </button>
       <button
@@ -58,7 +62,9 @@ function ConfirmButton({
   );
 }
 
-/** When an item trashed at `trashedAt` is purged, given the space's trash days. */
+/**
+ * When an item trashed at `trashedAt` is purged, given the space's trash days.
+ */
 export function purgeDate(trashedAt: string, days: number): string | undefined {
   const at = new Date(trashedAt);
   if (Number.isNaN(at.getTime())) return undefined;
@@ -90,7 +96,9 @@ function TrashTable({
   };
   return (
     <>
-      <p className="vl-muted">{t("drive-trash-retention", { days: space.settings.trash_days })}</p>
+      <p className="vl-muted">
+        {t("drive-trash-retention", { days: space.settings.trash_days })}
+      </p>
       <p role="status" className="vl-drive-notice">
         {notice}
       </p>
@@ -105,7 +113,9 @@ function TrashTable({
           label={t("drive-empty-trash")}
           confirm={t("drive-empty-trash-confirm", { count: items.length })}
           onConfirm={() =>
-            void run(async () => t("drive-emptied", { count: await api.emptyTrash(space.id) }))
+            void run(async () =>
+              t("drive-emptied", { count: await api.emptyTrash(space.id) }),
+            )
           }
         />
       )}
@@ -134,14 +144,18 @@ function TrashTable({
               return (
                 <tr key={node.id}>
                   <td className="vl-drive-name">{node.title}</td>
-                  <td>{trashedAt === undefined ? "—" : formatWhen(trashedAt)}</td>
+                  <td>
+                    {trashedAt === undefined ? "—" : formatWhen(trashedAt)}
+                  </td>
                   <td>{purgeAt === undefined ? "—" : formatWhen(purgeAt)}</td>
                   <td>{formatBytes(node.size)}</td>
                   <td className="vl-drive-actions">
                     <button
                       type="button"
                       className="vl-text-button"
-                      aria-label={t("drive-restore-label", { title: node.title })}
+                      aria-label={t("drive-restore-label", {
+                        title: node.title,
+                      })}
                       onClick={() =>
                         void run(async () => {
                           await api.restore(node.id);
@@ -172,10 +186,19 @@ function TrashTable({
   );
 }
 
-function SpaceTrash({ api, spaceId }: { readonly api: DriveApi; readonly spaceId: string }) {
+function SpaceTrash({
+  api,
+  spaceId,
+}: {
+  readonly api: DriveApi;
+  readonly spaceId: string;
+}) {
   const t = useT();
   const { loaded, reload } = useReloadable(async () => {
-    const [spaces, items] = await Promise.all([loadSpaces(api), api.trashList(spaceId)]);
+    const [spaces, items] = await Promise.all([
+      loadSpaces(api),
+      api.trashList(spaceId),
+    ]);
     return { space: spaces.find((space) => space.id === spaceId), items };
   }, [api, spaceId]);
   return (
@@ -186,9 +209,15 @@ function SpaceTrash({ api, spaceId }: { readonly api: DriveApi; readonly spaceId
         ) : (
           <>
             <h2>
-              <Link to={spacePath(space.id)}>{space.name}</Link> · {t("drive-trash-open")}
+              <Link to={spacePath(space.id)}>{space.name}</Link> ·{" "}
+              {t("drive-trash-open")}
             </h2>
-            <TrashTable api={api} space={space} items={items} onChanged={reload} />
+            <TrashTable
+              api={api}
+              space={space}
+              items={items}
+              onChanged={reload}
+            />
           </>
         )
       }
@@ -199,5 +228,9 @@ function SpaceTrash({ api, spaceId }: { readonly api: DriveApi; readonly spaceId
 /** A space's trash: restore, delete for good, or empty it (R-DR-4). */
 export function TrashPage() {
   const { spaceId = "" } = useParams();
-  return <DriveFrame>{(api) => <SpaceTrash api={api} spaceId={spaceId} />}</DriveFrame>;
+  return (
+    <DriveFrame>
+      {(api) => <SpaceTrash api={api} spaceId={spaceId} />}
+    </DriveFrame>
+  );
 }

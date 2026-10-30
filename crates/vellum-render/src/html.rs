@@ -124,7 +124,9 @@ pub fn is_user_class(class: &str) -> bool {
 pub fn is_user_id(id: &str) -> bool {
     let mut chars = id.chars();
     chars.next().is_some_and(|c| c.is_ascii_alphabetic())
-        && chars.all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | ':' | '.'))
+        && chars.all(|c| {
+            c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | ':' | '.')
+        })
         && id.len() <= 128
 }
 

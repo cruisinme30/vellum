@@ -10,7 +10,8 @@ use std::sync::{Arc, Mutex};
 use aws_lc_rs::rand::SystemRandom;
 use aws_lc_rs::rsa::KeySize;
 use aws_lc_rs::signature::{
-    ECDSA_P256_SHA256_FIXED_SIGNING, EcdsaKeyPair, KeyPair as _, RSA_PKCS1_SHA256, RsaKeyPair,
+    ECDSA_P256_SHA256_FIXED_SIGNING, EcdsaKeyPair, KeyPair as _,
+    RSA_PKCS1_SHA256, RsaKeyPair,
 };
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -18,7 +19,9 @@ use serde_json::{Value, json};
 use url::Url;
 use vellum_contracts::BoxFuture;
 use vellum_identity::sso::{SsoFinish, SsoIdentity};
-use vellum_identity::{Identity, IdentityConfig, Sso, SsoConfig, SsoHttp, Store};
+use vellum_identity::{
+    Identity, IdentityConfig, Sso, SsoConfig, SsoHttp, Store,
+};
 use vellum_kernel::{Error, ErrorKind, Timestamp};
 
 const ISSUER: &str = "https://id.northstar.dev";
@@ -71,7 +74,8 @@ struct FakeIdp {
 impl FakeIdp {
     fn new() -> Self {
         Self {
-            ec: EcdsaKeyPair::generate(&ECDSA_P256_SHA256_FIXED_SIGNING).unwrap(),
+            ec: EcdsaKeyPair::generate(&ECDSA_P256_SHA256_FIXED_SIGNING)
+                .unwrap(),
             rsa: RsaKeyPair::generate(KeySize::Rsa2048).unwrap(),
             next_token: Mutex::new(None),
             posted: Mutex::new(Vec::new()),
@@ -118,16 +122,26 @@ impl FakeIdp {
 }
 
 impl SsoHttp for FakeIdp {
-    fn get<'a>(&'a self, url: &'a str) -> BoxFuture<'a, Result<Vec<u8>, Error>> {
+    fn get<'a>(
+        &'a self,
+        url: &'a str,
+    ) -> BoxFuture<'a, Result<Vec<u8>, Error>> {
         let body = match url {
-            "https://id.northstar.dev/.well-known/openid-configuration" => json!({
-                "issuer": ISSUER,
-                "authorization_endpoint": "https://id.northstar.dev/authorize",
-                "token_endpoint": "https://id.northstar.dev/token",
-                "jwks_uri": "https://id.northstar.dev/jwks",
-            }),
+            "https://id.northstar.dev/.well-known/openid-configuration" => {
+                json!({
+                    "issuer": ISSUER,
+                    "authorization_endpoint": "https://id.northstar.dev/authori\
+                        ze",
+                    "token_endpoint": "https://id.northstar.dev/token",
+                    "jwks_uri": "https://id.northstar.dev/jwks",
+                })
+            }
             "https://id.northstar.dev/jwks" => self.jwks(),
-            _ => return Box::pin(async { Err(Error::new(ErrorKind::NotFound, "no such page")) }),
+            _ => {
+                return Box::pin(async {
+                    Err(Error::new(ErrorKind::NotFound, "no such page"))
+                });
+            }
         };
         Box::pin(async move { Ok(body.to_string().into_bytes()) })
     }
@@ -250,7 +264,9 @@ async fn forged_or_misdirected_tokens_are_refused() {
     let cases: Vec<(&str, MakeToken<'_>)> = vec![
         (
             "wrong nonce",
-            Box::new(|_| idp.sign("ES256", "ec1", &claims("other", "ana@northstar.dev"))),
+            Box::new(|_| {
+                idp.sign("ES256", "ec1", &claims("other", "ana@northstar.dev"))
+            }),
         ),
         (
             "other audience",
@@ -279,9 +295,11 @@ async fn forged_or_misdirected_tokens_are_refused() {
         (
             "tampered",
             Box::new(|n| {
-                let token = idp.sign("ES256", "ec1", &claims(n, "ana@northstar.dev"));
+                let token =
+                    idp.sign("ES256", "ec1", &claims(n, "ana@northstar.dev"));
                 let parts: Vec<&str> = token.split('.').collect();
-                let forged = b64(claims(n, "boss@northstar.dev").to_string().as_bytes());
+                let forged =
+                    b64(claims(n, "boss@northstar.dev").to_string().as_bytes());
                 format!("{}.{forged}.{}", parts[0], parts[2])
             }),
         ),
@@ -289,17 +307,22 @@ async fn forged_or_misdirected_tokens_are_refused() {
             "alg none",
             Box::new(|n| {
                 let header = b64(br#"{"alg":"none","kid":"ec1"}"#);
-                let body = b64(claims(n, "ana@northstar.dev").to_string().as_bytes());
+                let body =
+                    b64(claims(n, "ana@northstar.dev").to_string().as_bytes());
                 format!("{header}.{body}.")
             }),
         ),
         (
             "unknown key",
-            Box::new(|n| idp.sign("ES256", "nope", &claims(n, "ana@northstar.dev"))),
+            Box::new(|n| {
+                idp.sign("ES256", "nope", &claims(n, "ana@northstar.dev"))
+            }),
         ),
         (
             "RSA key, EC header",
-            Box::new(|n| idp.sign("ES256", "rsa1", &claims(n, "ana@northstar.dev"))),
+            Box::new(|n| {
+                idp.sign("ES256", "rsa1", &claims(n, "ana@northstar.dev"))
+            }),
         ),
     ];
     for (name, token) in cases {
@@ -313,7 +336,11 @@ async fn a_callback_needs_this_browser_and_works_once() {
     let (idp, sso) = setup();
     let started = sso.start(CALLBACK, None, false).await.unwrap();
     let nonce = param(&started.url, "nonce");
-    idp.will_issue(idp.sign("ES256", "ec1", &claims(&nonce, "ana@northstar.dev")));
+    idp.will_issue(idp.sign(
+        "ES256",
+        "ec1",
+        &claims(&nonce, "ana@northstar.dev"),
+    ));
     let other_browser = sso
         .finish(CALLBACK, &started.state, "c", Some("other"))
         .await;
@@ -327,7 +354,11 @@ async fn a_callback_needs_this_browser_and_works_once() {
         .finish(CALLBACK, &started.state, "c", Some(&started.state))
         .await;
     assert_eq!(ok.unwrap().next, "/");
-    idp.will_issue(idp.sign("ES256", "ec1", &claims(&nonce, "ana@northstar.dev")));
+    idp.will_issue(idp.sign(
+        "ES256",
+        "ec1",
+        &claims(&nonce, "ana@northstar.dev"),
+    ));
     let replay = sso
         .finish(CALLBACK, &started.state, "c", Some(&started.state))
         .await;
@@ -357,7 +388,9 @@ async fn reauthentication_needs_a_fresh_provider_sign_in() {
 
 fn identity(sso_config: SsoConfig) -> Identity {
     let idp = Arc::new(FakeIdp::new());
-    let config = IdentityConfig::new(Url::parse("https://vellum.northstar.dev").unwrap());
+    let config = IdentityConfig::new(
+        Url::parse("https://vellum.northstar.dev").unwrap(),
+    );
     Identity::new(config, Store::memory()).with_sso(Sso::new(sso_config, idp))
 }
 

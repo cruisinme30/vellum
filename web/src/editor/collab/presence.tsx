@@ -39,11 +39,16 @@ export function peersOf(awareness: Awareness, live?: LiveState): Peer[] {
     peers.push({
       clientId,
       name: user.name.trim().slice(0, 80),
-      color: typeof user.color === "string" && COLOR.test(user.color) ? user.color : "#4f5b92",
+      color:
+        typeof user.color === "string" && COLOR.test(user.color)
+          ? user.color
+          : "#4f5b92",
       canWrite: vouched?.canWrite,
     });
   }
-  return peers.toSorted((a, b) => a.name.localeCompare(b.name) || a.clientId - b.clientId);
+  return peers.toSorted(
+    (a, b) => a.name.localeCompare(b.name) || a.clientId - b.clientId,
+  );
 }
 
 /** Black or white, whichever reads better on `color` (`#rrggbb`). */
@@ -52,9 +57,12 @@ export function inkOn(color: string): string {
     const value = Number.parseInt(color.slice(offset, offset + 2), 16) / 255;
     return value <= 0.039_28 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
   };
-  const luminance = 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
+  const luminance =
+    0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
   // Contrast with white is 1.05 / (L + 0.05), with black (L + 0.05) / 0.05.
-  return 1.05 / (luminance + 0.05) >= (luminance + 0.05) / 0.05 ? "#ffffff" : "#000000";
+  return 1.05 / (luminance + 0.05) >= (luminance + 0.05) / 0.05
+    ? "#ffffff"
+    : "#000000";
 }
 
 /** Up to two initials of a name. */
@@ -63,13 +71,18 @@ export function initials(name: string): string {
   const letters = words.length > 1 ? [words[0], words.at(-1)] : [words[0]];
   return letters
     .map((word) =>
-      word === undefined ? "" : ([...new Intl.Segmenter().segment(word)][0]?.segment ?? ""),
+      word === undefined
+        ? ""
+        : ([...new Intl.Segmenter().segment(word)][0]?.segment ?? ""),
     )
     .join("")
     .toUpperCase();
 }
 
-/** Re-renders on awareness changes, keyed so an unchanged list keeps its identity. */
+/**
+ * Re-renders on awareness changes, keyed so an unchanged list keeps its
+ * identity.
+ */
 function useAwarenessKey(awareness: Awareness): string {
   const subscribe = useCallback(
     (listener: () => void) => {
@@ -108,7 +121,10 @@ export function PresenceBar({
   const shown = peers.slice(0, SHOWN);
   const more = peers.length - shown.length;
   return (
-    <ul className="vl-presence" aria-label={t("presence-label", { count: peers.length })}>
+    <ul
+      className="vl-presence"
+      aria-label={t("presence-label", { count: peers.length })}
+    >
       {shown.map((peer) => {
         const label =
           peer.canWrite === false

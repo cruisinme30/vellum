@@ -17,7 +17,8 @@ use sha2::{Digest, Sha256};
 use crate::error::{StoreError, StoreResult};
 
 /// SHA-256 of an empty payload, sent with every bodiless request.
-pub const EMPTY_SHA256: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+pub const EMPTY_SHA256: &str =
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
 /// The request parts that `SigV4` signs.
 pub struct Canonical<'a> {
@@ -78,9 +79,14 @@ impl AmzDate {
 /// # Errors
 /// Returns [`StoreError::Backend`] if the MAC cannot be keyed (HMAC takes
 /// keys of any length, so this does not happen in practice).
-pub fn authorization(key: &Key<'_>, req: &Canonical<'_>, when: &AmzDate) -> StoreResult<String> {
+pub fn authorization(
+    key: &Key<'_>,
+    req: &Canonical<'_>,
+    when: &AmzDate,
+) -> StoreResult<String> {
     let (canonical, signed_headers) = canonical_request(req);
-    let scope = format!("{}/{}/{}/aws4_request", when.date, key.region, key.service);
+    let scope =
+        format!("{}/{}/{}/aws4_request", when.date, key.region, key.service);
     let to_sign = format!(
         "AWS4-HMAC-SHA256\n{}\n{scope}\n{}",
         when.stamp,
@@ -89,7 +95,8 @@ pub fn authorization(key: &Key<'_>, req: &Canonical<'_>, when: &AmzDate) -> Stor
     let signing = signing_key(key, &when.date)?;
     let signature = hex::encode(hmac(&signing, to_sign.as_bytes())?);
     Ok(format!(
-        "AWS4-HMAC-SHA256 Credential={}/{scope}, SignedHeaders={signed_headers}, Signature={signature}",
+        "AWS4-HMAC-SHA256 Credential={}/{scope}, \
+            SignedHeaders={signed_headers}, Signature={signature}",
         key.access_key_id
     ))
 }
@@ -121,15 +128,18 @@ fn collapse_spaces(value: &str) -> String {
 
 /// Derives the per-day signing key.
 fn signing_key(key: &Key<'_>, date: &str) -> StoreResult<Vec<u8>> {
-    let k_date = hmac(format!("AWS4{}", key.secret).as_bytes(), date.as_bytes())?;
+    let k_date =
+        hmac(format!("AWS4{}", key.secret).as_bytes(), date.as_bytes())?;
     let k_region = hmac(&k_date, key.region.as_bytes())?;
     let k_service = hmac(&k_region, key.service.as_bytes())?;
     hmac(&k_service, b"aws4_request")
 }
 
 fn hmac(key: &[u8], data: &[u8]) -> StoreResult<Vec<u8>> {
-    let mut mac = <Hmac<Sha256> as KeyInit>::new_from_slice(key)
-        .map_err(|e| StoreError::Backend(format!("s3: cannot key HMAC: {e}")))?;
+    let mut mac =
+        <Hmac<Sha256> as KeyInit>::new_from_slice(key).map_err(|e| {
+            StoreError::Backend(format!("s3: cannot key HMAC: {e}"))
+        })?;
     mac.update(data);
     Ok(mac.finalize().into_bytes().to_vec())
 }
@@ -253,9 +263,11 @@ mod tests {
         let auth = authorization(&S3_KEY, &req, &may_24_2013())?;
         assert_eq!(
             auth,
-            "AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request, \
-             SignedHeaders=host;range;x-amz-content-sha256;x-amz-date, \
-             Signature=f0e8bdb87c964420e857bd35b5d6ed310bd44f0170aba48dd91039c6036bdb41"
+            "AWS4-HMAC-SHA256 \
+             Credential=AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request\
+             , SignedHeaders=host;range;x-amz-content-sha256;x-amz-date, \
+             Signature=f0e8bdb87c964420e857bd35b5d6ed310bd44f0170aba48dd91039c6\
+             036bdb41"
         );
         Ok(())
     }
@@ -367,9 +379,11 @@ mod tests {
         let auth = authorization(&key, &req, &when)?;
         assert_eq!(
             auth,
-            "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20150830/us-east-1/service/aws4_request, \
+            "AWS4-HMAC-SHA256 \
+             Credential=AKIDEXAMPLE/20150830/us-east-1/service/aws4_request, \
              SignedHeaders=host;x-amz-date, \
-             Signature=5fa00fa31553b73ebf1942676e86291e8372ff2a2260956d9b8aae1d763fbf31"
+             Signature=5fa00fa31553b73ebf1942676e86291e8372ff2a2260956d9b8aae1d\
+             763fbf31"
         );
         Ok(())
     }

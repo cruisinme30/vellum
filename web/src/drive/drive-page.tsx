@@ -13,7 +13,13 @@ import { CopyDiagnostic } from "../shell/copy-diagnostic";
 import type { DriveApi, NodeView, SpaceView } from "./api";
 import { ActivityFeed } from "./details-panel";
 import { ItemTable } from "./item-table";
-import { ancestors, loadSpaces, useReloadable, withStars, type Listing } from "./loading";
+import {
+  ancestors,
+  loadSpaces,
+  useReloadable,
+  withStars,
+  type Listing,
+} from "./loading";
 import {
   DRIVE_HOME,
   DRIVE_SEARCH,
@@ -39,7 +45,10 @@ const PLACES = [
   { to: DRIVE_SEARCH, label: "drive-search", end: true },
 ] as const;
 
-/** The Drive's places: My Drive, Shared drives, Shared with me, Starred, Recent and Search (R-DR-1). */
+/**
+ * The Drive's places: My Drive, Shared drives, Shared with me, Starred, Recent
+ * and Search (R-DR-1).
+ */
 function DriveNav() {
   const t = useT();
   return (
@@ -54,7 +63,11 @@ function DriveNav() {
 }
 
 /** A Drive screen: the places, then the screen, or the needs-a-server note. */
-export function DriveFrame({ children }: { readonly children: (api: DriveApi) => ReactNode }) {
+export function DriveFrame({
+  children,
+}: {
+  readonly children: (api: DriveApi) => ReactNode;
+}) {
   const t = useT();
   return (
     <ServerScreen api="drive" title={t("drive")} className="vl-drive">
@@ -98,7 +111,10 @@ function NewFolder({
     }
   };
   return (
-    <form className="vl-drive-new-folder" onSubmit={(event) => void submit(event)}>
+    <form
+      className="vl-drive-new-folder"
+      onSubmit={(event) => void submit(event)}
+    >
       <label htmlFor={id}>{t("drive-new-folder")}</label>
       <input
         id={id}
@@ -131,7 +147,8 @@ function Breadcrumbs({
 }) {
   const t = useT();
   const loaded = useLoaded(
-    () => (folderId === undefined ? Promise.resolve([]) : ancestors(api, folderId)),
+    () =>
+      folderId === undefined ? Promise.resolve([]) : ancestors(api, folderId),
     [api, folderId],
     failureText,
   );
@@ -140,7 +157,10 @@ function Breadcrumbs({
     <nav className="vl-drive-crumbs" aria-label={t("drive-breadcrumbs")}>
       <ol>
         <li>
-          <Link to={spacePath(space.id)} aria-current={folderId === undefined ? "page" : undefined}>
+          <Link
+            to={spacePath(space.id)}
+            aria-current={folderId === undefined ? "page" : undefined}
+          >
             {space.name}
           </Link>
         </li>
@@ -159,7 +179,9 @@ function Breadcrumbs({
   );
 }
 
-/** A space's top or one of its folders, with its tools and the space's usage. */
+/**
+ * A space's top or one of its folders, with its tools and the space's usage.
+ */
 function SpaceContents({
   api,
   spaces,
@@ -202,11 +224,19 @@ function SpaceContents({
       </div>
       <UsageMeter api={api} space={space} />
       {showActivity && (
-        <section className="vl-drive-space-activity" aria-label={t("drive-space-activity")}>
+        <section
+          className="vl-drive-space-activity"
+          aria-label={t("drive-space-activity")}
+        >
           <ActivityFeed api={api} id={space.id} />
         </section>
       )}
-      <NewFolder api={api} spaceId={space.id} parentId={folderId} onMade={reload} />
+      <NewFolder
+        api={api}
+        spaceId={space.id}
+        parentId={folderId}
+        onMade={reload}
+      />
       <Ready loaded={loaded}>
         {(listing) => (
           <ItemTable
@@ -247,7 +277,12 @@ export function MyDrivePage() {
             return mine === undefined ? (
               <p className="vl-muted">{t("drive-no-my-drive")}</p>
             ) : (
-              <SpaceContents api={api} spaces={spaces} space={mine} folderId={undefined} />
+              <SpaceContents
+                api={api}
+                spaces={spaces}
+                space={mine}
+                folderId={undefined}
+              />
             );
           }}
         </WithSpaces>
@@ -292,8 +327,11 @@ export function SharedDrivesPage() {
       {(api) => (
         <WithSpaces api={api}>
           {(spaces) => {
-            const shared = spaces.filter((space) => space.kind === "shared_drive");
-            if (shared.length === 0) return <p className="vl-muted">{t("drive-no-shared")}</p>;
+            const shared = spaces.filter(
+              (space) => space.kind === "shared_drive",
+            );
+            if (shared.length === 0)
+              return <p className="vl-muted">{t("drive-no-shared")}</p>;
             return (
               <ul className="vl-drive-spaces">
                 {shared.map((space) => (
@@ -319,7 +357,11 @@ function ListPage({
   readonly load: (api: DriveApi) => Promise<NodeView[]>;
   readonly empty: string;
 }) {
-  return <DriveFrame>{(api) => <FlatList api={api} load={load} empty={empty} />}</DriveFrame>;
+  return (
+    <DriveFrame>
+      {(api) => <FlatList api={api} load={load} empty={empty} />}
+    </DriveFrame>
+  );
 }
 
 function FlatList({
@@ -358,7 +400,9 @@ const recent = (api: DriveApi) => api.recent();
 /** Items in other people's My Drives shared with the person. */
 export function SharedWithMePage() {
   const t = useT();
-  return <ListPage load={sharedWithMe} empty={t("drive-shared-with-me-empty")} />;
+  return (
+    <ListPage load={sharedWithMe} empty={t("drive-shared-with-me-empty")} />
+  );
 }
 
 /** Items the person starred. */

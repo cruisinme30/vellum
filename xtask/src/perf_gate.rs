@@ -48,7 +48,8 @@ pub fn run(args: &[String]) -> Result<(), String> {
     let mut tolerance = DEFAULT_TOLERANCE;
     let mut iter = args.iter();
     while let Some(flag) = iter.next() {
-        let value = iter.next().ok_or_else(|| format!("{flag} needs a value"))?;
+        let value =
+            iter.next().ok_or_else(|| format!("{flag} needs a value"))?;
         match flag.as_str() {
             "--baseline" => baseline = Some(value.clone()),
             "--current" => current = Some(value.clone()),
@@ -90,7 +91,8 @@ pub fn run(args: &[String]) -> Result<(), String> {
 fn load(path: &Path) -> Result<Summary, String> {
     let text = std::fs::read_to_string(path)
         .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
-    serde_json::from_str(&text).map_err(|e| format!("{} is not a k6 summary: {e}", path.display()))
+    serde_json::from_str(&text)
+        .map_err(|e| format!("{} is not a k6 summary: {e}", path.display()))
 }
 
 /// Every `*.json` summary under `dir`, at any depth (artifact downloads
@@ -100,7 +102,8 @@ fn load_dir(dir: &Path) -> Result<Vec<Summary>, String> {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return Ok(found);
     };
-    let mut paths: Vec<_> = entries.filter_map(|e| e.ok().map(|e| e.path())).collect();
+    let mut paths: Vec<_> =
+        entries.filter_map(|e| e.ok().map(|e| e.path())).collect();
     paths.sort();
     for path in paths {
         if path.is_dir() {
@@ -147,7 +150,11 @@ pub fn median(runs: &[Summary]) -> Summary {
 /// regressed by `tolerance` or more, or is missing from the current run.
 /// Scenarios that are new in the current run pass; they join the baseline
 /// when it is next updated.
-pub fn compare(baseline: &Summary, current: &Summary, tolerance: f64) -> Result<String, String> {
+pub fn compare(
+    baseline: &Summary,
+    current: &Summary,
+    tolerance: f64,
+) -> Result<String, String> {
     let mut report = String::new();
     let mut failures = Vec::new();
     for (name, base) in &baseline.scenarios {
@@ -165,14 +172,16 @@ pub fn compare(baseline: &Summary, current: &Summary, tolerance: f64) -> Result<
         let verdict = if regressed { "REGRESSED" } else { "ok" };
         let _ = writeln!(
             report,
-            "{name:<24} baseline {:>9.1} ms  now {:>9.1} ms  {:>+7.1} %  {verdict}",
+            "{name:<24} baseline {:>9.1} ms  now {:>9.1} ms  {:>+7.1} %  \
+                {verdict}",
             base.p95_ms,
             now.p95_ms,
             change * 100.0
         );
         if regressed {
             failures.push(format!(
-                "{name}: p95 {:.1} ms is {:.1} % over the baseline {:.1} ms (limit {:.0} %)",
+                "{name}: p95 {:.1} ms is {:.1} % over the baseline {:.1} ms \
+                    (limit {:.0} %)",
                 now.p95_ms,
                 change * 100.0,
                 base.p95_ms,
@@ -198,7 +207,9 @@ mod tests {
         Summary {
             scenarios: entries
                 .iter()
-                .map(|(name, p95_ms)| ((*name).to_owned(), Scenario { p95_ms: *p95_ms }))
+                .map(|(name, p95_ms)| {
+                    ((*name).to_owned(), Scenario { p95_ms: *p95_ms })
+                })
                 .collect(),
         }
     }
@@ -230,14 +241,17 @@ mod tests {
 
     #[test]
     fn parses_the_k6_summary_shape() {
-        let parsed: Summary =
-            serde_json::from_str(r#"{"scenarios":{"read_cached":{"p95_ms":41.2}}}"#).unwrap();
+        let parsed: Summary = serde_json::from_str(
+            r#"{"scenarios":{"read_cached":{"p95_ms":41.2}}}"#,
+        )
+        .unwrap();
         assert_eq!(parsed, summary(&[("read_cached", 41.2)]));
     }
 
     #[test]
     fn the_committed_baseline_parses() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../deploy/perf/baseline.json");
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../deploy/perf/baseline.json");
         let baseline = load(&path).unwrap();
         assert!(!baseline.scenarios.is_empty());
     }
@@ -252,12 +266,16 @@ mod tests {
         let base = median(&nights);
         assert_eq!(base, summary(&[("read", 42.0), ("write", 95.0)]));
         // One slow night does not lift the bar: 47 ms is 12 % over 42 ms.
-        assert!(compare(&base, &summary(&[("read", 47.0), ("write", 95.0)]), 0.10).is_err());
+        assert!(
+            compare(&base, &summary(&[("read", 47.0), ("write", 95.0)]), 0.10)
+                .is_err()
+        );
     }
 
     #[test]
     fn history_is_read_from_nested_folders_and_may_be_missing() {
-        let dir = std::env::temp_dir().join(format!("perf-gate-{}", std::process::id()));
+        let dir = std::env::temp_dir()
+            .join(format!("perf-gate-{}", std::process::id()));
         let nested = dir.join("perf-summary-1");
         std::fs::create_dir_all(&nested).unwrap();
         std::fs::write(

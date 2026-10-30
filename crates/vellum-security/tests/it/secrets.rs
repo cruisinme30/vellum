@@ -12,7 +12,8 @@ use proptest::prelude::*;
 use vellum_security::secrets::{ALLOW_MARKER, Rule, SecretPolicy, scan};
 
 const UPPER_DIGIT: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-const ALNUM: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+const ALNUM: &str =
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
 /// A deterministic, well-mixed string of `n` characters from `chars`.
 fn body(chars: &str, n: usize) -> String {
@@ -45,7 +46,8 @@ fn finds_provider_tokens() {
         (token(&["np", "m_"], ALNUM, 36), Rule::NpmToken),
     ];
     for (secret, rule) in cases {
-        let text = format!("Northstar deploy notes\n\nUse `{secret}` for staging.\n");
+        let text =
+            format!("Northstar deploy notes\n\nUse `{secret}` for staging.\n");
         let found = scan(&text);
         assert_eq!(found.len(), 1, "{rule:?}");
         let f = &found[0];
@@ -82,7 +84,8 @@ fn finds_private_keys_and_jwts() {
         body(ALNUM, 43)
     );
     assert_eq!(rules(&format!("Authorization: Bearer {jwt}")), [Rule::Jwt]);
-    let not_jwt = format!("{}.{}", token(&["ey", "J"], ALNUM, 20), body(ALNUM, 20));
+    let not_jwt =
+        format!("{}.{}", token(&["ey", "J"], ALNUM, 20), body(ALNUM, 20));
     assert!(rules(&not_jwt).is_empty());
 }
 

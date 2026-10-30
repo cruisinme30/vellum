@@ -73,7 +73,10 @@ impl ShardedIndex {
 
     /// The shard storing `space`, placing it first when nobody has: a
     /// write may be the first anyone makes for a space.
-    async fn for_write(&self, space: SpaceId) -> DriveResult<(usize, &SqlIndex)> {
+    async fn for_write(
+        &self,
+        space: SpaceId,
+    ) -> DriveResult<(usize, &SqlIndex)> {
         let at = self.router.place(object(space)).await.map_err(routing)?;
         Ok((at, self.shard(at)?))
     }
@@ -129,7 +132,11 @@ impl ShardedIndex {
 
     /// The shard other than `at` that holds `id`, if any: the node is
     /// moving between shards.
-    async fn previous_shard(&self, id: ObjectId, at: usize) -> DriveResult<Option<usize>> {
+    async fn previous_shard(
+        &self,
+        id: ObjectId,
+        at: usize,
+    ) -> DriveResult<Option<usize>> {
         let cached = self
             .nodes
             .read()
@@ -198,11 +205,19 @@ impl DriveIndex for ShardedIndex {
         Ok(self.locate(id).await?.map(|(_, node)| node))
     }
 
-    async fn node_at(&self, space: SpaceId, path: &BlobPath) -> DriveResult<Option<Node>> {
+    async fn node_at(
+        &self,
+        space: SpaceId,
+        path: &BlobPath,
+    ) -> DriveResult<Option<Node>> {
         self.for_space(space).await?.node_at(space, path).await
     }
 
-    async fn children(&self, space: SpaceId, parent: Option<ObjectId>) -> DriveResult<Vec<Node>> {
+    async fn children(
+        &self,
+        space: SpaceId,
+        parent: Option<ObjectId>,
+    ) -> DriveResult<Vec<Node>> {
         self.for_space(space).await?.children(space, parent).await
     }
 
@@ -210,7 +225,11 @@ impl DriveIndex for ShardedIndex {
         self.for_space(space).await?.nodes(space).await
     }
 
-    async fn by_title(&self, space: SpaceId, title: &str) -> DriveResult<Vec<Node>> {
+    async fn by_title(
+        &self,
+        space: SpaceId,
+        title: &str,
+    ) -> DriveResult<Vec<Node>> {
         self.for_space(space).await?.by_title(space, title).await
     }
 
@@ -246,11 +265,20 @@ impl DriveIndex for ShardedIndex {
         Ok(all)
     }
 
-    async fn touch(&self, user: UserId, node: ObjectId, at: Timestamp) -> DriveResult<()> {
+    async fn touch(
+        &self,
+        user: UserId,
+        node: ObjectId,
+        at: Timestamp,
+    ) -> DriveResult<()> {
         self.for_node(node).await?.touch(user, node, at).await
     }
 
-    async fn recent(&self, user: UserId, limit: usize) -> DriveResult<Vec<(ObjectId, Timestamp)>> {
+    async fn recent(
+        &self,
+        user: UserId,
+        limit: usize,
+    ) -> DriveResult<Vec<(ObjectId, Timestamp)>> {
         let mut all = Vec::new();
         for shard in &self.shards {
             all.extend(shard.recent(user, limit).await?);
@@ -268,11 +296,19 @@ impl DriveIndex for ShardedIndex {
             .await
     }
 
-    async fn activity(&self, node: ObjectId, limit: usize) -> DriveResult<Vec<Activity>> {
+    async fn activity(
+        &self,
+        node: ObjectId,
+        limit: usize,
+    ) -> DriveResult<Vec<Activity>> {
         self.for_node(node).await?.activity(node, limit).await
     }
 
-    async fn set_links(&self, source: ObjectId, targets: &[ObjectId]) -> DriveResult<()> {
+    async fn set_links(
+        &self,
+        source: ObjectId,
+        targets: &[ObjectId],
+    ) -> DriveResult<()> {
         self.for_node(source)
             .await?
             .set_links(source, targets)
@@ -325,7 +361,8 @@ impl DriveIndex for ShardedIndex {
             sum.trashed = sum.trashed.saturating_add(t.trashed);
             sum.file_bytes = sum.file_bytes.saturating_add(t.file_bytes);
             sum.versions = sum.versions.saturating_add(t.versions);
-            sum.version_bytes = sum.version_bytes.saturating_add(t.version_bytes);
+            sum.version_bytes =
+                sum.version_bytes.saturating_add(t.version_bytes);
             sum.events_1d = sum.events_1d.saturating_add(t.events_1d);
             sum.events_7d = sum.events_7d.saturating_add(t.events_7d);
         }

@@ -28,7 +28,8 @@ interface Cue {
 /** Long enough to read a caption of about twelve words. */
 const READ_MS = 2500;
 
-const pad = (value: number, width = 2) => String(Math.floor(value)).padStart(width, "0");
+const pad = (value: number, width = 2) =>
+  String(Math.floor(value)).padStart(width, "0");
 
 /** `12345` ms → `00:00:12.345`. */
 function timestamp(ms: number): string {

@@ -38,7 +38,11 @@ export function SectionTools({
   const { busy, error, run } = useAction();
   const formId = useId();
   const book = info.id;
-  const after = async (target: { book_id: string; section_id?: string; id?: string }) => {
+  const after = async (target: {
+    book_id: string;
+    section_id?: string;
+    id?: string;
+  }) => {
     await onChanged();
     setMode(undefined);
     const id = target.section_id ?? target.id;
@@ -105,7 +109,11 @@ export function SectionTools({
 
   return (
     <div className="vl-book-tools">
-      <div className="vl-book-toolbar" role="toolbar" aria-label={t("books-section-tools")}>
+      <div
+        className="vl-book-toolbar"
+        role="toolbar"
+        aria-label={t("books-section-tools")}
+      >
         <button
           type="button"
           className="vl-text-button"
@@ -143,7 +151,10 @@ export function SectionTools({
           onClick={() => {
             run(async () => {
               await after(
-                await api.copySection(book, section.id, { at: "after", section: section.id }),
+                await api.copySection(book, section.id, {
+                  at: "after",
+                  section: section.id,
+                }),
               );
             });
           }}
@@ -203,7 +214,9 @@ export function SectionTools({
         <form className="vl-book-tool-form" id={formId} onSubmit={submit}>
           {(mode === "add" || mode === "child" || mode === "rename") && (
             <label>
-              {mode === "rename" ? t("books-new-title") : t("books-section-title")}
+              {mode === "rename"
+                ? t("books-new-title")
+                : t("books-section-title")}
               <input
                 name="title"
                 autoComplete="off"
@@ -216,7 +229,8 @@ export function SectionTools({
             <Ready loaded={books}>
               {(list) => {
                 const others = list.filter((b) => b.id !== book);
-                if (others.length === 0) return <p className="vl-muted">{t("books-no-other")}</p>;
+                if (others.length === 0)
+                  return <p className="vl-muted">{t("books-no-other")}</p>;
                 return (
                   <>
                     <label>
@@ -232,7 +246,12 @@ export function SectionTools({
                     <fieldset className="vl-book-choice">
                       <legend>{t("books-transfer-how")}</legend>
                       <label>
-                        <input type="radio" name="how" value="move" defaultChecked />
+                        <input
+                          type="radio"
+                          name="how"
+                          value="move"
+                          defaultChecked
+                        />
                         {t("books-transfer-move")}
                       </label>
                       <label>
@@ -245,7 +264,9 @@ export function SectionTools({
               }}
             </Ready>
           )}
-          {mode === "remove" && <p>{t("books-remove-confirm", { title: section.title })}</p>}
+          {mode === "remove" && (
+            <p>{t("books-remove-confirm", { title: section.title })}</p>
+          )}
           <div className="vl-book-form-actions">
             <button type="submit" className="vl-filled-button" disabled={busy}>
               {mode === "remove" ? t("books-remove") : t("books-save")}
@@ -290,7 +311,8 @@ export function FirstSection({
         api.addSection(book, title.trim(), { at: "end" }).then(
           async (added) => {
             await onChanged();
-            void navigate(`/books/${encodeURIComponent(book)}/${encodeURIComponent(added.id)}`);
+            const bookPath = encodeURIComponent(book);
+            void navigate(`/books/${bookPath}/${encodeURIComponent(added.id)}`);
           },
           (error_: unknown) => {
             setError(failureText(error_));

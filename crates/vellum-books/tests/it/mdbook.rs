@@ -22,8 +22,8 @@ struct TempDir(PathBuf);
 
 impl TempDir {
     fn new(name: &str) -> Self {
-        let path =
-            std::env::temp_dir().join(format!("vellum-mdbook-{}-{name}", std::process::id()));
+        let path = std::env::temp_dir()
+            .join(format!("vellum-mdbook-{}-{name}", std::process::id()));
         let _ = std::fs::remove_dir_all(&path);
         std::fs::create_dir_all(&path).unwrap();
         Self(path)
@@ -113,7 +113,12 @@ fn northstar() -> Book {
         )
         .unwrap();
     let _ = book
-        .add_section(&Place::End(Section::Suffix), "Glossary", "Terms.", &mut ids)
+        .add_section(
+            &Place::End(Section::Suffix),
+            "Glossary",
+            "Terms.",
+            &mut ids,
+        )
         .unwrap();
     book.add_part(0, "Part I · Joining").unwrap();
     let _ = (intro, week);
@@ -130,8 +135,10 @@ fn raw_book_folder_builds_with_mdbook() {
     let mut book = northstar();
     let _ = save_dir(&mut book, &dir).unwrap();
     build(&dir);
-    let page =
-        std::fs::read_to_string(dir.join(".mdbook/onboarding/your-first-week.html")).unwrap();
+    let page = std::fs::read_to_string(
+        dir.join(".mdbook/onboarding/your-first-week.html"),
+    )
+    .unwrap();
     assert!(page.contains("Your first week"));
 }
 
@@ -144,7 +151,10 @@ fn published_tree_builds_with_mdbook_and_resolves_cross_refs() {
     let site = northstar().to_mdbook(&Audience::Public).unwrap();
     write_site(&tmp.0, &site).unwrap();
     build(&tmp.0);
-    let page = std::fs::read_to_string(tmp.0.join("book/onboarding/your-first-week.html")).unwrap();
+    let page = std::fs::read_to_string(
+        tmp.0.join("book/onboarding/your-first-week.html"),
+    )
+    .unwrap();
     assert!(
         page.contains("§2.1 Services"),
         "cross-reference label missing"
@@ -158,7 +168,8 @@ fn published_tree_builds_with_mdbook_and_resolves_cross_refs() {
         "front matter leaked into the page"
     );
     // mdBook's own numbering agrees with Vellum's.
-    let toc = std::fs::read_to_string(tmp.0.join("book/toc.html")).unwrap_or_default();
+    let toc = std::fs::read_to_string(tmp.0.join("book/toc.html"))
+        .unwrap_or_default();
     let index = std::fs::read_to_string(tmp.0.join("book/index.html")).unwrap();
     assert!(
         toc.contains("2.1.") || index.contains("2.1."),

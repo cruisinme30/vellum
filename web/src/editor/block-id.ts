@@ -25,7 +25,10 @@ export function formatBlockId(value: number): string {
 export function newBlockId(): string {
   const bytes = new Uint8Array(5);
   globalThis.crypto.getRandomValues(bytes);
-  const value = bytes.reduce((accumulator, byte) => accumulator * 256 + byte, 0);
+  const value = bytes.reduce(
+    (accumulator, byte) => accumulator * 256 + byte,
+    0,
+  );
   return formatBlockId(value);
 }
 

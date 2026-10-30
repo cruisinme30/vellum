@@ -21,7 +21,10 @@ test.use({
 });
 // eslint-disable-next-line no-empty-pattern -- Playwright needs the fixtures object
 test.beforeEach(({}, testInfo) => {
-  test.skip(!testInfo.project.name.endsWith("-laptop"), "runs at laptop size only");
+  test.skip(
+    !testInfo.project.name.endsWith("-laptop"),
+    "runs at laptop size only",
+  );
 });
 
 const USER = {
@@ -41,7 +44,9 @@ async function fakeServer(page: Page, start: "new" | "signed-out") {
     start === "new"
       ? { needsSetup: true, credential: "anonymous", scopes: [] }
       : { needsSetup: false, credential: "anonymous", scopes: [] };
-  await page.route("**/api/v1/auth/status", (route) => route.fulfill({ json: status }));
+  await page.route("**/api/v1/auth/status", (route) =>
+    route.fulfill({ json: status }),
+  );
   await page.route("**/api/csrf", (route) =>
     route.fulfill({ json: { token: "t", header: "x-csrf-token" } }),
   );
@@ -60,7 +65,12 @@ async function fakeServer(page: Page, start: "new" | "signed-out") {
       });
       return;
     }
-    status = { needsSetup: false, credential: "session", scopes: ["read"], user: USER };
+    status = {
+      needsSetup: false,
+      credential: "session",
+      scopes: ["read"],
+      user: USER,
+    };
     await route.fulfill({ json: { user: USER, sessionId: "s1" } });
   });
   await page.route("**/api/v1/collections", (route) =>
@@ -92,7 +102,9 @@ test("a new workspace creates its first administrator", async ({ page }) => {
   ).toBeVisible();
 });
 
-test("signing in returns to the page asked for, and says why it failed", async ({ page }) => {
+test("signing in returns to the page asked for and says why it failed", async ({
+  page,
+}) => {
   await fakeServer(page, "signed-out");
   await page.goto("/data");
   await expect(page).toHaveURL(/\/sign-in\?next=%2Fdata$/);
@@ -115,19 +127,32 @@ test("a second step asks for the authenticator code", async ({ page }) => {
   await page.route("**/api/v1/auth/status", (route) =>
     route.fulfill({
       json: signedIn
-        ? { needsSetup: false, credential: "session", scopes: ["read"], user: USER }
+        ? {
+            needsSetup: false,
+            credential: "session",
+            scopes: ["read"],
+            user: USER,
+          }
         : { needsSetup: false, credential: "anonymous", scopes: [] },
     }),
   );
   await page.route("**/auth/sign-in", (route) =>
-    route.fulfill({ json: { secondFactor: { ticket: "vmt_e2e", methods: ["totp", "recovery"] } } }),
+    route.fulfill({
+      json: {
+        secondFactor: { ticket: "vmt_e2e", methods: ["totp", "recovery"] },
+      },
+    }),
   );
   await page.route("**/auth/sign-in/verify", async (route) => {
     const body = route.request().postDataJSON() as { code?: string };
     if (body.code !== "123456") {
       await route.fulfill({
         status: 401,
-        json: { code: "unauthenticated", message: "the code is wrong", retryable: false },
+        json: {
+          code: "unauthenticated",
+          message: "the code is wrong",
+          retryable: false,
+        },
       });
       return;
     }
@@ -138,7 +163,9 @@ test("a second step asks for the authenticator code", async ({ page }) => {
   await page.getByLabel("Email").fill("priya@northstar.dev");
   await page.getByLabel("Password").fill("a long enough password");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByRole("heading", { name: "Two-step verification" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Two-step verification" }),
+  ).toBeVisible();
   await expectNoViolations(page);
   await page.getByLabel("Code from your authenticator app").fill("000000");
   await page.getByRole("button", { name: "Verify" }).click();
@@ -151,11 +178,20 @@ test("a second step asks for the authenticator code", async ({ page }) => {
 test("single sign-on goes to the SAML provider and back", async ({ page }) => {
   await fakeServer(page, "signed-out");
   let signedIn = false;
-  const entra = { id: "entra", name: "Entra ID", startUrl: "/auth/sso/start?provider=entra" };
+  const entra = {
+    id: "entra",
+    name: "Entra ID",
+    startUrl: "/auth/sso/start?provider=entra",
+  };
   await page.route("**/api/v1/auth/status", (route) =>
     route.fulfill({
       json: signedIn
-        ? { needsSetup: false, credential: "session", scopes: ["read"], user: USER }
+        ? {
+            needsSetup: false,
+            credential: "session",
+            scopes: ["read"],
+            user: USER,
+          }
         : {
             needsSetup: false,
             credential: "anonymous",
@@ -202,7 +238,9 @@ test("single sign-on goes to the SAML provider and back", async ({ page }) => {
     });
   });
   await page.getByRole("link", { name: "Sign in with Entra ID" }).click();
-  await expect(page.getByRole("heading", { name: "Northstar sign-in" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Northstar sign-in" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page).toHaveURL(/\/data$/);
   await expect(page.getByText("There are no collections yet.")).toBeVisible();

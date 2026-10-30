@@ -17,10 +17,12 @@ import {
 
 import "./transfer.css";
 
-const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
+const errorText = (error: unknown) =>
+  error instanceof Error ? error.message : String(error);
 
 /** An SVG page as an image source; images cannot run scripts. */
-const svgSource = (svg: string) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+const svgSource = (svg: string) =>
+  `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 
 const VIEW_BOX = /\sviewBox="([^"]*)"/;
 const WIDTH = /\swidth="([^"]*)"/;
@@ -32,7 +34,9 @@ const HEIGHT = /\sheight="([^"]*)"/;
  * without it each page is a sliver until it decodes, then grows and pushes
  * the next one down.
  */
-export function svgPageSize(svg: string): { width: number; height: number } | undefined {
+export function svgPageSize(
+  svg: string,
+): { width: number; height: number } | undefined {
   const start = svg.indexOf("<svg");
   if (start === -1) return undefined;
   const tag = svg.slice(start, svg.indexOf(">", start));
@@ -80,7 +84,9 @@ export function ExportPanel({ target, api, onClose }: ExportPanelProperties) {
   const t = useT();
   const headingId = useId();
   const formats: ExportFormat[] =
-    target.kind === "page" ? ["pdf", "docx", "html", "md"] : ["pdf", "docx", "html"];
+    target.kind === "page"
+      ? ["pdf", "docx", "html", "md"]
+      : ["pdf", "docx", "html"];
   const [format, setFormat] = useState<ExportFormat>("pdf");
   const [paper, setPaper] = useState<Paper>("a4");
   const [busy, setBusy] = useState(false);
@@ -88,13 +94,20 @@ export function ExportPanel({ target, api, onClose }: ExportPanelProperties) {
   const targetKey = JSON.stringify(target);
 
   // The target is compared by value, so a new object for the same target does not reload.
-  const preview = useLoaded(() => api.preview(target, paper), [api, targetKey, paper], errorText);
+  const preview = useLoaded(
+    () => api.preview(target, paper),
+    [api, targetKey, paper],
+    errorText,
+  );
 
   const download = async () => {
     setBusy(true);
     setFailure(undefined);
     try {
-      save(await api.download(target, format, paper), exportFileName(target.title, format));
+      save(
+        await api.download(target, format, paper),
+        exportFileName(target.title, format),
+      );
     } catch (error) {
       setFailure(errorText(error));
     } finally {
@@ -103,7 +116,12 @@ export function ExportPanel({ target, api, onClose }: ExportPanelProperties) {
   };
 
   return (
-    <div className="vl-transfer-panel" role="dialog" aria-modal="false" aria-labelledby={headingId}>
+    <div
+      className="vl-transfer-panel"
+      role="dialog"
+      aria-modal="false"
+      aria-labelledby={headingId}
+    >
       <div className="vl-transfer-head">
         <h2 id={headingId}>{t("export-title")}</h2>
         <button
@@ -182,7 +200,11 @@ export function ExportPanel({ target, api, onClose }: ExportPanelProperties) {
           <>
             {preview.value.warnings.length > 0 && (
               <details className="vl-transfer-warnings">
-                <summary>{t("export-warnings", { count: preview.value.warnings.length })}</summary>
+                <summary>
+                  {t("export-warnings", {
+                    count: preview.value.warnings.length,
+                  })}
+                </summary>
                 <ul>
                   {preview.value.warnings.map((w, index) => (
                     <li key={index}>

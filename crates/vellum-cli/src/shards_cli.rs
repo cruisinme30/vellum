@@ -23,9 +23,9 @@ pub async fn move_space(space: &str, to: &str) -> Result<Vec<String>, Error> {
                 "VELLUM_SHARDS is not set: there is only one database",
             )
         })?;
-    let id: SpaceId = space
-        .parse()
-        .map_err(|e| Error::new(ErrorKind::InvalidInput, format!("bad space ID: {e}")))?;
+    let id: SpaceId = space.parse().map_err(|e| {
+        Error::new(ErrorKind::InvalidInput, format!("bad space ID: {e}"))
+    })?;
     let unavailable = |e: vellum_db::Error| {
         let kind = if matches!(e, vellum_db::Error::UnknownShard(_)) {
             ErrorKind::InvalidInput

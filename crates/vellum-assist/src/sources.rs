@@ -79,5 +79,9 @@ pub trait Sources: Send + Sync {
     async fn page(&self, who: &Principal, id: &str) -> Result<Page, Error>;
 
     /// Creates a draft page for `who` to review, attributed to the model.
-    async fn create_draft(&self, who: &Principal, page: DraftPage) -> Result<Created, Error>;
+    async fn create_draft(
+        &self,
+        who: &Principal,
+        page: DraftPage,
+    ) -> Result<Created, Error>;
 }

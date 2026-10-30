@@ -53,9 +53,12 @@ use vellum_export::gdocs::{self, AccessToken};
 use vellum_export::import::{self as importer, Source};
 use vellum_export::pdf::{Paper, PdfEngine, PrintTheme};
 use vellum_export::ports::{
-    AssetError, AssetSource, FigureError, FigureRenderer, FigureSvg, NoLiveData, Ports,
+    AssetError, AssetSource, FigureError, FigureRenderer, FigureSvg,
+    NoLiveData, Ports,
 };
-use vellum_export::{ExportError, ExportWarning, Flow, ImportError, LowerOptions, Target};
+use vellum_export::{
+    ExportError, ExportWarning, Flow, ImportError, LowerOptions, Target,
+};
 use vellum_format::{Document, Fence};
 use vellum_jobs::export::CollectionsEngine;
 use vellum_kernel::{Actor, BookId, Error, ErrorKind, ObjectId, SpaceId};
@@ -64,7 +67,8 @@ use vellum_render::theme::{BuiltinTheme, Theme};
 use vellum_security::upload::{self, Kind, Scanner, UploadPolicy};
 
 use crate::uploads::{
-    UploadRefusal, caller, encode, invalid, json, parse_page, refused, request_id, respond,
+    UploadRefusal, caller, encode, invalid, json, parse_page, refused,
+    request_id, respond,
 };
 
 /// Where the export routes are mounted.
@@ -122,7 +126,9 @@ impl<S: Scanner + 'static> Transfer<S> {
         base_url: Option<String>,
     ) -> Self {
         let google = gdocs::Drive::new(GOOGLE_TIMEOUT)
-            .inspect_err(|e| tracing::warn!(error = %e, "Google Docs export is off"))
+            .inspect_err(
+                |e| tracing::warn!(error = %e, "Google Docs export is off"),
+            )
             .ok();
         Self {
             drive,
@@ -225,8 +231,12 @@ impl FigureRenderer for RenderFigures {
                 width: drawn.width,
                 height: drawn.height,
             }),
-            Err(figure::FigureError::Unsupported) => Err(FigureError::Unsupported),
-            Err(figure::FigureError::Source { message }) => Err(FigureError::Source(message)),
+            Err(figure::FigureError::Unsupported) => {
+                Err(FigureError::Unsupported)
+            }
+            Err(figure::FigureError::Source { message }) => {
+                Err(FigureError::Source(message))
+            }
             Err(figure::FigureError::Unavailable { message }) => {
                 Err(FigureError::Unavailable(message))
             }
@@ -244,7 +254,8 @@ struct PageFiles {
 #[async_trait]
 impl AssetSource for PageFiles {
     async fn fetch(&self, url: &str) -> Result<Vec<u8>, AssetError> {
-        let missing = || AssetError(format!("{url} is not a file of this workspace"));
+        let missing =
+            || AssetError(format!("{url} is not a file of this workspace"));
         let rest = url
             .strip_prefix("vellum://attachment/")
             .ok_or_else(missing)?;
@@ -279,7 +290,9 @@ impl Format {
             "html" => Self::Html,
             "md" | "markdown" => Self::Markdown,
             _ => {
-                return Err(invalid("format must be pdf, preview, docx, html or md"));
+                return Err(invalid(
+                    "format must be pdf, preview, docx, html or md",
+                ));
             }
         })
     }
@@ -399,7 +412,9 @@ impl<S: Send + Sync> Transfer<S> {
             .await?
         {
             Made::File(file) => Ok(file),
-            Made::Preview(_) => Err(Error::new(ErrorKind::Internal, "unexpected preview")),
+            Made::Preview(_) => {
+                Err(Error::new(ErrorKind::Internal, "unexpected preview"))
+            }
         }
     }
 
@@ -421,7 +436,9 @@ impl<S: Send + Sync> Transfer<S> {
                 let (title, doc) = read_page(&self.drive, &actor, page).await?;
                 if format == Format::Markdown {
                     let _slot = self.slot().await?;
-                    let out = vellum_export::bundle::markdown(&doc, &ports, &today()).await;
+                    let out =
+                        vellum_export::bundle::markdown(&doc, &ports, &today())
+                            .await;
                     return Ok(Made::File(Exported {
                         file_name: format!("{}.md", file_stem(&title)),
                         mime: "text/markdown; charset=utf-8",
@@ -429,14 +446,24 @@ impl<S: Send + Sync> Transfer<S> {
                         warnings: out.warnings,
                     }));
                 }
-                vellum_export::lower(&doc, &ports, &self.options(format.target())).await
+                vellum_export::lower(
+                    &doc,
+                    &ports,
+                    &self.options(format.target()),
+                )
+                .await
             }
             ExportItem::Book(book, scope) => {
                 if format == Format::Markdown {
-                    return Err(invalid("books export as pdf, preview, docx or html"));
+                    return Err(invalid(
+                        "books export as pdf, preview, docx or html",
+                    ));
                 }
                 let books = self.books.as_ref().ok_or_else(|| {
-                    Error::new(ErrorKind::Unavailable, "books are not served here")
+                    Error::new(
+                        ErrorKind::Unavailable,
+                        "books are not served here",
+                    )
                 })?;
                 let ctx = RequestContext {
                     request_id,
@@ -445,8 +472,12 @@ impl<S: Send + Sync> Transfer<S> {
                     traceparent: None,
                 };
                 let export = load_book(books, &ctx, book, scope).await?;
-                vellum_export::book::lower_book(&export, &ports, &self.options(format.target()))
-                    .await
+                vellum_export::book::lower_book(
+                    &export,
+                    &ports,
+                    &self.options(format.target()),
+                )
+                .await
             }
         };
         let _slot = self.slot().await?;
@@ -475,23 +506,30 @@ impl<S: Send + Sync> Transfer<S> {
             ..DocxOptions::default()
         };
         let title = flow.title.clone();
-        let made = tokio::task::spawn_blocking(move || -> Result<Written, ExportError> {
-            Ok(match format {
-                Format::Docx => Written::File(vellum_export::docx::write(&flow, &docx)?),
-                Format::Html => {
-                    Written::File(vellum_export::html::write(&flow, &theme).into_bytes())
-                }
-                Format::Preview => {
-                    let (pages, count) = engine.preview(&flow, &theme, PREVIEW_PAGES)?;
-                    Written::Preview(pages, count)
-                }
-                Format::Pdf | Format::Markdown => {
-                    Written::File(engine.render(&flow, &theme)?.bytes)
-                }
-            })
-        })
+        let made = tokio::task::spawn_blocking(
+            move || -> Result<Written, ExportError> {
+                Ok(match format {
+                    Format::Docx => {
+                        Written::File(vellum_export::docx::write(&flow, &docx)?)
+                    }
+                    Format::Html => Written::File(
+                        vellum_export::html::write(&flow, &theme).into_bytes(),
+                    ),
+                    Format::Preview => {
+                        let (pages, count) =
+                            engine.preview(&flow, &theme, PREVIEW_PAGES)?;
+                        Written::Preview(pages, count)
+                    }
+                    Format::Pdf | Format::Markdown => {
+                        Written::File(engine.render(&flow, &theme)?.bytes)
+                    }
+                })
+            },
+        )
         .await
-        .map_err(|e| Error::new(ErrorKind::Internal, format!("the export stopped: {e}")))?
+        .map_err(|e| {
+            Error::new(ErrorKind::Internal, format!("the export stopped: {e}"))
+        })?
         .map_err(export_error)?;
         tracing::info!(format = ?format, warnings = warnings.len(), "exported");
         Ok(match made {
@@ -505,7 +543,8 @@ impl<S: Send + Sync> Transfer<S> {
                 let (ext, mime) = match format {
                     Format::Docx => (
                         "docx",
-                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        "application/vnd.openxmlformats-officedocument.wordproc\
+                            essingml.document",
                     ),
                     Format::Html => ("html", "text/html; charset=utf-8"),
                     _ => ("pdf", "application/pdf"),
@@ -632,10 +671,16 @@ async fn export_google<S: Scanner + 'static>(
                 "Google Docs export is not available",
             )
         })?;
-        let (title, doc) = read_page(&transfer.drive, &actor, parse_page(&page_id)?).await?;
+        let (title, doc) =
+            read_page(&transfer.drive, &actor, parse_page(&page_id)?).await?;
         let ports = transfer.ports(&actor);
         let _slot = transfer.slot().await?;
-        let lowered = vellum_export::lower(&doc, &ports, &transfer.options(Target::Office)).await;
+        let lowered = vellum_export::lower(
+            &doc,
+            &ports,
+            &transfer.options(Target::Office),
+        )
+        .await;
         let file = google
             .export(
                 &lowered.flow,
@@ -646,7 +691,10 @@ async fn export_google<S: Scanner + 'static>(
             )
             .await
             .map_err(export_error)?;
-        tracing::info!(warnings = lowered.warnings.len(), "exported to Google Docs");
+        tracing::info!(
+            warnings = lowered.warnings.len(),
+            "exported to Google Docs"
+        );
         Ok(json(
             StatusCode::CREATED,
             &GoogleDoc {
@@ -688,7 +736,9 @@ async fn import_upload<S: Scanner + 'static>(
             .get("name")
             .filter(|n| !n.is_empty())
             .cloned()
-            .ok_or_else(|| invalid("say the file's name in the `name` query parameter"))?;
+            .ok_or_else(|| {
+                invalid("say the file's name in the `name` query parameter")
+            })?;
         // Rights first, so a refused caller never sends the body.
         transfer
             .drive
@@ -745,7 +795,8 @@ async fn import_google<S: Scanner + 'static>(
     let result = async {
         let actor = caller(&request, Scope::WriteDirect)?;
         let input: GoogleImport = read_json(request).await?;
-        let (space, parent) = target(Some(&input.space_id), input.parent_id.as_ref())?;
+        let (space, parent) =
+            target(Some(&input.space_id), input.parent_id.as_ref())?;
         transfer
             .drive
             .may_import(&actor, space, parent)
@@ -758,7 +809,10 @@ async fn import_google<S: Scanner + 'static>(
             )
         })?;
         let (name, bytes) = google
-            .download_docx(&AccessToken::new(input.access_token), &input.file_id)
+            .download_docx(
+                &AccessToken::new(input.access_token),
+                &input.file_id,
+            )
             .await
             .map_err(import_error)?;
         let name = if name.to_ascii_lowercase().ends_with(".docx") {
@@ -766,7 +820,16 @@ async fn import_google<S: Scanner + 'static>(
         } else {
             format!("{name}.docx")
         };
-        let view = run_import(&transfer, &actor, Source::Word, space, parent, name, bytes).await?;
+        let view = run_import(
+            &transfer,
+            &actor,
+            Source::Word,
+            space,
+            parent,
+            name,
+            bytes,
+        )
+        .await?;
         Ok(json(StatusCode::CREATED, &view))
     }
     .await;
@@ -783,9 +846,14 @@ async fn run_import<S: Scanner + 'static>(
     name: String,
     bytes: Vec<u8>,
 ) -> Result<ImportView, Error> {
-    let cleaned = upload::check(transfer.policy, transfer.scanner.as_deref(), name, bytes)
-        .await
-        .map_err(|e| refused(&e))?;
+    let cleaned = upload::check(
+        transfer.policy,
+        transfer.scanner.as_deref(),
+        name,
+        bytes,
+    )
+    .await
+    .map_err(|e| refused(&e))?;
     if cleaned.kind != Kind::Zip {
         return Err(with_status(
             Error::new(
@@ -802,7 +870,9 @@ async fn run_import<S: Scanner + 'static>(
         importer::import(source, &file_name, &cleaned.bytes, &CollectionsEngine)
     })
     .await
-    .map_err(|e| Error::new(ErrorKind::Internal, format!("the import stopped: {e}")))?
+    .map_err(|e| {
+        Error::new(ErrorKind::Internal, format!("the import stopped: {e}"))
+    })?
     .map_err(import_error)?;
     let files = set
         .files
@@ -814,7 +884,12 @@ async fn run_import<S: Scanner + 'static>(
         .import(actor, space, parent, &title, files)
         .await
         .map_err(Error::from)?;
-    tracing::info!(source = source.name(), folder = %imported.folder.id, nodes = imported.nodes, "imported");
+    tracing::info!(
+        source = source.name(),
+        folder = %imported.folder.id,
+        nodes = imported.nodes,
+        "imported"
+    );
     Ok(ImportView {
         folder_id: imported.folder.id,
         title: imported.folder.title,
@@ -875,13 +950,16 @@ async fn load_book(
                 },
             )
             .await?;
-        let _ = docs.insert(section_id, vellum_format::parse(&doc.source).document);
+        let _ =
+            docs.insert(section_id, vellum_format::parse(&doc.source).document);
     }
     let items = info
         .toc
         .iter()
         .map(|line| match line {
-            TocLine::Chapter(node) => BookItem::Section(Box::new(section(node, &mut docs))),
+            TocLine::Chapter(node) => {
+                BookItem::Section(Box::new(section(node, &mut docs)))
+            }
             TocLine::Part { title } => BookItem::Part(title.clone()),
             TocLine::Separator => BookItem::Separator,
         })
@@ -894,7 +972,10 @@ async fn load_book(
     })
 }
 
-fn section(node: &TocNode, docs: &mut HashMap<String, Document>) -> BookSection {
+fn section(
+    node: &TocNode,
+    docs: &mut HashMap<String, Document>,
+) -> BookSection {
     BookSection {
         id: node.id.clone(),
         title: node.title.clone(),
@@ -918,7 +999,8 @@ fn parse_source(raw: Option<&str>) -> Result<Source, Error> {
         "docx" | "word" => Source::Word,
         _ => {
             return Err(invalid(
-                "source must be markdown, obsidian, outline, docmost, notion, confluence or docx",
+                "source must be markdown, obsidian, outline, docmost, notion, \
+                    confluence or docx",
             ));
         }
     })
@@ -928,14 +1010,13 @@ fn target(
     space: Option<&String>,
     parent: Option<&String>,
 ) -> Result<(SpaceId, Option<ObjectId>), Error> {
-    let space = space
-        .and_then(|s| s.parse().ok())
-        .ok_or_else(|| invalid("say which space to import into with `space`"))?;
+    let space = space.and_then(|s| s.parse().ok()).ok_or_else(|| {
+        invalid("say which space to import into with `space`")
+    })?;
     let parent = match parent.filter(|p| !p.is_empty()) {
-        Some(p) => Some(
-            p.parse()
-                .map_err(|_| Error::new(ErrorKind::NotFound, "folder not found"))?,
-        ),
+        Some(p) => Some(p.parse().map_err(|_| {
+            Error::new(ErrorKind::NotFound, "folder not found")
+        })?),
         None => None,
     };
     Ok((space, parent))
@@ -965,17 +1046,22 @@ fn principal(request: &Request) -> Principal {
 }
 
 fn query_map(request: &Request) -> HashMap<String, String> {
-    url::form_urlencoded::parse(request.uri().query().unwrap_or_default().as_bytes())
-        .into_owned()
-        .collect()
+    url::form_urlencoded::parse(
+        request.uri().query().unwrap_or_default().as_bytes(),
+    )
+    .into_owned()
+    .collect()
 }
 
-async fn read_json<T: serde::de::DeserializeOwned>(request: Request) -> Result<T, Error> {
+async fn read_json<T: serde::de::DeserializeOwned>(
+    request: Request,
+) -> Result<T, Error> {
     let body = axum::body::to_bytes(request.into_body(), MAX_JSON)
         .await
         .map_err(|_| invalid("the body is missing or larger than 64 KiB"))?;
-    serde_json::from_slice(&body)
-        .map_err(|e| Error::new(ErrorKind::InvalidInput, format!("invalid body: {e}")))
+    serde_json::from_slice(&body).map_err(|e| {
+        Error::new(ErrorKind::InvalidInput, format!("invalid body: {e}"))
+    })
 }
 
 /// An error sent with `status` instead of its kind's.
@@ -987,7 +1073,10 @@ fn export_error(error: ExportError) -> Error {
     match error {
         ExportError::Invalid(m) => Error::new(ErrorKind::InvalidInput, m),
         ExportError::TooLarge(m) => with_status(
-            Error::new(ErrorKind::InvalidInput, format!("too large to export: {m}")),
+            Error::new(
+                ErrorKind::InvalidInput,
+                format!("too large to export: {m}"),
+            ),
             StatusCode::PAYLOAD_TOO_LARGE,
         ),
         ExportError::Remote {
@@ -999,9 +1088,10 @@ fn export_error(error: ExportError) -> Error {
             ),
             StatusCode::BAD_GATEWAY,
         ),
-        ExportError::NotConfigured(what) => {
-            Error::new(ErrorKind::Unavailable, format!("{what} is not configured"))
-        }
+        ExportError::NotConfigured(what) => Error::new(
+            ErrorKind::Unavailable,
+            format!("{what} is not configured"),
+        ),
         other => {
             tracing::error!(error = %other, "export failed");
             Error::new(ErrorKind::Internal, "the export failed")
@@ -1043,7 +1133,8 @@ fn download(file: Exported) -> Response {
         (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
         (
             header::CONTENT_SECURITY_POLICY,
-            "default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox",
+            "default-src 'none'; img-src data:; style-src 'unsafe-inline'; \
+                sandbox",
         ),
         (header::CACHE_CONTROL, "private, no-store"),
     ];

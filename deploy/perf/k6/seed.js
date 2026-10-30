@@ -4,7 +4,7 @@
 // Seeds a Northstar workspace for the release drills and the chaos test:
 // PAGES pages in SPACE, each created and then edited once.
 //
-//   k6 run -e BASE_URL=http://localhost:7700 -e PAGES=200 deploy/perf/k6/seed.js
+// k6 run -e BASE_URL=http://localhost:7700 -e PAGES=200 deploy/perf/k6/seed.js
 
 import { check } from 'k6';
 import { bases, createPage, savePage, signIn, space } from './session.js';

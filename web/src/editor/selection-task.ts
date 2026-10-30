@@ -18,9 +18,15 @@ function oneLine(text: string): string | undefined {
   return line === "" ? undefined : line;
 }
 
-/** Whether a key press is "make a task from the selection": Ctrl+Alt+Enter, or Cmd+Option+Enter on a Mac. */
+/**
+ * Whether a key press is "make a task from the selection": Ctrl+Alt+Enter, or
+ * Cmd+Option+Enter on a Mac.
+ */
 export const isSelectionTaskKey = (event: KeyboardEvent) =>
-  (event.ctrlKey || event.metaKey) && event.altKey && !event.shiftKey && event.key === "Enter";
+  (event.ctrlKey || event.metaKey) &&
+  event.altKey &&
+  !event.shiftKey &&
+  event.key === "Enter";
 
 /**
  * The selected text, outside code, that the editor's "make a task" key or
@@ -38,13 +44,19 @@ export function selectionTaskText(state: EditorState): string | undefined {
  * `root` into a task. Typing never reaches a read-only page, so the plain
  * key is safe there; in the editor it stays a letter.
  */
-export function readOnlyTaskText(event: KeyboardEvent, root: Element): string | undefined {
+export function readOnlyTaskText(
+  event: KeyboardEvent,
+  root: Element,
+): string | undefined {
   if (event.key !== "t" && event.key !== "T") return undefined;
-  if (event.metaKey || event.ctrlKey || event.altKey || event.isComposing) return undefined;
+  if (event.metaKey || event.ctrlKey || event.altKey || event.isComposing)
+    return undefined;
   if (isEditable(event.target)) return undefined;
   const selection = globalThis.getSelection();
-  if (selection === null || selection.isCollapsed || selection.rangeCount === 0) return undefined;
-  if (!root.contains(selection.getRangeAt(0).commonAncestorContainer)) return undefined;
+  if (selection === null || selection.isCollapsed || selection.rangeCount === 0)
+    return undefined;
+  if (!root.contains(selection.getRangeAt(0).commonAncestorContainer))
+    return undefined;
   return oneLine(selection.toString());
 }
 
@@ -69,7 +81,10 @@ export function useReadOnlyTaskKey(
   }, [editor, editable, onSelectionTask]);
 }
 
-/** The toolbar's "make a task" action; `undefined` when the page cannot be edited. */
+/**
+ * The toolbar's "make a task" action; `undefined` when the page cannot be
+ * edited.
+ */
 export function toolbarTask(
   editor: Editor,
   editable: boolean,

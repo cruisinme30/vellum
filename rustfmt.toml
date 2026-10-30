@@ -4,3 +4,5 @@
 edition = "2024"
 style_edition = "2024"
 newline_style = "Unix"
+# Lines stop at 80 characters across the repo (ADR 0074, D320).
+max_width = 80

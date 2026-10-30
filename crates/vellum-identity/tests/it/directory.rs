@@ -27,8 +27,9 @@ fn finds_active_people_by_name_handle_or_email() {
         .unwrap();
     let _ = id.update_user(sam.id, None, None, Some(true)).unwrap();
 
-    let names =
-        |q: &str| -> Vec<String> { id.search_people(q, 8).into_iter().map(|u| u.name).collect() };
+    let names = |q: &str| -> Vec<String> {
+        id.search_people(q, 8).into_iter().map(|u| u.name).collect()
+    };
     // Names starting with the query come first.
     assert_eq!(names("pri"), ["Priya Raman", "Ana Pri"]);
     assert_eq!(

@@ -12,7 +12,8 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D109, D110, D111, D307, D308
-- Issue: #279 (redesign), #549 (type and theme toggle); the first version predates the issue rule
+- Issue: #279 (redesign), #549 (type and theme toggle); the first version
+  predates the issue rule
 - Pull requests: #31, #325
 
 :::

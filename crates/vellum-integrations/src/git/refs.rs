@@ -28,7 +28,18 @@ use serde::{Deserialize, Serialize};
 use crate::model::IssueKey;
 
 /// What a reference asks for.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    Serialize,
+    Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum RefKind {
     /// Link, and drive the issue's state; merging completes it.
@@ -51,7 +62,9 @@ pub enum Location {
 }
 
 /// One issue a pull request or commit refers to.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
+)]
 pub struct Reference {
     /// The issue.
     pub key: IssueKey,
@@ -95,7 +108,8 @@ fn linking_word(word: &str, next: Option<&str>) -> Option<usize> {
 }
 
 const PUNCTUATION: &[char] = &[
-    '(', ')', '[', ']', '{', '}', '.', ',', ';', ':', '!', '?', '"', '\'', '`', '*', '<', '>',
+    '(', ')', '[', ']', '{', '}', '.', ',', ';', ':', '!', '?', '"', '\'', '`',
+    '*', '<', '>',
 ];
 
 /// A key written as `ENG-142`, or inside a URL path as `/issue/ENG-142`.
@@ -115,7 +129,10 @@ fn key_in_token(token: &str) -> Option<IssueKey> {
 }
 
 /// `(key, kind, explicit)` hits in free text.
-fn scan_text(text: &str, implicit: Option<RefKind>) -> Vec<(IssueKey, RefKind, bool)> {
+fn scan_text(
+    text: &str,
+    implicit: Option<RefKind>,
+) -> Vec<(IssueKey, RefKind, bool)> {
     let tokens: Vec<String> = text
         .split_whitespace()
         .map(|t| t.trim_matches(PUNCTUATION).to_owned())
@@ -222,7 +239,9 @@ impl Collector {
                     .map(|(_, kind, _)| *kind)
                     .max()
                     .unwrap_or(RefKind::Closing);
-                let kind = if explicit_linking || (!explicit && implicit_kind == RefKind::Linking) {
+                let kind = if explicit_linking
+                    || (!explicit && implicit_kind == RefKind::Linking)
+                {
                     RefKind::Linking
                 } else {
                     RefKind::Closing

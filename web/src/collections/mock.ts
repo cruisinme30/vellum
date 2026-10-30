@@ -24,7 +24,13 @@ import {
 import { computeRow, resolve, type MockWorld } from "./mock-engine";
 import { runQuery } from "./mock-query";
 import type { CollectionsStore } from "./store";
-import type { CollectionInfo, CsvImported, PropertyInfo, RowDetail, Value } from "./types";
+import type {
+  CollectionInfo,
+  CsvImported,
+  PropertyInfo,
+  RowDetail,
+  Value,
+} from "./types";
 import { EMPTY, isEmpty, list, plain, text, texts } from "./value";
 
 /** Checks that a value fits a property, as the server does on a write. */
@@ -43,10 +49,14 @@ function check(world: MockWorld, property: PropertyInfo, value: Value): void {
     relation: "list",
   };
   if (value.type !== (want[property.type] ?? "text")) {
-    throw new Error(`${property.name} expects a ${property.type} value, not ${value.type}`);
+    throw new Error(
+      `${property.name} expects a ${property.type} value, not ${value.type}`,
+    );
   }
   const names = property.options?.map((o) => o.name);
-  const wrong = names ? texts(value).find((item) => !names.includes(item)) : undefined;
+  const wrong = names
+    ? texts(value).find((item) => !names.includes(item))
+    : undefined;
   if (wrong !== undefined) {
     throw new Error(`"${wrong}" is not an option of ${property.name}`);
   }
@@ -55,7 +65,9 @@ function check(world: MockWorld, property: PropertyInfo, value: Value): void {
     ? texts(value).find((id) => !targets.some((r) => r.id === id))
     : undefined;
   if (missing !== undefined) {
-    throw new Error(`${property.name} links to a row that does not exist: ${missing}`);
+    throw new Error(
+      `${property.name} links to a row that does not exist: ${missing}`,
+    );
   }
 }
 
@@ -124,12 +136,18 @@ export function createMockCollectionsStore(
     const [was, now] = [new Set(texts(before)), new Set(texts(after))];
     for (const target of rows.get(to) ?? []) {
       const linked = new Set(texts(target.values[back]));
-      const wanted = now.has(target.id) || (linked.has(rowId) && !was.has(target.id));
+      const wanted =
+        now.has(target.id) || (linked.has(rowId) && !was.has(target.id));
       if (wanted !== linked.has(rowId)) {
-        const next = wanted ? [...linked, rowId] : [...linked].filter((id) => id !== rowId);
+        const next = wanted
+          ? [...linked, rowId]
+          : [...linked].filter((id) => id !== rowId);
         replace(to, {
           ...target,
-          values: { ...target.values, [back]: list(next.map((id) => text(id))) },
+          values: {
+            ...target.values,
+            [back]: list(next.map((id) => text(id))),
+          },
         });
       }
     }
@@ -160,7 +178,10 @@ export function createMockCollectionsStore(
       row: {
         id: row.id,
         cells: Object.fromEntries(
-          collection.properties.map((p) => [p.key, { value: full.values[p.key] ?? EMPTY }]),
+          collection.properties.map((p) => [
+            p.key,
+            { value: full.values[p.key] ?? EMPTY },
+          ]),
         ),
       },
       body: row.body,
@@ -184,7 +205,11 @@ export function createMockCollectionsStore(
       return strip(next);
     });
   /** Adds parsed CSV rows to a collection. */
-  const addRows = (collection: MockCollection, csv: string, write: boolean): CsvImported => {
+  const addRows = (
+    collection: MockCollection,
+    csv: string,
+    write: boolean,
+  ): CsvImported => {
     const parsed = csvRows(collection, csv);
     const added = parsed.rows.map((values): MockRow => ({
       id: newPageId(),
@@ -202,7 +227,9 @@ export function createMockCollectionsStore(
       diagnostics: [],
       collection: strip(collection),
       changed: {
-        written: write ? added.map((r) => ({ collection: collection.id, row: r.id })) : [],
+        written: write
+          ? added.map((r) => ({ collection: collection.id, row: r.id }))
+          : [],
         deleted: [],
       },
     };
@@ -222,9 +249,15 @@ export function createMockCollectionsStore(
           .toSorted((a, b) => a.title.localeCompare(b.title)),
       })),
     info: (id) => later(() => strip(collectionOf(id))),
-    query: (input) => later(() => runQuery(world, collectionOf(input.collection_id), input)),
+    query: (input) =>
+      later(() => runQuery(world, collectionOf(input.collection_id), input)),
     getRow: (key) =>
-      later(() => detail(collectionOf(key.collection_id), rowOf(key.collection_id, key.row_id))),
+      later(() =>
+        detail(
+          collectionOf(key.collection_id),
+          rowOf(key.collection_id, key.row_id),
+        ),
+      ),
     createRow: (input) =>
       later(() => {
         const collection = collectionOf(input.collection_id);
@@ -238,18 +271,28 @@ export function createMockCollectionsStore(
         changed();
         return {
           row: detail(collection, row),
-          changed: { written: [{ collection: collection.id, row: row.id }], deleted: [] },
+          changed: {
+            written: [{ collection: collection.id, row: row.id }],
+            deleted: [],
+          },
         };
       }),
     updateRow: (input) =>
       later(() => {
         const collection = collectionOf(input.collection_id);
-        const row = write(collection, rowOf(collection.id, input.row_id), input.values ?? {});
+        const row = write(
+          collection,
+          rowOf(collection.id, input.row_id),
+          input.values ?? {},
+        );
         replace(collection.id, { ...row, body: input.body ?? row.body });
         changed();
         return {
           row: detail(collection, rowOf(collection.id, row.id)),
-          changed: { written: [{ collection: collection.id, row: row.id }], deleted: [] },
+          changed: {
+            written: [{ collection: collection.id, row: row.id }],
+            deleted: [],
+          },
         };
       }),
     deleteRow: (key) =>
@@ -265,11 +308,15 @@ export function createMockCollectionsStore(
         );
         changed();
         return {
-          changed: { written: [], deleted: [{ collection: collection.id, row: row.id }] },
+          changed: {
+            written: [],
+            deleted: [{ collection: collection.id, row: row.id }],
+          },
         };
       }),
     saveView: (input) => edit(input.collection_id, (c) => saveView(c, input)),
-    deleteView: (key) => edit(key.collection_id, (c) => deleteView(c, key.view)),
+    deleteView: (key) =>
+      edit(key.collection_id, (c) => deleteView(c, key.view)),
     addProperty: (input) => {
       if (input.type !== "relation") {
         return edit(input.collection_id, (c) => addProperty(c, input));
@@ -285,17 +332,23 @@ export function createMockCollectionsStore(
         return strip(source);
       });
     },
-    updateProperty: (input) => edit(input.collection_id, (c) => updateProperty(c, input)),
+    updateProperty: (input) =>
+      edit(input.collection_id, (c) => updateProperty(c, input)),
     deleteProperty: (key) =>
       later(() => {
         const source = collectionOf(key.collection_id);
-        const relation = source.properties.find((p) => p.key === key.key)?.relation;
+        const relation = source.properties.find(
+          (p) => p.key === key.key,
+        )?.relation;
         const next = deleteProperty(source, key.key);
         const back = relation?.back ?? "";
         if (relation && back !== "" && relation.to === source.id) {
           replaceCollections(deleteProperty(next, back));
         } else if (relation && back !== "") {
-          replaceCollections(next, deleteProperty(collectionOf(relation.to), back));
+          replaceCollections(
+            next,
+            deleteProperty(collectionOf(relation.to), back),
+          );
         } else {
           replaceCollections(next);
         }
@@ -310,21 +363,38 @@ export function createMockCollectionsStore(
           limit: Number.MAX_SAFE_INTEGER,
         });
         const stem =
-          input.view === undefined ? collection.title : `${collection.title} - ${result.view}`;
+          input.view === undefined
+            ? collection.title
+            : `${collection.title} - ${result.view}`;
         return { fileName: `${stem}.csv`, csv: csvOf(result) };
       }),
     importCsv: (input) =>
-      later(() => addRows(collectionOf(input.collection_id), input.csv, input.dry_run !== true)),
+      later(() =>
+        addRows(
+          collectionOf(input.collection_id),
+          input.csv,
+          input.dry_run !== true,
+        ),
+      ),
     createFromCsv: (input) =>
       later(() => {
         const title = input.title.trim();
         if (title === "") {
           throw new Error("a collection needs a title");
         }
-        if (collections.some((c) => c.title.toLowerCase() === title.toLowerCase())) {
-          throw new Error(`a collection named ${JSON.stringify(title)} is already there`);
+        if (
+          collections.some((c) => c.title.toLowerCase() === title.toLowerCase())
+        ) {
+          throw new Error(
+            `a collection named ${JSON.stringify(title)} is already there`,
+          );
         }
-        const collection = collectionFromCsv(newPageId(), title, input.folder, input.csv);
+        const collection = collectionFromCsv(
+          newPageId(),
+          title,
+          input.folder,
+          input.csv,
+        );
         const write = input.dry_run !== true;
         if (write) {
           collections = [...collections, collection];

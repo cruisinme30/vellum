@@ -12,7 +12,12 @@ import type { AccountApi, FactorsView } from "./api";
 import { SecurityPage } from "./security-page";
 import { fromBase64Url, toBase64Url } from "./webauthn";
 
-const NONE: FactorsView = { totp: false, passkeys: [], recoveryCodesLeft: 0, required: false };
+const NONE: FactorsView = {
+  totp: false,
+  passkeys: [],
+  recoveryCodesLeft: 0,
+  required: false,
+};
 const unused = () => Promise.reject(new Error("not in this test"));
 
 function fakeAccount(initial: FactorsView) {
@@ -24,7 +29,9 @@ function fakeAccount(initial: FactorsView) {
         })
       : Promise.reject(new Error("the code is wrong")),
   );
-  const removeTotp = vi.fn<AccountApi["removeTotp"]>(() => Promise.resolve(NONE));
+  const removeTotp = vi.fn<AccountApi["removeTotp"]>(() =>
+    Promise.resolve(NONE),
+  );
   const api: AccountApi = {
     tokens: unused,
     tokenPolicy: unused,
@@ -32,7 +39,11 @@ function fakeAccount(initial: FactorsView) {
     revokeToken: unused,
     factors: () => Promise.resolve(initial),
     startTotp: () =>
-      Promise.resolve({ secret: "JBSWY3DPEHPK3PXP", uri: "otpauth://x", qr: ["11", "01"] }),
+      Promise.resolve({
+        secret: "JBSWY3DPEHPK3PXP",
+        uri: "otpauth://x",
+        qr: ["11", "01"],
+      }),
     confirmTotp,
     removeTotp,
     startPasskey: unused,
@@ -69,7 +80,11 @@ describe("Settings → Two-step verification", () => {
   it("adds an authenticator app and shows the recovery codes once", async () => {
     const { api, confirmTotp } = fakeAccount(NONE);
     const user = renderSecurity(api);
-    await user.click(await screen.findByRole("button", { name: "Set up an authenticator app" }));
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Set up an authenticator app",
+      }),
+    );
     expect(await screen.findByRole("img", { name: /QR code/ })).toBeDefined();
     const code = screen.getByLabelText("Enter the 6-digit code it shows");
     await user.type(code, "000000");
@@ -86,24 +101,33 @@ describe("Settings → Two-step verification", () => {
     expect(screen.queryByTestId("recovery-codes")).toBeNull();
     expect(
       screen.getByText(
-        "10 recovery codes left. Each works once, if you lose your app and passkeys.",
+        "10 recovery codes left. Each works once, if you lose your app and " +
+          "passkeys.",
       ),
     ).toBeDefined();
   });
 
-  it("removes the app after a confirmation and says when the workspace requires one", async () => {
-    const { api, removeTotp } = fakeAccount({
-      ...NONE,
-      totp: true,
-      recoveryCodesLeft: 4,
-      required: true,
-    });
-    const user = renderSecurity(api);
-    expect(await screen.findByText(/requires two-step verification/)).toBeDefined();
-    await user.click(screen.getByRole("button", { name: "Remove app" }));
-    expect(removeTotp).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("button", { name: "Remove" }));
-    expect(removeTotp).toHaveBeenCalled();
-    expect(await screen.findByText("Authenticator app removed.")).toBeDefined();
-  });
+  it(
+    "removes the app after a confirmation and says when the workspace " +
+      "requires one",
+    async () => {
+      const { api, removeTotp } = fakeAccount({
+        ...NONE,
+        totp: true,
+        recoveryCodesLeft: 4,
+        required: true,
+      });
+      const user = renderSecurity(api);
+      expect(
+        await screen.findByText(/requires two-step verification/),
+      ).toBeDefined();
+      await user.click(screen.getByRole("button", { name: "Remove app" }));
+      expect(removeTotp).not.toHaveBeenCalled();
+      await user.click(screen.getByRole("button", { name: "Remove" }));
+      expect(removeTotp).toHaveBeenCalled();
+      expect(
+        await screen.findByText("Authenticator app removed."),
+      ).toBeDefined();
+    },
+  );
 });

@@ -9,15 +9,15 @@
 // With BASE_URLS, requests take turns over the replicas. TOKEN, EMAIL and
 // PASSWORD are as in session.js.
 //
-// Scenarios mirror the brief's targets (#528, ADR 0022 D299): 2,000 reads/s
-// of rendered 50-block pages, split between a hot set and the rest; cold
-// renders right after a save; writes; 50 editing sessions in pairs on
-// different replicas, timing each keystroke until the other editor sees
-// it; and a steady trickle of PDF exports of the same pages (#539, D304),
-// the heaviest request a reader can make, which must neither miss the
-// 3 s PDF budget nor slow the reads running beside it. The thresholds are the SLOs, and k6 may drop no more than 1 % of the
-// reads it was asked to send; `cargo xtask perf-gate` separately fails the
-// run when any p95 grows 10 % or more over recent nights.
+// Scenarios mirror the brief's targets (#528, ADR 0022 D299): 2,000 reads/s of
+// rendered 50-block pages, split between a hot set and the rest; cold renders
+// right after a save; writes; 50 editing sessions in pairs on different
+// replicas, timing each keystroke until the other editor sees it; and a steady
+// trickle of PDF exports of the same pages (#539, D304), the heaviest request a
+// reader can make, which must neither miss the 3 s PDF budget nor slow the
+// reads running beside it. The thresholds are the SLOs, and k6 may drop no more
+// than 1 % of the reads it was asked to send; `cargo xtask perf-gate`
+// separately fails the run when any p95 grows 10 % or more over recent nights.
 
 import http from 'k6/http';
 import { check, fail } from 'k6';

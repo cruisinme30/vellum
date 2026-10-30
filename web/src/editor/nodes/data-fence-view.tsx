@@ -1,7 +1,11 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { NodeViewContent, NodeViewWrapper, type ReactNodeViewProps } from "@tiptap/react";
+import {
+  NodeViewContent,
+  NodeViewWrapper,
+  type ReactNodeViewProps,
+} from "@tiptap/react";
 import { useState } from "react";
 
 import { CollectionEmbedPreview } from "../../collections/embed-preview";
@@ -14,10 +18,18 @@ import { CopyDiagnostic } from "../../shell/copy-diagnostic";
 import { Icon } from "../../shell/icon";
 import { NODES } from "../schema/blocks.gen";
 
-import { KROKI, parseChart, parseCsv, type ChartPreview } from "./fence-preview";
+import {
+  KROKI,
+  parseChart,
+  parseCsv,
+  type ChartPreview,
+} from "./fence-preview";
 
 const ICONS: Readonly<Record<string, string>> = Object.fromEntries(
-  NODES.find((n) => n.name === "dataFence")?.slash.map((s) => [s.attrs.lang, s.icon]) ?? [],
+  NODES.find((n) => n.name === "dataFence")?.slash.map((s) => [
+    s.attrs.lang,
+    s.icon,
+  ]) ?? [],
 );
 
 function ChartSvg({ chart }: { readonly chart: ChartPreview }) {
@@ -43,7 +55,11 @@ function ChartSvg({ chart }: { readonly chart: ChartPreview }) {
         aria-label={t("chart-summary", { title: chart.title, summary })}
       >
         {line ? (
-          <polyline points={points.join(" ")} fill="none" className="vl-chart-line" />
+          <polyline
+            points={points.join(" ")}
+            fill="none"
+            className="vl-chart-line"
+          />
         ) : (
           chart.values.map((v, index) => (
             <rect
@@ -98,7 +114,13 @@ function CsvTable({ rows }: { readonly rows: string[][] }) {
   );
 }
 
-function Preview({ lang, body }: { readonly lang: string; readonly body: string }) {
+function Preview({
+  lang,
+  body,
+}: {
+  readonly lang: string;
+  readonly body: string;
+}) {
   const t = useT();
   if (lang === "chart") {
     const chart = parseChart(body);
@@ -115,11 +137,15 @@ function Preview({ lang, body }: { readonly lang: string; readonly body: string 
     return <CollectionEmbedPreview fence={body} />;
   }
   return (
-    <p className="vl-muted">{t(KROKI.has(lang) ? "fence-kroki" : "fence-rendered", { lang })}</p>
+    <p className="vl-muted">
+      {t(KROKI.has(lang) ? "fence-kroki" : "fence-rendered", { lang })}
+    </p>
   );
 }
 
-/** Fences the server cannot draw on its own: collections need the live store. */
+/**
+ * Fences the server cannot draw on its own: collections need the live store.
+ */
 const CLIENT_ONLY = new Set(["collection"]);
 
 /**
@@ -138,7 +164,11 @@ function ServerPreview({
   readonly body: string;
 }) {
   const t = useT();
-  const { drawn, failure, busy } = useBlockRender(api, { lang, args, source: body });
+  const { drawn, failure, busy } = useBlockRender(api, {
+    lang,
+    args,
+    source: body,
+  });
   if (failure !== undefined) {
     return (
       <>
@@ -160,7 +190,12 @@ function ServerPreview({
   }
   return (
     <>
-      <RenderedHtml api={api} html={drawn.html} className="vl-fence-render" busy={busy} />
+      <RenderedHtml
+        api={api}
+        html={drawn.html}
+        className="vl-fence-render"
+        busy={busy}
+      />
       {drawn.warnings.length > 0 && (
         <p className="vl-fence-warning" role="status">
           <Icon name="warning" />
@@ -183,16 +218,22 @@ function ServerPreview({
  * source opens with the Source button; without one, a
  * light preview sits above the always-open source.
  */
-export function DataFenceView({ node, updateAttributes, editor }: ReactNodeViewProps) {
+export function DataFenceView({
+  node,
+  updateAttributes,
+  editor,
+}: ReactNodeViewProps) {
   const t = useT();
   const { render } = useServerApis();
   const lang = String(node.attrs["lang"]);
   const arguments_ = String(node.attrs["args"]);
   const body = node.textContent;
-  const server = render !== undefined && !CLIENT_ONLY.has(lang) ? render : undefined;
+  const server =
+    render !== undefined && !CLIENT_ONLY.has(lang) ? render : undefined;
   const [sourceChoice, setSourceChoice] = useState<boolean>();
   // Source shows by default only where there is nothing drawn to look at.
-  const sourceOpen = sourceChoice ?? (server === undefined || body.trim() === "");
+  const sourceOpen =
+    sourceChoice ?? (server === undefined || body.trim() === "");
   return (
     <NodeViewWrapper className="vl-block vl-fence" data-lang={lang}>
       <div className="vl-fence-head" contentEditable={false}>
@@ -226,7 +267,12 @@ export function DataFenceView({ node, updateAttributes, editor }: ReactNodeViewP
         {server === undefined ? (
           <Preview lang={lang} body={body} />
         ) : (
-          <ServerPreview api={server} lang={lang} args={arguments_} body={body} />
+          <ServerPreview
+            api={server}
+            lang={lang}
+            args={arguments_}
+            body={body}
+          />
         )}
       </div>
       <pre

@@ -15,7 +15,9 @@ use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 use time::macros::datetime;
-use vellum_contracts::{CredentialKind, Operation, Principal, RequestContext, ScopeSet, Service};
+use vellum_contracts::{
+    CredentialKind, Operation, Principal, RequestContext, ScopeSet, Service,
+};
 use vellum_format::parse;
 use vellum_kernel::{RequestId, Timestamp, UserId};
 use vellum_render::figure::{FigureConfig, Figures};
@@ -46,7 +48,8 @@ async fn each_issues_block_shows_its_own_view_or_its_own_error() {
     let dir = tempfile::tempdir().unwrap();
     let mara = UserId::generate();
     let store = Arc::new(LocalStore::open(dir.path()).await.unwrap());
-    let directory = StaticDirectory::new().with(mara, UserRef::parse("mara").unwrap());
+    let directory =
+        StaticDirectory::new().with(mara, UserRef::parse("mara").unwrap());
     let (svc, _) = WorkService::open(
         store,
         Arc::new(directory),
@@ -65,7 +68,19 @@ async fn each_issues_block_shows_its_own_view_or_its_own_error() {
     )
     .await;
     for title in ["Ship login", "Fix upload", "Plan Q1"] {
-        let _ = call(&ops, mara, "work.create_issue", json!({"team": "ENG", "title": title, "state": "todo", "assignee": "mara", "priority": 2})).await;
+        let _ = call(
+            &ops,
+            mara,
+            "work.create_issue",
+            json!({
+                "team": "ENG",
+                "title": title,
+                "state": "todo",
+                "assignee": "mara",
+                "priority": 2
+            }),
+        )
+        .await;
     }
 
     let page = "\
@@ -109,7 +124,8 @@ view: 01JC0000000000000000000V01
     let live = svc
         .live_issues(page, &UserRef::parse("mara").unwrap())
         .await;
-    let renderer = Renderer::new(Figures::new(FigureConfig::default()).unwrap());
+    let renderer =
+        Renderer::new(Figures::new(FigureConfig::default()).unwrap());
     let html = renderer
         .render_offline(&parse(page).document, &live, &RenderOptions::default())
         .html;

@@ -57,7 +57,8 @@ export class TokenStore {
 
   async save(tokens: Tokens): Promise<void> {
     this.memory = tokens;
-    if (this.persistent) await this.disk.write(this.vault.encrypt(JSON.stringify(tokens)));
+    if (this.persistent)
+      await this.disk.write(this.vault.encrypt(JSON.stringify(tokens)));
   }
 
   async clear(): Promise<void> {
@@ -73,7 +74,8 @@ function isTokens(value: unknown): value is Tokens {
     typeof record["server"] === "string" &&
     typeof record["account"] === "string" &&
     typeof record["accessToken"] === "string" &&
-    (record["refreshToken"] === undefined || typeof record["refreshToken"] === "string") &&
+    (record["refreshToken"] === undefined ||
+      typeof record["refreshToken"] === "string") &&
     typeof record["expiresAt"] === "number"
   );
 }

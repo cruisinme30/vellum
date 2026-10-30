@@ -19,7 +19,10 @@ export function statusCache(
   lookup: (key: string) => Promise<IssueStatus | undefined>,
   now: () => number = Date.now,
 ) {
-  const entries = new Map<string, { at: number; value: Promise<IssueStatus | undefined> }>();
+  const entries = new Map<
+    string,
+    { at: number; value: Promise<IssueStatus | undefined> }
+  >();
   return (key: string): Promise<IssueStatus | undefined> => {
     const hit = entries.get(key);
     if (hit && now() - hit.at < FRESH_MS) return hit.value;
@@ -38,8 +41,13 @@ export function statusCache(
  * state once Work answers, with the title as the accessible description.
  * A click opens the issue. The Markdown stays the bare key.
  */
-export function issueChipView(sources: ChipSources, t: Translate): NodeViewRenderer {
-  const lookup = sources.issueStatus ? statusCache(sources.issueStatus) : undefined;
+export function issueChipView(
+  sources: ChipSources,
+  t: Translate,
+): NodeViewRenderer {
+  const lookup = sources.issueStatus
+    ? statusCache(sources.issueStatus)
+    : undefined;
   return ({ node }) => {
     const key = String(node.attrs["key"]);
     const dom = document.createElement("span");
@@ -66,7 +74,11 @@ export function issueChipView(sources: ChipSources, t: Translate): NodeViewRende
       state.textContent = status.state;
       dom.append(state);
       dom.dataset["closed"] = String(status.closed);
-      dom.title = t("chips-issue-title", { key, title: status.title, state: status.state });
+      dom.title = t("chips-issue-title", {
+        key,
+        title: status.title,
+        state: status.state,
+      });
       dom.setAttribute("aria-label", dom.title);
     });
     return { dom };

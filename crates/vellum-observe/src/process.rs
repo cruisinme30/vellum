@@ -14,7 +14,9 @@ use opentelemetry::metrics::ObservableGauge;
 use serde::{Deserialize, Serialize};
 
 /// A snapshot of the process.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize,
+)]
 #[serde(default)]
 pub struct ProcessSnapshot {
     /// Resident set size in bytes.
@@ -42,7 +44,8 @@ fn parse_stat(stat: &str) -> ProcessSnapshot {
     };
     // `rest` starts at field 3 (state).
     let fields: Vec<&str> = rest.split_whitespace().collect();
-    let field = |n: usize| fields.get(n - 3).and_then(|v| v.parse::<u64>().ok());
+    let field =
+        |n: usize| fields.get(n - 3).and_then(|v| v.parse::<u64>().ok());
     // Linux reports clock ticks at 100 Hz and 4 KiB pages on every
     // architecture Vellum ships for; reading the exact values needs libc.
     let cpu_ms = field(14).zip(field(15)).map(|(u, s)| (u + s) * 10);
@@ -53,7 +56,8 @@ fn parse_stat(stat: &str) -> ProcessSnapshot {
     }
 }
 
-static GAUGES: OnceLock<(ObservableGauge<u64>, ObservableGauge<u64>)> = OnceLock::new();
+static GAUGES: OnceLock<(ObservableGauge<u64>, ObservableGauge<u64>)> =
+    OnceLock::new();
 
 /// Registers `process.memory.usage` and `process.thread.count` gauges on
 /// the global meter provider. Safe to call more than once.
@@ -90,7 +94,8 @@ mod tests {
 
     #[test]
     fn parses_proc_stat() {
-        let stat = "4242 (vellum (srv)) S 1 4242 4242 0 -1 4194560 1000 0 0 0 150 50 0 0 20 0 7 0 100 81920000 2048 18446744073709551615";
+        let stat = "4242 (vellum (srv)) S 1 4242 4242 0 -1 4194560 1000 0 0 0 \
+            150 50 0 0 20 0 7 0 100 81920000 2048 18446744073709551615";
         let s = parse_stat(stat);
         assert_eq!(s.cpu_ms, Some(2000));
         assert_eq!(s.threads, Some(7));

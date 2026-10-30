@@ -9,7 +9,7 @@
 //!   title, branch, description and linked-issue checks before a pull
 //!   request is opened.
 //! - `cargo xtask install-hooks` turns on the repository's git hooks and
-//!   commit template.
+//!   commit template, and makes `git blame` skip reformatting commits.
 //! - `cargo xtask relock` resolves `Cargo.lock` and `web/pnpm-lock.yaml`
 //!   conflicts after merging `develop`.
 //! - `cargo xtask boundaries` enforces the crate layering: every workspace
@@ -47,9 +47,9 @@ mod pr_check;
 mod relock;
 mod schema;
 
-const USAGE: &str = "usage: cargo xtask <fast | pr-check | install-hooks | relock | boundaries | adr | \
-                     help [check|write] | budgets | installers | perf-gate | \
-                     schema [--check]>";
+const USAGE: &str = "usage: cargo xtask <fast | pr-check | install-hooks | \
+                     relock | boundaries | adr | help [check|write] | budgets \
+                     | installers | perf-gate | schema [--check]>";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -74,7 +74,10 @@ fn main() -> ExitCode {
     match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(message) => {
-            #[expect(clippy::print_stderr, reason = "xtask reports to the terminal")]
+            #[expect(
+                clippy::print_stderr,
+                reason = "xtask reports to the terminal"
+            )]
             {
                 eprintln!("{message}");
             }
@@ -83,12 +86,14 @@ fn main() -> ExitCode {
     }
 }
 
-/// Points git at `.githooks` (commit-msg, pre-commit, pre-push) and at the
-/// commit template.
+/// Points git at `.githooks` (commit-msg, pre-commit, pre-push), at the
+/// commit template and at `.git-blame-ignore-revs`.
 fn install_hooks() -> Result<(), String> {
     for (key, value) in [
         ("core.hooksPath", ".githooks"),
         ("commit.template", ".gitmessage"),
+        // git blame skips the 80-column reformat (ADR 0074).
+        ("blame.ignoreRevsFile", ".git-blame-ignore-revs"),
     ] {
         let status = Command::new("git")
             .args(["config", key, value])

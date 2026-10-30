@@ -15,7 +15,11 @@ const LIST_COMMANDS: Readonly<Record<string, (editor: Editor) => boolean>> = {
 };
 
 /** Replaces the `/query` text with the chosen block. */
-export function insertSlashItem(editor: Editor, range: Range, item: SlashItem): boolean {
+export function insertSlashItem(
+  editor: Editor,
+  range: Range,
+  item: SlashItem,
+): boolean {
   editor.chain().focus().deleteRange(range).run();
   const type = editor.schema.nodes[item.node];
   if (!type) {
@@ -36,12 +40,20 @@ export function insertSlashItem(editor: Editor, range: Range, item: SlashItem): 
     return editor.chain().focus().setNode(item.node, item.attrs).run();
   }
   if (item.node === "table") {
-    return editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+    return editor
+      .chain()
+      .focus()
+      .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+      .run();
   }
-  const template = item.template === undefined ? undefined : TEMPLATES[item.template];
+  const template =
+    item.template === undefined ? undefined : TEMPLATES[item.template];
   const json: JSONContent | undefined = template?.();
   const node = json
-    ? editor.schema.nodeFromJSON({ ...json, attrs: { ...json.attrs, ...item.attrs } })
+    ? editor.schema.nodeFromJSON({
+        ...json,
+        attrs: { ...json.attrs, ...item.attrs },
+      })
     : type.createAndFill(item.attrs);
   if (!node) {
     return false;
@@ -51,7 +63,10 @@ export function insertSlashItem(editor: Editor, range: Range, item: SlashItem): 
     .focus()
     .command(({ tr }) => {
       const { $from } = tr.selection;
-      const empty = $from.parent.isTextblock && $from.parent.content.size === 0 && $from.depth > 0;
+      const empty =
+        $from.parent.isTextblock &&
+        $from.parent.content.size === 0 &&
+        $from.depth > 0;
       const from = empty ? $from.before() : $from.after();
       const to = $from.after();
       tr.replaceWith(from, to, node);

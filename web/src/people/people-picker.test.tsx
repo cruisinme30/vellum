@@ -20,11 +20,26 @@ import {
 import { PeoplePicker } from "./people-picker";
 
 const PEOPLE = createListDirectory([
-  { kind: "user", principal: "user:01PRIYA", name: "Priya Raman", detail: "priya@northstar.dev" },
-  { kind: "user", principal: "user:01PRIA", name: "Pria Stone", detail: "pria@northstar.dev" },
+  {
+    kind: "user",
+    principal: "user:01PRIYA",
+    name: "Priya Raman",
+    detail: "priya@northstar.dev",
+  },
+  {
+    kind: "user",
+    principal: "user:01PRIA",
+    name: "Pria Stone",
+    detail: "pria@northstar.dev",
+  },
 ]);
 const GROUPS = createListDirectory([
-  { kind: "group", principal: "group:01SRE", name: "SRE", detail: "12 members" },
+  {
+    kind: "group",
+    principal: "group:01SRE",
+    name: "SRE",
+    detail: "12 members",
+  },
 ]);
 
 function Harness({
@@ -81,7 +96,11 @@ describe("people picker", () => {
 
   it("removes with the chip button or Backspace", async () => {
     const onChange = vi.fn();
-    const user = renderPicker({ directory: PEOPLE, initial: ["user:A", "group:B"], onChange });
+    const user = renderPicker({
+      directory: PEOPLE,
+      initial: ["user:A", "group:B"],
+      onChange,
+    });
     await user.click(screen.getByRole("button", { name: "Remove group:B" }));
     expect(onChange).toHaveBeenLastCalledWith(["user:A"]);
     await user.keyboard("{Backspace}");
@@ -99,7 +118,9 @@ describe("people picker", () => {
   });
 
   it("works without a directory and reports a failed search", async () => {
-    const failing: DirectoryApi = { search: () => Promise.reject(new Error("down")) };
+    const failing: DirectoryApi = {
+      search: () => Promise.reject(new Error("down")),
+    };
     const user = renderPicker({ directory: failing });
     await user.type(screen.getByRole("combobox"), "pri");
     expect(await screen.findByRole("alert")).toBeDefined();
@@ -119,7 +140,12 @@ describe("directory", () => {
   });
 
   it("asks the server for groups", async () => {
-    const entry = { kind: "group", principal: "group:01SRE", name: "SRE", detail: "On call" };
+    const entry = {
+      kind: "group",
+      principal: "group:01SRE",
+      name: "SRE",
+      detail: "On call",
+    };
     const get = vi.fn(() => Promise.resolve({ entries: [entry] }));
     const api = createHttpGroupDirectory({
       get,
@@ -127,18 +153,26 @@ describe("directory", () => {
       forgetSession: vi.fn(),
     } as unknown as Http);
     expect(await api.search("sr")).toEqual([entry]);
-    expect(get).toHaveBeenCalledWith("/api/v1/directory/groups", { q: "sr", limit: 8 });
+    expect(get).toHaveBeenCalledWith("/api/v1/directory/groups", {
+      q: "sr",
+      limit: 8,
+    });
   });
 
   it("merges people and groups, skipping a failed source", async () => {
-    const failing: DirectoryApi = { search: () => Promise.reject(new Error("down")) };
+    const failing: DirectoryApi = {
+      search: () => Promise.reject(new Error("down")),
+    };
     const both = combineDirectories(PEOPLE, GROUPS, failing, PEOPLE);
     const found = await both.search("r");
     expect(found).toEqual([]);
     const all = await both.search("sre");
     expect(all.map((entry) => entry.principal)).toEqual(["group:01SRE"]);
     const people = await both.search("pri");
-    expect(people.map((entry) => entry.principal)).toEqual(["user:01PRIYA", "user:01PRIA"]);
+    expect(people.map((entry) => entry.principal)).toEqual([
+      "user:01PRIYA",
+      "user:01PRIA",
+    ]);
   });
 
   it("recognises typed principals", () => {

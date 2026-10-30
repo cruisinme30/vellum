@@ -33,7 +33,8 @@ fn inputs(dir: &Path, out: &mut Vec<PathBuf>) {
     let Ok(entries) = fs::read_dir(dir) else {
         return;
     };
-    let mut paths: Vec<PathBuf> = entries.filter_map(Result::ok).map(|e| e.path()).collect();
+    let mut paths: Vec<PathBuf> =
+        entries.filter_map(Result::ok).map(|e| e.path()).collect();
     paths.sort();
     for path in paths {
         let name = path
@@ -64,7 +65,8 @@ fn docx_structure(bytes: &[u8]) -> String {
         .unwrap();
     let mut reader = Reader::from_str(&xml);
     let mut out = String::new();
-    let (mut style, mut level, mut text) = (String::new(), None::<String>, String::new());
+    let (mut style, mut level, mut text) =
+        (String::new(), None::<String>, String::new());
     let (mut tables, mut row, mut cell): (usize, Vec<String>, String) =
         (0, Vec::new(), String::new());
     let mut in_instr = false;
@@ -119,9 +121,14 @@ fn docx_structure(bytes: &[u8]) -> String {
                 }
                 "p" => {
                     if !text.trim().is_empty() || !style.is_empty() {
-                        let style = if style.is_empty() { "Normal" } else { &style };
-                        let level = level.as_ref().map(|l| format!("/{l}")).unwrap_or_default();
-                        let _ = writeln!(out, "[{style}{level}] {}", text.trim());
+                        let style =
+                            if style.is_empty() { "Normal" } else { &style };
+                        let level = level
+                            .as_ref()
+                            .map(|l| format!("/{l}"))
+                            .unwrap_or_default();
+                        let _ =
+                            writeln!(out, "[{style}{level}] {}", text.trim());
                     }
                 }
                 "tc" if tables == 1 => row.push(std::mem::take(&mut cell)),
@@ -185,7 +192,9 @@ async fn corpus_exports_match_their_goldens() {
             &LowerOptions::new(Target::Office, "2026-10-29"),
         )
         .await;
-        let docx = docx_structure(&write(&office.flow, &DocxOptions::default()).unwrap());
+        let docx = docx_structure(
+            &write(&office.flow, &DocxOptions::default()).unwrap(),
+        );
 
         for (suffix, actual) in [(".pdf.txt", pdf), (".docx.txt", docx)] {
             let path = PathBuf::from(format!("{}{suffix}", golden.display()));

@@ -630,7 +630,9 @@ kbd {
    * 8px for the focus ring.
    */
   :root {
-    scroll-padding-block-end: calc(80px + 1.275rem + env(safe-area-inset-bottom, 0px));
+    scroll-padding-block-end: calc(
+      80px + 1.275rem + env(safe-area-inset-bottom, 0px)
+    );
   }
 
   .vl-shell {

@@ -26,7 +26,9 @@ export default defineConfig({
     viewport: { width: 1280, height: 720 },
     colorScheme: "light",
     video: { mode: "on", size: { width: 1280, height: 720 } },
-    ...(chromiumPath === undefined ? {} : { launchOptions: { executablePath: chromiumPath } }),
+    ...(chromiumPath === undefined
+      ? {}
+      : { launchOptions: { executablePath: chromiumPath } }),
   },
   webServer: {
     command: "pnpm run build && pnpm run preview",

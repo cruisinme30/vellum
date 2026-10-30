@@ -16,7 +16,12 @@ import type {
 } from "../../api/api.gen";
 import type { Http } from "../../api/http";
 
-export type { DeliveryView, HookInput, HookList, HookView } from "../../api/api.gen";
+export type {
+  DeliveryView,
+  HookInput,
+  HookList,
+  HookView,
+} from "../../api/api.gen";
 
 /** The webhooks admin's server operations. */
 export interface WebhooksApi {
@@ -41,7 +46,8 @@ export function createHttpWebhooksApi(http: Http): WebhooksApi {
   return {
     list: () => http.get<HookList>(HOOKS),
     create: (input) => http.send<HookCreated>("POST", HOOKS, input),
-    update: (id, input, enabled) => http.send<HookView>("PUT", hook(id), { ...input, enabled }),
+    update: (id, input, enabled) =>
+      http.send<HookView>("PUT", hook(id), { ...input, enabled }),
     async remove(id) {
       await http.send("DELETE", hook(id));
     },
@@ -52,7 +58,9 @@ export function createHttpWebhooksApi(http: Http): WebhooksApi {
       return list.deliveries;
     },
     async redeliver(id, deliveryId) {
-      await http.send("POST", `${hook(id)}/redeliver`, { delivery_id: deliveryId });
+      await http.send("POST", `${hook(id)}/redeliver`, {
+        delivery_id: deliveryId,
+      });
     },
   };
 }

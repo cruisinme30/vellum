@@ -31,7 +31,12 @@ const sectionPath = (book: string, section: string) =>
 export function BooksPage() {
   const t = useT();
   return (
-    <ServerScreen api="books" help="book.create" title={t("books")} className="vl-books">
+    <ServerScreen
+      api="books"
+      help="book.create"
+      title={t("books")}
+      className="vl-books"
+    >
       {(api) => <AllBooks api={api} />}
     </ServerScreen>
   );
@@ -69,7 +74,10 @@ function TocList({
             <li key={index} className="vl-toc-separator" aria-hidden="true" />
           );
         }
-        const label = line.number == undefined ? line.title : `${line.number} ${line.title}`;
+        const label =
+          line.number == undefined
+            ? line.title
+            : `${line.number} ${line.title}`;
         return (
           <li key={line.id ?? index}>
             {line.id == undefined || line.draft ? (
@@ -137,12 +145,21 @@ function SectionView({
             />
           )}
           {showAccess && (
-            <AccessPanel api={api} book={info.id} section={found} onChanged={onChanged} />
+            <AccessPanel
+              api={api}
+              book={info.id}
+              section={found}
+              onChanged={onChanged}
+            />
           )}
           <article className="vl-book-section">
             <h2>
-              {found.number == undefined ? found.title : `${found.number} ${found.title}`}
-              {found.restricted && <span className="vl-book-badge">{t("books-restricted")}</span>}
+              {found.number == undefined
+                ? found.title
+                : `${found.number} ${found.title}`}
+              {found.restricted && (
+                <span className="vl-book-badge">{t("books-restricted")}</span>
+              )}
             </h2>
             <ExportButton
               label={t("export-section")}
@@ -190,7 +207,11 @@ function BookToolbar({
     (p) => (canManage || !p.manager) && (p.key !== "access" || hasSection),
   );
   return (
-    <div className="vl-book-toolbar" role="toolbar" aria-label={t("books-book-tools")}>
+    <div
+      className="vl-book-toolbar"
+      role="toolbar"
+      aria-label={t("books-book-tools")}
+    >
       {shown.map((p) => (
         <button
           key={p.key}
@@ -303,7 +324,12 @@ function Book({
       </div>
       <ExportButton
         label={t("export-book")}
-        target={{ kind: "book", id: info.id, title: info.title, scope: "whole" }}
+        target={{
+          kind: "book",
+          id: info.id,
+          title: info.title,
+          scope: "whole",
+        }}
       />
       {error !== undefined && (
         <p className="vl-field-error" role="alert">
@@ -331,8 +357,12 @@ function Book({
               onChanged={reload}
             />
           )}
-          {panel === "snapshots" && <SnapshotsPanel api={api} book={info.id} canEdit={canEdit} />}
-          {panel === "publish" && canManage && <PublishPanel api={api} book={info.id} />}
+          {panel === "snapshots" && (
+            <SnapshotsPanel api={api} book={info.id} canEdit={canEdit} />
+          )}
+          {panel === "publish" && canManage && (
+            <PublishPanel api={api} book={info.id} />
+          )}
           {shown === undefined ? (
             <p className="vl-muted">{t("books-no-sections")}</p>
           ) : (
@@ -365,7 +395,9 @@ function BookForApi({
   const loaded = useLoaded(() => api.book(book), [api, book], failureText);
   return (
     <Ready loaded={loaded}>
-      {(info) => <Book key={info.id} api={api} initial={info} section={section} />}
+      {(info) => (
+        <Book key={info.id} api={api} initial={info} section={section} />
+      )}
     </Ready>
   );
 }

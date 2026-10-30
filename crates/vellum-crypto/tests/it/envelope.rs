@@ -5,8 +5,8 @@
 
 use proptest::prelude::*;
 use vellum_crypto::{
-    CryptoError, KekId, LocalKeyring, SecretKey, is_envelope, kek_of, open, plaintext_len, rewrap,
-    seal,
+    CryptoError, KekId, LocalKeyring, SecretKey, is_envelope, kek_of, open,
+    plaintext_len, rewrap, seal,
 };
 
 type TestResult = Result<(), CryptoError>;
@@ -24,7 +24,8 @@ fn block_on<F: Future>(future: F) -> F::Output {
 #[tokio::test]
 async fn round_trip_and_fresh_dek_per_object() -> TestResult {
     let ring = keyring("kek-a")?;
-    let doc = b"---\nid: 01JB\ntitle: Northstar roadmap\nvellum: 1\n---\n# Roadmap\n";
+    let doc =
+        b"---\nid: 01JB\ntitle: Northstar roadmap\nvellum: 1\n---\n# Roadmap\n";
     let one = seal(&ring, doc).await?;
     let two = seal(&ring, doc).await?;
     assert!(is_envelope(&one));
@@ -67,9 +68,13 @@ async fn rotation_rewraps_without_touching_payload() -> TestResult {
 
     let new_id = KekId::new("kek-2026-10")?;
     ring.rotate_to(new_id.clone(), SecretKey::generate()?);
-    let rewrapped = rewrap(&ring, &sealed).await?.ok_or(CryptoError::Decrypt)?;
+    let rewrapped =
+        rewrap(&ring, &sealed).await?.ok_or(CryptoError::Decrypt)?;
     assert_eq!(kek_of(&rewrapped)?, new_id);
-    assert!(rewrapped.ends_with(sealed.get(sealed.len() - 40..).unwrap_or_default()));
+    assert!(
+        rewrapped
+            .ends_with(sealed.get(sealed.len() - 40..).unwrap_or_default())
+    );
 
     assert!(!ring.forget(&new_id), "current KEK cannot be forgotten");
     assert!(ring.forget(&KekId::new("kek-2026-01")?));
@@ -98,16 +103,26 @@ fn rejects_malformed_headers() {
 
 proptest! {
     #[test]
-    fn any_payload_round_trips(data in proptest::collection::vec(any::<u8>(), 0..4096)) {
-        let ring = keyring("kek-prop").map_err(|e| TestCaseError::fail(e.to_string()))?;
-        let back = block_on(async { open(&ring, &seal(&ring, &data).await?).await })
+    fn any_payload_round_trips(
+        data in proptest::collection::vec(any::<u8>(), 0..4096)
+    ) {
+        let ring = keyring(
+            "kek-prop"
+        ).map_err(|e| TestCaseError::fail(e.to_string()))?;
+        let back = block_on(
+            async { open(&ring, &seal(&ring, &data).await?).await }
+        )
             .map_err(|e| TestCaseError::fail(e.to_string()))?;
         prop_assert_eq!(back, data);
     }
 
     #[test]
-    fn garbage_never_panics(data in proptest::collection::vec(any::<u8>(), 0..256)) {
-        let ring = keyring("kek-prop").map_err(|e| TestCaseError::fail(e.to_string()))?;
+    fn garbage_never_panics(
+        data in proptest::collection::vec(any::<u8>(), 0..256)
+    ) {
+        let ring = keyring(
+            "kek-prop"
+        ).map_err(|e| TestCaseError::fail(e.to_string()))?;
         let mut framed = b"\0VLE\x01".to_vec();
         framed.extend_from_slice(&data);
         prop_assert!(block_on(open(&ring, &framed)).is_err());

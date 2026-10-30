@@ -17,10 +17,14 @@ use vellum_notify::delivery::{Outcome, attempt};
 use vellum_notify::endpoint::{SafeTransport, policy};
 use vellum_notify::signature::{DEFAULT_TOLERANCE, verify};
 use vellum_notify::webhook::{Subscription, TeamScope, prepare};
-use vellum_notify::{EventAction, EventType, SIGNATURE_HEADER, WebhookEvent, WebhookSecret};
+use vellum_notify::{
+    EventAction, EventType, SIGNATURE_HEADER, WebhookEvent, WebhookSecret,
+};
 
 /// Accepts one request, answers with `status_line`, returns the request.
-async fn receiver(status_line: &'static str) -> (u16, tokio::task::JoinHandle<String>) {
+async fn receiver(
+    status_line: &'static str,
+) -> (u16, tokio::task::JoinHandle<String>) {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
     let handle = tokio::spawn(async move {
@@ -74,7 +78,8 @@ fn event() -> WebhookEvent {
         occurred_at: Timestamp::now(),
         team: Some("ENG".to_owned()),
         actor: None,
-        data: json!({"identifier": "ENG-1", "title": "Northstar launch checklist"}),
+        data: json!({"identifier": "ENG-1", "title": "Northstar launch \
+            checklist"}),
         updated_from: None,
         url: None,
     }
@@ -82,8 +87,10 @@ fn event() -> WebhookEvent {
 
 #[tokio::test(flavor = "current_thread")]
 async fn delivers_a_verifiable_signature() {
-    let (port, server) = receiver("HTTP/1.1 204 No Content\r\nContent-Length: 0\r\n\r\n").await;
-    let transport = SafeTransport::new(policy(&["localhost".to_owned()])).unwrap();
+    let (port, server) =
+        receiver("HTTP/1.1 204 No Content\r\nContent-Length: 0\r\n\r\n").await;
+    let transport =
+        SafeTransport::new(policy(&["localhost".to_owned()])).unwrap();
     let sub = subscription(port);
     let request = prepare(&event(), &sub, Timestamp::now()).unwrap();
     assert_eq!(
@@ -95,7 +102,12 @@ async fn delivers_a_verifiable_signature() {
     let (head, body) = raw.split_once("\r\n\r\n").unwrap();
     let signature = head
         .lines()
-        .find_map(|l| l.strip_prefix(&format!("{}: ", SIGNATURE_HEADER.to_ascii_lowercase())))
+        .find_map(|l| {
+            l.strip_prefix(&format!(
+                "{}: ",
+                SIGNATURE_HEADER.to_ascii_lowercase()
+            ))
+        })
         .unwrap();
     verify(
         signature,
@@ -111,11 +123,14 @@ async fn delivers_a_verifiable_signature() {
 #[tokio::test(flavor = "current_thread")]
 async fn honours_retry_after_and_refuses_private_targets() {
     let (port, server) = receiver(
-        "HTTP/1.1 503 Service Unavailable\r\nRetry-After: 30\r\nContent-Length: 0\r\n\r\n",
+        "HTTP/1.1 503 Service Unavailable\r\nRetry-After: 30\r\n\
+            Content-Length: 0\r\n\r\n",
     )
     .await;
-    let transport = SafeTransport::new(policy(&["localhost".to_owned()])).unwrap();
-    let request = prepare(&event(), &subscription(port), Timestamp::now()).unwrap();
+    let transport =
+        SafeTransport::new(policy(&["localhost".to_owned()])).unwrap();
+    let request =
+        prepare(&event(), &subscription(port), Timestamp::now()).unwrap();
     assert_eq!(
         attempt(&transport, &request, "webhook", 0).await,
         Outcome::Retry(Some(30))

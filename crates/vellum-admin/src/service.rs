@@ -21,12 +21,13 @@ use vellum_observe::process::{self, ProcessSnapshot};
 use vellum_observe::slo::{self, Slo, SloStatus};
 use vellum_observe::store::StoreStats;
 use vellum_observe::{
-    ClientIngest, ClientReport, RouteMetrics, RouteStat, Trace, TraceId, TraceQuery, TraceStore,
-    TraceSummary, flame,
+    ClientIngest, ClientReport, RouteMetrics, RouteStat, Trace, TraceId,
+    TraceQuery, TraceStore, TraceSummary, flame,
 };
 
 use crate::audit::{
-    AuditActor, AuditLog, AuditQuery, AuditRecord, ChainReport, NewAuditEvent, Outcome,
+    AuditActor, AuditLog, AuditQuery, AuditRecord, ChainReport, NewAuditEvent,
+    Outcome,
 };
 use crate::backup::{self, BackupFile, BackupInfo, DrillReport};
 use crate::profile::ProfileResponse;
@@ -82,7 +83,9 @@ pub struct RoutesView {
 }
 
 /// Persistent scheduler state, kept in `.vellum/admin/state.json`.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(default)]
 pub struct AdminState {
     /// The last successful backup.
@@ -94,7 +97,9 @@ pub struct AdminState {
 }
 
 /// What a scheduler tick did.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema,
+)]
 pub struct TickReport {
     /// A backup that ran.
     pub backup: Option<BackupInfo>,
@@ -167,7 +172,10 @@ impl<K: KeyProvider + 'static> AdminService<K> {
     /// must not open them, and losing the server's keys must not lose the
     /// backups (ADR 0021, D93).
     #[must_use]
-    #[expect(clippy::too_many_arguments, reason = "explicit wiring of every port")]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "explicit wiring of every port"
+    )]
     pub fn new(
         audit: Arc<dyn AuditLog>,
         settings: Arc<dyn SettingsStore>,
@@ -232,7 +240,8 @@ impl<K: KeyProvider + 'static> AdminService<K> {
     /// be read.
     pub async fn routes(&self, minutes: u64) -> Result<RoutesView> {
         let minutes = minutes.clamp(1, vellum_observe::red::WINDOW_MINUTES);
-        let budgets = self.settings.load().await?.settings.observability.budgets;
+        let budgets =
+            self.settings.load().await?.settings.observability.budgets;
         let mut routes = self.metrics.snapshot(minutes);
         budgets.annotate(&mut routes);
         Ok(RoutesView {
@@ -260,7 +269,11 @@ impl<K: KeyProvider + 'static> AdminService<K> {
     /// [`Self::profile`] as the profile endpoint answers it, with the
     /// number of requests included.
     #[must_use]
-    pub fn profile_report(&self, seconds: u64, route: Option<&str>) -> ProfileResponse {
+    pub fn profile_report(
+        &self,
+        seconds: u64,
+        route: Option<&str>,
+    ) -> ProfileResponse {
         let now_ms = u64::try_from(Timestamp::now().unix_ms()).unwrap_or(0);
         let since = now_ms.saturating_sub(seconds.saturating_mul(1000));
         let traces = self.traces.since(since);
@@ -321,7 +334,8 @@ impl<K: KeyProvider + 'static> AdminService<K> {
         let mut out = String::new();
         for r in &records {
             out.push_str(
-                &serde_json::to_string(r).map_err(internal("cannot encode audit record"))?,
+                &serde_json::to_string(r)
+                    .map_err(internal("cannot encode audit record"))?,
             );
             out.push('\n');
         }
@@ -396,7 +410,8 @@ impl<K: KeyProvider + 'static> AdminService<K> {
     ) -> Result<Versioned> {
         let current = self.settings.load().await?;
         let changes = settings::diff(&current.settings, &new);
-        let fields: Vec<String> = changes.iter().map(|c| c.path.clone()).collect();
+        let fields: Vec<String> =
+            changes.iter().map(|c| c.path.clone()).collect();
         let result = self.settings.save(expected_version, &new).await;
         let event = caller
             .event("admin.settings_update")
@@ -404,11 +419,13 @@ impl<K: KeyProvider + 'static> AdminService<K> {
             .detail("fields", fields)
             .detail(
                 "changes",
-                serde_json::to_value(&changes).map_err(internal("cannot encode changes"))?,
+                serde_json::to_value(&changes)
+                    .map_err(internal("cannot encode changes"))?,
             );
         match result {
             Ok(version) => {
-                let _ = self.audit.append(event.detail("version", version)).await?;
+                let _ =
+                    self.audit.append(event.detail("version", version)).await?;
                 Ok(Versioned {
                     version,
                     settings: new,
@@ -433,7 +450,10 @@ impl<K: KeyProvider + 'static> AdminService<K> {
     /// # Errors
     ///
     /// Returns an error when the settings cannot be read.
-    pub async fn telemetry_preview(&self, facts: &UsageFacts) -> Result<UsageReport> {
+    pub async fn telemetry_preview(
+        &self,
+        facts: &UsageFacts,
+    ) -> Result<UsageReport> {
         let s = self.settings.load().await?;
         Ok(usage::build_report(
             &s.settings.telemetry,
@@ -446,11 +466,16 @@ impl<K: KeyProvider + 'static> AdminService<K> {
 
     async fn load_state(&self) -> Result<AdminState> {
         match tokio::fs::read(self.paths.state_file()).await {
-            Ok(bytes) => serde_json::from_slice(&bytes).map_err(internal("admin state is damaged")),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(AdminState::default()),
-            Err(e) => {
-                Err(Error::new(ErrorKind::Unavailable, "cannot read admin state").with_source(e))
+            Ok(bytes) => serde_json::from_slice(&bytes)
+                .map_err(internal("admin state is damaged")),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                Ok(AdminState::default())
             }
+            Err(e) => Err(Error::new(
+                ErrorKind::Unavailable,
+                "cannot read admin state",
+            )
+            .with_source(e)),
         }
     }
 
@@ -458,12 +483,15 @@ impl<K: KeyProvider + 'static> AdminService<K> {
         let path = self.paths.state_file();
         if let Some(parent) = path.parent() {
             tokio::fs::create_dir_all(parent).await.map_err(|e| {
-                Error::new(ErrorKind::Unavailable, "cannot create the admin directory")
-                    .with_source(e)
+                Error::new(
+                    ErrorKind::Unavailable,
+                    "cannot create the admin directory",
+                )
+                .with_source(e)
             })?;
         }
-        let bytes =
-            serde_json::to_vec_pretty(state).map_err(internal("cannot encode admin state"))?;
+        let bytes = serde_json::to_vec_pretty(state)
+            .map_err(internal("cannot encode admin state"))?;
         crate::fsutil::write_atomic(&path, &bytes).await
     }
 
@@ -496,11 +524,20 @@ impl<K: KeyProvider + 'static> AdminService<K> {
         let s = self.settings.load().await?.settings;
         let dir = self.paths.backup_dir(&s);
         let exclude = [self.paths.scratch_dir.clone()];
-        let result = backup::create(&*self.backup_keys, &self.paths.data_dir, &dir, &exclude).await;
+        let result = backup::create(
+            &*self.backup_keys,
+            &self.paths.data_dir,
+            &dir,
+            &exclude,
+        )
+        .await;
         match result {
             Ok(info) => {
-                let removed =
-                    backup::prune(&dir, usize::try_from(s.backups.keep).unwrap_or(1)).await?;
+                let removed = backup::prune(
+                    &dir,
+                    usize::try_from(s.backups.keep).unwrap_or(1),
+                )
+                .await?;
                 let _ = self
                     .audit
                     .append(
@@ -543,11 +580,17 @@ impl<K: KeyProvider + 'static> AdminService<K> {
         let _guard = self.state.lock().await;
         let s = self.settings.load().await?.settings;
         let dir = self.paths.backup_dir(&s);
-        let newest = backup::list(&dir)
-            .await?
-            .into_iter()
-            .next()
-            .ok_or_else(|| Error::new(ErrorKind::NotFound, "there is no backup to drill yet"))?;
+        let newest =
+            backup::list(&dir)
+                .await?
+                .into_iter()
+                .next()
+                .ok_or_else(|| {
+                    Error::new(
+                        ErrorKind::NotFound,
+                        "there is no backup to drill yet",
+                    )
+                })?;
         let report = backup::drill(
             &*self.backup_keys,
             &dir.join(&newest.name),
@@ -571,7 +614,11 @@ impl<K: KeyProvider + 'static> AdminService<K> {
             )
             .await?;
         if !report.passed {
-            tracing::error!(backup = %report.backup, error = ?report.error, "restore drill failed");
+            tracing::error!(
+                backup = %report.backup,
+                error = ?report.error,
+                "restore drill failed"
+            );
         }
         let mut state = self.load_state().await?;
         state.last_drill = Some(report.clone());
@@ -593,13 +640,16 @@ impl<K: KeyProvider + 'static> AdminService<K> {
         let system = Caller::system();
         let backup_due = s.backups.enabled
             && state.last_backup.as_ref().is_none_or(|b| {
-                now - b.created_at.unix_ms() >= i64::from(s.backups.interval_hours) * 3_600_000
+                now - b.created_at.unix_ms()
+                    >= i64::from(s.backups.interval_hours) * 3_600_000
             });
         if backup_due {
             report.backup = Some(self.backup_now(&system).await?);
         }
         let last_drill = state.last_drill.as_ref().map(|d| d.ran_at.unix_ms());
-        if s.backups.enabled && backup::drill_due(last_drill, now, s.backups.drill_interval_days) {
+        if s.backups.enabled
+            && backup::drill_due(last_drill, now, s.backups.drill_interval_days)
+        {
             match self.drill_now(&system).await {
                 Ok(d) => report.drill = Some(d),
                 Err(e) if e.kind() == ErrorKind::NotFound => {}
@@ -614,10 +664,13 @@ impl<K: KeyProvider + 'static> AdminService<K> {
             transport.send(endpoint, &body).await?;
             let _ = self
                 .audit
-                .append(system.event("admin.telemetry_send").detail(
-                    "report",
-                    serde_json::to_value(&body).map_err(internal("cannot encode report"))?,
-                ))
+                .append(
+                    system.event("admin.telemetry_send").detail(
+                        "report",
+                        serde_json::to_value(&body)
+                            .map_err(internal("cannot encode report"))?,
+                    ),
+                )
                 .await?;
             let mut state = self.load_state().await?;
             state.last_telemetry_ms = Some(now);

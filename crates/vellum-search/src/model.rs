@@ -18,7 +18,17 @@ use vellum_kernel::{BlockId, DocId, ObjectId, SpaceId, Timestamp, UserId};
 
 /// The kind of object a document is, for the drive's "type" filter.
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    Serialize,
+    Deserialize,
+    JsonSchema,
 )]
 #[serde(rename_all = "snake_case")]
 pub enum DocKind {
@@ -83,7 +93,9 @@ impl FromStr for DocKind {
 }
 
 /// The kind of a block, which shapes how its hit is shown.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum BlockKind {
     /// A heading; it opens a section.
@@ -289,7 +301,8 @@ pub struct SearchHit {
     pub heading_path: Vec<String>,
     /// A short excerpt of the block with the matches marked.
     pub snippet: Vec<Fragment>,
-    /// The fused relevance score; higher is better. Only comparable within one response.
+    /// The fused relevance score; higher is better. Only comparable within one
+    /// response.
     pub score: f64,
     /// A stable citation: `vellum://doc/{doc}#{block}`.
     pub citation: String,

@@ -132,7 +132,8 @@ enum Command {
     Admin(AdminCommand),
     /// Prints the OpenAPI 3.1 document of every service.
     Openapi {
-        /// Print the TypeScript client types instead (`web/src/api/api.gen.ts`).
+        /// Print the TypeScript client types instead
+        /// (`web/src/api/api.gen.ts`).
         #[arg(long)]
         typescript: bool,
     },
@@ -211,11 +212,15 @@ fn break_glass(config: Option<&std::path::Path>) -> ExitCode {
         Err(error) => return fail(&error),
     };
     let lifetime = std::time::Duration::from_mins(15);
-    match vellum_identity::Identity::issue_break_glass(&config.data_dir, lifetime) {
+    match vellum_identity::Identity::issue_break_glass(
+        &config.data_dir,
+        lifetime,
+    ) {
         Ok(code) => print(&format!(
             "Break-glass code (valid once, for 15 minutes):\n{code}\n\n\
              Redeem it on the sign-in page, or with\n\
-             curl -X POST -H 'content-type: application/json' -d '{{\"code\":\"<code>\"}}' <url>/auth/break-glass"
+             curl -X POST -H 'content-type: application/json' -d \
+             '{{\"code\":\"<code>\"}}' <url>/auth/break-glass"
         )),
         Err(error) => fail(&error),
     }
@@ -223,7 +228,10 @@ fn break_glass(config: Option<&std::path::Path>) -> ExitCode {
 
 fn fail(message: &dyn std::fmt::Display) -> ExitCode {
     // Standard error is the only channel when telemetry is not running.
-    #[expect(clippy::print_stderr, reason = "the error must reach the operator")]
+    #[expect(
+        clippy::print_stderr,
+        reason = "the error must reach the operator"
+    )]
     {
         eprintln!("vellum: {message}");
     }
@@ -248,7 +256,8 @@ fn no_command() -> ExitCode {
         Ok(guard) => guard,
         Err(error) => return fail(&error),
     };
-    let span = tracing::info_span!("vellum.cli", version = env!("CARGO_PKG_VERSION"));
+    let span =
+        tracing::info_span!("vellum.cli", version = env!("CARGO_PKG_VERSION"));
     let _entered = span.enter();
     tracing::info!("vellum started; no command given");
     ExitCode::SUCCESS
@@ -261,7 +270,8 @@ fn with_telemetry(f: impl FnOnce() -> ExitCode) -> ExitCode {
         Ok(guard) => guard,
         Err(error) => return fail(&error),
     };
-    let span = tracing::info_span!("vellum.cli", version = env!("CARGO_PKG_VERSION"));
+    let span =
+        tracing::info_span!("vellum.cli", version = env!("CARGO_PKG_VERSION"));
     let _entered = span.enter();
     f()
 }
@@ -273,23 +283,33 @@ fn main() -> ExitCode {
     };
     match command {
         // Reading the embedded books needs no telemetry or configuration.
-        Command::Docs(args) => match docs::run(&args, &mut std::io::stdout().lock()) {
-            Ok(()) => ExitCode::SUCCESS,
-            Err(error) => fail(&format_args!("docs: {error}")),
-        },
+        Command::Docs(args) => {
+            match docs::run(&args, &mut std::io::stdout().lock()) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(error) => fail(&format_args!("docs: {error}")),
+            }
+        }
         Command::Mcp(args) => {
-            let telemetry_config = TelemetryConfig::from_env("vellum", env!("CARGO_PKG_VERSION"));
+            let telemetry_config =
+                TelemetryConfig::from_env("vellum", env!("CARGO_PKG_VERSION"));
             let _guard = match telemetry::init(&telemetry_config) {
                 Ok(guard) => guard,
                 Err(error) => return fail(&error),
             };
-            let span = tracing::info_span!("vellum.cli", version = env!("CARGO_PKG_VERSION"));
+            let span = tracing::info_span!(
+                "vellum.cli",
+                version = env!("CARGO_PKG_VERSION")
+            );
             let _entered = span.enter();
             mcp::run(&args)
         }
-        Command::Admin(AdminCommand::BreakGlass { config }) => break_glass(config.as_deref()),
+        Command::Admin(AdminCommand::BreakGlass { config }) => {
+            break_glass(config.as_deref())
+        }
         Command::Admin(AdminCommand::Backup { config }) => {
-            with_telemetry(|| run_admin(|| backup_cli::backup_now(config.as_deref())))
+            with_telemetry(|| {
+                run_admin(|| backup_cli::backup_now(config.as_deref()))
+            })
         }
         Command::Admin(AdminCommand::Backups { config }) => {
             with_telemetry(|| run_admin(|| backup_cli::list(config.as_deref())))
@@ -305,24 +325,29 @@ fn main() -> ExitCode {
             Err(error) => fail(&error),
         },
         Command::Reindex(args) => {
-            let telemetry_config = TelemetryConfig::from_env("vellum", env!("CARGO_PKG_VERSION"));
+            let telemetry_config =
+                TelemetryConfig::from_env("vellum", env!("CARGO_PKG_VERSION"));
             let _guard = match telemetry::init(&telemetry_config) {
                 Ok(guard) => guard,
                 Err(error) => return fail(&error),
             };
-            let span = tracing::info_span!("vellum.cli", version = env!("CARGO_PKG_VERSION"));
+            let span = tracing::info_span!(
+                "vellum.cli",
+                version = env!("CARGO_PKG_VERSION")
+            );
             let _entered = span.enter();
             reindex::run(&args)
         }
         Command::Profile(args) => with_telemetry(|| admin::profile(&args)),
         Command::Budgets(args) => with_telemetry(|| admin::budgets(&args)),
         Command::Openapi { typescript } => match services::contract_gateway() {
-            Ok(gateway) if typescript => {
-                print(vellum_api::typescript::client(gateway.openapi()).trim_end())
-            }
-            Ok(gateway) => {
-                print(&serde_json::to_string_pretty(gateway.openapi()).unwrap_or_default())
-            }
+            Ok(gateway) if typescript => print(
+                vellum_api::typescript::client(gateway.openapi()).trim_end(),
+            ),
+            Ok(gateway) => print(
+                &serde_json::to_string_pretty(gateway.openapi())
+                    .unwrap_or_default(),
+            ),
             Err(error) => fail(&error),
         },
         Command::GraphqlSchema => match services::contract_gateway() {
@@ -330,14 +355,16 @@ fn main() -> ExitCode {
             Err(error) => fail(&error),
         },
         Command::Serve { config } => {
-            let telemetry_config = TelemetryConfig::from_env("vellum", env!("CARGO_PKG_VERSION"));
+            let telemetry_config =
+                TelemetryConfig::from_env("vellum", env!("CARGO_PKG_VERSION"));
             // The recorder fills the buffer behind Admin → Requests.
             let observability = observability::Observability::new();
             let recorder = Box::new(observability.recorder());
-            let _guard = match telemetry::init_with(&telemetry_config, Some(recorder)) {
-                Ok(guard) => guard,
-                Err(error) => return fail(&error),
-            };
+            let _guard =
+                match telemetry::init_with(&telemetry_config, Some(recorder)) {
+                    Ok(guard) => guard,
+                    Err(error) => return fail(&error),
+                };
             // Resident memory and threads, for the saturation panels.
             vellum_observe::process::register_metrics();
             match serve::run(config.as_deref(), observability) {

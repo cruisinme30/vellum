@@ -31,7 +31,8 @@ const MOVES: Readonly<
   End: ([r], [rows, columns], control) => [control ? rows - 1 : r, columns - 1],
 };
 
-const clamp = (value: number, size: number) => Math.min(Math.max(value, 0), size - 1);
+const clamp = (value: number, size: number) =>
+  Math.min(Math.max(value, 0), size - 1);
 
 interface CellProperties {
   readonly row: RowView;
@@ -78,7 +79,10 @@ function GridCell(properties: CellProperties) {
         <ValueEditor
           property={property}
           value={cell?.value}
-          label={t("collection-edit-cell", { property: property.name, row: title })}
+          label={t("collection-edit-cell", {
+            property: property.name,
+            row: title,
+          })}
           onCommit={properties.onCommit}
           onCancel={properties.onCancel}
         />
@@ -121,7 +125,9 @@ export function TableView({ info, result, onOpen }: ViewProperties) {
   const hintId = useId();
   const write = useWriter(info.id);
   const rows = uniqueRows(result);
-  const properties = result.columns.map((column) => propertyOf(info.properties, column));
+  const properties = result.columns.map((column) =>
+    propertyOf(info.properties, column),
+  );
   const [active, setActive] = useState<{ row: string; column: number }>();
   const [editing, setEditing] = useState(false);
   const [errors, setErrors] = useState<ReadonlyMap<string, string>>(new Map());
@@ -137,7 +143,9 @@ export function TableView({ info, result, onOpen }: ViewProperties) {
     if (refocus.current && !editing) {
       refocus.current = false;
       grid.current
-        ?.querySelector<HTMLElement>(`[data-cell="${String(rowIndex)}:${String(columnIndex)}"]`)
+        ?.querySelector<HTMLElement>(
+          `[data-cell="${String(rowIndex)}:${String(columnIndex)}"]`,
+        )
         ?.focus();
     }
   });
@@ -179,7 +187,11 @@ export function TableView({ info, result, onOpen }: ViewProperties) {
       setEditing(true);
     }
   };
-  const onKeyDown = (event: KeyboardEvent, row: RowView, property: PropertyInfo) => {
+  const onKeyDown = (
+    event: KeyboardEvent,
+    row: RowView,
+    property: PropertyInfo,
+  ) => {
     if (editing || event.target !== event.currentTarget) {
       return;
     }
@@ -187,7 +199,13 @@ export function TableView({ info, result, onOpen }: ViewProperties) {
     const control = event.ctrlKey || event.metaKey;
     if (move) {
       event.preventDefault();
-      select(...move([rowIndex, columnIndex], [rows.length, properties.length], control));
+      select(
+        ...move(
+          [rowIndex, columnIndex],
+          [rows.length, properties.length],
+          control,
+        ),
+      );
     } else if (event.key === "Enter" && event.shiftKey) {
       event.preventDefault();
       onOpen(row.id);
@@ -215,9 +233,17 @@ export function TableView({ info, result, onOpen }: ViewProperties) {
           aria-describedby={hintId}
           aria-rowcount={result.total + 1}
           aria-colcount={properties.length}
-          style={{ "--vl-columns": String(properties.length - 1) } as React.CSSProperties}
+          style={
+            {
+              "--vl-columns": String(properties.length - 1),
+            } as React.CSSProperties
+          }
         >
-          <div role="row" className="vl-grid-row vl-grid-head" aria-rowindex={1}>
+          <div
+            role="row"
+            className="vl-grid-row vl-grid-head"
+            aria-rowindex={1}
+          >
             {properties.map((property, index) => (
               <div
                 key={property.key}
@@ -231,7 +257,12 @@ export function TableView({ info, result, onOpen }: ViewProperties) {
             ))}
           </div>
           {rows.map((row, r) => (
-            <div key={row.id} role="row" className="vl-grid-row" aria-rowindex={r + 2}>
+            <div
+              key={row.id}
+              role="row"
+              className="vl-grid-row"
+              aria-rowindex={r + 2}
+            >
               {properties.map((property, c) => {
                 const here = r === rowIndex && c === columnIndex;
                 return (
@@ -281,7 +312,10 @@ export function TableView({ info, result, onOpen }: ViewProperties) {
       {rows.length === 0 && <p className="vl-muted">{t("collection-empty")}</p>}
       {result.truncated && (
         <p className="vl-muted">
-          {t("collection-truncated", { shown: rows.length, total: result.total })}
+          {t("collection-truncated", {
+            shown: rows.length,
+            total: result.total,
+          })}
         </p>
       )}
     </div>

@@ -5,7 +5,12 @@ import { describe, expect, it } from "vitest";
 
 import { ApiError } from "../api/http";
 
-import { diagnosticOf, diagnosticText, failureText, recentDiagnostic } from "./failure";
+import {
+  diagnosticOf,
+  diagnosticText,
+  failureText,
+  recentDiagnostic,
+} from "./failure";
 
 describe("failureText", () => {
   it("quotes the request ID and remembers the diagnostic behind the line", () => {

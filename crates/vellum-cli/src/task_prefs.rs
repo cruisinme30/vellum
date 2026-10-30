@@ -46,10 +46,11 @@ impl PeoplePrefs {
         let path = dir.map(|d| d.join("people.json"));
         let state = match &path {
             Some(p) if p.exists() => {
-                let bytes =
-                    std::fs::read(p).map_err(|e| unavailable("cannot read people.json", e))?;
-                serde_json::from_slice(&bytes)
-                    .map_err(|e| unavailable("people.json is not valid JSON", e))?
+                let bytes = std::fs::read(p)
+                    .map_err(|e| unavailable("cannot read people.json", e))?;
+                serde_json::from_slice(&bytes).map_err(|e| {
+                    unavailable("people.json is not valid JSON", e)
+                })?
             }
             _ => BTreeMap::new(),
         };
@@ -59,25 +60,28 @@ impl PeoplePrefs {
         })
     }
 
-    fn lock(&self) -> Result<std::sync::MutexGuard<'_, BTreeMap<UserId, Person>>, Error> {
-        self.state
-            .lock()
-            .map_err(|_| Error::new(ErrorKind::Internal, "people lock poisoned"))
+    fn lock(
+        &self,
+    ) -> Result<std::sync::MutexGuard<'_, BTreeMap<UserId, Person>>, Error>
+    {
+        self.state.lock().map_err(|_| {
+            Error::new(ErrorKind::Internal, "people lock poisoned")
+        })
     }
 
     /// A person's settings; defaults when they never saved any, or when
     /// what was saved no longer parses (a zone dropped from the tz
     /// database, say).
     pub fn preferences(&self, user: UserId) -> Preferences {
-        let saved = self
-            .lock()
-            .ok()
-            .and_then(|state| state.get(&user).and_then(|p| p.settings.clone()));
+        let saved = self.lock().ok().and_then(|state| {
+            state.get(&user).and_then(|p| p.settings.clone())
+        });
         saved
             .and_then(|input| match Preferences::parse(&input) {
                 Ok(prefs) => Some(prefs),
                 Err(error) => {
-                    tracing::warn!(%error, %user, "saved My Work settings ignored");
+                    tracing::warn!(%error, %user, "saved My Work settings \
+                        ignored");
                     None
                 }
             })
@@ -97,7 +101,11 @@ impl PeoplePrefs {
     /// # Errors
     ///
     /// The file cannot be written.
-    pub fn set_preferences(&self, user: UserId, prefs: &Preferences) -> Result<(), Error> {
+    pub fn set_preferences(
+        &self,
+        user: UserId,
+        prefs: &Preferences,
+    ) -> Result<(), Error> {
         self.change(|state| {
             state.entry(user).or_default().settings = Some(prefs.to_input());
         })
@@ -108,7 +116,11 @@ impl PeoplePrefs {
     /// # Errors
     ///
     /// The file cannot be written.
-    pub fn dismiss(&self, user: UserId, comment: CommentId) -> Result<(), Error> {
+    pub fn dismiss(
+        &self,
+        user: UserId,
+        comment: CommentId,
+    ) -> Result<(), Error> {
         self.change(|state| {
             let person = state.entry(user).or_default();
             if !person.dismissed.contains(&comment) {
@@ -119,7 +131,10 @@ impl PeoplePrefs {
         })
     }
 
-    fn change(&self, edit: impl FnOnce(&mut BTreeMap<UserId, Person>)) -> Result<(), Error> {
+    fn change(
+        &self,
+        edit: impl FnOnce(&mut BTreeMap<UserId, Person>),
+    ) -> Result<(), Error> {
         let bytes = {
             let mut state = self.lock()?;
             edit(&mut state);
@@ -130,11 +145,14 @@ impl PeoplePrefs {
             return Ok(());
         };
         if let Some(dir) = path.parent() {
-            std::fs::create_dir_all(dir).map_err(|e| unavailable("cannot save people.json", e))?;
+            std::fs::create_dir_all(dir)
+                .map_err(|e| unavailable("cannot save people.json", e))?;
         }
         let temp = path.with_extension("json.tmp");
-        std::fs::write(&temp, bytes).map_err(|e| unavailable("cannot save people.json", e))?;
-        std::fs::rename(&temp, path).map_err(|e| unavailable("cannot save people.json", e))
+        std::fs::write(&temp, bytes)
+            .map_err(|e| unavailable("cannot save people.json", e))?;
+        std::fs::rename(&temp, path)
+            .map_err(|e| unavailable("cannot save people.json", e))
     }
 }
 

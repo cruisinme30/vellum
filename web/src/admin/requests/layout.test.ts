@@ -18,21 +18,25 @@ describe("waterfall layout", () => {
     ]);
   });
 
-  it("scales bars to the whole timeline, including browser time before the request", () => {
-    const rows = waterfallRows(TRACE);
-    const nav = rows[0];
-    const root = rows[1];
-    expect(nav?.leftPct).toBe(0);
-    expect(nav?.widthPct).toBe(100);
-    expect(root?.leftPct).toBeCloseTo(20);
-    expect(root?.widthPct).toBeCloseTo(60);
-    const tiny = waterfallRows({
-      ...TRACE,
-      client: [],
-      spans: [{ ...TRACE.spans[0], duration_us: 0 }] as typeof TRACE.spans,
-    });
-    expect(tiny[0]?.widthPct).toBeCloseTo(0.2);
-  });
+  it(
+    "scales bars to the whole timeline, including browser time before the " +
+      "request",
+    () => {
+      const rows = waterfallRows(TRACE);
+      const nav = rows[0];
+      const root = rows[1];
+      expect(nav?.leftPct).toBe(0);
+      expect(nav?.widthPct).toBe(100);
+      expect(root?.leftPct).toBeCloseTo(20);
+      expect(root?.widthPct).toBeCloseTo(60);
+      const tiny = waterfallRows({
+        ...TRACE,
+        client: [],
+        spans: [{ ...TRACE.spans[0], duration_us: 0 }] as typeof TRACE.spans,
+      });
+      expect(tiny[0]?.widthPct).toBeCloseTo(0.2);
+    },
+  );
 
   it("formats durations", () => {
     expect(formatDuration(850)).toBe("850 µs");

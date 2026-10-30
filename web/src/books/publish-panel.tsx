@@ -12,16 +12,25 @@ import { PeoplePicker } from "../people/people-picker";
 import { Failure, formText, useAction, when, type Submit } from "./actions";
 import type { BooksApi, Publication, PublishFormat } from "./api";
 
-function PublicationLine({ publication }: { readonly publication: Publication }) {
+function PublicationLine({
+  publication,
+}: {
+  readonly publication: Publication;
+}) {
   const t = useT();
   return (
     <li>
       <strong>
-        {publication.format === "site" ? t("books-publish-site") : t("books-publish-mdbook")}
+        {publication.format === "site"
+          ? t("books-publish-site")
+          : t("books-publish-mdbook")}
       </strong>{" "}
       <small className="vl-muted">
-        {publication.public ? t("books-publish-public") : t("books-publish-members")} ·{" "}
-        {when(publication.at)} · {t("books-publish-files", { count: publication.files })}
+        {publication.public
+          ? t("books-publish-public")
+          : t("books-publish-members")}{" "}
+        · {when(publication.at)} ·{" "}
+        {t("books-publish-files", { count: publication.files })}
       </small>
       <div className="vl-muted">{publication.folder}</div>
       {publication.url != undefined && (
@@ -34,14 +43,24 @@ function PublicationLine({ publication }: { readonly publication: Publication })
 }
 
 /** Publishing the book as a static site or an mdBook tree (managers only). */
-export function PublishPanel({ api, book }: { readonly api: BooksApi; readonly book: string }) {
+export function PublishPanel({
+  api,
+  book,
+}: {
+  readonly api: BooksApi;
+  readonly book: string;
+}) {
   const t = useT();
   const [version, setVersion] = useState(0);
   const [members, setMembers] = useState(false);
   const [audience, setAudience] = useState<string[]>([]);
   const [missing, setMissing] = useState(false);
   const directory = useServerApi("directory");
-  const loaded = useLoaded(() => api.publications(book), [api, book, version], failureText);
+  const loaded = useLoaded(
+    () => api.publications(book),
+    [api, book, version],
+    failureText,
+  );
   const { busy, error, run } = useAction();
   const submit: Submit = (event) => {
     event.preventDefault();

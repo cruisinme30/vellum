@@ -33,7 +33,9 @@ import "./work.css";
 /** How long typing pauses before the line is parsed again. */
 const PARSE_DELAY_MS = 120;
 
-/** The event My Work listens for to load again after a task is added elsewhere. */
+/**
+ * The event My Work listens for to load again after a task is added elsewhere.
+ */
 export const TASKS_CHANGED = "vellum:tasks-changed";
 
 /** Tells open task views that the tasks changed. */
@@ -55,7 +57,10 @@ function runsOf(text: string, parsed: ParseView | undefined): Run[] {
   const out: Run[] = [];
   let at = 0;
   const spans = (parsed?.highlights ?? [])
-    .filter((span) => span.start >= 0 && span.end <= text.length && span.start < span.end)
+    .filter(
+      (span) =>
+        span.start >= 0 && span.end <= text.length && span.start < span.end,
+    )
     .toSorted((a, b) => a.start - b.start);
   for (const span of spans) {
     if (span.start < at) continue;
@@ -67,7 +72,10 @@ function runsOf(text: string, parsed: ParseView | undefined): Run[] {
   return out;
 }
 
-/** The parse of `text`, a short pause after the last keystroke; stale answers are dropped. */
+/**
+ * The parse of `text`, a short pause after the last keystroke; stale answers
+ * are dropped.
+ */
 function useParsed(api: WorkApi, text: string): ParseView | undefined {
   const [answer, setAnswer] = useState<{ text: string; parsed: ParseView }>();
   useEffect(() => {
@@ -96,19 +104,27 @@ function Facts({ parsed }: { readonly parsed: ParseView }) {
   const t = useT();
   const { fields } = parsed;
   const facts: [string, string][] = [];
-  if (fields.due != undefined) facts.push(["due", t("quick-add-due", { when: fields.due })]);
+  if (fields.due != undefined)
+    facts.push(["due", t("quick-add-due", { when: fields.due })]);
   if (fields.start != undefined)
     facts.push(["start", t("quick-add-start", { when: fields.start })]);
-  if (fields.when != undefined) facts.push(["when", t(`my-work-bucket-${fields.when}`)]);
+  if (fields.when != undefined)
+    facts.push(["when", t(`my-work-bucket-${fields.when}`)]);
   if (fields.rrule != undefined) {
     const repeats =
-      fields.recur_from === "completion" ? "quick-add-repeats-done" : "quick-add-repeats";
+      fields.recur_from === "completion"
+        ? "quick-add-repeats-done"
+        : "quick-add-repeats";
     facts.push(["recurrence", t(repeats, { rule: fields.rrule })]);
   }
   if (fields.priority != undefined) {
-    facts.push(["priority", t("quick-add-priority", { priority: fields.priority })]);
+    facts.push([
+      "priority",
+      t("quick-add-priority", { priority: fields.priority }),
+    ]);
   }
-  if (parsed.list != undefined) facts.push(["list", t("quick-add-list", { list: parsed.list })]);
+  if (parsed.list != undefined)
+    facts.push(["list", t("quick-add-list", { list: parsed.list })]);
   for (const label of fields.labels) facts.push(["label", `@${label}`]);
   for (const person of parsed.assignees) facts.push(["person", `+${person}`]);
   for (const remind of fields.remind) {
@@ -131,7 +147,10 @@ export interface QuickAddFormProperties {
   readonly api: WorkApi;
   /** Text to start with, such as a selection in a page. */
   readonly initial?: string;
-  /** Added to the new task's title as written, unparsed: a link back to the page. */
+  /**
+   * Added to the new task's title as written, unparsed: a link back to the
+   * page.
+   */
   readonly suffix?: string | undefined;
   /** Puts the cursor in the line when it opens, as the dialog does. */
   readonly focusOnMount?: boolean;
@@ -191,9 +210,12 @@ export function QuickAddForm({
     setError(undefined);
     api
       .addTask(line, list === "" ? undefined : list)
-      // The link goes in after parsing, so words in a page title never read as dates.
+      // The link goes in after parsing, so words in a page title never read as
+      // dates.
       .then((task) =>
-        suffix === undefined ? task : api.update(task.id, { title: `${task.title} ${suffix}` }),
+        suffix === undefined
+          ? task
+          : api.update(task.id, { title: `${task.title} ${suffix}` }),
       )
       .then(
         (task) => {
@@ -315,7 +337,10 @@ export function usePageTask(
 }
 
 /** A Markdown link back to a page, for a task's title. */
-function pageLink(page: { readonly id: string; readonly title: string }): string {
+function pageLink(page: {
+  readonly id: string;
+  readonly title: string;
+}): string {
   // Brackets and backslashes would end or escape the link text.
   const label = page.title.replaceAll(/[[\]\\]/g, "").trim() || "page";
   return `[${label}](/p/${encodeURIComponent(page.id)})`;
@@ -350,7 +375,9 @@ function QuickAddDialog({
     >
       <h2 id={titleId}>{t("quick-add-title")}</h2>
       {start.page !== undefined && (
-        <p className="vl-muted">{t("quick-add-from-page", { page: start.page.title })}</p>
+        <p className="vl-muted">
+          {t("quick-add-from-page", { page: start.page.title })}
+        </p>
       )}
       <QuickAddForm
         api={api}
@@ -368,7 +395,11 @@ function QuickAddDialog({
 }
 
 /** Holds the quick-add dialog for the whole app. */
-export function QuickAddProvider({ children }: { readonly children: ReactNode }) {
+export function QuickAddProvider({
+  children,
+}: {
+  readonly children: ReactNode;
+}) {
   const { work } = useServerApis();
   const [start, setStart] = useState<QuickAddStart>();
   const returnFocus = useRef<Element | null>(null);
@@ -381,7 +412,10 @@ export function QuickAddProvider({ children }: { readonly children: ReactNode })
     const back = returnFocus.current;
     if (back instanceof HTMLElement) back.focus();
   }, []);
-  const value = useMemo<OpenQuickAdd>(() => (work === undefined ? undefined : open), [work, open]);
+  const value = useMemo<OpenQuickAdd>(
+    () => (work === undefined ? undefined : open),
+    [work, open],
+  );
   return (
     <QuickAddContext value={value}>
       {children}

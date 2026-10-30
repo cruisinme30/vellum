@@ -1,7 +1,9 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-/** The webhooks admin's pieces: the form, the secret box and the delivery log. */
+/**
+ * The webhooks admin's pieces: the form, the secret box and the delivery log.
+ */
 
 import { useId, useState, type ComponentProps } from "react";
 
@@ -11,7 +13,12 @@ import { useT } from "../../i18n/i18n";
 import { CopyDiagnostic } from "../../shell/copy-diagnostic";
 
 import { ScrollRegion } from "./scroll-region";
-import type { DeliveryView, HookInput, HookView, WebhooksApi } from "./webhooks-api";
+import type {
+  DeliveryView,
+  HookInput,
+  HookView,
+  WebhooksApi,
+} from "./webhooks-api";
 
 const TIME = new Intl.DateTimeFormat("en", {
   month: "short",
@@ -82,7 +89,12 @@ export function HookForm({
     event.preventDefault();
     setBusy(true);
     setError(undefined);
-    onSubmit({ url: url.trim(), description, event_types: [...events], teams: parseTeams(teams) })
+    onSubmit({
+      url: url.trim(),
+      description,
+      event_types: [...events],
+      teams: parseTeams(teams),
+    })
       .then(
         () => {
           if (initial === undefined) {
@@ -199,7 +211,8 @@ export function SecretOnce({
   return (
     <div className="vl-admin-secret" role="region" aria-labelledby={id}>
       <p id={id}>
-        <strong>{t("admin-webhooks-secret-title")}</strong> {t("admin-webhooks-secret-hint")}
+        <strong>{t("admin-webhooks-secret-title")}</strong>{" "}
+        {t("admin-webhooks-secret-hint")}
       </p>
       <code className="vl-admin-secret-value">{secret}</code>
       <div className="vl-admin-actions">
@@ -233,12 +246,23 @@ export function Outcome({ delivery }: { readonly delivery: DeliveryView }) {
 }
 
 /** A hook's recent attempts, with "send again". */
-export function Deliveries({ api, hook }: { readonly api: WebhooksApi; readonly hook: HookView }) {
+export function Deliveries({
+  api,
+  hook,
+}: {
+  readonly api: WebhooksApi;
+  readonly hook: HookView;
+}) {
   const t = useT();
   const [reload, setReload] = useState(0);
   const [notice, setNotice] = useState<Notice>();
-  const loaded = useLoaded(() => api.deliveries(hook.id), [api, hook.id, reload], failureText);
-  if (loaded.state === "loading") return <p className="vl-muted">{t("admin-loading")}</p>;
+  const loaded = useLoaded(
+    () => api.deliveries(hook.id),
+    [api, hook.id, reload],
+    failureText,
+  );
+  if (loaded.state === "loading")
+    return <p className="vl-muted">{t("admin-loading")}</p>;
   if (loaded.state === "failed") {
     return (
       <p className="vl-field-error" role="alert">
@@ -252,12 +276,17 @@ export function Deliveries({ api, hook }: { readonly api: WebhooksApi; readonly 
   return (
     <ScrollRegion label={t("admin-webhooks-deliveries")}>
       {notice !== undefined && (
-        <p className={notice.ok ? "" : "vl-field-error"} role={notice.ok ? "status" : "alert"}>
+        <p
+          className={notice.ok ? "" : "vl-field-error"}
+          role={notice.ok ? "status" : "alert"}
+        >
           {notice.message}
         </p>
       )}
       <table className="vl-admin-table">
-        <caption>{t("admin-webhooks-deliveries-caption", { url: hook.url })}</caption>
+        <caption>
+          {t("admin-webhooks-deliveries-caption", { url: hook.url })}
+        </caption>
         <thead>
           <tr>
             <th scope="col">{t("admin-webhooks-when")}</th>
@@ -265,13 +294,21 @@ export function Deliveries({ api, hook }: { readonly api: WebhooksApi; readonly 
             <th scope="col">{t("admin-webhooks-attempt")}</th>
             <th scope="col">{t("admin-webhooks-result")}</th>
             <th scope="col">
-              <span className="vl-visually-hidden">{t("admin-webhooks-actions")}</span>
+              <span className="vl-visually-hidden">
+                {t("admin-webhooks-actions")}
+              </span>
             </th>
           </tr>
         </thead>
         <tbody>
           {loaded.value.map((delivery) => (
-            <tr key={`${delivery.delivery_id}:${String(delivery.attempt)}:${delivery.at}`}>
+            <tr
+              key={[
+                delivery.delivery_id,
+                String(delivery.attempt),
+                delivery.at,
+              ].join(":")}
+            >
               <td>{when(delivery.at)}</td>
               <td>
                 <code>{delivery.event}</code>
@@ -282,7 +319,9 @@ export function Deliveries({ api, hook }: { readonly api: WebhooksApi; readonly 
                 {delivery.next_attempt != undefined && (
                   <small className="vl-muted">
                     {" "}
-                    {t("admin-webhooks-next", { when: when(delivery.next_attempt) })}
+                    {t("admin-webhooks-next", {
+                      when: when(delivery.next_attempt),
+                    })}
                   </small>
                 )}
               </td>
@@ -294,7 +333,10 @@ export function Deliveries({ api, hook }: { readonly api: WebhooksApi; readonly 
                     onClick={() => {
                       api.redeliver(hook.id, delivery.delivery_id).then(
                         () => {
-                          setNotice({ ok: true, message: t("admin-webhooks-queued") });
+                          setNotice({
+                            ok: true,
+                            message: t("admin-webhooks-queued"),
+                          });
                           setReload((n) => n + 1);
                         },
                         (error: unknown) => {

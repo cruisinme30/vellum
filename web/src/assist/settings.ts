@@ -34,7 +34,9 @@ type Area = "local" | "session";
 
 function area(which: Area): Storage | undefined {
   try {
-    return which === "local" ? globalThis.localStorage : globalThis.sessionStorage;
+    return which === "local"
+      ? globalThis.localStorage
+      : globalThis.sessionStorage;
   } catch {
     return undefined;
   }
@@ -46,7 +48,8 @@ function read(which: Area, key: string): StoredModel | undefined {
     if (text === null || text === undefined) return undefined;
     const value = JSON.parse(text) as Partial<StoredModel>;
     if (
-      (value.provider !== "anthropic" && value.provider !== "openai_compatible") ||
+      (value.provider !== "anthropic" &&
+        value.provider !== "openai_compatible") ||
       typeof value.model !== "string"
     ) {
       return undefined;
@@ -114,7 +117,9 @@ export function toSettings(stored: StoredModel): ModelSettings {
   return {
     provider: stored.provider,
     model: stored.model.trim(),
-    ...(stored.baseUrl.trim() === "" ? {} : { base_url: stored.baseUrl.trim() }),
+    ...(stored.baseUrl.trim() === ""
+      ? {}
+      : { base_url: stored.baseUrl.trim() }),
     ...(stored.apiKey.trim() === "" ? {} : { api_key: stored.apiKey.trim() }),
   };
 }
@@ -125,7 +130,9 @@ export function keyHint(key: string): string {
 }
 
 /** The saved settings for `userId`, updating when they change. */
-export function useStoredModel(userId: string | undefined): StoredModel | undefined {
+export function useStoredModel(
+  userId: string | undefined,
+): StoredModel | undefined {
   const subscribe = useCallback((listener: () => void) => {
     listeners.add(listener);
     return () => {

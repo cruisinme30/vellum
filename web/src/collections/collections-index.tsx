@@ -44,7 +44,9 @@ export function CollectionsIndexView() {
           {t("collection-loading")}
         </p>
       )}
-      {collections?.length === 0 && <p className="vl-muted">{t("collections-empty")}</p>}
+      {collections?.length === 0 && (
+        <p className="vl-muted">{t("collections-empty")}</p>
+      )}
       {collections !== undefined && collections.length > 0 && (
         <ul className="vl-page-list">
           {collections.map((collection) => (

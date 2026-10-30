@@ -35,7 +35,11 @@ const SIGNED_IN: AuthStatus = {
   scopes: ["read"],
   user: USER,
 };
-const NEW: AuthStatus = { needsSetup: true, credential: "anonymous", scopes: [] };
+const NEW: AuthStatus = {
+  needsSetup: true,
+  credential: "anonymous",
+  scopes: [],
+};
 
 /** A fake server whose status moves on as people sign in, out or set up. */
 function fakeAuth(start: AuthStatus) {
@@ -43,7 +47,9 @@ function fakeAuth(start: AuthStatus) {
   const signIn = vi.fn((email: string) => {
     if (email === "wrong@northstar.dev") {
       return Promise.reject(
-        new ApiError("unauthenticated", "Wrong email or password.", { requestId: "01JREQ" }),
+        new ApiError("unauthenticated", "Wrong email or password.", {
+          requestId: "01JREQ",
+        }),
       );
     }
     status = SIGNED_IN;
@@ -57,7 +63,12 @@ function fakeAuth(start: AuthStatus) {
     status = SIGNED_IN;
     return Promise.resolve(USER);
   });
-  const auth: AuthApi = { status: () => Promise.resolve(status), signIn, signOut, setUp };
+  const auth: AuthApi = {
+    status: () => Promise.resolve(status),
+    signIn,
+    signOut,
+    setUp,
+  };
   return { auth, status: start, signIn, signOut, setUp };
 }
 
@@ -65,27 +76,50 @@ describe("signing in against a server", () => {
   it("sends a signed-out visitor to sign-in, then back where they were", async () => {
     const session = fakeAuth(SIGNED_OUT);
     const app = renderApp("/data?x=1", undefined, undefined, session);
-    expect(await screen.findByRole("heading", { level: 1, name: "Sign in" })).toBeTruthy();
-    expect(app.location()).toBe(`/sign-in?next=${encodeURIComponent("/data?x=1")}`);
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Sign in" }),
+    ).toBeTruthy();
+    expect(app.location()).toBe(
+      `/sign-in?next=${encodeURIComponent("/data?x=1")}`,
+    );
     await app.user.type(screen.getByLabelText("Email"), "priya@northstar.dev");
     await app.user.type(screen.getByLabelText("Password"), "correct horse");
     await app.user.click(screen.getByRole("button", { name: "Sign in" }));
     await waitFor(() => {
       expect(app.location()).toBe("/data?x=1");
     });
-    expect(session.signIn).toHaveBeenCalledWith("priya@northstar.dev", "correct horse");
+    expect(session.signIn).toHaveBeenCalledWith(
+      "priya@northstar.dev",
+      "correct horse",
+    );
   });
 
   it("offers every sign-in provider, returning to the page asked for", async () => {
-    const okta = { id: "okta", name: "Okta", startUrl: "/auth/sso/start?provider=okta" };
-    const entra = { id: "entra", name: "Entra ID", startUrl: "/auth/sso/start?provider=entra" };
-    const status: AuthStatus = { ...SIGNED_OUT, sso: okta, providers: [okta, entra] };
+    const okta = {
+      id: "okta",
+      name: "Okta",
+      startUrl: "/auth/sso/start?provider=okta",
+    };
+    const entra = {
+      id: "entra",
+      name: "Entra ID",
+      startUrl: "/auth/sso/start?provider=entra",
+    };
+    const status: AuthStatus = {
+      ...SIGNED_OUT,
+      sso: okta,
+      providers: [okta, entra],
+    };
     renderApp("/sign-in?next=%2Fdata", undefined, undefined, fakeAuth(status));
     const link = await screen.findByRole("link", { name: "Sign in with Okta" });
-    expect(link.getAttribute("href")).toBe("/auth/sso/start?provider=okta&next=%2Fdata");
-    expect(screen.getByRole("link", { name: "Sign in with Entra ID" }).getAttribute("href")).toBe(
-      "/auth/sso/start?provider=entra&next=%2Fdata",
+    expect(link.getAttribute("href")).toBe(
+      "/auth/sso/start?provider=okta&next=%2Fdata",
     );
+    expect(
+      screen
+        .getByRole("link", { name: "Sign in with Entra ID" })
+        .getAttribute("href"),
+    ).toBe("/auth/sso/start?provider=entra&next=%2Fdata");
   });
 
   it("goes to sign-in without a next for the home page", async () => {
@@ -95,8 +129,16 @@ describe("signing in against a server", () => {
   });
 
   it("shows a refused sign-in with its request ID", async () => {
-    const app = renderApp("/sign-in", undefined, undefined, fakeAuth(SIGNED_OUT));
-    await app.user.type(await screen.findByLabelText("Email"), "wrong@northstar.dev");
+    const app = renderApp(
+      "/sign-in",
+      undefined,
+      undefined,
+      fakeAuth(SIGNED_OUT),
+    );
+    await app.user.type(
+      await screen.findByLabelText("Email"),
+      "wrong@northstar.dev",
+    );
     await app.user.type(screen.getByLabelText("Password"), "nope nope nope");
     await app.user.click(screen.getByRole("button", { name: "Sign in" }));
     const alert = await screen.findByRole("alert");
@@ -113,7 +155,10 @@ describe("signing in against a server", () => {
       undefined,
       fakeAuth(SIGNED_OUT),
     );
-    await app.user.type(await screen.findByLabelText("Email"), "priya@northstar.dev");
+    await app.user.type(
+      await screen.findByLabelText("Email"),
+      "priya@northstar.dev",
+    );
     await app.user.type(screen.getByLabelText("Password"), "correct horse");
     await app.user.click(screen.getByRole("button", { name: "Sign in" }));
     await waitFor(() => {
@@ -125,7 +170,10 @@ describe("signing in against a server", () => {
   it("lets a signed-in user straight in and greets them by name", async () => {
     renderApp("/", undefined, undefined, fakeAuth(SIGNED_IN));
     expect(
-      await screen.findByRole("heading", { level: 1, name: "Good to see you, Priya" }),
+      await screen.findByRole("heading", {
+        level: 1,
+        name: "Good to see you, Priya",
+      }),
     ).toBeTruthy();
   });
 
@@ -146,7 +194,9 @@ describe("signing in against a server", () => {
     const session = fakeAuth(SIGNED_IN);
     session.signOut.mockRejectedValueOnce(new Error("socket closed"));
     const app = renderApp("/admin", undefined, undefined, session);
-    await app.user.click(await screen.findByRole("button", { name: "Sign out" }));
+    await app.user.click(
+      await screen.findByRole("button", { name: "Sign out" }),
+    );
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toBe("Something went wrong. Try again.");
   });
@@ -156,13 +206,17 @@ describe("setting up a new workspace", () => {
   it("sends everyone to set-up and creates the first administrator", async () => {
     const session = fakeAuth(NEW);
     const app = renderApp("/search", undefined, undefined, session);
-    expect(await screen.findByRole("heading", { name: "Set up your workspace" })).toBeTruthy();
+    expect(
+      await screen.findByRole("heading", { name: "Set up your workspace" }),
+    ).toBeTruthy();
     await app.user.type(screen.getByLabelText("Your name"), "Priya Raman");
     await app.user.type(screen.getByLabelText("Email"), "priya@northstar.dev");
     const password = screen.getByLabelText("Password");
     expect(password.getAttribute("aria-describedby")).toBeTruthy();
     await app.user.type(password, "a long enough password");
-    await app.user.click(screen.getByRole("button", { name: "Create account" }));
+    await app.user.click(
+      screen.getByRole("button", { name: "Create account" }),
+    );
     await waitFor(() => {
       expect(app.location()).toBe("/");
     });
@@ -214,7 +268,9 @@ describe("helpers", () => {
   });
 
   it("describes errors", () => {
-    expect(describeError(new ApiError("conflict", "Changed"), "x")).toBe("Changed");
+    expect(describeError(new ApiError("conflict", "Changed"), "x")).toBe(
+      "Changed",
+    );
     expect(describeError(new Error("raw"), "fallback")).toBe("fallback");
   });
 });
@@ -224,14 +280,19 @@ function withSteps(step: SecondStepRequired) {
   let status: AuthStatus = SIGNED_OUT;
   const verify = vi.fn((_ticket: string, proof: { code?: string }) => {
     if (proof.code !== "123456") {
-      return Promise.reject(new ApiError("unauthenticated", "the code is wrong"));
+      return Promise.reject(
+        new ApiError("unauthenticated", "the code is wrong"),
+      );
     }
     status = SIGNED_IN;
     return Promise.resolve(USER);
   });
   const enrol = vi.fn(() => {
     status = SIGNED_IN;
-    return Promise.resolve({ user: USER, recoveryCodes: ["aaaaa-bbbbb", "ccccc-ddddd"] });
+    return Promise.resolve({
+      user: USER,
+      recoveryCodes: ["aaaaa-bbbbb", "ccccc-ddddd"],
+    });
   });
   const steps: SignInSteps = {
     verify,
@@ -255,7 +316,10 @@ function withSteps(step: SecondStepRequired) {
 }
 
 async function password(app: ReturnType<typeof renderApp>) {
-  await app.user.type(await screen.findByLabelText("Email"), "priya@northstar.dev");
+  await app.user.type(
+    await screen.findByLabelText("Email"),
+    "priya@northstar.dev",
+  );
   await app.user.type(screen.getByLabelText("Password"), "correct horse");
   await app.user.click(screen.getByRole("button", { name: "Sign in" }));
 }
@@ -270,17 +334,29 @@ describe("the second sign-in step", () => {
       status: SIGNED_OUT,
     });
     await password(app);
-    expect(await screen.findByRole("heading", { name: "Two-step verification" })).toBeTruthy();
-    await app.user.type(screen.getByLabelText("Code from your authenticator app"), "000000");
+    expect(
+      await screen.findByRole("heading", { name: "Two-step verification" }),
+    ).toBeTruthy();
+    await app.user.type(
+      screen.getByLabelText("Code from your authenticator app"),
+      "000000",
+    );
     await app.user.click(screen.getByRole("button", { name: "Verify" }));
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toBe("the code is wrong");
-    await app.user.click(screen.getByRole("button", { name: "Use a recovery code instead" }));
+    await app.user.click(
+      screen.getByRole("button", { name: "Use a recovery code instead" }),
+    );
     expect(screen.getByLabelText("Recovery code")).toBeTruthy();
     await app.user.click(
-      screen.getByRole("button", { name: "Use your authenticator app instead" }),
+      screen.getByRole("button", {
+        name: "Use your authenticator app instead",
+      }),
     );
-    await app.user.type(screen.getByLabelText("Code from your authenticator app"), "123456");
+    await app.user.type(
+      screen.getByLabelText("Code from your authenticator app"),
+      "123456",
+    );
     await app.user.click(screen.getByRole("button", { name: "Verify" }));
     await waitFor(() => {
       expect(app.location()).toBe("/data");
@@ -292,21 +368,33 @@ describe("the second sign-in step", () => {
     const { auth, enrol } = withSteps(
       new SecondStepRequired("enrol", "vmt_e", ["totp", "passkey"]),
     );
-    const app = renderApp("/sign-in", undefined, undefined, { auth, status: SIGNED_OUT });
+    const app = renderApp("/sign-in", undefined, undefined, {
+      auth,
+      status: SIGNED_OUT,
+    });
     await password(app);
     expect(
-      await screen.findByRole("heading", { name: "Set up two-step verification" }),
+      await screen.findByRole("heading", {
+        name: "Set up two-step verification",
+      }),
     ).toBeTruthy();
-    await app.user.click(screen.getByRole("button", { name: "Set up an authenticator app" }));
+    await app.user.click(
+      screen.getByRole("button", { name: "Set up an authenticator app" }),
+    );
     expect(await screen.findByRole("img", { name: /QR code/ })).toBeTruthy();
     expect(screen.getByText("JBSWY3DPEHPK3PXP")).toBeTruthy();
-    await app.user.type(screen.getByLabelText("Enter the 6-digit code it shows"), "654321");
+    await app.user.type(
+      screen.getByLabelText("Enter the 6-digit code it shows"),
+      "654321",
+    );
     await app.user.click(screen.getByRole("button", { name: "Turn on" }));
     const codes = await screen.findByTestId("recovery-codes");
     expect(codes.textContent).toContain("aaaaa-bbbbb");
     expect(enrol).toHaveBeenCalledWith("vmt_e", { code: "654321" });
     expect(app.location()).toBe("/sign-in");
-    await app.user.click(screen.getByRole("button", { name: "I have saved them" }));
+    await app.user.click(
+      screen.getByRole("button", { name: "I have saved them" }),
+    );
     await waitFor(() => {
       expect(app.location()).toBe("/");
     });

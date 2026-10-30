@@ -5,7 +5,9 @@
 
 use vellum_crypto::{CryptoError, KekId, KeyProvider, SecretKey, WrappedDek};
 
-use crate::{AwsCredentialProvider, AwsKms, GcpKms, MetadataServerToken, VaultTransit};
+use crate::{
+    AwsCredentialProvider, AwsKms, GcpKms, MetadataServerToken, VaultTransit,
+};
 
 /// The remote key service a KEK id names.
 #[derive(Debug)]
@@ -37,7 +39,8 @@ impl RemoteKeys {
     ) -> Result<Self, CryptoError> {
         let var = |name: &str| var(name).filter(|v| !v.trim().is_empty());
         if let Some(rest) = kek.strip_prefix("aws-kms:") {
-            let (region, key) = rest.split_once(':').ok_or(CryptoError::InvalidKekId)?;
+            let (region, key) =
+                rest.split_once(':').ok_or(CryptoError::InvalidKekId)?;
             let credentials = AwsCredentialProvider::from_vars(var)?;
             tracing::info!(source = credentials.kind(), "AWS KMS credentials");
             let kms = AwsKms::new(region, key, credentials)?;
@@ -47,14 +50,23 @@ impl RemoteKeys {
             }));
         }
         if let Some(name) = kek.strip_prefix("gcp-kms:") {
-            return Ok(Self::Gcp(GcpKms::new(name, MetadataServerToken::new()?)?));
+            return Ok(Self::Gcp(GcpKms::new(
+                name,
+                MetadataServerToken::new()?,
+            )?));
         }
         if let Some(rest) = kek.strip_prefix("vault:") {
-            let (mount, key) = rest.rsplit_once('/').ok_or(CryptoError::InvalidKekId)?;
-            let missing =
-                |name: &str| CryptoError::Provider(format!("vault-transit: {name} is not set"));
-            let addr = var("VAULT_ADDR").ok_or_else(|| missing("VAULT_ADDR"))?;
-            let token = var("VAULT_TOKEN").ok_or_else(|| missing("VAULT_TOKEN"))?;
+            let (mount, key) =
+                rest.rsplit_once('/').ok_or(CryptoError::InvalidKekId)?;
+            let missing = |name: &str| {
+                CryptoError::Provider(format!(
+                    "vault-transit: {name} is not set"
+                ))
+            };
+            let addr =
+                var("VAULT_ADDR").ok_or_else(|| missing("VAULT_ADDR"))?;
+            let token =
+                var("VAULT_TOKEN").ok_or_else(|| missing("VAULT_TOKEN"))?;
             let vault = VaultTransit::new(addr, token, mount, key)?;
             return Ok(Self::Vault(match var("VAULT_NAMESPACE") {
                 Some(namespace) => vault.with_namespace(namespace),
@@ -92,7 +104,10 @@ impl KeyProvider for RemoteKeys {
         }
     }
 
-    async fn unwrap(&self, wrapped: &WrappedDek) -> Result<SecretKey, CryptoError> {
+    async fn unwrap(
+        &self,
+        wrapped: &WrappedDek,
+    ) -> Result<SecretKey, CryptoError> {
         match self {
             Self::Aws(p) => p.unwrap(wrapped).await,
             Self::Gcp(p) => p.unwrap(wrapped).await,
@@ -105,7 +120,9 @@ impl KeyProvider for RemoteKeys {
 mod tests {
     use super::*;
 
-    fn vars<'a>(pairs: &'a [(&'a str, &'a str)]) -> impl Fn(&str) -> Option<String> + 'a {
+    fn vars<'a>(
+        pairs: &'a [(&'a str, &'a str)],
+    ) -> impl Fn(&str) -> Option<String> + 'a {
         move |name| {
             pairs
                 .iter()
@@ -121,7 +138,10 @@ mod tests {
             vars(&[("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/v2/c")]),
         )?;
         assert_eq!(aws.backend(), "aws-kms");
-        assert_eq!(aws.current_kek().as_str(), "aws-kms:eu-west-1:alias/vellum");
+        assert_eq!(
+            aws.current_kek().as_str(),
+            "aws-kms:eu-west-1:alias/vellum"
+        );
         let gcp = RemoteKeys::from_kek_id(
             "gcp-kms:projects/p/locations/l/keyRings/r/cryptoKeys/k",
             vars(&[]),

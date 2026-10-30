@@ -20,7 +20,9 @@ export interface Space {
 /** Page status from front matter. */
 type PageStatus = "draft" | "in-review" | "verified" | "outdated";
 
-/** A page as the tree and lists see it; the body lives in its collab document. */
+/**
+ * A page as the tree and lists see it; the body lives in its collab document.
+ */
 export interface PageMeta {
   /** The page ULID, its only identity. */
   readonly id: string;
@@ -59,7 +61,10 @@ export interface SearchHit {
   readonly page: PageMeta;
   /** Text around the match, when the body matched. */
   readonly snippet: string;
-  /** The snippet split into matched and unmatched runs, when the server marked them. */
+  /**
+   * The snippet split into matched and unmatched runs, when the server marked
+   * them.
+   */
   readonly fragments?: readonly Fragment[];
 }
 

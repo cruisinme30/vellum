@@ -1,7 +1,13 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { setTelemetrySink, type TelemetrySink } from "../platform/telemetry";
@@ -27,7 +33,11 @@ function key(name: string, extra: Partial<KeyboardEventInit> = {}) {
 function setup(scopes: ("issues" | "editor")[] = []) {
   const actions = { newIssue: vi.fn(), goTo: vi.fn(), assignToMe: vi.fn() };
   render(
-    <KeyboardRoot commands={workCommands(actions)} scopes={scopes} platform="mac">
+    <KeyboardRoot
+      commands={workCommands(actions)}
+      scopes={scopes}
+      platform="mac"
+    >
       <button type="button">Somewhere</button>
       <input aria-label="Title" />
     </KeyboardRoot>,
@@ -69,7 +79,9 @@ describe("KeyboardRoot", () => {
     const search = screen.getByRole("combobox", { name: "Search commands" });
     expect(document.activeElement).toBe(search);
     fireEvent.change(search, { target: { value: "inbox" } });
-    expect(screen.getAllByRole("option")[0]?.textContent).toContain("Go to Inbox");
+    expect(screen.getAllByRole("option")[0]?.textContent).toContain(
+      "Go to Inbox",
+    );
     expect(screen.getAllByRole("option")[0]?.textContent).toContain("G then I");
     fireEvent.keyDown(search, { key: "Enter" });
     expect(actions.goTo).toHaveBeenCalledWith("inbox");
@@ -131,9 +143,13 @@ describe("KeyboardRoot", () => {
     try {
       setup();
       key("c");
-      expect(histogram).toHaveBeenCalledWith("ui.keyboard.dispatch", expect.any(Number), {
-        command: "issue.create",
-      });
+      expect(histogram).toHaveBeenCalledWith(
+        "ui.keyboard.dispatch",
+        expect.any(Number),
+        {
+          command: "issue.create",
+        },
+      );
       expect(count).toHaveBeenCalledWith("ui.keyboard.commands", {
         command: "issue.create",
         via: "key",

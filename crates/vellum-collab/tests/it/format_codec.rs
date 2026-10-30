@@ -18,7 +18,8 @@ use vellum_contracts::blocks::{MarkType, NodeType};
 
 /// Attribute names each node may carry, read from `schema/blocks.json`.
 fn schema_attrs() -> HashMap<String, HashSet<String>> {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../schema/blocks.json");
+    let path =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../schema/blocks.json");
     let schema: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap();
     schema["nodes"]
@@ -43,7 +44,11 @@ fn schema_attrs() -> HashMap<String, HashSet<String>> {
 
 /// Every node, attribute and mark the codec writes is in the editor's
 /// schema.
-fn check_schema(nodes: &[Node], schema: &HashMap<String, HashSet<String>>, out: &mut Vec<String>) {
+fn check_schema(
+    nodes: &[Node],
+    schema: &HashMap<String, HashSet<String>>,
+    out: &mut Vec<String>,
+) {
     for node in nodes {
         match node {
             Node::Element(element) => {
@@ -55,7 +60,10 @@ fn check_schema(nodes: &[Node], schema: &HashMap<String, HashSet<String>>, out: 
                     element
                         .attrs
                         .keys()
-                        .filter(|key| !allowed.is_some_and(|allowed| allowed.contains(*key)))
+                        .filter(|key| {
+                            !allowed
+                                .is_some_and(|allowed| allowed.contains(*key))
+                        })
                         .map(|key| format!("{}.{key}", element.name)),
                 );
                 check_schema(&element.children, schema, out);
@@ -78,7 +86,8 @@ fn inputs(dir: &Path, out: &mut Vec<PathBuf>) {
     let Ok(entries) = fs::read_dir(dir) else {
         return;
     };
-    let mut paths: Vec<PathBuf> = entries.filter_map(Result::ok).map(|e| e.path()).collect();
+    let mut paths: Vec<PathBuf> =
+        entries.filter_map(Result::ok).map(|e| e.path()).collect();
     paths.sort();
     for path in paths {
         let name = path
@@ -88,7 +97,9 @@ fn inputs(dir: &Path, out: &mut Vec<PathBuf>) {
             .to_owned();
         if path.is_dir() {
             inputs(&path, out);
-        } else if path.extension().is_some_and(|e| e == "md") && name != "README.md" {
+        } else if path.extension().is_some_and(|e| e == "md")
+            && name != "README.md"
+        {
             out.push(path);
         }
     }
@@ -127,7 +138,8 @@ fn corpus_survives_the_editor_tree() {
         let mut unknown = Vec::new();
         check_schema(&tree.content, &schema, &mut unknown);
         if !unknown.is_empty() {
-            failures.push(format!("{name}: names outside the schema: {unknown:?}"));
+            failures
+                .push(format!("{name}: names outside the schema: {unknown:?}"));
         }
         let back = to_document(&tree);
         if back != parsed {
@@ -139,7 +151,8 @@ fn corpus_survives_the_editor_tree() {
         let markdown = through_yjs(&source);
         if markdown != canonical {
             failures.push(format!(
-                "{name}: Markdown differs:\n{markdown}\n--- expected:\n{canonical}"
+                "{name}: Markdown differs:\n{markdown}\n--- expected:\n\
+                    {canonical}"
             ));
         }
     }
@@ -165,7 +178,8 @@ fn block() -> impl Strategy<Value = String> {
         word.prop_map(|w| format!("@{w}")),
         word.prop_map(|w| format!("[[{w}]]")),
     ];
-    let line = prop::collection::vec(inline, 1..5).prop_map(|parts| parts.join(" "));
+    let line =
+        prop::collection::vec(inline, 1..5).prop_map(|parts| parts.join(" "));
     prop_oneof![
         line.clone(),
         (1..=6_usize, line.clone())
@@ -175,17 +189,23 @@ fn block() -> impl Strategy<Value = String> {
             .map(|i| format!("- {i}"))
             .collect::<Vec<_>>()
             .join("\n")),
-        prop::collection::vec((any::<bool>(), line.clone()), 1..4).prop_map(|items| items
-            .iter()
-            .map(|(done, i)| format!("- [{}] {i}", if *done { "x" } else { " " }))
-            .collect::<Vec<_>>()
-            .join("\n")),
+        prop::collection::vec((any::<bool>(), line.clone()), 1..4).prop_map(
+            |items| items
+                .iter()
+                .map(|(done, i)| format!(
+                    "- [{}] {i}",
+                    if *done { "x" } else { " " }
+                ))
+                .collect::<Vec<_>>()
+                .join("\n")
+        ),
         line.clone().prop_map(|text| format!("> {text}")),
         "[a-z ]{0,20}".prop_map(|code| format!("```rust\n{code}\n```")),
         line.clone()
             .prop_map(|text| format!("::: info\n{text}\n:::")),
-        (line.clone(), line)
-            .prop_map(|(a, b)| format!("| {a} | {b} |\n| --- | :-: |\n| {b} | {a} |")),
+        (line.clone(), line).prop_map(|(a, b)| format!(
+            "| {a} | {b} |\n| --- | :-: |\n| {b} | {a} |"
+        )),
     ]
 }
 
@@ -204,7 +224,9 @@ proptest! {
         });
         source.push_str(&blocks.join("\n\n"));
         source.push('\n');
-        let canonical = vellum_format::serialize(&vellum_format::parse(&source).document);
+        let canonical = vellum_format::serialize(
+            &vellum_format::parse(&source).document
+        );
         let once = through_yjs(&source);
         prop_assert_eq!(&once, &canonical);
         prop_assert_eq!(through_yjs(&once), once);

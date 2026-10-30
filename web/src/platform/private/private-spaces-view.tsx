@@ -30,8 +30,14 @@ function grouped(fingerprint: string): string {
 export function PrivateSpacesView() {
   const t = useT();
   return (
-    <ServerScreen api="privateSpaces" help="app.private-spaces" title={t("private-title")}>
-      {(api) => <PrivateSpaces api={api} device={desktopBridge()?.privateSpaces} />}
+    <ServerScreen
+      api="privateSpaces"
+      help="app.private-spaces"
+      title={t("private-title")}
+    >
+      {(api) => (
+        <PrivateSpaces api={api} device={desktopBridge()?.privateSpaces} />
+      )}
     </ServerScreen>
   );
 }
@@ -71,12 +77,17 @@ export function PrivateSpaces({
       },
       (error: unknown) => {
         setBusy(false);
-        const fallback = error instanceof Error ? error.message : t("private-error");
+        const fallback =
+          error instanceof Error ? error.message : t("private-error");
         const keys = untrustedKeys(fallback);
         setMessage(
           keys === undefined || space === undefined
             ? { text: describeError(error, fallback), failed: true }
-            : { text: t("private-untrusted"), failed: true, untrusted: { space, keys } },
+            : {
+                text: t("private-untrusted"),
+                failed: true,
+                untrusted: { space, keys },
+              },
         );
       },
     );
@@ -94,7 +105,9 @@ export function PrivateSpaces({
             {(found) => (
               <p>
                 {t("private-device-fingerprint")}{" "}
-                <code>{found === undefined ? "" : grouped(found.fingerprint)}</code>
+                <code>
+                  {found === undefined ? "" : grouped(found.fingerprint)}
+                </code>
               </p>
             )}
           </Ready>
@@ -113,7 +126,10 @@ export function PrivateSpaces({
           keys={message.untrusted.keys}
           busy={busy}
           onTrust={() => {
-            const { space, keys } = message.untrusted ?? { space: "", keys: [] };
+            const { space, keys } = message.untrusted ?? {
+              space: "",
+              keys: [],
+            };
             run(async () => {
               const { lines } = await device.reseal(space, keys);
               return lines;
@@ -157,12 +173,16 @@ function SpaceCard({
   readonly busy: boolean;
   readonly device: DeviceActions | undefined;
   readonly api: PrivateSpacesApi;
-  readonly run: (action: () => Promise<readonly string[]>, space?: string) => void;
+  readonly run: (
+    action: () => Promise<readonly string[]>,
+    space?: string,
+  ) => void;
 }) {
   const t = useT();
   const heading = `private-space-${space.id}`;
   const keys = space.keys.keys;
-  const enrolled = mine !== undefined && keys.some((k) => k.fingerprint === mine);
+  const enrolled =
+    mine !== undefined && keys.some((k) => k.fingerprint === mine);
   return (
     <section aria-labelledby={heading}>
       <h2 id={heading}>{space.name}</h2>
@@ -231,7 +251,9 @@ function SpaceCard({
   );
 }
 
-/** Device keys new since this device last sealed, to compare before trusting. */
+/**
+ * Device keys new since this device last sealed, to compare before trusting.
+ */
 function UntrustedKeys({
   keys,
   busy,
@@ -253,7 +275,12 @@ function UntrustedKeys({
           </li>
         ))}
       </ul>
-      <button type="button" className="vl-filled-button" disabled={busy} onClick={onTrust}>
+      <button
+        type="button"
+        className="vl-filled-button"
+        disabled={busy}
+        onClick={onTrust}
+      >
         {t("private-trust")}
       </button>
     </section>

@@ -123,7 +123,12 @@ function Summary({
       <h3 id="assist-summary-heading" className="vl-assist-subhead">
         {t("assist-summary")}
       </h3>
-      <button type="button" className="vl-filled-button" disabled={busy} onClick={run}>
+      <button
+        type="button"
+        className="vl-filled-button"
+        disabled={busy}
+        onClick={run}
+      >
         {busy ? t("assist-thinking") : t("assist-summarize")}
       </button>
       {error !== undefined && (
@@ -156,7 +161,11 @@ function DraftFromTemplate({
     setBusy(true);
     setError(undefined);
     api
-      .draft(toSettings(stored), { templatePageId: pageId, title, instructions })
+      .draft(toSettings(stored), {
+        templatePageId: pageId,
+        title,
+        instructions,
+      })
       .then(
         (draft) => {
           const path = appPath(draft.url);

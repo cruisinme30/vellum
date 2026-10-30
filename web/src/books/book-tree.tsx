@@ -7,7 +7,13 @@ import { useNavigate } from "react-router";
 import { useT } from "../i18n/i18n";
 
 import type { Place } from "./api";
-import { dropPlace, isWithin, placeFor, type OutlineMove, type OutlineRow } from "./outline";
+import {
+  dropPlace,
+  isWithin,
+  placeFor,
+  type OutlineMove,
+  type OutlineRow,
+} from "./outline";
 
 const KEY_MOVES: Readonly<Record<string, OutlineMove>> = {
   ArrowUp: "up",
@@ -16,7 +22,10 @@ const KEY_MOVES: Readonly<Record<string, OutlineMove>> = {
   ArrowLeft: "outdent",
 };
 
-const ZONES: Partial<Record<Place["at"], Drop["zone"]>> = { before: "before", after: "after" };
+const ZONES: Partial<Record<Place["at"], Drop["zone"]>> = {
+  before: "before",
+  after: "after",
+};
 
 const DRAG_TYPE = "application/x-vellum-section";
 
@@ -58,12 +67,15 @@ export function BookTree({
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const list = useRef<HTMLDivElement>(null);
-  const tabStop = rows.find((r) => r.id === (focusId ?? current))?.id ?? rows[0]?.id;
+  const tabStop =
+    rows.find((r) => r.id === (focusId ?? current))?.id ?? rows[0]?.id;
 
   const focus = (id: string | undefined) => {
     if (id === undefined) return;
     setFocusId(id);
-    list.current?.querySelector<HTMLElement>(`[data-section-id="${CSS.escape(id)}"]`)?.focus();
+    list.current
+      ?.querySelector<HTMLElement>(`[data-section-id="${CSS.escape(id)}"]`)
+      ?.focus();
   };
 
   const move = (id: string, place: Place | undefined, title: string) => {
@@ -82,7 +94,8 @@ export function BookTree({
   };
 
   const onKeyDown = (event: KeyboardEvent, row: OutlineRow, at: number) => {
-    const reorder = event.altKey && event.shiftKey ? KEY_MOVES[event.key] : undefined;
+    const reorder =
+      event.altKey && event.shiftKey ? KEY_MOVES[event.key] : undefined;
     if (reorder) {
       event.preventDefault();
       move(row.id, placeFor(rows, row.id, reorder, maxDepth), row.node.title);
@@ -115,11 +128,21 @@ export function BookTree({
     }
   };
 
-  const zoneOf = (event: DragEvent<HTMLElement>, row: OutlineRow): Drop | undefined => {
+  const zoneOf = (
+    event: DragEvent<HTMLElement>,
+    row: OutlineRow,
+  ): Drop | undefined => {
     const dragged = rows.find((r) => r.id === dragging);
-    if (dragged === undefined || isWithin(rows, row.id, dragged.id)) return undefined;
+    if (dragged === undefined || isWithin(rows, row.id, dragged.id))
+      return undefined;
     const box = event.currentTarget.getBoundingClientRect();
-    const place = dropPlace(row, dragged, event.clientY - box.top, box.height, maxDepth);
+    const place = dropPlace(
+      row,
+      dragged,
+      event.clientY - box.top,
+      box.height,
+      maxDepth,
+    );
     if (place === undefined) return undefined;
     const zone = ZONES[place.at] ?? "inside";
     return { id: row.id, zone };
@@ -142,7 +165,9 @@ export function BookTree({
       >
         {rows.map((row, at) => {
           const label =
-            row.node.number == undefined ? row.node.title : `${row.node.number} ${row.node.title}`;
+            row.node.number == undefined
+              ? row.node.title
+              : `${row.node.number} ${row.node.title}`;
           const zone = drop?.id === row.id ? drop.zone : undefined;
           return (
             <div
@@ -176,7 +201,8 @@ export function BookTree({
                 }
                 event.preventDefault();
                 event.dataTransfer.dropEffect = "move";
-                if (next.id !== drop?.id || next.zone !== drop.zone) setDrop(next);
+                if (next.id !== drop?.id || next.zone !== drop.zone)
+                  setDrop(next);
               }}
               onDragLeave={() => {
                 if (drop?.id === row.id) setDrop(undefined);
@@ -185,10 +211,19 @@ export function BookTree({
                 event.preventDefault();
                 const dragged = rows.find((r) => r.id === dragging);
                 const box = event.currentTarget.getBoundingClientRect();
-                if (dragged !== undefined && !isWithin(rows, row.id, dragged.id)) {
+                if (
+                  dragged !== undefined &&
+                  !isWithin(rows, row.id, dragged.id)
+                ) {
                   move(
                     dragged.id,
-                    dropPlace(row, dragged, event.clientY - box.top, box.height, maxDepth),
+                    dropPlace(
+                      row,
+                      dragged,
+                      event.clientY - box.top,
+                      box.height,
+                      maxDepth,
+                    ),
                     dragged.node.title,
                   );
                 }
@@ -199,7 +234,8 @@ export function BookTree({
                 if (event.target === event.currentTarget) setFocusId(row.id);
               }}
               onKeyDown={(event) => {
-                if (event.target === event.currentTarget) onKeyDown(event, row, at);
+                if (event.target === event.currentTarget)
+                  onKeyDown(event, row, at);
               }}
               onClick={() => {
                 void navigate(sectionPath(row.id));

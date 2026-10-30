@@ -3,12 +3,13 @@
 
 //! Running Work commands from inside the server, without the gateway.
 //!
-//! Integrations (GitHub, GitLab, Slack, Sentry, email) act on issues as a
-//! bot user. Service crates cannot depend on each other, so the server's
-//! composition root adapts these two calls to the integrations' port.
-//! A command passed to [`WorkService::transact`] runs under the same lock
-//! as every operation (and runs again if another replica committed first), and its changes are written and announced the same
-//! way: files first, then events, with memory put back if a write fails.
+//! Integrations (GitHub, GitLab, Slack, Sentry, email) act on issues as a bot
+//! user. Service crates cannot depend on each other, so the server's
+//! composition root adapts these two calls to the integrations' port. A command
+//! passed to [`WorkService::transact`] runs under the same lock as every
+//! operation (and runs again if another replica committed first), and its
+//! changes are written and announced the same way: files first, then events,
+//! with memory put back if a write fails.
 
 use vellum_kernel::Error;
 use vellum_work::{Changes, CommentChanges, Comments, Ctx, UserRef, WorkGraph};
@@ -20,7 +21,10 @@ pub type Outcome<R> = (Changes, Option<CommentChanges>, R);
 
 impl WorkService {
     /// Reads the issue graph and comments under the service lock.
-    pub async fn read<R>(&self, f: impl FnOnce(&WorkGraph, &Comments) -> R) -> R {
+    pub async fn read<R>(
+        &self,
+        f: impl FnOnce(&WorkGraph, &Comments) -> R,
+    ) -> R {
         let st = self.read_state().await;
         f(&st.graph, &st.comments)
     }
@@ -38,12 +42,18 @@ impl WorkService {
     pub async fn transact<R>(
         &self,
         actor: UserRef,
-        mut f: impl FnMut(&mut WorkGraph, &mut Comments, &Ctx) -> Result<Outcome<R>, Error>,
+        mut f: impl FnMut(
+            &mut WorkGraph,
+            &mut Comments,
+            &Ctx,
+        ) -> Result<Outcome<R>, Error>,
     ) -> Result<R, Error> {
         let mut lost = 0;
         loop {
             match self.transact_once(actor.clone(), &mut f).await {
-                Err(e) if super::is_race(&e) && lost < super::ATTEMPTS => lost += 1,
+                Err(e) if super::is_race(&e) && lost < super::ATTEMPTS => {
+                    lost += 1
+                }
                 other => return other,
             }
         }
@@ -52,7 +62,11 @@ impl WorkService {
     async fn transact_once<R>(
         &self,
         actor: UserRef,
-        f: &mut impl FnMut(&mut WorkGraph, &mut Comments, &Ctx) -> Result<Outcome<R>, Error>,
+        f: &mut impl FnMut(
+            &mut WorkGraph,
+            &mut Comments,
+            &Ctx,
+        ) -> Result<Outcome<R>, Error>,
     ) -> Result<R, Error> {
         let now = self.clock.now();
         let ctx = Ctx {
@@ -63,13 +77,14 @@ impl WorkService {
         let mut st = self.write_state().await?;
         let backup = st.clone();
         let state = &mut *st;
-        let (changes, comments, out) = match f(&mut state.graph, &mut state.comments, &ctx) {
-            Ok(done) => done,
-            Err(e) => {
-                *st = backup;
-                return Err(e);
-            }
-        };
+        let (changes, comments, out) =
+            match f(&mut state.graph, &mut state.comments, &ctx) {
+                Ok(done) => done,
+                Err(e) => {
+                    *st = backup;
+                    return Err(e);
+                }
+            };
         self.commit(
             &mut st,
             backup,

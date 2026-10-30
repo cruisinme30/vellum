@@ -85,7 +85,11 @@ function Form({
           </option>
         ))}
       </select>
-      <button type="submit" className="vl-text-button" disabled={busy || !dirty}>
+      <button
+        type="submit"
+        className="vl-text-button"
+        disabled={busy || !dirty}
+      >
         {t("plan-repeat-save")}
       </button>
       <p role="status" className="vl-muted">
@@ -115,7 +119,9 @@ export function RepeatSettings({
   const api = useServerApi("planning");
   if (api === undefined) {
     if (issue.repeat == undefined) return;
-    return <p className="vl-muted">{t("plan-repeats", { repeat: issue.repeat })}</p>;
+    return (
+      <p className="vl-muted">{t("plan-repeats", { repeat: issue.repeat })}</p>
+    );
   }
   return <Form api={api} issue={issue} onSaved={onSaved} />;
 }

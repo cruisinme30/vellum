@@ -62,8 +62,8 @@ gitGraph
 | Full (`full.yml`) | release pull requests into `main` only | the fast suite, plus Rust line coverage of at least 85 %, the reproducible release build and image within their budgets, Playwright end-to-end and the full UI suite (Chromium, Firefox and WebKit at four sizes, with visual baselines), and external link checks |
 
 CodeQL (`codeql.yml`) scans release pull requests, pushes to `main` and
-`develop` weekly. The nightly load test, security scan and fuzz runs skip a night when
-`develop` has not changed since the last green night.
+`develop` weekly. The nightly load test, security scan and fuzz runs skip a
+night when `develop` has not changed since the last green night.
 
 On a pull request into `develop`, a new push cancels that pull request's
 older **Fast suite** and **Labels** runs, so a batch has one live run;
@@ -90,13 +90,20 @@ cargo xtask install-hooks
 
 This turns on the commit template and three git hooks: `commit-msg`
 checks the commit message, `pre-commit` checks the staged files in
-seconds (format, lint, types and secrets), and `pre-push`
+seconds (format, lint, types, line length and secrets), and `pre-push`
 runs `cargo xtask fast`, which mirrors every **Fast suite** check in CI
 and refuses the push if one fails. Run it by hand at any time:
 
 ```sh
 cargo xtask fast
 ```
+
+Lines stop at 80 characters in every file
+([ADR 0074](docs/adr/0074-line-length-80.md)). rustfmt and Prettier wrap
+code; split long strings and comments yourself.
+`scripts/ci/check-line-length.sh` lists what is still too long, and
+`cargo xtask install-hooks` sets `git blame` to skip the commit that
+reformatted the repo.
 
 A check whose tool is not installed fails the run, because a skipped check
 used to let failures reach CI unnoticed. Install every tool, at the
@@ -107,18 +114,19 @@ scripts/dev/install-tools.sh
 ```
 
 Cloud sessions get them from the environment's setup script, which runs
-`curl -sSfL https://raw.githubusercontent.com/cruisinme30/vellum/develop/scripts/dev/install-tools.sh | bash`.
-Set `VELLUM_ALLOW_MISSING_TOOLS=1` to skip a missing tool instead. The
-local run is focused: clippy, rustdoc and the Rust tests cover only the
-crates your branch changed, and the web and desktop unit tests only the
-files related to your changes, without the coverage gate. The
-batch pull request into develop runs the entire suite in CI, so don't run it in a
-feature branch; `VELLUM_FAST_ALL_TESTS=1` does it locally if you need to. Tests that need
-Docker are left out without a Docker daemon, and CI runs them. Local
-builds skip debug info and incremental caches (`CARGO_PROFILE_DEV_DEBUG=0`,
-`CARGO_INCREMENTAL=0`) so a test build fits a small disk; set either
-variable yourself to override. In an emergency, `git push --no-verify`
-skips the hook, but CI still gates the merge.
+`curl -sSfL
+https://raw.githubusercontent.com/cruisinme30/vellum/develop/scripts/dev/install-tools.sh |
+bash`. Set `VELLUM_ALLOW_MISSING_TOOLS=1` to skip a missing tool instead. The
+local run is focused: clippy, rustdoc and the Rust tests cover only the crates
+your branch changed, and the web and desktop unit tests only the files related
+to your changes, without the coverage gate. The batch pull request into develop
+runs the entire suite in CI, so don't run it in a feature branch;
+`VELLUM_FAST_ALL_TESTS=1` does it locally if you need to. Tests that need Docker
+are left out without a Docker daemon, and CI runs them. Local builds skip debug
+info and incremental caches (`CARGO_PROFILE_DEV_DEBUG=0`, `CARGO_INCREMENTAL=0`)
+so a test build fits a small disk; set either variable yourself to override. In
+an emergency, `git push --no-verify` skips the hook, but CI still gates the
+merge.
 
 Before opening a pull request, or after editing its title or description,
 check them the way CI will:
@@ -197,8 +205,9 @@ cd web && UI_SITE_DIR=../_site pnpm exec playwright test e2e/ui
 ```
 
 `UI_BROWSERS`, `UI_VIEWPORTS` and `UI_SCOPE` widen or narrow the run.
-`UI_SCOPE=full` (the release check) adds every help page in the default
-mode; `UI_SCOPE=exhaustive` checks every help page in every mode. Visual baselines are refreshed with `scripts/ci/ui-baselines.sh`.
+`UI_SCOPE=full` (the release check) adds every help page in the default mode;
+`UI_SCOPE=exhaustive` checks every help page in every mode. Visual baselines are
+refreshed with `scripts/ci/ui-baselines.sh`.
 
 ## Workflows
 
@@ -232,16 +241,16 @@ Every change is traceable to the discussion that led to it.
   issue stays open) in the **Issue** section of the description.
 - **A feature records its decisions.** Run
   `cargo xtask adr new <slug> --decisions N --issue N`. It writes
-  `docs/adr/NNNN-<slug>.md` from `docs/adr/0000-template.md` with the next
-  free record and decision numbers across all branches
-  (`cargo xtask adr next` only prints them), skipping those reserved in
-  `docs/adr/reserved.toml`. Push the branch right away to claim the
-  numbers, then fill it in. Every record has the same four sections,
-  **Context**, **Decisions**, **Alternatives** and **Consequences**, plus
-  the issue and pull requests in its facts block. Keep it short: under
-  150 lines and at most six bullets in a row; the **Decision records**
-  check enforces both, and fails when two records share a number. When a feature only extends an existing decision,
-  update that record or name it as `ADR NNNN` in the description.
+  `docs/adr/NNNN-<slug>.md` from `docs/adr/0000-template.md` with the next free
+  record and decision numbers across all branches (`cargo xtask adr next` only
+  prints them), skipping those reserved in `docs/adr/reserved.toml`. Push the
+  branch right away to claim the numbers, then fill it in. Every record has the
+  same four sections, **Context**, **Decisions**, **Alternatives** and
+  **Consequences**, plus the issue and pull requests in its facts block. Keep it
+  short: under 150 lines and at most six bullets in a row; the **Decision
+  records** check enforces both, and fails when two records share a number. When
+  a feature only extends an existing decision, update that record or name it as
+  `ADR NNNN` in the description.
 
 The **Issue and decision record** check in the fast suite enforces this.
 Release pull requests, Dependabot, and `chore` or `ci` pull requests are

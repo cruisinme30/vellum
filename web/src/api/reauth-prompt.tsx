@@ -33,8 +33,17 @@ import "./reauth-prompt.css";
  * needs a recent sign-in, takes the password again (or sends the person
  * through single sign-on), and lets the waiting action run.
  */
-export function ReauthPrompt({ gate, http }: { readonly gate: ReauthGate; readonly http: Http }) {
-  const subscribe = useCallback((listener: () => void) => gate.subscribe(listener), [gate]);
+export function ReauthPrompt({
+  gate,
+  http,
+}: {
+  readonly gate: ReauthGate;
+  readonly http: Http;
+}) {
+  const subscribe = useCallback(
+    (listener: () => void) => gate.subscribe(listener),
+    [gate],
+  );
   const pending = useCallback(() => gate.pending(), [gate]);
   const open = useSyncExternalStore(subscribe, pending, pending);
   return open ? <ReauthDialog gate={gate} http={http} /> : undefined;
@@ -166,7 +175,12 @@ function PasswordForm({
       <div className="vl-reauth-actions">
         <CancelButton gate={gate} />
         {askCode && passkeysSupported() && (
-          <button type="button" className="vl-text-button" disabled={busy} onClick={withPasskey}>
+          <button
+            type="button"
+            className="vl-text-button"
+            disabled={busy}
+            onClick={withPasskey}
+          >
             {t("reauth-passkey")}
           </button>
         )}
@@ -178,7 +192,13 @@ function PasswordForm({
   );
 }
 
-function ReauthDialog({ gate, http }: { readonly gate: ReauthGate; readonly http: Http }) {
+function ReauthDialog({
+  gate,
+  http,
+}: {
+  readonly gate: ReauthGate;
+  readonly http: Http;
+}) {
   const t = useT();
   const session = useSession();
   const id = useId();
@@ -217,7 +237,10 @@ function ReauthDialog({ gate, http }: { readonly gate: ReauthGate; readonly http
         {sso !== undefined && (
           <div className="vl-reauth-actions">
             {!withPassword && <CancelButton gate={gate} />}
-            <a className="vl-text-button" href={ssoReauthUrl(sso.startUrl, next)}>
+            <a
+              className="vl-text-button"
+              href={ssoReauthUrl(sso.startUrl, next)}
+            >
               {t("reauth-sso", { name: sso.name })}
             </a>
           </div>

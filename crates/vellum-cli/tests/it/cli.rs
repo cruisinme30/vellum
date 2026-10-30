@@ -44,7 +44,8 @@ fn rejects_an_invalid_log_filter() {
 
 #[test]
 fn profile_renders_a_folded_file() {
-    let dir = std::env::temp_dir().join(format!("vellum-cli-profile-{}", std::process::id()));
+    let dir = std::env::temp_dir()
+        .join(format!("vellum-cli-profile-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let input = dir.join("in.folded");
     let out = dir.join("out.svg");
@@ -73,7 +74,8 @@ fn profile_renders_a_folded_file() {
 
 #[test]
 fn budgets_checks_a_routes_file() {
-    let dir = std::env::temp_dir().join(format!("vellum-cli-budgets-{}", std::process::id()));
+    let dir = std::env::temp_dir()
+        .join(format!("vellum-cli-budgets-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let input = dir.join("routes.json");
     std::fs::write(
@@ -104,7 +106,8 @@ fn budgets_checks_a_routes_file() {
 fn prints_the_api_contracts() {
     let output = vellum().arg("openapi").output().unwrap();
     assert!(output.status.success());
-    let doc: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let doc: serde_json::Value =
+        serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(doc["openapi"], "3.1.1");
     // The admin console is part of the API the clients are generated from.
     for path in ["/v1/admin/requests", "/v1/admin/routes", "/v1/admin/audit"] {
@@ -128,7 +131,8 @@ fn serves_health_checks() {
         .local_addr()
         .unwrap()
         .port();
-    let data = std::env::temp_dir().join(format!("vellum-serve-{}", std::process::id()));
+    let data = std::env::temp_dir()
+        .join(format!("vellum-serve-{}", std::process::id()));
     let mut child = vellum()
         .arg("serve")
         .env("VELLUM_BIND", format!("127.0.0.1:{port}"))
@@ -137,9 +141,12 @@ fn serves_health_checks() {
         .spawn()
         .unwrap();
     let get = |path: &str| {
-        let mut stream = std::net::TcpStream::connect(("127.0.0.1", port)).ok()?;
-        let request =
-            format!("GET {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
+        let mut stream =
+            std::net::TcpStream::connect(("127.0.0.1", port)).ok()?;
+        let request = format!(
+            "GET {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\
+                \r\n"
+        );
         stream.write_all(request.as_bytes()).ok()?;
         let mut reply = String::new();
         let _ = stream.read_to_string(&mut reply);
@@ -157,7 +164,8 @@ fn serves_health_checks() {
     // every response carries the trace id for the browser to join.
     let admin = get("/api/v1/admin/requests").unwrap_or_default();
     let keys = data.join(".vellum").join("keys");
-    let made_keys = keys.join("admin.key").is_file() && keys.join("backup.key").is_file();
+    let made_keys =
+        keys.join("admin.key").is_file() && keys.join("backup.key").is_file();
     let made_audit = data.join(".vellum").join("audit").is_dir();
     child.kill().unwrap();
     let _ = child.wait();
@@ -183,7 +191,11 @@ fn mcp_demo_answers_discover_over_stdio() {
         .stderr(Stdio::null())
         .spawn()
         .unwrap();
-    let request = r#"{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}"#;
+    let request = concat!(
+        r#"{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_met"#,
+        r#"a":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.mod"#,
+        r#"elcontextprotocol/clientCapabilities":{}}}}"#,
+    );
     let mut stdin = child.stdin.take().unwrap();
     writeln!(stdin, "{request}").unwrap();
     drop(stdin);

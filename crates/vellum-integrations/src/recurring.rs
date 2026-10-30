@@ -23,7 +23,18 @@ use serde::{Deserialize, Serialize};
 use crate::model::{IssueDraft, Source};
 
 /// A day of the week, as stored in schedules.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    Serialize,
+    Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Day {
     /// Monday.
@@ -159,7 +170,9 @@ impl Rule {
             | Self::Years { interval } => *interval,
         };
         if interval == 0 {
-            return Err(ScheduleError::InvalidRule("interval must be at least 1"));
+            return Err(ScheduleError::InvalidRule(
+                "interval must be at least 1",
+            ));
         }
         if let Self::Months { day: Some(day), .. } = self
             && !(*day == -1 || (1..=31).contains(day))
@@ -179,17 +192,20 @@ impl Rule {
     }
 
     /// Every occurrence from `first` on, in order.
-    pub fn occurrences(&self, first: Date) -> Box<dyn Iterator<Item = Date> + '_> {
+    pub fn occurrences(
+        &self,
+        first: Date,
+    ) -> Box<dyn Iterator<Item = Date> + '_> {
         match self {
             Self::Days {
                 weekdays_only: true,
                 ..
-            } => Box::new(
-                first
-                    .series(1.day())
-                    .filter(|d| !matches!(d.weekday(), Weekday::Saturday | Weekday::Sunday)),
-            ),
-            Self::Days { interval, .. } => Box::new(first.series(i64::from(*interval).days())),
+            } => Box::new(first.series(1.day()).filter(|d| {
+                !matches!(d.weekday(), Weekday::Saturday | Weekday::Sunday)
+            })),
+            Self::Days { interval, .. } => {
+                Box::new(first.series(i64::from(*interval).days()))
+            }
             Self::Weeks { interval, on } => {
                 let mut days: Vec<Weekday> = if on.is_empty() {
                     vec![first.weekday()]
@@ -199,15 +215,21 @@ impl Rule {
                 days.sort_by_key(|d| d.to_monday_zero_offset());
                 days.dedup();
                 let monday = first
-                    .checked_sub(i64::from(first.weekday().to_monday_zero_offset()).days())
+                    .checked_sub(
+                        i64::from(first.weekday().to_monday_zero_offset())
+                            .days(),
+                    )
                     .unwrap_or(first);
                 Box::new(
                     monday
                         .series(i64::from(*interval).weeks())
                         .flat_map(move |week| {
                             days.clone().into_iter().filter_map(move |day| {
-                                week.checked_add(i64::from(day.to_monday_zero_offset()).days())
-                                    .ok()
+                                week.checked_add(
+                                    i64::from(day.to_monday_zero_offset())
+                                        .days(),
+                                )
+                                .ok()
                             })
                         })
                         .filter(move |d| *d >= first),
@@ -219,11 +241,14 @@ impl Rule {
                 Box::new(
                     (0..)
                         .map_while(move |k: i32| {
-                            let months = i32::from(first.year()) * 12 + i32::from(first.month())
+                            let months = i32::from(first.year()) * 12
+                                + i32::from(first.month())
                                 - 1
                                 + k * interval;
-                            let year = i16::try_from(months.div_euclid(12)).ok()?;
-                            let month = i8::try_from(months.rem_euclid(12) + 1).ok()?;
+                            let year =
+                                i16::try_from(months.div_euclid(12)).ok()?;
+                            let month =
+                                i8::try_from(months.rem_euclid(12) + 1).ok()?;
                             clamp_day(year, month, day)
                         })
                         .filter(move |d| *d >= first),
@@ -232,7 +257,9 @@ impl Rule {
             Self::Years { interval } => {
                 let interval = i32::from(*interval);
                 Box::new((0..).map_while(move |k: i32| {
-                    let year = i16::try_from(i32::from(first.year()) + k * interval).ok()?;
+                    let year =
+                        i16::try_from(i32::from(first.year()) + k * interval)
+                            .ok()?;
                     clamp_day(year, first.month(), first.day())
                 }))
             }
@@ -266,9 +293,13 @@ impl Schedule {
     /// # Errors
     ///
     /// [`ScheduleError::UnknownTimeZone`] for a bad zone name.
-    pub fn creation_time(&self, previous_due: Date) -> Result<Timestamp, ScheduleError> {
-        let tz = TimeZone::get(&self.time_zone)
-            .map_err(|_| ScheduleError::UnknownTimeZone(self.time_zone.clone()))?;
+    pub fn creation_time(
+        &self,
+        previous_due: Date,
+    ) -> Result<Timestamp, ScheduleError> {
+        let tz = TimeZone::get(&self.time_zone).map_err(|_| {
+            ScheduleError::UnknownTimeZone(self.time_zone.clone())
+        })?;
         let day = previous_due.tomorrow().unwrap_or(previous_due);
         day.to_datetime(Time::constant(0, 1, 0, 0))
             .to_zoned(tz)
@@ -282,7 +313,10 @@ impl Schedule {
     /// # Errors
     ///
     /// [`ScheduleError`] for an invalid rule or time zone.
-    pub fn due_now(&self, now: Timestamp) -> Result<Option<Occurrence>, ScheduleError> {
+    pub fn due_now(
+        &self,
+        now: Timestamp,
+    ) -> Result<Option<Occurrence>, ScheduleError> {
         self.rule.validate()?;
         if self.paused {
             return Ok(None);
@@ -291,7 +325,8 @@ impl Schedule {
         let mut pick: Option<Date> = None;
         let mut skipped = 0_u32;
         for created in (self.created..).take(MAX_STEPS) {
-            let Some(next) = self.rule.next_after(self.first_due, previous) else {
+            let Some(next) = self.rule.next_after(self.first_due, previous)
+            else {
                 break;
             };
             if self.ended(next, created) {
@@ -458,7 +493,8 @@ mod tests {
     }
 
     #[test]
-    fn next_issue_appears_at_0001_team_time_after_the_due_date() -> Result<(), ScheduleError> {
+    fn next_issue_appears_at_0001_team_time_after_the_due_date()
+    -> Result<(), ScheduleError> {
         let mut s = schedule();
         s.created = 1;
         s.last_due = Some(date(2026, 11, 2));
@@ -477,7 +513,8 @@ mod tests {
     }
 
     #[test]
-    fn outages_create_only_the_latest_missed_occurrence() -> Result<(), ScheduleError> {
+    fn outages_create_only_the_latest_missed_occurrence()
+    -> Result<(), ScheduleError> {
         let mut s = schedule();
         s.created = 1;
         s.last_due = Some(date(2026, 11, 2));

@@ -3,12 +3,12 @@
 
 //! KEKs persisted in a secret store, by default the OS keychain.
 //!
-//! The KEK's raw bytes live in the store under its [`KekId`]; the server
-//! config records which id is current and which are retired. The OS backend
-//! (macOS Keychain, Windows Credential Manager, the Linux Secret Service) is
-//! behind the `os-keychain` feature. The Secret Service needs a running
-//! keyring daemon (GNOME Keyring or KDE Wallet), which desktops have and headless
-//! Linux servers usually lack; those use a passphrase or a KMS/Vault provider.
+//! The KEK's raw bytes live in the store under its [`KekId`]; the server config
+//! records which id is current and which are retired. The OS backend (macOS
+//! Keychain, Windows Credential Manager, the Linux Secret Service) is behind
+//! the `os-keychain` feature. The Secret Service needs a running keyring daemon
+//! (GNOME Keyring or KDE Wallet), which desktops have and headless Linux
+//! servers usually lack; those use a passphrase or a KMS/Vault provider.
 
 use zeroize::Zeroizing;
 
@@ -22,7 +22,10 @@ pub trait SecretStore: Send + Sync {
     ///
     /// # Errors
     /// [`CryptoError::Provider`] if the store cannot be reached.
-    fn load(&self, name: &str) -> Result<Option<Zeroizing<Vec<u8>>>, CryptoError>;
+    fn load(
+        &self,
+        name: &str,
+    ) -> Result<Option<Zeroizing<Vec<u8>>>, CryptoError>;
 
     /// Stores `secret` under `name`, replacing any previous value.
     ///
@@ -36,8 +39,15 @@ pub trait SecretStore: Send + Sync {
 /// # Errors
 /// Store failures, or [`CryptoError::Malformed`] if the stored value is not a
 /// 32-byte key.
-#[tracing::instrument(name = "crypto.kek.load_or_create", skip(store), fields(kek_id = %id))]
-pub fn load_or_create_kek(store: &impl SecretStore, id: &KekId) -> Result<SecretKey, CryptoError> {
+#[tracing::instrument(
+    name = "crypto.kek.load_or_create",
+    skip(store),
+    fields(kek_id = %id)
+)]
+pub fn load_or_create_kek(
+    store: &impl SecretStore,
+    id: &KekId,
+) -> Result<SecretKey, CryptoError> {
     if let Some(bytes) = store.load(id.as_str())? {
         return SecretKey::from_slice(&bytes);
     }
@@ -58,7 +68,8 @@ pub fn keyring_from_store(
     current: &KekId,
     retired: &[KekId],
 ) -> Result<LocalKeyring, CryptoError> {
-    let mut ring = LocalKeyring::new(current.clone(), load_or_create_kek(store, current)?);
+    let mut ring =
+        LocalKeyring::new(current.clone(), load_or_create_kek(store, current)?);
     for id in retired {
         let bytes = store
             .load(id.as_str())?
@@ -84,8 +95,9 @@ pub fn rotate_in_store(
     Ok(())
 }
 
-/// The operating system keychain: macOS Keychain, Windows Credential
-/// Manager or the Linux Secret Service. Entries use `service` and the KEK id as the account name.
+/// The operating system keychain: macOS Keychain, Windows Credential Manager or
+/// the Linux Secret Service. Entries use `service` and the KEK id as the
+/// account name.
 #[cfg(feature = "os-keychain")]
 pub struct OsKeychain {
     service: String,
@@ -125,7 +137,10 @@ impl OsKeychain {
 
 #[cfg(feature = "os-keychain")]
 impl SecretStore for OsKeychain {
-    fn load(&self, name: &str) -> Result<Option<Zeroizing<Vec<u8>>>, CryptoError> {
+    fn load(
+        &self,
+        name: &str,
+    ) -> Result<Option<Zeroizing<Vec<u8>>>, CryptoError> {
         match self.entry(name)?.get_secret() {
             Ok(secret) => Ok(Some(Zeroizing::new(secret))),
             Err(keyring_core::Error::NoEntry) => Ok(None),
@@ -146,21 +161,26 @@ fn provider_error(error: &keyring_core::Error) -> CryptoError {
 }
 
 #[cfg(all(feature = "os-keychain", target_os = "macos"))]
-fn platform_store() -> Result<std::sync::Arc<keyring_core::CredentialStore>, CryptoError> {
-    let store =
-        apple_native_keyring_store::keychain::Store::new().map_err(|e| provider_error(&e))?;
+fn platform_store()
+-> Result<std::sync::Arc<keyring_core::CredentialStore>, CryptoError> {
+    let store = apple_native_keyring_store::keychain::Store::new()
+        .map_err(|e| provider_error(&e))?;
     Ok(store)
 }
 
 #[cfg(all(feature = "os-keychain", windows))]
-fn platform_store() -> Result<std::sync::Arc<keyring_core::CredentialStore>, CryptoError> {
-    let store = windows_native_keyring_store::Store::new().map_err(|e| provider_error(&e))?;
+fn platform_store()
+-> Result<std::sync::Arc<keyring_core::CredentialStore>, CryptoError> {
+    let store = windows_native_keyring_store::Store::new()
+        .map_err(|e| provider_error(&e))?;
     Ok(store)
 }
 
 #[cfg(all(feature = "os-keychain", target_os = "linux"))]
-fn platform_store() -> Result<std::sync::Arc<keyring_core::CredentialStore>, CryptoError> {
-    let store = dbus_secret_service_keyring_store::Store::new().map_err(|e| provider_error(&e))?;
+fn platform_store()
+-> Result<std::sync::Arc<keyring_core::CredentialStore>, CryptoError> {
+    let store = dbus_secret_service_keyring_store::Store::new()
+        .map_err(|e| provider_error(&e))?;
     Ok(store)
 }
 
@@ -168,8 +188,10 @@ fn platform_store() -> Result<std::sync::Arc<keyring_core::CredentialStore>, Cry
     feature = "os-keychain",
     not(any(target_os = "macos", target_os = "linux", windows))
 ))]
-fn platform_store() -> Result<std::sync::Arc<keyring_core::CredentialStore>, CryptoError> {
+fn platform_store()
+-> Result<std::sync::Arc<keyring_core::CredentialStore>, CryptoError> {
     Err(CryptoError::Provider(
-        "no OS keychain on this platform; use a passphrase or KMS/Vault KEK".into(),
+        "no OS keychain on this platform; use a passphrase or KMS/Vault KEK"
+            .into(),
     ))
 }

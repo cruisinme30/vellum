@@ -29,7 +29,9 @@ const MAX_KEY_LEN: usize = 4096;
 const MAX_ERROR_LEN: usize = 300;
 
 /// The wire format a model endpoint speaks.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Provider {
     /// The Anthropic Messages API (`POST {base}/v1/messages`).
@@ -131,7 +133,8 @@ impl ModelSettings {
                 ));
             }
         }
-        let url = Url::parse(&self.base()).map_err(|_| invalid("base_url: not an absolute URL"))?;
+        let url = Url::parse(&self.base())
+            .map_err(|_| invalid("base_url: not an absolute URL"))?;
         // The request URL is built by appending the API path, so a query,
         // fragment or sign-in part would change where it goes (RT-038).
         if !matches!(url.scheme(), "http" | "https")
@@ -142,7 +145,8 @@ impl ModelSettings {
             || url.fragment().is_some()
         {
             return Err(invalid(
-                "base_url: give the endpoint as http(s)://host[:port]/path, without a query",
+                "base_url: give the endpoint as http(s)://host[:port]/path, \
+                    without a query",
             ));
         }
         Ok(())
@@ -179,7 +183,8 @@ pub struct Completion {
 pub enum ModelError {
     /// The endpoint is not one Vellum may reach.
     #[error(
-        "Vellum can't reach {0}: use the provider's public https address, or ask an admin to allow a self-hosted endpoint"
+        "Vellum can't reach {0}: use the provider's public https address, or \
+            ask an admin to allow a self-hosted endpoint"
     )]
     Blocked(String),
     /// The provider refused the key.
@@ -205,14 +210,16 @@ pub enum ModelError {
 impl From<ModelError> for Error {
     fn from(e: ModelError) -> Self {
         let kind = match &e {
-            ModelError::Blocked(_) | ModelError::Rejected(_) | ModelError::Declined => {
-                ErrorKind::InvalidInput
-            }
+            ModelError::Blocked(_)
+            | ModelError::Rejected(_)
+            | ModelError::Declined => ErrorKind::InvalidInput,
             // The user's provider key, not their Vellum session: a 401
             // would sign them out of Vellum.
             ModelError::Key(_) => ErrorKind::PermissionDenied,
             ModelError::RateLimited => ErrorKind::RateLimited,
-            ModelError::Unavailable(_) | ModelError::Malformed(_) => ErrorKind::Unavailable,
+            ModelError::Unavailable(_) | ModelError::Malformed(_) => {
+                ErrorKind::Unavailable
+            }
         };
         Self::new(kind, e.to_string())
     }
@@ -313,7 +320,8 @@ pub fn read_response(
     let json: Value = serde_json::from_slice(body).unwrap_or(Value::Null);
     if !(200..300).contains(&status) {
         let message = shorten(
-            &provider_message(&json).unwrap_or_else(|| format!("HTTP {status}")),
+            &provider_message(&json)
+                .unwrap_or_else(|| format!("HTTP {status}")),
             key,
         );
         return Err(match status {
@@ -325,13 +333,17 @@ pub fn read_response(
     }
     let (text, stop) = match provider {
         Provider::Anthropic => {
-            let text = json.get("content").and_then(Value::as_array).map(|blocks| {
-                blocks
-                    .iter()
-                    .filter(|b| b.get("type").and_then(Value::as_str) == Some("text"))
-                    .filter_map(|b| b.get("text").and_then(Value::as_str))
-                    .collect::<String>()
-            });
+            let text =
+                json.get("content").and_then(Value::as_array).map(|blocks| {
+                    blocks
+                        .iter()
+                        .filter(|b| {
+                            b.get("type").and_then(Value::as_str)
+                                == Some("text")
+                        })
+                        .filter_map(|b| b.get("text").and_then(Value::as_str))
+                        .collect::<String>()
+                });
             (text, json.get("stop_reason").and_then(Value::as_str))
         }
         Provider::OpenaiCompatible => {
@@ -350,11 +362,14 @@ pub fn read_response(
     if matches!(stop, Some("refusal" | "content_filter")) {
         return Err(ModelError::Declined);
     }
-    let text = text.ok_or_else(|| ModelError::Malformed("no text in the answer".into()))?;
+    let text = text
+        .ok_or_else(|| ModelError::Malformed("no text in the answer".into()))?;
     let truncated = matches!(stop, Some("max_tokens" | "length"));
     if text.trim().is_empty() {
         return Err(if truncated {
-            ModelError::Rejected("the model ran out of tokens before answering".into())
+            ModelError::Rejected(
+                "the model ran out of tokens before answering".into(),
+            )
         } else {
             ModelError::Malformed("the answer was empty".into())
         });
@@ -386,7 +401,11 @@ impl HttpModel {
                 Url::parse(e.trim().trim_end_matches('/'))
                     .ok()
                     .filter(|u| u.host_str().is_some())
-                    .ok_or_else(|| invalid(&format!("VELLUM_AI_ENDPOINTS: {e} is not a URL")))
+                    .ok_or_else(|| {
+                        invalid(&format!(
+                            "VELLUM_AI_ENDPOINTS: {e} is not a URL"
+                        ))
+                    })
             })
             .collect::<Result<Vec<_>, _>>()?;
         let mut policy = UrlPolicy::default();
@@ -397,7 +416,8 @@ impl HttpModel {
         policy.timeout = timeout;
         policy.max_body_bytes = 4 * 1024 * 1024;
         let client = SafeClient::new(policy).map_err(|e| {
-            Error::new(ErrorKind::Internal, "cannot build the model client").with_source(e)
+            Error::new(ErrorKind::Internal, "cannot build the model client")
+                .with_source(e)
         })?;
         Ok(Self { client, endpoints })
     }
@@ -416,7 +436,8 @@ impl HttpModel {
             e.scheme() == url.scheme()
                 && e.host_str() == url.host_str()
                 && e.port_or_known_default() == url.port_or_known_default()
-                && url.path().trim_end_matches('/') == e.path().trim_end_matches('/')
+                && url.path().trim_end_matches('/')
+                    == e.path().trim_end_matches('/')
                 && url.query().is_none()
                 && url.fragment().is_none()
                 && url.username().is_empty()
@@ -450,8 +471,8 @@ impl ModelClient for HttpModel {
             .iter()
             .map(|(k, v)| (*k, v.as_str()))
             .collect();
-        let body =
-            serde_json::to_vec(&request.body).map_err(|e| ModelError::Malformed(e.to_string()))?;
+        let body = serde_json::to_vec(&request.body)
+            .map_err(|e| ModelError::Malformed(e.to_string()))?;
         let started = std::time::Instant::now();
         let (status, bytes) = self
             .client
@@ -461,15 +482,21 @@ impl ModelClient for HttpModel {
                 SsrfError::Http(e) if e.is_timeout() => {
                     ModelError::Unavailable("the request timed out".into())
                 }
-                SsrfError::Http(_) => ModelError::Unavailable("the endpoint did not answer".into()),
-                SsrfError::TooLarge(_) => ModelError::Malformed("the answer was too large".into()),
+                SsrfError::Http(_) => ModelError::Unavailable(
+                    "the endpoint did not answer".into(),
+                ),
+                SsrfError::TooLarge(_) => {
+                    ModelError::Malformed("the answer was too large".into())
+                }
                 other => ModelError::Blocked(format!("{base} ({other})")),
             })?;
         tracing::info!(
             provider = ?settings.provider,
             model = settings.model.trim(),
             status,
-            elapsed_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX),
+            elapsed_ms = u64::try_from(
+                started.elapsed().as_millis()
+            ).unwrap_or(u64::MAX),
             "model call"
         );
         read_response(settings.provider, status, &bytes, key)
@@ -547,7 +574,12 @@ mod tests {
             Some(true)
         );
         let bad = br#"{"error":{"message":"invalid key sk-test-123456"}}"#;
-        let err = read_response(Provider::Anthropic, 401, bad, Some("sk-test-123456"));
+        let err = read_response(
+            Provider::Anthropic,
+            401,
+            bad,
+            Some("sk-test-123456"),
+        );
         assert!(
             matches!(&err, Err(ModelError::Key(m)) if !m.contains("sk-test")),
             "{err:?}"
@@ -576,8 +608,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn plain_http_and_private_hosts_need_an_admin_listing() -> Result<(), Error> {
-        let model = HttpModel::new(&["http://ollama:11434/v1".into()], Duration::from_secs(5))?;
+    async fn plain_http_and_private_hosts_need_an_admin_listing()
+    -> Result<(), Error> {
+        let model = HttpModel::new(
+            &["http://ollama:11434/v1".into()],
+            Duration::from_secs(5),
+        )?;
         assert!(model.is_listed("http://ollama:11434/v1"));
         assert!(!model.is_listed("http://ollama:11435/v1"));
         let mut s = settings(Provider::OpenaiCompatible);

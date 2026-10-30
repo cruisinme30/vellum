@@ -49,11 +49,15 @@ mod store;
 
 pub use engine::{Actor, Authz, Change, Clock, Decision, Error};
 pub use graph::{
-    Access, Directory, FOREVER, GraphError, Levels, Materialised, SpaceGraph, materialise,
-    next_expiry,
+    Access, Directory, FOREVER, GraphError, Levels, Materialised, SpaceGraph,
+    materialise, next_expiry,
 };
 pub use memory::MemoryStore;
-pub use model::{Id, Object, Permission, Principal, Relation, Subject, Tuple, TupleRelation};
+pub use model::{
+    Id, Object, Permission, Principal, Relation, Subject, Tuple, TupleRelation,
+};
 pub use sharded::ShardedStore;
 pub use sql::SqlStore;
-pub use store::{AuthzStore, Commit, EffectiveRow, Scope, StoreError, TupleKey};
+pub use store::{
+    AuthzStore, Commit, EffectiveRow, Scope, StoreError, TupleKey,
+};

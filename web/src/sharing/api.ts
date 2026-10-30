@@ -23,7 +23,12 @@ interface NewLink {
 /** The sharing calls the share dialog makes. */
 export interface SharingApi {
   state(id: string): Promise<SharingView>;
-  share(id: string, principal: string, role: GrantRole, expiresAt?: string): Promise<SharingView>;
+  share(
+    id: string,
+    principal: string,
+    role: GrantRole,
+    expiresAt?: string,
+  ): Promise<SharingView>;
   unshare(id: string, principal: string): Promise<SharingView>;
   /** The answer holds the only copy of the link's URL. */
   createLink(id: string, link: NewLink): Promise<CreatedLink>;
@@ -44,7 +49,10 @@ export function createHttpSharingApi(http: Http): SharingApi {
         expires_at: expiresAt,
       }),
     unshare: (id, principal) =>
-      http.send<SharingView>("DELETE", `${item(id)}/grants/${segment(principal)}`),
+      http.send<SharingView>(
+        "DELETE",
+        `${item(id)}/grants/${segment(principal)}`,
+      ),
     createLink: (id, link) =>
       http.send<CreatedLink>("POST", `${item(id)}/links`, {
         expires_at: link.expiresAt,
@@ -56,4 +64,9 @@ export function createHttpSharingApi(http: Http): SharingApi {
   };
 }
 
-export type { CreatedLink, GrantView, LinkView, SharingView } from "../api/api.gen";
+export type {
+  CreatedLink,
+  GrantView,
+  LinkView,
+  SharingView,
+} from "../api/api.gen";

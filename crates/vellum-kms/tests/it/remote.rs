@@ -13,8 +13,8 @@ use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpListener;
 use vellum_crypto::{CryptoError, KeyProvider, kek_of, open, rewrap, seal};
 use vellum_kms::{
-    AwsCredentialProvider, AwsCredentials, AwsKms, GcpKms, MetadataServerToken, StaticToken,
-    VaultTransit,
+    AwsCredentialProvider, AwsCredentials, AwsKms, GcpKms, MetadataServerToken,
+    StaticToken, VaultTransit,
 };
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
@@ -45,7 +45,9 @@ type Handler = dyn Fn(&Seen) -> (u16, Value) + Send + Sync;
 
 /// A keep-alive HTTP/1.1 server on localhost that answers with `handler`
 /// and records every request.
-async fn serve(handler: Arc<Handler>) -> Result<(String, Arc<Mutex<Vec<Seen>>>), BoxError> {
+async fn serve(
+    handler: Arc<Handler>,
+) -> Result<(String, Arc<Mutex<Vec<Seen>>>), BoxError> {
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let base = format!("http://{}", listener.local_addr()?);
     let log = Arc::new(Mutex::new(Vec::new()));
@@ -112,7 +114,8 @@ async fn connection(
             other => ("application/json", other.to_string()),
         };
         let response = format!(
-            "HTTP/1.1 {status} X\r\ncontent-type: {kind}\r\ncontent-length: {}\r\n\r\n{reply}",
+            "HTTP/1.1 {status} X\r\ncontent-type: {kind}\r\n\
+                content-length: {}\r\n\r\n{reply}",
             reply.len()
         );
         reader.get_mut().write_all(response.as_bytes()).await?;
@@ -177,7 +180,8 @@ fn vault_handler() -> Arc<Handler> {
                 || {
                     (
                         400,
-                        json!({ "errors": ["cipher: message authentication failed"] }),
+                        json!({ "errors": ["cipher: message authentication \
+                            failed"] }),
                     )
                 },
                 |pt| (200, json!({ "data": { "plaintext": pt } })),
@@ -191,7 +195,8 @@ fn vault_handler() -> Arc<Handler> {
 async fn vault_transit_seals_opens_and_rotates() -> Result<(), BoxError> {
     let (base, log) = serve(vault_handler()).await?;
     let old = VaultTransit::new(&base, "s.root", "transit", "vellum-2026")?;
-    let new = VaultTransit::new(&base, "s.root", "transit", "vellum-2027")?.with_namespace("team");
+    let new = VaultTransit::new(&base, "s.root", "transit", "vellum-2027")?
+        .with_namespace("team");
     assert_eq!(old.current_kek().as_str(), "vault:transit/vellum-2026");
     round_trip(&old, &new).await?;
 
@@ -199,7 +204,8 @@ async fn vault_transit_seals_opens_and_rotates() -> Result<(), BoxError> {
     let first = log.first().ok_or("no requests")?;
     assert_eq!(first.method, "POST");
     assert_eq!(first.path, "/v1/transit/encrypt/vellum-2026");
-    let aad = String::from_utf8(unb64(field(&first.json(), "associated_data")))?;
+    let aad =
+        String::from_utf8(unb64(field(&first.json(), "associated_data")))?;
     assert_eq!(aad, "vellum/dek/v1:vault:transit/vellum-2026");
     assert!(
         log.iter()
@@ -209,10 +215,12 @@ async fn vault_transit_seals_opens_and_rotates() -> Result<(), BoxError> {
 }
 
 #[tokio::test]
-async fn vault_errors_are_provider_errors_without_secrets() -> Result<(), BoxError> {
+async fn vault_errors_are_provider_errors_without_secrets()
+-> Result<(), BoxError> {
     let (base, _) = serve(vault_handler()).await?;
     let provider = VaultTransit::new(&base, "s.wrong", "transit", "vellum")?;
-    let Err(CryptoError::Provider(message)) = seal(&provider, b"x").await else {
+    let Err(CryptoError::Provider(message)) = seal(&provider, b"x").await
+    else {
         return Err("expected a provider error".into());
     };
     assert!(message.contains("403"), "{message}");
@@ -236,13 +244,17 @@ fn aws_handler() -> Arc<Handler> {
 }
 
 /// The KMS fake, accepting calls signed with `access_key` and `session`.
-fn aws_handler_for(access_key: &'static str, session: &'static str) -> Arc<Handler> {
+fn aws_handler_for(
+    access_key: &'static str,
+    session: &'static str,
+) -> Arc<Handler> {
     Arc::new(move |seen: &Seen| {
         let signed = seen.header("authorization").is_some_and(|a| {
             a.starts_with(&format!("AWS4-HMAC-SHA256 Credential={access_key}/"))
                 && a.contains("/eu-west-1/kms/aws4_request")
                 && a.contains(
-                    "SignedHeaders=content-type;host;x-amz-date;x-amz-security-token;x-amz-target",
+                    "SignedHeaders=content-type;host;x-amz-date;x-amz-security-\
+                        token;x-amz-target",
                 )
         });
         if !signed || seen.header("x-amz-security-token") != Some(session) {
@@ -259,12 +271,16 @@ fn aws_handler_for(access_key: &'static str, session: &'static str) -> Arc<Handl
                 let blob = fake_seal(key, context, field(&body, "Plaintext"));
                 (
                     200,
-                    json!({ "CiphertextBlob": b64(blob.as_bytes()), "KeyId": key }),
+                    json!({
+                        "CiphertextBlob": b64(blob.as_bytes()),
+                        "KeyId": key
+                    }),
                 )
             }
             Some("TrentService.Decrypt") => {
                 let blob =
-                    String::from_utf8(unb64(field(&body, "CiphertextBlob"))).unwrap_or_default();
+                    String::from_utf8(unb64(field(&body, "CiphertextBlob")))
+                        .unwrap_or_default();
                 fake_open(key, context, &blob).map_or_else(
                     || (400, json!({ "__type": "InvalidCiphertextException" })),
                     |pt| (200, json!({ "Plaintext": pt, "KeyId": key })),
@@ -278,12 +294,15 @@ fn aws_handler_for(access_key: &'static str, session: &'static str) -> Arc<Handl
 #[tokio::test]
 async fn aws_kms_seals_opens_and_rotates() -> Result<(), BoxError> {
     let (base, log) = serve(aws_handler()).await?;
-    let credentials = AwsCredentials::new("AKIDEXAMPLE", "secret", Some("session".into()));
+    let credentials =
+        AwsCredentials::new("AKIDEXAMPLE", "secret", Some("session".into()));
     let old =
-        AwsKms::new("eu-west-1", "alias/vellum-2026", credentials.clone())?.with_endpoint(&base);
+        AwsKms::new("eu-west-1", "alias/vellum-2026", credentials.clone())?
+            .with_endpoint(&base);
     let new = AwsKms::new(
         "eu-west-1",
-        "arn:aws:kms:eu-west-1:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab",
+        "arn:aws:kms:eu-west-1:111122223333:key/1234abcd-12ab-34cd-56ef-1234567\
+            890ab",
         credentials,
     )?
     .with_endpoint(&base);
@@ -315,7 +334,11 @@ fn gcp_handler() -> Arc<Handler> {
             return if seen.header("metadata-flavor") == Some("Google") {
                 (
                     200,
-                    json!({ "access_token": "ya29.token", "expires_in": 3600, "token_type": "Bearer" }),
+                    json!({
+                        "access_token": "ya29.token",
+                        "expires_in": 3600,
+                        "token_type": "Bearer"
+                    }),
                 )
             } else {
                 (403, json!({}))
@@ -335,7 +358,8 @@ fn gcp_handler() -> Arc<Handler> {
             );
         }
         if let Some(name) = path.strip_suffix(":decrypt") {
-            let ct = String::from_utf8(unb64(field(&body, "ciphertext"))).unwrap_or_default();
+            let ct = String::from_utf8(unb64(field(&body, "ciphertext")))
+                .unwrap_or_default();
             return fake_open(name, aad, &ct).map_or_else(
                 || (400, json!({ "error": { "status": "INVALID_ARGUMENT" } })),
                 |pt| (200, json!({ "plaintext": pt })),
@@ -346,12 +370,16 @@ fn gcp_handler() -> Arc<Handler> {
 }
 
 #[tokio::test]
-async fn gcp_kms_seals_opens_and_rotates_with_cached_metadata_tokens() -> Result<(), BoxError> {
+async fn gcp_kms_seals_opens_and_rotates_with_cached_metadata_tokens()
+-> Result<(), BoxError> {
     let (base, log) = serve(gcp_handler()).await?;
-    let ring = "projects/northstar/locations/europe-west1/keyRings/vellum/cryptoKeys";
+    let ring =
+        "projects/northstar/locations/europe-west1/keyRings/vellum/cryptoKeys";
     let tokens = || MetadataServerToken::with_url(format!("{base}/token"));
-    let old = GcpKms::new(&format!("{ring}/kek-2026"), tokens()?)?.with_endpoint(&base);
-    let new = GcpKms::new(&format!("{ring}/kek-2027"), tokens()?)?.with_endpoint(&base);
+    let old = GcpKms::new(&format!("{ring}/kek-2026"), tokens()?)?
+        .with_endpoint(&base);
+    let new = GcpKms::new(&format!("{ring}/kek-2027"), tokens()?)?
+        .with_endpoint(&base);
     round_trip(&old, &new).await?;
 
     let log = log.lock().map_err(|_| "poisoned")?.clone();
@@ -367,15 +395,19 @@ async fn gcp_kms_seals_opens_and_rotates_with_cached_metadata_tokens() -> Result
 #[tokio::test]
 async fn gcp_kms_with_a_static_token() -> Result<(), BoxError> {
     let (base, _) = serve(gcp_handler()).await?;
-    let name = "projects/northstar/locations/global/keyRings/vellum/cryptoKeys/kek";
-    let good = GcpKms::new(name, StaticToken::new("ya29.token"))?.with_endpoint(&base);
+    let name =
+        "projects/northstar/locations/global/keyRings/vellum/cryptoKeys/kek";
+    let good =
+        GcpKms::new(name, StaticToken::new("ya29.token"))?.with_endpoint(&base);
     let sealed = seal(&good, b"hello").await?;
     assert_eq!(open(&good, &sealed).await?, b"hello");
 
-    let bad = GcpKms::new(name, StaticToken::new("expired"))?.with_endpoint(&base);
-    assert!(
-        matches!(open(&bad, &sealed).await, Err(CryptoError::Provider(m)) if m.contains("401"))
-    );
+    let bad =
+        GcpKms::new(name, StaticToken::new("expired"))?.with_endpoint(&base);
+    assert!(matches!(
+        open(&bad, &sealed).await,
+        Err(CryptoError::Provider(m)) if m.contains("401")
+    ));
     Ok(())
 }
 
@@ -383,8 +415,12 @@ async fn gcp_kms_with_a_static_token() -> Result<(), BoxError> {
 async fn providers_refuse_kek_ids_of_other_backends() -> Result<(), BoxError> {
     let (base, _) = serve(vault_handler()).await?;
     let vault = VaultTransit::new(&base, "s.root", "transit", "vellum")?;
-    let aws = AwsKms::new("eu-west-1", "alias/k", AwsCredentials::new("a", "b", None))?
-        .with_endpoint(&base);
+    let aws = AwsKms::new(
+        "eu-west-1",
+        "alias/k",
+        AwsCredentials::new("a", "b", None),
+    )?
+    .with_endpoint(&base);
     let sealed = seal(&vault, b"x").await?;
     assert!(matches!(
         open(&aws, &sealed).await,
@@ -409,9 +445,16 @@ fn aws_role_handler() -> Arc<Handler> {
                 let body = String::from_utf8_lossy(&seen.body).into_owned();
                 if !body.contains("Action=AssumeRoleWithWebIdentity")
                     || !body.contains("WebIdentityToken=oidc-token-1")
-                    || !body.contains("RoleArn=arn%3Aaws%3Aiam%3A%3A111122223333%3Arole%2Fvellum")
+                    || !body.contains(
+                        "RoleArn=arn%3Aaws%3Aiam%3A%3A11112222333\
+                        3%3Arole%2Fvellum",
+                    )
                 {
-                    return (400, json!({ "Error": { "Code": "InvalidIdentityToken" } }));
+                    return (
+                        400,
+                        json!({ "Error": { "Code": "InvalidIdentityTok\
+                        en" } }),
+                    );
                 }
                 (
                     200,
@@ -442,8 +485,14 @@ fn aws_role_handler() -> Arc<Handler> {
                     (400, Value::Null)
                 }
             }
-            ("GET", path) if path.starts_with("/latest/meta-data/iam/security-credentials/") => {
-                if seen.header("x-aws-ec2-metadata-token") != Some("imds-session") {
+            ("GET", path)
+                if path.starts_with(
+                    "/latest/meta-data/iam/security-credentials/",
+                ) =>
+            {
+                if seen.header("x-aws-ec2-metadata-token")
+                    != Some("imds-session")
+                {
                     return (401, Value::Null);
                 }
                 if path.ends_with('/') {
@@ -463,17 +512,23 @@ fn aws_role_handler() -> Arc<Handler> {
     })
 }
 
-async fn role_round_trip(credentials: AwsCredentialProvider, base: &str) -> Result<(), BoxError> {
-    let kms = AwsKms::new("eu-west-1", "alias/vellum", credentials)?.with_endpoint(base);
+async fn role_round_trip(
+    credentials: AwsCredentialProvider,
+    base: &str,
+) -> Result<(), BoxError> {
+    let kms = AwsKms::new("eu-west-1", "alias/vellum", credentials)?
+        .with_endpoint(base);
     let sealed = seal(&kms, b"role credentials").await?;
     assert_eq!(open(&kms, &sealed).await?, b"role credentials");
     Ok(())
 }
 
 #[tokio::test]
-async fn aws_kms_uses_web_identity_without_static_keys() -> Result<(), BoxError> {
+async fn aws_kms_uses_web_identity_without_static_keys() -> Result<(), BoxError>
+{
     let (base, log) = serve(aws_role_handler()).await?;
-    let dir = std::env::temp_dir().join(format!("vellum-irsa-{}", std::process::id()));
+    let dir = std::env::temp_dir()
+        .join(format!("vellum-irsa-{}", std::process::id()));
     std::fs::create_dir_all(&dir)?;
     let token = dir.join("token");
     std::fs::write(&token, "oidc-token-1\n")?;
@@ -496,16 +551,22 @@ async fn aws_kms_uses_web_identity_without_static_keys() -> Result<(), BoxError>
 #[tokio::test]
 async fn aws_kms_uses_container_credentials() -> Result<(), BoxError> {
     let (base, _) = serve(aws_role_handler()).await?;
-    let dir = std::env::temp_dir().join(format!("vellum-pod-identity-{}", std::process::id()));
+    let dir = std::env::temp_dir()
+        .join(format!("vellum-pod-identity-{}", std::process::id()));
     std::fs::create_dir_all(&dir)?;
     let token = dir.join("token");
     std::fs::write(&token, "pod-identity-token")?;
-    let credentials =
-        AwsCredentialProvider::container(&format!("{base}/creds"), Some(token.clone()))?;
+    let credentials = AwsCredentialProvider::container(
+        &format!("{base}/creds"),
+        Some(token.clone()),
+    )?;
     role_round_trip(credentials, &base).await?;
 
     std::fs::write(&token, "stale")?;
-    let refused = AwsCredentialProvider::container(&format!("{base}/creds"), Some(token))?;
+    let refused = AwsCredentialProvider::container(
+        &format!("{base}/creds"),
+        Some(token),
+    )?;
     let error = AwsKms::new("eu-west-1", "alias/vellum", refused)?
         .with_endpoint(&base)
         .wrap(&vellum_crypto::SecretKey::generate()?)

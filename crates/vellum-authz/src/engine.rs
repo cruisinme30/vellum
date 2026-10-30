@@ -16,8 +16,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::{Instrument as _, Span, field};
 
 use crate::graph::{self, Directory, Materialised, SpaceGraph};
-use crate::model::{Id, Object, Permission, Principal, Relation, Subject, Tuple, TupleRelation};
-use crate::store::{AuthzStore, Commit, EffectiveRow, Scope, StoreError, TupleKey};
+use crate::model::{
+    Id, Object, Permission, Principal, Relation, Subject, Tuple, TupleRelation,
+};
+use crate::store::{
+    AuthzStore, Commit, EffectiveRow, Scope, StoreError, TupleKey,
+};
 
 /// How many times a write retries after losing an epoch race.
 const MAX_ATTEMPTS: usize = 8;
@@ -70,7 +74,9 @@ impl Change {
                 ..
             })
             | Self::Revoke { relation: r, .. } => (*r).max(Relation::Manager),
-            Self::Grant(_) | Self::Restrict(_) | Self::Unrestrict(_) => Relation::Manager,
+            Self::Grant(_) | Self::Restrict(_) | Self::Unrestrict(_) => {
+                Relation::Manager
+            }
         }
     }
 }
@@ -194,7 +200,8 @@ impl<S: AuthzStore> Authz<S> {
                 .await?;
             let row = rows.into_iter().max();
             let decision = Decision {
-                allowed: row.is_some_and(|(r, _)| r.implies(permission.required())),
+                allowed: row
+                    .is_some_and(|(r, _)| r.implies(permission.required())),
                 relation: row.map(|(r, _)| r),
                 epoch: row.map(|(_, e)| e),
             };
@@ -236,7 +243,8 @@ impl<S: AuthzStore> Authz<S> {
             authz.rows = field::Empty,
         );
         async {
-            let rows = self.store.list(space, principal, (self.clock)()).await?;
+            let rows =
+                self.store.list(space, principal, (self.clock)()).await?;
             let ids: Vec<Id> = rows
                 .into_iter()
                 .filter(|(_, r)| r.implies(permission.required()))
@@ -308,10 +316,17 @@ impl<S: AuthzStore> Authz<S> {
     /// # Errors
     ///
     /// Fails only if the index cannot be read.
-    pub async fn groups_of(&self, principal: Principal) -> Result<BTreeSet<Id>, Error> {
-        let span = tracing::info_span!("authz.groups_of", authz.groups = field::Empty);
+    pub async fn groups_of(
+        &self,
+        principal: Principal,
+    ) -> Result<BTreeSet<Id>, Error> {
+        let span =
+            tracing::info_span!("authz.groups_of", authz.groups = field::Empty);
         async {
-            let directory = Directory::new(&self.store.load_directory().await?, (self.clock)());
+            let directory = Directory::new(
+                &self.store.load_directory().await?,
+                (self.clock)(),
+            );
             let groups = directory.groups_of(principal);
             let _ = Span::current().record("authz.groups", groups.len());
             Ok(groups)
@@ -342,7 +357,12 @@ impl<S: AuthzStore> Authz<S> {
     /// [`Error::Forbidden`] when the actor lacks access; [`Error::Malformed`],
     /// [`Error::WrongSpace`] or [`Error::UnknownNode`] for a bad change;
     /// [`Error::Contended`] when concurrent writers keep winning.
-    pub async fn write(&self, space: Id, actor: Actor, changes: &[Change]) -> Result<u64, Error> {
+    pub async fn write(
+        &self,
+        space: Id,
+        actor: Actor,
+        changes: &[Change],
+    ) -> Result<u64, Error> {
         let span = tracing::info_span!(
             "authz.write",
             authz.space = %space,
@@ -379,8 +399,16 @@ impl<S: AuthzStore> Authz<S> {
     /// # Errors
     ///
     /// Fails if the tree is not a forest or the index fails.
-    pub async fn tree_changed(&self, space: Id, roots: &[Id]) -> Result<u64, Error> {
-        let span = tracing::info_span!("authz.tree_changed", authz.space = %space, authz.roots = roots.len());
+    pub async fn tree_changed(
+        &self,
+        space: Id,
+        roots: &[Id],
+    ) -> Result<u64, Error> {
+        let span = tracing::info_span!(
+            "authz.tree_changed",
+            authz.space = %space,
+            authz.roots = roots.len()
+        );
         self.recompute(space, Vec::new(), Vec::new(), |graph| {
             let mut objects = BTreeSet::new();
             for &root in roots {
@@ -463,19 +491,29 @@ impl<S: AuthzStore> Authz<S> {
         add: &[Subject],
         remove: &[Subject],
     ) -> Result<(), Error> {
-        let span =
-            tracing::info_span!("authz.group", authz.group = %group, authz.spaces = field::Empty);
+        let span = tracing::info_span!(
+            "authz.group",
+            authz.group = %group,
+            authz.spaces = field::Empty
+        );
         async {
-            let upsert: Vec<Tuple> = add.iter().map(|s| Tuple::member(group, *s)).collect();
+            let upsert: Vec<Tuple> =
+                add.iter().map(|s| Tuple::member(group, *s)).collect();
             let delete: Vec<TupleKey> = remove
                 .iter()
                 .map(|s| Tuple::member(group, *s).key())
                 .collect();
             // Groups containing this one, before and after, so removing a
             // nested group also refreshes spaces that granted the outer one.
-            let before = Directory::new(&self.store.load_directory().await?, (self.clock)());
+            let before = Directory::new(
+                &self.store.load_directory().await?,
+                (self.clock)(),
+            );
             self.store.write_directory(upsert, delete).await?;
-            let after = Directory::new(&self.store.load_directory().await?, (self.clock)());
+            let after = Directory::new(
+                &self.store.load_directory().await?,
+                (self.clock)(),
+            );
             let mut groups = before.containing(group);
             groups.extend(after.containing(group));
             let spaces = self.store.spaces_granting(&groups).await?;
@@ -489,7 +527,12 @@ impl<S: AuthzStore> Authz<S> {
         .await
     }
 
-    async fn authorise(&self, space: Id, actor: Actor, change: &Change) -> Result<(), Error> {
+    async fn authorise(
+        &self,
+        space: Id,
+        actor: Actor,
+        change: &Change,
+    ) -> Result<(), Error> {
         let Actor::User(user) = actor else {
             return Ok(());
         };
@@ -528,9 +571,13 @@ impl<S: AuthzStore> Authz<S> {
             };
             apply(&mut graph, &upsert, &delete);
             let now = (self.clock)();
-            let directory = Directory::new(&self.store.load_directory().await?, now);
+            let directory =
+                Directory::new(&self.store.load_directory().await?, now);
             let rows = {
-                let span = tracing::debug_span!("authz.materialise", authz.rows = field::Empty);
+                let span = tracing::debug_span!(
+                    "authz.materialise",
+                    authz.rows = field::Empty
+                );
                 let _entered = span.enter();
                 let materialised = graph::materialise(&graph, &directory, now)?;
                 let rows = rows_in(&graph, &materialised, &scope, now);
@@ -566,13 +613,17 @@ impl<S: AuthzStore> Authz<S> {
     }
 }
 
-fn tuple_writes(changes: &[Change]) -> Result<(Vec<Tuple>, Vec<TupleKey>), Error> {
+fn tuple_writes(
+    changes: &[Change],
+) -> Result<(Vec<Tuple>, Vec<TupleKey>), Error> {
     let mut upsert = Vec::new();
     let mut delete = Vec::new();
     for change in changes {
         match *change {
             Change::Grant(t) => {
-                if !t.is_well_formed() || !matches!(t.relation, TupleRelation::Role(_)) {
+                if !t.is_well_formed()
+                    || !matches!(t.relation, TupleRelation::Role(_))
+                {
                     return Err(Error::Malformed(*change));
                 }
                 upsert.push(t);
@@ -640,7 +691,12 @@ fn apply(graph: &mut SpaceGraph, upsert: &[Tuple], delete: &[TupleKey]) {
     graph.tuples.extend_from_slice(upsert);
 }
 
-fn rows_in(graph: &SpaceGraph, m: &Materialised, scope: &Scope, now: i64) -> Vec<EffectiveRow> {
+fn rows_in(
+    graph: &SpaceGraph,
+    m: &Materialised,
+    scope: &Scope,
+    now: i64,
+) -> Vec<EffectiveRow> {
     let wanted = |object: &Id| match scope {
         Scope::All => true,
         Scope::Objects(set) => set.contains(object),
@@ -651,15 +707,14 @@ fn rows_in(graph: &SpaceGraph, m: &Materialised, scope: &Scope, now: i64) -> Vec
         .filter(|(object, _)| wanted(object))
         .flat_map(|(object, access)| {
             access.iter().flat_map(move |(principal, levels)| {
-                levels
-                    .rows(now)
-                    .into_iter()
-                    .map(move |(relation, valid_until)| EffectiveRow {
+                levels.rows(now).into_iter().map(
+                    move |(relation, valid_until)| EffectiveRow {
                         object,
                         principal: *principal,
                         relation,
                         valid_until,
-                    })
+                    },
+                )
             })
         })
         .collect()

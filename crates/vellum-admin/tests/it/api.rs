@@ -10,9 +10,12 @@ use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 use vellum_admin::api::{AdminApi, NoFacts, caller};
-use vellum_admin::{AdminPaths, AdminService, MemoryAuditLog, MemorySettingsStore};
+use vellum_admin::{
+    AdminPaths, AdminService, MemoryAuditLog, MemorySettingsStore,
+};
 use vellum_contracts::{
-    CredentialKind, Operation, OperationKind, Principal, RequestContext, Scope, ScopeSet, Service,
+    CredentialKind, Operation, OperationKind, Principal, RequestContext, Scope,
+    ScopeSet, Service,
 };
 use vellum_crypto::{KekId, LocalKeyring, SecretKey};
 use vellum_kernel::{ErrorKind, RequestId, Timestamp, UserId};
@@ -63,7 +66,9 @@ fn ctx(kind: CredentialKind, scopes: &[Scope]) -> RequestContext {
             Timestamp::now(),
         ),
         deadline: Instant::now() + Duration::from_secs(30),
-        traceparent: Some("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01".into()),
+        traceparent: Some(
+            "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01".into(),
+        ),
     }
 }
 
@@ -76,7 +81,11 @@ impl Fixture {
         self.operations.iter().find(|o| o.id() == id).unwrap()
     }
 
-    async fn call(&self, id: &str, input: Value) -> vellum_kernel::Result<Value> {
+    async fn call(
+        &self,
+        id: &str,
+        input: Value,
+    ) -> vellum_kernel::Result<Value> {
         self.op(id).call(admin(), input).await
     }
 }
@@ -160,7 +169,10 @@ async fn audits_settings_and_backups() {
     let saved = f
         .call(
             "admin.update_settings",
-            json!({"expected_version": current["version"], "settings": settings}),
+            json!({
+                "expected_version": current["version"],
+                "settings": settings
+            }),
         )
         .await
         .unwrap();
@@ -174,12 +186,19 @@ async fn audits_settings_and_backups() {
         .unwrap();
     assert_eq!(
         look,
-        json!({"seed": "#4f5b92", "export_theme": "light", "site_theme": "auto"})
+        json!({
+            "seed": "#4f5b92",
+            "export_theme": "light",
+            "site_theme": "auto"
+        })
     );
     let stale = f
         .call(
             "admin.update_settings",
-            json!({"expected_version": current["version"], "settings": settings}),
+            json!({
+                "expected_version": current["version"],
+                "settings": settings
+            }),
         )
         .await
         .unwrap_err();

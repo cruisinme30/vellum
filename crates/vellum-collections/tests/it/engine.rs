@@ -8,8 +8,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use vellum_collections::csv;
 use vellum_collections::{
-    ChartSource, Collection, CollectionEmbed, Computer, DateValue, Edit, EditError, RowRef,
-    SchemaError, Value, ViewKind, Workspace, view,
+    ChartSource, Collection, CollectionEmbed, Computer, DateValue, Edit,
+    EditError, RowRef, SchemaError, Value, ViewKind, Workspace, view,
 };
 use vellum_kernel::{CollectionId, DocId};
 
@@ -77,7 +77,8 @@ fn northstar() -> Workspace {
             row(
                 R1,
                 &format!(
-                    "t: R1 · Replay 7 days\npr: P0\nown: dev\ne: 2026-10-28\nest: 8\ndn: true\ntags: [api]\nrel: [{V10}]\n"
+                    "t: R1 · Replay 7 days\npr: P0\nown: dev\ne: 2026-10-28\n\
+                        est: 8\ndn: true\ntags: [api]\nrel: [{V10}]\n"
                 ),
             ),
         ),
@@ -86,7 +87,8 @@ fn northstar() -> Workspace {
             row(
                 R2,
                 &format!(
-                    "t: R2 · Diff report\npr: P0\nown: priya\ne: 2026-11-05\nest: 5\ntags: [api, ux]\nrel: [{V10}]\n"
+                    "t: R2 · Diff report\npr: P0\nown: priya\ne: 2026-11-05\n\
+                        est: 5\ntags: [api, ux]\nrel: [{V10}]\n"
                 ),
             ),
         ),
@@ -95,7 +97,8 @@ fn northstar() -> Workspace {
             row(
                 R3,
                 &format!(
-                    "t: R3 · PDF report\npr: P1\nown: maya\ne: 2026-11-18\nest: 3\nrel: [{V10}]\n"
+                    "t: R3 · PDF report\npr: P1\nown: maya\ne: 2026-11-18\n\
+                        est: 3\nrel: [{V10}]\n"
                 ),
             ),
         ),
@@ -103,7 +106,10 @@ fn northstar() -> Workspace {
             "rows/r4.md",
             row(
                 R4,
-                &format!("t: R4 · Nightly simulations\npr: P2\nest: 8\nrel: [{V11}]\n"),
+                &format!(
+                    "t: R4 · Nightly simulations\npr: P2\nest: 8\n\
+                        rel: [{V11}]\n"
+                ),
             ),
         ),
     ];
@@ -120,8 +126,10 @@ fn northstar() -> Workspace {
             row(V11, &format!("t: 1.1 Nightly simulations\nrq: [{R4}]\n")),
         ),
     ];
-    let (requirements, d1) = Collection::load(&reqs_schema(), requirement_rows).unwrap();
-    let (releases, d2) = Collection::load(&rels_schema(), release_rows).unwrap();
+    let (requirements, d1) =
+        Collection::load(&reqs_schema(), requirement_rows).unwrap();
+    let (releases, d2) =
+        Collection::load(&rels_schema(), release_rows).unwrap();
     assert!(d1.is_empty() && d2.is_empty(), "{d1:?} {d2:?}");
     let mut ws = Workspace::new();
     ws.insert(requirements).unwrap();
@@ -277,7 +285,12 @@ fn views_filter_sort_and_group() {
     let schema = ws.collection(cid(REQS)).unwrap().schema().clone();
     let mut computer = Computer::new(&ws, now());
 
-    let all = view::query(&mut computer, cid(REQS), schema.view(Some("All")).unwrap()).unwrap();
+    let all = view::query(
+        &mut computer,
+        cid(REQS),
+        schema.view(Some("All")).unwrap(),
+    )
+    .unwrap();
     let titles: Vec<&str> = all.groups[0]
         .rows
         .iter()
@@ -318,7 +331,12 @@ fn views_filter_sort_and_group() {
             .all(|c| c.key != "own" && c.key != "tags")
     );
 
-    let open = view::query(&mut computer, cid(REQS), schema.view(Some("Open")).unwrap()).unwrap();
+    let open = view::query(
+        &mut computer,
+        cid(REQS),
+        schema.view(Some("Open")).unwrap(),
+    )
+    .unwrap();
     assert_eq!(open.total, 3);
 
     let cal = view::query(
@@ -356,7 +374,8 @@ fn filters_cover_every_operator() {
     let mut computer = Computer::new(&ws, now());
     let count = |computer: &mut Computer<'_>, filter: &str| {
         let mut v = schema.view(None).unwrap().clone();
-        v.filters = vec![vellum_collections::Filter::parse(filter, &schema).unwrap()];
+        v.filters =
+            vec![vellum_collections::Filter::parse(filter, &schema).unwrap()];
         view::query(computer, cid(REQS), &v).unwrap().total
     };
     assert_eq!(count(&mut computer, "Priority is P0"), 2);
@@ -383,12 +402,15 @@ fn formula_errors_show_inline() {
     let mut ws = northstar();
     let yaml = reqs_schema().replace(
         "views:",
-        "  - {key: bad, name: Ratio, type: formula, f: 'Estimate / (Estimate - Estimate)'}\nviews:",
+        "  - {key: bad, name: Ratio, type: formula, f: 'Estimate / (Estimate - \
+            Estimate)'}\nviews:",
     );
     let schema = vellum_collections::Schema::from_yaml(&yaml).unwrap();
     ws.set_schema(schema.clone()).unwrap();
     let mut computer = Computer::new(&ws, now());
-    let result = view::query(&mut computer, cid(REQS), schema.view(None).unwrap()).unwrap();
+    let result =
+        view::query(&mut computer, cid(REQS), schema.view(None).unwrap())
+            .unwrap();
     let col = result.columns.iter().position(|c| c.key == "bad").unwrap();
     let c = &result.groups[0].rows[0].cells[col];
     assert_eq!(c.display, "⚠ division by zero");
@@ -400,10 +422,11 @@ fn formula_errors_show_inline() {
 fn cross_collection_cycles_are_reported() {
     let reqs = reqs_schema().replace(
         "views:",
-        "  - {key: x, name: X, type: rollup, via: rel, prop: y, agg: sum}\nviews:",
+        "  - {key: x, name: X, type: rollup, via: rel, prop: y, agg: sum}\n\
+            views:",
     );
-    let releases =
-        rels_schema() + "  - {key: y, name: Y, type: rollup, via: rq, prop: x, agg: sum}\n";
+    let releases = rels_schema()
+        + "  - {key: y, name: Y, type: rollup, via: rq, prop: x, agg: sum}\n";
     let (a, _) = Collection::load(
         &reqs,
         [("rows/r1.md", row(R1, &format!("t: R1\nrel: [{V10}]\n")))],
@@ -424,7 +447,8 @@ fn cross_collection_cycles_are_reported() {
 fn mismatched_relation_pairs_are_rejected() {
     let mut ws = northstar();
     let bad = rels_schema().replace("back: rel", "back: t");
-    let (c, _) = Collection::load(&bad, std::iter::empty::<(&str, &str)>()).unwrap();
+    let (c, _) =
+        Collection::load(&bad, std::iter::empty::<(&str, &str)>()).unwrap();
     assert!(matches!(
         ws.insert(c),
         Err(SchemaError::RelationBack { .. })
@@ -439,7 +463,8 @@ fn files_round_trip() {
     let files = c.files().unwrap();
     assert_eq!(files[0].0, "schema.yaml");
     assert!(files.iter().any(|(p, _)| p == "rows/r1-replay-7-days.md"));
-    let (again, diags) = Collection::load(&files[0].1, files[1..].iter().cloned()).unwrap();
+    let (again, diags) =
+        Collection::load(&files[0].1, files[1..].iter().cloned()).unwrap();
     assert!(diags.is_empty(), "{diags:?}\n{}", files[0].1);
     assert_eq!(again.files().unwrap(), files);
 }
@@ -449,14 +474,21 @@ fn csv_round_trips() {
     let ws = northstar();
     let schema = ws.collection(cid(REQS)).unwrap().schema().clone();
     let mut computer = Computer::new(&ws, now());
-    let text = csv::export(&mut computer, cid(REQS), schema.view(Some("All")).unwrap()).unwrap();
+    let text = csv::export(
+        &mut computer,
+        cid(REQS),
+        schema.view(Some("All")).unwrap(),
+    )
+    .unwrap();
     let mut lines = text.lines();
     assert_eq!(
         lines.next().unwrap(),
-        "Requirement,Priority,Owner,Target,Estimate,Done,Tags,Release,Remaining,Release points,Created"
+        "Requirement,Priority,Owner,Target,Estimate,Done,Tags,Release,Remaining\
+            ,Release points,Created"
     );
     assert!(text.contains(
-        "R2 · Diff report,P0,priya,2026-11-05,5,No,\"api, ux\",1.0 Policy simulator,5,16,"
+        "R2 · Diff report,P0,priya,2026-11-05,5,No,\"api, ux\",1.0 Policy \
+            simulator,5,16,"
     ));
 
     // Import into an empty copy of the collection.
@@ -483,7 +515,10 @@ fn csv_round_trips() {
 
     // A brand-new collection infers its types.
     let new = csv::import_new(
-        "Name,Points,Shipped,Due,Link,Team\nA,1,yes,2026-01-01,https://northstar.dev/a,eng\nB,2.5,no,2026-02-01,https://northstar.dev/b,eng\nC,,yes,,,design\n=cmd,3,no,2026-03-01,https://northstar.dev/c,eng\n",
+        "Name,Points,Shipped,Due,Link,Team\n\
+            A,1,yes,2026-01-01,https://northstar.dev/a,eng\n\
+            B,2.5,no,2026-02-01,https://northstar.dev/b,eng\nC,,yes,,,design\n\
+            =cmd,3,no,2026-03-01,https://northstar.dev/c,eng\n",
         CollectionId::generate(),
         "Imported",
     )
@@ -555,7 +590,8 @@ fn csv_headers_cannot_run_as_formulas() {
             .starts_with(['=', '+', '-', '@'])),
         "header runs as a formula: {header}"
     );
-    let again = csv::import_new(&out, CollectionId::generate(), "Again").unwrap();
+    let again =
+        csv::import_new(&out, CollectionId::generate(), "Again").unwrap();
     let read: Vec<&str> = again
         .schema
         .properties
@@ -570,14 +606,16 @@ fn embeds_and_charts_resolve() {
     let ws = northstar();
     let mut computer = Computer::new(&ws, now());
     let embed = CollectionEmbed::parse(&format!(
-        "id: {REQS}\nview: By priority\nfilter: Done is false\nhide: [Release]\n"
+        "id: {REQS}\nview: By priority\nfilter: Done is false\n\
+            hide: [Release]\n"
     ))
     .unwrap();
     let result = embed.resolve(&mut computer).unwrap();
     assert_eq!(result.total, 3);
     assert!(result.columns.iter().all(|c| c.key != "rel"));
 
-    let missing = CollectionEmbed::parse(&format!("id: {REQS}\nview: Nope\n")).unwrap();
+    let missing =
+        CollectionEmbed::parse(&format!("id: {REQS}\nview: Nope\n")).unwrap();
     assert!(
         missing
             .resolve(&mut computer)
@@ -610,7 +648,8 @@ fn embeds_and_charts_resolve() {
         .unwrap()
         .resolve(&mut computer)
         .unwrap();
-    let names: Vec<&str> = chart.series.iter().map(|s| s.name.as_str()).collect();
+    let names: Vec<&str> =
+        chart.series.iter().map(|s| s.name.as_str()).collect();
     assert_eq!(names, ["Yes", "No"]);
     assert_eq!(chart.series[1].values, [1.0, 1.0, 1.0]);
 }
@@ -659,7 +698,8 @@ fn csv_import_caps_its_diagnostics() {
     // Two bytes per unknown release title, and one bad number per row.
     let cell = "a,".repeat(200_000);
     let rows = "r,,lots\n".repeat(5_000);
-    let text = format!("Requirement,Release,Estimate\nx,\"{cell}\",lots\n{rows}");
+    let text =
+        format!("Requirement,Release,Estimate\nx,\"{cell}\",lots\n{rows}");
     let import = csv::import_into(&text, &ws, cid(REQS)).unwrap();
     assert!(
         import.diagnostics.len() <= csv::MAX_DIAGNOSTICS + 1,
@@ -675,7 +715,8 @@ fn csv_import_matches_relation_titles_in_linear_time() {
     let mut ws = northstar();
     for i in 0..2_000 {
         let mut values = BTreeMap::new();
-        let _ = values.insert("t".to_owned(), Value::Text(format!("Release {i}")));
+        let _ =
+            values.insert("t".to_owned(), Value::Text(format!("Release {i}")));
         let _ = ws
             .apply(Edit::CreateRow {
                 collection: cid(RELS),

@@ -141,15 +141,17 @@ impl Writer<'_> {
     }
 
     fn stats(&mut self, c: &Container) {
-        let Some(Data::Stats(stats)) = self.data(Data::from_container(c)) else {
+        let Some(Data::Stats(stats)) = self.data(Data::from_container(c))
+        else {
             return self.sections(c);
         };
         self.out.push_str("<div");
         self.attrs("vl-stats", &c.attrs);
         self.out.push('>');
         for stat in &stats.items {
-            self.out
-                .push_str("<div class=\"vl-stat\"><div class=\"vl-stat-value\">");
+            self.out.push_str(
+                "<div class=\"vl-stat\"><div class=\"vl-stat-value\">",
+            );
             self.inlines(&stat.value);
             self.out.push_str("</div><div class=\"vl-stat-label\">");
             self.inlines(&stat.label);
@@ -177,7 +179,8 @@ impl Writer<'_> {
     }
 
     fn facts(&mut self, c: &Container) {
-        let Some(Data::Facts(facts)) = self.data(Data::from_container(c)) else {
+        let Some(Data::Facts(facts)) = self.data(Data::from_container(c))
+        else {
             return self.sections(c);
         };
         self.out.push_str("<dl");
@@ -194,7 +197,8 @@ impl Writer<'_> {
     }
 
     fn progress(&mut self, c: &Container) {
-        let Some(Data::Progress(progress)) = self.data(Data::from_container(c)) else {
+        let Some(Data::Progress(progress)) = self.data(Data::from_container(c))
+        else {
             return self.sections(c);
         };
         self.out.push_str("<div");
@@ -219,7 +223,8 @@ impl Writer<'_> {
     }
 
     fn steps(&mut self, c: &Container) {
-        let Some(Data::Steps(steps)) = self.data(Data::from_container(c)) else {
+        let Some(Data::Steps(steps)) = self.data(Data::from_container(c))
+        else {
             return self.sections(c);
         };
         self.out.push_str("<ol");
@@ -241,7 +246,8 @@ impl Writer<'_> {
     }
 
     fn cards(&mut self, c: &Container) {
-        let Some(Data::Cards(cards)) = self.data(Data::from_container(c)) else {
+        let Some(Data::Cards(cards)) = self.data(Data::from_container(c))
+        else {
             return self.sections(c);
         };
         self.out.push_str("<ul");
@@ -250,8 +256,9 @@ impl Writer<'_> {
         for card in &cards.cards {
             self.out.push_str("<li class=\"vl-card\">");
             if let Some(icon) = &card.icon {
-                self.out
-                    .push_str("<span class=\"vl-card-icon\" aria-hidden=\"true\">");
+                self.out.push_str(
+                    "<span class=\"vl-card-icon\" aria-hidden=\"true\">",
+                );
                 html::text(&mut self.out, icon);
                 self.out.push_str("</span>");
             }
@@ -278,7 +285,9 @@ impl Writer<'_> {
             .iter()
             .flatten()
             .find_map(|b| match b {
-                Block::Paragraph { content, .. } => Some(vellum_format::plain_text(content)),
+                Block::Paragraph { content, .. } => {
+                    Some(vellum_format::plain_text(content))
+                }
                 _ => None,
             })
             .unwrap_or_else(|| c.arg.clone());
@@ -312,7 +321,11 @@ impl Writer<'_> {
                     "title",
                     &format!("{} embed", provider.name()),
                 );
-                self.out.push_str(" allow=\"fullscreen; picture-in-picture\" allowfullscreen referrerpolicy=\"no-referrer\" loading=\"lazy\"></iframe></div>");
+                self.out.push_str(
+                    " allow=\"fullscreen; picture-in-picture\" \
+                    allowfullscreen referrerpolicy=\"no-referrer\" \
+                    loading=\"lazy\"></iframe></div>",
+                );
                 if c.sections.iter().any(|s| !s.is_empty()) {
                     self.out.push_str("<figcaption>");
                     self.sections(c);
@@ -322,7 +335,8 @@ impl Writer<'_> {
             }
             None => {
                 self.warn(format!(
-                    "{:?} cannot be embedded (allowed: YouTube, Vimeo, Loom, Figma, Google Maps, CodePen); showing a link",
+                    "{:?} cannot be embedded (allowed: YouTube, Vimeo, Loom, \
+                        Figma, Google Maps, CodePen); showing a link",
                     c.arg
                 ));
                 self.link_card(c);
@@ -335,7 +349,9 @@ impl Writer<'_> {
         for b in c.sections.iter().flatten() {
             let Block::List(list) = b else { continue };
             for item in &list.items {
-                let Some(Block::Paragraph { content, .. }) = item.blocks.first() else {
+                let Some(Block::Paragraph { content, .. }) =
+                    item.blocks.first()
+                else {
                     continue;
                 };
                 for inline in content {
@@ -349,7 +365,10 @@ impl Writer<'_> {
                             links.push((r.map(|r| r.href), title));
                         }
                         Inline::Link { url, content, .. } => {
-                            links.push((safe_url(self, url), vellum_format::plain_text(content)));
+                            links.push((
+                                safe_url(self, url),
+                                vellum_format::plain_text(content),
+                            ));
                         }
                         _ => {}
                     }
@@ -365,7 +384,10 @@ impl Writer<'_> {
                 .collect();
         }
         if links.is_empty() {
-            self.out.push_str("<div class=\"vl-live-placeholder\" data-kind=\"pages\">Subpages appear here.</div>");
+            self.out.push_str(
+                "<div class=\"vl-live-placeholder\" \
+                data-kind=\"pages\">Subpages appear here.</div>",
+            );
             return;
         }
         self.out.push_str("<ul");
@@ -382,8 +404,9 @@ impl Writer<'_> {
                     self.out.push_str("</a>");
                 }
                 None => {
-                    self.out
-                        .push_str("<span class=\"vl-page-card vl-unresolved\">");
+                    self.out.push_str(
+                        "<span class=\"vl-page-card vl-unresolved\">",
+                    );
                     html::text(&mut self.out, &title);
                     self.out.push_str("</span>");
                 }

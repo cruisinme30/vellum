@@ -59,7 +59,12 @@ impl Drive {
     ///
     /// # Errors
     /// `SpaceNotFound`, or index and authorization failures.
-    #[tracing::instrument(name = "drive.admin_space", skip_all, fields(space = %space), err)]
+    #[tracing::instrument(
+        name = "drive.admin_space",
+        skip_all,
+        fields(space = %space),
+        err
+    )]
     pub async fn admin_space(&self, space: SpaceId) -> DriveResult<AdminSpace> {
         self.observe("admin_space", async {
             let space = self.space(space).await?;
@@ -77,7 +82,12 @@ impl Drive {
     /// # Errors
     /// `Invalid` for a bad slug or name, `AlreadyExists` if the slug is
     /// taken, or a store failure.
-    #[tracing::instrument(name = "drive.admin_create_space", skip_all, fields(slug = slug), err)]
+    #[tracing::instrument(
+        name = "drive.admin_create_space",
+        skip_all,
+        fields(slug = slug),
+        err
+    )]
     pub async fn admin_create_space(
         &self,
         slug: &str,
@@ -85,10 +95,18 @@ impl Drive {
         owner: UserId,
     ) -> DriveResult<AdminSpace> {
         if name.trim().is_empty() {
-            return Err(DriveError::Invalid("a shared drive needs a name".into()));
+            return Err(DriveError::Invalid(
+                "a shared drive needs a name".into(),
+            ));
         }
         let space = self
-            .create_space(&Actor::System, SpaceKind::SharedDrive, slug, name, None)
+            .create_space(
+                &Actor::System,
+                SpaceKind::SharedDrive,
+                slug,
+                name,
+                None,
+            )
             .await?;
         self.access
             .set_member(space.id, owner, Some(SpaceRole::Owner))
@@ -121,7 +139,12 @@ impl Drive {
     /// # Errors
     /// `SpaceNotFound`; `Invalid` for a My Drive, or when the change would
     /// leave the drive with no manager or owner.
-    #[tracing::instrument(name = "drive.admin_set_member", skip_all, fields(space = %space), err)]
+    #[tracing::instrument(
+        name = "drive.admin_set_member",
+        skip_all,
+        fields(space = %space),
+        err
+    )]
     pub async fn admin_set_member(
         &self,
         space: SpaceId,
@@ -132,12 +155,14 @@ impl Drive {
             let found = self.space(space).await?;
             if found.kind == SpaceKind::UserDrive {
                 return Err(DriveError::Invalid(
-                    "a My Drive belongs to its owner; they share items from it themselves".into(),
+                    "a My Drive belongs to its owner; they share items from it \
+                        themselves".into(),
                 ));
             }
             let members = self.access.members(space).await?;
-            let still_managed = members.iter().any(|m| m.user != user && m.role.manages())
-                || role.is_some_and(SpaceRole::manages);
+            let still_managed =
+                members.iter().any(|m| m.user != user && m.role.manages())
+                    || role.is_some_and(SpaceRole::manages);
             if !still_managed {
                 return Err(DriveError::Invalid(
                     "a shared drive needs at least one manager or owner".into(),

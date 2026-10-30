@@ -3,7 +3,9 @@
 
 //! A passphrase KEK can be re-derived from nothing but an envelope header.
 
-use vellum_crypto::{CryptoError, LocalKeyring, PassphraseKdf, kek_of, open, seal};
+use vellum_crypto::{
+    CryptoError, LocalKeyring, PassphraseKdf, kek_of, open, seal,
+};
 
 #[tokio::test]
 async fn passphrase_kek_reopens_from_header_alone() -> Result<(), CryptoError> {
@@ -13,7 +15,8 @@ async fn passphrase_kek_reopens_from_header_alone() -> Result<(), CryptoError> {
 
     let id = kek_of(&sealed)?;
     let restored = PassphraseKdf::from_kek_id(&id)?;
-    let reopened = LocalKeyring::new(id.clone(), restored.derive(b"northstar")?);
+    let reopened =
+        LocalKeyring::new(id.clone(), restored.derive(b"northstar")?);
     assert_eq!(open(&reopened, &sealed).await?, b"vault");
 
     let wrong = LocalKeyring::new(id, restored.derive(b"southstar")?);

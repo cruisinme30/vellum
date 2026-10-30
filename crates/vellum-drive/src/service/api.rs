@@ -11,8 +11,8 @@ use vellum_kernel::{Actor, ObjectId, SpaceId, Timestamp, UserId, VersionId};
 
 use crate::drive::AdminSpace;
 use crate::model::{
-    Activity, ActivityKind, Node, NodeKind, RetentionPolicy, Space, SpaceKind, SpaceSettings,
-    VersionRecord,
+    Activity, ActivityKind, Node, NodeKind, RetentionPolicy, Space, SpaceKind,
+    SpaceSettings, VersionRecord,
 };
 use crate::ports::SpaceRole;
 
@@ -48,7 +48,9 @@ pub struct VersionKey {
 }
 
 /// What kind of space.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum SpaceKindView {
     /// A team drive.
@@ -164,7 +166,9 @@ pub struct SpaceList {
 }
 
 /// What an item is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum NodeKindView {
     /// A folder.
@@ -362,14 +366,24 @@ impl From<&Activity> for ActivityView {
         let (kind, from, to) = match &a.kind {
             ActivityKind::Created => ("created", None, None),
             ActivityKind::Edited { .. } => ("edited", None, None),
-            ActivityKind::Renamed { from, to } => ("renamed", Some(from.clone()), Some(to.clone())),
-            ActivityKind::Moved { from, to } => ("moved", Some(from.clone()), Some(to.clone())),
-            ActivityKind::Copied { from } => ("copied", Some(from.to_string()), None),
+            ActivityKind::Renamed { from, to } => {
+                ("renamed", Some(from.clone()), Some(to.clone()))
+            }
+            ActivityKind::Moved { from, to } => {
+                ("moved", Some(from.clone()), Some(to.clone()))
+            }
+            ActivityKind::Copied { from } => {
+                ("copied", Some(from.to_string()), None)
+            }
             ActivityKind::Trashed => ("trashed", None, None),
             ActivityKind::Restored => ("restored", None, None),
             ActivityKind::Purged => ("purged", None, None),
-            ActivityKind::ConflictCopy { copy } => ("conflict_copy", None, Some(copy.to_string())),
-            ActivityKind::VersionRestored { .. } => ("version_restored", None, None),
+            ActivityKind::ConflictCopy { copy } => {
+                ("conflict_copy", None, Some(copy.to_string()))
+            }
+            ActivityKind::VersionRestored { .. } => {
+                ("version_restored", None, None)
+            }
         };
         Self {
             at: a.at,
@@ -648,7 +662,9 @@ pub struct Done {
 }
 
 /// A role on a whole space (ADR 0021, D242).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum SpaceRoleView {
     /// May view.

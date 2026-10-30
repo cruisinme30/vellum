@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 //! DB spans: every statement gets `db.system`, `db.statement`, `db.rows` and
-//! `db.duration_ms`, plus a `vellum.db.duration_ms` histogram for RED dashboards.
+//! `db.duration_ms`, plus a `vellum.db.duration_ms` histogram for RED
+//! dashboards.
 
 use std::future::Future;
 use std::time::Instant;
@@ -67,14 +68,19 @@ impl RowCount for () {
     }
 }
 
-/// Runs `fut` inside a `db.query` span and records rows and elapsed milliseconds.
+/// Runs `fut` inside a `db.query` span and records rows and elapsed
+/// milliseconds.
 ///
 /// `statement` is a short, stable name (never SQL with values in it), so spans
 /// can be grouped and nothing sensitive reaches the trace.
 ///
 /// # Errors
 /// Returns whatever `fut` returns; errors also mark the span as failed.
-pub async fn traced<T, E, F>(system: &'static str, statement: &'static str, fut: F) -> Result<T, E>
+pub async fn traced<T, E, F>(
+    system: &'static str,
+    statement: &'static str,
+    fut: F,
+) -> Result<T, E>
 where
     T: RowCount,
     F: Future<Output = Result<T, E>>,

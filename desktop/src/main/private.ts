@@ -55,7 +55,10 @@ export class PrivateSpaces {
   /** This device's key, created in the OS keychain on first use. */
   async deviceKey(): Promise<DeviceKey> {
     const result = await this.deps.run(["private", "key", "--json"], {});
-    const parsed = JSON.parse(this.output(result).join("\n")) as Record<string, unknown>;
+    const parsed = JSON.parse(this.output(result).join("\n")) as Record<
+      string,
+      unknown
+    >;
     const { public_key: publicKey, fingerprint } = parsed;
     if (typeof publicKey !== "string" || typeof fingerprint !== "string")
       throw new Error("The device key could not be read");
@@ -76,13 +79,23 @@ export class PrivateSpaces {
    * in `trust`, after the person compared their fingerprints.
    */
   async reseal(spaceId: unknown, trust?: unknown): Promise<PrivateResult> {
-    const trusted = parseFingerprints(trust).map((fingerprint) => `--trust=${fingerprint}`);
-    return this.remote(["reseal", "--space", parseSpaceId(spaceId), ...trusted]);
+    const trusted = parseFingerprints(trust).map(
+      (fingerprint) => `--trust=${fingerprint}`,
+    );
+    return this.remote([
+      "reseal",
+      "--space",
+      parseSpaceId(spaceId),
+      ...trusted,
+    ]);
   }
 
-  private async remote(commandArguments: readonly string[]): Promise<PrivateResult> {
+  private async remote(
+    commandArguments: readonly string[],
+  ): Promise<PrivateResult> {
     const token = await this.accessToken();
-    if (token === undefined) throw new Error("Sign in before using private spaces");
+    if (token === undefined)
+      throw new Error("Sign in before using private spaces");
     const result = await this.deps.run(["private", ...commandArguments], {
       VELLUM_SERVER: this.server(),
       VELLUM_TOKEN: token,
@@ -94,7 +107,9 @@ export class PrivateSpaces {
   private output(result: RunResult): string[] {
     if (result.code !== 0) {
       const reason = result.stderr.trim().split("\n").at(-1) ?? "";
-      throw new Error(reason === "" ? "The private-space command failed" : reason);
+      throw new Error(
+        reason === "" ? "The private-space command failed" : reason,
+      );
     }
     return result.stdout
       .split("\n")
@@ -126,7 +141,8 @@ export function parseSpaceId(input: unknown): string {
 
 /** The label members see for this device: the page's, or the machine's name. */
 export function deviceLabel(input: unknown, hostname: string): string {
-  const chosen = typeof input === "string" ? input : `${hostname} (Vellum desktop)`;
+  const chosen =
+    typeof input === "string" ? input : `${hostname} (Vellum desktop)`;
   // Control characters never reach the server or the command line.
   // eslint-disable-next-line no-control-regex
   const clean = chosen.replaceAll(/[\u0000-\u001F\u007F]/gu, " ").trim();

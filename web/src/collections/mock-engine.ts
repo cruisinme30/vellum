@@ -5,7 +5,16 @@
 // filtering, sorting, grouping, hiding and limiting for the demo views.
 import type { MockCollection, MockRow } from "./mock-data";
 import type { Column, Group, PropertyInfo, RowView, Value } from "./types";
-import { bool, EMPTY, formatNumber, isEmpty, number, plain, text, texts } from "./value";
+import {
+  bool,
+  EMPTY,
+  formatNumber,
+  isEmpty,
+  number,
+  plain,
+  text,
+  texts,
+} from "./value";
 
 /** All collections and their rows. */
 export interface MockWorld {
@@ -20,17 +29,28 @@ export interface FullRow {
 }
 
 /** Finds a property by key, or by display name ignoring case. */
-export function resolve(collection: MockCollection, nameOrKey: string): PropertyInfo | undefined {
+export function resolve(
+  collection: MockCollection,
+  nameOrKey: string,
+): PropertyInfo | undefined {
   const wanted = nameOrKey.trim();
   return (
     collection.properties.find((p) => p.key === wanted) ??
-    collection.properties.find((p) => p.name.toLowerCase() === wanted.toLowerCase())
+    collection.properties.find(
+      (p) => p.name.toLowerCase() === wanted.toLowerCase(),
+    )
   );
 }
 
-function rollup(world: MockWorld, property: PropertyInfo, values: Record<string, Value>): Value {
+function rollup(
+  world: MockWorld,
+  property: PropertyInfo,
+  values: Record<string, Value>,
+): Value {
   const spec = property.rollup;
-  const from = world.collections.find((c) => c.properties.some((p) => p.key === spec?.via));
+  const from = world.collections.find((c) =>
+    c.properties.some((p) => p.key === spec?.via),
+  );
   const via = from?.properties.find((p) => p.key === spec?.via);
   const targets = world.rows.get(via?.relation?.to ?? "") ?? [];
   const linked = new Set(texts(values[spec?.via ?? ""]));
@@ -38,13 +58,19 @@ function rollup(world: MockWorld, property: PropertyInfo, values: Record<string,
     .filter((row) => linked.has(row.id))
     .map((row) => row.values[spec?.prop ?? ""]);
   if (spec?.agg === "sum") {
-    return number(items.reduce((sum, v) => sum + (v?.type === "number" ? v.value : 0), 0));
+    return number(
+      items.reduce((sum, v) => sum + (v?.type === "number" ? v.value : 0), 0),
+    );
   }
   return number(items.length);
 }
 
 /** A row's stored values plus its formulas and rollups. */
-export function computeRow(world: MockWorld, collection: MockCollection, row: MockRow): FullRow {
+export function computeRow(
+  world: MockWorld,
+  collection: MockCollection,
+  row: MockRow,
+): FullRow {
   const values: Record<string, Value> = { ...row.values };
   for (const property of collection.properties) {
     const formula = collection.formulas[property.key];
@@ -58,12 +84,18 @@ export function computeRow(world: MockWorld, collection: MockCollection, row: Mo
 }
 
 /** The title of a row in any collection, by id. */
-function titleOf(world: MockWorld, collectionId: string, rowId: string): string {
+function titleOf(
+  world: MockWorld,
+  collectionId: string,
+  rowId: string,
+): string {
   const row = world.rows.get(collectionId)?.find((r) => r.id === rowId);
   return row ? plain(row.values["name"]) : rowId;
 }
 
-/** The text items a value shows: related rows' titles, options, or the value. */
+/**
+ * The text items a value shows: related rows' titles, options, or the value.
+ */
 export function itemTexts(
   world: MockWorld,
   property: PropertyInfo,
@@ -74,7 +106,9 @@ export function itemTexts(
     return texts(value).map((id) => titleOf(world, to, id));
   }
   if (value?.type === "list") {
-    return value.value.filter((item) => !isEmpty(item)).map((item) => plain(item));
+    return value.value
+      .filter((item) => !isEmpty(item))
+      .map((item) => plain(item));
   }
   return isEmpty(value) ? [] : [plain(value)];
 }
@@ -101,7 +135,11 @@ const RANK: Record<Value["type"], number> = {
 };
 
 /** The server's sort order: select options as listed, then by value. */
-function compareValues(property: PropertyInfo | undefined, a: Value, b: Value): number {
+function compareValues(
+  property: PropertyInfo | undefined,
+  a: Value,
+  b: Value,
+): number {
   const names = (property?.options ?? []).map((o) => o.name);
   const rank = (value: Value) => {
     const at = names.indexOf(plain(value));
@@ -149,8 +187,13 @@ export function sortRows(
   });
 }
 
-/** Columns of a result: every property but the hidden ones (never the title). */
-export function columnsOf(collection: MockCollection, hidden: readonly string[]): Column[] {
+/**
+ * Columns of a result: every property but the hidden ones (never the title).
+ */
+export function columnsOf(
+  collection: MockCollection,
+  hidden: readonly string[],
+): Column[] {
   return collection.properties
     .filter((p) => p.type === "title" || !hidden.includes(p.key))
     .map((p) => ({
@@ -169,7 +212,10 @@ export interface Groupable extends RowView {
 }
 
 /** The values a row is grouped by: one per item, none when empty. */
-function groupValues(property: PropertyInfo, value: Value | undefined): readonly Value[] {
+function groupValues(
+  property: PropertyInfo,
+  value: Value | undefined,
+): readonly Value[] {
   if (property.type === "checkbox") {
     return [bool(value?.type === "bool" && value.value)];
   }
@@ -180,12 +226,19 @@ function groupValues(property: PropertyInfo, value: Value | undefined): readonly
 }
 
 /** The groups one value puts a row in, with their labels. */
-function groupItems(world: MockWorld, property: PropertyInfo, value: Value | undefined) {
+function groupItems(
+  world: MockWorld,
+  property: PropertyInfo,
+  value: Value | undefined,
+) {
   return groupValues(property, value)
     .filter((item) => property.type === "checkbox" || !isEmpty(item))
     .map((item) => ({
       value: item,
-      label: property.type === "checkbox" ? plain(item) : display(world, property, item),
+      label:
+        property.type === "checkbox"
+          ? plain(item)
+          : display(world, property, item),
     }));
 }
 
@@ -211,14 +264,22 @@ export function groupRows(
   const options = board ? (property.options ?? []).map((o) => o.name) : [];
   const extra = keyed
     .flatMap((k) => k.items)
-    .filter((item, index, all) => all.findIndex((other) => other.label === item.label) === index)
+    .filter(
+      (item, index, all) =>
+        all.findIndex((other) => other.label === item.label) === index,
+    )
     .filter((item) => !options.includes(item.label))
     .toSorted((a, b) => compareValues(property, a.value, b.value));
-  const order = [...options.map((name) => ({ value: text(name), label: name })), ...extra];
+  const order = [
+    ...options.map((name) => ({ value: text(name), label: name })),
+    ...extra,
+  ];
   const groups: Group[] = order.map(({ value, label }) => ({
     value,
     label,
-    rows: keyed.filter((k) => k.items.some((item) => item.label === label)).map((k) => k.row),
+    rows: keyed
+      .filter((k) => k.items.some((item) => item.label === label))
+      .map((k) => k.row),
   }));
   const none = keyed.filter((k) => k.items.length === 0).map((k) => k.row);
   if (none.length > 0 || (board && groups.length === 0)) {

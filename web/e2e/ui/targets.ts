@@ -42,7 +42,10 @@ export interface Target {
   open?: RegExp;
 }
 
-/** quick (the default): the fast subset; full: every page; exhaustive: every page in every mode. */
+/**
+ * quick (the default): the fast subset; full: every page; exhaustive: every
+ * page in every mode.
+ */
 const scope = process.env["UI_SCOPE"] ?? "quick";
 
 export const APP_PORT = 4173;
@@ -57,7 +60,12 @@ export const SITE_DIR = path.resolve(
 const app = (
   name: string,
   route: string,
-  options: { server?: ServerState; visual?: boolean; fast?: boolean; open?: RegExp } = {},
+  options: {
+    server?: ServerState;
+    visual?: boolean;
+    fast?: boolean;
+    open?: RegExp;
+  } = {},
 ): Target => ({
   name: `app ${name}`,
   url: `http://127.0.0.1:${String(APP_PORT)}${route}`,
@@ -80,7 +88,12 @@ const screen = (name: string, route: string, fast = false): Target =>
 
 /** A dialog or panel on a server screen, opened by pressing `button`. */
 const panel = (name: string, route: string, button: RegExp): Target =>
-  app(name, route, { server: "signed-in", fast: false, visual: false, open: button });
+  app(name, route, {
+    server: "signed-in",
+    fast: false,
+    visual: false,
+    open: button,
+  });
 
 function serverScreens(): Target[] {
   return [
@@ -92,9 +105,21 @@ function serverScreens(): Target[] {
     screen("book section", `/books/${HANDBOOK}/setup`, true),
     panel("book publish", `/books/${HANDBOOK}/setup`, /^Publish$/),
     panel("book snapshots", `/books/${HANDBOOK}/setup`, /^Snapshots$/),
-    panel("book section access", `/books/${HANDBOOK}/setup`, /^Section access$/),
-    panel("book outline history", `/books/${HANDBOOK}/setup`, /^Outline history$/),
-    panel("book move section", `/books/${HANDBOOK}/setup`, /^Move to another book$/),
+    panel(
+      "book section access",
+      `/books/${HANDBOOK}/setup`,
+      /^Section access$/,
+    ),
+    panel(
+      "book outline history",
+      `/books/${HANDBOOK}/setup`,
+      /^Outline history$/,
+    ),
+    panel(
+      "book move section",
+      `/books/${HANDBOOK}/setup`,
+      /^Move to another book$/,
+    ),
     screen("appearance (server)", "/settings/appearance"),
     screen("notification settings", "/settings/notifications"),
     screen("private spaces", "/settings/private-spaces"),
@@ -146,11 +171,29 @@ const APP_TARGETS: Target[] = [
   app("drive", "/drive", { server: "drive", visual: false }),
   app("drive folder", "/drive/s/S1/f/F1", { server: "drive", visual: false }),
   app("drive trash", "/drive/s/S1/trash", { server: "drive", visual: false }),
-  app("drive settings", "/drive/s/S2/settings", { server: "drive", visual: false }),
-  app("drive search", "/drive/search?q=plan&kind=page", { server: "drive", visual: false }),
-  app("drive recent", "/drive/recent", { server: "drive", visual: false, fast: false }),
-  app("drive starred", "/drive/starred", { server: "drive", visual: false, fast: false }),
-  app("drive shared drives", "/drive/shared", { server: "drive", visual: false, fast: false }),
+  app("drive settings", "/drive/s/S2/settings", {
+    server: "drive",
+    visual: false,
+  }),
+  app("drive search", "/drive/search?q=plan&kind=page", {
+    server: "drive",
+    visual: false,
+  }),
+  app("drive recent", "/drive/recent", {
+    server: "drive",
+    visual: false,
+    fast: false,
+  }),
+  app("drive starred", "/drive/starred", {
+    server: "drive",
+    visual: false,
+    fast: false,
+  }),
+  app("drive shared drives", "/drive/shared", {
+    server: "drive",
+    visual: false,
+    fast: false,
+  }),
   app("drive shared with me", "/drive/shared-with-me", {
     server: "drive",
     visual: false,
@@ -159,8 +202,14 @@ const APP_TARGETS: Target[] = [
   // The theme editor's words and its contrast table change as tokens are
   // added, so the layout audit covers it rather than a pixel baseline.
   app("appearance", "/settings/appearance", { visual: false }),
-  app("issues board", "/issues?layout=board", { server: "work", visual: false }),
-  app("issues list", "/issues?group=assignee", { server: "work", visual: false }),
+  app("issues board", "/issues?layout=board", {
+    server: "work",
+    visual: false,
+  }),
+  app("issues list", "/issues?group=assignee", {
+    server: "work",
+    visual: false,
+  }),
   app("my issues", "/issues/mine", { server: "work", visual: false }),
   app("triage", "/issues/triage", { server: "work", visual: false }),
   app("cycles", "/issues/cycles", { server: "work", visual: false }),
@@ -213,7 +262,10 @@ function siteTargets(): Target[] {
 
 const quick = scope !== "full" && scope !== "exhaustive";
 
-/** Every target in scope: the fast subset unless UI_SCOPE is full or exhaustive. */
-export const TARGETS: readonly Target[] = [...APP_TARGETS, ...siteTargets()].filter(
-  (target) => !quick || target.fast,
-);
+/**
+ * Every target in scope: the fast subset unless UI_SCOPE is full or exhaustive.
+ */
+export const TARGETS: readonly Target[] = [
+  ...APP_TARGETS,
+  ...siteTargets(),
+].filter((target) => !quick || target.fast);

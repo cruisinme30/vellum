@@ -18,34 +18,58 @@ export function siblings(
   spaceId: string,
   parentId: string | undefined,
 ) {
-  return pages.filter((p) => p.spaceId === spaceId && p.parentId === parentId).toSorted(byPosition);
+  return pages
+    .filter((p) => p.spaceId === spaceId && p.parentId === parentId)
+    .toSorted(byPosition);
 }
 
-/** Builds the tree of one space. Orphans (a missing parent) are shown at the top level. */
-export function buildTree(pages: readonly PageMeta[], spaceId: string): TreeNode[] {
+/**
+ * Builds the tree of one space. Orphans (a missing parent) are shown at the top
+ * level.
+ */
+export function buildTree(
+  pages: readonly PageMeta[],
+  spaceId: string,
+): TreeNode[] {
   const inSpace = pages.filter((p) => p.spaceId === spaceId);
   const ids = new Set(inSpace.map((p) => p.id));
   const children = new Map<string | undefined, PageMeta[]>();
   for (const page of inSpace) {
-    const key = page.parentId !== undefined && ids.has(page.parentId) ? page.parentId : undefined;
+    const key =
+      page.parentId !== undefined && ids.has(page.parentId)
+        ? page.parentId
+        : undefined;
     children.set(key, [...(children.get(key) ?? []), page]);
   }
-  const build = (parent: string | undefined, seen: ReadonlySet<string>): TreeNode[] =>
+  const build = (
+    parent: string | undefined,
+    seen: ReadonlySet<string>,
+  ): TreeNode[] =>
     (children.get(parent) ?? [])
       .toSorted(byPosition)
       .filter((page) => !seen.has(page.id))
-      .map((page) => ({ page, children: build(page.id, new Set([...seen, page.id])) }));
+      .map((page) => ({
+        page,
+        children: build(page.id, new Set([...seen, page.id])),
+      }));
   return build(undefined, new Set());
 }
 
 /** The ids of a page and everything under it. */
-export function descendants(pages: readonly PageMeta[], id: string): Set<string> {
+export function descendants(
+  pages: readonly PageMeta[],
+  id: string,
+): Set<string> {
   const out = new Set([id]);
   let grew = true;
   while (grew) {
     grew = false;
     for (const page of pages) {
-      if (page.parentId !== undefined && out.has(page.parentId) && !out.has(page.id)) {
+      if (
+        page.parentId !== undefined &&
+        out.has(page.parentId) &&
+        !out.has(page.id)
+      ) {
         out.add(page.id);
         grew = true;
       }
@@ -74,17 +98,29 @@ export function ancestors(pages: readonly PageMeta[], id: string): PageMeta[] {
  * Moves a page (and its subtree) to a new parent and index. Returns the
  * pages unchanged when the move is impossible, such as into its own subtree.
  */
-export function movePage(pages: readonly PageMeta[], id: string, target: MoveTarget): PageMeta[] {
+export function movePage(
+  pages: readonly PageMeta[],
+  id: string,
+  target: MoveTarget,
+): PageMeta[] {
   const page = pages.find((p) => p.id === id);
-  if (!page || (target.parentId !== undefined && descendants(pages, id).has(target.parentId))) {
+  if (
+    !page ||
+    (target.parentId !== undefined &&
+      descendants(pages, id).has(target.parentId))
+  ) {
     return [...pages];
   }
   const parent =
-    target.parentId === undefined ? undefined : pages.find((p) => p.id === target.parentId);
+    target.parentId === undefined
+      ? undefined
+      : pages.find((p) => p.id === target.parentId);
   if (target.parentId !== undefined && parent?.spaceId !== target.spaceId) {
     return [...pages];
   }
-  const others = siblings(pages, target.spaceId, target.parentId).filter((p) => p.id !== id);
+  const others = siblings(pages, target.spaceId, target.parentId).filter(
+    (p) => p.id !== id,
+  );
   const index = Math.max(0, Math.min(target.index, others.length));
   const order = [...others.slice(0, index), page, ...others.slice(index)];
   const positions = new Map(order.map((p, index_) => [p.id, index_ + 1]));
@@ -92,7 +128,12 @@ export function movePage(pages: readonly PageMeta[], id: string, target: MoveTar
   return pages.map((p) => {
     const position = positions.get(p.id);
     if (p.id === id) {
-      return { ...p, spaceId: target.spaceId, parentId: target.parentId, position: position ?? 1 };
+      return {
+        ...p,
+        spaceId: target.spaceId,
+        parentId: target.parentId,
+        position: position ?? 1,
+      };
     }
     if (moved.has(p.id)) {
       return { ...p, spaceId: target.spaceId };
@@ -101,10 +142,16 @@ export function movePage(pages: readonly PageMeta[], id: string, target: MoveTar
   });
 }
 
-/** The keyboard and menu moves of the tree (a single-pointer alternative to dragging). */
+/**
+ * The keyboard and menu moves of the tree (a single-pointer alternative to
+ * dragging).
+ */
 export type TreeMove = "up" | "down" | "indent" | "outdent";
 
-/** Where a page goes for a keyboard move, or `undefined` when it cannot move that way. */
+/**
+ * Where a page goes for a keyboard move, or `undefined` when it cannot move
+ * that way.
+ */
 export function targetFor(
   pages: readonly PageMeta[],
   id: string,
@@ -139,7 +186,11 @@ export function targetFor(
       }
       const parentRow = siblings(pages, parent.spaceId, parent.parentId);
       const at = parentRow.findIndex((p) => p.id === parent.id);
-      return { spaceId: parent.spaceId, parentId: parent.parentId, index: at + 1 };
+      return {
+        spaceId: parent.spaceId,
+        parentId: parent.parentId,
+        index: at + 1,
+      };
     }
   }
 }

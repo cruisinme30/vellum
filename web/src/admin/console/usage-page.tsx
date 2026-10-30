@@ -21,12 +21,19 @@ const TIME = new Intl.DateTimeFormat("en", {
 
 const NUMBER = new Intl.NumberFormat("en");
 
-type Figure = readonly [labelId: string, value: (counts: UsageCounts) => string];
+type Figure = readonly [
+  labelId: string,
+  value: (counts: UsageCounts) => string,
+];
 
-const count = (pick: (c: UsageCounts) => number) => (c: UsageCounts) => NUMBER.format(pick(c));
+const count = (pick: (c: UsageCounts) => number) => (c: UsageCounts) =>
+  NUMBER.format(pick(c));
 
 /** Each group of figures, in reading order. */
-const GROUPS: readonly (readonly [headingId: string, figures: readonly Figure[]])[] = [
+const GROUPS: readonly (readonly [
+  headingId: string,
+  figures: readonly Figure[],
+])[] = [
   [
     "admin-usage-people",
     [
@@ -74,7 +81,11 @@ function Figures({ counts }: { readonly counts: UsageCounts }) {
   return (
     <div className="vl-usage">
       {GROUPS.map(([headingId, figures]) => (
-        <section key={headingId} aria-labelledby={headingId} className="vl-usage-group">
+        <section
+          key={headingId}
+          aria-labelledby={headingId}
+          className="vl-usage-group"
+        >
           <h2 id={headingId}>{t(headingId)}</h2>
           <dl className="vl-usage-grid">
             {figures.map(([labelId, value]) => (
@@ -93,7 +104,11 @@ function Figures({ counts }: { readonly counts: UsageCounts }) {
 function Overview({ api }: { readonly api: AdminConsoleApi }) {
   const t = useT();
   const [refresh, setRefresh] = useState(0);
-  const loaded = useLoaded(() => api.usage(refresh > 0), [api, refresh], failureText);
+  const loaded = useLoaded(
+    () => api.usage(refresh > 0),
+    [api, refresh],
+    failureText,
+  );
   const counts = loaded.state === "ready" ? loaded.value : undefined;
   return (
     <>
@@ -106,11 +121,15 @@ function Overview({ api }: { readonly api: AdminConsoleApi }) {
             setRefresh((n) => n + 1);
           }}
         >
-          {loaded.state === "loading" ? t("admin-usage-counting") : t("admin-usage-count-now")}
+          {loaded.state === "loading"
+            ? t("admin-usage-counting")
+            : t("admin-usage-count-now")}
         </button>
         <p role="status" className="vl-muted">
           {counts !== undefined && counts.sampled_at_ms > 0
-            ? t("admin-usage-counted", { when: TIME.format(new Date(counts.sampled_at_ms)) })
+            ? t("admin-usage-counted", {
+                when: TIME.format(new Date(counts.sampled_at_ms)),
+              })
             : ""}
         </p>
       </div>
@@ -121,7 +140,11 @@ function Overview({ api }: { readonly api: AdminConsoleApi }) {
         </p>
       )}
       {counts !== undefined &&
-        (counts.sampled_at_ms > 0 ? <Figures counts={counts} /> : <p>{t("admin-usage-none")}</p>)}
+        (counts.sampled_at_ms > 0 ? (
+          <Figures counts={counts} />
+        ) : (
+          <p>{t("admin-usage-none")}</p>
+        ))}
     </>
   );
 }

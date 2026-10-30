@@ -15,7 +15,9 @@ import type {
 
 import { EARLIER, NOW, PRIYA } from "./northstar-work";
 
-/** The Northstar admin console's figures, as `vellum serve` answers them (D285). */
+/**
+ * The Northstar admin console's figures, as `vellum serve` answers them (D285).
+ */
 
 export const USAGE: UsageCounts = {
   users: 48,
@@ -44,7 +46,10 @@ export const ADMIN_STATE: AdminState = {
   last_telemetry_ms: Date.parse(EARLIER),
 };
 
-export const ADMIN_SETTINGS: Versioned = { version: 3, settings: { organisation: "Northstar" } };
+export const ADMIN_SETTINGS: Versioned = {
+  version: 3,
+  settings: { organisation: "Northstar" },
+};
 
 export const AUDIT: AuditList = {
   records: [
@@ -200,7 +205,12 @@ export const ADMIN_SPACES: AdminSpaceList = {
         kind: "shared_drive",
         slug: "northstar",
         name: "Northstar Product and Engineering",
-        settings: { daily_days: 30, keep_all_days: 7, trash_days: 30, weekly_weeks: 52 },
+        settings: {
+          daily_days: 30,
+          keep_all_days: 7,
+          trash_days: 30,
+          weekly_weeks: 52,
+        },
       },
       used_bytes: 9_400_000_000,
       members: [
@@ -216,9 +226,15 @@ export const GROUPS: GroupList = {
     {
       id: "01M6400000GROUP0ENGINEER01",
       name: "Engineering",
-      description: "Everyone who ships code, including contractors on the platform team",
+      description:
+        "Everyone who ships code, including contractors on the platform team",
       created_at: EARLIER,
     },
-    { id: "01M6400000GROUP0DESIGN0001", name: "Design", description: "", created_at: NOW },
+    {
+      id: "01M6400000GROUP0DESIGN0001",
+      name: "Design",
+      description: "",
+      created_at: NOW,
+    },
   ],
 };

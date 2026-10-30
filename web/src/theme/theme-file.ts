@@ -39,7 +39,9 @@ export interface CustomTheme {
 export const TOKEN_NAMES: readonly string[] = Object.keys(buildScheme("light"));
 
 const KNOWN = new Set(TOKEN_NAMES);
-const BASES = THEMES.filter((theme): theme is ResolvedTheme => theme !== "system");
+const BASES = THEMES.filter(
+  (theme): theme is ResolvedTheme => theme !== "system",
+);
 const HEX = /^#[\da-f]{6}$/i;
 
 /** The full scheme of a custom theme. */
@@ -56,7 +58,10 @@ export type ThemeFileError =
   | { readonly kind: "base" }
   | { readonly kind: "seed" }
   | { readonly kind: "token"; readonly token: string }
-  | { readonly kind: "contrast"; readonly failures: readonly ContrastFailure[] };
+  | {
+      readonly kind: "contrast";
+      readonly failures: readonly ContrastFailure[];
+    };
 
 /** A theme file's result. */
 export type ThemeFileResult =
@@ -98,7 +103,8 @@ function readName(value: unknown): string | undefined {
  * imported files and for the custom theme kept in the browser.
  */
 export function validateTheme(value: unknown): ThemeFileResult {
-  if (typeof value !== "object" || value === null) return fail({ kind: "format" });
+  if (typeof value !== "object" || value === null)
+    return fail({ kind: "format" });
   const record = value as Record<string, unknown>;
   if (record["format"] !== THEME_FORMAT) return fail({ kind: "format" });
   const name = readName(record["name"]);
@@ -106,12 +112,15 @@ export function validateTheme(value: unknown): ThemeFileResult {
   const base = BASES.find((theme) => theme === record["base"]);
   if (base === undefined) return fail({ kind: "base" });
   const seed = record["seed"];
-  if (typeof seed !== "string" || !HEX.test(seed)) return fail({ kind: "seed" });
+  if (typeof seed !== "string" || !HEX.test(seed))
+    return fail({ kind: "seed" });
   const tokens = readTokens(record["tokens"]);
   if ("kind" in tokens) return fail(tokens as ThemeFileError);
   const theme: CustomTheme = { name, base, seed: seed.toLowerCase(), tokens };
   const failures = checkContrast(customScheme(theme));
-  return failures.length > 0 ? fail({ kind: "contrast", failures }) : { ok: true, theme };
+  return failures.length > 0
+    ? fail({ kind: "contrast", failures })
+    : { ok: true, theme };
 }
 
 /** Reads a theme file's text. */
@@ -132,9 +141,17 @@ export function importTheme(text: string): ThemeFileResult {
  */
 export function exportTheme(theme: CustomTheme): string {
   const scheme = customScheme(theme);
-  const tokens = Object.fromEntries(TOKEN_NAMES.map((token) => [token, scheme[token] ?? ""]));
+  const tokens = Object.fromEntries(
+    TOKEN_NAMES.map((token) => [token, scheme[token] ?? ""]),
+  );
   return `${JSON.stringify(
-    { format: THEME_FORMAT, name: theme.name, base: theme.base, seed: theme.seed, tokens },
+    {
+      format: THEME_FORMAT,
+      name: theme.name,
+      base: theme.base,
+      seed: theme.seed,
+      tokens,
+    },
     undefined,
     2,
   )}\n`;

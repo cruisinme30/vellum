@@ -1,10 +1,22 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
+import {
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+  type KeyboardEvent,
+} from "react";
 import { useNavigate } from "react-router";
 
-import { ancestors, buildTree, targetFor, type TreeMove, type TreeNode } from "../data/tree";
+import {
+  ancestors,
+  buildTree,
+  targetFor,
+  type TreeMove,
+  type TreeNode,
+} from "../data/tree";
 import type { MoveTarget, PageMeta, Space } from "../data/types";
 import { useServices } from "../data/workspace-context";
 import { useT } from "../i18n/i18n";
@@ -20,10 +32,19 @@ interface Row {
   readonly size: number;
 }
 
-/** The rows a keyboard user can reach: every page whose ancestors are expanded. */
-export function visibleRows(nodes: readonly TreeNode[], expanded: ReadonlySet<string>): Row[] {
+/**
+ * The rows a keyboard user can reach: every page whose ancestors are expanded.
+ */
+export function visibleRows(
+  nodes: readonly TreeNode[],
+  expanded: ReadonlySet<string>,
+): Row[] {
   const rows: Row[] = [];
-  const walk = (list: readonly TreeNode[], level: number, parentId?: string) => {
+  const walk = (
+    list: readonly TreeNode[],
+    level: number,
+    parentId?: string,
+  ) => {
     for (const [index, node] of list.entries()) {
       rows.push({ node, level, parentId, index, size: list.length });
       if (expanded.has(node.page.id)) {
@@ -43,14 +64,23 @@ const KEY_MOVES: Readonly<Record<string, TreeMove>> = {
 };
 
 /** Where a drop lands: before, inside or after the row under the pointer. */
-export function dropTarget(row: Row, spaceId: string, offset: number, height: number): MoveTarget {
+export function dropTarget(
+  row: Row,
+  spaceId: string,
+  offset: number,
+  height: number,
+): MoveTarget {
   if (offset < height * 0.25) {
     return { spaceId, parentId: row.parentId, index: row.index };
   }
   if (offset > height * 0.75) {
     return { spaceId, parentId: row.parentId, index: row.index + 1 };
   }
-  return { spaceId, parentId: row.node.page.id, index: row.node.children.length };
+  return {
+    spaceId,
+    parentId: row.node.page.id,
+    index: row.node.children.length,
+  };
 }
 
 interface PageTreeProperties {
@@ -66,7 +96,12 @@ interface PageTreeProperties {
  * opens the page menu, so dragging always has a keyboard alternative
  * (WCAG 2.5.7).
  */
-export function PageTree({ space, pages, currentId, onNavigate }: PageTreeProperties) {
+export function PageTree({
+  space,
+  pages,
+  currentId,
+  onNavigate,
+}: PageTreeProperties) {
   const t = useT();
   const navigate = useNavigate();
   const { store } = useServices();
@@ -126,7 +161,8 @@ export function PageTree({ space, pages, currentId, onNavigate }: PageTreeProper
   const onKeyDown = (event: KeyboardEvent, row: Row, at: number) => {
     const id = row.node.page.id;
     const hasChildren = row.node.children.length > 0;
-    const reorder = event.altKey && event.shiftKey ? KEY_MOVES[event.key] : undefined;
+    const reorder =
+      event.altKey && event.shiftKey ? KEY_MOVES[event.key] : undefined;
     if (reorder) {
       event.preventDefault();
       move(id, reorder);
@@ -180,10 +216,16 @@ export function PageTree({ space, pages, currentId, onNavigate }: PageTreeProper
 
   const onDrop = (event: DragEvent<HTMLElement>, row: Row) => {
     event.preventDefault();
-    const id = dragging ?? event.dataTransfer.getData("application/x-vellum-page");
+    const id =
+      dragging ?? event.dataTransfer.getData("application/x-vellum-page");
     const box = event.currentTarget.getBoundingClientRect();
     if (id !== "" && id !== row.node.page.id) {
-      const target = dropTarget(row, space.id, event.clientY - box.top, box.height);
+      const target = dropTarget(
+        row,
+        space.id,
+        event.clientY - box.top,
+        box.height,
+      );
       if (target.parentId !== undefined) {
         toggle(target.parentId, true);
       }
@@ -248,13 +290,18 @@ export function PageTree({ space, pages, currentId, onNavigate }: PageTreeProper
                 type="button"
                 className="vl-tree-twisty"
                 tabIndex={-1}
-                aria-label={t(isOpen ? "tree-collapse" : "tree-expand", { title })}
+                aria-label={t(isOpen ? "tree-collapse" : "tree-expand", {
+                  title,
+                })}
                 onClick={(event) => {
                   event.stopPropagation();
                   toggle(page.id);
                 }}
               >
-                <Icon name={isOpen ? "keyboard_arrow_down" : "chevron_right"} size={18} />
+                <Icon
+                  name={isOpen ? "keyboard_arrow_down" : "chevron_right"}
+                  size={18}
+                />
               </button>
             ) : (
               <span className="vl-tree-twisty" />
@@ -311,11 +358,13 @@ export function PageTree({ space, pages, currentId, onNavigate }: PageTreeProper
                 move(page.id, how);
               }}
               onAddChild={() => {
-                void store.createPage({ spaceId: space.id, parentId: page.id }).then((child) => {
-                  if (child === undefined) return;
-                  toggle(page.id, true);
-                  open(child.id);
-                });
+                void store
+                  .createPage({ spaceId: space.id, parentId: page.id })
+                  .then((child) => {
+                    if (child === undefined) return;
+                    toggle(page.id, true);
+                    open(child.id);
+                  });
               }}
             />
           </div>

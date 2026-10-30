@@ -85,8 +85,9 @@ pub type SecretHash = [u8; 32];
 /// [`ErrorKind::Internal`] if the system random source fails.
 pub fn generate(kind: Kind) -> Result<String, Error> {
     let mut bytes = [0_u8; 32];
-    getrandom::fill(&mut bytes)
-        .map_err(|e| Error::new(ErrorKind::Internal, format!("random source failed: {e}")))?;
+    getrandom::fill(&mut bytes).map_err(|e| {
+        Error::new(ErrorKind::Internal, format!("random source failed: {e}"))
+    })?;
     Ok(format!(
         "{}{}",
         kind.prefix(),

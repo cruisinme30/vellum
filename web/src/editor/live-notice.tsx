@@ -10,7 +10,9 @@ import type { LiveState } from "./collab/provider";
 /** How long joining may take before the page says so. */
 const JOIN_NOTICE_MS = 1000;
 
-/** One line under the toolbar when the page is not plainly editable and synced. */
+/**
+ * One line under the toolbar when the page is not plainly editable and synced.
+ */
 export function LiveNotice({
   state,
   joining,
@@ -57,7 +59,9 @@ export function LiveNotice({
   // The live region stays mounted so screen readers announce each change.
   return (
     <div role="status">
-      {key === undefined ? undefined : <p className="vl-editor-notice">{t(key)}</p>}
+      {key === undefined ? undefined : (
+        <p className="vl-editor-notice">{t(key)}</p>
+      )}
     </div>
   );
 }

@@ -37,7 +37,9 @@ use subtle::ConstantTimeEq as _;
 use vellum_kernel::{Error, ErrorKind, ObjectId, Timestamp, UserId};
 
 use crate::groups::GroupMembers;
-use crate::identity::{BREAK_GLASS_EMAIL, Identity, check_name, normalise_email};
+use crate::identity::{
+    BREAK_GLASS_EMAIL, Identity, check_name, normalise_email,
+};
 use crate::secret::{self, Kind};
 use crate::store::{Group, ScimToken, User};
 
@@ -47,7 +49,8 @@ const USER_SCHEMA: &str = "urn:ietf:params:scim:schemas:core:2.0:User";
 const GROUP_SCHEMA: &str = "urn:ietf:params:scim:schemas:core:2.0:Group";
 const LIST_SCHEMA: &str = "urn:ietf:params:scim:api:messages:2.0:ListResponse";
 const ERROR_SCHEMA: &str = "urn:ietf:params:scim:api:messages:2.0:Error";
-const CONFIG_SCHEMA: &str = "urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig";
+const CONFIG_SCHEMA: &str =
+    "urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig";
 const SCIM_JSON: &str = "application/scim+json";
 /// The most resources one list returns.
 const MAX_PAGE: usize = 200;
@@ -106,7 +109,10 @@ impl Identity {
             created_at: Timestamp::now(),
         };
         self.store().write(|s| s.sign_in.scim = Some(record))?;
-        tracing::info!(event = "identity.scim_token_rotated", "SCIM token made");
+        tracing::info!(
+            event = "identity.scim_token_rotated",
+            "SCIM token made"
+        );
         Ok(ScimTokenCreated {
             token,
             scim: self.scim_status(),
@@ -121,7 +127,10 @@ impl Identity {
     /// Only if the store cannot be written.
     pub fn revoke_scim_token(&self) -> Result<ScimView, Error> {
         self.store().write(|s| s.sign_in.scim = None)?;
-        tracing::info!(event = "identity.scim_token_revoked", "SCIM turned off");
+        tracing::info!(
+            event = "identity.scim_token_revoked",
+            "SCIM turned off"
+        );
         Ok(self.scim_status())
     }
 
@@ -164,7 +173,11 @@ struct ScimError {
 }
 
 impl ScimError {
-    fn new(status: StatusCode, scim_type: Option<&'static str>, detail: impl Into<String>) -> Self {
+    fn new(
+        status: StatusCode,
+        scim_type: Option<&'static str>,
+        detail: impl Into<String>,
+    ) -> Self {
         Self {
             status,
             scim_type,
@@ -186,7 +199,9 @@ impl From<Error> for ScimError {
         let (status, scim_type) = match e.kind() {
             ErrorKind::NotFound => (StatusCode::NOT_FOUND, None),
             ErrorKind::Conflict => (StatusCode::CONFLICT, Some("uniqueness")),
-            ErrorKind::InvalidInput => (StatusCode::BAD_REQUEST, Some("invalidValue")),
+            ErrorKind::InvalidInput => {
+                (StatusCode::BAD_REQUEST, Some("invalidValue"))
+            }
             ErrorKind::PermissionDenied => (StatusCode::FORBIDDEN, None),
             ErrorKind::Unauthenticated => (StatusCode::UNAUTHORIZED, None),
             ErrorKind::Unavailable => (StatusCode::SERVICE_UNAVAILABLE, None),
@@ -203,14 +218,16 @@ impl IntoResponse for ScimError {
             "status": self.status.as_u16().to_string(),
             "detail": self.detail,
         });
-        if let (Some(kind), Some(map)) = (self.scim_type, body.as_object_mut()) {
+        if let (Some(kind), Some(map)) = (self.scim_type, body.as_object_mut())
+        {
             let _ = map.insert("scimType".to_owned(), Value::from(kind));
         }
         let mut response = scim_json(self.status, &body);
         if self.status == StatusCode::UNAUTHORIZED {
-            let _ = response
-                .headers_mut()
-                .insert(header::WWW_AUTHENTICATE, HeaderValue::from_static("Bearer"));
+            let _ = response.headers_mut().insert(
+                header::WWW_AUTHENTICATE,
+                HeaderValue::from_static("Bearer"),
+            );
         }
         response
     }
@@ -221,8 +238,10 @@ type Answer = Result<Response, ScimError>;
 fn scim_json(status: StatusCode, body: &Value) -> Response {
     let mut response = (status, body.to_string()).into_response();
     let headers = response.headers_mut();
-    let _ = headers.insert(header::CONTENT_TYPE, HeaderValue::from_static(SCIM_JSON));
-    let _ = headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    let _ = headers
+        .insert(header::CONTENT_TYPE, HeaderValue::from_static(SCIM_JSON));
+    let _ = headers
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     response
 }
 
@@ -235,8 +254,9 @@ fn created(location: &str, body: &Value) -> Response {
 }
 
 fn parse_body(body: &Bytes) -> Result<Value, ScimError> {
-    serde_json::from_slice(body)
-        .map_err(|e| ScimError::bad("invalidSyntax", format!("the body is not JSON: {e}")))
+    serde_json::from_slice(body).map_err(|e| {
+        ScimError::bad("invalidSyntax", format!("the body is not JSON: {e}"))
+    })
 }
 
 // --- The router ---
@@ -263,7 +283,11 @@ impl Scim {
     }
 }
 
-async fn require_token(State(scim): State<Scim>, request: Request, next: Next) -> Response {
+async fn require_token(
+    State(scim): State<Scim>,
+    request: Request,
+    next: Next,
+) -> Response {
     let presented = request
         .headers()
         .get(header::AUTHORIZATION)
@@ -291,7 +315,10 @@ async fn require_token(State(scim): State<Scim>, request: Request, next: Next) -
 /// The SCIM endpoints, to mount cross-site at [`SCIM_PREFIX`]. `members`
 /// is the permission engine's group membership; without it, group
 /// members cannot be read or changed.
-pub fn router(identity: Arc<Identity>, members: Option<Arc<dyn GroupMembers>>) -> Router {
+pub fn router(
+    identity: Arc<Identity>,
+    members: Option<Arc<dyn GroupMembers>>,
+) -> Router {
     let state = Scim { identity, members };
     Router::new()
         .route("/ServiceProviderConfig", get(service_provider_config))
@@ -321,7 +348,11 @@ async fn service_provider_config() -> Response {
         &json!({
             "schemas": [CONFIG_SCHEMA],
             "patch": { "supported": true },
-            "bulk": { "supported": false, "maxOperations": 0, "maxPayloadSize": 0 },
+            "bulk": {
+                "supported": false,
+                "maxOperations": 0,
+                "maxPayloadSize": 0
+            },
             "filter": { "supported": true, "maxResults": MAX_PAGE },
             "changePassword": { "supported": false },
             "sort": { "supported": false },
@@ -329,7 +360,8 @@ async fn service_provider_config() -> Response {
             "authenticationSchemes": [{
                 "type": "oauthbearertoken",
                 "name": "Bearer token",
-                "description": "The token made in Admin → Sign-in → Provisioning",
+                "description": "The token made in Admin → Sign-in → \
+                    Provisioning",
             }],
         }),
     )
@@ -429,10 +461,14 @@ fn external_id(value: &Value) -> Result<Option<String>, ScimError> {
     match value {
         Value::Null => Ok(None),
         other => {
-            let id = text(other)
-                .ok_or_else(|| ScimError::bad("invalidValue", "externalId must be a string"))?;
+            let id = text(other).ok_or_else(|| {
+                ScimError::bad("invalidValue", "externalId must be a string")
+            })?;
             if id.len() > MAX_EXTERNAL_ID {
-                return Err(ScimError::bad("invalidValue", "externalId is too long"));
+                return Err(ScimError::bad(
+                    "invalidValue",
+                    "externalId is too long",
+                ));
             }
             Ok(Some(id))
         }
@@ -462,15 +498,17 @@ impl Account {
 
     /// Reads a whole User resource (create and replace).
     fn from_resource(body: &Value) -> Result<Self, ScimError> {
-        let user_name = body
-            .get("userName")
-            .and_then(text)
-            .ok_or_else(|| ScimError::bad("invalidValue", "userName is required"))?;
+        let user_name =
+            body.get("userName").and_then(text).ok_or_else(|| {
+                ScimError::bad("invalidValue", "userName is required")
+            })?;
         let emails = body.get("emails").and_then(Value::as_array);
         let email = emails
             .and_then(|list| {
                 list.iter()
-                    .find(|e| e.get("primary").and_then(Value::as_bool) == Some(true))
+                    .find(|e| {
+                        e.get("primary").and_then(Value::as_bool) == Some(true)
+                    })
                     .or_else(|| list.first())
             })
             .and_then(|e| e.get("value"))
@@ -486,7 +524,9 @@ impl Account {
                     body.pointer("/name/familyName"),
                 )
             })
-            .unwrap_or_else(|| email.split('@').next().unwrap_or_default().to_owned());
+            .unwrap_or_else(|| {
+                email.split('@').next().unwrap_or_default().to_owned()
+            });
         Ok(Self {
             email,
             name,
@@ -495,7 +535,11 @@ impl Account {
                 .map(external_id)
                 .transpose()?
                 .flatten(),
-            active: body.get("active").map(boolean).transpose()?.unwrap_or(true),
+            active: body
+                .get("active")
+                .map(boolean)
+                .transpose()?
+                .unwrap_or(true),
         })
     }
 }
@@ -524,7 +568,8 @@ fn user_resource(base: &str, user: &User) -> Value {
             "location": format!("{base}/Users/{}", user.id),
         },
     });
-    if let (Some(id), Some(map)) = (&user.external_id, resource.as_object_mut()) {
+    if let (Some(id), Some(map)) = (&user.external_id, resource.as_object_mut())
+    {
         let _ = map.insert("externalId".to_owned(), Value::from(id.clone()));
     }
     resource
@@ -551,7 +596,11 @@ fn protected(user: &User) -> Result<(), ScimError> {
 }
 
 /// Applies `next` to the account `user`, as one change.
-fn apply_account(identity: &Identity, user: &User, next: &Account) -> Result<User, ScimError> {
+fn apply_account(
+    identity: &Identity,
+    user: &User,
+    next: &Account,
+) -> Result<User, ScimError> {
     protected(user)?;
     let now = Account::of(user);
     let email = normalise_email(&next.email)?;
@@ -590,12 +639,19 @@ fn apply_account(identity: &Identity, user: &User, next: &Account) -> Result<Use
         let _ = identity.update_user(user.id, renamed, None, blocked)?;
     }
     if blocked == Some(true) {
-        tracing::info!(event = "identity.scim_user_blocked", user = %user.id, "SCIM blocked an account");
+        tracing::info!(
+            event = "identity.scim_user_blocked",
+            user = %user.id,
+            "SCIM blocked an account"
+        );
     }
     find_user(identity, &user.id.to_string())
 }
 
-async fn list_users(State(scim): State<Scim>, Query(query): Query<ListQuery>) -> Answer {
+async fn list_users(
+    State(scim): State<Scim>,
+    Query(query): Query<ListQuery>,
+) -> Answer {
     let filter = query.filter.as_deref().map(parse_filter).transpose()?;
     let base = scim.base();
     let mut users: Vec<User> = scim.identity.store().read(|s| {
@@ -607,7 +663,9 @@ async fn list_users(State(scim): State<Scim>, Query(query): Query<ListQuery>) ->
     });
     if let Some((attribute, value)) = &filter {
         let matches = |u: &User| match attribute.as_str() {
-            "username" | "emails.value" | "emails" => u.email.eq_ignore_ascii_case(value),
+            "username" | "emails.value" | "emails" => {
+                u.email.eq_ignore_ascii_case(value)
+            }
             "externalid" => u.external_id.as_deref() == Some(value.as_str()),
             "id" => u.id.to_string() == *value,
             _ => false,
@@ -649,8 +707,13 @@ async fn create_user(State(scim): State<Scim>, body: Bytes) -> Answer {
         .identity
         .create_user(&email, &account.name, None, false)?;
     let user = find_user(&scim.identity, &made.id.to_string())?;
-    let user = apply_account(&scim.identity, &user, &Account { email, ..account })?;
-    tracing::info!(event = "identity.scim_user_created", user = %user.id, "SCIM created an account");
+    let user =
+        apply_account(&scim.identity, &user, &Account { email, ..account })?;
+    tracing::info!(
+        event = "identity.scim_user_created",
+        user = %user.id,
+        "SCIM created an account"
+    );
     let base = scim.base();
     Ok(created(
         &format!("{base}/Users/{}", user.id),
@@ -658,7 +721,11 @@ async fn create_user(State(scim): State<Scim>, body: Bytes) -> Answer {
     ))
 }
 
-async fn replace_user(State(scim): State<Scim>, Path(id): Path<String>, body: Bytes) -> Answer {
+async fn replace_user(
+    State(scim): State<Scim>,
+    Path(id): Path<String>,
+    body: Bytes,
+) -> Answer {
     let user = find_user(&scim.identity, &id)?;
     let account = Account::from_resource(&parse_body(&body)?)?;
     let user = apply_account(&scim.identity, &user, &account)?;
@@ -669,12 +736,16 @@ async fn replace_user(State(scim): State<Scim>, Path(id): Path<String>, body: By
 }
 
 /// The operations of a `PatchOp` body.
-fn operations(body: &Value) -> Result<Vec<(String, Option<String>, Value)>, ScimError> {
+fn operations(
+    body: &Value,
+) -> Result<Vec<(String, Option<String>, Value)>, ScimError> {
     let list = body
         .get("Operations")
         .or_else(|| body.get("operations"))
         .and_then(Value::as_array)
-        .ok_or_else(|| ScimError::bad("invalidSyntax", "a patch needs Operations"))?;
+        .ok_or_else(|| {
+            ScimError::bad("invalidSyntax", "a patch needs Operations")
+        })?;
     list.iter()
         .map(|op| {
             let kind = op
@@ -683,9 +754,13 @@ fn operations(body: &Value) -> Result<Vec<(String, Option<String>, Value)>, Scim
                 .map(str::to_lowercase)
                 .filter(|k| matches!(k.as_str(), "add" | "replace" | "remove"))
                 .ok_or_else(|| {
-                    ScimError::bad("invalidSyntax", "op must be add, replace or remove")
+                    ScimError::bad(
+                        "invalidSyntax",
+                        "op must be add, replace or remove",
+                    )
                 })?;
-            let path = op.get("path").and_then(Value::as_str).map(str::to_owned);
+            let path =
+                op.get("path").and_then(Value::as_str).map(str::to_owned);
             Ok((kind, path, op.get("value").cloned().unwrap_or(Value::Null)))
         })
         .collect()
@@ -701,8 +776,13 @@ fn patch_user_attribute(
 ) -> Result<(), ScimError> {
     let lower = path.to_lowercase();
     match lower.as_str() {
-        "active" => account.active = if remove { true } else { boolean(value)? },
-        "externalid" => account.external_id = if remove { None } else { external_id(value)? },
+        "active" => {
+            account.active = if remove { true } else { boolean(value)? }
+        }
+        "externalid" => {
+            account.external_id =
+                if remove { None } else { external_id(value)? }
+        }
         "displayname" | "name.formatted" => {
             if let Some(name) = text(value) {
                 account.name = name;
@@ -743,7 +823,11 @@ fn patch_user_attribute(
     Ok(())
 }
 
-async fn patch_user(State(scim): State<Scim>, Path(id): Path<String>, body: Bytes) -> Answer {
+async fn patch_user(
+    State(scim): State<Scim>,
+    Path(id): Path<String>,
+    body: Bytes,
+) -> Answer {
     let user = find_user(&scim.identity, &id)?;
     let mut account = Account::of(&user);
     let mut names = (None, None);
@@ -751,14 +835,31 @@ async fn patch_user(State(scim): State<Scim>, Path(id): Path<String>, body: Byte
         let remove = op == "remove";
         match (path, &value) {
             (Some(path), _) => {
-                patch_user_attribute(&mut account, &mut names, &path, &value, remove)?;
+                patch_user_attribute(
+                    &mut account,
+                    &mut names,
+                    &path,
+                    &value,
+                    remove,
+                )?;
             }
             (None, Value::Object(map)) if !remove => {
                 for (key, value) in map {
-                    patch_user_attribute(&mut account, &mut names, key, value, false)?;
+                    patch_user_attribute(
+                        &mut account,
+                        &mut names,
+                        key,
+                        value,
+                        false,
+                    )?;
                 }
             }
-            _ => return Err(ScimError::bad("noTarget", "a remove needs a path")),
+            _ => {
+                return Err(ScimError::bad(
+                    "noTarget",
+                    "a remove needs a path",
+                ));
+            }
         }
     }
     let parts: Vec<String> = <[Option<String>; 2]>::from(names)
@@ -775,7 +876,10 @@ async fn patch_user(State(scim): State<Scim>, Path(id): Path<String>, body: Byte
     ))
 }
 
-async fn delete_user(State(scim): State<Scim>, Path(id): Path<String>) -> Answer {
+async fn delete_user(
+    State(scim): State<Scim>,
+    Path(id): Path<String>,
+) -> Answer {
     let user = find_user(&scim.identity, &id)?;
     let next = Account {
         active: false,
@@ -823,7 +927,13 @@ async fn group_resource(
         let people = scim.identity.store().read(|s| {
             ids.iter()
                 .filter_map(|id| s.users.get(id))
-                .map(|u| json!({ "value": u.id.to_string(), "display": u.name, "$ref": format!("{base}/Users/{}", u.id) }))
+                .map(|u| {
+                    json!({
+                        "value": u.id.to_string(),
+                        "display": u.name,
+                        "$ref": format!("{base}/Users/{}", u.id)
+                    })
+                })
                 .collect::<Vec<_>>()
         });
         let _ = map.insert("members".to_owned(), Value::from(people));
@@ -832,7 +942,10 @@ async fn group_resource(
 }
 
 /// The people a `members` value names; each must be an active account.
-fn member_ids(identity: &Identity, value: &Value) -> Result<BTreeSet<UserId>, ScimError> {
+fn member_ids(
+    identity: &Identity,
+    value: &Value,
+) -> Result<BTreeSet<UserId>, ScimError> {
     let list = match value {
         Value::Array(list) => list.clone(),
         Value::Null => Vec::new(),
@@ -840,12 +953,13 @@ fn member_ids(identity: &Identity, value: &Value) -> Result<BTreeSet<UserId>, Sc
     };
     list.iter()
         .map(|m| {
-            let id = m
-                .get("value")
-                .and_then(Value::as_str)
-                .ok_or_else(|| ScimError::bad("invalidValue", "each member needs a value"))?;
-            let user = find_user(identity, id)
-                .map_err(|_| ScimError::bad("invalidValue", format!("no account {id}")))?;
+            let id =
+                m.get("value").and_then(Value::as_str).ok_or_else(|| {
+                    ScimError::bad("invalidValue", "each member needs a value")
+                })?;
+            let user = find_user(identity, id).map_err(|_| {
+                ScimError::bad("invalidValue", format!("no account {id}"))
+            })?;
             if user.disabled {
                 return Err(ScimError::bad(
                     "invalidValue",
@@ -881,7 +995,10 @@ async fn set_members(
     Ok(())
 }
 
-async fn list_groups(State(scim): State<Scim>, Query(query): Query<ListQuery>) -> Answer {
+async fn list_groups(
+    State(scim): State<Scim>,
+    Query(query): Query<ListQuery>,
+) -> Answer {
     let filter = query.filter.as_deref().map(parse_filter).transpose()?;
     let mut groups: Vec<Group> = scim
         .identity
@@ -943,11 +1060,13 @@ fn set_group_external_id(
 
 async fn create_group(State(scim): State<Scim>, body: Bytes) -> Answer {
     let body = parse_body(&body)?;
-    let name = body
-        .get("displayName")
-        .and_then(text)
-        .ok_or_else(|| ScimError::bad("invalidValue", "displayName is required"))?;
-    let members = member_ids(&scim.identity, body.get("members").unwrap_or(&Value::Null))?;
+    let name = body.get("displayName").and_then(text).ok_or_else(|| {
+        ScimError::bad("invalidValue", "displayName is required")
+    })?;
+    let members = member_ids(
+        &scim.identity,
+        body.get("members").unwrap_or(&Value::Null),
+    )?;
     if !members.is_empty() {
         let _ = scim.port()?;
     }
@@ -959,7 +1078,11 @@ async fn create_group(State(scim): State<Scim>, body: Bytes) -> Answer {
         .flatten();
     set_group_external_id(&scim.identity, made.id, external)?;
     set_members(&scim, made.id, &members, &BTreeSet::new()).await?;
-    tracing::info!(event = "identity.scim_group_created", group = %made.id, "SCIM created a group");
+    tracing::info!(
+        event = "identity.scim_group_created",
+        group = %made.id,
+        "SCIM created a group"
+    );
     let group = find_group(&scim.identity, &made.id.to_string())?;
     let base = scim.base();
     Ok(created(
@@ -968,18 +1091,27 @@ async fn create_group(State(scim): State<Scim>, body: Bytes) -> Answer {
     ))
 }
 
-async fn current_members(scim: &Scim, group: ObjectId) -> Result<BTreeSet<UserId>, ScimError> {
+async fn current_members(
+    scim: &Scim,
+    group: ObjectId,
+) -> Result<BTreeSet<UserId>, ScimError> {
     Ok(scim.port()?.members(group).await?)
 }
 
-async fn replace_group(State(scim): State<Scim>, Path(id): Path<String>, body: Bytes) -> Answer {
+async fn replace_group(
+    State(scim): State<Scim>,
+    Path(id): Path<String>,
+    body: Bytes,
+) -> Answer {
     let group = find_group(&scim.identity, &id)?;
     let body = parse_body(&body)?;
-    let name = body
-        .get("displayName")
-        .and_then(text)
-        .ok_or_else(|| ScimError::bad("invalidValue", "displayName is required"))?;
-    let wanted = member_ids(&scim.identity, body.get("members").unwrap_or(&Value::Null))?;
+    let name = body.get("displayName").and_then(text).ok_or_else(|| {
+        ScimError::bad("invalidValue", "displayName is required")
+    })?;
+    let wanted = member_ids(
+        &scim.identity,
+        body.get("members").unwrap_or(&Value::Null),
+    )?;
     let _ = scim.identity.update_group(group.id, Some(&name), None)?;
     let external = body
         .get("externalId")
@@ -1031,7 +1163,9 @@ fn patch_group_attribute(
         ("remove", "members") if value.is_null() => change.remove_all = true,
         ("remove", "members") => change.remove.extend(member_ids_any(value)?),
         ("add", "members") => change.add.extend(member_ids(identity, value)?),
-        ("replace", "members") => change.replace = Some(member_ids(identity, value)?),
+        ("replace", "members") => {
+            change.replace = Some(member_ids(identity, value)?)
+        }
         ("remove", "externalid") => {
             change.set_external_id = true;
             change.external_id = None;
@@ -1057,32 +1191,62 @@ fn member_ids_any(value: &Value) -> Result<BTreeSet<UserId>, ScimError> {
             m.get("value")
                 .and_then(Value::as_str)
                 .and_then(|id| id.parse().ok())
-                .ok_or_else(|| ScimError::bad("invalidValue", "each member needs an account ID"))
+                .ok_or_else(|| {
+                    ScimError::bad(
+                        "invalidValue",
+                        "each member needs an account ID",
+                    )
+                })
         })
         .collect()
 }
 
-async fn patch_group(State(scim): State<Scim>, Path(id): Path<String>, body: Bytes) -> Answer {
+async fn patch_group(
+    State(scim): State<Scim>,
+    Path(id): Path<String>,
+    body: Bytes,
+) -> Answer {
     let group = find_group(&scim.identity, &id)?;
     let mut change = GroupChange::default();
     for (op, path, value) in operations(&parse_body(&body)?)? {
         match (path, &value) {
             (Some(path), _) => {
-                patch_group_attribute(&scim.identity, &mut change, &op, &path, &value)?;
+                patch_group_attribute(
+                    &scim.identity,
+                    &mut change,
+                    &op,
+                    &path,
+                    &value,
+                )?;
             }
             (None, Value::Object(map)) if op != "remove" => {
                 for (key, value) in map {
-                    patch_group_attribute(&scim.identity, &mut change, &op, key, value)?;
+                    patch_group_attribute(
+                        &scim.identity,
+                        &mut change,
+                        &op,
+                        key,
+                        value,
+                    )?;
                 }
             }
-            _ => return Err(ScimError::bad("noTarget", "a remove needs a path")),
+            _ => {
+                return Err(ScimError::bad(
+                    "noTarget",
+                    "a remove needs a path",
+                ));
+            }
         }
     }
     if let Some(name) = &change.name {
         let _ = scim.identity.update_group(group.id, Some(name), None)?;
     }
     if change.set_external_id {
-        set_group_external_id(&scim.identity, group.id, change.external_id.take())?;
+        set_group_external_id(
+            &scim.identity,
+            group.id,
+            change.external_id.take(),
+        )?;
     }
     let membership_changed = change.replace.is_some()
         || change.remove_all
@@ -1110,18 +1274,26 @@ async fn patch_group(State(scim): State<Scim>, Path(id): Path<String>, body: Byt
     ))
 }
 
-async fn delete_group(State(scim): State<Scim>, Path(id): Path<String>) -> Answer {
+async fn delete_group(
+    State(scim): State<Scim>,
+    Path(id): Path<String>,
+) -> Answer {
     let group = find_group(&scim.identity, &id)?;
     // Members go first, so access through the group ends even if the
     // record could not be removed; a retry finishes the job.
     if let Some(port) = &scim.members {
-        let everyone: Vec<UserId> = port.members(group.id).await?.into_iter().collect();
+        let everyone: Vec<UserId> =
+            port.members(group.id).await?.into_iter().collect();
         if !everyone.is_empty() {
             port.change(group.id, &[], &everyone).await?;
         }
     }
     scim.identity.forget_group(group.id)?;
-    tracing::info!(event = "identity.scim_group_deleted", group = %group.id, "SCIM deleted a group");
+    tracing::info!(
+        event = "identity.scim_group_deleted",
+        group = %group.id,
+        "SCIM deleted a group"
+    );
     Ok(StatusCode::NO_CONTENT.into_response())
 }
 

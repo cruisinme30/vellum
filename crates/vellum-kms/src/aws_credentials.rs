@@ -157,11 +157,15 @@ impl AwsCredentialProvider {
     /// # Errors
     /// [`CryptoError::Provider`] if `url` is plain HTTP to a host other than
     /// loopback or the ECS and EKS agents, or the client cannot be built.
-    pub fn container(url: &str, token_file: Option<PathBuf>) -> Result<Self, CryptoError> {
+    pub fn container(
+        url: &str,
+        token_file: Option<PathBuf>,
+    ) -> Result<Self, CryptoError> {
         check_container_url(url)?;
         Self::with_source(Source::Container {
             url: url.to_owned(),
-            token: token_file.map_or(ContainerToken::None, ContainerToken::File),
+            token: token_file
+                .map_or(ContainerToken::None, ContainerToken::File),
         })
     }
 
@@ -191,14 +195,19 @@ impl AwsCredentialProvider {
     ///
     /// # Errors
     /// As [`Self::from_env`].
-    pub fn from_vars(var: impl Fn(&str) -> Option<String>) -> Result<Self, CryptoError> {
+    pub fn from_vars(
+        var: impl Fn(&str) -> Option<String>,
+    ) -> Result<Self, CryptoError> {
         let var = |name: &str| var(name).filter(|v| !v.trim().is_empty());
         let missing = |name: &str, because: &str| {
-            CryptoError::Provider(format!("{BACKEND}: {name} is not set but {because} is"))
+            CryptoError::Provider(format!(
+                "{BACKEND}: {name} is not set but {because} is"
+            ))
         };
         if let Some(id) = var("AWS_ACCESS_KEY_ID") {
-            let secret = var("AWS_SECRET_ACCESS_KEY")
-                .ok_or_else(|| missing("AWS_SECRET_ACCESS_KEY", "AWS_ACCESS_KEY_ID"))?;
+            let secret = var("AWS_SECRET_ACCESS_KEY").ok_or_else(|| {
+                missing("AWS_SECRET_ACCESS_KEY", "AWS_ACCESS_KEY_ID")
+            })?;
             return Ok(Self::fixed(AwsCredentials::new(
                 id,
                 secret,
@@ -206,15 +215,23 @@ impl AwsCredentialProvider {
             )));
         }
         if let Some(token_file) = var("AWS_WEB_IDENTITY_TOKEN_FILE") {
-            let role = var("AWS_ROLE_ARN")
-                .ok_or_else(|| missing("AWS_ROLE_ARN", "AWS_WEB_IDENTITY_TOKEN_FILE"))?;
-            let session = var("AWS_ROLE_SESSION_NAME").unwrap_or_else(|| SESSION_NAME.into());
-            return Self::web_identity(role, token_file, session, sts_endpoint(&var));
+            let role = var("AWS_ROLE_ARN").ok_or_else(|| {
+                missing("AWS_ROLE_ARN", "AWS_WEB_IDENTITY_TOKEN_FILE")
+            })?;
+            let session = var("AWS_ROLE_SESSION_NAME")
+                .unwrap_or_else(|| SESSION_NAME.into());
+            return Self::web_identity(
+                role,
+                token_file,
+                session,
+                sts_endpoint(&var),
+            );
         }
         if let Some(relative) = var("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI") {
             if !relative.starts_with('/') {
                 return Err(CryptoError::Provider(format!(
-                    "{BACKEND}: AWS_CONTAINER_CREDENTIALS_RELATIVE_URI must start with /"
+                    "{BACKEND}: AWS_CONTAINER_CREDENTIALS_RELATIVE_URI must \
+                        start with /"
                 )));
             }
             return Self::with_source(Source::Container {
@@ -229,19 +246,23 @@ impl AwsCredentialProvider {
                 var("AWS_CONTAINER_AUTHORIZATION_TOKEN"),
             ) {
                 (Some(file), _) => ContainerToken::File(file.into()),
-                (None, Some(token)) => ContainerToken::Inline(Zeroizing::new(token)),
+                (None, Some(token)) => {
+                    ContainerToken::Inline(Zeroizing::new(token))
+                }
                 (None, None) => ContainerToken::None,
             };
             return Self::with_source(Source::Container { url: full, token });
         }
-        if var("AWS_EC2_METADATA_DISABLED").is_some_and(|v| v.eq_ignore_ascii_case("true")) {
+        if var("AWS_EC2_METADATA_DISABLED")
+            .is_some_and(|v| v.eq_ignore_ascii_case("true"))
+        {
             return Err(CryptoError::Provider(format!(
                 "{BACKEND}: no AWS credentials are configured and the instance \
                  metadata service is disabled"
             )));
         }
-        let endpoint =
-            var("AWS_EC2_METADATA_SERVICE_ENDPOINT").unwrap_or_else(|| IMDS_ENDPOINT.into());
+        let endpoint = var("AWS_EC2_METADATA_SERVICE_ENDPOINT")
+            .unwrap_or_else(|| IMDS_ENDPOINT.into());
         Self::imds(endpoint)
     }
 
@@ -278,13 +299,21 @@ impl AwsCredentialProvider {
                 session_name,
                 sts_endpoint,
             } => {
-                self.web_identity_now(role_arn, token_file, session_name, sts_endpoint)
-                    .await
+                self.web_identity_now(
+                    role_arn,
+                    token_file,
+                    session_name,
+                    sts_endpoint,
+                )
+                .await
             }
-            Source::Container { url, token } => self.container_now(url, token).await,
+            Source::Container { url, token } => {
+                self.container_now(url, token).await
+            }
             Source::Imds { endpoint } => self.imds_now(endpoint).await,
         };
-        let (credentials, expires) = http::record(BACKEND, self.kind(), started, fetched)?;
+        let (credentials, expires) =
+            http::record(BACKEND, self.kind(), started, fetched)?;
         if let Ok(mut guard) = self.cached.lock() {
             *guard = Some((credentials.clone(), expires));
         }
@@ -293,7 +322,8 @@ impl AwsCredentialProvider {
 
     fn cached(&self) -> Option<AwsCredentials> {
         let (credentials, expires) = self.cached.lock().ok()?.clone()?;
-        let fresh = expires.is_none_or(|at| SystemTime::now() + REFRESH_MARGIN < at);
+        let fresh =
+            expires.is_none_or(|at| SystemTime::now() + REFRESH_MARGIN < at);
         fresh.then_some(credentials)
     }
 
@@ -323,10 +353,14 @@ impl AwsCredentialProvider {
         let body = http::send_json(BACKEND, request).await?;
         let result = body
             .pointer(
-                "/AssumeRoleWithWebIdentityResponse/AssumeRoleWithWebIdentityResult/Credentials",
+                "/AssumeRoleWithWebIdentityResponse/AssumeRoleWithWebIdentityRe\
+                    sult/Credentials",
             )
             .ok_or_else(|| {
-                CryptoError::Provider(format!("{BACKEND}: STS answered without credentials"))
+                CryptoError::Provider(format!(
+                    "{BACKEND}: STS answered without \
+                    credentials"
+                ))
             })?;
         parse_credentials(result, "SessionToken")
     }
@@ -343,7 +377,10 @@ impl AwsCredentialProvider {
                 request = request.header("authorization", value.as_str());
             }
             ContainerToken::File(path) => {
-                let value = read_secret(path, "AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE")?;
+                let value = read_secret(
+                    path,
+                    "AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE",
+                )?;
                 request = request.header("authorization", value.as_str());
             }
         }
@@ -361,11 +398,15 @@ impl AwsCredentialProvider {
                 BACKEND,
                 self.client
                     .put(format!("{endpoint}/latest/api/token"))
-                    .header("x-aws-ec2-metadata-token-ttl-seconds", IMDS_TOKEN_TTL),
+                    .header(
+                        "x-aws-ec2-metadata-token-ttl-seconds",
+                        IMDS_TOKEN_TTL,
+                    ),
             )
             .await?,
         );
-        let base = format!("{endpoint}/latest/meta-data/iam/security-credentials/");
+        let base =
+            format!("{endpoint}/latest/meta-data/iam/security-credentials/");
         let roles = http::send_text(
             BACKEND,
             self.client
@@ -379,7 +420,9 @@ impl AwsCredentialProvider {
             .find(|line| !line.is_empty())
             .filter(|role| http::safe_segment(role, &['+', '=', ',', '@']))
             .ok_or_else(|| {
-                CryptoError::Provider(format!("{BACKEND}: this instance has no IAM role"))
+                CryptoError::Provider(format!(
+                    "{BACKEND}: this instance has no IAM role"
+                ))
             })?;
         let body = http::send_json(
             BACKEND,
@@ -436,19 +479,21 @@ fn check_container_url(url: &str) -> Result<(), CryptoError> {
         Ok(())
     } else {
         Err(CryptoError::Provider(format!(
-            "{BACKEND}: AWS_CONTAINER_CREDENTIALS_FULL_URI must be HTTPS, or HTTP to \
-             loopback or the ECS or EKS credentials agent"
+            "{BACKEND}: AWS_CONTAINER_CREDENTIALS_FULL_URI must be HTTPS, or \
+             HTTP to loopback or the ECS or EKS credentials agent"
         )))
     }
 }
 
 /// Reads a token file, trimming surrounding whitespace. The error names
 /// the variable, never the file's content.
-fn read_secret(path: &PathBuf, variable: &str) -> Result<Zeroizing<String>, CryptoError> {
-    let raw =
-        Zeroizing::new(std::fs::read_to_string(path).map_err(|e| {
-            CryptoError::Provider(format!("{BACKEND}: cannot read {variable}: {e}"))
-        })?);
+fn read_secret(
+    path: &PathBuf,
+    variable: &str,
+) -> Result<Zeroizing<String>, CryptoError> {
+    let raw = Zeroizing::new(std::fs::read_to_string(path).map_err(|e| {
+        CryptoError::Provider(format!("{BACKEND}: cannot read {variable}: {e}"))
+    })?);
     let token = Zeroizing::new(raw.trim().to_owned());
     if token.is_empty() {
         return Err(CryptoError::Provider(format!(
@@ -468,7 +513,11 @@ fn parse_credentials(
         body.get(name)
             .and_then(Value::as_str)
             .filter(|v| !v.is_empty())
-            .ok_or_else(|| CryptoError::Provider(format!("{BACKEND}: response lacks {name}")))
+            .ok_or_else(|| {
+                CryptoError::Provider(format!(
+                    "{BACKEND}: response lacks {name}"
+                ))
+            })
     };
     let credentials = AwsCredentials::new(
         field("AccessKeyId")?,
@@ -476,9 +525,13 @@ fn parse_credentials(
         Some(field(token_field)?.to_owned()),
     );
     let expires = match body.get("Expiration") {
-        Some(Value::String(text)) => Some(parse_rfc3339(text).ok_or_else(|| {
-            CryptoError::Provider(format!("{BACKEND}: Expiration is not a date"))
-        })?),
+        Some(Value::String(text)) => {
+            Some(parse_rfc3339(text).ok_or_else(|| {
+                CryptoError::Provider(format!(
+                    "{BACKEND}: Expiration is not a date"
+                ))
+            })?)
+        }
         Some(Value::Number(n)) => n
             .as_f64()
             .filter(|s| s.is_finite() && *s >= 0.0)
@@ -487,7 +540,8 @@ fn parse_credentials(
     };
     // Temporary credentials without an expiry would be cached forever;
     // treat them as short-lived instead.
-    let expires = expires.or_else(|| Some(SystemTime::now() + REFRESH_MARGIN * 2));
+    let expires =
+        expires.or_else(|| Some(SystemTime::now() + REFRESH_MARGIN * 2));
     Ok((credentials, expires))
 }
 
@@ -500,10 +554,12 @@ fn parse_rfc3339(text: &str) -> Option<SystemTime> {
         .or_else(|| text.strip_suffix("+00:00"))?;
     let (date, time) = body.split_once('T')?;
     let mut d = date.split('-').map(str::parse::<i64>);
-    let (year, month, day) = (d.next()?.ok()?, d.next()?.ok()?, d.next()?.ok()?);
+    let (year, month, day) =
+        (d.next()?.ok()?, d.next()?.ok()?, d.next()?.ok()?);
     let time = time.split('.').next()?;
     let mut t = time.split(':').map(str::parse::<i64>);
-    let (hour, minute, second) = (t.next()?.ok()?, t.next()?.ok()?, t.next()?.ok()?);
+    let (hour, minute, second) =
+        (t.next()?.ok()?, t.next()?.ok()?, t.next()?.ok()?);
     if !(1..=12).contains(&month)
         || !(1..=31).contains(&day)
         || hour > 23
@@ -534,7 +590,9 @@ const fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
 fn form_encode(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     for byte in text.bytes() {
-        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b'~') {
+        if byte.is_ascii_alphanumeric()
+            || matches!(byte, b'-' | b'_' | b'.' | b'~')
+        {
             out.push(char::from(byte));
         } else {
             let _ = write!(out, "%{byte:02X}");
@@ -547,7 +605,9 @@ fn form_encode(text: &str) -> String {
 mod tests {
     use super::*;
 
-    fn vars<'a>(pairs: &'a [(&'a str, &'a str)]) -> impl Fn(&str) -> Option<String> + 'a {
+    fn vars<'a>(
+        pairs: &'a [(&'a str, &'a str)],
+    ) -> impl Fn(&str) -> Option<String> + 'a {
         move |name| {
             pairs
                 .iter()
@@ -558,9 +618,15 @@ mod tests {
 
     #[test]
     fn the_chain_follows_the_sdk_order() -> Result<(), CryptoError> {
-        let kind = |pairs: &[(&str, &str)]| AwsCredentialProvider::from_vars(vars(pairs));
+        let kind = |pairs: &[(&str, &str)]| {
+            AwsCredentialProvider::from_vars(vars(pairs))
+        };
         assert_eq!(
-            kind(&[("AWS_ACCESS_KEY_ID", "a"), ("AWS_SECRET_ACCESS_KEY", "b")])?.kind(),
+            kind(&[
+                ("AWS_ACCESS_KEY_ID", "a"),
+                ("AWS_SECRET_ACCESS_KEY", "b")
+            ])?
+            .kind(),
             "static"
         );
         assert_eq!(
@@ -573,7 +639,8 @@ mod tests {
             "web-identity"
         );
         assert_eq!(
-            kind(&[("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/v2/creds")])?.kind(),
+            kind(&[("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/v2/creds")])?
+                .kind(),
             "container"
         );
         assert_eq!(
@@ -600,10 +667,17 @@ mod tests {
                 .map(|e| e.to_string())
                 .unwrap_or_default()
         };
-        assert!(refused(&[("AWS_ACCESS_KEY_ID", "a")]).contains("AWS_SECRET_ACCESS_KEY"));
-        assert!(refused(&[("AWS_WEB_IDENTITY_TOKEN_FILE", "/t")]).contains("AWS_ROLE_ARN"));
         assert!(
-            refused(&[("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "v2")]).contains("start with /")
+            refused(&[("AWS_ACCESS_KEY_ID", "a")])
+                .contains("AWS_SECRET_ACCESS_KEY")
+        );
+        assert!(
+            refused(&[("AWS_WEB_IDENTITY_TOKEN_FILE", "/t")])
+                .contains("AWS_ROLE_ARN")
+        );
+        assert!(
+            refused(&[("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "v2")])
+                .contains("start with /")
         );
     }
 
@@ -652,7 +726,9 @@ mod tests {
     #[test]
     fn expirations_parse() {
         let at = |s: &str| {
-            parse_rfc3339(s).and_then(|t| t.duration_since(UNIX_EPOCH).ok().map(|d| d.as_secs()))
+            parse_rfc3339(s).and_then(|t| {
+                t.duration_since(UNIX_EPOCH).ok().map(|d| d.as_secs())
+            })
         };
         assert_eq!(at("1970-01-01T00:00:00Z"), Some(0));
         assert_eq!(at("2026-10-29T21:44:58Z"), Some(1_793_310_298));
@@ -673,12 +749,17 @@ mod tests {
         let (credentials, expires) = parse_credentials(&body, "Token")
             .unwrap_or_else(|_| (AwsCredentials::new("x", "y", None), None));
         let shown = format!("{credentials:?}");
-        assert!(!shown.contains("very-secret") && !shown.contains("session-secret"));
+        assert!(
+            !shown.contains("very-secret") && !shown.contains("session-secret")
+        );
         assert!(expires.is_some(), "temporary credentials always expire");
-        let missing = parse_credentials(&serde_json::json!({"AccessKeyId": "a"}), "Token")
-            .err()
-            .map(|e| e.to_string())
-            .unwrap_or_default();
+        let missing = parse_credentials(
+            &serde_json::json!({"AccessKeyId": "a"}),
+            "Token",
+        )
+        .err()
+        .map(|e| e.to_string())
+        .unwrap_or_default();
         assert!(missing.contains("SecretAccessKey"));
     }
 

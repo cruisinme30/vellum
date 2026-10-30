@@ -46,7 +46,8 @@ pub fn scan(text: &str) -> Vec<Link> {
     let mut links = Vec::new();
     let mut offset = 0;
     let mut fence: Option<(char, usize)> = None;
-    let mut in_front_matter = text.starts_with("---\n") || text.starts_with("---\r\n");
+    let mut in_front_matter =
+        text.starts_with("---\n") || text.starts_with("---\r\n");
     for (n, line) in text.split_inclusive('\n').enumerate() {
         let start = offset;
         offset += line.len();
@@ -67,7 +68,10 @@ pub fn scan(text: &str) -> Vec<Link> {
                 Some((open, open_len))
                     if open == marker
                         && len >= open_len
-                        && trimmed.trim_start_matches(marker).trim().is_empty() =>
+                        && trimmed
+                            .trim_start_matches(marker)
+                            .trim()
+                            .is_empty() =>
                 {
                     fence = None;
                 }
@@ -94,9 +98,9 @@ fn scan_line(line: &str, base: usize, links: &mut Vec<Link>) {
     while i < bytes.len() {
         match bytes.get(i) {
             Some(b'`') => {
-                let run = bytes
-                    .get(i..)
-                    .map_or(0, |r| r.iter().take_while(|b| **b == b'`').count());
+                let run = bytes.get(i..).map_or(0, |r| {
+                    r.iter().take_while(|b| **b == b'`').count()
+                });
                 let fence = "`".repeat(run);
                 let after = i + run;
                 i = line
@@ -106,7 +110,8 @@ fn scan_line(line: &str, base: usize, links: &mut Vec<Link>) {
             }
             Some(b'[') if bytes.get(i + 1) == Some(&b'[') => {
                 let open = i + 2;
-                let Some(close) = line.get(open..).and_then(|r| r.find("]]")) else {
+                let Some(close) = line.get(open..).and_then(|r| r.find("]]"))
+                else {
                     i += 2;
                     continue;
                 };
@@ -118,7 +123,8 @@ fn scan_line(line: &str, base: usize, links: &mut Vec<Link>) {
                     let trimmed = title.trim();
                     links.push(Link {
                         target: Target::Wiki(trimmed.to_owned()),
-                        span: base + open + lead..base + open + lead + trimmed.len(),
+                        span: base + open + lead
+                            ..base + open + lead + trimmed.len(),
                     });
                 }
                 i = open + close + 2;
@@ -142,7 +148,11 @@ fn scan_line(line: &str, base: usize, links: &mut Vec<Link>) {
 /// Parses the destination of an inline link starting at `open` (just
 /// after `](`), returning the link (if it is a document link) and the
 /// index after the closing parenthesis.
-fn inline_target(line: &str, open: usize, base: usize) -> Option<(Option<Link>, usize)> {
+fn inline_target(
+    line: &str,
+    open: usize,
+    base: usize,
+) -> Option<(Option<Link>, usize)> {
     let rest = line.get(open..)?;
     let (dest_start, dest) = if let Some(inner) = rest.strip_prefix('<') {
         let end = inner.find('>')?;
@@ -166,7 +176,10 @@ fn inline_target(line: &str, open: usize, base: usize) -> Option<(Option<Link>, 
             .map_or(rest.len(), |(at, _)| at);
         (open, rest.get(..end)?)
     };
-    let close = line.get(dest_start + dest.len()..)?.find(')')? + dest_start + dest.len() + 1;
+    let close = line.get(dest_start + dest.len()..)?.find(')')?
+        + dest_start
+        + dest.len()
+        + 1;
     let path_len = dest.find(['#', '?']).unwrap_or(dest.len());
     let path = dest.get(..path_len)?;
     let span = base + dest_start..base + dest_start + path_len;
@@ -177,8 +190,10 @@ fn inline_target(line: &str, open: usize, base: usize) -> Option<(Option<Link>, 
         });
         return Some((found, close));
     }
-    let external =
-        path.is_empty() || path.contains("://") || path.starts_with(['/', '#']) || has_scheme(path);
+    let external = path.is_empty()
+        || path.contains("://")
+        || path.starts_with(['/', '#'])
+        || has_scheme(path);
     if external {
         return Some((None, close));
     }
@@ -192,9 +207,9 @@ fn inline_target(line: &str, open: usize, base: usize) -> Option<(Option<Link>, 
 fn has_scheme(path: &str) -> bool {
     path.split_once(':').is_some_and(|(scheme, _)| {
         !scheme.is_empty()
-            && scheme
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.'))
+            && scheme.chars().all(|c| {
+                c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.')
+            })
     })
 }
 
@@ -245,7 +260,8 @@ pub fn percent_encode(text: &str) -> String {
 /// Resolves a relative link from a document in `dir` (`None`: store root).
 #[must_use]
 pub fn resolve(dir: Option<&BlobPath>, relative: &str) -> Option<BlobPath> {
-    let mut parts: Vec<&str> = dir.map(|d| d.segments().collect()).unwrap_or_default();
+    let mut parts: Vec<&str> =
+        dir.map(|d| d.segments().collect()).unwrap_or_default();
     for segment in relative.split('/') {
         match segment {
             "" | "." => {}
@@ -261,7 +277,8 @@ pub fn resolve(dir: Option<&BlobPath>, relative: &str) -> Option<BlobPath> {
 /// The relative path from a document in `dir` to `to`.
 #[must_use]
 pub fn relative(dir: Option<&BlobPath>, to: &BlobPath) -> String {
-    let from: Vec<&str> = dir.map(|d| d.segments().collect()).unwrap_or_default();
+    let from: Vec<&str> =
+        dir.map(|d| d.segments().collect()).unwrap_or_default();
     let target: Vec<&str> = to.segments().collect();
     let common = from.iter().zip(&target).take_while(|(a, b)| a == b).count();
     let ups = from.len() - common;
@@ -333,11 +350,13 @@ mod tests {
     fn finds_all_three_forms() {
         let id = ObjectId::generate();
         let text = format!(
-            "---\ntitle: \"[[Not]]\"\n---\nSee [[Plan]] and [[ Spec | the spec ]], [x](vellum://doc/{id}#h), \
-             [y](../Specs/My%20Doc.md#top) [z](<a b.md>), [w](https://e.com/x.md) `[[code]]`\n\
-             ```\n[[fenced]]\n```\n"
+            "---\ntitle: \"[[Not]]\"\n---\n\
+             See [[Plan]] and [[ Spec | the spec ]], [x](vellum://doc/{id}#h), \
+             [y](../Specs/My%20Doc.md#top) [z](<a b.md>), \
+             [w](https://e.com/x.md) `[[code]]`\n```\n[[fenced]]\n```\n"
         );
-        let found: Vec<Target> = scan(&text).into_iter().map(|l| l.target).collect();
+        let found: Vec<Target> =
+            scan(&text).into_iter().map(|l| l.target).collect();
         assert_eq!(
             found,
             vec![

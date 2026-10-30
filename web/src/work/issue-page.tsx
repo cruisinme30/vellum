@@ -32,7 +32,10 @@ interface Loaded {
 }
 
 async function loadIssue(api: WorkApi, key: string): Promise<Loaded> {
-  const [issue, teams] = await Promise.all([api.issue(key), api.teams({ includeArchived: true })]);
+  const [issue, teams] = await Promise.all([
+    api.issue(key),
+    api.teams({ includeArchived: true }),
+  ]);
   return { issue, team: teams.find((team) => team.key === issue.team) };
 }
 
@@ -69,11 +72,21 @@ function StatePicker({
   );
 }
 
-function Comments({ api, issueKey }: { readonly api: WorkApi; readonly issueKey: string }) {
+function Comments({
+  api,
+  issueKey,
+}: {
+  readonly api: WorkApi;
+  readonly issueKey: string;
+}) {
   const t = useT();
   const [version, setVersion] = useState(0);
   const [error, setError] = useState<string>();
-  const loaded = useLoaded(() => api.comments(issueKey), [api, issueKey, version], failureText);
+  const loaded = useLoaded(
+    () => api.comments(issueKey),
+    [api, issueKey, version],
+    failureText,
+  );
   const submit: NonNullable<ComponentProps<"form">["onSubmit"]> = (event) => {
     event.preventDefault();
     const form = event.currentTarget;
@@ -82,7 +95,10 @@ function Comments({ api, issueKey }: { readonly api: WorkApi; readonly issueKey:
     const assign = data.get("assign");
     if (typeof body !== "string" || body.trim() === "") return;
     setError(undefined);
-    const assignTo = typeof assign === "string" && assign.trim() !== "" ? assign.trim() : undefined;
+    const assignTo =
+      typeof assign === "string" && assign.trim() !== ""
+        ? assign.trim()
+        : undefined;
     const sent =
       assignTo === undefined
         ? api.addComment(issueKey, body.trim())
@@ -100,7 +116,9 @@ function Comments({ api, issueKey }: { readonly api: WorkApi; readonly issueKey:
   return (
     <section aria-labelledby="issue-comments">
       <h2 id="issue-comments">{t("issue-comments")}</h2>
-      <Ready loaded={loaded}>{(comments) => <CommentList comments={comments} />}</Ready>
+      <Ready loaded={loaded}>
+        {(comments) => <CommentList comments={comments} />}
+      </Ready>
       <form className="vl-work-comment" onSubmit={submit}>
         <label>
           {t("issue-comment-add")}
@@ -124,9 +142,14 @@ function Comments({ api, issueKey }: { readonly api: WorkApi; readonly issueKey:
   );
 }
 
-function CommentList({ comments }: { readonly comments: readonly CommentOut[] }) {
+function CommentList({
+  comments,
+}: {
+  readonly comments: readonly CommentOut[];
+}) {
   const t = useT();
-  if (comments.length === 0) return <p className="vl-muted">{t("issue-no-comments")}</p>;
+  if (comments.length === 0)
+    return <p className="vl-muted">{t("issue-no-comments")}</p>;
   return (
     <ol className="vl-comment-list">
       {comments.map((comment) => (
@@ -144,10 +167,15 @@ function CommentList({ comments }: { readonly comments: readonly CommentOut[] })
   );
 }
 
-/** The Markdown a doc started from an issue begins with: a link back and the description. */
+/**
+ * The Markdown a doc started from an issue begins with: a link back and the
+ * description.
+ */
 function pageBodyFromIssue(issue: IssueOut): string {
   const description = issue.description?.trim() ?? "";
-  return description === "" ? `Issue: ${issue.key}\n` : `Issue: ${issue.key}\n\n${description}\n`;
+  return description === ""
+    ? `Issue: ${issue.key}\n`
+    : `Issue: ${issue.key}\n\n${description}\n`;
 }
 
 /**
@@ -190,11 +218,21 @@ function CreatePageFromIssue({ issue }: { readonly issue: IssueOut }) {
   );
 }
 
-function Issue({ api, issueKey }: { readonly api: WorkApi; readonly issueKey: string }) {
+function Issue({
+  api,
+  issueKey,
+}: {
+  readonly api: WorkApi;
+  readonly issueKey: string;
+}) {
   const t = useT();
   const [version, setVersion] = useState(0);
   const [error, setError] = useState<string>();
-  const loaded = useLoaded(() => loadIssue(api, issueKey), [api, issueKey, version], failureText);
+  const loaded = useLoaded(
+    () => loadIssue(api, issueKey),
+    [api, issueKey, version],
+    failureText,
+  );
   const setState = (state: string) => {
     setError(undefined);
     api.setState(issueKey, state).then(
@@ -237,7 +275,8 @@ function Issue({ api, issueKey }: { readonly api: WorkApi; readonly issueKey: st
               <CopyDiagnostic message={error} />
             </p>
           )}
-          {found.issue.description != undefined && found.issue.description !== "" ? (
+          {found.issue.description != undefined &&
+          found.issue.description !== "" ? (
             <p className="vl-issue-description">{found.issue.description}</p>
           ) : (
             <p className="vl-muted">{t("issue-no-description")}</p>

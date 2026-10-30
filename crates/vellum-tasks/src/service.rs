@@ -188,10 +188,18 @@ pub struct TaskView {
 impl TaskView {
     fn new(task: &Task, overdue: bool, subtasks: Vec<Self>) -> Self {
         let (kind, doc, issue_key) = match &task.source {
-            Source::Checklist { doc, .. } => (TaskKind::Checklist, Some(*doc), None),
-            Source::Issue { key, .. } => (TaskKind::Issue, None, Some(key.clone())),
-            Source::Comment { doc, .. } => (TaskKind::Comment, Some(*doc), None),
-            Source::Mention { doc, issue, .. } => (TaskKind::Mention, *doc, issue.clone()),
+            Source::Checklist { doc, .. } => {
+                (TaskKind::Checklist, Some(*doc), None)
+            }
+            Source::Issue { key, .. } => {
+                (TaskKind::Issue, None, Some(key.clone()))
+            }
+            Source::Comment { doc, .. } => {
+                (TaskKind::Comment, Some(*doc), None)
+            }
+            Source::Mention { doc, issue, .. } => {
+                (TaskKind::Mention, *doc, issue.clone())
+            }
             Source::Review { .. } => (TaskKind::Review, None, None),
         };
         Self {
@@ -219,7 +227,8 @@ impl TaskView {
     }
 
     fn standalone(task: &Task, today: Date) -> Self {
-        let overdue = !task.done && task.fields.due.is_some_and(|d| d.date() < today);
+        let overdue =
+            !task.done && task.fields.due.is_some_and(|d| d.date() < today);
         Self::new(task, overdue, Vec::new())
     }
 }
@@ -287,7 +296,12 @@ impl MyWorkView {
         for (group, entries) in &view.upcoming {
             match group {
                 UpcomingGroup::Day(day) => {
-                    push(BucketName::Upcoming, Some(day.to_string()), None, entries);
+                    push(
+                        BucketName::Upcoming,
+                        Some(day.to_string()),
+                        None,
+                        entries,
+                    );
                 }
                 UpcomingGroup::Week(monday) => {
                     push(
@@ -301,7 +315,8 @@ impl MyWorkView {
         }
         push(BucketName::Anytime, None, None, &view.anytime);
         push(BucketName::Someday, None, None, &view.someday);
-        let done: Vec<Entry> = view.done.iter().take(DONE_SHOWN).cloned().collect();
+        let done: Vec<Entry> =
+            view.done.iter().take(DONE_SHOWN).cloned().collect();
         push(BucketName::Done, None, None, &done);
         Self {
             today: today.to_string(),
@@ -438,7 +453,8 @@ pub struct ImportView {
 /// How the person's tasks reach other apps, for My Work's settings (D298).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct ConnectionsView {
-    /// The CalDAV account URL to give a task app (it signs in with an API token).
+    /// The CalDAV account URL to give a task app (it signs in with an API
+    /// token).
     pub caldav_url: String,
     /// Whether the server receives capture e-mail (a mail domain is set).
     pub email: bool,
@@ -619,11 +635,11 @@ fn parse_target(to: &str) -> Result<Target, Error> {
         "evening" | "this evening" => Target::Evening,
         "anytime" => Target::Anytime,
         "someday" => Target::Someday,
-        other => Target::Day(
-            other
-                .parse()
-                .map_err(|_| invalid("move to a bucket or a YYYY-MM-DD date"))?,
-        ),
+        other => {
+            Target::Day(other.parse().map_err(|_| {
+                invalid("move to a bucket or a YYYY-MM-DD date")
+            })?)
+        }
     })
 }
 
@@ -646,7 +662,12 @@ fn with_mentions(title: &str, people: &[String]) -> String {
 fn find_task(doc: &Document, block: BlockId) -> Option<Task> {
     projection::project_file(&doc.context, &doc.text)
         .into_iter()
-        .find(|t| matches!(&t.source, Source::Checklist { block: b, .. } if *b == block))
+        .find(|t| {
+            matches!(
+                &t.source,
+                Source::Checklist { block: b, .. } if *b == block
+            )
+        })
 }
 
 const fn is_list(doc: &Document) -> bool {
@@ -712,7 +733,9 @@ impl TasksService {
     pub fn take_edited(&self) -> Vec<UserId> {
         self.edited
             .lock()
-            .map(|mut edited| std::mem::take(&mut *edited).into_iter().collect())
+            .map(|mut edited| {
+                std::mem::take(&mut *edited).into_iter().collect()
+            })
             .unwrap_or_default()
     }
 
@@ -728,14 +751,24 @@ impl TasksService {
     /// # Errors
     ///
     /// Fails when the workspace does.
-    pub(crate) async fn gather(&self, user: UserId, handle: &str) -> Result<Vec<Task>, Error> {
+    pub(crate) async fn gather(
+        &self,
+        user: UserId,
+        handle: &str,
+    ) -> Result<Vec<Task>, Error> {
         let files = self.workspace.task_files(user).await?;
         let mut tasks: Vec<Task> = files
             .iter()
             .flat_map(|file| {
                 projection::project_file(&file.context, &file.text)
                     .into_iter()
-                    .filter(|t| projection::belongs_to(t, handle, file.context.owner.as_deref()))
+                    .filter(|t| {
+                        projection::belongs_to(
+                            t,
+                            handle,
+                            file.context.owner.as_deref(),
+                        )
+                    })
             })
             .collect();
         tasks.extend(self.workspace.assigned(user).await?);
@@ -776,13 +809,19 @@ impl TasksService {
                     };
                     return Ok((written, out));
                 }
-                Err(err) if err.kind() == ErrorKind::Conflict && attempt < EDIT_ATTEMPTS => {}
+                Err(err)
+                    if err.kind() == ErrorKind::Conflict
+                        && attempt < EDIT_ATTEMPTS => {}
                 Err(err) => return Err(err),
             }
         }
     }
 
-    fn task_view(doc: &Document, block: BlockId, today: Date) -> Result<TaskView, Error> {
+    fn task_view(
+        doc: &Document,
+        block: BlockId,
+        today: Date,
+    ) -> Result<TaskView, Error> {
         find_task(doc, block)
             .map(|task| TaskView::standalone(&task, today))
             .ok_or_else(|| not_found("no such task"))
@@ -793,7 +832,11 @@ impl TasksService {
     /// # Errors
     ///
     /// Fails when the workspace does.
-    pub async fn my_work(&self, user: UserId, _input: NoInput) -> Result<MyWorkView, Error> {
+    pub async fn my_work(
+        &self,
+        user: UserId,
+        _input: NoInput,
+    ) -> Result<MyWorkView, Error> {
         let me = self.me(user).await?;
         let tasks = self.gather(user, &me.profile.handle).await?;
         let view = projection::build(tasks, me.today());
@@ -805,7 +848,11 @@ impl TasksService {
     /// # Errors
     ///
     /// Fails when the profile cannot be read.
-    pub async fn parse(&self, user: UserId, input: ParseInput) -> Result<ParseView, Error> {
+    pub async fn parse(
+        &self,
+        user: UserId,
+        input: ParseInput,
+    ) -> Result<ParseView, Error> {
         let me = self.me(user).await?;
         let parsed = quickadd::parse(&input.text, me.now.datetime());
         Ok(ParseView {
@@ -826,7 +873,11 @@ impl TasksService {
     }
 
     /// The person's Inbox, created on first use.
-    pub(crate) async fn inbox(&self, user: UserId, handle: &str) -> Result<DocId, Error> {
+    pub(crate) async fn inbox(
+        &self,
+        user: UserId,
+        handle: &str,
+    ) -> Result<DocId, Error> {
         self.list_named(user, handle, None).await
     }
 
@@ -840,9 +891,13 @@ impl TasksService {
         let files = self.workspace.task_files(user).await?;
         let is_target = |f: &&Document| {
             title.map_or_else(
-                || f.context.origin == Origin::Inbox && f.context.owner.as_deref() == Some(handle),
+                || {
+                    f.context.origin == Origin::Inbox
+                        && f.context.owner.as_deref() == Some(handle)
+                },
                 |title| {
-                    f.context.origin == Origin::List && list_title(f).eq_ignore_ascii_case(title)
+                    f.context.origin == Origin::List
+                        && list_title(f).eq_ignore_ascii_case(title)
                 },
             )
         };
@@ -867,7 +922,11 @@ impl TasksService {
     ///
     /// `invalid_input` for an empty title, `not_found` for an unknown
     /// parent.
-    pub async fn create(&self, user: UserId, input: CreateInput) -> Result<TaskView, Error> {
+    pub async fn create(
+        &self,
+        user: UserId,
+        input: CreateInput,
+    ) -> Result<TaskView, Error> {
         let me = self.me(user).await?;
         let parsed = quickadd::parse(&input.text, me.now.datetime());
         if parsed.title.trim().is_empty() {
@@ -891,9 +950,15 @@ impl TasksService {
         let block = BlockId::generate();
         let (written, ()) = self
             .edit(user, doc, |file| {
-                checklist::append(&file.text, parent, &title, &parsed.fields, block)
-                    .map(|text| (text, ()))
-                    .map_err(edit_error)
+                checklist::append(
+                    &file.text,
+                    parent,
+                    &title,
+                    &parsed.fields,
+                    block,
+                )
+                .map(|text| (text, ()))
+                .map_err(edit_error)
             })
             .await?;
         Self::task_view(&written, block, me.today())
@@ -915,7 +980,8 @@ impl TasksService {
         let now = me.now.clone();
         let (written, completion) = self
             .edit(user, doc, |file| {
-                checklist::complete(&file.text, block, &now, input.cascade).map_err(edit_error)
+                checklist::complete(&file.text, block, &now, input.cascade)
+                    .map_err(edit_error)
             })
             .await?;
         let next = match completion {
@@ -933,7 +999,11 @@ impl TasksService {
     /// # Errors
     ///
     /// `not_found` for an unknown task.
-    pub async fn reopen(&self, user: UserId, input: TaskRef) -> Result<TaskView, Error> {
+    pub async fn reopen(
+        &self,
+        user: UserId,
+        input: TaskRef,
+    ) -> Result<TaskView, Error> {
         let me = self.me(user).await?;
         let (doc, block) = parse_task_id(&input.task)?;
         let at = me.now.timestamp();
@@ -953,7 +1023,11 @@ impl TasksService {
     ///
     /// `invalid_input` for an unknown target, `not_found` for an unknown
     /// task.
-    pub async fn move_to(&self, user: UserId, input: MoveInput) -> Result<TaskView, Error> {
+    pub async fn move_to(
+        &self,
+        user: UserId,
+        input: MoveInput,
+    ) -> Result<TaskView, Error> {
         let me = self.me(user).await?;
         let (doc, block) = parse_task_id(&input.task)?;
         let target = parse_target(&input.to)?;
@@ -961,8 +1035,11 @@ impl TasksService {
         let (written, ()) = self
             .edit(user, doc, |file| {
                 let list = Checklist::parse(&file.text);
-                let item = list.find(block).ok_or_else(|| not_found("no such task"))?;
-                let fields = projection::reschedule(&item.fields, target, today);
+                let item = list
+                    .find(block)
+                    .ok_or_else(|| not_found("no such task"))?;
+                let fields =
+                    projection::reschedule(&item.fields, target, today);
                 checklist::update(&file.text, block, &item.title, &fields)
                     .map(|text| (text, ()))
                     .map_err(edit_error)
@@ -977,7 +1054,11 @@ impl TasksService {
     ///
     /// `invalid_input` for a value that does not parse, `not_found` for
     /// an unknown task.
-    pub async fn update(&self, user: UserId, input: UpdateInput) -> Result<TaskView, Error> {
+    pub async fn update(
+        &self,
+        user: UserId,
+        input: UpdateInput,
+    ) -> Result<TaskView, Error> {
         let me = self.me(user).await?;
         let (doc, block) = parse_task_id(&input.task)?;
         let changes = [
@@ -999,7 +1080,9 @@ impl TasksService {
         let (written, ()) = self
             .edit(user, doc, |file| {
                 let list = Checklist::parse(&file.text);
-                let item = list.find(block).ok_or_else(|| not_found("no such task"))?;
+                let item = list
+                    .find(block)
+                    .ok_or_else(|| not_found("no such task"))?;
                 let mut attrs = Attrs::new();
                 item.fields.write_attrs(&mut attrs);
                 for (key, value) in &changes {
@@ -1007,8 +1090,8 @@ impl TasksService {
                         attrs.set(key, value.trim().to_owned());
                     }
                 }
-                let fields =
-                    TaskFields::from_attrs(&attrs).map_err(|err| invalid(err.to_string()))?;
+                let fields = TaskFields::from_attrs(&attrs)
+                    .map_err(|err| invalid(err.to_string()))?;
                 let title = input
                     .title
                     .as_deref()
@@ -1026,7 +1109,11 @@ impl TasksService {
     /// # Errors
     ///
     /// `not_found` for an unknown task.
-    pub async fn delete(&self, user: UserId, input: TaskRef) -> Result<DeletedView, Error> {
+    pub async fn delete(
+        &self,
+        user: UserId,
+        input: TaskRef,
+    ) -> Result<DeletedView, Error> {
         let (doc, block) = parse_task_id(&input.task)?;
         let _ = self
             .edit(user, doc, |file| {
@@ -1059,7 +1146,11 @@ impl TasksService {
     /// # Errors
     ///
     /// Fails when the workspace does.
-    pub async fn lists(&self, user: UserId, _input: NoInput) -> Result<ListsView, Error> {
+    pub async fn lists(
+        &self,
+        user: UserId,
+        _input: NoInput,
+    ) -> Result<ListsView, Error> {
         let files = self.workspace.task_files(user).await?;
         let mut lists: Vec<ListView> = files
             .iter()
@@ -1067,9 +1158,9 @@ impl TasksService {
             .map(Self::list_view)
             .collect();
         lists.sort_by(|a, b| {
-            b.inbox
-                .cmp(&a.inbox)
-                .then_with(|| a.title.to_lowercase().cmp(&b.title.to_lowercase()))
+            b.inbox.cmp(&a.inbox).then_with(|| {
+                a.title.to_lowercase().cmp(&b.title.to_lowercase())
+            })
         });
         Ok(ListsView { lists })
     }
@@ -1091,10 +1182,10 @@ impl TasksService {
             return Err(invalid("choose another title"));
         }
         let files = self.workspace.task_files(user).await?;
-        if files
-            .iter()
-            .any(|f| f.context.origin == Origin::List && list_title(f).eq_ignore_ascii_case(title))
-        {
+        if files.iter().any(|f| {
+            f.context.origin == Origin::List
+                && list_title(f).eq_ignore_ascii_case(title)
+        }) {
             return Err(Error::new(
                 ErrorKind::Conflict,
                 "a list with this title exists",
@@ -1120,7 +1211,9 @@ impl TasksService {
         }
         let file = self.workspace.read(user, input.list_id).await?;
         let meta = lists::read_meta(&file.text);
-        if !is_list(&file) || meta.owner.as_deref() != Some(me.profile.handle.as_str()) {
+        if !is_list(&file)
+            || meta.owner.as_deref() != Some(me.profile.handle.as_str())
+        {
             return Err(Error::new(
                 ErrorKind::PermissionDenied,
                 "only the list's owner can change its members",
@@ -1147,7 +1240,11 @@ impl TasksService {
     /// # Errors
     ///
     /// `permission_denied` unless the caller owns the list.
-    pub async fn share_list(&self, user: UserId, input: MemberInput) -> Result<ListView, Error> {
+    pub async fn share_list(
+        &self,
+        user: UserId,
+        input: MemberInput,
+    ) -> Result<ListView, Error> {
         self.set_member(user, input, true).await
     }
 
@@ -1156,7 +1253,11 @@ impl TasksService {
     /// # Errors
     ///
     /// `permission_denied` unless the caller owns the list.
-    pub async fn unshare_list(&self, user: UserId, input: MemberInput) -> Result<ListView, Error> {
+    pub async fn unshare_list(
+        &self,
+        user: UserId,
+        input: MemberInput,
+    ) -> Result<ListView, Error> {
         self.set_member(user, input, false).await
     }
 
@@ -1166,7 +1267,11 @@ impl TasksService {
     /// # Errors
     ///
     /// `invalid_input` when the export cannot be read.
-    pub async fn import(&self, user: UserId, input: ImportInput) -> Result<ImportView, Error> {
+    pub async fn import(
+        &self,
+        user: UserId,
+        input: ImportInput,
+    ) -> Result<ImportView, Error> {
         let me = self.me(user).await?;
         let parsed = match input.from {
             ImportFrom::GoogleTasks => import::google_tasks(&input.content),
@@ -1175,7 +1280,9 @@ impl TasksService {
                 &input.content,
                 me.now.datetime(),
             ),
-            ImportFrom::Things => import::things_json(&input.content, me.today()),
+            ImportFrom::Things => {
+                import::things_json(&input.content, me.today())
+            }
         }
         .map_err(|err| invalid(err.to_string()))?;
         let mut out = Vec::new();
@@ -1183,7 +1290,8 @@ impl TasksService {
             let files = self.workspace.task_files(user).await?;
             let existing = files.iter().find(|f| {
                 f.context.origin == Origin::List
-                    && f.context.owner.as_deref() == Some(me.profile.handle.as_str())
+                    && f.context.owner.as_deref()
+                        == Some(me.profile.handle.as_str())
                     && list_title(f).eq_ignore_ascii_case(&list.title)
             });
             let (doc, added) = if let Some(file) = existing {
@@ -1195,7 +1303,11 @@ impl TasksService {
                     .await?;
                 (file.context.doc, added)
             } else {
-                let text = import::render_list(&list, DocId::generate(), &me.profile.handle);
+                let text = import::render_list(
+                    &list,
+                    DocId::generate(),
+                    &me.profile.handle,
+                );
                 let id = self
                     .workspace
                     .create(
@@ -1220,9 +1332,14 @@ impl TasksService {
     /// # Errors
     ///
     /// Fails when the workspace does.
-    pub async fn rotate_feed(&self, user: UserId, _input: NoInput) -> Result<SecretView, Error> {
+    pub async fn rotate_feed(
+        &self,
+        user: UserId,
+        _input: NoInput,
+    ) -> Result<SecretView, Error> {
         let (token, hash) = feed::issue_token().map_err(|err| {
-            Error::new(ErrorKind::Internal, "could not issue a token").with_source(err)
+            Error::new(ErrorKind::Internal, "could not issue a token")
+                .with_source(err)
         })?;
         self.workspace
             .set_secret(user, SecretKind::Feed, Some(hash))
@@ -1250,7 +1367,8 @@ impl TasksService {
     ) -> Result<ConnectionsView, Error> {
         let profile = self.workspace.profile(user).await?;
         let slack = self.config.slack_signing_secret.is_some();
-        let slack_linked = slack && self.workspace.slack_linked(profile.handle.clone()).await?;
+        let slack_linked = slack
+            && self.workspace.slack_linked(profile.handle.clone()).await?;
         Ok(ConnectionsView {
             caldav_url: format!(
                 "{}{}",
@@ -1270,7 +1388,11 @@ impl TasksService {
     /// # Errors
     ///
     /// Fails when the workspace does.
-    pub async fn revoke_feed(&self, user: UserId, _input: NoInput) -> Result<Done, Error> {
+    pub async fn revoke_feed(
+        &self,
+        user: UserId,
+        _input: NoInput,
+    ) -> Result<Done, Error> {
         self.workspace
             .set_secret(user, SecretKind::Feed, None)
             .await?;
@@ -1282,9 +1404,14 @@ impl TasksService {
     /// # Errors
     ///
     /// Fails when the workspace does.
-    pub async fn rotate_capture(&self, user: UserId, _input: NoInput) -> Result<SecretView, Error> {
+    pub async fn rotate_capture(
+        &self,
+        user: UserId,
+        _input: NoInput,
+    ) -> Result<SecretView, Error> {
         let (token, hash) = feed::issue_token().map_err(|err| {
-            Error::new(ErrorKind::Internal, "could not issue a token").with_source(err)
+            Error::new(ErrorKind::Internal, "could not issue a token")
+                .with_source(err)
         })?;
         self.workspace
             .set_secret(user, SecretKind::Capture, Some(hash))
@@ -1299,7 +1426,11 @@ impl TasksService {
     /// # Errors
     ///
     /// Fails when the workspace does.
-    pub async fn revoke_capture(&self, user: UserId, _input: NoInput) -> Result<Done, Error> {
+    pub async fn revoke_capture(
+        &self,
+        user: UserId,
+        _input: NoInput,
+    ) -> Result<Done, Error> {
         self.workspace
             .set_secret(user, SecretKind::Capture, None)
             .await?;
@@ -1312,20 +1443,29 @@ impl TasksService {
     /// # Errors
     ///
     /// Slack capture not set up, or a forged or expired code.
-    pub async fn link_slack(&self, user: UserId, input: SlackLinkInput) -> Result<Done, Error> {
+    pub async fn link_slack(
+        &self,
+        user: UserId,
+        input: SlackLinkInput,
+    ) -> Result<Done, Error> {
         let Some(secret) = &self.config.slack_signing_secret else {
             return Err(Error::new(
                 ErrorKind::Unavailable,
                 "Slack capture is not set up on this server",
             ));
         };
-        let (team, slack_user) = capture::read_slack_link_code(secret, &input.code, self.now())
-            .map_err(|_| {
-                Error::new(
-                    ErrorKind::InvalidInput,
-                    "this Slack link is not valid or has expired; use Save as task in Slack again",
-                )
-            })?;
+        let (team, slack_user) = capture::read_slack_link_code(
+            secret,
+            &input.code,
+            self.now(),
+        )
+        .map_err(|_| {
+            Error::new(
+                ErrorKind::InvalidInput,
+                "this Slack link is not valid or has expired; use Save as \
+                        task in Slack again",
+            )
+        })?;
         self.workspace.link_slack(user, team, slack_user).await?;
         tracing::info!("Slack account linked for capture");
         Ok(Done {})
@@ -1336,7 +1476,11 @@ impl TasksService {
     /// # Errors
     ///
     /// Fails when the workspace does.
-    pub async fn unlink_slack(&self, user: UserId, _input: NoInput) -> Result<Done, Error> {
+    pub async fn unlink_slack(
+        &self,
+        user: UserId,
+        _input: NoInput,
+    ) -> Result<Done, Error> {
         let _ = self.workspace.unlink_slack(user).await?;
         Ok(Done {})
     }
@@ -1346,7 +1490,11 @@ impl TasksService {
     /// # Errors
     ///
     /// Fails when the workspace does.
-    pub async fn digest(&self, user: UserId, _input: NoInput) -> Result<DigestView, Error> {
+    pub async fn digest(
+        &self,
+        user: UserId,
+        _input: NoInput,
+    ) -> Result<DigestView, Error> {
         let me = self.me(user).await?;
         let tasks = self.gather(user, &me.profile.handle).await?;
         let view = projection::build(tasks, me.today());
@@ -1411,7 +1559,11 @@ impl TasksService {
     /// # Errors
     ///
     /// `invalid` for a malformed comment ID.
-    pub async fn dismiss_mention(&self, user: UserId, input: MentionRef) -> Result<Done, Error> {
+    pub async fn dismiss_mention(
+        &self,
+        user: UserId,
+        input: MentionRef,
+    ) -> Result<Done, Error> {
         let comment: CommentId = input
             .comment
             .parse()
@@ -1481,7 +1633,10 @@ fn task_operations(s: &Arc<TasksService>) -> Vec<Operation> {
             Scope::Read,
             handler!(s, my_work),
         )
-        .summary("Lists My Work: Inbox, Today, Evening, Upcoming, Anytime, Someday, Done"),
+        .summary(
+            "Lists My Work: Inbox, Today, Evening, Upcoming, Anytime, \
+            Someday, Done",
+        ),
         Operation::query(
             "tasks.parse",
             "/v1/tasks/parse",
@@ -1636,7 +1791,10 @@ fn list_operations(s: &Arc<TasksService>) -> Vec<Operation> {
             Scope::WriteDirect,
             handler!(s, link_slack),
         )
-        .summary("Links your Slack account for Save as task, with the code Slack showed you"),
+        .summary(
+            "Links your Slack account for Save as task, with the code \
+            Slack showed you",
+        ),
         Operation::mutation(
             "tasks.unlink_slack",
             Delete,
@@ -1656,7 +1814,9 @@ fn settings_operations(s: &Arc<TasksService>) -> Vec<Operation> {
             Scope::Read,
             handler!(s, settings),
         )
-        .summary("Your My Work settings: time zone, start of day and digest time"),
+        .summary(
+            "Your My Work settings: time zone, start of day and digest time",
+        ),
         Operation::mutation(
             "tasks.settings_update",
             HttpMethod::Put,
@@ -1685,7 +1845,9 @@ fn google_operations(s: &Arc<TasksService>) -> Vec<Operation> {
             Scope::Read,
             handler!(s, google_status),
         )
-        .summary("Whether Google Calendar time-blocking is set up and connected"),
+        .summary(
+            "Whether Google Calendar time-blocking is set up and connected",
+        ),
         Operation::mutation(
             "tasks.google_connect",
             Post,
@@ -1693,7 +1855,9 @@ fn google_operations(s: &Arc<TasksService>) -> Vec<Operation> {
             Scope::WriteDirect,
             handler!(s, google_connect),
         )
-        .summary("Starts connecting Google Calendar; returns Google's consent page"),
+        .summary(
+            "Starts connecting Google Calendar; returns Google's consent page",
+        ),
         Operation::mutation(
             "tasks.google_sync",
             Post,

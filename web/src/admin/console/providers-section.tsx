@@ -47,7 +47,11 @@ function RequireSsoForm({
       });
   };
   return (
-    <form className="vl-admin-form" onSubmit={submit} aria-labelledby={`${id}-title`}>
+    <form
+      className="vl-admin-form"
+      onSubmit={submit}
+      aria-labelledby={`${id}-title`}
+    >
       <h3 id={`${id}-title`}>{t("admin-sso-require-title")}</h3>
       <label className="vl-account-scope">
         <input
@@ -97,12 +101,16 @@ function ProviderRow({
       <td>
         <code>{provider.issuer ?? provider.entityId}</code>
         <div className="vl-muted">
-          {provider.kind === "saml" ? t("admin-sso-kind-saml") : t("admin-sso-kind-oidc")}
+          {provider.kind === "saml"
+            ? t("admin-sso-kind-saml")
+            : t("admin-sso-kind-oidc")}
         </div>
       </td>
       <td>
         {provider.enabled ? t("factors-on") : t("admin-sso-off")}
-        {provider.readOnly && <div className="vl-muted">{t("admin-sso-from-env")}</div>}
+        {provider.readOnly && (
+          <div className="vl-muted">{t("admin-sso-from-env")}</div>
+        )}
       </td>
       <td>
         {!provider.readOnly && (
@@ -180,8 +188,8 @@ export function ProvidersSection({
         {t("admin-sso-callback")} <code>{view.oidcCallbackUrl}</code>
       </p>
       <p className="vl-muted">
-        {t("admin-saml-service")} <code>{view.saml.entityId}</code> {t("admin-saml-acs")}{" "}
-        <code>{view.saml.acsUrl}</code>
+        {t("admin-saml-service")} <code>{view.saml.entityId}</code>{" "}
+        {t("admin-saml-acs")} <code>{view.saml.acsUrl}</code>
       </p>
       {error !== undefined && (
         <p className="vl-field-error" role="alert">
@@ -193,7 +201,9 @@ export function ProvidersSection({
       ) : (
         <div className="vl-admin-scroll">
           <table className="vl-admin-table">
-            <caption>{t("admin-sso-caption", { count: view.providers.length })}</caption>
+            <caption>
+              {t("admin-sso-caption", { count: view.providers.length })}
+            </caption>
             <thead>
               <tr>
                 <th scope="col">{t("admin-sso-name")}</th>
@@ -236,7 +246,12 @@ export function ProvidersSection({
           refresh(t("admin-sso-saved", { name: saved.name }));
         }}
       />
-      <RequireSsoForm key={String(view.requireSso)} api={api} view={view} onChanged={onChanged} />
+      <RequireSsoForm
+        key={String(view.requireSso)}
+        api={api}
+        view={view}
+        onChanged={onChanged}
+      />
     </section>
   );
 }

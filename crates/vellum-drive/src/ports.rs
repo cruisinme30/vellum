@@ -35,13 +35,25 @@ pub trait DriveIndex: Send + Sync + fmt::Debug {
     /// Looks up a node, live or trashed.
     async fn node(&self, id: ObjectId) -> DriveResult<Option<Node>>;
     /// The node at `path` in `space`, live or trashed.
-    async fn node_at(&self, space: SpaceId, path: &BlobPath) -> DriveResult<Option<Node>>;
+    async fn node_at(
+        &self,
+        space: SpaceId,
+        path: &BlobPath,
+    ) -> DriveResult<Option<Node>>;
     /// Live nodes directly in `parent` (`None`: the space root).
-    async fn children(&self, space: SpaceId, parent: Option<ObjectId>) -> DriveResult<Vec<Node>>;
+    async fn children(
+        &self,
+        space: SpaceId,
+        parent: Option<ObjectId>,
+    ) -> DriveResult<Vec<Node>>;
     /// Every node in a space, live and trashed.
     async fn nodes(&self, space: SpaceId) -> DriveResult<Vec<Node>>;
     /// Live nodes in `space` with this exact title.
-    async fn by_title(&self, space: SpaceId, title: &str) -> DriveResult<Vec<Node>>;
+    async fn by_title(
+        &self,
+        space: SpaceId,
+        title: &str,
+    ) -> DriveResult<Vec<Node>>;
     /// Removes a node and everything keyed by it (links from it, user
     /// state, versions); activity is kept as history.
     async fn remove_node(&self, id: ObjectId) -> DriveResult<()>;
@@ -56,17 +68,34 @@ pub trait DriveIndex: Send + Sync + fmt::Debug {
     /// A user's starred nodes, most recently starred first.
     async fn starred(&self, user: UserId) -> DriveResult<Vec<ObjectId>>;
     /// Records that a user opened or edited a node.
-    async fn touch(&self, user: UserId, node: ObjectId, at: Timestamp) -> DriveResult<()>;
+    async fn touch(
+        &self,
+        user: UserId,
+        node: ObjectId,
+        at: Timestamp,
+    ) -> DriveResult<()>;
     /// A user's most recently opened or edited nodes, newest first.
-    async fn recent(&self, user: UserId, limit: usize) -> DriveResult<Vec<(ObjectId, Timestamp)>>;
+    async fn recent(
+        &self,
+        user: UserId,
+        limit: usize,
+    ) -> DriveResult<Vec<(ObjectId, Timestamp)>>;
 
     /// Appends an activity entry.
     async fn append_activity(&self, entry: &Activity) -> DriveResult<()>;
     /// Activity on `node` or anything beneath it, newest first.
-    async fn activity(&self, node: ObjectId, limit: usize) -> DriveResult<Vec<Activity>>;
+    async fn activity(
+        &self,
+        node: ObjectId,
+        limit: usize,
+    ) -> DriveResult<Vec<Activity>>;
 
     /// Replaces the set of nodes `source` links to.
-    async fn set_links(&self, source: ObjectId, targets: &[ObjectId]) -> DriveResult<()>;
+    async fn set_links(
+        &self,
+        source: ObjectId,
+        targets: &[ObjectId],
+    ) -> DriveResult<()>;
     /// Nodes that link to `target`.
     async fn backlinks(&self, target: ObjectId) -> DriveResult<Vec<ObjectId>>;
 
@@ -149,12 +178,25 @@ pub trait Access: Send + Sync + fmt::Debug {
     /// Spaces where `user` holds any access.
     async fn spaces(&self, user: UserId) -> DriveResult<Vec<SpaceId>>;
     /// Nodes in `space` that `user` may view.
-    async fn accessible(&self, user: UserId, space: SpaceId) -> DriveResult<Vec<ObjectId>>;
+    async fn accessible(
+        &self,
+        user: UserId,
+        space: SpaceId,
+    ) -> DriveResult<Vec<ObjectId>>;
     /// Called after nodes were created, moved, trashed, restored or purged,
     /// so materialised access can be recomputed for their subtrees.
-    async fn tree_changed(&self, space: SpaceId, nodes: &[ObjectId]) -> DriveResult<()>;
+    async fn tree_changed(
+        &self,
+        space: SpaceId,
+        nodes: &[ObjectId],
+    ) -> DriveResult<()>;
     /// Gives the creator of a node ownership of it.
-    async fn grant_owner(&self, user: UserId, space: SpaceId, node: ObjectId) -> DriveResult<()>;
+    async fn grant_owner(
+        &self,
+        user: UserId,
+        space: SpaceId,
+        node: ObjectId,
+    ) -> DriveResult<()>;
     /// Every group `user` belongs to right now, nested groups included,
     /// by group ID. Book sections restricted to `group:<ID>` use it.
     async fn groups_of(&self, user: UserId) -> DriveResult<BTreeSet<ObjectId>>;

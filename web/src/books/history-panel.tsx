@@ -21,14 +21,19 @@ function OutlineChanges({
   readonly info: BookInfo;
 }) {
   const t = useT();
-  const now = new Map(outlineRows(info.toc).map((row) => [row.id, row.node.label]));
+  const now = new Map(
+    outlineRows(info.toc).map((row) => [row.id, row.node.label]),
+  );
   return (
     <ol className="vl-book-outline">
       {entry.outline.map((line) => {
         const current = now.get(line.id);
         const changed = current !== line.label;
         return (
-          <li key={line.id} style={{ paddingInlineStart: `${String((line.depth - 1) * 14)}px` }}>
+          <li
+            key={line.id}
+            style={{ paddingInlineStart: `${String((line.depth - 1) * 14)}px` }}
+          >
             <span>{line.label}</span>
             {changed && (
               <small className="vl-book-change">
@@ -59,7 +64,11 @@ export function HistoryPanel({
   readonly onChanged: () => Promise<void>;
 }) {
   const t = useT();
-  const loaded = useLoaded(() => api.history(info.id), [api, info.id, version], failureText);
+  const loaded = useLoaded(
+    () => api.history(info.id),
+    [api, info.id, version],
+    failureText,
+  );
   const [open, setOpen] = useState<string>();
   const { busy, error, run } = useAction();
   return (
@@ -78,7 +87,9 @@ export function HistoryPanel({
                     className="vl-text-button"
                     aria-expanded={open === entry.id}
                     onClick={() => {
-                      setOpen((current) => (current === entry.id ? undefined : entry.id));
+                      setOpen((current) =>
+                        current === entry.id ? undefined : entry.id,
+                      );
                     }}
                   >
                     {t("books-history-entry", {

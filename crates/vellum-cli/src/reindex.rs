@@ -11,7 +11,9 @@ use std::io::Write as _;
 use std::process::ExitCode;
 
 use futures::{StreamExt as _, TryStreamExt as _};
-use vellum_db::{Index, IndexConfig, IndexKey, Listing, ShardedIndex, ShardsConfig};
+use vellum_db::{
+    Index, IndexConfig, IndexKey, Listing, ShardedIndex, ShardsConfig,
+};
 use vellum_kernel::config::Config;
 use vellum_store::{BlobStore, StoreError, remote::s3::S3Store};
 
@@ -50,8 +52,8 @@ pub fn run(args: &Args) -> ExitCode {
 
 fn execute(args: &Args) -> Result<Vec<String>, String> {
     let config = Config::load(None).map_err(|e| e.to_string())?;
-    let shards =
-        ShardsConfig::from_env(|key| std::env::var(key).ok()).map_err(|e| e.to_string())?;
+    let shards = ShardsConfig::from_env(|key| std::env::var(key).ok())
+        .map_err(|e| e.to_string())?;
     let bucket = crate::workspace::bucket(|k| std::env::var(k).ok())
         .map_err(|e| e.to_string())?
         .map(S3Store::new)
@@ -71,8 +73,13 @@ fn execute(args: &Args) -> Result<Vec<String>, String> {
                 .block_on(async {
                     // Read the bucket as the server stores it: sealed
                     // unless the files are plaintext.
-                    match crate::at_rest::keys(&config, &store, true, var).await? {
-                        Some(keys) => fetch_listing(&crate::at_rest::sealed(store, keys)).await,
+                    match crate::at_rest::keys(&config, &store, true, var)
+                        .await?
+                    {
+                        Some(keys) => {
+                            fetch_listing(&crate::at_rest::sealed(store, keys))
+                                .await
+                        }
                         None => fetch_listing(&store).await,
                     }
                     .map_err(|e| {
@@ -103,7 +110,9 @@ fn execute(args: &Args) -> Result<Vec<String>, String> {
             let index = ShardedIndex::open(&shards).await?;
             let report = match source {
                 Source::Bucket(listing) => index.reindex_listing(listing).await,
-                Source::Folder(files) => index.reindex(&config.data_dir, files).await,
+                Source::Folder(files) => {
+                    index.reindex(&config.data_dir, files).await
+                }
             };
             index.close().await;
             report
@@ -112,11 +121,16 @@ fn execute(args: &Args) -> Result<Vec<String>, String> {
         let index_config = if let Some(url) = &config.database_url {
             IndexConfig::postgres(url.clone())
         } else if args.plaintext {
-            IndexConfig::sqlite(config.data_dir.join(".vellum/index.sqlite"), None)
+            IndexConfig::sqlite(
+                config.data_dir.join(".vellum/index.sqlite"),
+                None,
+            )
         } else {
             // The server's key: the variable, or the one kept beside the data.
-            let key = crate::workspace::sqlite_key(&config, |k| std::env::var(k).ok())
-                .map_err(|e| e.to_string())?;
+            let key = crate::workspace::sqlite_key(&config, |k| {
+                std::env::var(k).ok()
+            })
+            .map_err(|e| e.to_string())?;
             IndexConfig::sqlite(
                 config.data_dir.join(".vellum/index.sqlite"),
                 key.map(IndexKey::new),
@@ -126,7 +140,9 @@ fn execute(args: &Args) -> Result<Vec<String>, String> {
             let index = Index::open(&index_config).await?;
             let report = match source {
                 Source::Bucket(listing) => index.reindex_listing(listing).await,
-                Source::Folder(files) => index.reindex(&config.data_dir, files).await,
+                Source::Folder(files) => {
+                    index.reindex(&config.data_dir, files).await
+                }
             };
             index.close().await;
             report
@@ -150,7 +166,9 @@ fn execute(args: &Args) -> Result<Vec<String>, String> {
 /// # Errors
 ///
 /// The listing or a fetch fails (after the store's own retries).
-pub async fn fetch_listing(store: &dyn BlobStore) -> Result<Listing, StoreError> {
+pub async fn fetch_listing(
+    store: &dyn BlobStore,
+) -> Result<Listing, StoreError> {
     let entries: Vec<_> = store.list(None).try_collect().await?;
     let mut fetched = futures::stream::iter(entries)
         .map(|entry| async move {
@@ -183,7 +201,9 @@ enum Source {
 
 /// The raw bytes of a key written as 64 hex characters.
 pub fn key_bytes(hex: Option<&str>) -> Result<[u8; 32], String> {
-    let hex = hex.ok_or_else(|| format!("set {KEY_VAR} to the index key, or pass --plaintext"))?;
+    let hex = hex.ok_or_else(|| {
+        format!("set {KEY_VAR} to the index key, or pass --plaintext")
+    })?;
     parse_hex_key(KEY_VAR, hex)
 }
 
@@ -231,7 +251,9 @@ mod tests {
         }
         let listing = fetch_listing(&store).await.unwrap();
         assert!(listing.len() >= 3);
-        let read = |p: &str| vellum_db::FileReader::read(&listing, std::path::Path::new(p));
+        let read = |p: &str| {
+            vellum_db::FileReader::read(&listing, std::path::Path::new(p))
+        };
         assert_eq!(
             read("drives/shared/eng/roadmap.md").unwrap(),
             b"---\ntitle: Roadmap\n---\n"
@@ -243,10 +265,12 @@ mod tests {
     async fn a_sealed_bucket_lists_plaintext() {
         let dir = tempfile::tempdir().unwrap();
         let raw = LocalStore::open(dir.path()).await.unwrap();
-        let keys = crate::at_rest::AtRestKeys::KeyFile(vellum_crypto::LocalKeyring::new(
-            vellum_crypto::KekId::new("local:test").unwrap(),
-            vellum_crypto::SecretKey::from_bytes([4; 32]),
-        ));
+        let keys = crate::at_rest::AtRestKeys::KeyFile(
+            vellum_crypto::LocalKeyring::new(
+                vellum_crypto::KekId::new("local:test").unwrap(),
+                vellum_crypto::SecretKey::from_bytes([4; 32]),
+            ),
+        );
         let store = crate::at_rest::sealed(raw, keys);
         let page = "drives/shared/eng/roadmap.md";
         let _ = store
@@ -261,7 +285,9 @@ mod tests {
             &std::fs::read(dir.path().join(page)).unwrap()
         ));
         let listing = fetch_listing(&store).await.unwrap();
-        let read = vellum_db::FileReader::read(&listing, std::path::Path::new(page)).unwrap();
+        let read =
+            vellum_db::FileReader::read(&listing, std::path::Path::new(page))
+                .unwrap();
         assert_eq!(read, b"---\ntitle: Roadmap\n---\n");
     }
 

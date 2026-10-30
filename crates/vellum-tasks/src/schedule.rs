@@ -111,14 +111,17 @@ impl TasksService {
         let tasks = self.gather(user, &profile.handle).await?;
         let mut out: Vec<Notice> = Vec::new();
         for due in remind::due_between(&tasks, after, until, &settings) {
-            let Some(task) = tasks.iter().find(|t| t.source.key() == due.task) else {
+            let Some(task) = tasks.iter().find(|t| t.source.key() == due.task)
+            else {
                 continue;
             };
             let body = match task.fields.due {
                 Some(Due::DateTime(moment)) => {
                     format!("Due {}", moment.strftime("%a %-d %b %H:%M"))
                 }
-                Some(Due::Date(day)) => format!("Due {}", day.strftime("%a %-d %b")),
+                Some(Due::Date(day)) => {
+                    format!("Due {}", day.strftime("%a %-d %b"))
+                }
                 None => String::new(),
             };
             out.push(Notice {
@@ -142,7 +145,10 @@ impl TasksService {
                     user,
                     kind: NoticeKind::Digest,
                     subject: format!("digest.{}", next.date()),
-                    title: format!("Your day: {today} to do, {} in the Inbox", view.inbox.len()),
+                    title: format!(
+                        "Your day: {today} to do, {} in the Inbox",
+                        view.inbox.len()
+                    ),
                     // The counts line; the whole digest is in My Work.
                     body: markdown
                         .lines()
@@ -230,7 +236,9 @@ impl Schedule {
             *notices = later;
             !notices.is_empty()
         });
-        due.sort_by(|a, b| a.at.cmp(&b.at).then_with(|| a.subject.cmp(&b.subject)));
+        due.sort_by(|a, b| {
+            a.at.cmp(&b.at).then_with(|| a.subject.cmp(&b.subject))
+        });
         self.watermark = now;
         self.horizon = self.horizon.max(now);
         due
@@ -264,12 +272,14 @@ mod tests {
         assert_eq!(s.extend(at(0)), (at(0), at(6)));
         s.plan(ana, vec![notice(ana, 3, "b"), notice(ana, 1, "a")]);
         s.plan(ben, vec![notice(ben, 2, "c"), notice(ben, 9, "too far")]);
-        let fired: Vec<String> = s.fire(at(2)).into_iter().map(|n| n.subject).collect();
+        let fired: Vec<String> =
+            s.fire(at(2)).into_iter().map(|n| n.subject).collect();
         assert_eq!(fired, ["a", "c"]);
         assert!(s.fire(at(2)).is_empty());
         // A later plan cannot bring back what was sent.
         s.plan(ana, vec![notice(ana, 1, "a"), notice(ana, 3, "b")]);
-        let fired: Vec<String> = s.fire(at(4)).into_iter().map(|n| n.subject).collect();
+        let fired: Vec<String> =
+            s.fire(at(4)).into_iter().map(|n| n.subject).collect();
         assert_eq!(fired, ["b"]);
         assert_eq!(s.watermark(), at(4));
     }

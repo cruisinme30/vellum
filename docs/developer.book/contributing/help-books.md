@@ -43,9 +43,11 @@ Press / to insert any block.
 
 ::: facts
 
-- `corpus="kind/name"`: the file the example becomes, `corpus/guide/kind/name.md`
+- `corpus="kind/name"`: the file the example becomes,
+  `corpus/guide/kind/name.md`
 - kinds: inline, block, container, fence, mermaid, table, page
-- `live=false`: a source-only example, for front matter and whole pages that cannot sit inside a chapter
+- `live=false`: a source-only example, for front matter and whole pages that
+  cannot sit inside a chapter
 
 :::
 
@@ -94,9 +96,11 @@ older release find its guide.
 ## Style {#style}
 
 - Write for someone busy: lead with what the reader can do, in short sentences.
-- Name interface elements in bold, exactly as they appear: **Share**, **⋯ → Export**.
+- Name interface elements in bold, exactly as they appear: **Share**, **⋯ →
+  Export**.
 - Use the Northstar workspace and its people for every example.
-- Vale and markdownlint run in CI; add real words Vale does not know to `.vale/styles/config/vocabularies/Vellum/accept.txt`.
+- Vale and markdownlint run in CI; add real words Vale does not know to
+  `.vale/styles/config/vocabularies/Vellum/accept.txt`.
 
 ## Keeping the books current {#current}
 

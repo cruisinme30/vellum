@@ -52,7 +52,10 @@ export function AnswerView({ answer }: { readonly answer: Answer }) {
 }
 
 /** The signed-in person's id and saved model, or a prompt to set one up. */
-export function useModel(): { userId: string | undefined; stored: StoredModel | undefined } {
+export function useModel(): {
+  userId: string | undefined;
+  stored: StoredModel | undefined;
+} {
   const session = useSession();
   const userId = session?.status.user?.id;
   return { userId, stored: useStoredModel(userId) };

@@ -14,7 +14,11 @@ import { TriageSuggestion } from "./suggestion";
 describe("insights", () => {
   it("asks again when the breakdown changes and shows a table", async () => {
     const api = fakeApi();
-    const user = renderAt("/insights", api, <Route path="/insights" element={<InsightsPage />} />);
+    const user = renderAt(
+      "/insights",
+      api,
+      <Route path="/insights" element={<InsightsPage />} />,
+    );
     expect(await screen.findByText("12 issues")).toBeTruthy();
     expect(screen.getByText("Median 30 h")).toBeTruthy();
     expect(screen.getByText("85% within 4 d")).toBeTruthy();
@@ -41,12 +45,19 @@ describe("asks", () => {
       api,
       <Route path="/asks/:team/:slug" element={<AskPage />} />,
     );
-    expect(await screen.findByRole("heading", { name: "Report a bug" })).toBeTruthy();
-    await user.type(screen.getByLabelText("Summary (required)"), "Crash on save");
+    expect(
+      await screen.findByRole("heading", { name: "Report a bug" }),
+    ).toBeTruthy();
+    await user.type(
+      screen.getByLabelText("Summary (required)"),
+      "Crash on save",
+    );
     await user.selectOptions(screen.getByLabelText("Area"), "Web");
     await user.type(screen.getByLabelText("Details"), "Every time.");
     await user.click(screen.getByRole("button", { name: "Send" }));
-    expect(await screen.findByText("Sent as ENG-10. The team will triage it.")).toBeTruthy();
+    expect(
+      await screen.findByText("Sent as ENG-10. The team will triage it."),
+    ).toBeTruthy();
     expect(api.submitForm).toHaveBeenCalledWith("ENG", "bug", {
       summary: "Crash on save",
       area: "Web",
@@ -60,7 +71,11 @@ describe("new issue", () => {
     const draft = draftFromUrl(
       new URLSearchParams("team=ENG&title=Fix+login&labels=bug,web&evil=1"),
     );
-    expect(draft).toEqual({ team: "ENG", title: "Fix login", labels: "bug,web" });
+    expect(draft).toEqual({
+      team: "ENG",
+      title: "Fix login",
+      labels: "bug,web",
+    });
   });
 
   it("prefills from the URL, previews the template and sends every field", async () => {
@@ -98,9 +113,14 @@ describe("triage suggestion", () => {
     const user = renderAt(
       "/",
       api,
-      <Route path="/" element={<TriageSuggestion issueKey="ENG-3" onApplied={applied} />} />,
+      <Route
+        path="/"
+        element={<TriageSuggestion issueKey="ENG-3" onApplied={applied} />}
+      />,
     );
-    expect(await screen.findByRole("heading", { name: "Claude suggests" })).toBeTruthy();
+    expect(
+      await screen.findByRole("heading", { name: "Claude suggests" }),
+    ).toBeTruthy();
     expect(screen.getByText("Move to OPS")).toBeTruthy();
     expect(screen.getByText("Priority Urgent")).toBeTruthy();
     expect(screen.getByText("Looks like the pager outage.")).toBeTruthy();
@@ -125,7 +145,11 @@ describe("triage suggestion", () => {
         }),
       ),
     });
-    renderAt("/", api, <Route path="/" element={<TriageSuggestion issueKey="ENG-3" />} />);
+    renderAt(
+      "/",
+      api,
+      <Route path="/" element={<TriageSuggestion issueKey="ENG-3" />} />,
+    );
     await waitFor(() => {
       expect(api.brief).toHaveBeenCalled();
     });

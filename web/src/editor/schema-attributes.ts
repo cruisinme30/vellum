@@ -6,21 +6,34 @@ import { Extension, type Attribute } from "@tiptap/core";
 import { NODES } from "./schema/blocks.gen";
 import { tiptapAttributes } from "./schema/spec";
 
-/** Attributes the stock Tiptap nodes already define (or that have their own extension). */
+/**
+ * Attributes the stock Tiptap nodes already define (or that have their own
+ * extension).
+ */
 const NATIVE: Readonly<Record<string, readonly string[]>> = {
   heading: ["level"],
   orderedList: ["start"],
   taskItem: ["checked", "attributes"],
 };
 
-/** The schema attributes a stock Tiptap node lacks, such as `tight` or `attributes`. */
-export function missingAttributes(): { types: string[]; attributes: Record<string, Attribute> }[] {
+/**
+ * The schema attributes a stock Tiptap node lacks, such as `tight` or
+ * `attributes`.
+ */
+export function missingAttributes(): {
+  types: string[];
+  attributes: Record<string, Attribute>;
+}[] {
   return NODES.filter((node) => node.impl === "tiptap").flatMap((node) => {
     const native = new Set(NATIVE[node.name]);
     const attributes = Object.fromEntries(
-      Object.entries(tiptapAttributes(node)).filter(([key]) => !native.has(key)),
+      Object.entries(tiptapAttributes(node)).filter(
+        ([key]) => !native.has(key),
+      ),
     );
-    return Object.keys(attributes).length === 0 ? [] : [{ types: [node.name], attributes }];
+    return Object.keys(attributes).length === 0
+      ? []
+      : [{ types: [node.name], attributes }];
   });
 }
 

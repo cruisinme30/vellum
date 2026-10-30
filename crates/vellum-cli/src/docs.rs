@@ -28,7 +28,10 @@ pub enum DocsError {
     #[error("no book named `{0}`; the books are user, admin and developer")]
     UnknownBook(String),
     /// The book has no page at that path.
-    #[error("the {book} guide has no page `{page}`; run `vellum docs {book}` to list its pages")]
+    #[error(
+        "the {book} guide has no page `{page}`; run `vellum docs {book}` to \
+            list its pages"
+    )]
     UnknownPage {
         /// The book.
         book: Book,
@@ -46,8 +49,8 @@ pub enum DocsError {
 /// Runs `vellum docs`, writing to `out`.
 pub fn run(args: &DocsArgs, out: &mut impl Write) -> Result<(), DocsError> {
     if let Some(id) = &args.help_id {
-        let target =
-            vellum_help::resolve(id).ok_or_else(|| DocsError::UnknownHelpId(id.clone()))?;
+        let target = vellum_help::resolve(id)
+            .ok_or_else(|| DocsError::UnknownHelpId(id.clone()))?;
         let page = target.page;
         writeln!(
             out,
@@ -72,7 +75,8 @@ pub fn run(args: &DocsArgs, out: &mut impl Write) -> Result<(), DocsError> {
         writeln!(out, "\nRun `vellum docs <book>` for its contents.")?;
         return Ok(());
     };
-    let book = Book::from_slug(name).ok_or_else(|| DocsError::UnknownBook(name.clone()))?;
+    let book = Book::from_slug(name)
+        .ok_or_else(|| DocsError::UnknownBook(name.clone()))?;
     let Some(path) = &args.page else {
         writeln!(out, "{}\n", book.title())?;
         for page in book.pages() {
@@ -80,9 +84,11 @@ pub fn run(args: &DocsArgs, out: &mut impl Write) -> Result<(), DocsError> {
         }
         return Ok(());
     };
-    let page = vellum_help::page(book, path).ok_or_else(|| DocsError::UnknownPage {
-        book,
-        page: path.clone(),
+    let page = vellum_help::page(book, path).ok_or_else(|| {
+        DocsError::UnknownPage {
+            book,
+            page: path.clone(),
+        }
     })?;
     out.write_all(page.markdown().as_bytes())?;
     Ok(())

@@ -73,36 +73,47 @@ async fn sts(State(fake): State<Arc<Fake>>, body: String) -> impl IntoResponse {
         .filter_map(|pair| pair.split_once('='))
         .map(|(k, v)| (k.to_owned(), v.to_owned()))
         .collect();
-    if form.get("Action").map(String::as_str) != Some("AssumeRoleWithWebIdentity")
-        || form.get("WebIdentityToken").map(String::as_str) != Some("projected-jwt")
+    if form.get("Action").map(String::as_str)
+        != Some("AssumeRoleWithWebIdentity")
+        || form.get("WebIdentityToken").map(String::as_str)
+            != Some("projected-jwt")
     {
         return (
             StatusCode::FORBIDDEN,
-            "<ErrorResponse><Error><Code>AccessDenied</Code><Message>bad token</Message></Error></ErrorResponse>".to_owned(),
+            "<ErrorResponse><Error><Code>AccessDenied</Code><Message>bad \
+                token</Message></Error></ErrorResponse>"
+                .to_owned(),
         );
     }
     let expiration = fake.expiration.lock().unwrap().clone();
     (
         StatusCode::OK,
         format!(
-            "<AssumeRoleWithWebIdentityResponse><AssumeRoleWithWebIdentityResult><Credentials>\
-             <AccessKeyId>{KEY_ID}</AccessKeyId><SecretAccessKey>temp-secret</SecretAccessKey>\
-             <SessionToken>{SESSION}</SessionToken><Expiration>{expiration}</Expiration>\
-             </Credentials></AssumeRoleWithWebIdentityResult></AssumeRoleWithWebIdentityResponse>"
+            "<AssumeRoleWithWebIdentityResponse><AssumeRoleWithWebIdentityResul\
+             t><Credentials><AccessKeyId>{KEY_ID}</AccessKeyId><SecretAccessKey\
+             >temp-secret</SecretAccessKey><SessionToken>{SESSION}</SessionToke\
+             n><Expiration>{expiration}</Expiration></Credentials></AssumeRoleW\
+             ithWebIdentityResult></AssumeRoleWithWebIdentityResponse>"
         ),
     )
 }
 
 fn json_credentials(fake: &Fake) -> String {
     let expiration = fake.expiration.lock().unwrap().clone();
-    format!(
-        r#"{{"AccessKeyId":"{KEY_ID}","SecretAccessKey":"temp-secret","Token":"{SESSION}","Expiration":"{expiration}"}}"#
-    )
+    format!(concat!(
+        r#"{{"AccessKeyId":"{KEY_ID}","SecretAccessKey":"temp-secret","To"#,
+        r#"ken":"{SESSION}","Expiration":"{expiration}"}}"#,
+    ))
 }
 
-async fn container(State(fake): State<Arc<Fake>>, headers: HeaderMap) -> impl IntoResponse {
+async fn container(
+    State(fake): State<Arc<Fake>>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
     let _ = fake.container_calls.fetch_add(1, Ordering::SeqCst);
-    if headers.get("authorization").and_then(|v| v.to_str().ok()) != Some("pod-identity-token") {
+    if headers.get("authorization").and_then(|v| v.to_str().ok())
+        != Some("pod-identity-token")
+    {
         return (StatusCode::UNAUTHORIZED, String::new());
     }
     (StatusCode::OK, json_credentials(&fake))
@@ -131,7 +142,10 @@ async fn imds_roles(headers: HeaderMap) -> impl IntoResponse {
     }
 }
 
-async fn imds_role(State(fake): State<Arc<Fake>>, headers: HeaderMap) -> impl IntoResponse {
+async fn imds_role(
+    State(fake): State<Arc<Fake>>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
     let _ = fake.imds_calls.fetch_add(1, Ordering::SeqCst);
     if !imds_ok(&headers) {
         return (StatusCode::UNAUTHORIZED, String::new());

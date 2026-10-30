@@ -18,7 +18,8 @@ as vector images to PDF and Word.
 - type: bar, line, area, donut, pie, grouped, stacked or scatter
 - labels: the x-axis categories, for bar, line, area, grouped and stacked
 - values: one series of numbers, for bar, line and area
-- any other key: a named series (grouped, stacked, scatter) or slice (donut, pie)
+- any other key: a named series (grouped, stacked, scatter) or slice (donut,
+  pie)
 - unit: a suffix for values, such as ms or %
 - ymin and ymax: fix the y-axis range
 - legend: top, bottom, right or none

@@ -7,7 +7,8 @@ use http::{StatusCode, header};
 use serde_json::json;
 
 use crate::identity_tests::{
-    ORIGIN, Reply, app, csrf, finish, json_request, request, send, signed_in_admin,
+    ORIGIN, Reply, app, csrf, finish, json_request, request, send,
+    signed_in_admin,
 };
 
 async fn call(
@@ -47,8 +48,20 @@ async fn admins_manage_webhooks_and_secrets_are_shown_once() {
     .await;
     assert_eq!(refused.status, StatusCode::BAD_REQUEST, "{}", refused.text);
 
-    let created = call(&app, &cookie, &token, "POST", "/api/v1/admin/webhooks",
-        &json!({"url": "https://hooks.northstar.dev/vellum", "description": "CI", "event_types": ["issue", "comment"], "teams": ["eng"]})).await;
+    let created = call(
+        &app,
+        &cookie,
+        &token,
+        "POST",
+        "/api/v1/admin/webhooks",
+        &json!({
+            "url": "https://hooks.northstar.dev/vellum",
+            "description": "CI",
+            "event_types": ["issue", "comment"],
+            "teams": ["eng"]
+        }),
+    )
+    .await;
     assert_eq!(created.status, StatusCode::OK, "{}", created.text);
     let secret = created.json()["secret"].as_str().unwrap().to_owned();
     let id = created.json()["hook"]["id"].as_str().unwrap().to_owned();
@@ -56,7 +69,10 @@ async fn admins_manage_webhooks_and_secrets_are_shown_once() {
 
     let listed = send(
         &app,
-        finish(request("GET", "/api/v1/admin/webhooks").header(header::COOKIE, &cookie)),
+        finish(
+            request("GET", "/api/v1/admin/webhooks")
+                .header(header::COOKIE, &cookie),
+        ),
     )
     .await;
     assert_eq!(listed.status, StatusCode::OK, "{}", listed.text);
@@ -64,8 +80,22 @@ async fn admins_manage_webhooks_and_secrets_are_shown_once() {
     assert_eq!(listed.json()["hooks"][0]["teams"], json!(["ENG"]));
     assert_eq!(listed.json()["event_types"].as_array().unwrap().len(), 8);
 
-    let updated = call(&app, &cookie, &token, "PUT", &format!("/api/v1/admin/webhooks/{id}"),
-        &json!({"url": "https://hooks.northstar.dev/v2", "event_types": ["project"], "enabled": false})).await;
+    let updated = call(
+        &app,
+        &cookie,
+        &token,
+        "PUT",
+        &format!(
+            "/api/v1/admin/we\
+        bhooks/{id}"
+        ),
+        &json!({
+            "url": "https://hooks.northstar.dev/v2",
+            "event_types": ["project"],
+            "enabled": false
+        }),
+    )
+    .await;
     assert_eq!(updated.status, StatusCode::OK, "{}", updated.text);
     assert_eq!(updated.json()["enabled"], json!(false));
     assert_eq!(updated.json()["teams"], json!([]));
@@ -95,7 +125,9 @@ async fn admins_manage_webhooks_and_secrets_are_shown_once() {
     assert_eq!(log.json()["deliveries"], json!([]));
 
     // Kept across a restart, readable only by the server.
-    let stored = std::fs::read_to_string(dir.path().join(".vellum/webhooks.json")).unwrap();
+    let stored =
+        std::fs::read_to_string(dir.path().join(".vellum/webhooks.json"))
+            .unwrap();
     assert!(stored.contains(&id));
 
     let deleted = send(
@@ -120,7 +152,8 @@ async fn admins_manage_webhooks_and_secrets_are_shown_once() {
     assert_eq!(gone.status, StatusCode::NOT_FOUND, "{}", gone.text);
 
     // Signed out, nothing.
-    let anonymous = send(&app, finish(request("GET", "/api/v1/admin/webhooks"))).await;
+    let anonymous =
+        send(&app, finish(request("GET", "/api/v1/admin/webhooks"))).await;
     assert_eq!(
         anonymous.status,
         StatusCode::UNAUTHORIZED,

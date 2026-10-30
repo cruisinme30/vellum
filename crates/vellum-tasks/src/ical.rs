@@ -16,7 +16,9 @@ use jiff::civil::{Date, DateTime};
 use jiff::tz::TimeZone;
 use jiff::{SignedDuration, Timestamp};
 
-use crate::model::{Due, Priority, RecurFrom, Recurrence, Reminder, Task, TaskFields};
+use crate::model::{
+    Due, Priority, RecurFrom, Recurrence, Reminder, Task, TaskFields,
+};
 use crate::recur::RRule;
 
 /// One property: `NAME;PARAM=value:value`.
@@ -180,7 +182,10 @@ impl Component {
     }
 
     /// Every property with this name.
-    pub fn all<'a>(&'a self, name: &'a str) -> impl Iterator<Item = &'a Property> {
+    pub fn all<'a>(
+        &'a self,
+        name: &'a str,
+    ) -> impl Iterator<Item = &'a Property> {
         self.properties
             .iter()
             .filter(move |p| p.name.eq_ignore_ascii_case(name))
@@ -233,14 +238,21 @@ impl Component {
         let mut stack: Vec<Self> = Vec::new();
         let mut root = None;
         for (index, line) in unfolded.iter().enumerate() {
-            let property = parse_line(line).ok_or(IcalError::Line(index + 1))?;
+            let property =
+                parse_line(line).ok_or(IcalError::Line(index + 1))?;
             match property.name.as_str() {
-                "BEGIN" => stack.push(Self::new(&property.value.to_ascii_uppercase())),
+                "BEGIN" => {
+                    stack.push(Self::new(&property.value.to_ascii_uppercase()))
+                }
                 "END" => {
                     let done = stack
                         .pop()
-                        .filter(|c| c.name.eq_ignore_ascii_case(&property.value))
-                        .ok_or_else(|| IcalError::Nesting(property.value.clone()))?;
+                        .filter(|c| {
+                            c.name.eq_ignore_ascii_case(&property.value)
+                        })
+                        .ok_or_else(|| {
+                            IcalError::Nesting(property.value.clone())
+                        })?;
                     if let Some(parent) = stack.last_mut() {
                         parent.components.push(done);
                     } else {
@@ -351,7 +363,10 @@ pub enum Value {
 /// # Errors
 ///
 /// Returns [`IcalError::Date`] for a malformed value.
-pub fn read_value(property: &Property, owner: &TimeZone) -> Result<Value, IcalError> {
+pub fn read_value(
+    property: &Property,
+    owner: &TimeZone,
+) -> Result<Value, IcalError> {
     let raw = property.value.trim();
     let bad = || IcalError::Date(raw.to_owned());
     let date_of = |text: &str| -> Option<Date> {
@@ -466,12 +481,18 @@ pub fn to_vtodo(
     todo.push_text("SUMMARY", &task.title);
     let fields = &task.fields;
     if let Some(start) = fields.start {
-        todo.push(Property::new("DTSTART", format_date(start)).param("VALUE", "DATE"));
+        todo.push(
+            Property::new("DTSTART", format_date(start)).param("VALUE", "DATE"),
+        );
     }
     if let Some(due) = fields.due {
         todo.push(match due {
-            Due::Date(day) => Property::new("DUE", format_date(day)).param("VALUE", "DATE"),
-            Due::DateTime(moment) => Property::new("DUE", format_floating(moment)),
+            Due::Date(day) => {
+                Property::new("DUE", format_date(day)).param("VALUE", "DATE")
+            }
+            Due::DateTime(moment) => {
+                Property::new("DUE", format_floating(moment))
+            }
         });
     }
     if let Some(recurrence) = &fields.recurrence {
@@ -488,7 +509,8 @@ pub fn to_vtodo(
         ));
     }
     if !fields.labels.is_empty() {
-        let labels: Vec<String> = fields.labels.iter().map(|l| escape_text(l)).collect();
+        let labels: Vec<String> =
+            fields.labels.iter().map(|l| escape_text(l)).collect();
         todo.push(Property::new("CATEGORIES", labels.join(",")));
     }
     if task.done {
@@ -501,15 +523,19 @@ pub fn to_vtodo(
         todo.push(Property::new("STATUS", "NEEDS-ACTION"));
     }
     if let Some(parent) = parent_uid {
-        todo.push(Property::new("RELATED-TO", parent).param("RELTYPE", "PARENT"));
+        todo.push(
+            Property::new("RELATED-TO", parent).param("RELTYPE", "PARENT"),
+        );
     }
     for reminder in &fields.reminders {
         let mut alarm = Component::new("VALARM");
         alarm.push(Property::new("ACTION", "DISPLAY"));
         alarm.push_text("DESCRIPTION", &task.title);
         match reminder {
-            Reminder::Relative(offset) => alarm
-                .push(Property::new("TRIGGER", duration_value(*offset)).param("RELATED", "END")),
+            Reminder::Relative(offset) => alarm.push(
+                Property::new("TRIGGER", duration_value(*offset))
+                    .param("RELATED", "END"),
+            ),
             Reminder::At(moment) => {
                 if let Ok(zoned) = moment.to_zoned(owner.clone()) {
                     alarm.push(
@@ -560,7 +586,11 @@ pub struct TodoUpdate {
 ///
 /// Returns [`IcalError`] for malformed text, a missing `VTODO` or an
 /// unsupported rule.
-pub fn from_vtodo(text: &str, owner: &TimeZone, now: Timestamp) -> Result<TodoUpdate, IcalError> {
+pub fn from_vtodo(
+    text: &str,
+    owner: &TimeZone,
+    now: Timestamp,
+) -> Result<TodoUpdate, IcalError> {
     let root = Component::parse(text)?;
     let todo = if root.name == "VTODO" {
         &root
@@ -585,11 +615,16 @@ pub fn from_vtodo(text: &str, owner: &TimeZone, now: Timestamp) -> Result<TodoUp
         });
     }
     if let Some(property) = todo.get("RRULE") {
-        let rule: RRule = property
-            .value
-            .parse()
-            .map_err(|e: crate::recur::RRuleError| IcalError::RRule(e.to_string()))?;
-        let from = if text_of("X-VELLUM-RECUR-FROM").as_deref() == Some("completion") {
+        let rule: RRule =
+            property
+                .value
+                .parse()
+                .map_err(|e: crate::recur::RRuleError| {
+                    IcalError::RRule(e.to_string())
+                })?;
+        let from = if text_of("X-VELLUM-RECUR-FROM").as_deref()
+            == Some("completion")
+        {
             RecurFrom::Completion
         } else {
             RecurFrom::Schedule
@@ -613,7 +648,8 @@ pub fn from_vtodo(text: &str, owner: &TimeZone, now: Timestamp) -> Result<TodoUp
         .collect();
     let status = text_of("STATUS").unwrap_or_default().to_ascii_uppercase();
     let completed = todo.get("COMPLETED");
-    let done = status == "COMPLETED" || (completed.is_some() && status != "NEEDS-ACTION");
+    let done = status == "COMPLETED"
+        || (completed.is_some() && status != "NEEDS-ACTION");
     if done {
         fields.done = Some(
             completed
@@ -632,9 +668,9 @@ pub fn from_vtodo(text: &str, owner: &TimeZone, now: Timestamp) -> Result<TodoUp
         let reminder = if trigger.get_param("VALUE") == Some("DATE-TIME") {
             match read_value(trigger, owner)? {
                 Value::Local(moment) => Some(Reminder::At(moment)),
-                Value::Date(day) => {
-                    Some(Reminder::At(day.to_datetime(jiff::civil::Time::midnight())))
-                }
+                Value::Date(day) => Some(Reminder::At(
+                    day.to_datetime(jiff::civil::Time::midnight()),
+                )),
             }
         } else {
             trigger.value.parse::<Reminder>().ok()
@@ -670,8 +706,9 @@ mod tests {
 
     fn task() -> Task {
         let attrs = crate::attrs::Attrs::parse(
-            "{start=2026-11-01 due=2026-11-03T15:00 rrule=FREQ=WEEKLY;UNTIL=20261231 \
-             recur_from=completion remind=-PT15M,2026-11-03T08:00 p=2 labels=home,a;b}",
+            "{start=2026-11-01 due=2026-11-03T15:00 \
+             rrule=FREQ=WEEKLY;UNTIL=20261231 recur_from=completion \
+             remind=-PT15M,2026-11-03T08:00 p=2 labels=home,a;b}",
         )
         .unwrap();
         Task {
@@ -717,7 +754,11 @@ mod tests {
         let text = cal.to_ical();
         assert!(text.contains("DUE:20261103T150000\r\n"));
         assert!(text.contains("RRULE:FREQ=WEEKLY;UNTIL=20261231T235959Z\r\n"));
-        assert!(text.contains("SUMMARY:Send the Northstar invoice\\, v2\\; final\r\n"));
+        assert!(
+            text.contains(
+                "SUMMARY:Send the Northstar invoice\\, v2\\; final\r\n"
+            )
+        );
         assert!(text.contains("TRIGGER;RELATED=END:-PT15M\r\n"));
         assert!(text.contains("TRIGGER;VALUE=DATE-TIME:20261103T080000Z\r\n"));
         let back = from_vtodo(&text, &zone, stamp).unwrap();
@@ -741,7 +782,8 @@ mod tests {
         let now: Timestamp = "2026-11-05T12:00:00Z".parse().unwrap();
         let text = "BEGIN:VCALENDAR\r\nBEGIN:VTODO\r\nUID:x\r\nSUMMARY:Call\r\n\
 DUE;TZID=Europe/Berlin:20261103T150000\r\nDTSTART:20261102T230000Z\r\n\
-STATUS:COMPLETED\r\nPRIORITY:9\r\nCATEGORIES:a,b\r\nCATEGORIES:c\r\nEND:VTODO\r\nEND:VCALENDAR\r\n";
+STATUS:COMPLETED\r\nPRIORITY:9\r\nCATEGORIES:a,b\r\nCATEGORIES:c\r\n\
+END:VTODO\r\nEND:VCALENDAR\r\n";
         let todo = from_vtodo(text, &zone, now).unwrap();
         assert_eq!(todo.fields.due.unwrap().to_string(), "2026-11-03T09:00");
         assert_eq!(todo.fields.start, Some(date(2026, 11, 2)));
@@ -768,7 +810,8 @@ STATUS:COMPLETED\r\nPRIORITY:9\r\nCATEGORIES:a,b\r\nCATEGORIES:c\r\nEND:VTODO\r\
             from_vtodo("BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n", &zone, now),
             Err(IcalError::NoTodo)
         );
-        let bad_rule = "BEGIN:VTODO\r\nUID:x\r\nRRULE:FREQ=HOURLY\r\nEND:VTODO\r\n";
+        let bad_rule =
+            "BEGIN:VTODO\r\nUID:x\r\nRRULE:FREQ=HOURLY\r\nEND:VTODO\r\n";
         assert!(matches!(
             from_vtodo(bad_rule, &zone, now),
             Err(IcalError::RRule(_))

@@ -66,7 +66,9 @@ const item = (id: string) => `/api/v1/drive/items/${encodeURIComponent(id)}`;
 export function createHttpPageHistory(http: Http): PageHistory {
   return {
     async list(pageId) {
-      const { versions } = await http.get<{ versions: VersionView[] }>(`${item(pageId)}/versions`);
+      const { versions } = await http.get<{ versions: VersionView[] }>(
+        `${item(pageId)}/versions`,
+      );
       return versions
         .map((version) => ({
           id: version.id,
@@ -74,7 +76,11 @@ export function createHttpPageHistory(http: Http): PageHistory {
           size: version.size,
           author: version.author,
         }))
-        .toSorted((a, b) => b.savedAt.getTime() - a.savedAt.getTime() || b.id.localeCompare(a.id));
+        .toSorted(
+          (a, b) =>
+            b.savedAt.getTime() - a.savedAt.getTime() ||
+            b.id.localeCompare(a.id),
+        );
     },
     async read(pageId, versionId) {
       const version = await http.get<{ content?: string | null }>(
@@ -83,7 +89,10 @@ export function createHttpPageHistory(http: Http): PageHistory {
       return version.content ?? undefined;
     },
     async restore(pageId, versionId) {
-      await http.send("POST", `${item(pageId)}/versions/${encodeURIComponent(versionId)}/restore`);
+      await http.send(
+        "POST",
+        `${item(pageId)}/versions/${encodeURIComponent(versionId)}/restore`,
+      );
     },
   };
 }

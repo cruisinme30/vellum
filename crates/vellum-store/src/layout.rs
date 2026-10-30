@@ -81,7 +81,9 @@ impl Kind {
     pub fn of(path: &BlobPath) -> Self {
         let name = path.file_name();
         let first = path.segments().next().unwrap_or_default();
-        if first == SYSTEM_DIR || path.segments().any(|s| s == ".git" || s == BUILD_DIR) {
+        if first == SYSTEM_DIR
+            || path.segments().any(|s| s == ".git" || s == BUILD_DIR)
+        {
             return Self::System;
         }
         if is_scratch(name) {
@@ -95,11 +97,13 @@ impl Kind {
         match name {
             FOLDER_META => return Self::FolderMeta,
             "book.yaml" | "SUMMARY.md" if has_ext(parent_name, "book") => {
-                return parent.map_or(Self::Document, |book| Self::BookManifest { book });
+                return parent.map_or(Self::Document, |book| {
+                    Self::BookManifest { book }
+                });
             }
             "schema.yaml" if has_ext(parent_name, "collection") => {
-                return parent.map_or(Self::Asset, |collection| Self::CollectionSchema {
-                    collection,
+                return parent.map_or(Self::Asset, |collection| {
+                    Self::CollectionSchema { collection }
                 });
             }
             _ => {}
@@ -128,8 +132,9 @@ impl Kind {
 }
 
 fn has_ext(name: &str, ext: &str) -> bool {
-    name.rsplit_once('.')
-        .is_some_and(|(stem, e)| !stem.is_empty() && e.eq_ignore_ascii_case(ext))
+    name.rsplit_once('.').is_some_and(|(stem, e)| {
+        !stem.is_empty() && e.eq_ignore_ascii_case(ext)
+    })
 }
 
 /// True for anything in a page's `.attachments/` directory: an uploaded
@@ -145,7 +150,11 @@ fn in_book_data(path: &BlobPath) -> bool {
     let segments: Vec<&str> = path.segments().collect();
     segments.windows(2).any(|w| {
         matches!(w, [book, dir]
-            if [SNAPSHOTS_DIR, HISTORY_DIR, PUBLISHED_DIR].contains(dir) && has_ext(book, "book"))
+            if [
+                SNAPSHOTS_DIR,
+                HISTORY_DIR,
+                PUBLISHED_DIR
+            ].contains(dir) && has_ext(book, "book"))
     })
 }
 
@@ -161,7 +170,8 @@ fn is_scratch(name: &str) -> bool {
 
 fn issue_of(path: &BlobPath) -> Option<Kind> {
     let mut seg = path.segments();
-    let (teams, team, issues, file) = (seg.next()?, seg.next()?, seg.next()?, seg.next()?);
+    let (teams, team, issues, file) =
+        (seg.next()?, seg.next()?, seg.next()?, seg.next()?);
     if teams != "teams" || issues != "issues" || seg.next().is_some() {
         return None;
     }
@@ -228,10 +238,10 @@ pub mod at {
 
 /// Turns a title into a file name every backend accepts.
 ///
-/// The name stays readable: characters that Windows, macOS, S3 or Drive reject are
-/// replaced with `-`, leading dots and trailing dots or spaces are
-/// trimmed, Windows device names are suffixed, and the stem is cut on a
-/// character boundary so the name with `ext` fits [`MAX_NAME_BYTES`].
+/// The name stays readable: characters that Windows, macOS, S3 or Drive reject
+/// are replaced with `-`, leading dots and trailing dots or spaces are trimmed,
+/// Windows device names are suffixed, and the stem is cut on a character
+/// boundary so the name with `ext` fits [`MAX_NAME_BYTES`].
 #[must_use]
 pub fn file_name(title: &str, ext: &str) -> String {
     const RESERVED: [&str; 4] = ["CON", "PRN", "AUX", "NUL"];
@@ -252,7 +262,8 @@ pub fn file_name(title: &str, ext: &str) -> String {
         .to_owned();
     let upper = stem.to_ascii_uppercase();
     let device = RESERVED.contains(&upper.as_str())
-        || (upper.len() == 4 && (upper.starts_with("COM") || upper.starts_with("LPT")));
+        || (upper.len() == 4
+            && (upper.starts_with("COM") || upper.starts_with("LPT")));
     if stem.is_empty() || device {
         stem.push_str("-untitled");
         stem = stem.trim_start_matches('-').to_owned();

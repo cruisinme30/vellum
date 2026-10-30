@@ -2,8 +2,8 @@
 # SPDX-FileCopyrightText: 2026 The Vellum contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 #
-# The Vellum image: one static binary on distroless (D94; size budget in xtask/src/budgets.rs).
-# Build from the repository root:
+# The Vellum image: one static binary on distroless (D94; size budget in
+# xtask/src/budgets.rs). Build from the repository root:
 #
 #   docker build -f deploy/docker/Dockerfile -t vellum .
 #
@@ -94,7 +94,8 @@ COPY --from=build /out/vellum /vellum-linux-${TARGETARCH}
 
 FROM ${DIST} AS dist
 
-# Exports just the binary: docker build --target binary --output type=local,dest=out .
+# Exports just the binary: docker build --target binary --output
+# type=local,dest=out .
 FROM scratch AS binary
 ARG TARGETARCH
 COPY --from=dist /vellum-linux-${TARGETARCH} /vellum

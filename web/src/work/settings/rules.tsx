@@ -25,7 +25,10 @@ import {
 const EVERY: FilterJson = { and: [] };
 
 /** A triage rule with its actions; the file format names them `then`. */
-function withActions(rule: Omit<TriageRule, "then">, actions: TriageRule["then"]): TriageRule {
+function withActions(
+  rule: Omit<TriageRule, "then">,
+  actions: TriageRule["then"],
+): TriageRule {
   // eslint-disable-next-line unicorn/no-thenable -- the field's name in team.yaml
   return { ...rule, then: actions };
 }
@@ -52,7 +55,8 @@ function Condition({
   const t = useT();
   const text = JSON.stringify(when);
   const group = parse(text);
-  if (group === undefined) return <p className="vl-muted">{t("work-filter-unsupported")}</p>;
+  if (group === undefined)
+    return <p className="vl-muted">{t("work-filter-unsupported")}</p>;
   return (
     <FilterBuilder
       key={text}
@@ -124,7 +128,13 @@ function RuleFrame({
 }
 
 /** Triage on or off, and the triage rules. */
-export function TriageSection({ file, edit }: { readonly file: TeamFile; readonly edit: Edit }) {
+export function TriageSection({
+  file,
+  edit,
+}: {
+  readonly file: TeamFile;
+  readonly edit: Edit;
+}) {
   const t = useT();
   const rules = file.triage_rules ?? [];
   const statuses = file.workflow.statuses.map((status) => status.key);
@@ -141,7 +151,9 @@ export function TriageSection({ file, edit }: { readonly file: TeamFile; readonl
   const setRule = (at: number, rule: TriageRule) => {
     setRules((list) => list.map((each, index) => (index === at ? rule : each)));
   };
-  const hasTriageStatus = file.workflow.statuses.some((status) => status.category === "triage");
+  const hasTriageStatus = file.workflow.statuses.some(
+    (status) => status.category === "triage",
+  );
   return (
     <section className="vl-settings-section" aria-labelledby="settings-triage">
       <h2 id="settings-triage">{t("team-settings-triage")}</h2>
@@ -152,12 +164,15 @@ export function TriageSection({ file, edit }: { readonly file: TeamFile; readonl
           edit((f) => ({ ...f, triage }));
         }}
       />
-      {!hasTriageStatus && <p className="vl-muted">{t("team-settings-triage-needs-status")}</p>}
+      {!hasTriageStatus && (
+        <p className="vl-muted">{t("team-settings-triage-needs-status")}</p>
+      )}
       <p className="vl-muted">{t("team-settings-rules-hint")}</p>
       <ol className="vl-settings-rules">
         {rules.map((rule, index) => (
           <RuleFrame
-            // Rules have no IDs; the order is the identity, and a move remounts.
+            // Rules have no IDs; the order is the identity, and a move
+            // remounts.
             key={`${String(version)}:${String(index)}`}
             name={rule.name}
             index={index}
@@ -169,7 +184,10 @@ export function TriageSection({ file, edit }: { readonly file: TeamFile; readonl
               setRules((list) => moved(list, index, step), true);
             }}
             onRemove={() => {
-              setRules((list) => list.filter((_, index_) => index_ !== index), true);
+              setRules(
+                (list) => list.filter((_, index_) => index_ !== index),
+                true,
+              );
             }}
           >
             <Condition
@@ -196,7 +214,9 @@ export function TriageSection({ file, edit }: { readonly file: TeamFile; readonl
                     index,
                     withActions(
                       rule,
-                      value === "" ? actions : { ...actions, priority: Number(value) },
+                      value === ""
+                        ? actions
+                        : { ...actions, priority: Number(value) },
                     ),
                   );
                 }}
@@ -209,7 +229,12 @@ export function TriageSection({ file, edit }: { readonly file: TeamFile; readonl
                   const handle = value.trim().replace(/^@/, "");
                   setRule(
                     index,
-                    withActions(rule, handle === "" ? actions : { ...actions, assignee: handle }),
+                    withActions(
+                      rule,
+                      handle === ""
+                        ? actions
+                        : { ...actions, assignee: handle },
+                    ),
                   );
                 }}
               />
@@ -224,7 +249,10 @@ export function TriageSection({ file, edit }: { readonly file: TeamFile; readonl
           setRules((list) => [
             ...list,
             withActions(
-              { name: t("team-settings-rule-new", { n: list.length + 1 }), when: EVERY },
+              {
+                name: t("team-settings-rule-new", { n: list.length + 1 }),
+                when: EVERY,
+              },
               {},
             ),
           ]);
@@ -237,14 +265,26 @@ export function TriageSection({ file, edit }: { readonly file: TeamFile; readonl
 }
 
 /** SLA rules: the first matching rule sets the clock. */
-export function SlaSection({ file, edit }: { readonly file: TeamFile; readonly edit: Edit }) {
+export function SlaSection({
+  file,
+  edit,
+}: {
+  readonly file: TeamFile;
+  readonly edit: Edit;
+}) {
   const t = useT();
   const rules = file.sla?.rules ?? [];
   const statuses = file.workflow.statuses.map((status) => status.key);
   const [version, setVersion] = useState(0);
-  const setRules = (change: (rules: readonly SlaRule[]) => readonly SlaRule[], reorder = false) => {
+  const setRules = (
+    change: (rules: readonly SlaRule[]) => readonly SlaRule[],
+    reorder = false,
+  ) => {
     if (reorder) setVersion((v) => v + 1);
-    edit((f) => ({ ...f, sla: { ...f.sla, rules: change(f.sla?.rules ?? []) } }));
+    edit((f) => ({
+      ...f,
+      sla: { ...f.sla, rules: change(f.sla?.rules ?? []) },
+    }));
   };
   const setRule = (at: number, rule: SlaRule) => {
     setRules((list) => list.map((each, index) => (index === at ? rule : each)));
@@ -267,7 +307,10 @@ export function SlaSection({ file, edit }: { readonly file: TeamFile; readonly e
               setRules((list) => moved(list, index, step), true);
             }}
             onRemove={() => {
-              setRules((list) => list.filter((_, index_) => index_ !== index), true);
+              setRules(
+                (list) => list.filter((_, index_) => index_ !== index),
+                true,
+              );
             }}
           >
             <Condition

@@ -24,8 +24,8 @@ use crate::seal::Sealer;
 use crate::secret::{self, Kind, SecretHash};
 use crate::sso::{Sso, SsoIdentity};
 use crate::store::{
-    ApiToken, SecondFactorPolicy, SecondFactors, Session, SessionMethod, SsoLink, State, Store,
-    User, hash_key,
+    ApiToken, SecondFactorPolicy, SecondFactors, Session, SessionMethod,
+    SsoLink, State, Store, User, hash_key,
 };
 
 /// How often `last_seen_at` and `last_used_at` are written back, so a busy
@@ -144,7 +144,9 @@ pub struct TokenInfo {
 }
 
 /// A user as the API shows it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "camelCase")]
 #[expect(
     clippy::struct_excessive_bools,
@@ -246,15 +248,17 @@ fn count(n: usize) -> u64 {
 }
 
 fn elapsed(since: Timestamp, now: Timestamp) -> Duration {
-    Duration::from_millis(u64::try_from(now.unix_ms() - since.unix_ms()).unwrap_or(0))
+    Duration::from_millis(
+        u64::try_from(now.unix_ms() - since.unix_ms()).unwrap_or(0),
+    )
 }
 
 pub(crate) fn normalise_email(email: &str) -> Result<String, Error> {
     let email = email.trim().to_lowercase();
     let valid = email.len() <= 254
-        && email
-            .split_once('@')
-            .is_some_and(|(local, domain)| !local.is_empty() && domain.contains('.'))
+        && email.split_once('@').is_some_and(|(local, domain)| {
+            !local.is_empty() && domain.contains('.')
+        })
         && !email.chars().any(char::is_whitespace);
     if valid {
         Ok(email)
@@ -386,7 +390,10 @@ impl Identity {
         user_agent: Option<&str>,
     ) -> Result<NewSession, Error> {
         let sso = self.sso.as_ref().ok_or_else(|| {
-            Error::new(ErrorKind::Unavailable, "single sign-on is not configured")
+            Error::new(
+                ErrorKind::Unavailable,
+                "single sign-on is not configured",
+            )
         })?;
         self.sso_sign_in_with(sso, found, user_agent)
     }
@@ -411,9 +418,9 @@ impl Identity {
         )
     }
 
-    /// Signs in someone a provider vouched for; `may_link` says whether
-    /// an existing account with the address may be joined, and `may_create` says whether
-    /// an address with no account gets one.
+    /// Signs in someone a provider vouched for; `may_link` says whether an
+    /// existing account with the address may be joined, and `may_create` says
+    /// whether an address with no account gets one.
     pub(crate) fn federated_sign_in(
         &self,
         found: &SsoIdentity,
@@ -424,7 +431,8 @@ impl Identity {
         if self.needs_setup() {
             return Err(Error::new(
                 ErrorKind::Conflict,
-                "finish set-up first: the first administrator signs in with a password",
+                "finish set-up first: the first administrator signs in with a \
+                    password",
             ));
         }
         let link = SsoLink {
@@ -452,13 +460,15 @@ impl Identity {
             .unwrap_or_else(|| "Member".to_owned());
         let may_create = email.as_deref().is_some_and(may_create);
         let (user, created) = self.store.write(|s| {
-            if let Some(user) = s.users.values().find(|u| u.sso.contains(&link)) {
+            if let Some(user) = s.users.values().find(|u| u.sso.contains(&link))
+            {
                 return Ok((user.clone(), false));
             }
             let Some(email) = email else {
                 return Err(Error::new(
                     ErrorKind::PermissionDenied,
-                    "the sign-in provider did not share a verified email address",
+                    "the sign-in provider did not share a verified email \
+                        address",
                 ));
             };
             if email == BREAK_GLASS_EMAIL {
@@ -467,7 +477,8 @@ impl Identity {
                     "this account cannot use single sign-on",
                 ));
             }
-            if let Some(user) = s.users.values_mut().find(|u| u.email == email) {
+            if let Some(user) = s.users.values_mut().find(|u| u.email == email)
+            {
                 // A provider limited to some domains must not take over
                 // accounts outside them (RT-043).
                 if !may_link(&email) {
@@ -482,7 +493,8 @@ impl Identity {
             if !may_create {
                 return Err(Error::new(
                     ErrorKind::PermissionDenied,
-                    "there is no account for this address; ask an administrator to add you",
+                    "there is no account for this address; ask an \
+                        administrator to add you",
                 ));
             }
             let user = User {
@@ -526,7 +538,10 @@ impl Identity {
     /// Sets how Client ID Metadata Documents are fetched (through the SSRF
     /// guard in production).
     #[must_use]
-    pub fn with_metadata_fetcher(mut self, fetcher: Arc<dyn ClientMetadataFetcher>) -> Self {
+    pub fn with_metadata_fetcher(
+        mut self,
+        fetcher: Arc<dyn ClientMetadataFetcher>,
+    ) -> Self {
         self.fetcher = fetcher;
         self
     }
@@ -556,7 +571,12 @@ impl Identity {
     ///
     /// [`ErrorKind::Conflict`] after set-up, and the errors of
     /// [`Identity::create_user`].
-    pub fn setup(&self, email: &str, name: &str, password: &str) -> Result<UserView, Error> {
+    pub fn setup(
+        &self,
+        email: &str,
+        name: &str,
+        password: &str,
+    ) -> Result<UserView, Error> {
         if !self.needs_setup() {
             return Err(Error::new(
                 ErrorKind::Conflict,
@@ -643,22 +663,24 @@ impl Identity {
                 .sessions
                 .values()
                 .map(|x| (x.user, x.last_seen_at.unix_ms()))
-                .chain(
-                    s.api_tokens
-                        .values()
-                        .filter_map(|t| t.last_used_at.map(|at| (t.user, at.unix_ms()))),
-                );
+                .chain(s.api_tokens.values().filter_map(|t| {
+                    t.last_used_at.map(|at| (t.user, at.unix_ms()))
+                }));
             for (user, at) in seen {
                 let entry = last.entry(user).or_insert(at);
                 *entry = (*entry).max(at);
             }
             let mut counts = PeopleCounts {
-                sessions: count(s.sessions.values().filter(|x| x.expires_at > now).count()),
+                sessions: count(
+                    s.sessions.values().filter(|x| x.expires_at > now).count(),
+                ),
                 api_tokens: count(s.api_tokens.len()),
                 ..PeopleCounts::default()
             };
             let day = 86_400_000_i64;
-            for user in s.users.values().filter(|u| u.email != BREAK_GLASS_EMAIL) {
+            for user in
+                s.users.values().filter(|u| u.email != BREAK_GLASS_EMAIL)
+            {
                 counts.users += 1;
                 counts.enabled += u64::from(!user.disabled);
                 counts.admins += u64::from(user.admin && !user.disabled);
@@ -698,7 +720,9 @@ impl Identity {
                 })
                 .collect()
         });
-        found.sort_by(|(a, x), (b, y)| a.cmp(b).then_with(|| x.name.cmp(&y.name)));
+        found.sort_by(|(a, x), (b, y)| {
+            a.cmp(b).then_with(|| x.name.cmp(&y.name))
+        });
         found.into_iter().take(limit).map(|(_, u)| u).collect()
     }
 
@@ -730,10 +754,12 @@ impl Identity {
     ) -> Result<UserView, Error> {
         let name = name.map(check_name).transpose()?;
         self.store.write(|s| {
-            let others_admin = s
-                .users
-                .values()
-                .any(|u| u.id != id && u.admin && !u.disabled && u.email != BREAK_GLASS_EMAIL);
+            let others_admin = s.users.values().any(|u| {
+                u.id != id
+                    && u.admin
+                    && !u.disabled
+                    && u.email != BREAK_GLASS_EMAIL
+            });
             let Some(user) = s.users.get_mut(&id) else {
                 return Err(Error::new(ErrorKind::NotFound, "user not found"));
             };
@@ -770,12 +796,15 @@ impl Identity {
     ///
     /// [`ErrorKind::NotFound`] for an unknown user, and
     /// [`ErrorKind::InvalidInput`] for someone who is not an admin.
-    pub fn set_break_glass(&self, id: UserId, on: bool) -> Result<UserView, Error> {
+    pub fn set_break_glass(
+        &self,
+        id: UserId,
+        on: bool,
+    ) -> Result<UserView, Error> {
         self.store.write(|s| {
-            let user = s
-                .users
-                .get_mut(&id)
-                .ok_or_else(|| Error::new(ErrorKind::NotFound, "user not found"))?;
+            let user = s.users.get_mut(&id).ok_or_else(|| {
+                Error::new(ErrorKind::NotFound, "user not found")
+            })?;
             if on && !user.admin {
                 return Err(Error::new(
                     ErrorKind::InvalidInput,
@@ -806,7 +835,8 @@ impl Identity {
             SignIn::Session(session) => Ok(session),
             SignIn::Verify(_) | SignIn::Enrol(_) => Err(Error::new(
                 ErrorKind::PermissionDenied,
-                "this account needs two-step verification; sign in from the web app",
+                "this account needs two-step verification; sign in from the \
+                    web app",
             )),
         }
     }
@@ -886,10 +916,13 @@ impl Identity {
                 "this account is disabled; ask an administrator",
             ));
         }
-        if self.store.read(|s| s.sign_in.require_sso) && !(user.admin && user.break_glass) {
+        if self.store.read(|s| s.sign_in.require_sso)
+            && !(user.admin && user.break_glass)
+        {
             return Err(Error::new(
                 ErrorKind::PermissionDenied,
-                "this workspace signs in with single sign-on; use the sign-in button",
+                "this workspace signs in with single sign-on; use the sign-in \
+                    button",
             ));
         }
         if user
@@ -905,7 +938,11 @@ impl Identity {
                 }
             })?;
         }
-        tracing::info!(event = "identity.password_checked", user = %user.id, "password accepted");
+        tracing::info!(
+            event = "identity.password_checked",
+            user = %user.id,
+            "password accepted"
+        );
         Ok(user)
     }
 
@@ -958,7 +995,8 @@ impl Identity {
             let user = s.users.get(&session.user)?.clone();
             Some((session, user))
         })?;
-        let idle = elapsed(session.last_seen_at, now) > self.config.session_idle;
+        let idle =
+            elapsed(session.last_seen_at, now) > self.config.session_idle;
         if session.expires_at <= now || idle || user.disabled {
             let _ = self.store.write(|s| s.sessions.remove(&session.id));
             return None;
@@ -976,7 +1014,12 @@ impl Identity {
             CredentialKind::Session
         };
         Some(Resolved {
-            principal: Principal::user(user.id, kind, user_scopes(&user), session.authenticated_at),
+            principal: Principal::user(
+                user.id,
+                kind,
+                user_scopes(&user),
+                session.authenticated_at,
+            ),
             csrf_binding: Some(session.hash),
         })
     }
@@ -1070,8 +1113,9 @@ impl Identity {
             if let Some(u) = s.users.get_mut(&user) {
                 u.password_hash = Some(new_hash);
             }
-            s.sessions
-                .retain(|id, session| session.user != user || keep.as_ref() == Some(id));
+            s.sessions.retain(|id, session| {
+                session.user != user || keep.as_ref() == Some(id)
+            });
             s.grants.retain(|_, g| g.user != user);
             let grants = &s.grants;
             s.access_tokens.retain(|_, t| grants.contains_key(&t.grant));
@@ -1094,8 +1138,14 @@ impl Identity {
             s.mfa_challenges.retain(|_, c| c.user != user);
             Some(before - s.sessions.len())
         })?;
-        let ended = ended.ok_or_else(|| Error::new(ErrorKind::NotFound, "user not found"))?;
-        tracing::info!(event = "identity.signed_out_everywhere", user = %user, sessions = ended, "every session ended");
+        let ended = ended
+            .ok_or_else(|| Error::new(ErrorKind::NotFound, "user not found"))?;
+        tracing::info!(
+            event = "identity.signed_out_everywhere",
+            user = %user,
+            sessions = ended,
+            "every session ended"
+        );
         Ok(ended)
     }
 
@@ -1184,7 +1234,9 @@ impl Identity {
         if expires_in_days.is_some_and(|d| d == 0 || d > MAX_TOKEN_DAYS) {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
-                format!("a token lasts 1 to {MAX_TOKEN_DAYS} days, or never expires"),
+                format!(
+                    "a token lasts 1 to {MAX_TOKEN_DAYS} days, or never expires"
+                ),
             ));
         }
         if let Some(max) = self.store.read(|s| s.sign_in.max_token_days) {
@@ -1214,15 +1266,21 @@ impl Identity {
             name,
             scopes: scopes.to_vec(),
             created_at: now,
-            expires_at: expires_in_days
-                .map(|d| after(now, Duration::from_secs(u64::from(d) * 24 * 3600))),
+            expires_at: expires_in_days.map(|d| {
+                after(now, Duration::from_secs(u64::from(d) * 24 * 3600))
+            }),
             last_used_at: None,
         };
         let stored = token.clone();
         self.store.write(|s| {
             let _ = s.api_tokens.insert(stored.id.clone(), stored);
         })?;
-        tracing::info!(event = "identity.api_token_created", user = %user, token = %token.id, "API token created");
+        tracing::info!(
+            event = "identity.api_token_created",
+            user = %user,
+            token = %token.id,
+            "API token created"
+        );
         Ok((secret, token))
     }
 
@@ -1245,7 +1303,11 @@ impl Identity {
     /// # Errors
     ///
     /// [`ErrorKind::NotFound`] when the user has no such token.
-    pub fn revoke_api_token(&self, user: UserId, id: &str) -> Result<(), Error> {
+    pub fn revoke_api_token(
+        &self,
+        user: UserId,
+        id: &str,
+    ) -> Result<(), Error> {
         self.store.write(|s| match s.api_tokens.get(id) {
             Some(token) if token.user == user => {
                 let _ = s.api_tokens.remove(id);
@@ -1258,12 +1320,15 @@ impl Identity {
     /// Every personal API token, newest first, for administrators (D291).
     #[must_use]
     pub fn all_api_tokens(&self) -> Vec<(ApiToken, Option<UserView>)> {
-        let mut tokens: Vec<(ApiToken, Option<UserView>)> = self.store.read(|s| {
-            s.api_tokens
-                .values()
-                .map(|t| (t.clone(), s.users.get(&t.user).map(UserView::from)))
-                .collect()
-        });
+        let mut tokens: Vec<(ApiToken, Option<UserView>)> =
+            self.store.read(|s| {
+                s.api_tokens
+                    .values()
+                    .map(|t| {
+                        (t.clone(), s.users.get(&t.user).map(UserView::from))
+                    })
+                    .collect()
+            });
         tokens.sort_by_key(|(t, _)| std::cmp::Reverse(t.created_at));
         tokens
     }
@@ -1275,8 +1340,15 @@ impl Identity {
     /// [`ErrorKind::NotFound`] for an unknown token.
     pub fn admin_revoke_api_token(&self, id: &str) -> Result<ApiToken, Error> {
         let removed = self.store.write(|s| s.api_tokens.remove(id))?;
-        let token = removed.ok_or_else(|| Error::new(ErrorKind::NotFound, "token not found"))?;
-        tracing::info!(event = "identity.api_token_revoked", token = %token.id, user = %token.user, "API token revoked by an administrator");
+        let token = removed.ok_or_else(|| {
+            Error::new(ErrorKind::NotFound, "token not found")
+        })?;
+        tracing::info!(
+            event = "identity.api_token_revoked",
+            token = %token.id,
+            user = %token.user,
+            "API token revoked by an administrator"
+        );
         Ok(token)
     }
 
@@ -1287,7 +1359,9 @@ impl Identity {
     /// [`ErrorKind::NotFound`] for an unknown user.
     pub fn token_scopes(&self, user: UserId) -> Result<Vec<Scope>, Error> {
         self.store
-            .read(|s| s.users.get(&user).map(|u| user_scopes(u).iter().collect()))
+            .read(|s| {
+                s.users.get(&user).map(|u| user_scopes(u).iter().collect())
+            })
             .ok_or_else(|| Error::new(ErrorKind::NotFound, "user not found"))
     }
 
@@ -1303,7 +1377,10 @@ impl Identity {
     /// # Errors
     ///
     /// [`ErrorKind::InvalidInput`] for a cap outside 1 to 3650 days.
-    pub fn set_max_token_days(&self, days: Option<u32>) -> Result<Option<u32>, Error> {
+    pub fn set_max_token_days(
+        &self,
+        days: Option<u32>,
+    ) -> Result<Option<u32>, Error> {
         if days.is_some_and(|d| d == 0 || d > MAX_TOKEN_DAYS) {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
@@ -1324,21 +1401,34 @@ impl Identity {
     /// [`ErrorKind::Unauthenticated`] for an unknown, expired or revoked
     /// token, or one whose user is disabled.
     pub fn verify_token(&self, token: &str) -> Result<TokenInfo, Error> {
-        let invalid = || Error::new(ErrorKind::Unauthenticated, "the access token is invalid");
+        let invalid = || {
+            Error::new(
+                ErrorKind::Unauthenticated,
+                "the access token is invalid",
+            )
+        };
         let now = Timestamp::now();
         let hash = secret::hash(token);
         match Kind::of(token) {
-            Some(Kind::ApiToken) if secret::well_formed(token, Kind::ApiToken) => {
+            Some(Kind::ApiToken)
+                if secret::well_formed(token, Kind::ApiToken) =>
+            {
                 let id = secret::label(&hash);
                 let (record, user) = self
                     .store
                     .read(|s| {
-                        let t = s.api_tokens.get(&id).filter(|t| t.hash == hash)?.clone();
+                        let t = s
+                            .api_tokens
+                            .get(&id)
+                            .filter(|t| t.hash == hash)?
+                            .clone();
                         let u = s.users.get(&t.user)?.clone();
                         Some((t, u))
                     })
                     .ok_or_else(invalid)?;
-                if user.disabled || record.expires_at.is_some_and(|at| at <= now) {
+                if user.disabled
+                    || record.expires_at.is_some_and(|at| at <= now)
+                {
                     return Err(invalid());
                 }
                 if record
@@ -1357,30 +1447,39 @@ impl Identity {
                     user_name: user.name.clone(),
                     client_id: "api-token".to_owned(),
                     client_name: record.name,
-                    scopes: ScopeSet::from_scopes(record.scopes).intersect(user_scopes(&user)),
+                    scopes: ScopeSet::from_scopes(record.scopes)
+                        .intersect(user_scopes(&user)),
                     audience: Vec::new(),
                     expires_at: record.expires_at,
                     issued_at: record.created_at,
                 })
             }
-            Some(Kind::AccessToken) if secret::well_formed(token, Kind::AccessToken) => {
+            Some(Kind::AccessToken)
+                if secret::well_formed(token, Kind::AccessToken) =>
+            {
                 let key = hash_key(&hash);
                 self.store
                     .read(|s| {
                         let access = s.access_tokens.get(&key)?;
                         let grant = s.grants.get(&access.grant)?;
                         let user = s.users.get(&grant.user)?;
-                        (access.expires_at > now && !user.disabled).then(|| TokenInfo {
-                            token_id: grant.id.clone(),
-                            user: user.id,
-                            user_name: user.name.clone(),
-                            client_id: grant.client_id.clone(),
-                            client_name: grant.client_name.clone(),
-                            scopes: ScopeSet::from_scopes(access.scopes.iter().copied())
+                        (access.expires_at > now && !user.disabled).then(|| {
+                            TokenInfo {
+                                token_id: grant.id.clone(),
+                                user: user.id,
+                                user_name: user.name.clone(),
+                                client_id: grant.client_id.clone(),
+                                client_name: grant.client_name.clone(),
+                                scopes: ScopeSet::from_scopes(
+                                    access.scopes.iter().copied(),
+                                )
                                 .intersect(user_scopes(user)),
-                            audience: access.audience.clone(),
-                            expires_at: Some(access.expires_at),
-                            issued_at: grant.auth_time.unwrap_or(grant.created_at),
+                                audience: access.audience.clone(),
+                                expires_at: Some(access.expires_at),
+                                issued_at: grant
+                                    .auth_time
+                                    .unwrap_or(grant.created_at),
+                            }
                         })
                     })
                     .ok_or_else(invalid)
@@ -1420,7 +1519,10 @@ impl Identity {
     /// # Errors
     ///
     /// [`ErrorKind::Internal`] if the file cannot be written.
-    pub fn issue_break_glass(data_dir: &Path, lifetime: Duration) -> Result<String, Error> {
+    pub fn issue_break_glass(
+        data_dir: &Path,
+        lifetime: Duration,
+    ) -> Result<String, Error> {
         let code = secret::generate(Kind::BreakGlass)?;
         let record = BreakGlassFile {
             hash: hash_key(&secret::hash(&code)),
@@ -1479,8 +1581,12 @@ impl Identity {
             );
             return Err(refused());
         }
-        std::fs::remove_file(&path)
-            .map_err(|e| Error::new(ErrorKind::Internal, format!("cannot spend the code: {e}")))?;
+        std::fs::remove_file(&path).map_err(|e| {
+            Error::new(
+                ErrorKind::Internal,
+                format!("cannot spend the code: {e}"),
+            )
+        })?;
         let user = self.break_glass_user()?;
         tracing::warn!(
             event = "identity.break_glass_used",

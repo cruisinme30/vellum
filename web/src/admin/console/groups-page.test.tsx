@@ -52,10 +52,13 @@ function fakeApi() {
   const changeGroupMembers = vi.fn<AdminConsoleApi["changeGroupMembers"]>(() =>
     Promise.resolve({ group: SRE, members: [PRIYA, MARCO] }),
   );
-  const createGroup = vi.fn<AdminConsoleApi["createGroup"]>((name, description) =>
-    Promise.resolve({ ...SRE, id: "new", name, description }),
+  const createGroup = vi.fn<AdminConsoleApi["createGroup"]>(
+    (name, description) =>
+      Promise.resolve({ ...SRE, id: "new", name, description }),
   );
-  const deleteGroup = vi.fn<AdminConsoleApi["deleteGroup"]>(() => Promise.resolve());
+  const deleteGroup = vi.fn<AdminConsoleApi["deleteGroup"]>(() =>
+    Promise.resolve(),
+  );
   const api: AdminConsoleApi = {
     audit: unused,
     verifyAudit: unused,
@@ -105,11 +108,18 @@ describe("groups API", () => {
       forgetSession: vi.fn(),
     } as unknown as Http);
     await api.changeGroupMembers(SRE.id, { remove: [MARCO.id] });
-    expect(send).toHaveBeenLastCalledWith("POST", `/api/v1/admin/groups/${SRE.id}/members`, {
-      remove: [MARCO.id],
-    });
+    expect(send).toHaveBeenLastCalledWith(
+      "POST",
+      `/api/v1/admin/groups/${SRE.id}/members`,
+      {
+        remove: [MARCO.id],
+      },
+    );
     await api.deleteGroup(SRE.id);
-    expect(send).toHaveBeenLastCalledWith("DELETE", `/api/v1/admin/groups/${SRE.id}`);
+    expect(send).toHaveBeenLastCalledWith(
+      "DELETE",
+      `/api/v1/admin/groups/${SRE.id}`,
+    );
   });
 });
 
@@ -118,22 +128,32 @@ describe("groups page", () => {
     const { api, changeGroupMembers, deleteGroup } = fakeApi();
     const user = renderPage(api);
     await user.click(await screen.findByRole("button", { name: "Manage SRE" }));
-    const panel = screen.getByRole("region", { name: /Name and members of SRE/ });
+    const panel = screen.getByRole("region", {
+      name: /Name and members of SRE/,
+    });
     expect(await within(panel).findByText("Priya Shah")).toBeDefined();
 
     await user.selectOptions(
       within(panel).getByRole("combobox", { name: "Add to group" }),
       MARCO.id,
     );
-    await user.click(within(panel).getByRole("button", { name: "Add to group" }));
+    await user.click(
+      within(panel).getByRole("button", { name: "Add to group" }),
+    );
     await waitFor(() => {
-      expect(changeGroupMembers).toHaveBeenCalledWith(SRE.id, { add: [MARCO.id] });
+      expect(changeGroupMembers).toHaveBeenCalledWith(SRE.id, {
+        add: [MARCO.id],
+      });
     });
     expect(await within(panel).findByText("Marco Ruiz")).toBeDefined();
 
-    await user.click(within(panel).getByRole("button", { name: "Delete group" }));
+    await user.click(
+      within(panel).getByRole("button", { name: "Delete group" }),
+    );
     expect(deleteGroup).not.toHaveBeenCalled();
-    await user.click(within(panel).getByRole("button", { name: "Delete group" }));
+    await user.click(
+      within(panel).getByRole("button", { name: "Delete group" }),
+    );
     await waitFor(() => {
       expect(deleteGroup).toHaveBeenCalledWith(SRE.id);
     });
@@ -143,8 +163,13 @@ describe("groups page", () => {
     const { api, createGroup } = fakeApi();
     const user = renderPage(api);
     const form = await screen.findByRole("form", { name: "Create a group" });
-    await user.type(within(form).getByRole("textbox", { name: "Name" }), "Design");
-    await user.click(within(form).getByRole("button", { name: "Create a group" }));
+    await user.type(
+      within(form).getByRole("textbox", { name: "Name" }),
+      "Design",
+    );
+    await user.click(
+      within(form).getByRole("button", { name: "Create a group" }),
+    );
     await waitFor(() => {
       expect(createGroup).toHaveBeenCalledWith("Design", "");
     });

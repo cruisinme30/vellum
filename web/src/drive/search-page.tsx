@@ -12,7 +12,13 @@ import { DriveFrame } from "./drive-page";
 import { ItemTable } from "./item-table";
 import { loadSpaces, useReloadable, withStars } from "./loading";
 
-const KINDS: readonly NodeKindView[] = ["page", "folder", "book", "collection", "shortcut"];
+const KINDS: readonly NodeKindView[] = [
+  "page",
+  "folder",
+  "book",
+  "collection",
+  "shortcut",
+];
 
 const isKind = (value: string): value is NodeKindView =>
   (KINDS as readonly string[]).includes(value);
@@ -29,11 +35,15 @@ export function filtersOf(parameters: URLSearchParams): Filters {
   };
 }
 
-/** The URL for some filters, so a search can be shared and the back button works. */
+/**
+ * The URL for some filters, so a search can be shared and the back button
+ * works.
+ */
 export function parametersOf(filters: Filters): URLSearchParams {
   const parameters = new URLSearchParams();
   const set = (key: string, value: string | undefined) => {
-    if (value !== undefined && value.trim() !== "") parameters.set(key, value.trim());
+    if (value !== undefined && value.trim() !== "")
+      parameters.set(key, value.trim());
   };
   set("q", filters.title);
   for (const kind of filters.kinds ?? []) parameters.append("kind", kind);
@@ -73,7 +83,9 @@ function TextFilter({
   );
 }
 
-/** The filter form (R-DR-9): title, kind, modified range, location and starred. */
+/**
+ * The filter form (R-DR-9): title, kind, modified range, location and starred.
+ */
 function FilterForm({
   spaces,
   initial,

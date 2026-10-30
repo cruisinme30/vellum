@@ -19,7 +19,9 @@ use std::time::{Duration, Instant};
 use serde_json::{Value, json};
 use time::OffsetDateTime;
 use time::macros::datetime;
-use vellum_contracts::{CredentialKind, Operation, Principal, RequestContext, ScopeSet, Service};
+use vellum_contracts::{
+    CredentialKind, Operation, Principal, RequestContext, ScopeSet, Service,
+};
 use vellum_kernel::{ErrorKind, RequestId, Timestamp, UserId};
 use vellum_store::LocalStore;
 use vellum_work::UserRef;
@@ -62,7 +64,12 @@ async fn open(
 }
 
 impl World {
-    async fn try_call(&self, who: &str, op: &str, input: Value) -> Result<Value, ErrorKind> {
+    async fn try_call(
+        &self,
+        who: &str,
+        op: &str,
+        input: Value,
+    ) -> Result<Value, ErrorKind> {
         let id = self.users.iter().find(|(n, _)| *n == who).unwrap().1;
         let principal = Principal::user(
             id,
@@ -107,7 +114,12 @@ async fn world() -> World {
         .call(
             "mara",
             "work.create_team",
-            json!({"key": "ENG", "name": "Engineering", "lead": "mara", "members": ["dev"]}),
+            json!({
+                "key": "ENG",
+                "name": "Engineering",
+                "lead": "mara",
+                "members": ["dev"]
+            }),
         )
         .await;
     w
@@ -117,7 +129,17 @@ async fn world() -> World {
 async fn projects_milestones_and_updates_survive_a_restart() {
     let w = world().await;
     let p = w
-        .call("mara", "work.create_project", json!({"title": "Gateway replay", "teams": ["ENG"], "lead": "@mara", "status": "in-progress", "target_date": "2026-12-01"}))
+        .call(
+            "mara",
+            "work.create_project",
+            json!({
+                "title": "Gateway replay",
+                "teams": ["ENG"],
+                "lead": "@mara",
+                "status": "in-progress",
+                "target_date": "2026-12-01"
+            }),
+        )
         .await;
     let id = p["id"].as_str().unwrap().to_owned();
     assert_eq!(p["status"], "in-progress");
@@ -131,13 +153,27 @@ async fn projects_milestones_and_updates_survive_a_restart() {
         .call(
             "mara",
             "work.add_milestone",
-            json!({"project_id": id, "name": "Beta", "target_date": "2026-11-15"}),
+            json!({
+                "project_id": id,
+                "name": "Beta",
+                "target_date": "2026-11-15"
+            }),
         )
         .await;
     let milestone = p["milestones"][0]["id"].as_str().unwrap().to_owned();
 
     let issue = w
-        .call("dev", "work.create_issue", json!({"team": "ENG", "title": "Record traffic", "project": id, "milestone": milestone, "estimate": "3"}))
+        .call(
+            "dev",
+            "work.create_issue",
+            json!({
+                "team": "ENG",
+                "title": "Record traffic",
+                "project": id,
+                "milestone": milestone,
+                "estimate": "3"
+            }),
+        )
         .await;
     let key = issue["issue"]["key"].as_str().unwrap().to_owned();
     let _ = w
@@ -152,7 +188,8 @@ async fn projects_milestones_and_updates_survive_a_restart() {
         .call(
             "mara",
             "work.post_update",
-            json!({"project_id": id, "health": "at-risk", "body": "Replay is slow."}),
+            json!({"project_id": id, "health": "at-risk", "body": "Replay is \
+                slow."}),
         )
         .await;
     assert_eq!(posted["author"], "mara");
@@ -197,7 +234,10 @@ async fn projects_milestones_and_updates_survive_a_restart() {
         w.try_call(
             "mara",
             "work.create_initiative",
-            json!({"title": "Ghost", "projects": ["01JBZ3M8K2Q4R5S6T7V8W9X0P1"]})
+            json!({
+                "title": "Ghost",
+                "projects": ["01JBZ3M8K2Q4R5S6T7V8W9X0P1"]
+            })
         )
         .await,
         Err(ErrorKind::NotFound)
@@ -211,7 +251,12 @@ async fn a_repeating_issue_comes_back_after_its_due_date() {
         .call(
             "dev",
             "work.create_issue",
-            json!({"team": "ENG", "title": "Rotate keys", "due": "2026-11-02", "repeat": "1w"}),
+            json!({
+                "team": "ENG",
+                "title": "Rotate keys",
+                "due": "2026-11-02",
+                "repeat": "1w"
+            }),
         )
         .await;
     assert_eq!(created["issue"]["repeat"], "1w");
@@ -228,7 +273,12 @@ async fn a_repeating_issue_comes_back_after_its_due_date() {
         w.try_call(
             "dev",
             "work.create_issue",
-            json!({"team": "ENG", "title": "Bad", "due": "2026-11-02", "repeat": "often"})
+            json!({
+                "team": "ENG",
+                "title": "Bad",
+                "due": "2026-11-02",
+                "repeat": "often"
+            })
         )
         .await,
         Err(ErrorKind::InvalidInput)

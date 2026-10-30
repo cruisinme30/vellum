@@ -28,10 +28,12 @@ use vellum_render::{RenderOptions, Renderer};
 /// CPU. The public origin has no sign-in rate limit, so without a bound a
 /// flood of guesses would run Argon2 (19 `MiB` each) without end, as
 /// sign-in did before red team round 4.
-static SLOTS: std::sync::LazyLock<tokio::sync::Semaphore> = std::sync::LazyLock::new(|| {
-    let cpus = std::thread::available_parallelism().map_or(2, std::num::NonZero::get);
-    tokio::sync::Semaphore::new(cpus.saturating_mul(2).clamp(2, 64))
-});
+static SLOTS: std::sync::LazyLock<tokio::sync::Semaphore> =
+    std::sync::LazyLock::new(|| {
+        let cpus = std::thread::available_parallelism()
+            .map_or(2, std::num::NonZero::get);
+        tokio::sync::Semaphore::new(cpus.saturating_mul(2).clamp(2, 64))
+    });
 
 /// How long a check waits for a slot before it is refused.
 const SLOT_WAIT: std::time::Duration = std::time::Duration::from_millis(500);
@@ -52,14 +54,17 @@ pub struct IdentityPasswords;
 #[async_trait]
 impl LinkPasswords for IdentityPasswords {
     async fn hash(&self, password: String) -> DriveResult<String> {
-        let _slot = slot()
-            .await
-            .ok_or_else(|| DriveError::Index("the server is busy; try again".into()))?;
+        let _slot = slot().await.ok_or_else(|| {
+            DriveError::Index("the server is busy; try again".into())
+        })?;
         tokio::task::spawn_blocking(move || {
-            vellum_identity::password::hash(&password).map_err(|e| DriveError::Index(e.to_string()))
+            vellum_identity::password::hash(&password)
+                .map_err(|e| DriveError::Index(e.to_string()))
         })
         .await
-        .map_err(|e| DriveError::Index(format!("password hashing stopped: {e}")))?
+        .map_err(|e| {
+            DriveError::Index(format!("password hashing stopped: {e}"))
+        })?
     }
 
     async fn verify(&self, password: String, stored: String) -> bool {
@@ -67,9 +72,11 @@ impl LinkPasswords for IdentityPasswords {
         let Some(_slot) = slot().await else {
             return false;
         };
-        tokio::task::spawn_blocking(move || vellum_identity::password::verify(&password, &stored))
-            .await
-            .unwrap_or(false)
+        tokio::task::spawn_blocking(move || {
+            vellum_identity::password::verify(&password, &stored)
+        })
+        .await
+        .unwrap_or(false)
     }
 }
 
@@ -102,14 +109,20 @@ impl SharedPages {
         Self { sharing, renderer }
     }
 
-    async fn open(&self, token: ShareToken, password: Option<String>) -> Result<PublicPage, Error> {
+    async fn open(
+        &self,
+        token: ShareToken,
+        password: Option<String>,
+    ) -> Result<PublicPage, Error> {
         let gone = || {
             Error::new(
                 ErrorKind::NotFound,
-                "This link does not work. It may have expired or been turned off.",
+                "This link does not work. It may have expired or been turned \
+                    off.",
             )
         };
-        let opened = match self.sharing.open(&token, password.as_deref()).await {
+        let opened = match self.sharing.open(&token, password.as_deref()).await
+        {
             Ok(opened) => opened,
             Err(DriveError::NotFound(_)) => return Err(gone()),
             Err(other) => return Err(other.into()),
@@ -126,7 +139,8 @@ impl SharedPages {
             .read(&Actor::System, node.id)
             .await
             .map_err(|_| gone())?;
-        let markdown = String::from_utf8(blob.bytes.to_vec()).map_err(|_| gone())?;
+        let markdown =
+            String::from_utf8(blob.bytes.to_vec()).map_err(|_| gone())?;
         let doc = vellum_format::parse(&markdown).document;
         let page = self.renderer.render_offline(
             &doc,
@@ -154,10 +168,11 @@ fn escape(text: &str) -> String {
 /// The shared page's document. `body` is the renderer's sanitised HTML.
 fn document(title: &str, body: &str) -> String {
     format!(
-        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">\
-         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\
-         <meta name=\"robots\" content=\"noindex\"><title>{}</title></head>\
-         <body><main>{body}</main><footer><p>Shared with Vellum</p></footer></body></html>",
+        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta \
+         name=\"viewport\" content=\"width=device-width, \
+         initial-scale=1\"><meta name=\"robots\" \
+         content=\"noindex\"><title>{}</title></head><body><main>{body}</main><\
+         footer><p>Shared with Vellum</p></footer></body></html>",
         escape(title)
     )
 }
@@ -171,8 +186,13 @@ impl PublicSite for SharedPages {
         Box::pin(self.open(token, password))
     }
 
-    fn published<'a>(&'a self, _path: &'a str) -> BoxFuture<'a, Result<PublicPage, Error>> {
-        Box::pin(async { Err(Error::new(ErrorKind::NotFound, "page not found")) })
+    fn published<'a>(
+        &'a self,
+        _path: &'a str,
+    ) -> BoxFuture<'a, Result<PublicPage, Error>> {
+        Box::pin(async {
+            Err(Error::new(ErrorKind::NotFound, "page not found"))
+        })
     }
 }
 
@@ -215,12 +235,20 @@ mod tests {
         }
     }
 
-    async fn call(ops: &[Operation], who: UserId, op: &str, input: Value) -> Result<Value, Error> {
+    async fn call(
+        ops: &[Operation],
+        who: UserId,
+        op: &str,
+        input: Value,
+    ) -> Result<Value, Error> {
         let op = ops.iter().find(|o| o.id() == op).expect("operation");
         op.call(ctx(who), input).await
     }
 
-    async fn get(app: &axum::Router, path: &str) -> (StatusCode, http::HeaderMap, String) {
+    async fn get(
+        app: &axum::Router,
+        path: &str,
+    ) -> (StatusCode, http::HeaderMap, String) {
         let request = Request::get(path)
             .header(header::HOST, "pages.localhost")
             .body(Body::empty())
@@ -257,17 +285,27 @@ mod tests {
             )
             .with_public_origin(Some("http://pages.localhost".into())),
         );
-        let ops =
-            Arc::new(DriveService::new(Arc::clone(&drive)).with_sharing(Arc::clone(&sharing)))
-                .operations();
+        let ops = Arc::new(
+            DriveService::new(Arc::clone(&drive))
+                .with_sharing(Arc::clone(&sharing)),
+        )
+        .operations();
         let mara = UserId::generate();
         let bob = UserId::generate();
         let me = Actor::User { user: mara };
         let space = drive
-            .create_space(&me, SpaceKind::SharedDrive, "eng", "Engineering", None)
+            .create_space(
+                &me,
+                SpaceKind::SharedDrive,
+                "eng",
+                "Engineering",
+                None,
+            )
             .await
             .unwrap();
-        let body = "# Launch plan\n\nShip in **May**. See [[Secret page]] and <script>alert(1)</script>.\n";
+        let body = "# Launch plan\n\n\
+            Ship in **May**. See [[Secret page]] and \
+            <script>alert(1)</script>.\n";
         let page = drive
             .create_page(&me, space.id, None, "Launch plan", body)
             .await
@@ -278,7 +316,11 @@ mod tests {
             &ops,
             mara,
             "drive.share",
-            json!({"id": page.id, "principal": format!("user:{bob}"), "role": "viewer"}),
+            json!({
+                "id": page.id,
+                "principal": format!("user:{bob}"),
+                "role": "viewer"
+            }),
         )
         .await
         .unwrap();
@@ -287,7 +329,8 @@ mod tests {
         assert!(
             grants
                 .iter()
-                .any(|g| g["principal"] == format!("user:{bob}") && g["role"] == "viewer")
+                .any(|g| g["principal"] == format!("user:{bob}")
+                    && g["role"] == "viewer")
         );
         assert_eq!(shared["links_allowed"], true);
         // Bob may read, but not see the sharing settings.
@@ -302,9 +345,10 @@ mod tests {
             .unwrap_err();
         assert_eq!(refused.kind(), ErrorKind::PermissionDenied);
 
-        let created = call(&ops, mara, "drive.create_link", json!({"id": page.id}))
-            .await
-            .unwrap();
+        let created =
+            call(&ops, mara, "drive.create_link", json!({"id": page.id}))
+                .await
+                .unwrap();
         let token = created["token"].as_str().unwrap().to_owned();
         assert_eq!(created["url"], format!("http://pages.localhost/s/{token}"));
         let locked = call(
@@ -351,9 +395,10 @@ mod tests {
 
         // Revoked: the same URL is a plain 404 that says nothing about why.
         let link_id = created["link"]["id"].as_str().unwrap().to_owned();
-        let _ = call(&ops, mara, "drive.revoke_link", json!({"link_id": link_id}))
-            .await
-            .unwrap();
+        let _ =
+            call(&ops, mara, "drive.revoke_link", json!({"link_id": link_id}))
+                .await
+                .unwrap();
         let (status, _, html) = get(&app, &format!("/s/{token}")).await;
         assert_eq!(status, StatusCode::NOT_FOUND);
         assert!(html.contains("This link does not work"), "{html}");

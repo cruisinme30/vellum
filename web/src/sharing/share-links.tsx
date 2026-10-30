@@ -13,7 +13,9 @@ type Submit = NonNullable<ComponentProps<"form">["onSubmit"]>;
 
 function linkState(link: LinkView): string {
   if (link.live) return "share-link-active";
-  const expired = link.expires_at != undefined && new Date(link.expires_at).getTime() <= Date.now();
+  const expired =
+    link.expires_at != undefined &&
+    new Date(link.expires_at).getTime() <= Date.now();
   return expired ? "share-link-expired" : "share-link-revoked";
 }
 
@@ -60,7 +62,10 @@ export function Links({
 }: {
   readonly state: SharingView;
   readonly created: CreatedLink | undefined;
-  readonly onCreate: (link: { expiresAt?: string; password?: string }) => Promise<boolean>;
+  readonly onCreate: (link: {
+    expiresAt?: string;
+    password?: string;
+  }) => Promise<boolean>;
   readonly onRevoke: (linkId: string) => Promise<boolean>;
 }) {
   const t = useT();
@@ -101,7 +106,12 @@ export function Links({
           </label>
           <label className="vl-share-field">
             <span>{t("share-link-password")}</span>
-            <input type="password" name="password" minLength={8} autoComplete="new-password" />
+            <input
+              type="password"
+              name="password"
+              minLength={8}
+              autoComplete="new-password"
+            />
           </label>
         </div>
         <button type="submit" className="vl-filled-button">
@@ -114,7 +124,9 @@ export function Links({
           {state.links.map((link) => (
             <li key={link.id}>
               <span className="vl-share-name">
-                {t("share-link-made", { date: DATE.format(new Date(link.created_at)) })}
+                {t("share-link-made", {
+                  date: DATE.format(new Date(link.created_at)),
+                })}
                 <small className="vl-muted">
                   {t(linkState(link))}
                   {link.has_password && ` · ${t("share-link-has-password")}`}

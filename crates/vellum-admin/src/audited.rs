@@ -15,7 +15,8 @@ use std::sync::Arc;
 
 use serde_json::Value;
 use vellum_contracts::{
-    BoxFuture, Handler, Operation, OperationKind, Readiness, RequestContext, Scope, Service,
+    BoxFuture, Handler, Operation, OperationKind, Readiness, RequestContext,
+    Scope, Service,
 };
 use vellum_kernel::{Error, ErrorKind};
 
@@ -29,7 +30,10 @@ const TARGET_FIELDS: [&str; 4] = ["id", "user_id", "space_id", "member_id"];
 /// Wraps `service` so its admin-scope mutations are audited in `log`.
 /// Other operations pass through untouched.
 #[must_use]
-pub fn audited(service: Arc<dyn Service>, log: Arc<dyn AuditLog>) -> Arc<dyn Service> {
+pub fn audited(
+    service: Arc<dyn Service>,
+    log: Arc<dyn AuditLog>,
+) -> Arc<dyn Service> {
     Arc::new(Audited {
         inner: service,
         log,
@@ -62,7 +66,9 @@ impl Service for Audited {
                 }
                 let action = op.id();
                 let log = Arc::clone(&self.log);
-                op.wrap(move |inner| Arc::new(AuditedHandler { inner, log, action }))
+                op.wrap(move |inner| {
+                    Arc::new(AuditedHandler { inner, log, action })
+                })
             })
             .collect()
     }
@@ -102,7 +108,11 @@ const fn outcome_of(result: &Result<Value, Error>) -> Outcome {
 }
 
 impl Handler for AuditedHandler {
-    fn call(&self, ctx: RequestContext, input: Value) -> BoxFuture<'static, Result<Value, Error>> {
+    fn call(
+        &self,
+        ctx: RequestContext,
+        input: Value,
+    ) -> BoxFuture<'static, Result<Value, Error>> {
         let caller = caller(&ctx);
         let target = target_of(&input);
         let space = input
@@ -127,7 +137,8 @@ impl Handler for AuditedHandler {
             // A change that happened must not be reported as failed because
             // the audit write failed; the failure is logged loudly instead.
             if let Err(e) = log.append(event).await {
-                tracing::error!(action, error = %e, "could not audit an admin action");
+                tracing::error!(action, error = %e, "could not audit an admin \
+                    action");
             }
             result
         })
@@ -168,7 +179,10 @@ mod tests {
                     Scope::Admin,
                     |_ctx, input: Input| async move {
                         if input.id == "missing" {
-                            Err(Error::new(ErrorKind::NotFound, "user not found"))
+                            Err(Error::new(
+                                ErrorKind::NotFound,
+                                "user not found",
+                            ))
                         } else {
                             Ok(true)
                         }
@@ -209,15 +223,18 @@ mod tests {
     #[tokio::test]
     async fn admin_mutations_are_audited_without_their_input() {
         let log = Arc::new(MemoryAuditLog::default());
-        let service = audited(Arc::new(Users), Arc::clone(&log) as Arc<dyn AuditLog>);
+        let service =
+            audited(Arc::new(Users), Arc::clone(&log) as Arc<dyn AuditLog>);
         let ops = service.operations();
-        let by_id = |id: &str| ops.iter().find(|o| o.id() == id).expect("declared");
+        let by_id =
+            |id: &str| ops.iter().find(|o| o.id() == id).expect("declared");
         assert_eq!(
             by_id("users.block").fresh_auth_window(),
             Some(Duration::from_mins(5)),
             "the declaration is kept"
         );
-        let input = serde_json::json!({"id": "u1", "password": "hunter2-hunter2"});
+        let input =
+            serde_json::json!({"id": "u1", "password": "hunter2-hunter2"});
         let _ = by_id("users.block").call(ctx(), input).await.expect("ok");
         let _ = by_id("users.block")
             .call(ctx(), serde_json::json!({"id": "missing"}))

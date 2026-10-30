@@ -23,9 +23,11 @@ use crate::uploads::{self, PREFIX};
 type TestResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
 
 /// A 1×1 PNG.
-const PNG: &str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+const PNG: &str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk\
+    YPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 /// The antivirus test file, which every scanner reports.
-const EICAR: &str = r"X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*";
+const EICAR: &str =
+    r"X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*";
 
 /// Finds the antivirus test file, or is down.
 struct FakeScanner {
@@ -33,12 +35,17 @@ struct FakeScanner {
 }
 
 impl Scanner for FakeScanner {
-    fn scan(&self, bytes: &[u8]) -> impl Future<Output = Result<(), UploadError>> + Send {
+    fn scan(
+        &self,
+        bytes: &[u8],
+    ) -> impl Future<Output = Result<(), UploadError>> + Send {
         let found = bytes.windows(10).any(|w| w == b"EICAR-STAN");
         let down = self.down;
         async move {
             if down {
-                Err(UploadError::ScannerUnavailable("connection refused".into()))
+                Err(UploadError::ScannerUnavailable(
+                    "connection refused".into(),
+                ))
             } else if found {
                 Err(UploadError::Infected("Eicar-Signature".into()))
             } else {
@@ -66,7 +73,13 @@ impl World {
         let owner = UserId::generate();
         let actor = Actor::User { user: owner };
         let space = drive
-            .create_space(&actor, SpaceKind::SharedDrive, "launch", "Launch", None)
+            .create_space(
+                &actor,
+                SpaceKind::SharedDrive,
+                "launch",
+                "Launch",
+                None,
+            )
             .await?;
         let page = drive
             .create_page(&actor, space.id, None, "Launch plan", "Ship it.\n")
@@ -81,7 +94,12 @@ impl World {
     }
 
     /// The routes as `user` sees them, with `scopes`.
-    fn app(&self, user: Option<UserId>, scopes: &[Scope], scanner: FakeScanner) -> Router {
+    fn app(
+        &self,
+        user: Option<UserId>,
+        scopes: &[Scope],
+        scanner: FakeScanner,
+    ) -> Router {
         self.app_with(user, scopes, scanner, UploadPolicy::default())
     }
 
@@ -103,7 +121,11 @@ impl World {
         Router::new()
             .nest(
                 PREFIX,
-                uploads::router(Arc::clone(&self.drive), Some(Arc::new(scanner)), policy),
+                uploads::router(
+                    Arc::clone(&self.drive),
+                    Some(Arc::new(scanner)),
+                    policy,
+                ),
             )
             .layer(axum::Extension(principal))
     }
@@ -130,7 +152,10 @@ fn get(path: &str) -> Request<Body> {
         .unwrap_or_else(|e| unreachable!("{e}"))
 }
 
-async fn call(app: &Router, request: Request<Body>) -> (StatusCode, http::HeaderMap, Vec<u8>) {
+async fn call(
+    app: &Router,
+    request: Request<Body>,
+) -> (StatusCode, http::HeaderMap, Vec<u8>) {
     let response = app
         .clone()
         .oneshot(request)
@@ -154,7 +179,8 @@ async fn uploads_are_checked_stored_and_served() -> TestResult {
     let w = World::new().await?;
     let app = w.app(Some(w.owner), &Scope::ALL, ok());
 
-    let (status, _, body) = call(&app, upload(&w.files(), "Q3%20chart.png", png())).await;
+    let (status, _, body) =
+        call(&app, upload(&w.files(), "Q3%20chart.png", png())).await;
     assert_eq!(
         status,
         StatusCode::CREATED,
@@ -188,12 +214,17 @@ async fn uploads_are_checked_stored_and_served() -> TestResult {
     assert!(header(header::CONTENT_DISPOSITION).starts_with("inline;"));
 
     // Markdown and SVG are files to download, never pages or drawings.
-    let (status, ..) = call(&app, upload(&w.files(), "notes.md", b"# Notes\n".to_vec())).await;
+    let (status, ..) =
+        call(&app, upload(&w.files(), "notes.md", b"# Notes\n".to_vec())).await;
     assert_eq!(status, StatusCode::CREATED);
-    let svg = b"<svg xmlns='http://www.w3.org/2000/svg'><script>alert(1)</script></svg>".to_vec();
+    let svg = b"<svg \
+        xmlns='http://www.w3.org/2000/svg'><script>alert(1)</script></svg\
+        >"
+    .to_vec();
     let (status, ..) = call(&app, upload(&w.files(), "logo.svg", svg)).await;
     assert_eq!(status, StatusCode::CREATED);
-    let (_, headers, _) = call(&app, get(&format!("{}/logo.svg", w.files()))).await;
+    let (_, headers, _) =
+        call(&app, get(&format!("{}/logo.svg", w.files()))).await;
     let disposition = headers
         .get(header::CONTENT_DISPOSITION)
         .and_then(|v| v.to_str().ok())
@@ -224,18 +255,21 @@ async fn bad_uploads_are_refused_and_not_stored() -> TestResult {
     // Content that does not match its name, or is not a kind Vellum takes.
     let status = call(&app, upload(&files, "chart.pdf", png())).await.0;
     assert_eq!(status, StatusCode::UNSUPPORTED_MEDIA_TYPE);
-    let status = call(&app, upload(&files, "tool.exe", vec![0x4d, 0x5a, 0, 0x90]))
-        .await
-        .0;
+    let status =
+        call(&app, upload(&files, "tool.exe", vec![0x4d, 0x5a, 0, 0x90]))
+            .await
+            .0;
     assert_eq!(status, StatusCode::UNSUPPORTED_MEDIA_TYPE);
 
     // The virus scanner's verdict holds, and a scanner that is down
     // refuses everything.
-    let (status, _, body) = call(&app, upload(&files, "eicar.txt", EICAR.into())).await;
+    let (status, _, body) =
+        call(&app, upload(&files, "eicar.txt", EICAR.into())).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     assert!(String::from_utf8_lossy(&body).contains("virus scanner"));
     let down = w.app(Some(w.owner), &Scope::ALL, FakeScanner { down: true });
-    let (status, headers, _) = call(&down, upload(&files, "notes.txt", b"hello".to_vec())).await;
+    let (status, headers, _) =
+        call(&down, upload(&files, "notes.txt", b"hello".to_vec())).await;
     assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
     assert!(headers.contains_key(header::RETRY_AFTER));
 
@@ -249,7 +283,8 @@ async fn bad_uploads_are_refused_and_not_stored() -> TestResult {
     assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
 
     // An upload says its length and its name.
-    let no_length = Request::post(format!("{files}?name=a.txt")).body(Body::from("hello"))?;
+    let no_length = Request::post(format!("{files}?name=a.txt"))
+        .body(Body::from("hello"))?;
     assert_eq!(call(&app, no_length).await.0, StatusCode::BAD_REQUEST);
     let no_name = upload(&files, "", b"hello".to_vec());
     assert_eq!(call(&app, no_name).await.0, StatusCode::BAD_REQUEST);

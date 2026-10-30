@@ -20,13 +20,17 @@ describe("genericNode", () => {
     expect(genericNode("toc").config.content).toBeUndefined();
   });
 
-  it.each(["callout", "columns", "column", "tabs", "heading", "paragraph"] as const)(
-    "keeps the isolating and defining flags of %s",
-    (name) => {
-      const spec = nodeSpec(name);
-      const node = genericNode(name);
-      expect(node.config.isolating === true).toBe(spec.isolating === true);
-      expect(node.config.defining === true).toBe(spec.defining === true);
-    },
-  );
+  it.each([
+    "callout",
+    "columns",
+    "column",
+    "tabs",
+    "heading",
+    "paragraph",
+  ] as const)("keeps the isolating and defining flags of %s", (name) => {
+    const spec = nodeSpec(name);
+    const node = genericNode(name);
+    expect(node.config.isolating === true).toBe(spec.isolating === true);
+    expect(node.config.defining === true).toBe(spec.defining === true);
+  });
 });

@@ -29,7 +29,8 @@ use vellum_admin::api::{AdminApi, USAGE_MAX_AGE_MS, UsageFactsSource};
 use vellum_admin::counts::{CountsSource, UsageCounts, UsageSampler};
 use vellum_admin::usage::{HttpUsageTransport, UsageFacts, UsageTransport};
 use vellum_admin::{
-    AdminPaths, AdminService, FileAuditLog, FileSettingsStore, MemoryAuditLog, MemorySettingsStore,
+    AdminPaths, AdminService, FileAuditLog, FileSettingsStore, MemoryAuditLog,
+    MemorySettingsStore,
 };
 use vellum_contracts::Service;
 use vellum_crypto::{KekId, LocalKeyring, SecretKey};
@@ -37,7 +38,9 @@ use vellum_drive::{DriveIndex, DriveTotals};
 use vellum_identity::Identity;
 use vellum_kernel::config::Profile;
 use vellum_kernel::{Config, Error, ErrorKind, Timestamp};
-use vellum_observe::{RequestRecorder, RouteMetrics, TraceStore, recorder_layer};
+use vellum_observe::{
+    RequestRecorder, RouteMetrics, TraceStore, recorder_layer,
+};
 
 use crate::serve::key_file;
 use crate::services::VERSION;
@@ -147,7 +150,8 @@ impl CountsSource for WorkspaceCounts {
         let people = self.identity.people(now);
         let drive = match &self.drive {
             Some(drive) => drive.totals(now).await.map_err(|e| {
-                Error::new(ErrorKind::Unavailable, "cannot count the drive").with_source(e)
+                Error::new(ErrorKind::Unavailable, "cannot count the drive")
+                    .with_source(e)
             })?,
             None => DriveTotals::default(),
         };
@@ -201,7 +205,10 @@ pub fn spawn_sampling(sampler: Arc<UsageSampler>) {
             let _ = tick.tick().await;
             match sampler.refresh().await {
                 Ok(counts) => tracing::debug!(?counts, "usage counted"),
-                Err(error) => tracing::warn!(%error, "cannot count usage; keeping the last counts"),
+                Err(error) => {
+                    tracing::warn!(%error, "cannot count usage; keeping the \
+                        last counts")
+                }
             }
         }
     }));
@@ -214,7 +221,8 @@ pub fn spawn_sampling(sampler: Arc<UsageSampler>) {
 /// The key is not 32 bytes.
 pub fn keyring(id: &str, bytes: &[u8]) -> Result<LocalKeyring, Error> {
     let crypto = |e: vellum_crypto::CryptoError| {
-        Error::new(ErrorKind::Internal, format!("cannot load the {id} key")).with_source(e)
+        Error::new(ErrorKind::Internal, format!("cannot load the {id} key"))
+            .with_source(e)
     };
     let kek = SecretKey::from_slice(bytes).map_err(crypto)?;
     Ok(LocalKeyring::new(KekId::new(id).map_err(crypto)?, kek))
@@ -248,14 +256,17 @@ pub async fn open(
     config: &Config,
     observability: &Observability,
     env: impl Fn(&str) -> Option<String>,
-) -> Result<(Arc<AdminService<LocalKeyring>>, Arc<dyn UsageFactsSource>), Error> {
+) -> Result<(Arc<AdminService<LocalKeyring>>, Arc<dyn UsageFactsSource>), Error>
+{
     let data_dir = &config.data_dir;
     let (admin_key, _) = load_key(data_dir, ADMIN_KEY_VAR, "admin.key", &env)?;
-    let (backup_key, beside_data) = load_key(data_dir, BACKUP_KEY_VAR, "backup.key", &env)?;
+    let (backup_key, beside_data) =
+        load_key(data_dir, BACKUP_KEY_VAR, "backup.key", &env)?;
     if beside_data {
         tracing::warn!(
-            "the backup key is kept in the data folder (.vellum/keys/backup.key); \
-             copy it somewhere safe and set {BACKUP_KEY_VAR}, or a lost server takes its backups with it"
+            "the backup key is kept in the data folder \
+             (.vellum/keys/backup.key); copy it somewhere safe and set \
+             {BACKUP_KEY_VAR}, or a lost server takes its backups with it"
         );
     }
     let vellum = data_dir.join(".vellum");
@@ -264,7 +275,8 @@ pub async fn open(
         Arc::new(keyring("admin", &admin_key)?),
     )
     .await?;
-    let usage: Option<Arc<dyn UsageTransport>> = match HttpUsageTransport::new() {
+    let usage: Option<Arc<dyn UsageTransport>> = match HttpUsageTransport::new()
+    {
         Ok(transport) => Some(Arc::new(transport)),
         Err(error) => {
             tracing::warn!(%error, "usage reports are off: no HTTP client");
@@ -324,7 +336,10 @@ pub fn describe(scratch: &Path) -> Result<Arc<dyn Service>, Error> {
 
 /// Runs scheduled backups, restore drills and usage reports every few
 /// minutes, for as long as the server runs.
-pub fn spawn_ticks(service: Arc<AdminService<LocalKeyring>>, facts: Arc<dyn UsageFactsSource>) {
+pub fn spawn_ticks(
+    service: Arc<AdminService<LocalKeyring>>,
+    facts: Arc<dyn UsageFactsSource>,
+) {
     drop(tokio::spawn(async move {
         let mut tick = tokio::time::interval(TICK);
         tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
@@ -333,7 +348,10 @@ pub fn spawn_ticks(service: Arc<AdminService<LocalKeyring>>, facts: Arc<dyn Usag
             let facts = facts.facts().await;
             match service.tick(&facts).await {
                 Ok(report) => tracing::debug!(?report, "admin jobs checked"),
-                Err(error) => tracing::warn!(%error, "a scheduled backup, drill or report failed"),
+                Err(error) => {
+                    tracing::warn!(%error, "a scheduled backup, drill or \
+                        report failed")
+                }
             }
         }
     }));
@@ -352,10 +370,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn keys_come_from_the_environment_or_the_data_folder() -> Result<(), Error> {
-        let dir =
-            tempfile::tempdir().map_err(|e| Error::new(ErrorKind::Internal, e.to_string()))?;
-        let vars: HashMap<&str, String> = HashMap::from([(BACKUP_KEY_VAR, "ab".repeat(32))]);
+    async fn keys_come_from_the_environment_or_the_data_folder()
+    -> Result<(), Error> {
+        let dir = tempfile::tempdir()
+            .map_err(|e| Error::new(ErrorKind::Internal, e.to_string()))?;
+        let vars: HashMap<&str, String> =
+            HashMap::from([(BACKUP_KEY_VAR, "ab".repeat(32))]);
         let env = |k: &str| vars.get(k).cloned();
         let _ = open(&config(dir.path()), &Observability::new(), env).await?;
         let keys = dir.path().join(".vellum").join("keys");

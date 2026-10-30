@@ -24,14 +24,21 @@ function Suggestion({
   const [version, setVersion] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
-  const loaded = useLoaded(() => api.brief(issueKey), [api, issueKey, version], failureText);
+  const loaded = useLoaded(
+    () => api.brief(issueKey),
+    [api, issueKey, version],
+    failureText,
+  );
   if (loaded.state !== "ready") return;
   const s = loaded.value.suggestion;
   if (s == undefined) return;
   const act = (accept: boolean) => {
     setBusy(true);
     setError(undefined);
-    (accept ? api.acceptSuggestion(issueKey) : api.dismissSuggestion(issueKey)).then(
+    (accept
+      ? api.acceptSuggestion(issueKey)
+      : api.dismissSuggestion(issueKey)
+    ).then(
       () => {
         setBusy(false);
         setVersion((v) => v + 1);
@@ -49,14 +56,22 @@ function Suggestion({
       t("plan-suggest-priority", {
         priority: t(priorityId(s.priority)),
       }),
-    s.labels.length > 0 && t("plan-suggest-labels", { labels: s.labels.join(", ") }),
-    s.assignee != undefined && t("plan-suggest-assignee", { assignee: `@${s.assignee}` }),
-    s.duplicate_of != undefined && t("plan-suggest-duplicate", { key: s.duplicate_of }),
+    s.labels.length > 0 &&
+      t("plan-suggest-labels", { labels: s.labels.join(", ") }),
+    s.assignee != undefined &&
+      t("plan-suggest-assignee", { assignee: `@${s.assignee}` }),
+    s.duplicate_of != undefined &&
+      t("plan-suggest-duplicate", { key: s.duplicate_of }),
   ].filter((p): p is string => typeof p === "string");
   return (
-    <aside className="vl-plan-suggestion" aria-labelledby={`vl-suggest-${issueKey}`}>
+    <aside
+      className="vl-plan-suggestion"
+      aria-labelledby={`vl-suggest-${issueKey}`}
+    >
       <h2 id={`vl-suggest-${issueKey}`}>
-        {t("plan-suggest-title", { model: s.model === "" ? t("plan-suggest-assistant") : s.model })}
+        {t("plan-suggest-title", {
+          model: s.model === "" ? t("plan-suggest-assistant") : s.model,
+        })}
       </h2>
       <ul>
         {parts.map((p) => (

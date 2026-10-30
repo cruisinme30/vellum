@@ -37,7 +37,11 @@ pub struct MarkdownExport {
 
 /// Writes `doc` as Markdown with live blocks frozen at `as_of`.
 #[tracing::instrument(name = "export.markdown", skip_all)]
-pub async fn markdown(doc: &Document, ports: &Ports, as_of: &str) -> MarkdownExport {
+pub async fn markdown(
+    doc: &Document,
+    ports: &Ports,
+    as_of: &str,
+) -> MarkdownExport {
     let started = Instant::now();
     let mut doc = doc.clone();
     let mut warnings = Vec::new();
@@ -58,9 +62,13 @@ async fn freeze(
     while let Some(blocks) = stack.pop() {
         for block in blocks.iter_mut() {
             match block {
-                Block::Fence(fence) if fence.kind() == FenceKind::Collection => {
+                Block::Fence(fence)
+                    if fence.kind() == FenceKind::Collection =>
+                {
                     match ports.live.collection(fence).await {
-                        Ok(snapshot) => *block = snapshot_block(&snapshot, as_of),
+                        Ok(snapshot) => {
+                            *block = snapshot_block(&snapshot, as_of)
+                        }
                         Err(error) => warnings.push(ExportWarning::new(
                             "collection",
                             format!("{}; kept as an embed", error.0),
@@ -121,7 +129,8 @@ fn snapshot_block(snapshot: &crate::ports::Snapshot, as_of: &str) -> Block {
             .rows
             .iter()
             .map(|row| {
-                let mut cells: Vec<Vec<Inline>> = row.iter().map(text).collect();
+                let mut cells: Vec<Vec<Inline>> =
+                    row.iter().map(text).collect();
                 cells.resize(snapshot.columns.len(), Vec::new());
                 cells
             })
@@ -144,7 +153,11 @@ fn snapshot_block(snapshot: &crate::ports::Snapshot, as_of: &str) -> Block {
 /// [`ExportError::Invalid`] for a path that is empty, absolute or climbs
 /// with `..`, or a repeated path; [`ExportError::TooLarge`] past
 /// [`MAX_ENTRIES`].
-#[tracing::instrument(name = "export.zip", skip_all, fields(files = files.len()))]
+#[tracing::instrument(
+    name = "export.zip",
+    skip_all,
+    fields(files = files.len())
+)]
 pub fn zip(files: &[(String, Vec<u8>)]) -> Result<Vec<u8>, ExportError> {
     let started = Instant::now();
     let result = zip_inner(files);
@@ -210,7 +223,10 @@ mod tests {
 
     #[async_trait]
     impl LiveData for Live {
-        async fn collection(&self, _fence: &Fence) -> Result<Snapshot, LiveError> {
+        async fn collection(
+            &self,
+            _fence: &Fence,
+        ) -> Result<Snapshot, LiveError> {
             Ok(Snapshot {
                 title: "Open risks".into(),
                 columns: vec!["Risk".into(), "Owner".into()],
@@ -238,7 +254,8 @@ mod tests {
     #[tokio::test]
     async fn live_blocks_are_frozen() {
         let doc = vellum_format::parse(
-            "# Risks\n\n```collection\nid: risks\n```\n\n```chart\nsource: risks\ntitle: Trend\n```\n",
+            "# Risks\n\n```collection\nid: risks\n```\n\n```chart\n\
+                source: risks\ntitle: Trend\n```\n",
         )
         .document;
         let ports = Ports {
@@ -263,7 +280,8 @@ mod tests {
 
     #[tokio::test]
     async fn unavailable_live_data_keeps_the_source() {
-        let doc = vellum_format::parse("```collection\nid: risks\n```\n").document;
+        let doc =
+            vellum_format::parse("```collection\nid: risks\n```\n").document;
         let out = markdown(&doc, &Ports::default(), "2026-10-29").await;
         assert_eq!(out.warnings.len(), 1);
         assert!(out.text.contains("```collection"));

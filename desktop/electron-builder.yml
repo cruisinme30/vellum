@@ -1,9 +1,10 @@
 # SPDX-FileCopyrightText: 2026 The Vellum contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 
-# Packaging for macOS (notarised, universal), Windows (NSIS, signed with
-# Azure Trusted Signing) and Linux (AppImage, deb and rpm). Signing material comes only from the environment; see
-# .github/workflows/release.yml and ADR 0023 (D99).
+# Packaging for macOS (notarised, universal), Windows (NSIS, signed with Azure
+# Trusted Signing) and Linux (AppImage, deb and rpm). Signing material comes
+# only from the environment; see .github/workflows/release.yml and ADR 0023
+# (D99).
 appId: dev.vellum.desktop
 productName: Vellum
 copyright: Copyright © 2026 The Vellum contributors

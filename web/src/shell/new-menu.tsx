@@ -1,7 +1,14 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 
 import { useT } from "../i18n/i18n";
 
@@ -36,7 +43,8 @@ export function NewButton({
     if (!open) return;
     menu.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
     const onPointer = (event: PointerEvent) => {
-      if (!menu.current?.parentElement?.contains(event.target as Node)) setOpen(false);
+      if (!menu.current?.parentElement?.contains(event.target as Node))
+        setOpen(false);
     };
     document.addEventListener("pointerdown", onPointer);
     return () => {
@@ -61,7 +69,10 @@ export function NewButton({
     run();
   };
   const onKeyDown = (event: KeyboardEvent) => {
-    const entries = [...(menu.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])];
+    const entries = [
+      ...(menu.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ??
+        []),
+    ];
     const at = entries.indexOf(document.activeElement as HTMLElement);
     const targets: Record<string, number> = {
       ArrowDown: at + 1,
@@ -76,7 +87,9 @@ export function NewButton({
     } else if (event.key === "Escape" || event.key === "Tab") {
       event.preventDefault();
       setOpen(false);
-      menu.current?.parentElement?.querySelector<HTMLElement>("button")?.focus();
+      menu.current?.parentElement
+        ?.querySelector<HTMLElement>("button")
+        ?.focus();
     }
   };
 

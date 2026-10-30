@@ -30,7 +30,8 @@ cleanly in Git and takes the same permissions as any other folder.
 ## Create a collection {#create}
 
 1. Open **Data** and select **New collection**.
-2. Name it, for example "Requirements tracker", and pick the drive folder it lives in.
+2. Name it, for example "Requirements tracker", and pick the drive folder it
+   lives in.
 3. Leave the CSV empty for a blank collection, or start from a CSV file:
    its first column becomes the title and Vellum guesses the other types.
 4. Add properties under **Properties**, and rows with **New row**.
@@ -89,6 +90,8 @@ writes the current view, with its filters and sort, to a file.
 
 ## In this part
 
-- [Properties and relations](properties.md): every property type, relations and rollups.
+- [Properties and relations](properties.md): every property type, relations and
+  rollups.
 - [Formulas](formulas.md): the formula language with 30 worked examples.
-- [Views, filters and embeds](views.md): table, board, gallery, calendar, timeline and list.
+- [Views, filters and embeds](views.md): table, board, gallery, calendar,
+  timeline and list.

@@ -12,7 +12,12 @@ import { CopyDiagnostic } from "../../shell/copy-diagnostic";
 import { Icon } from "../../shell/icon";
 import type { CommentsApi } from "../../work/api";
 
-import { blockPosition, setCommentMarkers, targetOf, type Anchor } from "./anchor";
+import {
+  blockPosition,
+  setCommentMarkers,
+  targetOf,
+  type Anchor,
+} from "./anchor";
 import { field, submitWith, Thread } from "./thread";
 
 /** Props of {@link CommentsPanel}. */
@@ -22,7 +27,9 @@ export interface CommentsPanelProperties {
   readonly editor: Editor;
   /** The signed-in person's handle, to mark their reactions. */
   readonly me: string | undefined;
-  /** Where a new thread goes; taken from the selection when the panel opened. */
+  /**
+   * Where a new thread goes; taken from the selection when the panel opened.
+   */
   readonly anchor: Anchor;
   readonly onClose: () => void;
 }
@@ -41,11 +48,14 @@ function reveal(editor: Editor, blockId: string) {
   if (pos === undefined) return;
   const inside = Math.min(pos + 1, editor.state.doc.content.size);
   editor.view.dispatch(
-    editor.state.tr.setSelection(TextSelection.near(editor.state.doc.resolve(inside))),
+    editor.state.tr.setSelection(
+      TextSelection.near(editor.state.doc.resolve(inside)),
+    ),
   );
   editor.view.focus();
   const dom = editor.view.nodeDOM(pos);
-  if (dom instanceof HTMLElement) dom.scrollIntoView({ block: "center", behavior: "smooth" });
+  if (dom instanceof HTMLElement)
+    dom.scrollIntoView({ block: "center", behavior: "smooth" });
 }
 
 /**
@@ -119,7 +129,9 @@ export function CommentsPanel({
   };
 
   const shown = (threads ?? []).filter((thread) =>
-    filter === "open" ? thread.resolved_at == undefined : thread.resolved_at != undefined,
+    filter === "open"
+      ? thread.resolved_at == undefined
+      : thread.resolved_at != undefined,
   );
 
   return (
@@ -155,7 +167,11 @@ export function CommentsPanel({
           <CopyDiagnostic message={error} />
         </p>
       )}
-      <div className="vl-segmented" role="group" aria-label={t("comments-filter")}>
+      <div
+        className="vl-segmented"
+        role="group"
+        aria-label={t("comments-filter")}
+      >
         {(["open", "resolved"] as const).map((value) => (
           <button
             key={value}
@@ -169,7 +185,12 @@ export function CommentsPanel({
           </button>
         ))}
       </div>
-      <ThreadsState threads={threads} loadError={loadError} shown={shown.length} filter={filter} />
+      <ThreadsState
+        threads={threads}
+        loadError={loadError}
+        shown={shown.length}
+        filter={filter}
+      />
       {shown.length > 0 && (
         <ol className="vl-thread-list">
           {shown.map((thread) => (
@@ -183,7 +204,9 @@ export function CommentsPanel({
                 reveal(editor, block);
               }}
               onReply={(commentId, body) => run(api.reply(commentId, body))}
-              onReact={(commentId, emoji, on) => run(api.react(commentId, emoji, on))}
+              onReact={(commentId, emoji, on) =>
+                run(api.react(commentId, emoji, on))
+              }
               onResolve={(resolved) => run(api.resolve(thread.id, resolved))}
               onAssign={(assignee) => run(api.assign(thread.id, assignee))}
             />
@@ -222,13 +245,18 @@ function ThreadsState({
       </p>
     );
   }
-  return shown === 0 ? <p className="vl-muted">{t(`comments-none-${filter}`)}</p> : undefined;
+  return shown === 0 ? (
+    <p className="vl-muted">{t(`comments-none-${filter}`)}</p>
+  ) : undefined;
 }
 
 /** What a new thread is on, in words. */
 function anchorText(t: Translate, anchor: Anchor) {
-  if (anchor.quote !== "") return t("comments-on-quote", { quote: anchor.quote });
-  return t(anchor.blockId === undefined ? "comments-on-page" : "comments-on-block");
+  if (anchor.quote !== "")
+    return t("comments-on-quote", { quote: anchor.quote });
+  return t(
+    anchor.blockId === undefined ? "comments-on-page" : "comments-on-block",
+  );
 }
 
 function NewThread({
@@ -244,7 +272,9 @@ function NewThread({
       className="vl-comment-form"
       onSubmit={submitWith((form) => {
         const body = field(form, "body");
-        return body === "" ? undefined : onSubmit(body, field(form, "assign").replace(/^@/, ""));
+        return body === ""
+          ? undefined
+          : onSubmit(body, field(form, "assign").replace(/^@/, ""));
       })}
     >
       <p className="vl-muted vl-comment-anchor">{anchorText(t, anchor)}</p>

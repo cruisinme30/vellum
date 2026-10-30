@@ -29,14 +29,16 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use vellum_db::sqlx::types::Uuid;
 use vellum_db::{BeginWrite as _, Index, IndexPool, sqlx, traced};
-use vellum_kernel::{Actor, EventId, ObjectId, SpaceId, Timestamp, UserId, VersionId};
+use vellum_kernel::{
+    Actor, EventId, ObjectId, SpaceId, Timestamp, UserId, VersionId,
+};
 use vellum_store::BlobPath;
 
 use crate::error::{DriveError, DriveResult};
 use crate::files;
 use crate::model::{
-    Activity, ActivityKind, DriveTotals, Node, NodeKind, Space, SpaceKind, SpaceSettings,
-    TrashState, VersionRecord,
+    Activity, ActivityKind, DriveTotals, Node, NodeKind, Space, SpaceKind,
+    SpaceSettings, TrashState, VersionRecord,
 };
 use crate::ports::DriveIndex;
 
@@ -47,8 +49,9 @@ const MAX_DEPTH: i32 = 4096;
 macro_rules! select_nodes {
     ($filter:literal) => {
         concat!(
-            "SELECT space_id, node_id, kind, parent_id, path, title, byte_size, \
-             modified_at, created_by, target_id, trash FROM drive_nodes WHERE ",
+            "SELECT space_id, node_id, kind, parent_id, path, title, \
+             byte_size, modified_at, created_by, target_id, trash FROM \
+             drive_nodes WHERE ",
             $filter
         )
     };
@@ -118,7 +121,8 @@ macro_rules! project_space {
             $system,
             "space.read",
             sqlx::query_as(
-                "SELECT kind, slug, name, root_path FROM drive_spaces WHERE space_id = $1"
+                "SELECT kind, slug, name, root_path FROM drive_spaces WHERE \
+                    space_id = $1"
             )
             .bind(space)
             .fetch_optional(&mut *$tx)
@@ -142,9 +146,9 @@ macro_rules! project_space {
                 $system,
                 "space.project",
                 sqlx::query(
-                    "INSERT INTO spaces (space_id, kind, slug, root_path, name, indexed_at) \
-                     VALUES ($1, $2, $3, $4, $5, $6) \
-                     ON CONFLICT (space_id) DO UPDATE SET kind = excluded.kind, \
+                    "INSERT INTO spaces (space_id, kind, slug, root_path, \
+                     name, indexed_at) VALUES ($1, $2, $3, $4, $5, $6) ON \
+                     CONFLICT (space_id) DO UPDATE SET kind = excluded.kind, \
                      slug = excluded.slug, root_path = excluded.root_path, \
                      name = excluded.name, indexed_at = excluded.indexed_at",
                 )
@@ -160,8 +164,9 @@ macro_rules! project_space {
                 $system,
                 "space.closure",
                 sqlx::query(
-                    "INSERT INTO page_ancestors (space_id, ancestor_id, descendant_id, depth) \
-                     VALUES ($1, $1, $1, 0) ON CONFLICT DO NOTHING",
+                    "INSERT INTO page_ancestors (space_id, ancestor_id, \
+                     descendant_id, depth) VALUES ($1, $1, $1, 0) ON CONFLICT \
+                     DO NOTHING",
                 )
                 .bind(space)
                 .execute(&mut *$tx)
@@ -183,8 +188,8 @@ macro_rules! rebuild_closure {
             $system,
             "closure.subtree",
             sqlx::query_as(
-                "WITH RECURSIVE sub(id) AS (SELECT $1 UNION \
-                 SELECT n.node_id FROM drive_nodes n JOIN sub ON n.tree_parent_id = sub.id) \
+                "WITH RECURSIVE sub(id) AS (SELECT $1 UNION SELECT n.node_id \
+                 FROM drive_nodes n JOIN sub ON n.tree_parent_id = sub.id) \
                  SELECT id FROM sub",
             )
             .bind(root)
@@ -194,7 +199,8 @@ macro_rules! rebuild_closure {
             let _ = run!(
                 $system,
                 "closure.clear",
-                sqlx::query("DELETE FROM page_ancestors WHERE descendant_id = $1")
+                sqlx::query("DELETE FROM page_ancestors WHERE descendant_id = \
+                    $1")
                     .bind(member)
                     .execute(&mut *$tx)
             );
@@ -202,18 +208,18 @@ macro_rules! rebuild_closure {
                 $system,
                 "closure.chain",
                 sqlx::query_as(
-                    "WITH RECURSIVE chain(id, depth) AS (SELECT $1, 0 UNION ALL \
-                     SELECT p.node_id, c.depth + 1 FROM chain c \
-                     JOIN drive_nodes n ON n.node_id = c.id \
-                     JOIN drive_nodes p ON p.node_id = n.tree_parent_id \
-                     WHERE c.depth < $2) \
-                     SELECT id, depth FROM chain",
+                    "WITH RECURSIVE chain(id, depth) AS (SELECT $1, 0 UNION \
+                     ALL SELECT p.node_id, c.depth + 1 FROM chain c JOIN \
+                     drive_nodes n ON n.node_id = c.id JOIN drive_nodes p ON \
+                     p.node_id = n.tree_parent_id WHERE c.depth < $2) SELECT \
+                     id, depth FROM chain",
                 )
                 .bind(member)
                 .bind(MAX_DEPTH)
                 .fetch_all(&mut *$tx)
             );
-            // The space sits above every top-level node, as a reindex writes it.
+            // The space sits above every top-level node, as a reindex writes
+            // it.
             let mut chain = dedup_chain(chain);
             let top = chain.iter().map(|(_, depth)| *depth).max().unwrap_or(0);
             chain.push((space, top.saturating_add(1)));
@@ -222,8 +228,8 @@ macro_rules! rebuild_closure {
                     $system,
                     "closure.insert",
                     sqlx::query(
-                        "INSERT INTO page_ancestors (space_id, ancestor_id, descendant_id, depth) \
-                         VALUES ($1, $2, $3, $4)",
+                        "INSERT INTO page_ancestors (space_id, ancestor_id, \
+                         descendant_id, depth) VALUES ($1, $2, $3, $4)",
                     )
                     .bind(space)
                     .bind(ancestor)
@@ -248,7 +254,8 @@ macro_rules! project_node {
                     $system,
                     "folder.parent",
                     sqlx::query_as(
-                        "SELECT folder_id FROM folders WHERE space_id = $1 AND folder_id = $2",
+                        "SELECT folder_id FROM folders WHERE space_id = $1 AND \
+                            folder_id = $2",
                     )
                     .bind(space)
                     .bind(uuid(parent))
@@ -261,7 +268,8 @@ macro_rules! project_node {
         let _ = run!(
             $system,
             "document.clear",
-            sqlx::query("DELETE FROM documents WHERE doc_id = $1 OR (space_id = $2 AND path = $3)")
+            sqlx::query("DELETE FROM documents WHERE doc_id = $1 OR (space_id \
+                = $2 AND path = $3)")
                 .bind(id)
                 .bind(space)
                 .bind(path)
@@ -271,14 +279,16 @@ macro_rules! project_node {
             let existing: Option<(Uuid,)> = run!(
                 $system,
                 "folder.read",
-                sqlx::query_as("SELECT space_id FROM folders WHERE folder_id = $1")
+                sqlx::query_as("SELECT space_id FROM folders WHERE folder_id = \
+                    $1")
                     .bind(id)
                     .fetch_optional(&mut *$tx)
             );
             let _ = run!(
                 $system,
                 "folder.clear_path",
-                sqlx::query("DELETE FROM folders WHERE space_id = $1 AND path = $2 AND folder_id <> $3")
+                sqlx::query("DELETE FROM folders WHERE space_id = $1 AND path \
+                    = $2 AND folder_id <> $3")
                     .bind(space)
                     .bind(path)
                     .bind(id)
@@ -290,8 +300,9 @@ macro_rules! project_node {
                     $system,
                     "folder.update",
                     sqlx::query(
-                        "UPDATE folders SET parent_id = $3, path = $4, name = $5, indexed_at = $6 \
-                         WHERE space_id = $1 AND folder_id = $2",
+                        "UPDATE folders SET parent_id = $3, path = $4, name = \
+                         $5, indexed_at = $6 WHERE space_id = $1 AND folder_id \
+                         = $2",
                     )
                     .bind(space)
                     .bind(id)
@@ -313,8 +324,9 @@ macro_rules! project_node {
                     $system,
                     "folder.insert",
                     sqlx::query(
-                        "INSERT INTO folders (space_id, folder_id, parent_id, path, name, indexed_at) \
-                         VALUES ($1, $2, $3, $4, $5, $6)",
+                        "INSERT INTO folders (space_id, folder_id, parent_id, \
+                         path, name, indexed_at) VALUES ($1, $2, $3, $4, $5, \
+                         $6)",
                     )
                     .bind(space)
                     .bind(id)
@@ -330,8 +342,9 @@ macro_rules! project_node {
                 $system,
                 "folder.adopt_folders",
                 sqlx::query(
-                    "UPDATE folders SET parent_id = $2 WHERE space_id = $1 AND folder_id IN \
-                     (SELECT node_id FROM drive_nodes WHERE space_id = $1 AND parent_id = $2)",
+                    "UPDATE folders SET parent_id = $2 WHERE space_id = $1 AND \
+                     folder_id IN (SELECT node_id FROM drive_nodes WHERE \
+                     space_id = $1 AND parent_id = $2)",
                 )
                 .bind(space)
                 .bind(id)
@@ -341,8 +354,9 @@ macro_rules! project_node {
                 $system,
                 "folder.adopt_documents",
                 sqlx::query(
-                    "UPDATE documents SET folder_id = $2 WHERE space_id = $1 AND doc_id IN \
-                     (SELECT node_id FROM drive_nodes WHERE space_id = $1 AND parent_id = $2)",
+                    "UPDATE documents SET folder_id = $2 WHERE space_id = $1 \
+                     AND doc_id IN (SELECT node_id FROM drive_nodes WHERE \
+                     space_id = $1 AND parent_id = $2)",
                 )
                 .bind(space)
                 .bind(id)
@@ -363,9 +377,10 @@ macro_rules! project_node {
                 $system,
                 "document.insert",
                 sqlx::query(
-                    "INSERT INTO documents (space_id, doc_id, folder_id, kind, path, title, \
-                     content_hash, byte_size, modified_at, trashed_at, explicitly_trashed, \
-                     indexed_at) VALUES ($1, $2, $3, $4, $5, $6, '', $7, $8, $9, $10, $11)",
+                    "INSERT INTO documents (space_id, doc_id, folder_id, kind, \
+                     path, title, content_hash, byte_size, modified_at, \
+                     trashed_at, explicitly_trashed, indexed_at) VALUES ($1, \
+                     $2, $3, $4, $5, $6, '', $7, $8, $9, $10, $11)",
                 )
                 .bind(space)
                 .bind(id)
@@ -396,11 +411,12 @@ impl DriveIndex for SqlIndex {
                 system,
                 "space.upsert",
                 sqlx::query(
-                    "INSERT INTO drive_spaces (space_id, kind, slug, name, owner_id, root_path, settings) \
-                     VALUES ($1, $2, $3, $4, $5, $6, $7) \
-                     ON CONFLICT (space_id) DO UPDATE SET kind = excluded.kind, \
-                     slug = excluded.slug, name = excluded.name, owner_id = excluded.owner_id, \
-                     root_path = excluded.root_path, settings = excluded.settings",
+                    "INSERT INTO drive_spaces (space_id, kind, slug, name, \
+                     owner_id, root_path, settings) VALUES ($1, $2, $3, $4, \
+                     $5, $6, $7) ON CONFLICT (space_id) DO UPDATE SET kind = \
+                     excluded.kind, slug = excluded.slug, name = \
+                     excluded.name, owner_id = excluded.owner_id, root_path = \
+                     excluded.root_path, settings = excluded.settings",
                 )
                 .bind(id)
                 .bind(space_kind(space.kind))
@@ -416,14 +432,16 @@ impl DriveIndex for SqlIndex {
             let (seq,): (i64,) = run!(
                 system,
                 "space.announce",
-                sqlx::query_as("UPDATE cluster_feed SET head = head + 1 WHERE id = 1 RETURNING head")
+                sqlx::query_as("UPDATE cluster_feed SET head = head + 1 WHERE \
+                    id = 1 RETURNING head")
                     .fetch_one(&mut *tx)
             );
             let _ = run!(
                 system,
                 "space.announce",
                 sqlx::query(
-                    "INSERT INTO cluster_changes (seq, topic, subject, origin) VALUES ($1, $2, $3, '')"
+                    "INSERT INTO cluster_changes (seq, topic, subject, origin) \
+                        VALUES ($1, $2, $3, '')"
                 )
                 .bind(seq)
                 .bind(vellum_db::feed::SPACES)
@@ -441,8 +459,8 @@ impl DriveIndex for SqlIndex {
                 system,
                 "space.get",
                 sqlx::query_as(
-                    "SELECT space_id, kind, slug, name, owner_id, root_path, settings \
-                     FROM drive_spaces WHERE space_id = $1",
+                    "SELECT space_id, kind, slug, name, owner_id, root_path, \
+                     settings FROM drive_spaces WHERE space_id = $1",
                 )
                 .bind(uuid(id))
                 .fetch_all(pool)
@@ -457,7 +475,8 @@ impl DriveIndex for SqlIndex {
                 system,
                 "space.list",
                 sqlx::query_as(
-                    "SELECT space_id, kind, slug, name, owner_id, root_path, settings FROM drive_spaces",
+                    "SELECT space_id, kind, slug, name, owner_id, root_path, \
+                        settings FROM drive_spaces",
                 )
                 .fetch_all(pool)
             ))
@@ -480,7 +499,8 @@ impl DriveIndex for SqlIndex {
             let old: Option<(Uuid, Option<Uuid>)> = run!(
                 system,
                 "node.previous",
-                sqlx::query_as("SELECT space_id, tree_parent_id FROM drive_nodes WHERE node_id = $1")
+                sqlx::query_as("SELECT space_id, tree_parent_id FROM \
+                    drive_nodes WHERE node_id = $1")
                     .bind(id)
                     .fetch_optional(&mut *tx)
             );
@@ -495,9 +515,10 @@ impl DriveIndex for SqlIndex {
                 system,
                 "node.insert",
                 sqlx::query(
-                    "INSERT INTO drive_nodes (space_id, node_id, kind, parent_id, tree_parent_id, \
-                     path, title, byte_size, modified_at, created_by, target_id, trash) \
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
+                    "INSERT INTO drive_nodes (space_id, node_id, kind, \
+                     parent_id, tree_parent_id, path, title, byte_size, \
+                     modified_at, created_by, target_id, trash) VALUES ($1, \
+                     $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
                 )
                 .bind(space)
                 .bind(id)
@@ -518,7 +539,8 @@ impl DriveIndex for SqlIndex {
                 let _ = run!(
                     system,
                     "node.move_links",
-                    sqlx::query("UPDATE drive_links SET space_id = $2 WHERE source_id = $1")
+                    sqlx::query("UPDATE drive_links SET space_id = $2 WHERE \
+                        source_id = $1")
                         .bind(id)
                         .bind(space)
                         .execute(&mut *tx)
@@ -526,7 +548,8 @@ impl DriveIndex for SqlIndex {
                 let _ = run!(
                     system,
                     "node.move_versions",
-                    sqlx::query("UPDATE drive_versions SET space_id = $2 WHERE doc_id = $1")
+                    sqlx::query("UPDATE drive_versions SET space_id = $2 WHERE \
+                        doc_id = $1")
                         .bind(id)
                         .bind(space)
                         .execute(&mut *tx)
@@ -534,7 +557,8 @@ impl DriveIndex for SqlIndex {
                 let _ = run!(
                     system,
                     "node.move_user_state",
-                    sqlx::query("UPDATE user_doc_state SET space_id = $2 WHERE doc_id = $1")
+                    sqlx::query("UPDATE user_doc_state SET space_id = $2 WHERE \
+                        doc_id = $1")
                         .bind(id)
                         .bind(space)
                         .execute(&mut *tx)
@@ -543,7 +567,8 @@ impl DriveIndex for SqlIndex {
             let spaced: i64 = run!(
                 system,
                 "node.space_indexed",
-                sqlx::query_scalar("SELECT COUNT(*) FROM spaces WHERE space_id = $1")
+                sqlx::query_scalar("SELECT COUNT(*) FROM spaces WHERE space_id \
+                    = $1")
                     .bind(space)
                     .fetch_one(&mut *tx)
             );
@@ -554,8 +579,8 @@ impl DriveIndex for SqlIndex {
                     system,
                     "closure.placed",
                     sqlx::query_scalar(
-                        "SELECT COUNT(*) FROM page_ancestors \
-                         WHERE space_id = $1 AND descendant_id = $2 AND ancestor_id = $2",
+                        "SELECT COUNT(*) FROM page_ancestors WHERE space_id = \
+                         $1 AND descendant_id = $2 AND ancestor_id = $2",
                     )
                     .bind(space)
                     .bind(id)
@@ -584,7 +609,11 @@ impl DriveIndex for SqlIndex {
         row.map(node_from_row).transpose()
     }
 
-    async fn node_at(&self, space: SpaceId, path: &BlobPath) -> DriveResult<Option<Node>> {
+    async fn node_at(
+        &self,
+        space: SpaceId,
+        path: &BlobPath,
+    ) -> DriveResult<Option<Node>> {
         let row: Option<NodeRow> = on_pool!(self, pool, system => {
             Ok(run!(
                 system,
@@ -598,13 +627,18 @@ impl DriveIndex for SqlIndex {
         row.map(node_from_row).transpose()
     }
 
-    async fn children(&self, space: SpaceId, parent: Option<ObjectId>) -> DriveResult<Vec<Node>> {
+    async fn children(
+        &self,
+        space: SpaceId,
+        parent: Option<ObjectId>,
+    ) -> DriveResult<Vec<Node>> {
         let rows: Vec<NodeRow> = on_pool!(self, pool, system => {
             Ok(match parent {
                 Some(parent) => run!(
                     system,
                     "node.children",
-                    sqlx::query_as(select_nodes!("space_id = $1 AND parent_id = $2 AND trash IS NULL"))
+                    sqlx::query_as(select_nodes!("space_id = $1 AND parent_id \
+                        = $2 AND trash IS NULL"))
                     .bind(uuid(space))
                     .bind(uuid(parent))
                     .fetch_all(pool)
@@ -612,7 +646,8 @@ impl DriveIndex for SqlIndex {
                 None => run!(
                     system,
                     "node.top_level",
-                    sqlx::query_as(select_nodes!("space_id = $1 AND parent_id IS NULL AND trash IS NULL"))
+                    sqlx::query_as(select_nodes!("space_id = $1 AND parent_id \
+                        IS NULL AND trash IS NULL"))
                     .bind(uuid(space))
                     .fetch_all(pool)
                 ),
@@ -638,12 +673,17 @@ impl DriveIndex for SqlIndex {
         Ok(out)
     }
 
-    async fn by_title(&self, space: SpaceId, title: &str) -> DriveResult<Vec<Node>> {
+    async fn by_title(
+        &self,
+        space: SpaceId,
+        title: &str,
+    ) -> DriveResult<Vec<Node>> {
         let rows: Vec<NodeRow> = on_pool!(self, pool, system => {
             Ok(run!(
                 system,
                 "node.by_title",
-                sqlx::query_as(select_nodes!("space_id = $1 AND title = $2 AND trash IS NULL"))
+                sqlx::query_as(select_nodes!("space_id = $1 AND title = $2 AND \
+                    trash IS NULL"))
                 .bind(uuid(space))
                 .bind(title)
                 .fetch_all(pool)
@@ -658,14 +698,24 @@ impl DriveIndex for SqlIndex {
             let mut tx = pool.begin_write().await.map_err(db_error)?;
             for (op, sql) in [
                 ("node.remove", "DELETE FROM drive_nodes WHERE node_id = $1"),
-                ("node.remove_links", "DELETE FROM drive_links WHERE source_id = $1"),
-                ("node.remove_versions", "DELETE FROM drive_versions WHERE doc_id = $1"),
-                ("node.remove_user_state", "DELETE FROM user_doc_state WHERE doc_id = $1"),
-                ("node.remove_document", "DELETE FROM documents WHERE doc_id = $1"),
-                ("node.remove_folder", "DELETE FROM folders WHERE folder_id = $1"),
-                ("node.remove_closure", "DELETE FROM page_ancestors WHERE descendant_id = $1"),
+                ("node.remove_links", "DELETE FROM drive_links WHERE source_id \
+                    = $1"),
+                ("node.remove_versions", "DELETE FROM drive_versions WHERE \
+                    doc_id = $1"),
+                ("node.remove_user_state", "DELETE FROM user_doc_state WHERE \
+                    doc_id = $1"),
+                ("node.remove_document", "DELETE FROM documents WHERE doc_id = \
+                    $1"),
+                ("node.remove_folder", "DELETE FROM folders WHERE folder_id = \
+                    $1"),
+                ("node.remove_closure", "DELETE FROM page_ancestors WHERE \
+                    descendant_id = $1"),
             ] {
-                let _ = traced(system, op, sqlx::query(sql).bind(id).execute(&mut *tx))
+                let _ = traced(
+                    system,
+                    op,
+                    sqlx::query(sql).bind(id).execute(&mut *tx)
+                )
                     .await
                     .map_err(db_error)?;
             }
@@ -673,7 +723,8 @@ impl DriveIndex for SqlIndex {
             let orphans: Vec<(Uuid, Uuid)> = run!(
                 system,
                 "node.orphans",
-                sqlx::query_as("SELECT node_id, space_id FROM drive_nodes WHERE tree_parent_id = $1")
+                sqlx::query_as("SELECT node_id, space_id FROM drive_nodes \
+                    WHERE tree_parent_id = $1")
                     .bind(id)
                     .fetch_all(&mut *tx)
             );
@@ -681,7 +732,8 @@ impl DriveIndex for SqlIndex {
                 let spaced: i64 = run!(
                     system,
                     "node.space_indexed",
-                    sqlx::query_scalar("SELECT COUNT(*) FROM spaces WHERE space_id = $1")
+                    sqlx::query_scalar("SELECT COUNT(*) FROM spaces WHERE \
+                        space_id = $1")
                         .bind(space)
                         .fetch_one(&mut *tx)
                 );
@@ -708,9 +760,10 @@ impl DriveIndex for SqlIndex {
                         system,
                         "user.star",
                         sqlx::query(
-                            "INSERT INTO user_doc_state (space_id, user_id, doc_id, starred_at) \
-                             VALUES ($1, $2, $3, $4) ON CONFLICT (space_id, user_id, doc_id) \
-                             DO UPDATE SET starred_at = excluded.starred_at",
+                            "INSERT INTO user_doc_state (space_id, user_id, \
+                             doc_id, starred_at) VALUES ($1, $2, $3, $4) ON \
+                             CONFLICT (space_id, user_id, doc_id) DO UPDATE \
+                             SET starred_at = excluded.starred_at",
                         )
                         .bind(space)
                         .bind(uuid(user))
@@ -756,17 +809,23 @@ impl DriveIndex for SqlIndex {
         Ok(out.into_iter().map(|(id, _)| id).collect())
     }
 
-    async fn touch(&self, user: UserId, node: ObjectId, at: Timestamp) -> DriveResult<()> {
+    async fn touch(
+        &self,
+        user: UserId,
+        node: ObjectId,
+        at: Timestamp,
+    ) -> DriveResult<()> {
         let space = self.space_of(node).await?;
         on_pool!(self, pool, system => {
             let _ = run!(
                 system,
                 "user.touch",
                 sqlx::query(
-                    "INSERT INTO user_doc_state (space_id, user_id, doc_id, last_viewed_at, view_count) \
-                     VALUES ($1, $2, $3, $4, 1) ON CONFLICT (space_id, user_id, doc_id) \
-                     DO UPDATE SET last_viewed_at = excluded.last_viewed_at, \
-                     view_count = user_doc_state.view_count + 1",
+                    "INSERT INTO user_doc_state (space_id, user_id, doc_id, \
+                     last_viewed_at, view_count) VALUES ($1, $2, $3, $4, 1) ON \
+                     CONFLICT (space_id, user_id, doc_id) DO UPDATE SET \
+                     last_viewed_at = excluded.last_viewed_at, view_count = \
+                     user_doc_state.view_count + 1",
                 )
                 .bind(space)
                 .bind(uuid(user))
@@ -778,7 +837,11 @@ impl DriveIndex for SqlIndex {
         })
     }
 
-    async fn recent(&self, user: UserId, limit: usize) -> DriveResult<Vec<(ObjectId, Timestamp)>> {
+    async fn recent(
+        &self,
+        user: UserId,
+        limit: usize,
+    ) -> DriveResult<Vec<(ObjectId, Timestamp)>> {
         let limit = i64::try_from(limit).unwrap_or(i64::MAX);
         let rows: Vec<(Uuid, i64)> = on_pool!(self, pool, system => {
             Ok(run!(
@@ -805,10 +868,14 @@ impl DriveIndex for SqlIndex {
             ancestors: entry.ancestors.clone(),
             kind: entry.kind.clone(),
         })?;
-        let (space, event) = (uuid(entry.space), Uuid::from_u128(entry.id.as_u128()));
-        let mut scope: Vec<Uuid> = Vec::with_capacity(entry.ancestors.len() + 1);
+        let (space, event) =
+            (uuid(entry.space), Uuid::from_u128(entry.id.as_u128()));
+        let mut scope: Vec<Uuid> =
+            Vec::with_capacity(entry.ancestors.len() + 1);
         let mut seen = HashSet::new();
-        for id in std::iter::once(entry.node).chain(entry.ancestors.iter().copied()) {
+        for id in
+            std::iter::once(entry.node).chain(entry.ancestors.iter().copied())
+        {
             if seen.insert(id) {
                 scope.push(uuid(id));
             }
@@ -819,8 +886,8 @@ impl DriveIndex for SqlIndex {
                 system,
                 "activity.insert",
                 sqlx::query(
-                    "INSERT INTO drive_activity (space_id, event_id, node_id, at, entry) \
-                     VALUES ($1, $2, $3, $4, $5)",
+                    "INSERT INTO drive_activity (space_id, event_id, node_id, \
+                     at, entry) VALUES ($1, $2, $3, $4, $5)",
                 )
                 .bind(space)
                 .bind(event)
@@ -834,8 +901,8 @@ impl DriveIndex for SqlIndex {
                     system,
                     "activity.scope",
                     sqlx::query(
-                        "INSERT INTO drive_activity_scope (space_id, object_id, event_id) \
-                         VALUES ($1, $2, $3)",
+                        "INSERT INTO drive_activity_scope (space_id, \
+                         object_id, event_id) VALUES ($1, $2, $3)",
                     )
                     .bind(space)
                     .bind(*object)
@@ -848,7 +915,11 @@ impl DriveIndex for SqlIndex {
         })
     }
 
-    async fn activity(&self, node: ObjectId, limit: usize) -> DriveResult<Vec<Activity>> {
+    async fn activity(
+        &self,
+        node: ObjectId,
+        limit: usize,
+    ) -> DriveResult<Vec<Activity>> {
         let limit = i64::try_from(limit).unwrap_or(i64::MAX);
         let rows: Vec<ActivityRow> = on_pool!(self, pool, system => {
             Ok(run!(
@@ -868,7 +939,11 @@ impl DriveIndex for SqlIndex {
         rows.into_iter().map(activity_from_row).collect()
     }
 
-    async fn set_links(&self, source: ObjectId, targets: &[ObjectId]) -> DriveResult<()> {
+    async fn set_links(
+        &self,
+        source: ObjectId,
+        targets: &[ObjectId],
+    ) -> DriveResult<()> {
         let space = self.space_of(source).await?;
         let mut unique: Vec<ObjectId> = targets.to_vec();
         unique.sort_unstable();
@@ -887,7 +962,8 @@ impl DriveIndex for SqlIndex {
                     system,
                     "links.insert",
                     sqlx::query(
-                        "INSERT INTO drive_links (space_id, source_id, target_id) VALUES ($1, $2, $3)",
+                        "INSERT INTO drive_links (space_id, source_id, \
+                            target_id) VALUES ($1, $2, $3)",
                     )
                     .bind(space)
                     .bind(uuid(source))
@@ -906,13 +982,15 @@ impl DriveIndex for SqlIndex {
                 system,
                 "links.backlinks",
                 sqlx::query_as(
-                    "SELECT DISTINCT source_id FROM drive_links WHERE target_id = $1 AND source_id <> $1",
+                    "SELECT DISTINCT source_id FROM drive_links WHERE \
+                        target_id = $1 AND source_id <> $1",
                 )
                 .bind(uuid(target))
                 .fetch_all(pool)
             ))
         })?;
-        let mut out: Vec<ObjectId> = rows.into_iter().map(|(id,)| object(id)).collect();
+        let mut out: Vec<ObjectId> =
+            rows.into_iter().map(|(id,)| object(id)).collect();
         out.sort_unstable();
         Ok(out)
     }
@@ -933,8 +1011,8 @@ impl DriveIndex for SqlIndex {
                 system,
                 "version.insert",
                 sqlx::query(
-                    "INSERT INTO drive_versions (space_id, version_id, doc_id, byte_size, author) \
-                     VALUES ($1, $2, $3, $4, $5)",
+                    "INSERT INTO drive_versions (space_id, version_id, doc_id, \
+                     byte_size, author) VALUES ($1, $2, $3, $4, $5)",
                 )
                 .bind(uuid(version.space))
                 .bind(id)
@@ -954,8 +1032,9 @@ impl DriveIndex for SqlIndex {
                 system,
                 "version.list",
                 sqlx::query_as(
-                    "SELECT version_id, doc_id, space_id, byte_size, author FROM drive_versions \
-                     WHERE doc_id = $1 ORDER BY version_id DESC",
+                    "SELECT version_id, doc_id, space_id, byte_size, author \
+                     FROM drive_versions WHERE doc_id = $1 ORDER BY version_id \
+                     DESC",
                 )
                 .bind(uuid(doc))
                 .fetch_all(pool)
@@ -993,8 +1072,8 @@ impl DriveIndex for SqlIndex {
                 system,
                 "usage.nodes",
                 sqlx::query_scalar(
-                    "SELECT CAST(COALESCE(SUM(byte_size), 0) AS BIGINT) FROM drive_nodes \
-                     WHERE space_id = $1",
+                    "SELECT CAST(COALESCE(SUM(byte_size), 0) AS BIGINT) FROM \
+                     drive_nodes WHERE space_id = $1",
                 )
                 .bind(uuid(space))
                 .fetch_one(pool)
@@ -1003,8 +1082,8 @@ impl DriveIndex for SqlIndex {
                 system,
                 "usage.versions",
                 sqlx::query_scalar(
-                    "SELECT CAST(COALESCE(SUM(byte_size), 0) AS BIGINT) FROM drive_versions \
-                     WHERE space_id = $1",
+                    "SELECT CAST(COALESCE(SUM(byte_size), 0) AS BIGINT) FROM \
+                     drive_versions WHERE space_id = $1",
                 )
                 .bind(uuid(space))
                 .fetch_one(pool)
@@ -1023,15 +1102,18 @@ impl DriveIndex for SqlIndex {
             let spaces: i64 = run!(
                 system,
                 "totals.spaces",
-                sqlx::query_scalar("SELECT COUNT(*) FROM drive_spaces").fetch_one(pool)
+                sqlx::query_scalar(
+                    "SELECT COUNT(*) FROM drive_spaces"
+                ).fetch_one(pool)
             );
             let nodes: Vec<(String, i64, i64, i64)> = run!(
                 system,
                 "totals.nodes",
                 sqlx::query_as(
-                    "SELECT kind, CAST(CASE WHEN trash IS NULL THEN 1 ELSE 0 END AS BIGINT) AS live, \
-                     COUNT(*), CAST(COALESCE(SUM(byte_size), 0) AS BIGINT) \
-                     FROM drive_nodes GROUP BY kind, live",
+                    "SELECT kind, CAST(CASE WHEN trash IS NULL THEN 1 ELSE 0 \
+                     END AS BIGINT) AS live, COUNT(*), \
+                     CAST(COALESCE(SUM(byte_size), 0) AS BIGINT) FROM \
+                     drive_nodes GROUP BY kind, live",
                 )
                 .fetch_all(pool)
             );
@@ -1039,8 +1121,8 @@ impl DriveIndex for SqlIndex {
                 system,
                 "totals.versions",
                 sqlx::query_as(
-                    "SELECT COUNT(*), CAST(COALESCE(SUM(byte_size), 0) AS BIGINT) \
-                     FROM drive_versions",
+                    "SELECT COUNT(*), CAST(COALESCE(SUM(byte_size), 0) AS \
+                     BIGINT) FROM drive_versions",
                 )
                 .fetch_one(pool)
             );
@@ -1048,8 +1130,9 @@ impl DriveIndex for SqlIndex {
                 system,
                 "totals.activity",
                 sqlx::query_as(
-                    "SELECT CAST(COALESCE(SUM(CASE WHEN at >= $1 THEN 1 ELSE 0 END), 0) AS BIGINT), \
-                     COUNT(*) FROM drive_activity WHERE at >= $2",
+                    "SELECT CAST(COALESCE(SUM(CASE WHEN at >= $1 THEN 1 ELSE 0 \
+                     END), 0) AS BIGINT), COUNT(*) FROM drive_activity WHERE \
+                     at >= $2",
                 )
                 .bind(day)
                 .bind(week)
@@ -1068,7 +1151,8 @@ impl DriveIndex for SqlIndex {
         for (kind, live, n, bytes) in nodes {
             let kind = parse_node_kind(&kind)?;
             totals.add_nodes(kind, live == 1, unsigned(n));
-            totals.file_bytes = totals.file_bytes.saturating_add(unsigned(bytes));
+            totals.file_bytes =
+                totals.file_bytes.saturating_add(unsigned(bytes));
         }
         Ok(totals)
     }
@@ -1081,7 +1165,8 @@ impl SqlIndex {
             Ok(run!(
                 system,
                 "node.space",
-                sqlx::query_as("SELECT space_id FROM drive_nodes WHERE node_id = $1")
+                sqlx::query_as("SELECT space_id FROM drive_nodes WHERE node_id \
+                    = $1")
                     .bind(uuid(node))
                     .fetch_optional(pool)
             ))
@@ -1121,7 +1206,11 @@ fn space_from_row(row: SpaceRow) -> DriveResult<Space> {
     let kind = match kind.as_str() {
         "shared_drive" => SpaceKind::SharedDrive,
         "user_drive" => SpaceKind::UserDrive,
-        other => return Err(DriveError::Index(format!("unknown space kind {other}"))),
+        other => {
+            return Err(DriveError::Index(format!(
+                "unknown space kind {other}"
+            )));
+        }
     };
     let settings: SpaceSettings = from_yaml(&settings)?;
     Ok(Space {
@@ -1136,7 +1225,19 @@ fn space_from_row(row: SpaceRow) -> DriveResult<Space> {
 }
 
 fn node_from_row(row: NodeRow) -> DriveResult<Node> {
-    let (space, id, kind, parent, path, title, bytes, modified, created_by, target, trash) = row;
+    let (
+        space,
+        id,
+        kind,
+        parent,
+        path,
+        title,
+        bytes,
+        modified,
+        created_by,
+        target,
+        trash,
+    ) = row;
     let trash: Option<TrashState> = trash.map(|t| from_yaml(&t)).transpose()?;
     Ok(Node {
         id: object(id),
@@ -1220,7 +1321,11 @@ fn parse_node_kind(kind: &str) -> DriveResult<NodeKind> {
         "book" => NodeKind::Book,
         "collection" => NodeKind::Collection,
         "shortcut" => NodeKind::Shortcut,
-        other => return Err(DriveError::Index(format!("unknown node kind {other}"))),
+        other => {
+            return Err(DriveError::Index(format!(
+                "unknown node kind {other}"
+            )));
+        }
     })
 }
 
@@ -1233,15 +1338,18 @@ const fn object(id: Uuid) -> ObjectId {
 }
 
 fn blob_path(path: &str) -> DriveResult<BlobPath> {
-    BlobPath::new(path).map_err(|err| DriveError::Index(format!("stored path {path}: {err}")))
+    BlobPath::new(path)
+        .map_err(|err| DriveError::Index(format!("stored path {path}: {err}")))
 }
 
 fn timestamp(ms: i64) -> DriveResult<Timestamp> {
-    Timestamp::from_unix_ms(ms).map_err(|err| DriveError::Index(err.to_string()))
+    Timestamp::from_unix_ms(ms)
+        .map_err(|err| DriveError::Index(err.to_string()))
 }
 
 fn size(bytes: u64) -> DriveResult<i64> {
-    i64::try_from(bytes).map_err(|_| DriveError::Index(format!("size {bytes} is too large")))
+    i64::try_from(bytes)
+        .map_err(|_| DriveError::Index(format!("size {bytes} is too large")))
 }
 
 fn unsigned(value: i64) -> u64 {
@@ -1255,7 +1363,8 @@ fn now_ms() -> i64 {
 }
 
 fn from_yaml<T: serde::de::DeserializeOwned>(text: &str) -> DriveResult<T> {
-    serde_saphyr::from_str(text).map_err(|err| DriveError::Index(format!("stored YAML: {err}")))
+    serde_saphyr::from_str(text)
+        .map_err(|err| DriveError::Index(format!("stored YAML: {err}")))
 }
 
 fn db_error(err: impl fmt::Display) -> DriveError {

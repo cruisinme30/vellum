@@ -16,7 +16,18 @@ use crate::error::WorkError;
 /// The seven fixed status categories.
 ///
 /// The declaration order is the board and focus order of the categories.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Category {
     /// New issues waiting for a team member to accept them.
@@ -157,7 +168,11 @@ pub struct Status {
 }
 
 impl Status {
-    fn new(key: &str, name: &str, category: Category) -> Result<Self, WorkError> {
+    fn new(
+        key: &str,
+        name: &str,
+        category: Category,
+    ) -> Result<Self, WorkError> {
         Ok(Self {
             key: StatusKey::parse(key)?,
             name: name.to_owned(),
@@ -218,7 +233,9 @@ impl Workflow {
                 return Err(format!("status key {} is used twice", s.key));
             }
         }
-        let count = |c: Category| self.statuses.iter().filter(|s| s.category == c).count();
+        let count = |c: Category| {
+            self.statuses.iter().filter(|s| s.category == c).count()
+        };
         if count(Category::Duplicate) != 1 {
             return Err("needs exactly one duplicate status".to_owned());
         }
@@ -234,8 +251,15 @@ impl Workflow {
             }
         }
         match self.get(&self.default) {
-            None => Err(format!("default status {} does not exist", self.default)),
-            Some(s) if !matches!(s.category, Category::Backlog | Category::Unstarted) => {
+            None => {
+                Err(format!("default status {} does not exist", self.default))
+            }
+            Some(s)
+                if !matches!(
+                    s.category,
+                    Category::Backlog | Category::Unstarted
+                ) =>
+            {
                 Err("default status must be backlog or unstarted".to_owned())
             }
             Some(_) => Ok(()),
@@ -354,7 +378,8 @@ mod tests {
     fn board_order_groups_by_category() {
         let mut w = Workflow::standard().unwrap();
         w.statuses.reverse();
-        let order: Vec<_> = w.board_order().iter().map(|s| s.key.as_str()).collect();
+        let order: Vec<_> =
+            w.board_order().iter().map(|s| s.key.as_str()).collect();
         assert_eq!(order.first(), Some(&"triage"));
         assert_eq!(order.last(), Some(&"duplicate"));
     }

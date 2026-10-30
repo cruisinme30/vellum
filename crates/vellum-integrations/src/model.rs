@@ -17,8 +17,12 @@ use jiff::Timestamp;
 use jiff::civil::Date;
 use serde::{Deserialize, Serialize};
 
+use crate::git::Mapping;
+
 /// An issue identifier such as `ENG-142`.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
+)]
 #[serde(try_from = "String", into = "String")]
 pub struct IssueKey {
     /// The team key, upper case (`ENG`).
@@ -93,7 +97,18 @@ impl From<IssueKey> for String {
 }
 
 /// The fixed status categories; each team names its own states inside them.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    Serialize,
+    Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum StateCategory {
     /// Waiting in the team's triage inbox.
@@ -132,7 +147,18 @@ pub struct WorkflowState {
 }
 
 /// Issue priority, 0–4 as stored in front matter.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    Serialize,
+    Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Priority {
     /// 0: no priority.
@@ -166,12 +192,13 @@ impl Priority {
     pub fn parse(text: &str) -> Option<Self> {
         match text.trim().to_ascii_lowercase().as_str() {
             "0" | "none" | "no priority" | "no_priority" => Some(Self::None),
-            "1" | "p1" | "urgent" | "highest" | "blocker" | "critical" | "fatal" => {
-                Some(Self::Urgent)
-            }
+            "1" | "p1" | "urgent" | "highest" | "blocker" | "critical"
+            | "fatal" => Some(Self::Urgent),
             "2" | "p2" | "high" | "major" => Some(Self::High),
             "3" | "p3" | "normal" | "medium" => Some(Self::Normal),
-            "4" | "p4" | "low" | "lowest" | "minor" | "trivial" => Some(Self::Low),
+            "4" | "p4" | "low" | "lowest" | "minor" | "trivial" => {
+                Some(Self::Low)
+            }
             _ => None,
         }
     }
@@ -269,7 +296,11 @@ pub struct IssueDraft {
 impl IssueDraft {
     /// An empty draft for `team` from `source`.
     #[must_use]
-    pub fn new(team: impl Into<String>, title: impl Into<String>, source: Source) -> Self {
+    pub fn new(
+        team: impl Into<String>,
+        title: impl Into<String>,
+        source: Source,
+    ) -> Self {
         Self {
             team: team.into(),
             title: title.into(),
@@ -367,7 +398,7 @@ pub trait WorkCommands: Send + Sync {
     fn git_mapping(
         &self,
         team: &str,
-    ) -> impl Future<Output = Result<Option<crate::git::Mapping>, WorkError>> + Send {
+    ) -> impl Future<Output = Result<Option<Mapping>, WorkError>> + Send {
         let _ = team;
         async { Ok(None) }
     }

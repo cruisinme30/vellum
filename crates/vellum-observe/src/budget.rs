@@ -25,7 +25,9 @@ pub const PAGE_RENDER_ROUTE: &str = "/api/v1/pages/{id}/render";
 pub const PAGE_RENDER_MS: u64 = 50;
 
 /// A budget for one route, or every route under a prefix.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(deny_unknown_fields)]
 pub struct RouteBudget {
     /// The HTTP method, or every method when absent.
@@ -63,7 +65,9 @@ impl RouteBudget {
 }
 
 /// The budgets for every route.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(default, deny_unknown_fields)]
 pub struct Budgets {
     /// The p95 budget for reads without a rule, in milliseconds.
@@ -92,7 +96,9 @@ impl Default for Budgets {
 }
 
 /// A route whose p95 is over its budget.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(
+    Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema,
+)]
 pub struct Breach {
     /// The HTTP method.
     pub method: String,
@@ -135,7 +141,10 @@ impl Budgets {
         for stat in stats {
             let budget = self.budget_for(&stat.method, &stat.route);
             stat.budget_ms = Some(budget);
-            #[expect(clippy::cast_precision_loss, reason = "budgets are small integers")]
+            #[expect(
+                clippy::cast_precision_loss,
+                reason = "budgets are small integers"
+            )]
             let limit = budget as f64;
             stat.over_budget = stat.counts.requests >= self.min_requests
                 && stat.p95_ms.is_some_and(|p95| p95 > limit);
@@ -154,17 +163,25 @@ impl Budgets {
     #[must_use]
     pub fn problems(&self) -> Vec<String> {
         let mut problems = Vec::new();
-        for (name, value) in [("read_ms", self.read_ms), ("write_ms", self.write_ms)] {
+        for (name, value) in
+            [("read_ms", self.read_ms), ("write_ms", self.write_ms)]
+        {
             if value == 0 {
                 problems.push(format!("{name} must be at least 1"));
             }
         }
         for rule in &self.routes {
             if rule.p95_ms == 0 {
-                problems.push(format!("the budget for {} must be at least 1", rule.route));
+                problems.push(format!(
+                    "the budget for {} must be at least 1",
+                    rule.route
+                ));
             }
             if !rule.route.starts_with('/') {
-                problems.push(format!("the route {} must start with /", rule.route));
+                problems.push(format!(
+                    "the route {} must start with /",
+                    rule.route
+                ));
             }
         }
         problems
@@ -189,7 +206,10 @@ pub fn marked_breaches(stats: &[RouteStat]) -> Vec<Breach> {
         })
         .collect();
     breaches.sort_by(|a, b| {
-        #[expect(clippy::cast_precision_loss, reason = "budgets are small integers")]
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "budgets are small integers"
+        )]
         let ratio = |x: &Breach| x.p95_ms / x.budget_ms.max(1) as f64;
         ratio(b).total_cmp(&ratio(a))
     });

@@ -156,7 +156,10 @@ async fn clamd_clean_and_infected() {
     let clamd = Clamd::new(fake_clamd().await, Duration::from_secs(5));
     clamd.scan(&vec![b'a'; 200_000]).await.unwrap();
     let err = clamd
-        .scan(b"X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*")
+        .scan(
+            b"X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE\
+            !$H+H*",
+        )
         .await
         .unwrap_err();
     match err {

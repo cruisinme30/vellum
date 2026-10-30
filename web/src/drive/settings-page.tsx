@@ -32,21 +32,30 @@ export function draftOf(space: SpaceView): Draft {
   return {
     name: space.name,
     quotaGb:
-      s.quota_bytes === undefined || s.quota_bytes === null ? "" : String(s.quota_bytes / GB),
+      s.quota_bytes === undefined || s.quota_bytes === null
+        ? ""
+        : String(s.quota_bytes / GB),
     trashDays: String(s.trash_days),
     keepAllDays: String(s.keep_all_days),
     dailyDays: String(s.daily_days),
     weeklyWeeks:
-      s.weekly_weeks === undefined || s.weekly_weeks === null ? "" : String(s.weekly_weeks),
+      s.weekly_weeks === undefined || s.weekly_weeks === null
+        ? ""
+        : String(s.weekly_weeks),
   };
 }
 
 const whole = (text: string) => {
   const value = Number(text.trim());
-  return text.trim() !== "" && Number.isInteger(value) && value >= 0 ? value : undefined;
+  return text.trim() !== "" && Number.isInteger(value) && value >= 0
+    ? value
+    : undefined;
 };
 
-/** An optional field: empty is "none", else it must pass `parse`; `false` when it does not. */
+/**
+ * An optional field: empty is "none", else it must pass `parse`; `false` when
+ * it does not.
+ */
 const optional = (text: string, parse: (text: string) => number | undefined) =>
   text.trim() === "" ? undefined : (parse(text) ?? false);
 
@@ -59,7 +68,9 @@ const positive = (text: string) => {
  * The settings a draft says, or the name of the first field that is not a
  * valid number. Quota is in GB and may have decimals; the rest are whole.
  */
-export function settingsOf(draft: Draft): SettingsView | { readonly invalid: keyof Draft } {
+export function settingsOf(
+  draft: Draft,
+): SettingsView | { readonly invalid: keyof Draft } {
   const quota = optional(draft.quotaGb, positive);
   if (quota === false) return { invalid: "quotaGb" };
   const trashDays = whole(draft.trashDays);
@@ -81,11 +92,19 @@ export function settingsOf(draft: Draft): SettingsView | { readonly invalid: key
 
 const FIELDS: readonly { key: keyof Draft; label: string; hint?: string }[] = [
   { key: "name", label: "drive-settings-name" },
-  { key: "quotaGb", label: "drive-settings-quota", hint: "drive-settings-quota-hint" },
+  {
+    key: "quotaGb",
+    label: "drive-settings-quota",
+    hint: "drive-settings-quota-hint",
+  },
   { key: "trashDays", label: "drive-settings-trash-days" },
   { key: "keepAllDays", label: "drive-settings-keep-all" },
   { key: "dailyDays", label: "drive-settings-daily" },
-  { key: "weeklyWeeks", label: "drive-settings-weekly", hint: "drive-settings-weekly-hint" },
+  {
+    key: "weeklyWeeks",
+    label: "drive-settings-weekly",
+    hint: "drive-settings-weekly-hint",
+  },
 ];
 
 function Field({
@@ -196,7 +215,9 @@ function SettingsForm({
           type="button"
           className="vl-text-button"
           onClick={() =>
-            void run(async () => t("drive-pruned", { count: await api.pruneVersions(space.id) }))
+            void run(async () =>
+              t("drive-pruned", { count: await api.pruneVersions(space.id) }),
+            )
           }
         >
           {t("drive-prune")}
@@ -209,7 +230,13 @@ function SettingsForm({
   );
 }
 
-function SpaceSettings({ api, spaceId }: { readonly api: DriveApi; readonly spaceId: string }) {
+function SpaceSettings({
+  api,
+  spaceId,
+}: {
+  readonly api: DriveApi;
+  readonly spaceId: string;
+}) {
   const t = useT();
   const { loaded, reload } = useReloadable(async () => {
     const spaces = await loadSpaces(api);
@@ -223,7 +250,8 @@ function SpaceSettings({ api, spaceId }: { readonly api: DriveApi; readonly spac
         ) : (
           <>
             <h2>
-              <Link to={spacePath(space.id)}>{space.name}</Link> · {t("drive-settings")}
+              <Link to={spacePath(space.id)}>{space.name}</Link> ·{" "}
+              {t("drive-settings")}
             </h2>
             <UsageMeter api={api} space={space} />
             <SettingsForm api={api} space={space} onSaved={reload} />
@@ -237,5 +265,9 @@ function SpaceSettings({ api, spaceId }: { readonly api: DriveApi; readonly spac
 /** A space's quota, trash and version retention settings (R-DR-10). */
 export function DriveSettingsPage() {
   const { spaceId = "" } = useParams();
-  return <DriveFrame>{(api) => <SpaceSettings api={api} spaceId={spaceId} />}</DriveFrame>;
+  return (
+    <DriveFrame>
+      {(api) => <SpaceSettings api={api} spaceId={spaceId} />}
+    </DriveFrame>
+  );
 }

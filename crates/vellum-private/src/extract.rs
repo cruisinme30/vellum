@@ -162,7 +162,8 @@ impl Walker {
                     } else {
                         BlockKind::ListItem
                     };
-                    let id = item.attrs.id.as_deref().and_then(|s| s.parse().ok());
+                    let id =
+                        item.attrs.id.as_deref().and_then(|s| s.parse().ok());
                     let id = self.id_or_derived(id);
                     let one = Block::List(vellum_format::List {
                         start: list.start,
@@ -191,7 +192,12 @@ impl Walker {
             }
             Block::Math { literal, id } => {
                 let id = self.id_or_derived(*id);
-                self.push(id, BlockKind::Other, literal.trim().to_owned(), block);
+                self.push(
+                    id,
+                    BlockKind::Other,
+                    literal.trim().to_owned(),
+                    block,
+                );
             }
             Block::Table(table) => {
                 let id = self.id_or_derived(table.id);
@@ -204,7 +210,13 @@ impl Walker {
         }
     }
 
-    fn push(&mut self, id: BlockId, kind: BlockKind, text: String, block: &Block) {
+    fn push(
+        &mut self,
+        id: BlockId,
+        kind: BlockKind,
+        text: String,
+        block: &Block,
+    ) {
         let markdown = serialize(&Document {
             front_matter: None,
             blocks: vec![block.clone()],
@@ -215,7 +227,11 @@ impl Walker {
             id,
             kind,
             section: self.headings.last().map(|(_, id, _)| *id),
-            heading_path: self.headings.iter().map(|(_, _, t)| t.clone()).collect(),
+            heading_path: self
+                .headings
+                .iter()
+                .map(|(_, _, t)| t.clone())
+                .collect(),
             text,
             markdown,
         });
@@ -228,7 +244,8 @@ impl Walker {
             let mut hash = Fnv::new();
             hash.write(&self.doc.as_u128().to_le_bytes());
             hash.write(&self.blocks.len().to_le_bytes());
-            BlockId::from_u64(hash.finish() & BlockId::MAX).unwrap_or_else(BlockId::generate)
+            BlockId::from_u64(hash.finish() & BlockId::MAX)
+                .unwrap_or_else(BlockId::generate)
         })
     }
 }
@@ -270,7 +287,9 @@ fn texts(blocks: &[Block]) -> String {
 fn text_of(block: &Block) -> String {
     match block {
         Block::ThematicBreak => String::new(),
-        Block::Paragraph { content, .. } | Block::Heading { content, .. } => plain_text(content),
+        Block::Paragraph { content, .. } | Block::Heading { content, .. } => {
+            plain_text(content)
+        }
         Block::BlockQuote { blocks, .. } => texts(blocks),
         Block::List(list) => list
             .items
@@ -304,7 +323,12 @@ fn text_of(block: &Block) -> String {
 mod tests {
     use super::*;
 
-    const PAGE: &str = "---\nid: 01JDPR7A00000000000000000A\ntitle: Board notes\nvellum: 1\n---\n\n# Q4 plan ^blk-p1an0001\n\nRaise the seed round in December. ^blk-ra1se001\n\n- [ ] Draft the deck\n- [x] Pick the lead\n\n## Risks\n\n> Runway is nine months.\n\n| Item | Cost |\n| --- | --- |\n| Legal | 40k |\n";
+    const PAGE: &str = "---\nid: 01JDPR7A00000000000000000A\n\
+        title: Board notes\nvellum: 1\n---\n\n# Q4 plan ^blk-p1an0001\n\n\
+        Raise the seed round in December. ^blk-ra1se001\n\n\
+        - [ ] Draft the deck\n- [x] Pick the lead\n\n## Risks\n\n\
+        > Runway is nine months.\n\n| Item | Cost |\n| --- | --- |\n\
+        | Legal | 40k |\n";
 
     fn read() -> PrivateDoc {
         read_document(
@@ -346,9 +370,11 @@ mod tests {
     #[test]
     fn derived_block_ids_are_stable() {
         let (a, b) = (read(), read());
-        let ids = |d: &PrivateDoc| d.blocks.iter().map(|b| b.id).collect::<Vec<_>>();
+        let ids =
+            |d: &PrivateDoc| d.blocks.iter().map(|b| b.id).collect::<Vec<_>>();
         assert_eq!(ids(&a), ids(&b));
-        let unique: std::collections::HashSet<_> = ids(&a).into_iter().collect();
+        let unique: std::collections::HashSet<_> =
+            ids(&a).into_iter().collect();
         assert_eq!(unique.len(), a.blocks.len());
     }
 
@@ -363,7 +389,8 @@ mod tests {
         .unwrap_err();
         assert_eq!(err, ExtractError::NoId("a/untitled.md".to_owned()));
 
-        let no_title = "---\nid: 01JDPR7A00000000000000000B\n---\n\nJust text.\n";
+        let no_title =
+            "---\nid: 01JDPR7A00000000000000000B\n---\n\nJust text.\n";
         let doc = read_document(
             SpaceId::from_u128(7),
             "a/plain.md",

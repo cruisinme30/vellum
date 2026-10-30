@@ -115,18 +115,28 @@ impl Row {
     /// values are preserved verbatim, and a page without an `id` gets a new
     /// one (with a warning, so the caller writes it back).
     #[must_use]
-    pub fn parse(text: &str, schema: &Schema, location: &str) -> (Self, Vec<Diagnostic>) {
+    pub fn parse(
+        text: &str,
+        schema: &Schema,
+        location: &str,
+    ) -> (Self, Vec<Diagnostic>) {
         let mut diags = Vec::new();
         let (front, body) = split_front_matter(text);
         let mapping = match front.map(crate::yaml::from_str::<Yaml>) {
             Some(Ok(Yaml::Map(m))) => m,
             None | Some(Ok(Yaml::Null)) => Mapping::new(),
             Some(Ok(_)) => {
-                diags.push(Diagnostic::error(location, "front matter is not a mapping"));
+                diags.push(Diagnostic::error(
+                    location,
+                    "front matter is not a mapping",
+                ));
                 Mapping::new()
             }
             Some(Err(e)) => {
-                diags.push(Diagnostic::error(location, format!("front matter: {e}")));
+                diags.push(Diagnostic::error(
+                    location,
+                    format!("front matter: {e}"),
+                ));
                 Mapping::new()
             }
         };
@@ -162,7 +172,10 @@ impl Row {
                     Err(why) => {
                         diags.push(Diagnostic::error(
                             location,
-                            format!("{} ({key}): {why}; kept as written", p.name),
+                            format!(
+                                "{} ({key}): {why}; kept as written",
+                                p.name
+                            ),
                         ));
                         row.extra.insert(key, v);
                     }
@@ -224,7 +237,10 @@ fn split_front_matter(text: &str) -> (Option<&str>, &str) {
 /// # Errors
 ///
 /// Returns why the value does not fit the property type.
-pub(crate) fn from_yaml(kind: &PropertyType, v: &Yaml) -> Result<Value, String> {
+pub(crate) fn from_yaml(
+    kind: &PropertyType,
+    v: &Yaml,
+) -> Result<Value, String> {
     if v.is_null() {
         return Ok(Value::Empty);
     }
@@ -253,7 +269,9 @@ pub(crate) fn from_yaml(kind: &PropertyType, v: &Yaml) -> Result<Value, String> 
         PropertyType::Number { .. } => match v {
             #[allow(clippy::cast_precision_loss)]
             Yaml::Int(n) => Some(Value::Number(*n as f64)),
-            Yaml::Float(n) => Some(*n).filter(|f| f.is_finite()).map(Value::Number),
+            Yaml::Float(n) => {
+                Some(*n).filter(|f| f.is_finite()).map(Value::Number)
+            }
             Yaml::String(s) => parse_number(s).map(Value::Number),
             _ => None,
         }
@@ -271,11 +289,17 @@ pub(crate) fn from_yaml(kind: &PropertyType, v: &Yaml) -> Result<Value, String> 
             .map(Value::Date)
             .ok_or_else(|| "expected a date like 2026-11-24".into()),
         PropertyType::Multi { .. } => list(v)
-            .map(|items| Value::List(items.into_iter().map(Value::Text).collect()))
+            .map(|items| {
+                Value::List(items.into_iter().map(Value::Text).collect())
+            })
             .ok_or_else(|| "expected a list of options".into()),
         PropertyType::Person => match list(v) {
-            Some(mut items) if items.len() == 1 => Ok(Value::Text(items.remove(0))),
-            Some(items) => Ok(Value::List(items.into_iter().map(Value::Text).collect())),
+            Some(mut items) if items.len() == 1 => {
+                Ok(Value::Text(items.remove(0)))
+            }
+            Some(items) => {
+                Ok(Value::List(items.into_iter().map(Value::Text).collect()))
+            }
             None => Err("expected a person handle or a list of them".into()),
         },
         PropertyType::Relation { .. } => {
@@ -289,9 +313,9 @@ pub(crate) fn from_yaml(kind: &PropertyType, v: &Yaml) -> Result<Value, String> 
             }
             Ok(relation_value(&ids))
         }
-        PropertyType::Rollup { .. } | PropertyType::Formula { .. } | PropertyType::Created => {
-            Ok(Value::Empty)
-        }
+        PropertyType::Rollup { .. }
+        | PropertyType::Formula { .. }
+        | PropertyType::Created => Ok(Value::Empty),
     }
 }
 
@@ -318,7 +342,9 @@ fn to_yaml(kind: &PropertyType, v: &Value) -> Yaml {
         PropertyType::Multi { .. } | PropertyType::Relation { .. }
     );
     match v {
-        Value::List(items) => Yaml::Seq(items.iter().map(scalar_yaml).collect()),
+        Value::List(items) => {
+            Yaml::Seq(items.iter().map(scalar_yaml).collect())
+        }
         other if always_list => Yaml::Seq(vec![scalar_yaml(other)]),
         other => scalar_yaml(other),
     }
@@ -337,7 +363,9 @@ fn scalar_yaml(v: &Value) -> Yaml {
         Value::Number(n) => Yaml::Float(*n),
         Value::Bool(b) => Yaml::Bool(*b),
         Value::Date(d) => Yaml::String(d.to_string()),
-        Value::List(items) => Yaml::Seq(items.iter().map(scalar_yaml).collect()),
+        Value::List(items) => {
+            Yaml::Seq(items.iter().map(scalar_yaml).collect())
+        }
     }
 }
 
@@ -373,7 +401,9 @@ mod tests {
     use super::*;
     use crate::schema::TEST_SCHEMA;
 
-    const ROW: &str = "---\nid: 01JBQ8Y4ZK6V3W2N5R7T9X1C3G\nt: R1 · Replay 7 days\npr: P0\nest: 8\nicon: 🎯\n---\nNotes about this requirement.\n";
+    const ROW: &str = "---\nid: 01JBQ8Y4ZK6V3W2N5R7T9X1C3G\n\
+        t: R1 · Replay 7 days\npr: P0\nest: 8\nicon: 🎯\n---\n\
+        Notes about this requirement.\n";
 
     #[test]
     fn parses_and_round_trips() {
@@ -390,7 +420,8 @@ mod tests {
     #[test]
     fn bad_values_are_kept_with_a_diagnostic() {
         let schema = Schema::from_yaml(TEST_SCHEMA).unwrap();
-        let text = "---\nid: 01JBQ8Y4ZK6V3W2N5R7T9X1C3G\nt: R2\nest: lots\n---\n";
+        let text =
+            "---\nid: 01JBQ8Y4ZK6V3W2N5R7T9X1C3G\nt: R2\nest: lots\n---\n";
         let (row, diags) = Row::parse(text, &schema, "rows/r2.md");
         assert_eq!(diags.len(), 1);
         assert!(

@@ -54,15 +54,21 @@ pub fn warm_up(address: SocketAddr) -> Result<Rooms, String> {
         "POST",
         "/api/v1/drive/spaces",
         &[("Authorization", &auth)],
-        Some(&json!({"kind": "shared_drive", "slug": "northstar", "name": "Northstar"})),
+        Some(&json!({
+            "kind": "shared_drive",
+            "slug": "northstar",
+            "name": "Northstar"
+        })),
     )?
     .expect_json(200, "create the shared drive")?;
     let space_id = string_field(&space, "id")?;
     let mut pages = Vec::with_capacity(PAGES);
     for i in 0..PAGES {
         let body = format!(
-            "# Northstar roadmap {i}\n\nThe Q{} launch plan covers onboarding, billing and the \
-             mobile release.\n\n- [ ] Review the budget\n- [x] Ship the release notes\n",
+            "# Northstar roadmap {i}\n\n\
+             The Q{} launch plan covers onboarding, billing and the mobile \
+             release.\n\n- [ ] Review the budget\n\
+             - [x] Ship the release notes\n",
             i % 4 + 1
         );
         let page = request(
@@ -70,7 +76,11 @@ pub fn warm_up(address: SocketAddr) -> Result<Rooms, String> {
             "POST",
             &format!("/api/v1/drive/spaces/{space_id}/pages"),
             &[("Authorization", &auth)],
-            Some(&json!({"space_id": space_id, "title": format!("Roadmap {i}"), "body": body})),
+            Some(&json!({
+                "space_id": space_id,
+                "title": format!("Roadmap {i}"),
+                "body": body
+            })),
         )?
         .expect_json(200, "create a page")?;
         pages.push(string_field(&page, "id")?);
@@ -116,11 +126,12 @@ fn sign_in(address: SocketAddr) -> Result<String, String> {
         &[],
         Some(&json!({"email": email, "password": PASSWORD})),
     )?;
-    let cookie = signed_in
-        .cookie()
-        .ok_or_else(|| format!("sign-in set no cookie (HTTP {})", signed_in.status))?;
-    let csrf = request(address, "GET", "/api/csrf", &[("Cookie", &cookie)], None)?
-        .expect_json(200, "fetch a CSRF token")?;
+    let cookie = signed_in.cookie().ok_or_else(|| {
+        format!("sign-in set no cookie (HTTP {})", signed_in.status)
+    })?;
+    let csrf =
+        request(address, "GET", "/api/csrf", &[("Cookie", &cookie)], None)?
+            .expect_json(200, "fetch a CSRF token")?;
     let csrf = string_field(&csrf, "token")?;
     let token = request(
         address,
@@ -203,12 +214,13 @@ fn request(
     let _ = stream
         .read_to_end(&mut raw)
         .map_err(|e| format!("{method} {path}: {e}"))?;
-    parse_response(&raw).ok_or_else(|| format!("{method} {path}: unreadable response"))
+    parse_response(&raw)
+        .ok_or_else(|| format!("{method} {path}: unreadable response"))
 }
 
 fn connect(address: SocketAddr) -> Result<TcpStream, String> {
-    let stream =
-        TcpStream::connect_timeout(&address, TIMEOUT).map_err(|e| format!("connect: {e}"))?;
+    let stream = TcpStream::connect_timeout(&address, TIMEOUT)
+        .map_err(|e| format!("connect: {e}"))?;
     stream
         .set_read_timeout(Some(TIMEOUT))
         .and_then(|()| stream.set_write_timeout(Some(TIMEOUT)))
@@ -228,7 +240,8 @@ fn parse_response(raw: &[u8]) -> Option<Response> {
         .map(|(name, value)| (name.trim().to_owned(), value.trim().to_owned()))
         .collect();
     let chunked = headers.iter().any(|(name, value)| {
-        name.eq_ignore_ascii_case("transfer-encoding") && value.eq_ignore_ascii_case("chunked")
+        name.eq_ignore_ascii_case("transfer-encoding")
+            && value.eq_ignore_ascii_case("chunked")
     });
     let body = if chunked {
         dechunk(rest)?
@@ -247,7 +260,9 @@ fn dechunk(mut rest: &[u8]) -> Option<Vec<u8>> {
     loop {
         let end = rest.windows(2).position(|w| w == b"\r\n")?;
         let size_text = std::str::from_utf8(rest.get(..end)?).ok()?;
-        let size = usize::from_str_radix(size_text.split(';').next()?.trim(), 16).ok()?;
+        let size =
+            usize::from_str_radix(size_text.split(';').next()?.trim(), 16)
+                .ok()?;
         rest = rest.get(end + 2..)?;
         if size == 0 {
             return Some(body);
@@ -263,7 +278,11 @@ const WEBSOCKET_KEY: &str = "dmVsbHVtLWJ1ZGdldHMtMQ=="; // gitleaks:allow
 
 /// Opens a collaboration WebSocket, sends Yjs sync step 1 with an empty
 /// state vector and waits for the server's first message.
-fn open_room(address: SocketAddr, path: &str, auth: &str) -> Result<TcpStream, String> {
+fn open_room(
+    address: SocketAddr,
+    path: &str,
+    auth: &str,
+) -> Result<TcpStream, String> {
     let stream = connect(address)?;
     let mut writer = stream.try_clone().map_err(|e| e.to_string())?;
     write!(
@@ -309,7 +328,8 @@ fn open_room(address: SocketAddr, path: &str, auth: &str) -> Result<TcpStream, S
 fn client_frame(payload: &[u8]) -> Vec<u8> {
     const MASK: [u8; 4] = [0x37, 0xfa, 0x21, 0x3d];
     let length = u8::try_from(payload.len()).unwrap_or(125).min(125);
-    let mut frame = vec![0x82, 0x80 | length, MASK[0], MASK[1], MASK[2], MASK[3]];
+    let mut frame =
+        vec![0x82, 0x80 | length, MASK[0], MASK[1], MASK[2], MASK[3]];
     frame.extend(
         payload
             .iter()
@@ -326,14 +346,16 @@ mod tests {
 
     #[test]
     fn parses_plain_and_chunked_bodies() {
-        let plain = b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nSet-Cookie: a=1; HttpOnly\r\n\r\n{}";
+        let plain = b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\
+            Set-Cookie: a=1; HttpOnly\r\n\r\n{}";
         let response = parse_response(plain).unwrap();
         assert_eq!(response.status, 200);
         assert_eq!(response.body, b"{}");
         assert_eq!(response.cookie().as_deref(), Some("a=1"));
 
         let chunked =
-            b"HTTP/1.1 201 Created\r\nTransfer-Encoding: chunked\r\n\r\n3\r\n{\"a\r\n4\r\n\":1}\r\n0\r\n\r\n";
+            b"HTTP/1.1 201 Created\r\nTransfer-Encoding: chunked\r\n\r\n3\r\n\
+                {\"a\r\n4\r\n\":1}\r\n0\r\n\r\n";
         let response = parse_response(chunked).unwrap();
         assert_eq!(response.status, 201);
         assert_eq!(response.body, br#"{"a":1}"#);

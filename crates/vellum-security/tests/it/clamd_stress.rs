@@ -21,13 +21,17 @@ use std::io::{Cursor, Write as _};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use vellum_security::upload::{Clamd, Scanner, UploadError, UploadPolicy, check};
+use vellum_security::upload::{
+    Clamd, Scanner, UploadError, UploadPolicy, check,
+};
 use zip::write::SimpleFileOptions;
 
-const EICAR: &[u8] = b"X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*";
+const EICAR: &[u8] =
+    b"X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*";
 
 fn clamd() -> Clamd {
-    let address = std::env::var("VELLUM_TEST_CLAMD").expect("set VELLUM_TEST_CLAMD=host:port");
+    let address = std::env::var("VELLUM_TEST_CLAMD")
+        .expect("set VELLUM_TEST_CLAMD=host:port");
     Clamd::new(address, Duration::from_secs(30))
 }
 
@@ -122,7 +126,9 @@ async fn a_flood_of_mixed_uploads_never_lets_malware_through() {
                 (Arc::clone(&clamd), (*name).to_owned(), bytes.clone(), *bad);
             runs.push(tokio::spawn(async move {
                 let at = Instant::now();
-                let result = check(policy, Some(clamd.as_ref()), name.clone(), bytes).await;
+                let result =
+                    check(policy, Some(clamd.as_ref()), name.clone(), bytes)
+                        .await;
                 (round, name, bad, result.map(|_| ()), at.elapsed())
             }));
         }
@@ -147,7 +153,8 @@ async fn a_flood_of_mixed_uploads_never_lets_malware_through() {
         }
     }
     println!(
-        "{passed} clean passed, {refused} malicious refused, {busy} refused as busy, in {:?}",
+        "{passed} clean passed, {refused} malicious refused, {busy} refused as \
+            busy, in {:?}",
         started.elapsed()
     );
     assert!(passed > 0 && refused > 0);

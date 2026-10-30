@@ -85,7 +85,10 @@ export async function fakeDrive(page: Page, owner: string): Promise<FakeDrive> {
   const refusals = new Map<string, Refusal>();
   let next = 1;
 
-  const notFound = { status: 404, json: { code: "not_found", message: "no such item" } };
+  const notFound = {
+    status: 404,
+    json: { code: "not_found", message: "no such item" },
+  };
 
   /** The items under `parent`, depth first, each list in its stored order. */
   const depthFirst = (parent?: string): Item[] =>
@@ -100,9 +103,15 @@ export async function fakeDrive(page: Page, owner: string): Promise<FakeDrive> {
     items.splice(items.indexOf(item), 1);
     if (typeof parent === "string") item.parent_id = parent;
     else delete item.parent_id;
-    const siblings = items.filter((entry) => entry.parent_id === item.parent_id);
+    const siblings = items.filter(
+      (entry) => entry.parent_id === item.parent_id,
+    );
     const before = typeof index === "number" ? siblings[index] : undefined;
-    items.splice(before === undefined ? items.length : items.indexOf(before), 0, item);
+    items.splice(
+      before === undefined ? items.length : items.indexOf(before),
+      0,
+      item,
+    );
   };
 
   /** The answer to a read, or `undefined` for an unknown route. */
@@ -111,16 +120,21 @@ export async function fakeDrive(page: Page, owner: string): Promise<FakeDrive> {
     if (path === "/shared-drives") return { spaces: [] };
     if (path === "/shared-with-me") return { items: shared };
     const one = /^\/items\/([^/]+)$/.exec(path)?.[1];
-    if (one !== undefined) return [...items, ...shared].find((item) => item.id === one);
-    if (path === "/starred") return { items: items.filter((item) => starred.has(item.id)) };
-    if (path === `/spaces/${SPACE.id}/tree`) return { items: depthFirst(), truncated: false };
+    if (one !== undefined)
+      return [...items, ...shared].find((item) => item.id === one);
+    if (path === "/starred")
+      return { items: items.filter((item) => starred.has(item.id)) };
+    if (path === `/spaces/${SPACE.id}/tree`)
+      return { items: depthFirst(), truncated: false };
     if (path === `/spaces/${SPACE.id}/items`) {
       const parent = query.get("parent_id") ?? undefined;
       return { items: items.filter((item) => item.parent_id === parent) };
     }
     if (path === "/search") {
       const title = (query.get("title") ?? "").toLowerCase();
-      return { items: items.filter((item) => item.title.toLowerCase().includes(title)) };
+      return {
+        items: items.filter((item) => item.title.toLowerCase().includes(title)),
+      };
     }
     return undefined;
   };
@@ -150,7 +164,8 @@ export async function fakeDrive(page: Page, owner: string): Promise<FakeDrive> {
     body: Record<string, unknown>,
   ) => {
     const title = body["title"];
-    if (method === "PATCH" && typeof title === "string") item.title = title.trim();
+    if (method === "PATCH" && typeof title === "string")
+      item.title = title.trim();
     if (action === "star") {
       if (body["starred"] === true) starred.add(item.id);
       else starred.delete(item.id);
@@ -190,10 +205,15 @@ export async function fakeDrive(page: Page, owner: string): Promise<FakeDrive> {
   await page.route("**/api/v1/drive/**", handle);
   // Full-text search, over titles only: enough to show the app asks it.
   await page.route("**/api/v1/search?*", (route) => {
-    const q = (new URL(route.request().url()).searchParams.get("q") ?? "").toLowerCase();
+    const q = (
+      new URL(route.request().url()).searchParams.get("q") ?? ""
+    ).toLowerCase();
     const hits = items
       .filter((item) => item.title.toLowerCase().includes(q))
-      .map((item) => ({ doc: item.id, snippet: [{ text: item.title, hit: true }] }));
+      .map((item) => ({
+        doc: item.id,
+        snippet: [{ text: item.title, hit: true }],
+      }));
     return route.fulfill({ json: { hits, has_more: false, hybrid: false } });
   });
   return {

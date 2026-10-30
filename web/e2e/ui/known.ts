@@ -20,16 +20,23 @@ interface KnownIssue {
 const KNOWN: readonly KnownIssue[] = [];
 
 /** Splits problems into new ones and ones already tracked by an issue. */
-export function triage(problems: Problem[], title: string): { fresh: Problem[]; known: string[] } {
+export function triage(
+  problems: Problem[],
+  title: string,
+): { fresh: Problem[]; known: string[] } {
   const fresh: Problem[] = [];
   const known: string[] = [];
   for (const problem of problems) {
     // eslint-disable-next-line sonarjs/no-empty-collection -- empty until a bug is filed
     const entry = KNOWN.find(
-      (candidate) => candidate.rule === problem.rule && candidate.test.test(title),
+      (candidate) =>
+        candidate.rule === problem.rule && candidate.test.test(title),
     );
     if (entry === undefined) fresh.push(problem);
-    else known.push(`#${String(entry.issue)}: ${problem.rule} @ ${problem.target}`);
+    else
+      known.push(
+        `#${String(entry.issue)}: ${problem.rule} @ ${problem.target}`,
+      );
   }
   return { fresh, known };
 }

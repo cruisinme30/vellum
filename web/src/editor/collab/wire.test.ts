@@ -34,23 +34,27 @@ describe("collab wire format", () => {
 
   it("writes the bytes yrs writes", () => {
     // MSG_SYNC, step 1, a one-byte state vector holding zero clients.
-    expect(encodeFrame([{ type: "sync-step-1", stateVector: bytes(0) }])).toEqual(
-      bytes(0, 0, 1, 0),
-    );
+    expect(
+      encodeFrame([{ type: "sync-step-1", stateVector: bytes(0) }]),
+    ).toEqual(bytes(0, 0, 1, 0));
     // Done is the raw tag and an empty payload.
-    expect(encodeFrame([{ type: "custom", tag: MSG_DONE, payload: bytes() }])).toEqual(
-      bytes(101, 0),
-    );
+    expect(
+      encodeFrame([{ type: "custom", tag: MSG_DONE, payload: bytes() }]),
+    ).toEqual(bytes(101, 0));
     // A two-byte varint length.
     const long = new Uint8Array(200);
-    expect(encodeFrame([{ type: "update", update: long }]).subarray(0, 4)).toEqual(
-      bytes(0, 2, 0xc8, 0x01),
-    );
+    expect(
+      encodeFrame([{ type: "update", update: long }]).subarray(0, 4),
+    ).toEqual(bytes(0, 2, 0xc8, 0x01));
   });
 
   it("refuses tags yrs would write differently", () => {
-    expect(() => encodeFrame([{ type: "custom", tag: 200, payload: bytes() }])).toThrow(WireError);
-    expect(() => encodeFrame([{ type: "custom", tag: 1, payload: bytes() }])).toThrow(WireError);
+    expect(() =>
+      encodeFrame([{ type: "custom", tag: 200, payload: bytes() }]),
+    ).toThrow(WireError);
+    expect(() =>
+      encodeFrame([{ type: "custom", tag: 1, payload: bytes() }]),
+    ).toThrow(WireError);
   });
 
   it.each([
@@ -58,7 +62,10 @@ describe("collab wire format", () => {
     ["a payload longer than the frame", bytes(0, 0, 5, 1, 2)],
     ["an unknown sync step", bytes(0, 9, 0)],
     ["a custom message without its payload", bytes(101)],
-    ["a number past 2^53", bytes(0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f)],
+    [
+      "a number past 2^53",
+      bytes(0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f),
+    ],
   ])("refuses %s", (_name, frame) => {
     expect(() => decodeFrame(frame)).toThrow(WireError);
   });
@@ -72,7 +79,11 @@ describe("peer lists", () => {
   it("round-trips the server's encode_peers, with client IDs past 32 bits", () => {
     const entries = [
       { clientId: 7, user: "01J0000000000000000000USER", canWrite: true },
-      { clientId: 2 ** 40 + 3, user: "01J0000000000000000000VIEW", canWrite: false },
+      {
+        clientId: 2 ** 40 + 3,
+        user: "01J0000000000000000000VIEW",
+        canWrite: false,
+      },
     ];
     expect(decodePeers(encodePeers(entries))).toEqual(entries);
   });

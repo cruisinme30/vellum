@@ -38,7 +38,8 @@ const fn kind(change: &Change) -> &'static str {
     }
 }
 
-async fn store() -> Result<(tempfile::TempDir, LocalStore), Box<dyn std::error::Error>> {
+async fn store()
+-> Result<(tempfile::TempDir, LocalStore), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
     let store = LocalStore::open(dir.path()).await?;
     Ok((dir, store))
@@ -102,7 +103,14 @@ async fn startup_scan_finds_offline_edits() -> TestResult {
         ["created", "modified", "renamed", "untracked"],
         "{changes:#?}"
     );
-    assert!(changes.iter().any(|c| matches!(c, Change::Renamed { id, to, .. } if *id == b && to.as_str() == "drives/users/ana/New.md")));
+    assert!(changes.iter().any(|c| matches!(
+        c,
+        Change::Renamed {
+            id,
+            to,
+            ..
+        } if *id == b && to.as_str() == "drives/users/ana/New.md"
+    )));
     assert!(
         watcher
             .scan()
@@ -121,7 +129,8 @@ async fn rename_split_across_batches_is_one_rename() -> TestResult {
     let meta = store
         .put(&p("a/Plan.md"), doc(A, "v1"), Precondition::None)
         .await?;
-    let mut watcher = Reconciler::new(store.clone(), [(id, meta.path.clone(), meta.etag)]);
+    let mut watcher =
+        Reconciler::new(store.clone(), [(id, meta.path.clone(), meta.etag)]);
     let _ = store.rename(&meta.path, &p("b/Plan.md")).await?;
 
     let now = Instant::now();
@@ -130,7 +139,12 @@ async fn rename_split_across_batches_is_one_rename() -> TestResult {
         .reconcile([p("b/Plan.md")], now + Duration::from_millis(500))
         .await?;
     assert!(
-        matches!(&later[..], [Change::Renamed { from, to, .. }] if from.as_str() == "a/Plan.md" && to.as_str() == "b/Plan.md"),
+        matches!(
+            &later[..],
+            [
+                Change::Renamed { from, to, .. }
+            ] if from.as_str() == "a/Plan.md" && to.as_str() == "b/Plan.md"
+        ),
         "{later:?}"
     );
     assert_eq!(
@@ -148,7 +162,8 @@ async fn removal_waits_for_the_grace_period() -> TestResult {
     let meta = store
         .put(&p("Plan.md"), doc(A, "v1"), Precondition::None)
         .await?;
-    let mut watcher = Reconciler::new(store.clone(), [(id, meta.path.clone(), meta.etag)]);
+    let mut watcher =
+        Reconciler::new(store.clone(), [(id, meta.path.clone(), meta.etag)]);
     store.delete(&meta.path, Precondition::None).await?;
     let now = Instant::now();
     assert_eq!(watcher.reconcile([meta.path.clone()], now).await?, []);
@@ -171,7 +186,8 @@ async fn own_writes_are_silent_and_copies_are_flagged() -> TestResult {
     let v1 = store
         .put(&p("Plan.md"), doc(A, "v1"), Precondition::None)
         .await?;
-    let mut watcher = Reconciler::new(store.clone(), [(id, v1.path.clone(), v1.etag)]);
+    let mut watcher =
+        Reconciler::new(store.clone(), [(id, v1.path.clone(), v1.etag)]);
     let v2 = store
         .put(&v1.path, doc(A, "v2"), Precondition::None)
         .await?;
@@ -208,9 +224,15 @@ async fn live_feed_reports_external_edits() -> TestResult {
 
     std::fs::create_dir_all(dir.path().join("drives"))?;
     std::fs::write(dir.path().join("drives/Plan.md"), doc(A, "v1"))?;
-    let created = tokio::time::timeout(Duration::from_secs(10), out_rx.recv()).await?;
+    let created =
+        tokio::time::timeout(Duration::from_secs(10), out_rx.recv()).await?;
     assert!(
-        matches!(created, Some(Change::Created { ref path, .. }) if path.as_str() == "drives/Plan.md"),
+        matches!(
+            created,
+            Some(
+                Change::Created { ref path, .. }
+            ) if path.as_str() == "drives/Plan.md"
+        ),
         "{created:?}"
     );
 
@@ -218,18 +240,30 @@ async fn live_feed_reports_external_edits() -> TestResult {
         dir.path().join("drives/Plan.md"),
         dir.path().join("drives/Roadmap.md"),
     )?;
-    let renamed = tokio::time::timeout(Duration::from_secs(10), out_rx.recv()).await?;
+    let renamed =
+        tokio::time::timeout(Duration::from_secs(10), out_rx.recv()).await?;
     assert!(
-        matches!(renamed, Some(Change::Renamed { ref to, .. }) if to.as_str() == "drives/Roadmap.md"),
+        matches!(
+            renamed,
+            Some(
+                Change::Renamed { ref to, .. }
+            ) if to.as_str() == "drives/Roadmap.md"
+        ),
         "{renamed:?}"
     );
 
     // Moving a whole folder is reported for the folder only; the
     // document inside must still come out as a rename.
     std::fs::rename(dir.path().join("drives"), dir.path().join("moved"))?;
-    let moved = tokio::time::timeout(Duration::from_secs(10), out_rx.recv()).await?;
+    let moved =
+        tokio::time::timeout(Duration::from_secs(10), out_rx.recv()).await?;
     assert!(
-        matches!(moved, Some(Change::Renamed { ref to, .. }) if to.as_str() == "moved/Roadmap.md"),
+        matches!(
+            moved,
+            Some(
+                Change::Renamed { ref to, .. }
+            ) if to.as_str() == "moved/Roadmap.md"
+        ),
         "{moved:?}"
     );
     task.abort();

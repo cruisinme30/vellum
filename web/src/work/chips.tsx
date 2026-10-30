@@ -44,14 +44,26 @@ const RISKS = new Set(["gray", "yellow", "orange", "red"]);
  */
 function SlaChip({ sla }: { readonly sla: SlaOut | null | undefined }) {
   const t = useT();
-  if (sla === undefined || sla === null || (sla.stopped_at ?? undefined) !== undefined) return;
+  if (
+    sla === undefined ||
+    sla === null ||
+    (sla.stopped_at ?? undefined) !== undefined
+  )
+    return;
   const risk = RISKS.has(sla.risk) ? sla.risk : "gray";
   const due = new Date(sla.breaches_at);
   const when = Number.isNaN(due.getTime())
     ? sla.breaches_at
-    : due.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric" });
+    : due.toLocaleString(undefined, {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+      });
   return (
-    <span className={`vl-work-chip vl-sla vl-sla-${risk}`} title={sla.breaches_at}>
+    <span
+      className={`vl-work-chip vl-sla vl-sla-${risk}`}
+      title={sla.breaches_at}
+    >
       {t(`work-sla-${risk}`, { when })}
     </span>
   );
@@ -67,7 +79,9 @@ export function IssueChips({ issue }: { readonly issue: IssueOut }) {
         <span className="vl-work-chip">{issue.estimate}</span>
       )}
       {issue.assignee !== undefined && issue.assignee !== null && (
-        <span className="vl-work-chip vl-work-chip-person">@{issue.assignee}</span>
+        <span className="vl-work-chip vl-work-chip-person">
+          @{issue.assignee}
+        </span>
       )}
     </span>
   );

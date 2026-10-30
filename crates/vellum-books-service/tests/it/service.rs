@@ -6,7 +6,10 @@
 //! calls them.
 
 #![allow(clippy::unwrap_used, reason = "test helpers fail loudly")]
-#![allow(clippy::too_many_lines, reason = "the fixture spells out a whole book")]
+#![allow(
+    clippy::too_many_lines,
+    reason = "the fixture spells out a whole book"
+)]
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -14,17 +17,23 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use vellum_authz::{
-    Actor, Authz, Change, Id, MemoryStore, Object, Permission, Relation, Subject, Tuple,
+    Actor, Authz, Change, Id, MemoryStore, Object, Permission, Relation,
+    Subject, Tuple,
 };
 use vellum_books_service::api::{
-    AddSection, At, BookKey, CopySection, CreateBook, CreateSnapshot, DiffInput, HistoryEntry,
-    HistoryInput, ListBooks, MergeSection, MoveSection, PlaceInput, Publish, PublishFormat,
-    RestoreOutline, SectionKey, SetSectionAccess, SplitSection, TocLine, TransferSection,
+    AddSection, At, BookKey, CopySection, CreateBook, CreateSnapshot,
+    DiffInput, HistoryEntry, HistoryInput, ListBooks, MergeSection,
+    MoveSection, PlaceInput, Publish, PublishFormat, RestoreOutline,
+    SectionKey, SetSectionAccess, SplitSection, TocLine, TransferSection,
     UpdateSection,
 };
 use vellum_books_service::{AuthzAccess, BooksService, Shelf};
-use vellum_contracts::{CredentialKind, Principal, RequestContext, Scope, ScopeSet, Service as _};
-use vellum_kernel::{BookId, ErrorKind, ObjectId, RequestId, Timestamp, UserId};
+use vellum_contracts::{
+    CredentialKind, Principal, RequestContext, Scope, ScopeSet, Service as _,
+};
+use vellum_kernel::{
+    BookId, ErrorKind, ObjectId, RequestId, Timestamp, UserId,
+};
 use vellum_store::{BlobPath, LocalStore};
 
 const DIR: &str = "drives/shared/Northstar/Handbook.book";
@@ -80,12 +89,16 @@ async fn world() -> World {
     let tmp = tempfile::tempdir().unwrap();
     let root = tmp.path().to_path_buf();
     let fresh = || ObjectId::generate().to_string();
-    let (book, intro, ops, runbook, glossary) = (fresh(), fresh(), fresh(), fresh(), fresh());
+    let (book, intro, ops, runbook, glossary) =
+        (fresh(), fresh(), fresh(), fresh(), fresh());
     let (guide, start) = (fresh(), fresh());
     write(
         &root,
         &format!("{GUIDE}/book.yaml"),
-        &format!("vellum: 1\nid: {guide}\ntitle: Guide\nnodes:\n  {start}:\n    path: start.md\n"),
+        &format!(
+            "vellum: 1\nid: {guide}\ntitle: Guide\nnodes:\n  {start}:\n\
+             \x20   path: start.md\n"
+        ),
     );
     write(
         &root,
@@ -158,7 +171,8 @@ async fn world() -> World {
         )
         .unwrap();
     let authz = Arc::new(Authz::new(store));
-    let (ana, raj, mia) = (UserId::generate(), UserId::generate(), UserId::generate());
+    let (ana, raj, mia) =
+        (UserId::generate(), UserId::generate(), UserId::generate());
     let user = |u: UserId| Subject::User(Id(u.as_u128()));
     let node = Object::Node(uid(&book));
     let _ = authz
@@ -186,7 +200,9 @@ async fn world() -> World {
     let blobs = Arc::new(LocalStore::open(&root).await.unwrap());
     let access = Arc::new(AuthzAccess::new(
         Arc::clone(&authz),
-        Arc::new(move |p: &BlobPath| p.as_str().starts_with("drives/shared/").then_some(space)),
+        Arc::new(move |p: &BlobPath| {
+            p.as_str().starts_with("drives/shared/").then_some(space)
+        }),
     ));
     let service = Arc::new(BooksService::new(blobs, access));
     World {
@@ -528,7 +544,10 @@ async fn removal_needs_sight_of_the_whole_subtree() {
             SetSectionAccess {
                 book_id: w.book,
                 section_id: w.runbook.clone(),
-                restrict_to: vec![format!("group:{}", ObjectId::from_u128(w.sre.0))],
+                restrict_to: vec![format!(
+                    "group:{}",
+                    ObjectId::from_u128(w.sre.0)
+                )],
                 owners: vec![],
                 reviewers: vec![],
             },
@@ -626,7 +645,9 @@ async fn snapshots_and_diffs_respect_restrictions() {
         .unwrap_err();
     assert_eq!(err.kind(), ErrorKind::PermissionDenied);
 
-    for (section, body) in [(&w.runbook, "Restart twice."), (&w.glossary, "More terms.")] {
+    for (section, body) in
+        [(&w.runbook, "Restart twice."), (&w.glossary, "More terms.")]
+    {
         let _ = w
             .service
             .update_section(
@@ -687,7 +708,9 @@ async fn books_are_created_through_the_shelf_or_not_at_all() {
         Arc::new(LocalStore::open(&w.root).await.unwrap()),
         Arc::new(AuthzAccess::new(
             Arc::clone(&w.authz),
-            Arc::new(move |p: &BlobPath| p.as_str().starts_with("drives/shared/").then_some(space)),
+            Arc::new(move |p: &BlobPath| {
+                p.as_str().starts_with("drives/shared/").then_some(space)
+            }),
         )),
     )
     .with_shelf(Arc::new(FakeShelf(Arc::clone(&asked))));
@@ -885,7 +908,9 @@ async fn headings_become_sections_and_back() {
                 book_id: w.book,
                 section_id: w.glossary.clone(),
                 title: None,
-                body: Some("Terms.\n\n## Alpha\n\nA.\n\n## Beta\n\nB.\n".to_owned()),
+                body: Some(
+                    "Terms.\n\n## Alpha\n\nA.\n\n## Beta\n\nB.\n".to_owned(),
+                ),
             },
         )
         .await
@@ -993,9 +1018,11 @@ async fn sections_copy_within_and_move_between_books() {
     let handbook = w.service.get(&raj, w.book).await.unwrap();
     assert!(!titles(&handbook.toc)[..2].contains(&"Operations".to_owned()));
     assert!(
-        std::fs::read_to_string(w.root.join(GUIDE).join("operations/README.md"))
-            .unwrap()
-            .contains("Pager rotation")
+        std::fs::read_to_string(
+            w.root.join(GUIDE).join("operations/README.md")
+        )
+        .unwrap()
+        .contains("Pager rotation")
     );
 
     // The same book is refused, and so is a viewer of the source.
@@ -1036,18 +1063,19 @@ async fn sections_copy_within_and_move_between_books() {
 #[tokio::test]
 async fn managers_publish_and_only_public_sites_are_served() {
     let w = world().await;
-    let publish = async |user: UserId, format: PublishFormat, audience: Vec<String>| {
-        w.service
-            .publish(
-                &ctx(user),
-                Publish {
-                    book_id: w.book,
-                    format,
-                    audience,
-                },
-            )
-            .await
-    };
+    let publish =
+        async |user: UserId, format: PublishFormat, audience: Vec<String>| {
+            w.service
+                .publish(
+                    &ctx(user),
+                    Publish {
+                        book_id: w.book,
+                        format,
+                        audience,
+                    },
+                )
+                .await
+        };
     let denied = publish(w.raj, PublishFormat::Site, vec![]).await;
     assert_eq!(denied.unwrap_err().kind(), ErrorKind::PermissionDenied);
 

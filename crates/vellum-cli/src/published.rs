@@ -56,7 +56,10 @@ pub fn router(books: Arc<BooksService>) -> Router {
         .with_state(books)
 }
 
-async fn root(State(books): State<Arc<BooksService>>, Path(book): Path<String>) -> Response {
+async fn root(
+    State(books): State<Arc<BooksService>>,
+    Path(book): Path<String>,
+) -> Response {
     serve(&books, &book, "").await
 }
 
@@ -84,7 +87,10 @@ async fn serve(books: &BooksService, book: &str, path: &str) -> Response {
                 header::CONTENT_TYPE,
                 HeaderValue::from_static(crate::web::content_type(name)),
             );
-            let _ = headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
+            let _ = headers.insert(
+                header::CACHE_CONTROL,
+                HeaderValue::from_static("no-cache"),
+            );
             let _ = headers.insert(
                 header::CONTENT_SECURITY_POLICY,
                 HeaderValue::from_static(vellum_api::security::public_csp()),

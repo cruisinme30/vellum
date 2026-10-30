@@ -48,7 +48,11 @@ pub struct Diagnostic {
 
 impl Diagnostic {
     /// Creates a diagnostic.
-    pub fn new(line: usize, code: DiagnosticCode, message: impl Into<String>) -> Self {
+    pub fn new(
+        line: usize,
+        code: DiagnosticCode,
+        message: impl Into<String>,
+    ) -> Self {
         Self {
             line,
             code,

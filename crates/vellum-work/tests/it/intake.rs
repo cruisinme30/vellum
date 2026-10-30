@@ -4,7 +4,10 @@
 //! Intake forms and AI-suggested triage, end to end on the Northstar demo
 //! workspace.
 
-#![allow(clippy::unwrap_used, reason = "fixture helpers panic on bad test data")]
+#![allow(
+    clippy::unwrap_used,
+    reason = "fixture helpers panic on bad test data"
+)]
 
 use std::collections::BTreeMap;
 
@@ -14,8 +17,8 @@ use vellum_work::intake::{FieldKind, FormField, IntakeForm, MapsTo};
 use vellum_work::label::Label;
 use vellum_work::suggest::TriageSuggestion;
 use vellum_work::{
-    Category, Ctx, IssueId, NewIssue, Priority, StatusKey, Team, TeamId, TeamKey, UserRef,
-    WorkGraph,
+    Category, Ctx, IssueId, NewIssue, Priority, StatusKey, Team, TeamId,
+    TeamKey, UserRef, WorkGraph,
 };
 
 fn user(h: &str) -> UserRef {
@@ -152,8 +155,15 @@ fn a_public_form_files_a_triage_issue() {
     // files nothing.
     let mut bad = g.clone();
     assert!(
-        bad.submit_form(&tk("ENG"), "nope", id(2), &answers(&[]), None, &ctx(None))
-            .is_err()
+        bad.submit_form(
+            &tk("ENG"),
+            "nope",
+            id(2),
+            &answers(&[]),
+            None,
+            &ctx(None)
+        )
+        .is_err()
     );
     assert!(g.issue(&id(2)).is_none());
 }

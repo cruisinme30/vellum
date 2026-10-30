@@ -47,7 +47,12 @@ function Row({
     <li
       className={`vl-waterfall__row vl-waterfall__row--${row.lane}${row.error ? " vl-waterfall__row--error" : ""}`}
     >
-      <button type="button" aria-expanded={open} aria-label={label} onClick={onToggle}>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-label={label}
+        onClick={onToggle}
+      >
         <span
           className="vl-waterfall__name"
           style={{ paddingInlineStart: `${String(row.depth * 16)}px` }}
@@ -57,17 +62,24 @@ function Row({
         <span className="vl-waterfall__track" aria-hidden="true">
           <span
             className="vl-waterfall__bar"
-            style={{ left: `${row.leftPct.toFixed(2)}%`, width: `${row.widthPct.toFixed(2)}%` }}
+            style={{
+              left: `${row.leftPct.toFixed(2)}%`,
+              width: `${row.widthPct.toFixed(2)}%`,
+            }}
           />
         </span>
-        <span className="vl-waterfall__time">{formatDuration(row.durationUs)}</span>
+        <span className="vl-waterfall__time">
+          {formatDuration(row.durationUs)}
+        </span>
       </button>
       {open && <Details row={row} />}
     </li>
   );
 }
 
-/** The span waterfall of one trace: browser spans, then server spans as a tree. */
+/**
+ * The span waterfall of one trace: browser spans, then server spans as a tree.
+ */
 export function Waterfall({ trace }: { readonly trace: Trace }) {
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const rows = waterfallRows(trace);
@@ -87,9 +99,12 @@ export function Waterfall({ trace }: { readonly trace: Trace }) {
       <header>
         <h2>Trace {trace.trace_id}</h2>
         <p>
-          {formatDuration(trace.duration_us)} · {trace.spans.length} server spans
-          {trace.client.length > 0 && ` · ${String(trace.client.length)} browser spans`}
-          {trace.dropped_spans > 0 && ` · ${String(trace.dropped_spans)} spans not kept`}
+          {formatDuration(trace.duration_us)} · {trace.spans.length} server
+          spans
+          {trace.client.length > 0 &&
+            ` · ${String(trace.client.length)} browser spans`}
+          {trace.dropped_spans > 0 &&
+            ` · ${String(trace.dropped_spans)} spans not kept`}
         </p>
       </header>
       <ol aria-label="Spans">

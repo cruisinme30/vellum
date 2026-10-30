@@ -21,7 +21,9 @@ use crate::settings::TelemetrySettings;
 pub const REPORT_SCHEMA: u32 = 1;
 
 /// Facts the server knows about itself, gathered by the caller.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema,
+)]
 pub struct UsageFacts {
     /// Active people.
     pub users: u64,
@@ -128,7 +130,10 @@ pub fn build_report(
         version: version.chars().take(32).collect(),
         os: std::env::consts::OS.to_owned(),
         arch: std::env::consts::ARCH.to_owned(),
-        profile: token(&facts.profile, &["single", "docker", "compose", "helm"]),
+        profile: token(
+            &facts.profile,
+            &["single", "docker", "compose", "helm"],
+        ),
         database: token(&facts.database, &["sqlite", "postgres"]),
         users: bucket(facts.users).to_owned(),
         spaces: bucket(facts.spaces).to_owned(),
@@ -140,7 +145,11 @@ pub fn build_report(
 /// Whether a report is due: telemetry is on, an endpoint is set, and the
 /// interval has passed since `last_sent_ms` (Unix milliseconds).
 #[must_use]
-pub fn is_due(settings: &TelemetrySettings, last_sent_ms: Option<i64>, now_ms: i64) -> bool {
+pub fn is_due(
+    settings: &TelemetrySettings,
+    last_sent_ms: Option<i64>,
+    now_ms: i64,
+) -> bool {
     let interval = i64::from(settings.interval_hours) * 3_600_000;
     settings.enabled
         && settings.endpoint.is_some()
@@ -197,7 +206,8 @@ impl UsageTransport for HttpUsageTransport {
             ));
         }
         let body = serde_json::to_vec(report).map_err(|e| {
-            Error::new(ErrorKind::Internal, "cannot encode the report").with_source(e)
+            Error::new(ErrorKind::Internal, "cannot encode the report")
+                .with_source(e)
         })?;
         let response = self
             .client
@@ -218,7 +228,10 @@ impl UsageTransport for HttpUsageTransport {
         } else {
             Err(Error::new(
                 ErrorKind::Unavailable,
-                format!("telemetry endpoint answered {}", response.status().as_u16()),
+                format!(
+                    "telemetry endpoint answered {}",
+                    response.status().as_u16()
+                ),
             ))
         }
     }

@@ -19,15 +19,16 @@ use futures::stream::BoxStream;
 use vellum_crypto::recipients::is_recipient_envelope;
 use vellum_store::layout::{FOLDER_META, SYSTEM_DIR};
 use vellum_store::{
-    Blob, BlobEntry, BlobMeta, BlobPath, BlobStore, Precondition, StoreError, StoreResult,
+    Blob, BlobEntry, BlobMeta, BlobPath, BlobStore, Precondition, StoreError,
+    StoreResult,
 };
 
 /// The sibling-order file the drive keeps in each folder.
 const ORDER_FILE: &str = ".vellum-order.yaml";
 
 /// Why a write was refused.
-const REFUSED: &str =
-    "this space is end-to-end encrypted: only pages sealed on a member's device can be saved here";
+const REFUSED: &str = "this space is end-to-end encrypted: only pages sealed \
+    on a member's device can be saved here";
 
 /// True for files inside a space that hold no page content, which a
 /// private space keeps readable: folder manifests, sibling order,
@@ -92,8 +93,9 @@ impl PrivateRoots {
     /// True when a write of `bytes` to `path` would put readable content
     /// into a private space.
     fn refuses(&self, path: &BlobPath, bytes: &[u8]) -> bool {
-        self.relative(path)
-            .is_some_and(|rel| !structural(&rel) && !is_recipient_envelope(bytes))
+        self.relative(path).is_some_and(|rel| {
+            !structural(&rel) && !is_recipient_envelope(bytes)
+        })
     }
 }
 
@@ -158,11 +160,19 @@ impl BlobStore for Guard {
         self.inner.put(path, bytes, condition).await
     }
 
-    async fn delete(&self, path: &BlobPath, condition: Precondition) -> StoreResult<()> {
+    async fn delete(
+        &self,
+        path: &BlobPath,
+        condition: Precondition,
+    ) -> StoreResult<()> {
         self.inner.delete(path, condition).await
     }
 
-    async fn rename(&self, from: &BlobPath, to: &BlobPath) -> StoreResult<BlobMeta> {
+    async fn rename(
+        &self,
+        from: &BlobPath,
+        to: &BlobPath,
+    ) -> StoreResult<BlobMeta> {
         // Moving a readable page into a private space is a write too.
         if self.roots.relative(to).is_some_and(|rel| !structural(&rel)) {
             let moving = self.inner.get(from).await?;
@@ -173,7 +183,10 @@ impl BlobStore for Guard {
         self.inner.rename(from, to).await
     }
 
-    fn list(&self, dir: Option<&BlobPath>) -> BoxStream<'static, StoreResult<BlobEntry>> {
+    fn list(
+        &self,
+        dir: Option<&BlobPath>,
+    ) -> BoxStream<'static, StoreResult<BlobEntry>> {
         self.inner.list(dir)
     }
 }

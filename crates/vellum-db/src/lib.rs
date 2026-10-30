@@ -13,7 +13,8 @@
 //! drive's page change log in [`changes`].
 //!
 //! Two backends share one schema shape:
-//! - **SQLite** for the single binary, encrypted with SQLCipher when a key is given.
+//! - **SQLite** for the single binary, encrypted with SQLCipher when a key is
+//!   given.
 //! - **Postgres** for the HA profiles.
 //!
 //! Conventions: IDs are ULID text, timestamps are UTC epoch milliseconds,
@@ -36,9 +37,13 @@ mod tx;
 pub use config::{IndexConfig, IndexKey};
 pub use error::{Error, Result};
 pub use index::{Backend, Index, IndexPool};
-pub use reindex::{FileReader, Listing, PlainFiles, Problem, ProblemKind, ReindexReport, Tree};
+pub use reindex::{
+    FileReader, Listing, PlainFiles, Problem, ProblemKind, ReindexReport, Tree,
+};
 pub use router::ShardRouter;
-pub use shard::{MAIN_URL_VAR, SHARDS_VAR, Shard, ShardedIndex, ShardsConfig, shard_url_var};
+pub use shard::{
+    MAIN_URL_VAR, SHARDS_VAR, Shard, ShardedIndex, ShardsConfig, shard_url_var,
+};
 pub use telemetry::{RowCount, traced};
 pub use tx::BeginWrite;
 

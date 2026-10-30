@@ -21,7 +21,11 @@ export type Destination = "inbox" | "my-work" | "board" | "cycle" | "triage";
 export const APP_DESTINATIONS: readonly Destination[] = ["inbox", "my-work"];
 
 /** The `G` chords only the Work screens bind. */
-export const SCREEN_DESTINATIONS: readonly Destination[] = ["board", "cycle", "triage"];
+export const SCREEN_DESTINATIONS: readonly Destination[] = [
+  "board",
+  "cycle",
+  "triage",
+];
 
 /** What the current screen can do. Every action is optional. */
 export interface WorkActions {
@@ -49,7 +53,13 @@ type Simple = Exclude<keyof WorkActions, "goTo" | "destinations">;
 type Spec = readonly [Simple, string, string, Scope, (readonly string[])?];
 
 const SPECS: readonly Spec[] = [
-  ["newIssue", "issue.create", "New issue", "global", ["create", "ticket", "bug"]],
+  [
+    "newIssue",
+    "issue.create",
+    "New issue",
+    "global",
+    ["create", "ticket", "bug"],
+  ],
   [
     "newIssueFromTemplate",
     "issue.create-from-template",
@@ -62,12 +72,36 @@ const SPECS: readonly Spec[] = [
   ["setPriority", "issue.set-priority", "Set priority", "issues", ["urgent"]],
   ["setLabels", "issue.set-labels", "Set labels", "issues", ["tag"]],
   ["assign", "issue.assign", "Assign", "issues", ["owner"]],
-  ["assignToMe", "issue.assign-to-me", "Assign to me", "issues", ["mine", "take"]],
-  ["setEstimate", "issue.set-estimate", "Set estimate", "issues", ["points", "size"]],
+  [
+    "assignToMe",
+    "issue.assign-to-me",
+    "Assign to me",
+    "issues",
+    ["mine", "take"],
+  ],
+  [
+    "setEstimate",
+    "issue.set-estimate",
+    "Set estimate",
+    "issues",
+    ["points", "size"],
+  ],
   ["setCycle", "issue.set-cycle", "Set cycle", "issues", ["sprint"]],
-  ["toggleSelect", "issue.select", "Select for bulk changes", "issues", ["bulk"]],
+  [
+    "toggleSelect",
+    "issue.select",
+    "Select for bulk changes",
+    "issues",
+    ["bulk"],
+  ],
   ["peek", "issue.peek", "Peek without opening", "issues", ["preview"]],
-  ["copyBranchName", "issue.copy-branch", "Copy the Git branch name", "issues", ["git"]],
+  [
+    "copyBranchName",
+    "issue.copy-branch",
+    "Copy the Git branch name",
+    "issues",
+    ["git"],
+  ],
 ];
 
 const KEYS: Readonly<Record<Simple, string>> = {
@@ -100,13 +134,21 @@ export function workCommands(actions: WorkActions): Command[] {
   for (const [action, id, title, scope, keywords] of SPECS) {
     const run = actions[action];
     if (run !== undefined) {
-      commands.push({ id, title, scope, keys: [KEYS[action]], keywords: keywords ?? [], run });
+      commands.push({
+        id,
+        title,
+        scope,
+        keys: [KEYS[action]],
+        keywords: keywords ?? [],
+        run,
+      });
     }
   }
   const { goTo, destinations } = actions;
   if (goTo !== undefined) {
     for (const [destination, key, title] of DESTINATIONS) {
-      if (destinations !== undefined && !destinations.includes(destination)) continue;
+      if (destinations !== undefined && !destinations.includes(destination))
+        continue;
       commands.push({
         id: `go.${destination}`,
         title,

@@ -20,11 +20,15 @@ instead. If every member loses their keys, nobody can recover the pages.
 ## Steps
 
 1. Install the desktop app; end-to-end encrypted spaces need it.
-2. Select **New → Space**, call it "Pricing research" and turn on **End-to-end encryption**.
-3. Add members. Each member's device holds their own key; Vellum encrypts every page to all members.
-4. Create a book "Interviews" with one section per interview, and a collection "Findings" with a relation to the interviews.
+2. Select **New → Space**, call it "Pricing research" and turn on **End-to-end
+   encryption**.
+3. Add members. Each member's device holds their own key; Vellum encrypts every
+   page to all members.
+4. Create a book "Interviews" with one section per interview, and a collection
+   "Findings" with a relation to the interviews.
 5. Write a summary page that embeds the findings board.
-6. To remove a member, remove them from the space; Vellum re-encrypts new versions without their key.
+6. To remove a member, remove them from the space; Vellum re-encrypts new
+   versions without their key.
 
 ## A finding
 

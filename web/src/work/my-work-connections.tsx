@@ -15,7 +15,12 @@ import { Ready, ServerScreen } from "../data/server-apis";
 import { useLoaded } from "../data/use-loaded";
 import { useT } from "../i18n/i18n";
 
-import type { ConnectionsApi, ConnectionsView, ImportFrom, ImportView } from "./connections-api";
+import type {
+  ConnectionsApi,
+  ConnectionsView,
+  ImportFrom,
+  ImportView,
+} from "./connections-api";
 import { previewCount } from "./import-preview";
 
 import "./work.css";
@@ -51,7 +56,13 @@ function Failure({ error }: { readonly error: string | undefined }) {
 }
 
 /** A secret or URL to copy, in a read-only field with a Copy button. */
-function Copyable({ label, value }: { readonly label: string; readonly value: string }) {
+function Copyable({
+  label,
+  value,
+}: {
+  readonly label: string;
+  readonly value: string;
+}) {
   const t = useT();
   const id = useId();
   const [copied, setCopied] = useState(false);
@@ -76,7 +87,8 @@ function Copyable({ label, value }: { readonly label: string; readonly value: st
                 setCopied(true);
               },
               () => {
-                // The field is selected on focus, so copying by hand still works.
+                // The field is selected on focus, so copying by hand still
+                // works.
               },
             );
           }}
@@ -109,15 +121,26 @@ function Section({
 }
 
 /** The feed URL, CalDAV URL and an app password for CalDAV apps. */
-function Calendar({ api, view }: { readonly api: ConnectionsApi; readonly view: ConnectionsView }) {
+function Calendar({
+  api,
+  view,
+}: {
+  readonly api: ConnectionsApi;
+  readonly view: ConnectionsView;
+}) {
   const t = useT();
   const { error, busy, run } = useRun();
   const [feed, setFeed] = useState<string>();
   const [off, setOff] = useState(false);
   const [password, setPassword] = useState<string>();
   return (
-    <Section title={t("connections-calendar")} intro={t("connections-calendar-intro")}>
-      {feed !== undefined && <Copyable label={t("connections-feed-url")} value={feed} />}
+    <Section
+      title={t("connections-calendar")}
+      intro={t("connections-calendar-intro")}
+    >
+      {feed !== undefined && (
+        <Copyable label={t("connections-feed-url")} value={feed} />
+      )}
       {off && <p role="status">{t("connections-feed-off")}</p>}
       <div className="vl-connections-actions">
         <button
@@ -160,13 +183,19 @@ function Calendar({ api, view }: { readonly api: ConnectionsApi; readonly view: 
           className="vl-text-button"
           disabled={busy}
           onClick={() => {
-            run(() => api.appPassword(t("connections-caldav-token-name")), setPassword);
+            run(
+              () => api.appPassword(t("connections-caldav-token-name")),
+              setPassword,
+            );
           }}
         >
           {t("connections-caldav-password")}
         </button>
       ) : (
-        <Copyable label={t("connections-caldav-password-label")} value={password} />
+        <Copyable
+          label={t("connections-caldav-password-label")}
+          value={password}
+        />
       )}
       <Failure error={error} />
     </Section>
@@ -188,7 +217,10 @@ function Capture({
   const [address, setAddress] = useState<string>();
   const [off, setOff] = useState(false);
   return (
-    <Section title={t("connections-capture")} intro={t("connections-capture-intro")}>
+    <Section
+      title={t("connections-capture")}
+      intro={t("connections-capture-intro")}
+    >
       <h3>{t("connections-email")}</h3>
       {view.email ? (
         <>
@@ -229,8 +261,12 @@ function Capture({
         <p className="vl-muted">{t("connections-email-unavailable")}</p>
       )}
       <h3>{t("connections-slack")}</h3>
-      {!view.slack && <p className="vl-muted">{t("connections-slack-unavailable")}</p>}
-      {view.slack && !view.slack_linked && <p className="vl-muted">{t("connections-slack-how")}</p>}
+      {!view.slack && (
+        <p className="vl-muted">{t("connections-slack-unavailable")}</p>
+      )}
+      {view.slack && !view.slack_linked && (
+        <p className="vl-muted">{t("connections-slack-how")}</p>
+      )}
       {view.slack && view.slack_linked && (
         <>
           <p>{t("connections-slack-linked")}</p>
@@ -251,7 +287,10 @@ function Capture({
   );
 }
 
-const SOURCES: readonly { readonly from: ImportFrom; readonly accept: string }[] = [
+const SOURCES: readonly {
+  readonly from: ImportFrom;
+  readonly accept: string;
+}[] = [
   { from: "google_tasks", accept: ".json,application/json" },
   { from: "todoist", accept: ".csv,text/csv" },
   { from: "things", accept: ".json,application/json" },
@@ -264,19 +303,28 @@ function Import({ api }: { readonly api: ConnectionsApi }) {
   const [from, setFrom] = useState<ImportFrom>("google_tasks");
   const [file, setFile] = useState<{ name: string; content: string }>();
   const [result, setResult] = useState<ImportView>();
-  const count = file === undefined ? undefined : previewCount(from, file.content);
+  const count =
+    file === undefined ? undefined : previewCount(from, file.content);
   const accept = SOURCES.find((source) => source.from === from)?.accept;
   const submit: NonNullable<ComponentProps<"form">["onSubmit"]> = (event) => {
     event.preventDefault();
     if (file === undefined) return;
     const project = new FormData(event.currentTarget).get("project");
     run(
-      () => api.importTasks(from, file.content, typeof project === "string" ? project : undefined),
+      () =>
+        api.importTasks(
+          from,
+          file.content,
+          typeof project === "string" ? project : undefined,
+        ),
       setResult,
     );
   };
   return (
-    <Section title={t("connections-import")} intro={t("connections-import-intro")}>
+    <Section
+      title={t("connections-import")}
+      intro={t("connections-import-intro")}
+    >
       <form className="vl-connections-form" onSubmit={submit}>
         <label>
           {t("connections-import-from")}
@@ -321,7 +369,9 @@ function Import({ api }: { readonly api: ConnectionsApi }) {
         <button
           type="submit"
           className="vl-filled-button"
-          disabled={busy || file === undefined || count === undefined || count === 0}
+          disabled={
+            busy || file === undefined || count === undefined || count === 0
+          }
         >
           {t("connections-import-button")}
         </button>
@@ -339,7 +389,10 @@ function Import({ api }: { readonly api: ConnectionsApi }) {
           <ul>
             {result.lists.map((list) => (
               <li key={list.doc}>
-                {t("connections-import-list", { list: list.title, count: list.added })}
+                {t("connections-import-list", {
+                  list: list.title,
+                  count: list.added,
+                })}
               </li>
             ))}
           </ul>
@@ -354,7 +407,11 @@ function Import({ api }: { readonly api: ConnectionsApi }) {
 function Connections({ api }: { readonly api: ConnectionsApi }) {
   const t = useT();
   const [version, setVersion] = useState(0);
-  const loaded = useLoaded(() => api.connections(), [api, version], failureText);
+  const loaded = useLoaded(
+    () => api.connections(),
+    [api, version],
+    failureText,
+  );
   return (
     <>
       <p>
@@ -383,7 +440,11 @@ function Connections({ api }: { readonly api: ConnectionsApi }) {
 export function MyWorkConnectionsPage() {
   const t = useT();
   return (
-    <ServerScreen api="connections" title={t("connections-title")} className="vl-work">
+    <ServerScreen
+      api="connections"
+      title={t("connections-title")}
+      className="vl-work"
+    >
       {(api) => <Connections api={api} />}
     </ServerScreen>
   );

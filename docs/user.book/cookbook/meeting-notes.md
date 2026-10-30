@@ -11,9 +11,12 @@ owner's My Work, with due dates on their calendars.
 
 ## Steps
 
-1. Create a page from **New → From template → Meeting notes**, or a blank page titled "Gateway sync 2026-11-02".
-2. Under **Decisions**, add a `good` callout for each decision so it stands out when people skim.
-3. Under **Actions**, type `[]` to start a task, then `@` to mention the owner and a date.
+1. Create a page from **New → From template → Meeting notes**, or a blank page
+   titled "Gateway sync 2026-11-02".
+2. Under **Decisions**, add a `good` callout for each decision so it stands out
+   when people skim.
+3. Under **Actions**, type `[]` to start a task, then `@` to mention the owner
+   and a date.
 4. Share the page with the attendees.
 
 Each action with a person and a date now shows in that person's My Work

@@ -1,7 +1,15 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { createContext, use, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  use,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 import { telemetry } from "../platform/telemetry";
 
@@ -35,9 +43,9 @@ interface ScreenKeys {
   readonly scopes: readonly Scope[];
 }
 
-const ScreenKeysContext = createContext<((keys: ScreenKeys | undefined) => void) | undefined>(
-  undefined,
-);
+const ScreenKeysContext = createContext<
+  ((keys: ScreenKeys | undefined) => void) | undefined
+>(undefined);
 
 /**
  * Lets the mounted screen add its commands and scopes (such as `issues` on
@@ -72,7 +80,8 @@ export function KeyboardRoot({
   const [screen, setScreen] = useState<ScreenKeys>();
   const returnFocus = useRef<Element | null>(null);
   const active = useMemo(
-    () => new Set<Scope>(["global", ...scopes, ...(screen?.scopes ?? NO_SCOPES)]),
+    () =>
+      new Set<Scope>(["global", ...scopes, ...(screen?.scopes ?? NO_SCOPES)]),
     [scopes, screen],
   );
 
@@ -121,10 +130,17 @@ export function KeyboardRoot({
       if (result.kind === "run") {
         returnFocus.current = document.activeElement;
         result.command.run();
-        telemetry().histogram("ui.keyboard.dispatch", performance.now() - started, {
+        telemetry().histogram(
+          "ui.keyboard.dispatch",
+          performance.now() - started,
+          {
+            command: result.command.id,
+          },
+        );
+        telemetry().count("ui.keyboard.commands", {
           command: result.command.id,
+          via: "key",
         });
-        telemetry().count("ui.keyboard.commands", { command: result.command.id, via: "key" });
       }
     };
     document.addEventListener("keydown", onKeyDown);
@@ -145,18 +161,28 @@ export function KeyboardRoot({
       {children}
       {open === "menu" ? (
         <CommandMenu
-          commands={all.filter((c) => active.has(c.scope) && c.id !== "menu.open")}
+          commands={all.filter(
+            (c) => active.has(c.scope) && c.id !== "menu.open",
+          )}
           pages={pages}
           platform={platform}
           onClose={close}
           onRun={(command) => {
             command.run();
-            telemetry().count("ui.keyboard.commands", { command: command.id, via: "menu" });
+            telemetry().count("ui.keyboard.commands", {
+              command: command.id,
+              via: "menu",
+            });
           }}
         />
       ) : undefined}
       {open === "sheet" ? (
-        <ShortcutSheet commands={all} platform={platform} scopes={active} onClose={close} />
+        <ShortcutSheet
+          commands={all}
+          platform={platform}
+          scopes={active}
+          onClose={close}
+        />
       ) : undefined}
     </ScreenKeysContext>
   );

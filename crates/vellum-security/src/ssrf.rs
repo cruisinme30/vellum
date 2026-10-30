@@ -258,7 +258,10 @@ impl GuardedResolver {
     /// # Errors
     ///
     /// Returns [`SsrfError::Unresolved`] or [`SsrfError::Address`].
-    pub async fn resolve_checked(&self, host: &str) -> Result<Vec<SocketAddr>, SsrfError> {
+    pub async fn resolve_checked(
+        &self,
+        host: &str,
+    ) -> Result<Vec<SocketAddr>, SsrfError> {
         let addrs: Vec<SocketAddr> = tokio::net::lookup_host((host, 0))
             .await
             .map_err(|_| SsrfError::Unresolved(host.to_owned()))?
@@ -316,7 +319,8 @@ impl SafeClient {
         let client = builder()
             .redirect(reqwest::redirect::Policy::custom(move |attempt| {
                 if attempt.previous().len() > redirect_policy.max_redirects {
-                    let err = SsrfError::Redirects(redirect_policy.max_redirects);
+                    let err =
+                        SsrfError::Redirects(redirect_policy.max_redirects);
                     return attempt.error(err);
                 }
                 match redirect_policy.check_url(attempt.url()) {
@@ -353,11 +357,18 @@ impl SafeClient {
     /// # Errors
     ///
     /// As [`SafeClient::get`].
-    pub async fn get_trusted(&self, url: &str) -> Result<reqwest::Response, SsrfError> {
+    pub async fn get_trusted(
+        &self,
+        url: &str,
+    ) -> Result<reqwest::Response, SsrfError> {
         self.fetch(url, true).await
     }
 
-    async fn fetch(&self, url: &str, trusted: bool) -> Result<reqwest::Response, SsrfError> {
+    async fn fetch(
+        &self,
+        url: &str,
+        trusted: bool,
+    ) -> Result<reqwest::Response, SsrfError> {
         let url = Url::parse(url)?;
         if trusted {
             self.policy.check_trusted_url(&url)?;
@@ -389,7 +400,10 @@ impl SafeClient {
     /// # Errors
     ///
     /// As [`SafeClient::get_trusted`], plus [`SsrfError::TooLarge`].
-    pub async fn get_trusted_bytes(&self, url: &str) -> Result<Vec<u8>, SsrfError> {
+    pub async fn get_trusted_bytes(
+        &self,
+        url: &str,
+    ) -> Result<Vec<u8>, SsrfError> {
         let response = self.get_trusted(url).await?;
         self.read_limited(response).await
     }
@@ -487,7 +501,10 @@ impl SafeClient {
         Ok((status, self.read_limited(response).await?))
     }
 
-    async fn read_limited(&self, mut response: reqwest::Response) -> Result<Vec<u8>, SsrfError> {
+    async fn read_limited(
+        &self,
+        mut response: reqwest::Response,
+    ) -> Result<Vec<u8>, SsrfError> {
         let limit = self.policy.max_body_bytes;
         if response.content_length().is_some_and(|len| len > limit) {
             return Err(SsrfError::TooLarge(limit));

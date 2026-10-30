@@ -29,7 +29,9 @@ function NewBookForm({
   readonly onCancel: () => void;
 }) {
   const t = useT();
-  const drives = useWorkspace().spaces.filter((space) => space.root !== undefined);
+  const drives = useWorkspace().spaces.filter(
+    (space) => space.root !== undefined,
+  );
   const [title, setTitle] = useState("");
   const [folder, setFolder] = useState(drives[0]?.root ?? "");
   const [error, setError] = useState<string>();
@@ -87,7 +89,11 @@ function NewBookForm({
         <button type="button" className="vl-text-button" onClick={onCancel}>
           {t("books-cancel")}
         </button>
-        <button type="submit" className="vl-filled-button" disabled={busy || title.trim() === ""}>
+        <button
+          type="submit"
+          className="vl-filled-button"
+          disabled={busy || title.trim() === ""}
+        >
           {t("books-create")}
         </button>
       </div>

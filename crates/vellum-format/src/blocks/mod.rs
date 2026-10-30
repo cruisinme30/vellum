@@ -7,8 +7,8 @@
 //! Render, export and the editor all read these types, so a block means the
 //! same thing everywhere. Reading is lenient: a line that cannot be read is
 //! skipped with a [`Diagnostic`] (its `line` is the 1-based line inside the
-//! block, or 0 for the whole block), and everything else is kept. When nothing can be read, callers
-//! show the block's source as the readable fallback.
+//! block, or 0 for the whole block), and everything else is kept. When nothing
+//! can be read, callers show the block's source as the readable fallback.
 
 mod containers;
 mod fences;
@@ -19,12 +19,14 @@ use crate::ast::{Block, Container, ContainerKind, Fence, FenceKind};
 use crate::diagnostic::{Diagnostic, DiagnosticCode};
 
 pub use containers::{
-    Card, Cards, Fact, Facts, Progress, ProgressItem, Stat, Stats, Step, Steps, Tab, Tabs, Trend,
+    Card, Cards, Fact, Facts, Progress, ProgressItem, Stat, Stats, Step, Steps,
+    Tab, Tabs, Trend,
 };
 pub use fences::{
-    Architecture, Arrow, Board, BoardCard, BoardColumn, Calculator, CalculatorInput,
-    CalculatorOutput, Chart, ChartKind, CollectionView, DataTable, Image, Lane, Risk, RiskMatrix,
-    Roadmap, RoadmapRow, Series, Timeline, TimelineItem,
+    Architecture, Arrow, Board, BoardCard, BoardColumn, Calculator,
+    CalculatorInput, CalculatorOutput, Chart, ChartKind, CollectionView,
+    DataTable, Image, Lane, Risk, RiskMatrix, Roadmap, RoadmapRow, Series,
+    Timeline, TimelineItem,
 };
 
 /// Typed data read from a block, with the problems found reading it.
@@ -94,13 +96,21 @@ impl Data {
             FenceKind::Chart => Chart::parse(fence).map(Self::Chart),
             FenceKind::Timeline => Timeline::parse(fence).map(Self::Timeline),
             FenceKind::Roadmap => Roadmap::parse(fence).map(Self::Roadmap),
-            FenceKind::RiskMatrix => RiskMatrix::parse(fence).map(Self::RiskMatrix),
+            FenceKind::RiskMatrix => {
+                RiskMatrix::parse(fence).map(Self::RiskMatrix)
+            }
             FenceKind::Board => Board::parse(fence).map(Self::Board),
             FenceKind::Table => DataTable::parse(fence).map(Self::Table),
-            FenceKind::Architecture => Architecture::parse(fence).map(Self::Architecture),
-            FenceKind::Calculator => Calculator::parse(fence).map(Self::Calculator),
+            FenceKind::Architecture => {
+                Architecture::parse(fence).map(Self::Architecture)
+            }
+            FenceKind::Calculator => {
+                Calculator::parse(fence).map(Self::Calculator)
+            }
             FenceKind::Image => Image::parse(fence).map(Self::Image),
-            FenceKind::Collection => CollectionView::parse(fence).map(Self::Collection),
+            FenceKind::Collection => {
+                CollectionView::parse(fence).map(Self::Collection)
+            }
             FenceKind::Code | FenceKind::Diagram => return None,
         })
     }
@@ -111,7 +121,9 @@ impl Data {
         Some(match container.kind() {
             ContainerKind::Stats => Stats::parse(container).map(Self::Stats),
             ContainerKind::Facts => Facts::parse(container).map(Self::Facts),
-            ContainerKind::Progress => Progress::parse(container).map(Self::Progress),
+            ContainerKind::Progress => {
+                Progress::parse(container).map(Self::Progress)
+            }
             ContainerKind::Cards => Cards::parse(container).map(Self::Cards),
             ContainerKind::Steps => Steps::parse(container).map(Self::Steps),
             ContainerKind::Tabs => Tabs::parse(container).map(Self::Tabs),

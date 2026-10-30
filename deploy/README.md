@@ -46,9 +46,9 @@ install is imported on first start.
 
 ## Organisation: Helm
 
-Install the [Zalando Postgres Operator](https://github.com/zalando/postgres-operator)
-first, and [Argo Rollouts](https://argoproj.github.io/rollouts/) for canary
-releases. Then:
+Install the [Zalando Postgres
+Operator](https://github.com/zalando/postgres-operator) first, and [Argo
+Rollouts](https://argoproj.github.io/rollouts/) for canary releases. Then:
 
 ```sh
 kubectl create secret generic vellum-kek --from-literal=passphrase="$(openssl rand -base64 32)"

@@ -151,13 +151,16 @@ impl Book {
         let mut items = Vec::new();
         for section in [Section::Prefix, Section::Numbered, Section::Suffix] {
             let mut part: Option<String> = None;
-            for (index, item) in self.summary.items(section).iter().enumerate() {
+            for (index, item) in self.summary.items(section).iter().enumerate()
+            {
                 items.push(match item {
-                    Item::Chapter(chapter) => TocItem::Chapter(Box::new(entry(
-                        Slot::top(section, index),
-                        chapter,
-                        part.as_ref(),
-                    ))),
+                    Item::Chapter(chapter) => {
+                        TocItem::Chapter(Box::new(entry(
+                            Slot::top(section, index),
+                            chapter,
+                            part.as_ref(),
+                        )))
+                    }
                     Item::Separator => TocItem::Separator,
                     Item::Part(title) => {
                         part = Some(title.clone());
@@ -189,7 +192,9 @@ fn build(
         .children
         .iter()
         .enumerate()
-        .map(|(index, child)| build(book, numbers, style, slot.child(index), child, part))
+        .map(|(index, child)| {
+            build(book, numbers, style, slot.child(index), child, part)
+        })
         .collect();
     TocEntry {
         id: chapter

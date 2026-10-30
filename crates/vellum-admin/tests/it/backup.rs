@@ -51,7 +51,8 @@ async fn backup_restore_and_drill() {
     let scratch = tempfile::tempdir().unwrap();
     seed(data.path());
     #[cfg(unix)]
-    std::os::unix::fs::symlink("/etc/passwd", data.path().join("link")).unwrap();
+    std::os::unix::fs::symlink("/etc/passwd", data.path().join("link"))
+        .unwrap();
     let k = keys(1);
 
     let info = backup::create(&k, data.path(), out.path(), &[])
@@ -150,7 +151,8 @@ async fn damaged_backups_fail_the_drill() {
 async fn prune_keeps_the_newest() {
     let out = tempfile::tempdir().unwrap();
     for stamp in ["20261001T000000Z", "20261002T000000Z", "20261003T000000Z"] {
-        std::fs::write(out.path().join(format!("vellum-{stamp}.vbk")), b"x").unwrap();
+        std::fs::write(out.path().join(format!("vellum-{stamp}.vbk")), b"x")
+            .unwrap();
     }
     std::fs::write(out.path().join("other.txt"), b"x").unwrap();
     let removed = backup::prune(out.path(), 2).await.unwrap();

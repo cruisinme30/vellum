@@ -248,7 +248,10 @@ impl Collections for NoCollections {
             .collect()
     }
 
-    fn create(&self, _table: &NewCollection) -> Result<CollectionFiles, String> {
+    fn create(
+        &self,
+        _table: &NewCollection,
+    ) -> Result<CollectionFiles, String> {
         Err(NO_COLLECTIONS.into())
     }
 }

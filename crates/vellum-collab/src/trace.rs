@@ -45,7 +45,8 @@ impl TraceParent {
 
     /// Makes `span` a child of this remote context.
     pub fn parent(&self, span: &tracing::Span) {
-        let cx = opentelemetry::Context::new().with_remote_span_context(self.span_context());
+        let cx = opentelemetry::Context::new()
+            .with_remote_span_context(self.span_context());
         // Fails only when no OpenTelemetry layer is installed, in which
         // case there is no trace to join.
         let _ignored = span.set_parent(cx);
@@ -73,13 +74,18 @@ impl FromStr for TraceParent {
                 && s.bytes()
                     .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
         };
-        if version != "00" || !lower_hex(trace, 32) || !lower_hex(span, 16) || !lower_hex(flags, 2)
+        if version != "00"
+            || !lower_hex(trace, 32)
+            || !lower_hex(span, 16)
+            || !lower_hex(flags, 2)
         {
             return Err(TraceParentError);
         }
-        let trace_id = TraceId::from_hex(trace).map_err(|_| TraceParentError)?;
+        let trace_id =
+            TraceId::from_hex(trace).map_err(|_| TraceParentError)?;
         let span_id = SpanId::from_hex(span).map_err(|_| TraceParentError)?;
-        let flags = u8::from_str_radix(flags, 16).map_err(|_| TraceParentError)?;
+        let flags =
+            u8::from_str_radix(flags, 16).map_err(|_| TraceParentError)?;
         if trace_id == TraceId::INVALID || span_id == SpanId::INVALID {
             return Err(TraceParentError);
         }
@@ -107,11 +113,13 @@ impl fmt::Display for TraceParent {
 mod tests {
     use super::*;
 
-    const SAMPLE: &str = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
+    const SAMPLE: &str =
+        "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
 
     #[test]
     fn round_trips_the_w3c_example() {
-        let parsed: TraceParent = SAMPLE.parse().unwrap_or_else(|e| unreachable!("{e}"));
+        let parsed: TraceParent =
+            SAMPLE.parse().unwrap_or_else(|e| unreachable!("{e}"));
         assert_eq!(parsed.to_string(), SAMPLE);
         assert!(parsed.span_context().is_sampled());
         assert!(parsed.span_context().is_remote());
@@ -129,7 +137,11 @@ mod tests {
             "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01-x",
             "00-4bf92f3577b34da6a3ce929d0e0e473g-00f067aa0ba902b7-01",
         ] {
-            assert_eq!(bad.parse::<TraceParent>(), Err(TraceParentError), "{bad}");
+            assert_eq!(
+                bad.parse::<TraceParent>(),
+                Err(TraceParentError),
+                "{bad}"
+            );
         }
     }
 }

@@ -53,21 +53,29 @@ describe("themes", () => {
     expect(light["surface"]).toBe("#f7f8fc");
   });
 
-  it.each(resolved)("%s meets WCAG 2.2 AA contrast with the default seed", (theme) => {
-    expect(checkContrast(buildScheme(theme))).toEqual([]);
-  });
+  it.each(resolved)(
+    "%s meets WCAG 2.2 AA contrast with the default seed",
+    (theme) => {
+      expect(checkContrast(buildScheme(theme))).toEqual([]);
+    },
+  );
 
   it.each(["#b3261e", "#00897b", "#f9a825", "#6750a4", "#000000"])(
     "every theme stays accessible with seed %s",
     (seed) => {
       for (const theme of resolved) {
-        expect(checkContrast(buildScheme(theme, seed)), `${theme} ${seed}`).toEqual([]);
+        expect(
+          checkContrast(buildScheme(theme, seed)),
+          `${theme} ${seed}`,
+        ).toEqual([]);
       }
     },
   );
 
   it("falls back to the default seed when the seed is not a colour", () => {
-    expect(buildScheme("dark", "nope")).toEqual(buildScheme("dark", DEFAULT_SEED));
+    expect(buildScheme("dark", "nope")).toEqual(
+      buildScheme("dark", DEFAULT_SEED),
+    );
   });
 
   it("reports failing pairs", () => {

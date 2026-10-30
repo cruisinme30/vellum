@@ -107,13 +107,14 @@ impl CollectionEmbed {
     ///
     /// Returns an [`EmbedError`] when the view or an override is unknown.
     pub fn view_def(&self, schema: &Schema) -> Result<ViewDef, EmbedError> {
-        let mut def = schema.view(self.view.as_deref()).cloned().ok_or_else(|| {
-            EmbedError(format!(
-                "{} has no view named {:?}",
-                schema.title,
-                self.view.as_deref().unwrap_or_default()
-            ))
-        })?;
+        let mut def =
+            schema.view(self.view.as_deref()).cloned().ok_or_else(|| {
+                EmbedError(format!(
+                    "{} has no view named {:?}",
+                    schema.title,
+                    self.view.as_deref().unwrap_or_default()
+                ))
+            })?;
         def.overlay(&self.overrides, schema)
             .map_err(|e| EmbedError(e.to_string()))?;
         Ok(def)
@@ -125,19 +126,30 @@ impl CollectionEmbed {
     ///
     /// Returns an [`EmbedError`] when the collection is not available or
     /// the view is invalid.
-    pub fn resolve(&self, computer: &mut Computer<'_>) -> Result<ViewResult, EmbedError> {
-        let c = computer
-            .workspace()
-            .collection(self.id)
-            .ok_or_else(|| EmbedError("this collection is not available".into()))?;
+    pub fn resolve(
+        &self,
+        computer: &mut Computer<'_>,
+    ) -> Result<ViewResult, EmbedError> {
+        let c = computer.workspace().collection(self.id).ok_or_else(|| {
+            EmbedError("this collection is not available".into())
+        })?;
         let def = self.view_def(c.schema())?;
-        view::query(computer, self.id, &def).map_err(|e| EmbedError(e.to_string()))
+        view::query(computer, self.id, &def)
+            .map_err(|e| EmbedError(e.to_string()))
     }
 }
 
 /// How a chart combines the `y` values that share an `x`.
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, schemars::JsonSchema,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Default,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
 )]
 #[serde(rename_all = "snake_case")]
 pub enum ChartAgg {
@@ -201,17 +213,18 @@ impl ChartSource {
     /// # Errors
     ///
     /// Returns an [`EmbedError`] for a bad id, missing `x` or unknown `agg`.
-    pub fn from_attrs(attrs: &BTreeMap<String, String>) -> Result<Option<Self>, EmbedError> {
+    pub fn from_attrs(
+        attrs: &BTreeMap<String, String>,
+    ) -> Result<Option<Self>, EmbedError> {
         let Some(source) = attrs.get("source") else {
             return Ok(None);
         };
         let Some(id) = source.strip_prefix("collection:") else {
             return Ok(None);
         };
-        let x = attrs
-            .get("x")
-            .cloned()
-            .ok_or_else(|| EmbedError("a collection chart needs x=<property>".into()))?;
+        let x = attrs.get("x").cloned().ok_or_else(|| {
+            EmbedError("a collection chart needs x=<property>".into())
+        })?;
         let y = attrs.get("y").cloned();
         let agg = match attrs.get("agg").map(|a| a.to_ascii_lowercase()) {
             None if y.is_none() => ChartAgg::Count,
@@ -222,7 +235,9 @@ impl ChartSource {
                 "avg" => ChartAgg::Avg,
                 "min" => ChartAgg::Min,
                 "max" => ChartAgg::Max,
-                other => return Err(EmbedError(format!("unknown agg {other:?}"))),
+                other => {
+                    return Err(EmbedError(format!("unknown agg {other:?}")));
+                }
             },
         };
         Ok(Some(Self {
@@ -241,26 +256,32 @@ impl ChartSource {
     ///
     /// Returns an [`EmbedError`] when the collection, view or a property is
     /// unknown.
-    pub fn resolve(&self, computer: &mut Computer<'_>) -> Result<ChartData, EmbedError> {
+    pub fn resolve(
+        &self,
+        computer: &mut Computer<'_>,
+    ) -> Result<ChartData, EmbedError> {
         let ws = computer.workspace();
         let schema = ws
             .collection(self.id)
-            .ok_or_else(|| EmbedError("this collection is not available".into()))?
+            .ok_or_else(|| {
+                EmbedError("this collection is not available".into())
+            })?
             .schema();
         let prop = |name: &str| {
-            schema
-                .resolve(name)
-                .ok_or_else(|| EmbedError(format!("{} has no property {name:?}", schema.title)))
+            schema.resolve(name).ok_or_else(|| {
+                EmbedError(format!("{} has no property {name:?}", schema.title))
+            })
         };
         let x = prop(&self.x)?;
         let y = self.y.as_deref().map(prop).transpose()?;
         let series_prop = self.series.as_deref().map(prop).transpose()?;
-        let def = schema.view(self.view.as_deref()).cloned().ok_or_else(|| {
-            EmbedError(format!(
-                "{} has no view named {:?}",
-                schema.title, self.view
-            ))
-        })?;
+        let def =
+            schema.view(self.view.as_deref()).cloned().ok_or_else(|| {
+                EmbedError(format!(
+                    "{} has no view named {:?}",
+                    schema.title, self.view
+                ))
+            })?;
         let result = view::run(computer, self.id, &def, usize::MAX)
             .map_err(|e| EmbedError(e.to_string()))?;
 
@@ -273,7 +294,8 @@ impl ChartSource {
             if !seen.insert(row.id) {
                 continue;
             }
-            let xv = computer.value(self.id, row.id, &x.key).unwrap_or_default();
+            let xv =
+                computer.value(self.id, row.id, &x.key).unwrap_or_default();
             let xs = labelled(computer, x, &xv);
             let n = match (y, self.agg) {
                 (_, ChartAgg::Count) | (None, _) => Some(1.0),
@@ -283,16 +305,24 @@ impl ChartSource {
                     .and_then(|v| v.as_number()),
             };
             let Some(n) = n else { continue };
-            let names: Vec<String> = series_prop.map_or_else(
-                || vec![y.map_or_else(|| "Count".to_owned(), |y| y.name.clone())],
-                |s| {
-                    let sv = computer.value(self.id, row.id, &s.key).unwrap_or_default();
-                    labelled(computer, s, &sv)
-                        .into_iter()
-                        .map(|(_, l)| l)
-                        .collect()
-                },
-            );
+            let names: Vec<String> =
+                series_prop.map_or_else(
+                    || {
+                        vec![y.map_or_else(
+                            || "Count".to_owned(),
+                            |y| y.name.clone(),
+                        )]
+                    },
+                    |s| {
+                        let sv = computer
+                            .value(self.id, row.id, &s.key)
+                            .unwrap_or_default();
+                        labelled(computer, s, &sv)
+                            .into_iter()
+                            .map(|(_, l)| l)
+                            .collect()
+                    },
+                );
             for (v, label) in &xs {
                 if !categories.iter().any(|(_, l)| l == label) {
                     categories.push((v.clone(), label.clone()));
@@ -301,18 +331,28 @@ impl ChartSource {
                     if !series_names.contains(s) {
                         series_names.push(s.clone());
                     }
-                    cells.entry((s.clone(), label.clone())).or_default().push(n);
+                    cells
+                        .entry((s.clone(), label.clone()))
+                        .or_default()
+                        .push(n);
                 }
             }
         }
-        categories.sort_by(|(a, _), (b, _)| view::compare_for_sort(Some(x), a, b));
-        let categories: Vec<String> = categories.into_iter().map(|(_, l)| l).collect();
+        categories
+            .sort_by(|(a, _), (b, _)| view::compare_for_sort(Some(x), a, b));
+        let categories: Vec<String> =
+            categories.into_iter().map(|(_, l)| l).collect();
         let series = series_names
             .into_iter()
             .map(|name| Series {
                 values: categories
                     .iter()
-                    .map(|cat| combine(self.agg, cells.get(&(name.clone(), cat.clone()))))
+                    .map(|cat| {
+                        combine(
+                            self.agg,
+                            cells.get(&(name.clone(), cat.clone())),
+                        )
+                    })
                     .collect(),
                 name,
             })
@@ -355,7 +395,9 @@ fn combine(agg: ChartAgg, values: Option<&Vec<f64>>) -> f64 {
             values.iter().sum::<f64>() / n
         }
         ChartAgg::Min => values.iter().copied().fold(f64::INFINITY, f64::min),
-        ChartAgg::Max => values.iter().copied().fold(f64::NEG_INFINITY, f64::max),
+        ChartAgg::Max => {
+            values.iter().copied().fold(f64::NEG_INFINITY, f64::max)
+        }
     }
 }
 
@@ -366,12 +408,16 @@ mod tests {
     #[test]
     fn parses_the_fence() {
         let e = CollectionEmbed::parse(
-            "id: 01JBQ8Y4ZK6V3W2N5R7T9X1C3E\nview: By status\nfilter: Status != Done\n",
+            "id: 01JBQ8Y4ZK6V3W2N5R7T9X1C3E\nview: By status\n\
+                filter: Status != Done\n",
         )
         .unwrap();
         assert_eq!(e.view.as_deref(), Some("By status"));
         assert!(CollectionEmbed::parse("id: nope").is_err());
-        assert!(CollectionEmbed::parse("id: 01JBQ8Y4ZK6V3W2N5R7T9X1C3E\nbogus: 1").is_err());
+        assert!(
+            CollectionEmbed::parse("id: 01JBQ8Y4ZK6V3W2N5R7T9X1C3E\nbogus: 1")
+                .is_err()
+        );
     }
 
     #[test]

@@ -1,7 +1,9 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-/** Saved and shared views, and the team's statuses by category (R-WK-3, R-WK-4). */
+/**
+ * Saved and shared views, and the team's statuses by category (R-WK-3, R-WK-4).
+ */
 
 import { useId, useState, type ComponentProps } from "react";
 
@@ -12,7 +14,12 @@ import { useT } from "../i18n/i18n";
 
 import type { TeamOut, ViewOut, WorkApi } from "./api";
 import { fieldText } from "./form";
-import { CATEGORIES, VISIBILITIES, viewInput, type Settings } from "./view-settings";
+import {
+  CATEGORIES,
+  VISIBILITIES,
+  viewInput,
+  type Settings,
+} from "./view-settings";
 
 export function SavedViews({
   api,
@@ -31,7 +38,11 @@ export function SavedViews({
   const [version, setVersion] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
-  const loaded = useLoaded(() => api.views(team.key), [api, team.key, version], failureText);
+  const loaded = useLoaded(
+    () => api.views(team.key),
+    [api, team.key, version],
+    failureText,
+  );
   const views = loaded.state === "ready" ? loaded.value : [];
   const current = views.find((view) => view.id === settings.view);
   const run = (work: Promise<unknown>, after?: () => void) => {
@@ -80,7 +91,10 @@ export function SavedViews({
             <option key={view.id} value={view.id}>
               {view.visibility === "private"
                 ? view.name
-                : t("work-views-shared", { name: view.name, owner: view.owner })}
+                : t("work-views-shared", {
+                    name: view.name,
+                    owner: view.owner,
+                  })}
             </option>
           ))}
         </select>
@@ -170,7 +184,9 @@ export function Statuses({ team }: { readonly team: TeamOut }) {
       <summary>{t("work-statuses", { team: team.name })}</summary>
       <dl>
         {CATEGORIES.map((category) => {
-          const statuses = team.statuses.filter((status) => status.category === category);
+          const statuses = team.statuses.filter(
+            (status) => status.category === category,
+          );
           if (statuses.length === 0) return;
           return (
             <div key={category}>
@@ -179,7 +195,9 @@ export function Statuses({ team }: { readonly team: TeamOut }) {
                 <dd key={status.key}>
                   {status.name}
                   {status.key === team.default_status && (
-                    <span className="vl-work-chip">{t("work-status-default")}</span>
+                    <span className="vl-work-chip">
+                      {t("work-status-default")}
+                    </span>
                   )}
                 </dd>
               ))}

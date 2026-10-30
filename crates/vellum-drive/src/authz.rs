@@ -16,8 +16,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use vellum_authz::{
-    Actor as AuthzActor, Authz, AuthzStore, Change, Id, MemoryStore, Object, Principal, Relation,
-    SqlStore, Subject, Tuple, TupleRelation,
+    Actor as AuthzActor, Authz, AuthzStore, Change, Id, MemoryStore, Object,
+    Principal, Relation, SqlStore, Subject, Tuple, TupleRelation,
 };
 use vellum_kernel::{ObjectId, ShareId, SpaceId, Timestamp, UserId};
 
@@ -31,11 +31,19 @@ pub trait TreeSync: Send + Sync {
     ///
     /// # Errors
     /// Store failures, as [`DriveError::Access`].
-    fn set_parents(&self, space: Id, parents: BTreeMap<Id, Option<Id>>) -> DriveResult<()>;
+    fn set_parents(
+        &self,
+        space: Id,
+        parents: BTreeMap<Id, Option<Id>>,
+    ) -> DriveResult<()>;
 }
 
 impl TreeSync for MemoryStore {
-    fn set_parents(&self, space: Id, parents: BTreeMap<Id, Option<Id>>) -> DriveResult<()> {
+    fn set_parents(
+        &self,
+        space: Id,
+        parents: BTreeMap<Id, Option<Id>>,
+    ) -> DriveResult<()> {
         self.set_tree(space, parents).map_err(access_error)
     }
 }
@@ -44,7 +52,11 @@ impl TreeSync for MemoryStore {
 /// [`crate::sql::SqlIndex`] keeps in step on every write (D141), so there
 /// is nothing to hand over. Pair it with that index on the same database.
 impl TreeSync for SqlStore {
-    fn set_parents(&self, _space: Id, _parents: BTreeMap<Id, Option<Id>>) -> DriveResult<()> {
+    fn set_parents(
+        &self,
+        _space: Id,
+        _parents: BTreeMap<Id, Option<Id>>,
+    ) -> DriveResult<()> {
         Ok(())
     }
 }
@@ -52,7 +64,11 @@ impl TreeSync for SqlStore {
 /// As for [`SqlStore`]: each shard's `page_ancestors` is kept by the
 /// sharded drive index on the same shard.
 impl TreeSync for vellum_authz::ShardedStore {
-    fn set_parents(&self, _space: Id, _parents: BTreeMap<Id, Option<Id>>) -> DriveResult<()> {
+    fn set_parents(
+        &self,
+        _space: Id,
+        _parents: BTreeMap<Id, Option<Id>>,
+    ) -> DriveResult<()> {
         Ok(())
     }
 }
@@ -136,10 +152,18 @@ impl<S: AuthzStore + TreeSync + 'static> Access for AuthzAccess<S> {
             .collect())
     }
 
-    async fn accessible(&self, user: UserId, space: SpaceId) -> DriveResult<Vec<ObjectId>> {
+    async fn accessible(
+        &self,
+        user: UserId,
+        space: SpaceId,
+    ) -> DriveResult<Vec<ObjectId>> {
         let ids = self
             .authz
-            .accessible(id(space), principal(user), vellum_authz::Permission::Read)
+            .accessible(
+                id(space),
+                principal(user),
+                vellum_authz::Permission::Read,
+            )
             .await
             .map_err(access_error)?;
         Ok(ids
@@ -149,7 +173,11 @@ impl<S: AuthzStore + TreeSync + 'static> Access for AuthzAccess<S> {
             .collect())
     }
 
-    async fn tree_changed(&self, space: SpaceId, nodes: &[ObjectId]) -> DriveResult<()> {
+    async fn tree_changed(
+        &self,
+        space: SpaceId,
+        nodes: &[ObjectId],
+    ) -> DriveResult<()> {
         self.sync_tree(space).await?;
         let roots: Vec<Id> = nodes.iter().map(|n| id(*n)).collect();
         let _ = self
@@ -160,7 +188,12 @@ impl<S: AuthzStore + TreeSync + 'static> Access for AuthzAccess<S> {
         Ok(())
     }
 
-    async fn grant_owner(&self, user: UserId, space: SpaceId, node: ObjectId) -> DriveResult<()> {
+    async fn grant_owner(
+        &self,
+        user: UserId,
+        space: SpaceId,
+        node: ObjectId,
+    ) -> DriveResult<()> {
         self.sync_tree(space).await?;
         let object = if node.as_u128() == space.as_u128() {
             Object::Space(id(space))
@@ -191,12 +224,17 @@ impl<S: AuthzStore + TreeSync + 'static> Access for AuthzAccess<S> {
         let now = now_ms();
         let mut strongest: BTreeMap<u128, Relation> = BTreeMap::new();
         for tuple in &graph.tuples {
-            let (Object::Space(object), TupleRelation::Role(role), Subject::User(user)) =
-                (tuple.object, tuple.relation, tuple.subject)
+            let (
+                Object::Space(object),
+                TupleRelation::Role(role),
+                Subject::User(user),
+            ) = (tuple.object, tuple.relation, tuple.subject)
             else {
                 continue;
             };
-            if object != id(space) || tuple.expires_at.is_some_and(|at| at <= now) {
+            if object != id(space)
+                || tuple.expires_at.is_some_and(|at| at <= now)
+            {
                 continue;
             }
             let entry = strongest.entry(user.0).or_insert(role);
@@ -230,7 +268,9 @@ impl<S: AuthzStore + TreeSync + 'static> Access for AuthzAccess<S> {
             .iter()
             .filter(|t| t.object == object && t.subject == subject)
             .filter_map(|t| match t.relation {
-                TupleRelation::Role(held) if Some(held) != role.map(relation) => {
+                TupleRelation::Role(held)
+                    if Some(held) != role.map(relation) =>
+                {
                     Some(Change::Revoke {
                         object,
                         relation: held,
@@ -241,7 +281,11 @@ impl<S: AuthzStore + TreeSync + 'static> Access for AuthzAccess<S> {
             })
             .collect();
         if let Some(role) = role {
-            changes.push(Change::Grant(Tuple::role(object, relation(role), subject)));
+            changes.push(Change::Grant(Tuple::role(
+                object,
+                relation(role),
+                subject,
+            )));
         }
         let _ = self
             .authz
@@ -363,14 +407,20 @@ impl<S: AuthzStore + TreeSync + 'static> AuthzAccess<S> {
         Ok(graph
             .tuples
             .into_iter()
-            .filter(|t| t.object == object && t.expires_at.is_none_or(|at| at > now))
+            .filter(|t| {
+                t.object == object && t.expires_at.is_none_or(|at| at > now)
+            })
             .filter_map(|t| {
                 let TupleRelation::Role(relation) = t.relation else {
                     return None;
                 };
                 let grantee = match t.subject {
-                    Subject::User(user) => Grantee::User(UserId::from_u128(user.0)),
-                    Subject::Group(group) => Grantee::Group(ObjectId::from_u128(group.0)),
+                    Subject::User(user) => {
+                        Grantee::User(UserId::from_u128(user.0))
+                    }
+                    Subject::Group(group) => {
+                        Grantee::Group(ObjectId::from_u128(group.0))
+                    }
                     Subject::ShareLink(_) => return None,
                 };
                 Some((t, grantee, relation_role(relation)))
@@ -381,7 +431,12 @@ impl<S: AuthzStore + TreeSync + 'static> AuthzAccess<S> {
 
 #[async_trait]
 impl<S: AuthzStore + TreeSync + 'static> ShareAccess for AuthzAccess<S> {
-    async fn can_share(&self, user: UserId, space: SpaceId, node: ObjectId) -> DriveResult<bool> {
+    async fn can_share(
+        &self,
+        user: UserId,
+        space: SpaceId,
+        node: ObjectId,
+    ) -> DriveResult<bool> {
         let decision = self
             .authz
             .check(
@@ -395,7 +450,11 @@ impl<S: AuthzStore + TreeSync + 'static> ShareAccess for AuthzAccess<S> {
         Ok(decision.allowed)
     }
 
-    async fn grants(&self, space: SpaceId, node: ObjectId) -> DriveResult<Vec<Grant>> {
+    async fn grants(
+        &self,
+        space: SpaceId,
+        node: ObjectId,
+    ) -> DriveResult<Vec<Grant>> {
         Ok(self
             .role_tuples(space, node)
             .await?
@@ -424,7 +483,9 @@ impl<S: AuthzStore + TreeSync + 'static> ShareAccess for AuthzAccess<S> {
             .role_tuples(space, node)
             .await?
             .into_iter()
-            .filter(|(_, grantee, role)| *grantee == grant.grantee && *role != grant.role)
+            .filter(|(_, grantee, role)| {
+                *grantee == grant.grantee && *role != grant.role
+            })
             .map(|(_, _, role)| Change::Revoke {
                 object,
                 relation: role_relation(role),

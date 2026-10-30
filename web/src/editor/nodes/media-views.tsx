@@ -17,7 +17,13 @@ interface FieldProperties {
   readonly readOnly: boolean;
 }
 
-function Field({ label, value, onChange, type = "text", readOnly }: FieldProperties) {
+function Field({
+  label,
+  value,
+  onChange,
+  type = "text",
+  readOnly,
+}: FieldProperties) {
   return (
     <label className="vl-field">
       <span>{label}</span>
@@ -42,7 +48,9 @@ function useEditing(properties: ReactNodeViewProps, key: string) {
   const [focused, setFocused] = useState(false);
   const open =
     properties.editor.isEditable &&
-    (focused || properties.selected || String(properties.node.attrs[key]) === "");
+    (focused ||
+      properties.selected ||
+      String(properties.node.attrs[key]) === "");
   const formEvents = {
     onFocus: () => {
       setFocused(true);
@@ -67,7 +75,12 @@ export function LinkCardView(properties: ReactNodeViewProps) {
   return (
     <NodeViewWrapper className="vl-block vl-linkCard" contentEditable={false}>
       {href ? (
-        <a className="vl-card-link" href={href} target="_blank" rel="noopener noreferrer">
+        <a
+          className="vl-card-link"
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           <Icon name="link" />
           <span>
             <strong>{title === "" ? href : title}</strong>
@@ -102,7 +115,10 @@ export function LinkCardView(properties: ReactNodeViewProps) {
   );
 }
 
-/** `::: embed <url>`: a sandboxed frame for supported providers, a link otherwise. */
+/**
+ * `::: embed <url>`: a sandboxed frame for supported providers, a link
+ * otherwise.
+ */
 export function EmbedView(properties: ReactNodeViewProps) {
   const t = useT();
   const { node, updateAttributes, editor } = properties;

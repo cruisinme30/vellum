@@ -6,9 +6,9 @@
 //! Every stored object is sealed with its own random 256-bit data-encryption
 //! key (DEK) using XChaCha20-Poly1305. The DEK is wrapped by a key-encryption
 //! key (KEK) held by a [`KeyProvider`]: a [`LocalKeyring`] fed from the OS
-//! keychain or an Argon2id passphrase ([`PassphraseKdf`]), or a remote KMS or Vault adapter.
-//! Rotating the KEK re-wraps DEKs ([`envelope::rewrap`]) without re-encrypting
-//! payloads, and dropping one object's DEK shreds that object.
+//! keychain or an Argon2id passphrase ([`PassphraseKdf`]), or a remote KMS or
+//! Vault adapter. Rotating the KEK re-wraps DEKs ([`envelope::rewrap`]) without
+//! re-encrypting payloads, and dropping one object's DEK shreds that object.
 //!
 //! E2E private spaces use [`recipients`] instead: the DEK is wrapped to each
 //! member's X25519 key, so only members' devices can open the object.
@@ -28,6 +28,10 @@ pub use error::CryptoError;
 pub use key::{KEY_LEN, KekId, MAX_KEK_ID_LEN, SecretKey};
 #[cfg(feature = "os-keychain")]
 pub use keychain::OsKeychain;
-pub use keychain::{SecretStore, keyring_from_store, load_or_create_kek, rotate_in_store};
-pub use passphrase::{PASSPHRASE_ENV, PASSPHRASE_FILE_ENV, PassphraseKdf, passphrase_from_env};
+pub use keychain::{
+    SecretStore, keyring_from_store, load_or_create_kek, rotate_in_store,
+};
+pub use passphrase::{
+    PASSPHRASE_ENV, PASSPHRASE_FILE_ENV, PassphraseKdf, passphrase_from_env,
+};
 pub use provider::{KeyProvider, LocalKeyring, WrappedDek};

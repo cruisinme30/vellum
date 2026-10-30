@@ -164,7 +164,8 @@ impl FileRec {
         if !self.mime.starts_with("application/vnd.google-apps.")
             && let Some(map) = v.as_object_mut()
         {
-            let _ = map.insert("size".into(), json!(self.bytes.len().to_string()));
+            let _ =
+                map.insert("size".into(), json!(self.bytes.len().to_string()));
             if let Some(rev) = &self.head_revision_id {
                 let _ = map.insert("headRevisionId".into(), json!(rev));
             }
@@ -285,7 +286,10 @@ fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 }
 
 /// Splits a two-part `multipart/related` body into metadata and media.
-fn parse_multipart(content_type: &str, body: &[u8]) -> Result<(Value, Vec<u8>), String> {
+fn parse_multipart(
+    content_type: &str,
+    body: &[u8],
+) -> Result<(Value, Vec<u8>), String> {
     let boundary = content_type
         .split(';')
         .find_map(|p| p.trim().strip_prefix("boundary="))
@@ -295,18 +299,21 @@ fn parse_multipart(content_type: &str, body: &[u8]) -> Result<(Value, Vec<u8>), 
     let mut parts = Vec::new();
     let mut rest = body;
     loop {
-        let start = find(rest, delimiter.as_bytes()).ok_or("missing delimiter")?;
+        let start =
+            find(rest, delimiter.as_bytes()).ok_or("missing delimiter")?;
         rest = rest.get(start + delimiter.len()..).ok_or("truncated")?;
         if rest.starts_with(b"--") {
             break;
         }
-        let rest_after_crlf = rest.strip_prefix(b"\r\n").ok_or("missing CRLF")?;
-        let headers_end = find(rest_after_crlf, b"\r\n\r\n").ok_or("missing part headers")?;
+        let rest_after_crlf =
+            rest.strip_prefix(b"\r\n").ok_or("missing CRLF")?;
+        let headers_end =
+            find(rest_after_crlf, b"\r\n\r\n").ok_or("missing part headers")?;
         let content = rest_after_crlf
             .get(headers_end + 4..)
             .ok_or("truncated part")?;
-        let end =
-            find(content, format!("\r\n{delimiter}").as_bytes()).ok_or("unterminated part")?;
+        let end = find(content, format!("\r\n{delimiter}").as_bytes())
+            .ok_or("unterminated part")?;
         parts.push(content.get(..end).ok_or("bad part")?.to_vec());
         rest = content.get(end + 2..).ok_or("truncated")?;
     }
@@ -368,7 +375,11 @@ impl Table {
         self.files.get(id).is_some_and(|f| f.mime == FOLDER_MIME)
     }
 
-    fn create(&mut self, metadata: &Value, bytes: Option<Vec<u8>>) -> Result<FileRec, Box<Reply>> {
+    fn create(
+        &mut self,
+        metadata: &Value,
+        bytes: Option<Vec<u8>>,
+    ) -> Result<FileRec, Box<Reply>> {
         let name = metadata
             .get("name")
             .and_then(Value::as_str)
@@ -412,7 +423,11 @@ impl Table {
         Ok(rec)
     }
 
-    fn replace_content(&mut self, id: &str, bytes: Vec<u8>) -> Result<FileRec, Box<Reply>> {
+    fn replace_content(
+        &mut self,
+        id: &str,
+        bytes: Vec<u8>,
+    ) -> Result<FileRec, Box<Reply>> {
         let now = self.tick();
         let rev = self.new_rev();
         let file = self
@@ -477,8 +492,11 @@ impl Table {
             .take(size)
             .map(|f| self.view(f))
             .collect();
-        let mut body =
-            json!({ "kind": "drive#fileList", "incompleteSearch": false, "files": page });
+        let mut body = json!({
+            "kind": "drive#fileList",
+            "incompleteSearch": false,
+            "files": page
+        });
         if offset + size < hits.len()
             && let Some(map) = body.as_object_mut()
         {
@@ -499,7 +517,8 @@ impl Table {
                 return error(
                     StatusCode::FORBIDDEN,
                     "fileNotDownloadable",
-                    "Only files with binary content can be downloaded. Use Export with Docs Editors files.",
+                    "Only files with binary content can be downloaded. Use \
+                        Export with Docs Editors files.",
                 );
             }
             return (StatusCode::OK, file.bytes.clone()).into_response();
@@ -507,7 +526,12 @@ impl Table {
         axum::Json(self.view(file)).into_response()
     }
 
-    fn update_metadata(&mut self, id: &str, query: &HashMap<String, String>, body: &[u8]) -> Reply {
+    fn update_metadata(
+        &mut self,
+        id: &str,
+        query: &HashMap<String, String>,
+        body: &[u8],
+    ) -> Reply {
         let patch: Value = if body.is_empty() {
             json!({})
         } else {
@@ -543,7 +567,12 @@ impl Table {
         axum::Json(self.view(&file)).into_response()
     }
 
-    fn start_session(&mut self, target: Option<String>, headers: &HeaderMap, body: &[u8]) -> Reply {
+    fn start_session(
+        &mut self,
+        target: Option<String>,
+        headers: &HeaderMap,
+        body: &[u8],
+    ) -> Reply {
         let metadata: Value = if body.is_empty() {
             json!({})
         } else {
@@ -566,7 +595,8 @@ impl Table {
         }
         let upload_id = format!("u{}", self.sessions.len() + 1);
         let location = format!(
-            "http://{}/upload/drive/v3/files?uploadType=resumable&upload_id={upload_id}",
+            "http://{}/upload/drive/v3/files?uploadType=resumable&upload_id={up\
+                load_id}",
             self.addr
         );
         let _ = self.sessions.insert(
@@ -620,7 +650,10 @@ impl Table {
             }
             session.received.truncate(start);
             // Optionally keep only half a chunk, as a flaky network might.
-            let keep = if partial && body.len() > 1 && start + body.len() < session.total {
+            let keep = if partial
+                && body.len() > 1
+                && start + body.len() < session.total
+            {
                 body.len() / 2
             } else {
                 body.len()
@@ -638,7 +671,9 @@ impl Table {
             }
             return resp;
         }
-        let Some(session) = query.get("upload_id").and_then(|u| self.sessions.remove(u)) else {
+        let Some(session) =
+            query.get("upload_id").and_then(|u| self.sessions.remove(u))
+        else {
             return not_found("upload session");
         };
         let result = match &session.target {
@@ -666,8 +701,12 @@ fn route(
     if let Some(rest) = path.strip_prefix("/upload/drive/v3/files") {
         let id = rest.strip_prefix('/');
         return match (method, id, upload_type) {
-            (&Method::PUT, None, "resumable") => table.put_chunk(query, headers, body),
-            (&Method::POST, None, "resumable") => table.start_session(None, headers, body),
+            (&Method::PUT, None, "resumable") => {
+                table.put_chunk(query, headers, body)
+            }
+            (&Method::POST, None, "resumable") => {
+                table.start_session(None, headers, body)
+            }
             (&Method::PATCH, Some(id), "resumable") => {
                 table.start_session(Some(id.to_owned()), headers, body)
             }
@@ -677,17 +716,21 @@ fn route(
                     .and_then(|v| v.to_str().ok())
                     .unwrap_or_default();
                 match parse_multipart(content_type, body) {
-                    Ok((metadata, media)) => match table.create(&metadata, Some(media)) {
-                        Ok(file) => axum::Json(file.json()).into_response(),
-                        Err(reply) => *reply,
-                    },
+                    Ok((metadata, media)) => {
+                        match table.create(&metadata, Some(media)) {
+                            Ok(file) => axum::Json(file.json()).into_response(),
+                            Err(reply) => *reply,
+                        }
+                    }
                     Err(e) => bad_request(&format!("bad multipart body: {e}")),
                 }
             }
-            (&Method::PATCH, Some(id), "media") => match table.replace_content(id, body.to_vec()) {
-                Ok(file) => axum::Json(file.json()).into_response(),
-                Err(reply) => *reply,
-            },
+            (&Method::PATCH, Some(id), "media") => {
+                match table.replace_content(id, body.to_vec()) {
+                    Ok(file) => axum::Json(file.json()).into_response(),
+                    Err(reply) => *reply,
+                }
+            }
             _ => bad_request("unsupported upload"),
         };
     }
@@ -809,8 +852,9 @@ impl FakeDrive {
         let mut table = self.lock();
         let now = table.tick();
         let id = table.new_id();
-        let head_revision_id =
-            (!mime.starts_with("application/vnd.google-apps.")).then(|| table.new_rev());
+        let head_revision_id = (!mime
+            .starts_with("application/vnd.google-apps."))
+        .then(|| table.new_rev());
         let created = created.unwrap_or(now);
         let rec = FileRec {
             id: id.clone(),
@@ -834,7 +878,11 @@ impl FakeDrive {
         let mut found: Vec<&FileRec> = table
             .files
             .values()
-            .filter(|f| f.name == name && f.parents.iter().any(|p| p == parent) && !f.trashed)
+            .filter(|f| {
+                f.name == name
+                    && f.parents.iter().any(|p| p == parent)
+                    && !f.trashed
+            })
             .collect();
         found.sort_by(|a, b| a.created.cmp(&b.created).then(a.id.cmp(&b.id)));
         let ids = found.into_iter().map(|f| f.id.clone()).collect();
@@ -887,8 +935,10 @@ impl FakeDrive {
 
 #[test]
 fn parses_the_query_subset() {
-    let q =
-        r"name = 'it\'s a \\ and b' and 'p1' in parents and trashed = false and mimeType != 'x'";
+    let q = concat!(
+        r"name = 'it\'s a \\ and b' and 'p1' in parents and trashed = false ",
+        r"and mimeType != 'x'",
+    );
     assert_eq!(
         parse_q(q),
         Ok(vec![

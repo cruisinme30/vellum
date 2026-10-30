@@ -115,7 +115,11 @@ pub async fn world(app: &Router) -> World {
         app,
         w.post(
             "/api/v1/drive/spaces",
-            &json!({"kind": "shared_drive", "slug": "eng", "name": "Engineering"}),
+            &json!({
+                "kind": "shared_drive",
+                "slug": "eng",
+                "name": "Engineering"
+            }),
         ),
     )
     .await;
@@ -126,7 +130,8 @@ pub async fn world(app: &Router) -> World {
         app,
         w.post(
             &format!("/api/v1/drive/spaces/{space_id}/pages"),
-            &json!({"title": "Runbook", "body": "## Deploys\n\nFreeze on Fridays.\n"}),
+            &json!({"title": "Runbook", "body": "## Deploys\n\n\
+                Freeze on Fridays.\n"}),
         ),
     )
     .await;
@@ -136,7 +141,10 @@ pub async fn world(app: &Router) -> World {
         app,
         w.post(
             "/api/v1/me/tokens",
-            &json!({"name": "Claude", "scopes": ["read", "write:draft", "work"]}),
+            &json!({
+                "name": "Claude",
+                "scopes": ["read", "write:draft", "work"]
+            }),
         ),
     )
     .await;
@@ -176,14 +184,20 @@ async fn mcp_is_a_resource_server_of_the_identity_service() {
     assert_eq!(issuer.status, StatusCode::OK, "identity's metadata stays");
 
     let w = world(&app).await;
-    let listed = send(&app, mcp(Some(&w.bearer), "tools/list", &json!({}))).await;
+    let listed =
+        send(&app, mcp(Some(&w.bearer), "tools/list", &json!({}))).await;
     assert_eq!(listed.status, StatusCode::OK, "{}", listed.text);
     // Direct writes need write:direct, which this token lacks.
     let direct = tool(
         &app,
         &w.bearer,
         "propose_edit",
-        json!({ "doc_id": w.page_id, "summary": "x", "direct": true, "edits": [] }),
+        json!({
+            "doc_id": w.page_id,
+            "summary": "x",
+            "direct": true,
+            "edits": []
+        }),
     )
     .await;
     assert_eq!(direct.status, StatusCode::FORBIDDEN, "{}", direct.text);
@@ -198,7 +212,9 @@ async fn a_personal_token_reads_and_drafts_through_mcp() {
     let (page_id, bearer) = (&w.page_id, &w.bearer);
 
     // Reads go through the drive as the token's user.
-    let doc = structured(&tool(&app, bearer, "get_doc", json!({ "id": page_id })).await);
+    let doc = structured(
+        &tool(&app, bearer, "get_doc", json!({ "id": page_id })).await,
+    );
     assert_eq!(doc["title"], "Runbook");
     assert!(
         doc["markdown"]
@@ -207,7 +223,9 @@ async fn a_personal_token_reads_and_drafts_through_mcp() {
             .contains("Freeze on Fridays.")
     );
     let version = doc["version"].as_str().unwrap().to_owned();
-    let blocks = structured(&tool(&app, bearer, "get_blocks", json!({ "doc_id": page_id })).await);
+    let blocks = structured(
+        &tool(&app, bearer, "get_blocks", json!({ "doc_id": page_id })).await,
+    );
     let freeze = blocks["blocks"]
         .as_array()
         .unwrap()
@@ -243,13 +261,19 @@ async fn a_personal_token_reads_and_drafts_through_mcp() {
                 "doc_id": page_id,
                 "base_version": version,
                 "summary": "Allow hotfixes",
-                "edits": [{ "op": "replace", "block_id": freeze, "markdown": "Freeze on Fridays, except hotfixes." }],
+                "edits": [{
+                    "op": "replace",
+                    "block_id": freeze,
+                    "markdown": "Freeze on Fridays, except hotfixes."
+                }],
             }),
         )
         .await,
     );
     assert_eq!(edit["mode"], "draft", "{edit}");
-    let draft = structured(&tool(&app, bearer, "get_doc", json!({ "id": edit["id"] })).await);
+    let draft = structured(
+        &tool(&app, bearer, "get_doc", json!({ "id": edit["id"] })).await,
+    );
     let draft_md = draft["markdown"].as_str().unwrap();
     assert!(draft_md.contains("status: draft"), "{draft_md}");
     assert!(
@@ -257,7 +281,9 @@ async fn a_personal_token_reads_and_drafts_through_mcp() {
         "{draft_md}"
     );
     assert!(draft_md.contains("except hotfixes"), "{draft_md}");
-    let again = structured(&tool(&app, bearer, "get_doc", json!({ "id": page_id })).await);
+    let again = structured(
+        &tool(&app, bearer, "get_doc", json!({ "id": page_id })).await,
+    );
     assert_eq!(again["version"], version, "the page itself is untouched");
 
     // A new page lands where asked, as a draft with its attribution.
@@ -266,11 +292,17 @@ async fn a_personal_token_reads_and_drafts_through_mcp() {
             &app,
             bearer,
             "create_draft",
-            json!({ "parent": "space:eng", "title": "Postmortem", "markdown": "What happened." }),
+            json!({
+                "parent": "space:eng",
+                "title": "Postmortem",
+                "markdown": "What happened."
+            }),
         )
         .await,
     );
-    let new_page = structured(&tool(&app, bearer, "get_doc", json!({ "id": created["id"] })).await);
+    let new_page = structured(
+        &tool(&app, bearer, "get_doc", json!({ "id": created["id"] })).await,
+    );
     let md = new_page["markdown"].as_str().unwrap();
     assert!(
         md.contains("status: draft") && md.contains("authored_by: model"),
@@ -299,7 +331,9 @@ async fn listeners_hear_about_changes_from_the_feed() {
         .unwrap();
     assert_eq!(listen.status(), StatusCode::OK);
     let mut stream = listen.into_body();
-    let ack = tokio::time::timeout(std::time::Duration::from_secs(5), stream.frame()).await;
+    let ack =
+        tokio::time::timeout(std::time::Duration::from_secs(5), stream.frame())
+            .await;
     let mut seen = format!("{ack:?}");
     assert!(seen.contains("acknowledged"), "{seen}");
 
@@ -307,8 +341,11 @@ async fn listeners_hear_about_changes_from_the_feed() {
     let read = send(
         &app,
         finish(
-            request("GET", &format!("/api/v1/drive/items/{}/content", w.page_id))
-                .header(header::COOKIE, &w.cookie),
+            request(
+                "GET",
+                &format!("/api/v1/drive/items/{}/content", w.page_id),
+            )
+            .header(header::COOKIE, &w.cookie),
         ),
     )
     .await;
@@ -323,7 +360,10 @@ async fn listeners_hear_about_changes_from_the_feed() {
                     "id": w.page_id,
                     "base_content": current["content"],
                     "base_etag": current["etag"],
-                    "content": format!("{}\nThaw on Mondays.\n", current["content"].as_str().unwrap_or_default()),
+                    "content": format!(
+                        "{}\nThaw on Mondays.\n",
+                        current["content"].as_str().unwrap_or_default()
+                    ),
                 }),
             )
             .header(header::COOKIE, &w.cookie)
@@ -332,12 +372,16 @@ async fn listeners_hear_about_changes_from_the_feed() {
     )
     .await;
     assert_eq!(saved.status, StatusCode::OK, "{}", saved.text);
-    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+    let deadline =
+        tokio::time::Instant::now() + std::time::Duration::from_secs(10);
     while !seen.contains("notifications/resources/updated")
         && tokio::time::Instant::now() < deadline
     {
-        if let Ok(Some(Ok(frame))) =
-            tokio::time::timeout(std::time::Duration::from_secs(1), stream.frame()).await
+        if let Ok(Some(Ok(frame))) = tokio::time::timeout(
+            std::time::Duration::from_secs(1),
+            stream.frame(),
+        )
+        .await
             && let Ok(data) = frame.into_data()
         {
             seen.push_str(&String::from_utf8_lossy(&data));
@@ -376,16 +420,20 @@ async fn page_templates_come_from_templates_folders() {
     .await;
     assert_eq!(page.status, StatusCode::OK, "{}", page.text);
 
-    let list = structured(&tool(&app, &w.bearer, "get_template", json!({})).await);
+    let list =
+        structured(&tool(&app, &w.bearer, "get_template", json!({})).await);
     assert_eq!(list["templates"][0]["name"], "prd", "{list}");
     assert_eq!(list["templates"].as_array().unwrap().len(), 1, "{list}");
-    let prd = structured(&tool(&app, &w.bearer, "get_template", json!({ "name": "PRD" })).await);
+    let prd = structured(
+        &tool(&app, &w.bearer, "get_template", json!({ "name": "PRD" })).await,
+    );
     let md = prd["markdown"].as_str().unwrap();
     assert!(
         md.contains("## Requirements") && !md.contains("id:"),
         "{md}"
     );
-    let missing = tool(&app, &w.bearer, "get_template", json!({ "name": "nope" })).await;
+    let missing =
+        tool(&app, &w.bearer, "get_template", json!({ "name": "nope" })).await;
     assert_eq!(
         missing.json()["result"]["isError"],
         true,
@@ -438,7 +486,11 @@ async fn export_hands_over_the_file_and_its_route() {
         &app,
         &w.bearer,
         "export",
-        json!({ "target": "01JBQ8Y4ZK6V3W2N5R7T9X1C41", "format": "docx", "section": "s1" }),
+        json!({
+            "target": "01JBQ8Y4ZK6V3W2N5R7T9X1C41",
+            "format": "docx",
+            "section": "s1"
+        }),
     )
     .await;
     assert_eq!(

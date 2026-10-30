@@ -40,13 +40,16 @@ use vellum_kernel::{Error, ErrorKind};
 use vellum_security::ssrf::UrlPolicy;
 
 use crate::delivery::{
-    self, EndpointHealth, HealthAction, HttpTransport, Outcome, RetryPolicy, WEBHOOK_CHANNEL,
+    self, EndpointHealth, HealthAction, HttpTransport, Outcome, RetryPolicy,
+    WEBHOOK_CHANNEL,
 };
 use crate::endpoint::check_url;
 use crate::event::{EventAction, EventType, WebhookEvent};
 use crate::secret::WebhookSecret;
 use crate::service::save_json;
-use crate::webhook::{DELIVERY_HEADER, EVENT_HEADER, Subscription, TeamScope, prepare};
+use crate::webhook::{
+    DELIVERY_HEADER, EVENT_HEADER, Subscription, TeamScope, prepare,
+};
 
 /// The most hooks a workspace can have.
 pub const MAX_HOOKS: usize = 50;
@@ -158,10 +161,18 @@ impl HookStore {
     pub fn open(data_dir: &Path, policy: UrlPolicy) -> Result<Self, Error> {
         let path = data_dir.join(".vellum").join("webhooks.json");
         let state = match std::fs::read(&path) {
-            Ok(bytes) => serde_json::from_slice(&bytes)
-                .map_err(|e| internal(format!("cannot parse {}: {e}", path.display())))?,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => HookState::default(),
-            Err(e) => return Err(internal(format!("cannot read {}: {e}", path.display()))),
+            Ok(bytes) => serde_json::from_slice(&bytes).map_err(|e| {
+                internal(format!("cannot parse {}: {e}", path.display()))
+            })?,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                HookState::default()
+            }
+            Err(e) => {
+                return Err(internal(format!(
+                    "cannot read {}: {e}",
+                    path.display()
+                )));
+            }
         };
         Ok(Self {
             path: Some(path),
@@ -174,7 +185,10 @@ impl HookStore {
         self.state.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    fn change<R>(&self, f: impl FnOnce(&mut HookState) -> Result<R, Error>) -> Result<R, Error> {
+    fn change<R>(
+        &self,
+        f: impl FnOnce(&mut HookState) -> Result<R, Error>,
+    ) -> Result<R, Error> {
         let mut state = self.lock();
         let out = f(&mut state)?;
         if let Some(path) = &self.path {
@@ -193,9 +207,10 @@ impl HookStore {
     /// Takes up to [`BATCH`] deliveries due at `now` off the queue.
     fn take_due(&self, now: Timestamp) -> Vec<Pending> {
         let mut state = self.lock();
-        let (mut due, later): (Vec<_>, Vec<_>) = std::mem::take(&mut state.pending)
-            .into_iter()
-            .partition(|p| p.due <= now);
+        let (mut due, later): (Vec<_>, Vec<_>) =
+            std::mem::take(&mut state.pending)
+                .into_iter()
+                .partition(|p| p.due <= now);
         let rest = due.split_off(due.len().min(BATCH));
         state.pending = rest.into_iter().chain(later).collect();
         drop(state);
@@ -209,7 +224,10 @@ impl HookStore {
     }
 }
 
-fn subscription(hook: &StoredHook, now: Timestamp) -> Result<Subscription, Error> {
+fn subscription(
+    hook: &StoredHook,
+    now: Timestamp,
+) -> Result<Subscription, Error> {
     let url = Url::parse(&hook.url).map_err(internal)?;
     let secrets = hook
         .secrets
@@ -353,9 +371,13 @@ impl<T: HttpTransport> Webhooks<T> {
                         ..pending.clone()
                     });
                 }
-                if let Some(h) = state.hooks.iter_mut().find(|h| h.id == hook.id) {
+                if let Some(h) =
+                    state.hooks.iter_mut().find(|h| h.id == hook.id)
+                {
                     // Only final outcomes count towards pausing.
-                    if next.is_none() && h.health.record(outcome, now) == HealthAction::Pause {
+                    if next.is_none()
+                        && h.health.record(outcome, now) == HealthAction::Pause
+                    {
                         h.enabled = false;
                         h.paused_reason = Some(format!(
                             "paused after {} failed deliveries since {}",
@@ -380,7 +402,8 @@ impl<T: HttpTransport> Webhooks<T> {
                 (_, None) => report.failed += 1,
             }
             if paused.unwrap_or(false) {
-                tracing::warn!(hook = %hook.id, "webhook paused after failing for days");
+                tracing::warn!(hook = %hook.id, "webhook paused after failing \
+                    for days");
                 report.paused += 1;
             }
         }
@@ -404,7 +427,9 @@ impl<T: HttpTransport> Webhooks<T> {
         ping: bool,
     ) -> (DeliveryView, Outcome) {
         let request = subscription(hook, now)
-            .and_then(|sub| prepare(&pending.event, &sub, now).map_err(internal))
+            .and_then(|sub| {
+                prepare(&pending.event, &sub, now).map_err(internal)
+            })
             .map(|mut request| {
                 request.delivery_id.clone_from(&pending.delivery_id);
                 for (name, value) in &mut request.headers {
@@ -460,7 +485,11 @@ impl<T: HttpTransport> Webhooks<T> {
     /// # Errors
     ///
     /// An unknown hook.
-    pub async fn ping(&self, id: &str, now: Timestamp) -> Result<DeliveryView, Error> {
+    pub async fn ping(
+        &self,
+        id: &str,
+        now: Timestamp,
+    ) -> Result<DeliveryView, Error> {
         let hook = self
             .store
             .lock()
@@ -514,7 +543,12 @@ impl<T: HttpTransport> Webhooks<T> {
     /// # Errors
     ///
     /// An unknown hook or delivery, or a ping (which has no event).
-    pub fn redeliver(&self, id: &str, delivery_id: &str, now: Timestamp) -> Result<(), Error> {
+    pub fn redeliver(
+        &self,
+        id: &str,
+        delivery_id: &str,
+        now: Timestamp,
+    ) -> Result<(), Error> {
         self.store.change(|state| {
             if !state.hooks.iter().any(|h| h.id == id) {
                 return Err(not_found());
@@ -522,9 +556,16 @@ impl<T: HttpTransport> Webhooks<T> {
             let event = state
                 .log
                 .get(id)
-                .and_then(|log| log.iter().find(|l| l.view.delivery_id == delivery_id))
+                .and_then(|log| {
+                    log.iter().find(|l| l.view.delivery_id == delivery_id)
+                })
                 .and_then(|l| l.event.clone())
-                .ok_or_else(|| Error::new(ErrorKind::NotFound, "no such delivery to send again"))?;
+                .ok_or_else(|| {
+                    Error::new(
+                        ErrorKind::NotFound,
+                        "no such delivery to send again",
+                    )
+                })?;
             state.pending.push(Pending {
                 delivery_id: random_id("redeliver_"),
                 hook: id.to_owned(),
@@ -537,7 +578,12 @@ impl<T: HttpTransport> Webhooks<T> {
     }
 }
 
-fn push_log(state: &mut HookState, hook: &str, view: DeliveryView, event: Option<WebhookEvent>) {
+fn push_log(
+    state: &mut HookState,
+    hook: &str,
+    view: DeliveryView,
+    event: Option<WebhookEvent>,
+) {
     let log = state.log.entry(hook.to_owned()).or_default();
     log.insert(0, Logged { view, event });
     log.truncate(LOG_PER_HOOK);
@@ -733,9 +779,12 @@ fn check(input: &HookInput, policy: &UrlPolicy) -> Result<Checked, Error> {
     if input.url.len() > 2048 {
         return Err(invalid("the URL is too long"));
     }
-    let url = check_url(input.url.trim(), policy).map_err(|e| invalid(format!("url: {e}")))?;
+    let url = check_url(input.url.trim(), policy)
+        .map_err(|e| invalid(format!("url: {e}")))?;
     if !url.username().is_empty() || url.password().is_some() {
-        return Err(invalid("url: put credentials in the receiver, not the URL"));
+        return Err(invalid(
+            "url: put credentials in the receiver, not the URL",
+        ));
     }
     if input.description.chars().count() > MAX_DESCRIPTION {
         return Err(invalid(format!(
@@ -753,7 +802,10 @@ fn check(input: &HookInput, policy: &UrlPolicy) -> Result<Checked, Error> {
     let mut keys = BTreeSet::new();
     for team in &input.teams {
         let key = team.trim().to_ascii_uppercase();
-        if key.is_empty() || key.len() > 10 || !key.chars().all(|c| c.is_ascii_alphanumeric()) {
+        if key.is_empty()
+            || key.len() > 10
+            || !key.chars().all(|c| c.is_ascii_alphanumeric())
+        {
             return Err(invalid(format!("{team:?} is not a team key")));
         }
         let _ = keys.insert(key);
@@ -827,7 +879,11 @@ impl HookStore {
             state.hooks.push(hook.clone());
             Ok(view(state, &hook, now))
         })?;
-        tracing::info!(hook = %created.id, host = checked.url.host_str().unwrap_or_default(), "webhook created");
+        tracing::info!(
+            hook = %created.id,
+            host = checked.url.host_str().unwrap_or_default(),
+            "webhook created"
+        );
         Ok(HookCreated {
             hook: created,
             secret,
@@ -839,7 +895,11 @@ impl HookStore {
     /// # Errors
     ///
     /// As [`Self::create`], or an unknown hook.
-    pub fn update(&self, input: &HookUpdate, now: Timestamp) -> Result<HookView, Error> {
+    pub fn update(
+        &self,
+        input: &HookUpdate,
+        now: Timestamp,
+    ) -> Result<HookView, Error> {
         let checked = check(&input.hook, &self.policy)?;
         self.change(|state| {
             let hook = state
@@ -1001,7 +1061,10 @@ impl<T: HttpTransport + 'static> Service for WebhooksService<T> {
                     .store()
                     .update(&input, Timestamp::now())),
             )
-            .summary("Change a webhook's URL, events, teams or turn it on or off"),
+            .summary(
+                "Change a webhook's URL, events, teams or turn it on or \
+                off",
+            ),
             Operation::mutation(
                 "webhooks.delete",
                 HttpMethod::Delete,
@@ -1019,7 +1082,8 @@ impl<T: HttpTransport + 'static> Service for WebhooksService<T> {
                 "/v1/admin/webhooks/{id}/secret",
                 Scope::Admin,
                 admin!(self, |h, ctx, input: HookId| {
-                    let secret = h.store().rotate(&input.id, Timestamp::now())?;
+                    let secret =
+                        h.store().rotate(&input.id, Timestamp::now())?;
                     let hook = h
                         .store()
                         .list(Timestamp::now())
@@ -1030,7 +1094,10 @@ impl<T: HttpTransport + 'static> Service for WebhooksService<T> {
                     Ok(HookCreated { hook, secret })
                 }),
             )
-            .summary("Make a new signing secret; the old one signs for 24 more hours"),
+            .summary(
+                "Make a new signing secret; the old one signs for 24 more \
+                hours",
+            ),
             Operation::mutation(
                 "webhooks.test",
                 HttpMethod::Post,
@@ -1056,7 +1123,11 @@ impl<T: HttpTransport + 'static> Service for WebhooksService<T> {
                 "/v1/admin/webhooks/{id}/redeliver",
                 Scope::Admin,
                 admin!(self, |h, ctx, input: RedeliverInput| {
-                    h.redeliver(&input.id, &input.delivery_id, Timestamp::now())?;
+                    h.redeliver(
+                        &input.id,
+                        &input.delivery_id,
+                        Timestamp::now(),
+                    )?;
                     Ok(Done { ok: true })
                 }),
             )
@@ -1091,7 +1162,10 @@ mod tests {
     }
 
     impl HttpTransport for &Receiver {
-        async fn post(&self, request: &OutboundRequest) -> Result<HttpResponse, TransportError> {
+        async fn post(
+            &self,
+            request: &OutboundRequest,
+        ) -> Result<HttpResponse, TransportError> {
             self.got.lock().unwrap().push(request.clone());
             Ok(HttpResponse {
                 status: *self.status.lock().unwrap(),
@@ -1170,7 +1244,11 @@ mod tests {
         assert!(
             store
                 .create(
-                    &input("https://hooks.northstar.dev/x", &["issue"], &["E N G"]),
+                    &input(
+                        "https://hooks.northstar.dev/x",
+                        &["issue"],
+                        &["E N G"]
+                    ),
                     None,
                     at(0)
                 )
@@ -1192,7 +1270,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn events_reach_matching_hooks_signed_and_private_teams_stay_private() {
+    async fn events_reach_matching_hooks_signed_and_private_teams_stay_private()
+    {
         let receiver = Receiver::new(204);
         let hooks = hooks(&receiver);
         let all = hooks
@@ -1212,7 +1291,11 @@ mod tests {
             )
             .unwrap();
         let private = BTreeSet::from(["SEC".to_owned()]);
-        let queued = hooks.publish(&[issue_event("ENG"), issue_event("SEC")], &private, at(0));
+        let queued = hooks.publish(
+            &[issue_event("ENG"), issue_event("SEC")],
+            &private,
+            at(0),
+        );
         assert_eq!(queued, 1, "only the public ENG issue, only the issue hook");
         let report = hooks.run_due(at(0)).await;
         assert_eq!(report.delivered, 1);
@@ -1336,10 +1419,11 @@ mod tests {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt as _;
-            let mode = std::fs::metadata(dir.path().join(".vellum/webhooks.json"))
-                .unwrap()
-                .permissions()
-                .mode();
+            let mode =
+                std::fs::metadata(dir.path().join(".vellum/webhooks.json"))
+                    .unwrap()
+                    .permissions()
+                    .mode();
             assert_eq!(mode & 0o077, 0);
         }
     }

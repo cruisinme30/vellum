@@ -66,16 +66,26 @@ describe("workCommands", () => {
   it("leaves out the G chords for screens the app does not have", () => {
     const goTo = vi.fn();
     const commands = workCommands({ goTo, destinations: ["inbox", "my-work"] });
-    expect(commands.map((command) => command.id)).toEqual(["go.inbox", "go.my-work"]);
+    expect(commands.map((command) => command.id)).toEqual([
+      "go.inbox",
+      "go.my-work",
+    ]);
   });
 
   it("lets the app and a Work screen bind their G chords side by side", () => {
     // Regression: both registered `G I` globally, so every Work screen threw.
     const app = workCommands({ goTo: vi.fn(), destinations: APP_DESTINATIONS });
-    const screen = workCommands({ ...everything(), destinations: SCREEN_DESTINATIONS });
-    expect(() => new Keymap([...app, ...screen], { platform: "mac" })).not.toThrow();
+    const screen = workCommands({
+      ...everything(),
+      destinations: SCREEN_DESTINATIONS,
+    });
+    expect(
+      () => new Keymap([...app, ...screen], { platform: "mac" }),
+    ).not.toThrow();
     const all = [...APP_DESTINATIONS, ...SCREEN_DESTINATIONS];
     expect(new Set(all).size).toBe(all.length);
-    expect(new Set(all)).toEqual(new Set(["board", "cycle", "inbox", "my-work", "triage"]));
+    expect(new Set(all)).toEqual(
+      new Set(["board", "cycle", "inbox", "my-work", "triage"]),
+    );
   });
 });

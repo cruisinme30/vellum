@@ -27,7 +27,9 @@ use std::sync::{Arc, Mutex};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
-use vellum_contracts::{BoxFuture, HttpMethod, Operation, RequestContext, Scope, Service};
+use vellum_contracts::{
+    BoxFuture, HttpMethod, Operation, RequestContext, Scope, Service,
+};
 use vellum_drive::Drive;
 use vellum_kernel::{Actor, Error, ErrorKind, ObjectId, UserId};
 use vellum_render::figure::{FigureConfig, Figures};
@@ -37,7 +39,8 @@ use vellum_work::UserRef;
 use vellum_work_service::{LiveIssues, WorkService};
 
 /// Finds a user's Work handle, for `@me` in issue filters.
-pub type Handles = Arc<dyn Fn(UserId) -> BoxFuture<'static, Option<UserRef>> + Send + Sync>;
+pub type Handles =
+    Arc<dyn Fn(UserId) -> BoxFuture<'static, Option<UserRef>> + Send + Sync>;
 
 /// Names a page.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
@@ -140,12 +143,13 @@ pub fn app_stylesheet(seed: Option<&str>) -> Result<String, Error> {
         ));
     };
     let hex = raw.strip_prefix('#').unwrap_or(raw);
-    let color: vellum_render::theme::Color = format!("#{hex}").parse().map_err(|_| {
-        Error::new(
-            ErrorKind::InvalidInput,
-            "seed must be six hex digits, rrggbb",
-        )
-    })?;
+    let color: vellum_render::theme::Color =
+        format!("#{hex}").parse().map_err(|_| {
+            Error::new(
+                ErrorKind::InvalidInput,
+                "seed must be six hex digits, rrggbb",
+            )
+        })?;
     Ok(vellum_render::theme::scoped_stylesheet_from_seed(
         RENDER_SCOPE,
         "data-theme",
@@ -178,14 +182,20 @@ fn block_markdown(input: &BlockInput) -> Result<String, Error> {
     let invalid = |m: &str| Error::new(ErrorKind::InvalidInput, m.to_owned());
     let lang_ok = !input.lang.is_empty()
         && input.lang.len() <= 32
-        && input
-            .lang
-            .bytes()
-            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'_');
+        && input.lang.bytes().all(|b| {
+            b.is_ascii_lowercase()
+                || b.is_ascii_digit()
+                || b == b'-'
+                || b == b'_'
+        });
     if !lang_ok {
-        return Err(invalid("`lang` must be a fence language such as `mermaid`"));
+        return Err(invalid(
+            "`lang` must be a fence language such as `mermaid`",
+        ));
     }
-    if input.args.len() > MAX_BLOCK_ARGS || input.args.contains(['\n', '\r', '`']) {
+    if input.args.len() > MAX_BLOCK_ARGS
+        || input.args.contains(['\n', '\r', '`'])
+    {
         return Err(invalid("`args` must be one short line without backticks"));
     }
     if input.source.len() > MAX_BLOCK_SOURCE {
@@ -335,8 +345,12 @@ impl PageRenderService {
     ///
     /// A malformed diagram-server setting.
     pub fn figures_from_env() -> Result<Figures, Error> {
-        Figures::new(FigureConfig::from_env())
-            .map_err(|e| Error::new(ErrorKind::InvalidInput, format!("diagram settings: {e}")))
+        Figures::new(FigureConfig::from_env()).map_err(|e| {
+            Error::new(
+                ErrorKind::InvalidInput,
+                format!("diagram settings: {e}"),
+            )
+        })
     }
 
     /// Renders one page for the caller.
@@ -352,9 +366,12 @@ impl PageRenderService {
         input: PageKey,
     ) -> Result<RenderedPageView, Error> {
         let user = ctx.principal.require_user()?;
-        let (node, blob) = self.drive.read(&Actor::User { user }, input.id).await?;
-        let markdown = String::from_utf8(blob.bytes.to_vec())
-            .map_err(|_| Error::new(ErrorKind::InvalidInput, "the page is not text"))?;
+        let (node, blob) =
+            self.drive.read(&Actor::User { user }, input.id).await?;
+        let markdown =
+            String::from_utf8(blob.bytes.to_vec()).map_err(|_| {
+                Error::new(ErrorKind::InvalidInput, "the page is not text")
+            })?;
         let key = render_key(node.id, &markdown);
         if let Some(page) = self.cache.get(&key) {
             let _ = tracing::Span::current().record("cache", "hit");
@@ -461,9 +478,9 @@ impl Service for PageRenderService {
             .summary("Renders a page as sanitised HTML for the reader")
             .revalidate()
             .description(
-                "Reads the page with the caller's permissions and returns its HTML, \
-                 outline and render warnings. Embedded `::: issues` blocks show the \
-                 issues the caller may see.",
+                "Reads the page with the caller's permissions and returns its \
+                 HTML, outline and render warnings. Embedded `::: issues` \
+                 blocks show the issues the caller may see.",
             ),
             {
                 let s = Arc::clone(&self);
@@ -477,12 +494,16 @@ impl Service for PageRenderService {
                         async move { s.render_block(&ctx, input).await }
                     },
                 )
-                .summary("Draws one fenced block, such as a diagram, for the editor")
+                .summary(
+                    "Draws one fenced block, such as a diagram, for the \
+                    editor",
+                )
                 .description(
-                    "Renders a single fence (Mermaid, Kroki diagrams, charts, timelines, \
-                     roadmaps, risk matrices, architecture, boards, calculators) to the \
-                     same sanitised HTML as `render.page`. It changes nothing; it is a \
-                     POST only because the body can be long.",
+                    "Renders a single fence (Mermaid, Kroki diagrams, charts, \
+                     timelines, roadmaps, risk matrices, architecture, boards, \
+                     calculators) to the same sanitised HTML as `render.page`. \
+                     It changes nothing; it is a POST only because the body \
+                     can be long.",
                 )
             },
             Operation::query(
@@ -497,7 +518,10 @@ impl Service for PageRenderService {
                     })
                 },
             )
-            .summary("The theme stylesheet for rendered HTML shown inside the app")
+            .summary(
+                "The theme stylesheet for rendered HTML shown inside the \
+                app",
+            )
             .revalidate(),
         ]
     }
@@ -516,7 +540,9 @@ mod tests {
     use vellum_drive::memory::MemoryIndex;
     use vellum_kernel::{RequestId, Timestamp};
     use vellum_store::LocalStore;
-    use vellum_work_service::{Directory, EventLog, StaticDirectory, SystemClock};
+    use vellum_work_service::{
+        Directory, EventLog, StaticDirectory, SystemClock,
+    };
 
     use super::*;
 
@@ -534,7 +560,12 @@ mod tests {
         }
     }
 
-    async fn call(ops: &[Operation], who: UserId, op: &str, input: Value) -> Result<Value, Error> {
+    async fn call(
+        ops: &[Operation],
+        who: UserId,
+        op: &str,
+        input: Value,
+    ) -> Result<Value, Error> {
         let op = ops.iter().find(|o| o.id() == op).expect("operation");
         op.call(ctx(who), input).await
     }
@@ -563,8 +594,9 @@ mod tests {
             Arc::new(AuthzAccess::new(authz, index)),
         ));
         let (mara, bob) = (UserId::generate(), UserId::generate());
-        let directory =
-            Arc::new(StaticDirectory::new().with(mara, UserRef::parse("mara").unwrap()));
+        let directory = Arc::new(
+            StaticDirectory::new().with(mara, UserRef::parse("mara").unwrap()),
+        );
         let (work, _) = WorkService::open(
             store,
             directory.clone(),
@@ -587,14 +619,25 @@ mod tests {
             &work_ops,
             mara,
             "work.create_issue",
-            json!({"team": "ENG", "title": "Ship <login>", "state": "todo", "priority": 2}),
+            json!({
+                "team": "ENG",
+                "title": "Ship <login>",
+                "state": "todo",
+                "priority": 2
+            }),
         )
         .await
         .unwrap();
 
         let me = Actor::User { user: mara };
         let space = drive
-            .create_space(&me, SpaceKind::SharedDrive, "eng", "Engineering", None)
+            .create_space(
+                &me,
+                SpaceKind::SharedDrive,
+                "eng",
+                "Engineering",
+                None,
+            )
             .await
             .unwrap();
         let handles: Handles = Arc::new(move |user| {
@@ -632,7 +675,9 @@ mod tests {
             space,
             ..
         } = world().await;
-        let body = "# Launch plan\n\n::: issues\nfilter:\n  field: team\n  op: is\n  values: [ENG]\n:::\n\n::: issues\nfilter: [not, a, filter]\n:::\n";
+        let body = "# Launch plan\n\n::: issues\n\
+            filter:\n  field: team\n  op: is\n  values: [ENG]\n:::\n\n\
+            ::: issues\nfilter: [not, a, filter]\n:::\n";
         let page = drive
             .create_page(&me, space, None, "Launch plan", body)
             .await
@@ -652,9 +697,10 @@ mod tests {
         assert_eq!(out["render_version"], RENDER_VERSION);
         let warnings = out["warnings"].as_array().unwrap();
         assert!(
-            warnings
-                .iter()
-                .any(|w| w["message"].as_str().unwrap().contains("issues block 2")),
+            warnings.iter().any(|w| w["message"]
+                .as_str()
+                .unwrap()
+                .contains("issues block 2")),
             "{warnings:?}"
         );
 
@@ -719,7 +765,8 @@ mod tests {
         for n in 0..50 {
             let _ = write!(
                 body,
-                "## Section {n}\n\nSome **bold** text and a [link](https://northstar.dev).\n\n"
+                "## Section {n}\n\n\
+                    Some **bold** text and a [link](https://northstar.dev).\n\n"
             );
         }
         let plain = drive
@@ -757,7 +804,9 @@ mod tests {
                 &me,
                 plain.id,
                 base,
-                bytes::Bytes::from_static(b"# Northstar handbook\n\nRewritten.\n"),
+                bytes::Bytes::from_static(
+                    b"# Northstar handbook\n\nRewritten.\n",
+                ),
             )
             .await
             .unwrap();
@@ -776,7 +825,8 @@ mod tests {
             source: source.into(),
         };
         assert_eq!(
-            block_markdown(&block("mermaid", "", "graph TD\n  A --> B\n")).unwrap(),
+            block_markdown(&block("mermaid", "", "graph TD\n  A --> B\n"))
+                .unwrap(),
             "```mermaid\ngraph TD\n  A --> B\n```\n"
         );
         assert_eq!(
@@ -784,7 +834,9 @@ mod tests {
             "```roadmap title=\"Q3\"\nx\n```\n"
         );
         // A body holding a fence gets a longer one.
-        let tricky = block_markdown(&block("mermaid", "", "a\n````\n# not a heading")).unwrap();
+        let tricky =
+            block_markdown(&block("mermaid", "", "a\n````\n# not a heading"))
+                .unwrap();
         assert!(tricky.starts_with("`````mermaid\n"), "{tricky}");
         assert!(tricky.ends_with("\n`````\n"), "{tricky}");
         let doc = vellum_format::parse(&tricky).document;
@@ -814,9 +866,10 @@ mod tests {
                 json!({"lang": lang, "source": source}),
             )
         };
-        let timeline = draw("timeline", "2026-01-10 | Kickoff\n2026-03-01 | Beta\n")
-            .await
-            .unwrap();
+        let timeline =
+            draw("timeline", "2026-01-10 | Kickoff\n2026-03-01 | Beta\n")
+                .await
+                .unwrap();
         let html = timeline["html"].as_str().unwrap();
         assert!(html.contains("vl-timeline"), "{html}");
         assert!(html.contains("Kickoff"), "{html}");
@@ -853,9 +906,10 @@ mod tests {
         assert!(!hostile["html"].as_str().unwrap().contains("<script"));
 
         // `::: issues` cannot be smuggled in to read Work as the caller.
-        let smuggled = draw("mermaid", "x\n```\n\n::: issues\nfilter: {}\n:::\n")
-            .await
-            .unwrap();
+        let smuggled =
+            draw("mermaid", "x\n```\n\n::: issues\nfilter: {}\n:::\n")
+                .await
+                .unwrap();
         assert!(!smuggled["html"].as_str().unwrap().contains("vl-issue-row"));
 
         let err = draw("Mermaid", "x").await.unwrap_err();
@@ -905,14 +959,17 @@ mod tests {
         assert_ne!(tinted["css"], plain["css"]);
         assert_eq!(tinted["css"], hashed["css"]);
         let seed = "#c2185b".parse().unwrap();
-        let dark =
-            vellum_render::theme::Theme::from_seed(vellum_render::theme::BuiltinTheme::Dark, seed);
+        let dark = vellum_render::theme::Theme::from_seed(
+            vellum_render::theme::BuiltinTheme::Dark,
+            seed,
+        );
         let primary = format!("--vl-primary: {};", dark.get("primary"));
         assert!(tinted["css"].as_str().unwrap().contains(&primary));
         for bad in ["red", "12345", "#12345g", "1234567"] {
-            let err = call(&w.ops, w.mara, "render.stylesheet", json!({"seed": bad}))
-                .await
-                .unwrap_err();
+            let err =
+                call(&w.ops, w.mara, "render.stylesheet", json!({"seed": bad}))
+                    .await
+                    .unwrap_err();
             assert_eq!(err.kind(), ErrorKind::InvalidInput, "{bad}");
         }
     }
@@ -928,7 +985,8 @@ mod tests {
             match open.as_mut() {
                 None => {
                     if let Some(head) = line.strip_prefix("```") {
-                        let (lang, args) = head.split_once(' ').unwrap_or((head, ""));
+                        let (lang, args) =
+                            head.split_once(' ').unwrap_or((head, ""));
                         open = Some(BlockInput {
                             lang: lang.to_owned(),
                             args: args.to_owned(),
@@ -939,7 +997,10 @@ mod tests {
                 Some(block) if line == "```" => {
                     let done = std::mem::take(block);
                     open = None;
-                    if !matches!(done.lang.as_str(), "image" | "collection" | "sparkle") {
+                    if !matches!(
+                        done.lang.as_str(),
+                        "image" | "collection" | "sparkle"
+                    ) {
                         fences.push(done);
                     }
                 }
@@ -965,15 +1026,17 @@ mod tests {
         let fences = fixture_fences();
         assert!(fences.len() >= 11, "{}", fences.len());
         let mut blocks = serde_json::Map::new();
-        let mut page =
-            String::from("# Every block\n\nOne of every drawn block, from the server.\n");
+        let mut page = String::from(
+            "# Every block\n\nOne of every drawn block, from the server.\n",
+        );
         for fence in &fences {
             let out = w
                 .svc
                 .render_block(&ctx(w.mara), fence.clone())
                 .await
                 .unwrap();
-            let _ = blocks.insert(fence.lang.clone(), serde_json::to_value(out).unwrap());
+            let _ = blocks
+                .insert(fence.lang.clone(), serde_json::to_value(out).unwrap());
             let _ = write!(page, "\n{}", block_markdown(fence).unwrap());
         }
         let doc = vellum_format::parse(&page).document;
@@ -1005,14 +1068,19 @@ mod tests {
                 "id": "01M6400000PAGE00ROADMAP001",
                 "title": rendered.title,
                 "html": rendered.html,
-                "outline": rendered.toc.iter().map(|e| json!({"level": e.level, "id": e.id, "text": e.text})).collect::<Vec<_>>(),
-                "warnings": rendered.warnings.iter().map(|w| json!({"block": w.block, "message": w.message})).collect::<Vec<_>>(),
+                "outline": rendered.toc.iter().map(
+                    |e| json!({"level": e.level, "id": e.id, "text": e.text})
+                ).collect::<Vec<_>>(),
+                "warnings": rendered.warnings.iter().map(
+                    |w| json!({"block": w.block, "message": w.message})
+                ).collect::<Vec<_>>(),
                 "stale_figures": rendered.stale_figures,
                 "etag": blob.etag,
                 "render_version": RENDER_VERSION,
             },
         });
-        let text = format!("{}\n", serde_json::to_string_pretty(&fixture).unwrap());
+        let text =
+            format!("{}\n", serde_json::to_string_pretty(&fixture).unwrap());
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../web/e2e/support/render-fixture.gen.json");
         if std::env::var_os("VELLUM_BLESS").is_some() {
@@ -1022,8 +1090,9 @@ mod tests {
         let committed = std::fs::read_to_string(&path).unwrap_or_default();
         assert!(
             committed == text,
-            "web/e2e/support/render-fixture.gen.json is out of date. Regenerate it with \
-             `VELLUM_BLESS=1 cargo test -p vellum-cli web_render_fixture`."
+            "web/e2e/support/render-fixture.gen.json is out of date. \
+             Regenerate it with `VELLUM_BLESS=1 cargo test -p vellum-cli \
+             web_render_fixture`."
         );
     }
 }
