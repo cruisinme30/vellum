@@ -20,6 +20,7 @@
 
 pub mod sql;
 
+use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, Mutex, PoisonError};
 
@@ -38,6 +39,14 @@ pub const MAX_PASSWORD_BYTES: usize = 256;
 pub const MIN_PASSWORD_CHARS: usize = 8;
 /// The most live links one item may have.
 pub const MAX_LINKS_PER_ITEM: usize = 50;
+/// Wrong passwords one link takes within [`PASSWORD_WINDOW_MS`] before it
+/// stops checking passwords until the window passes (RT-042).
+pub const MAX_PASSWORD_FAILURES: u32 = 10;
+/// The window wrong passwords are counted in: 15 minutes.
+pub const PASSWORD_WINDOW_MS: i64 = 15 * 60 * 1000;
+/// Links whose failures are remembered at once; older counts are dropped
+/// first so the map stays small under a flood.
+const MAX_TRACKED_LINKS: usize = 10_000;
 
 /// A role that can be granted on an item.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -365,6 +374,8 @@ pub struct Sharing {
     passwords: Arc<dyn LinkPasswords>,
     clock: Arc<dyn Fn() -> Timestamp + Send + Sync>,
     public_origin: Option<String>,
+    /// Wrong passwords per link: how many, and when the count started.
+    failures: Arc<Mutex<HashMap<ShareId, (u32, i64)>>>,
 }
 
 impl fmt::Debug for Sharing {
@@ -405,6 +416,7 @@ impl Sharing {
             passwords,
             clock: Arc::new(Timestamp::now),
             public_origin: None,
+            failures: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -431,6 +443,35 @@ impl Sharing {
 
     fn now(&self) -> Timestamp {
         (self.clock)()
+    }
+
+    /// Whether `link` has had too many wrong passwords lately. Counts are
+    /// per replica: a cluster of `n` allows `n` times as many guesses,
+    /// still far too few for a guessed password of 8 characters or more.
+    fn locked_out(&self, link: ShareId) -> bool {
+        let now = self.now().unix_ms();
+        let failures = self.failures.lock().unwrap_or_else(PoisonError::into_inner);
+        failures.get(&link).is_some_and(|(count, since)| {
+            *count >= MAX_PASSWORD_FAILURES && now - since < PASSWORD_WINDOW_MS
+        })
+    }
+
+    /// Counts a wrong password for `link`.
+    fn failed(&self, link: ShareId) {
+        let now = self.now().unix_ms();
+        let mut failures = self.failures.lock().unwrap_or_else(PoisonError::into_inner);
+        if failures.len() >= MAX_TRACKED_LINKS {
+            failures.retain(|_, (_, since)| now - *since < PASSWORD_WINDOW_MS);
+            if failures.len() >= MAX_TRACKED_LINKS {
+                failures.clear();
+            }
+        }
+        let entry = failures.entry(link).or_insert((0, now));
+        if now - entry.1 >= PASSWORD_WINDOW_MS {
+            *entry = (0, now);
+        }
+        entry.0 = entry.0.saturating_add(1);
+        drop(failures);
     }
 
     /// The live item, if `user` may share it. Someone who may only view it
@@ -645,15 +686,27 @@ impl Sharing {
             let Some(given) = password else {
                 return Ok(Opened::PasswordRequired { retry: false });
             };
+            // Too many wrong guesses: refuse without hashing, so neither a
+            // guessing run nor a flood of slow hashes gets anywhere (RT-042).
+            if self.locked_out(record.id) {
+                tracing::warn!(link = %record.id, "share link password locked after repeated failures");
+                return Ok(Opened::PasswordRequired { retry: true });
+            }
             if given.len() > MAX_PASSWORD_BYTES
                 || !self
                     .passwords
                     .verify(given.to_owned(), stored.clone())
                     .await
             {
+                self.failed(record.id);
                 tracing::info!(link = %record.id, "share link password refused");
                 return Ok(Opened::PasswordRequired { retry: true });
             }
+            let _ = self
+                .failures
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .remove(&record.id);
         }
         if !self
             .access
