@@ -50,8 +50,20 @@ describe("the HTTP workspace store", () => {
     expect(snapshot.name).toBe("Northstar");
     expect(snapshot.people).toEqual([{ handle: "priya", name: "Priya Raman" }]);
     expect(snapshot.spaces).toEqual([
-      { id: "S-MINE", slug: "priya", name: "My Drive", icon: "🏠" },
-      { id: "S-TEAM", slug: "eng", name: "Engineering", icon: "👥" },
+      {
+        id: "S-MINE",
+        slug: "priya",
+        name: "My Drive",
+        icon: "🏠",
+        root: "drives/users/priya",
+      },
+      {
+        id: "S-TEAM",
+        slug: "eng",
+        name: "Engineering",
+        icon: "👥",
+        root: "drives/shared/eng",
+      },
     ]);
     expect(snapshot.pages.map((p) => p.id)).toEqual(["f1", "p2", "p1", "t1"]);
     expect(http.get.mock.calls).toContainEqual([
