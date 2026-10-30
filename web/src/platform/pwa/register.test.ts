@@ -86,6 +86,22 @@ describe("registerServiceWorker", () => {
     expect(reload).not.toHaveBeenCalled();
   });
 
+  it("treats a first install that claimed the page before its events arrived as no update", async () => {
+    // WebKit can deliver "installed" after the worker activated and
+    // `clients.claim()` made it the page's controller.
+    const { container, reload, onUpdateReady, options } = setup(NULL);
+    await registerServiceWorker(options);
+    const first = new FakeWorker();
+    container.registration.installing = first;
+    container.registration.dispatchEvent(new Event("updatefound"));
+    container.controller = first;
+    first.state = "installed";
+    first.dispatchEvent(new Event("statechange"));
+    container.dispatchEvent(new Event("controllerchange"));
+    expect(onUpdateReady).not.toHaveBeenCalled();
+    expect(reload).not.toHaveBeenCalled();
+  });
+
   it("reports a version already waiting at start-up", async () => {
     const { container, onUpdateReady, options } = setup();
     container.registration.waiting = new FakeWorker();
