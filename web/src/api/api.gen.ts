@@ -6591,11 +6591,6 @@ export interface RenderStylesheet {
 }
 
 /**
- * No input.
- */
-export type RenderStylesheetNoInput = Record<string, never>;
-
-/**
  * Something on the page that rendered with a fallback.
  */
 export interface RenderWarning {
@@ -8020,6 +8015,17 @@ export interface StoredBlock {
    * The document's title.
    */
   title: string;
+}
+
+/**
+ * Which accent colour to draw figures in (ADR 0068, D302).
+ */
+export interface StylesheetInput {
+  /**
+   * The app's accent colour as six hex digits, `rrggbb` (a leading `#`
+   * is accepted). Absent draws in Vellum's own colours.
+   */
+  seed?: string | null;
 }
 
 /**
@@ -12359,7 +12365,7 @@ export interface Operations {
   "render.stylesheet": {
     method: "GET";
     path: "/v1/render/stylesheet";
-    input: RenderStylesheetNoInput;
+    input: StylesheetInput;
     output: RenderStylesheet;
   };
   /** A block with the heading section around it, for quoting and citations */

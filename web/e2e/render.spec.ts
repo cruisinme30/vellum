@@ -31,6 +31,9 @@ test.beforeEach(({}, testInfo) => {
 
 interface Fixture {
   readonly stylesheet: unknown;
+  /** An accent colour, `#rrggbb`, and the stylesheet drawn from it (D302). */
+  readonly accent: string;
+  readonly stylesheet_accent: unknown;
   readonly page: { readonly html: string };
   readonly blocks: Readonly<Record<string, unknown>>;
 }
@@ -62,10 +65,15 @@ const DRAWN = [
 
 /** Answers the render routes from the fixture; counts the requests. */
 async function fakeRenderer(page: Page, failBlock?: string) {
-  const counts = { page: 0, block: 0 };
-  await page.route("**/api/v1/render/stylesheet", (route) =>
-    route.fulfill({ json: FIXTURE.stylesheet }),
-  );
+  const counts = { page: 0, block: 0, seeds: [] as (string | null)[] };
+  await page.route("**/api/v1/render/stylesheet*", (route) => {
+    const seed = new URL(route.request().url()).searchParams.get("seed");
+    counts.seeds.push(seed);
+    if (seed === null) return route.fulfill({ json: FIXTURE.stylesheet });
+    return `#${seed}` === FIXTURE.accent
+      ? route.fulfill({ json: FIXTURE.stylesheet_accent })
+      : route.fulfill({ status: 400, json: { code: "invalid_input", message: "unknown seed" } });
+  });
   await page.route(`**/api/v1/pages/${PAGE}/render`, (route) => {
     counts.page += 1;
     return route.fulfill({ json: FIXTURE.page });
@@ -157,6 +165,38 @@ test("a theme change re-themes drawn blocks without asking the server again", as
   });
   await expect.poll(fill).not.toBe(light);
   expect(counts.page).toBe(1);
+});
+
+test("a custom accent colour tints drawn blocks (D302)", async ({ page }) => {
+  await signedIn(page);
+  await fakeCollab(page);
+  const counts = await fakeRenderer(page);
+  await page.goto(`/p/${PAGE}?view=read`);
+  const reading = page.getByRole("region", { name: "Rendered page" });
+  const bar = reading.locator(".vl-chart svg rect").first();
+  await expect(bar).toBeVisible();
+  const primary = () =>
+    reading.evaluate((element) =>
+      getComputedStyle(element).getPropertyValue("--vl-primary").trim(),
+    );
+  const fill = () => bar.evaluate((element) => getComputedStyle(element).fill);
+  const before = { primary: await primary(), fill: await fill() };
+
+  // The appearance settings save the accent; a reload picks it up.
+  await page.evaluate((accent) => {
+    localStorage.setItem("vellum.appearance", JSON.stringify({ seed: accent }));
+  }, FIXTURE.accent);
+  await page.reload();
+  await expect(bar).toBeVisible();
+  await expect.poll(primary).not.toBe(before.primary);
+  await expect.poll(fill).not.toBe(before.fill);
+  expect(counts.seeds).toContain(FIXTURE.accent.slice(1));
+  await expectNoOverflow(page, ".vl-reading");
+  const axe = await new AxeBuilder({ page })
+    .include(".vl-reading")
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+    .analyze();
+  expect(axe.violations).toEqual([]);
 });
 
 test("calculators in the reading view recompute as a slider moves", async ({ page }) => {

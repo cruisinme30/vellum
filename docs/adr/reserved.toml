@@ -104,3 +104,7 @@ holder = "reliability gates thread: perf gates from the 1.0 audit (#528), ADR 00
 [[reservation]]
 adrs = "0070"
 holder = "red team round 5 (#529)"
+
+[[reservation]]
+decisions = "D302-D304"
+holder = "UI and perf leftovers: figure accent (D302, ADR 0068), team archiving (D303), k6 PDF export (D304)"

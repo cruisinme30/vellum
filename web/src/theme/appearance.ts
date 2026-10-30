@@ -144,6 +144,20 @@ export function effectiveSeed(value: Appearance, organisationSeed?: string): str
   return value.seed ?? organisationSeed ?? DEFAULT_SEED;
 }
 
+/**
+ * The accent colour the server should draw figures in (D302): a custom
+ * theme's own seed, else the accent in use. Vellum's own seed is
+ * `undefined`, so the common case shares one cached stylesheet.
+ */
+export function figureSeed(value: Appearance, organisationSeed?: string): string | undefined {
+  const seed = (
+    value.theme === "custom" && value.custom !== undefined
+      ? value.custom.seed
+      : effectiveSeed(value, organisationSeed)
+  ).toLowerCase();
+  return seed === DEFAULT_SEED ? undefined : seed;
+}
+
 /** Loads a reading font's faces the first time it is chosen. */
 const FONT_LOADERS: Readonly<Record<ReadingFont, () => Promise<unknown>>> = {
   default: () => Promise.resolve(),

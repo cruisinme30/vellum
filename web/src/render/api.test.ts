@@ -20,9 +20,11 @@ describe("createHttpRenderApi", () => {
     const api = createHttpRenderApi(http);
     await api.page("01M6400000PAGE00ROADMAP001");
     await api.stylesheet();
+    await api.stylesheet("#C2185B");
     expect(get.mock.calls).toEqual([
       ["/api/v1/pages/01M6400000PAGE00ROADMAP001/render"],
       ["/api/v1/render/stylesheet"],
+      ["/api/v1/render/stylesheet?seed=C2185B"],
     ]);
   });
 
