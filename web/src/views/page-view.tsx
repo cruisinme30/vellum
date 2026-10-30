@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
 import { useSession } from "../api/session";
+import { usePageAssistant } from "../assist/page-assistant";
 import { PageFilesProvider } from "../attachments/context";
 import { FilesPanel } from "../attachments/files-panel";
 import { useServerApis, useServerApi } from "../data/server-apis";
@@ -149,6 +150,7 @@ export function PageView() {
   const { store, collab } = useServices();
   const workspace = useWorkspace();
   const pageHistory = usePageHistory(pageId);
+  const assistant = usePageAssistant(pageId);
   const { work, drive } = useServerApis();
   const view = usePageViewMode();
   const share = useShare(pageId);
@@ -266,11 +268,13 @@ export function PageView() {
                 scanSecrets={drive?.scanSecrets}
                 actions={
                   <>
+                    {assistant.button}
                     {pageFiles.button}
                     {pageHistory.button}
                   </>
                 }
               />
+              {assistant.panel}
               {pageFiles.panel}
             </PageFilesProvider>
           )}

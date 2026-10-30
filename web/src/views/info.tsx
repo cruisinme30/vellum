@@ -97,6 +97,7 @@ const ADMIN_SCREENS = [
   "webhooks",
   "requests",
   "routes",
+  "mcp",
 ] as const;
 
 /** Admin: the console's screens, and the signed-in account. */

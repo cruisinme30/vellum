@@ -21,6 +21,7 @@ import { createAuthApi } from "./api/auth";
 import { createHttp } from "./api/http";
 import { createReauthGate, withReauth } from "./api/reauth";
 import { App } from "./app";
+import { createHttpAssistApi, createHttpMcpSetupApi } from "./assist/api";
 import { createHttpAttachmentsApi } from "./attachments/api";
 import { createHttpBooksApi } from "./books/api";
 import { createHttpCollectionsStore } from "./collections/http";
@@ -121,6 +122,8 @@ root.render(
       privateSpaces={status === undefined ? undefined : createHttpPrivateSpacesApi(http)}
       render={status === undefined ? undefined : createHttpRenderApi(http)}
       account={status === undefined ? undefined : createHttpAccountApi(http)}
+      assist={status === undefined ? undefined : createHttpAssistApi(http)}
+      mcpSetup={status === undefined ? undefined : createHttpMcpSetupApi()}
       collections={
         status === undefined ? createMockCollectionsStore() : createHttpCollectionsStore(http)
       }

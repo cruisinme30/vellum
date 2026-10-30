@@ -26,6 +26,10 @@ import type { Http } from "./api/http";
 import type { ReauthGate } from "./api/reauth";
 import { ReauthPrompt } from "./api/reauth-prompt";
 import { RequireSession, SessionProvider, useSession } from "./api/session";
+import type { AssistApi, McpSetupApi } from "./assist/api";
+import { AskView } from "./assist/ask-view";
+import { McpSetupPage } from "./assist/mcp-setup-page";
+import { AssistantSettingsView } from "./assist/settings-view";
 import type { AttachmentsApi } from "./attachments/api";
 import type { BooksApi } from "./books/api";
 import { BookPage, BooksPage } from "./books/books-page";
@@ -122,6 +126,8 @@ export function AppRoutes() {
         <Route path="settings/private-spaces" element={<PrivateSpacesView />} />
         <Route path="settings/api-tokens" element={<ApiTokensPage />} />
         <Route path="settings/security" element={<SecurityPage />} />
+        <Route path="settings/ai" element={<AssistantSettingsView />} />
+        <Route path="ask" element={<AskView />} />
         <Route path="new" element={<NewPageView />} />
         <Route path="my-work" element={<MyWorkPage />} />
         <Route path="issues" element={<IssuesPage />} />
@@ -159,6 +165,7 @@ export function AppRoutes() {
         <Route path="admin/groups" element={<GroupsPage />} />
         <Route path="admin/tokens" element={<AdminTokensPage />} />
         <Route path="admin/sign-in" element={<SignInPage />} />
+        <Route path="admin/mcp" element={<McpSetupPage />} />
         <Route path="*" element={<NotFoundView />} />
       </Route>
     </Routes>
@@ -195,6 +202,10 @@ export interface AppServices {
   readonly sharing?: SharingApi | undefined;
   /** The person's API tokens and sign-in factors; absent in demo mode. */
   readonly account?: AccountApi | undefined;
+  /** The person's own model (summarise, ask, draft); absent in demo mode. */
+  readonly assist?: AssistApi | undefined;
+  /** The admin page's MCP client setup; absent in demo mode. */
+  readonly mcpSetup?: McpSetupApi | undefined;
   readonly collections: CollectionsStore;
   /** Present when a Vellum server answered; absent in demo mode. */
   readonly session?: { readonly auth: AuthApi; readonly status: AuthStatus } | undefined;
@@ -280,6 +291,8 @@ export function AppProviders({
   render,
   sharing,
   account,
+  assist,
+  mcpSetup,
   collections,
   session,
   notifications,
@@ -288,8 +301,32 @@ export function AppProviders({
   children,
 }: AppServices & { readonly children: ReactNode }) {
   const serverApis = useMemo(
-    () => ({ work, books, drive, attachments, privateSpaces, directory, render, sharing, account }),
-    [work, books, drive, attachments, privateSpaces, directory, render, sharing, account],
+    () => ({
+      work,
+      books,
+      drive,
+      attachments,
+      privateSpaces,
+      directory,
+      render,
+      sharing,
+      account,
+      assist,
+      mcpSetup,
+    }),
+    [
+      work,
+      books,
+      drive,
+      attachments,
+      privateSpaces,
+      directory,
+      render,
+      sharing,
+      account,
+      assist,
+      mcpSetup,
+    ],
   );
   const [demoNotifications] = useState<NotificationServices>(() => ({
     store: createMockNotificationPreferencesStore(),
