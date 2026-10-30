@@ -330,6 +330,16 @@ impl Spaces {
         }
     }
 
+    /// The root folder and ID of the space holding `path`.
+    fn root_of(&self, path: &BlobPath) -> Option<(BlobPath, Id)> {
+        self.0
+            .read()
+            .ok()?
+            .iter()
+            .find(|(root, _)| path.starts_with(root))
+            .cloned()
+    }
+
     fn of(&self, path: &BlobPath) -> Option<Id> {
         self.0
             .read()
@@ -394,6 +404,39 @@ async fn load_spaces(drive: &dyn DriveIndex) -> Result<Vec<(BlobPath, Id)>, Erro
         .into_iter()
         .map(|s| (s.root, Id(s.id.as_uuid().as_u128())))
         .collect())
+}
+
+/// The permission node of a drive folder, so collections can be created
+/// in it (D305): a space's root folder is the space itself, any other
+/// folder is its live drive node. Pages and unknown paths have none.
+/// A miss reloads the space list, which `space_of` shares.
+fn folder_nodes(
+    spaces: &Arc<Spaces>,
+    index: &Arc<dyn DriveIndex>,
+) -> vellum_collections::service::access::NodeOf {
+    let (spaces, index) = (Arc::clone(spaces), Arc::clone(index));
+    Arc::new(move |folder: BlobPath| {
+        let (spaces, index) = (Arc::clone(&spaces), Arc::clone(&index));
+        Box::pin(async move {
+            // A space made a moment ago may not be cached yet: read the
+            // list again once before giving up.
+            if spaces.root_of(&folder).is_none()
+                && let Ok(all) = load_spaces(index.as_ref()).await
+            {
+                spaces.replace(all);
+            }
+            let (root, space) = spaces.root_of(&folder)?;
+            if folder == root {
+                return Some(space);
+            }
+            let node = index
+                .node_at(vellum_kernel::SpaceId::from_u128(space.0), &folder)
+                .await
+                .ok()??;
+            (node.kind == vellum_drive::NodeKind::Folder && node.trash.is_none())
+                .then(|| Id(node.id.as_u128()))
+        })
+    })
 }
 
 /// How often accounts made since startup are checked for a My Drive.
@@ -708,10 +751,10 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
         Arc::new(move |path: &BlobPath| lookup.of(path));
     let mut collections = CollectionsService::new(
         Arc::clone(&store),
-        Arc::new(vellum_collections::service::AuthzAccess::new(
-            Arc::clone(authz),
-            Arc::clone(&space_of),
-        )),
+        Arc::new(
+            vellum_collections::service::AuthzAccess::new(Arc::clone(authz), Arc::clone(&space_of))
+                .with_folders(folder_nodes(spaces, &index)),
+        ),
     );
     if let Some(feed) = feeds.rows {
         collections = collections.with_index_feed(feed);

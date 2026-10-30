@@ -74,8 +74,10 @@ pub trait Access: Send + Sync + 'static {
 /// Finds the space a collection folder belongs to.
 pub type SpaceOf = Arc<dyn Fn(&BlobPath) -> Option<Id> + Send + Sync>;
 
-/// Finds the authz node of a drive folder, from the index.
-pub type NodeOf = Arc<dyn Fn(&BlobPath) -> Option<Id> + Send + Sync>;
+/// Finds the authz node of a drive folder, from the index; `None` when
+/// the path is not a live folder of a known space (D305).
+pub type NodeOf =
+    Arc<dyn Fn(BlobPath) -> futures::future::BoxFuture<'static, Option<Id>> + Send + Sync>;
 
 /// [`Access`] backed by the authorization engine.
 ///
@@ -178,7 +180,10 @@ impl<S: AuthzStore + 'static> Access for AuthzAccess<S> {
         folder: &BlobPath,
         need: Need,
     ) -> Result<bool, Error> {
-        let Some(node) = self.node_of.as_ref().and_then(|f| f(folder)) else {
+        let Some(node_of) = &self.node_of else {
+            return Ok(false);
+        };
+        let Some(node) = node_of(folder.clone()).await else {
             return Ok(false);
         };
         self.check(principal, (self.space_of)(folder), node, need)
@@ -272,7 +277,11 @@ mod tests {
         let ops = BlobPath::new("drives/shared/Ops").unwrap();
         assert!(!access.allowed_in(&ana, &ops, Need::Edit).await.unwrap());
         let folder = Id(77);
-        let access = access.with_folders(Arc::new(move |_: &BlobPath| Some(folder)));
+        let access = access.with_folders(Arc::new(
+            move |_: BlobPath| -> futures::future::BoxFuture<'static, Option<Id>> {
+                Box::pin(async move { Some(folder) })
+            },
+        ));
         assert!(access.allowed_in(&ana, &ops, Need::Edit).await.unwrap());
         assert!(!access.allowed_in(&anon, &ops, Need::Edit).await.unwrap());
         assert_eq!(Need::Edit.as_str(), "edit");

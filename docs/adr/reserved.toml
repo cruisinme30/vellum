@@ -106,6 +106,10 @@ adrs = "0070"
 holder = "red team round 5 (#529)"
 
 [[reservation]]
+decisions = "D305"
+holder = "collections from CSV in serve (#541, ADR 0045)"
+
+[[reservation]]
 decisions = "D302-D304"
 holder = "UI and perf leftovers: figure accent (D302, ADR 0068), team archiving (D303), k6 PDF export (D304)"
 

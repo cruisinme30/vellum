@@ -22,6 +22,8 @@ mod backup_cli;
 mod cluster;
 mod collab;
 #[cfg(test)]
+mod collections_tests;
+#[cfg(test)]
 mod delivery_tests;
 mod docs;
 mod e2e;
