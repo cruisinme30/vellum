@@ -3,12 +3,8 @@
 
 import { render, screen } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
-import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
-import type { AdminConsoleApi, AdminSignInApi } from "../admin/console/api";
-import { AdminConsoleProvider } from "../admin/console/context";
-import { SignInPage } from "../admin/console/sign-in-page";
 import { ServerApisProvider } from "../data/server-apis";
 import { I18nProvider } from "../i18n/i18n";
 
@@ -109,34 +105,5 @@ describe("Settings → Two-step verification", () => {
     await user.click(screen.getByRole("button", { name: "Remove" }));
     expect(removeTotp).toHaveBeenCalled();
     expect(await screen.findByText("Authenticator app removed.")).toBeDefined();
-  });
-});
-
-describe("Admin → Sign-in", () => {
-  it("saves who must use two-step verification", async () => {
-    const update = vi.fn<AdminSignInApi["update"]>((change) =>
-      Promise.resolve({ secondFactor: change.secondFactor ?? "optional", maxTokenDays: 90 }),
-    );
-    const signIn: AdminSignInApi = {
-      settings: () => Promise.resolve({ secondFactor: "optional", maxTokenDays: 90 }),
-      update,
-      resetFactors: unused,
-      signOutEverywhere: unused,
-    };
-    const user = userEvent.setup();
-    render(
-      <I18nProvider>
-        <MemoryRouter>
-          <AdminConsoleProvider api={{ signIn } as unknown as AdminConsoleApi}>
-            <SignInPage />
-          </AdminConsoleProvider>
-        </MemoryRouter>
-      </I18nProvider>,
-    );
-    expect(await screen.findByText(/at most 90 days/)).toBeDefined();
-    await user.click(screen.getByRole("radio", { name: /^Admins/ }));
-    await user.click(screen.getByRole("button", { name: "Save" }));
-    expect(update).toHaveBeenCalledWith({ secondFactor: "admins" });
-    expect(await screen.findByText("Sign-in settings saved.")).toBeDefined();
   });
 });

@@ -444,13 +444,16 @@ fn sso_failed(message: &str) -> Response {
 struct SsoStartQuery {
     next: Option<String>,
     #[serde(default)]
+    provider: Option<String>,
+    #[serde(default)]
     reauth: Option<String>,
 }
 
 /// Sends the browser to the provider's sign-in page.
 async fn sso_start(State(identity): Shared, Query(query): Query<SsoStartQuery>) -> Response {
-    let Some(sso) = identity.sso() else {
-        return sso_failed("Single sign-on is not set up on this server.");
+    let (provider, sso) = match identity.sso_provider(query.provider.as_deref()) {
+        Ok(found) => found,
+        Err(e) => return sso_failed(e.message()),
     };
     let redirect_uri = format!("{}{SSO_CALLBACK_PATH}", identity.config().base());
     let reauth = query
@@ -465,7 +468,11 @@ async fn sso_start(State(identity): Shared, Query(query): Query<SsoStartQuery>) 
             let mut response = Redirect::to(&started.url).into_response();
             let _ = response.headers_mut().insert(
                 header::SET_COOKIE,
-                sso_state_cookie(&identity, &started.state, crate::sso::PENDING_LIFETIME),
+                sso_state_cookie(
+                    &identity,
+                    &format!("{provider}.{}", started.state),
+                    crate::sso::PENDING_LIFETIME,
+                ),
             );
             no_store(response)
         }
@@ -488,8 +495,22 @@ async fn sso_callback(
     headers: HeaderMap,
     Query(query): Query<SsoCallbackQuery>,
 ) -> Response {
-    let Some(sso) = identity.sso().cloned() else {
-        return sso_failed("Single sign-on is not set up on this server.");
+    // The state cookie names the provider the sign-in started with.
+    let pending = cookie(&headers, sso_state_name(&identity));
+    let (provider, cookie_state) = match pending.and_then(|p| p.split_once('.')) {
+        Some((provider, state)) => (Some(provider), Some(state)),
+        None => (None, None),
+    };
+    let sso = match identity.sso_provider(provider) {
+        Ok((_, sso)) => sso,
+        Err(e) => {
+            let mut failed = sso_failed(e.message());
+            let _ = failed.headers_mut().append(
+                header::SET_COOKIE,
+                sso_state_cookie(&identity, "", Duration::ZERO),
+            );
+            return no_store(failed);
+        }
     };
     let mut response = match (&query.error, &query.code, &query.state) {
         (Some(error), _, _) => {
@@ -498,30 +519,31 @@ async fn sso_callback(
         }
         (None, Some(code), Some(state)) => {
             let redirect_uri = format!("{}{SSO_CALLBACK_PATH}", identity.config().base());
-            let cookie_state = cookie(&headers, sso_state_name(&identity));
             match sso.finish(&redirect_uri, state, code, cookie_state).await {
-                Ok(done) => match identity.sso_sign_in(&done.identity, user_agent(&headers)) {
-                    Ok(session) => {
-                        // A sign-in in this browser replaces its old session.
-                        if let Some(old) = cookie(&headers, identity.config().cookie_name()) {
-                            let _ = identity.sign_out(old);
+                Ok(done) => {
+                    match identity.sso_sign_in_with(&sso, &done.identity, user_agent(&headers)) {
+                        Ok(session) => {
+                            // A sign-in in this browser replaces its old session.
+                            if let Some(old) = cookie(&headers, identity.config().cookie_name()) {
+                                let _ = identity.sign_out(old);
+                            }
+                            let max_age = Duration::from_millis(
+                                u64::try_from(
+                                    session.session.expires_at.unix_ms()
+                                        - session.session.created_at.unix_ms(),
+                                )
+                                .unwrap_or(0),
+                            );
+                            let mut ok = Redirect::to(&done.next).into_response();
+                            let _ = ok.headers_mut().append(
+                                header::SET_COOKIE,
+                                session_cookie(&identity, &session.secret, max_age),
+                            );
+                            ok
                         }
-                        let max_age = Duration::from_millis(
-                            u64::try_from(
-                                session.session.expires_at.unix_ms()
-                                    - session.session.created_at.unix_ms(),
-                            )
-                            .unwrap_or(0),
-                        );
-                        let mut ok = Redirect::to(&done.next).into_response();
-                        let _ = ok.headers_mut().append(
-                            header::SET_COOKIE,
-                            session_cookie(&identity, &session.secret, max_age),
-                        );
-                        ok
+                        Err(e) => sso_failed(e.message()),
                     }
-                    Err(e) => sso_failed(e.message()),
-                },
+                }
                 Err(e) => {
                     tracing::info!(event = "identity.sso_failed", error = %e, "single sign-on failed");
                     sso_failed(e.message())

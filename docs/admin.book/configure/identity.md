@@ -22,10 +22,22 @@ at their next sign-in. If someone loses every method and recovery code,
 **Admin → Users → Reset two-step verification** removes them and ends
 that person's sessions.
 
+Add OpenID Connect providers in **Admin → Sign-in → Single sign-on**:
+a name, the issuer URL, the client ID and secret, and the email domains
+whose people get an account on first sign-in. Register the redirect URI
+the page shows with each provider. The sign-in page shows a button for
+every provider that is on. Client secrets are encrypted with the
+identity key and never shown again; leave the field blank to keep one.
+A provider set with `VELLUM_OIDC_*` still works and shows as read-only.
+
 With SSO on, you can require it for everyone except **break-glass
-admins**, who can still sign in with a password and passkey if the
-identity provider is down. Existing sessions keep working while the
-provider is down.
+admins** (**Admin → Users → Allow password**), who can still sign in
+with a password and a second factor if the identity provider is down.
+Existing sessions keep working while the provider is down, and the
+`vellum admin break-glass` code always works.
+
+Servers that share one database (replicas) must share the identity key:
+set the same 64-hex-character `VELLUM_IDENTITY_KEY` on each of them.
 
 ## SCIM provisioning {#scim}
 

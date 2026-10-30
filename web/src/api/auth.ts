@@ -19,6 +19,8 @@ export interface User {
 
 /** `SsoButton`: how single sign-on is offered, when a provider is set up. */
 interface SsoButton {
+  /** The provider's ID. */
+  readonly id?: string;
   readonly name: string;
   /** Where the button goes; append `?next=<path>` to return there. */
   readonly startUrl: string;
@@ -31,6 +33,8 @@ export interface AuthStatus {
   readonly scopes: readonly string[];
   readonly user?: User | null;
   readonly sso?: SsoButton | null;
+  /** Every single sign-on button, in order; older servers send only `sso`. */
+  readonly providers?: readonly SsoButton[];
 }
 
 /** The first administrator's details (`SetupInput`). */

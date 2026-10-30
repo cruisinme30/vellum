@@ -648,6 +648,7 @@ mod tests {
                 created_at: Timestamp::now(),
                 sso: Vec::new(),
                 factors: crate::store::SecondFactors::default(),
+                break_glass: false,
             },
         );
         let _ = state.sessions.insert(

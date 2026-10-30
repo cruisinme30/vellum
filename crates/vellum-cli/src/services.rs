@@ -146,6 +146,10 @@ impl Services {
         if let Some(key) = identity_key(data_dir, shared, |k| std::env::var(k).ok())? {
             identity = identity.with_sealing_key(&key)?;
         }
+        identity = identity.with_sso_http(Arc::new(|issuer: &Url| {
+            let http: Arc<dyn vellum_identity::SsoHttp> = Arc::new(GuardedSsoHttp::new(issuer)?);
+            Ok(http)
+        }));
         if let Some(sso) = sso {
             let http = Arc::new(GuardedSsoHttp::new(&sso.issuer)?);
             tracing::info!(issuer = %sso.issuer, "single sign-on is on");

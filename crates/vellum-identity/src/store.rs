@@ -64,6 +64,10 @@ pub struct User {
     /// Authenticator apps, passkeys and recovery codes (D290).
     #[serde(default, skip_serializing_if = "SecondFactors::is_empty")]
     pub factors: SecondFactors,
+    /// A break-glass admin: may still sign in with a password and a second
+    /// factor when single sign-on is required (D292).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub break_glass: bool,
 }
 
 /// A person's second factors (ADR 0069, D290).
@@ -394,6 +398,47 @@ pub struct SignInSettings {
     pub max_token_days: Option<u32>,
     /// Who must use a second factor with a password (D290).
     pub second_factor: SecondFactorPolicy,
+    /// Whether passwords are refused, except for break-glass admins (D292).
+    pub require_sso: bool,
+    /// Identity providers added in Admin → Sign-in (D292).
+    pub providers: Vec<Provider>,
+}
+
+/// An identity provider people sign in with (ADR 0069, D292).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Provider {
+    /// A short, stable ID (`okta`, `google-2`), used in URLs.
+    pub id: String,
+    /// The button label: "Sign in with {name}".
+    pub name: String,
+    /// Whether the sign-in page offers it.
+    pub enabled: bool,
+    /// Email domains whose people get an account on first sign-in.
+    #[serde(default)]
+    pub allowed_domains: Vec<String>,
+    /// Whether a verified address with no account gets one.
+    #[serde(default)]
+    pub auto_create: bool,
+    /// When it was added.
+    pub created_at: Timestamp,
+    /// The protocol and its settings.
+    pub protocol: Protocol,
+}
+
+/// How Vellum talks to a provider.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum Protocol {
+    /// `OpenID Connect`, authorization code flow with PKCE.
+    Oidc {
+        /// The issuer URL.
+        issuer: String,
+        /// The client ID registered with the provider.
+        client_id: String,
+        /// The client secret, sealed ([`crate::seal`]); `None` for a
+        /// public client.
+        client_secret: Option<String>,
+    },
 }
 
 /// Who must use a second factor when signing in with a password.
@@ -764,6 +809,7 @@ mod tests {
                         created_at: Timestamp::now(),
                         sso: Vec::new(),
                         factors: SecondFactors::default(),
+                        break_glass: false,
                     },
                 );
                 let _ = s.sessions.insert(
