@@ -74,3 +74,11 @@ minutes there, and 6 minutes on the glibc host.
   are build tools only and never reach the image.
 - The binary changes by a few hundred kilobytes (101.1 MB against 101.4
   MB), within the budget.
+- Fixed on 2026-10-30: `musl-gcc` is the C compiler only, not the linker.
+  Debian's `musl-gcc.specs` always passes `-dynamic-linker`, so the
+  `-static-pie` link that rustc uses on x86_64 produced a binary with an
+  ELF interpreter (`/lib/ld-musl-x86_64.so.1`) that distroless does not
+  have, and the image could not start. aarch64 links `-static -no-pie` and
+  was not affected. rustc now links with the host `gcc` and its own
+  self-contained musl, and the `build` stage fails if `readelf` finds an
+  `INTERP` header or a `NEEDED` entry in the binary.

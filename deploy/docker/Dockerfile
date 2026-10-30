@@ -38,14 +38,15 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG TARGETARCH
 WORKDIR /src
 # musl-gcc compiles the C dependencies for the musl target. SQLCipher in
-# vellum-db builds a vendored OpenSSL, whose build runs Perl and make. Not
+# vellum-db builds a vendored OpenSSL, whose build runs Perl and make.
+# binutils provides readelf for the static-link check below. Not
 # pinned: Debian drops superseded package revisions from its mirrors, so an
 # exact pin breaks the build at the next security update. They are build
 # tools only and never reach the image, and the Rust base image itself is
 # pinned by digest.
 # hadolint ignore=DL3008
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends musl-tools perl make \
+    && apt-get install -y --no-install-recommends musl-tools perl make binutils \
     && rm -rf /var/lib/apt/lists/*
 # Use the image's toolchain (the same version as rust-toolchain.toml)
 # without downloading the extra components the file asks for. The musl
@@ -64,14 +65,27 @@ RUN case "${TARGETARCH}" in \
     && rustup target add "${triple}"
 COPY . .
 COPY --from=web /src/web/dist web/dist
+# musl-gcc is the C compiler only, never the linker. rustc links with the
+# host gcc and its own self-contained musl start files and libc. Debian's
+# musl-gcc.specs replaces gcc's link rules with an unconditional
+# `-dynamic-linker /lib/ld-musl-*.so.1`, so the `-static-pie` link rustc
+# uses on x86_64 came out as a PIE with an ELF interpreter that the
+# distroless image does not have (D271).
+#
+# The check after the build fails it if the binary has an ELF interpreter
+# or a shared-library dependency: the runtime image has no loader and no
+# libraries, so such a binary cannot start ("no such file or directory").
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     triple="$(cat /target)" \
-    && env_triple="$(echo "${triple}" | tr 'a-z-' 'A-Z_')" \
     && export "CC_$(echo "${triple}" | tr - _)=musl-gcc" \
-              "CARGO_TARGET_${env_triple}_LINKER=musl-gcc" \
     && cargo build --release --locked --package vellum-cli --target "${triple}" \
     && mkdir -p /out \
-    && cp "target/${triple}/release/vellum" /out/vellum
+    && cp "target/${triple}/release/vellum" /out/vellum \
+    && headers="$(readelf --program-headers --dynamic --wide /out/vellum)" \
+    && if grep -E 'INTERP|\(NEEDED\)' <<<"${headers}" >&2; then \
+         echo "error: the vellum binary is dynamically linked; the runtime image needs a static binary" >&2; \
+         exit 1; \
+       fi
 
 # The binary, named by architecture.
 FROM scratch AS built
