@@ -6,6 +6,7 @@ import { userEvent } from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
+import { ApiError } from "../../api/http";
 import { I18nProvider } from "../../i18n/i18n";
 
 import type { AdminConsoleApi, AdminSignInApi, ProviderView, SignInView } from "./api";
@@ -83,6 +84,27 @@ function fakeSignIn(initial: SignInView) {
     view = { ...view, providers: view.providers.filter((p) => p.id !== id) };
     return Promise.resolve(view);
   });
+  const rotateScim = vi.fn<AdminSignInApi["rotateScim"]>(() => {
+    const scim = {
+      enabled: true,
+      tokenCreatedAt: "2026-10-30T08:00:00Z",
+      baseUrl: "https://vellum.northstar.dev/scim/v2",
+    };
+    view = { ...view, scim };
+    return Promise.resolve({ token: "vsc_new-token", scim });
+  });
+  const revokeScim = vi.fn<AdminSignInApi["revokeScim"]>(() => {
+    view = { ...view, scim: { enabled: false, baseUrl: view.scim.baseUrl } };
+    return Promise.resolve(view);
+  });
+  const samlMetadata = vi.fn<AdminSignInApi["samlMetadata"]>(() =>
+    Promise.resolve({
+      entityId: "https://sts.windows.net/tenant/",
+      ssoUrl: "https://login.microsoftonline.com/tenant/saml2",
+      certificate: "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n",
+      certificateFingerprints: ["AB:CD"],
+    }),
+  );
   const api: AdminSignInApi = {
     settings: () => Promise.resolve(view),
     update,
@@ -91,29 +113,11 @@ function fakeSignIn(initial: SignInView) {
     addProvider,
     updateProvider,
     removeProvider,
-    rotateScim: vi.fn<AdminSignInApi["rotateScim"]>(() => {
-      const scim = {
-        enabled: true,
-        tokenCreatedAt: "2026-10-30T08:00:00Z",
-        baseUrl: "https://vellum.northstar.dev/scim/v2",
-      };
-      view = { ...view, scim };
-      return Promise.resolve({ token: "vsc_new-token", scim });
-    }),
-    revokeScim: vi.fn<AdminSignInApi["revokeScim"]>(() => {
-      view = { ...view, scim: { enabled: false, baseUrl: view.scim.baseUrl } };
-      return Promise.resolve(view);
-    }),
-    samlMetadata: vi.fn<AdminSignInApi["samlMetadata"]>(() =>
-      Promise.resolve({
-        entityId: "https://sts.windows.net/tenant/",
-        ssoUrl: "https://login.microsoftonline.com/tenant/saml2",
-        certificate: "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n",
-        certificateFingerprints: ["AB:CD"],
-      }),
-    ),
+    rotateScim,
+    revokeScim,
+    samlMetadata,
   };
-  return { api, update, addProvider, updateProvider, removeProvider };
+  return { api, update, addProvider, updateProvider, removeProvider, rotateScim, samlMetadata };
 }
 
 function renderPage(signIn: AdminSignInApi) {
@@ -260,5 +264,83 @@ describe("Admin → Sign-in", () => {
     renderPage(api);
     expect(await screen.findByText("Set by the server's environment")).toBeDefined();
     expect(screen.queryByRole("button", { name: "Change Northstar" })).toBeNull();
+  });
+});
+
+const refused = () => new ApiError("conflict", "the server said no");
+
+async function textOf(found: Promise<HTMLElement>): Promise<string | null> {
+  const element = await found;
+  return element.textContent;
+}
+
+describe("Admin → Sign-in when the server refuses", () => {
+  it("shows a settings page that cannot load", async () => {
+    const { api } = fakeSignIn(BASE);
+    renderPage({ ...api, settings: () => Promise.reject(refused()) });
+    expect(await textOf(screen.findByRole("alert"))).toBe("the server said no");
+  });
+
+  it("says why each change failed", async () => {
+    const fake = fakeSignIn({ ...BASE, providers: [OKTA] });
+    const user = renderPage(fake.api);
+    await screen.findByRole("rowheader", { name: "Okta" });
+
+    fake.update.mockRejectedValueOnce(refused());
+    const twoStep = screen.getByRole("form", { name: "Two-step verification" });
+    await user.click(within(twoStep).getByRole("button", { name: "Save" }));
+    expect(await textOf(within(twoStep).findByRole("alert"))).toBe("the server said no");
+
+    fake.update.mockRejectedValueOnce(refused());
+    const sso = screen.getByRole("form", { name: "Require single sign-on" });
+    await user.click(within(sso).getByRole("button", { name: "Save" }));
+    expect(await textOf(within(sso).findByRole("alert"))).toBe("the server said no");
+
+    fake.removeProvider.mockRejectedValueOnce(refused());
+    await user.click(screen.getByRole("button", { name: "Remove Okta" }));
+    expect(await screen.findAllByText("the server said no")).toHaveLength(3);
+
+    fake.addProvider.mockRejectedValueOnce(refused());
+    const add = screen.getByRole("form", { name: "Add a sign-in provider" });
+    await user.type(within(add).getByLabelText("Name"), "Okta 2");
+    await user.type(within(add).getByLabelText("Issuer URL"), "https://two.okta.com");
+    await user.type(within(add).getByLabelText("Client ID"), "v");
+    await user.click(within(add).getByRole("button", { name: "Save" }));
+    expect(await textOf(within(add).findByRole("alert"))).toBe("the server said no");
+  });
+
+  it("shows a SAML provider's stored certificate, and a metadata URL that cannot be read", async () => {
+    const fake = fakeSignIn({
+      ...BASE,
+      providers: [{ ...SAML, ssoUrl: "https://login.example/saml2", entityId: "https://sts/" }],
+    });
+    fake.samlMetadata.mockRejectedValueOnce(refused());
+    const user = renderPage(fake.api);
+    await user.click(await screen.findByRole("button", { name: "Change Entra ID" }));
+    const form = screen.getByRole("form", { name: "Change Entra ID" });
+    expect(within(form).getByText("AB:CD")).toBeDefined();
+    expect(
+      within(form).getByLabelText("Signing certificate (PEM)").getAttribute("placeholder"),
+    ).toBe("Stored. Paste a new certificate to replace it.");
+    await user.type(within(form).getByLabelText("Metadata URL"), "https://bad.example/md");
+    await user.click(within(form).getByRole("button", { name: "Read metadata" }));
+    expect(await textOf(within(form).findByRole("alert"))).toBe("the server said no");
+    await user.click(within(form).getByRole("button", { name: "Cancel" }));
+    expect(screen.getByRole("form", { name: "Add a sign-in provider" })).toBeDefined();
+  });
+
+  it("keeps the SCIM token when making a new one is cancelled or fails", async () => {
+    const fake = fakeSignIn({
+      ...BASE,
+      scim: { enabled: true, tokenCreatedAt: "2026-10-30T08:00:00Z", baseUrl: BASE.scim.baseUrl },
+    });
+    const user = renderPage(fake.api);
+    await user.click(await screen.findByRole("button", { name: "Make a new token" }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByText(/stops working at once/)).toBeNull();
+    fake.rotateScim.mockRejectedValueOnce(refused());
+    await user.click(screen.getByRole("button", { name: "Make a new token" }));
+    await user.click(screen.getByRole("button", { name: "Make a new token" }));
+    expect(await textOf(screen.findByRole("alert"))).toBe("the server said no");
   });
 });
