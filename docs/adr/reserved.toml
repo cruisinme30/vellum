@@ -120,3 +120,8 @@ holder = "search and secret-scanning leftovers: hybrid toggle and status (#526, 
 [[reservation]]
 decisions = "D306"
 holder = "SQLite write transactions begin IMMEDIATE (#542), ADR 0006"
+
+[[reservation]]
+adrs = "0071"
+decisions = "D307-D309"
+holder = "red team round 6 (#529)"
