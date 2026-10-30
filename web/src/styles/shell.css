@@ -562,6 +562,11 @@ kbd {
   color: var(--md-on-surface);
 }
 
+/* A long status name wraps inside its chip instead of widening the page. */
+.vl-page-props .vl-chip {
+  white-space: normal;
+}
+
 .vl-status-verified {
   background: var(--md-callout-good-bg);
   color: var(--md-callout-good);
