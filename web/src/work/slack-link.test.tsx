@@ -43,6 +43,9 @@ function fakeApi(linkSlack: WorkApi["linkSlack"]): WorkApi {
         day_starts_at: "09:00",
         digest_at: "07:30",
       }),
+    lists: () => Promise.resolve([]),
+    google: () => Promise.resolve({ configured: false, connected: false }),
+    parse: () => Promise.reject(new Error("not needed")),
     linkSlack,
   } as unknown as WorkApi;
 }

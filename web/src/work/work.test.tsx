@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
@@ -26,7 +26,6 @@ import {
 } from "./api";
 import { IssuePage } from "./issue-page";
 import { IssuesPage } from "./issues-page";
-import { MyWorkPage } from "./my-work-page";
 
 function task(id: string, title: string, extra: Partial<TaskView> = {}): TaskView {
   return {
@@ -100,23 +99,6 @@ const MY_WORK: MyWorkView = {
 // eslint-disable-next-line unicorn/no-null -- the API's "none"
 const NONE = null;
 
-const MENTIONED: MyWorkView = {
-  open: 1,
-  today: "2026-10-29",
-  sections: [
-    {
-      bucket: "inbox",
-      tasks: [
-        task("mention.c9", "@ana can you check the copy?", {
-          kind: "mention",
-          issue_key: "ENG-7",
-          mentioned_by: "priya",
-        }),
-      ],
-    },
-  ],
-};
-
 function fakeApi(overrides: Partial<WorkApi> = {}) {
   const myWork = vi.fn<WorkApi["myWork"]>(() => Promise.resolve(MY_WORK));
   const addTask = vi.fn<WorkApi["addTask"]>((text) => Promise.resolve(task("new", text)));
@@ -185,6 +167,17 @@ function fakeApi(overrides: Partial<WorkApi> = {}) {
     saveTeamSettings: () => Promise.reject(new Error("unused")),
     createTeam: () => Promise.reject(new Error("unused")),
     setTeamArchived: () => Promise.reject(new Error("unused")),
+    // My Work's own calls are tested in my-work.test.tsx.
+    parse: () => Promise.reject(new Error("unused")),
+    move: () => Promise.reject(new Error("unused")),
+    update: () => Promise.reject(new Error("unused")),
+    lists: () => Promise.resolve([]),
+    createList: () => Promise.reject(new Error("unused")),
+    shareList: () => Promise.reject(new Error("unused")),
+    google: () => Promise.resolve({ configured: false, connected: false }),
+    connectGoogle: () => Promise.reject(new Error("unused")),
+    syncGoogle: () => Promise.reject(new Error("unused")),
+    disconnectGoogle: () => Promise.resolve(),
     ...overrides,
   };
   return {
@@ -280,62 +273,6 @@ describe("work API", () => {
     expect(send).toHaveBeenLastCalledWith("PATCH", "/api/v1/work/issues/ENG-1", {
       state: "done",
     });
-  });
-});
-
-describe("My Work", () => {
-  it("lists tasks by bucket, ticks them and adds new ones", async () => {
-    const { api, myWork, addTask, setDone } = fakeApi();
-    const user = renderAt("/my-work", api, <Route path="my-work" element={<MyWorkPage />} />);
-    expect(await screen.findByRole("heading", { name: "Today" })).toBeDefined();
-    expect(screen.queryByRole("heading", { name: "Inbox" })).toBeNull();
-    expect(screen.getByText("Due 2026-10-29")).toBeDefined();
-    expect(screen.getByRole("link", { name: "ENG-7" }).getAttribute("href")).toBe("/issues/ENG-7");
-
-    await user.click(screen.getByRole("checkbox", { name: "Write the launch post" }));
-    expect(setDone).toHaveBeenCalledWith("k1", true);
-
-    await user.type(screen.getByRole("textbox", { name: "Add a task" }), "Call Sam tomorrow");
-    await user.click(screen.getByRole("button", { name: "Add" }));
-    expect(addTask).toHaveBeenCalledWith("Call Sam tomorrow");
-    await waitFor(() => {
-      expect(myWork).toHaveBeenCalledTimes(3);
-    });
-  });
-
-  it("shows who mentioned you and dismisses the mention", async () => {
-    const { api, dismissMention } = fakeApi({ myWork: () => Promise.resolve(MENTIONED) });
-    const user = renderAt("/my-work", api, <Route path="my-work" element={<MyWorkPage />} />);
-    expect(await screen.findByText("priya mentioned you:")).toBeDefined();
-    expect(screen.queryByRole("checkbox")).toBeNull();
-    expect(screen.getByRole("link", { name: "ENG-7" }).getAttribute("href")).toBe("/issues/ENG-7");
-    await user.click(
-      screen.getByRole("button", { name: "Dismiss the mention “@ana can you check the copy?”" }),
-    );
-    expect(dismissMention).toHaveBeenCalledWith("mention.c9");
-  });
-
-  it("saves the time zone, start of day and digest time", async () => {
-    const { api, saveSettings } = fakeApi();
-    const user = renderAt("/my-work", api, <Route path="my-work" element={<MyWorkPage />} />);
-    await user.click(await screen.findByText("Time zone and reminders"));
-    expect(await screen.findByText("My Work counts days in UTC.")).toBeDefined();
-    const zone = screen.getByRole("combobox", { name: "Time zone" });
-    await user.clear(zone);
-    await user.type(zone, "Asia/Tokyo");
-    await user.clear(screen.getByLabelText("Morning digest at"));
-    await user.click(screen.getByRole("button", { name: "Save settings" }));
-    expect(saveSettings).toHaveBeenCalledWith({
-      time_zone: "Asia/Tokyo",
-      day_starts_at: "09:00",
-      digest_at: NONE,
-    });
-    expect(await screen.findByText("Settings saved.")).toBeDefined();
-  });
-
-  it("explains itself in demo mode", () => {
-    renderAt("/my-work", undefined, <Route path="my-work" element={<MyWorkPage />} />);
-    expect(screen.getByText(/needs a Vellum server/)).toBeDefined();
   });
 });
 

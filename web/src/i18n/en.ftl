@@ -125,6 +125,22 @@ search-count =
     }
 search-empty = No page matches “{ $query }”.
 search-working = Searching…
+search-filters = Filters
+search-filter-owner = Owner
+search-filter-anyone = Anyone
+search-filter-me = Me
+search-filter-modified = Modified
+search-filter-any-time = Any time
+search-filter-days =
+    { $days ->
+        [7] In the last week
+        [30] In the last month
+        [365] In the last year
+       *[other] In the last { $days } days
+    }
+search-filter-location = Location
+search-filter-everywhere = Every space
+search-filter-starred = Starred only
 inbox-intro = Pages that mention @{ $handle }.
 inbox-empty = Nobody has mentioned you yet.
 admin-intro = Run this Vellum server: who uses it, who did what, settings, backups and how requests perform.
@@ -401,6 +417,7 @@ toolbar-highlight = Highlight
 toolbar-link = Link
 toolbar-link-prompt = Link address (leave empty to remove the link)
 toolbar-insert = Insert
+toolbar-task = Make a task from the selection
 slash-label = Blocks
 slash-empty = No block matches.
 chips-mention-label = People and dates
@@ -809,7 +826,7 @@ loading = Loading…
 my-work = My Work
 my-work-intro = Your tasks and the issues assigned to you.
 my-work-add = Add a task
-my-work-add-hint = Call Sam tomorrow 3pm !high
+my-work-add-hint = Call Sam tomorrow 3pm p1 #home
 my-work-add-button = Add
 my-work-empty = Nothing to do. Add a task above.
 my-work-slack-title = Link Slack
@@ -839,6 +856,113 @@ my-work-settings-digest = Morning digest at
 my-work-settings-digest-hint = Reminders on a date without a time count from the start of your day. Clear the digest time to stop the digest.
 my-work-settings-save = Save settings
 my-work-settings-saved = Settings saved.
+my-work-tomorrow = Tomorrow
+my-work-next-week = In a week
+my-work-move = Move…
+my-work-move-label = Move “{ $title }”
+my-work-drop-here = Drop the task on a day or bucket
+my-work-block = Block time
+my-work-block-for = Block time for “{ $title }”
+my-work-block-at = Blocked { $from }–{ $to }, { $day }
+my-work-block-start = Starts
+my-work-block-minutes = Minutes
+my-work-block-save = Save block
+my-work-block-clear = Clear block
+my-work-block-invalid = Pick a start and a length from 5 minutes to one day.
+my-work-google = Google Calendar
+my-work-google-intro = Blocked time shows as events in a “Vellum” calendar. Moving an event in Google Calendar moves the block; deleting it clears the block.
+my-work-google-off = Google Calendar is not set up on this server. An administrator can turn it on.
+my-work-google-connected = Connected. Blocks sync every 5 minutes.
+my-work-google-not-connected = Not connected.
+my-work-google-connect = Connect Google Calendar
+my-work-google-sync = Sync now
+my-work-google-synced =
+    { $changed ->
+        [0] Already in sync.
+        [one] Synced one change.
+       *[other] Synced { $changed } changes.
+    }
+my-work-google-disconnect = Disconnect
+my-work-lists = Lists
+my-work-lists-empty = No lists yet. Make one to share tasks with other people.
+my-work-list-open =
+    { $count ->
+        [one] one open task
+       *[other] { $count } open tasks
+    }
+my-work-list-shared-by = shared by @{ $owner }
+my-work-list-members = Members of { $list }
+my-work-list-unshare = Stop sharing { $list } with @{ $member }
+my-work-list-share = Share { $list } with
+my-work-list-share-button = Share
+my-work-list-new = New list
+my-work-list-create = Create list
+quick-add-title = Quick-add a task
+quick-add-from-page = The task links back to { $page }.
+quick-add-cancel = Cancel
+quick-add-to-list = List
+quick-add-understood = What Vellum understood
+quick-add-due = Due { $when }
+quick-add-start = Starts { $when }
+quick-add-repeats = Repeats: { $rule }
+quick-add-repeats-done = Repeats after done: { $rule }
+quick-add-priority = Priority { $priority }
+quick-add-list = List { $list }
+quick-add-remind = Reminder { $when }
+connections-open = Calendars, capture and import
+connections-title = My Work settings
+connections-back = Back to My Work
+connections-copy = Copy
+connections-copied = Copied.
+connections-calendar = Calendar
+connections-calendar-intro = Show your tasks in a calendar app, or edit them in a task app that speaks CalDAV.
+connections-feed-url = Your calendar feed URL
+connections-feed-new = Get a new feed URL
+connections-feed-revoke = Turn the feed off
+connections-feed-off = The feed is off. Its URL no longer works.
+connections-feed-hint = Subscribe to the URL in Google Calendar, Apple Calendar or Outlook. It is shown only once; getting a new one stops the old one working.
+connections-caldav = Task apps (CalDAV)
+connections-caldav-url = CalDAV account URL
+connections-caldav-apple = Apple Reminders: Settings, Calendar, Accounts, Add Account, Other, Add CalDAV Account. Choose Manual and paste the URL; the user name is your handle and the password is an app password.
+connections-caldav-thunderbird = Thunderbird: New Calendar, On the Network, paste the URL and sign in with your handle and an app password.
+connections-caldav-password = Make an app password
+connections-caldav-password-label = App password (shown once)
+connections-caldav-token-name = CalDAV task app
+connections-capture = Capture
+connections-capture-intro = Send things to your Inbox from e-mail and Slack.
+connections-email = E-mail
+connections-email-address = Your capture address
+connections-email-new = Get a new address
+connections-email-revoke = Turn capture by e-mail off
+connections-email-off = Capture by e-mail is off. The address no longer works.
+connections-email-unavailable = This server does not receive capture e-mail. An administrator can set a mail domain.
+connections-slack = Slack
+connections-slack-unavailable = Slack capture is not set up on this server. An administrator can add the Vellum Slack app.
+connections-slack-how = In Slack, open a message's menu and choose Save as task. The first time, Slack shows a link that connects your account.
+connections-slack-linked = Your Slack account is connected. Save as task puts messages in your Inbox.
+connections-slack-unlink = Disconnect Slack
+connections-import = Import
+connections-import-intro = Bring tasks over from another app. Each list becomes a list here; importing the same file again adds only what is new.
+connections-import-from = From
+connections-import-google_tasks = Google Tasks (Takeout Tasks.json)
+connections-import-todoist = Todoist (project CSV)
+connections-import-things = Things (JSON)
+connections-import-file = Export file
+connections-import-project = List name for this project
+connections-import-button = Import
+connections-import-preview =
+    { $count ->
+        [0] { $file } holds no tasks Vellum can read.
+        [one] { $file } holds one task.
+       *[other] { $file } holds { $count } tasks.
+    }
+connections-import-unreadable = { $file } is not an export from that app.
+connections-import-done = Imported.
+connections-import-list =
+    { $count ->
+        [one] { $list }: one task added
+       *[other] { $list }: { $count } tasks added
+    }
 
 ## Issues
 
@@ -858,6 +982,7 @@ issue-comment-by = { $author }, { $when }
 issue-create-doc = Create doc from issue
 issue-comment-add = Add a comment
 issue-comment-send = Comment
+issue-comment-assign = Assign to (optional)
 
 ## People picker
 

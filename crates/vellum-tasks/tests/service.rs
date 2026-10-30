@@ -680,6 +680,20 @@ async fn the_feed_needs_its_secret() {
 }
 
 #[tokio::test]
+async fn connections_name_the_caldav_url_and_what_capture_offers() {
+    let f = fixture();
+    let view = f.service.connections(f.user, NoInput {}).await.unwrap();
+    assert_eq!(
+        view.caldav_url,
+        "https://vellum.northstar.dev/dav/calendars/ana/"
+    );
+    assert!(view.email);
+    // Slack capture is not set up here, so nobody can be linked.
+    assert!(!view.slack);
+    assert!(!view.slack_linked);
+}
+
+#[tokio::test]
 async fn caldav_round_trip() {
     let f = fixture();
     let id = f.add("Buy milk").await;

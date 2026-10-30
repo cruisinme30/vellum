@@ -55,7 +55,6 @@ import { DriveSettingsPage } from "./drive/settings-page";
 import { TrashPage } from "./drive/trash-page";
 import type { CollabConnector } from "./editor/collab/provider";
 import { I18nProvider, useT } from "./i18n/i18n";
-import { KeyboardRoot } from "./keyboard/keyboard-root";
 import { NotificationsProvider, type NotificationServices } from "./notifications/context";
 import { NotificationSettingsView } from "./notifications/notification-settings";
 import { createMockNotificationPreferencesStore } from "./notifications/preferences";
@@ -64,6 +63,7 @@ import type { PrivateSpacesApi } from "./platform/private/api";
 import { PrivateSpacesView } from "./platform/private/private-spaces-view";
 import type { RenderApi } from "./render/api";
 import type { SharingApi } from "./sharing/api";
+import { AppKeyboard } from "./shell/app-keyboard";
 import { AppShell } from "./shell/app-shell";
 import { AppearanceProvider, type OrganisationAppearance } from "./theme/appearance-context";
 import { AppearancePage } from "./theme/appearance-page";
@@ -73,10 +73,12 @@ import { NewPageView } from "./views/new-page";
 import { InboxView, SearchView } from "./views/search";
 import { SetupView, SignInView } from "./views/sign-in";
 import type { WorkApi } from "./work/api";
+import type { ConnectionsApi } from "./work/connections-api";
 import { CyclesPage } from "./work/cycles-page";
 import { IssuePage } from "./work/issue-page";
 import { IssuesPage } from "./work/issues-page";
 import { MyIssuesPage } from "./work/my-issues-page";
+import { MyWorkConnectionsPage } from "./work/my-work-connections";
 import { MyWorkPage } from "./work/my-work-page";
 import type { PlanningApi } from "./work/planning/api";
 import { AskPage, AsksPage } from "./work/planning/asks-page";
@@ -85,6 +87,7 @@ import { InsightsPage } from "./work/planning/insights-page";
 import { NewIssuePage } from "./work/planning/new-issue-page";
 import { ProjectPage } from "./work/planning/project-page";
 import { ProjectsPage } from "./work/planning/projects-page";
+import { QuickAddProvider } from "./work/quick-add";
 import { TeamSettingsPage } from "./work/settings/team-settings-page";
 import { TriagePage } from "./work/triage-page";
 
@@ -137,6 +140,7 @@ export function AppRoutes() {
         <Route path="ask" element={<AskView />} />
         <Route path="new" element={<NewPageView />} />
         <Route path="my-work" element={<MyWorkPage />} />
+        <Route path="my-work/settings" element={<MyWorkConnectionsPage />} />
         <Route path="issues" element={<IssuesPage />} />
         <Route path="issues/mine" element={<MyIssuesPage />} />
         <Route path="issues/triage" element={<TriagePage />} />
@@ -201,6 +205,8 @@ export interface AppServices {
   readonly admin?: AdminConsoleApi | undefined;
   /** My Work and issues, from a Vellum server; absent in demo mode. */
   readonly work?: WorkApi | undefined;
+  /** My Work's calendar feed, CalDAV, capture and imports; absent in demo mode. */
+  readonly connections?: ConnectionsApi | undefined;
   /** Books, from a Vellum server; absent in demo mode. */
   readonly books?: BooksApi | undefined;
   /** The drive's spaces, trash, activity and settings; absent in demo mode. */
@@ -311,6 +317,7 @@ export function AppProviders({
   assist,
   mcpSetup,
   planning,
+  connections,
   collections,
   session,
   notifications,
@@ -332,6 +339,7 @@ export function AppProviders({
       assist,
       mcpSetup,
       planning,
+      connections,
     }),
     [
       work,
@@ -346,6 +354,7 @@ export function AppProviders({
       assist,
       mcpSetup,
       planning,
+      connections,
     ],
   );
   const [demoNotifications] = useState<NotificationServices>(() => ({
@@ -381,11 +390,13 @@ export function AppProviders({
 export function App(services: AppServices) {
   return (
     <AppProviders {...services}>
-      <KeyboardRoot>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-      </KeyboardRoot>
+      <BrowserRouter>
+        <QuickAddProvider>
+          <AppKeyboard>
+            <AppRoutes />
+          </AppKeyboard>
+        </QuickAddProvider>
+      </BrowserRouter>
     </AppProviders>
   );
 }

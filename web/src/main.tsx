@@ -49,6 +49,7 @@ import { createHttpRenderApi } from "./render/api";
 import { createHttpSharingApi } from "./sharing/api";
 import { createHttpOrganisationAppearance } from "./theme/organisation";
 import { createHttpWorkApi } from "./work/api";
+import { createHttpConnectionsApi } from "./work/connections-api";
 import { createHttpPlanningApi } from "./work/planning/api";
 
 // Demo pages keep their edits across reloads in the browser's local
@@ -126,6 +127,7 @@ root.render(
       account={status === undefined ? undefined : createHttpAccountApi(http)}
       assist={status === undefined ? undefined : createHttpAssistApi(http)}
       mcpSetup={status === undefined ? undefined : createHttpMcpSetupApi()}
+      connections={status === undefined ? undefined : createHttpConnectionsApi(http)}
       collections={
         status === undefined ? createMockCollectionsStore() : createHttpCollectionsStore(http)
       }

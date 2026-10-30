@@ -1998,6 +1998,28 @@ export interface ComputedRow {
 }
 
 /**
+ * How the person's tasks reach other apps, for My Work's settings (D298).
+ */
+export interface ConnectionsView {
+  /**
+   * The CalDAV account URL to give a task app (it signs in with an API token).
+   */
+  caldav_url: string;
+  /**
+   * Whether the server receives capture e-mail (a mail domain is set).
+   */
+  email: boolean;
+  /**
+   * Whether Slack capture is set up on the server.
+   */
+  slack: boolean;
+  /**
+   * Whether this person is linked to a Slack user.
+   */
+  slack_linked: boolean;
+}
+
+/**
  * A page's content.
  */
 export interface ContentView {
@@ -12784,6 +12806,13 @@ export interface Operations {
     input: CompleteInput;
     output: CompleteView;
   };
+  /** Where your tasks connect: CalDAV, e-mail and Slack capture */
+  "tasks.connections": {
+    method: "GET";
+    path: "/v1/my-work/connections";
+    input: NoInput;
+    output: ConnectionsView;
+  };
   /** Adds a task from a quick-add line */
   "tasks.create": {
     method: "POST";
@@ -13452,6 +13481,7 @@ export const OPERATIONS = {
   "search.titles": { method: "GET", path: "/v1/search/titles", mutation: false },
   "security.scan_secrets": { method: "POST", path: "/v1/security/secrets/scan", mutation: true },
   "tasks.complete": { method: "POST", path: "/v1/tasks/{task}/complete", mutation: true },
+  "tasks.connections": { method: "GET", path: "/v1/my-work/connections", mutation: false },
   "tasks.create": { method: "POST", path: "/v1/tasks", mutation: true },
   "tasks.create_list": { method: "POST", path: "/v1/task-lists", mutation: true },
   "tasks.delete": { method: "DELETE", path: "/v1/tasks/{task}", mutation: true },

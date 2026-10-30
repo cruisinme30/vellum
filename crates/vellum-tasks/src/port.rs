@@ -136,6 +136,13 @@ pub trait Workspace: Send + Sync + 'static {
     /// Everyone whose reminders and digest the server sends.
     fn people(&self) -> BoxFuture<'_, Result<Vec<UserId>, Error>>;
 
+    /// Whether the person with this handle is linked to a Slack user, so
+    /// "Save as task" in Slack reaches their Inbox. `false` by default.
+    fn slack_linked(&self, handle: String) -> BoxFuture<'_, Result<bool, Error>> {
+        let _ = handle;
+        Box::pin(async { Ok(false) })
+    }
+
     /// The Vellum user linked to a Slack user in a Slack workspace.
     fn slack_user(
         &self,

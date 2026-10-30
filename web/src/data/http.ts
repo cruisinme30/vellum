@@ -4,9 +4,10 @@
 import type { SearchPage } from "../api/api.gen";
 import { ApiError, type Http } from "../api/http";
 
+import { filterHits, modifiedFrom } from "./search";
 import type { SignedInUser, StoreProblem, WorkspaceSnapshot, WorkspaceStore } from "./store";
 import { descendants, movePage } from "./tree";
-import type { PageMeta, SearchHit, Space } from "./types";
+import type { PageMeta, SearchFilters, SearchHit, Space } from "./types";
 
 /** `SpaceView` from `vellum-drive`. */
 interface SpaceView {
@@ -329,13 +330,14 @@ export function createHttpWorkspaceStore(
     seedFor() {
       return;
     },
-    async search(raw) {
+    async search(raw, filters) {
       const q = raw.trim();
       if (q === "") return [];
       // Only what the tree holds opens here: shared-with-me items have no space in it yet.
       const known = new Map(snapshot.pages.map((p) => [p.id, p]));
+      const me = snapshot.me.handle;
       try {
-        return await searchText(http, q, known);
+        return filterHits(await searchText(http, q, known, filters), filters, me);
       } catch (error) {
         if (!searchMissing(error)) {
           report(error);
@@ -343,7 +345,7 @@ export function createHttpWorkspaceStore(
         }
       }
       try {
-        return await searchTitles(http, q, known);
+        return filterHits(await searchTitles(http, q, known), filters, me);
       } catch (error) {
         report(error);
         return [];
@@ -378,17 +380,27 @@ async function searchText(
   http: Http,
   q: string,
   known: ReadonlyMap<string, PageMeta>,
+  filters: SearchFilters | undefined,
 ): Promise<SearchHit[]> {
-  const found = await http.get<SearchPage>(SEARCH, { q, kinds: "page", limit: SEARCH_LIMIT });
+  // The server narrows what it can before its limit; the caller checks every filter again.
+  const found = await http.get<SearchPage>(SEARCH, {
+    q,
+    kinds: "page",
+    limit: SEARCH_LIMIT,
+    starred: filters?.starred === true ? true : undefined,
+    spaces: filters?.spaceId,
+    modified_from: modifiedFrom(filters),
+  });
   const hits = new Map<string, SearchHit>();
   for (const hit of found.hits) {
     const page = known.get(hit.doc);
     if (page === undefined || hits.has(page.id)) continue;
-    const snippet = hit.snippet
+    const fragments = hit.snippet.map(({ text, hit: matched }) => ({ text, hit: matched }));
+    const snippet = fragments
       .map((fragment) => fragment.text)
       .join("")
       .trim();
-    hits.set(page.id, { page, snippet });
+    hits.set(page.id, { page, snippet, fragments });
   }
   return [...hits.values()];
 }

@@ -7,7 +7,7 @@ import { telemetry } from "../platform/telemetry";
 
 import "./keyboard.css";
 
-import { CommandMenu } from "./command-menu";
+import { CommandMenu, type PageFinder } from "./command-menu";
 import { Keymap, type Command, type Scope } from "./keymap";
 import { currentPlatform, type KeyPlatform } from "./keys";
 import { ShortcutSheet } from "./shortcut-sheet";
@@ -19,6 +19,8 @@ export interface KeyboardRootProperties {
   /** Scopes in force besides `global`, such as `issues` on an issue list. */
   readonly scopes?: readonly Scope[];
   readonly platform?: KeyPlatform;
+  /** Page search in the ⌘K menu; commands only when absent. */
+  readonly pages?: PageFinder | undefined;
   readonly children?: ReactNode;
 }
 
@@ -63,6 +65,7 @@ export function KeyboardRoot({
   commands = NO_COMMANDS,
   scopes = NO_SCOPES,
   platform = currentPlatform(),
+  pages,
   children,
 }: KeyboardRootProperties) {
   const [open, setOpen] = useState<Open>("none");
@@ -77,7 +80,7 @@ export function KeyboardRoot({
     () => [
       {
         id: "menu.open",
-        title: "Search and run any command",
+        title: "Search pages and run any command",
         scope: "global",
         keys: ["mod+k"],
         run: () => {
@@ -143,6 +146,7 @@ export function KeyboardRoot({
       {open === "menu" ? (
         <CommandMenu
           commands={all.filter((c) => active.has(c.scope) && c.id !== "menu.open")}
+          pages={pages}
           platform={platform}
           onClose={close}
           onRun={(command) => {
