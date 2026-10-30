@@ -331,13 +331,10 @@ impl Services {
             UploadPolicy::default(),
             Some(self.public_url.clone()),
         ));
+        if let Some(adapter) = &self.mcp_adapter {
+            adapter.set_exporter(mcp_exporter(&transfer));
+        }
         (transfer.export_router(), transfer.import_router())
-    }
-
-    /// The MCP workspace adapter, for tests that plug in its exporter.
-    #[cfg(test)]
-    pub const fn mcp_adapter(&self) -> Option<&Arc<crate::mcp_workspace::ServeWorkspace>> {
-        self.mcp_adapter.as_ref()
     }
 
     /// Rate-limit counts shared with the other replicas, when an index is
@@ -478,6 +475,49 @@ impl Services {
             .mount(exports::EXPORT_PREFIX, export)
             .mount_uploads(exports::IMPORT_PREFIX, import, upload_body_limit())
     }
+}
+
+/// The MCP `export` tool's hook into the export service (ADR 0065, D265).
+fn mcp_exporter<S: Send + Sync + 'static>(
+    transfer: &Arc<exports::Transfer<S>>,
+) -> crate::mcp_workspace::Exporter {
+    use crate::mcp_workspace::{ExportFile, ExportWhat};
+    let transfer = Arc::clone(transfer);
+    Arc::new(move |principal, what, format| {
+        let transfer = Arc::clone(&transfer);
+        Box::pin(async move {
+            let item = match what {
+                ExportWhat::Page(id) => exports::ExportItem::Page(id),
+                ExportWhat::Book { id, section } => {
+                    let book = id.parse().map_err(|_| {
+                        vellum_kernel::Error::new(
+                            vellum_kernel::ErrorKind::NotFound,
+                            "book not found",
+                        )
+                    })?;
+                    let scope = section.map_or(
+                        vellum_export::book::BookScope::Whole,
+                        vellum_export::book::BookScope::Subtree,
+                    );
+                    exports::ExportItem::Book(book, scope)
+                }
+            };
+            let file = transfer
+                .export(
+                    &principal,
+                    vellum_kernel::RequestId::generate(),
+                    item,
+                    &format,
+                    vellum_export::pdf::Paper::A4,
+                )
+                .await?;
+            Ok(ExportFile {
+                file_name: file.file_name,
+                mime: file.mime.to_owned(),
+                bytes: file.bytes,
+            })
+        })
+    })
 }
 
 /// The largest upload body: the upload policy's file limit.

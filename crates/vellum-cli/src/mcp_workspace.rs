@@ -369,10 +369,6 @@ impl ServeWorkspace {
     }
 
     /// Serves `export` through `exporter` (the server's export routes).
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "wired to the export routes when they land (#513)")
-    )]
     pub fn set_exporter(&self, exporter: Exporter) {
         let _ = self.exporter.set(exporter);
     }

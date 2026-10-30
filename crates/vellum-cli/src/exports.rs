@@ -371,7 +371,6 @@ impl<S: Send + Sync> Transfer<S> {
     /// `unauthenticated` or `permission_denied` without the scope,
     /// `not_found` for what the caller cannot see, `invalid_input` for a
     /// bad format or scope, `unavailable` when the export slots are busy.
-    #[allow(dead_code)] // the MCP `export` tool calls it
     pub async fn export(
         &self,
         principal: &Principal,
