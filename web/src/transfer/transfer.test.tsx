@@ -15,7 +15,7 @@ import {
   type ExportTarget,
   type TransferApi,
 } from "./api";
-import { ExportPanel } from "./export-panel";
+import { ExportPanel, svgPageSize } from "./export-panel";
 import { IssueImportForm } from "./import-screen";
 
 const PAGE: ExportTarget = { kind: "page", id: "p 1", title: "Launch plan" };
@@ -131,6 +131,28 @@ describe("export panel", () => {
     expect(await screen.findByText("the server is busy")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Download" }));
     expect(await screen.findByText("too large to export")).toBeTruthy();
+  });
+});
+
+describe("preview page size", () => {
+  it("reads the page's box, so a page has its height before it decodes", () => {
+    expect(
+      svgPageSize('<svg class="typst-doc" viewBox="0 0 595.28 841.89" width="595.28pt">'),
+    ).toEqual({ width: 595.28, height: 841.89 });
+    expect(svgPageSize(SVG)).toEqual({ width: 10, height: 10 });
+    expect(svgPageSize('<svg stroke-width="2"></svg>')).toBeUndefined();
+    expect(svgPageSize("<p>not a page</p>")).toBeUndefined();
+  });
+
+  it("gives each preview picture its page's size", async () => {
+    render(
+      <I18nProvider>
+        <ExportPanel target={PAGE} api={fakeApi()} onClose={vi.fn()} />
+      </I18nProvider>,
+    );
+    const [page] = await screen.findAllByRole("img");
+    expect(page?.getAttribute("width")).toBe("10");
+    expect(page?.getAttribute("height")).toBe("10");
   });
 });
 

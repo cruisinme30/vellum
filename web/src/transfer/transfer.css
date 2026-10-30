@@ -19,6 +19,11 @@
   box-shadow: -2px 0 12px rgb(0 0 0 / 20%);
 }
 
+/* The panel scrolls; once the preview overflows it, nothing above is squeezed. */
+.vl-transfer-panel > * {
+  flex-shrink: 0;
+}
+
 .vl-transfer-panel > .vl-muted {
   margin: 0;
   overflow-wrap: anywhere;

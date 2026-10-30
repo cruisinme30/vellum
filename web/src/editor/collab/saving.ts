@@ -84,7 +84,7 @@ export function createSaver(
 
   const canSave = () => {
     const state = live.getSnapshot();
-    return state.status === "online" && state.canWrite;
+    return state.status === "online" && state.canWrite === true;
   };
 
   /** Records how a save that covered `covered` edits ended. */
