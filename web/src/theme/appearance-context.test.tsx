@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { act, renderHook, waitFor } from "@testing-library/react";
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -17,6 +17,21 @@ const quiet = () => {
 const wrapper = ({ children }: { readonly children: ReactNode }) => (
   <AppearanceProvider>{children}</AppearanceProvider>
 );
+
+type Organisation = ComponentProps<typeof AppearanceProvider>["organisation"];
+
+/** A wrapper whose provider loads the organisation's look with `load`. */
+function withOrganisation(load: Organisation) {
+  return function OrganisationWrapper({
+    children,
+  }: {
+    readonly children: ReactNode;
+  }) {
+    return (
+      <AppearanceProvider organisation={load}>{children}</AppearanceProvider>
+    );
+  };
+}
 
 /** A controllable `(prefers-color-scheme: dark)` media query. */
 function fakeDarkQuery(initial: boolean) {
@@ -138,12 +153,9 @@ describe("the organisation's look", () => {
       exportTheme: "sepia",
       siteTheme: "auto",
     });
-    const withOrg = ({ children }: { readonly children: ReactNode }) => (
-      <AppearanceProvider organisation={organisation}>
-        {children}
-      </AppearanceProvider>
-    );
-    const { result } = renderHook(() => useAppearance(), { wrapper: withOrg });
+    const { result } = renderHook(() => useAppearance(), {
+      wrapper: withOrganisation(organisation),
+    });
     await waitFor(() => {
       expect(result.current.organisation?.exportTheme).toBe("sepia");
     });
@@ -154,12 +166,9 @@ describe("the organisation's look", () => {
 
   it("keeps Vellum's seed when the organisation's look cannot load", async () => {
     const organisation = vi.fn().mockRejectedValue(new Error("offline"));
-    const withOrg = ({ children }: { readonly children: ReactNode }) => (
-      <AppearanceProvider organisation={organisation}>
-        {children}
-      </AppearanceProvider>
-    );
-    const { result } = renderHook(() => useAppearance(), { wrapper: withOrg });
+    const { result } = renderHook(() => useAppearance(), {
+      wrapper: withOrganisation(organisation),
+    });
     await waitFor(() => {
       expect(organisation).toHaveBeenCalled();
     });
