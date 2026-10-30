@@ -55,7 +55,7 @@ vellum-kernel.workspace = true
 
 [dev-dependencies]
 axum = { version = "0.8.9", default-features = false, features = ["http1", "tokio", "json", "query"] }
-proptest = ">=1.11.0, <1.12"
+proptest = ">=1.11.0, <1.13"
 tempfile = "3.27.0"
 tokio = { version = "1.49.0", features = ["macros", "rt-multi-thread"] }
 vellum-store = { path = ".", features = ["conformance", "git", "dropbox", "onedrive", "s3", "gdrive"] }

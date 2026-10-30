@@ -37,5 +37,5 @@ uuid = { version = "1.29.0", features = ["v4", "v7"] }
 zeroize = "1.9.1"
 
 [dev-dependencies]
-proptest = ">=1.11.0, <1.12"
+proptest = ">=1.11.0, <1.13"
 serde_json = "1.0.154"

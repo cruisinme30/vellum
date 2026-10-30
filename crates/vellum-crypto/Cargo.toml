@@ -50,5 +50,5 @@ getrandom = { version = "0.4.3", features = ["wasm_js"] }
 [dev-dependencies]
 # proptest 1.12 moves to rand 0.10 while OpenTelemetry is on rand 0.9;
 # cargo-deny bans the duplicate until they meet.
-proptest = ">=1.11.0, <1.12"
+proptest = ">=1.11.0, <1.13"
 tokio = { version = "1.54.1", features = ["macros", "rt"] }
