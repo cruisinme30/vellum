@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-//! The crate-boundary check.
+//! The crate-boundary check: the layering of the crate graph, and one
+//! integration test program per crate.
 
 use cargo_metadata::{DependencyKind, MetadataCommand};
 
@@ -28,6 +29,8 @@ pub struct Crate {
     pub layer: Option<String>,
     /// Names of the workspace crates it depends on (normal and build).
     pub depends_on: Vec<String>,
+    /// Names of its integration test targets (`tests/`).
+    pub test_targets: Vec<String>,
 }
 
 /// Loads the workspace and checks it.
@@ -58,6 +61,12 @@ pub fn run() -> Result<(), String> {
                 .filter(|d| members.contains(&d.name))
                 .map(|d| d.name.clone())
                 .collect(),
+            test_targets: p
+                .targets
+                .iter()
+                .filter(|t| t.is_test())
+                .map(|t| t.name.clone())
+                .collect(),
         })
         .collect();
     let violations = check(&crates);
@@ -83,6 +92,17 @@ pub fn check(crates: &[Crate]) -> Vec<String> {
         .iter()
         .filter(|c| !TOOLING.contains(&c.name.as_str()))
     {
+        // Each test program links the whole dependency graph again; one
+        // per test file overflowed the coverage runner (ADR 0076, D324).
+        if krate.test_targets.len() > 1 {
+            violations.push(format!(
+                "{} has {} integration test programs ({}): move them into \
+                 modules of tests/it/main.rs",
+                krate.name,
+                krate.test_targets.len(),
+                krate.test_targets.join(", "),
+            ));
+        }
         let Some(own) = krate.layer.as_deref() else {
             violations.push(format!(
                 "{} declares no [package.metadata.vellum] layer",
@@ -121,6 +141,7 @@ mod tests {
             name: name.to_owned(),
             layer: layer.map(str::to_owned),
             depends_on: deps.iter().map(|d| (*d).to_owned()).collect(),
+            test_targets: vec!["it".to_owned()],
         }
     }
 
@@ -167,6 +188,15 @@ mod tests {
         assert!(v[0].contains("declares no"));
         assert!(v[1].contains("unknown layer `middle`"));
         assert!(v[2].contains("(no layer)"));
+    }
+
+    #[test]
+    fn a_second_test_program_fails() {
+        let mut two = krate("k", Some("kernel"), &[]);
+        two.test_targets = vec!["it".to_owned(), "extra".to_owned()];
+        let v = check(&[two]);
+        assert_eq!(v.len(), 1);
+        assert!(v[0].contains("k has 2 integration test programs (it, extra)"));
     }
 
     #[test]

@@ -47,8 +47,8 @@ document that aborts the process with a stack overflow (#260).
 
 ### D121: attack suites live in the repository
 
-- Each crate that reads untrusted input has `tests/hostile.rs` (or
-  `tests/hostile_*.rs`): small, deterministic attack cases that run in the
+- Each crate that reads untrusted input has `tests/it/hostile.rs` (or
+  `tests/it/hostile_*.rs`): small, deterministic attack cases that run in the
   fast suite on every pull request.
 - Coverage-guided fuzz targets live in `fuzz/` (cargo-fuzz, nightly
   toolchain) and run in the nightly full suite with a time budget; a crash

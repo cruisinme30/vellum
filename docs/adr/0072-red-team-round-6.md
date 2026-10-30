@@ -88,11 +88,11 @@ the web editor.
 - Providers that do not send `AuthnStatement` cannot be used to
   re-authenticate; people sign in with a password or another provider.
 - Large imports may wait for a free slot on a busy server.
-- Regression tests: `crates/vellum-identity/tests/sso.rs`
+- Regression tests: `crates/vellum-identity/tests/it/sso.rs`
   (`a_provider_cannot_link_accounts_outside_its_domains`),
-  `tests/scim.rs` (`an_admins_address_is_out_of_reach`), `tests/saml.rs`
+  `tests/it/scim.rs` (`an_admins_address_is_out_of_reach`), `tests/it/saml.rs`
   (`reauthentication_needs_a_recent_authn_instant`),
   `crates/vellum-cli/src/uploads_tests.rs`
   (`uploads_are_refused_when_the_memory_budget_is_spent`) and
-  `crates/vellum-mcp/tests/http.rs`
+  `crates/vellum-mcp/tests/it/http.rs`
   (`listen_streams_close_when_the_token_is_revoked`).

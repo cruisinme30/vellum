@@ -9,7 +9,7 @@
 # develop failed (scripts/ci/reliability-gate.sh, ADR 0022 D254).
 #
 # Each test runs once per event: the Rust tests run only in the coverage
-# job and the UI tests only in the end-to-end matrix, not again inside the
+# shards and the UI tests only in the end-to-end matrix, not again inside the
 # fast suite. Pushes to main are not checked again: main requires an
 # up-to-date branch, so the merge commit has the tree this suite passed.
 #
@@ -92,33 +92,69 @@ jobs:
       actions: read
       issues: read # the issue and decision record check reads the linked issue
 
-  coverage:
-    name: Rust coverage
+  # Four shards of the Rust tests (ADR 0076, D324): one runner ran out of
+  # disk linking every test program, and the tests take long enough that
+  # four runners finish sooner. Each shard builds the whole instrumented
+  # workspace, runs a quarter of the tests and reports its line coverage.
+  coverage-shard:
+    name: Rust tests ${{ matrix.shard }}/4
     needs: gate
     if: needs.gate.outputs.run == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - run: rustup toolchain install
+      # The shards build the same thing, so they share one cache, which
+      # the first shard saves.
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          save-if: ${{ github.event_name != 'pull_request' }}
+          save-if: >-
+            ${{ github.event_name != 'pull_request' && matrix.shard == 1 }}
       - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
         with:
           tool: cargo-nextest,cargo-llvm-cov,mdbook
       # The only run of the workspace tests in this suite: the fast suite
-      # leaves them to this job when the full suite calls it.
-      - name: Tests, with line coverage of at least 85 %
+      # leaves them to these shards when the full suite calls it.
+      - name: A quarter of the tests, with line coverage
         env:
           NEXTEST_PROFILE: ci
-        run: >-
-          cargo llvm-cov nextest --workspace --exclude xtask --locked
-          --fail-under-lines 85 --lcov --output-path lcov.info
+          SHARD: ${{ matrix.shard }}
+        run: |
+          cargo llvm-cov nextest --workspace --exclude xtask --locked \
+            --no-report --partition "hash:${SHARD}/4"
+          cargo llvm-cov report --lcov --output-path "lcov-${SHARD}.info"
       - name: Tests of the build tooling (not counted in coverage)
+        if: matrix.shard == 1
         run: cargo nextest run --package xtask --locked --profile ci
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-coverage-${{ matrix.shard }}
+          path: lcov-${{ matrix.shard }}.info
+
+  # Keeps the job the Full suite waits for: merges the shards' coverage
+  # and holds the total to at least 85 % of lines.
+  coverage:
+    name: Rust coverage
+    needs: coverage-shard
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: rust-coverage-*
+          merge-multiple: true
+      - name: Line coverage of at least 85 %
+        run: scripts/ci/merge-coverage.sh 85 lcov.info lcov-*.info
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: rust-coverage
@@ -339,7 +375,9 @@ jobs:
   full-suite:
     name: Full suite
     if: always()
-    needs: [gate, fast, coverage, binary, image, clamav, e2e, links, reliability]
+    needs:
+      [gate, fast, coverage-shard, coverage, binary, image, clamav, e2e,
+       links, reliability]
     runs-on: ubuntu-24.04
     steps:
       - name: Every check passed

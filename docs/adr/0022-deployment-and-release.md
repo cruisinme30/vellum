@@ -103,7 +103,7 @@ MinIO stopped publishing community images in October 2025.
 
 ### D253: upgrades from every earlier schema, with data
 
-- `crates/vellum-db/tests/upgrade.rs` stops at each earlier migration
+- `crates/vellum-db/tests/it/upgrade.rs` stops at each earlier migration
   (any may be a previous release's), writes the Northstar rows from
   `tests/fixtures/upgrade/NNNN.sql` that fit, then upgrades. Every row must
   survive and the schema must match a fresh install, on both engines.

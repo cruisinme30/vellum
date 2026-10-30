@@ -2,7 +2,7 @@
 -- SPDX-License-Identifier: AGPL-3.0-only
 
 -- Northstar rows written against the schema as it stood after migration
--- 0003, for the upgrade test (tests/upgrade.rs). Every later migration
+-- 0003, for the upgrade test (tests/it/upgrade.rs). Every later migration
 -- runs over these rows. ID(n) becomes an engine-specific ID literal: a
 -- 16-byte blob on SQLite, a UUID on Postgres. Booleans keep their
 -- defaults so one file serves both engines.
