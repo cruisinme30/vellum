@@ -665,6 +665,7 @@ mod tests {
                 sso: Vec::new(),
                 factors: crate::store::SecondFactors::default(),
                 break_glass: false,
+                external_id: None,
             },
         );
         let _ = state.sessions.insert(

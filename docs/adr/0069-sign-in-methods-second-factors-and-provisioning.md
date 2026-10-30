@@ -96,9 +96,14 @@ came from [ADR 0057](0057-admin-users-spaces-and-reauthentication.md).
   that admins rotate in Admin → Sign-in; it is stored as a hash.
 - SCIM users have no password and are never admins. `active: false` or a
   delete blocks the account, which ends its sessions and tokens; content
-  stays where it is.
+  stays where it is, and a blocked account still answers `GET`.
+  Break-glass admins cannot be changed by SCIM, and the last admin is
+  never blocked.
 - SCIM groups are the admin groups of ADR 0057 (names unique ignoring
-  case), with members changed through the permission engine.
+  case), with members changed through the permission engine; only active
+  accounts can be added.
+- The gateway leaves bearer tokens on `/scim/v2` to the SCIM router, so a
+  SCIM token works nowhere else and no other token works there.
 
 ## Alternatives
 

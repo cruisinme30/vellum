@@ -29,6 +29,7 @@ import type {
   ProviderInput,
   ProviderView,
   SamlMetadataView,
+  ScimTokenCreated,
   UsageCounts,
   SearchStatusView,
   SettingsView,
@@ -123,6 +124,10 @@ export interface AdminSignInApi {
   removeProvider(id: string): Promise<SignInView>;
   /** Reads a SAML provider's metadata URL to fill in its settings (D293). */
   samlMetadata(url: string): Promise<SamlMetadataView>;
+  /** Makes a new SCIM token, shown once; the old one stops working (D294). */
+  rotateScim(): Promise<ScimTokenCreated>;
+  /** Turns SCIM provisioning off. */
+  revokeScim(): Promise<SignInView>;
 }
 
 /** What an admin changes about an account; unset fields stay as they are. */
@@ -232,6 +237,8 @@ export function createHttpAdminConsoleApi(http: Http): AdminConsoleApi {
         }),
       removeProvider: (id) =>
         http.send<SignInView>("DELETE", `${ADMIN}/sign-in/providers/${encodeURIComponent(id)}`),
+      rotateScim: () => http.send<ScimTokenCreated>("POST", `${ADMIN}/sign-in/scim/token`),
+      revokeScim: () => http.send<SignInView>("DELETE", `${ADMIN}/sign-in/scim/token`),
       samlMetadata: (url) =>
         http.send<SamlMetadataView>("POST", `${ADMIN}/sign-in/saml-metadata`, { url }),
     },

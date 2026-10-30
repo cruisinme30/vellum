@@ -49,6 +49,8 @@ pub struct Services {
     workspace: Vec<Arc<dyn Service>>,
     /// The integration receivers, when an integration secret is set.
     hooks: Option<axum::Router>,
+    /// Group membership, for SCIM, when an index is configured.
+    group_members: Option<Arc<dyn vellum_identity::GroupMembers>>,
     /// Live editing, when an index is configured.
     collab: Option<Collab>,
     /// This replica's place in the cluster, when an index is configured.
@@ -187,6 +189,7 @@ impl Services {
             origin: url.origin().ascii_serialization(),
             workspace: Vec::new(),
             hooks: None,
+            group_members: None,
             collab: None,
             replica: None,
             rate_counts: None,
@@ -281,6 +284,7 @@ impl Services {
         .await?;
         self.workspace = opened.services;
         self.hooks = opened.hooks;
+        self.group_members = opened.group_members;
         self.collab = opened.collab;
         self.replica = opened.replica;
         self.rate_counts = opened.rate_counts;
@@ -517,6 +521,11 @@ impl Services {
             .mount("/auth", identity_http::browser_router(Arc::clone(identity)))
             .mount_cross_site("/oauth", identity_http::oauth_router(Arc::clone(identity)))
             .mount_cross_site("/saml", identity_http::saml_router(Arc::clone(identity)))
+            // Providers provision with their own bearer token (D294).
+            .mount_cross_site(
+                vellum_identity::scim::SCIM_PREFIX,
+                vellum_identity::scim::router(Arc::clone(identity), self.group_members.clone()),
+            )
             .mount_cross_site("/.well-known", well_known)
             .mount("/collab", self.collab())
             // The help books, for the app's `?` buttons (ADR 0024, D256).

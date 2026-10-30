@@ -7605,6 +7605,39 @@ export interface SaveViewInput {
 }
 
 /**
+ * A new SCIM token, shown once.
+ */
+export interface ScimTokenCreated {
+  /**
+   * Provisioning as it now is.
+   */
+  scim: ScimView;
+  /**
+   * The token (`vsc_…`), for the provider's settings.
+   */
+  token: string;
+}
+
+/**
+ * Provisioning as Admin → Sign-in shows it. The token is never shown
+ * again after it is made.
+ */
+export interface ScimView {
+  /**
+   * The SCIM base URL to give the provider.
+   */
+  baseUrl: string;
+  /**
+   * Whether a token is set, so providers can provision.
+   */
+  enabled: boolean;
+  /**
+   * When the current token was made.
+   */
+  tokenCreatedAt?: Timestamp | null;
+}
+
+/**
  * A permission ceiling carried by a credential.
  *
  * The set matches the MCP scopes in the brief: `read`, `write:draft`,
@@ -8294,6 +8327,10 @@ export interface SignInView {
    * What to register with SAML providers.
    */
   saml: SamlServiceView;
+  /**
+   * SCIM provisioning (D294).
+   */
+  scim: ScimView;
   /**
    * Who must use a second factor with a password.
    */
@@ -13436,12 +13473,26 @@ export interface Operations {
     input: UserById;
     output: IdentityAdminResetFactorsUserView;
   };
+  /** Turn SCIM provisioning off */
+  "identity.admin_revoke_scim": {
+    method: "DELETE";
+    path: "/v1/admin/sign-in/scim/token";
+    input: Empty;
+    output: SignInView;
+  };
   /** Revoke anyone's API token */
   "identity.admin_revoke_token": {
     method: "DELETE";
     path: "/v1/admin/tokens/{id}";
     input: ById;
     output: Done;
+  };
+  /** Make a new SCIM provisioning token; the old one stops working */
+  "identity.admin_rotate_scim": {
+    method: "POST";
+    path: "/v1/admin/sign-in/scim/token";
+    input: Empty;
+    output: ScimTokenCreated;
   };
   /** Read a SAML provider's metadata to fill in its settings */
   "identity.admin_saml_metadata": {
@@ -14441,7 +14492,9 @@ export const OPERATIONS = {
   "identity.admin_add_provider": { method: "POST", path: "/v1/admin/sign-in/providers", mutation: true },
   "identity.admin_remove_provider": { method: "DELETE", path: "/v1/admin/sign-in/providers/{id}", mutation: true },
   "identity.admin_reset_factors": { method: "POST", path: "/v1/admin/users/{id}/second-factors/reset", mutation: true },
+  "identity.admin_revoke_scim": { method: "DELETE", path: "/v1/admin/sign-in/scim/token", mutation: true },
   "identity.admin_revoke_token": { method: "DELETE", path: "/v1/admin/tokens/{id}", mutation: true },
+  "identity.admin_rotate_scim": { method: "POST", path: "/v1/admin/sign-in/scim/token", mutation: true },
   "identity.admin_saml_metadata": { method: "POST", path: "/v1/admin/sign-in/saml-metadata", mutation: true },
   "identity.admin_sign_in": { method: "GET", path: "/v1/admin/sign-in", mutation: false },
   "identity.admin_sign_out": { method: "POST", path: "/v1/admin/users/{id}/sign-out", mutation: true },

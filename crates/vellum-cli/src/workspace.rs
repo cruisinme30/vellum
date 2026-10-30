@@ -563,6 +563,8 @@ struct Workspace {
     e2e: Arc<vellum_e2e::E2e>,
     /// Sharing: grants and share links (#95).
     sharing: Arc<vellum_drive::sharing::Sharing>,
+    /// Group membership in the permission engine, for SCIM (D294).
+    group_members: Arc<dyn vellum_identity::GroupMembers>,
 }
 
 /// What `vellum serve` mounts for the workspace.
@@ -599,6 +601,8 @@ pub struct Opened {
     pub search: Option<Arc<crate::search_admin::SearchStatus>>,
     /// Work, which issue imports create through (see [`crate::issue_import`]).
     pub work: Option<Arc<WorkService>>,
+    /// Group membership, which SCIM changes (ADR 0069, D294).
+    pub group_members: Option<Arc<dyn vellum_identity::GroupMembers>>,
 }
 
 /// My Work's settings: where its secrets live and what it links to.
@@ -832,6 +836,7 @@ async fn build<S: AuthzStore + TreeSync + 'static>(
         space_of,
         e2e,
         sharing,
+        group_members: Arc::new(crate::groups::AuthzGroups(Arc::clone(authz))),
     })
 }
 
@@ -1260,6 +1265,7 @@ pub async fn open(
         public: Some(public_site(&workspace.sharing)?),
         search: Some(search_status),
         work: Some(workspace.work),
+        group_members: Some(workspace.group_members),
     })
 }
 

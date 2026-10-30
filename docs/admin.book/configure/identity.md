@@ -50,10 +50,16 @@ set the same 64-hex-character `VELLUM_IDENTITY_KEY` on each of them.
 
 ## SCIM provisioning {#scim}
 
-Turn on SCIM in **Admin → Sign-in → Provisioning** and paste the URL and
-token into your identity provider. Users and groups created there
-appear in Vellum; users removed there are deactivated, their sessions
-end and their content stays with its folders.
+Turn on SCIM in **Admin → Sign-in → Provisioning** and paste the URL
+(`https://<your server>/scim/v2`) and token into your identity provider.
+The token is shown once; **Make a new token** replaces it at once, and
+**Turn off** stops provisioning. Users and groups created there appear
+in Vellum: accounts without a password that sign in through the
+provider, never as admins, and groups you can share with like any other.
+Users removed or deactivated there are blocked, their sessions and API
+tokens end, and their content stays with its folders. Break-glass admins
+are out of the provider's reach. Vellum answers `eq` filters on
+`userName`, `externalId`, `emails.value`, `displayName` and `id`.
 
 ## Sessions {#sessions}
 

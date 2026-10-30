@@ -161,6 +161,7 @@ impl Identity {
             name: check_name(name)?,
             description: check_description(description)?,
             created_at: Timestamp::now(),
+            external_id: None,
         };
         self.store().write(|s| {
             if name_taken(&s.groups, &group.name, group.id) {
@@ -208,7 +209,7 @@ impl Identity {
         })?
     }
 
-    fn forget_group(&self, id: ObjectId) -> Result<(), Error> {
+    pub(crate) fn forget_group(&self, id: ObjectId) -> Result<(), Error> {
         self.store().write(|s| {
             s.groups
                 .remove(&id.to_string())
