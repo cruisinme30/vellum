@@ -117,10 +117,18 @@ async function attachEvidence(page: Page, testInfo: TestInfo, problems: Problem[
   }
 }
 
-/** Presses the target's `open` button, if any, and waits for what it opens. */
-export async function openPanel(page: Page, target: Target): Promise<void> {
+/**
+ * Presses the target's `open` button, if any, and waits for what it opens.
+ * The stress mode lengthens every text, so there the button's name only
+ * has to start with the words.
+ */
+export async function openPanel(page: Page, target: Target, mode?: Mode): Promise<void> {
   if (target.open === undefined) return;
-  await page.getByRole("button", { name: target.open }).first().click();
+  const name =
+    mode?.name === "stress"
+      ? new RegExp(target.open.source.replace(/\$$/, ""), target.open.flags)
+      : target.open;
+  await page.getByRole("button", { name }).first().click();
   await settle(page);
   // A panel's pictures (an export preview) decode after the network is
   // idle; give the ones in view a moment so the audit does not race them.
@@ -151,7 +159,7 @@ export async function auditTarget(
   await fakeServer(page, target.server);
   await page.goto(target.url, { waitUntil: "load" });
   await settle(page);
-  await openPanel(page, target);
+  await openPanel(page, target, mode);
 
   const problems: Problem[] = [...errors];
   const findings: Finding[] = await page.evaluate(layoutAudit);
