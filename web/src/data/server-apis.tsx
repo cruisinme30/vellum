@@ -16,6 +16,7 @@ import type { PrivateSpacesApi } from "../platform/private/api";
 import type { RenderApi } from "../render/api";
 import type { SharingApi } from "../sharing/api";
 import { CopyDiagnostic } from "../shell/copy-diagnostic";
+import type { TransferApi } from "../transfer/api";
 import type { WorkApi } from "../work/api";
 import type { ConnectionsApi } from "../work/connections-api";
 import type { PlanningApi } from "../work/planning/api";
@@ -44,6 +45,8 @@ export interface ServerApis {
   readonly planning?: PlanningApi | undefined;
   /** My Work's calendar feed, CalDAV, capture and imports. */
   readonly connections?: ConnectionsApi | undefined;
+  /** Export and import. */
+  readonly transfer?: TransferApi | undefined;
 }
 
 const ServerApisContext = createContext<ServerApis>({});

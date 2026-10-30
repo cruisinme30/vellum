@@ -143,7 +143,7 @@ async fn legacy_handshake_then_plain_requests() {
         .await;
     assert_eq!(
         c.recv().await["result"]["tools"].as_array().map(Vec::len),
-        Some(14)
+        Some(15)
     );
 }
 

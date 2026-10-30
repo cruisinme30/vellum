@@ -1891,3 +1891,66 @@ assist-ask-link = Ask your own model about this instead
 assist-sources = Sources
 assist-truncated = The input or the answer was cut short.
 assist-written-by = Written by { $model }. Check it against the sources.
+
+
+## Export and import
+export-open = Export
+export-title = Export
+export-close = Close export
+export-book = Export book
+export-section = Export section
+export-format = Format
+export-format-pdf = PDF
+export-format-docx = Word
+export-format-html = HTML
+export-format-md = Markdown
+export-paper = Paper
+export-paper-a4 = A4
+export-paper-letter = US Letter
+export-download = Download
+export-working = Exporting…
+export-preview = PDF preview
+export-preview-loading = Typesetting the preview…
+export-page-alt = Page { $page }
+export-more-pages = { $count ->
+    [one] One more page is in the PDF.
+   *[other] { $count } more pages are in the PDF.
+}
+export-warnings = { $count ->
+    [one] One block exports differently
+   *[other] { $count } blocks export differently
+}
+import-title = Import
+import-intro = Bring pages in from Notion, Confluence, Word or a Markdown folder. Everything lands in a new folder, so nothing already here changes.
+import-file = File (.zip export or .docx)
+import-source = Exported from
+import-source-notion = Notion (Markdown & CSV)
+import-source-confluence = Confluence (HTML)
+import-source-docx = Word document
+import-source-markdown = Markdown folder
+import-source-obsidian = Obsidian vault
+import-source-outline = Outline
+import-source-docmost = Docmost
+import-space = Into
+import-folder = Folder
+import-folder-top = Top of the space
+import-start = Import
+import-working = Importing…
+import-done = Imported { $pages } items into “{ $title }”.
+import-open = Open the folder
+import-issues-title = Issues from Linear, Jira or GitHub
+import-issues-intro = Only workspace admins can import issues. Preview first to see what will be created. Issues imported before are skipped, so you can run an import again.
+import-issues-tracker = Exported from
+import-issues-tracker-linear = Linear (CSV export)
+import-issues-tracker-jira = Jira (search results as JSON)
+import-issues-tracker-github = GitHub Issues (JSON)
+import-issues-repo = Repository
+import-issues-team = Team key
+import-issues-file = Export file
+import-issues-preview = Preview
+import-issues-planned = { $created } issues will be created; { $skipped } were imported before.
+import-issues-done = Created { $created } issues; { $skipped } were imported before.
+import-issues-warnings = { $count ->
+    [one] One note
+   *[other] { $count } notes
+}

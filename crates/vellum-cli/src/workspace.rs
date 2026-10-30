@@ -554,6 +554,8 @@ pub struct Opened {
     pub public: Option<Arc<dyn vellum_api::public::PublicSite>>,
     /// Search's admin side: the hybrid switch and indexing progress.
     pub search: Option<Arc<crate::search_admin::SearchStatus>>,
+    /// Work, which issue imports create through (see [`crate::issue_import`]).
+    pub work: Option<Arc<WorkService>>,
 }
 
 /// My Work's settings: where its secrets live and what it links to.
@@ -1214,6 +1216,7 @@ pub async fn open(
         drive: Some(workspace.drive),
         public: Some(public_site(&workspace.sharing)?),
         search: Some(search_status),
+        work: Some(workspace.work),
     })
 }
 

@@ -48,6 +48,7 @@ import { openLocalDatabase } from "./platform/store/persistence";
 import { createHttpRenderApi } from "./render/api";
 import { createHttpSharingApi } from "./sharing/api";
 import { createHttpOrganisationAppearance } from "./theme/organisation";
+import { createHttpTransferApi } from "./transfer/api";
 import { createHttpWorkApi } from "./work/api";
 import { createHttpConnectionsApi } from "./work/connections-api";
 import { createHttpPlanningApi } from "./work/planning/api";
@@ -128,6 +129,7 @@ root.render(
       assist={status === undefined ? undefined : createHttpAssistApi(http)}
       mcpSetup={status === undefined ? undefined : createHttpMcpSetupApi()}
       connections={status === undefined ? undefined : createHttpConnectionsApi(http)}
+      transfer={status === undefined ? undefined : createHttpTransferApi(http)}
       collections={
         status === undefined ? createMockCollectionsStore() : createHttpCollectionsStore(http)
       }

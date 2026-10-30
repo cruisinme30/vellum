@@ -9044,10 +9044,12 @@ dependencies = [
  "vellum-db",
  "vellum-drive",
  "vellum-e2e",
+ "vellum-export",
  "vellum-format",
  "vellum-help",
  "vellum-identity",
  "vellum-integrations",
+ "vellum-jobs",
  "vellum-kernel",
  "vellum-kms",
  "vellum-mcp",
@@ -9063,6 +9065,7 @@ dependencies = [
  "vellum-work",
  "vellum-work-service",
  "zeroize",
+ "zip",
 ]
 
 [[package]]

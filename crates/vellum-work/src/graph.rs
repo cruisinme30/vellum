@@ -165,7 +165,8 @@ pub struct Changes {
 }
 
 impl Changes {
-    pub(crate) fn merge(&mut self, other: Self) {
+    /// Adds what `other` changed, for a command made of several steps.
+    pub fn merge(&mut self, other: Self) {
         self.issues.extend(other.issues);
         self.removed_paths.extend(other.removed_paths);
         self.teams.extend(other.teams);

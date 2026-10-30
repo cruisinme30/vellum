@@ -36,12 +36,17 @@ OAuth:
 | --- | --- |
 | `search` | Finds pages, rows and issues, with block-level citations |
 | `get_doc`, `get_blocks`, `get_outline` | Reads a page, some blocks or its outline |
+| `get_template` | Lists page templates, or reads one to follow |
 | `create_draft`, `propose_edit` | Writes a new page or a change as a draft for you to review |
 | `create_issue`, `update_issue`, `add_comment` | Works with issues and comments |
 | `create_task` | Adds a task to My Work |
 | `query_collection`, `upsert_rows` | Reads and updates collection rows |
 | `export` | Exports a page or book |
 | `list_changes` | Lists what changed since a time |
+
+Page templates are ordinary pages in a folder named **Templates** in any
+space you can open. The assistant finds them by name, such as `prd` for a
+page titled "PRD", and follows the one you ask for when it drafts.
 
 Built-in prompts include summarise a space, write a PRD, weekly status,
 verify a page and triage an issue.

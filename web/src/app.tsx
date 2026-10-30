@@ -67,6 +67,8 @@ import { AppKeyboard } from "./shell/app-keyboard";
 import { AppShell } from "./shell/app-shell";
 import { AppearanceProvider, type OrganisationAppearance } from "./theme/appearance-context";
 import { AppearancePage } from "./theme/appearance-page";
+import type { TransferApi } from "./transfer/api";
+import { ImportScreen } from "./transfer/import-screen";
 import { FavoritesView, HomeView } from "./views/home";
 import { AdminView, HelpView, NotFoundView } from "./views/info";
 import { NewPageView } from "./views/new-page";
@@ -139,6 +141,7 @@ export function AppRoutes() {
         <Route path="settings/ai" element={<AssistantSettingsView />} />
         <Route path="ask" element={<AskView />} />
         <Route path="new" element={<NewPageView />} />
+        <Route path="import" element={<ImportScreen />} />
         <Route path="my-work" element={<MyWorkPage />} />
         <Route path="my-work/settings" element={<MyWorkConnectionsPage />} />
         <Route path="issues" element={<IssuesPage />} />
@@ -229,6 +232,8 @@ export interface AppServices {
   readonly mcpSetup?: McpSetupApi | undefined;
   /** Work planning, from a Vellum server; absent in demo mode. */
   readonly planning?: PlanningApi | undefined;
+  /** Export and import, from a Vellum server; absent in demo mode. */
+  readonly transfer?: TransferApi | undefined;
   readonly collections: CollectionsStore;
   /** Present when a Vellum server answered; absent in demo mode. */
   readonly session?: { readonly auth: AuthApi; readonly status: AuthStatus } | undefined;
@@ -318,6 +323,7 @@ export function AppProviders({
   mcpSetup,
   planning,
   connections,
+  transfer,
   collections,
   session,
   notifications,
@@ -340,6 +346,7 @@ export function AppProviders({
       mcpSetup,
       planning,
       connections,
+      transfer,
     }),
     [
       work,
@@ -355,6 +362,7 @@ export function AppProviders({
       mcpSetup,
       planning,
       connections,
+      transfer,
     ],
   );
   const [demoNotifications] = useState<NotificationServices>(() => ({

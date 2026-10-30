@@ -25,6 +25,9 @@ mod collab;
 mod delivery_tests;
 mod docs;
 mod e2e;
+mod exports;
+#[cfg(test)]
+mod exports_tests;
 mod feed;
 mod google_http;
 #[cfg(test)]
@@ -35,6 +38,9 @@ mod identity;
 #[cfg(test)]
 mod identity_tests;
 mod integrations;
+mod issue_import;
+#[cfg(test)]
+mod issue_import_tests;
 mod keys;
 mod limits;
 mod mail;

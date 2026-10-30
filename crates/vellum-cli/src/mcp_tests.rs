@@ -85,6 +85,7 @@ pub async fn server(dir: &std::path::Path) -> (Services, Router) {
 /// personal token for MCP: the session cookie, its CSRF token, the page's
 /// ID and the bearer token.
 pub struct World {
+    pub space_id: String,
     pub cookie: String,
     pub csrf: String,
     pub page_id: String,
@@ -106,6 +107,7 @@ pub async fn world(app: &Router) -> World {
     let mut w = World {
         csrf: csrf(app, &cookie).await,
         cookie,
+        space_id: String::new(),
         page_id: String::new(),
         bearer: String::new(),
     };
@@ -118,7 +120,8 @@ pub async fn world(app: &Router) -> World {
     )
     .await;
     assert_eq!(space.status, StatusCode::OK, "{}", space.text);
-    let space_id = space.json()["id"].as_str().unwrap().to_owned();
+    w.space_id = space.json()["id"].as_str().unwrap().to_owned();
+    let space_id = w.space_id.clone();
     let page = send(
         app,
         w.post(
@@ -342,5 +345,107 @@ async fn listeners_hear_about_changes_from_the_feed() {
     }
     assert!(seen.contains("notifications/resources/updated"), "{seen}");
     assert!(seen.contains(&uri), "{seen}");
+    services.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn page_templates_come_from_templates_folders() {
+    let dir = tempfile::tempdir().unwrap();
+    let (services, app) = server(dir.path()).await;
+    let w = world(&app).await;
+    let folder = send(
+        &app,
+        w.post(
+            &format!("/api/v1/drive/spaces/{}/folders", w.space_id),
+            &json!({ "name": "Templates" }),
+        ),
+    )
+    .await;
+    assert_eq!(folder.status, StatusCode::OK, "{}", folder.text);
+    let page = send(
+        &app,
+        w.post(
+            &format!("/api/v1/drive/spaces/{}/pages", w.space_id),
+            &json!({
+                "parent_id": folder.json()["id"],
+                "title": "PRD",
+                "body": "## Problem\n\n## Requirements\n",
+            }),
+        ),
+    )
+    .await;
+    assert_eq!(page.status, StatusCode::OK, "{}", page.text);
+
+    let list = structured(&tool(&app, &w.bearer, "get_template", json!({})).await);
+    assert_eq!(list["templates"][0]["name"], "prd", "{list}");
+    assert_eq!(list["templates"].as_array().unwrap().len(), 1, "{list}");
+    let prd = structured(&tool(&app, &w.bearer, "get_template", json!({ "name": "PRD" })).await);
+    let md = prd["markdown"].as_str().unwrap();
+    assert!(
+        md.contains("## Requirements") && !md.contains("id:"),
+        "{md}"
+    );
+    let missing = tool(&app, &w.bearer, "get_template", json!({ "name": "nope" })).await;
+    assert_eq!(
+        missing.json()["result"]["isError"],
+        true,
+        "{}",
+        missing.text
+    );
+    services.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn export_hands_over_the_file_and_its_route() {
+    let dir = tempfile::tempdir().unwrap();
+    let (services, app) = server(dir.path()).await;
+    let w = world(&app).await;
+    // The tool runs the export routes' own code, as the token's user.
+    let made = tool(
+        &app,
+        &w.bearer,
+        "export",
+        json!({ "target": w.page_id, "format": "pdf" }),
+    )
+    .await;
+    let body = made.json();
+    let a = &body["result"]["structuredContent"];
+    assert_eq!(a["mime_type"], "application/pdf", "{}", made.text);
+    assert_eq!(a["name"], "Runbook.pdf", "{a}");
+    assert!(a["size"].as_u64().unwrap() > 0, "{a}");
+    assert_eq!(
+        a["url"],
+        format!("{ORIGIN}/api/v1/export/pages/{}?format=pdf", w.page_id)
+    );
+    assert!(a.get("data").is_none(), "the file is not repeated: {a}");
+    let blob = body["result"]["content"][2]["resource"]["blob"]
+        .as_str()
+        .unwrap();
+    assert!(blob.starts_with("JVBERi0"), "a PDF: {}", made.text);
+
+    // The same file comes from the route the result links.
+    let route = send(
+        &app,
+        Request::get(format!("/api/v1/export/pages/{}?format=pdf", w.page_id))
+            .header(header::AUTHORIZATION, format!("Bearer {}", w.bearer))
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(route.status, StatusCode::OK, "{}", route.text);
+
+    let missing = tool(
+        &app,
+        &w.bearer,
+        "export",
+        json!({ "target": "01JBQ8Y4ZK6V3W2N5R7T9X1C41", "format": "docx", "section": "s1" }),
+    )
+    .await;
+    assert_eq!(
+        missing.json()["result"]["isError"],
+        true,
+        "{}",
+        missing.text
+    );
     services.shutdown().await;
 }

@@ -91,6 +91,8 @@ export interface Http {
    * Like `send` it carries the CSRF token and an idempotency key.
    */
   upload<T>(path: string, query: Query, body: Blob, type: string): Promise<T>;
+  /** A GET whose answer is a file (an export). */
+  blob(path: string, query?: Query): Promise<Blob>;
   /** Forgets the CSRF token; called after signing in or out, when the session changes. */
   forgetSession(): void;
 }
@@ -275,6 +277,12 @@ export function createHttp(options: HttpOptions = {}): Http {
         path,
         body === undefined ? undefined : { body: JSON.stringify(body), type: "application/json" },
       );
+    },
+
+    async blob(path: string, query?: Query): Promise<Blob> {
+      const response = await request("GET", `${path}${queryString(query)}`, {});
+      if (!response.ok) throw await errorOf(response);
+      return response.blob();
     },
 
     upload<T>(path: string, query: Query, body: Blob, type: string): Promise<T> {

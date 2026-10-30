@@ -30,7 +30,7 @@ use vellum_tasks::service::TasksService;
 use crate::collab::Collab;
 use crate::identity::{GuardedFetcher, GuardedSsoHttp, IdentityAuthenticator};
 use crate::observability::{self, Observability};
-use crate::{uploads, workspace};
+use crate::{exports, issue_import, uploads, workspace};
 
 /// The binary's version, shown in `/healthz` and the API documents.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -87,6 +87,12 @@ pub struct Services {
     search: Option<Arc<crate::search_admin::SearchStatus>>,
     /// Bring-your-own-model features, when the MCP workspace is wired.
     assist: Option<Arc<dyn Service>>,
+    /// The public URL, for links out of an export.
+    public_url: String,
+    /// The same workspace, for wiring the export routes into MCP (D265).
+    mcp_adapter: Option<Arc<crate::mcp_workspace::ServeWorkspace>>,
+    /// Work, which issue imports create through.
+    work: Option<Arc<vellum_work_service::WorkService>>,
 }
 
 impl std::fmt::Debug for Services {
@@ -199,6 +205,9 @@ impl Services {
             secrets: Arc::default(),
             search: None,
             assist: None,
+            public_url: public_url.trim_end_matches('/').to_owned(),
+            mcp_adapter: None,
+            work: None,
         })
     }
 
@@ -285,6 +294,7 @@ impl Services {
                 limit.spawn_sync(counts.clone());
                 limit as Arc<dyn vellum_mcp::ratelimit::SharedLimit>
             });
+            self.mcp_adapter = Some(Arc::clone(&workspace));
             let workspace = workspace as Arc<dyn vellum_mcp::ports::Workspace>;
             let mcp = crate::mcp_serve::endpoint(
                 Arc::clone(&workspace),
@@ -300,6 +310,7 @@ impl Services {
         self.books = opened.books;
         self.drive = opened.drive;
         self.public = opened.public;
+        self.work = opened.work;
         Ok(self)
     }
 
@@ -327,6 +338,46 @@ impl Services {
     /// Share links on the public origin, when an index is configured.
     pub fn public_site(&self) -> Option<Arc<dyn vellum_api::public::PublicSite>> {
         self.public.clone()
+    }
+
+    /// The export and import routers, mounted at [`exports::EXPORT_PREFIX`]
+    /// and [`exports::IMPORT_PREFIX`] by [`Self::mount`]. Without a
+    /// workspace index they answer 503.
+    pub fn transfer(&self) -> (axum::Router, axum::Router) {
+        let Some(drive) = &self.drive else {
+            return (exports::unavailable_router(), exports::unavailable_router());
+        };
+        let figures = crate::page_render::PageRenderService::figures_from_env()
+            .inspect_err(|e| tracing::warn!(error = %e, "exports draw no figures"))
+            .ok()
+            .map(Arc::new);
+        let transfer = Arc::new(exports::Transfer::new(
+            Arc::clone(drive),
+            self.books.clone(),
+            figures,
+            self.scanner.clone(),
+            UploadPolicy::default(),
+            Some(self.public_url.clone()),
+        ));
+        if let Some(adapter) = &self.mcp_adapter {
+            adapter.set_exporter(mcp_exporter(&transfer));
+        }
+        (transfer.export_router(), transfer.import_router())
+    }
+
+    /// The issue import route, mounted at [`issue_import::PREFIX`] by
+    /// [`Self::mount`]. Without a workspace index it answers 503.
+    pub fn issue_import(&self) -> axum::Router {
+        self.work
+            .as_ref()
+            .map_or_else(issue_import::unavailable_router, |work| {
+                issue_import::router(
+                    Arc::clone(work),
+                    Arc::clone(&self.identity),
+                    self.scanner.clone(),
+                    UploadPolicy::default(),
+                )
+            })
     }
 
     /// Rate-limit counts shared with the other replicas, when an index is
@@ -429,6 +480,7 @@ impl Services {
             builder = builder.service(service);
         }
         let identity = &self.identity;
+        let (export, import) = self.transfer();
         if let Some(hooks) = &self.hooks {
             // Providers sign each delivery and send no CSRF token.
             builder = builder.mount_cross_site("/hooks", hooks.clone());
@@ -470,7 +522,57 @@ impl Services {
             // The help books, for the app's `?` buttons (ADR 0024, D256).
             .mount(crate::help_http::PREFIX, Self::help())
             .mount_uploads(uploads::PREFIX, self.uploads(), upload_body_limit())
+            .mount(exports::EXPORT_PREFIX, export)
+            .mount_uploads(exports::IMPORT_PREFIX, import, upload_body_limit())
+            .mount_uploads(
+                issue_import::PREFIX,
+                self.issue_import(),
+                upload_body_limit(),
+            )
     }
+}
+
+/// The MCP `export` tool's hook into the export service (ADR 0065, D265).
+fn mcp_exporter<S: Send + Sync + 'static>(
+    transfer: &Arc<exports::Transfer<S>>,
+) -> crate::mcp_workspace::Exporter {
+    use crate::mcp_workspace::{ExportFile, ExportWhat};
+    let transfer = Arc::clone(transfer);
+    Arc::new(move |principal, what, format| {
+        let transfer = Arc::clone(&transfer);
+        Box::pin(async move {
+            let item = match what {
+                ExportWhat::Page(id) => exports::ExportItem::Page(id),
+                ExportWhat::Book { id, section } => {
+                    let book = id.parse().map_err(|_| {
+                        vellum_kernel::Error::new(
+                            vellum_kernel::ErrorKind::NotFound,
+                            "book not found",
+                        )
+                    })?;
+                    let scope = section.map_or(
+                        vellum_export::book::BookScope::Whole,
+                        vellum_export::book::BookScope::Subtree,
+                    );
+                    exports::ExportItem::Book(book, scope)
+                }
+            };
+            let file = transfer
+                .export(
+                    &principal,
+                    vellum_kernel::RequestId::generate(),
+                    item,
+                    &format,
+                    vellum_export::pdf::Paper::A4,
+                )
+                .await?;
+            Ok(ExportFile {
+                file_name: file.file_name,
+                mime: file.mime.to_owned(),
+                bytes: file.bytes,
+            })
+        })
+    })
 }
 
 /// The largest upload body: the upload policy's file limit.
