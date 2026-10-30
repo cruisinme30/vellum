@@ -42,6 +42,17 @@
 #
 # What it cannot check is printed at the end of every run, never hidden.
 #
+# Earlier passes (D319): a stage that passes records a fingerprint of what
+# it reads: its input files in the commit, this script, the CI image and
+# its own options (fast: the commit itself, its base and branch, since it
+# checks commit messages and history). A later run reuses that pass instead
+# of running the stage again, and the report marks it "cached". Only this
+# local script does this: GitHub CI runs every suite in full, and so does
+# the gate when CI or GITHUB_ACTIONS is set. links and reliability read the
+# outside world and always run; a --grep or --focused run neither reuses
+# nor records passes. Records live under the git directory in
+# vellum-gate/passes and are pruned after 30 days.
+#
 # Options:
 #   --release            add the release stages
 #   --only <stages>      run only these (comma-separated stage names; e2e
@@ -55,6 +66,8 @@
 #   --browsers <list>    only these browsers (comma-separated); no stamp
 #   --grep <pattern>     only the UI tests matching it (Playwright -g); no
 #                        stamp. For a quick look at one failing test
+#   --fresh              run every stage, reusing no earlier pass (new
+#                        passes are still recorded)
 #   -h, --help           this text
 #
 # Caches live in named Docker volumes (vellum-gate-*); remove them with
@@ -83,6 +96,7 @@ parallel=""
 jobs=4
 browsers=chromium,firefox,webkit
 grep_tests=""
+fresh=0
 while (($# > 0)); do
   case "$1" in
     --release) release=1 ;;
@@ -93,6 +107,7 @@ while (($# > 0)); do
     --jobs) jobs="${2:?}"; shift ;;
     --browsers) browsers="${2:?}"; shift ;;
     --grep) grep_tests="${2:?}"; shift ;;
+    --fresh) fresh=1 ;;
     -h | --help) usage; exit 0 ;;
     *) echo "gate.sh: unknown option $1 (see --help)" >&2; exit 2 ;;
   esac
@@ -202,12 +217,18 @@ stages=()
 # run_stage <name> <command...>: runs a stage into its own log and records
 # its exit status and duration.
 run_stage() {
-  local name="$1" start="${SECONDS}" status=0
+  local name="$1" start="${SECONDS}" status=0 record
   shift
+  if record="$(earlier_pass "${name}")"; then
+    echo "0 0 cached: ${record}" >"${logs}/${name}.status"
+    echo "  cached ${name} (${record})"
+    return 0
+  fi
   echo "  start  ${name}"
   "$@" >"${logs}/${name}.log" 2>&1 || status=$?
   echo "${status} $((SECONDS - start))" >"${logs}/${name}.status"
   if ((status == 0)); then
+    record_pass "${name}"
     echo "  pass   ${name} ($(duration $((SECONDS - start))))"
   else
     echo "  FAIL   ${name} ($(duration $((SECONDS - start)))): ${logs}/${name}.log"
@@ -217,6 +238,53 @@ run_stage() {
 skip_stage() { echo "skip 0 $2" >"${logs}/$1.status"; }
 duration() { printf '%dm%02ds' $(($1 / 60)) $(($1 % 60)); }
 passed() { [[ -f "${logs}/$1.status" ]] && [[ "$(cut -d' ' -f1 "${logs}/$1.status")" == 0 ]]; }
+
+# --- earlier passes (D319) ---------------------------------------------------
+
+# A stage with a fingerprint in stage_key records its passes; one without
+# (image, prepare, links, reliability, and any stage of a --grep or
+# --focused run) always runs. Never in CI: there every suite runs in full.
+declare -A stage_key=() must_run=()
+reuse=1
+((fresh)) && reuse=0
+[[ -n "${CI:-}${GITHUB_ACTIONS:-}" ]] && reuse=0
+pass_dir="${common}/vellum-gate/passes"
+
+# fingerprint <name> <include-regex> <exclude-regex> [<extra>...]: a hash of
+# the stage's name, this script, the CI image's inputs, the extras (the
+# stage's options) and every file of the commit whose path matches the
+# include and not the exclude regex (POSIX extended; an empty exclude
+# excludes nothing). Paths, modes and blob hashes, so a rename counts.
+fingerprint() {
+  local name="$1" include="$2" exclude="$3"
+  shift 3
+  {
+    printf 'stage=%s\ngate=%s\nimage=%s\n' "${name}" "${gate_blob}" "${image_tag}"
+    printf 'extra=%s\n' "$@"
+    awk -F'\t' -v inc="${include}" -v exc="${exclude}" \
+      '$2 ~ inc && (exc == "" || $2 !~ exc)' "${logs}/tree.lst"
+  } | git hash-object --stdin
+}
+
+# earlier_pass <name>: prints the recorded pass of this stage's fingerprint
+# and succeeds, if reuse is on and there is one.
+earlier_pass() {
+  local key="${stage_key[$1]:-}"
+  ((reuse)) && [[ -n "${key}" && -f "${pass_dir}/$1-${key}" ]] || return 1
+  [[ -z "${must_run[$1]:-}" ]] || return 1
+  touch "${pass_dir}/$1-${key}"
+  cat "${pass_dir}/$1-${key}"
+}
+
+# record_pass <name>: records a pass of this stage's fingerprint. Written
+# to a temporary file first, so a killed run leaves no half record.
+record_pass() {
+  local key="${stage_key[$1]:-}"
+  [[ -n "${key}" ]] || return 0
+  mkdir -p "${pass_dir}"
+  printf 'passed at %s on %s\n' "${sha:0:12}" "$(date +%Y-%m-%d)" >"${pass_dir}/$1-${key}.$$"
+  mv -f "${pass_dir}/$1-${key}.$$" "${pass_dir}/$1-${key}"
+}
 
 # drun <stage> <docker run args...>: a labelled, self-removing container.
 drun() {
@@ -465,11 +533,16 @@ stage_reliability() {
 # codeql.yml: security-extended, build mode none, for the languages the
 # macOS CLI can extract. Fails on error-level results, which code
 # scanning's check reports as failures.
-stage_codeql() {
-  local codeql="${VELLUM_CODEQL:-}" dir="${logs}/codeql" lang pack errors total
-  if [[ -z "${codeql}" ]]; then
-    codeql="$(command -v codeql || echo "$(dirname "$(dirname "${common}")")/vellum-tools/codeql/codeql")"
+codeql_cli() {
+  if [[ -n "${VELLUM_CODEQL:-}" ]]; then
+    echo "${VELLUM_CODEQL}"
+  else
+    command -v codeql || echo "$(dirname "$(dirname "${common}")")/vellum-tools/codeql/codeql"
   fi
+}
+stage_codeql() {
+  local codeql dir="${logs}/codeql" lang pack errors total
+  codeql="$(codeql_cli)"
   if [[ ! -x "${codeql}" ]]; then
     echo "No CodeQL CLI: set VELLUM_CODEQL to the codeql binary of a CodeQL bundle."
     return 1
@@ -514,6 +587,50 @@ echo "Vellum gate ${run_id}: ${sha:0:12} (tree ${tree:0:12}) on ${branch:-a deta
 echo "Logs: ${logs}   Docker memory: ${memory_gb} GB, browsers at once: ${parallel}"
 start="${SECONDS}"
 
+# What each stage reads (D319). When unsure, a stage reads more: a missed
+# input could reuse a pass the commit no longer earns.
+git ls-tree -r --full-tree HEAD >"${logs}/tree.lst"
+gate_blob="$(git hash-object "$0")"
+# The website: the landing page, the books and ADRs, and the workspace that
+# builds the rich-block renderer.
+site_inputs='^(site|docs|crates|\.cargo)/|(^|/)Cargo\.toml$|^Cargo\.lock$|^rust-toolchain\.toml$|^scripts/ci/(build|check)-site\.sh$'
+if [[ -z "${grep_tests}" ]]; then
+  stage_key[site]="$(fingerprint site "${site_inputs}" '')"
+  # The UI suite: the web app and the website it serves.
+  for browser in "${BROWSERS[@]}"; do
+    stage_key[e2e-${browser}]="$(fingerprint "e2e-${browser}" "${site_inputs}|^web/" '' \
+      "${PLAYWRIGHT_IMAGE}")"
+  done
+fi
+# The Fast suite checks every file, and also the commit messages, branch
+# name and history since the base, so it keys on the commit itself.
+if ((!focused)); then
+  stage_key[fast]="$(fingerprint fast . '' "${sha}" "${base}" "${branch}" \
+    "skip_ui=$(want e2e && echo 1 || echo 0)" "token=${GH_TOKEN:+1}")"
+fi
+# The Rust tests read the whole tree but the website, the desktop shell
+# and the web app, of which they read only the generated files and pins.
+stage_key[coverage]="$(fingerprint coverage \
+  '^[^w]|^w[^e]|^we[^b]|^web[^/]|^web/(package\.json|pnpm-lock\.yaml)$|^web/.*\.gen\.ts$' \
+  '^(site|desktop)/')"
+# The release image copies the whole tree.
+stage_key[x86]="$(fingerprint x86 . '')"
+stage_key[clamav]="$(fingerprint clamav '^deploy/' '')"
+# CodeQL scans the workflows and every JavaScript and TypeScript file.
+want codeql && stage_key[codeql]="$(fingerprint codeql . '\.(rs|md)$' \
+  "$("$(codeql_cli)" version --format=terse 2>/dev/null || echo none)")"
+[[ -d "${pass_dir}" ]] && find "${pass_dir}" -type f -mtime +30 -delete 2>/dev/null || true
+
+# The browsers need the website built from this commit, so if any browser
+# runs, the website stage runs too; if none does, nothing needs installing.
+e2e_needed=0
+if want e2e; then
+  for browser in "${BROWSERS[@]}"; do
+    earlier_pass "e2e-${browser}" >/dev/null || e2e_needed=1
+  done
+  ((e2e_needed)) && must_run[site]=1
+fi
+
 run_stage image stage_image
 run_stage prepare stage_prepare
 stages+=(image prepare)
@@ -533,11 +650,18 @@ fi
 
 if want fast; then run_stage fast stage_fast & background+=($!); stages+=(fast); fi
 if want site; then run_stage site stage_site & site_pid=$!; stages+=(site); fi
-if want e2e; then run_stage pw-install stage_pw_install & pw_pid=$!; stages+=(pw-install); fi
+if want e2e; then
+  if ((e2e_needed)); then
+    run_stage pw-install stage_pw_install & pw_pid=$!
+  else
+    echo "0 0 not needed: every browser passed earlier" >"${logs}/pw-install.status"
+  fi
+  stages+=(pw-install)
+fi
 
 if want e2e; then
   wait "${site_pid}" || true
-  wait "${pw_pid}" || true
+  [[ -z "${pw_pid:-}" ]] || wait "${pw_pid}" || true
   if passed site && passed pw-install; then
     run_e2e
   else
@@ -573,6 +697,8 @@ for name in "${stages[@]}"; do
     "${rest:-${logs}/${name}.log}"
 done
 echo "Total: $(duration $((SECONDS - start)))"
+cached="$(cat "${logs}"/*.status 2>/dev/null | grep -c ' cached: ' || true)"
+((cached == 0)) || echo "${cached} stage(s) reused an earlier pass on the same inputs; --fresh reruns them."
 
 # Every CI check this run did not perform, so no one mistakes a stamp for
 # more than it is.

@@ -11,8 +11,8 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D318
-- Issue: #532
+- Decisions: D318, D319
+- Issue: #532 (D318), #563 (D319)
 - Pull requests: to be linked when merged
 
 :::
@@ -60,6 +60,31 @@ main or a release branch.
   `--supersede`); release branches are replaced with `--force-with-lease`
   against their current SHA. The pre-commit hook checks only staged files.
 
+### `D319`: a local rerun reuses stages that passed on the same inputs
+
+- When a stage passes, the gate records a fingerprint of what it read:
+  its input files in the commit (paths, modes and blob hashes), the gate
+  script itself, the CI image's pinned inputs and the stage's options.
+  A later local run whose fingerprint for that stage has a record reuses
+  the pass, and the report marks the stage `cached` with the commit it
+  passed at. Records live in `vellum-gate/passes` under the git directory
+  and are pruned after 30 days unused.
+- What each stage reads, chosen to include rather than miss: the website
+  reads `site/`, `docs/`, the Rust workspace and its two scripts; each
+  browser reads those and `web/`; coverage reads everything but `site/`,
+  `desktop/` and the web app (its generated `*.gen.ts` files and pins
+  stay in); the amd64 builds read the whole tree; ClamAV reads `deploy/`;
+  CodeQL reads everything but Rust and Markdown, with the CLI's version.
+  The Fast suite also checks commit messages, the branch name and history
+  since the base, so it keys on the commit, its base and branch.
+- When any browser has to run, the website stage runs as well, because
+  the browsers test the site built from this commit. `links` and
+  `reliability` read the outside world and always run; `--grep` and
+  `--focused` runs neither reuse nor record passes; `--fresh` reruns
+  everything.
+- Only the local script does this. GitHub CI runs every suite in full, and
+  the gate itself reuses nothing when `CI` or `GITHUB_ACTIONS` is set.
+
 ## Alternatives
 
 - **Rely on the pre-push Fast suite**: it is focused and leaves out the
@@ -70,16 +95,25 @@ main or a release branch.
   that are not in the commit, and the run would write into the checkout.
 - **Stamp the commit hash**: amending a message would force a rerun of a
   tree that already passed.
+- **Reuse nothing between local runs** (D318 as first written): a fix for
+  one browser's failure reran every stage, Rust and amd64 builds included.
+- **Key every stage on the whole tree**: safe, but any edit reruns
+  everything, which is what reuse is meant to avoid.
 
 ## Consequences
 
 - A push to develop or a release costs a local run (tens of minutes cold,
-  less with warm caches), but CI should then pass the first time.
+  less with warm caches), but CI should then pass the first time. A rerun
+  after a fix runs only the stages whose inputs the fix touched (D319).
 - The gate runs CI's checks as they are: nothing is skipped, retried or
   allow-listed to get a green run. What it cannot check is printed at the
   end of every run: the pull request's title, description and linked
   issue (`cargo xtask pr-check` covers them before opening it), GitHub's
   dependency review, and zizmor's online audits unless `GH_TOKEN` is set.
+  A stage reused from an earlier run (D319) passed on identical inputs; if
+  a stage turns out to read a file its fingerprint leaves out, a local run
+  can reuse a pass the commit no longer earns. CI's full run still catches
+  it, the input list is then widened, and `--fresh` sidesteps it.
 - **CodeQL does not scan Rust locally**: the macOS CodeQL CLI cannot
   extract it, so CI's CodeQL run stays the only Rust scan.
 - The x86 stage runs under emulation and is slow, so it waits for the

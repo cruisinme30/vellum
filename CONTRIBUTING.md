@@ -153,7 +153,10 @@ uncommitted edits, prints a pass or fail table with each stage's log and
 a list of what it could not check, and on success stamps the commit's tree. The
 `pre-push` hook refuses a push to those branches without the stamp and
 prints the command to run; rewording a commit keeps the stamp, any other
-change needs a new run. Pushes to other branches run the focused Fast
+change needs a new run. A rerun reuses every stage that already passed on
+the same inputs and marks it `cached` (D319), so after a fix only the
+stages the fix touched run again; `--fresh` reruns them all. CI always
+runs everything. Pushes to other branches run the focused Fast
 suite as before, in the gate's container when cargo is not installed.
 Then push with:
 
