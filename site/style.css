@@ -43,6 +43,60 @@
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
+/* Until the web fonts arrive, text is set in Arial (Liberation Sans or
+   Arimo on Linux, which share its widths), scaled and given Google Sans's
+   line heights, so lines wrap and stand as they will in Google Sans. With
+   an unmatched fallback (DejaVu Sans on Linux, which system-ui picks), the
+   swap rewrapped every paragraph and the landing page moved by a CLS of
+   0.12 on a phone over slow 4G. Sizes are measured in Chromium against the
+   landing page's text, one face per weight the site uses. */
+@font-face {
+  font-family: "Vellum Sans Fallback";
+  font-weight: 400;
+  src: local("Arial"), local("ArialMT"), local("Liberation Sans"), local("LiberationSans"), local("Arimo"), local("Arimo-Regular");
+  size-adjust: 100.1%;
+  ascent-override: 96.5%;
+  descent-override: 28.6%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Vellum Sans Fallback";
+  font-weight: 500;
+  src: local("Arial"), local("ArialMT"), local("Liberation Sans"), local("LiberationSans"), local("Arimo"), local("Arimo-Regular");
+  size-adjust: 103%;
+  ascent-override: 93.8%;
+  descent-override: 27.8%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Vellum Sans Fallback";
+  font-weight: 600;
+  src: local("Arial Bold"), local("Arial-BoldMT"), local("Liberation Sans Bold"), local("LiberationSans-Bold"), local("Arimo Bold"), local("Arimo-Bold");
+  size-adjust: 98.6%;
+  ascent-override: 98%;
+  descent-override: 29%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Vellum Sans Fallback";
+  font-weight: 700;
+  src: local("Arial Bold"), local("Arial-BoldMT"), local("Liberation Sans Bold"), local("LiberationSans-Bold"), local("Arimo Bold"), local("Arimo-Bold");
+  size-adjust: 101.2%;
+  ascent-override: 95.5%;
+  descent-override: 28.3%;
+  line-gap-override: 0%;
+}
+/* Courier New (Liberation Mono, Cousine) already matches Google Sans
+   Code's widths; only its line heights differ. */
+@font-face {
+  font-family: "Vellum Code Fallback";
+  font-weight: 400 600;
+  src: local("Courier New"), local("CourierNewPSMT"), local("Liberation Mono"), local("LiberationMono"), local("Cousine"), local("Cousine-Regular");
+  ascent-override: 96.6%;
+  descent-override: 28.6%;
+  line-gap-override: 0%;
+}
+
 :root {
   color-scheme: light dark;
   --bg: #ffffff;
@@ -68,8 +122,8 @@
   --night: #131314;
   --night-2: #1e1f20;
   --shadow: 0 1px 3px rgba(60, 64, 67, 0.15), 0 24px 48px -24px rgba(60, 64, 67, 0.35);
-  --sans: "Google Sans Flex", "Google Sans", Roboto, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
-  --mono: "Google Sans Code", "Roboto Mono", ui-monospace, Menlo, Consolas, monospace;
+  --sans: "Google Sans Flex", "Vellum Sans Fallback", "Google Sans", Roboto, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --mono: "Google Sans Code", "Vellum Code Fallback", "Roboto Mono", ui-monospace, Menlo, Consolas, monospace;
 }
 
 /* Dark: the reader's choice from the theme toggle (theme.js, D308), or
@@ -357,7 +411,9 @@ kbd {
   text-align: center;
 }
 .hero h1 {
-  max-width: 15ch;
+  /* 15ch in Google Sans Flex, in em so the fallback font shown before
+     it arrives does not narrow the heading and wrap it a line lower. */
+  max-width: 9.765em;
   margin: 0 auto 24px;
   font-size: clamp(2.75rem, 7vw, 5.5rem);
   line-height: 1.02;
