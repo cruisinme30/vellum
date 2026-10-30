@@ -2,11 +2,89 @@
 # SPDX-FileCopyrightText: 2026 The Vellum contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 #
-# Fast formatting checks before each commit. CI runs the full set.
+# Quick checks on the staged files before each commit, in seconds: format,
+# lint and type checks for what is staged, and secrets in the staged diff.
+# A tool that is not installed is skipped with a note; the gate
+# (scripts/dev/gate.sh, ADR 0073) and CI run the full set.
 set -euo pipefail
 
 root="$(git rev-parse --show-toplevel)"
-cargo fmt --all --check --manifest-path "${root}/Cargo.toml"
-if [[ -d "${root}/web/node_modules" ]]; then
-  pnpm --dir "${root}/web" exec prettier --check .
+cd "${root}"
+mapfile -t staged < <(git diff --cached --name-only --diff-filter=ACMR)
+((${#staged[@]} > 0)) || exit 0
+
+failures=0
+have() { command -v "$1" >/dev/null 2>&1; }
+skip() { echo "pre-commit: $1 is not installed; $2 left to the gate and CI." >&2; }
+# check <what> <command...>: runs one check and counts its failure.
+check() {
+  local what="$1"
+  shift
+  "$@" || { echo "pre-commit: ${what} failed." >&2; failures=$((failures + 1)); }
+}
+# pick <pattern...>: the staged files matching any extended regex.
+pick() {
+  local IFS='|'
+  printf '%s\n' "${staged[@]}" | grep -E "^($*)$" || true
+}
+
+# Rust: rustfmt on the staged files, in the gate's image without a toolchain.
+mapfile -t rust < <(pick '.*\.rs')
+if ((${#rust[@]} > 0)); then
+  if have rustfmt; then
+    check rustfmt rustfmt --check --edition 2024 "${rust[@]}"
+  elif have docker && docker image inspect vellum-ci-local:latest >/dev/null 2>&1; then
+    check rustfmt docker run --rm --label vellum-gate=pre-commit -v "${root}:/src:ro" -w /src \
+      vellum-ci-local:latest rustfmt --check --edition 2024 "${rust[@]}"
+  else
+    skip rustfmt "Rust formatting"
+  fi
+fi
+
+# The web app and the desktop shell: Prettier and ESLint on the staged
+# files, and the TypeScript compiler when a TypeScript file is staged.
+for app in web desktop; do
+  mapfile -t files < <(pick "${app}/.*")
+  ((${#files[@]} > 0)) || continue
+  if [[ ! -d "${app}/node_modules" ]]; then
+    skip "${app}/node_modules" "${app} checks (pnpm --dir ${app} install)"
+    continue
+  fi
+  relative=("${files[@]#"${app}/"}")
+  check "Prettier (${app})" pnpm --silent --dir "${app}" exec prettier --check --ignore-unknown "${relative[@]}"
+  mapfile -t code < <(printf '%s\n' "${relative[@]}" | grep -E '\.(ts|tsx|js|mjs|cjs)$' || true)
+  if ((${#code[@]} > 0)); then
+    check "ESLint (${app})" pnpm --silent --dir "${app}" exec eslint --max-warnings 0 --no-warn-ignored "${code[@]}"
+    check "TypeScript (${app})" pnpm --silent --dir "${app}" exec tsc --noEmit
+  fi
+done
+
+mapfile -t shells < <(pick 'scripts/.*\.sh' 'deploy/.*\.sh' 'site/.*\.sh' '\.githooks/.*')
+if ((${#shells[@]} > 0)); then
+  if have shellcheck; then check shellcheck shellcheck -x "${shells[@]}"; else skip shellcheck "shell checks"; fi
+fi
+
+mapfile -t yamls < <(pick '.*\.ya?ml')
+if ((${#yamls[@]} > 0)); then
+  if have yamllint; then check yamllint yamllint --strict "${yamls[@]}"; else skip yamllint "YAML checks"; fi
+fi
+
+mapfile -t markdown < <(pick '.*\.md')
+if ((${#markdown[@]} > 0)); then
+  if have markdownlint-cli2; then
+    check markdownlint markdownlint-cli2 --no-globs "${markdown[@]}"
+  else
+    skip markdownlint-cli2 "Markdown checks"
+  fi
+fi
+
+if have gitleaks; then
+  check gitleaks gitleaks git --pre-commit --staged --redact --no-banner --log-level warn .
+else
+  skip gitleaks "the secrets scan"
+fi
+
+if ((failures > 0)); then
+  echo "pre-commit: ${failures} check(s) failed; fix them, stage the fixes and commit again." >&2
+  exit 1
 fi

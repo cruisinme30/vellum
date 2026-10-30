@@ -19,6 +19,12 @@
 //! runs the full checks locally too.
 //! `VELLUM_FAST_ALL_TESTS=1` also adds the UI layout checks: the
 //! integrator's full run (issue #532).
+//!
+//! The local gate (`scripts/dev/gate.sh`, ADR 0073, D318) also sets
+//! `VELLUM_FAST_ALL_AREAS=1`, which checks every area whatever the branch
+//! changed, as the merge queue and the full suite do, and
+//! `VELLUM_FAST_SKIP_UI=1`, because it runs the whole UI suite in every
+//! browser in the Playwright image itself.
 
 use std::env;
 use std::ffi::OsString;
@@ -155,6 +161,10 @@ enum Outcome {
 const ALLOW_MISSING_TOOLS: &str = "VELLUM_ALLOW_MISSING_TOOLS";
 /// Set to `1` to run every crate's tests, as CI does.
 const ALL_TESTS: &str = "VELLUM_FAST_ALL_TESTS";
+/// Set to `1` to check every area, not only those the branch changed.
+const ALL_AREAS: &str = "VELLUM_FAST_ALL_AREAS";
+/// Set to `1` to leave the UI layout checks to a caller that runs them.
+const SKIP_UI: &str = "VELLUM_FAST_SKIP_UI";
 
 /// What a skipped step means: allowed only when the contributor opted in.
 const fn missing_tool(allowed: bool) -> Outcome {
@@ -173,9 +183,12 @@ fn env_flag(key: &str) -> bool {
 pub fn run() -> Result<(), String> {
     let root = repo_root()?;
     let base = merge_base(&root);
-    let areas = base
-        .as_deref()
-        .map_or(Areas::ALL, |base| changed_areas(&root, base));
+    let areas = if env_flag(ALL_AREAS) {
+        Areas::ALL
+    } else {
+        base.as_deref()
+            .map_or(Areas::ALL, |base| changed_areas(&root, base))
+    };
     let mut results = Vec::new();
     let started = Instant::now();
     let allow_missing = env_flag(ALLOW_MISSING_TOOLS);
@@ -399,11 +412,12 @@ fn steps(base: Option<&str>, branch: Option<&str>, tested: Option<&[String]>) ->
     // The "UI layout (quick)" job: what a merged batch most often breaks
     // without any single branch failing on its own (issue #532). It takes
     // minutes, so only the integrator's full run (VELLUM_FAST_ALL_TESTS=1)
-    // includes it; threads run focused tests.
+    // includes it; threads run focused tests. The local gate runs the
+    // whole UI suite itself (ADR 0073), so it skips this one.
     let mut ui = Step::new("UI layout (quick)", "scripts/ci/ui-quick.sh", &[])
         .needs("mdbook")
         .area(Area::Ui);
-    ui.not_needed = !env_flag(ALL_TESTS);
+    ui.not_needed = !env_flag(ALL_TESTS) || env_flag(SKIP_UI);
     steps.push(ui);
     steps.extend([
         // Files, docs and secrets
@@ -418,6 +432,13 @@ fn steps(base: Option<&str>, branch: Option<&str>, tested: Option<&[String]>) ->
             ],
         )
         .needs("shellcheck"),
+        // Without a GitHub token zizmor runs only its offline audits; CI
+        // adds the online ones.
+        Step::new(
+            "Workflow security (zizmor)",
+            "zizmor",
+            &["--persona=regular", "--min-severity=low", ".github"],
+        ),
         Step::new("Decision records", "scripts/ci/check-adrs.sh", &[]).needs("bash"),
         Step::new("Markdown", "markdownlint-cli2", &[]),
         Step::new(
@@ -704,6 +725,7 @@ mod tests {
             "Rust tests",
             "Web lint",
             "REUSE headers",
+            "Workflow security (zizmor)",
             "Secrets",
             "Commit template and DCO sign-off",
             "Branch name",

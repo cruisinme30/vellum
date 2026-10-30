@@ -89,7 +89,8 @@ cargo xtask install-hooks
 ```
 
 This turns on the commit template and three git hooks: `commit-msg`
-checks the commit message, `pre-commit` checks formatting, and `pre-push`
+checks the commit message, `pre-commit` checks the staged files in
+seconds (format, lint, types and secrets), and `pre-push`
 runs `cargo xtask fast`, which mirrors every **Fast suite** check in CI
 and refuses the push if one fails. Run it by hand at any time:
 
@@ -130,6 +131,32 @@ It checks the branch name, the title (a Conventional Commit, at most 72
 characters after the type), every section of the description template, and
 that "Closes #N" names an issue, with a decision record for features
 ([ADR 0048](docs/adr/0048-catch-ci-failures-before-pushing.md)).
+
+### The local gate
+
+Before pushing to `develop`, `main` or a `chore/release-…` branch, run the
+local gate on the commit you will push
+([ADR 0073](docs/adr/0073-local-ci-gate.md)):
+
+```sh
+scripts/dev/gate.sh             # for develop
+scripts/dev/gate.sh --release   # for main and release branches
+```
+
+It needs only Docker. It runs, in Linux containers, every check CI runs
+on that commit: the whole Fast suite with every test, the website, and the
+full UI suite in Chromium, Firefox and WebKit; `--release` adds the rest
+of the release checks: Rust coverage, two byte-identical amd64 release
+builds with their budgets, ClamAV, external links, the nightly results and
+CodeQL (`VELLUM_CODEQL` points at the CLI). It tests the commit, not
+uncommitted edits, prints a pass or fail table with each stage's log and
+a list of what it could not check, and on success stamps the commit's tree. The
+`pre-push` hook refuses a push to those branches without the stamp and
+prints the command to run; rewording a commit keeps the stamp, any other
+change needs a new run. Pushes to other branches run the focused Fast
+suite as before, in the gate's container when cargo is not installed. On
+a Mac without cargo, turn the hooks on with
+`git config core.hooksPath .githooks`.
 
 ### Tests that need containers
 
