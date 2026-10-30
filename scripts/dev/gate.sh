@@ -64,7 +64,8 @@
 set -euo pipefail
 # One block, so bash reads the whole file before running any of it: a
 # checkout that changes this file mid-run cannot change what runs.
-# shellcheck disable=SC2329 # stages are called through run_stage
+# shellcheck disable=SC2317,SC2329 # stages are called through run_stage
+# (SC2317 in ShellCheck 0.10, as on the CI runner; SC2329 from 0.11 on)
 {
 
 if ((BASH_VERSINFO[0] * 100 + BASH_VERSINFO[1] < 501)); then
