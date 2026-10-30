@@ -3,10 +3,11 @@
 
 //! Resource budgets for the single binary: under 2 s from start to ready,
 //! under 80 MB resident and under 1 % of one CPU when idle (R-LT-1), from
-//! the brief's targets. The size budgets sit just above the first measured
-//! sizes (release 3: binary 100 MB, image 40.7 MB), so growth fails the
-//! check while shrinking toward the brief's 40 MB download is tracked
-//! separately. A shutdown signal must also drain and exit cleanly.
+//! the brief's targets. The brief's 40 MB download is the binary after
+//! `gzip -9`, as packages, image layers and compressed downloads carry it,
+//! and the compressed image has the same 40 MB limit (ADR 0067, D279). The
+//! binary on disk is capped just above its size, so growth fails too. A
+//! shutdown signal must also drain and exit cleanly.
 //!
 //! `cargo xtask budgets --binary <path> [--image-bytes <n>] [--settle <secs>]`
 //! starts `<path> serve` on a free port with an empty data folder, times
@@ -26,8 +27,11 @@ use std::time::{Duration, Instant};
 /// The budgets, in bytes and time. Megabytes are decimal, as downloads are.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Limits {
-    /// The binary, which is the single-binary download.
+    /// The binary as it sits on disk.
     pub binary_bytes: u64,
+    /// The binary compressed with `gzip -9`: what the brief's "40 MB
+    /// download" measures (ADR 0067, D279).
+    pub download_bytes: u64,
     /// The compressed container image.
     pub image_bytes: u64,
     /// Resident memory once idle.
@@ -42,10 +46,13 @@ pub struct Limits {
     pub drain: Duration,
 }
 
-/// The budgets. Time and memory are the brief's targets; sizes cap growth.
+/// The budgets. The download, image, time and memory limits are the
+/// brief's targets. The on-disk binary has no target of its own, so its
+/// limit sits about 10 % above the size after #491 and catches growth.
 pub const LIMITS: Limits = Limits {
-    binary_bytes: 110_000_000,
-    image_bytes: 45_000_000,
+    binary_bytes: 90_000_000,
+    download_bytes: 40_000_000,
+    image_bytes: 40_000_000,
     idle_rss_bytes: 80_000_000,
     idle_cpu_permille: 10,
     busy_rss_bytes: 250_000_000,
@@ -58,6 +65,8 @@ pub const LIMITS: Limits = Limits {
 pub struct Measurements {
     /// Size of the binary file.
     pub binary_bytes: Option<u64>,
+    /// Size of the binary after `gzip -9`.
+    pub download_bytes: Option<u64>,
     /// Size of the compressed image, when given.
     pub image_bytes: Option<u64>,
     /// Time to the first ready response.
@@ -112,6 +121,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
                 .map_err(|e| format!("cannot read {}: {e}", options.binary.display()))?
                 .len(),
         ),
+        download_bytes: Some(gzip_bytes(&options.binary)?),
         image_bytes: options.image_bytes,
         ..Measurements::default()
     };
@@ -152,6 +162,9 @@ pub fn evaluate(measured: &Measurements, limits: &Limits) -> Vec<String> {
     };
     if let Some(bytes) = measured.binary_bytes {
         over("binary size", bytes, limits.binary_bytes);
+    }
+    if let Some(bytes) = measured.download_bytes {
+        over("gzipped binary", bytes, limits.download_bytes);
     }
     if let Some(bytes) = measured.image_bytes {
         over("compressed image", bytes, limits.image_bytes);
@@ -204,6 +217,11 @@ fn report(measured: &Measurements, limits: &Limits) -> String {
         mb(limits.binary_bytes),
     ));
     text.push_str(&row(
+        "gzipped binary",
+        measured.download_bytes.map(mb),
+        mb(limits.download_bytes),
+    ));
+    text.push_str(&row(
         "compressed image",
         measured.image_bytes.map(mb),
         mb(limits.image_bytes),
@@ -251,6 +269,36 @@ fn mb(bytes: u64) -> String {
 /// Formats thousandths of a core as a percentage with one decimal place.
 fn percent(permille: u64) -> String {
     format!("{}.{} %", permille / 10, permille % 10)
+}
+
+/// The size of `path` after `gzip -9`, the way release downloads, packages
+/// and image layers carry it.
+fn gzip_bytes(path: &Path) -> Result<u64, String> {
+    let mut child = Command::new("gzip")
+        .args(["-9", "-c", "--"])
+        .arg(path)
+        .stdout(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("cannot run gzip: {e}"))?;
+    let mut total = 0_u64;
+    if let Some(mut out) = child.stdout.take() {
+        let mut buffer = vec![0_u8; 1 << 16];
+        loop {
+            let read = out
+                .read(&mut buffer)
+                .map_err(|e| format!("cannot read gzip's output: {e}"))?;
+            if read == 0 {
+                break;
+            }
+            total += u64::try_from(read).unwrap_or(u64::MAX);
+        }
+    }
+    let status = child.wait().map_err(|e| format!("gzip: {e}"))?;
+    if status.success() {
+        Ok(total)
+    } else {
+        Err(format!("gzip failed on {}: {status}", path.display()))
+    }
 }
 
 fn has_serve(binary: &Path) -> bool {
@@ -441,6 +489,7 @@ mod tests {
     fn within_budget_passes() {
         let measured = Measurements {
             binary_bytes: Some(12_000_000),
+            download_bytes: Some(4_000_000),
             image_bytes: Some(5_000_000),
             cold_start: Some(Duration::from_millis(300)),
             idle_rss_bytes: Some(30_000_000),
@@ -454,7 +503,8 @@ mod tests {
     #[test]
     fn every_breach_is_listed() {
         let measured = Measurements {
-            binary_bytes: Some(111_000_000),
+            binary_bytes: Some(91_000_000),
+            download_bytes: Some(41_000_000),
             image_bytes: Some(46_000_000),
             cold_start: Some(Duration::from_millis(2_500)),
             idle_rss_bytes: Some(90_000_000),
@@ -463,23 +513,39 @@ mod tests {
             drain: Some((Duration::from_millis(10), false)),
         };
         let failures = evaluate(&measured, &LIMITS);
-        assert_eq!(failures.len(), 7, "{failures:?}");
+        assert_eq!(failures.len(), 8, "{failures:?}");
         assert!(
-            failures[0].contains("111.0 MB over the 110.0 MB"),
+            failures[0].contains("91.0 MB over the 90.0 MB"),
             "{failures:?}"
         );
         assert!(
-            failures[3].contains("busy resident memory: 260.0 MB over the 250.0 MB"),
+            failures[1].contains("gzipped binary: 41.0 MB over the 40.0 MB"),
             "{failures:?}"
         );
-        assert!(failures[4].contains("1.5 % over the 1.0 %"), "{failures:?}");
-        assert!(failures[5].contains("2500 ms"), "{failures:?}");
+        assert!(
+            failures[4].contains("busy resident memory: 260.0 MB over the 250.0 MB"),
+            "{failures:?}"
+        );
+        assert!(failures[5].contains("1.5 % over the 1.0 %"), "{failures:?}");
+        assert!(failures[6].contains("2500 ms"), "{failures:?}");
     }
 
     #[test]
     fn unmeasured_values_are_skipped() {
         assert!(evaluate(&Measurements::default(), &LIMITS).is_empty());
         assert!(report(&Measurements::default(), &LIMITS).contains("n/a"));
+    }
+
+    #[test]
+    fn gzip_measures_the_compressed_size() {
+        let dir = std::env::temp_dir().join(format!("vellum-gzip-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("zeros");
+        std::fs::write(&file, vec![0_u8; 1_000_000]).unwrap();
+        let bytes = gzip_bytes(&file).unwrap();
+        assert!(bytes > 0 && bytes < 10_000, "{bytes}");
+        assert!(gzip_bytes(&dir.join("missing")).is_err());
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
