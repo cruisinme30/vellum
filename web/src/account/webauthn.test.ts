@@ -50,7 +50,7 @@ afterEach(() => {
 
 describe("passkeys in the browser", () => {
   it("knows when the browser has none", () => {
-    vi.stubGlobal("PublicKeyCredential");
+    vi.stubGlobal("PublicKeyCredential", undefined);
     expect(passkeysSupported()).toBe(false);
     browser();
     expect(passkeysSupported()).toBe(true);
