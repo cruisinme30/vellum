@@ -45,6 +45,11 @@ consistent theme.
   diagrams switch with the site's light and dark toggle.
 - `check-site.sh` fails when a page still shows a Mermaid, architecture
   or chart fence as source.
+- The first paint is final: the build writes each rendered image's
+  width and height, so the page keeps its space before the image arrives,
+  and the code font is preloaded with the text font and uses
+  `font-display: optional`. Code only fetched its font once laid out, so
+  with `swap` it arrived after first paint and moved the page below it.
 - Why: the docs show exactly what the app shows, with no second diagram
   pipeline and no client-side Mermaid bundle.
 

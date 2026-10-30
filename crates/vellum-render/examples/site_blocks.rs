@@ -21,7 +21,7 @@
 
 use std::fmt::Write as _;
 use std::io::Write as _;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use vellum_format::FenceKind;
@@ -63,7 +63,8 @@ fn main() -> ExitCode {
                 return ExitCode::FAILURE;
             }
         };
-        let (page, count) = render_page(&renderer, &source);
+        let dir = path.parent().unwrap_or_else(|| Path::new("."));
+        let (page, count) = render_page(&renderer, &source, &|src| image_size(dir, src));
         if count > 0 {
             if let Err(error) = std::fs::write(path, page) {
                 let _ = writeln!(stderr, "site_blocks: {}: {error}", path.display());
@@ -106,9 +107,12 @@ enum Part {
     Block(String),
 }
 
+/// Looks up an image's width and height in pixels from its `src`.
+type ImageSize<'a> = &'a dyn Fn(&str) -> Option<(usize, usize)>;
+
 /// Renders the rich blocks of one page. Returns the new page and how many
-/// blocks were rendered.
-fn render_page(renderer: &Renderer, source: &str) -> (String, usize) {
+/// blocks were rendered. `size` gives the size of the page's own images.
+fn render_page(renderer: &Renderer, source: &str, size: ImageSize<'_>) -> (String, usize) {
     let (front, body) = split_front_matter(source);
     let mut out = String::from(front);
     let mut count = 0;
@@ -123,7 +127,8 @@ fn render_page(renderer: &Renderer, source: &str) -> (String, usize) {
                     &RenderOptions::default(),
                 );
                 out.push('\n');
-                out.push_str(&one_line(&fix_links(&wrap_article(&page.html))));
+                let html = size_images(&fix_links(&wrap_article(&page.html)), size);
+                out.push_str(&one_line(&html));
                 out.push_str("\n\n");
                 count += 1;
             }
@@ -320,6 +325,54 @@ fn one_line(html: &str) -> String {
     out
 }
 
+/// The size of a local image next to the page, read from the file's header.
+/// Images on other sites, and files the reader cannot size, give `None`.
+fn image_size(dir: &Path, src: &str) -> Option<(usize, usize)> {
+    if src.starts_with('/') || src.contains(':') {
+        return None;
+    }
+    let path = src.split(['#', '?']).next().unwrap_or(src);
+    let found = imagesize::size(dir.join(path)).ok()?;
+    Some((found.width, found.height))
+}
+
+/// Gives every image in rendered HTML its size, so the browser keeps its
+/// space from first paint instead of pushing the page down when the image
+/// arrives (a layout shift). An image with no width gets its `width` and
+/// `height`; one the author sized (`width="80%"`) keeps that width and gets
+/// the image's aspect ratio, so its height is known too.
+fn size_images(html: &str, size: ImageSize<'_>) -> String {
+    let mut out = String::with_capacity(html.len());
+    let mut rest = html;
+    while let Some(at) = rest.find("<img ") {
+        let (head, tail) = rest.split_at(at);
+        out.push_str(head);
+        let end = tail.find('>').map_or(tail.len(), |e| e + 1);
+        let (tag, after) = tail.split_at(end);
+        rest = after;
+        let src = tag
+            .split_once(" src=\"")
+            .and_then(|(_, s)| s.split_once('"'))
+            .map(|(s, _)| s.replace("&amp;", "&"));
+        let found = src.as_deref().and_then(size);
+        match found {
+            Some((w, h)) if w > 0 && h > 0 && !tag.contains(" height=") => {
+                let extra = if tag.contains(" width=") {
+                    format!(" style=\"aspect-ratio: {w} / {h}\"")
+                } else {
+                    format!(" width=\"{w}\" height=\"{h}\"")
+                };
+                out.push_str("<img");
+                out.push_str(&extra);
+                out.push_str(tag.get(4..).unwrap_or(""));
+            }
+            _ => out.push_str(tag),
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
 /// Rewrites relative links for the published books, as build-site.sh does
 /// for Markdown links: `<name>.book/` becomes `<name>/`, and a page's
 /// `.md` becomes `.html` (`README.md` becomes `index.html`).
@@ -432,10 +485,28 @@ mod tests {
         let (page, count) = render_page(
             &renderer(),
             "---\ntitle: T\n---\n# T\n\n```mermaid\nflowchart LR\n  A --> B\n```\n",
+            &|_| None,
         );
         assert_eq!(count, 1);
         assert!(page.starts_with("---\ntitle: T\n---\n# T\n"));
         assert!(page.contains("<svg"), "{page}");
         assert!(!page.contains("\n\n<svg"));
+    }
+
+    #[test]
+    fn images_keep_their_space_before_they_load() {
+        let size = |src: &str| (src == "a.jpg" || src == "b.svg").then_some((800, 600));
+        assert_eq!(
+            size_images("<p><img src=\"a.jpg\" alt=\"A\"></p>", &size),
+            "<p><img width=\"800\" height=\"600\" src=\"a.jpg\" alt=\"A\"></p>"
+        );
+        assert_eq!(
+            size_images("<img src=\"b.svg\" width=\"80%\">", &size),
+            "<img style=\"aspect-ratio: 800 / 600\" src=\"b.svg\" width=\"80%\">"
+        );
+        assert_eq!(
+            size_images("<img src=\"https://x/c.png\">", &size),
+            "<img src=\"https://x/c.png\">"
+        );
     }
 }

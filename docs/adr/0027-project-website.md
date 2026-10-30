@@ -93,7 +93,9 @@ tools, Google's colours, and every guide readable on the site itself.
   so readers always get the site font. `optional` kept the fallback for
   the whole visit whenever the font took over ~100 ms, which over the
   network was most first visits. The UI suite's layout-shift gate still
-  passes on a slow network.
+  passes on a slow network. The code font is the exception (ADR 0071,
+  D309): it is preloaded too and uses `optional`, since `swap` moved
+  every line below the first code on the page.
 - The build fills in the font path per book through a placeholder, so the older
   releases' books at `docs/v/<tag>/` find the fonts too, and it strips
   mdBook's own font stylesheet from every page, not only the top level.
