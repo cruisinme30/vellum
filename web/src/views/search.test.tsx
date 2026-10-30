@@ -74,7 +74,7 @@ describe("InboxView", () => {
 describe("SearchView filters and highlights", () => {
   it("marks the matched words and narrows by the filters in the URL", async () => {
     const { user, location } = renderWithProviders(<SearchView />, "/search?q=gateway");
-    const results = await screen.findAllByRole("link");
+    const results = await screen.findAllByRole("link", { name: /gateway/i });
     expect(results[0]?.querySelector("mark")?.textContent.toLowerCase()).toBe("gateway");
 
     await user.click(screen.getByRole("checkbox", { name: "Starred only" }));

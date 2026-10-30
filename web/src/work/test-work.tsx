@@ -9,7 +9,12 @@ import type { ReactNode } from "react";
 import { MemoryRouter, Routes } from "react-router";
 import { vi } from "vitest";
 
+import { createNorthstarStore } from "../data/mock/northstar";
 import { ServerApisProvider } from "../data/server-apis";
+import type { WorkspaceStore } from "../data/store";
+import { WorkspaceProvider } from "../data/workspace-context";
+import type { CollabConnector } from "../editor/collab/provider";
+import { createMemoryCommentsApi } from "../editor/comments/memory-comments";
 import { I18nProvider } from "../i18n/i18n";
 
 import type { IssueOut, ListView, MyWorkView, ParseView, TaskView, TeamOut, WorkApi } from "./api";
@@ -184,6 +189,9 @@ export function fakeApi(overrides: Partial<WorkApi> = {}) {
     Promise.resolve({ adopted: 0, created: 2, deleted: 0, moved: 1, unblocked: 0, updated: 0 }),
   );
   const api: WorkApi = {
+    ...createMemoryCommentsApi("ana"),
+    fileIssue: (created) => Promise.resolve({ issue: issue("ENG-9", created.title) }),
+    searchIssues: () => Promise.resolve([issue("ENG-7", "Fix sign-in")]),
     myWork,
     addTask,
     setDone,
@@ -244,15 +252,28 @@ export function fakeApi(overrides: Partial<WorkApi> = {}) {
   };
 }
 
-export function renderAt(path: string, api: WorkApi | undefined, routes: ReactNode) {
+const collab: CollabConnector = {
+  open: () => {
+    throw new Error("no editor in these tests");
+  },
+};
+
+export function renderAt(
+  path: string,
+  api: WorkApi | undefined,
+  routes: ReactNode,
+  store: WorkspaceStore = createNorthstarStore(),
+) {
   const user = userEvent.setup();
   render(
     <I18nProvider>
-      <ServerApisProvider apis={{ work: api }}>
-        <MemoryRouter initialEntries={[path]}>
-          <Routes>{routes}</Routes>
-        </MemoryRouter>
-      </ServerApisProvider>
+      <WorkspaceProvider store={store} collab={collab}>
+        <ServerApisProvider apis={{ work: api }}>
+          <MemoryRouter initialEntries={[path]}>
+            <Routes>{routes}</Routes>
+          </MemoryRouter>
+        </ServerApisProvider>
+      </WorkspaceProvider>
     </I18nProvider>,
   );
   return user;

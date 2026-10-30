@@ -11,13 +11,8 @@ import { NORTHSTAR_BODIES } from "../data/mock/northstar-pages";
 import { createLocalConnector } from "./collab/local-connector";
 import type { CollabConnector, LiveConnection, LiveState } from "./collab/provider";
 import { body, h, p, wiki } from "./content";
-import {
-  isSelectionTaskKey,
-  PageEditor,
-  readOnlyTaskText,
-  selectionTaskText,
-  type PageEditorProperties,
-} from "./page-editor";
+import { PageEditor, type PageEditorProperties } from "./page-editor";
+import { isSelectionTaskKey, readOnlyTaskText, selectionTaskText } from "./selection-task";
 import { createTestEditor, memoryChannels, resolveGateway, settle } from "./test-editor";
 
 const user = { name: "Priya", color: "#1a73e8" };

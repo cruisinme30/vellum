@@ -4,7 +4,6 @@
 import { getSchema, type JSONContent } from "@tiptap/core";
 import { Collaboration } from "@tiptap/extension-collaboration";
 import { CollaborationCaret } from "@tiptap/extension-collaboration-caret";
-import type { EditorState } from "@tiptap/pm/state";
 import { type Editor, EditorContent, useEditor } from "@tiptap/react";
 import {
   useCallback,
@@ -20,7 +19,6 @@ import * as Y from "yjs";
 import { useT } from "../i18n/i18n";
 import { Icon } from "../shell/icon";
 import type { WorkApi } from "../work/api";
-import { isEditable } from "../keyboard/keymap";
 
 import type { ChipSources } from "./chips/items";
 import { PresenceBar } from "./collab/presence";
@@ -38,6 +36,7 @@ import { CommentsPanel } from "./comments/comments-panel";
 import { FileIssue } from "./comments/file-issue";
 import { vellumExtensions } from "./extensions";
 import type { ResolvePage } from "./nodes/inline";
+import { isSelectionTaskKey, selectionTaskText, useReadOnlyTaskKey } from "./selection-task";
 import { Toolbar } from "./toolbar";
 
 /** Props of {@link PageEditor}. */
@@ -149,42 +148,6 @@ const SAVE_LABELS: Record<SaveStatus, string> = {
   saving: "editor-saving",
   failed: "editor-save-failed",
 };
-
-/** Selected text as one line, or `undefined` when only space is selected. */
-function oneLine(text: string): string | undefined {
-  const line = text.trim().replaceAll(/\s+/g, " ");
-  return line === "" ? undefined : line;
-}
-
-/** Whether a key press is "make a task from the selection": Ctrl+Alt+Enter, or Cmd+Option+Enter on a Mac. */
-export const isSelectionTaskKey = (event: KeyboardEvent) =>
-  (event.ctrlKey || event.metaKey) && event.altKey && !event.shiftKey && event.key === "Enter";
-
-/**
- * The selected text, outside code, that the editor's "make a task" key or
- * button turns into a task (R-MW-3); `undefined` with nothing to use.
- */
-export function selectionTaskText(state: EditorState): string | undefined {
-  const { selection } = state;
-  if (selection.empty) return undefined;
-  if (selection.$from.parent.type.spec.code === true) return undefined;
-  return oneLine(state.doc.textBetween(selection.from, selection.to, " ", " "));
-}
-
-/**
- * On a page that cannot be edited, a bare `T` turns the text selected in
- * `root` into a task. Typing never reaches a read-only page, so the plain
- * key is safe there; in the editor it stays a letter.
- */
-export function readOnlyTaskText(event: KeyboardEvent, root: Element): string | undefined {
-  if (event.key !== "t" && event.key !== "T") return undefined;
-  if (event.metaKey || event.ctrlKey || event.altKey || event.isComposing) return undefined;
-  if (isEditable(event.target)) return undefined;
-  const selection = globalThis.getSelection();
-  if (selection === null || selection.isCollapsed || selection.rangeCount === 0) return undefined;
-  if (!root.contains(selection.getRangeAt(0).commonAncestorContainer)) return undefined;
-  return oneLine(selection.toString());
-}
 
 /** Whether a key press is the save shortcut (Ctrl+S, or Cmd+S on a Mac). */
 const isSaveKey = (event: KeyboardEvent) =>
@@ -405,19 +368,7 @@ function BoundEditor({
     },
     [session, seeded],
   );
-  useEffect(() => {
-    if (editable || onSelectionTask === undefined) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      const selected = readOnlyTaskText(event, editor.view.dom);
-      if (selected === undefined) return;
-      event.preventDefault();
-      onSelectionTask(selected);
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [editor, editable, onSelectionTask]);
+  useReadOnlyTaskKey(editor, editable, onSelectionTask);
   useEffect(() => {
     // Tiptap would emit an update for the change; leave the document alone.
     if (editor.isEditable !== editable) {

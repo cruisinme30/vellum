@@ -46,6 +46,16 @@ function fakeWork() {
     setState: notUsed,
     comments: notUsed,
     addComment: notUsed,
+    parse: notUsed,
+    move: notUsed,
+    update: notUsed,
+    lists: notUsed,
+    createList: notUsed,
+    shareList: notUsed,
+    google: notUsed,
+    connectGoogle: notUsed,
+    syncGoogle: notUsed,
+    disconnectGoogle: notUsed,
   };
 }
 
