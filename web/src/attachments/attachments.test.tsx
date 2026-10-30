@@ -181,7 +181,12 @@ describe("the attachments API", () => {
     const upload = vi.fn(() => Promise.resolve(file("a b.png")));
     const send = vi.fn(() => Promise.resolve());
     const get = vi.fn(() => Promise.resolve({ items: [file("z.txt"), file("a.txt")] }));
-    const api = createHttpAttachmentsApi({ get, send, upload, forgetSession: vi.fn() } as unknown as Http);
+    const api = createHttpAttachmentsApi({
+      get,
+      send,
+      upload,
+      forgetSession: vi.fn(),
+    } as unknown as Http);
     const picked = new File(["x"], "a b.png");
     await api.upload(PAGE, picked);
     expect(upload).toHaveBeenCalledWith(

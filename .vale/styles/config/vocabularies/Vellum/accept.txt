@@ -188,3 +188,5 @@ winget
 rustc
 renderer's
 revalidates
+Canonicalization
+lxml
