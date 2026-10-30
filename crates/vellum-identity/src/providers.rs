@@ -460,7 +460,7 @@ pub(crate) fn may_create(p: &Provider, email: &str) -> bool {
 }
 
 /// Whether `p` may sign in to an existing account with `email`: only
-/// addresses in its domains when it lists any (RT-043, D307).
+/// addresses in its domains when it lists any (RT-043, D315).
 pub(crate) fn may_link(p: &Provider, email: &str) -> bool {
     crate::sso::in_domains(&p.allowed_domains, email)
 }

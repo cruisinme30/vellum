@@ -93,7 +93,7 @@ impl SsoConfig {
 
     /// Whether this provider may sign in to an existing account with
     /// `email`: any address without a domain list, otherwise only one in
-    /// the list (RT-043, D307).
+    /// the list (RT-043, D315).
     #[must_use]
     pub fn may_link(&self, email: &str) -> bool {
         in_domains(&self.allowed_domains, email)
