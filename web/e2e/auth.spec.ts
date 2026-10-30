@@ -189,12 +189,17 @@ test("single sign-on goes to the SAML provider and back", async ({ page }) => {
         </form></main></html>`,
     }),
   );
-  // ...and the server checks it, opens a session and goes on.
+  // ...and the server checks it, opens a session and goes on. The real
+  // server answers 303; Playwright's WebKit refuses to fulfil a faked
+  // redirect, so this page moves on the same way the start route does.
   await page.route("**/saml/acs", async (route) => {
     expect(route.request().method()).toBe("POST");
     expect(route.request().postData()).toContain("RelayState=r");
     signedIn = true;
-    await route.fulfill({ status: 303, headers: { location: `${app}/data` } });
+    await route.fulfill({
+      contentType: "text/html",
+      body: `<!doctype html><meta http-equiv="refresh" content="0;url=${app}/data">`,
+    });
   });
   await page.getByRole("link", { name: "Sign in with Entra ID" }).click();
   await expect(page.getByRole("heading", { name: "Northstar sign-in" })).toBeVisible();
