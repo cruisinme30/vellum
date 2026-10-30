@@ -26,6 +26,7 @@ use crate::cluster::now_ms;
 use crate::error::Result;
 use crate::index::{Index, IndexPool};
 use crate::telemetry::traced;
+use crate::tx::BeginWrite as _;
 
 /// A place in the log.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -223,7 +224,7 @@ impl DriveChanges {
         let delete = "DELETE FROM drive_changes WHERE (txid, seq) <= ($1, $2)";
         macro_rules! run {
             ($pool:expr) => {{
-                let mut tx = $pool.begin().await?;
+                let mut tx = $pool.begin_write().await?;
                 let top: Option<(i64, i64)> = traced(
                     system,
                     "changes.prune_top",

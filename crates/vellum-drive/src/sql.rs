@@ -28,7 +28,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use vellum_db::sqlx::types::Uuid;
-use vellum_db::{Index, IndexPool, sqlx, traced};
+use vellum_db::{BeginWrite as _, Index, IndexPool, sqlx, traced};
 use vellum_kernel::{Actor, EventId, ObjectId, SpaceId, Timestamp, UserId, VersionId};
 use vellum_store::BlobPath;
 
@@ -391,7 +391,7 @@ impl DriveIndex for SqlIndex {
         let settings = files::to_yaml(&space.settings)?;
         let now = now_ms();
         on_pool!(self, pool, system => {
-            let mut tx = pool.begin().await.map_err(db_error)?;
+            let mut tx = pool.begin_write().await.map_err(db_error)?;
             let _ = run!(
                 system,
                 "space.upsert",
@@ -476,7 +476,7 @@ impl DriveIndex for SqlIndex {
         let trash = node.trash.as_ref().map(files::to_yaml).transpose()?;
         let now = now_ms();
         on_pool!(self, pool, system => {
-            let mut tx = pool.begin().await.map_err(db_error)?;
+            let mut tx = pool.begin_write().await.map_err(db_error)?;
             let old: Option<(Uuid, Option<Uuid>)> = run!(
                 system,
                 "node.previous",
@@ -655,7 +655,7 @@ impl DriveIndex for SqlIndex {
     async fn remove_node(&self, id: ObjectId) -> DriveResult<()> {
         let id = uuid(id);
         on_pool!(self, pool, system => {
-            let mut tx = pool.begin().await.map_err(db_error)?;
+            let mut tx = pool.begin_write().await.map_err(db_error)?;
             for (op, sql) in [
                 ("node.remove", "DELETE FROM drive_nodes WHERE node_id = $1"),
                 ("node.remove_links", "DELETE FROM drive_links WHERE source_id = $1"),
@@ -814,7 +814,7 @@ impl DriveIndex for SqlIndex {
             }
         }
         on_pool!(self, pool, system => {
-            let mut tx = pool.begin().await.map_err(db_error)?;
+            let mut tx = pool.begin_write().await.map_err(db_error)?;
             let _ = run!(
                 system,
                 "activity.insert",
@@ -874,7 +874,7 @@ impl DriveIndex for SqlIndex {
         unique.sort_unstable();
         unique.dedup();
         on_pool!(self, pool, system => {
-            let mut tx = pool.begin().await.map_err(db_error)?;
+            let mut tx = pool.begin_write().await.map_err(db_error)?;
             let _ = run!(
                 system,
                 "links.clear",
@@ -921,7 +921,7 @@ impl DriveIndex for SqlIndex {
         let author = files::to_yaml(&version.author)?;
         let id = Uuid::from_u128(version.id.as_u128());
         on_pool!(self, pool, system => {
-            let mut tx = pool.begin().await.map_err(db_error)?;
+            let mut tx = pool.begin_write().await.map_err(db_error)?;
             let _ = run!(
                 system,
                 "version.clear",

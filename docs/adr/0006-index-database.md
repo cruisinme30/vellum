@@ -11,8 +11,8 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D46, D47, D48, D142
-- Issue: #56, #230
+- Decisions: D46, D47, D48, D142, D306
+- Issue: #56, #230, #542
 - Pull requests: #24, #299
 
 :::
@@ -75,6 +75,19 @@ between what a reindex rebuilds and what only the database holds.
   and the next run converges. An entry naming a removed shard stops the
   reindex before anything is written.
 
+### D306: SQLite write transactions begin IMMEDIATE
+
+- Every transaction that writes starts through `vellum_db::BeginWrite`,
+  which sends `BEGIN IMMEDIATE` on SQLite and a plain `BEGIN` on Postgres.
+- Reason: a deferred `BEGIN` that reads first and writes later fails at
+  once with "database is locked" (`SQLITE_BUSY_SNAPSHOT`) when another
+  connection commits in between; the 5 s busy timeout cannot help. The
+  k6 load run hit this on page saves
+  ([#542](https://github.com/cruisinme30/vellum/issues/542)). With the
+  write lock taken up front, writers queue in the busy handler.
+- Read-only transactions keep a plain `BEGIN`; WAL lets them run beside
+  the writer.
+
 ## Alternatives
 
 - **The `sqlx` `Any` driver over both backends**: one code path, but it loses
@@ -86,6 +99,9 @@ between what a reindex rebuilds and what only the database holds.
   would then change the source of truth. Not chosen; the store and the
   watcher (ADR 0026) assign IDs.
 
+- **Retry a transaction on `SQLITE_BUSY`**: works, but every caller
+  would need to be safe to rerun, and retries add tail latency under
+  load. Not chosen (D306).
 - **Hash the space ID to pick a shard**: no map to keep, but adding a
   shard moves most spaces. Not chosen; the map moves only what an
   operator asks for.
@@ -96,3 +112,5 @@ between what a reindex rebuilds and what only the database holds.
 - Losing the index file loses stars and recents but no content; grants
   come back from the YAML copies.
 - Sharded reads look up the map first; callers should cache it per space.
+- SQLite writers are serialised for the whole transaction (D306), so
+  write transactions must stay short; no network or file I/O inside one.

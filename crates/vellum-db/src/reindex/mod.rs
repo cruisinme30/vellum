@@ -25,6 +25,7 @@ use vellum_kernel::ObjectId;
 use crate::error::{Error, Result};
 use crate::index::{Index, Pool};
 use crate::telemetry::traced;
+use crate::tx::BeginWrite as _;
 
 /// Reads a file's plaintext. The default reads it as is; encrypted
 /// workspaces pass a reader that opens the envelope first.
@@ -336,7 +337,7 @@ pub fn now_ms() -> i64 {
 macro_rules! write_snapshot {
     ($pool:expr, $system:expr, $snap:expr, $now:expr) => {{
         let snap: &Snapshot = $snap;
-        let mut tx = $pool.begin().await?;
+        let mut tx = $pool.begin_write().await?;
         // Deleting spaces cascades to folders, documents and page_ancestors.
         let _ = traced($system, "reindex.clear", sqlx::query("DELETE FROM spaces").execute(&mut *tx)).await?;
         for s in &snap.spaces {

@@ -116,3 +116,7 @@ holder = "UI and perf leftovers: figure accent (D302, ADR 0068), team archiving 
 [[reservation]]
 decisions = "D300-D301"
 holder = "search and secret-scanning leftovers: hybrid toggle and status (#526, ADR 0011), uploads and rows (#527, ADR 0025)"
+
+[[reservation]]
+decisions = "D306"
+holder = "SQLite write transactions begin IMMEDIATE (#542), ADR 0006"
