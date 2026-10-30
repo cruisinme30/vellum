@@ -66,17 +66,40 @@ pub struct Index {
     _closer: Option<Arc<SqliteCloser>>,
 }
 
+/// Initialises the OpenSSL that SQLCipher links, without its exit handler.
+///
+/// Left to itself, SQLCipher initialises OpenSSL on first use, and OpenSSL
+/// then registers `OPENSSL_cleanup` with `atexit`. At exit that handler
+/// frees every thread's OpenSSL state (`init_thread_deregister(NULL, 1)`)
+/// without a lock, while each thread that used OpenSSL also frees its own
+/// state from a thread-local destructor when it ends. sqlx runs every
+/// SQLite connection on its own detached worker thread, so a worker that
+/// ends while the process exits frees the same blocks a second time
+/// (`double free or corruption`, `malloc_consolidate(): invalid chunk
+/// size`). OpenSSL documents `OPENSSL_cleanup` as unsafe while other
+/// threads still use the library, and a Rust process never joins its
+/// detached threads before exit.
+///
+/// `openssl_sys::init` asks OpenSSL for `OPENSSL_INIT_NO_ATEXIT`, which only
+/// counts if it comes first, so this runs before the first connection
+/// opens. The OS reclaims OpenSSL's memory when the process ends.
+fn init_openssl_without_exit_cleanup() {
+    openssl_sys::init();
+}
+
 /// How long dropping the last SQLite index waits for its connections.
 const CLOSE_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Closes a SQLite pool when the last [`Index`] clone goes away.
 ///
 /// sqlx closes a dropped SQLite connection later, on that connection's
-/// own worker thread. SQLCipher frees its shared state in an `atexit`
-/// handler. If a process exits while a worker is still closing, the two
-/// race and the process aborts at exit (`double free`, `malloc_consolidate`,
-/// SIGSEGV), which showed up as random test failures. Closing the pool
-/// here, before the drop returns, means no worker is left behind.
+/// own worker thread. SQLCipher frees its shared state (key provider,
+/// private heap, mutexes) in an `atexit` handler. If a process exits while
+/// a worker is still closing an encrypted database, the two race and the
+/// process crashes at exit (SIGSEGV). Closing the pool here, before the
+/// drop returns, means no worker is left behind. OpenSSL's own exit
+/// handler is a separate race, handled by
+/// [`init_openssl_without_exit_cleanup`].
 #[derive(Debug)]
 struct SqliteCloser(SqlitePool);
 
@@ -123,6 +146,7 @@ impl Index {
     pub async fn open(config: &IndexConfig) -> Result<Self> {
         let index = match config {
             IndexConfig::Sqlite { path, key } => {
+                init_openssl_without_exit_cleanup();
                 if let Some(parent) = path.parent() {
                     std::fs::create_dir_all(parent)?;
                 }
