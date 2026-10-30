@@ -50,6 +50,7 @@ afterEach(() => {
 
 describe("passkeys in the browser", () => {
   it("knows when the browser has none", () => {
+    // eslint-disable-next-line unicorn/no-useless-undefined -- stubGlobal takes a value: none here
     vi.stubGlobal("PublicKeyCredential", undefined);
     expect(passkeysSupported()).toBe(false);
     browser();
