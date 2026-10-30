@@ -25,12 +25,12 @@ as its source text, and every `:::` callout, card grid, step list and tab
 set was unwrapped into plain paragraphs, so the docs showed none of the
 rich blocks they teach. The landing page, the docs home and the books
 also had three different top bars, so the site did not read as one site.
-Gourav asked for architecture and flow diagrams, rich content and one
+The project owner asked for architecture and flow diagrams, rich content and one
 consistent theme.
 
 ## Decisions
 
-### `D309`: rich blocks are drawn by vellum-render at site build
+### `D309`: rich blocks are drawn by `vellum-render` at site build
 
 - `crates/vellum-render/examples/site_blocks.rs` rewrites each staged
   page before mdBook runs: every top-level `:::` container and every
@@ -53,8 +53,8 @@ consistent theme.
 - `site/bar.html` is the only markup of the top bar; `build-site.sh`
   puts it into the landing page, the docs home and every book page,
   including the decision records and older releases' books.
-- `site/bar.css` styles it in px, so it looks the same in the landing
-  page's 16 px rems and mdBook's 10 px rems (D307). It wraps rather than
+- `site/bar.css` styles it in pixels, so it looks the same in the landing
+  page's 16-pixel rems and mdBook's 10-pixel rems (D307). It wraps rather than
   pushing off screen (#248). In a book it is fixed above the sidebar, and
   the sidebar and mdBook's menu bar start below it, at the bar's height
   that `theme.js` measures.
@@ -64,7 +64,7 @@ consistent theme.
 
 ### `D311`: tab sets become real tabs in the books
 
-- `site/blocks.js` turns each rendered tab set into a WAI-ARIA tablist
+- `site/blocks.js` turns each rendered tab set into a WAI-ARIA tab list
   with arrow, Home and End keys. Without the script, and when printed,
   every tab shows one after another, as the renderer writes them.
 
