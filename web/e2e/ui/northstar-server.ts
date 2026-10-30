@@ -6,9 +6,11 @@ import type { BrowserContext, Route } from "@playwright/test";
 import type {
   BookInfo,
   BookList,
+  BriefOut,
   GoogleView,
   IssueGroups,
   ListsView,
+  SearchStatusView,
   SectionDoc as SectionDocument,
   TeamsOut,
 } from "../../src/api/api.gen";
@@ -223,6 +225,21 @@ const READS: readonly (readonly [RegExp, unknown])[] = [
   [/^\/admin\/state$/, ADMIN_STATE],
   [/^\/admin\/settings$/, ADMIN_SETTINGS],
   [
+    /^\/admin\/search$/,
+    {
+      engine: "tantivy",
+      model_configured: true,
+      hybrid: true,
+      model: "all-MiniLM-L6-v2",
+      dimensions: 384,
+      loaded: true,
+      idle_minutes: 15,
+      job: "idle",
+      done: 512,
+      total: 512,
+    } satisfies SearchStatusView,
+  ],
+  [
     /^\/admin\/backups$/,
     { backups: [{ name: "vellum-2026-10-29T08-00.tar.zst", size: 812_000_000 }] },
   ],
@@ -242,6 +259,18 @@ function lookUp(path: string): unknown {
   if (path.startsWith("/drive/")) return driveAnswer(`/api/v1${path}`);
   const key = /^\/work\/issues\/([^/]+)$/.exec(path)?.[1];
   if (key !== undefined) return ISSUES.find((candidate) => candidate.key === key);
+  const briefed = /^\/work\/issues\/([^/]+)\/triage\/brief$/.exec(path)?.[1];
+  const issue = ISSUES.find((candidate) => candidate.key === briefed);
+  if (issue !== undefined) {
+    return {
+      key: issue.key,
+      title: issue.title,
+      body: "",
+      team: TEAM.key,
+      similar: [],
+      teams: [{ key: TEAM.key, name: TEAM.name, labels: TEAM.labels, people: ["priya"] }],
+    } satisfies BriefOut;
+  }
   return undefined;
 }
 
