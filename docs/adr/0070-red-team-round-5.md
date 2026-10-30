@@ -12,7 +12,7 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D281, D282, D283, D284
-- Issue: #529 (findings #530, #531, #533, #534, #535)
+- Issue: #529 (findings #530, #531, #533, #534, #535, #536)
 - Pull requests: to be linked when merged
 
 :::
@@ -23,10 +23,11 @@ Round 5 of the red team (ADR 0030) read the features that landed or
 queued on 2026-10-29: uploads and export/import in `vellum serve`, admin
 users, spaces and groups with re-authentication, bring-your-own-model
 assist, saved Work views, MCP in serve, books publishing and themes.
-Five findings came out of it, each fixed with a regression test. Two let
+Six findings came out of it, share links included, each fixed with a regression test. Two let
 one user act on another's data (an import taking over page IDs, a public
 site copying a book's snapshots), one skipped the admin re-auth check,
-and two were resource abuse by any signed-in user.
+and three were abuse of the server's resources: two by any signed-in
+user, and one, guessing share-link passwords, by anyone holding a link.
 
 ## Decisions
 
@@ -52,13 +53,16 @@ and two were resource abuse by any signed-in user.
   (RT-038).
 - Model base URLs with a query, fragment or user info are refused.
 
-### D284: user-made Work views and book publications have bounds
+### D284: what users and visitors can make the server do is bounded
 
 - Refused saved views carry an owned reason; nothing is leaked to make a
   `&'static str` (RT-040). Filters take at most 16 KiB and a person owns
   at most 200 views.
 - A book publication never copies book data: anything under a dot folder
   (`.snapshots`, `.history`, `.published`) or `book.yaml` (RT-041).
+- A share link that takes 10 wrong passwords in 15 minutes stops
+  checking passwords until the window passes, and link passwords are
+  hashed behind the same `password::Gate` as sign-in (RT-042).
 
 ## Alternatives
 
@@ -79,3 +83,5 @@ and two were resource abuse by any signed-in user.
 - A self-hosted model must be called at the exact base the admin lists;
   a user who typed a sub-path gets "can't reach".
 - A 201st saved view is refused until the person deletes one.
+- Someone guessing a link's password locks it for everyone for up to 15
+  minutes; the owner can make a new link.
