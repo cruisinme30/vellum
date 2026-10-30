@@ -17,6 +17,25 @@
   margin-block-end: 16px;
 }
 
+/* Labels wrap their words and their field onto the next line, and a field
+   never grows past its column, so large text and long options stay on
+   a phone screen. */
+.vl-requests label {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: center;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.vl-requests input:not([type="checkbox"]),
+.vl-requests select {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+
 .vl-requests__filters button,
 .vl-requests__table button {
   border-radius: 999px;

@@ -109,7 +109,10 @@
   border-radius: 999px;
   font-size: 0.8125rem;
   font-weight: 500;
-  white-space: nowrap;
+  /* Short labels stay on one line; long or enlarged ones wrap inside the
+     column instead of pushing the page sideways. */
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .vl-health-on-track {
