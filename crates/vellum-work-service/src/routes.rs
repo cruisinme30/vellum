@@ -213,6 +213,40 @@ pub(crate) fn all(s: &Arc<WorkService>) -> Vec<Operation> {
             s.put_project(c, i).await
         })
         .summary("Creates or replaces a project page"),
+        // Planning: projects from fields, milestones, updates, initiatives,
+        // templates (D223).
+        mutation(s, "work.create_project", Post, "/v1/work/projects", Work, |s, c, i| async move {
+            s.create_project(c, i).await
+        })
+        .summary("Creates a project from fields"),
+        mutation(s, "work.add_milestone", Post, "/v1/work/projects/{project_id}/milestones", Work, |s, c, i| async move {
+            s.add_milestone(c, i).await
+        })
+        .summary("Adds a milestone to a project"),
+        query(s, "work.list_updates", "/v1/work/projects/{project_id}/updates", |s, c, i| async move {
+            s.list_updates(c, i).await
+        })
+        .summary("Lists a project's health updates, newest first"),
+        mutation(s, "work.post_update", Post, "/v1/work/projects/{project_id}/updates", Work, |s, c, i| async move {
+            s.post_update(c, i).await
+        })
+        .summary("Posts a health update: on track, at risk or off track"),
+        query(s, "work.list_initiatives", "/v1/work/initiatives", |s, c, i| async move {
+            s.list_initiatives(c, i).await
+        })
+        .summary("Lists initiatives with their projects' rolled-up health and progress"),
+        mutation(s, "work.create_initiative", Post, "/v1/work/initiatives", Work, |s, c, i| async move {
+            s.create_initiative(c, i).await
+        })
+        .summary("Creates an initiative"),
+        mutation(s, "work.put_initiative", Put, "/v1/work/initiatives/{initiative_id}", Work, |s, c, i| async move {
+            s.put_initiative(c, i).await
+        })
+        .summary("Replaces an initiative page"),
+        query(s, "work.list_templates", "/v1/work/teams/{team}/templates", |s, c, i| async move {
+            s.list_templates(c, i).await
+        })
+        .summary("Lists a team's issue templates in full"),
         // Comments.
         query(s, "work.list_comments", "/v1/work/comments", |s, c, i| async move { s.list_comments(c, i).await })
             .summary("Lists comment threads on an issue, page or block"),

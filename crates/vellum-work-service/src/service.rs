@@ -30,8 +30,9 @@ use vellum_work::my_issues::{Tab, my_issues};
 use vellum_work::project::Project;
 use vellum_work::view::{self, View, Visibility};
 use vellum_work::{
-    BlockRef, Changes, Ctx, Estimate, Issue, IssueId, IssuePatch, NewIssue, Priority, ProjectId,
-    Relation, StatusKey, Team, TeamKey, TriageAction, UserRef, ViewId, WorkGraph,
+    BlockRef, Changes, Ctx, Estimate, Issue, IssueId, IssuePatch, MilestoneId, NewIssue, Priority,
+    ProjectId, Relation, Repeat, StatusKey, Team, TeamKey, TriageAction, UserRef, ViewId,
+    WorkGraph,
 };
 
 use crate::api::{
@@ -51,6 +52,7 @@ pub mod embed;
 pub mod embeds;
 pub mod insights;
 pub mod live;
+pub mod planning;
 pub mod triage;
 
 /// The most issues one list returns.
@@ -68,6 +70,8 @@ pub struct State {
     project_paths: BTreeMap<ProjectId, String>,
     /// Saved views, stored as `views/<id>.yaml`.
     pub(crate) views: BTreeMap<ViewId, View>,
+    /// Project updates and initiatives (D223).
+    pub(crate) planning: planning::Planning,
     /// The journal revision this copy reflects (see [`crate::journal`]).
     pub(crate) seen: u64,
     /// When this copy last compared itself with the journal for a read.
@@ -213,8 +217,37 @@ impl WorkService {
         let sla = st.graph.sla_tick(now);
         changes.issues.extend(sla.issues);
         changes.events.extend(sla.events);
+        let recur = st
+            .graph
+            .recur(now, |t| planning::team_today(t, now), IssueId::generate)?;
+        changes.issues.extend(recur.issues);
+        changes.teams.extend(recur.teams);
+        changes.cycles.extend(recur.cycles);
+        changes.events.extend(recur.events);
         self.commit(&mut st, backup, changes, None, Vec::new(), None)
             .await
+    }
+
+    /// Files the next issue of each repeating issue whose due date has
+    /// passed in its team's time zone (D224). Cheap when nothing is due;
+    /// `vellum serve` runs it every few minutes on one replica.
+    ///
+    /// # Errors
+    ///
+    /// Returns `unavailable` if the files cannot be written.
+    #[instrument(skip_all)]
+    pub async fn run_recurring(&self) -> Result<(), Error> {
+        retrying(|| async {
+            let now = self.clock.now();
+            let mut st = self.write_state().await?;
+            let backup = st.clone();
+            let changes =
+                st.graph
+                    .recur(now, |t| planning::team_today(t, now), IssueId::generate)?;
+            self.commit(&mut st, backup, changes, None, Vec::new(), None)
+                .await
+        })
+        .await
     }
 
     // ----- replicas -----
@@ -788,7 +821,7 @@ impl WorkService {
             projects: st
                 .graph
                 .projects()
-                .map(|p| ProjectOut::of(p, &st.graph.project_progress(&p.id)))
+                .map(|p| planning::project_out(&st, p, self.clock.now().date()))
                 .collect(),
         })
     }
@@ -804,7 +837,7 @@ impl WorkService {
             .graph
             .project(&id)
             .ok_or_else(|| Error::new(ErrorKind::NotFound, format!("unknown project {id}")))?;
-        Ok(ProjectOut::of(p, &st.graph.project_progress(&id)))
+        Ok(planning::project_out(&st, p, self.clock.now().date()))
     }
 
     pub(crate) async fn list_comments(
@@ -882,8 +915,22 @@ impl WorkService {
             .as_deref()
             .map(|k| Self::issue_id(&st.graph, k))
             .transpose()?;
+        draft.milestone = i
+            .milestone
+            .as_deref()
+            .map(|m| parse_id("milestone", m))
+            .transpose()?;
         draft.due = i.due.as_deref().map(date).transpose()?;
         draft.intake = i.intake;
+        let repeat = match i.repeat.as_deref() {
+            Some(text) => Some(text.parse::<Repeat>()?),
+            None => draft.template.as_ref().and_then(|name| {
+                st.graph
+                    .team(&draft.team)
+                    .and_then(|t| t.templates.iter().find(|x| &x.name == name))
+                    .and_then(|x| x.repeat)
+            }),
+        };
         let source = i
             .source_block
             .as_deref()
@@ -896,7 +943,22 @@ impl WorkService {
         }
         let id = draft.id;
         let backup = st.clone();
-        let changes = st.graph.create_issue(draft, &ctx)?;
+        let mut changes = match st.graph.create_issue(draft, &ctx) {
+            Ok(c) => c,
+            Err(e) => {
+                *st = backup;
+                return Err(e.into());
+            }
+        };
+        if repeat.is_some() {
+            match st.graph.set_repeat(&id, repeat, ctx.now) {
+                Ok(more) => changes.issues.extend(more.issues),
+                Err(e) => {
+                    *st = backup;
+                    return Err(e.into());
+                }
+            }
+        }
         self.commit(
             &mut st,
             backup,
@@ -933,9 +995,29 @@ impl WorkService {
             .graph
             .issue(&id)
             .ok_or_else(|| Error::new(ErrorKind::NotFound, i.key.clone()))?;
+        let repeat = i
+            .repeat
+            .as_deref()
+            .map(|t| (!t.is_empty()).then(|| t.parse::<Repeat>()).transpose())
+            .transpose()?;
         let patch = patch_from(&st.graph, current, i, me)?;
         let backup = st.clone();
-        let changes = st.graph.update_issue(&id, patch, &ctx)?;
+        let mut changes = match st.graph.update_issue(&id, patch, &ctx) {
+            Ok(c) => c,
+            Err(e) => {
+                *st = backup;
+                return Err(e.into());
+            }
+        };
+        if let Some(repeat) = repeat {
+            match st.graph.set_repeat(&id, repeat, ctx.now) {
+                Ok(more) => changes.issues.extend(more.issues),
+                Err(e) => {
+                    *st = backup;
+                    return Err(e.into());
+                }
+            }
+        }
         self.commit(
             &mut st,
             backup,
@@ -1152,7 +1234,7 @@ impl WorkService {
             .graph
             .project(&id)
             .ok_or_else(|| Error::new(ErrorKind::NotFound, id.to_string()))?;
-        Ok(ProjectOut::of(p, &st.graph.project_progress(&id)))
+        Ok(planning::project_out(&st, p, ctx.today))
     }
 
     // ----- comments -----
@@ -1388,6 +1470,13 @@ fn patch_from(
                     .transpose()
             })
             .transpose()?,
+        milestone: clearable(i.milestone)
+            .map(|v| {
+                v.as_deref()
+                    .map(|m| parse_id::<MilestoneId>("milestone", m))
+                    .transpose()
+            })
+            .transpose()?,
         cycle: clearable(i.cycle)
             .map(|v| v.as_deref().map(CycleKey::parse).transpose())
             .transpose()?,
@@ -1504,7 +1593,7 @@ async fn load_all(store: &dyn BlobStore) -> Result<(State, LoadReport), Error> {
     let mut state = State::default();
     let mut report = LoadReport::default();
     let mut paths = Vec::new();
-    for dir in ["teams", "projects", ".comments", "views"] {
+    for dir in ["teams", "projects", "initiatives", ".comments", "views"] {
         paths.extend(list(store, dir).await?);
     }
     // Teams first: issues and cycles need their team.
@@ -1567,7 +1656,7 @@ async fn apply_paths(
                     let _ = state.views.insert(view.id, view);
                 }
             }
-            Kind::Team | Kind::Cycle | Kind::Project => {
+            Kind::Team | Kind::Cycle | Kind::Project | Kind::Update | Kind::Initiative => {
                 return Err(Error::new(ErrorKind::Conflict, "team settings changed"));
             }
             Kind::Other => {}
@@ -1623,6 +1712,7 @@ async fn load_one(store: &dyn BlobStore, state: &mut State, path: &str) -> Resul
             let view = View::from_yaml(path, text)?;
             let _ = state.views.insert(view.id, view);
         }
+        Kind::Update | Kind::Initiative => state.planning.load(kind == Kind::Update, path, text)?,
         Kind::Other => {}
     }
     Ok(true)
@@ -1636,6 +1726,8 @@ enum Kind {
     Project,
     Thread,
     View,
+    Update,
+    Initiative,
     Other,
 }
 
@@ -1652,6 +1744,8 @@ fn classify(path: &str) -> Kind {
         ["teams", _, "issues", f] if has_ext(f, "md") => Kind::Issue,
         ["teams", _, "cycles", f] if has_ext(f, "yaml") => Kind::Cycle,
         ["projects", _, "project.md"] => Kind::Project,
+        ["projects", _, "updates", f] if has_ext(f, "md") => Kind::Update,
+        ["initiatives", f] if has_ext(f, "md") => Kind::Initiative,
         [".comments", _, f] if has_ext(f, "yaml") => Kind::Thread,
         ["views", f] if has_ext(f, "yaml") => Kind::View,
         _ => Kind::Other,
@@ -1676,8 +1770,9 @@ mod tests {
         assert_eq!(classify(".comments/01JB/01JD.yaml"), Kind::Thread);
         assert_eq!(
             classify("projects/gateway/updates/2026-11-02-abc.md"),
-            Kind::Other
+            Kind::Update
         );
+        assert_eq!(classify("initiatives/q4-launch.md"), Kind::Initiative);
         assert_eq!(classify("teams/ENG/notes.md"), Kind::Other);
     }
 

@@ -11,12 +11,12 @@
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
+use time::{Date, OffsetDateTime};
 use vellum_kernel::{Error, ErrorKind};
 use vellum_work::comment::{Assignment, Comment, Target, Thread};
 use vellum_work::cycle::Cycle;
-use vellum_work::project::{Project, ProjectProgress};
+use vellum_work::project::{Project, ProjectProgress, ProjectUpdate};
 use vellum_work::{Issue, Team, WorkGraph};
 
 // ----- shared helpers -----
@@ -171,6 +171,8 @@ pub struct IssueOut {
     pub links: Vec<LinkOut>,
     /// Due date.
     pub due: Option<String>,
+    /// How often it repeats (`1w`, `2w`, `1m`, `3d`).
+    pub repeat: Option<String>,
     /// The running or last SLA.
     pub sla: Option<SlaOut>,
     /// Created.
@@ -267,6 +269,7 @@ impl IssueOut {
                 })
                 .collect(),
             due: issue.due.map(|d| d.to_string()),
+            repeat: issue.repeat.map(|r| r.to_string()),
             sla: issue.sla.as_ref().map(|s| SlaOut {
                 kind: s.kind.clone(),
                 breaches_at: rfc3339(s.breaches_at),
@@ -394,40 +397,107 @@ impl CycleOut {
     }
 }
 
-/// A project with its computed progress.
+/// A project with its computed progress and latest health.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct ProjectOut {
     /// Project ID.
     pub id: String,
     /// Title.
     pub title: String,
-    /// planned, started, paused, completed or canceled.
+    /// backlog, planned, in-progress, completed or canceled.
     pub status: String,
     /// Lead handle.
     pub lead: Option<String>,
+    /// Member handles.
+    pub members: Vec<String>,
     /// Team keys.
     pub teams: Vec<String>,
+    /// Start date.
+    pub start_date: Option<String>,
     /// Target date.
     pub target_date: Option<String>,
     /// Issues in the project.
     pub issues: u32,
+    /// Completed issues.
+    pub completed_issues: u32,
+    /// Points in scope.
+    pub scope: u32,
+    /// Completed points.
+    pub completed: u32,
     /// Percent complete by points.
     pub percent: u8,
+    /// on-track, at-risk or off-track, from the latest update.
+    pub health: Option<String>,
+    /// When the latest update was posted.
+    pub updated_at: Option<String>,
+    /// Whether the lead owes an update by the project's cadence.
+    pub update_due: bool,
+    /// weekly, biweekly, monthly or never.
+    pub update_cadence: String,
+    /// Milestones in order, with progress.
+    pub milestones: Vec<MilestoneOut>,
     /// The project file, front matter and spec.
     pub markdown: String,
 }
 
+/// A milestone with its progress.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct MilestoneOut {
+    /// Milestone ID.
+    pub id: String,
+    /// Name.
+    pub name: String,
+    /// Target date.
+    pub target_date: Option<String>,
+    /// Issues in the milestone.
+    pub issues: u32,
+    /// Completed issues.
+    pub completed_issues: u32,
+    /// Percent complete by points.
+    pub percent: u8,
+}
+
 impl ProjectOut {
-    pub(crate) fn of(p: &Project, progress: &ProjectProgress) -> Self {
+    pub(crate) fn of(
+        p: &Project,
+        progress: &ProjectProgress,
+        latest: Option<&ProjectUpdate>,
+        today: Date,
+    ) -> Self {
+        let overall = progress.overall;
         Self {
             id: p.id.to_string(),
             title: p.title.clone(),
             status: name_of(&p.status),
             lead: p.lead.as_ref().map(ToString::to_string),
+            members: p.members.iter().map(ToString::to_string).collect(),
             teams: p.teams.iter().map(ToString::to_string).collect(),
+            start_date: p.start_date.map(|d| d.to_string()),
             target_date: p.target_date.map(|d| d.to_string()),
-            issues: progress.overall.issues,
-            percent: progress.overall.percent(),
+            issues: overall.issues,
+            completed_issues: overall.completed_issues,
+            scope: overall.scope,
+            completed: overall.completed,
+            percent: overall.percent(),
+            health: latest.map(|u| name_of(&u.health)),
+            updated_at: latest.map(|u| rfc3339(u.created_at)),
+            update_due: p.update_due(latest.map(|u| u.created_at), today),
+            update_cadence: name_of(&p.update_cadence),
+            milestones: p
+                .milestones
+                .iter()
+                .map(|m| {
+                    let done = progress.milestones.get(&m.id).copied().unwrap_or_default();
+                    MilestoneOut {
+                        id: m.id.to_string(),
+                        name: m.name.clone(),
+                        target_date: m.target_date.map(|d| d.to_string()),
+                        issues: done.issues,
+                        completed_issues: done.completed_issues,
+                        percent: done.percent(),
+                    }
+                })
+                .collect(),
             markdown: p.to_markdown().unwrap_or_default(),
         }
     }
@@ -659,10 +729,14 @@ pub struct CreateIssue {
     pub labels: Vec<String>,
     /// Project ID.
     pub project: Option<String>,
+    /// Milestone ID within the project.
+    pub milestone: Option<String>,
     /// Parent issue key.
     pub parent: Option<String>,
     /// Due date, `YYYY-MM-DD`.
     pub due: Option<String>,
+    /// Repeat after the due date passes: `3d`, `1w`, `2w`, `1m`.
+    pub repeat: Option<String>,
     /// `<doc id>#blk-…` when filed from a page.
     pub source_block: Option<String>,
     /// The selected text, for a block.
@@ -697,6 +771,10 @@ pub struct UpdateIssue {
     pub remove_labels: Vec<String>,
     /// Project ID; empty clears.
     pub project: Option<String>,
+    /// Milestone ID; empty clears.
+    pub milestone: Option<String>,
+    /// How often it repeats (`1w`); empty stops it.
+    pub repeat: Option<String>,
     /// Cycle key; empty clears.
     pub cycle: Option<String>,
     /// Parent issue key; empty clears.

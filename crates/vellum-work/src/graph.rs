@@ -1241,6 +1241,104 @@ impl WorkGraph {
         changes.merge(self.record_burn_up(today));
         Ok(changes)
     }
+
+    /// Sets or clears how often an issue repeats.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WorkError::UnknownIssue`] for an unknown issue,
+    /// and [`WorkError::Invalid`] when a repeat is set on an issue with no
+    /// due date (it would never fire).
+    pub fn set_repeat(
+        &mut self,
+        id: &IssueId,
+        repeat: Option<crate::recur::Repeat>,
+        now: OffsetDateTime,
+    ) -> Result<Changes> {
+        let issue = self.issue_ref(id)?;
+        if repeat == issue.repeat {
+            return Ok(Changes::default());
+        }
+        if let Some(r) = repeat.filter(|_| issue.due.is_none()) {
+            return Err(WorkError::Invalid {
+                what: "repeat",
+                value: r.to_string(),
+                reason: "a repeating issue needs a due date",
+            });
+        }
+        let issue = self
+            .issues
+            .get_mut(id)
+            .ok_or_else(|| WorkError::UnknownIssue(id.to_string()))?;
+        issue.repeat = repeat;
+        issue.updated_at = now;
+        let mut changes = Changes::default();
+        let _ = changes.issues.insert(*id);
+        Ok(changes)
+    }
+
+    /// Files the next issue of every repeating issue whose due date is
+    /// before today in its team's time zone, as `today_of` gives it (D224):
+    /// run every few minutes, that is 00:01 team time the day after. The copy keeps the team, title,
+    /// description, priority, estimate, assignee, labels, project and
+    /// milestone, starts in the team's default status and takes over the
+    /// repeat; the old issue keeps its history and stops repeating.
+    ///
+    /// # Errors
+    ///
+    /// As [`WorkGraph::create_issue`]; nothing changes for the issue that
+    /// failed, and earlier ones stay filed.
+    pub fn recur(
+        &mut self,
+        now: OffsetDateTime,
+        today_of: impl Fn(&Team) -> Date,
+        mut new_id: impl FnMut() -> IssueId,
+    ) -> Result<Changes> {
+        let due: Vec<(IssueId, crate::recur::Repeat, Date, Date)> = self
+            .issues
+            .values()
+            .filter_map(|i| {
+                let today = today_of(self.teams.get(&i.team)?);
+                Some((i.id, i.repeat?, i.due?, today))
+            })
+            .filter(|(_, _, due, today)| due < today)
+            .collect();
+        let mut changes = Changes::default();
+        for (id, repeat, due_on, today) in due {
+            let ctx = Ctx {
+                now,
+                today,
+                actor: None,
+            };
+            let ctx = &ctx;
+            let old = self.issue_ref(&id)?.clone();
+            let Some(team) = self.teams.get(&old.team) else {
+                continue;
+            };
+            let mut draft = NewIssue::new(new_id(), old.team.clone(), &old.title);
+            draft.body.clone_from(&old.body);
+            draft.state = Some(team.workflow.default.clone());
+            draft.priority = Some(old.priority);
+            draft.estimate = old.estimate;
+            draft.assignee.clone_from(&old.assignee);
+            draft.labels.clone_from(&old.labels);
+            draft.project = old.project;
+            draft.milestone = old.milestone;
+            draft.due = Some(repeat.next_on_or_after(due_on, ctx.today));
+            let next = draft.id;
+            changes.merge(self.create_issue(draft, ctx)?);
+            if let Some(i) = self.issues.get_mut(&next) {
+                i.repeat = Some(repeat);
+                i.creator.clone_from(&old.creator);
+            }
+            if let Some(i) = self.issues.get_mut(&id) {
+                i.repeat = None;
+                i.updated_at = ctx.now;
+            }
+            let _ = changes.issues.insert(id);
+        }
+        Ok(changes)
+    }
 }
 
 /// Applies every field of a patch except the status, which it returns.

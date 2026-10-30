@@ -78,6 +78,13 @@ import { IssuePage } from "./work/issue-page";
 import { IssuesPage } from "./work/issues-page";
 import { MyIssuesPage } from "./work/my-issues-page";
 import { MyWorkPage } from "./work/my-work-page";
+import type { PlanningApi } from "./work/planning/api";
+import { AskPage, AsksPage } from "./work/planning/asks-page";
+import { InitiativesPage } from "./work/planning/initiatives-page";
+import { InsightsPage } from "./work/planning/insights-page";
+import { NewIssuePage } from "./work/planning/new-issue-page";
+import { ProjectPage } from "./work/planning/project-page";
+import { ProjectsPage } from "./work/planning/projects-page";
 import { TeamSettingsPage } from "./work/settings/team-settings-page";
 import { TriagePage } from "./work/triage-page";
 
@@ -135,6 +142,14 @@ export function AppRoutes() {
         <Route path="issues/triage" element={<TriagePage />} />
         <Route path="issues/cycles" element={<CyclesPage />} />
         <Route path="issues/settings" element={<TeamSettingsPage />} />
+        {/* Work planning (D223-D225); /issues/new before /issues/:issueKey. */}
+        <Route path="issues/new" element={<NewIssuePage />} />
+        <Route path="projects" element={<ProjectsPage />} />
+        <Route path="projects/:projectId" element={<ProjectPage />} />
+        <Route path="initiatives" element={<InitiativesPage />} />
+        <Route path="insights" element={<InsightsPage />} />
+        <Route path="asks" element={<AsksPage />} />
+        <Route path="asks/:team/:slug" element={<AskPage />} />
         <Route path="issues/:issueKey" element={<IssuePage />} />
         <Route path="books" element={<BooksPage />} />
         <Route path="books/:bookId" element={<BookPage />} />
@@ -206,6 +221,8 @@ export interface AppServices {
   readonly assist?: AssistApi | undefined;
   /** The admin page's MCP client setup; absent in demo mode. */
   readonly mcpSetup?: McpSetupApi | undefined;
+  /** Work planning, from a Vellum server; absent in demo mode. */
+  readonly planning?: PlanningApi | undefined;
   readonly collections: CollectionsStore;
   /** Present when a Vellum server answered; absent in demo mode. */
   readonly session?: { readonly auth: AuthApi; readonly status: AuthStatus } | undefined;
@@ -293,6 +310,7 @@ export function AppProviders({
   account,
   assist,
   mcpSetup,
+  planning,
   collections,
   session,
   notifications,
@@ -313,6 +331,7 @@ export function AppProviders({
       account,
       assist,
       mcpSetup,
+      planning,
     }),
     [
       work,
@@ -326,6 +345,7 @@ export function AppProviders({
       account,
       assist,
       mcpSetup,
+      planning,
     ],
   );
   const [demoNotifications] = useState<NotificationServices>(() => ({
