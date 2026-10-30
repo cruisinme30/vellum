@@ -93,7 +93,7 @@ tools, Google's colours, and every guide readable on the site itself.
   the whole visit whenever the font took over ~100 ms, which over the
   network was most first visits. The UI suite's layout-shift gate still
   passes on a slow network.
-- The build fills in the font path per book (`@FONTS@`), so the older
+- The build fills in the font path per book through a placeholder, so the older
   releases' books at `docs/v/<tag>/` find the fonts too, and it strips
   mdBook's own font stylesheet from every page, not only the top level.
 - Smaller fixes: chapter numbers no longer run into titles, the book
